@@ -97,7 +97,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
     }
 
     // Set a fixed position for the ticker instead of searching for it
-    setTickerPosition(new THREE.Vector3(0.0, 1.18, 0.0)); // Position at ground level
+    setTickerPosition(new THREE.Vector3(0.0, 1.0, 0.0)); // Position at ground level
     setTickerRotation(new THREE.Euler(0, 0, 0));
     setTickerScale(new THREE.Vector3(1.6, 1.6, 1.6));
   }, [isReady]); // Only depend on isReady

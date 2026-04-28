@@ -233,6 +233,19 @@ const CyborgTempleScene = ({
     isBlinking: false,
     blinkProgress: 0
   });
+
+  // Unicorn eye mesh refs (L_EYE, R_EYE parented to head bone) — opacity blink
+  const unicornEyesRef = useRef([]);
+  const unicornBlinkStateRef = useRef({
+    lastBlinkTime: 0,
+    nextBlinkDelay: Math.random() * 4000 + 3000,
+    isBlinking: false,
+    blinkProgress: 0
+  });
+
+  // One-shot Unicorn_waving on focus arrival. Armed when user clicks RL80;
+  // fired 2s after the camera lerp converges.
+  const unicornWaveStateRef = useRef({ armed: false, timeoutId: null });
   
   // Flame shader material refs (multiple flames in scene)
   const flameMaterialsRef = useRef([]);
@@ -772,8 +785,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v2_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v2.glb";
+    let modelPath = "/models/RL80_4anims_v4_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v4.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -897,6 +910,18 @@ const CyborgTempleScene = ({
               fluffyHeadBoneRef.current = obj;
             }
           });
+        }
+        // Point.006 was meant to be red in Blender but the GLB exports it as
+        // white (color [1,1,1]) — override on the JS side. Intensity in the
+        // GLB is ~0.27 which reads as nearly invisible against the scene's
+        // ambient + character lights, so bump it too.
+        else if (child.isLight && child.name === 'Point006') {
+          child.color.setHex(0xff0000);
+          child.intensity = 0.3;
+        }
+                else if (child.isLight && child.name === 'Point00') {
+          child.color.setHex(0x17FFF7);
+          child.intensity = 0.3;
         }
       });
       
@@ -1026,7 +1051,19 @@ const CyborgTempleScene = ({
                 : animatedCharacters[charName];
               // Clean animation tracks to remove references to non-existent bones
               const cleanedAnimation = cleanAnimationTracks(animation, cleanRoot);
-              
+
+              // Unicorn_waving: keep only arm-bone quaternion tracks (drop
+              // any position/scale and any non-arm rotation tracks left over
+              // from earlier exports). Stays in regular blend mode — the
+              // wave plays alongside the still-running idle, dominating arm
+              // bones via a high effective weight set in the trigger.
+              if (charName === 'RL80' && /wav/i.test(animName)) {
+                const armBoneRe = /mixamorig(Left|Right)(Shoulder|Arm|ForeArm|Hand)/i;
+                cleanedAnimation.tracks = cleanedAnimation.tracks.filter(t => {
+                  return /\.quaternion$/i.test(t.name) && armBoneRe.test(t.name);
+                });
+              }
+
               const action = mixer.clipAction(cleanedAnimation);
               
               if (!actionsRef.current[charName]) {
@@ -1202,6 +1239,21 @@ const CyborgTempleScene = ({
             child.material.transparent = true;
             child.material.needsUpdate = true;
           }
+        }
+
+        // Unicorn eye meshes. In the GLB the node names are Unicorn_L_EYE /
+        // Unicorn_R_EYE (the geometry names L_EYE/R_EYE are not what the
+        // resulting Three.js Mesh.name takes — the node name wins).
+        // Opacity-based blink mirroring the Demon, synchronized across both.
+        // The eyes share material index 39 with the body mesh, so clone the
+        // material per eye — otherwise opacity mutations fade the whole unicorn.
+        if (child.isMesh && (child.name === 'Unicorn_L_EYE' || child.name === 'Unicorn_R_EYE')) {
+          if (child.material) {
+            child.material = child.material.clone();
+            child.material.transparent = true;
+            child.material.needsUpdate = true;
+          }
+          unicornEyesRef.current.push(child);
         }
 
         // Apply flickering flame shader to Flame mesh
@@ -1550,19 +1602,21 @@ const CyborgTempleScene = ({
         console.error('[CyborgTempleScene] Please ensure the file exists at: public' + modelPath);
       }
       
-      // Retry logic with full URL fallback and desktop model fallback for mobile
+      // Retry logic with full URL fallback and un-optimized model fallback
       if (retryCount < maxRetries) {
         retryCount++;
         const useFullUrl = retryCount >= 2; // Try full URL on second retry
-        
-        // On last retry for mobile, try the desktop model as fallback
-        if (retryCount === maxRetries && isOnMobile && !usingFallback) {
-          console.warn(`[CyborgTempleScene] Mobile model failed, attempting fallback to desktop model...`);
+
+        // On last retry, fall back to the un-optimized GLB. Applies to both
+        // desktop and mobile — covers the case where the _opt.glb hasn't been
+        // generated/uploaded yet on the deploy.
+        if (retryCount === maxRetries && !usingFallback && modelPath !== fallbackModelPath) {
+          console.warn(`[CyborgTempleScene] Optimized model failed, attempting fallback to un-optimized model...`);
           modelPath = fallbackModelPath;
           usingFallback = true;
-          retryCount = maxRetries - 1; // Give one more chance with desktop model
+          retryCount = maxRetries - 1; // Give one more chance with un-optimized model
         }
-        
+
         console.warn(`[CyborgTempleScene] Retrying model load (attempt ${retryCount}/${maxRetries})${useFullUrl ? ' with full URL' : ''}${usingFallback ? ' using fallback model' : ''}...`);
         setTimeout(() => {
           loadModel(useFullUrl);
@@ -1760,8 +1814,21 @@ const CyborgTempleScene = ({
     const restoreRL80FromFocus = () => {
       if (!rl80FocusedRef.current) return;
       rl80FocusedRef.current = false;
+      // Cancel any pending Unicorn_waving trigger / its post-wave fade-back.
+      if (unicornWaveStateRef.current.timeoutId) {
+        clearTimeout(unicornWaveStateRef.current.timeoutId);
+        unicornWaveStateRef.current.timeoutId = null;
+      }
+      unicornWaveStateRef.current.armed = false;
       const rl80Actions = actionsRef.current['RL80'];
       if (!rl80Actions) return;
+      // Fade out the additive wave action if still running — it's not tracked
+      // via rl80State.currentAnimation, so the loop-anim restore below
+      // wouldn't otherwise touch it.
+      const waveKey = Object.keys(rl80Actions).find(a => /wav/i.test(a));
+      if (waveKey && rl80Actions[waveKey].isRunning && rl80Actions[waveKey].isRunning()) {
+        rl80Actions[waveKey].fadeOut(0.4);
+      }
       const rl80State = rl80AnimStateRef.current;
       const loopAnims = Object.keys(rl80Actions).filter(a => /typing|idle/i.test(a) && a !== 'sit_idle');
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(rl80Actions)[0];
@@ -2253,8 +2320,8 @@ const CyborgTempleScene = ({
             'RL80': {
               // RL80 at (1.704, -1.652, 1.476)
               // Camera should be closer to center (opposite side)
-              cameraPos: new THREE.Vector3(1, -0.4, 0.7),  // Positioned toward center, looking outward
-              lookAtPos: new THREE.Vector3(1.804, -0.7, 2),  // Look at upper body
+              cameraPos: new THREE.Vector3(1.0, -0.4, 0.7),  // Positioned toward center, looking outward
+              lookAtPos: new THREE.Vector3(1.604, -0.7, 1.5),  // Look at upper body
               // Orbit around the unicorn's chest so dragging revolves the
               // camera around the body instead of around a point off to the
               // side of him. lookAtPos is kept for the fly-in composition.
@@ -2299,28 +2366,20 @@ const CyborgTempleScene = ({
               lookAtPos: new THREE.Vector3(0, 1.9, 0)
             },
             'Screen1': {
-              // Screen1 at (-0.632, 0.593, -0.682)
-              // Position camera in front of screen
-              cameraPos: new THREE.Vector3(-1.932, 0.563, -1.9),  // Move camera forward (positive Z)
-              lookAtPos: new THREE.Vector3(0.732, 0.693, 0.482)  // Look at screen center
+              cameraPos: new THREE.Vector3(-1.832, 0.133, -1.75),
+              lookAtPos: new THREE.Vector3(0.682, 0.263, 0.492)
             },
             'Screen2': {
-              // Screen2 at (-0.766, 0.593, 0.975)
-              // Position camera in front of screen
-              cameraPos: new THREE.Vector3(-1.866, 0.393, 2.2),  // Move camera forward (positive Z)
-              lookAtPos: new THREE.Vector3(-0.766, 0.593, 0.975)  // Look at screen center
+              cameraPos: new THREE.Vector3(-1.7, -0.007, 1.9),
+              lookAtPos: new THREE.Vector3(-0.766, 0.193, 0.95)
             },
             'Screen3': {
-              // Screen3 at (0.995, 0.614, -1.027)
-              // Position camera in front of screen
-              cameraPos: new THREE.Vector3(1.9, 0.564, -2.3),  // Move camera forward (positive Z)
-              lookAtPos: new THREE.Vector3(1.4, 0.614, -1.7)  // Look at screen center
+              cameraPos: new THREE.Vector3(1.7, 0.15, -2.05),
+              lookAtPos: new THREE.Vector3(1.45, 0.155, -1.7)
             },
             'Screen4': {
-              // Screen4 at (0.770, 0.614, 0.552)
-              // Position camera in front of screen
-              cameraPos: new THREE.Vector3(1.90, 0.314, 1.6),  // Move camera forward (positive Z)
-              lookAtPos: new THREE.Vector3(0.470, 0.714, .352)  // Look at screen center
+              cameraPos: new THREE.Vector3(1.90, -0.086, 1.7),
+              lookAtPos: new THREE.Vector3(0.470, 0.314, .352)
             },
           };
           
@@ -2445,6 +2504,12 @@ const CyborgTempleScene = ({
                 console.warn('[RL80] Idle animation not found. Available:', animKeys);
               }
             }
+            // Arm one-shot Unicorn_waving — fires 2s after camera arrival.
+            if (unicornWaveStateRef.current.timeoutId) {
+              clearTimeout(unicornWaveStateRef.current.timeoutId);
+              unicornWaveStateRef.current.timeoutId = null;
+            }
+            unicornWaveStateRef.current.armed = true;
           } else if (object.userData.agentId === 'Fluffy') {
             fluffyFocusedRef.current = true;
             // Pause the animation so the cat sits still — eliminates loop seam glitch
@@ -3232,7 +3297,45 @@ const CyborgTempleScene = ({
         }
       }
     }
-    
+
+    // Unicorn eye blink (opacity-based, synchronized across L_EYE + R_EYE)
+    if (unicornEyesRef.current.length > 0) {
+      const currentTime = state.clock.getElapsedTime() * 1000;
+      const blink = unicornBlinkStateRef.current;
+
+      if (!blink.isBlinking && currentTime - blink.lastBlinkTime > blink.nextBlinkDelay) {
+        blink.isBlinking = true;
+        blink.lastBlinkTime = currentTime;
+        blink.nextBlinkDelay = Math.random() * 4000 + 3000;
+      }
+
+      if (blink.isBlinking) {
+        const closeTime = 100;
+        const holdTime = 120;
+        const openTime = 140;
+        const totalDuration = closeTime + holdTime + openTime;
+        const t = currentTime - blink.lastBlinkTime;
+
+        let opacity;
+        if (t < totalDuration) {
+          if (t < closeTime) {
+            opacity = 1 - (t / closeTime);
+          } else if (t < closeTime + holdTime) {
+            opacity = 0;
+          } else {
+            opacity = (t - closeTime - holdTime) / openTime;
+          }
+        } else {
+          blink.isBlinking = false;
+          opacity = 1;
+        }
+
+        for (const eye of unicornEyesRef.current) {
+          if (eye.material) eye.material.opacity = opacity;
+        }
+      }
+    }
+
     // Demon head look-at-camera override (only when focused on Demon)
     if (demonFocusedRef.current && demonHeadBoneRef.current) {
       const head = demonHeadBoneRef.current;
@@ -3487,6 +3590,55 @@ const CyborgTempleScene = ({
             if (state.controls && state.controls.target) {
               state.controls.target.copy(focusTarget.lookAt);
               state.controls.update();
+            }
+            // Fire one-shot Unicorn_waving 2s after the camera settles in
+            // front of him. The wave clip is additive (see clip-loading
+            // section), so it layers on top of the running idle/typing
+            // action without replacing it — the body stays seated while the
+            // arm waves. Idle is NOT faded out here.
+            if (focusTarget.agentId === 'RL80' && unicornWaveStateRef.current.armed) {
+              unicornWaveStateRef.current.armed = false;
+              unicornWaveStateRef.current.timeoutId = setTimeout(() => {
+                unicornWaveStateRef.current.timeoutId = null;
+                if (!rl80FocusedRef.current) return;
+                const rl80Actions = actionsRef.current['RL80'];
+                if (!rl80Actions) return;
+                const waveKey = Object.keys(rl80Actions).find(a => /wav/i.test(a));
+                if (!waveKey) return;
+                const wave = rl80Actions[waveKey];
+                // Slow the wave playback a bit (0.75× = ~33% longer reads
+                // more deliberate). Schedule timing uses the *played*
+                // duration, not the intrinsic clip duration.
+                const timeScale = 0.75;
+                const clipDurMs = wave.getClip().duration * 1000;
+                const playedDurMs = clipDurMs / timeScale;
+                const fadeInMs = Math.min(200, clipDurMs * 0.25);
+                const fadeOutMs = 500; // longer hang on the way out
+                const fadeInS = fadeInMs / 1000;
+                const fadeOutS = fadeOutMs / 1000;
+
+                // Regular blending. Idle stays at weight 1 controlling the
+                // body; wave runs at a high base weight so it dominates the
+                // arm bones (idle wins on body bones since the wave clip has
+                // no tracks for them). The mixer's effective weight is
+                // base_weight × fade_interpolant — by setting base = 10 and
+                // using the standard fadeIn (interpolant 0→1) / fadeOut
+                // (interpolant 1→0), effective weight smoothly ramps 0→10
+                // and 10→0 without snapping.
+                wave.reset();
+                wave.setLoop(THREE.LoopOnce, 1);
+                wave.clampWhenFinished = true;
+                wave.setEffectiveTimeScale(timeScale);
+                wave.setEffectiveWeight(10);
+                wave.fadeIn(fadeInS);
+                wave.play();
+
+                unicornWaveStateRef.current.timeoutId = setTimeout(() => {
+                  unicornWaveStateRef.current.timeoutId = null;
+                  if (!rl80FocusedRef.current) return;
+                  wave.fadeOut(fadeOutS);
+                }, Math.max(50, playedDurMs - fadeOutMs));
+              }, 2000);
             }
           }
         } else if (!focusTarget._orbitSettled && focusTarget.orbitCenter) {
