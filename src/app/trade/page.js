@@ -24,6 +24,7 @@ import BuyModal from '@/components/BuyModal';
 import { useRouter } from 'next/navigation';
 
 
+
 export default function CyborgTemple() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -507,12 +508,12 @@ export default function CyborgTemple() {
               className="custom-title"
               style={{
                 position: "relative",
-                left: "2rem",
+                left: isMobileView ? "1rem" : "2rem",
                 // top: "1.5rem",
                 color: "#f6f5f1ff",
                 fontFamily: "UnifrakturCook, serif",
                 textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
-                fontSize: "3rem",
+                fontSize: isMobileView ? "2rem" : "3rem",
                 fontWeight: 900,
                 lineHeight: 0.85,
                 transform: "rotate(-8deg) skew(-15deg)",
@@ -998,7 +999,7 @@ export default function CyborgTemple() {
             boxShadow: '0 0 24px rgba(218, 165, 32, 0.18)',
           } : {
             position: 'fixed',
-            right: '25%',
+            right: '20%',
             top: '50%',
             transform: 'translateY(-50%)',
             opacity: info ? 1 : 0,

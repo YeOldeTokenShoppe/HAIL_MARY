@@ -700,46 +700,6 @@ const CyborgTempleScene = ({
   }), [loadedModel, camera]); */
 
   // Define annotation points - adjust positions based on your temple scene
-  const annotations = [
-    {
-      text: "RL80 - A virtuous and autonomous AI agent serving her followers and token holders.",
-      attachTo: object7MeshRef, // Attach to Object_7 mesh
-      offset: [0, 1.9, 0], // Position slightly above the object center
-      textOffset: [0, 0.2, -0.5], // Position text panel above and back
-      customCamera: {
-        position: [2, -0.8, -0.5], // Camera moved right and lower
-        lookAt: [0, -0.5, 0], // Look outward toward the characters
-        distance: 1.5 // Slightly increased distance for better framing
-      }
-    },
-    // {
-    //   position: [2, 0, -2], // Right side
-    //   text: "Digital Offering Station\nPlace virtual candles here"
-    // },
-
- {
-      text: "RL80 Holder Neural Network - live display of holders online right now.",
-      attachTo: cylinderMeshRef, // Attach to the cylinder mesh
-      offset: [0, 0.5, 0], // Position at cylinder center
-      textOffset: [0, 0.2, -1], // Position text panel 1.5 units up and 1 unit back
-      customCamera: {
-        position: [-2, -0.7, 3.3], // Camera moved right and lower
-        lookAt: [1, -0.7, -0.1], // Look outward toward the characters
-        distance: 1.2 // Slightly increased distance for better framing
-      }
-    },
-    {
-      text: "The 3 Wise Mechs - RL80's council: Demon, Monk, and Tekno.",
-      attachTo: cube010MeshRef, // Attach to Cube010 mesh
-      offset: [-1.8, 1.1, 0.5], // Position above the cube center
-      textOffset: [0.1, 0, -0.4], // Position text panel above and back
-      customCamera: {
-        position: [0.2, -1.3, -0.3], // Camera moved right and lower
-        lookAt: [-2.7, -1, 0.3], // Look outward toward the characters
-        distance: 2.5 // Slightly increased distance for better framing
-      }
-    },
-  ];
   
 
   useEffect(() => {
@@ -844,7 +804,7 @@ const CyborgTempleScene = ({
       // Create an anchor group for positioning — same desktop model on both
       // mobile and desktop for now.
       const anchorGroup = new THREE.Group();
-      anchorGroup.position.set(0, 0, 0);
+      anchorGroup.position.set(0, 0.3, 0);
       anchorGroup.rotation.set(0, 0, 0);
       anchorGroup.scale.set(1, 1, 1);
       
@@ -1251,8 +1211,19 @@ const CyborgTempleScene = ({
           if (child.material) {
             child.material = child.material.clone();
             child.material.transparent = true;
+            child.material.side = THREE.DoubleSide;
+            child.material.polygonOffset = true;
+            child.material.polygonOffsetFactor = -1;
+            child.material.polygonOffsetUnits = -1;
             child.material.needsUpdate = true;
           }
+          child.renderOrder = 1;
+          // The eyes are parented to the head bone, but three.js's frustum
+          // culling uses the rest-pose bounding sphere — when the head moves
+          // the actual eye position can fall outside that rest sphere, and
+          // the renderer skips drawing the mesh from angles where the rest
+          // sphere isn't in view. Disable frustum culling so they always draw.
+          child.frustumCulled = false;
           unicornEyesRef.current.push(child);
         }
 
@@ -1602,21 +1573,19 @@ const CyborgTempleScene = ({
         console.error('[CyborgTempleScene] Please ensure the file exists at: public' + modelPath);
       }
       
-      // Retry logic with full URL fallback and un-optimized model fallback
+      // Retry logic with full URL fallback and desktop model fallback for mobile
       if (retryCount < maxRetries) {
         retryCount++;
         const useFullUrl = retryCount >= 2; // Try full URL on second retry
-
-        // On last retry, fall back to the un-optimized GLB. Applies to both
-        // desktop and mobile — covers the case where the _opt.glb hasn't been
-        // generated/uploaded yet on the deploy.
-        if (retryCount === maxRetries && !usingFallback && modelPath !== fallbackModelPath) {
-          console.warn(`[CyborgTempleScene] Optimized model failed, attempting fallback to un-optimized model...`);
+        
+        // On last retry for mobile, try the desktop model as fallback
+        if (retryCount === maxRetries && isOnMobile && !usingFallback) {
+          console.warn(`[CyborgTempleScene] Mobile model failed, attempting fallback to desktop model...`);
           modelPath = fallbackModelPath;
           usingFallback = true;
-          retryCount = maxRetries - 1; // Give one more chance with un-optimized model
+          retryCount = maxRetries - 1; // Give one more chance with desktop model
         }
-
+        
         console.warn(`[CyborgTempleScene] Retrying model load (attempt ${retryCount}/${maxRetries})${useFullUrl ? ' with full URL' : ''}${usingFallback ? ' using fallback model' : ''}...`);
         setTimeout(() => {
           loadModel(useFullUrl);
@@ -2320,28 +2289,28 @@ const CyborgTempleScene = ({
             'RL80': {
               // RL80 at (1.704, -1.652, 1.476)
               // Camera should be closer to center (opposite side)
-              cameraPos: new THREE.Vector3(1.0, -0.4, 0.7),  // Positioned toward center, looking outward
-              lookAtPos: new THREE.Vector3(1.604, -0.7, 1.5),  // Look at upper body
+              cameraPos: new THREE.Vector3(1.0, -0.3, 0.7),  // Positioned toward center, looking outward
+              lookAtPos: new THREE.Vector3(1.504, -0., 1.6),  // Look at upper body
               // Orbit around the unicorn's chest so dragging revolves the
               // camera around the body instead of around a point off to the
               // side of him. lookAtPos is kept for the fly-in composition.
-              orbitCenter: new THREE.Vector3(1.704, -0.5, 1.476)
+              orbitCenter: new THREE.Vector3(1.704, -0.2, 1.476)
             },
             'Demon': {
               // Demon at (-1.554, -1.719, -1.351)
               // Camera positioned on opposite side (toward center)
-              cameraPos: new THREE.Vector3(-0.9, -0.5, -0.7),  // Positioned toward center, looking outward
-              lookAtPos: new THREE.Vector3(-1.3, -0.6,  -1.1),  // Look at upper body
+              cameraPos: new THREE.Vector3(-0.9, -0.3, -0.7),  // Positioned toward center, looking outward
+              lookAtPos: new THREE.Vector3(-1.3, -0.3,  -1.1),  // Look at upper body
               // Orbit around the demon's actual chest so dragging revolves
               // the camera around him instead of around a point in front of
               // his body. lookAtPos is kept for the fly-in composition.
-              orbitCenter: new THREE.Vector3(-1.554, -0.75, -1.351)
+              orbitCenter: new THREE.Vector3(-1.554, -0.35, -1.351)
             },
             'Monk': {
               // Monk at (-1.315, -1.672, 1.636)
               // Camera positioned on opposite side (toward center)
-              cameraPos: new THREE.Vector3(-0.5, -0.5, 1.3),  // Positioned toward center, looking outward
-              lookAtPos: new THREE.Vector3(-1.515, -0.7, 1.636)  // Look at upper body
+              cameraPos: new THREE.Vector3(-0.5, -0.3, 1.3),  // Positioned toward center, looking outward
+              lookAtPos: new THREE.Vector3(-1.515, -0.3, 1.636)  // Look at upper body
             },
             'Tekno': { 
               // Tekno at (1.512, -1.625, -1.575)
@@ -2357,8 +2326,8 @@ const CyborgTempleScene = ({
             
             'Fluffy': {
               // Fluffy - opposite side of Monk
-              cameraPos: new THREE.Vector3(0.55, -0.6, -1.65),
-              lookAtPos: new THREE.Vector3(1.615, -1.2, -1.736)
+              cameraPos: new THREE.Vector3(0.55, -0.3, -1.65),
+              lookAtPos: new THREE.Vector3(1.615, -0.6, -1.736)
             },
             'Angel': {
               // Angel at top of scene, above the screens
@@ -2366,20 +2335,20 @@ const CyborgTempleScene = ({
               lookAtPos: new THREE.Vector3(0, 1.9, 0)
             },
             'Screen1': {
-              cameraPos: new THREE.Vector3(-1.832, 0.133, -1.75),
-              lookAtPos: new THREE.Vector3(0.682, 0.263, 0.492)
+              cameraPos: new THREE.Vector3(-1.832, 0.46, -1.75),
+              lookAtPos: new THREE.Vector3(0.682, 0.4, 0.492)
             },
             'Screen2': {
-              cameraPos: new THREE.Vector3(-1.7, -0.007, 1.9),
-              lookAtPos: new THREE.Vector3(-0.766, 0.193, 0.95)
+              cameraPos: new THREE.Vector3(-1.7, 0.7, 1.9),
+              lookAtPos: new THREE.Vector3(-0.766, 0.5, 0.95)
             },
             'Screen3': {
-              cameraPos: new THREE.Vector3(1.7, 0.15, -2.05),
-              lookAtPos: new THREE.Vector3(1.45, 0.155, -1.7)
+              cameraPos: new THREE.Vector3(1.7, 0.65, -2.05),
+              lookAtPos: new THREE.Vector3(1.45, 0.555, -1.7)
             },
             'Screen4': {
-              cameraPos: new THREE.Vector3(1.90, -0.086, 1.7),
-              lookAtPos: new THREE.Vector3(0.470, 0.314, .352)
+              cameraPos: new THREE.Vector3(1.90, 0.6, 1.7),
+              lookAtPos: new THREE.Vector3(0.470, 0.5, .352)
             },
           };
           

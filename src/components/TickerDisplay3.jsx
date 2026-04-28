@@ -2,6 +2,22 @@ import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 
+const SUB_DIGITS = ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"];
+const toSubscript = (n) =>
+  String(n).split("").map((d) => SUB_DIGITS[Number(d)] ?? d).join("");
+
+// Compact sub-cent price notation, mirrors ChartShrine: 0.00000003352 → $0.0₇3352
+const formatSubCentPrice = (p) => {
+  if (p == null || !Number.isFinite(p) || p <= 0) return "—";
+  if (p >= 1) return `$${p.toFixed(4)}`;
+  if (p >= 0.001) return `$${p.toFixed(5)}`;
+  const frac = p.toFixed(20).split(".")[1];
+  let zeros = 0;
+  while (zeros < frac.length && frac[zeros] === "0") zeros++;
+  const sig = frac.slice(zeros, zeros + 4).replace(/0+$/, "") || "0";
+  return `$0.0${toSubscript(zeros)}${sig}`;
+};
+
 const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
   const meshRef = useRef();
   const canvasRef = useRef();
@@ -62,16 +78,19 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
       // Fetch data without blocking - fire and forget
       fetchYahooFinanceData().catch(err => console.error('Market data fetch error:', err));
       fetchCryptoData().catch(err => console.error('Crypto data fetch error:', err));
+      fetchRL80Data().catch(err => console.error('RL80 data fetch error:', err));
     }, 1500); // 1.5 second delay to let animations establish
-    
+
     // Set up intervals for regular updates
     const marketDataInterval = setInterval(fetchYahooFinanceData, 300000); // 5 minutes
     const cryptoInterval = setInterval(fetchCryptoData, 300000); // 5 minutes
-    
+    const rl80Interval = setInterval(fetchRL80Data, 300000); // 5 minutes
+
     return () => {
       clearTimeout(initTimer);
       clearInterval(marketDataInterval);
       clearInterval(cryptoInterval);
+      clearInterval(rl80Interval);
     };
   }, []);
 
@@ -97,7 +116,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
     }
 
     // Set a fixed position for the ticker instead of searching for it
-    setTickerPosition(new THREE.Vector3(0.0, 1.0, 0.0)); // Position at ground level
+    setTickerPosition(new THREE.Vector3(0.0, 1.2, 0.0)); // Position at ground level
     setTickerRotation(new THREE.Euler(0, 0, 0));
     setTickerScale(new THREE.Vector3(1.6, 1.6, 1.6));
   }, [isReady]); // Only depend on isReady
@@ -110,7 +129,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
       const canvas = document.createElement("canvas");
       // Set canvas dimensions for the thin height
       canvas.width = 2048; // Power of 2 for better GPU performance
-      canvas.height = 32;  // Smaller height for the very thin ticker
+      canvas.height = 40;  // Slightly deeper ticker for legibility
       canvasRef.current = canvas;
 
       const texture = new THREE.CanvasTexture(canvas);
@@ -133,7 +152,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
 
         // Add some text
         ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold 14px Arial"; // Smaller font for thin ticker
+        ctx.font = "bold 16px Arial"; // Smaller font for thin ticker
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(
@@ -155,7 +174,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
       // Original dimensions from logs: x: 2, y: 0.08228, z: 2
       // So radius = 1 (2/2), height = 0.08228
       const originalRadius = 1; // Half of x or z dimension
-      const originalHeight = 0.12; // y dimension from logs
+      const originalHeight = 0.15; // y dimension from logs
       
       
       const geometry = new THREE.CylinderGeometry(
@@ -328,6 +347,27 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
   };
   
   
+  // Fetch RL80 price (sourced from CoinMarketCap via the rl80-price route)
+  const fetchRL80Data = async () => {
+    try {
+      const response = await fetch('/api/rl80-price');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data?.price == null) return;
+      setMarketData(prevData => {
+        const filtered = prevData.filter(item => item.name !== "RL80");
+        return [...filtered, {
+          name: "RL80",
+          symbol: "RL80",
+          price: data.price,
+          changePercent: data.priceChange24h ?? 0,
+        }];
+      });
+    } catch (error) {
+      console.error("Error fetching RL80 data:", error);
+    }
+  };
+
   // Fetch crypto data from our server-side API (with caching)
   const fetchCryptoData = async () => {
     try {
@@ -393,55 +433,6 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
       : []),
   ];
 
-  // Calculate total width of one set of data
-  const calculateTotalWidth = (ctx, data) => {
-    if (!ctx || !data || data.length === 0) return 2048; // Return default width for initial render
-
-    let totalWidth = 0;
-    const basepadding = 80; // Match the basepadding in drawData
-
-    // Calculate the exact same width as drawData produces
-    combinedData.forEach((item, index) => {
-      // Add separator width
-      totalWidth += ctx.measureText(" ◆ ").width + basepadding;
-      
-      if (item.isSentiment) {
-        // Fear & Greed - match the exact spacing from drawData
-        totalWidth += ctx.measureText("Fear & Greed:").width + 15; // Match the +15 adjustment
-        totalWidth += ctx.measureText(item.price.toString()).width + 70;
-        totalWidth += ctx.measureText(`(${item.classification})`).width + basepadding * 3.6;
-      } else if (item.symbol) {
-        // Market data
-        const priceText = item.symbol === "^VIX" ? 
-          `${item.price.toFixed(2)}` : 
-          `$${item.price.toFixed(2)}`;
-        
-        // Use same spacing map as drawData
-        const spacingMap = {
-          "Gold": 32, "Oil": 32, "VIX": 32, "Dollar Index": 28,
-          "10Y Treasury Yield": 15, "Nasdaq": 25, "Dow Jones": 25,
-          "S&P 500": 25, "Bitcoin": 32, "Ethereum": 30
-        };
-        const nameSpacing = spacingMap[item.name] || 22;
-        
-        // Special handling for 10Y Treasury Yield
-        if (item.name === "10Y Treasury Yield") {
-          totalWidth += ctx.measureText(`${item.name}`).width + 20; // No colon
-          totalWidth += ctx.measureText(`: ${priceText}`).width + 25; // Colon with price
-        } else {
-          totalWidth += ctx.measureText(`${item.name}:`).width + nameSpacing;
-          totalWidth += ctx.measureText(priceText).width + 25;
-        }
-        
-        // Change width
-        const changeText = `${item.changePercent >= 0 ? "▲" : "▼"} ${Math.abs(item.changePercent).toFixed(2)}%`;
-        totalWidth += ctx.measureText(changeText).width + basepadding * 0.7;
-      }
-    });
-
-    return totalWidth;
-  };
-
   // Function to update ticker geometry based on model scale
   const updateTickerGeometry = (modelScale) => {
     if (!meshRef.current || !modelScale) return;
@@ -456,7 +447,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
     const newGeometry = new THREE.CylinderGeometry(
       newRadius,
       newRadius,
-      0.313 * modelScale, // Scale height proportionally
+      0.39 * modelScale, // Scale height proportionally
       128,
       1,
       true
@@ -479,11 +470,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
     if (!ctx) return;
 
     // Set up font first to get measurements
-    ctx.font = "bold 14px Arial";
-
-    // Calculate total width needed for one set of data
-    const setWidth = calculateTotalWidth(ctx, combinedData);
-    if (setWidth === 0) return; // No data to display yet
+    ctx.font = "bold 16px Arial";
 
     // Clear canvas with black background
     ctx.fillStyle = "#000000";
@@ -495,239 +482,190 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
     // Draw text
     ctx.textBaseline = "middle";
 
-    // Enhanced drawing function with better styling and fixed spacing:
-    const drawData = (startX) => {
+    // Single source of truth for layout: pass draw=false to measure without painting.
+    const drawData = (startX, draw = true) => {
       let xPos = startX;
-      const basepadding = 80; // Increased padding to prevent overlap
+      const basepadding = 80;
       const yPos = canvas.height / 2;
-      
-      // Add subtle separator line at the bottom
-      ctx.fillStyle = "#222222";
-      ctx.fillRect(0, canvas.height - 3, canvas.width, 1); // Thinner line for smaller canvas
 
-      // Initialize needSeparator to true to ensure all items get separators
+      if (draw) {
+        ctx.fillStyle = "#222222";
+        ctx.fillRect(0, canvas.height - 3, canvas.width, 1);
+      }
+
       let needSeparator = true;
-      let previousItemName = ""; // Track previous item to adjust separator spacing
+      let previousItemName = "";
 
       combinedData.forEach((item, index) => {
-        // Simplified separator spacing for fewer items
         let separatorPadding = basepadding;
         if (previousItemName === "Fear & Greed") {
-          separatorPadding = basepadding * 0.5; // Less space after Fear & Greed
+          separatorPadding = basepadding * 0.5;
         }
 
-        // Draw separator before this item (except the first one)
         if (needSeparator || item.name === "10Y Treasury Yield") {
-          ctx.fillStyle = is80sMode ? "#67e8f9" : "#666666"; // Cyan in 80s mode, brighter color for better visibility
-          ctx.font = "bold 14px Arial"; // Added bold for better visibility
-          
-          // Add extra space before 10Y Treasury Yield
-          if (item.name === "10Y Treasury Yield") {
-            xPos += 60; // Increased from 35 to 60 for much more space before separator
-          } else if (item.isSentiment) {
-            xPos += 20; // Add extra space before Fear & Greed separator
-          }
-          
-          // Draw separator with custom position for Treasury Yield
-          if (item.name === "10Y Treasury Yield") {
-            // Draw separator slightly higher for Treasury Yield
-            ctx.fillText(" ◆ ", xPos, yPos - 2);
-          } else {
-            ctx.fillText(" ◆ ", xPos, yPos);
-          }
-          
-          // Simplified spacing after separators
-          let postSeparatorSpacing = separatorPadding;
-          
-          
-          xPos += ctx.measureText(" ◆ ").width + postSeparatorSpacing;
-        }
-        
-        // After first item, we'll need separators before all subsequent items
-        needSeparator = true;
-        previousItemName = item.name; // Store for next iteration
+          ctx.font = "bold 16px Arial";
 
-        let displayText = "";
-        let changeColor = "#FFFFFF"; // default white
-        let nameColor = is80sMode ? "#67e8f9" : "#DDDDDD"; // cyan in 80s mode, slightly dimmer for name in normal
-        let priceColor = is80sMode ? "#00ff41" : "#FFFFFF"; // green numbers in 80s mode, bright for price in normal
-        let changePercent = 0;
-        
-        // Special case - if this is 10Y Treasury Yield or Fear & Greed, we need to ensure it has enough space
-        if (item.name === "10Y Treasury Yield") {
-          // Force an extra separator for 10Y Treasury
-          ctx.fillStyle = "#AAAAAA"; // Bright color for visibility
-          ctx.font = "bold 14px Arial"; // Adjusted for smaller canvas
-          ctx.fillText(" ", xPos, yPos);
-          xPos += ctx.measureText(" ◆ ").width + 110;
-          
-          // Add extra padding for 10Y Treasury Yield
-          xPos += 25; // Extra space after the forced separator
-        } else if (item.isSentiment) {
-          // Add extra padding for Fear & Greed Index
-          xPos += 55; // Add space before Fear & Greed to ensure separator visibility
+          if (item.name === "10Y Treasury Yield") {
+            xPos += 60;
+          } else if (item.isSentiment) {
+            xPos += 20;
+          }
+
+          if (draw) {
+            ctx.fillStyle = is80sMode ? "#67e8f9" : "#666666";
+            if (item.name === "10Y Treasury Yield") {
+              ctx.fillText(" ◆ ", xPos, yPos - 2);
+            } else {
+              ctx.fillText(" ◆ ", xPos, yPos);
+            }
+          }
+
+          xPos += ctx.measureText(" ◆ ").width + separatorPadding;
         }
-        
+
+        needSeparator = true;
+        previousItemName = item.name;
+
+        let changeColor = "#FFFFFF";
+        let nameColor = is80sMode ? "#67e8f9" : "#DDDDDD";
+        let priceColor = is80sMode ? "#00ff41" : "#FFFFFF";
+        let changePercent = 0;
+
+        if (item.name === "10Y Treasury Yield") {
+          ctx.font = "bold 16px Arial";
+          xPos += ctx.measureText(" ◆ ").width + 110;
+          xPos += 25;
+        } else if (item.isSentiment) {
+          xPos += 55;
+        }
+
         if (item.isSentiment) {
-          // Fear & Greed - using compact custom rendering
           const value = item.price;
           let sentimentColor = "#FFFFFF";
-          
-          // Color based on sentiment value
-          if (value <= 25) sentimentColor = "#FF3B30"; // Extreme Fear - Bright red
-          else if (value <= 40) sentimentColor = "#FF9500"; // Fear - Orange
-          else if (value <= 60) sentimentColor = "#FFCC00"; // Neutral - Yellow
-          else if (value <= 75) sentimentColor = "#34C759"; // Greed - Green
-          else sentimentColor = "#00C7BE"; // Extreme Greed - Teal
-          
-          // Draw everything with precise control
-          // First the name with no spacing issues
-          ctx.fillStyle = is80sMode ? "#67e8f9" : "#E5E5EA";
+
+          if (value <= 25) sentimentColor = "#FF3B30";
+          else if (value <= 40) sentimentColor = "#FF9500";
+          else if (value <= 60) sentimentColor = "#FFCC00";
+          else if (value <= 75) sentimentColor = "#34C759";
+          else sentimentColor = "#00C7BE";
+
+          ctx.font = "bold 16px Arial";
+          if (draw) {
+            ctx.fillStyle = is80sMode ? "#67e8f9" : "#E5E5EA";
+            ctx.fillText("Fear & Greed:", xPos, yPos);
+          }
+          xPos += ctx.measureText("Fear & Greed:").width + 15;
+
+          ctx.font = "bold 16px Arial";
+          if (draw) {
+            ctx.fillStyle = is80sMode ? "#00ff41" : "#FFFFFF";
+            ctx.fillText(value, xPos, yPos);
+          }
+          xPos += ctx.measureText(String(value)).width + 70;
+
           ctx.font = "bold 14px Arial";
-          ctx.fillText("Fear & Greed:", xPos, yPos);
-          xPos += ctx.measureText("Fear & Greed:").width + 15; // Changed from -90 to +15 for proper spacing
-          
-          // Value - with controlled space
-          ctx.fillStyle = is80sMode ? "#00ff41" : "#FFFFFF";
-          ctx.font = "bold 14px Arial";
-          ctx.fillText(value, xPos, yPos);
-          xPos += ctx.measureText(value).width + 70;
-          
-          // Classification in parentheses
-          ctx.fillStyle = sentimentColor;
-          ctx.font = "bold 12px Arial";
-          ctx.fillText(`(${item.classification})`, xPos, yPos);
+          if (draw) {
+            ctx.fillStyle = sentimentColor;
+            ctx.fillText(`(${item.classification})`, xPos, yPos);
+          }
           xPos += ctx.measureText(`(${item.classification})`).width + basepadding * 3.6;
         } else if (item.symbol) {
-          // Market data (indices, crypto, commodities, etc.)
-          const price = item.price ? 
-            (item.symbol === "^VIX" || item.symbol === "^TNX" ? 
-              `${item.price.toFixed(2)}` : 
-              `$${item.price.toFixed(2)}`) : 
+          const price = item.price ?
+            (item.symbol === "^VIX" || item.symbol === "^TNX" ?
+              `${item.price.toFixed(2)}` :
+              item.name === "RL80" ?
+                formatSubCentPrice(item.price) :
+                `$${item.price.toFixed(2)}`) :
             "N/A";
-            
+
           changePercent = item.changePercent ? parseFloat(item.changePercent) : 0;
-          
-          // Set colors based on type and price movement
-          changeColor = changePercent >= 0 ? "#4CD964" : "#FF3B30"; // Green for positive, red for negative
-          
-          // Different colors for different market categories
+          changeColor = changePercent >= 0 ? "#4CD964" : "#FF3B30";
+
           const colorMap = is80sMode ? {
-            // 80s mode - all names in cyan
-            "Gold": "#67e8f9",
-            "Oil": "#67e8f9",
-            "Nasdaq": "#67e8f9",
-            "Dow Jones": "#67e8f9",
-            "S&P 500": "#67e8f9",
-            "VIX": "#67e8f9",
-            "Bitcoin": "#67e8f9",
-            "Ethereum": "#67e8f9",
-            "Dollar Index": "#67e8f9",
-            "10Y Treasury Yield": "#67e8f9"
+            "Gold": "#67e8f9", "Oil": "#67e8f9", "Nasdaq": "#67e8f9",
+            "Dow Jones": "#67e8f9", "S&P 500": "#67e8f9", "VIX": "#67e8f9",
+            "Bitcoin": "#67e8f9", "Ethereum": "#67e8f9",
+            "Dollar Index": "#67e8f9", "10Y Treasury Yield": "#67e8f9",
+            "RL80": "#ff5dd6"
           } : {
-            // Normal mode - original colors
-            "Gold": "#FFD700",
-            "Oil": "#FF9500",
-            "Nasdaq": "#5856D6",
-            "Dow Jones": "#007AFF",
-            "S&P 500": "#5AC8FA",
-            "VIX": "#FF2D55",
-            "Bitcoin": "#FF9500",
-            "Ethereum": "#5856D6",
-            "Dollar Index": "#64D2FF",
-            "10Y Treasury Yield": "#FFCC00"
+            "Gold": "#FFD700", "Oil": "#FF9500", "Nasdaq": "#5856D6",
+            "Dow Jones": "#007AFF", "S&P 500": "#5AC8FA", "VIX": "#FF2D55",
+            "Bitcoin": "#FF9500", "Ethereum": "#5856D6",
+            "Dollar Index": "#64D2FF", "10Y Treasury Yield": "#FFCC00",
+            "RL80": "#ff5dd6"
           };
           nameColor = colorMap[item.name] || (is80sMode ? "#67e8f9" : "#DDDDDD");
-          
-          // Spacing configuration
+
           const spacingMap = {
-            "Gold": 32,
-            "Oil": 32,
-            "VIX": 32,
-            "Dollar Index": 28,
-            "10Y Treasury Yield": 15,
-            "Nasdaq": 25,
-            "Dow Jones": 25,
-            "S&P 500": 25,
-            "Bitcoin": 32,
-            "Ethereum": 30
+            "Gold": 32, "Oil": 32, "VIX": 32, "Dollar Index": 28,
+            "10Y Treasury Yield": 15, "Nasdaq": 25, "Dow Jones": 25,
+            "S&P 500": 25, "Bitcoin": 32, "Ethereum": 30, "RL80": 28
           };
           const nameSpacing = spacingMap[item.name] || 22;
-          
-          // Draw name
-          ctx.fillStyle = nameColor;
-          ctx.font = "bold 14px Arial";
-          
-          // Special handling for 10Y Treasury Yield name
+
+          ctx.font = "bold 16px Arial";
           if (item.name === "10Y Treasury Yield") {
-            // Draw name without colon to save space
-            ctx.fillText(`${item.name}`, xPos, yPos);
-            // Normal spacing for Treasury Yield
+            if (draw) {
+              ctx.fillStyle = nameColor;
+              ctx.fillText(`${item.name}`, xPos, yPos);
+            }
             xPos += ctx.measureText(`${item.name}`).width + 20;
           } else {
-            // Normal case for other items
-            ctx.fillText(`${item.name}:`, xPos, yPos);
+            if (draw) {
+              ctx.fillStyle = nameColor;
+              ctx.fillText(`${item.name}:`, xPos, yPos);
+            }
             xPos += ctx.measureText(`${item.name}:`).width + nameSpacing;
           }
-          
-          // Draw price
-          ctx.fillStyle = priceColor;
-          ctx.font = "bold 14px Arial";
-          
-          // Price spacing configuration
+
           const priceSpacingMap = {
-            "VIX": 35,
-            "10Y Treasury Yield": 15,
-            "Dollar Index": 30,
-            "Oil": 28,
-            "Bitcoin": 25,
-            "Ethereum": 25
+            "VIX": 35, "10Y Treasury Yield": 15, "Dollar Index": 30,
+            "Oil": 28, "Bitcoin": 25, "Ethereum": 25
           };
           const priceSpacing = priceSpacingMap[item.name] || 25;
-          
-          // For 10Y Treasury Yield, add a colon and pack things tighter
+
+          ctx.font = "bold 16px Arial";
           if (item.name === "10Y Treasury Yield") {
-            ctx.fillText(`: ${price}`, xPos, yPos);
-            
-            // Normal spacing after 10Y Treasury price
+            if (draw) {
+              ctx.fillStyle = priceColor;
+              ctx.fillText(`: ${price}`, xPos, yPos);
+            }
             xPos += ctx.measureText(`: ${price}`).width + 25;
           } else {
-            ctx.fillText(`${price}`, xPos, yPos);
-            
-            // Regular price spacing for other items
+            if (draw) {
+              ctx.fillStyle = priceColor;
+              ctx.fillText(`${price}`, xPos, yPos);
+            }
             xPos += ctx.measureText(`${price}`).width + priceSpacing;
           }
-          
-          // Draw change with arrow
+
           const arrow = changePercent >= 0 ? "▲ " : "▼ ";
-          ctx.fillStyle = changeColor;
-          ctx.font = "bold 12px Arial";
-          ctx.fillText(`${arrow}${Math.abs(changePercent).toFixed(2)}%`, xPos, yPos);
-          
-          // Percent spacing configuration
+          const changeText = `${arrow}${Math.abs(changePercent).toFixed(2)}%`;
+          ctx.font = "bold 14px Arial";
+          if (draw) {
+            ctx.fillStyle = changeColor;
+            ctx.fillText(changeText, xPos, yPos);
+          }
+
           const percentSpacingMap = {
-            "VIX": 0.9,
-            "10Y Treasury Yield": 0.7,
-            "Dollar Index": 0.8,
-            "Oil": 0.85,
-            "Gold": 1.0
+            "VIX": 0.9, "10Y Treasury Yield": 0.7, "Dollar Index": 0.8,
+            "Oil": 0.85, "Gold": 1.0
           };
           const percentSpacing = basepadding * (percentSpacingMap[item.name] || 0.7);
-          
-          xPos += ctx.measureText(`${arrow}${Math.abs(changePercent).toFixed(2)}%`).width + percentSpacing;
+
+          xPos += ctx.measureText(changeText).width + percentSpacing;
         }
       });
 
       return xPos;
     };
 
-    // Draw data multiple times to fill the canvas for seamless scrolling
-    const dataWidth = calculateTotalWidth(ctx, combinedData);
-    
-    // We need at least 3 copies to ensure seamless scrolling
-    // One for the main view, one for the left buffer, one for the right buffer
+    // Measure with the same logic that draws, so wrap-around copies don't overlap.
+    const dataWidth = drawData(0, false);
+    if (dataWidth <= 0) return;
+
     const startX = -(scrollPos.current % dataWidth);
-    
+
     for (let i = -1; i <= Math.ceil(canvas.width / dataWidth) + 1; i++) {
       drawData(startX + (i * dataWidth));
     }
@@ -759,8 +697,8 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
         // Update market data, preserving crypto data from CoinGecko
         setMarketData(prevData => {
           const cryptoData = prevData.filter(
-            item => item.name === 'Bitcoin' || item.name === 'Ethereum' || 
-                    item.name === 'Solana'
+            item => item.name === 'Bitcoin' || item.name === 'Ethereum' ||
+                    item.name === 'Solana' || item.name === 'RL80'
           );
           return [...cryptoData, ...marketData];
         });
