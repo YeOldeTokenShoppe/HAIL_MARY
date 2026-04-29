@@ -10,6 +10,7 @@ import { easing } from 'maath';
 import DarkClouds from "./Clouds";
 import BreathSmoke from "./BreathSmoke";
 import BuyModal from './BuyModal';
+import FullscreenCRTOverlay from './FullscreenCRTOverlay';
 import { useLanguage } from './LanguageProvider';
 // import { useControls, folder } from 'leva';
 
@@ -457,337 +458,6 @@ const getCrtTextSequence = (t, locale = 'en') => [
   { text: t('crtScreen.rosary') || '> AS A ROSARY FOR PROSPERITY', type: 'command', delay: 0 },
 ];
 
-// Fullscreen CRT Overlay for mobile
-function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete, t, locale }) {
-  const [displayedLines, setDisplayedLines] = useState([]);
-  const [currentLineIndex, setCurrentLineIndex] = useState(0);
-  const [currentCharIndex, setCurrentCharIndex] = useState(0);
-  const [showCursor, setShowCursor] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
-  const [animationComplete, setAnimationComplete] = useState(false);
-  const [buttonPulse, setButtonPulse] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
-  const containerRef = useRef(null);
-
-  // Generate translated text sequence
-  const crtTextSequence = useMemo(() => getCrtTextSequence(t, locale), [t, locale]);
-  const isRTL = RTL_LOCALES.includes(locale);
-
-  // Handle fade in/out
-  useEffect(() => {
-    if (isActive) {
-      // Small delay before fade in for smoother transition from zoom
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 50);
-      return () => clearTimeout(timer);
-    } else {
-      setIsVisible(false);
-    }
-  }, [isActive]);
-
-  // Reset animation when becoming active
-  useEffect(() => {
-    if (isActive) {
-      setDisplayedLines([]);
-      setCurrentLineIndex(0);
-      setCurrentCharIndex(0);
-      setAnimationComplete(false);
-      const timer = setTimeout(() => {
-        setIsTyping(true);
-      }, 800);
-      return () => clearTimeout(timer);
-    } else {
-      setIsTyping(false);
-      setDisplayedLines([]);
-      setCurrentLineIndex(0);
-      setCurrentCharIndex(0);
-      setAnimationComplete(false);
-    }
-  }, [isActive]);
-
-
-  // Detect when animation is complete
-  useEffect(() => {
-    if (currentLineIndex >= crtTextSequence.length && !animationComplete) {
-      const timer = setTimeout(() => {
-        setAnimationComplete(true);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [currentLineIndex, animationComplete]);
-
-  // Button pulse animation
-  useEffect(() => {
-    if (!animationComplete) return;
-    const interval = setInterval(() => {
-      setButtonPulse(p => (p + 0.1) % (Math.PI * 2));
-    }, 50);
-    return () => clearInterval(interval);
-  }, [animationComplete]);
-
-  // Typing effect
-  useEffect(() => {
-    if (!isTyping || currentLineIndex >= crtTextSequence.length) {
-      return;
-    }
-
-    const currentLine = crtTextSequence[currentLineIndex];
-    const typingSpeed = currentLine.type === 'command' ? 25 : 35;
-
-    if (currentLine.type === 'pause') {
-      const timer = setTimeout(() => {
-        setDisplayedLines(prev => [...prev, { text: '', type: 'pause' }]);
-        setCurrentLineIndex(prev => prev + 1);
-        setCurrentCharIndex(0);
-      }, currentLine.delay);
-      return () => clearTimeout(timer);
-    }
-
-    if (currentCharIndex < currentLine.text.length) {
-      const timer = setTimeout(() => {
-        setCurrentCharIndex(prev => prev + 1);
-      }, typingSpeed);
-      return () => clearTimeout(timer);
-    }
-
-    const timer = setTimeout(() => {
-      setDisplayedLines(prev => [...prev, { text: currentLine.text, type: currentLine.type }]);
-      setCurrentLineIndex(prev => prev + 1);
-      setCurrentCharIndex(0);
-      onLineComplete?.(); // Play sound for each line
-    }, currentLine.delay);
-
-    return () => clearTimeout(timer);
-  }, [isTyping, currentLineIndex, currentCharIndex, onLineComplete]);
-
-  // Blinking cursor
-  useEffect(() => {
-    const cursorInterval = setInterval(() => {
-      setShowCursor(prev => !prev);
-    }, 530);
-    return () => clearInterval(cursorInterval);
-  }, []);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [displayedLines, currentCharIndex]);
-
-  const currentLine = crtTextSequence[currentLineIndex];
-  const typingText = currentLine && currentLine.type !== 'pause'
-    ? currentLine.text.slice(0, currentCharIndex)
-    : '';
-
-  const getColor = (type) => {
-    switch (type) {
-      case 'command': return '#00ffaa';
-      case 'header': return '#ffff00';
-      case 'highlight': return '#ff00ff';
-      default: return '#00ff88';
-    }
-  };
-
-  const getFontSize = (type) => {
-    switch (type) {
-      case 'header': return '1.4rem';
-      case 'command': return '1.1rem';
-      default: return '1.2rem';
-    }
-  };
-
-  if (!isActive) return null;
-
-  const pulseValue = (Math.sin(buttonPulse) + 1) / 2;
-
-  return (
-    <div
-      onClick={(e) => {
-        // Only close if clicking the background, not buttons
-        if (e.target === e.currentTarget) {
-          onClose?.();
-        }
-      }}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        background: 'radial-gradient(ellipse at center, #0a1f0a 0%, #000000 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2rem 1.5rem',
-        fontFamily: getFontFamilyForLocale(locale),
-        overflow: 'hidden',
-        opacity: isVisible ? 1 : 0,
-        transition: 'opacity 0.4s ease-in-out',
-        direction: isRTL ? 'rtl' : 'ltr',
-      }}
-    >
-      {/* Scanline overlay */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)',
-        pointerEvents: 'none',
-        zIndex: 1,
-      }} />
-
-      {/* CRT flicker effect */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.3) 100%)',
-        pointerEvents: 'none',
-        zIndex: 2,
-      }} />
-
-      {/* Screen content container */}
-      <div style={{
-        position: 'relative',
-        width: '95%',
-        maxWidth: '800px',
-        height: '90%',
-        maxHeight: '900px',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        zIndex: 3,
-      }}>
-        {/* Terminal header */}
-        <div style={{
-          padding: '0.5rem 1rem',
-          color: '#00ff66',
-          fontSize: '0.75rem',
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-          display: 'flex',
-          flexDirection: isRTL ? 'row-reverse' : 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          opacity: 0.7,
-        }}>
-          <span>{t('crtScreen.terminalTitle') || 'RL80 TERMINAL v1.0'}</span>
-          <span style={{ opacity: 0.6 }}>{t('crtScreen.secureConnection') || 'SECURE CONNECTION'}</span>
-        </div>
-
-        {/* Content area */}
-        <div
-          ref={containerRef}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            flex: 1,
-            padding: '1rem',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.3rem',
-          }}
-        >
-          {/* Rendered lines */}
-          {displayedLines.map((line, index) => {
-            if (line.type === 'pause') {
-              return <div key={index} style={{ height: '0.5rem' }} />;
-            }
-            return (
-              <div
-                key={index}
-                style={{
-                  color: getColor(line.type),
-                  fontSize: getFontSize(line.type),
-                  lineHeight: 1.4,
-                  textShadow: `0 0 10px ${getColor(line.type)}`,
-                  textAlign: isRTL ? 'right' : 'left',
-                }}
-              >
-                {line.text}
-              </div>
-            );
-          })}
-
-          {/* Current typing line */}
-          {currentLine && currentLine.type !== 'pause' && currentLineIndex < crtTextSequence.length && (
-            <div style={{
-              color: getColor(currentLine.type),
-              fontSize: getFontSize(currentLine.type),
-              lineHeight: 1.4,
-              textShadow: `0 0 10px ${getColor(currentLine.type)}`,
-              textAlign: isRTL ? 'right' : 'left',
-            }}>
-              {isRTL ? (
-                <>{showCursor ? '█' : ' '}{typingText}</>
-              ) : (
-                <>{typingText}{showCursor ? '█' : ' '}</>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Button area */}
-        {animationComplete && (
-          <div style={{
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '1rem',
-          }}>
-            {/* Buy button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onBuyClick?.();
-              }}
-              style={{
-                background: `rgba(0, 68, 34, ${0.6 + pulseValue * 0.4})`,
-                border: '2px solid #00ff66',
-                borderRadius: '4px',
-                padding: '0.75rem 2rem',
-                color: '#00ffaa',
-                fontSize: '1rem',
-                fontFamily: getFontFamilyForLocale(locale),
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                boxShadow: `0 0 ${10 + pulseValue * 10}px rgba(0, 255, 102, ${0.3 + pulseValue * 0.3})`,
-                transition: 'all 0.2s',
-              }}
-            >
-              {t('crtScreen.buyButton') || 'BUY RL80'}
-            </button>
-
-            {/* Exit hint */}
-            <div style={{
-              color: '#00ff66',
-              fontSize: '0.75rem',
-              opacity: 0.7,
-              letterSpacing: '0.05em',
-            }}>
-              {isRTL ? (
-                <>{showCursor ? '_' : ' '}{t('crtScreen.tapToReturn') || '> tap anywhere to return'}</>
-              ) : (
-                <>{t('crtScreen.tapToReturn') || '> tap anywhere to return'}{showCursor ? '_' : ' '}</>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // CRT Screen component with typing animation
 function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = false, onButtonClick, buttonText = "ENTER THE PORTAL", onLineComplete, textScale = 1, t, locale, ...props }) {
@@ -1608,18 +1278,24 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
               }
             }, 300);
           }}
-          onBuyClick={() => {
-            setShowFullscreenCRT(false);
-            setShowBuyModal(true);
-          }}
           onLineComplete={() => {
             if (digitalTextSoundRef.current) {
               digitalTextSoundRef.current.currentTime = 0;
               digitalTextSoundRef.current.play().catch(() => {});
             }
           }}
-          t={t}
           locale={locale}
+          textSequence={getCrtTextSequence(t, locale)}
+          terminalTitle={t('crtScreen.terminalTitle') || 'RL80 TERMINAL v1.0'}
+          terminalStatus={t('crtScreen.secureConnection') || 'SECURE CONNECTION'}
+          tapToReturnLabel={t('crtScreen.tapToReturn') || '> tap anywhere to return'}
+          actionButton={{
+            label: t('crtScreen.buyButton') || 'BUY RL80',
+            onClick: () => {
+              setShowFullscreenCRT(false);
+              setShowBuyModal(true);
+            },
+          }}
         />,
         document.body
       )}

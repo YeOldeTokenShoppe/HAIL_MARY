@@ -130,6 +130,7 @@ const CyborgTempleScene = ({
   templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
   disableCandleInteraction = false, // When true, XCandle nodes are not made clickable (no zoom-to-candle, no inspector)
   jackpotOnlyFistPump = false, // When true, FistPump only fires from slotMachineJackpot — removed from Demon's random alternation and the price-poll trigger
+  gameStarted = false, // When true, the monk_hail/monk_beckon attention-getter loop is allowed to run. Held off until the user clicks START in GameOverlay.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -271,6 +272,18 @@ const CyborgTempleScene = ({
     currentAnimation: 'typing_monk',
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 10000 + 15000,
+  });
+
+  // Monk attention-getting one-shot (clip name "Pointing_Monk"). Plays
+  // every few seconds before the user has clicked the monk for focus — used
+  // to attract the user into starting the game flow. Once focused, firing
+  // stops permanently for that session.
+  const monkWaveStateRef = useRef({
+    nextFireTime: 0,           // ms epoch when the next wave should fire
+    hasBeenFocused: false,     // becomes true on first focus → no more waves
+    everInitialized: false,    // becomes true after the first delay schedule
+    hailsUntilBeckon: 4 + Math.floor(Math.random() * 2), // beckon fires every 4–5 hails
+    attentionActive: false,    // true while the hail/idle/beckon cycle is running — gates head tracking
   });
 
   // Tekno animation state
@@ -745,7 +758,7 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v4a_opt.glb";
+    let modelPath = "/models/RL80_4anims_v4c_opt.glb";
     const fallbackModelPath = "/models/RL80_4anims_v4.glb";
     let usingFallback = false;
     const startTime = performance.now();
@@ -974,8 +987,9 @@ const CyborgTempleScene = ({
           if (firstTrackBone === 'Pelvis') {
             targetCharacters = ['Demon'];
           }
-          // Monk animations (Root_2-based skeleton or *_monk named)
-          else if (firstTrackBone === 'Root_2' || animName.endsWith('_monk')) {
+          // Monk animations (Root_2-based skeleton, *_monk / *_Monk suffix,
+          // or monk_* prefix).
+          else if (firstTrackBone === 'Root_2' || /_monk$|^monk_/i.test(animName)) {
             targetCharacters = ['Monk'];
           }
           // Standard Root-based animations for RL80 and Tekno only
@@ -1373,11 +1387,14 @@ const CyborgTempleScene = ({
           child.visible = disableCandleInteraction;
         }
 
+        // Capture Angel_Empty on every device so we can billboard it toward
+        // the camera regardless of the mobile/desktop split below.
+        if (child.name === 'Angel_Empty') {
+          angelEmptyRef.current = child;
+        }
+
         // Find angel and coin objects for MOBILE.glb animations
         if (isOnMobile) {
-          if (child.name === 'Angel_Empty') {
-            angelEmptyRef.current = child;
-          }
           if (child.name === 'angel' || child.name === 'Angel') {
             angelRef.current = child;
           }
@@ -1573,19 +1590,35 @@ const CyborgTempleScene = ({
         console.error('[CyborgTempleScene] Please ensure the file exists at: public' + modelPath);
       }
       
-      // Retry logic with full URL fallback and desktop model fallback for mobile
+      // 404 on the optimized model means it just doesn't exist on disk —
+      // no point retrying with backoff. Fall back to the un-optimized GLB
+      // immediately. Speeds up dev (when the opt file is intentionally
+      // missing) and prod (when the deploy didn't include it).
+      const is404 = error.message && error.message.includes('404');
+      if (is404 && !usingFallback && modelPath !== fallbackModelPath) {
+        console.warn('[CyborgTempleScene] Optimized model 404 — falling back to un-optimized model immediately');
+        modelPath = fallbackModelPath;
+        usingFallback = true;
+        retryCount = 0;
+        setTimeout(() => loadModel(false), 50);
+        return;
+      }
+
+      // Retry logic with full URL fallback for non-404 errors
       if (retryCount < maxRetries) {
         retryCount++;
         const useFullUrl = retryCount >= 2; // Try full URL on second retry
-        
-        // On last retry for mobile, try the desktop model as fallback
-        if (retryCount === maxRetries && isOnMobile && !usingFallback) {
-          console.warn(`[CyborgTempleScene] Mobile model failed, attempting fallback to desktop model...`);
+
+        // On last retry, fall back to un-optimized GLB. Applies to both
+        // desktop and mobile (no longer mobile-gated since we now use the
+        // same source GLB everywhere — mobile just gets the smaller opt build).
+        if (retryCount === maxRetries && !usingFallback && modelPath !== fallbackModelPath) {
+          console.warn(`[CyborgTempleScene] Optimized model failed, attempting fallback to un-optimized model...`);
           modelPath = fallbackModelPath;
           usingFallback = true;
-          retryCount = maxRetries - 1; // Give one more chance with desktop model
+          retryCount = maxRetries - 1; // Give one more chance with fallback
         }
-        
+
         console.warn(`[CyborgTempleScene] Retrying model load (attempt ${retryCount}/${maxRetries})${useFullUrl ? ' with full URL' : ''}${usingFallback ? ' using fallback model' : ''}...`);
         setTimeout(() => {
           loadModel(useFullUrl);
@@ -2416,6 +2449,10 @@ const CyborgTempleScene = ({
             }
           } else if (object.userData.agentId === 'Monk') {
             monkFocusedRef.current = true;
+            // Stop the attention-getting waving_over loop forever — user has
+            // engaged with the monk; the game flow takes over from here.
+            monkWaveStateRef.current.hasBeenFocused = true;
+            monkWaveStateRef.current.attentionActive = false;
             const monkActions = actionsRef.current['Monk'];
             if (monkActions) {
               const idleKey = Object.keys(monkActions).find(a => /idle_monk/i.test(a));
@@ -2953,6 +2990,106 @@ const CyborgTempleScene = ({
       }
     }
     
+    // Monk attention-getting wave (waving_over) — fires every 5–9s on a
+    // one-shot, returns to the monk's regular loop. Stops once the user has
+    // focused on the monk (game flow takes over from there). Held off until
+    // the user clicks START in GameOverlay (gameStarted prop).
+    if (gameStarted && actionsRef.current['Monk'] && !monkWaveStateRef.current.hasBeenFocused && !monkFocusedRef.current) {
+      const monkActions = actionsRef.current['Monk'];
+      // Attention-getter cycle: hail → idle (head still tracks camera) → hail
+      // → idle → … → beckon (every 4–5 hails) → idle → repeat. Loops until
+      // the user clicks the monk (hasBeenFocused).
+      const hailKey = Object.keys(monkActions).find(a => /monk_hail/i.test(a));
+      const beckonKey = Object.keys(monkActions).find(a => /monk_beckon/i.test(a));
+      const idleKey = Object.keys(monkActions).find(a => /idle_monk/i.test(a));
+      if (hailKey) {
+        const wState = monkWaveStateRef.current;
+        const now = Date.now();
+        if (!wState.everInitialized) {
+          // Initial delay before first sequence so the page settles in first.
+          wState.nextFireTime = now + 3000;
+          wState.everInitialized = true;
+        }
+        const monkState = monkAnimStateRef.current;
+        if (now >= wState.nextFireTime && !monkState.isPlayingSpecial) {
+          const hail = monkActions[hailKey];
+          const prev = monkActions[monkState.currentAnimation];
+          const isRetrigger = prev === hail;
+          if (prev && !isRetrigger) prev.fadeOut(0.5);
+          hail.reset();
+          hail.setLoop(THREE.LoopOnce, 1);
+          hail.clampWhenFinished = true;
+          // On retrigger, skip fadeIn — it would drop weight to 0 momentarily
+          // and (with no other action playing) the mixer would fall back to
+          // bind pose, causing a T-pose flash between hail loops. Keep weight
+          // at 1 by jumping straight to play.
+          if (!isRetrigger) hail.fadeIn(0.5);
+          else hail.setEffectiveWeight(1);
+          hail.play();
+          monkState.currentAnimation = hailKey;
+          monkState.isPlayingSpecial = true;
+          wState.attentionActive = true;
+          wState.hailsUntilBeckon -= 1;
+          const hailDurMs = hail.getClip().duration * 1000;
+
+          // Helper: cross-fade into idle_monk for one playthrough, then
+          // re-arm so the outer block retriggers hail on the next frame.
+          // Falls back to immediate retrigger if idle_monk isn't available.
+          const playIdleInterlude = (fromAction) => {
+            if (monkWaveStateRef.current.hasBeenFocused) return;
+            if (!idleKey) {
+              monkState.isPlayingSpecial = false;
+              monkWaveStateRef.current.nextFireTime = Date.now();
+              return;
+            }
+            const idle = monkActions[idleKey];
+            if (fromAction && fromAction !== idle) fromAction.fadeOut(0.5);
+            idle.reset();
+            idle.setLoop(THREE.LoopOnce, 1);
+            idle.clampWhenFinished = true;
+            idle.fadeIn(0.5);
+            idle.play();
+            monkState.currentAnimation = idleKey;
+            const idleDurMs = idle.getClip().duration * 1000;
+            setTimeout(() => {
+              if (monkWaveStateRef.current.hasBeenFocused) return;
+              monkState.isPlayingSpecial = false;
+              monkWaveStateRef.current.nextFireTime = Date.now();
+            }, Math.max(100, idleDurMs - 500));
+          };
+
+          // Step 2: just before hail ends, either cross-fade into monk_beckon
+          // (every 4–5 hails) or play an idle interlude before the next hail.
+          setTimeout(() => {
+            if (monkWaveStateRef.current.hasBeenFocused) return;
+            const wState2 = monkWaveStateRef.current;
+            const shouldBeckon = beckonKey && wState2.hailsUntilBeckon <= 0;
+            if (!shouldBeckon) {
+              playIdleInterlude(hail);
+              return;
+            }
+            // Reset the counter for the next beckon (4–5 hails away).
+            wState2.hailsUntilBeckon = 4 + Math.floor(Math.random() * 2);
+            const beckon = monkActions[beckonKey];
+            hail.fadeOut(0.5);
+            beckon.reset();
+            beckon.setLoop(THREE.LoopOnce, 1);
+            beckon.clampWhenFinished = true;
+            beckon.fadeIn(0.5);
+            beckon.play();
+            monkState.currentAnimation = beckonKey;
+            const beckonDurMs = beckon.getClip().duration * 1000;
+
+            // Step 3: just before beckon ends, play an idle interlude before
+            // the next hail cycle.
+            setTimeout(() => {
+              playIdleInterlude(beckon);
+            }, Math.max(100, beckonDurMs - 500));
+          }, Math.max(100, hailDurMs - 500));
+        }
+      }
+    }
+
     // Handle Monk animation alternation — mostly typing/idle, occasional disbelief/fistpump
     if (!isOnMobile && actionsRef.current['Monk']) {
       const currentTime = Date.now();
@@ -3363,8 +3500,11 @@ const CyborgTempleScene = ({
       demonHeadBoneRef._dummy = null;
     }
 
-    // Monk head look-at-camera override (only when focused on Monk)
-    if (monkFocusedRef.current && monkHeadBoneRef.current) {
+    // Monk head look-at-camera override — active when focused on the Monk
+    // OR while the attention-getter cycle is running, so the monk appears
+    // to address the user across hail → idle → hail → beckon transitions.
+    const monkIsPointing = monkWaveStateRef.current.attentionActive;
+    if ((monkFocusedRef.current || monkIsPointing) && monkHeadBoneRef.current) {
       const head = monkHeadBoneRef.current;
 
       if (!monkHeadBoneRef._baseQuat) {
@@ -3388,9 +3528,11 @@ const CyborgTempleScene = ({
       const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 0.5);
       dummy.quaternion.multiply(flip);
 
-      const maxHeadAngle = 1.2;
+      // ~110° max turn so the monk can track the camera further around to
+      // the right (was 1.2 rad ≈ 69°).
+      const maxHeadAngle = 1.92;
       const angleBetween = monkHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
-      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.9) : 0;
       const blendedWorldQuat = monkHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
 
       const parentWorldQuat = new THREE.Quaternion();
@@ -3403,11 +3545,23 @@ const CyborgTempleScene = ({
       monkHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
 
       head.quaternion.copy(monkHeadBoneRef._smoothedQuat);
-    } else if (monkHeadBoneRef._smoothedQuat) {
-      monkHeadBoneRef._smoothedQuat = null;
-      monkHeadBoneRef._baseQuat = null;
-      monkHeadBoneRef._baseWorldQuat = null;
-      monkHeadBoneRef._dummy = null;
+    } else if (monkHeadBoneRef._smoothedQuat && monkHeadBoneRef.current) {
+      // Symmetric release — slerp the smoothedQuat toward whatever the
+      // animation wants right now at the same 0.08-per-frame rate the
+      // engagement used, so the head rotates back as naturally as it
+      // engaged instead of snapping. head.quaternion at this point is the
+      // animation's intended pose since the mixer has already run.
+      const head = monkHeadBoneRef.current;
+      const animQuat = head.quaternion.clone();
+      monkHeadBoneRef._smoothedQuat.slerp(animQuat, 0.08);
+      head.quaternion.copy(monkHeadBoneRef._smoothedQuat);
+      // Once close enough to the anim pose, stop overriding.
+      if (monkHeadBoneRef._smoothedQuat.angleTo(animQuat) < 0.01) {
+        monkHeadBoneRef._smoothedQuat = null;
+        monkHeadBoneRef._baseQuat = null;
+        monkHeadBoneRef._baseWorldQuat = null;
+        monkHeadBoneRef._dummy = null;
+      }
     }
 
     // RL80 head look-at-camera override (only when focused on RL80)
@@ -3630,6 +3784,42 @@ const CyborgTempleScene = ({
       }
     }
     
+    // Y-axis billboard: rotate Angel_Empty so its forward axis always points
+    // at the camera horizontally (keeps the angel upright; coins/children
+    // ride along since they're descendants of Angel_Empty).
+    if (angelEmptyRef.current) {
+      const angelEmpty = angelEmptyRef.current;
+      const angelWorldPos = new THREE.Vector3();
+      angelEmpty.getWorldPosition(angelWorldPos);
+
+      // Project camera onto the angel's horizontal plane so only the Y axis rotates.
+      const targetWorld = new THREE.Vector3(camera.position.x, angelWorldPos.y, camera.position.z);
+
+      // Compute the desired world quaternion via a dummy lookAt, then convert
+      // to local space so it composes correctly with parent transforms.
+      if (!angelEmpty.userData._billboardDummy) {
+        angelEmpty.userData._billboardDummy = new THREE.Object3D();
+      }
+      const dummy = angelEmpty.userData._billboardDummy;
+      dummy.position.copy(angelWorldPos);
+      dummy.lookAt(targetWorld);
+      // Correction: model's forward axis isn't -Z. Rotate around world up so
+      // the front of the angel faces the camera. Flip the sign if it ends up
+      // showing the back instead.
+      const billboardYOffset = Math.PI / 2;
+      dummy.quaternion.multiply(
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), billboardYOffset)
+      );
+
+      const parentWorldQuat = new THREE.Quaternion();
+      if (angelEmpty.parent) {
+        angelEmpty.parent.getWorldQuaternion(parentWorldQuat);
+        angelEmpty.quaternion.copy(parentWorldQuat.invert().multiply(dummy.quaternion));
+      } else {
+        angelEmpty.quaternion.copy(dummy.quaternion);
+      }
+    }
+
     // Add subtle animations for mobile objects
     if (isOnMobile) {
       // Angel_Empty hover animation - subtle up and down motion for the entire group

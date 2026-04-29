@@ -1,7 +1,9 @@
 "use client";
 import React, { Suspense, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import CleanCanvas from '@/components/CleanCanvas';
+import FullscreenCRTOverlay from '@/components/FullscreenCRTOverlay';
 import { OrbitControls, Stats, Cloud, Clouds } from '@react-three/drei';
 import ConstellationModel from '@/components/ConstellationModel';
 import Aurora from '@/components/Aurora';
@@ -21,7 +23,70 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import CoinLoader from '@/components/CoinLoader';
 import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
+import EntryOverlay from '@/components/EntryOverlay';
+import GameOverlay from '@/components/GameOverlay';
 import { useRouter } from 'next/navigation';
+
+// Mobile CRT overlay stubs — placeholder copy per Screen1-4. Replace later
+// with real content once the per-screen mobile views are designed.
+const SCREEN_OVERLAY_STUBS = {
+  Screen1: {
+    title: 'RL80 // CHART',
+    sequence: [
+      { text: '> LOADING CHART FEED...', type: 'command', delay: 600 },
+      { text: '> LINK ESTABLISHED', type: 'command', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: 'RL80 / USD', type: 'header', delay: 600 },
+      { text: '', type: 'pause', delay: 300 },
+      { text: 'Live price + chart', type: 'body', delay: 600 },
+      { text: 'available on desktop.', type: 'body', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: '> MOBILE VIEW: COMING SOON', type: 'command', delay: 0 },
+    ],
+  },
+  Screen2: {
+    title: 'MACRO // AGENT',
+    sequence: [
+      { text: '> CONNECTING TO AGENT...', type: 'command', delay: 600 },
+      { text: '> SIGNAL ACQUIRED', type: 'command', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: 'MACRO FEED', type: 'header', delay: 600 },
+      { text: '', type: 'pause', delay: 300 },
+      { text: 'AI commentary on', type: 'body', delay: 500 },
+      { text: 'global markets.', type: 'body', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: '> MOBILE VIEW: COMING SOON', type: 'command', delay: 0 },
+    ],
+  },
+  Screen3: {
+    title: 'TEKNO // TERMINAL',
+    sequence: [
+      { text: '> BOOTING TEKNO...', type: 'command', delay: 600 },
+      { text: '> TERMINAL ONLINE', type: 'command', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: 'TEKNO INTERFACE', type: 'header', delay: 600 },
+      { text: '', type: 'pause', delay: 300 },
+      { text: 'Interactive console', type: 'body', delay: 500 },
+      { text: 'available on desktop.', type: 'body', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: '> MOBILE VIEW: COMING SOON', type: 'command', delay: 0 },
+    ],
+  },
+  Screen4: {
+    title: 'RESERVED // SLOT',
+    sequence: [
+      { text: '> SCANNING CHANNEL 4...', type: 'command', delay: 600 },
+      { text: '> NO TRANSMISSION', type: 'command', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: 'RESERVED', type: 'header', delay: 600 },
+      { text: '', type: 'pause', delay: 300 },
+      { text: 'This slot is held', type: 'body', delay: 500 },
+      { text: 'for future content.', type: 'body', delay: 800 },
+      { text: '', type: 'pause', delay: 400 },
+      { text: '> STAY TUNED', type: 'command', delay: 0 },
+    ],
+  },
+};
 
 
 
@@ -47,6 +112,35 @@ export default function CyborgTemple() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  // Gated by localStorage — only auto-shows on first visit. The bottom-nav
+  // CHOOSE PATH button reopens it on demand.
+  const [showEntryOverlay, setShowEntryOverlay] = useState(false);
+  // Which modality the user has entered. null = lobby (no mode chosen).
+  // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
+  const [tradeMode, setTradeMode] = useState(null);
+  // GameOverlay shows only its intro card; once the user hits START, it
+  // unmounts and the scene takes over (case content lives on the in-scene
+  // Screen objects). Reset on each fresh entry to game mode.
+  const [gameStarted, setGameStarted] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const seen = localStorage.getItem('rl80_trade_overlay_seen');
+    if (!seen) setShowEntryOverlay(true);
+  }, []);
+  const dismissEntryOverlay = () => {
+    setShowEntryOverlay(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rl80_trade_overlay_seen', '1');
+    }
+  };
+  const handleEntrySelect = (action) => {
+    console.log('[EntryOverlay] selected:', action);
+    if (action === 'game') {
+      setTradeMode('game');
+      setGameStarted(false);  // fresh intro every time game is re-entered
+    }
+    dismissEntryOverlay();
+  };
   // First-visit hint: tells the user characters are clickable. Hides when
   // they click any character (focusedAgent flips truthy) or after a timer.
   const [showCharacterHint, setShowCharacterHint] = useState(false);
@@ -55,6 +149,17 @@ export default function CyborgTemple() {
   // shown (zoomHintSeenRef).
   const [showZoomOutHint, setShowZoomOutHint] = useState(false);
   const zoomHintSeenRef = useRef(false);
+  // Mobile-only: when a Screen1-4 is tapped, fade in a fullscreen CRT overlay
+  // after the camera fly-in. The 3D screens are unreadable on phones.
+  const [screenOverlay, setScreenOverlay] = useState(null);
+  const screenOverlayTimerRef = useRef(null);
+  useEffect(() => {
+    return () => {
+      if (screenOverlayTimerRef.current) {
+        clearTimeout(screenOverlayTimerRef.current);
+      }
+    };
+  }, []);
   const router = useRouter();
   
   // Get music context
@@ -855,6 +960,7 @@ export default function CyborgTemple() {
               isMobile={isMobileView}
               disableCandleInteraction
               jackpotOnlyFistPump
+              gameStarted={gameStarted}
               onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
               onCoinFaceTap={(coinIndex, isCharacters) => {
                 if (isCharacters) {
@@ -881,8 +987,24 @@ export default function CyborgTemple() {
                       setUserHasInteracted(true);
                     }, 500);
                   }
+                  // Mobile: schedule fullscreen CRT overlay after camera fly-in.
+                  // The 3D screens are unreadable at phone resolution; the
+                  // overlay shows readable content instead.
+                  if (isMobileView && /^Screen[1-4]$/.test(agentId)) {
+                    if (screenOverlayTimerRef.current) {
+                      clearTimeout(screenOverlayTimerRef.current);
+                    }
+                    screenOverlayTimerRef.current = setTimeout(() => {
+                      setScreenOverlay(agentId);
+                    }, 1100);
+                  }
                 } else {
                   setFocusedAgent(null);
+                  if (screenOverlayTimerRef.current) {
+                    clearTimeout(screenOverlayTimerRef.current);
+                    screenOverlayTimerRef.current = null;
+                  }
+                  setScreenOverlay(null);
                 }
               }}
             />
@@ -1249,7 +1371,9 @@ export default function CyborgTemple() {
             )}
 
             {/* Bottom Nav — rendered on both mobile and desktop, mirrors
-                /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY). */}
+                /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY).
+                Hidden while EntryOverlay is up so it owns the screen. */}
+            {!showEntryOverlay && (
             <MobileBottomNav
                 hideWallet
                 accountOnLeft
@@ -1258,69 +1382,118 @@ export default function CyborgTemple() {
                    placeholders for now. */
                 onBuyClick={() => {}}
                 centerSlot={
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 6,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {[
-                      { label: 'Believe',  bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)', onClick: () => {} },
-                      { label: 'Abstain', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)', onClick: () => {} },
-                      { label: 'Doubt', bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)', onClick: () => {} },
-                    ].map(({ label, bg, border, onClick }) => (
-                      <button
-                        key={label}
-                        onClick={onClick}
-                        style={{
-                          minWidth: 70,
-                          height: 60,
-                          padding: '10px 10px',
-                          borderRadius: 10,
-                          background: bg,
-                          border: `1px solid ${border}`,
-                          color: '#fff',
-                          fontFamily: "'Orbitron', monospace",
-                          fontSize: 11,
-                          fontWeight: 800,
-                          letterSpacing: '0.12em',
-                          cursor: 'pointer',
-                          textShadow: '0 1px 0 rgba(0,0,0,0.4)',
-                          boxShadow: `0 0 8px ${border}, inset 0 1px 0 rgba(255,255,255,0.15)`,
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
+                  tradeMode === 'game' ? (
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 6,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {[
+                        { label: 'Believe',  bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)', onClick: () => {} },
+                        { label: 'Abstain', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)', onClick: () => {} },
+                        { label: 'Doubt', bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)', onClick: () => {} },
+                      ].map(({ label, bg, border, onClick }) => (
+                        <button
+                          key={label}
+                          onClick={onClick}
+                          style={{
+                            minWidth: 70,
+                            height: 60,
+                            padding: '10px 10px',
+                            borderRadius: 10,
+                            background: bg,
+                            border: `1px solid ${border}`,
+                            color: '#fff',
+                            fontFamily: "'Orbitron', monospace",
+                            fontSize: 11,
+                            fontWeight: 800,
+                            letterSpacing: '0.12em',
+                            cursor: 'pointer',
+                            textShadow: '0 1px 0 rgba(0,0,0,0.4)',
+                            boxShadow: `0 0 8px ${border}, inset 0 1px 0 rgba(255,255,255,0.15)`,
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowEntryOverlay(true)}
+                      aria-label="Choose path"
+                      style={{
+                        minWidth: 220,
+                        height: 60,
+                        padding: '10px 22px',
+                        borderRadius: 10,
+                        background: 'linear-gradient(135deg, rgba(77,255,170,0.18), rgba(13,80,50,0.32))',
+                        border: '1px solid rgba(77,255,170,0.85)',
+                        color: '#8effc4',
+                        fontFamily: "'Orbitron', monospace",
+                        fontSize: 13,
+                        fontWeight: 800,
+                        letterSpacing: '0.22em',
+                        cursor: 'pointer',
+                        textShadow: '0 0 10px rgba(77,255,170,0.55)',
+                        boxShadow: '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
+                      }}
+                    >
+                      ✦ CHOOSE PATH
+                    </button>
+                  )
                 }
-                /* Menu slot (right) routes home; book slot (left) is BUY,
-                   matching the root page's positioning. */
-                onMenuClick={() => router.push('/')}
+                /* Right slot: in lobby it's HOME; in game mode it becomes
+                   MENU so the path picker is always reachable (verdict
+                   buttons have taken the center). Book slot (left) is BUY. */
+                onMenuClick={
+                  tradeMode === 'game'
+                    ? () => setShowEntryOverlay(true)
+                    : () => router.push('/')
+                }
                 menuIcon={
-                  <svg
-                    className="btm-book-icon-svg"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M9 5v4" />
-                    <rect width="4" height="6" x="7" y="9" rx="1" />
-                    <path d="M9 15v2" />
-                    <path d="M17 3v2" />
-                    <rect width="4" height="8" x="15" y="5" rx="1" />
-                    <path d="M17 13v3" />
-                    <path d="M3 3v16a2 2 0 0 0 2 2h16" />
-                  </svg>
+                  tradeMode === 'game' ? (
+                    <svg
+                      className="btm-book-icon-svg"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="3" width="7" height="7" rx="1" />
+                      <rect x="14" y="3" width="7" height="7" rx="1" />
+                      <rect x="3" y="14" width="7" height="7" rx="1" />
+                      <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="btm-book-icon-svg"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M9 5v4" />
+                      <rect width="4" height="6" x="7" y="9" rx="1" />
+                      <path d="M9 15v2" />
+                      <path d="M17 3v2" />
+                      <rect width="4" height="8" x="15" y="5" rx="1" />
+                      <path d="M17 13v3" />
+                      <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+                    </svg>
+                  )
                 }
-                menuLabel="HOME"
+                menuLabel={tradeMode === 'game' ? 'MENU' : 'HOME'}
                 isUserSignedIn={isSignedIn}
                 userImage={user?.imageUrl}
                 show80sButton={false}
@@ -1336,12 +1509,84 @@ export default function CyborgTemple() {
                   </svg>
                 }
               />
+            )}
 
             {/* Buy Modal — triggered from the repurposed menu slot */}
             <BuyModal
               isOpen={showBuyModal}
               onClose={() => setShowBuyModal(false)}
             />
+
+            {/* Entry Overlay — modality picker. Heavy black scrim makes the
+                scene barely visible; user can re-open via bottom-nav MENU. */}
+            {showEntryOverlay && sceneReady && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 1500,
+                  background: 'rgba(0, 0, 0, 0.92)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                }}
+              >
+                <EntryOverlay
+                  onSelect={handleEntrySelect}
+                  onDismiss={dismissEntryOverlay}
+                />
+              </div>
+            )}
+
+            {/* Game Overlay — only the intro card is shown. Once the user
+                clicks START, onStart fires and we unmount the overlay so the
+                scene + bottom-bar verdict buttons take over. Case content
+                lives on the in-scene Screen objects. */}
+            {tradeMode === 'game' && !gameStarted && !showEntryOverlay && sceneReady && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: '5.5rem',
+                  zIndex: 1001,
+                  background: 'rgba(0, 0, 0, 0.92)',
+                  overflow: 'hidden',
+                }}
+              >
+                <GameOverlay
+                  onComplete={(result) => {
+                    console.log('[GameOverlay] complete:', result);
+                  }}
+                  onStart={() => {
+                    console.log('[GameOverlay] start');
+                    setGameStarted(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Mobile fullscreen CRT overlay for Screen1-4 taps. Rendered via
+                portal to escape the canvas/transform stack. */}
+            {typeof document !== 'undefined' && createPortal(
+              <FullscreenCRTOverlay
+                isActive={!!screenOverlay}
+                onClose={() => {
+                  setScreenOverlay(null);
+                  // Defocus the screen so the camera glides back. Reuses the
+                  // existing event the on-screen back buttons dispatch.
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('screenGoBack'));
+                  }
+                }}
+                locale="en"
+                textSequence={screenOverlay ? SCREEN_OVERLAY_STUBS[screenOverlay].sequence : []}
+                terminalTitle={screenOverlay ? SCREEN_OVERLAY_STUBS[screenOverlay].title : ''}
+                terminalStatus="MOBILE PREVIEW"
+                tapToReturnLabel="> tap anywhere to return"
+              />,
+              document.body
+            )}
 
             {/* Telegram Feature Box - Desktop only */}
             {/* {!isMobileView && !focusedAgent?.startsWith('Screen') && (
