@@ -28,14 +28,10 @@ export const AGENT_CAMERA_SETTINGS = {
     lookAtPos: new THREE.Vector3(-1.295, -0.155, 0.085),
     orbitCenter: null,
   },
-  Tekno: {
-    cameraPos: new THREE.Vector3(0.7, -0.3, -1.3),
-    lookAtPos: new THREE.Vector3(0.9, -0.4, -1.351),
-    orbitCenter: null,
-  },
+
   Fluffy: {
-    cameraPos: new THREE.Vector3(0.55, -0.3, -1.65),
-    lookAtPos: new THREE.Vector3(1.615, -0.6, -1.736),
+    cameraPos: new THREE.Vector3(0.54, 0.11, -1.65),
+    lookAtPos: new THREE.Vector3(1.87, -1.35, 0.745),
     orbitCenter: null,
   },
   Angel: {
@@ -44,23 +40,23 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Screen1: {
-    cameraPos: new THREE.Vector3(-1.832, 0.46, -1.75),
-    lookAtPos: new THREE.Vector3(0.682, 0.4, 0.492),
+    cameraPos: new THREE.Vector3(-0.84, -0.09, -0.81),
+    lookAtPos: new THREE.Vector3(-0.28, -0.27, 1.445),
     orbitCenter: null,
   },
   Screen2: {
-    cameraPos: new THREE.Vector3(-1.7, 0.7, 1.9),
-    lookAtPos: new THREE.Vector3(-0.766, 0.5, 0.95),
+    cameraPos: new THREE.Vector3(-0.81, 0.03, 0.71),
+    lookAtPos: new THREE.Vector3(1.57, -0.25, 0.205),
     orbitCenter: null,
   },
   Screen3: {
-    cameraPos: new THREE.Vector3(1.7, 0.65, -2.05),
-    lookAtPos: new THREE.Vector3(1.45, 0.555, -1.7),
+    cameraPos: new THREE.Vector3(0.73, -0.02, -0.77),
+    lookAtPos: new THREE.Vector3(-0.585, -0.005, -0.47),
     orbitCenter: null,
   },
   Screen4: {
-    cameraPos: new THREE.Vector3(1.90, 0.6, 1.7),
-    lookAtPos: new THREE.Vector3(0.470, 0.5, 0.352),
+    cameraPos: new THREE.Vector3(0.765, -0.06, 0.66),
+    lookAtPos: new THREE.Vector3(0.595, -0.05, -0.005),
     orbitCenter: null,
   },
 };
@@ -1144,21 +1140,28 @@ const CyborgTempleScene = ({
           setMechClickableData(child);
         }
         
-        // Make the four screens clickable
-        if (child.name === 'Screen1' || child.name === 'Screen2' || child.name === 'Screen3' || child.name === 'Screen4') {
-          
+        // Make the four screens clickable. Match either the original
+        // Screen1-4 names or the compact-model ScreenA-D names, normalizing
+        // to Screen1-4 for downstream code (camera settings, event dispatches).
+        const screenLetterToNumber = { A: 'Screen1', B: 'Screen2', C: 'Screen3', D: 'Screen4' };
+        const screenLetterMatch = child.name && /^Screen([A-D])$/.exec(child.name);
+        const isNumberedScreen = child.name === 'Screen1' || child.name === 'Screen2' || child.name === 'Screen3' || child.name === 'Screen4';
+        if (isNumberedScreen || screenLetterMatch) {
+          const normalizedScreenId = isNumberedScreen
+            ? child.name
+            : screenLetterToNumber[screenLetterMatch[1]];
+
           const setScreenClickableData = (obj) => {
             obj.userData.clickable = true;
-            obj.userData.agentId = child.name;
-            obj.userData.agentName = child.name;
-            obj.userData.targetObject = child; // Store reference to the actual object
-            
-            // Also apply to all children if it's a group
+            obj.userData.agentId = normalizedScreenId;
+            obj.userData.agentName = normalizedScreenId;
+            obj.userData.targetObject = child;
+
             if (obj.children && obj.children.length > 0) {
               obj.children.forEach(setScreenClickableData);
             }
           };
-          
+
           setScreenClickableData(child);
         }
         
@@ -1194,12 +1197,15 @@ const CyborgTempleScene = ({
           angelEmptyRef.current = child;
         }
 
-        // Find angel and coin objects for MOBILE.glb animations
+        // Capture the angel mesh on every device — the desktop and mobile
+        // GLBs both ship with a visible angel and we want focus to work in
+        // both contexts.
+        if (child.name === 'angel' || child.name === 'Angel') {
+          angelRef.current = child;
+        }
+
+        // Find coin objects for MOBILE.glb animations
         if (isOnMobile) {
-          if (child.name === 'angel' || child.name === 'Angel') {
-            angelRef.current = child;
-          }
-          
           if (child.name === 'CoinSpoke') {
             coinSpokeRef.current = child;
           }
@@ -1292,8 +1298,10 @@ const CyborgTempleScene = ({
         if (child.name === 'CoinFace3') coinFaceRefs.current[2] = child;
         if (child.name === 'CoinFace4') coinFaceRefs.current[3] = child;
 
-        // Make Angel and CoinFace meshes clickable for zoom
-        if (child.name === 'Angel' || child.name === 'angel' || child.name === 'Angel_Empty') {
+        // Make Angel and CoinFace meshes clickable for zoom. Match any mesh
+        // whose name contains "angel" (case-insensitive) so the desktop and
+        // mobile GLBs both wire up regardless of exact naming variations.
+        if (child.name && /angel/i.test(child.name)) {
           const setAngelClickable = (obj) => {
             obj.userData.clickable = true;
             obj.userData.agentId = 'Angel';
