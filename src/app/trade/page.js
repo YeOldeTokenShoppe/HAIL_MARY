@@ -25,6 +25,7 @@ import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
 import EntryOverlay from '@/components/EntryOverlay';
 import GameOverlay from '@/components/GameOverlay';
+import CameraTuningPanel from '@/components/CameraTuningPanel';
 import { useRouter } from 'next/navigation';
 
 // Mobile CRT overlay stubs — placeholder copy per Screen1-4. Replace later
@@ -105,9 +106,6 @@ export default function CyborgTemple() {
   const [modelLoadStartTime] = useState(Date.now());
   const [focusedAgent, setFocusedAgent] = useState(null);
   const [useAurora, setUseAurora] = useState(false);
-  const swapCoinsRef = useRef(null);
-  const [coinMode, setCoinMode] = useState('agents'); // 'supporters' or 'agents'
-  const [coinVideo, setCoinVideo] = useState(null); // { src, label } when a coin video is playing
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
@@ -231,7 +229,7 @@ export default function CyborgTemple() {
         
         // Preload the appropriate model
       // const modelToPreload = '/models/RL80_4anims_v2_opt.glb';
-          const modelToPreload = '/models/RL80_4anims_v4.glb';
+          const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');
@@ -438,6 +436,9 @@ export default function CyborgTemple() {
     <>
       {/* Loading Screen */}
       <CoinLoader loading={isSceneLoading} />
+
+      {/* Dev camera-tuning panel — shows only when ?tune=1 is in URL */}
+      <CameraTuningPanel />
           
       <div 
         style={{ 
@@ -744,7 +745,7 @@ export default function CyborgTemple() {
             // Mobile was framed for the old compact MOBILE3.glb — now that it loads
             // the full desktop scene, pull back + widen FOV so the whole tableau
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
-            position: isMobileView ? [0, 0.5, 7] : [0, 0.5, 6.5],
+            position: isMobileView ? [0, 1, 6] : [0, 0.5, 5.5],
             fov: isMobileView ? 55 : 50
           }}
           gl={{ 
@@ -950,7 +951,7 @@ export default function CyborgTemple() {
             
             {/* CyborgTempleScene with the RL80 model */}
             <CyborgTempleScene
-              position={[0, -1.5, 0]}
+              position={[0, -1.6, 0]}
               scale={[1.2, 1.2, 1.2]}
               rotation={[0, 0, 0]}
               isPlaying={false}
@@ -961,23 +962,9 @@ export default function CyborgTemple() {
               disableCandleInteraction
               jackpotOnlyFistPump
               gameStarted={gameStarted}
-              onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
-              onCoinFaceTap={(coinIndex, isCharacters) => {
-                if (isCharacters) {
-                  // Agent/character coins
-                  const coinVideos = [
-                    null, // CoinFace1 — Our Lady (no video yet)
-                    { src: '/videos/gr80_greetings.mp4', label: 'St. GR80' },
-                    null, // CoinFace3 — H80Z (no video yet)
-                    null, // CoinFace4 — TBD
-                  ]
-                  const video = coinVideos[coinIndex]
-                  if (video) setCoinVideo(video)
-                } else {
-                  // Supporter/user coins — handle separately
-                  // TODO: show supporter info or profile
-                  console.log(`Supporter coin ${coinIndex} tapped`)
-                }
+              onCoinFaceTap={(coinIndex) => {
+                // TODO: show leaderboard player info for tapped coin
+                console.log(`CoinFace ${coinIndex} tapped`)
               }}
               onAgentClick={(agentId) => {
                 if (agentId) {
@@ -1189,154 +1176,6 @@ export default function CyborgTemple() {
             </div>
           );
         })()}
-
-        {/* Coin Mode Buttons - Mobile only */}
-        {/* {isMobileView && mounted && !isCandleModalOpen && (
-          <div style={{
-            position: 'fixed',
-            bottom: '5.5rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1000,
-            display: 'flex',
-            gap: 12,
-          }}>
-            <button
-              onClick={() => {
-                if (coinMode !== 'supporters') {
-                  swapCoinsRef.current?.()
-                  setCoinMode('supporters')
-                }
-              }}
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                background: coinMode === 'supporters' ? 'rgba(255, 215, 0, 0.15)' : 'rgba(0, 0, 0, 0.6)',
-                border: `2px solid ${coinMode === 'supporters' ? 'rgba(255, 215, 0, 0.8)' : 'rgba(255, 255, 255, 0.2)'}`,
-                color: coinMode === 'supporters' ? 'rgba(255, 215, 0, 0.95)' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: 10,
-                fontFamily: 'monospace',
-                fontWeight: coinMode === 'supporters' ? 700 : 400,
-                lineHeight: '1.1',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                cursor: 'pointer',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                transition: 'all 0.3s ease',
-                padding: 4,
-              }}
-              aria-label="Show top supporters"
-            >
-              Top<br/>Fans
-            </button>
-            <button
-              onClick={() => {
-                if (coinMode !== 'agents') {
-                  swapCoinsRef.current?.()
-                  setCoinMode('agents')
-                }
-              }}
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                background: coinMode === 'agents' ? 'rgba(0, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.6)',
-                border: `2px solid ${coinMode === 'agents' ? 'rgba(0, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.2)'}`,
-                color: coinMode === 'agents' ? 'rgba(0, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: 10,
-                fontFamily: 'monospace',
-                fontWeight: coinMode === 'agents' ? 700 : 400,
-                lineHeight: '1.1',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                cursor: 'pointer',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                transition: 'all 0.3s ease',
-                padding: 4,
-              }}
-              aria-label="Show project managers"
-            >
-              Project<br/>Mgrs
-            </button>
-          </div>
-        )} */}
-
-        {/* Coin Video Overlay — expands from coin position */}
-        {coinVideo && (
-          <div
-            onClick={() => setCoinVideo(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 2000,
-              background: 'rgba(0, 0, 0, 0.6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '85vw',
-                maxWidth: 360,
-                borderRadius: 16,
-                overflow: 'hidden',
-                border: '2px solid rgba(255, 215, 0, 0.6)',
-                background: '#0a0a1a',
-                boxShadow: '0 0 30px rgba(255, 215, 0, 0.15)',
-              }}
-            >
-              <video
-                src={coinVideo.src}
-                autoPlay
-                playsInline
-                controls
-                style={{
-                  width: '100%',
-                  display: 'block',
-                }}
-              />
-              <div style={{
-                padding: '10px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-                <span style={{
-                  color: 'rgba(255, 215, 0, 0.9)',
-                  fontFamily: 'monospace',
-                  fontSize: 14,
-                  fontWeight: 700,
-                }}>
-                  {coinVideo.label}
-                </span>
-                <button
-                  onClick={() => setCoinVideo(null)}
-                  style={{
-                    background: 'none',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: 8,
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    padding: '4px 12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (

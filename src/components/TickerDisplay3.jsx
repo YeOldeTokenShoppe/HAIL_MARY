@@ -116,9 +116,9 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
     }
 
     // Set a fixed position for the ticker instead of searching for it
-    setTickerPosition(new THREE.Vector3(0.0, 1.2, 0.0)); // Position at ground level
+    setTickerPosition(new THREE.Vector3(0.0, -1.13, 0.0)); // Position at ground level
     setTickerRotation(new THREE.Euler(0, 0, 0));
-    setTickerScale(new THREE.Vector3(1.6, 1.6, 1.6));
+    setTickerScale(new THREE.Vector3(2.23, 2.23, 2.23));
   }, [isReady]); // Only depend on isReady
 
   // Initialize canvas and texture when ticker position is found
@@ -129,7 +129,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
       const canvas = document.createElement("canvas");
       // Set canvas dimensions for the thin height
       canvas.width = 2048; // Power of 2 for better GPU performance
-      canvas.height = 40;  // Slightly deeper ticker for legibility
+      canvas.height = 32;  // Slightly deeper ticker for legibility
       canvasRef.current = canvas;
 
       const texture = new THREE.CanvasTexture(canvas);
@@ -174,7 +174,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
       // Original dimensions from logs: x: 2, y: 0.08228, z: 2
       // So radius = 1 (2/2), height = 0.08228
       const originalRadius = 1; // Half of x or z dimension
-      const originalHeight = 0.15; // y dimension from logs
+      const originalHeight = 0.1; // y dimension from logs
       
       
       const geometry = new THREE.CylinderGeometry(
@@ -205,7 +205,7 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
         ctx2.fillStyle = "#000000";
         ctx2.fillRect(0, 0, canvas.width, canvas.height);
         ctx2.fillStyle = "#FFFFFF";
-        ctx2.font = "bold 20px Arial"; // Smaller font for smaller height
+        ctx2.font = "bold 16px Arial"; // Smaller font for smaller height
         ctx2.textAlign = "left";
         ctx2.textBaseline = "middle";
         // Show initial ticker items even with 0 values
