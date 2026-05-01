@@ -59,6 +59,28 @@ export const AGENT_CAMERA_SETTINGS = {
     lookAtPos: new THREE.Vector3(0.595, -0.05, -0.005),
     orbitCenter: null,
   },
+  // ScreenA-D are the secondary (council-chat) monitors. Initial values
+  // mirror each character's primary-screen sibling — tune with ?tune=1.
+  ScreenA: {
+    cameraPos: new THREE.Vector3(-1.27, 0.105, -0.87),
+    lookAtPos: new THREE.Vector3(-1.525, -0.135, 0.31),
+    orbitCenter: null,
+  },
+  ScreenB: {
+    cameraPos: new THREE.Vector3(-0.865, -0.2, 1.035),
+    lookAtPos: new THREE.Vector3(0.635, 0.03, 1.52),
+    orbitCenter: null,
+  },
+  ScreenC: {
+    cameraPos: new THREE.Vector3(0.695, 0.08, -1.12),
+    lookAtPos: new THREE.Vector3(-0.865, -0.155, -1.525),
+    orbitCenter: null,
+  },
+  ScreenD: {
+    cameraPos: new THREE.Vector3(0.97, -0.09, 0.89),
+    lookAtPos: new THREE.Vector3(1.615, 0.015, -1.015),
+    orbitCenter: null,
+  },
 };
 
 // --- Word cluster configuration ---
@@ -1140,21 +1162,18 @@ const CyborgTempleScene = ({
           setMechClickableData(child);
         }
         
-        // Make the four screens clickable. Match either the original
-        // Screen1-4 names or the compact-model ScreenA-D names, normalizing
-        // to Screen1-4 for downstream code (camera settings, event dispatches).
-        const screenLetterToNumber = { A: 'Screen1', B: 'Screen2', C: 'Screen3', D: 'Screen4' };
-        const screenLetterMatch = child.name && /^Screen([A-D])$/.exec(child.name);
-        const isNumberedScreen = child.name === 'Screen1' || child.name === 'Screen2' || child.name === 'Screen3' || child.name === 'Screen4';
-        if (isNumberedScreen || screenLetterMatch) {
-          const normalizedScreenId = isNumberedScreen
-            ? child.name
-            : screenLetterToNumber[screenLetterMatch[1]];
-
+        // Make the screens clickable. Screen1-4 are the primary monitors
+        // (each character's main feed). ScreenA-D are the secondary monitors
+        // (the council group-chat displays). They are *separate* meshes —
+        // each gets its own agentId so clicking either zooms to that
+        // specific screen.
+        const isPrimaryScreen = child.name === 'Screen1' || child.name === 'Screen2' || child.name === 'Screen3' || child.name === 'Screen4';
+        const isSecondaryScreen = child.name === 'ScreenA' || child.name === 'ScreenB' || child.name === 'ScreenC' || child.name === 'ScreenD';
+        if (isPrimaryScreen || isSecondaryScreen) {
           const setScreenClickableData = (obj) => {
             obj.userData.clickable = true;
-            obj.userData.agentId = normalizedScreenId;
-            obj.userData.agentName = normalizedScreenId;
+            obj.userData.agentId = child.name;
+            obj.userData.agentName = child.name;
             obj.userData.targetObject = child;
 
             if (obj.children && obj.children.length > 0) {
@@ -3587,7 +3606,7 @@ const CyborgTempleScene = ({
     <group ref={groupRef} visible={true} position={position} scale={scale} rotation={rotation}>
       {/* The 3D model is added dynamically in useEffect */}
       <HolographicStatue3
-              position={[-0.085, 0.6, -0.03]}
+              position={[-0.085, 0.5, -0.03]}
               scale={[0.5, 0.5, 0.5]}
               rotation={[0, -Math.PI * 0.2, 0]}
               hover={false}

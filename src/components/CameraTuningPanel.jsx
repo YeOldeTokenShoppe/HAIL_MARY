@@ -22,6 +22,10 @@ const AGENT_IDS = [
   "Screen2",
   "Screen3",
   "Screen4",
+  "ScreenA",
+  "ScreenB",
+  "ScreenC",
+  "ScreenD",
 ];
 
 const STORAGE_KEY = "rl80_camera_tuner_overrides_v1";

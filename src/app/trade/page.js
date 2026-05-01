@@ -13,6 +13,7 @@ import PostProcessingEffects from '@/components/PostProcessingEffects';
 import CyborgTempleScene from '@/components/CyborgTempleScene';
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
+import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -745,7 +746,7 @@ export default function CyborgTemple() {
             // Mobile was framed for the old compact MOBILE3.glb — now that it loads
             // the full desktop scene, pull back + widen FOV so the whole tableau
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
-            position: isMobileView ? [0, 1, 6] : [0, 0.5, 5.5],
+            position: isMobileView ? [0, 1.1, 7.5] : [0, 0.5, 6.0],
             fov: isMobileView ? 55 : 50
           }}
           gl={{ 
@@ -1012,6 +1013,9 @@ export default function CyborgTemple() {
 
             {/* Liminal Terminal preview — screens render cryptic teasers */}
             <VideoScreens is80sMode={context80sMode} previewMode={true} />
+
+            {/* Council group chat painted onto the four secondary screens */}
+            <CouncilChatScreens />
 
               {/* <NeuralNetworkR3F 
               theme={2}
