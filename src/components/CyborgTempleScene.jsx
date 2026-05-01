@@ -90,6 +90,20 @@ export const AGENT_CAMERA_SETTINGS = {
   },
 };
 
+// Holographic statue (the small floating figure above the workstation).
+// Desktop and mobile positions tuned independently — mobile model shifts
+// the workstation up so the statue has its own offset.
+export const HOLO_STATUE_DESKTOP = {
+  position: [-0.085, 0.5, -0.03],
+  scale: [0.5, 0.5, 0.5],
+  rotation: [0, -Math.PI * 0.2, 0],
+};
+export const HOLO_STATUE_MOBILE = {
+  position: [-0.085, 1.4, -0.03], // placeholder — tune for the mobile shift
+  scale: [0.5, 0.5, 0.5],
+  rotation: [0, -Math.PI * 0.2, 0],
+};
+
 // Returns the active cameraPos/lookAtPos/orbitCenter for the given agent.
 // On mobile, MOBILE_CAMERA_OFFSET.y is added to the Y component of every
 // vector to compensate for the workstation model's mobile-only vertical
@@ -3653,13 +3667,18 @@ const CyborgTempleScene = ({
     <>
       <group ref={groupRef} visible={true} position={position} scale={scale} rotation={rotation}>
         {/* The 3D model is added dynamically in useEffect */}
-        <HolographicStatue3
-                position={[-0.085, 0.5, -0.03]}
-                scale={[0.5, 0.5, 0.5]}
-                rotation={[0, -Math.PI * 0.2, 0]}
-                hover={false}
-                rotate={true}
-              />
+        {(() => {
+          const cfg = isOnMobile ? HOLO_STATUE_MOBILE : HOLO_STATUE_DESKTOP;
+          return (
+            <HolographicStatue3
+              position={cfg.position}
+              scale={cfg.scale}
+              rotation={cfg.rotation}
+              hover={false}
+              rotate={true}
+            />
+          );
+        })()}
       </group>
       {showCharacterHints && [
         { id: 'RL80', ref: rl80HintRef },

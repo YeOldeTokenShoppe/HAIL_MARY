@@ -757,7 +757,7 @@ export default function CyborgTemple() {
             // Mobile was framed for the old compact MOBILE3.glb — now that it loads
             // the full desktop scene, pull back + widen FOV so the whole tableau
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
-            position: isMobileView ? [0, 1.9, 7.5] : [0, 0.5, 6.0],
+            position: isMobileView ? [0, 2.1, 7.5] : [0, 0.5, 6.0],
             fov: isMobileView ? 55 : 50
           }}
           gl={{ 
