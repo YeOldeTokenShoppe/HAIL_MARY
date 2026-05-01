@@ -550,6 +550,17 @@ export default function CyborgTemple() {
               0 0 36px rgba(218, 165, 32, 0.32);
           }
         }
+
+        @keyframes characterHintIconPulse {
+          0%, 100% {
+            opacity: 0.85;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.12);
+          }
+        }
       `}</style>
       
       <div style={{
@@ -746,7 +757,7 @@ export default function CyborgTemple() {
             // Mobile was framed for the old compact MOBILE3.glb — now that it loads
             // the full desktop scene, pull back + widen FOV so the whole tableau
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
-            position: isMobileView ? [0, 1.1, 7.5] : [0, 0.5, 6.0],
+            position: isMobileView ? [0, 1.9, 7.5] : [0, 0.5, 6.0],
             fov: isMobileView ? 55 : 50
           }}
           gl={{ 
@@ -952,7 +963,7 @@ export default function CyborgTemple() {
             
             {/* CyborgTempleScene with the RL80 model */}
             <CyborgTempleScene
-              position={[0, -1.6, 0]}
+              position={isMobileView ? [0, -0.7, 0] : [0, -1.6, 0]}
               scale={[1.2, 1.2, 1.2]}
               rotation={[0, 0, 0]}
               isPlaying={false}
@@ -963,6 +974,7 @@ export default function CyborgTemple() {
               disableCandleInteraction
               jackpotOnlyFistPump
               gameStarted={gameStarted}
+              showCharacterHints={showCharacterHint && !focusedAgent}
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 console.log(`CoinFace ${coinIndex} tapped`)
@@ -1000,7 +1012,7 @@ export default function CyborgTemple() {
             {/* TickerDisplay3 — now rendered on both mobile and desktop since
                 they share the same GLB model. */}
             {tickerReady && (
-              <TickerDisplay3 modelRef={null} onLoad={handleTickerLoad} />
+              <TickerDisplay3 modelRef={null} onLoad={handleTickerLoad} isMobile={isMobileView} />
             )}
 
           
@@ -1042,43 +1054,12 @@ export default function CyborgTemple() {
               maxDistance={10}
               // zoomToCursor={true}
               autoRotate={!focusedAgent}
-              autoRotateSpeed={0.2}
+              autoRotateSpeed={0.4}
             />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
         </CleanCanvas>
         )}
-
-        {/* First-visit hint chip — bottom, only when NOT focused on anyone. */}
-        {showCharacterHint && !focusedAgent && (
-          <div
-            style={{
-              position: 'fixed',
-              left: '50%',
-              bottom: isMobileView ? '6.5rem' : '7rem',
-              transform: 'translateX(-50%)',
-              zIndex: 19,
-              pointerEvents: 'none',
-              background: 'rgba(0, 0, 0, 0.72)',
-              color: '#daa520',
-              border: '1px solid rgba(218, 165, 32, 0.55)',
-              borderRadius: '999px',
-              padding: '0.55rem 1.1rem',
-              fontFamily: "'Orbitron', 'Courier New', monospace",
-              fontSize: isMobileView ? '0.7rem' : '0.78rem',
-              fontWeight: 700,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              whiteSpace: 'nowrap',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              animation: 'characterHintPulse 2.4s ease-in-out infinite',
-            }}
-          >
-            ✦ Tap an agent to meet them ✦
-          </div>
-        )}
-
 
         {/* Floating Character Label on Focus */}
         {(() => {

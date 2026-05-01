@@ -4,6 +4,7 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import AnnotationSystem from "@/components/AnnotationSystem";
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
 import HolographicStatue3 from "@/components/HolographicStatue3";
@@ -12,6 +13,12 @@ import HolographicStatue3 from "@/components/HolographicStatue3";
 // (CameraTuningPanel) can mutate values in place. The click handler reads
 // from this object on every focus, so live edits take effect on the next
 // agent click without a reload.
+//
+// Mobile shifts the entire workstation along the Y axis, so on mobile we
+// apply a single global Y offset (MOBILE_Y_OFFSET below) to cameraPos /
+// lookAtPos / orbitCenter when resolving for a click. Tune via the panel.
+export const MOBILE_CAMERA_OFFSET = { y: 0.7 };
+
 export const AGENT_CAMERA_SETTINGS = {
   RL80: {
     cameraPos: new THREE.Vector3(2.205, 0.14, 0.68),
@@ -82,6 +89,27 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
 };
+
+// Returns the active cameraPos/lookAtPos/orbitCenter for the given agent.
+// On mobile, MOBILE_CAMERA_OFFSET.y is added to the Y component of every
+// vector to compensate for the workstation model's mobile-only vertical
+// shift. Always returns fresh THREE.Vector3 instances safe to mutate.
+export function resolveAgentSettings(agentId, isMobile) {
+  const base = AGENT_CAMERA_SETTINGS[agentId];
+  if (!base) return null;
+  const dy = isMobile ? (MOBILE_CAMERA_OFFSET.y || 0) : 0;
+  const apply = (v) => {
+    if (!v) return null;
+    const out = v.clone();
+    if (dy) out.y += dy;
+    return out;
+  };
+  return {
+    cameraPos: apply(base.cameraPos),
+    lookAtPos: apply(base.lookAtPos),
+    orbitCenter: apply(base.orbitCenter),
+  };
+}
 
 // --- Word cluster configuration ---
 const WORD_CLUSTER_WORDS = [
@@ -206,6 +234,7 @@ const CyborgTempleScene = ({
   disableCandleInteraction = false, // When true, XCandle nodes are not made clickable (no zoom-to-candle, no inspector)
   jackpotOnlyFistPump = false, // When true, FistPump only fires from slotMachineJackpot — removed from Demon's random alternation and the price-poll trigger
   gameStarted = false, // When true, the monk_hail/monk_beckon attention-getter loop is allowed to run. Held off until the user clicks START in GameOverlay.
+  showCharacterHints = false, // When true, render small "?" badges over each agent's head as a tap affordance
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -241,17 +270,16 @@ const CyborgTempleScene = ({
     if (!window.location.search.includes('tune=1')) return;
     window.__cameraTuner = {
       settings: AGENT_CAMERA_SETTINGS,
-      focusOn: (agentId) => {
-        const s = AGENT_CAMERA_SETTINGS[agentId];
-        if (!s) return;
-        if (originalCameraPosition.current == null) {
-          // Stash camera so Escape (and panel "reset") can return to overview.
-          originalCameraPosition.current = null; // let the click handler set this on next real click
-        }
+      mobileOffset: MOBILE_CAMERA_OFFSET,
+      // Pass `mobilePreview: true` from the panel to preview the mobile
+      // Y-offset without changing the device.
+      focusOn: (agentId, mobilePreview = false) => {
+        const resolved = resolveAgentSettings(agentId, mobilePreview);
+        if (!resolved) return;
         setFocusTarget({
-          position: s.cameraPos.clone(),
-          lookAt: s.lookAtPos.clone(),
-          orbitCenter: s.orbitCenter ? s.orbitCenter.clone() : null,
+          position: resolved.cameraPos,
+          lookAt: resolved.lookAtPos,
+          orbitCenter: resolved.orbitCenter,
           agentId,
           agentName: agentId,
         });
@@ -305,6 +333,11 @@ const CyborgTempleScene = ({
   const rl80HeadBoneRef = useRef();
   const rl80FocusedRef = useRef(false); // true when camera is zoomed in on RL80
   const fluffyHeadBoneRef = useRef();
+  // Hint marker group refs (positioned each frame from the head bones)
+  const rl80HintRef = useRef();
+  const demonHintRef = useRef();
+  const monkHintRef = useRef();
+  const fluffyHintRef = useRef();
   const fluffyFocusedRef = useRef(false); // true when camera is zoomed in on Fluffy
 
   // Demon eye mesh ref and blink state
@@ -1731,8 +1764,8 @@ const CyborgTempleScene = ({
           
           setTimeout(() => {
             setFocusTarget(null);
-            // Clear the stored position after reset
-            originalCameraPosition.current = null;
+            // Keep originalCameraPosition pinned to the page-load position
+            // so subsequent focus/un-focus cycles return here too.
           }, 1000);
         } else {
           setFocusTarget(null);
@@ -2027,10 +2060,10 @@ const CyborgTempleScene = ({
                 }
               }));
             } else {
-              // First click — zoom camera to candle
-              if (!focusTarget) {
-                originalCameraPosition.current = camera.position.clone();
-              }
+              // First click — zoom camera to candle. Don't overwrite
+              // originalCameraPosition here; it was captured once at mount and
+              // represents the page-load camera position the user expects to
+              // return to on un-focus.
               const targetObj = object.userData.targetObject || object;
               const candleWorldPos = new THREE.Vector3();
               targetObj.getWorldPosition(candleWorldPos);
@@ -2064,7 +2097,8 @@ const CyborgTempleScene = ({
               });
               setTimeout(() => {
                 setFocusTarget(null);
-                originalCameraPosition.current = null;
+                // Keep originalCameraPosition pinned — it represents the
+                // page-load overview position, not the most recent un-focus.
               }, 1000);
             } else {
               setFocusTarget(null);
@@ -2072,19 +2106,18 @@ const CyborgTempleScene = ({
             break;
           }
 
-          // Store the current camera position BEFORE any animation
-          // But only if we're not already focused on something
-          if (!focusTarget) {
-            originalCameraPosition.current = camera.position.clone();
-          }
+          // originalCameraPosition was captured once at mount (line ~1535)
+          // and stays pinned to the page-load camera position. Don't refresh
+          // it here — that would mean the user returns to wherever they were
+          // mid-orbit before clicking, instead of the original overview.
 
           // Get the target object's world position
           const targetObject = object.userData.targetObject || object;
           const objectWorldPos = new THREE.Vector3();
           targetObject.getWorldPosition(objectWorldPos);
           
-          const settings = AGENT_CAMERA_SETTINGS[object.userData.agentId];
-          
+          const settings = resolveAgentSettings(object.userData.agentId, isOnMobile);
+
           if (!settings) {
             // Fallback: calculate a reasonable position based on object location
             const cameraPosition = new THREE.Vector3(
@@ -2094,7 +2127,7 @@ const CyborgTempleScene = ({
             );
             const lookAtTarget = objectWorldPos.clone();
             lookAtTarget.y += 0.5;
-            
+
             setFocusTarget({
               position: cameraPosition,
               lookAt: lookAtTarget,
@@ -2102,18 +2135,17 @@ const CyborgTempleScene = ({
               agentName: object.userData.agentName
             });
           } else {
-            // Use absolute positions for known agents. On mobile we widen the
-            // FOV during focus instead of moving the camera — the desktop
-            // camera positions sit between the center console and the
-            // characters, so pulling further along that vector punches through
-            // the console mesh. Wider FOV makes the subject read smaller in
-            // the portrait viewport without changing camera position.
+            // Use absolute positions for known agents. resolveAgentSettings()
+            // already merged any mobile overrides on top of the desktop values.
+            // On mobile we additionally widen the FOV during focus so the
+            // subject reads smaller in the portrait viewport without changing
+            // camera position.
             setFocusTarget({
-              position: settings.cameraPos.clone(),
-              lookAt: settings.lookAtPos.clone(),
+              position: settings.cameraPos,
+              lookAt: settings.lookAtPos,
               // Optional override: where OrbitControls revolves around after
               // the fly-in arrives. Defaults to lookAt when not provided.
-              orbitCenter: settings.orbitCenter ? settings.orbitCenter.clone() : null,
+              orbitCenter: settings.orbitCenter,
               fov: isMobile ? 75 : undefined,
               agentId: object.userData.agentId,
               agentName: object.userData.agentName
@@ -2267,7 +2299,7 @@ const CyborgTempleScene = ({
           });
           setTimeout(() => {
             setFocusTarget(null);
-            originalCameraPosition.current = null;
+            // Don't null originalCameraPosition — keep page-load anchor.
           }, 1000);
         } else {
           setFocusTarget(null);
@@ -2343,7 +2375,7 @@ const CyborgTempleScene = ({
         });
         setTimeout(() => {
           setFocusTarget(null);
-          originalCameraPosition.current = null;
+          // Don't null originalCameraPosition — keep page-load anchor.
         }, 1000);
       } else {
         setFocusTarget(null);
@@ -3596,23 +3628,73 @@ const CyborgTempleScene = ({
           coinRef.current.position.y = coinRef.current.userData.initialY + yOffset;
         }
       };
-      
+
+    }
+
+    // Pin character hint markers above each agent's head bone (world space)
+    if (showCharacterHints) {
+      const hintPairs = [
+        [rl80HeadBoneRef.current, rl80HintRef.current],
+        [demonHeadBoneRef.current, demonHintRef.current],
+        [monkHeadBoneRef.current, monkHintRef.current],
+        [fluffyHeadBoneRef.current, fluffyHintRef.current],
+      ];
+      for (const [bone, marker] of hintPairs) {
+        if (bone && marker) {
+          bone.getWorldPosition(marker.position);
+          marker.position.y += 0.18;
+        }
+      }
     }
   });
 
-  // Always return the group that contains the model  
+  // Always return the group that contains the model
   return (
-    
-    <group ref={groupRef} visible={true} position={position} scale={scale} rotation={rotation}>
-      {/* The 3D model is added dynamically in useEffect */}
-      <HolographicStatue3
-              position={[-0.085, 0.5, -0.03]}
-              scale={[0.5, 0.5, 0.5]}
-              rotation={[0, -Math.PI * 0.2, 0]}
-              hover={false}
-              rotate={true}
-            />
-    </group>
+    <>
+      <group ref={groupRef} visible={true} position={position} scale={scale} rotation={rotation}>
+        {/* The 3D model is added dynamically in useEffect */}
+        <HolographicStatue3
+                position={[-0.085, 0.5, -0.03]}
+                scale={[0.5, 0.5, 0.5]}
+                rotation={[0, -Math.PI * 0.2, 0]}
+                hover={false}
+                rotate={true}
+              />
+      </group>
+      {showCharacterHints && [
+        { id: 'RL80', ref: rl80HintRef },
+        { id: 'Demon', ref: demonHintRef },
+        { id: 'Monk', ref: monkHintRef },
+        { id: 'Fluffy', ref: fluffyHintRef },
+      ].map(({ id, ref }) => (
+        <group key={id} ref={ref} position={[0, 9999, 0]}>
+          <Html center occlude zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
+            <button
+              onPointerDown={(e) => { e.stopPropagation(); onAgentClick && onAgentClick(id); }}
+              aria-label={`Tap to meet ${id}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                position: 'relative',
+                top: '-1rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                cursor: 'pointer',
+                pointerEvents: 'auto',
+                fontSize: '2rem',
+                lineHeight: 1,
+                filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.6))',
+                animation: 'characterHintIconPulse 2.4s ease-in-out infinite',
+              }}
+            >
+              <span role="img" aria-hidden="true">💬</span>
+            </button>
+          </Html>
+        </group>
+      ))}
+    </>
   );
 };
 

@@ -18,7 +18,14 @@ const formatSubCentPrice = (p) => {
   return `$0.0${toSubscript(zeros)}${sig}`;
 };
 
-const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
+const TickerDisplay3 = ({
+  modelRef,
+  is80sMode = false,
+  onLoad,
+  isMobile = false,
+  yPosition = -1.23,
+  mobileYPosition = -0.33,
+}) => {
   const meshRef = useRef();
   const canvasRef = useRef();
   const textureRef = useRef();
@@ -116,10 +123,11 @@ const TickerDisplay3 = ({ modelRef, is80sMode = false, onLoad }) => {
     }
 
     // Set a fixed position for the ticker instead of searching for it
-    setTickerPosition(new THREE.Vector3(0.0, -1.23, 0.0)); // Position at ground level
+    const y = isMobile ? mobileYPosition : yPosition;
+    setTickerPosition(new THREE.Vector3(0.0, y, 0.0)); // Position at ground level
     setTickerRotation(new THREE.Euler(0, 0, 0));
     setTickerScale(new THREE.Vector3(2.23, 2.23, 2.23));
-  }, [isReady]); // Only depend on isReady
+  }, [isReady, isMobile, yPosition, mobileYPosition]);
 
   // Initialize canvas and texture when ticker position is found
   useEffect(() => {
