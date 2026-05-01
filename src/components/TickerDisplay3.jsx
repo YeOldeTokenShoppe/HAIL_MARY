@@ -23,7 +23,7 @@ const TickerDisplay3 = ({
   is80sMode = false,
   onLoad,
   isMobile = false,
-  yPosition = -1.23,
+  yPosition = -1.53,
   mobileYPosition = -0.83,
 }) => {
   const meshRef = useRef();

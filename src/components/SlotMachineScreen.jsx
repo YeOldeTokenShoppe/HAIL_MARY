@@ -164,20 +164,14 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal, onWin }) => {
       const W = canvas.width
       const H = canvas.height
 
-      // Machine body — brushed metal gradient
-      const bodyGrad = ctx.createLinearGradient(0, 0, W, H)
-      bodyGrad.addColorStop(0, '#9a9a9a')
-      bodyGrad.addColorStop(0.5, '#d4d4d4')
-      bodyGrad.addColorStop(1, '#8f8f8f')
-      ctx.fillStyle = bodyGrad
+      // Machine body
+      ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, W, H)
 
       // Inner bezel
       const pad = 18
-      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.fillStyle = '#000'
       ctx.fillRect(pad, pad, W - pad * 2, H - pad * 2)
-      ctx.fillStyle = '#2a2a2a'
-      ctx.fillRect(pad + 2, pad + 2, W - pad * 2 - 4, H - pad * 2 - 4)
 
       // Reel geometry — three reels centered horizontally, full inner height
       const reelH = H - pad * 2 - 16

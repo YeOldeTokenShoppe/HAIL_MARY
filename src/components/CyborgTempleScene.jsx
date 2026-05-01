@@ -21,18 +21,18 @@ export const MOBILE_CAMERA_OFFSET = { y: 0.7 };
 
 export const AGENT_CAMERA_SETTINGS = {
   RL80: {
-    cameraPos: new THREE.Vector3(2.205, 0.14, 0.68),
-    lookAtPos: new THREE.Vector3(-0.84, -0.33, 0.675),
+    cameraPos: new THREE.Vector3(1.91, -0.07, 0.595),
+    lookAtPos: new THREE.Vector3(-0.775, -0.73, 0.755),
     orbitCenter: null,
   },
   Demon: {
-    cameraPos: new THREE.Vector3(-1.88, 0.28, -0.47),
-    lookAtPos: new THREE.Vector3(0.605, -0.535, -2.06),
+    cameraPos: new THREE.Vector3(-1.88, -0.02, -0.47),
+    lookAtPos: new THREE.Vector3(0.605, -0.235, -2.06),
     // orbitCenter: new THREE.Vector3(-1.554, -0.35, -1.351),
   },
   Monk: {
-    cameraPos: new THREE.Vector3(-0.61, -0.1, 1.645),
-    lookAtPos: new THREE.Vector3(-1.295, -0.155, 0.085),
+    cameraPos: new THREE.Vector3(-0.61, -0.31, 1.645),
+    lookAtPos: new THREE.Vector3(-1.295, -0.305, 0.085),
     orbitCenter: null,
   },
 
@@ -47,45 +47,45 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Screen1: {
-    cameraPos: new THREE.Vector3(-0.84, -0.09, -0.81),
-    lookAtPos: new THREE.Vector3(-0.28, -0.27, 1.445),
+    cameraPos: new THREE.Vector3(-0.84, -0.655, -0.81),
+    lookAtPos: new THREE.Vector3(-0.48, -0.27, 1.445),
     orbitCenter: null,
   },
   Screen2: {
-    cameraPos: new THREE.Vector3(-0.81, 0.03, 0.71),
+    cameraPos: new THREE.Vector3(-0.81, -0.605, 0.84),
     lookAtPos: new THREE.Vector3(1.57, -0.25, 0.205),
     orbitCenter: null,
   },
   Screen3: {
-    cameraPos: new THREE.Vector3(0.73, -0.02, -0.77),
-    lookAtPos: new THREE.Vector3(-0.585, -0.005, -0.47),
+    cameraPos: new THREE.Vector3(0.73, -0.32, -0.77),
+    lookAtPos: new THREE.Vector3(-0.585, -0.305, -0.47),
     orbitCenter: null,
   },
   Screen4: {
-    cameraPos: new THREE.Vector3(0.765, -0.06, 0.66),
-    lookAtPos: new THREE.Vector3(0.595, -0.05, -0.005),
+    cameraPos: new THREE.Vector3(0.765, -0.36, 0.66),
+    lookAtPos: new THREE.Vector3(0.595, -0.35, -0.005),
     orbitCenter: null,
   },
   // ScreenA-D are the secondary (council-chat) monitors. Initial values
   // mirror each character's primary-screen sibling — tune with ?tune=1.
   ScreenA: {
-    cameraPos: new THREE.Vector3(-1.27, 0.105, -0.87),
-    lookAtPos: new THREE.Vector3(-1.525, -0.135, 0.31),
+    cameraPos: new THREE.Vector3(-1.27, -0.455, -0.87),
+    lookAtPos: new THREE.Vector3(-1.525, -0.34, 0.31),
     orbitCenter: null,
   },
   ScreenB: {
-    cameraPos: new THREE.Vector3(-0.865, -0.2, 1.035),
-    lookAtPos: new THREE.Vector3(0.635, 0.03, 1.52),
+    cameraPos: new THREE.Vector3(-0.92, -0.6, 1.28),
+    lookAtPos: new THREE.Vector3(0.47, -0.32, 1.34),
     orbitCenter: null,
   },
   ScreenC: {
-    cameraPos: new THREE.Vector3(0.695, 0.08, -1.12),
-    lookAtPos: new THREE.Vector3(-0.865, -0.155, -1.525),
+    cameraPos: new THREE.Vector3(0.695, -0.22, -1.12),
+    lookAtPos: new THREE.Vector3(-0.865, -0.455, -1.525),
     orbitCenter: null,
   },
   ScreenD: {
-    cameraPos: new THREE.Vector3(0.97, -0.09, 0.89),
-    lookAtPos: new THREE.Vector3(1.615, 0.015, -1.015),
+    cameraPos: new THREE.Vector3(1.005, -0.49, 0.7),
+    lookAtPos: new THREE.Vector3(1.615, -0.305, -1.015),
     orbitCenter: null,
   },
 };
@@ -94,7 +94,7 @@ export const AGENT_CAMERA_SETTINGS = {
 // Desktop and mobile positions tuned independently — mobile model shifts
 // the workstation up so the statue has its own offset.
 export const HOLO_STATUE_DESKTOP = {
-  position: [-0.085, 0.5, -0.03],
+  position: [-0.085, 0.2, -0.03],
   scale: [0.5, 0.5, 0.5],
   rotation: [0, -Math.PI * 0.2, 0],
 };
@@ -624,7 +624,7 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v7_opt.glb";
+    let modelPath = "/models/RL80_4anims_v9_opt.glb";
     const fallbackModelPath = "/models/RL80_4anims_v5_Compact.glb";
     let usingFallback = false;
     const startTime = performance.now();

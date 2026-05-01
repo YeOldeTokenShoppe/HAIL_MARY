@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import CleanCanvas from '@/components/CleanCanvas';
 import FullscreenCRTOverlay from '@/components/FullscreenCRTOverlay';
+import FullscreenChatOverlay from '@/components/FullscreenChatOverlay';
 import { OrbitControls, Stats, Cloud, Clouds } from '@react-three/drei';
 import ConstellationModel from '@/components/ConstellationModel';
 import Aurora from '@/components/Aurora';
@@ -152,10 +153,18 @@ export default function CyborgTemple() {
   // after the camera fly-in. The 3D screens are unreadable on phones.
   const [screenOverlay, setScreenOverlay] = useState(null);
   const screenOverlayTimerRef = useRef(null);
+  // Mobile-only: ScreenA-D all paint the same council group chat. After the
+  // fly-in, fade in a readable chat overlay instead of the canvas-painted
+  // texture (illegible at phone resolution).
+  const [chatOverlay, setChatOverlay] = useState(false);
+  const chatOverlayTimerRef = useRef(null);
   useEffect(() => {
     return () => {
       if (screenOverlayTimerRef.current) {
         clearTimeout(screenOverlayTimerRef.current);
+      }
+      if (chatOverlayTimerRef.current) {
+        clearTimeout(chatOverlayTimerRef.current);
       }
     };
   }, []);
@@ -229,8 +238,8 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      // const modelToPreload = '/models/RL80_4anims_v2_opt.glb';
-          const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
+      const modelToPreload = '/models/RL80_4anims_v9_opt.glb';
+          // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');
@@ -757,7 +766,7 @@ export default function CyborgTemple() {
             // Mobile was framed for the old compact MOBILE3.glb — now that it loads
             // the full desktop scene, pull back + widen FOV so the whole tableau
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
-            position: isMobileView ? [0, 2.1, 7.5] : [0, 0.5, 6.0],
+            position: isMobileView ? [0, 2.1, 7.5] : [0, 0.5, 6.5],
             fov: isMobileView ? 55 : 50
           }}
           gl={{ 
@@ -963,7 +972,7 @@ export default function CyborgTemple() {
             
             {/* CyborgTempleScene with the RL80 model */}
             <CyborgTempleScene
-              position={isMobileView ? [0, -1.2, 0] : [0, -1.6, 0]}
+              position={isMobileView ? [0, -1.2, 0] : [0, -1.9, 0]}
               scale={[1.2, 1.2, 1.2]}
               rotation={[0, 0, 0]}
               isPlaying={false}
@@ -998,6 +1007,16 @@ export default function CyborgTemple() {
                       setScreenOverlay(agentId);
                     }, 1100);
                   }
+                  // Mobile: ScreenA-D share the council group chat — fade in
+                  // the readable chat overlay after the fly-in completes.
+                  if (isMobileView && /^Screen[A-D]$/.test(agentId)) {
+                    if (chatOverlayTimerRef.current) {
+                      clearTimeout(chatOverlayTimerRef.current);
+                    }
+                    chatOverlayTimerRef.current = setTimeout(() => {
+                      setChatOverlay(true);
+                    }, 1100);
+                  }
                 } else {
                   setFocusedAgent(null);
                   if (screenOverlayTimerRef.current) {
@@ -1005,6 +1024,11 @@ export default function CyborgTemple() {
                     screenOverlayTimerRef.current = null;
                   }
                   setScreenOverlay(null);
+                  if (chatOverlayTimerRef.current) {
+                    clearTimeout(chatOverlayTimerRef.current);
+                    chatOverlayTimerRef.current = null;
+                  }
+                  setChatOverlay(false);
                 }
               }}
             />
@@ -1418,6 +1442,20 @@ export default function CyborgTemple() {
                 terminalTitle={screenOverlay ? SCREEN_OVERLAY_STUBS[screenOverlay].title : ''}
                 terminalStatus="MOBILE PREVIEW"
                 tapToReturnLabel="> tap anywhere to return"
+              />,
+              document.body
+            )}
+
+            {/* Mobile fullscreen council-chat overlay for ScreenA-D taps. */}
+            {typeof document !== 'undefined' && createPortal(
+              <FullscreenChatOverlay
+                isActive={chatOverlay}
+                onClose={() => {
+                  setChatOverlay(false);
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('screenGoBack'));
+                  }
+                }}
               />,
               document.body
             )}

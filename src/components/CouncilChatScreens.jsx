@@ -26,7 +26,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 
 // ---------- Speaker styling ----------
 
-const SPEAKERS = {
+export const SPEAKERS = {
   GR: { name: "ST. GR80", color: "#4dffaa" }, // monk — phosphor green
   HZ: { name: "H80Z",     color: "#ff4d6d" }, // demon — adversary red
   TK: { name: "TEKNO",    color: "#6bb8ff" }, // builder — cyan
@@ -37,7 +37,7 @@ const SPEAKERS = {
 // 50 messages, mixed lengths, written to expose each character's voice and
 // quietly reveal lore (candles, indexer, prayers, the gas refunder reveal).
 
-const CHAT = [
+export const CHAT = [
   { s: "GR", t: "log: candle 0xa37b lit 14:33. sender = new wallet, no hist." },
   { s: "HZ", t: "burner." },
   { s: "GR", t: "noted." },
