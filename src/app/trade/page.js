@@ -1010,9 +1010,16 @@ export default function CyborgTemple() {
             />
 
             {/* TickerDisplay3 — now rendered on both mobile and desktop since
-                they share the same GLB model. */}
+                they share the same GLB model. autoRotate props mirror the
+                OrbitControls below so the cylinder spins opposite the camera. */}
             {tickerReady && (
-              <TickerDisplay3 modelRef={null} onLoad={handleTickerLoad} isMobile={isMobileView} />
+              <TickerDisplay3
+                modelRef={null}
+                onLoad={handleTickerLoad}
+                isMobile={isMobileView}
+                autoRotate={!focusedAgent}
+                autoRotateSpeed={0.4}
+              />
             )}
 
           

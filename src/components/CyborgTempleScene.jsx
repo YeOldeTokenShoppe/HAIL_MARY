@@ -624,7 +624,7 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v5_Compact.glb";
+    let modelPath = "/models/RL80_4anims_v7_opt.glb";
     const fallbackModelPath = "/models/RL80_4anims_v5_Compact.glb";
     let usingFallback = false;
     const startTime = performance.now();
@@ -3555,111 +3555,24 @@ const CyborgTempleScene = ({
         angelEmptyRef.current.position.y = angelEmptyRef.current.userData.originalY + Math.sin(time * 0.8) * 0.01; // Gentle hover with 0.05 units amplitude
       }
       
-      // Coin animations - subtle individual hovering
-      const time = state.clock.getElapsedTime();
-      
-      // Helper function for individual coin hovering with click effects
-      const hoverCoin = (coinRef, coinName, phaseOffset, speed = 1.2, amplitude = 0.01) => {
-        if (!coinRef.current) return;
-        
-        const animState = coinAnimationState.current[coinName];
-        
-        // Store initial Y position if not set
-        if (coinRef.current.userData.initialY === undefined) {
-          coinRef.current.userData.initialY = coinRef.current.position.y;
-        }
-        
-        // Calculate base hover
-        let yOffset = Math.sin(time * speed + phaseOffset) * amplitude;
-        
-        // Add flutter animation if coin was clicked
-        if (animState && animState.isAnimating) {
-          const elapsed = (Date.now() - animState.startTime) / 1000; // Convert to seconds
-          const flutterDecay = Math.exp(-elapsed * 2); // Slower decay over time
-          
-          // Remove the vertical bounce - just keep the base hover
-          // yOffset is already set from the base hover calculation above
-          
-          // Add rotation tilt on Y-axis - back and forth a couple times
-          if (coinRef.current.rotation) {
-            // Use a moderate speed for a nice spin effect
-            const tiltSpeed = 6; // Speed of the rotation oscillation
-            const tiltAmount = 0.6; // About 34 degrees max tilt - more pronounced
-            // Sin wave creates smooth back and forth motion that decays
-            coinRef.current.rotation.y = Math.sin(elapsed * tiltSpeed) * tiltAmount * flutterDecay;
-            
-            // Optional: Add a slight continuous spin as well
-            // coinRef.current.rotation.y += elapsed * 2 * flutterDecay; // Continuous spin overlay
-          }
-          
-          // Add glow effect by modifying emissive
-          coinRef.current.traverse((child) => {
-            if (child.isMesh && child.material) {
-              if (!child.material.userData.originalEmissive) {
-                child.material.userData.originalEmissive = child.material.emissive ? 
-                  child.material.emissive.clone() : new THREE.Color(0x000000);
-                child.material.userData.originalIntensity = child.material.emissiveIntensity || 0;
-              }
-              
-              // Pulse the emissive glow
-              const glowIntensity = 5 * flutterDecay * (0.5 + 0.5 * Math.sin(elapsed * 10));
-              const colors = {
-                'Coin1': 0x00ff00, // Green
-                'Coin2': 0x00ffff, // Cyan
-                'Coin3': 0xff00ff, // Magenta
-                'Coin4': 0xffdd00  // Gold
-              };
-              
-              if (child.material.emissive) {
-                child.material.emissive = new THREE.Color(colors[coinName] || 0xffdd00);
-              }
-              child.material.emissiveIntensity = child.material.userData.originalIntensity + glowIntensity;
-            }
-          });
-        } else {
-          // Reset rotation when not animating
-          if (coinRef.current.rotation) {
-            coinRef.current.rotation.y *= 0.95; // Smooth return to zero on Y-axis
-          }
-          
-          // Reset emissive if not hovering
-          if (!hoveredCoin || hoveredCoin !== coinName) {
-            coinRef.current.traverse((child) => {
-              if (child.isMesh && child.material && child.material.userData.originalEmissive) {
-                child.material.emissive = child.material.userData.originalEmissive;
-                child.material.emissiveIntensity = child.material.userData.originalIntensity;
-              }
-            });
-          }
-        }
-        
-        // Apply position with special handling for Group coins
-        if (coinRef.current.name === 'Coin3' && coinRef.current.type === 'Group') {
-          // Use much smaller amplitude for the Group
-          coinRef.current.position.y = coinRef.current.userData.initialY + yOffset * 0.1;
-        } else {
-          // Normal handling for Mesh coins
-          coinRef.current.position.y = coinRef.current.userData.initialY + yOffset;
-        }
-      };
 
     }
 
     // Pin character hint markers above each agent's head bone (world space)
-    if (showCharacterHints) {
-      const hintPairs = [
-        [rl80HeadBoneRef.current, rl80HintRef.current],
-        [demonHeadBoneRef.current, demonHintRef.current],
-        [monkHeadBoneRef.current, monkHintRef.current],
-        [fluffyHeadBoneRef.current, fluffyHintRef.current],
-      ];
-      for (const [bone, marker] of hintPairs) {
-        if (bone && marker) {
-          bone.getWorldPosition(marker.position);
-          marker.position.y += 0.18;
-        }
-      }
-    }
+    // if (showCharacterHints) {
+    //   const hintPairs = [
+    //     [rl80HeadBoneRef.current, rl80HintRef.current],
+    //     [demonHeadBoneRef.current, demonHintRef.current],
+    //     [monkHeadBoneRef.current, monkHintRef.current],
+    //     [fluffyHeadBoneRef.current, fluffyHintRef.current],
+    //   ];
+    //   for (const [bone, marker] of hintPairs) {
+    //     if (bone && marker) {
+    //       bone.getWorldPosition(marker.position);
+    //       marker.position.y += 0.18;
+    //     }
+    //   }
+    // }
   });
 
   // Always return the group that contains the model

@@ -485,7 +485,7 @@ const TickerDisplay3 = ({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Update scroll position for continuous scrolling (slower speed)
-    scrollPos.current = (scrollPos.current + 0.2) % canvas.width; // Reduced speed from 2 to 0.5
+    scrollPos.current = (scrollPos.current + 0.4) % canvas.width; // Reduced speed from 2 to 0.5
 
     // Draw text
     ctx.textBaseline = "middle";
