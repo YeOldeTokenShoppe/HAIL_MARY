@@ -787,7 +787,7 @@ export default function CyborgTemple() {
         >
           <fog attach="fog" args={context80sMode ? ['#1a0033', 50, 300] : ['#000000', 20, 200]} />
           <Suspense fallback={null}>
-            <ambientLight intensity={0.5} />
+            <ambientLight intensity={1.5} />
             <PostProcessingEffects is80sMode={context80sMode} />
             
             {/* Synthwave sunset for 80s mode - desktop only */}
