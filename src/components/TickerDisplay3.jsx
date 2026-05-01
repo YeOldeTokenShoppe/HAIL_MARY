@@ -24,7 +24,7 @@ const TickerDisplay3 = ({
   onLoad,
   isMobile = false,
   yPosition = -1.23,
-  mobileYPosition = -0.33,
+  mobileYPosition = -0.83,
 }) => {
   const meshRef = useRef();
   const canvasRef = useRef();

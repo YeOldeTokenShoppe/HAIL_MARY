@@ -963,7 +963,7 @@ export default function CyborgTemple() {
             
             {/* CyborgTempleScene with the RL80 model */}
             <CyborgTempleScene
-              position={isMobileView ? [0, -0.7, 0] : [0, -1.6, 0]}
+              position={isMobileView ? [0, -1.2, 0] : [0, -1.6, 0]}
               scale={[1.2, 1.2, 1.2]}
               rotation={[0, 0, 0]}
               isPlaying={false}
@@ -1059,6 +1059,9 @@ export default function CyborgTemple() {
               dampingFactor={0.1}
               minDistance={0.1}
               maxDistance={10}
+              // Clamp polar angle so the camera can't dip beneath the platform
+              minPolarAngle={Math.PI * 0.18}
+              maxPolarAngle={Math.PI * 0.52}
               // zoomToCursor={true}
               autoRotate={!focusedAgent}
               autoRotateSpeed={0.4}
@@ -1254,7 +1257,7 @@ export default function CyborgTemple() {
                   ) : (
                     <button
                       onClick={() => setShowEntryOverlay(true)}
-                      aria-label="Choose option"
+                      aria-label="Select option"
                       style={{
                         minWidth: 220,
                         height: 60,
@@ -1272,7 +1275,7 @@ export default function CyborgTemple() {
                         boxShadow: '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
                       }}
                     >
-                      ✦ CHOOSE OPTION
+                      ✦ SELECT OPTION
                     </button>
                   )
                 }

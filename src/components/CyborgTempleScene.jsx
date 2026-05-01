@@ -99,7 +99,7 @@ export const HOLO_STATUE_DESKTOP = {
   rotation: [0, -Math.PI * 0.2, 0],
 };
 export const HOLO_STATUE_MOBILE = {
-  position: [-0.085, 1.4, -0.03], // placeholder — tune for the mobile shift
+  position: [-0.085, 0.9, -0.03], // placeholder — tune for the mobile shift
   scale: [0.5, 0.5, 0.5],
   rotation: [0, -Math.PI * 0.2, 0],
 };
@@ -1547,6 +1547,15 @@ const CyborgTempleScene = ({
       originalCameraPosition.current = camera.position.clone();
     }
   }, [camera]);
+
+  // Resting orbit pivot — sits near the workstation/character cluster so
+  // OrbitControls rotates around the visible center of the model rather than
+  // world origin. Mirrors the model's position offset between mobile/desktop.
+  const restingOrbitCenter = useMemo(
+    () => new THREE.Vector3(0, isMobile ? 0.0 : -0.5, 0),
+    [isMobile]
+  );
+  const orbitTargetInitedRef = useRef(false);
   
   // Update PalmTree visibility when is80sMode changes
   useEffect(() => {
@@ -1770,7 +1779,7 @@ const CyborgTempleScene = ({
         if (originalCameraPosition.current) {
           const resetTarget = {
             position: originalCameraPosition.current.clone(),
-            lookAt: new THREE.Vector3(0, 0, 0),
+            lookAt: restingOrbitCenter.clone(),
             agentId: null,
             agentName: 'Reset'
           };
@@ -2102,7 +2111,7 @@ const CyborgTempleScene = ({
             if (originalCameraPosition.current) {
               setFocusTarget({
                 position: originalCameraPosition.current.clone(),
-                lookAt: new THREE.Vector3(0, 0, 0),
+                lookAt: restingOrbitCenter.clone(),
                 // Restore the default FOV on un-focus (mobile widens during
                 // focus; this lerps it back).
                 fov: isMobile ? 55 : 50,
@@ -2307,7 +2316,7 @@ const CyborgTempleScene = ({
         if (originalCameraPosition.current) {
           setFocusTarget({
             position: originalCameraPosition.current.clone(),
-            lookAt: new THREE.Vector3(0, 0, 0),
+            lookAt: restingOrbitCenter.clone(),
             agentId: null,
             agentName: 'Reset'
           });
@@ -2383,7 +2392,7 @@ const CyborgTempleScene = ({
       if (originalCameraPosition.current) {
         setFocusTarget({
           position: originalCameraPosition.current.clone(),
-          lookAt: new THREE.Vector3(0, 0, 0),
+          lookAt: restingOrbitCenter.clone(),
           agentId: null,
           agentName: 'Reset'
         });
@@ -2425,6 +2434,14 @@ const CyborgTempleScene = ({
     flameMaterialsRef.current.forEach(mat => {
       mat.uniforms.uTime.value = state.clock.elapsedTime;
     });
+
+    // One-shot: nudge OrbitControls' initial pivot from world origin to the
+    // workstation center so resting rotation feels centered on the model.
+    if (!orbitTargetInitedRef.current && state.controls && state.controls.target) {
+      state.controls.target.copy(restingOrbitCenter);
+      state.controls.update();
+      orbitTargetInitedRef.current = true;
+    }
 
     // Update all character mixers independently
     if (mixersRef.current) {
@@ -3435,6 +3452,26 @@ const CyborgTempleScene = ({
             if (state.controls && state.controls.target) {
               state.controls.target.copy(focusTarget.lookAt);
               state.controls.update();
+            }
+            // If no explicit orbitCenter was provided, derive one from the
+            // focused character's head bone so OrbitControls revolves around
+            // the actual character once it takes over.
+            if (!focusTarget.orbitCenter) {
+              const headBoneByAgent = {
+                RL80: rl80HeadBoneRef,
+                Demon: demonHeadBoneRef,
+                Monk: monkHeadBoneRef,
+                Fluffy: fluffyHeadBoneRef,
+              };
+              const boneRef = headBoneByAgent[focusTarget.agentId];
+              if (boneRef && boneRef.current) {
+                const pivot = new THREE.Vector3();
+                boneRef.current.getWorldPosition(pivot);
+                // Drop pivot toward chest height so orbit feels balanced
+                // around the body rather than spinning around the head.
+                pivot.y -= 0.25;
+                focusTarget.orbitCenter = pivot;
+              }
             }
             // Fire one-shot Unicorn_waving 2s after the camera settles in
             // front of him. The wave clip is additive (see clip-loading
