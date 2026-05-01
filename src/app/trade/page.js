@@ -1266,7 +1266,7 @@ export default function CyborgTemple() {
                   ) : (
                     <button
                       onClick={() => setShowEntryOverlay(true)}
-                      aria-label="Choose path"
+                      aria-label="Choose option"
                       style={{
                         minWidth: 220,
                         height: 60,
@@ -1284,7 +1284,7 @@ export default function CyborgTemple() {
                         boxShadow: '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
                       }}
                     >
-                      ✦ CHOOSE PATH
+                      ✦ CHOOSE OPTION
                     </button>
                   )
                 }
