@@ -373,6 +373,17 @@ const CyborgTempleScene = ({
     blinkProgress: 0
   });
 
+  // Granny eye mesh refs and blink state. Mesh-swap blink: Eyes is the open
+  // mesh, Closedeyes is a narrower closed shape that takes over for the
+  // blink frames. Reads cleaner than fading opacity (no momentary hole).
+  const grannyEyesRef = useRef();
+  const grannyClosedEyesRef = useRef();
+  const grannyBlinkStateRef = useRef({
+    lastBlinkTime: 0,
+    nextBlinkDelay: Math.random() * 4000 + 3000,
+    isBlinking: false,
+  });
+
   // Unicorn eye mesh refs (L_EYE, R_EYE parented to head bone) — opacity blink
   const unicornEyesRef = useRef([]);
   const unicornBlinkStateRef = useRef({
@@ -644,8 +655,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v15_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v6.glb";
+    let modelPath = "/models/RL80_4anims_v18_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v8.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -772,12 +783,41 @@ const CyborgTempleScene = ({
         }
         else if (child.name === 'GrannyEmpty') {
           animatedCharacters['Granny'] = child;
-          // Find head bone in Granny skeleton for orbit-center derivation
-          child.traverse((bone) => {
-            if (bone.isBone && /head/i.test(bone.name) && !grannyHeadBoneRef.current) {
-              grannyHeadBoneRef.current = bone;
+          // Find head bone (for orbit-center derivation) plus the open/closed
+          // eye meshes. Two-pass to be deterministic regardless of traversal
+          // order: gather all meshes first, then resolve refs from the list.
+          const meshes = [];
+          child.traverse((obj) => {
+            if (obj.isBone && /head/i.test(obj.name) && !grannyHeadBoneRef.current) {
+              grannyHeadBoneRef.current = obj;
             }
+            if (obj.isMesh) meshes.push(obj);
           });
+          // Open eyes: prefer exact "Eyes", fall back to anything matching
+          // "eyes" but not "closed" (handles names like "Eyes_2").
+          let openEyes = meshes.find((m) => /^eyes$/i.test(m.name || ''));
+          if (!openEyes) {
+            openEyes = meshes.find((m) =>
+              /eye/i.test(m.name || '') && !/closed/i.test(m.name || '')
+            );
+          }
+          // Closed eyes: prefer exact "Closedeyes", fall back to anything
+          // with "closed" in the name, then to a different eye-ish mesh
+          // (handles "Eyes.001" naming when mesh-data names leak through).
+          let closedEyes = meshes.find((m) => /^closedeyes(\.\d+)?$/i.test(m.name || ''));
+          if (!closedEyes) {
+            closedEyes = meshes.find((m) => /closed/i.test(m.name || ''));
+          }
+          if (!closedEyes && openEyes) {
+            closedEyes = meshes.find((m) =>
+              m !== openEyes && /eye/i.test(m.name || '')
+            );
+          }
+          if (openEyes) grannyEyesRef.current = openEyes;
+          if (closedEyes) {
+            grannyClosedEyesRef.current = closedEyes;
+            closedEyes.visible = false;
+          }
         }
         // Point.006 was meant to be red in Blender but the GLB exports it as
         // white (color [1,1,1]) — override on the JS side. Intensity in the
@@ -1051,10 +1091,47 @@ const CyborgTempleScene = ({
         console.warn = originalWarn;
       }
       
-      // Create grid ground
-      const gridHelper = new THREE.GridHelper(50, 50, 0x00ff41, 0x00ff41);
-      gridHelper.material.opacity = 0.3;
-      gridHelper.material.transparent = true;
+      // Create grid ground — square grid lines clipped to a circular boundary
+      // so the floor reads as a disc rather than a square plane. Same look as
+      // the previous GridHelper, just bounded.
+      const gridRadius = 25;
+      const gridDivisions = 50;
+      const gridStep = (2 * gridRadius) / gridDivisions;
+      const gridPositions = [];
+      // Lines parallel to Z (constant X): clip to circle x² + z² = r²
+      for (let i = 0; i <= gridDivisions; i++) {
+        const x = -gridRadius + i * gridStep;
+        const dz2 = gridRadius * gridRadius - x * x;
+        if (dz2 <= 0) continue;
+        const z = Math.sqrt(dz2);
+        gridPositions.push(x, 0, -z, x, 0, z);
+      }
+      // Lines parallel to X (constant Z)
+      for (let i = 0; i <= gridDivisions; i++) {
+        const z = -gridRadius + i * gridStep;
+        const dx2 = gridRadius * gridRadius - z * z;
+        if (dx2 <= 0) continue;
+        const x = Math.sqrt(dx2);
+        gridPositions.push(-x, 0, z, x, 0, z);
+      }
+      // Boundary circle outline
+      const circleSegments = 96;
+      for (let i = 0; i < circleSegments; i++) {
+        const a0 = (i / circleSegments) * Math.PI * 2;
+        const a1 = ((i + 1) / circleSegments) * Math.PI * 2;
+        gridPositions.push(
+          gridRadius * Math.cos(a0), 0, gridRadius * Math.sin(a0),
+          gridRadius * Math.cos(a1), 0, gridRadius * Math.sin(a1),
+        );
+      }
+      const gridGeometry = new THREE.BufferGeometry();
+      gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridPositions, 3));
+      const gridMaterial = new THREE.LineBasicMaterial({
+        color: 0x00ff41,
+        opacity: 0.3,
+        transparent: true,
+      });
+      const gridHelper = new THREE.LineSegments(gridGeometry, gridMaterial);
       gridHelper.position.y = -0.06;
       anchorGroup.add(gridHelper);
       
@@ -3328,6 +3405,28 @@ const CyborgTempleScene = ({
             demonBlink.isBlinking = false;
             demonEyesRef.current.material.opacity = 1;
           }
+        }
+      }
+    }
+
+    // Granny eye blink (mesh-swap: Eyes ↔ Closedeyes).
+    if (grannyEyesRef.current) {
+      const currentTime = state.clock.getElapsedTime() * 1000;
+      const blink = grannyBlinkStateRef.current;
+      const closed = grannyClosedEyesRef.current;
+
+      if (!blink.isBlinking && currentTime - blink.lastBlinkTime > blink.nextBlinkDelay) {
+        blink.isBlinking = true;
+        blink.lastBlinkTime = currentTime;
+        blink.nextBlinkDelay = Math.random() * 4000 + 3000;
+        grannyEyesRef.current.visible = false;
+        if (closed) closed.visible = true;
+      } else if (blink.isBlinking) {
+        const blinkDuration = 150;
+        if (currentTime - blink.lastBlinkTime > blinkDuration) {
+          blink.isBlinking = false;
+          grannyEyesRef.current.visible = true;
+          if (closed) closed.visible = false;
         }
       }
     }
