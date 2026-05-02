@@ -41,6 +41,13 @@ export const AGENT_CAMERA_SETTINGS = {
     lookAtPos: new THREE.Vector3(1.87, -1.35, 0.745),
     orbitCenter: null,
   },
+  // Granny — placeholder cameraPos/lookAtPos. Tune via the in-app
+  // CameraTuningPanel (?tune=1) or by editing here directly.
+  Granny: {
+    cameraPos: new THREE.Vector3(0.495, -0.215, -1.915),
+    lookAtPos: new THREE.Vector3(0.57, -1.075, 1.33),
+    orbitCenter: null,
+  },
   Angel: {
     cameraPos: new THREE.Vector3(0, 1.8, 1.2),
     lookAtPos: new THREE.Vector3(0, 1.9, 0),
@@ -347,12 +354,15 @@ const CyborgTempleScene = ({
   const rl80HeadBoneRef = useRef();
   const rl80FocusedRef = useRef(false); // true when camera is zoomed in on RL80
   const fluffyHeadBoneRef = useRef();
+  const grannyHeadBoneRef = useRef();
   // Hint marker group refs (positioned each frame from the head bones)
   const rl80HintRef = useRef();
   const demonHintRef = useRef();
   const monkHintRef = useRef();
   const fluffyHintRef = useRef();
+  const grannyHintRef = useRef();
   const fluffyFocusedRef = useRef(false); // true when camera is zoomed in on Fluffy
+  const grannyFocusedRef = useRef(false); // true when camera is zoomed in on Granny
 
   // Demon eye mesh ref and blink state
   const demonEyesRef = useRef();
@@ -400,6 +410,16 @@ const CyborgTempleScene = ({
     currentAnimation: 'typing_monk',
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 10000 + 15000,
+  });
+
+  // Granny animation state — alternates granny_typing (loop) with
+  // granny_fistPump (one-shot). Mirrors the Demon alternation shape.
+  const grannyAnimStateRef = useRef({
+    currentAnimation: 'granny_typing',
+    lastSwitchTime: 0,
+    nextSwitchDelay: Math.random() * 8000 + 8000,
+    isPlayingSpecial: false,
+    pumpReturnTimeoutId: null, // setTimeout ID for the post-fistPump return-to-typing
   });
 
   // Monk attention-getting one-shot (clip name "Pointing_Monk"). Plays
@@ -624,8 +644,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v9_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v5_Compact.glb";
+    let modelPath = "/models/RL80_4anims_v15_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v6.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -750,6 +770,15 @@ const CyborgTempleScene = ({
             }
           });
         }
+        else if (child.name === 'GrannyEmpty') {
+          animatedCharacters['Granny'] = child;
+          // Find head bone in Granny skeleton for orbit-center derivation
+          child.traverse((bone) => {
+            if (bone.isBone && /head/i.test(bone.name) && !grannyHeadBoneRef.current) {
+              grannyHeadBoneRef.current = bone;
+            }
+          });
+        }
         // Point.006 was meant to be red in Blender but the GLB exports it as
         // white (color [1,1,1]) — override on the JS side. Intensity in the
         // GLB is ~0.27 which reads as nearly invisible against the scene's
@@ -849,8 +878,16 @@ const CyborgTempleScene = ({
 
           let targetCharacters = [];
 
+          // Granny animations — match "granny" anywhere in the clip name or
+          // first-track bone name. Checked before bone-based rules in case
+          // Granny shares a Pelvis/Root skeleton with another character.
+          // Blender often exports as `Armature.NNN|granny_typing` when there
+          // are multiple armatures, so we substring-match instead of anchoring.
+          if (/granny/i.test(animName) || /granny/i.test(firstTrackBone)) {
+            targetCharacters = ['Granny'];
+          }
           // Demon animations (Pelvis-based skeleton)
-          if (firstTrackBone === 'Pelvis') {
+          else if (firstTrackBone === 'Pelvis') {
             targetCharacters = ['Demon'];
           }
           // Monk animations (Root_2-based skeleton, *_monk / *_Monk suffix,
@@ -977,13 +1014,17 @@ const CyborgTempleScene = ({
             } else {
               defaultAnimName = availableAnims[0];
             }
+          } else if (charName === 'Granny') {
+            // Tolerate armature-prefixed names from Blender exports.
+            const typingKey = availableAnims.find(a => /granny.*typ/i.test(a));
+            defaultAnimName = typingKey || availableAnims[0];
           }
           
           if (defaultAnimName && charActions[defaultAnimName]) {
             defaultAnim = charActions[defaultAnimName];
             
             // Add some timing variation for visual interest
-            if (charName === 'Monk' || charName === 'Tekno' || charName === 'Demon' || charName === 'Fluffy') {
+            if (charName === 'Monk' || charName === 'Tekno' || charName === 'Demon' || charName === 'Fluffy' || charName === 'Granny') {
               defaultAnim.time = Math.random() * defaultAnim.getClip().duration * 0.5;
             }
             defaultAnim.setLoop(THREE.LoopRepeat);
@@ -998,6 +1039,8 @@ const CyborgTempleScene = ({
               monkAnimStateRef.current.currentAnimation = defaultAnimName;
             } else if (charName === 'Tekno') {
               teknoAnimStateRef.current.currentAnimation = defaultAnimName;
+            } else if (charName === 'Granny') {
+              grannyAnimStateRef.current.currentAnimation = defaultAnimName;
             }
           } else {
             console.error(`[Play] ERROR: Could not find a default animation for ${charName}`);
@@ -1079,6 +1122,25 @@ const CyborgTempleScene = ({
             child.material.transparent = true;
             child.material.needsUpdate = true;
           }
+        }
+
+        // Glasses lenses — Blender's alpha doesn't survive the GLB export,
+        // so force semi-transparency on the JS side. Match by material name.
+        if (child.isMesh) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          let touchedLens = false;
+          mats.forEach((m) => {
+            if (!m || !/lens/i.test(m.name || '')) return;
+            m.transparent = true;
+            m.opacity = 0.25;
+            m.depthWrite = false;
+            m.side = THREE.DoubleSide;
+            m.needsUpdate = true;
+            touchedLens = true;
+          });
+          // Render lenses after the head/eyes so transparent fragments blend
+          // correctly against what's behind them.
+          if (touchedLens) child.renderOrder = 3;
         }
 
         // Unicorn eye meshes. In the GLB the node names are Unicorn_L_EYE /
@@ -1186,7 +1248,8 @@ const CyborgTempleScene = ({
         if (child.name === 'Demon' || child.name === 'Demon_empty' ||
             child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01' ||
             child.name === 'Tekno' || child.name === 'Tekno_Empty' ||
-            child.name === 'Fluffy_Empty') {
+            child.name === 'Fluffy_Empty' ||
+            child.name === 'GrannyEmpty') {
 
           // Normalize agentId to consistent names
           let agentId = child.name;
@@ -1194,6 +1257,7 @@ const CyborgTempleScene = ({
           else if (child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01') agentId = 'Monk';
           else if (child.name === 'Tekno' || child.name === 'Tekno_Empty') agentId = 'Tekno';
           else if (child.name === 'Fluffy_Empty') agentId = 'Fluffy';
+          else if (child.name === 'GrannyEmpty') agentId = 'Granny';
 
           const setMechClickableData = (obj) => {
             obj.userData.clickable = true;
@@ -1724,12 +1788,41 @@ const CyborgTempleScene = ({
       }
     };
 
+    // Helper: restore Granny to normal when leaving focus. Cross-fades
+    // granny_idle → granny_typing and resets the pump timer so she doesn't
+    // immediately fist-pump on un-zoom.
+    const restoreGrannyFromFocus = () => {
+      if (!grannyFocusedRef.current) return;
+      grannyFocusedRef.current = false;
+      const grannyActions = actionsRef.current['Granny'];
+      const grannyState = grannyAnimStateRef.current;
+      if (grannyActions) {
+        const typingKey = Object.keys(grannyActions).find(a => /granny.*typ/i.test(a));
+        if (grannyActions[grannyState.currentAnimation]) {
+          grannyActions[grannyState.currentAnimation].fadeOut(0.5);
+        }
+        if (typingKey && grannyActions[typingKey]) {
+          const typingAction = grannyActions[typingKey];
+          typingAction.reset();
+          typingAction.setLoop(THREE.LoopRepeat);
+          typingAction.setEffectiveWeight(1);
+          typingAction.fadeIn(0.5);
+          typingAction.play();
+          grannyState.currentAnimation = typingKey;
+        }
+      }
+      grannyState.isPlayingSpecial = false;
+      grannyState.nextSwitchDelay = Math.random() * 8000 + 8000;
+      grannyState.lastSwitchTime = Date.now();
+    };
+
     // Helper: restore all characters from focus
     const restoreAllFromFocus = () => {
       restoreDemonFromFocus();
       restoreMonkFromFocus();
       restoreRL80FromFocus();
       restoreFluffyFromFocus();
+      restoreGrannyFromFocus();
     };
 
     // Handle escape key to reset camera
@@ -2278,6 +2371,41 @@ const CyborgTempleScene = ({
                 action.paused = true;
               });
             }
+          } else if (object.userData.agentId === 'Granny') {
+            grannyFocusedRef.current = true;
+            const grannyState = grannyAnimStateRef.current;
+            // Cancel any pending pump-return setTimeout so a queued
+            // typing.play() doesn't slam over the idle we're about to start.
+            if (grannyState.pumpReturnTimeoutId) {
+              clearTimeout(grannyState.pumpReturnTimeoutId);
+              grannyState.pumpReturnTimeoutId = null;
+            }
+            // Cross-fade whatever is playing → granny_idle while focused so
+            // the close-up reads as attentive instead of mid-keystroke.
+            const grannyActions = actionsRef.current['Granny'];
+            if (grannyActions) {
+              const idleKey = Object.keys(grannyActions).find(a => /granny.*idle/i.test(a));
+              if (idleKey) {
+                // Fade out ALL currently-running clips, not just whichever
+                // grannyState.currentAnimation thinks is current — covers
+                // the case where a pump just started typing back behind us.
+                Object.values(grannyActions).forEach((action) => {
+                  if (action && action.isRunning && action.isRunning()) {
+                    action.fadeOut(0.5);
+                  }
+                });
+                const idleAction = grannyActions[idleKey];
+                idleAction.reset();
+                idleAction.setLoop(THREE.LoopRepeat);
+                idleAction.setEffectiveWeight(1);
+                idleAction.fadeIn(0.5);
+                idleAction.play();
+                grannyState.currentAnimation = idleKey;
+                grannyState.isPlayingSpecial = true;
+                grannyState.nextSwitchDelay = 999999;
+                grannyState.lastSwitchTime = Date.now();
+              }
+            }
           }
 
           // Call the parent callback if provided
@@ -2551,7 +2679,72 @@ const CyborgTempleScene = ({
         demonState.lastSwitchTime = currentTime;
       }
     }
-    
+
+    // Handle Granny animation alternation — typing loop with periodic
+    // one-shot fist pumps. Mirrors the Demon special-anim handoff shape but
+    // simplified to two clips. Paused during focus so she doesn't pump mid
+    // close-up.
+    if (!grannyFocusedRef.current && actionsRef.current['Granny']) {
+      const currentTime = Date.now();
+      const grannyState = grannyAnimStateRef.current;
+
+      if (grannyState.lastSwitchTime === 0) {
+        grannyState.lastSwitchTime = currentTime;
+      }
+
+      if (
+        !grannyState.isPlayingSpecial &&
+        currentTime - grannyState.lastSwitchTime > grannyState.nextSwitchDelay
+      ) {
+        const grannyActions = actionsRef.current['Granny'];
+        // Tolerate Blender's armature-prefixed names (e.g.
+        // "Armature.001|granny_typing") by matching on substring.
+        const typingKey = Object.keys(grannyActions).find(k => /granny.*typ/i.test(k));
+        const fistPumpKey = Object.keys(grannyActions).find(k => /granny.*fist/i.test(k));
+        const typing = typingKey && grannyActions[typingKey];
+        const fistPump = fistPumpKey && grannyActions[fistPumpKey];
+
+        if (typing && fistPump) {
+          typing.fadeOut(0.4);
+          fistPump.reset();
+          fistPump.setLoop(THREE.LoopOnce, 1);
+          fistPump.clampWhenFinished = true;
+          fistPump.fadeIn(0.4);
+          fistPump.play();
+
+          grannyState.isPlayingSpecial = true;
+          grannyState.currentAnimation = 'granny_fistPump';
+
+          const animDuration = fistPump.getClip().duration * 1000;
+          // Track the timeout ID so focus can cancel it — otherwise a
+          // pending pump-return fires during focus and slams typing back in
+          // over the idle we just faded to.
+          grannyState.pumpReturnTimeoutId = setTimeout(() => {
+            grannyState.pumpReturnTimeoutId = null;
+            // Bail if focus engaged after we were scheduled — the focus
+            // handler is already driving granny_idle.
+            if (grannyFocusedRef.current) return;
+            typing.stop();
+            typing.reset();
+            typing.setLoop(THREE.LoopRepeat);
+            typing.setEffectiveWeight(1);
+            typing.fadeIn(0.4);
+            typing.play();
+            fistPump.fadeOut(0.4);
+
+            grannyState.currentAnimation = typingKey;
+            grannyState.isPlayingSpecial = false;
+            grannyState.nextSwitchDelay = Math.random() * 8000 + 8000;
+            grannyState.lastSwitchTime = Date.now();
+          }, Math.max(100, animDuration - 400));
+        } else {
+          // Either clip is missing — back off so we don't busy-loop.
+          grannyState.nextSwitchDelay = 30000;
+          grannyState.lastSwitchTime = currentTime;
+        }
+      }
+    }
+
     // Handle RL80 animation alternation
     if (!isOnMobile && actionsRef.current['RL80']) {
       const currentTime = Date.now();
@@ -3350,6 +3543,55 @@ const CyborgTempleScene = ({
       rl80HeadBoneRef._dummy = null;
     }
 
+    // Granny head look-at-camera override — mirrors the RL80 setup.
+    // The flip-axis correction below is rig-specific; if Granny ends up
+    // looking the wrong way, tune the angle (try Math.PI, -Math.PI / 1.8,
+    // or Math.PI / 0.5).
+    if (grannyFocusedRef.current && grannyHeadBoneRef.current) {
+      const head = grannyHeadBoneRef.current;
+
+      if (!grannyHeadBoneRef._baseQuat) {
+        grannyHeadBoneRef._baseQuat = head.quaternion.clone();
+        head.updateWorldMatrix(true, false);
+        grannyHeadBoneRef._baseWorldQuat = new THREE.Quaternion();
+        head.getWorldQuaternion(grannyHeadBoneRef._baseWorldQuat);
+      }
+
+      head.updateWorldMatrix(true, false);
+      const headWorldPos = new THREE.Vector3();
+      head.getWorldPosition(headWorldPos);
+
+      if (!grannyHeadBoneRef._dummy) {
+        grannyHeadBoneRef._dummy = new THREE.Object3D();
+      }
+      const dummy = grannyHeadBoneRef._dummy;
+      dummy.position.copy(headWorldPos);
+      dummy.lookAt(camera.position);
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 0.5);
+      dummy.quaternion.multiply(flip);
+
+      const maxHeadAngle = 1.2; // ~70° clamp
+      const angleBetween = grannyHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
+      const blendedWorldQuat = grannyHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+
+      const parentWorldQuat = new THREE.Quaternion();
+      head.parent.getWorldQuaternion(parentWorldQuat);
+      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+
+      if (!grannyHeadBoneRef._smoothedQuat) {
+        grannyHeadBoneRef._smoothedQuat = head.quaternion.clone();
+      }
+      grannyHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
+
+      head.quaternion.copy(grannyHeadBoneRef._smoothedQuat);
+    } else if (grannyHeadBoneRef._smoothedQuat) {
+      grannyHeadBoneRef._smoothedQuat = null;
+      grannyHeadBoneRef._baseQuat = null;
+      grannyHeadBoneRef._baseWorldQuat = null;
+      grannyHeadBoneRef._dummy = null;
+    }
+
     // Fluffy (cat) head look-at-camera override
     // Animation is paused, so we use world-space lookAt with no loop-seam concerns
     if (fluffyFocusedRef.current && fluffyHeadBoneRef.current) {
@@ -3462,6 +3704,7 @@ const CyborgTempleScene = ({
                 Demon: demonHeadBoneRef,
                 Monk: monkHeadBoneRef,
                 Fluffy: fluffyHeadBoneRef,
+                Granny: grannyHeadBoneRef,
               };
               const boneRef = headBoneByAgent[focusTarget.agentId];
               if (boneRef && boneRef.current) {
@@ -3635,6 +3878,7 @@ const CyborgTempleScene = ({
         { id: 'Demon', ref: demonHintRef },
         { id: 'Monk', ref: monkHintRef },
         { id: 'Fluffy', ref: fluffyHintRef },
+        { id: 'Granny', ref: grannyHintRef },
       ].map(({ id, ref }) => (
         <group key={id} ref={ref} position={[0, 9999, 0]}>
           <Html center occlude zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>

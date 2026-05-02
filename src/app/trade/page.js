@@ -34,14 +34,14 @@ import { useRouter } from 'next/navigation';
 // with real content once the per-screen mobile views are designed.
 const SCREEN_OVERLAY_STUBS = {
   Screen1: {
-    title: 'RL80 // CHART',
+    title: 'TEKNO // TERMINAL',
     sequence: [
-      { text: '> LOADING CHART FEED...', type: 'command', delay: 600 },
-      { text: '> LINK ESTABLISHED', type: 'command', delay: 800 },
+      { text: '> BOOTING TEKNO...', type: 'command', delay: 600 },
+      { text: '> TERMINAL ONLINE', type: 'command', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
-      { text: 'RL80 / USD', type: 'header', delay: 600 },
+      { text: 'TEKNO INTERFACE', type: 'header', delay: 600 },
       { text: '', type: 'pause', delay: 300 },
-      { text: 'Live price + chart', type: 'body', delay: 600 },
+      { text: 'Interactive console', type: 'body', delay: 500 },
       { text: 'available on desktop.', type: 'body', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
       { text: '> MOBILE VIEW: COMING SOON', type: 'command', delay: 0 },
@@ -62,14 +62,14 @@ const SCREEN_OVERLAY_STUBS = {
     ],
   },
   Screen3: {
-    title: 'TEKNO // TERMINAL',
+    title: 'RL80 // CHART',
     sequence: [
-      { text: '> BOOTING TEKNO...', type: 'command', delay: 600 },
-      { text: '> TERMINAL ONLINE', type: 'command', delay: 800 },
+      { text: '> LOADING CHART FEED...', type: 'command', delay: 600 },
+      { text: '> LINK ESTABLISHED', type: 'command', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
-      { text: 'TEKNO INTERFACE', type: 'header', delay: 600 },
+      { text: 'RL80 / USD', type: 'header', delay: 600 },
       { text: '', type: 'pause', delay: 300 },
-      { text: 'Interactive console', type: 'body', delay: 500 },
+      { text: 'Live price + chart', type: 'body', delay: 600 },
       { text: 'available on desktop.', type: 'body', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
       { text: '> MOBILE VIEW: COMING SOON', type: 'command', delay: 0 },
@@ -238,7 +238,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v9_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v15_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -1088,7 +1088,7 @@ export default function CyborgTemple() {
               maxPolarAngle={Math.PI * 0.52}
               // zoomToCursor={true}
               autoRotate={!focusedAgent}
-              autoRotateSpeed={0.4}
+              autoRotateSpeed={0.5}
             />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
@@ -1101,7 +1101,7 @@ export default function CyborgTemple() {
             RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Unicorn Investor' },
             Demon: { name: 'H8ØZ', pronunciation: 'HAY-deez', tagline: 'Devil\'s advocate. Short-seller.' },
             Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android eschatologist hell-bent on saving humanity from itself.' },
-            Fluffy: { name: 'Virgil', pronunciation: 'VUR-jil', tagline: 'Vigilant watch-cat and underworld guide.' },
+            Granny: { name: 'Sadie', pronunciation: 'SAY-dee', tagline: 'Born lucky. Plays hunches. Cashes checks.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
           // On mobile, place the label as a bottom banner above the bottom

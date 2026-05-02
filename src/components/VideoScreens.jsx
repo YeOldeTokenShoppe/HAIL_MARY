@@ -1013,22 +1013,22 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
     // to build a "coming soon" atmosphere.
     return (
       <>
-        {/* Screen1 → looping slot machine (purely decorative, no text/interactivity) */}
+        {/* Screen3 → looping slot machine (purely decorative, no text/interactivity) */}
         <SlotMachineScreen
+          canvasGlobal="__screen3Canvas"
+          textureGlobal="__screen3Texture"
+        />
+        {/* Screen1/2/4 → mock CRT panels — three different variants so each
+            monitor reads as its own instrument. */}
+        <CRTScreen
           canvasGlobal="__screen1Canvas"
           textureGlobal="__screen1Texture"
+          variant="leaderboard"
         />
-        {/* Screen2/3/4 → mock CRT panels — three different variants so each
-            monitor reads as its own instrument. */}
         <CRTScreen
           canvasGlobal="__screen2Canvas"
           textureGlobal="__screen2Texture"
           variant="scope"
-        />
-        <CRTScreen
-          canvasGlobal="__screen3Canvas"
-          textureGlobal="__screen3Texture"
-          variant="leaderboard"
         />
         <CRTScreen
           canvasGlobal="__screen4Canvas"

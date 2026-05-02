@@ -69,6 +69,7 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
       { rank: 7, handle: 'h0sannna',        score: 0.29, accuracy: 0.63, flashUntil: 0 },
       { rank: 8, handle: 'lazarus.eth',     score: 0.31, accuracy: 0.61, flashUntil: 0 },
       { rank: 9, handle: 'phoenix_rose',    score: 0.33, accuracy: 0.59, flashUntil: 0 },
+      { rank: 10, handle: 's4die.eth',      score: 0.35, accuracy: 0.57, flashUntil: 0 },
     ]
     let lastLeaderboardTick = 0
 
