@@ -158,6 +158,14 @@ const BuyModal = ({ isOpen, onClose }) => {
   const handleBuy = useCallback(async () => {
     if (!walletAddress || isAuthorizing) return;
 
+    // Open a placeholder tab synchronously while we still have the user-gesture
+    // context. Mobile Safari (and Chrome to a lesser degree) silently blocks
+    // window.open() called from async callbacks — even initOnRamp's default
+    // 'new_tab' fails because it runs after the nonce/sign/auth/session chain.
+    // Opening 'about:blank' synchronously gets us a tab handle now; we redirect
+    // it to the actual onramp URL once we have the session token.
+    const popupRef = window.open('about:blank', '_blank');
+
     setAuthError(null);
     setIsAuthorizing(true);
     try {
@@ -204,43 +212,29 @@ const BuyModal = ({ isOpen, onClose }) => {
         throw new Error(sessionData.error || 'Failed to get session token');
       }
 
-      // 5) Init and open the Coinbase Onramp widget.
-      const { initOnRamp } = await import('@coinbase/cbpay-js');
-      if (instanceRef.current) {
-        instanceRef.current.destroy();
-        instanceRef.current = null;
-      }
-      initOnRamp({
+      // 5) Build the Coinbase Onramp URL and redirect the placeholder tab.
+      const { generateOnRampURL } = await import('@coinbase/cbpay-js');
+      const onrampUrl = generateOnRampURL({
         appId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
-        widgetParameters: {
-          sessionToken: sessionData.token,
-          addresses: { [walletAddress]: ['base'] },
-          assets: ['ETH', 'USDC'],
-          defaultNetwork: 'base',
-          defaultExperience: 'buy',
-        },
-        onSuccess: () => onClose(),
-        onExit: () => onClose(),
-        // 'new_tab' is the cbpay-js default and works on mobile. 'popup'
-        // calls window.open with strict popup features, which mobile
-        // browsers silently block after the async nonce/auth/session
-        // chain — the user sees the button gray and reset with no error.
-        experienceLoggedIn: 'new_tab',
-        experienceLoggedOut: 'new_tab',
-        closeOnExit: true,
-        closeOnSuccess: true,
-      }, (error, instance) => {
-        if (error) {
-          console.error('initOnRamp error:', error);
-          setAuthError('Unable to open Coinbase');
-          return;
-        }
-        if (instance) {
-          instanceRef.current = instance;
-          instance.open();
-        }
+        sessionToken: sessionData.token,
+        addresses: { [walletAddress]: ['base'] },
+        assets: ['ETH', 'USDC'],
+        defaultNetwork: 'base',
+        defaultExperience: 'buy',
       });
+
+      if (popupRef && !popupRef.closed) {
+        popupRef.location.href = onrampUrl;
+        onClose();
+      } else {
+        // Synchronous window.open was blocked anyway — fall back to same-tab
+        // navigation. Loses the modal/page state but completes the purchase.
+        window.location.href = onrampUrl;
+      }
     } catch (err) {
+      if (popupRef && !popupRef.closed) {
+        popupRef.close();
+      }
       console.error('Onramp authorization failed:', err);
       const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
       setAuthError(userRejected ? null : (err?.message || 'Authorization failed'));
