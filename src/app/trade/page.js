@@ -238,7 +238,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v18_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v19_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -1084,8 +1084,8 @@ export default function CyborgTemple() {
               minDistance={0.1}
               maxDistance={10}
               // Clamp polar angle so the camera can't dip beneath the platform
-              minPolarAngle={Math.PI * 0.18}
-              maxPolarAngle={Math.PI * 0.52}
+              // minPolarAngle={Math.PI * 0.18}
+              // maxPolarAngle={Math.PI * 0.52}
               // zoomToCursor={true}
               autoRotate={!focusedAgent}
               autoRotateSpeed={0.5}

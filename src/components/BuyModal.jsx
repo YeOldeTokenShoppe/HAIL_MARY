@@ -20,6 +20,14 @@ const SignInModalTrigger = dynamic(
   () => import('@coinbase/cdp-react').then((m) => ({ default: m.SignInModalTrigger })),
   { ssr: false },
 );
+const CopyAddress = dynamic(
+  () => import('@coinbase/cdp-react').then((m) => ({ default: m.CopyAddress })),
+  { ssr: false },
+);
+const ExportWalletModal = dynamic(
+  () => import('@coinbase/cdp-react').then((m) => ({ default: m.ExportWalletModal })),
+  { ssr: false },
+);
 import { useLanguage } from './LanguageProvider';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import SwapForm from './SwapForm';
@@ -42,7 +50,7 @@ const BuyModal = ({ isOpen, onClose }) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const { t } = useLanguage();
-  const { walletAddress } = useWalletAuth();
+  const { walletAddress, isEmbeddedWallet } = useWalletAuth();
   const { connectAsync, connectors: wagmiConnectors } = useConnect();
   const { signMessageAsync } = useSignMessage();
   const instanceRef = useRef(null);
@@ -725,9 +733,47 @@ const BuyModal = ({ isOpen, onClose }) => {
                       </div>
                 </div>
               ) : (
-                <button
-                  onClick={handleBuy}
-                  disabled={buyDisabled}
+                <>
+                  {isEmbeddedWallet && (
+                    <div style={{
+                      width: '100%',
+                      maxWidth: '320px',
+                      padding: isSmallPhone ? '10px 10px' : '12px 14px',
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      border: '1px solid rgba(0, 229, 114, 0.35)',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                      marginBottom: '4px',
+                    }}>
+                      <p style={{
+                        fontFamily: 'monospace',
+                        fontSize: isSmallPhone ? '10px' : '11px',
+                        fontWeight: '900',
+                        letterSpacing: '2px',
+                        color: '#00e572',
+                        margin: 0,
+                        textTransform: 'uppercase',
+                      }}>
+                        {'>>'} YOUR WALLET
+                      </p>
+                      <CopyAddress address={walletAddress} label="Address" />
+                      <ExportWalletModal address={walletAddress} />
+                      <p style={{
+                        fontFamily: 'monospace',
+                        fontSize: '10px',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        lineHeight: '1.5',
+                        margin: 0,
+                      }}>
+                        Funds you buy will be deposited to this wallet. Export your private key any time to move it to another app.
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleBuy}
+                    disabled={buyDisabled}
                   style={{
                     fontFamily: 'monospace',
                     fontSize: isSmallPhone ? '14px' : '16px',
@@ -760,6 +806,7 @@ const BuyModal = ({ isOpen, onClose }) => {
                 >
                   {buyLabel}
                 </button>
+                </>
               )}
 
               {authError && (

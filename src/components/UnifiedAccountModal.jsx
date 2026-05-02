@@ -3,7 +3,19 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useUser, useClerk, UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useWalletAuth } from './WalletAuthProvider';
+
+// Client-only — @coinbase/cdp-react reads localStorage at module init,
+// which throws during SSR. Mirrors the pattern in BuyModal/Providers.
+const CopyAddress = dynamic(
+  () => import('@coinbase/cdp-react').then((m) => ({ default: m.CopyAddress })),
+  { ssr: false },
+);
+const ExportWalletModal = dynamic(
+  () => import('@coinbase/cdp-react').then((m) => ({ default: m.ExportWalletModal })),
+  { ssr: false },
+);
 
 // Custom wallet connect UI using wagmi connectors
 function WalletConnectOptions({ connectExternal, connectingMethod, isMobile, theme = 'cyber' }) {
@@ -139,6 +151,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
   const {
     walletAddress,
     isWalletConnected,
+    isEmbeddedWallet,
     tokenBalance,
     connectWallet,
     disconnectWallet,
@@ -479,7 +492,39 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
                         <strong className="balance-amount" style={{ width: '100%' }}>{tokenBalance?.toLocaleString() || '0'} <span style={{color: '#fff'}}>RL80</span></strong>
                       </div>
                     </div>
-                    
+
+                    {isEmbeddedWallet && (
+                      <div style={{
+                        marginTop: '14px',
+                        padding: '12px',
+                        background: 'rgba(0, 0, 0, 0.35)',
+                        border: '1px solid rgba(0, 245, 212, 0.25)',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}>
+                        <span style={{
+                          fontSize: '10px',
+                          letterSpacing: '2px',
+                          textTransform: 'uppercase',
+                          color: 'rgba(255,255,255,0.6)',
+                        }}>
+                          Self-custody
+                        </span>
+                        <CopyAddress address={walletAddress} label="Full address" />
+                        <ExportWalletModal address={walletAddress} />
+                        <p style={{
+                          fontSize: '11px',
+                          color: 'rgba(255,255,255,0.55)',
+                          lineHeight: '1.5',
+                          margin: 0,
+                        }}>
+                          Export your private key to move this wallet into MetaMask, Coinbase Wallet, or any other app. Anyone with the key controls the funds — store it safely.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="wallet-actions">
                       <button
                         className="action-button disconnect"

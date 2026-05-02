@@ -14,7 +14,11 @@ const baseRpcUrl = cdpKey
 
 export const cdpEmbeddedWalletConfig = {
   projectId: cdpProjectId,
-  ethereum: { createOnLogin: 'smart' },
+  // EOA — smart accounts route personal_sign through CDP's smart-account
+  // handler which fails validateUserOwnsSmartAccount during the SIWE-lite
+  // signing step in BuyModal. EOA uses standard personal_sign and works
+  // with wagmi's useSignMessage. Revisit if/when we need gas sponsorship.
+  ethereum: { createOnLogin: 'eoa' },
   appName: 'RL80',
   appLogoUrl: 'https://rl80.com/favicon.svg',
   authMethods: ['email', 'oauth:google', 'oauth:apple', 'oauth:x'],

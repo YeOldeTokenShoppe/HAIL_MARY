@@ -11,9 +11,12 @@ const WalletAuthContext = createContext({});
 
 export function WalletAuthProvider({ children }) {
   const { user, isLoaded: clerkLoaded } = useUser();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
+  // Matches CDP_CONNECTOR_ID from @coinbase/cdp-wagmi. Hardcoded so we
+  // don't pull the package's localStorage-touching module into this provider.
+  const isEmbeddedWallet = connector?.id === 'cdp-embedded-wallet';
 
   const [tokenBalance, setTokenBalance] = useState(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
@@ -167,6 +170,7 @@ export function WalletAuthProvider({ children }) {
     walletAddress: address || null,
     tokenBalance,
     isWalletConnected: isConnected,
+    isEmbeddedWallet,
     activeAccount: null, // Deprecated - components should use walletAddress
 
     // Test mode (removed)
@@ -199,7 +203,7 @@ export function WalletAuthProvider({ children }) {
   // consumer.
   }), [
     user?.id, user?.firstName, user?.username,
-    clerkLoaded, address, tokenBalance, isConnected,
+    clerkLoaded, address, tokenBalance, isConnected, isEmbeddedWallet,
     isConnecting, isLoadingBalance, isSyncing,
     connectWallet, disconnectWallet, refreshBalance,
   ]);

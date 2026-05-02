@@ -4,7 +4,7 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { Html, SpotLight } from "@react-three/drei";
 import AnnotationSystem from "@/components/AnnotationSystem";
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
 import HolographicStatue3 from "@/components/HolographicStatue3";
@@ -110,6 +110,10 @@ export const HOLO_STATUE_MOBILE = {
   scale: [0.5, 0.5, 0.5],
   rotation: [0, -Math.PI * 0.2, 0],
 };
+
+// XZ nudge applied to Angel_Empty so the angel sits centered on the
+// altar spotlight when viewed top-down. Y is left to the hover animation.
+export const ANGEL_POSITION_OFFSET = { x: -0.10, z: 0.01 };
 
 // Returns the active cameraPos/lookAtPos/orbitCenter for the given agent.
 // On mobile, MOBILE_CAMERA_OFFSET.y is added to the Y component of every
@@ -273,6 +277,7 @@ const CyborgTempleScene = ({
   // Refs for MOBILE.glb animated objects
   const angelEmptyRef = useRef(); // Parent container for angel and coins
   const angelRef = useRef();
+  const angelSpotTarget = useMemo(() => new THREE.Object3D(), []);
   const coin1Ref = useRef();
   const coin2Ref = useRef();
   const coin3Ref = useRef();
@@ -655,8 +660,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v18_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v8.glb";
+    let modelPath = "/models/RL80_4anims_v19_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v9.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1402,6 +1407,8 @@ const CyborgTempleScene = ({
         // the camera regardless of the mobile/desktop split below.
         if (child.name === 'Angel_Empty') {
           angelEmptyRef.current = child;
+          child.position.x += ANGEL_POSITION_OFFSET.x;
+          child.position.z += ANGEL_POSITION_OFFSET.z;
         }
 
         // Capture the angel mesh on every device — the desktop and mobile
@@ -1409,6 +1416,26 @@ const CyborgTempleScene = ({
         // both contexts.
         if (child.name === 'angel' || child.name === 'Angel') {
           angelRef.current = child;
+          // Swap unlit MeshBasicMaterial for MeshStandardMaterial so the
+          // altar spotlight actually illuminates the angel surface.
+          child.traverse((obj) => {
+            if (obj.isMesh && obj.material && obj.material.isMeshBasicMaterial) {
+              const oldMat = obj.material;
+              const baseColor = oldMat.color ? oldMat.color.clone() : new THREE.Color(0xffffff);
+              obj.material = new THREE.MeshStandardMaterial({
+                map: oldMat.map || null,
+                color: baseColor,
+                transparent: oldMat.transparent,
+                opacity: oldMat.opacity,
+                roughness: 0.6,
+                metalness: 0.1,
+                emissive: baseColor.clone(),
+                emissiveMap: oldMat.map || null,
+                emissiveIntensity: 0.4,
+              });
+              oldMat.dispose?.();
+            }
+          });
         }
 
         // Find coin objects for MOBILE.glb animations
@@ -3962,13 +3989,29 @@ const CyborgTempleScene = ({
         {(() => {
           const cfg = isOnMobile ? HOLO_STATUE_MOBILE : HOLO_STATUE_DESKTOP;
           return (
-            <HolographicStatue3
-              position={cfg.position}
-              scale={cfg.scale}
-              rotation={cfg.rotation}
-              hover={false}
-              rotate={true}
-            />
+            <>
+              {/* <HolographicStatue3
+                position={cfg.position}
+                scale={cfg.scale}
+                rotation={cfg.rotation}
+                hover={false}
+                rotate={true}
+              /> */}
+              <primitive
+                object={angelSpotTarget}
+                position={[cfg.position[0], cfg.position[1] + 15, cfg.position[2]]}
+              />
+              <SpotLight
+                position={[-0.05, 1.52, 0]}
+                target={angelSpotTarget}
+                angle={0.25}
+                castShadow
+                intensity={0.05}
+                penumbra={0.0}
+                color={'#0bcd2e'}
+                distance={15}
+              />
+            </>
           );
         })()}
       </group>
