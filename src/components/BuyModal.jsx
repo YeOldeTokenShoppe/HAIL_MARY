@@ -3,7 +3,23 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useConnect, useSignMessage } from 'wagmi';
-import { AuthButton, SignInModal, SignInModalTrigger } from '@coinbase/cdp-react';
+import dynamic from 'next/dynamic';
+// Load CDP React components client-only — the package reads localStorage at
+// module init, which throws ReferenceError during Next SSR and turns every
+// page importing BuyModal into a 404. ssr:false defers evaluation to the
+// browser. Mirrors the CDPReactProvider treatment in Providers.jsx.
+const AuthButton = dynamic(
+  () => import('@coinbase/cdp-react').then((m) => ({ default: m.AuthButton })),
+  { ssr: false },
+);
+const SignInModal = dynamic(
+  () => import('@coinbase/cdp-react').then((m) => ({ default: m.SignInModal })),
+  { ssr: false },
+);
+const SignInModalTrigger = dynamic(
+  () => import('@coinbase/cdp-react').then((m) => ({ default: m.SignInModalTrigger })),
+  { ssr: false },
+);
 import { useLanguage } from './LanguageProvider';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import SwapForm from './SwapForm';

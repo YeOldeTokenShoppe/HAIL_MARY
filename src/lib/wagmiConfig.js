@@ -77,7 +77,13 @@ const connectors = [
     : []),
 ];
 
-if (cdpProjectId) {
+// Skip the CDP Embedded Wallet connector during SSR — it reads localStorage
+// synchronously at construction to look for stored auth tokens, which throws
+// `ReferenceError: localStorage is not defined` on the server and bubbles
+// up as an unhandledRejection that turns the page into a 404. On the client
+// it gets prepended after hydration; consumers look it up by id at click
+// time so there's no hydration mismatch.
+if (typeof window !== 'undefined' && cdpProjectId) {
   connectors.unshift(
     createCDPEmbeddedWalletConnector({
       cdpConfig: cdpEmbeddedWalletConfig,

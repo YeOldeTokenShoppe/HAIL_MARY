@@ -34,14 +34,14 @@ import { useRouter } from 'next/navigation';
 // with real content once the per-screen mobile views are designed.
 const SCREEN_OVERLAY_STUBS = {
   Screen1: {
-    title: 'TEKNO // TERMINAL',
+    title: 'RL80 // CHART',
     sequence: [
-      { text: '> BOOTING TEKNO...', type: 'command', delay: 600 },
-      { text: '> TERMINAL ONLINE', type: 'command', delay: 800 },
+      { text: '> LOADING CHART FEED...', type: 'command', delay: 600 },
+      { text: '> LINK ESTABLISHED', type: 'command', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
-      { text: 'TEKNO INTERFACE', type: 'header', delay: 600 },
+      { text: 'RL80 / USD', type: 'header', delay: 600 },
       { text: '', type: 'pause', delay: 300 },
-      { text: 'Interactive console', type: 'body', delay: 500 },
+      { text: 'Live price + chart', type: 'body', delay: 600 },
       { text: 'available on desktop.', type: 'body', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
       { text: '> MOBILE VIEW: COMING SOON', type: 'command', delay: 0 },
@@ -62,14 +62,14 @@ const SCREEN_OVERLAY_STUBS = {
     ],
   },
   Screen3: {
-    title: 'RL80 // CHART',
+    title: 'TEKNO // TERMINAL',
     sequence: [
-      { text: '> LOADING CHART FEED...', type: 'command', delay: 600 },
-      { text: '> LINK ESTABLISHED', type: 'command', delay: 800 },
+      { text: '> BOOTING TEKNO...', type: 'command', delay: 600 },
+      { text: '> TERMINAL ONLINE', type: 'command', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
-      { text: 'RL80 / USD', type: 'header', delay: 600 },
+      { text: 'TEKNO INTERFACE', type: 'header', delay: 600 },
       { text: '', type: 'pause', delay: 300 },
-      { text: 'Live price + chart', type: 'body', delay: 600 },
+      { text: 'Interactive console', type: 'body', delay: 500 },
       { text: 'available on desktop.', type: 'body', delay: 800 },
       { text: '', type: 'pause', delay: 400 },
       { text: '> MOBILE VIEW: COMING SOON', type: 'command', delay: 0 },
