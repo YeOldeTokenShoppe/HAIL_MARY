@@ -221,8 +221,12 @@ const BuyModal = ({ isOpen, onClose }) => {
         },
         onSuccess: () => onClose(),
         onExit: () => onClose(),
-        experienceLoggedIn: 'popup',
-        experienceLoggedOut: 'popup',
+        // 'new_tab' is the cbpay-js default and works on mobile. 'popup'
+        // calls window.open with strict popup features, which mobile
+        // browsers silently block after the async nonce/auth/session
+        // chain — the user sees the button gray and reset with no error.
+        experienceLoggedIn: 'new_tab',
+        experienceLoggedOut: 'new_tab',
         closeOnExit: true,
         closeOnSuccess: true,
       }, (error, instance) => {
