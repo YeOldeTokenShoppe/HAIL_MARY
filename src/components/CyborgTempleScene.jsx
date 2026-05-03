@@ -664,8 +664,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v6_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v6.glb";
+    let modelPath = "/models/RL80_4anims_v02_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v02.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1005,7 +1005,7 @@ const CyborgTempleScene = ({
                 ? templeScene
                 : animatedCharacters[charName];
               // Clean animation tracks to remove references to non-existent bones
-              const cleanedAnimation = cleanAnimationTracks(animation, cleanRoot);
+              let cleanedAnimation = cleanAnimationTracks(animation, cleanRoot);
 
               // Unicorn_waving: keep only arm-bone quaternion tracks (drop
               // any position/scale and any non-arm rotation tracks left over
@@ -1018,6 +1018,7 @@ const CyborgTempleScene = ({
                   return /\.quaternion$/i.test(t.name) && armBoneRe.test(t.name);
                 });
               }
+
 
               const action = mixer.clipAction(cleanedAnimation);
               
@@ -2777,6 +2778,32 @@ const CyborgTempleScene = ({
       state.controls.target.copy(restingOrbitCenter);
       state.controls.update();
       orbitTargetInitedRef.current = true;
+    }
+
+    // Skip the bind-pose region of looping unicorn (RL80) clips before
+    // the mixer evaluates them. Mixamo-style clips anchor a bind pose at
+    // frame 0 and the last frame; on loop wrap the mixer briefly hits
+    // those, causing a one-frame T-pose flash. Pre-empting the wrap
+    // (and forcing a minimum time at clip start) avoids it without
+    // mutating the clip data, so position tracks stay intact.
+    const rl80Actions = actionsRef.current?.['RL80'];
+    if (rl80Actions) {
+      const safeFrac = 0.05; // 5% inset on both ends
+      Object.keys(rl80Actions).forEach((name) => {
+        if (!/typ|idle/i.test(name) || /wav/i.test(name)) return;
+        const action = rl80Actions[name];
+        if (!action.isRunning() || action.paused) return;
+        const dur = action.getClip().duration;
+        const safe = dur * safeFrac;
+        const advance = delta * (action.getEffectiveTimeScale?.() ?? action.timeScale ?? 1);
+        if (action.time < safe) {
+          action.time = safe;
+        } else if (action.time + advance >= dur - safe) {
+          // Pre-empt the loop wrap so the trailing bind frame is skipped
+          // AND the next frame lands safely past the leading bind frame.
+          action.time = safe;
+        }
+      });
     }
 
     // Update all character mixers independently
