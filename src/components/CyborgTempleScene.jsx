@@ -625,12 +625,12 @@ const CyborgTempleScene = ({
     if (hasLoadedRef.current) return;
     
     // Small delay to ensure the ref is attached after first render
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (!groupRef.current) {
         console.error('[CyborgTempleScene] groupRef.current is still null after mount');
         return;
       }
-      
+
       hasLoadedRef.current = true;
       const currentGroupRef = groupRef.current; // Capture the ref value
 
@@ -657,15 +657,28 @@ const CyborgTempleScene = ({
     dracoLoader.setDecoderPath(dracoPath);
     gltfLoader.setDRACOLoader(dracoLoader);
     // Required for the optimized V2 model — gltf-transform re-encodes its
-    // meshes with EXT_meshopt_compression instead of Draco.
+    // meshes with EXT_meshopt_compression instead of Draco. Await
+    // MeshoptDecoder.ready so the WASM module is fully initialized before
+    // load() runs; on Android Chrome the load can otherwise race the WASM
+    // init and silently fail (no callback fires, model never appears).
+    // Bound the await with a 5s timeout so a hung WASM init doesn't hang
+    // the entire page — the un-opt fallback model doesn't need Meshopt.
+    try {
+      await Promise.race([
+        MeshoptDecoder.ready,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('MeshoptDecoder.ready timeout (5s)')), 5000)),
+      ]);
+    } catch (e) {
+      console.warn('[CyborgTempleScene] MeshoptDecoder init failed/timed out:', e?.message || e);
+    }
     gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
     // V2 model further optimized via gltf-transform (Meshopt + WebP textures
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v02_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v02.glb";
+    let modelPath = "/models/RL80_4anims_v03_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v03.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1649,13 +1662,13 @@ const CyborgTempleScene = ({
         console.error('[CyborgTempleScene] Please ensure the file exists at: public' + modelPath);
       }
       
-      // 404 on the optimized model means it just doesn't exist on disk —
-      // no point retrying with backoff. Fall back to the un-optimized GLB
-      // immediately. Speeds up dev (when the opt file is intentionally
-      // missing) and prod (when the deploy didn't include it).
-      const is404 = error.message && error.message.includes('404');
-      if (is404 && !usingFallback && modelPath !== fallbackModelPath) {
-        console.warn('[CyborgTempleScene] Optimized model 404 — falling back to un-optimized model immediately');
+      // Any error on the optimized model — 404, decode failure, WASM
+      // init race, etc. — falls back to the un-optimized GLB immediately.
+      // Decode errors are the typical Android Chrome failure mode for
+      // Meshopt/WebP-compressed models, so we don't want to burn retries
+      // hitting the same broken file.
+      if (!usingFallback && modelPath !== fallbackModelPath) {
+        console.warn('[CyborgTempleScene] Opt model failed — falling back to un-optimized model immediately. Error:', error?.message || error);
         modelPath = fallbackModelPath;
         usingFallback = true;
         retryCount = 0;

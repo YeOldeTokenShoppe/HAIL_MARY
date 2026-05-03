@@ -4,7 +4,6 @@ import {
   EffectComposer,
   Bloom,
   Noise,
-  Vignette,
   ChromaticAberration,
   Scanline,
   DepthOfField,
@@ -13,8 +12,11 @@ import {
 } from "@react-three/postprocessing";
 import { BlendFunction, GlitchMode } from "postprocessing";
 
-// Set default is80sMode to false so component can be used without props
-const PostProcessingEffects = ({ is80sMode = false }) => {
+// Set default is80sMode to false so component can be used without props.
+// `isMobile` skips Bloom on mobile — Bloom's mipmap-blur shader compilation
+// silently fails on some Android Chrome / Mali / Adreno drivers, leaving
+// the entire framebuffer black. Other effects (Vignette, etc.) stay on.
+const PostProcessingEffects = ({ is80sMode = false, isMobile = false }) => {
   const { scene, gl, camera } = useThree();
   const composerRef = useRef();
   const timeRef = useRef(0);
@@ -139,13 +141,15 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
         //   blendFunction={BlendFunction.SCREEN}
         // />
       )} */}
-      <Bloom
-        intensity={bloomIntensity}           // Dynamically controlled intensity
-        luminanceThreshold={0.3}  // Lowered to 0.3 to catch emissive cylinder rings
-        luminanceSmoothing={0.7}  // Adjusted from 0.9 for sharper bloom edges
-        height={400}              // Increased from 300 for more detail
-        blendFunction={BlendFunction.SCREEN} // Use SCREEN blend mode for a more natural glow
-      />
+      {!isMobile && (
+        <Bloom
+          intensity={bloomIntensity}           // Dynamically controlled intensity
+          luminanceThreshold={0.3}  // Lowered to 0.3 to catch emissive cylinder rings
+          luminanceSmoothing={0.7}  // Adjusted from 0.9 for sharper bloom edges
+          height={400}              // Increased from 300 for more detail
+          blendFunction={BlendFunction.SCREEN} // Use SCREEN blend mode for a more natural glow
+        />
+      )}
       {/* <DepthOfField
         focusDistance={4.0}       // Focus distance (equivalent to focus parameter)
         focalLength={0.0003}      // Focal length (equivalent to aperture parameter)
@@ -155,7 +159,6 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
         offset={[0.001, 0.001]}   // Subtle chromatic aberration
       /> */}
       {/* <Noise opacity={0.3} />      Film grain effect */}
-      <Vignette eskil={false} offset={0.3} darkness={0.5} />
     </>
   );
 
@@ -176,13 +179,15 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
           blendFunction={BlendFunction.ADD}
         />
       )} */}
-      <Bloom
-        intensity={bloomIntensity * 0.1}  // Subtle bloom enhancement for 80s mode
-        luminanceThreshold={0.6} // Higher threshold - only catch bright emissives
-        luminanceSmoothing={0.6}  // Softer bloom edges
-        height={400}              // Standard resolution
-        blendFunction={BlendFunction.SCREEN} // SCREEN for softer glow
-      />
+      {!isMobile && (
+        <Bloom
+          intensity={bloomIntensity * 0.1}  // Subtle bloom enhancement for 80s mode
+          luminanceThreshold={0.6} // Higher threshold - only catch bright emissives
+          luminanceSmoothing={0.6}  // Softer bloom edges
+          height={400}              // Standard resolution
+          blendFunction={BlendFunction.SCREEN} // SCREEN for softer glow
+        />
+      )}
       <ChromaticAberration
         offset={[0.005, 0.005]}     // Reduced chromatic aberration
         radialModulation={true}
@@ -202,7 +207,6 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
         mode={GlitchMode.SPORADIC} // Sporadic glitches for that 80s VHS feel
       />
       <Noise opacity={0.15} />    More visible noise
-      <Vignette eskil={false} offset={0.05} darkness={0.5} /> {/* Stronger vignette */}
     </>
   );
 

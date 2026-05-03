@@ -238,7 +238,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v02_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v03_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -769,14 +769,14 @@ export default function CyborgTemple() {
             position: isMobileView ? [0, 2.1, 7.5] : [0, 0.5, 6.5],
             fov: isMobileView ? 55 : 50
           }}
-          gl={{ 
+          gl={{
             antialias: !isMobileView,
             alpha: true,
-            powerPreference: isMobileView ? "low-power" : "high-performance",
+            powerPreference: isMobileView ? "default" : "high-performance",
             precision: isMobileView ? "mediump" : "highp",
             stencil: false,
             depth: true,
-            preserveDrawingBuffer: true
+            preserveDrawingBuffer: false
           }}
           dpr={isMobileView ? 
             (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1) : 
@@ -797,7 +797,7 @@ export default function CyborgTemple() {
           <fog attach="fog" args={context80sMode ? ['#1a0033', 50, 300] : ['#000000', 20, 200]} />
           <Suspense fallback={null}>
             <ambientLight intensity={1.5} />
-            <PostProcessingEffects is80sMode={context80sMode} />
+            <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} />
             
             {/* Synthwave sunset for 80s mode - desktop only */}
             {context80sMode && !isMobileView && (
