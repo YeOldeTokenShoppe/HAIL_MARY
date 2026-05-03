@@ -238,7 +238,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v19_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v6_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -981,7 +981,6 @@ export default function CyborgTemple() {
               is80sMode={context80sMode}
               isMobile={isMobileView}
               disableCandleInteraction
-              jackpotOnlyFistPump
               gameStarted={gameStarted}
               showCharacterHints={showCharacterHint && !focusedAgent}
               onCoinFaceTap={(coinIndex) => {

@@ -354,6 +354,10 @@ const CyborgTempleScene = ({
   // Head bone refs for look-at-camera override
   const demonHeadBoneRef = useRef();
   const demonFocusedRef = useRef(false); // true when camera is zoomed in on Demon
+  // Upper-arm bone + flag for the point-at-camera override that runs
+  // during the demon_pointing phase of the focus sequence.
+  const demonPointingArmBoneRef = useRef();
+  const demonArmAimingRef = useRef(false);
   const monkHeadBoneRef = useRef();
   const monkFocusedRef = useRef(false); // true when camera is zoomed in on Monk
   const rl80HeadBoneRef = useRef();
@@ -660,8 +664,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v19_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v9.glb";
+    let modelPath = "/models/RL80_4anims_v6_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v6.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -756,14 +760,32 @@ const CyborgTempleScene = ({
             });
           }
         }
-        else if (child.name === 'Demon_empty') {
+        else if (child.name === 'Devil_empty' || child.name === 'Devil_Empty') {
           animatedCharacters['Demon'] = child;
-          // Find head bone in Demon skeleton for look-at-camera
+          // Find head bone + lower spine bone (spine_01) in the Demon
+          // skeleton. The pointing override rotates the torso rather than
+          // a single arm bone so the entire pointing gesture (shoulder →
+          // elbow → wrist → hand) stays intact and just gets reaimed.
+          const spineCandidates = [];
           child.traverse((bone) => {
-            if (bone.isBone && /head/i.test(bone.name)) {
+            if (!bone.isBone) return;
+            if (/head/i.test(bone.name)) {
               demonHeadBoneRef.current = bone;
             }
+            if (/spine/i.test(bone.name)) {
+              spineCandidates.push(bone);
+            }
           });
+          // Prefer spine_01 (or spine.001 / Spine_01 variants); fall back
+          // to any spine bone if naming differs.
+          demonPointingArmBoneRef.current =
+            spineCandidates.find(b => /spine[._-]?0*1$/i.test(b.name)) ||
+            spineCandidates.find(b => /spine[._-]?1$/i.test(b.name)) ||
+            spineCandidates[0] ||
+            null;
+          if (!demonPointingArmBoneRef.current) {
+            console.warn('[Demon] No spine bone found for point-at-camera override.');
+          }
         }
         else if (child.name === 'Monk_empty') {
           animatedCharacters['Monk'] = child;
@@ -824,10 +846,14 @@ const CyborgTempleScene = ({
             closedEyes.visible = false;
           }
         }
+        // Point.003 sits near the angel — tinted to match the altar
+        // spotlight color so the angel surface picks up a green cast.
+        else if (child.isLight && child.name === 'Point003') {
+          child.color.setHex(0x0bcd2e);
+          child.intensity = 0.5;
+        }
         // Point.006 was meant to be red in Blender but the GLB exports it as
-        // white (color [1,1,1]) — override on the JS side. Intensity in the
-        // GLB is ~0.27 which reads as nearly invisible against the scene's
-        // ambient + character lights, so bump it too.
+        // white (color [1,1,1]) — override on the JS side.
         else if (child.isLight && child.name === 'Point006') {
           child.color.setHex(0xff0000);
           child.intensity = 0.3;
@@ -931,7 +957,14 @@ const CyborgTempleScene = ({
           if (/granny/i.test(animName) || /granny/i.test(firstTrackBone)) {
             targetCharacters = ['Granny'];
           }
-          // Demon animations (Pelvis-based skeleton)
+          // Demon animations — match "demon" anywhere in the clip name or
+          // first-track bone, since newer exports renamed clips to
+          // demon_typing / demon_idle / demon_fistPump / demon_pointing
+          // and may use a different skeleton root than the original Pelvis.
+          else if (/demon/i.test(animName) || /demon/i.test(firstTrackBone)) {
+            targetCharacters = ['Demon'];
+          }
+          // Demon animations (legacy Pelvis-based skeleton)
           else if (firstTrackBone === 'Pelvis') {
             targetCharacters = ['Demon'];
           }
@@ -1030,7 +1063,15 @@ const CyborgTempleScene = ({
               defaultAnimName = availableAnims[0];
             }
           } else if (charName === 'Demon') {
-            if (charActions['Root.001|Typing']) {
+            // Newer export uses demon_typing / demon_idle naming; tolerate
+            // the legacy Root.001|* names for older models still in use.
+            const demonTyping = availableAnims.find(a => /demon.*typ/i.test(a));
+            const demonIdle = availableAnims.find(a => /demon.*idle/i.test(a));
+            if (demonTyping) {
+              defaultAnimName = demonTyping;
+            } else if (demonIdle) {
+              defaultAnimName = demonIdle;
+            } else if (charActions['Root.001|Typing']) {
               defaultAnimName = 'Root.001|Typing';
             } else if (charActions['Root.001|Disbelief']) {
               defaultAnimName = 'Root.001|Disbelief';
@@ -1328,6 +1369,7 @@ const CyborgTempleScene = ({
         
         // Make the council characters clickable
         if (child.name === 'Demon' || child.name === 'Demon_empty' ||
+            child.name === 'Devil_empty' || child.name === 'Devil_Empty' ||
             child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01' ||
             child.name === 'Tekno' || child.name === 'Tekno_Empty' ||
             child.name === 'Fluffy_Empty' ||
@@ -1335,7 +1377,8 @@ const CyborgTempleScene = ({
 
           // Normalize agentId to consistent names
           let agentId = child.name;
-          if (child.name === 'Demon' || child.name === 'Demon_empty') agentId = 'Demon';
+          if (child.name === 'Demon' || child.name === 'Demon_empty' ||
+              child.name === 'Devil_empty' || child.name === 'Devil_Empty') agentId = 'Demon';
           else if (child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01') agentId = 'Monk';
           else if (child.name === 'Tekno' || child.name === 'Tekno_Empty') agentId = 'Tekno';
           else if (child.name === 'Fluffy_Empty') agentId = 'Fluffy';
@@ -1429,9 +1472,9 @@ const CyborgTempleScene = ({
                 opacity: oldMat.opacity,
                 roughness: 0.6,
                 metalness: 0.1,
-                emissive: baseColor.clone(),
+                emissive: new THREE.Color(0x0bcd2e),
                 emissiveMap: oldMat.map || null,
-                emissiveIntensity: 0.4,
+                emissiveIntensity: 0.25,
               });
               oldMat.dispose?.();
             }
@@ -1789,8 +1832,20 @@ const CyborgTempleScene = ({
       if (!demonFocusedRef.current) return;
       demonFocusedRef.current = false;
       const demonActions = actionsRef.current['Demon'];
-      if (!demonActions) return;
+      const demonMixer = mixersRef.current['Demon'];
       const demonState = demonAnimStateRef.current;
+      // Cancel any in-flight focus sequence (the 2s idle→pointing handoff
+      // and the 'finished' listener that swaps back to idle).
+      if (demonState.focusSequenceTimers) {
+        demonState.focusSequenceTimers.forEach(clearTimeout);
+        demonState.focusSequenceTimers = [];
+      }
+      if (demonState.focusSequenceListener && demonMixer) {
+        demonMixer.removeEventListener('finished', demonState.focusSequenceListener);
+        demonState.focusSequenceListener = null;
+      }
+      demonArmAimingRef.current = false;
+      if (!demonActions) return;
       const loopAnims = Object.keys(demonActions).filter(a => /typing|idle|laughing/i.test(a) && !/sit_idle/i.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
       if (demonActions[demonState.currentAnimation]) {
@@ -2376,25 +2431,74 @@ const CyborgTempleScene = ({
           if (object.userData.agentId === 'Demon') {
             demonFocusedRef.current = true;
             const demonActions = actionsRef.current['Demon'];
-            if (demonActions) {
-              const idleKey = Object.keys(demonActions).find(a => /sit_idle_demon/i.test(a));
-              if (idleKey) {
-                const demonState = demonAnimStateRef.current;
-                if (demonActions[demonState.currentAnimation]) {
-                  demonActions[demonState.currentAnimation].fadeOut(0.5);
+            const demonMixer = mixersRef.current['Demon'];
+            if (demonActions && demonMixer) {
+              const idleKey = Object.keys(demonActions).find(a => /demon.*idle/i.test(a));
+              const pointingKey = Object.keys(demonActions).find(a => /demon.*pointing/i.test(a));
+              const demonState = demonAnimStateRef.current;
+
+              const playIdle = (fadeIn = 0.5) => {
+                if (demonState.currentAnimation && demonActions[demonState.currentAnimation] && demonState.currentAnimation !== idleKey) {
+                  demonActions[demonState.currentAnimation].fadeOut(0.3);
                 }
                 const idleAction = demonActions[idleKey];
                 idleAction.reset();
                 idleAction.setLoop(THREE.LoopRepeat);
                 idleAction.setEffectiveWeight(1);
-                idleAction.fadeIn(0.5);
+                idleAction.fadeIn(fadeIn);
                 idleAction.play();
                 demonState.currentAnimation = idleKey;
+              };
+
+              if (idleKey) {
+                // Mark special so the random-alternation poller leaves us alone.
                 demonState.isPlayingSpecial = true;
                 demonState.nextSwitchDelay = 999999;
                 demonState.lastSwitchTime = Date.now();
+                demonState.focusSequenceTimers = demonState.focusSequenceTimers || [];
+
+                // Stage 1: fade in idle immediately.
+                playIdle(0.5);
+
+                if (pointingKey) {
+                  // Stage 2: after 2s, play pointing once, then return to idle.
+                  const t1 = setTimeout(() => {
+                    if (!demonFocusedRef.current) return;
+                    const pointingAction = demonActions[pointingKey];
+                    const idleAction = demonActions[idleKey];
+
+                    pointingAction.reset();
+                    pointingAction.setLoop(THREE.LoopOnce);
+                    // Hold the last pointing pose at full weight until the
+                    // crossfade to idle actually pulls it down — otherwise
+                    // pointing's weight snaps to 0 the instant 'finished'
+                    // fires, and the bones briefly fall to T-pose.
+                    pointingAction.clampWhenFinished = true;
+                    pointingAction.setEffectiveWeight(1);
+                    idleAction.fadeOut(0.3);
+                    pointingAction.fadeIn(0.3);
+                    pointingAction.play();
+                    demonState.currentAnimation = pointingKey;
+                    // Override the upper-arm rotation each frame to aim at
+                    // the camera while pointing is playing.
+                    demonArmAimingRef.current = true;
+
+                    const onFinished = (e) => {
+                      if (e.action !== pointingAction) return;
+                      demonMixer.removeEventListener('finished', onFinished);
+                      demonState.focusSequenceListener = null;
+                      demonArmAimingRef.current = false;
+                      if (!demonFocusedRef.current) return;
+                      // Stage 3: back to idle for the remainder of focus.
+                      playIdle(0.3);
+                    };
+                    demonMixer.addEventListener('finished', onFinished);
+                    demonState.focusSequenceListener = onFinished;
+                  }, 2000);
+                  demonState.focusSequenceTimers.push(t1);
+                }
               } else {
-                console.warn('[Demon] sit_idle_demon animation not found. Available:', Object.keys(demonActions));
+                console.warn('[Demon] demon_idle animation not found. Available:', Object.keys(demonActions));
               }
             }
           } else if (object.userData.agentId === 'Monk') {
@@ -2727,34 +2831,44 @@ const CyborgTempleScene = ({
             : availableAnimations[0];
         }
 
-        if (demonActions[demonState.currentAnimation]) {
-          demonActions[demonState.currentAnimation].fadeOut(0.5);
-        }
+        const currentAction = demonActions[demonState.currentAnimation];
+        const nextAction = demonActions[nextAnimation];
 
-        if (demonActions[nextAnimation]) {
-          const nextAction = demonActions[nextAnimation];
+        if (nextAction) {
           nextAction.reset();
-          nextAction.fadeIn(0.5);
-
           if (specialAnimations.includes(nextAnimation)) {
             nextAction.setLoop(THREE.LoopOnce, 1);
             nextAction.clampWhenFinished = true;
             demonState.isPlayingSpecial = true;
+          } else {
+            nextAction.setLoop(THREE.LoopRepeat);
+          }
+          nextAction.setEffectiveWeight(1);
+          nextAction.play();
 
+          // Use crossFadeTo so the fade-out and fade-in are scheduled
+          // against the same mixer time — prevents the brief T-pose
+          // flash from per-frame weight desync between separate
+          // fadeOut/fadeIn calls.
+          if (currentAction && currentAction !== nextAction) {
+            currentAction.crossFadeTo(nextAction, 0.5, false);
+          } else {
+            nextAction.fadeIn(0.5);
+          }
+
+          if (specialAnimations.includes(nextAnimation)) {
             const animDuration = nextAction.getClip().duration * 1000;
             setTimeout(() => {
               const returnAnim = loopAnimations.length > 0
                 ? loopAnimations[Math.floor(Math.random() * loopAnimations.length)]
                 : availableAnimations[0];
-              if (demonActions[returnAnim]) {
-                const returnAction = demonActions[returnAnim];
-                returnAction.stop();
+              const returnAction = demonActions[returnAnim];
+              if (returnAction) {
                 returnAction.reset();
                 returnAction.setLoop(THREE.LoopRepeat);
                 returnAction.setEffectiveWeight(1);
-                returnAction.fadeIn(0.5);
                 returnAction.play();
-                nextAction.fadeOut(0.5);
+                nextAction.crossFadeTo(returnAction, 0.5, false);
                 demonState.currentAnimation = returnAnim;
                 demonState.isPlayingSpecial = false;
                 demonState.nextSwitchDelay = Math.random() * 8000 + 6000;
@@ -2763,11 +2877,7 @@ const CyborgTempleScene = ({
                 demonState.isPlayingSpecial = false;
               }
             }, Math.max(100, animDuration - 500));
-          } else {
-            nextAction.setLoop(THREE.LoopRepeat);
           }
-
-          nextAction.play();
         }
 
         demonState.currentAnimation = nextAnimation;
@@ -3530,7 +3640,12 @@ const CyborgTempleScene = ({
       // Apply 180° Y correction so face (+Z) points at camera instead of back of head
       // Correction angle: adjust to make head face camera (tune this value)
       // 0 = looks left, PI = looks right, PI/2 = should be straight at camera
-      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 1.8);
+      // Base flip (-Math.PI / 1.8) was empirically tuned to combine with
+      // the 80% base-blend below. During pointing the spine yaws, which
+      // pulls the head's world rotation along with it; the boost rotates
+      // the lookAt target to compensate so the gaze stays on camera.
+      const pointingFlipBoost = demonArmAimingRef.current ? Math.PI / 9 + Math.PI / 36 + Math.PI / 36 : 0;
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 1.8 + pointingFlipBoost);
       dummy.quaternion.multiply(flip);
 
       // Clamp the angle between base pose and lookAt to prevent unnatural rotation
@@ -3556,6 +3671,62 @@ const CyborgTempleScene = ({
       demonHeadBoneRef._baseQuat = null;
       demonHeadBoneRef._baseWorldQuat = null;
       demonHeadBoneRef._dummy = null;
+    }
+
+    // Demon spine point-at-camera override — runs only during the
+    // demon_pointing phase of the focus sequence. Mirrors Blender's
+    // "rotate spine on Y" workflow: we override only the spine's local
+    // Y (yaw) component each frame to face the viewer horizontally,
+    // preserving any pitch/lean the animation provides.
+    //
+    // RIG_FORWARD_OFFSET_RAD compensates for the rig's authored forward
+    // direction. The spine's bone-local +Z usually doesn't line up with
+    // the chest-forward axis exactly; this offset rotates the target yaw
+    // to put the chest on the camera. Tune to taste — common values:
+    //   ±Math.PI / 6   (~30° off)
+    //   ±Math.PI / 2   (90° off — rig exported "side-facing")
+    //   Math.PI        (back-to-camera)
+    // If the character turns the wrong way, flip the sign.
+    const RIG_FORWARD_OFFSET_RAD = -Math.PI / 3 - Math.PI / 18;
+    if (demonArmAimingRef.current && demonPointingArmBoneRef.current) {
+      const spine = demonPointingArmBoneRef.current;
+
+      spine.updateWorldMatrix(true, false);
+      const spineWorldPos = new THREE.Vector3();
+      spine.getWorldPosition(spineWorldPos);
+
+      // Direction from spine to camera, projected to the horizontal plane.
+      const toCamera = new THREE.Vector3().subVectors(camera.position, spineWorldPos);
+      toCamera.y = 0;
+
+      // Express that direction in the spine's PARENT local frame so the
+      // yaw value is something we can drop straight into the spine's
+      // local Euler.y.
+      const parentWorldQuat = new THREE.Quaternion();
+      spine.parent.getWorldQuaternion(parentWorldQuat);
+      const toCameraInParent = toCamera.clone().applyQuaternion(parentWorldQuat.clone().invert());
+      toCameraInParent.y = 0;
+      if (toCameraInParent.lengthSq() > 1e-6) {
+        toCameraInParent.normalize();
+        const targetYaw = Math.atan2(toCameraInParent.x, toCameraInParent.z) + RIG_FORWARD_OFFSET_RAD;
+
+        // Decompose the animation's current spine local quat into Euler
+        // (YXZ so yaw is the first applied rotation), override yaw, and
+        // recompose. Pitch (X) and roll (Z) from the animation survive.
+        const animEuler = new THREE.Euler().setFromQuaternion(spine.quaternion, 'YXZ');
+        animEuler.y = targetYaw;
+        const targetLocal = new THREE.Quaternion().setFromEuler(animEuler);
+
+        if (!demonPointingArmBoneRef._smoothedQuat) {
+          demonPointingArmBoneRef._smoothedQuat = spine.quaternion.clone();
+        }
+        // Slow slerp so the torso turn reads as deliberate.
+        demonPointingArmBoneRef._smoothedQuat.slerp(targetLocal, 0.08);
+        spine.quaternion.copy(demonPointingArmBoneRef._smoothedQuat);
+      }
+    } else if (demonPointingArmBoneRef._smoothedQuat) {
+      demonPointingArmBoneRef._smoothedQuat = null;
+      demonPointingArmBoneRef._dummy = null;
     }
 
     // Monk head look-at-camera override — active when focused on the Monk
@@ -4001,16 +4172,20 @@ const CyborgTempleScene = ({
                 object={angelSpotTarget}
                 position={[cfg.position[0], cfg.position[1] + 15, cfg.position[2]]}
               />
-              <SpotLight
-                position={[-0.05, 1.52, 0]}
-                target={angelSpotTarget}
-                angle={0.25}
-                castShadow
-                intensity={0.05}
-                penumbra={0.0}
-                color={'#0bcd2e'}
-                distance={15}
-              />
+                                                                     
+  <SpotLight                                                                                                                                                
+    position={[-0.05, 1.52, 0]}                          
+    target={angelSpotTarget}
+    angle={0.35}
+    castShadow                                                                                                                                              
+    intensity={1}
+    penumbra={0.1}                                                                                                                                          
+    color={'#0bcd2e'}                                    
+    distance={15}
+    opacity={0.2}
+    // attenuation={12}                                                                                                                                        
+    // anglePower={8}
+  />              
             </>
           );
         })()}

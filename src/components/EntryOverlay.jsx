@@ -83,7 +83,7 @@ function MainView({ onSelect, onOpenIndulgence, onDismiss }) {
           </button>
         )}
         <div className="ro-stamp">// THE LIMINAL TERMINAL · BASE</div>
-        <h1 className="ro-title">CHOOSE MODAL80</h1>
+        <h1 className="ro-title">CHOOSE UTIL80</h1>
         <div className="ro-subtitle">Four ways to consult the terminal.</div>
       </header>
 
