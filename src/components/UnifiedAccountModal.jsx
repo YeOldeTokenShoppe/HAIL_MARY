@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useUser, useClerk, UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useEvmAccounts } from '@coinbase/cdp-hooks';
 import { useWalletAuth } from './WalletAuthProvider';
 
 // Client-only — @coinbase/cdp-react reads localStorage at module init,
@@ -157,6 +158,8 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
     disconnectWallet,
     connectors
   } = useWalletAuth();
+  const { evmAccounts } = useEvmAccounts();
+  const ownerEoaAddress = evmAccounts?.[0]?.address || null;
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [connectingMethod, setConnectingMethod] = useState(null); // Track which method is connecting
@@ -513,7 +516,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
                           Self-custody
                         </span>
                         <CopyAddress address={walletAddress} label="Full address" />
-                        <ExportWalletModal address={walletAddress} />
+                        {ownerEoaAddress && <ExportWalletModal address={ownerEoaAddress} />}
                         <p style={{
                           fontSize: '11px',
                           color: 'rgba(255,255,255,0.55)',

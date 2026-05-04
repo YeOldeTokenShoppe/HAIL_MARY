@@ -4,6 +4,13 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { useConnect, useSignMessage } from 'wagmi';
 import dynamic from 'next/dynamic';
+// useEvmAccounts surfaces the user's EOA(s). Required for ExportWalletModal:
+// for accounts that have a smart account, wagmi's address is the smart
+// account (a contract, no exportable key) — only the owner EOA can be
+// exported. New users with createOnLogin:'eoa' have only an EOA and the
+// EOA matches the wagmi address; users from earlier rounds with smart
+// accounts get the EOA owner here.
+import { useEvmAccounts } from '@coinbase/cdp-hooks';
 // Load CDP React components client-only — the package reads localStorage at
 // module init, which throws ReferenceError during Next SSR and turns every
 // page importing BuyModal into a 404. ssr:false defers evaluation to the
@@ -51,6 +58,8 @@ const BuyModal = ({ isOpen, onClose }) => {
   useEffect(() => { setMounted(true); }, []);
   const { t } = useLanguage();
   const { walletAddress, isEmbeddedWallet } = useWalletAuth();
+  const { evmAccounts } = useEvmAccounts();
+  const ownerEoaAddress = evmAccounts?.[0]?.address || null;
   const { connectAsync, connectors: wagmiConnectors } = useConnect();
   const { signMessageAsync } = useSignMessage();
   const instanceRef = useRef(null);
@@ -757,7 +766,7 @@ const BuyModal = ({ isOpen, onClose }) => {
                         {'>>'} YOUR WALLET
                       </p>
                       <CopyAddress address={walletAddress} label="Address" />
-                      <ExportWalletModal address={walletAddress} />
+                      {ownerEoaAddress && <ExportWalletModal address={ownerEoaAddress} />}
                       <p style={{
                         fontFamily: 'monospace',
                         fontSize: '10px',
