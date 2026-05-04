@@ -26,7 +26,6 @@ import CoinLoader from '@/components/CoinLoader';
 import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
 import EntryOverlay from '@/components/EntryOverlay';
-import GameOverlay from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
 import { useRouter } from 'next/navigation';
 
@@ -118,9 +117,9 @@ export default function CyborgTemple() {
   // Which modality the user has entered. null = lobby (no mode chosen).
   // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
   const [tradeMode, setTradeMode] = useState(null);
-  // GameOverlay shows only its intro card; once the user hits START, it
-  // unmounts and the scene takes over (case content lives on the in-scene
-  // Screen objects). Reset on each fresh entry to game mode.
+  // Tracks whether game mode is actively running. Entry now goes straight
+  // into the scene — the previous intro overlay has been removed in favor
+  // of the bottom-nav SELECT OPTION button.
   const [gameStarted, setGameStarted] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -137,13 +136,16 @@ export default function CyborgTemple() {
     console.log('[EntryOverlay] selected:', action);
     if (action === 'game') {
       setTradeMode('game');
-      setGameStarted(false);  // fresh intro every time game is re-entered
+      setGameStarted(true);
     }
     dismissEntryOverlay();
   };
   // First-visit hint: tells the user characters are clickable. Hides when
   // they click any character (focusedAgent flips truthy) or after a timer.
   const [showCharacterHint, setShowCharacterHint] = useState(false);
+  // Hand-tap GIF prompt: appears ~3s after the scene reveals to nudge the
+  // user to tap characters/screens, then auto-hides after a few seconds.
+  const [showHandTap, setShowHandTap] = useState(false);
   // One-shot hint shown on the user's first character zoom-in: explains how
   // to leave the close-up. Stays dismissed for the rest of the session once
   // shown (zoomHintSeenRef).
@@ -406,6 +408,27 @@ export default function CyborgTemple() {
 
     return () => clearTimeout(fallbackTimer);
   }, [isSceneLoading, isMobileView, modelLoaded]);
+
+  // Hand-tap GIF prompt: ~3s after the scene reveals, fade in for ~3.5s,
+  // then fade out. Skip entirely if the user has already focused something
+  // (they don't need the hint) or if the entry overlay is up. Also hide
+  // immediately on the first click/tap anywhere — they've engaged.
+  useEffect(() => {
+    if (!sceneReady || showEntryOverlay || focusedAgent) return;
+    const showTimer = setTimeout(() => setShowHandTap(true), 3000);
+    const hideTimer = setTimeout(() => setShowHandTap(false), 6500);
+    const hideOnInteraction = () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+      setShowHandTap(false);
+    };
+    window.addEventListener('pointerdown', hideOnInteraction, { once: true });
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+      window.removeEventListener('pointerdown', hideOnInteraction);
+    };
+  }, [sceneReady, showEntryOverlay, focusedAgent]);
 
   // Show the "tap a character" hint once the scene is visible. Auto-fade
   // after 6s; if the user clicks a character before then, hide immediately.
@@ -1195,6 +1218,50 @@ export default function CyborgTemple() {
           );
         })()}
 
+        {/* Hand-tap GIF prompt — sits in a dark empty area so the caption
+            has breathing room. Mobile: bottom-center above the nav bar.
+            Desktop: right side, vertically centered. */}
+        <div
+          style={{
+            position: 'fixed',
+            ...(isMobileView
+              ? { left: '50%', bottom: '6.5rem', transform: 'translateX(-50%)' }
+              : { right: '4%', top: '50%', transform: 'translateY(-50%)' }),
+            width: isMobileView ? '110px' : '160px',
+            opacity: showHandTap ? 1 : 0,
+            transition: 'opacity 0.5s ease',
+            pointerEvents: 'none',
+            zIndex: 25,
+            filter: 'drop-shadow(0 4px 14px rgba(0, 0, 0, 0.6))',
+          }}
+        >
+          <img
+            src="/handTap.gif"
+            alt="Tap to interact"
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+            }}
+          />
+          <div
+            style={{
+              marginTop: '0.4rem',
+              textAlign: 'center',
+              fontFamily: "'Orbitron', 'Courier New', monospace",
+              fontSize: isMobileView ? '0.6rem' : '0.7rem',
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: '#8effc4',
+              textShadow: '0 0 8px rgba(77, 255, 170, 0.7), 0 0 16px rgba(77, 255, 170, 0.35)',
+              lineHeight: 1.3,
+            }}
+          >
+            Tap characters &amp; screens
+          </div>
+        </div>
+
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (
           <>
@@ -1390,35 +1457,6 @@ export default function CyborgTemple() {
                 <EntryOverlay
                   onSelect={handleEntrySelect}
                   onDismiss={dismissEntryOverlay}
-                />
-              </div>
-            )}
-
-            {/* Game Overlay — only the intro card is shown. Once the user
-                clicks START, onStart fires and we unmount the overlay so the
-                scene + bottom-bar verdict buttons take over. Case content
-                lives on the in-scene Screen objects. */}
-            {tradeMode === 'game' && !gameStarted && !showEntryOverlay && sceneReady && (
-              <div
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: '5.5rem',
-                  zIndex: 1001,
-                  background: 'rgba(0, 0, 0, 0.92)',
-                  overflow: 'hidden',
-                }}
-              >
-                <GameOverlay
-                  onComplete={(result) => {
-                    console.log('[GameOverlay] complete:', result);
-                  }}
-                  onStart={() => {
-                    console.log('[GameOverlay] start');
-                    setGameStarted(true);
-                  }}
                 />
               </div>
             )}

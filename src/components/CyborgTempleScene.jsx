@@ -796,9 +796,7 @@ const CyborgTempleScene = ({
             spineCandidates.find(b => /spine[._-]?1$/i.test(b.name)) ||
             spineCandidates[0] ||
             null;
-          if (!demonPointingArmBoneRef.current) {
-            console.warn('[Demon] No spine bone found for point-at-camera override.');
-          }
+
         }
         else if (child.name === 'Monk_empty') {
           animatedCharacters['Monk'] = child;
@@ -3727,7 +3725,7 @@ const CyborgTempleScene = ({
     //   ±Math.PI / 2   (90° off — rig exported "side-facing")
     //   Math.PI        (back-to-camera)
     // If the character turns the wrong way, flip the sign.
-    const RIG_FORWARD_OFFSET_RAD = -Math.PI / 3 - Math.PI / 18;
+    const RIG_FORWARD_OFFSET_RAD = -Math.PI / 3 - Math.PI / 12;
     if (demonArmAimingRef.current && demonPointingArmBoneRef.current) {
       const spine = demonPointingArmBoneRef.current;
 

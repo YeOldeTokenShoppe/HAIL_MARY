@@ -47,6 +47,7 @@ export default function EntryOverlay({
       <div className="ro-scrim" />
       <div className="ro-scanlines" aria-hidden />
       <div className="ro-noise" aria-hidden />
+      <div className="ro-vignette" aria-hidden />
 
       {view === "main" ? (
         <MainView
@@ -65,6 +66,17 @@ export default function EntryOverlay({
   );
 }
 
+function CornerOrnaments() {
+  return (
+    <>
+      <span className="ro-corner ro-corner-tl" aria-hidden />
+      <span className="ro-corner ro-corner-tr" aria-hidden />
+      <span className="ro-corner ro-corner-bl" aria-hidden />
+      <span className="ro-corner ro-corner-br" aria-hidden />
+    </>
+  );
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // MAIN VIEW — primary CTA + three service tiles
 // ────────────────────────────────────────────────────────────────────────
@@ -72,6 +84,16 @@ export default function EntryOverlay({
 function MainView({ onSelect, onOpenIndulgence, onDismiss }) {
   return (
     <div className="ro-panel ro-panel-main">
+      <CornerOrnaments />
+      <div className="ro-marquee" aria-hidden>
+        <div className="ro-marquee-track">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <span key={i} className="ro-marquee-content">
+              ◆ CHANNEL OPEN ◆ TERMINAL ONLINE ◆ BASE NETWORK · BLOCK SYNCED ◆ ORACLES LISTENING ◆ FOUR PATHS AVAILABLE ◆&nbsp;
+            </span>
+          ))}
+        </div>
+      </div>
       <header className="ro-header">
         {onDismiss && (
           <button
@@ -83,7 +105,11 @@ function MainView({ onSelect, onOpenIndulgence, onDismiss }) {
           </button>
         )}
         <div className="ro-stamp">// THE LIMINAL TERMINAL · BASE</div>
-        <h1 className="ro-title">CHOOSE UTIL80</h1>
+        <h1 className="ro-title">
+          <span className="ro-title-orn" aria-hidden>✦</span>
+          <span className="ro-title-text" style={{ fontFamily: "'Orbitron', serif" }}>CHOOSE UTIL80</span>
+          <span className="ro-title-orn" aria-hidden>✦</span>
+        </h1>
         <div className="ro-subtitle">Four ways to consult the terminal.</div>
       </header>
 
@@ -93,7 +119,10 @@ function MainView({ onSelect, onOpenIndulgence, onDismiss }) {
         onClick={() => onSelect("game")}
       >
         <div className="ro-primary-meta">
-          <div className="ro-primary-tag">FREE · LEADERBOARD ENABLED</div>
+          <div className="ro-primary-tag">
+            <span className="ro-primary-tag-dot" aria-hidden />
+            FREE · LEADERBOARD ENABLED
+          </div>
           <div className="ro-primary-name">THE LIMINAL TERMINAL</div>
           <div className="ro-primary-desc">
             Crypto forensics training. Read cases. Render verdicts. Climb the board.
@@ -107,31 +136,37 @@ function MainView({ onSelect, onOpenIndulgence, onDismiss }) {
 
       <div className="ro-divider">
         <span className="ro-divider-line" />
-        <span className="ro-divider-text">OR PAY FOR PASSAGE</span>
+        <span className="ro-divider-text">◆ OR PAY FOR PASSAGE ◆</span>
         <span className="ro-divider-line" />
       </div>
 
       {/* Service tiles */}
       <div className="ro-tiles">
         <ServiceTile
+          numeral="I"
           tag="ANALYSIS"
           title="TOKEN REVIEW"
-          desc="Submit any Base token. Full team review delivered to chat."
+          desc="Request a team review of any token."
           sigil="✠"
+          accent="cyan"
           onClick={() => onSelect("analysis")}
         />
         <ServiceTile
+          numeral="II"
           tag="AUDIENCE"
           title="PRIVATE COUNSEL"
-          desc="Text session with the character of your choice. Capped at 20 messages."
+          desc="Text session with any of TLT crew."
           sigil="✦"
+          accent="amber"
           onClick={() => onSelect("audience")}
         />
         <ServiceTile
+          numeral="III"
           tag="INDULGENCE"
           title="ABSOLUTION · BLESSING · ROAST"
           desc="Pay for spiritual relief. One sin, one prayer, or one beating."
           sigil="❖"
+          accent="magenta"
           onClick={onOpenIndulgence}
           hasSubmenu
         />
@@ -151,12 +186,17 @@ function MainView({ onSelect, onOpenIndulgence, onDismiss }) {
 function IndulgenceView({ blessingAvailable, onSelect, onBack }) {
   return (
     <div className="ro-panel ro-panel-indulgence">
+      <CornerOrnaments />
       <header className="ro-header">
         <button className="ro-back" onClick={onBack}>
           ◂ BACK
         </button>
         <div className="ro-stamp ro-stamp-indulgence">// INDULGENCE · CHOOSE YOUR RITE</div>
-        <h1 className="ro-title">WHICH RELIEF DO YOU SEEK?</h1>
+        <h1 className="ro-title ro-title-magenta">
+          <span className="ro-title-orn" aria-hidden>❖</span>
+          <span className="ro-title-text">WHICH RELIEF DO YOU SEEK?</span>
+          <span className="ro-title-orn" aria-hidden>❖</span>
+        </h1>
         <div className="ro-subtitle">Each rite is performed by the character it suits.</div>
       </header>
 
@@ -213,13 +253,14 @@ function IndulgenceView({ blessingAvailable, onSelect, onBack }) {
 // SUBCOMPONENTS
 // ────────────────────────────────────────────────────────────────────────
 
-function ServiceTile({ tag, title, desc, sigil, onClick, hasSubmenu }) {
+function ServiceTile({ numeral, tag, title, desc, sigil, accent = "phos", onClick, hasSubmenu }) {
   return (
-    <button className="ro-tile" onClick={onClick}>
-      <div className="ro-tile-row">
+    <button className={`ro-tile ro-tile-${accent}`} onClick={onClick}>
+      {numeral && <div className="ro-tile-numeral" aria-hidden>{numeral}</div>}
+      <div className="ro-tile-sigil-wrap">
         <div className="ro-tile-sigil">{sigil}</div>
-        <div className="ro-tile-tag">{tag}</div>
       </div>
+      <div className="ro-tile-tag">{tag}</div>
       <div className="ro-tile-title">{title}</div>
       <div className="ro-tile-desc">{desc}</div>
       {hasSubmenu && (
@@ -268,6 +309,8 @@ const STYLES = `
   --ro-red: #ff4d6d;
   --ro-magenta: #ff3ea0;
   --ro-magenta-bright: #ff7ac4;
+  --ro-cyan: #4dd6ff;
+  --ro-cyan-bright: #8ee9ff;
 
   --ro-mono: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
   --ro-display: 'Cinzel Decorative', 'Cinzel', Didot, 'Bodoni 72', serif;
@@ -315,6 +358,15 @@ const STYLES = `
   opacity: 0.04;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
 }
+.ro-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(77, 255, 170, 0.06), transparent 45%),
+    radial-gradient(ellipse at 85% 90%, rgba(255, 62, 160, 0.05), transparent 45%);
+}
 
 .ro-panel {
   position: relative;
@@ -341,6 +393,64 @@ const STYLES = `
 .ro-panel::-webkit-scrollbar { width: 6px; }
 .ro-panel::-webkit-scrollbar-thumb { background: var(--ro-frame); }
 
+/* Decorative corner brackets — gothic-cyber */
+.ro-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  z-index: 12;
+}
+.ro-corner-tl { top: 8px; left: 8px; border-top: 2px solid var(--ro-phos); border-left: 2px solid var(--ro-phos); box-shadow: -1px -1px 8px rgba(77, 255, 170, 0.4); }
+.ro-corner-tr { top: 8px; right: 8px; border-top: 2px solid var(--ro-phos); border-right: 2px solid var(--ro-phos); box-shadow:  1px -1px 8px rgba(77, 255, 170, 0.4); }
+.ro-corner-bl { bottom: 8px; left: 8px; border-bottom: 2px solid var(--ro-phos); border-left: 2px solid var(--ro-phos); box-shadow: -1px  1px 8px rgba(77, 255, 170, 0.4); }
+.ro-corner-br { bottom: 8px; right: 8px; border-bottom: 2px solid var(--ro-phos); border-right: 2px solid var(--ro-phos); box-shadow:  1px  1px 8px rgba(77, 255, 170, 0.4); }
+.ro-panel-indulgence .ro-corner-tl,
+.ro-panel-indulgence .ro-corner-tr,
+.ro-panel-indulgence .ro-corner-bl,
+.ro-panel-indulgence .ro-corner-br {
+  border-color: var(--ro-magenta);
+  box-shadow: 0 0 8px rgba(255, 62, 160, 0.4);
+}
+
+/* Marquee data ticker */
+.ro-marquee {
+  position: relative;
+  margin: -12px -36px 18px;
+  padding: 6px 0;
+  border-top: 1px solid var(--ro-frame);
+  border-bottom: 1px solid var(--ro-frame);
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: var(--ro-phos);
+  text-shadow: 0 0 6px rgba(77, 255, 170, 0.4);
+}
+.ro-marquee::before,
+.ro-marquee::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 2;
+  pointer-events: none;
+}
+.ro-marquee::before { left: 0; background: linear-gradient(to right, var(--ro-bg), transparent); }
+.ro-marquee::after  { right: 0; background: linear-gradient(to left, var(--ro-bg), transparent); }
+.ro-marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: ro-marquee 38s linear infinite;
+  will-change: transform;
+}
+.ro-marquee-content { padding-right: 1em; }
+@keyframes ro-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
 /* ─────────── HEADER ─────────── */
 .ro-header {
   position: relative;
@@ -365,6 +475,32 @@ const STYLES = `
   margin: 0;
   text-shadow: 0 0 24px rgba(77, 255, 170, 0.45);
   line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ro-title-orn {
+  font-size: 18px;
+  color: var(--ro-phos);
+  text-shadow: 0 0 10px var(--ro-phos);
+  animation: ro-pulse 2.6s ease-in-out infinite;
+}
+.ro-title-text {
+  background: linear-gradient(180deg, var(--ro-phos-bright) 0%, var(--ro-phos) 60%, var(--ro-frame-bright) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.ro-title-magenta .ro-title-orn { color: var(--ro-magenta); text-shadow: 0 0 10px var(--ro-magenta); }
+.ro-title-magenta .ro-title-text {
+  background: linear-gradient(180deg, var(--ro-magenta-bright) 0%, var(--ro-magenta) 60%, #6b0e3a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+@keyframes ro-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.15); }
 }
 .ro-subtitle {
   font-style: italic;
@@ -448,6 +584,22 @@ const STYLES = `
   letter-spacing: 3px;
   color: var(--ro-phos);
   margin-bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ro-primary-tag-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ro-phos);
+  box-shadow: 0 0 8px var(--ro-phos);
+  animation: ro-blink 1.4s ease-in-out infinite;
+}
+@keyframes ro-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.25; }
 }
 .ro-primary-name {
   font-family: var(--ro-display);
@@ -482,6 +634,11 @@ const STYLES = `
   color: var(--ro-phos);
   margin-top: 4px;
   text-shadow: 0 0 12px var(--ro-phos);
+  animation: ro-arrow-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ro-arrow-pulse {
+  0%, 100% { transform: translateX(0);   text-shadow: 0 0 12px var(--ro-phos); }
+  50%      { transform: translateX(4px); text-shadow: 0 0 22px var(--ro-phos), 0 0 34px rgba(77, 255, 170, 0.5); }
 }
 
 /* ─────────── DIVIDER ─────────── */
@@ -509,10 +666,12 @@ const STYLES = `
   gap: 12px;
 }
 .ro-tile {
+  position: relative;
   display: flex;
   flex-direction: column;
-  padding: 16px 18px;
-  background: rgba(10, 58, 38, 0.20);
+  padding: 18px 18px 16px;
+  background:
+    linear-gradient(180deg, rgba(10, 58, 38, 0.32), rgba(5, 10, 7, 0.28));
   border: 1px solid var(--ro-frame);
   border-top: 2px solid var(--ro-frame-bright);
   cursor: pointer;
@@ -520,31 +679,67 @@ const STYLES = `
   font-family: var(--ro-mono);
   color: var(--ro-text);
   transition: all 0.2s;
-  min-height: 140px;
+  min-height: 160px;
+  overflow: hidden;
 }
-.ro-tile:hover {
-  background: rgba(13, 80, 50, 0.28);
-  border-color: var(--ro-phos);
-  border-top-color: var(--ro-phos);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+.ro-tile::before {
+  /* sweep on hover */
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  transition: left 0.7s ease;
+  pointer-events: none;
 }
-.ro-tile-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+.ro-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }
+.ro-tile:hover::before { left: 130%; }
+/* Accent variants */
+.ro-tile-phos { border-top-color: var(--ro-phos); }
+.ro-tile-phos:hover { border-color: var(--ro-phos); box-shadow: 0 8px 28px rgba(77, 255, 170, 0.22); }
+.ro-tile-cyan { border-top-color: var(--ro-cyan); }
+.ro-tile-cyan:hover { border-color: var(--ro-cyan); box-shadow: 0 8px 28px rgba(77, 214, 255, 0.25); }
+.ro-tile-amber { border-top-color: var(--ro-amber); }
+.ro-tile-amber:hover { border-color: var(--ro-amber); box-shadow: 0 8px 28px rgba(255, 184, 77, 0.22); }
+.ro-tile-magenta { border-top-color: var(--ro-magenta); }
+.ro-tile-magenta:hover { border-color: var(--ro-magenta); box-shadow: 0 8px 28px rgba(255, 62, 160, 0.25); }
+
+.ro-tile-numeral {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-family: var(--ro-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ro-text);
+  opacity: 0.16;
+  pointer-events: none;
+}
+.ro-tile-sigil-wrap {
+  margin-bottom: 10px;
 }
 .ro-tile-sigil {
   font-family: var(--ro-display);
-  font-size: 16px;
-  color: var(--ro-magenta);
+  font-size: 28px;
+  line-height: 1;
 }
+.ro-tile-phos    .ro-tile-sigil { color: var(--ro-phos);    text-shadow: 0 0 14px rgba(77, 255, 170, 0.65); }
+.ro-tile-cyan    .ro-tile-sigil { color: var(--ro-cyan);    text-shadow: 0 0 14px rgba(77, 214, 255, 0.65); }
+.ro-tile-amber   .ro-tile-sigil { color: var(--ro-amber);   text-shadow: 0 0 14px rgba(255, 184, 77, 0.6); }
+.ro-tile-magenta .ro-tile-sigil { color: var(--ro-magenta); text-shadow: 0 0 14px rgba(255, 62, 160, 0.6); }
 .ro-tile-tag {
   font-size: 9px;
   letter-spacing: 2.5px;
   color: var(--ro-text-dim);
+  margin-bottom: 4px;
 }
+.ro-tile-phos    .ro-tile-tag { color: var(--ro-phos); }
+.ro-tile-cyan    .ro-tile-tag { color: var(--ro-cyan); }
+.ro-tile-amber   .ro-tile-tag { color: var(--ro-amber); }
+.ro-tile-magenta .ro-tile-tag { color: var(--ro-magenta); }
 .ro-tile-spacer { flex: 1; }
 .ro-tile-price {
   font-family: var(--ro-display);
@@ -742,5 +937,11 @@ const STYLES = `
     color: inherit;
   }
   .ro-stamp { padding-right: 44px; }
+  .ro-marquee { margin: -8px -20px 14px; }
+  .ro-title { font-size: 22px; gap: 10px; }
+  .ro-title-orn { font-size: 14px; }
+  .ro-tile-numeral { font-size: 24px; }
+  .ro-tile { min-height: auto; }
+  .ro-corner { width: 16px; height: 16px; }
 }
 `;
