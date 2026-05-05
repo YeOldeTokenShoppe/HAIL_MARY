@@ -24,14 +24,17 @@ function getCorsHeaders(request) {
 }
 
 // CDP Onramp requires the originating user's IP for security validation —
-// ties the session token to the user it was minted for. In production on
-// Vercel the real client IP arrives in x-forwarded-for. CDP rejects
-// private/loopback/test IPs (including the 192.0.2.1 their own docs
-// suggest as a placeholder), so for local dev we expose an env override.
-// Set ONRAMP_DEV_CLIENT_IP=<your public IP> in .env.local — find yours
-// at https://api.ipify.org or `curl ifconfig.me`.
+// ties the session token to the user it was minted for. In production the
+// real client IP arrives via standard proxy headers — Firebase Hosting
+// sets fastly-client-ip (its CDN) and x-forwarded-for; Cloud Run / App
+// Hosting set x-forwarded-for. CDP rejects private/loopback/test IPs
+// (including the 192.0.2.1 their own docs suggest as a placeholder), so
+// for local dev we expose an env override — set ONRAMP_DEV_CLIENT_IP=
+// <your public IP> in .env.local (find yours at https://api.ipify.org).
 function getClientIp(request) {
   if (process.env.ONRAMP_DEV_CLIENT_IP) return process.env.ONRAMP_DEV_CLIENT_IP;
+  const fastly = request.headers.get('fastly-client-ip');
+  if (fastly) return fastly;
   const xff = request.headers.get('x-forwarded-for');
   if (xff) return xff.split(',')[0].trim();
   return (
