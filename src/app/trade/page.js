@@ -121,11 +121,6 @@ export default function CyborgTemple() {
   // into the scene — the previous intro overlay has been removed in favor
   // of the bottom-nav SELECT OPTION button.
   const [gameStarted, setGameStarted] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const seen = localStorage.getItem('rl80_trade_overlay_seen');
-    if (!seen) setShowEntryOverlay(true);
-  }, []);
   const dismissEntryOverlay = () => {
     setShowEntryOverlay(false);
     if (typeof window !== 'undefined') {
@@ -240,7 +235,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v03_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v07_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -1121,9 +1116,9 @@ export default function CyborgTemple() {
         {(() => {
           const agentInfo = {
             RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Unicorn Investor' },
-            Demon: { name: 'H8ØZ', pronunciation: 'HAY-deez', tagline: 'Devil\'s advocate. Short-seller.' },
+            Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Insider trader.' },
             Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android eschatologist hell-bent on saving humanity from itself.' },
-            Granny: { name: 'Sadie', pronunciation: 'SAY-dee', tagline: 'Born lucky. Plays hunches. Cashes checks.' },
+            Detective: { name: 'Detective Marisol', pronunciation: '', tagline: 'Field agent for an interdimensional anti-fraud task force.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
           // On mobile, place the label as a bottom banner above the bottom

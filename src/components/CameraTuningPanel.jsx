@@ -20,7 +20,7 @@ const AGENT_IDS = [
   "RL80",
   "Demon",
   "Monk",
-  "Granny",
+  "Detective",
   "Angel",
   "Screen1",
   "Screen2",

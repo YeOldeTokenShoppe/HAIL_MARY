@@ -26,13 +26,13 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Demon: {
-    cameraPos: new THREE.Vector3(-1.88, -0.02, -0.47),
+    cameraPos: new THREE.Vector3(-0.68, -0.02, 2.42),
     lookAtPos: new THREE.Vector3(0.605, -0.235, -2.06),
-    // orbitCenter: new THREE.Vector3(-1.554, -0.35, -1.351),
+    orbitCenter: null,
   },
   Monk: {
-    cameraPos: new THREE.Vector3(-0.61, -0.31, 1.645),
-    lookAtPos: new THREE.Vector3(-1.295, -0.305, 0.085),
+    cameraPos: new THREE.Vector3(-1.59, -0.82, -0.665),
+    lookAtPos: new THREE.Vector3(1.515, 0.445, -1.965),
     orbitCenter: null,
   },
 
@@ -41,9 +41,9 @@ export const AGENT_CAMERA_SETTINGS = {
     lookAtPos: new THREE.Vector3(1.87, -1.35, 0.745),
     orbitCenter: null,
   },
-  // Granny — placeholder cameraPos/lookAtPos. Tune via the in-app
+  // Detective — placeholder cameraPos/lookAtPos. Tune via the in-app
   // CameraTuningPanel (?tune=1) or by editing here directly.
-  Granny: {
+  Detective: {
     cameraPos: new THREE.Vector3(0.495, -0.215, -1.915),
     lookAtPos: new THREE.Vector3(0.57, -1.075, 1.33),
     orbitCenter: null,
@@ -363,18 +363,22 @@ const CyborgTempleScene = ({
   const rl80HeadBoneRef = useRef();
   const rl80FocusedRef = useRef(false); // true when camera is zoomed in on RL80
   const fluffyHeadBoneRef = useRef();
-  const grannyHeadBoneRef = useRef();
+  const detectiveHeadBoneRef = useRef();
   // Hint marker group refs (positioned each frame from the head bones)
   const rl80HintRef = useRef();
   const demonHintRef = useRef();
   const monkHintRef = useRef();
   const fluffyHintRef = useRef();
-  const grannyHintRef = useRef();
+  const detectiveHintRef = useRef();
   const fluffyFocusedRef = useRef(false); // true when camera is zoomed in on Fluffy
-  const grannyFocusedRef = useRef(false); // true when camera is zoomed in on Granny
+  const detectiveFocusedRef = useRef(false); // true when camera is zoomed in on Detective
 
   // Demon eye mesh ref and blink state
   const demonEyesRef = useRef();
+  // New-demon blink set: 'Eyes' mesh + 'Pupil_L'/'Pupil_R' (or shared
+  // 'Pupil'). Opacity-faded together each blink. Stays empty if the rig
+  // doesn't include those meshes — the per-frame blink block then no-ops.
+  const demonBlinkMeshesRef = useRef([]);
   const demonBlinkStateRef = useRef({
     lastBlinkTime: 0,
     nextBlinkDelay: Math.random() * 4000 + 3000, // Random delay between 3-7 seconds
@@ -382,12 +386,14 @@ const CyborgTempleScene = ({
     blinkProgress: 0
   });
 
-  // Granny eye mesh refs and blink state. Mesh-swap blink: Eyes is the open
-  // mesh, Closedeyes is a narrower closed shape that takes over for the
+  // Detective eye mesh refs and blink state. Mesh-swap blink: Eyes is the
+  // open mesh, Closedeyes is a narrower closed shape that takes over for the
   // blink frames. Reads cleaner than fading opacity (no momentary hole).
-  const grannyEyesRef = useRef();
-  const grannyClosedEyesRef = useRef();
-  const grannyBlinkStateRef = useRef({
+  // Refs stay null when the rig has no matching meshes — the per-frame
+  // blink block is then a no-op.
+  const detectiveEyesRef = useRef();
+  const detectiveClosedEyesRef = useRef();
+  const detectiveBlinkStateRef = useRef({
     lastBlinkTime: 0,
     nextBlinkDelay: Math.random() * 4000 + 3000,
     isBlinking: false,
@@ -432,14 +438,13 @@ const CyborgTempleScene = ({
     nextSwitchDelay: Math.random() * 10000 + 15000,
   });
 
-  // Granny animation state — alternates granny_typing (loop) with
-  // granny_fistPump (one-shot). Mirrors the Demon alternation shape.
-  const grannyAnimStateRef = useRef({
-    currentAnimation: 'granny_typing',
+  // Detective animation state — alternates detective_typing (loop) and
+  // detective_idle (loop) when idle, holds detective_idle while focused.
+  const detectiveAnimStateRef = useRef({
+    currentAnimation: 'detective_typing',
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 8000 + 8000,
     isPlayingSpecial: false,
-    pumpReturnTimeoutId: null, // setTimeout ID for the post-fistPump return-to-typing
   });
 
   // Monk attention-getting one-shot (clip name "Pointing_Monk"). Plays
@@ -454,14 +459,7 @@ const CyborgTempleScene = ({
     attentionActive: false,    // true while the hail/idle/beckon cycle is running — gates head tracking
   });
 
-  // Tekno animation state
-  const teknoAnimStateRef = useRef({
-    currentAnimation: 'Typing',
-    lastSwitchTime: 0,
-    nextSwitchDelay: Math.random() * 10000 + 20000, // Wait 20-30 seconds
-  });
-
-  // Price tracking for buy-triggered animations (H80Z/Tekno FistPump on buys)
+  // Price tracking for buy-triggered animations (H80Z FistPump on buys)
   const lastPriceRef = useRef(null);
   const priceCheckIntervalRef = useRef(null);
 
@@ -518,7 +516,7 @@ const CyborgTempleScene = ({
       const animDuration = fistPump.getClip().duration * 1000;
       setTimeout(() => {
         const loopAnims = Object.keys(demonActions).filter(a =>
-          /typing|idle|laughing/i.test(a));
+          /typing|idle/i.test(a) && !/sit_idle/i.test(a));
         const returnAnim = loopAnims.length > 0
           ? loopAnims[Math.floor(Math.random() * loopAnims.length)]
           : Object.keys(demonActions)[0];
@@ -677,8 +675,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v03_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v03.glb";
+    let modelPath = "/models/RL80_4anims_v07_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v07.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -773,22 +771,53 @@ const CyborgTempleScene = ({
             });
           }
         }
-        else if (child.name === 'Devil_empty' || child.name === 'Devil_Empty') {
+        else if (child.name === 'Demon_Empty' || child.name === 'Devil_empty' || child.name === 'Devil_Empty') {
           animatedCharacters['Demon'] = child;
           // Find head bone + lower spine bone (spine_01) in the Demon
           // skeleton. The pointing override rotates the torso rather than
           // a single arm bone so the entire pointing gesture (shoulder →
           // elbow → wrist → hand) stays intact and just gets reaimed.
+          const headCandidates = [];
           const spineCandidates = [];
-          child.traverse((bone) => {
-            if (!bone.isBone) return;
-            if (/head/i.test(bone.name)) {
-              demonHeadBoneRef.current = bone;
+          child.traverse((obj) => {
+            if (obj.isBone) {
+              if (/head/i.test(obj.name)) headCandidates.push(obj);
+              if (/spine/i.test(obj.name)) spineCandidates.push(obj);
+              return;
             }
-            if (/spine/i.test(bone.name)) {
-              spineCandidates.push(bone);
+            // Eyes + pupils get cloned materials and pushed to the blink
+            // set. Cloning so opacity tweaks don't propagate to any other
+            // mesh that happens to share the original material instance.
+            // Loose matcher: any mesh whose name contains "eye" or "pupil"
+            // (handles Blender suffixes like Eyes.001 / Eyes_1 / EyeBalls).
+            if (obj.isMesh && /eye|pupil/i.test(obj.name || '')) {
+              if (obj.material) {
+                obj.material = Array.isArray(obj.material)
+                  ? obj.material.map((m) => {
+                      const c = m.clone();
+                      c.transparent = true;
+                      c.needsUpdate = true;
+                      return c;
+                    })
+                  : (() => {
+                      const c = obj.material.clone();
+                      c.transparent = true;
+                      c.needsUpdate = true;
+                      return c;
+                    })();
+              }
+              demonBlinkMeshesRef.current.push(obj);
             }
           });
+          // Prefer exact "head", then anything that isn't an end/tip leaf
+          // (Head_end / HeadTip / HeadNub bones don't get rotation tracks
+          // in animations and cause jitter when picked as the look-at
+          // target). Fall back to whatever we found.
+          demonHeadBoneRef.current =
+            headCandidates.find(b => /^head$/i.test(b.name)) ||
+            headCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
+            headCandidates[0] ||
+            null;
           // Prefer spine_01 (or spine.001 / Spine_01 variants); fall back
           // to any spine bone if naming differs.
           demonPointingArmBoneRef.current =
@@ -807,9 +836,6 @@ const CyborgTempleScene = ({
             }
           });
         }
-        else if (child.name === 'Tekno_Empty') {
-          animatedCharacters['Tekno'] = child;
-        }
         else if (child.name === 'Fluffy_Empty') {
           animatedCharacters['Fluffy'] = child;
           // Find head bone in Fluffy skeleton for look-at-camera
@@ -819,15 +845,15 @@ const CyborgTempleScene = ({
             }
           });
         }
-        else if (child.name === 'GrannyEmpty') {
-          animatedCharacters['Granny'] = child;
+        else if (child.name === 'Detective_Empty') {
+          animatedCharacters['Detective'] = child;
           // Find head bone (for orbit-center derivation) plus the open/closed
           // eye meshes. Two-pass to be deterministic regardless of traversal
           // order: gather all meshes first, then resolve refs from the list.
           const meshes = [];
           child.traverse((obj) => {
-            if (obj.isBone && /head/i.test(obj.name) && !grannyHeadBoneRef.current) {
-              grannyHeadBoneRef.current = obj;
+            if (obj.isBone && /head/i.test(obj.name) && !detectiveHeadBoneRef.current) {
+              detectiveHeadBoneRef.current = obj;
             }
             if (obj.isMesh) meshes.push(obj);
           });
@@ -851,9 +877,9 @@ const CyborgTempleScene = ({
               m !== openEyes && /eye/i.test(m.name || '')
             );
           }
-          if (openEyes) grannyEyesRef.current = openEyes;
+          if (openEyes) detectiveEyesRef.current = openEyes;
           if (closedEyes) {
-            grannyClosedEyesRef.current = closedEyes;
+            detectiveClosedEyesRef.current = closedEyes;
             closedEyes.visible = false;
           }
         }
@@ -952,7 +978,7 @@ const CyborgTempleScene = ({
         // Assign animations based on bone structure:
         // - Pelvis-based → Demon
         // - Root_2-based → Monk
-        // - Root-based → RL80, Tekno
+        // - Root-based → RL80
 
         gltf.animations.forEach((animation) => {
           const animName = animation.name;
@@ -960,13 +986,14 @@ const CyborgTempleScene = ({
 
           let targetCharacters = [];
 
-          // Granny animations — match "granny" anywhere in the clip name or
-          // first-track bone name. Checked before bone-based rules in case
-          // Granny shares a Pelvis/Root skeleton with another character.
-          // Blender often exports as `Armature.NNN|granny_typing` when there
-          // are multiple armatures, so we substring-match instead of anchoring.
-          if (/granny/i.test(animName) || /granny/i.test(firstTrackBone)) {
-            targetCharacters = ['Granny'];
+          // Detective animations — match "detective" anywhere in the clip
+          // name or first-track bone name. Checked before bone-based rules
+          // in case Detective shares a Pelvis/Root skeleton with another
+          // character. Blender often exports as
+          // `Armature.NNN|detective_typing` when there are multiple
+          // armatures, so we substring-match instead of anchoring.
+          if (/detective/i.test(animName) || /detective/i.test(firstTrackBone)) {
+            targetCharacters = ['Detective'];
           }
           // Demon animations — match "demon" anywhere in the clip name or
           // first-track bone, since newer exports renamed clips to
@@ -984,7 +1011,7 @@ const CyborgTempleScene = ({
           else if (firstTrackBone === 'Root_2' || /_monk$|^monk_/i.test(animName)) {
             targetCharacters = ['Monk'];
           }
-          // Standard Root-based animations for RL80 and Tekno only
+          // Standard Root-based animations for RL80 only
           // (Demon uses Root.001|* / Pelvis animations, Monk uses *_monk animations)
           // Fluffy animations (sit_idle, or any _fluffy suffixed)
           else if (animName === 'sit_idle' || animName.endsWith('_fluffy')) {
@@ -1000,7 +1027,7 @@ const CyborgTempleScene = ({
                    animName === 'Typing' || animName === 'Idle' ||
                    animName === 'Disbelief' || animName === 'FistPump' ||
                    animName === 'Clap' || animName === 'Victory' || animName === 'Cheer') {
-            targetCharacters = ['RL80', 'Tekno'];
+            targetCharacters = ['RL80'];
           }
 
 
@@ -1098,23 +1125,15 @@ const CyborgTempleScene = ({
             } else {
               defaultAnimName = availableAnims[0];
             }
-          } else if (charName === 'Tekno') {
-            if (charActions['Typing']) {
-              defaultAnimName = 'Typing';
-            } else if (charActions['Idle']) {
-              defaultAnimName = 'Idle';
-            } else {
-              defaultAnimName = availableAnims[0];
-            }
           } else if (charName === 'Fluffy') {
             if (charActions['sit_idle']) {
               defaultAnimName = 'sit_idle';
             } else {
               defaultAnimName = availableAnims[0];
             }
-          } else if (charName === 'Granny') {
+          } else if (charName === 'Detective') {
             // Tolerate armature-prefixed names from Blender exports.
-            const typingKey = availableAnims.find(a => /granny.*typ/i.test(a));
+            const typingKey = availableAnims.find(a => /detective.*typ/i.test(a));
             defaultAnimName = typingKey || availableAnims[0];
           }
           
@@ -1122,7 +1141,7 @@ const CyborgTempleScene = ({
             defaultAnim = charActions[defaultAnimName];
             
             // Add some timing variation for visual interest
-            if (charName === 'Monk' || charName === 'Tekno' || charName === 'Demon' || charName === 'Fluffy' || charName === 'Granny') {
+            if (charName === 'Monk' || charName === 'Demon' || charName === 'Fluffy' || charName === 'Detective') {
               defaultAnim.time = Math.random() * defaultAnim.getClip().duration * 0.5;
             }
             defaultAnim.setLoop(THREE.LoopRepeat);
@@ -1135,10 +1154,8 @@ const CyborgTempleScene = ({
               demonAnimStateRef.current.currentAnimation = defaultAnimName;
             } else if (charName === 'Monk') {
               monkAnimStateRef.current.currentAnimation = defaultAnimName;
-            } else if (charName === 'Tekno') {
-              teknoAnimStateRef.current.currentAnimation = defaultAnimName;
-            } else if (charName === 'Granny') {
-              grannyAnimStateRef.current.currentAnimation = defaultAnimName;
+            } else if (charName === 'Detective') {
+              detectiveAnimStateRef.current.currentAnimation = defaultAnimName;
             }
           } else {
             console.error(`[Play] ERROR: Could not find a default animation for ${charName}`);
@@ -1380,21 +1397,19 @@ const CyborgTempleScene = ({
         }
         
         // Make the council characters clickable
-        if (child.name === 'Demon' || child.name === 'Demon_empty' ||
+        if (child.name === 'Demon' || child.name === 'Demon_empty' || child.name === 'Demon_Empty' ||
             child.name === 'Devil_empty' || child.name === 'Devil_Empty' ||
             child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01' ||
-            child.name === 'Tekno' || child.name === 'Tekno_Empty' ||
             child.name === 'Fluffy_Empty' ||
-            child.name === 'GrannyEmpty') {
+            child.name === 'Detective_Empty') {
 
           // Normalize agentId to consistent names
           let agentId = child.name;
-          if (child.name === 'Demon' || child.name === 'Demon_empty' ||
+          if (child.name === 'Demon' || child.name === 'Demon_empty' || child.name === 'Demon_Empty' ||
               child.name === 'Devil_empty' || child.name === 'Devil_Empty') agentId = 'Demon';
           else if (child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01') agentId = 'Monk';
-          else if (child.name === 'Tekno' || child.name === 'Tekno_Empty') agentId = 'Tekno';
           else if (child.name === 'Fluffy_Empty') agentId = 'Fluffy';
-          else if (child.name === 'GrannyEmpty') agentId = 'Granny';
+          else if (child.name === 'Detective_Empty') agentId = 'Detective';
 
           const setMechClickableData = (obj) => {
             obj.userData.clickable = true;
@@ -1521,21 +1536,6 @@ const CyborgTempleScene = ({
           }
           if (child.name === 'Coin2') {
             coin2Ref.current = child;
-            
-            // Make Coin2 clickable - maps to Tekno
-            const setCoin2ClickableData = (obj) => {
-              obj.userData.clickable = true;
-              obj.userData.agentId = 'Tekno';
-              obj.userData.agentName = 'Tekno';
-              obj.userData.targetObject = child;
-              obj.userData.isCoin = true;
-              
-              if (obj.children && obj.children.length > 0) {
-                obj.children.forEach(setCoin2ClickableData);
-              }
-            };
-            
-            setCoin2ClickableData(child);
           }
           if (child.name === 'Coin3') {
             coin3Ref.current = child;
@@ -1858,7 +1858,7 @@ const CyborgTempleScene = ({
       }
       demonArmAimingRef.current = false;
       if (!demonActions) return;
-      const loopAnims = Object.keys(demonActions).filter(a => /typing|idle|laughing/i.test(a) && !/sit_idle/i.test(a));
+      const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle/i.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
       if (demonActions[demonState.currentAnimation]) {
         demonActions[demonState.currentAnimation].fadeOut(0.5);
@@ -1959,32 +1959,34 @@ const CyborgTempleScene = ({
       }
     };
 
-    // Helper: restore Granny to normal when leaving focus. Cross-fades
-    // granny_idle → granny_typing and resets the pump timer so she doesn't
-    // immediately fist-pump on un-zoom.
-    const restoreGrannyFromFocus = () => {
-      if (!grannyFocusedRef.current) return;
-      grannyFocusedRef.current = false;
-      const grannyActions = actionsRef.current['Granny'];
-      const grannyState = grannyAnimStateRef.current;
-      if (grannyActions) {
-        const typingKey = Object.keys(grannyActions).find(a => /granny.*typ/i.test(a));
-        if (grannyActions[grannyState.currentAnimation]) {
-          grannyActions[grannyState.currentAnimation].fadeOut(0.5);
-        }
-        if (typingKey && grannyActions[typingKey]) {
-          const typingAction = grannyActions[typingKey];
+    // Helper: restore Detective to normal when leaving focus. Cross-fades
+    // whatever's playing back to detective_typing and rearms the
+    // typing↔idle alternation timer.
+    const restoreDetectiveFromFocus = () => {
+      if (!detectiveFocusedRef.current) return;
+      detectiveFocusedRef.current = false;
+      const detectiveActions = actionsRef.current['Detective'];
+      const detectiveState = detectiveAnimStateRef.current;
+      if (detectiveActions) {
+        const typingKey = Object.keys(detectiveActions).find(a => /detective.*typ/i.test(a));
+        Object.values(detectiveActions).forEach((action) => {
+          if (action && action.isRunning && action.isRunning()) {
+            action.fadeOut(0.5);
+          }
+        });
+        if (typingKey && detectiveActions[typingKey]) {
+          const typingAction = detectiveActions[typingKey];
           typingAction.reset();
           typingAction.setLoop(THREE.LoopRepeat);
           typingAction.setEffectiveWeight(1);
           typingAction.fadeIn(0.5);
           typingAction.play();
-          grannyState.currentAnimation = typingKey;
+          detectiveState.currentAnimation = typingKey;
         }
       }
-      grannyState.isPlayingSpecial = false;
-      grannyState.nextSwitchDelay = Math.random() * 8000 + 8000;
-      grannyState.lastSwitchTime = Date.now();
+      detectiveState.isPlayingSpecial = false;
+      detectiveState.nextSwitchDelay = Math.random() * 8000 + 8000;
+      detectiveState.lastSwitchTime = Date.now();
     };
 
     // Helper: restore all characters from focus
@@ -1993,7 +1995,7 @@ const CyborgTempleScene = ({
       restoreMonkFromFocus();
       restoreRL80FromFocus();
       restoreFluffyFromFocus();
-      restoreGrannyFromFocus();
+      restoreDetectiveFromFocus();
     };
 
     // Handle escape key to reset camera
@@ -2010,7 +2012,7 @@ const CyborgTempleScene = ({
               child.getWorldPosition(pos);
             }
             
-            if (child.name === 'Demon' || child.name === 'Monk_empty' || child.name === 'Tekno' || child.name === 'Fluffy_Empty') {
+            if (child.name === 'Demon' || child.name === 'Monk_empty' || child.name === 'Fluffy_Empty') {
               const pos = new THREE.Vector3();
               child.getWorldPosition(pos);
             }
@@ -2487,13 +2489,33 @@ const CyborgTempleScene = ({
                     // fires, and the bones briefly fall to T-pose.
                     pointingAction.clampWhenFinished = true;
                     pointingAction.setEffectiveWeight(1);
-                    idleAction.fadeOut(0.3);
-                    pointingAction.fadeIn(0.3);
+                    // Skip past the windup frames at the start of the
+                    // pointing clip — the authored anim leans back to
+                    // build momentum, which reads as "startled" coming
+                    // out of idle. Bump POINTING_SKIP_S up to skip more
+                    // windup, down to 0 to keep the full clip.
+                    const POINTING_SKIP_S = 0.9;
+                    pointingAction.time = POINTING_SKIP_S;
+                    // Tight cross-fade so the idle → pointing blend doesn't
+                    // visibly transit through a "leaning back" mid-pose.
+                    idleAction.fadeOut(0.1);
+                    pointingAction.fadeIn(0.1);
                     pointingAction.play();
                     demonState.currentAnimation = pointingKey;
-                    // Override the upper-arm rotation each frame to aim at
-                    // the camera while pointing is playing.
-                    demonArmAimingRef.current = true;
+                    // Defer the spine override + head-look suspension until
+                    // the 0.1s cross-fade completes — otherwise head-look
+                    // turns off mid-fade and the head visibly transits
+                    // through idle's "forward" pose before reaching the
+                    // authored pointing pose. With this delay the head
+                    // stays pinned on-camera through the fade and only
+                    // hands off to the authored pose once pointing is at
+                    // full weight (where it should be facing roughly the
+                    // same direction look-at had it).
+                    const armTimer = setTimeout(() => {
+                      if (!demonFocusedRef.current) return;
+                      demonArmAimingRef.current = true;
+                    }, 120);
+                    demonState.focusSequenceTimers.push(armTimer);
 
                     const onFinished = (e) => {
                       if (e.action !== pointingAction) return;
@@ -2591,39 +2613,33 @@ const CyborgTempleScene = ({
                 action.paused = true;
               });
             }
-          } else if (object.userData.agentId === 'Granny') {
-            grannyFocusedRef.current = true;
-            const grannyState = grannyAnimStateRef.current;
-            // Cancel any pending pump-return setTimeout so a queued
-            // typing.play() doesn't slam over the idle we're about to start.
-            if (grannyState.pumpReturnTimeoutId) {
-              clearTimeout(grannyState.pumpReturnTimeoutId);
-              grannyState.pumpReturnTimeoutId = null;
-            }
-            // Cross-fade whatever is playing → granny_idle while focused so
-            // the close-up reads as attentive instead of mid-keystroke.
-            const grannyActions = actionsRef.current['Granny'];
-            if (grannyActions) {
-              const idleKey = Object.keys(grannyActions).find(a => /granny.*idle/i.test(a));
+          } else if (object.userData.agentId === 'Detective') {
+            detectiveFocusedRef.current = true;
+            const detectiveState = detectiveAnimStateRef.current;
+            // Cross-fade whatever's playing → detective_idle while focused
+            // so the close-up reads as attentive instead of mid-keystroke.
+            const detectiveActions = actionsRef.current['Detective'];
+            if (detectiveActions) {
+              const idleKey = Object.keys(detectiveActions).find(a => /detective.*idle/i.test(a));
               if (idleKey) {
                 // Fade out ALL currently-running clips, not just whichever
-                // grannyState.currentAnimation thinks is current — covers
-                // the case where a pump just started typing back behind us.
-                Object.values(grannyActions).forEach((action) => {
+                // detectiveState.currentAnimation thinks is current — covers
+                // the case where alternation just kicked over behind us.
+                Object.values(detectiveActions).forEach((action) => {
                   if (action && action.isRunning && action.isRunning()) {
                     action.fadeOut(0.5);
                   }
                 });
-                const idleAction = grannyActions[idleKey];
+                const idleAction = detectiveActions[idleKey];
                 idleAction.reset();
                 idleAction.setLoop(THREE.LoopRepeat);
                 idleAction.setEffectiveWeight(1);
                 idleAction.fadeIn(0.5);
                 idleAction.play();
-                grannyState.currentAnimation = idleKey;
-                grannyState.isPlayingSpecial = true;
-                grannyState.nextSwitchDelay = 999999;
-                grannyState.lastSwitchTime = Date.now();
+                detectiveState.currentAnimation = idleKey;
+                detectiveState.isPlayingSpecial = true;
+                detectiveState.nextSwitchDelay = 999999;
+                detectiveState.lastSwitchTime = Date.now();
               }
             }
           }
@@ -2639,7 +2655,7 @@ const CyborgTempleScene = ({
               detail: { screenName: object.userData.agentId }
             }));
 
-            // For Screen3 (TeknoScreen), also dispatch UV coordinates for button clicks
+            // For Screen3, also dispatch UV coordinates for button clicks
             if (object.userData.agentId === 'Screen3' && intersects[i].uv) {
               window.dispatchEvent(new CustomEvent('screen3Click', {
                 detail: { uv: intersects[i].uv }
@@ -2826,7 +2842,8 @@ const CyborgTempleScene = ({
       });
     }
     
-    // Handle Demon animation alternation — mostly typing/idle, occasional fistpump/disbelief
+    // Handle Demon animation alternation — mostly typing/idle, occasional
+    // one-shot fistpump/laughing.
     if (!isOnMobile && actionsRef.current['Demon']) {
       const currentTime = Date.now();
       const demonState = demonAnimStateRef.current;
@@ -2839,14 +2856,15 @@ const CyborgTempleScene = ({
         const demonActions = actionsRef.current['Demon'];
         const availableAnimations = Object.keys(demonActions);
 
-        // Demon animations use Root.001|* prefix — classify by suffix.
+        // Loop pool = typing/idle; specials = fistpump/laughing (one-shot).
         // When `jackpotOnlyFistPump` is on, FistPump is reserved for
-        // slot-machine jackpots and excluded from the random rotation.
+        // slot-machine jackpots and excluded from the random rotation —
+        // leaving laughing as the only random special.
         const loopAnimations = availableAnimations.filter(a =>
-          /typing|idle|laughing/i.test(a));
+          /typing|idle/i.test(a) && !/sit_idle/i.test(a));
         const specialPattern = jackpotOnlyFistPump
-          ? /disbelief|clap/i
-          : /fistpump|disbelief|clap/i;
+          ? /laughing/i
+          : /fistpump|laughing/i;
         const specialAnimations = availableAnimations.filter(a =>
           specialPattern.test(a));
 
@@ -2932,67 +2950,52 @@ const CyborgTempleScene = ({
       }
     }
 
-    // Handle Granny animation alternation — typing loop with periodic
-    // one-shot fist pumps. Mirrors the Demon special-anim handoff shape but
-    // simplified to two clips. Paused during focus so she doesn't pump mid
-    // close-up.
-    if (!grannyFocusedRef.current && actionsRef.current['Granny']) {
+    // Handle Detective animation alternation — swap detective_typing and
+    // detective_idle (both looping) on a randomized interval. Paused
+    // entirely during focus so the held idle isn't bumped off by the
+    // alternation timer.
+    if (!detectiveFocusedRef.current && actionsRef.current['Detective']) {
       const currentTime = Date.now();
-      const grannyState = grannyAnimStateRef.current;
+      const detectiveState = detectiveAnimStateRef.current;
 
-      if (grannyState.lastSwitchTime === 0) {
-        grannyState.lastSwitchTime = currentTime;
+      if (detectiveState.lastSwitchTime === 0) {
+        detectiveState.lastSwitchTime = currentTime;
       }
 
       if (
-        !grannyState.isPlayingSpecial &&
-        currentTime - grannyState.lastSwitchTime > grannyState.nextSwitchDelay
+        !detectiveState.isPlayingSpecial &&
+        currentTime - detectiveState.lastSwitchTime > detectiveState.nextSwitchDelay
       ) {
-        const grannyActions = actionsRef.current['Granny'];
+        const detectiveActions = actionsRef.current['Detective'];
         // Tolerate Blender's armature-prefixed names (e.g.
-        // "Armature.001|granny_typing") by matching on substring.
-        const typingKey = Object.keys(grannyActions).find(k => /granny.*typ/i.test(k));
-        const fistPumpKey = Object.keys(grannyActions).find(k => /granny.*fist/i.test(k));
-        const typing = typingKey && grannyActions[typingKey];
-        const fistPump = fistPumpKey && grannyActions[fistPumpKey];
+        // "Armature.001|detective_typing") by matching on substring.
+        const typingKey = Object.keys(detectiveActions).find(k => /detective.*typ/i.test(k));
+        const idleKey = Object.keys(detectiveActions).find(k => /detective.*idle/i.test(k));
+        const typing = typingKey && detectiveActions[typingKey];
+        const idle = idleKey && detectiveActions[idleKey];
 
-        if (typing && fistPump) {
-          typing.fadeOut(0.4);
-          fistPump.reset();
-          fistPump.setLoop(THREE.LoopOnce, 1);
-          fistPump.clampWhenFinished = true;
-          fistPump.fadeIn(0.4);
-          fistPump.play();
+        if (typing && idle) {
+          // Pick whichever clip isn't currently playing.
+          const currentKey = detectiveState.currentAnimation;
+          const isOnTyping = currentKey === typingKey;
+          const fromAction = isOnTyping ? typing : idle;
+          const toAction = isOnTyping ? idle : typing;
+          const toKey = isOnTyping ? idleKey : typingKey;
 
-          grannyState.isPlayingSpecial = true;
-          grannyState.currentAnimation = 'granny_fistPump';
+          fromAction.fadeOut(0.5);
+          toAction.reset();
+          toAction.setLoop(THREE.LoopRepeat);
+          toAction.setEffectiveWeight(1);
+          toAction.fadeIn(0.5);
+          toAction.play();
 
-          const animDuration = fistPump.getClip().duration * 1000;
-          // Track the timeout ID so focus can cancel it — otherwise a
-          // pending pump-return fires during focus and slams typing back in
-          // over the idle we just faded to.
-          grannyState.pumpReturnTimeoutId = setTimeout(() => {
-            grannyState.pumpReturnTimeoutId = null;
-            // Bail if focus engaged after we were scheduled — the focus
-            // handler is already driving granny_idle.
-            if (grannyFocusedRef.current) return;
-            typing.stop();
-            typing.reset();
-            typing.setLoop(THREE.LoopRepeat);
-            typing.setEffectiveWeight(1);
-            typing.fadeIn(0.4);
-            typing.play();
-            fistPump.fadeOut(0.4);
-
-            grannyState.currentAnimation = typingKey;
-            grannyState.isPlayingSpecial = false;
-            grannyState.nextSwitchDelay = Math.random() * 8000 + 8000;
-            grannyState.lastSwitchTime = Date.now();
-          }, Math.max(100, animDuration - 400));
+          detectiveState.currentAnimation = toKey;
+          detectiveState.nextSwitchDelay = Math.random() * 8000 + 8000;
+          detectiveState.lastSwitchTime = currentTime;
         } else {
           // Either clip is missing — back off so we don't busy-loop.
-          grannyState.nextSwitchDelay = 30000;
-          grannyState.lastSwitchTime = currentTime;
+          detectiveState.nextSwitchDelay = 30000;
+          detectiveState.lastSwitchTime = currentTime;
         }
       }
     }
@@ -3368,93 +3371,6 @@ const CyborgTempleScene = ({
       }
     }
     
-    // Handle Tekno animation alternation
-    if (!isOnMobile && actionsRef.current['Tekno']) {
-      const currentTime = Date.now();
-      const teknoState = teknoAnimStateRef.current;
-      
-      if (teknoState.lastSwitchTime === 0) {
-        teknoState.lastSwitchTime = currentTime;
-      }
-      
-      if (currentTime - teknoState.lastSwitchTime > teknoState.nextSwitchDelay) {
-        const teknoActions = actionsRef.current['Tekno'];
-        
-        // Get available animations for Tekno
-        const availableAnimations = Object.keys(teknoActions);
-        
-        // Filter animations based on what's actually available
-        // Tekno has Idle, Typing, Clap, and Pray.001/Pray001 as loop animations
-        const loopAnimations = availableAnimations.filter(anim => 
-          anim === 'Typing' || anim === 'Idle' || anim === 'Clap');
-        const specialAnimations = availableAnimations.filter(anim => 
-          anim === 'Disbelief' || anim === '');
-        
-        // If we don't have any animations, skip
-        if (availableAnimations.length === 0) {
-          console.warn('[Tekno] No animations available, skipping switch');
-          return;
-        }
-        
-        let nextAnimation;
-        
-        if (loopAnimations.includes(teknoState.currentAnimation)) {
-          if (Math.random() < 0.8) { // 80% chance for loop animations
-            nextAnimation = teknoState.currentAnimation === 'Typing' ? 'Idle' : 'Typing';
-          } else {
-            nextAnimation = specialAnimations[Math.floor(Math.random() * specialAnimations.length)];
-          }
-        } else {
-          nextAnimation = loopAnimations[Math.floor(Math.random() * loopAnimations.length)];
-        }
-        
-        if (teknoActions[teknoState.currentAnimation]) {
-          teknoActions[teknoState.currentAnimation].fadeOut(0.5);
-        }
-        
-        if (teknoActions[nextAnimation]) {
-          const action = teknoActions[nextAnimation];
-          action.reset();
-          action.fadeIn(0.5);
-          
-          if (specialAnimations.includes(nextAnimation)) {
-            action.setLoop(THREE.LoopOnce, 1);
-            action.clampWhenFinished = true;
-            
-            const animDuration = action.getClip().duration * 1000;
-            setTimeout(() => {
-              const returnAnim = loopAnimations[Math.floor(Math.random() * loopAnimations.length)];
-              if (teknoActions[returnAnim]) {
-                action.fadeOut(0.5);
-                teknoActions[returnAnim].stop();
-                teknoActions[returnAnim].reset();
-                teknoActions[returnAnim].setLoop(THREE.LoopRepeat);
-                teknoActions[returnAnim].setEffectiveWeight(1);
-                teknoActions[returnAnim].play();
-              }
-              teknoState.currentAnimation = returnAnim;
-              teknoState.nextSwitchDelay = Math.random() * 10000 + 20000;
-              teknoState.lastSwitchTime = Date.now();
-            }, Math.max(100, animDuration - 500));
-          } else {
-            action.setLoop(THREE.LoopRepeat);
-          }
-          
-          action.play();
-        }
-        
-        teknoState.currentAnimation = nextAnimation;
-        
-        if (loopAnimations.includes(nextAnimation)) {
-          teknoState.nextSwitchDelay = Math.random() * 10000 + 20000; // 20-30 seconds
-        } else {
-          teknoState.nextSwitchDelay = 999999;
-        }
-        
-        teknoState.lastSwitchTime = currentTime;
-      }
-    }
-    
     // Blinking animation for RL80's eyes
 
     if (leftEyeRef.current && rightEyeRef.current) {
@@ -3522,85 +3438,80 @@ const CyborgTempleScene = ({
       }
     }
 
-    // Blinking animation for Demon's eyes (opacity-based for flat image plane)
-    if (demonEyesRef.current && demonEyesRef.current.material) {
+    // Blinking animation for Demon's eyes (opacity-based fade across
+    // Eyes + Pupil_L + Pupil_R, all faded together each blink). Uses the
+    // multi-mesh demonBlinkMeshesRef when populated; falls back to the
+    // single-mesh demonEyesRef for the legacy 'demon_eyes' rig.
+    const demonBlinkTargets = demonBlinkMeshesRef.current.length > 0
+      ? demonBlinkMeshesRef.current
+      : (demonEyesRef.current ? [demonEyesRef.current] : []);
+    if (demonBlinkTargets.length > 0) {
       const currentTime = state.clock.getElapsedTime() * 1000;
       const demonBlink = demonBlinkStateRef.current;
-      const demonState = demonAnimStateRef.current;
-
-      // Check if playing disbelief — keep eyes closed for the duration
-      const isDisbelief = demonState.isPlayingSpecial &&
-        /disbelief/i.test(demonState.currentAnimation);
-
-      if (isDisbelief) {
-        // Smoothly close eyes during disbelief
-        const target = 0;
-        const current = demonEyesRef.current.material.opacity;
-        demonEyesRef.current.material.opacity = current + (target - current) * 0.15;
-        // Skip normal blinking while in disbelief
-      } else {
-        // If returning from disbelief, smoothly reopen
-        if (demonEyesRef.current.material.opacity < 0.95 && !demonBlink.isBlinking) {
-          const current = demonEyesRef.current.material.opacity;
-          demonEyesRef.current.material.opacity = current + (1 - current) * 0.1;
-          if (demonEyesRef.current.material.opacity > 0.99) {
-            demonEyesRef.current.material.opacity = 1;
-          }
-        }
-
-        // Normal blinking
-        // Check if it's time to blink
-        if (!demonBlink.isBlinking && currentTime - demonBlink.lastBlinkTime > demonBlink.nextBlinkDelay) {
-          demonBlink.isBlinking = true;
-          demonBlink.lastBlinkTime = currentTime;
-          demonBlink.nextBlinkDelay = Math.random() * 4000 + 3000;
-        }
-
-        // Animate the blink (fade out 100ms, hold 120ms, fade in 140ms)
-        if (demonBlink.isBlinking) {
-          const closeTime = 100;
-          const holdTime = 120;
-          const openTime = 140;
-          const totalDuration = closeTime + holdTime + openTime;
-          const timeSinceBlinkStart = currentTime - demonBlink.lastBlinkTime;
-
-          if (timeSinceBlinkStart < totalDuration) {
-            let opacity;
-
-            if (timeSinceBlinkStart < closeTime) {
-              opacity = 1 - (timeSinceBlinkStart / closeTime);
-            } else if (timeSinceBlinkStart < closeTime + holdTime) {
-              opacity = 0;
-            } else {
-              opacity = (timeSinceBlinkStart - closeTime - holdTime) / openTime;
-            }
-
-            demonEyesRef.current.material.opacity = opacity;
+      const setBlinkOpacity = (opacity) => {
+        for (const m of demonBlinkTargets) {
+          if (!m || !m.material) continue;
+          if (Array.isArray(m.material)) {
+            for (const mat of m.material) if (mat) mat.opacity = opacity;
           } else {
-            demonBlink.isBlinking = false;
-            demonEyesRef.current.material.opacity = 1;
+            m.material.opacity = opacity;
           }
+        }
+      };
+
+      // Normal blinking (no special-anim coupling — laughing/fistPump
+      // don't close the eyes on this rig).
+      if (!demonBlink.isBlinking && currentTime - demonBlink.lastBlinkTime > demonBlink.nextBlinkDelay) {
+        demonBlink.isBlinking = true;
+        demonBlink.lastBlinkTime = currentTime;
+        demonBlink.nextBlinkDelay = Math.random() * 4000 + 3000;
+      }
+
+      // Animate the blink (fade out 100ms, hold 120ms, fade in 140ms)
+      if (demonBlink.isBlinking) {
+        const closeTime = 100;
+        const holdTime = 120;
+        const openTime = 140;
+        const totalDuration = closeTime + holdTime + openTime;
+        const timeSinceBlinkStart = currentTime - demonBlink.lastBlinkTime;
+
+        if (timeSinceBlinkStart < totalDuration) {
+          let opacity;
+
+          if (timeSinceBlinkStart < closeTime) {
+            opacity = 1 - (timeSinceBlinkStart / closeTime);
+          } else if (timeSinceBlinkStart < closeTime + holdTime) {
+            opacity = 0;
+          } else {
+            opacity = (timeSinceBlinkStart - closeTime - holdTime) / openTime;
+          }
+
+          setBlinkOpacity(opacity);
+        } else {
+          demonBlink.isBlinking = false;
+          setBlinkOpacity(1);
         }
       }
     }
 
-    // Granny eye blink (mesh-swap: Eyes ↔ Closedeyes).
-    if (grannyEyesRef.current) {
+    // Detective eye blink (mesh-swap: Eyes ↔ Closedeyes). No-op when the
+    // rig has no matching meshes — refs stay null in that case.
+    if (detectiveEyesRef.current) {
       const currentTime = state.clock.getElapsedTime() * 1000;
-      const blink = grannyBlinkStateRef.current;
-      const closed = grannyClosedEyesRef.current;
+      const blink = detectiveBlinkStateRef.current;
+      const closed = detectiveClosedEyesRef.current;
 
       if (!blink.isBlinking && currentTime - blink.lastBlinkTime > blink.nextBlinkDelay) {
         blink.isBlinking = true;
         blink.lastBlinkTime = currentTime;
         blink.nextBlinkDelay = Math.random() * 4000 + 3000;
-        grannyEyesRef.current.visible = false;
+        detectiveEyesRef.current.visible = false;
         if (closed) closed.visible = true;
       } else if (blink.isBlinking) {
         const blinkDuration = 150;
         if (currentTime - blink.lastBlinkTime > blinkDuration) {
           blink.isBlinking = false;
-          grannyEyesRef.current.visible = true;
+          detectiveEyesRef.current.visible = true;
           if (closed) closed.visible = false;
         }
       }
@@ -3644,8 +3555,13 @@ const CyborgTempleScene = ({
       }
     }
 
-    // Demon head look-at-camera override (only when focused on Demon)
-    if (demonFocusedRef.current && demonHeadBoneRef.current) {
+    // Demon head look-at-camera override (only when focused on Demon).
+    // Suspended while pointing is active — the pointing clip authors the
+    // head pose to match the arm direction, and writing to head.quaternion
+    // every frame would clobber that. The else branch below nulls the
+    // smoothed-quat caches so when pointing finishes the look-at re-anchors
+    // from the head's current pose without snapping.
+    if (demonFocusedRef.current && !demonArmAimingRef.current && demonHeadBoneRef.current) {
       const head = demonHeadBoneRef.current;
 
       // Capture the animation's base head rotation once (avoids loop seam flick)
@@ -3669,27 +3585,40 @@ const CyborgTempleScene = ({
       }
       const dummy = demonHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
-      // Aim slightly above the camera so the demon's gaze lands on the
-      // viewer's face rather than below it. Increase to look higher.
+      // Aim above the camera so the demon's gaze lands on the viewer's
+      // face rather than below it. Increase to make the head look higher.
       const demonGazeTarget = camera.position.clone();
-      demonGazeTarget.y += 0.8;
+      demonGazeTarget.y += 1.4;
       dummy.lookAt(demonGazeTarget);
-      // lookAt aligns -Z with target. The face likely points a different direction.
-      // Apply 180° Y correction so face (+Z) points at camera instead of back of head
-      // Correction angle: adjust to make head face camera (tune this value)
-      // 0 = looks left, PI = looks right, PI/2 = should be straight at camera
-      // Base flip (-Math.PI / 1.8) was empirically tuned to combine with
-      // the 80% base-blend below. During pointing the spine yaws, which
-      // pulls the head's world rotation along with it; the boost rotates
-      // the lookAt target to compensate so the gaze stays on camera.
-      const pointingFlipBoost = demonArmAimingRef.current ? Math.PI / 9 + Math.PI / 36 + Math.PI / 36 : 0;
-      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 1.8 + pointingFlipBoost);
+      // Rig-specific orientation correction. lookAt aligns the dummy's
+      // local -Z to the camera; the flip rotates the dummy frame so the
+      // head bone's authored forward/up axes end up where they should be.
+      //
+      // Tune these three Euler components (radians) until the head faces
+      // the camera cleanly:
+      //   FLIP_Y — yaw (most rigs need only this)
+      //     0 = no correction
+      //     ±Math.PI / 2 = ±90° (rig face axis is ±X)
+      //     Math.PI = 180° (rig face axis is +Z instead of -Z)
+      //   FLIP_X — pitch (use if head tips up/down)
+      //   FLIP_Z — roll  (use if head tips left/right around its forward axis)
+      //
+      // Apply order is YXZ so yaw applies first, then pitch, then roll —
+      // matches how 3D artists usually think about head orientation.
+      const FLIP_X = Math.PI / 5;   // ~36° pitch to counteract a downward-looking rig
+      const FLIP_Y = 0;
+      const FLIP_Z = -Math.PI / 24; // ~-7.5° roll to counteract rig tilt
+      const flip = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(FLIP_X, FLIP_Y, FLIP_Z, 'YXZ'),
+      );
       dummy.quaternion.multiply(flip);
 
-      // Clamp the angle between base pose and lookAt to prevent unnatural rotation
-      const maxHeadAngle = 1.2; // radians, ~70 degrees
+      // Clamp the angle between base pose and lookAt to prevent unnatural rotation.
+      // Raise maxHeadAngle / the 0.95 ceiling to let the head rotate further toward
+      // the camera before the clamp kicks in.
+      const maxHeadAngle = 1.7; // radians, ~97 degrees
       const angleBetween = demonHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
-      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.95) : 0;
       const blendedWorldQuat = demonHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
 
       // Convert blended world quaternion to bone-local space
@@ -3717,15 +3646,12 @@ const CyborgTempleScene = ({
     // Y (yaw) component each frame to face the viewer horizontally,
     // preserving any pitch/lean the animation provides.
     //
-    // RIG_FORWARD_OFFSET_RAD compensates for the rig's authored forward
-    // direction. The spine's bone-local +Z usually doesn't line up with
-    // the chest-forward axis exactly; this offset rotates the target yaw
-    // to put the chest on the camera. Tune to taste — common values:
-    //   ±Math.PI / 6   (~30° off)
-    //   ±Math.PI / 2   (90° off — rig exported "side-facing")
-    //   Math.PI        (back-to-camera)
-    // If the character turns the wrong way, flip the sign.
-    const RIG_FORWARD_OFFSET_RAD = -Math.PI / 3 - Math.PI / 12;
+    // RIG_FORWARD_OFFSET_RAD compensates for any residual aim error the
+    // pointing clip leaves behind — the spine yaws toward the camera, and
+    // this offset nudges the target yaw to put the chest on the camera.
+    // Increase magnitude to swivel further; flip sign if rotation is the
+    // wrong way.
+    const RIG_FORWARD_OFFSET_RAD = -Math.PI / 8;
     if (demonArmAimingRef.current && demonPointingArmBoneRef.current) {
       const spine = demonPointingArmBoneRef.current;
 
@@ -3878,53 +3804,56 @@ const CyborgTempleScene = ({
       rl80HeadBoneRef._dummy = null;
     }
 
-    // Granny head look-at-camera override — mirrors the RL80 setup.
-    // The flip-axis correction below is rig-specific; if Granny ends up
-    // looking the wrong way, tune the angle (try Math.PI, -Math.PI / 1.8,
-    // or Math.PI / 0.5).
-    if (grannyFocusedRef.current && grannyHeadBoneRef.current) {
-      const head = grannyHeadBoneRef.current;
+    // Detective head look-at-camera override — mirrors the RL80 setup.
+    // The flip-axis correction below is rig-specific; tune the divisor in
+    // `Math.PI / N` (or change the axis) until the head reads as facing
+    // the camera.
+    if (detectiveFocusedRef.current && detectiveHeadBoneRef.current) {
+      const head = detectiveHeadBoneRef.current;
 
-      if (!grannyHeadBoneRef._baseQuat) {
-        grannyHeadBoneRef._baseQuat = head.quaternion.clone();
+      if (!detectiveHeadBoneRef._baseQuat) {
+        detectiveHeadBoneRef._baseQuat = head.quaternion.clone();
         head.updateWorldMatrix(true, false);
-        grannyHeadBoneRef._baseWorldQuat = new THREE.Quaternion();
-        head.getWorldQuaternion(grannyHeadBoneRef._baseWorldQuat);
+        detectiveHeadBoneRef._baseWorldQuat = new THREE.Quaternion();
+        head.getWorldQuaternion(detectiveHeadBoneRef._baseWorldQuat);
       }
 
       head.updateWorldMatrix(true, false);
       const headWorldPos = new THREE.Vector3();
       head.getWorldPosition(headWorldPos);
 
-      if (!grannyHeadBoneRef._dummy) {
-        grannyHeadBoneRef._dummy = new THREE.Object3D();
+      if (!detectiveHeadBoneRef._dummy) {
+        detectiveHeadBoneRef._dummy = new THREE.Object3D();
       }
-      const dummy = grannyHeadBoneRef._dummy;
+      const dummy = detectiveHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
       dummy.lookAt(camera.position);
-      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 0.5);
+      // Rig-specific yaw correction. If the head over-rotates to one side,
+      // adjust the divisor — common values: 1 (180°), 2 (90°), -2 (-90°),
+      // 0.5 (≈ identity, no correction).
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI/0.25);
       dummy.quaternion.multiply(flip);
 
       const maxHeadAngle = 1.2; // ~70° clamp
-      const angleBetween = grannyHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
+      const angleBetween = detectiveHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
       const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
-      const blendedWorldQuat = grannyHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+      const blendedWorldQuat = detectiveHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
 
       const parentWorldQuat = new THREE.Quaternion();
       head.parent.getWorldQuaternion(parentWorldQuat);
       const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
 
-      if (!grannyHeadBoneRef._smoothedQuat) {
-        grannyHeadBoneRef._smoothedQuat = head.quaternion.clone();
+      if (!detectiveHeadBoneRef._smoothedQuat) {
+        detectiveHeadBoneRef._smoothedQuat = head.quaternion.clone();
       }
-      grannyHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
+      detectiveHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
 
-      head.quaternion.copy(grannyHeadBoneRef._smoothedQuat);
-    } else if (grannyHeadBoneRef._smoothedQuat) {
-      grannyHeadBoneRef._smoothedQuat = null;
-      grannyHeadBoneRef._baseQuat = null;
-      grannyHeadBoneRef._baseWorldQuat = null;
-      grannyHeadBoneRef._dummy = null;
+      head.quaternion.copy(detectiveHeadBoneRef._smoothedQuat);
+    } else if (detectiveHeadBoneRef._smoothedQuat) {
+      detectiveHeadBoneRef._smoothedQuat = null;
+      detectiveHeadBoneRef._baseQuat = null;
+      detectiveHeadBoneRef._baseWorldQuat = null;
+      detectiveHeadBoneRef._dummy = null;
     }
 
     // Fluffy (cat) head look-at-camera override
@@ -4039,7 +3968,7 @@ const CyborgTempleScene = ({
                 Demon: demonHeadBoneRef,
                 Monk: monkHeadBoneRef,
                 Fluffy: fluffyHeadBoneRef,
-                Granny: grannyHeadBoneRef,
+                Detective: detectiveHeadBoneRef,
               };
               const boneRef = headBoneByAgent[focusTarget.agentId];
               if (boneRef && boneRef.current) {
@@ -4233,7 +4162,7 @@ const CyborgTempleScene = ({
         { id: 'Demon', ref: demonHintRef },
         { id: 'Monk', ref: monkHintRef },
         { id: 'Fluffy', ref: fluffyHintRef },
-        { id: 'Granny', ref: grannyHintRef },
+        { id: 'Detective', ref: detectiveHintRef },
       ].map(({ id, ref }) => (
         <group key={id} ref={ref} position={[0, 9999, 0]}>
           <Html center occlude zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
