@@ -208,12 +208,14 @@ const BuyModal = ({ isOpen, onClose }) => {
         throw new Error(authData.error || 'Failed to authenticate');
       }
 
-      // 4) Use the JWT to mint a CDP Onramp session token.
+      // 4) Use the JWT to mint a CDP Onramp session token. Custom header
+      // (X-Onramp-Auth) instead of Authorization so Clerk middleware
+      // doesn't try to verify our token as a Clerk session JWT.
       const sessionRes = await fetch('/api/onramp-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authData.token}`,
+          'X-Onramp-Auth': `Bearer ${authData.token}`,
         },
       });
       const sessionData = await sessionRes.json();
@@ -222,15 +224,14 @@ const BuyModal = ({ isOpen, onClose }) => {
       }
 
       // 5) Build the Coinbase Onramp URL and redirect the placeholder tab.
-      const { generateOnRampURL } = await import('@coinbase/cbpay-js');
-      const onrampUrl = generateOnRampURL({
-        appId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
-        sessionToken: sessionData.token,
-        addresses: { [walletAddress]: ['base'] },
-        assets: ['ETH', 'USDC'],
-        defaultNetwork: 'base',
-        defaultExperience: 'buy',
-      });
+      // Per CDP guidance, when using a session token only the sessionToken
+      // (and optional UX hints) belong in the URL — the destination address
+      // and assets are already bound to the token server-side. Including
+      // `addresses` here would expose the user's wallet address in the URL.
+      const onrampUrl = new URL('https://pay.coinbase.com/buy/select-asset');
+      onrampUrl.searchParams.set('sessionToken', sessionData.token);
+      onrampUrl.searchParams.set('defaultNetwork', 'base');
+      onrampUrl.searchParams.set('defaultExperience', 'buy');
 
       if (popupRef && !popupRef.closed) {
         popupRef.location.href = onrampUrl;

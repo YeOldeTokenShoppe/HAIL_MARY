@@ -15,12 +15,30 @@ function getCorsHeaders(request) {
   const origin = request.headers.get('origin');
   const headers = {
     'Access-Control-Allow-Methods': 'POST',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Onramp-Auth',
   };
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
   }
   return headers;
+}
+
+// CDP Onramp requires the originating user's IP for security validation —
+// ties the session token to the user it was minted for. In production on
+// Vercel the real client IP arrives in x-forwarded-for. CDP rejects
+// private/loopback/test IPs (including the 192.0.2.1 their own docs
+// suggest as a placeholder), so for local dev we expose an env override.
+// Set ONRAMP_DEV_CLIENT_IP=<your public IP> in .env.local — find yours
+// at https://api.ipify.org or `curl ifconfig.me`.
+function getClientIp(request) {
+  if (process.env.ONRAMP_DEV_CLIENT_IP) return process.env.ONRAMP_DEV_CLIENT_IP;
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) return xff.split(',')[0].trim();
+  return (
+    request.headers.get('x-real-ip') ||
+    request.headers.get('cf-connecting-ip') ||
+    null
+  );
 }
 
 export async function OPTIONS(request) {
@@ -53,7 +71,10 @@ export async function POST(request) {
     );
   }
 
-  const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+  // Custom header instead of Authorization to avoid Clerk middleware
+  // attempting to verify our app-specific JWT as a Clerk session token,
+  // which fails with a kid mismatch and disrupts the response.
+  const authHeader = request.headers.get('x-onramp-auth');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return NextResponse.json(
       { error: 'Missing bearer token' },
@@ -77,6 +98,17 @@ export async function POST(request) {
     return NextResponse.json(
       { error: 'Invalid session subject' },
       { status: 401, headers: corsHeaders }
+    );
+  }
+
+  const clientIp = getClientIp(request);
+  if (!clientIp) {
+    console.error(
+      '[onramp-session] no public client IP — set ONRAMP_DEV_CLIENT_IP in .env.local for local dev'
+    );
+    return NextResponse.json(
+      { error: 'Client IP not available' },
+      { status: 500, headers: corsHeaders }
     );
   }
 
@@ -104,6 +136,7 @@ export async function POST(request) {
           },
         ],
         assets: ['ETH', 'USDC'],
+        clientIp,
       }),
     });
 
