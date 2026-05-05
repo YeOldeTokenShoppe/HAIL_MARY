@@ -358,6 +358,10 @@ const CyborgTempleScene = ({
   // during the demon_pointing phase of the focus sequence.
   const demonPointingArmBoneRef = useRef();
   const demonArmAimingRef = useRef(false);
+  // After demon_pointing finishes the demon transitions to demon_typing and
+  // stops following the camera — this flag suspends the head-look override
+  // for the remainder of the focus session. Cleared on unfocus.
+  const demonHeadFollowDisabledRef = useRef(false);
   const monkHeadBoneRef = useRef();
   const monkFocusedRef = useRef(false); // true when camera is zoomed in on Monk
   const rl80HeadBoneRef = useRef();
@@ -675,8 +679,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v07_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v07.glb";
+    let modelPath = "/models/RL80_4anims_v08_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v08.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1857,6 +1861,7 @@ const CyborgTempleScene = ({
         demonState.focusSequenceListener = null;
       }
       demonArmAimingRef.current = false;
+      demonHeadFollowDisabledRef.current = false;
       if (!demonActions) return;
       const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle/i.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
@@ -2523,8 +2528,21 @@ const CyborgTempleScene = ({
                       demonState.focusSequenceListener = null;
                       demonArmAimingRef.current = false;
                       if (!demonFocusedRef.current) return;
-                      // Stage 3: back to idle for the remainder of focus.
-                      playIdle(0.3);
+                      // Stage 3: settle into demon_typing for the rest of
+                      // focus and stop tracking the camera with the head.
+                      const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a));
+                      const fallbackAction = typingKey ? demonActions[typingKey] : demonActions[idleKey];
+                      const fallbackKey = typingKey || idleKey;
+                      if (fallbackAction) {
+                        pointingAction.fadeOut(0.3);
+                        fallbackAction.reset();
+                        fallbackAction.setLoop(THREE.LoopRepeat);
+                        fallbackAction.setEffectiveWeight(1);
+                        fallbackAction.fadeIn(0.3);
+                        fallbackAction.play();
+                        demonState.currentAnimation = fallbackKey;
+                      }
+                      demonHeadFollowDisabledRef.current = true;
                     };
                     demonMixer.addEventListener('finished', onFinished);
                     demonState.focusSequenceListener = onFinished;
@@ -3561,7 +3579,7 @@ const CyborgTempleScene = ({
     // every frame would clobber that. The else branch below nulls the
     // smoothed-quat caches so when pointing finishes the look-at re-anchors
     // from the head's current pose without snapping.
-    if (demonFocusedRef.current && !demonArmAimingRef.current && demonHeadBoneRef.current) {
+    if (demonFocusedRef.current && !demonArmAimingRef.current && !demonHeadFollowDisabledRef.current && demonHeadBoneRef.current) {
       const head = demonHeadBoneRef.current;
 
       // Capture the animation's base head rotation once (avoids loop seam flick)

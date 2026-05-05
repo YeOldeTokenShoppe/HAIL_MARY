@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
 import TBDScreen from './TBDScreen';
 import RL80ChartScreen from './RL80ChartScreen';
-import ReservedScreen from './ReservedScreen';
+import DetectiveScreen from './DetectiveScreen';
 import RL80Screen from './RL80Screen';
 import AgentChatScreen from './AgentChatScreen';
 import DataCubeScreen from './DataCubeScreen';
@@ -1013,11 +1013,8 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
     // to build a "coming soon" atmosphere.
     return (
       <>
-        {/* Screen3 → looping slot machine (purely decorative, no text/interactivity) */}
-        <SlotMachineScreen
-          canvasGlobal="__screen3Canvas"
-          textureGlobal="__screen3Texture"
-        />
+        {/* Screen3 → Detective's crypto-fraud investigation terminal */}
+        <DetectiveScreen />
         {/* Screen1/2/4 → mock CRT panels — three different variants so each
             monitor reads as its own instrument. */}
         <CRTScreen
@@ -1089,7 +1086,7 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
     <>
       <RL80ChartScreen />
       <TBDScreen />
-      <ReservedScreen />
+      <DetectiveScreen />
       <RL80Screen />
       <AgentChatScreen />
       <DataCubeScreen />
