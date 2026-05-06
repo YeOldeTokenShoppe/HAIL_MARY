@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import CleanCanvas from '@/components/CleanCanvas';
 import FullscreenCRTOverlay from '@/components/FullscreenCRTOverlay';
 import FullscreenChatOverlay from '@/components/FullscreenChatOverlay';
-import { OrbitControls, Stats, Cloud, Clouds } from '@react-three/drei';
+import { CameraControls, Stats, Cloud, Clouds } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import ConstellationModel from '@/components/ConstellationModel';
 import Aurora from '@/components/Aurora';
 import StarField from '@/components/StarField';
@@ -28,6 +29,42 @@ import BuyModal from '@/components/BuyModal';
 import EntryOverlay from '@/components/EntryOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
 import { useRouter } from 'next/navigation';
+
+// Drop-in replacement for the previous <OrbitControls> rig. Uses
+// camera-controls under the hood so fly-to transitions (setLookAt with
+// transition=true in CyborgTempleScene) animate position + target as a
+// single critically-damped motion instead of two competing systems.
+function CameraControlsRig({ autoRotate = false, autoRotateSpeed = 0.5 }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    c.minDistance = 0.1;
+    c.maxDistance = 10;
+    c.minPolarAngle = Math.PI * 0.18;
+    c.maxPolarAngle = Math.PI * 0.52;
+    // Roughly matches the previous dampingFactor=0.1 feel.
+    c.smoothTime = 0.25;
+    c.draggingSmoothTime = 0.125;
+    c.dollyToCursor = true;
+  }, []);
+
+  // Manual auto-orbit when no character is focused. The `autoRotate`
+  // prop is already gated on focusedAgent, so we don't need an extra
+  // c.active check (which appeared to swallow the rotation on initial
+  // mount). We use rotate() with enableTransition=false rather than
+  // mutating azimuthAngle — direct property writes get damped by
+  // smoothTime and tiny per-frame increments smear out before they're
+  // visible.
+  useFrame((_, delta) => {
+    const c = ref.current;
+    if (!c || !autoRotate) return;
+    c.rotate(delta * autoRotateSpeed * 0.1, 0, false);
+  });
+
+  return <CameraControls ref={ref} makeDefault />;
+}
 
 // Mobile CRT overlay stubs — placeholder copy per Screen1-4. Replace later
 // with real content once the per-screen mobile views are designed.
@@ -235,7 +272,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v09_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v12_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -1089,24 +1126,12 @@ export default function CyborgTemple() {
               nodeSize={0.06}  
             /> */}
             
-            {/* OrbitControls — enabled on both mobile and desktop. Drei's
-                controls handle touch (orbit/pinch/pan) natively. */}
-            <OrbitControls
-              makeDefault
-              enablePan={true}
-              enableZoom={true}
-              zoomSpeed={0.2}
-              enableDamping={true}
-              dampingFactor={0.1}
-              minDistance={0.1}
-              maxDistance={10}
-              // Clamp polar angle so the camera can't dip beneath the platform
-              minPolarAngle={Math.PI * 0.18}
-              maxPolarAngle={Math.PI * 0.52}
-              zoomToCursor={true}
-              autoRotate={!focusedAgent}
-              autoRotateSpeed={0.5}
-            />
+            {/* CameraControls (camera-controls under the hood) — handles
+                fly-to transitions atomically (position + target damped
+                together), avoiding the two-segment feel that came from
+                running an external tween alongside OrbitControls'
+                damping. Auto-orbit and limits replicated in the rig. */}
+            <CameraControlsRig autoRotate={!focusedAgent} autoRotateSpeed={0.5} />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
         </CleanCanvas>

@@ -26,8 +26,8 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Demon: {
-    cameraPos: new THREE.Vector3(-0.68, -0.02, 2.42),
-    lookAtPos: new THREE.Vector3(0.605, -0.235, -2.06),
+    cameraPos: new THREE.Vector3(-0.465, -0.56, 1.975),
+    lookAtPos: new THREE.Vector3(0.18, -0.485, 0.145),
     orbitCenter: null,
   },
   Monk: {
@@ -354,14 +354,6 @@ const CyborgTempleScene = ({
   // Head bone refs for look-at-camera override
   const demonHeadBoneRef = useRef();
   const demonFocusedRef = useRef(false); // true when camera is zoomed in on Demon
-  // Upper-arm bone + flag for the point-at-camera override that runs
-  // during the demon_pointing phase of the focus sequence.
-  const demonPointingArmBoneRef = useRef();
-  const demonArmAimingRef = useRef(false);
-  // After demon_pointing finishes the demon transitions to demon_typing and
-  // stops following the camera — this flag suspends the head-look override
-  // for the remainder of the focus session. Cleared on unfocus.
-  const demonHeadFollowDisabledRef = useRef(false);
   const monkHeadBoneRef = useRef();
   const monkFocusedRef = useRef(false); // true when camera is zoomed in on Monk
   const rl80HeadBoneRef = useRef();
@@ -679,8 +671,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v09_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v09.glb";
+    let modelPath = "/models/RL80_4anims_v12_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v12.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -777,16 +769,12 @@ const CyborgTempleScene = ({
         }
         else if (child.name === 'Demon_Empty' || child.name === 'Devil_empty' || child.name === 'Devil_Empty') {
           animatedCharacters['Demon'] = child;
-          // Find head bone + lower spine bone (spine_01) in the Demon
-          // skeleton. The pointing override rotates the torso rather than
-          // a single arm bone so the entire pointing gesture (shoulder →
-          // elbow → wrist → hand) stays intact and just gets reaimed.
+          // Find head bone in the Demon skeleton — used by the
+          // AnnotationSystem to anchor hint markers above the demon's head.
           const headCandidates = [];
-          const spineCandidates = [];
           child.traverse((obj) => {
             if (obj.isBone) {
               if (/head/i.test(obj.name)) headCandidates.push(obj);
-              if (/spine/i.test(obj.name)) spineCandidates.push(obj);
               return;
             }
             // Eyes + pupils get cloned materials and pushed to the blink
@@ -822,14 +810,6 @@ const CyborgTempleScene = ({
             headCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
             headCandidates[0] ||
             null;
-          // Prefer spine_01 (or spine.001 / Spine_01 variants); fall back
-          // to any spine bone if naming differs.
-          demonPointingArmBoneRef.current =
-            spineCandidates.find(b => /spine[._-]?0*1$/i.test(b.name)) ||
-            spineCandidates.find(b => /spine[._-]?1$/i.test(b.name)) ||
-            spineCandidates[0] ||
-            null;
-
         }
         else if (child.name === 'Monk_empty') {
           animatedCharacters['Monk'] = child;
@@ -890,8 +870,8 @@ const CyborgTempleScene = ({
         // Point.003 sits near the angel — tinted to match the altar
         // spotlight color so the angel surface picks up a green cast.
         else if (child.isLight && child.name === 'Point003') {
-          child.color.setHex(0x0bcd2e);
-          child.intensity = 0.5;
+          child.color.setHex(0xF5EDFF);
+          child.intensity = 0.3;
         }
         // Point.006 was meant to be red in Blender but the GLB exports it as
         // white (color [1,1,1]) — override on the JS side.
@@ -1783,6 +1763,7 @@ const CyborgTempleScene = ({
     [isMobile]
   );
   const orbitTargetInitedRef = useRef(false);
+
   
   // Update PalmTree visibility when is80sMode changes
   useEffect(() => {
@@ -1860,8 +1841,6 @@ const CyborgTempleScene = ({
         demonMixer.removeEventListener('finished', demonState.focusSequenceListener);
         demonState.focusSequenceListener = null;
       }
-      demonArmAimingRef.current = false;
-      demonHeadFollowDisabledRef.current = false;
       if (!demonActions) return;
       const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle/i.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
@@ -2446,7 +2425,10 @@ const CyborgTempleScene = ({
             });
           }
           
-          // When focusing on a character, switch to idle animation and enable head tracking
+          // Demon focus sequence: idle while the camera flies in (~2s),
+          // then play demon_pointing once, then settle into demon_typing.
+          // The pointing clip is authored to address the camera directly,
+          // so no head-look or spine override is needed.
           if (object.userData.agentId === 'Demon') {
             demonFocusedRef.current = true;
             const demonActions = actionsRef.current['Demon'];
@@ -2454,95 +2436,52 @@ const CyborgTempleScene = ({
             if (demonActions && demonMixer) {
               const idleKey = Object.keys(demonActions).find(a => /demon.*idle/i.test(a));
               const pointingKey = Object.keys(demonActions).find(a => /demon.*pointing/i.test(a));
+              const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a));
               const demonState = demonAnimStateRef.current;
 
-              const playIdle = (fadeIn = 0.5) => {
-                if (demonState.currentAnimation && demonActions[demonState.currentAnimation] && demonState.currentAnimation !== idleKey) {
-                  demonActions[demonState.currentAnimation].fadeOut(0.3);
+              const crossfadeTo = (key, { loop = THREE.LoopRepeat, fade = 0.3 } = {}) => {
+                if (!key || !demonActions[key]) return null;
+                const prev = demonActions[demonState.currentAnimation];
+                if (prev && demonState.currentAnimation !== key) {
+                  prev.fadeOut(fade);
                 }
-                const idleAction = demonActions[idleKey];
-                idleAction.reset();
-                idleAction.setLoop(THREE.LoopRepeat);
-                idleAction.setEffectiveWeight(1);
-                idleAction.fadeIn(fadeIn);
-                idleAction.play();
-                demonState.currentAnimation = idleKey;
+                const action = demonActions[key];
+                action.reset();
+                action.setLoop(loop);
+                if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
+                action.setEffectiveWeight(1);
+                action.fadeIn(fade);
+                action.play();
+                demonState.currentAnimation = key;
+                return action;
               };
 
               if (idleKey) {
-                // Mark special so the random-alternation poller leaves us alone.
+                // Pause the random-animation rotation while focused.
                 demonState.isPlayingSpecial = true;
                 demonState.nextSwitchDelay = 999999;
                 demonState.lastSwitchTime = Date.now();
                 demonState.focusSequenceTimers = demonState.focusSequenceTimers || [];
 
-                // Stage 1: fade in idle immediately.
-                playIdle(0.5);
+                // Stage 1: fade to idle while camera flies in.
+                crossfadeTo(idleKey, { fade: 0.5 });
 
                 if (pointingKey) {
-                  // Stage 2: after 2s, play pointing once, then return to idle.
+                  // Stage 2: after the camera has settled (~2s), play
+                  // pointing once.
                   const t1 = setTimeout(() => {
                     if (!demonFocusedRef.current) return;
-                    const pointingAction = demonActions[pointingKey];
-                    const idleAction = demonActions[idleKey];
-
-                    pointingAction.reset();
-                    pointingAction.setLoop(THREE.LoopOnce);
-                    // Hold the last pointing pose at full weight until the
-                    // crossfade to idle actually pulls it down — otherwise
-                    // pointing's weight snaps to 0 the instant 'finished'
-                    // fires, and the bones briefly fall to T-pose.
-                    pointingAction.clampWhenFinished = true;
-                    pointingAction.setEffectiveWeight(1);
-                    // Skip past the windup frames at the start of the
-                    // pointing clip — the authored anim leans back to
-                    // build momentum, which reads as "startled" coming
-                    // out of idle. Bump POINTING_SKIP_S up to skip more
-                    // windup, down to 0 to keep the full clip.
-                    const POINTING_SKIP_S = 0.9;
-                    pointingAction.time = POINTING_SKIP_S;
-                    // Tight cross-fade so the idle → pointing blend doesn't
-                    // visibly transit through a "leaning back" mid-pose.
-                    idleAction.fadeOut(0.1);
-                    pointingAction.fadeIn(0.1);
-                    pointingAction.play();
-                    demonState.currentAnimation = pointingKey;
-                    // Defer the spine override + head-look suspension until
-                    // the 0.1s cross-fade completes — otherwise head-look
-                    // turns off mid-fade and the head visibly transits
-                    // through idle's "forward" pose before reaching the
-                    // authored pointing pose. With this delay the head
-                    // stays pinned on-camera through the fade and only
-                    // hands off to the authored pose once pointing is at
-                    // full weight (where it should be facing roughly the
-                    // same direction look-at had it).
-                    const armTimer = setTimeout(() => {
-                      if (!demonFocusedRef.current) return;
-                      demonArmAimingRef.current = true;
-                    }, 120);
-                    demonState.focusSequenceTimers.push(armTimer);
+                    const pointingAction = crossfadeTo(pointingKey, { loop: THREE.LoopOnce, fade: 0.3 });
+                    if (!pointingAction) return;
 
                     const onFinished = (e) => {
                       if (e.action !== pointingAction) return;
                       demonMixer.removeEventListener('finished', onFinished);
                       demonState.focusSequenceListener = null;
-                      demonArmAimingRef.current = false;
                       if (!demonFocusedRef.current) return;
                       // Stage 3: settle into demon_typing for the rest of
-                      // focus and stop tracking the camera with the head.
-                      const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a));
-                      const fallbackAction = typingKey ? demonActions[typingKey] : demonActions[idleKey];
-                      const fallbackKey = typingKey || idleKey;
-                      if (fallbackAction) {
-                        pointingAction.fadeOut(0.3);
-                        fallbackAction.reset();
-                        fallbackAction.setLoop(THREE.LoopRepeat);
-                        fallbackAction.setEffectiveWeight(1);
-                        fallbackAction.fadeIn(0.3);
-                        fallbackAction.play();
-                        demonState.currentAnimation = fallbackKey;
-                      }
-                      demonHeadFollowDisabledRef.current = true;
+                      // focus (or idle if typing isn't authored).
+                      crossfadeTo(typingKey || idleKey, { fade: 0.3 });
                     };
                     demonMixer.addEventListener('finished', onFinished);
                     demonState.focusSequenceListener = onFinished;
@@ -2817,11 +2756,18 @@ const CyborgTempleScene = ({
       mat.uniforms.uTime.value = state.clock.elapsedTime;
     });
 
-    // One-shot: nudge OrbitControls' initial pivot from world origin to the
-    // workstation center so resting rotation feels centered on the model.
-    if (!orbitTargetInitedRef.current && state.controls && state.controls.target) {
-      state.controls.target.copy(restingOrbitCenter);
-      state.controls.update();
+    // One-shot: establish camera-controls' internal spherical state at
+    // load. setTarget alone doesn't always re-derive azimuth/polar from
+    // the camera position, which left auto-orbit doing nothing until a
+    // setLookAt happened (e.g. first focus → return). Calling setLookAt
+    // here with the camera's current position + the resting pivot fully
+    // initializes the controls so auto-rotation works immediately.
+    if (!orbitTargetInitedRef.current && state.controls && state.controls.setLookAt) {
+      state.controls.setLookAt(
+        camera.position.x, camera.position.y, camera.position.z,
+        restingOrbitCenter.x, restingOrbitCenter.y, restingOrbitCenter.z,
+        false,
+      );
       orbitTargetInitedRef.current = true;
     }
 
@@ -3573,143 +3519,9 @@ const CyborgTempleScene = ({
       }
     }
 
-    // Demon head look-at-camera override (only when focused on Demon).
-    // Suspended while pointing is active — the pointing clip authors the
-    // head pose to match the arm direction, and writing to head.quaternion
-    // every frame would clobber that. The else branch below nulls the
-    // smoothed-quat caches so when pointing finishes the look-at re-anchors
-    // from the head's current pose without snapping.
-    if (demonFocusedRef.current && !demonArmAimingRef.current && !demonHeadFollowDisabledRef.current && demonHeadBoneRef.current) {
-      const head = demonHeadBoneRef.current;
-
-      // Capture the animation's base head rotation once (avoids loop seam flick)
-      if (!demonHeadBoneRef._baseQuat) {
-        demonHeadBoneRef._baseQuat = head.quaternion.clone();
-        // Also capture the world quaternion of the head in rest pose for reference
-        head.updateWorldMatrix(true, false);
-        demonHeadBoneRef._baseWorldQuat = new THREE.Quaternion();
-        head.getWorldQuaternion(demonHeadBoneRef._baseWorldQuat);
-      }
-
-      // Get head world position
-      head.updateWorldMatrix(true, false);
-      const headWorldPos = new THREE.Vector3();
-      head.getWorldPosition(headWorldPos);
-
-      // Compute desired world quaternion: face the camera
-      // Use a dummy to do lookAt in world space
-      if (!demonHeadBoneRef._dummy) {
-        demonHeadBoneRef._dummy = new THREE.Object3D();
-      }
-      const dummy = demonHeadBoneRef._dummy;
-      dummy.position.copy(headWorldPos);
-      // Aim above the camera so the demon's gaze lands on the viewer's
-      // face rather than below it. Increase to make the head look higher.
-      const demonGazeTarget = camera.position.clone();
-      demonGazeTarget.y += 1.4;
-      dummy.lookAt(demonGazeTarget);
-      // Rig-specific orientation correction. lookAt aligns the dummy's
-      // local -Z to the camera; the flip rotates the dummy frame so the
-      // head bone's authored forward/up axes end up where they should be.
-      //
-      // Tune these three Euler components (radians) until the head faces
-      // the camera cleanly:
-      //   FLIP_Y — yaw (most rigs need only this)
-      //     0 = no correction
-      //     ±Math.PI / 2 = ±90° (rig face axis is ±X)
-      //     Math.PI = 180° (rig face axis is +Z instead of -Z)
-      //   FLIP_X — pitch (use if head tips up/down)
-      //   FLIP_Z — roll  (use if head tips left/right around its forward axis)
-      //
-      // Apply order is YXZ so yaw applies first, then pitch, then roll —
-      // matches how 3D artists usually think about head orientation.
-      const FLIP_X = Math.PI / 5;   // ~36° pitch to counteract a downward-looking rig
-      const FLIP_Y = 0;
-      const FLIP_Z = -Math.PI / 24; // ~-7.5° roll to counteract rig tilt
-      const flip = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(FLIP_X, FLIP_Y, FLIP_Z, 'YXZ'),
-      );
-      dummy.quaternion.multiply(flip);
-
-      // Clamp the angle between base pose and lookAt to prevent unnatural rotation.
-      // Raise maxHeadAngle / the 0.95 ceiling to let the head rotate further toward
-      // the camera before the clamp kicks in.
-      const maxHeadAngle = 1.7; // radians, ~97 degrees
-      const angleBetween = demonHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
-      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.95) : 0;
-      const blendedWorldQuat = demonHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
-
-      // Convert blended world quaternion to bone-local space
-      const parentWorldQuat = new THREE.Quaternion();
-      head.parent.getWorldQuaternion(parentWorldQuat);
-      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
-
-      // Smooth transition
-      if (!demonHeadBoneRef._smoothedQuat) {
-        demonHeadBoneRef._smoothedQuat = head.quaternion.clone();
-      }
-      demonHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
-
-      head.quaternion.copy(demonHeadBoneRef._smoothedQuat);
-    } else if (demonHeadBoneRef._smoothedQuat) {
-      demonHeadBoneRef._smoothedQuat = null;
-      demonHeadBoneRef._baseQuat = null;
-      demonHeadBoneRef._baseWorldQuat = null;
-      demonHeadBoneRef._dummy = null;
-    }
-
-    // Demon spine point-at-camera override — runs only during the
-    // demon_pointing phase of the focus sequence. Mirrors Blender's
-    // "rotate spine on Y" workflow: we override only the spine's local
-    // Y (yaw) component each frame to face the viewer horizontally,
-    // preserving any pitch/lean the animation provides.
-    //
-    // RIG_FORWARD_OFFSET_RAD compensates for any residual aim error the
-    // pointing clip leaves behind — the spine yaws toward the camera, and
-    // this offset nudges the target yaw to put the chest on the camera.
-    // Increase magnitude to swivel further; flip sign if rotation is the
-    // wrong way.
-    const RIG_FORWARD_OFFSET_RAD = -Math.PI / 8;
-    if (demonArmAimingRef.current && demonPointingArmBoneRef.current) {
-      const spine = demonPointingArmBoneRef.current;
-
-      spine.updateWorldMatrix(true, false);
-      const spineWorldPos = new THREE.Vector3();
-      spine.getWorldPosition(spineWorldPos);
-
-      // Direction from spine to camera, projected to the horizontal plane.
-      const toCamera = new THREE.Vector3().subVectors(camera.position, spineWorldPos);
-      toCamera.y = 0;
-
-      // Express that direction in the spine's PARENT local frame so the
-      // yaw value is something we can drop straight into the spine's
-      // local Euler.y.
-      const parentWorldQuat = new THREE.Quaternion();
-      spine.parent.getWorldQuaternion(parentWorldQuat);
-      const toCameraInParent = toCamera.clone().applyQuaternion(parentWorldQuat.clone().invert());
-      toCameraInParent.y = 0;
-      if (toCameraInParent.lengthSq() > 1e-6) {
-        toCameraInParent.normalize();
-        const targetYaw = Math.atan2(toCameraInParent.x, toCameraInParent.z) + RIG_FORWARD_OFFSET_RAD;
-
-        // Decompose the animation's current spine local quat into Euler
-        // (YXZ so yaw is the first applied rotation), override yaw, and
-        // recompose. Pitch (X) and roll (Z) from the animation survive.
-        const animEuler = new THREE.Euler().setFromQuaternion(spine.quaternion, 'YXZ');
-        animEuler.y = targetYaw;
-        const targetLocal = new THREE.Quaternion().setFromEuler(animEuler);
-
-        if (!demonPointingArmBoneRef._smoothedQuat) {
-          demonPointingArmBoneRef._smoothedQuat = spine.quaternion.clone();
-        }
-        // Slow slerp so the torso turn reads as deliberate.
-        demonPointingArmBoneRef._smoothedQuat.slerp(targetLocal, 0.08);
-        spine.quaternion.copy(demonPointingArmBoneRef._smoothedQuat);
-      }
-    } else if (demonPointingArmBoneRef._smoothedQuat) {
-      demonPointingArmBoneRef._smoothedQuat = null;
-      demonPointingArmBoneRef._dummy = null;
-    }
+    // (Demon head/spine overrides removed — demon_pointing is now authored
+    // to address the camera directly, so per-frame bone overrides aren't
+    // needed for the focus sequence.)
 
     // Monk head look-at-camera override — active when focused on the Monk
     // OR while the attention-getter cycle is running, so the monk appears
@@ -3928,143 +3740,114 @@ const CyborgTempleScene = ({
       fluffyHeadBoneRef._dummy = null;
     }
 
-    // Camera focus animation
+    // Camera focus animation. camera-controls handles the position+target
+    // transition as a single critically-damped motion, so we just dispatch
+    // setLookAt once per focus change and let the library drive the rest.
     if (focusTarget) {
-      // Lerp camera FOV toward focusTarget.fov when set — used on mobile so
-      // the subject reads smaller in portrait without moving the camera
-      // through the center console.
+      // FOV is independent of camera-controls — keep the manual lerp.
       if (typeof focusTarget.fov === 'number' && Math.abs(camera.fov - focusTarget.fov) > 0.05) {
         camera.fov += (focusTarget.fov - camera.fov) * 0.08;
         camera.updateProjectionMatrix();
       }
 
-      // For XCandle focus: lerp to position then release control to OrbitControls
-      if (focusTarget.agentId === 'XCandle') {
-        if (!focusTarget._arrived) {
-          camera.position.lerp(focusTarget.position, 0.08);
-          camera.lookAt(focusTarget.lookAt);
-          const dist = camera.position.distanceTo(focusTarget.position);
-          if (dist < 0.1) {
-            focusTarget._arrived = true;
-            // Update OrbitControls target so it orbits around the candle, not the origin
-            if (state.controls && state.controls.target) {
-              state.controls.target.copy(focusTarget.lookAt);
-              state.controls.update();
-            }
+      const controls = state.controls;
+      if (controls && controls.setLookAt && !focusTarget._dispatched) {
+        focusTarget._dispatched = true;
+
+        // Derive the orbit center NOW (not on arrival) so the fly-in aims
+        // directly at the final pivot in one continuous motion. The old
+        // flow flew to `lookAt`, then shifted target to `orbitCenter` after
+        // arrival — two distinct camera motions. Aiming straight at the
+        // orbit center collapses them into one.
+        if (
+          !focusTarget.orbitCenter &&
+          focusTarget.agentId !== 'XCandle' &&
+          focusTarget.agentName !== 'Reset'
+        ) {
+          const headBoneByAgent = {
+            RL80: rl80HeadBoneRef,
+            Demon: demonHeadBoneRef,
+            Monk: monkHeadBoneRef,
+            Fluffy: fluffyHeadBoneRef,
+            Detective: detectiveHeadBoneRef,
+          };
+          const boneRef = headBoneByAgent[focusTarget.agentId];
+          if (boneRef && boneRef.current) {
+            const pivot = new THREE.Vector3();
+            boneRef.current.getWorldPosition(pivot);
+            // Drop pivot toward chest height so the orbit feels balanced
+            // around the body rather than spinning around the head.
+            pivot.y -= 0.25;
+            focusTarget.orbitCenter = pivot;
           }
         }
-        // Once _arrived is set, do nothing — OrbitControls take over
-      } else if (focusTarget.agentName === 'Reset') {
-        // Reset: smoothly return camera, keep forcing lookAt
-        camera.position.lerp(focusTarget.position, 0.05);
-        camera.lookAt(focusTarget.lookAt);
-        if (state.controls && state.controls.target) {
-          state.controls.target.lerp(focusTarget.lookAt, 0.05);
-        }
-      } else {
-        // Character/screen focus: lerp to position, then hand off to OrbitControls
-        if (!focusTarget._arrived) {
-          camera.position.lerp(focusTarget.position, 0.05);
-          camera.lookAt(focusTarget.lookAt);
 
-          const dist = camera.position.distanceTo(focusTarget.position);
-          if (dist < 0.1) {
-            focusTarget._arrived = true;
-            // Initial orbit target = fly-in lookAt so there's no snap when
-            // OrbitControls takes over (its update() calls camera.lookAt on
-            // its target, which would otherwise jump the view).
-            if (state.controls && state.controls.target) {
-              state.controls.target.copy(focusTarget.lookAt);
-              state.controls.update();
-            }
-            // If no explicit orbitCenter was provided, derive one from the
-            // focused character's head bone so OrbitControls revolves around
-            // the actual character once it takes over.
-            if (!focusTarget.orbitCenter) {
-              const headBoneByAgent = {
-                RL80: rl80HeadBoneRef,
-                Demon: demonHeadBoneRef,
-                Monk: monkHeadBoneRef,
-                Fluffy: fluffyHeadBoneRef,
-                Detective: detectiveHeadBoneRef,
-              };
-              const boneRef = headBoneByAgent[focusTarget.agentId];
-              if (boneRef && boneRef.current) {
-                const pivot = new THREE.Vector3();
-                boneRef.current.getWorldPosition(pivot);
-                // Drop pivot toward chest height so orbit feels balanced
-                // around the body rather than spinning around the head.
-                pivot.y -= 0.25;
-                focusTarget.orbitCenter = pivot;
-              }
-            }
-            // Fire one-shot Unicorn_waving 2s after the camera settles in
-            // front of him. The wave clip is additive (see clip-loading
-            // section), so it layers on top of the running idle/typing
-            // action without replacing it — the body stays seated while the
-            // arm waves. Idle is NOT faded out here.
-            if (focusTarget.agentId === 'RL80' && unicornWaveStateRef.current.armed) {
-              unicornWaveStateRef.current.armed = false;
+        // Aim at the orbit center when we have one (single continuous
+        // motion); otherwise fall back to the authored lookAt point.
+        const finalLookAt = focusTarget.orbitCenter || focusTarget.lookAt;
+
+        const promise = controls.setLookAt(
+          focusTarget.position.x, focusTarget.position.y, focusTarget.position.z,
+          finalLookAt.x, finalLookAt.y, finalLookAt.z,
+          true,
+        );
+
+        const onArrival = () => {
+          focusTarget._arrived = true;
+
+          // XCandle / Reset paths don't need the RL80 wave handoff.
+          if (focusTarget.agentId === 'XCandle' || focusTarget.agentName === 'Reset') {
+            return;
+          }
+
+          // Fire one-shot Unicorn_waving 2s after the camera settles in
+          // front of him. The wave clip is additive (see clip-loading
+          // section), so it layers on top of the running idle/typing
+          // action without replacing it — the body stays seated while the
+          // arm waves. Idle is NOT faded out here.
+          if (focusTarget.agentId === 'RL80' && unicornWaveStateRef.current.armed) {
+            unicornWaveStateRef.current.armed = false;
+            unicornWaveStateRef.current.timeoutId = setTimeout(() => {
+              unicornWaveStateRef.current.timeoutId = null;
+              if (!rl80FocusedRef.current) return;
+              const rl80Actions = actionsRef.current['RL80'];
+              if (!rl80Actions) return;
+              const waveKey = Object.keys(rl80Actions).find(a => /wav/i.test(a));
+              if (!waveKey) return;
+              const wave = rl80Actions[waveKey];
+              const timeScale = 0.75;
+              const clipDurMs = wave.getClip().duration * 1000;
+              const playedDurMs = clipDurMs / timeScale;
+              const fadeInMs = Math.min(200, clipDurMs * 0.25);
+              const fadeOutMs = 500;
+              const fadeInS = fadeInMs / 1000;
+              const fadeOutS = fadeOutMs / 1000;
+
+              wave.reset();
+              wave.setLoop(THREE.LoopOnce, 1);
+              wave.clampWhenFinished = true;
+              wave.setEffectiveTimeScale(timeScale);
+              wave.setEffectiveWeight(10);
+              wave.fadeIn(fadeInS);
+              wave.play();
+
               unicornWaveStateRef.current.timeoutId = setTimeout(() => {
                 unicornWaveStateRef.current.timeoutId = null;
                 if (!rl80FocusedRef.current) return;
-                const rl80Actions = actionsRef.current['RL80'];
-                if (!rl80Actions) return;
-                const waveKey = Object.keys(rl80Actions).find(a => /wav/i.test(a));
-                if (!waveKey) return;
-                const wave = rl80Actions[waveKey];
-                // Slow the wave playback a bit (0.75× = ~33% longer reads
-                // more deliberate). Schedule timing uses the *played*
-                // duration, not the intrinsic clip duration.
-                const timeScale = 0.75;
-                const clipDurMs = wave.getClip().duration * 1000;
-                const playedDurMs = clipDurMs / timeScale;
-                const fadeInMs = Math.min(200, clipDurMs * 0.25);
-                const fadeOutMs = 500; // longer hang on the way out
-                const fadeInS = fadeInMs / 1000;
-                const fadeOutS = fadeOutMs / 1000;
-
-                // Regular blending. Idle stays at weight 1 controlling the
-                // body; wave runs at a high base weight so it dominates the
-                // arm bones (idle wins on body bones since the wave clip has
-                // no tracks for them). The mixer's effective weight is
-                // base_weight × fade_interpolant — by setting base = 10 and
-                // using the standard fadeIn (interpolant 0→1) / fadeOut
-                // (interpolant 1→0), effective weight smoothly ramps 0→10
-                // and 10→0 without snapping.
-                wave.reset();
-                wave.setLoop(THREE.LoopOnce, 1);
-                wave.clampWhenFinished = true;
-                wave.setEffectiveTimeScale(timeScale);
-                wave.setEffectiveWeight(10);
-                wave.fadeIn(fadeInS);
-                wave.play();
-
-                unicornWaveStateRef.current.timeoutId = setTimeout(() => {
-                  unicornWaveStateRef.current.timeoutId = null;
-                  if (!rl80FocusedRef.current) return;
-                  wave.fadeOut(fadeOutS);
-                }, Math.max(50, playedDurMs - fadeOutMs));
-              }, 2000);
-            }
+                wave.fadeOut(fadeOutS);
+              }, Math.max(50, playedDurMs - fadeOutMs));
+            }, 2000);
           }
-        } else if (!focusTarget._orbitSettled && focusTarget.orbitCenter) {
-          // After arrival, smoothly slide the orbit pivot from the fly-in
-          // lookAt to the explicit orbitCenter (e.g. Demon's chest). Done as
-          // a lerp so the camera doesn't snap and the user can start dragging
-          // immediately — their input just orbits a slowly-moving pivot for
-          // ~0.5s until it settles.
-          if (state.controls && state.controls.target) {
-            state.controls.target.lerp(focusTarget.orbitCenter, 0.08);
-            state.controls.update();
-            if (state.controls.target.distanceTo(focusTarget.orbitCenter) < 0.02) {
-              state.controls.target.copy(focusTarget.orbitCenter);
-              state.controls.update();
-              focusTarget._orbitSettled = true;
-            }
-          }
+        };
+
+        if (promise && typeof promise.then === 'function') {
+          // setLookAt's promise rejects if a newer transition supersedes
+          // this one (e.g. the user clicks another character mid-fly-in).
+          // Swallow that — the new transition's onArrival will run instead.
+          promise.then(onArrival).catch(() => {});
+        } else {
+          onArrival();
         }
-        // Once arrived AND orbit settled, OrbitControls fully owns the view
       }
     }
     
