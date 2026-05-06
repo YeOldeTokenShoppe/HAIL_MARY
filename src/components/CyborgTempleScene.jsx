@@ -31,8 +31,8 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Monk: {
-    cameraPos: new THREE.Vector3(-1.59, -0.82, -0.665),
-    lookAtPos: new THREE.Vector3(1.515, 0.445, -1.965),
+    cameraPos: new THREE.Vector3(-1.79, -0.325, -0.335),
+    lookAtPos: new THREE.Vector3(0.125, -0.215, -1.325),
     orbitCenter: null,
   },
 
@@ -54,12 +54,12 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Screen1: {
-    cameraPos: new THREE.Vector3(-0.84, -0.655, -0.81),
-    lookAtPos: new THREE.Vector3(-0.48, -0.27, 1.445),
+    cameraPos: new THREE.Vector3(-0.87, -0.4, -0.76),
+    lookAtPos: new THREE.Vector3(-0.48, -0.27, 0.775),
     orbitCenter: null,
   },
   Screen2: {
-    cameraPos: new THREE.Vector3(-0.81, -0.605, 0.84),
+    cameraPos: new THREE.Vector3(-0.81, -0.375, 0.84),
     lookAtPos: new THREE.Vector3(1.57, -0.25, 0.205),
     orbitCenter: null,
   },
@@ -76,13 +76,13 @@ export const AGENT_CAMERA_SETTINGS = {
   // ScreenA-D are the secondary (council-chat) monitors. Initial values
   // mirror each character's primary-screen sibling — tune with ?tune=1.
   ScreenA: {
-    cameraPos: new THREE.Vector3(-1.27, -0.455, -0.87),
-    lookAtPos: new THREE.Vector3(-1.525, -0.34, 0.31),
+    cameraPos: new THREE.Vector3(-1.225, -0.36, -0.7),
+    lookAtPos: new THREE.Vector3(-1.665, -0.34, 1.07),
     orbitCenter: null,
   },
   ScreenB: {
-    cameraPos: new THREE.Vector3(-0.92, -0.6, 1.28),
-    lookAtPos: new THREE.Vector3(0.47, -0.32, 1.34),
+    cameraPos: new THREE.Vector3(-0.76, -0.355, 1.28),
+    lookAtPos: new THREE.Vector3(-0.315, -0.32, 1.34),
     orbitCenter: null,
   },
   ScreenC: {
@@ -91,7 +91,7 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   ScreenD: {
-    cameraPos: new THREE.Vector3(1.005, -0.49, 0.7),
+    cameraPos: new THREE.Vector3(1.005, -0.36, 0.7),
     lookAtPos: new THREE.Vector3(1.615, -0.305, -1.015),
     orbitCenter: null,
   },
@@ -1762,6 +1762,21 @@ const CyborgTempleScene = ({
     () => new THREE.Vector3(0, isMobile ? 0.0 : -0.5, 0),
     [isMobile]
   );
+  // Canonical un-focus pose — front-facing zoomed-in overview of the
+  // platform. All de-focus paths fly the camera here regardless of where
+  // the auto-orbit happened to be when the user clicked, so users don't
+  // get dropped back into a "weird" angle. Numbers approximate where the
+  // /trade rig's slow zoom-in settles (seed [0, 3.5, 5.5] / [0, 4.5, 7]
+  // pulled to distance 4.8 / 6.5 along the seed's direction).
+  const sceneDefaultPose = useMemo(
+    () => ({
+      position: isMobile
+        ? new THREE.Vector3(0, 3.3, 5.3)
+        : new THREE.Vector3(0, 0.3, 5.2),
+      target: new THREE.Vector3(0, isMobile ? 0.0 : -0.5, 0),
+    }),
+    [isMobile]
+  );
   const orbitTargetInitedRef = useRef(false);
 
   
@@ -2026,26 +2041,18 @@ const CyborgTempleScene = ({
           onAgentClick(null);
         }
         
-        if (originalCameraPosition.current) {
-          const resetTarget = {
-            position: originalCameraPosition.current.clone(),
-            lookAt: restingOrbitCenter.clone(),
-            agentId: null,
-            agentName: 'Reset'
-          };
-          setFocusTarget(resetTarget);
-          
-          setTimeout(() => {
-            setFocusTarget(null);
-            // Keep originalCameraPosition pinned to the page-load position
-            // so subsequent focus/un-focus cycles return here too.
-          }, 1000);
-        } else {
+        setFocusTarget({
+          position: sceneDefaultPose.position.clone(),
+          lookAt: sceneDefaultPose.target.clone(),
+          agentId: null,
+          agentName: 'Reset'
+        });
+        setTimeout(() => {
           setFocusTarget(null);
-        }
+        }, 1000);
       }
     };
-    
+
     // Touch events for mobile and tablets
     const handleTouchStart = (event) => {
       // Don't prevent default for better touch compatibility
@@ -2358,24 +2365,18 @@ const CyborgTempleScene = ({
           if (focusTarget && focusTarget.agentId === object.userData.agentId) {
             restoreAllFromFocus();
             if (onAgentClick) onAgentClick(null);
-            if (originalCameraPosition.current) {
-              setFocusTarget({
-                position: originalCameraPosition.current.clone(),
-                lookAt: restingOrbitCenter.clone(),
-                // Restore the default FOV on un-focus (mobile widens during
-                // focus; this lerps it back).
-                fov: isMobile ? 55 : 50,
-                agentId: null,
-                agentName: 'Reset'
-              });
-              setTimeout(() => {
-                setFocusTarget(null);
-                // Keep originalCameraPosition pinned — it represents the
-                // page-load overview position, not the most recent un-focus.
-              }, 1000);
-            } else {
+            setFocusTarget({
+              position: sceneDefaultPose.position.clone(),
+              lookAt: sceneDefaultPose.target.clone(),
+              // Restore the default FOV on un-focus (mobile widens during
+              // focus; this lerps it back).
+              fov: isMobile ? 55 : 50,
+              agentId: null,
+              agentName: 'Reset'
+            });
+            setTimeout(() => {
               setFocusTarget(null);
-            }
+            }, 1000);
             break;
           }
 
@@ -2447,6 +2448,9 @@ const CyborgTempleScene = ({
                 }
                 const action = demonActions[key];
                 action.reset();
+                // Skip the bind-pose first frame — Mixamo clips anchor a
+                // T-pose at time=0, which flashes through the cross-fade.
+                action.time = action.getClip().duration * 0.05;
                 action.setLoop(loop);
                 if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
                 action.setEffectiveWeight(1);
@@ -2508,6 +2512,8 @@ const CyborgTempleScene = ({
                 }
                 const idleAction = monkActions[idleKey];
                 idleAction.reset();
+                // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
+                idleAction.time = idleAction.getClip().duration * 0.05;
                 idleAction.setLoop(THREE.LoopRepeat);
                 idleAction.setEffectiveWeight(1);
                 idleAction.fadeIn(0.5);
@@ -2589,6 +2595,8 @@ const CyborgTempleScene = ({
                 });
                 const idleAction = detectiveActions[idleKey];
                 idleAction.reset();
+                // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
+                idleAction.time = idleAction.getClip().duration * 0.05;
                 idleAction.setLoop(THREE.LoopRepeat);
                 idleAction.setEffectiveWeight(1);
                 idleAction.fadeIn(0.5);
@@ -2634,20 +2642,15 @@ const CyborgTempleScene = ({
           if (mesh) mesh.visible = false;
         });
         if (onAgentClick) onAgentClick(null);
-        if (originalCameraPosition.current) {
-          setFocusTarget({
-            position: originalCameraPosition.current.clone(),
-            lookAt: restingOrbitCenter.clone(),
-            agentId: null,
-            agentName: 'Reset'
-          });
-          setTimeout(() => {
-            setFocusTarget(null);
-            // Don't null originalCameraPosition — keep page-load anchor.
-          }, 1000);
-        } else {
+        setFocusTarget({
+          position: sceneDefaultPose.position.clone(),
+          lookAt: sceneDefaultPose.target.clone(),
+          agentId: null,
+          agentName: 'Reset'
+        });
+        setTimeout(() => {
           setFocusTarget(null);
-        }
+        }, 1000);
       }
     };
     window.addEventListener('screenGoBack', handleScreenGoBack);
@@ -2710,20 +2713,15 @@ const CyborgTempleScene = ({
 
       if (onAgentClick) onAgentClick(null);
 
-      if (originalCameraPosition.current) {
-        setFocusTarget({
-          position: originalCameraPosition.current.clone(),
-          lookAt: restingOrbitCenter.clone(),
-          agentId: null,
-          agentName: 'Reset'
-        });
-        setTimeout(() => {
-          setFocusTarget(null);
-          // Don't null originalCameraPosition — keep page-load anchor.
-        }, 1000);
-      } else {
+      setFocusTarget({
+        position: sceneDefaultPose.position.clone(),
+        lookAt: sceneDefaultPose.target.clone(),
+        agentId: null,
+        agentName: 'Reset'
+      });
+      setTimeout(() => {
         setFocusTarget(null);
-      }
+      }, 1000);
     };
 
     gl.domElement.addEventListener('pointerdown', handlePointerDown);

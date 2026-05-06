@@ -1,5 +1,5 @@
 "use client";
-import React, { Suspense, useState, useEffect, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import CleanCanvas from '@/components/CleanCanvas';
@@ -34,20 +34,81 @@ import { useRouter } from 'next/navigation';
 // camera-controls under the hood so fly-to transitions (setLookAt with
 // transition=true in CyborgTempleScene) animate position + target as a
 // single critically-damped motion instead of two competing systems.
-function CameraControlsRig({ autoRotate = false, autoRotateSpeed = 0.5 }) {
+function CameraControlsRig({
+  autoRotate = false,
+  autoRotateSpeed = 1.2,
+  initialPosition,
+  initialTarget,
+  zoomEndDistance = null,
+  zoomDuration = 25,
+  introStartDistance = null,
+  introDuration = 12,
+}) {
   const ref = useRef(null);
+  const startDistanceRef = useRef(null);
+  const zoomElapsedRef = useRef(0);
+  const userInteractedRef = useRef(false);
+  const initedRef = useRef(false);
+  // Intro state — scripted 360° fly-around + zoom-in on first load. When
+  // active it overrides the auto-rotate / slow-dolly logic below.
+  const introElapsedRef = useRef(0);
+  const introCompleteRef = useRef(introStartDistance == null);
+  const initialPolarRef = useRef(null);
+  // Capture initial pose in refs so re-renders that pass new array
+  // identities for `initialPosition` / `initialTarget` don't re-trigger
+  // the setup effect (which would yank the camera back to the seed pose
+  // and reset the zoom each time).
+  const initialPositionRef = useRef(initialPosition);
+  const initialTargetRef = useRef(initialTarget);
 
   useEffect(() => {
+    if (initedRef.current) return;
     const c = ref.current;
     if (!c) return;
+    initedRef.current = true;
     c.minDistance = 0.1;
-    c.maxDistance = 10;
+    // Bumped so the intro can start beyond the normal orbit envelope
+    // without setLookAt clamping the radius.
+    c.maxDistance = 20;
     c.minPolarAngle = Math.PI * 0.18;
     c.maxPolarAngle = Math.PI * 0.52;
     // Roughly matches the previous dampingFactor=0.1 feel.
     c.smoothTime = 0.25;
     c.draggingSmoothTime = 0.125;
     c.dollyToCursor = true;
+    const ip = initialPositionRef.current;
+    const it = initialTargetRef.current;
+    if (ip && it) {
+      const dx = ip[0] - it[0];
+      const dy = ip[1] - it[1];
+      const dz = ip[2] - it[2];
+      const r = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      startDistanceRef.current = r;
+      // Polar at the seed direction — held constant through the intro
+      // so the fly-around stays at the same elevation.
+      initialPolarRef.current = Math.acos(
+        Math.max(-1, Math.min(1, dy / r)),
+      );
+      let startX = ip[0], startY = ip[1], startZ = ip[2];
+      if (introStartDistance != null && r > 0) {
+        const k = introStartDistance / r;
+        startX = it[0] + dx * k;
+        startY = it[1] + dy * k;
+        startZ = it[2] + dz * k;
+      }
+      c.setLookAt(startX, startY, startZ, it[0], it[1], it[2], false);
+      zoomElapsedRef.current = 0;
+      introElapsedRef.current = 0;
+    }
+    // Stop the slow zoom as soon as the user takes the wheel — otherwise
+    // dollyTo would yank them back every frame.
+    const onControlStart = () => {
+      userInteractedRef.current = true;
+      // Bail out of the intro so the user's input isn't fought.
+      introCompleteRef.current = true;
+    };
+    c.addEventListener('controlstart', onControlStart);
+    return () => c.removeEventListener('controlstart', onControlStart);
   }, []);
 
   // Manual auto-orbit when no character is focused. The `autoRotate`
@@ -59,8 +120,71 @@ function CameraControlsRig({ autoRotate = false, autoRotateSpeed = 0.5 }) {
   // visible.
   useFrame((_, delta) => {
     const c = ref.current;
-    if (!c || !autoRotate) return;
-    c.rotate(delta * autoRotateSpeed * 0.1, 0, false);
+    if (!c) return;
+
+    // Cancel the intro if the user focuses a character — the focus
+    // fly-to drives the camera and our scripted setLookAt would fight it.
+    if (!autoRotate && !introCompleteRef.current) {
+      introCompleteRef.current = true;
+    }
+
+    // Scripted intro fly-around: full 360° orbit + dolly-in over
+    // `introDuration` seconds. Smoothstep easing so it eases in and out.
+    if (
+      !introCompleteRef.current &&
+      autoRotate &&
+      !userInteractedRef.current &&
+      introStartDistance != null &&
+      zoomEndDistance != null &&
+      initialPolarRef.current != null &&
+      initialTargetRef.current
+    ) {
+      introElapsedRef.current += delta;
+      const t = Math.min(introElapsedRef.current / introDuration, 1);
+      const eased = t * t * (3 - 2 * t); // smoothstep
+      const dir = autoRotateSpeed >= 0 ? 1 : -1;
+      const azimuth = dir * eased * Math.PI * 2;
+      const polar = initialPolarRef.current;
+      const distance = introStartDistance + (zoomEndDistance - introStartDistance) * eased;
+      const it = initialTargetRef.current;
+      const x = it[0] + distance * Math.sin(polar) * Math.sin(azimuth);
+      const y = it[1] + distance * Math.cos(polar);
+      const z = it[2] + distance * Math.sin(polar) * Math.cos(azimuth);
+      c.setLookAt(x, y, z, it[0], it[1], it[2], false);
+      if (t >= 1) {
+        introCompleteRef.current = true;
+        // Mark the slow zoom as already done — intro brought us to
+        // zoomEndDistance, no need to dolly any further.
+        zoomElapsedRef.current = zoomDuration;
+      }
+      return;
+    }
+
+    if (autoRotate) {
+      c.rotate(delta * autoRotateSpeed * 0.1, 0, false);
+    }
+
+    // Slow idle zoom-in. Pauses when a character is focused (autoRotate
+    // goes false) so the focus fly-to isn't fought, and aborts entirely
+    // once the user grabs the camera themselves. Skipped when an intro
+    // is in use (intro handles the zoom). We pass enableTransition=true
+    // so camera-controls' own damping smooths the radius approach —
+    // calling dollyTo(..., false) every frame hard-snaps `_spherical.radius`
+    // and visibly stutters against the per-frame `rotate()` updates.
+    if (
+      introStartDistance == null &&
+      autoRotate &&
+      !userInteractedRef.current &&
+      zoomEndDistance != null &&
+      startDistanceRef.current != null &&
+      zoomElapsedRef.current < zoomDuration
+    ) {
+      zoomElapsedRef.current += delta;
+      const t = Math.min(zoomElapsedRef.current / zoomDuration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      const distance = startDistanceRef.current + (zoomEndDistance - startDistanceRef.current) * eased;
+      c.dollyTo(distance, true);
+    }
   });
 
   return <CameraControls ref={ref} makeDefault />;
@@ -172,6 +296,16 @@ export default function CyborgTemple() {
     }
     dismissEntryOverlay();
   };
+  // Stable camera rig inputs — without `useMemo`, these inline arrays would
+  // get a new identity every render and re-mount the rig's effect, lurching
+  // the camera back to the start pose on every parent re-render.
+  const cameraInitialPosition = useMemo(
+    () => (isMobileView ? [0, 4.5, 7] : [0, 1.5, 7.5]),
+    [isMobileView],
+  );
+  const cameraInitialTarget = useMemo(() => [0, -0.5, 0], []);
+  const cameraZoomEndDistance = isMobileView ? 6.5 : 3.8;
+
   // First-visit hint: tells the user characters are clickable. Hides when
   // they click any character (focusedAgent flips truthy) or after a timer.
   const [showCharacterHint, setShowCharacterHint] = useState(false);
@@ -443,12 +577,14 @@ export default function CyborgTemple() {
 
   // Hand-tap GIF prompt: ~3s after the scene reveals, fade in for ~3.5s,
   // then fade out. Skip entirely if the user has already focused something
-  // (they don't need the hint) or if the entry overlay is up. Also hide
+  // (they don't need the hint) or if the entry overlay is up. Also skip if
+  // the user has interacted at all this session — un-focusing back to null
+  // would otherwise re-fire this effect and re-show the GIF. Hide
   // immediately on the first click/tap anywhere — they've engaged.
   useEffect(() => {
-    if (!sceneReady || showEntryOverlay || focusedAgent) return;
-    const showTimer = setTimeout(() => setShowHandTap(true), 3000);
-    const hideTimer = setTimeout(() => setShowHandTap(false), 6500);
+    if (!sceneReady || showEntryOverlay || focusedAgent || userHasInteracted) return;
+    const showTimer = setTimeout(() => setShowHandTap(true), 12500);
+    const hideTimer = setTimeout(() => setShowHandTap(false), 15500);
     const hideOnInteraction = () => {
       clearTimeout(showTimer);
       clearTimeout(hideTimer);
@@ -460,7 +596,7 @@ export default function CyborgTemple() {
       clearTimeout(hideTimer);
       window.removeEventListener('pointerdown', hideOnInteraction);
     };
-  }, [sceneReady, showEntryOverlay, focusedAgent]);
+  }, [sceneReady, showEntryOverlay, focusedAgent, userHasInteracted]);
 
   // Show the "tap a character" hint once the scene is visible. Auto-fade
   // after 6s; if the user clicks a character before then, hide immediately.
@@ -821,7 +957,9 @@ export default function CyborgTemple() {
             // Mobile was framed for the old compact MOBILE3.glb — now that it loads
             // the full desktop scene, pull back + widen FOV so the whole tableau
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
-            position: isMobileView ? [0, 2.1, 7.5] : [0, 0.5, 6.5],
+            // Raised + tilted down via CameraControlsRig setLookAt below; these
+            // values are the seed before the rig takes over.
+            position: isMobileView ? [0, 4.5, 7] : [0, 3.5, 5.5],
             fov: isMobileView ? 55 : 50
           }}
           gl={{
@@ -1131,7 +1269,16 @@ export default function CyborgTemple() {
                 together), avoiding the two-segment feel that came from
                 running an external tween alongside OrbitControls'
                 damping. Auto-orbit and limits replicated in the rig. */}
-            <CameraControlsRig autoRotate={!focusedAgent} autoRotateSpeed={0.5} />
+            <CameraControlsRig
+              autoRotate={!focusedAgent}
+              autoRotateSpeed={-0.8}
+              initialPosition={cameraInitialPosition}
+              initialTarget={cameraInitialTarget}
+              zoomEndDistance={cameraZoomEndDistance}
+              zoomDuration={25}
+              introStartDistance={isMobileView ? 13 : 11}
+              introDuration={12}
+            />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
         </CleanCanvas>
