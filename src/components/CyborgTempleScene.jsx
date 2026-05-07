@@ -26,8 +26,8 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Demon: {
-    cameraPos: new THREE.Vector3(-0.465, -0.56, 1.975),
-    lookAtPos: new THREE.Vector3(0.18, -0.485, 0.145),
+    cameraPos: new THREE.Vector3(-0.58, -0.56, 2.16),
+    lookAtPos: new THREE.Vector3(1.015, -0.485, 0.325),
     orbitCenter: null,
   },
   Monk: {
@@ -353,6 +353,11 @@ const CyborgTempleScene = ({
 
   // Head bone refs for look-at-camera override
   const demonHeadBoneRef = useRef();
+  // Set true when the user has moved the camera away from the demon's
+  // authored focus pose, so we skip the demon_pointing clip and instead
+  // play idle with the head-look-at-camera override (mirrors Monk/RL80
+  // tracking). Cleared on un-focus.
+  const demonHeadTrackingRef = useRef(false);
   const demonFocusedRef = useRef(false); // true when camera is zoomed in on Demon
   const monkHeadBoneRef = useRef();
   const monkFocusedRef = useRef(false); // true when camera is zoomed in on Monk
@@ -671,8 +676,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v12_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v12.glb";
+    let modelPath = "/models/RL80_4anims_v15_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v15.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1843,6 +1848,7 @@ const CyborgTempleScene = ({
     const restoreDemonFromFocus = () => {
       if (!demonFocusedRef.current) return;
       demonFocusedRef.current = false;
+      demonHeadTrackingRef.current = false;
       const demonActions = actionsRef.current['Demon'];
       const demonMixer = mixersRef.current['Demon'];
       const demonState = demonAnimStateRef.current;
@@ -1859,12 +1865,15 @@ const CyborgTempleScene = ({
       if (!demonActions) return;
       const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle/i.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
-      if (demonActions[demonState.currentAnimation]) {
-        demonActions[demonState.currentAnimation].fadeOut(0.5);
-      }
-      if (demonActions[returnAnim]) {
-        const returnAction = demonActions[returnAnim];
+      const prevAction = demonActions[demonState.currentAnimation];
+      const returnAction = demonActions[returnAnim];
+      // No-op if we'd cross-fade to the same clip — reset()+fadeIn on the
+      // currently-running action briefly snaps it to time=0 (T-pose frame).
+      if (returnAction && returnAction !== prevAction) {
+        if (prevAction) prevAction.fadeOut(0.5);
         returnAction.reset();
+        // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
+        returnAction.time = returnAction.getClip().duration * 0.05;
         returnAction.setLoop(THREE.LoopRepeat);
         returnAction.setEffectiveWeight(1);
         returnAction.fadeIn(0.5);
@@ -1885,12 +1894,13 @@ const CyborgTempleScene = ({
       const monkState = monkAnimStateRef.current;
       const loopAnims = Object.keys(monkActions).filter(a => /typing|idle|laughing/i.test(a) && !/idle_monk/i.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(monkActions)[0];
-      if (monkActions[monkState.currentAnimation]) {
-        monkActions[monkState.currentAnimation].fadeOut(0.5);
-      }
-      if (monkActions[returnAnim]) {
-        const returnAction = monkActions[returnAnim];
+      const prevAction = monkActions[monkState.currentAnimation];
+      const returnAction = monkActions[returnAnim];
+      if (returnAction && returnAction !== prevAction) {
+        if (prevAction) prevAction.fadeOut(0.5);
         returnAction.reset();
+        // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
+        returnAction.time = returnAction.getClip().duration * 0.05;
         returnAction.setLoop(THREE.LoopRepeat);
         returnAction.setEffectiveWeight(1);
         returnAction.fadeIn(0.5);
@@ -1968,14 +1978,19 @@ const CyborgTempleScene = ({
       const detectiveState = detectiveAnimStateRef.current;
       if (detectiveActions) {
         const typingKey = Object.keys(detectiveActions).find(a => /detective.*typ/i.test(a));
+        const prevAction = detectiveActions[detectiveState.currentAnimation];
+        const typingAction = typingKey ? detectiveActions[typingKey] : null;
+        // Fade out other running clips, but leave the target clip alone if
+        // it's already running — reset()+fadeIn would flash a T-pose frame.
         Object.values(detectiveActions).forEach((action) => {
-          if (action && action.isRunning && action.isRunning()) {
+          if (action && action !== typingAction && action.isRunning && action.isRunning()) {
             action.fadeOut(0.5);
           }
         });
-        if (typingKey && detectiveActions[typingKey]) {
-          const typingAction = detectiveActions[typingKey];
+        if (typingAction && typingAction !== prevAction) {
           typingAction.reset();
+          // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
+          typingAction.time = typingAction.getClip().duration * 0.05;
           typingAction.setLoop(THREE.LoopRepeat);
           typingAction.setEffectiveWeight(1);
           typingAction.fadeIn(0.5);
@@ -2292,7 +2307,25 @@ const CyborgTempleScene = ({
       let clickedOnAgent = false;
 
       for (let i = 0; i < intersects.length; i++) {
-        const object = intersects[i].object;
+        let object = intersects[i].object;
+
+        // Walk up the parent chain to find a clickable ancestor. Mesh
+        // descendants don't always inherit userData from the original
+        // setAngelClickable / agent-tag passes (e.g. nested groups added by
+        // the GLB exporter), so a hit on a deep child mesh would otherwise
+        // register as "not clickable" and fall through to the next intersect.
+        if (!object.userData.clickable) {
+          let walker = object.parent;
+          // Cap traversal at the model group to avoid escaping into the
+          // scene root.
+          while (walker && walker !== groupRef.current) {
+            if (walker.userData?.clickable) {
+              object = walker;
+              break;
+            }
+            walker = walker.parent;
+          }
+        }
 
         if (object.userData.clickable) {
           clickedOnAgent = true;
@@ -2324,6 +2357,51 @@ const CyborgTempleScene = ({
             topSupporterBannerRefs.current.forEach(mesh => {
               if (mesh) mesh.visible = true;
             });
+
+            // Compute Angel focus pose from the live bounding box rather
+            // than the static AGENT_CAMERA_SETTINGS values. The model is
+            // offset differently per device ([0,-1.9,0] desktop /
+            // [0,-1.2,0] mobile) and Angel_Empty has hover + billboard
+            // motion, so a fixed world-space cameraPos/lookAtPos can land
+            // above/below the actual mesh. Skipped when already focused
+            // so the toggle-unfocus block below handles the second click.
+            const alreadyFocused = focusTarget && focusTarget.agentId === 'Angel';
+            const targetMesh = angelRef.current || angelEmptyRef.current;
+            if (!alreadyFocused && targetMesh) {
+              const box = new THREE.Box3().setFromObject(targetMesh);
+              if (!box.isEmpty()) {
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                const center = new THREE.Vector3();
+                box.getCenter(center);
+
+                // Distance such that the mesh fits the vertical viewport
+                // with breathing room. Padded by ~30% so the angel doesn't
+                // touch the top/bottom edges.
+                const fovDeg = isMobile ? 75 : 50;
+                const fovRad = (fovDeg * Math.PI) / 180;
+                const fitDistance = Math.max(1.2, (size.y * 0.65) / Math.tan(fovRad / 2));
+
+                // Approach from +Z relative to the bbox center. Angel_Empty
+                // billboards on its Y axis to face the camera anyway, so
+                // the approach direction doesn't matter — only the
+                // bbox-relative framing does.
+                const cameraPos = new THREE.Vector3(
+                  center.x,
+                  center.y,
+                  center.z + fitDistance,
+                );
+
+                setFocusTarget({
+                  position: cameraPos,
+                  lookAt: center.clone(),
+                  fov: isMobile ? 75 : undefined,
+                  agentId: 'Angel',
+                  agentName: 'Angel',
+                });
+                break;
+              }
+            }
           }
 
           // XCandle click — first click zooms in, second click opens inspector
@@ -2442,11 +2520,24 @@ const CyborgTempleScene = ({
 
               const crossfadeTo = (key, { loop = THREE.LoopRepeat, fade = 0.3 } = {}) => {
                 if (!key || !demonActions[key]) return null;
+                const action = demonActions[key];
+                // No-op if we're already on this clip and it's running —
+                // otherwise reset()+fadeIn would briefly pull its weight to
+                // 0 with no other action fading in to fill the gap, and
+                // three.js blends the missing weight against the bind pose
+                // (T-pose flash). Just refresh loop/clamp settings.
+                const alreadyOn =
+                  demonState.currentAnimation === key &&
+                  action.isRunning && action.isRunning();
+                if (alreadyOn) {
+                  action.setLoop(loop);
+                  if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
+                  return action;
+                }
                 const prev = demonActions[demonState.currentAnimation];
-                if (prev && demonState.currentAnimation !== key) {
+                if (prev && prev !== action) {
                   prev.fadeOut(fade);
                 }
-                const action = demonActions[key];
                 action.reset();
                 // Skip the bind-pose first frame — Mixamo clips anchor a
                 // T-pose at time=0, which flashes through the cross-fade.
@@ -2472,9 +2563,30 @@ const CyborgTempleScene = ({
 
                 if (pointingKey) {
                   // Stage 2: after the camera has settled (~2s), play
-                  // pointing once.
+                  // pointing once — UNLESS the user has manually moved the
+                  // camera away from the authored focus pose. The clip is
+                  // animated to address the camera at settings.cameraPos;
+                  // from any other angle the demon ends up gesturing into
+                  // empty space. In that case, stay on idle and switch on
+                  // the head-look-at-camera override instead, like the
+                  // other characters do.
+                  const expectedCameraPos = settings && settings.cameraPos
+                    ? settings.cameraPos.clone()
+                    : null;
                   const t1 = setTimeout(() => {
                     if (!demonFocusedRef.current) return;
+
+                    if (expectedCameraPos) {
+                      const tolerance = 0.5; // meters
+                      const distSq = camera.position.distanceToSquared(expectedCameraPos);
+                      if (distSq > tolerance * tolerance) {
+                        // Camera drifted — keep the demon on idle and let
+                        // the per-frame head override track the camera.
+                        demonHeadTrackingRef.current = true;
+                        return;
+                      }
+                    }
+
                     const pointingAction = crossfadeTo(pointingKey, { loop: THREE.LoopOnce, fade: 0.3 });
                     if (!pointingAction) return;
 
@@ -2507,18 +2619,27 @@ const CyborgTempleScene = ({
               const idleKey = Object.keys(monkActions).find(a => /idle_monk/i.test(a));
               if (idleKey) {
                 const monkState = monkAnimStateRef.current;
-                if (monkActions[monkState.currentAnimation]) {
-                  monkActions[monkState.currentAnimation].fadeOut(0.5);
-                }
                 const idleAction = monkActions[idleKey];
-                idleAction.reset();
-                // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
-                idleAction.time = idleAction.getClip().duration * 0.05;
-                idleAction.setLoop(THREE.LoopRepeat);
-                idleAction.setEffectiveWeight(1);
-                idleAction.fadeIn(0.5);
-                idleAction.play();
-                monkState.currentAnimation = idleKey;
+                const prevAction = monkActions[monkState.currentAnimation];
+                const alreadyOn =
+                  monkState.currentAnimation === idleKey &&
+                  idleAction.isRunning && idleAction.isRunning();
+                // Skip the swap when already on this clip — fading the same
+                // action would briefly drop its weight to 0 and blend the
+                // bind pose into the bones (T-pose flash).
+                if (!alreadyOn) {
+                  if (prevAction && prevAction !== idleAction) {
+                    prevAction.fadeOut(0.5);
+                  }
+                  idleAction.reset();
+                  // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
+                  idleAction.time = idleAction.getClip().duration * 0.05;
+                  idleAction.setLoop(THREE.LoopRepeat);
+                  idleAction.setEffectiveWeight(1);
+                  idleAction.fadeIn(0.5);
+                  idleAction.play();
+                  monkState.currentAnimation = idleKey;
+                }
                 monkState.isPlayingSpecial = true;
                 monkState.nextSwitchDelay = 999999;
                 monkState.lastSwitchTime = Date.now();
@@ -2585,23 +2706,28 @@ const CyborgTempleScene = ({
             if (detectiveActions) {
               const idleKey = Object.keys(detectiveActions).find(a => /detective.*idle/i.test(a));
               if (idleKey) {
-                // Fade out ALL currently-running clips, not just whichever
-                // detectiveState.currentAnimation thinks is current — covers
-                // the case where alternation just kicked over behind us.
+                const idleAction = detectiveActions[idleKey];
+                const alreadyOn =
+                  detectiveState.currentAnimation === idleKey &&
+                  idleAction.isRunning && idleAction.isRunning();
+                // Fade out ALL currently-running clips except the target —
+                // fading the target while no replacement fades in pulls its
+                // weight to 0 and the bind pose blends in (T-pose flash).
                 Object.values(detectiveActions).forEach((action) => {
-                  if (action && action.isRunning && action.isRunning()) {
+                  if (action && action !== idleAction && action.isRunning && action.isRunning()) {
                     action.fadeOut(0.5);
                   }
                 });
-                const idleAction = detectiveActions[idleKey];
-                idleAction.reset();
-                // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
-                idleAction.time = idleAction.getClip().duration * 0.05;
-                idleAction.setLoop(THREE.LoopRepeat);
-                idleAction.setEffectiveWeight(1);
-                idleAction.fadeIn(0.5);
-                idleAction.play();
-                detectiveState.currentAnimation = idleKey;
+                if (!alreadyOn) {
+                  idleAction.reset();
+                  // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
+                  idleAction.time = idleAction.getClip().duration * 0.05;
+                  idleAction.setLoop(THREE.LoopRepeat);
+                  idleAction.setEffectiveWeight(1);
+                  idleAction.fadeIn(0.5);
+                  idleAction.play();
+                  detectiveState.currentAnimation = idleKey;
+                }
                 detectiveState.isPlayingSpecial = true;
                 detectiveState.nextSwitchDelay = 999999;
                 detectiveState.lastSwitchTime = Date.now();
@@ -2775,12 +2901,13 @@ const CyborgTempleScene = ({
     // those, causing a one-frame T-pose flash. Pre-empting the wrap
     // (and forcing a minimum time at clip start) avoids it without
     // mutating the clip data, so position tracks stay intact.
-    const rl80Actions = actionsRef.current?.['RL80'];
-    if (rl80Actions) {
-      const safeFrac = 0.05; // 5% inset on both ends
-      Object.keys(rl80Actions).forEach((name) => {
+    const safeFrac = 0.05; // 5% inset on both ends
+    ['RL80', 'Demon', 'Monk', 'Detective'].forEach((charName) => {
+      const charActions = actionsRef.current?.[charName];
+      if (!charActions) return;
+      Object.keys(charActions).forEach((name) => {
         if (!/typ|idle/i.test(name) || /wav/i.test(name)) return;
-        const action = rl80Actions[name];
+        const action = charActions[name];
         if (!action.isRunning() || action.paused) return;
         const dur = action.getClip().duration;
         const safe = dur * safeFrac;
@@ -2793,7 +2920,7 @@ const CyborgTempleScene = ({
           action.time = safe;
         }
       });
-    }
+    });
 
     // Update all character mixers independently
     if (mixersRef.current) {
@@ -3736,6 +3863,66 @@ const CyborgTempleScene = ({
       fluffyHeadBoneRef._smoothedQuat = null;
       fluffyHeadBoneRef._baseQuat = null;
       fluffyHeadBoneRef._dummy = null;
+    }
+
+    // Demon head look-at-camera override — only enabled when the focus
+    // logic decided to skip the demon_pointing clip (camera moved off the
+    // authored pose). Mirrors the Monk/RL80 pattern.
+    if (demonHeadTrackingRef.current && demonHeadBoneRef.current) {
+      const head = demonHeadBoneRef.current;
+
+      if (!demonHeadBoneRef._baseQuat) {
+        demonHeadBoneRef._baseQuat = head.quaternion.clone();
+        head.updateWorldMatrix(true, false);
+        demonHeadBoneRef._baseWorldQuat = new THREE.Quaternion();
+        head.getWorldQuaternion(demonHeadBoneRef._baseWorldQuat);
+      }
+
+      head.updateWorldMatrix(true, false);
+      const headWorldPos = new THREE.Vector3();
+      head.getWorldPosition(headWorldPos);
+
+      if (!demonHeadBoneRef._dummy) {
+        demonHeadBoneRef._dummy = new THREE.Object3D();
+      }
+      const dummy = demonHeadBoneRef._dummy;
+      dummy.position.copy(headWorldPos);
+      dummy.lookAt(camera.position);
+      // Rig-specific yaw correction. If the head ends up looking the wrong
+      // way, adjust the divisor in `Math.PI / N` (or change the axis).
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 0.5);
+      dummy.quaternion.multiply(flip);
+
+      // ~85° max turn — wider than the 70° default but conservative enough
+      // not to wrap the neck. 1.92 (Monk) lets the head spin past the
+      // natural range here.
+      const maxHeadAngle = 1.55;
+      const angleBetween = demonHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.85) : 0;
+      const blendedWorldQuat = demonHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+
+      const parentWorldQuat = new THREE.Quaternion();
+      head.parent.getWorldQuaternion(parentWorldQuat);
+      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+
+      if (!demonHeadBoneRef._smoothedQuat) {
+        demonHeadBoneRef._smoothedQuat = head.quaternion.clone();
+      }
+      demonHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
+      head.quaternion.copy(demonHeadBoneRef._smoothedQuat);
+    } else if (demonHeadBoneRef._smoothedQuat && demonHeadBoneRef.current) {
+      // Symmetric release — slerp back toward whatever the animation
+      // wants now, then drop the override once close enough.
+      const head = demonHeadBoneRef.current;
+      const animQuat = head.quaternion.clone();
+      demonHeadBoneRef._smoothedQuat.slerp(animQuat, 0.08);
+      head.quaternion.copy(demonHeadBoneRef._smoothedQuat);
+      if (demonHeadBoneRef._smoothedQuat.angleTo(animQuat) < 0.01) {
+        demonHeadBoneRef._smoothedQuat = null;
+        demonHeadBoneRef._baseQuat = null;
+        demonHeadBoneRef._baseWorldQuat = null;
+        demonHeadBoneRef._dummy = null;
+      }
     }
 
     // Camera focus animation. camera-controls handles the position+target

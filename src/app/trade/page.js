@@ -16,6 +16,7 @@ import CyborgTempleScene from '@/components/CyborgTempleScene';
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
+import ScreenBSlotMachine from "@/components/ScreenBSlotMachine";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -406,7 +407,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v12_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v14_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -837,12 +838,15 @@ export default function CyborgTemple() {
                 transform: "rotate(-8deg) skew(-15deg)",
                 zIndex: 1000,
                 whiteSpace: "nowrap",
-                cursor: "pointer",
                 marginTop: "0",
                 // Fade out the title while a character/screen is focused so
                 // the close-up has the visual stage to itself.
                 opacity: focusedAgent ? 0 : 1,
-                pointerEvents: focusedAgent ? "none" : "auto",
+                // The h1 has no click handler — make it pointer-transparent
+                // so its rotated/skewed hit rectangle doesn't swallow clicks
+                // on 3D objects underneath it (notably the Angel, which sits
+                // high in the upper viewport where the title overlaps).
+                pointerEvents: "none",
                 transition: "opacity 0.4s ease",
               }}
             >
@@ -1249,8 +1253,11 @@ export default function CyborgTemple() {
             {/* Liminal Terminal preview — screens render cryptic teasers */}
             <VideoScreens is80sMode={context80sMode} previewMode={true} />
 
-            {/* Council group chat painted onto the four secondary screens */}
+            {/* Council group chat painted onto ScreenA/C/D */}
             <CouncilChatScreens />
+
+            {/* ScreenB → looping slot machine */}
+            <ScreenBSlotMachine />
 
               {/* <NeuralNetworkR3F 
               theme={2}
@@ -1287,9 +1294,9 @@ export default function CyborgTemple() {
         {/* Floating Character Label on Focus */}
         {(() => {
           const agentInfo = {
-            RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Unicorn Investor' },
-            Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Insider trader.' },
-            Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android eschatologist hell-bent on saving humanity from itself.' },
+            RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Scans the tech tapestry for uncommon insights.' },
+            Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Short seller. Insider trader.' },
+            Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android theologian hell-bent on saving humanity from itself.' },
             Detective: { name: 'Detective Marisol', pronunciation: '', tagline: 'Field agent for an interdimensional anti-fraud task force.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];

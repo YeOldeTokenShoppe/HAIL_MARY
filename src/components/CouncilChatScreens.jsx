@@ -101,13 +101,13 @@ const TAG_HEIGHT = 16;
 const BODY_LINE_HEIGHT = 17;
 const MESSAGE_GAP = 14;
 
-// Starting scroll offset (0..1) for each of the four screens. Picked so the
-// four windows show clearly different parts of the thread at any one moment.
+// Starting scroll offset (0..1) for each of the secondary screens. Picked so
+// the windows show clearly different parts of the thread at any one moment.
+// ScreenB is intentionally omitted — it's owned by ScreenBSlotMachine.
 const SCREEN_START_OFFSETS = {
   ScreenA: 0.0,
-  ScreenB: 0.27,
-  ScreenC: 0.53,
-  ScreenD: 0.78,
+  ScreenC: 0.4,
+  ScreenD: 0.75,
 };
 
 // One full canvas-height per N seconds.
