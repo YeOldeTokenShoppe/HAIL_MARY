@@ -46,6 +46,7 @@ const CONNECTORS = [
 ];
 
 const BuyModal = ({ isOpen, onClose }) => {
+  const [activeTab, setActiveTab] = useState('buy');
   const [glitchActive, setGlitchActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallPhone, setIsSmallPhone] = useState(false);
@@ -162,6 +163,7 @@ const BuyModal = ({ isOpen, onClose }) => {
     }
     setIsAuthorizing(false);
     setAuthError(null);
+    setActiveTab('buy');
   }, [isOpen]);
 
   const handleBuy = useCallback(async () => {
@@ -256,6 +258,75 @@ const BuyModal = ({ isOpen, onClose }) => {
     }
   }, [walletAddress, isAuthorizing, signMessageAsync, onClose]);
 
+  const handleSell = useCallback(async () => {
+    if (!walletAddress || isAuthorizing) return;
+
+    // Open placeholder tab synchronously — same mobile Safari workaround as handleBuy.
+    const popupRef = window.open('about:blank', '_blank');
+
+    setAuthError(null);
+    setIsAuthorizing(true);
+    try {
+      const nonceRes = await fetch('/api/onramp-nonce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: walletAddress }),
+      });
+      const nonceData = await nonceRes.json();
+      if (!nonceRes.ok || !nonceData.message || !nonceData.envelope) {
+        throw new Error(nonceData.error || 'Failed to get authorization nonce');
+      }
+
+      const signature = await signMessageAsync({ message: nonceData.message });
+
+      const authRes = await fetch('/api/onramp-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: walletAddress,
+          message: nonceData.message,
+          envelope: nonceData.envelope,
+          signature,
+        }),
+      });
+      const authData = await authRes.json();
+      if (!authRes.ok || !authData.token) {
+        throw new Error(authData.error || 'Failed to authenticate');
+      }
+
+      const sessionRes = await fetch('/api/offramp-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Onramp-Auth': `Bearer ${authData.token}`,
+        },
+      });
+      const sessionData = await sessionRes.json();
+      if (!sessionRes.ok || !sessionData.token) {
+        throw new Error(sessionData.error || 'Failed to get offramp session token');
+      }
+
+      const offrampUrl = new URL('https://pay.coinbase.com/sell/select-asset');
+      offrampUrl.searchParams.set('sessionToken', sessionData.token);
+      offrampUrl.searchParams.set('defaultNetwork', 'base');
+
+      if (popupRef && !popupRef.closed) {
+        popupRef.location.href = offrampUrl;
+      } else {
+        window.location.href = offrampUrl;
+      }
+    } catch (err) {
+      if (popupRef && !popupRef.closed) {
+        popupRef.close();
+      }
+      console.error('Offramp authorization failed:', err);
+      const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
+      setAuthError(userRejected ? null : (err?.message || 'Authorization failed'));
+    } finally {
+      setIsAuthorizing(false);
+    }
+  }, [walletAddress, isAuthorizing, signMessageAsync]);
+
   const buyStage = !walletAddress
     ? 'connectWallet'
     : isAuthorizing
@@ -269,6 +340,20 @@ const BuyModal = ({ isOpen, onClose }) => {
       : (t('buyModal.buyWithCoinbase') || 'BUY WITH COINBASE');
   const buyDisabled = buyStage === 'authorizing';
   const buyClickable = !buyDisabled;
+
+  const sellStage = !walletAddress
+    ? 'connectWallet'
+    : isAuthorizing
+    ? 'authorizing'
+    : 'ready';
+  const sellLabel =
+    sellStage === 'connectWallet'
+      ? (t('buyModal.connectWallet') || 'CONNECT WALLET')
+      : sellStage === 'authorizing'
+      ? (t('buyModal.authorizing') || 'AUTHORIZING...')
+      : 'SELL WITH COINBASE';
+  const sellDisabled = sellStage === 'authorizing';
+  const sellClickable = !sellDisabled;
 
   if (!isOpen || !mounted) return null;
 
@@ -580,7 +665,7 @@ const BuyModal = ({ isOpen, onClose }) => {
                 position: 'relative',
               }}>
                 <span style={{ position: 'relative', zIndex: 2 }}>
-                  {t('buyModal.title') || 'BUY_RL80_'}
+                  {activeTab === 'buy' ? (t('buyModal.title') || 'BUY_RL80_') : 'SELL_RL80_'}
                 </span>
                 {glitchActive && (
                   <>
@@ -593,7 +678,7 @@ const BuyModal = ({ isOpen, onClose }) => {
                       width: '100%',
                       textAlign: 'center',
                     }}>
-                      {t('buyModal.title') || 'BUY_RL80_'}
+                      {activeTab === 'buy' ? (t('buyModal.title') || 'BUY_RL80_') : 'SELL_RL80_'}
                     </span>
                     <span style={{
                       position: 'absolute',
@@ -604,13 +689,48 @@ const BuyModal = ({ isOpen, onClose }) => {
                       width: '100%',
                       textAlign: 'center',
                     }}>
-                      {t('buyModal.title') || 'BUY_RL80_'}
+                      {activeTab === 'buy' ? (t('buyModal.title') || 'BUY_RL80_') : 'SELL_RL80_'}
                     </span>
                   </>
                 )}
               </h2>
 
-              {/* Two-step process explainer (connected users only) */}
+              {/* Buy / Sell tab toggle */}
+              <div style={{
+                display: 'flex',
+                width: '100%',
+                maxWidth: '320px',
+                border: '1px solid rgba(253, 237, 0, 0.35)',
+                borderRadius: '2px',
+                overflow: 'hidden',
+              }}>
+                {['buy', 'sell'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => { setActiveTab(tab); setAuthError(null); }}
+                    style={{
+                      flex: 1,
+                      fontFamily: 'monospace',
+                      fontSize: isSmallPhone ? '11px' : '12px',
+                      fontWeight: '900',
+                      letterSpacing: '2px',
+                      textTransform: 'uppercase',
+                      padding: isSmallPhone ? '7px 0' : '8px 0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      background: activeTab === tab
+                        ? (tab === 'buy' ? 'linear-gradient(135deg, #00e572, #00c85d)' : 'linear-gradient(135deg, #ff184c, #cc1040)')
+                        : 'rgba(0,0,0,0.35)',
+                      color: activeTab === tab ? '#000' : 'rgba(255,255,255,0.55)',
+                    }}
+                  >
+                    {tab === 'buy' ? '▲ BUY' : '▼ SELL'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Process explainer (connected users only) */}
               {walletAddress && (
                 <div style={{
                   width: '100%',
@@ -635,20 +755,37 @@ const BuyModal = ({ isOpen, onClose }) => {
                   }}>
                     {'>>'} HOW IT WORKS
                   </p>
-                  <p style={{
-                    fontFamily: 'monospace',
-                    fontSize: isSmallPhone ? '10px' : '11px',
-                    color: 'rgba(255, 255, 255, 0.85)',
-                    textAlign: 'left',
-                    lineHeight: '1.5',
-                    margin: 0,
-                  }}>
-                    1. Click Buy — opens Coinbase in a new tab
-                    <br />
-                    2. Buy ETH or USDC with your card
-                    <br />
-                    3. Come back to this tab and swap below
-                  </p>
+                  {activeTab === 'buy' ? (
+                    <p style={{
+                      fontFamily: 'monospace',
+                      fontSize: isSmallPhone ? '10px' : '11px',
+                      color: 'rgba(255, 255, 255, 0.85)',
+                      textAlign: 'left',
+                      lineHeight: '1.5',
+                      margin: 0,
+                    }}>
+                      1. Click Buy — opens Coinbase in a new tab
+                      <br />
+                      2. Buy ETH or USDC with your card
+                      <br />
+                      3. Come back to this tab and swap below
+                    </p>
+                  ) : (
+                    <p style={{
+                      fontFamily: 'monospace',
+                      fontSize: isSmallPhone ? '10px' : '11px',
+                      color: 'rgba(255, 255, 255, 0.85)',
+                      textAlign: 'left',
+                      lineHeight: '1.5',
+                      margin: 0,
+                    }}>
+                      1. Click Sell — opens Coinbase in a new tab
+                      <br />
+                      2. Choose ETH or USDC to sell for fiat
+                      <br />
+                      3. Funds land in your bank account
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -809,52 +946,91 @@ const BuyModal = ({ isOpen, onClose }) => {
                       </p>
                     </div>
                   )}
-                  <span style={{
-                    fontFamily: 'monospace',
-                    fontSize: '10px',
-                    fontWeight: '900',
-                    letterSpacing: '3px',
-                    color: 'rgba(0, 229, 114, 0.85)',
-                    textTransform: 'uppercase',
-                    marginBottom: '-4px',
-                  }}>
-                    Step 1
-                  </span>
-                  <button
-                    onClick={handleBuy}
-                    disabled={buyDisabled}
-                  style={{
-                    fontFamily: 'monospace',
-                    fontSize: isSmallPhone ? '14px' : '16px',
-                    fontWeight: '900',
-                    textTransform: 'uppercase',
-                    letterSpacing: '3px',
-                    color: '#000',
-                    background: buyClickable
-                      ? 'linear-gradient(135deg, #00e572, #00c85d)'
-                      : 'rgba(100, 100, 100, 0.5)',
-                    border: 'none',
-                    padding: isSmallPhone ? '14px 28px' : '16px 40px',
-                    cursor: buyClickable ? 'pointer' : 'wait',
-                    clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
-                    transition: 'all 0.3s ease',
-                    animation: buyStage === 'ready' ? 'pulse-glow 2s infinite' : 'none',
-                    position: 'relative',
-                    minWidth: isSmallPhone ? '200px' : '240px',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (buyClickable) {
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                      e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '';
-                  }}
-                >
-                  {buyLabel}
-                </button>
+                  {activeTab === 'buy' ? (
+                    <>
+                      <span style={{
+                        fontFamily: 'monospace',
+                        fontSize: '10px',
+                        fontWeight: '900',
+                        letterSpacing: '3px',
+                        color: 'rgba(0, 229, 114, 0.85)',
+                        textTransform: 'uppercase',
+                        marginBottom: '-4px',
+                      }}>
+                        Step 1
+                      </span>
+                      <button
+                        onClick={handleBuy}
+                        disabled={buyDisabled}
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: isSmallPhone ? '14px' : '16px',
+                          fontWeight: '900',
+                          textTransform: 'uppercase',
+                          letterSpacing: '3px',
+                          color: '#000',
+                          background: buyClickable
+                            ? 'linear-gradient(135deg, #00e572, #00c85d)'
+                            : 'rgba(100, 100, 100, 0.5)',
+                          border: 'none',
+                          padding: isSmallPhone ? '14px 28px' : '16px 40px',
+                          cursor: buyClickable ? 'pointer' : 'wait',
+                          clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+                          transition: 'all 0.3s ease',
+                          animation: buyStage === 'ready' ? 'pulse-glow 2s infinite' : 'none',
+                          position: 'relative',
+                          minWidth: isSmallPhone ? '200px' : '240px',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (buyClickable) {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '';
+                        }}
+                      >
+                        {buyLabel}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleSell}
+                      disabled={sellDisabled}
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: isSmallPhone ? '14px' : '16px',
+                        fontWeight: '900',
+                        textTransform: 'uppercase',
+                        letterSpacing: '3px',
+                        color: '#fff',
+                        background: sellClickable
+                          ? 'linear-gradient(135deg, #ff184c, #cc1040)'
+                          : 'rgba(100, 100, 100, 0.5)',
+                        border: 'none',
+                        padding: isSmallPhone ? '14px 28px' : '16px 40px',
+                        cursor: sellClickable ? 'pointer' : 'wait',
+                        clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        minWidth: isSmallPhone ? '200px' : '240px',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (sellClickable) {
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                          e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 24, 76, 0.6)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = '';
+                      }}
+                    >
+                      {sellLabel}
+                    </button>
+                  )}
                 </>
               )}
 
@@ -872,53 +1048,57 @@ const BuyModal = ({ isOpen, onClose }) => {
                 </p>
               )}
 
-              {/* Divider */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                width: '100%',
-                maxWidth: '320px',
-              }}>
-                <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(253, 237, 0, 0.4))' }} />
-                <span style={{
-                  fontFamily: 'monospace',
-                  fontSize: '10px',
-                  color: 'rgba(253, 237, 0, 0.6)',
-                  letterSpacing: '3px',
-                }}>
-                  {t('buyModal.orDivider') || 'OR'}
-                </span>
-                <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(253, 237, 0, 0.4), transparent)' }} />
-              </div>
+              {activeTab === 'buy' && (
+                <>
+                  {/* Divider */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    maxWidth: '320px',
+                  }}>
+                    <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(253, 237, 0, 0.4))' }} />
+                    <span style={{
+                      fontFamily: 'monospace',
+                      fontSize: '10px',
+                      color: 'rgba(253, 237, 0, 0.6)',
+                      letterSpacing: '3px',
+                    }}>
+                      {t('buyModal.orDivider') || 'OR'}
+                    </span>
+                    <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(253, 237, 0, 0.4), transparent)' }} />
+                  </div>
 
-              {/* In-app Swap Section — STEP 2 label only when connected,
-                  since Step 1 (the Buy button) is also connect-gated. */}
-              {walletAddress && (
-                <span style={{
-                  fontFamily: 'monospace',
-                  fontSize: '10px',
-                  fontWeight: '900',
-                  letterSpacing: '3px',
-                  color: 'rgba(0, 229, 114, 0.85)',
-                  textTransform: 'uppercase',
-                }}>
-                  Step 2
-                </span>
+                  {/* In-app Swap Section — STEP 2 label only when connected,
+                      since Step 1 (the Buy button) is also connect-gated. */}
+                  {walletAddress && (
+                    <span style={{
+                      fontFamily: 'monospace',
+                      fontSize: '10px',
+                      fontWeight: '900',
+                      letterSpacing: '3px',
+                      color: 'rgba(0, 229, 114, 0.85)',
+                      textTransform: 'uppercase',
+                    }}>
+                      Step 2
+                    </span>
+                  )}
+                  <p style={{
+                    fontFamily: 'monospace',
+                    fontSize: isSmallPhone ? '11px' : '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textAlign: 'center',
+                    lineHeight: '1.6',
+                    letterSpacing: '0.5px',
+                    maxWidth: '320px',
+                  }}>
+                    {t('buyModal.swapDescription') || 'Already have ETH or USDC? Swap directly for RL80.'}
+                  </p>
+
+                  <SwapForm isSmallPhone={isSmallPhone} isMobile={isMobile} />
+                </>
               )}
-              <p style={{
-                fontFamily: 'monospace',
-                fontSize: isSmallPhone ? '11px' : '13px',
-                color: 'rgba(255, 255, 255, 0.7)',
-                textAlign: 'center',
-                lineHeight: '1.6',
-                letterSpacing: '0.5px',
-                maxWidth: '320px',
-              }}>
-                {t('buyModal.swapDescription') || 'Already have ETH or USDC? Swap directly for RL80.'}
-              </p>
-
-              <SwapForm isSmallPhone={isSmallPhone} isMobile={isMobile} />
             </div>
           </div>
 
