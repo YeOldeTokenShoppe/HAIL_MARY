@@ -1,20 +1,31 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { DEMON_SITEPAL_CROP, DEMON_SITEPAL_FILTER } from "@/components/CyborgTempleScene";
+import {
+  DEMON_SITEPAL_CROP,
+  DEMON_SITEPAL_FILTER,
+  DETECTIVE_SITEPAL_CROP,
+  DETECTIVE_SITEPAL_FILTER,
+} from "@/components/CyborgTempleScene";
 
 /**
  * Dev-only SitePal crop tuning panel.
  *
- * Mount when ?tune=sitepal is in the URL. Mutates DEMON_SITEPAL_CROP
- * in place — the per-frame compositor in CyborgTempleScene reads each
- * field every tick, so edits take effect on the next frame without a
- * reload. Values persist to localStorage; "Log" prints a formatted
- * block to paste back into the source.
+ * Mount when ?tune=sitepal is in the URL. Mutates each character's
+ * CROP/FILTER objects in place — the per-frame compositor in
+ * CyborgTempleScene reads each field every tick, so edits take effect
+ * on the next frame without a reload. Values persist per-character to
+ * localStorage; "Log" prints a formatted block to paste back into the
+ * source.
+ *
+ * The active character is selected via the top-row buttons. To see
+ * your edits live, click that character in the 3D scene first so the
+ * SitePal swap activates and the per-frame compositor starts painting
+ * onto their Face2 mesh.
  */
 
-const STORAGE_KEY = "rl80_sitepal_crop_overrides_v1";
+const STORAGE_KEY = "rl80_sitepal_crop_overrides_v2";
 
-const FIELDS = [
+const CROP_FIELDS = [
   { key: "cropX", min: 0, max: 600, step: 1 },
   { key: "cropY", min: 0, max: 800, step: 1 },
   { key: "cropW", min: 1, max: 600, step: 1 },
@@ -31,9 +42,35 @@ const FILTER_FIELDS = [
   { key: "sepia", min: 0, max: 100, step: 1 },
 ];
 
+// Per-character tuning targets. Add a new entry here to wire up
+// another character — the panel auto-renders a tab for each.
+const CHARACTERS = [
+  {
+    id: "Demon",
+    label: "Demon",
+    crop: DEMON_SITEPAL_CROP,
+    filter: DEMON_SITEPAL_FILTER,
+    cropConstName: "DEMON_SITEPAL_CROP",
+    filterConstName: "DEMON_SITEPAL_FILTER",
+    cropDefaults: { cropX: 190, cropY: 117, cropW: 125, cropH: 180, rotateZ: 0, rotateX: 0 },
+    filterDefaults: { saturate: 145, contrast: 108, brightness: 105, hueRotate: 0, sepia: 10 },
+  },
+  {
+    id: "Detective",
+    label: "Detective",
+    crop: DETECTIVE_SITEPAL_CROP,
+    filter: DETECTIVE_SITEPAL_FILTER,
+    cropConstName: "DETECTIVE_SITEPAL_CROP",
+    filterConstName: "DETECTIVE_SITEPAL_FILTER",
+    cropDefaults: { cropX: 190, cropY: 117, cropW: 125, cropH: 180, rotateZ: 0, rotateX: 0 },
+    filterDefaults: { saturate: 145, contrast: 108, brightness: 105, hueRotate: 0, sepia: 10 },
+  },
+];
+
 export default function SitePalCropPanel() {
   const [enabled, setEnabled] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [activeId, setActiveId] = useState(CHARACTERS[0].id);
   const [, forceRender] = useState(0);
   const hasHydratedRef = useRef(false);
 
@@ -45,17 +82,40 @@ export default function SitePalCropPanel() {
     if (!hasHydratedRef.current) {
       hasHydratedRef.current = true;
       try {
+        let stored = null;
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
-          const stored = JSON.parse(raw);
-          FIELDS.forEach(({ key }) => {
-            if (typeof stored[key] === "number") DEMON_SITEPAL_CROP[key] = stored[key];
-          });
-          if (stored.filter) {
-            FILTER_FIELDS.forEach(({ key }) => {
-              if (typeof stored.filter[key] === "number") DEMON_SITEPAL_FILTER[key] = stored.filter[key];
+          stored = JSON.parse(raw);
+        } else {
+          // Migration: the v1 schema was a flat object for the Demon
+          // only ({ cropX, cropY, ..., filter: {...} }). Lift it into
+          // the per-character v2 shape so previously-tuned values
+          // aren't lost when this panel adds the character tabs.
+          const rawV1 = localStorage.getItem("rl80_sitepal_crop_overrides_v1");
+          if (rawV1) {
+            const v1 = JSON.parse(rawV1);
+            const cropFromV1 = {};
+            CROP_FIELDS.forEach(({ key }) => {
+              if (typeof v1[key] === "number") cropFromV1[key] = v1[key];
             });
+            stored = { Demon: { crop: cropFromV1, filter: v1.filter || {} } };
           }
+        }
+        if (stored) {
+          CHARACTERS.forEach((c) => {
+            const slice = stored[c.id];
+            if (!slice) return;
+            if (slice.crop) {
+              CROP_FIELDS.forEach(({ key }) => {
+                if (typeof slice.crop[key] === "number") c.crop[key] = slice.crop[key];
+              });
+            }
+            if (slice.filter) {
+              FILTER_FIELDS.forEach(({ key }) => {
+                if (typeof slice.filter[key] === "number") c.filter[key] = slice.filter[key];
+              });
+            }
+          });
           forceRender((n) => n + 1);
         }
       } catch {}
@@ -64,42 +124,47 @@ export default function SitePalCropPanel() {
 
   if (!enabled) return null;
 
+  const active = CHARACTERS.find((c) => c.id === activeId) || CHARACTERS[0];
+
   const persist = () => {
     try {
-      const out = { filter: {} };
-      FIELDS.forEach(({ key }) => { out[key] = DEMON_SITEPAL_CROP[key]; });
-      FILTER_FIELDS.forEach(({ key }) => { out.filter[key] = DEMON_SITEPAL_FILTER[key]; });
+      const out = {};
+      CHARACTERS.forEach((c) => {
+        const cropOut = {};
+        const filterOut = {};
+        CROP_FIELDS.forEach(({ key }) => { cropOut[key] = c.crop[key]; });
+        FILTER_FIELDS.forEach(({ key }) => { filterOut[key] = c.filter[key]; });
+        out[c.id] = { crop: cropOut, filter: filterOut };
+      });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
     } catch {}
   };
 
-  const setField = (key, val) => {
-    DEMON_SITEPAL_CROP[key] = val;
+  const setCropField = (key, val) => {
+    active.crop[key] = val;
     persist();
     forceRender((n) => n + 1);
   };
   const setFilterField = (key, val) => {
-    DEMON_SITEPAL_FILTER[key] = val;
+    active.filter[key] = val;
     persist();
     forceRender((n) => n + 1);
   };
 
   const reset = () => {
-    const cropDefaults = { cropX: 190, cropY: 117, cropW: 125, cropH: 180, rotateZ: 0, rotateX: 0 };
-    const filterDefaults = { saturate: 145, contrast: 108, brightness: 105, hueRotate: 0, sepia: 10 };
-    Object.assign(DEMON_SITEPAL_CROP, cropDefaults);
-    Object.assign(DEMON_SITEPAL_FILTER, filterDefaults);
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    Object.assign(active.crop, active.cropDefaults);
+    Object.assign(active.filter, active.filterDefaults);
+    persist();
     forceRender((n) => n + 1);
   };
 
   const logBlock = () => {
     const lines = [
-      "export const DEMON_SITEPAL_CROP = {",
-      ...FIELDS.map(({ key }) => `  ${key}: ${DEMON_SITEPAL_CROP[key]},`),
+      `export const ${active.cropConstName} = {`,
+      ...CROP_FIELDS.map(({ key }) => `  ${key}: ${active.crop[key]},`),
       "};",
-      "export const DEMON_SITEPAL_FILTER = {",
-      ...FILTER_FIELDS.map(({ key }) => `  ${key}: ${DEMON_SITEPAL_FILTER[key]},`),
+      `export const ${active.filterConstName} = {`,
+      ...FILTER_FIELDS.map(({ key }) => `  ${key}: ${active.filter[key]},`),
       "};",
     ];
     // eslint-disable-next-line no-console
@@ -119,7 +184,7 @@ export default function SitePalCropPanel() {
         padding: collapsed ? "4px 8px" : "8px 10px",
         border: "1px solid rgba(0,255,255,0.25)",
         borderRadius: 6,
-        minWidth: collapsed ? 0 : 240,
+        minWidth: collapsed ? 0 : 260,
         boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
         userSelect: "none",
       }}
@@ -135,7 +200,33 @@ export default function SitePalCropPanel() {
       </div>
       {!collapsed && (
         <>
-          {FIELDS.map(({ key, min, max, step }) => (
+          {/* Character tabs */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+            {CHARACTERS.map((c) => {
+              const isActive = c.id === activeId;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveId(c.id)}
+                  style={{
+                    flex: 1,
+                    background: isActive ? "rgba(0,255,255,0.25)" : "rgba(255,255,255,0.05)",
+                    color: isActive ? "#fff" : "#a5f3fc",
+                    border: `1px solid ${isActive ? "rgba(0,255,255,0.6)" : "rgba(255,255,255,0.1)"}`,
+                    borderRadius: 3,
+                    padding: "3px 0",
+                    font: "11px/1.3 ui-monospace, monospace",
+                    cursor: "pointer",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {CROP_FIELDS.map(({ key, min, max, step }) => (
             <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <span style={{ width: 70, color: "#a5f3fc" }}>{key}</span>
               <input
@@ -143,8 +234,8 @@ export default function SitePalCropPanel() {
                 min={min}
                 max={max}
                 step={step}
-                value={DEMON_SITEPAL_CROP[key]}
-                onChange={(e) => setField(key, Number(e.target.value))}
+                value={active.crop[key]}
+                onChange={(e) => setCropField(key, Number(e.target.value))}
                 style={{ flex: 1 }}
               />
               <input
@@ -152,8 +243,8 @@ export default function SitePalCropPanel() {
                 min={min}
                 max={max}
                 step={step}
-                value={DEMON_SITEPAL_CROP[key]}
-                onChange={(e) => setField(key, Number(e.target.value))}
+                value={active.crop[key]}
+                onChange={(e) => setCropField(key, Number(e.target.value))}
                 style={numInputStyle}
               />
             </div>
@@ -169,7 +260,7 @@ export default function SitePalCropPanel() {
                 min={min}
                 max={max}
                 step={step}
-                value={DEMON_SITEPAL_FILTER[key]}
+                value={active.filter[key]}
                 onChange={(e) => setFilterField(key, Number(e.target.value))}
                 style={{ flex: 1 }}
               />
@@ -178,7 +269,7 @@ export default function SitePalCropPanel() {
                 min={min}
                 max={max}
                 step={step}
-                value={DEMON_SITEPAL_FILTER[key]}
+                value={active.filter[key]}
                 onChange={(e) => setFilterField(key, Number(e.target.value))}
                 style={numInputStyle}
               />

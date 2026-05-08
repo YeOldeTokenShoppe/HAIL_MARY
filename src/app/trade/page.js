@@ -12,7 +12,10 @@ import Aurora from '@/components/Aurora';
 import StarField from '@/components/StarField';
 import Link from 'next/link';
 import PostProcessingEffects from '@/components/PostProcessingEffects';
-import CyborgTempleScene, { DEMON_SITEPAL_CONTAINER_ID } from '@/components/CyborgTempleScene';
+import CyborgTempleScene, {
+  DEMON_SITEPAL_CONTAINER_ID,
+  SITEPAL_SCENE_IDS,
+} from '@/components/CyborgTempleScene';
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
@@ -39,75 +42,216 @@ import { useRouter } from 'next/navigation';
 // once we want it persistent we can lift this into a parent always-on
 // mount and switch the audio with setPlayerVolume(0/7) instead. See the
 // equivalent in /main/page.js (SitePalEmbed) for the pattern.
-const DEMON_SITEPAL_ACCOUNT = "9308752";
-// context=1 (10th positional) is REQUIRED for Next.js per SitePal docs
-// — it switches the embed to the JS-framework bootstrap path and is
-// what makes setPlayerVolume / page-activation behave correctly. The
-// working /main embed uses context=1; using 0 here was breaking audio.
-const DEMON_SITEPAL_EMBED_PARAMS =
-  '9308752,600,800,"",1,1,2774900,0,1,1,"YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n",0,1';
+// Single-portal SitePal architecture. One embed hosts the avatar for
+// ALL characters; CyborgTempleScene calls window.loadSceneByID(...)
+// on focus to swap which character's scene is loaded into the portal.
+// This is SitePal's recommended pattern for multi-character apps and
+// avoids the multi-portal fragility (vhsshtml5_* internal state
+// arrays don't fully register when AC_VHost_Embed is called twice).
+//
+// context=1 (10th positional) is REQUIRED for Next.js per SitePal docs;
+// it switches the embed into the JS-framework bootstrap path so
+// setPlayerVolume / saySilent / replay behave correctly.
+const HOST_SITEPAL_CONFIG = {
+  containerId: DEMON_SITEPAL_CONTAINER_ID, // shared host container
+  account: "9308752",
+  // Initial scene is Demon (2774900). Other characters loaded via
+  // loadSceneByID(SITEPAL_SCENE_IDS.Detective), etc.
+  embedParams: '9308752,600,800,"",1,1,2774900,0,1,1,"YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n",0,1',
+};
 
-function DemonSitePalEmbed() {
+// Load the SitePal embed functions script ONCE per page (cached
+// promise on window). Loading it twice for the same account
+// re-initializes SitePal's global state (vhssHTML_scenes, etc.) and
+// the second load was clobbering the first portal — making both
+// characters share whichever portal/scene initialized last.
+function loadSitePalScriptOnce(account) {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (!window.__sitePalScriptPromise) {
+    window.__sitePalScriptPromise = new Promise((resolve) => {
+      // preserveDrawingBuffer patch needs to be in place before SitePal
+      // creates its WebGL canvas; restore after bootstrap. Stored on
+      // window so the second character's mount doesn't re-patch.
+      if (!window.__sitePalGetContextPatched) {
+        window.__sitePalGetContextPatched = true;
+        const orig = HTMLCanvasElement.prototype.getContext;
+        window.__sitePalOrigGetContext = orig;
+        HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+          if (type === "webgl" || type === "webgl2" || type === "experimental-webgl") {
+            attrs = { ...attrs, preserveDrawingBuffer: true };
+          }
+          return orig.call(this, type, attrs);
+        };
+        setTimeout(() => {
+          if (window.__sitePalOrigGetContext) {
+            HTMLCanvasElement.prototype.getContext = window.__sitePalOrigGetContext;
+          }
+        }, 8000);
+      }
+      const script = document.createElement("script");
+      script.src = `//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=${account}&js=0`;
+      script.type = "text/javascript";
+      script.onload = () => resolve();
+      script.onerror = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
+  return window.__sitePalScriptPromise;
+}
+
+function SitePalHostEmbed({ config }) {
   const containerRef = useRef(null);
 
   useEffect(() => {
-    // Force preserveDrawingBuffer on every WebGL context created while
-    // SitePal is bootstrapping — without it, drawImage(canvas, ...) on
-    // the SitePal canvas paints black. Restored after bootstrap.
-    const origGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (type, attrs) {
-      if (type === "webgl" || type === "webgl2" || type === "experimental-webgl") {
-        attrs = { ...attrs, preserveDrawingBuffer: true };
-      }
-      return origGetContext.call(this, type, attrs);
-    };
+    const { containerId, account, embedParams } = config;
+    let cancelled = false;
 
-    const script1 = document.createElement("script");
-    script1.src = `//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=${DEMON_SITEPAL_ACCOUNT}&js=0`;
-    script1.type = "text/javascript";
-
-    let restoreTimer;
-    script1.onload = () => {
+    loadSitePalScriptOnce(account).then(() => {
+      if (cancelled || !containerRef.current) return;
       const script2 = document.createElement("script");
       script2.type = "text/javascript";
-      script2.textContent = `AC_VHost_Embed(${DEMON_SITEPAL_EMBED_PARAMS});`;
-      containerRef.current?.appendChild(script2);
-      restoreTimer = setTimeout(() => {
-        HTMLCanvasElement.prototype.getContext = origGetContext;
-      }, 5000);
-    };
+      script2.textContent =
+        `try { AC_VHost_Embed(${embedParams}); } ` +
+        `catch (e) { AC_Vhost_Embed(${embedParams}); }`;
+      containerRef.current.appendChild(script2);
+    });
 
-    document.head.appendChild(script1);
+    // Reset the shared scene-ready flag so the per-frame compositor
+    // in CyborgTempleScene won't paint stale content while the host
+    // portal is still bootstrapping.
+    window.__sitePalSceneLoaded = false;
+    // The initial scene that boots in the embedParams (Demon, 2774900).
+    // CyborgTempleScene updates this on loadSceneByID swaps.
+    if (window.__sitePalCurrentSceneId === undefined) {
+      window.__sitePalCurrentSceneId = 2774900;
+    }
+    // Desired volume after the next vh_sceneLoaded. The click handler
+    // sets this BEFORE calling loadSceneByID so the new scene applies
+    // it on load — calling setPlayerVolume directly across a scene
+    // swap crashes SitePal with "setHostVolume on null" because the
+    // old host is being torn down while the new one isn't ready yet.
+    if (window.__sitePalDesiredVolume === undefined) {
+      window.__sitePalDesiredVolume = 0;
+    }
 
-    // Mute SitePal on scene load so the avatar doesn't talk until
-    // CyborgTempleScene unmutes it on Demon focus. Also raise a
-    // global flag so the source-canvas poll in CyborgTempleScene
-    // can accept the SitePal canvas immediately rather than waiting
-    // out a 15s timeout fallback for scenes that only render one
-    // <canvas> element.
-    window.__demonSitePalSceneLoaded = false;
-    window.vh_sceneLoaded = () => {
-      window.__demonSitePalSceneLoaded = true;
-      if (typeof window.setPlayerVolume === "function") {
-        window.setPlayerVolume(0);
+    // Shared SitePal lifecycle callbacks. vh_sceneLoaded fires both
+    // on initial scene load and on every loadSceneByID() swap. Use
+    // getSceneAttributes() to read the ACTUAL loaded scene ID rather
+    // than trusting our own optimistic flag — loadSceneByID() can
+    // fall back to the previously-loaded scene if the requested one
+    // fails, in which case our preemptive flag would lie about which
+    // character's avatar the source canvas is showing.
+    // Pre-warm queue: list of scene IDs to load after the initial
+    // scene boots. The SitePal server caches the scene assets after
+    // first fetch, so a brief load → load-back cycle at startup
+    // means the user's first click on a non-default character is
+    // near-instant instead of taking ~3-5s. Last entry should be
+    // the default character so we end up there for the actual UI.
+    const PRELOAD_QUEUE = [
+      SITEPAL_SCENE_IDS.Detective,
+      SITEPAL_SCENE_IDS.Demon, // revert to default after preload
+    ];
+
+    const advancePreload = () => {
+      if (!Array.isArray(window.__sitePalPreloadQueue) ||
+          window.__sitePalPreloadQueue.length === 0) {
+        window.__sitePalPreloading = false;
+        window.__sitePalPreloadQueue = null;
+        console.log('[SitePal] preload complete');
+        return;
+      }
+      const next = window.__sitePalPreloadQueue.shift();
+      window.__sitePalSceneLoaded = false;
+      try {
+        if (typeof window.loadSceneByID === "function") {
+          console.log('[SitePal] preloading sceneID=', next);
+          window.loadSceneByID(next);
+        }
+      } catch (e) {
+        window.__sitePalPreloading = false;
       }
     };
 
-    // Keep vh_audioError so real failures (license / not found) show
-    // up. The vh_audioStarted/Ended callbacks were tripping SitePal's
-    // internal post-callback code with a "Cannot read 'audioId' of
-    // undefined" error and being defined at all seemed to suppress
-    // playback, so we leave them undefined.
+    window.vh_sceneLoaded = () => {
+      let currentAudioName = null;
+      try {
+        if (typeof window.getSceneAttributes === "function") {
+          const attrs = window.getSceneAttributes();
+          if (attrs && attrs.sceneID) {
+            window.__sitePalCurrentSceneId = Number(attrs.sceneID);
+          }
+          if (attrs && attrs.audioName) {
+            currentAudioName = attrs.audioName;
+            window.__sitePalCurrentAudioName = attrs.audioName;
+          }
+          console.log('[SitePal vh_sceneLoaded] sceneID=',
+            attrs && attrs.sceneID, 'audio=', attrs && attrs.audioName);
+        }
+      } catch (e) {}
+      window.__sitePalSceneLoaded = true;
+      window.__sitePalSceneVersion = (window.__sitePalSceneVersion || 0) + 1;
+      if (typeof window.setStatus === "function") {
+        try { window.setStatus(1, 0, 0, 1, 0); } catch (e) {}
+      }
+
+      // Preload mode: don't trigger audio; advance to the next
+      // scene in the queue. When the queue empties, drop into
+      // normal user-driven mode for subsequent vh_sceneLoaded calls.
+      if (window.__sitePalPreloading) {
+        // Force-mute during preload so any audio that auto-starts
+        // for the swapped scene doesn't leak through.
+        if (typeof window.setPlayerVolume === "function") {
+          try { window.setPlayerVolume(0); } catch (e) {}
+        }
+        if (typeof window.stopSpeech === "function") {
+          try { window.stopSpeech(); } catch (e) {}
+        }
+        // Brief delay before advancing so SitePal can settle.
+        setTimeout(advancePreload, 150);
+        return;
+      }
+
+      // First scene load → kick off preload of remaining characters,
+      // then revert to the default. Skips on subsequent loads (the
+      // __sitePalInitialLoaded sentinel ensures preload runs once).
+      if (!window.__sitePalInitialLoaded && PRELOAD_QUEUE.length > 0) {
+        window.__sitePalInitialLoaded = true;
+        window.__sitePalPreloading = true;
+        window.__sitePalPreloadQueue = PRELOAD_QUEUE.slice();
+        console.log('[SitePal] starting preload', window.__sitePalPreloadQueue);
+        // Mute, then kick off after a beat so the initial paint can
+        // happen first.
+        if (typeof window.setPlayerVolume === "function") {
+          try { window.setPlayerVolume(0); } catch (e) {}
+        }
+        setTimeout(advancePreload, 250);
+        return;
+      }
+
+      // Normal mode: apply desired volume and play the scene's audio
+      // if a character is currently focused.
+      if (typeof window.setPlayerVolume === "function") {
+        try { window.setPlayerVolume(window.__sitePalDesiredVolume || 0); } catch (e) {}
+      }
+      if ((window.__sitePalDesiredVolume || 0) > 0) {
+        try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
+        try {
+          if (currentAudioName && typeof window.sayAudio === "function") {
+            console.log('[SitePal] sayAudio(', currentAudioName, ')');
+            window.sayAudio(currentAudioName);
+          } else if (typeof window.replay === "function") {
+            window.replay();
+          }
+        } catch (e) {}
+      }
+    };
     window.vh_audioError = (audID, portal, errCode, errMsg) => {
-      console.warn('[Demon SitePal] vh_audioError', { audID, errCode, errMsg });
+      console.warn("[SitePal] vh_audioError", { audID, errCode, errMsg });
     };
 
-    // Patch AudioContext to track every instance the embed creates so
-    // we can resume() them on the first user gesture. Browsers create
-    // suspended AudioContexts when audio elements are constructed
-    // pre-gesture, and SitePal's audio output goes silent if we don't
-    // resume them — even when setPlayerVolume(7) and sayAudio look
-    // healthy. Mirrors the working pattern in /main/page.js.
+    // Patch AudioContext + install resume listener (idempotent — only
+    // patches the first time, and the listener guards against
+    // double-priming via its `primed` closure).
     const OrigCtx = window.AudioContext || window.webkitAudioContext;
     if (OrigCtx && !OrigCtx._patched) {
       OrigCtx._instances = [];
@@ -123,13 +267,6 @@ function DemonSitePalEmbed() {
       window.AudioContext = PatchedCtx;
     }
 
-    // Resume any suspended AudioContexts on first user interaction so
-    // the avatar can speak after the focus click. saySilent(0) is the
-    // SitePal-recommended page activation primer for JS frameworks.
-    // CAPTURE phase + document level: the 3D canvas calls
-    // event.stopPropagation() on click, which would silently swallow
-    // a window-bubble-phase listener — capture fires before the
-    // canvas handler runs, so we get our priming pass guaranteed.
     let primed = false;
     const resumeAudio = () => {
       if (primed) return;
@@ -143,36 +280,36 @@ function DemonSitePalEmbed() {
         if (window._vhssAudioCtx) {
           try { window._vhssAudioCtx.resume(); } catch (e) {}
         }
-      } catch (e) { /* swallow */ }
+      } catch (e) {}
     };
     document.addEventListener("pointerdown", resumeAudio, true);
     document.addEventListener("touchstart", resumeAudio, true);
     document.addEventListener("keydown", resumeAudio, true);
 
     return () => {
-      if (script1.parentNode) script1.parentNode.removeChild(script1);
-      if (restoreTimer) clearTimeout(restoreTimer);
-      HTMLCanvasElement.prototype.getContext = origGetContext;
+      cancelled = true;
       document.removeEventListener("pointerdown", resumeAudio, true);
       document.removeEventListener("touchstart", resumeAudio, true);
       document.removeEventListener("keydown", resumeAudio, true);
-      delete window.vh_sceneLoaded;
-      delete window.vh_audioError;
-      delete window.__demonSitePalSceneLoaded;
+      // Don't delete vh_sceneLoaded / vh_audioError or the SitePal
+      // state globals on cleanup — Strict Mode in dev runs effects
+      // mount→cleanup→mount, and if SitePal fires vh_sceneLoaded
+      // during the brief unmounted window the flag never flips and
+      // audio is silently broken. Globals stay for page lifetime.
       if (containerRef.current) containerRef.current.innerHTML = "";
     };
-  }, []);
+  }, [config]);
 
   return (
     <div
-      id={DEMON_SITEPAL_CONTAINER_ID}
+      id={config.containerId}
       ref={containerRef}
       style={{
-        // Keep the container ONSCREEN (position 0,0 not -9999) — browsers
+        // Keep the container ONSCREEN (left:0 not -9999) — browsers
         // throttle WebGL render rate to ~1fps for offscreen canvases,
-        // which is what was causing the SitePal video to lag behind its
-        // audio. Opacity:0.01 + pointerEvents:none keeps it invisible
-        // and non-interactive while still receiving full GPU time.
+        // which makes SitePal video lag behind its audio. opacity 0.01
+        // + pointerEvents:none keeps it invisible and non-interactive
+        // while still receiving full GPU time.
         position: "fixed",
         left: 0,
         top: 0,
@@ -562,7 +699,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v23_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v27_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -800,16 +937,12 @@ export default function CyborgTemple() {
       {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal */}
       <SitePalCropPanel />
 
-      {/* SitePal embed — mount as soon as the page hydrates so its
-          ~15s bootstrap (script + scene + audio buffers) runs in
-          parallel with the 3D model load instead of starting after
-          sceneReady. The embed is hidden offscreen and uses its own
-          tiny WebGL canvas, so concurrent loading with the main 3D
-          scene is fine. Mounted once and left in place — re-injecting
-          the SitePal script breaks its internal vhssHTML_scenes
-          globals. CyborgTempleScene toggles Face1/Face2 visibility +
-          audio volume on Demon focus. */}
-      {mounted && <DemonSitePalEmbed />}
+      {/* Single host SitePal embed. CyborgTempleScene swaps the
+          loaded scene per character via window.loadSceneByID() on
+          focus. One WebGL/AudioContext shared across all characters.
+          Container kept onscreen-but-invisible (left:0, opacity:0.01)
+          to avoid the WebGL throttling that hits offscreen canvases. */}
+      {mounted && <SitePalHostEmbed config={HOST_SITEPAL_CONFIG} />}
           
       <div 
         style={{ 
@@ -1350,6 +1483,7 @@ export default function CyborgTemple() {
               gameStarted={gameStarted}
               showCharacterHints={showCharacterHint && !focusedAgent}
               useSitePalForDemon={focusedAgent === 'Demon'}
+              useSitePalForDetective={focusedAgent === 'Detective'}
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 console.log(`CoinFace ${coinIndex} tapped`)
