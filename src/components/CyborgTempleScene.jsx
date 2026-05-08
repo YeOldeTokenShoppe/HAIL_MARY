@@ -137,11 +137,11 @@ export const DEMON_SITEPAL_CROP = {
 //   hueRotate: degrees (+ warmer when positive at low values, depends)
 //   sepia: 0-100, mixes in a warm tan tone for skin matching
 export const DEMON_SITEPAL_FILTER = {
-  saturate: 145,
-  contrast: 108,
-  brightness: 105,
-  hueRotate: 0,
-  sepia: 10,
+  saturate: 203,
+  contrast: 102,
+  brightness: 87,
+  hueRotate: -4,
+  sepia: 8,
 };
 
 // DOM container id polled by the per-frame compositor. The trade page
