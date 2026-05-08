@@ -115,6 +115,46 @@ export const HOLO_STATUE_MOBILE = {
 // altar spotlight when viewed top-down. Y is left to the hover animation.
 export const ANGEL_POSITION_OFFSET = { x: -0.10, z: 0.01 };
 
+// SitePal face overlay onto the Demon's Face mesh. Crop region in the
+// source SitePal canvas (matches the pattern used by MainScene/Fortune
+// Teller). Tweak in place — the per-frame compositor reads these values
+// each frame, so live edits take effect on the next paint.
+export const DEMON_SITEPAL_CROP = {
+  cropX: 190,
+  cropY: 117,
+  cropW: 125,
+  cropH: 180,
+  rotateZ: 0,
+  rotateX: 0,
+};
+
+// Color correction applied to the SitePal frame before it lands on
+// Face2. SitePal's render comes back washed-out / grey-toned even
+// when the avatar art is colorful; these knobs map to CSS filter
+// syntax (ctx.filter) and are composed into a single filter string
+// per frame. Tweak in place — edits go live on the next paint.
+//   saturate / contrast / brightness: 100 = identity (percent)
+//   hueRotate: degrees (+ warmer when positive at low values, depends)
+//   sepia: 0-100, mixes in a warm tan tone for skin matching
+export const DEMON_SITEPAL_FILTER = {
+  saturate: 145,
+  contrast: 108,
+  brightness: 105,
+  hueRotate: 0,
+  sepia: 10,
+};
+
+// DOM container id polled by the per-frame compositor. The trade page
+// mounts the SitePal embed into this container on Demon focus.
+export const DEMON_SITEPAL_CONTAINER_ID = "sitepal-container-demon";
+
+// On focus, the Demon plays a specific audio track from the SitePal
+// account by name (sayAudio in the SitePal API). The track has to
+// exist in the SitePal account that owns the embed; the lipsync /
+// timing is bound to it server-side. Set to '' to disable speech
+// playback without ripping out the wiring.
+export const DEMON_SITEPAL_AUDIO_NAME = '11devil1';
+
 // Returns the active cameraPos/lookAtPos/orbitCenter for the given agent.
 // On mobile, MOBILE_CAMERA_OFFSET.y is added to the Y component of every
 // vector to compensate for the workstation model's mobile-only vertical
@@ -260,6 +300,7 @@ const CyborgTempleScene = ({
   jackpotOnlyFistPump = false, // When true, FistPump only fires from slotMachineJackpot — removed from Demon's random alternation and the price-poll trigger
   gameStarted = false, // When true, the monk_hail/monk_beckon attention-getter loop is allowed to run. Held off until the user clicks START in GameOverlay.
   showCharacterHints = false, // When true, render small "?" badges over each agent's head as a tap affordance
+  useSitePalForDemon = false, // When true, overlay the SitePal avatar canvas onto the Demon's Face mesh. Parent should mount the SitePal embed into DEMON_SITEPAL_CONTAINER_ID.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -373,6 +414,27 @@ const CyborgTempleScene = ({
   const detectiveHintRef = useRef();
   const fluffyFocusedRef = useRef(false); // true when camera is zoomed in on Fluffy
   const detectiveFocusedRef = useRef(false); // true when camera is zoomed in on Detective
+
+  // SitePal-on-Demon overlay refs. Face1 is the regular face; Face2 is
+  // the SitePal target (separate mesh with its own UVs tuned for the
+  // avatar crop). Both meshes are captured at GLB load. The SitePal
+  // material is built lazily and assigned to Face2; visibility is
+  // toggled per-frame based on `useSitePalForDemon` so SitePal can stay
+  // mounted (its global state breaks under script re-injection).
+  const demonFace1MeshRef = useRef(null);
+  const demonFace2MeshRef = useRef(null);
+  // Brow / eyebrow meshes that aren't actually joined into Face1 yet
+  // (or are intentionally a separate object). Hidden whenever Face2
+  // is showing the SitePal avatar so they don't draw over its face.
+  const demonBrowMeshesRef = useRef([]);
+  const demonSitePalRef = useRef({
+    cropCanvas: null,
+    cropCtx: null,
+    texture: null,
+    material: null,
+    sourceEl: null,
+    materialApplied: false,
+  });
 
   // Demon eye mesh ref and blink state
   const demonEyesRef = useRef();
@@ -676,8 +738,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v15_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v15.glb";
+    let modelPath = "/models/RL80_4anims_v23_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v23.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -782,6 +844,34 @@ const CyborgTempleScene = ({
               if (/head/i.test(obj.name)) headCandidates.push(obj);
               return;
             }
+            // Capture Face1 + Face2 for the SitePal overlay. Face1 is
+            // the regular face (visible by default). Face2 receives the
+            // SitePal canvas texture and is hidden until activation.
+            // Loose matcher tolerates Blender-suffixed names like
+            // 'Face1.001' / 'Face2_1' that some glTF exports produce
+            // when a mesh shares its data block with another node.
+            // Face1 capture: match any Object3D (Mesh OR Group). When
+            // Face1 has multiple materials, GLTFLoader exports it as
+            // a Group named "Face1" with one child Mesh per material,
+            // so a `obj.isMesh` check would miss it entirely. Setting
+            // the Group's `visible = false` hides all descendants —
+            // the renderer skips any object whose ancestor is hidden.
+            if ((obj.isMesh || obj.isGroup) &&
+                /^face1([._]\w+)?$/i.test(obj.name || '') &&
+                !demonFace1MeshRef.current) {
+              demonFace1MeshRef.current = obj;
+            }
+            if (obj.isMesh && /^face2([._]\w+)?$/i.test(obj.name || '') && !demonFace2MeshRef.current) {
+              demonFace2MeshRef.current = obj;
+              obj.visible = false; // hidden until SitePal activates
+            }
+            // Catch any brow / eyebrow mesh that wasn't actually joined
+            // into Face1 (the GLB sometimes exports them as a separate
+            // mesh even after a Blender Join, especially when they
+            // shared a different armature parent).
+            if (obj.isMesh && /brow/i.test(obj.name || '')) {
+              demonBrowMeshesRef.current.push(obj);
+            }
             // Eyes + pupils get cloned materials and pushed to the blink
             // set. Cloning so opacity tweaks don't propagate to any other
             // mesh that happens to share the original material instance.
@@ -815,6 +905,23 @@ const CyborgTempleScene = ({
             headCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
             headCandidates[0] ||
             null;
+
+          // One-shot inventory: dumps every named Mesh / Group under
+          // Demon_Empty so we can see exactly what's there (helpful
+          // when GLTFLoader splits a multi-material mesh into a
+          // Group + child Meshes after a Blender Join). Format:
+          // "name (kind) [matCount]" — kind is M for Mesh, G for Group.
+          const meshInventory = [];
+          child.traverse((o) => {
+            if (o === child) return;
+            if (o.isMesh) {
+              const matCount = Array.isArray(o.material) ? o.material.length : 1;
+              meshInventory.push(`${o.name || '<unnamed>'} (M) [${matCount}]`);
+            } else if (o.isGroup && o.name) {
+              meshInventory.push(`${o.name} (G)`);
+            }
+          });
+          console.log('[Demon meshes]', meshInventory.join(', '));
         }
         else if (child.name === 'Monk_empty') {
           animatedCharacters['Monk'] = child;
@@ -1033,6 +1140,15 @@ const CyborgTempleScene = ({
                 : animatedCharacters[charName];
               // Clean animation tracks to remove references to non-existent bones
               let cleanedAnimation = cleanAnimationTracks(animation, cleanRoot);
+
+              // Strip any tracks targeting Face1/Face2 on the Demon so
+              // GLB animations can't override our visibility/material
+              // toggle for the SitePal overlay swap.
+              if (charName === 'Demon') {
+                cleanedAnimation.tracks = cleanedAnimation.tracks.filter(
+                  (t) => !t.name.startsWith('Face1.') && !t.name.startsWith('Face2.')
+                );
+              }
 
               // Unicorn_waving: keep only arm-bone quaternion tracks (drop
               // any position/scale and any non-arm rotation tracks left over
@@ -2510,6 +2626,21 @@ const CyborgTempleScene = ({
           // so no head-look or spine override is needed.
           if (object.userData.agentId === 'Demon') {
             demonFocusedRef.current = true;
+            // SitePal speech control, synchronous within the click
+            // gesture. The published scene auto-plays its bound audio
+            // (`11devil1`) when the embed loads — we mute on load via
+            // vh_sceneLoaded and unmute here. Mirror /main pattern:
+            // saySilent(0) primes the page (SitePal's official JS
+            // framework activation), setPlayerVolume(7) unmutes, and
+            // replay() restarts the scene from the top so the user
+            // hears the full intro on each focus.
+            try {
+              if (typeof window !== 'undefined') {
+                if (typeof window.saySilent === 'function') window.saySilent(0);
+                if (typeof window.setPlayerVolume === 'function') window.setPlayerVolume(7);
+                if (typeof window.replay === 'function') window.replay();
+              }
+            } catch (e) { /* swallow */ }
             const demonActions = actionsRef.current['Demon'];
             const demonMixer = mixersRef.current['Demon'];
             if (demonActions && demonMixer) {
@@ -2873,12 +3004,227 @@ const CyborgTempleScene = ({
 
   
 
+  // SitePal-on-Demon setup. The embed is mounted once by the trade
+  // page (re-injecting its script breaks vhssHTML_scenes globals), so
+  // this effect only needs to find the SitePal canvas and build the
+  // texture/material once. Visibility + audio are toggled per-frame
+  // and in a separate effect respectively.
+  useEffect(() => {
+    if (!loadedModel) return;
+    const state = demonSitePalRef.current;
+    let cancelled = false;
+    let pollTimer = null;
+
+    const ensureMaterial = () => {
+      if (!state.cropCanvas) {
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = 512;
+        cropCanvas.height = 512;
+        state.cropCanvas = cropCanvas;
+        state.cropCtx = cropCanvas.getContext('2d');
+      }
+      if (!state.texture) {
+        const tex = new THREE.CanvasTexture(state.cropCanvas);
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false;
+        tex.wrapS = THREE.ClampToEdgeWrapping;
+        tex.wrapT = THREE.ClampToEdgeWrapping;
+        state.texture = tex;
+      }
+      if (!state.material) {
+        state.material = new THREE.MeshBasicMaterial({
+          map: state.texture,
+          toneMapped: false,
+          side: THREE.DoubleSide,
+        });
+      }
+      if (!state.materialApplied && demonFace2MeshRef.current) {
+        demonFace2MeshRef.current.material = state.material;
+        state.materialApplied = true;
+      }
+    };
+
+    // Poll for the SitePal source element. SitePal usually paints into
+    // the LAST <canvas> in the container once it's done bootstrapping
+    // (initial canvases are bootstrap stubs). Fall back to a <video>
+    // or in-iframe canvas if the embed picked a different render path
+    // for this scene/account. After a long timeout, accept whatever is
+    // there so we don't get stuck waiting forever.
+    const startedAt = Date.now();
+    const pollForSource = () => {
+      if (cancelled) return;
+      const container = document.getElementById(DEMON_SITEPAL_CONTAINER_ID);
+      if (container) {
+        const canvases = container.querySelectorAll('canvas');
+        // Fast path: once SitePal's vh_sceneLoaded callback has fired,
+        // the embed is fully bootstrapped — whatever canvas is present
+        // IS the right one to crop. Saves the multi-second wait when
+        // the scene only renders a single canvas (which was making
+        // Face2 take 20+ seconds to swap in even though audio was
+        // already playing).
+        const sceneLoaded = typeof window !== 'undefined' && window.__demonSitePalSceneLoaded;
+        if (sceneLoaded && canvases.length >= 1) {
+          state.sourceEl = canvases[canvases.length - 1];
+          ensureMaterial();
+          return;
+        }
+        if (canvases.length >= 2) {
+          state.sourceEl = canvases[canvases.length - 1];
+          ensureMaterial();
+          return;
+        }
+        const video = container.querySelector('video');
+        if (video) {
+          state.sourceEl = video;
+          ensureMaterial();
+          return;
+        }
+        const iframe = container.querySelector('iframe');
+        if (iframe) {
+          try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const ifc = doc.querySelectorAll('canvas');
+            if (ifc.length >= 1) {
+              state.sourceEl = ifc[ifc.length - 1];
+              ensureMaterial();
+              return;
+            }
+            const ifv = doc.querySelector('video');
+            if (ifv) {
+              state.sourceEl = ifv;
+              ensureMaterial();
+              return;
+            }
+          } catch (e) {
+            // cross-origin iframe — can't read into it
+          }
+        }
+        // Last-ditch: after 3s, take whatever single canvas exists.
+        // (Was 15s — too conservative. Most SitePal scenes have a
+        // canvas painted within ~1s; the vh_sceneLoaded fast path
+        // above handles the common case.)
+        if (Date.now() - startedAt > 3000 && canvases.length >= 1) {
+          state.sourceEl = canvases[canvases.length - 1];
+          ensureMaterial();
+          return;
+        }
+      }
+      pollTimer = setTimeout(pollForSource, 200);
+    };
+
+    ensureMaterial();
+    pollForSource();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [loadedModel]);
+
+  // Drive SitePal audio with focus state. The SitePal API
+  // (setPlayerVolume / sayAudio / stopSpeech) is exposed on `window`
+  // once vh_sceneLoaded fires, but may not be ready on the first
+  // focus — so we poll briefly. On focus: unmute and sayAudio() the
+  // configured track by name. On un-focus: mute and stopSpeech to
+  // interrupt any in-progress audio.
+  useEffect(() => {
+    let cancelled = false;
+    let stopTimer = null;
+    const target = useSitePalForDemon ? 7 : 0;
+
+    const apply = () => {
+      if (cancelled) return true;
+      if (typeof window === 'undefined') return false;
+      if (typeof window.setPlayerVolume !== 'function') return false;
+      window.setPlayerVolume(target);
+      // sayAudio is fired synchronously inside the click handler
+      // (see Demon block in handlePointerDown) — Chrome's autoplay
+      // policy requires it to happen during the user gesture event,
+      // not from a post-render useEffect. This effect only handles
+      // muting + stopSpeech on un-focus.
+      if (!useSitePalForDemon && typeof window.stopSpeech === 'function') {
+        try { window.stopSpeech(); } catch (e) { /* swallow */ }
+      }
+      return true;
+    };
+
+    if (!apply()) {
+      const poll = setInterval(() => {
+        if (apply()) clearInterval(poll);
+      }, 300);
+      stopTimer = setTimeout(() => clearInterval(poll), 8000);
+    }
+    return () => {
+      cancelled = true;
+      if (stopTimer) clearTimeout(stopTimer);
+    };
+  }, [useSitePalForDemon]);
+
   // Animation loop
   useFrame((state, delta) => {
     // Update flame shader time for all flame meshes
     flameMaterialsRef.current.forEach(mat => {
       mat.uniforms.uTime.value = state.clock.elapsedTime;
     });
+
+    // SitePal-on-Demon per-frame block. Toggles Face1/Face2 visibility
+    // based on `useSitePalForDemon` and (only when active) crops the
+    // SitePal canvas into our 512x512 texture canvas. Tunable crop
+    // region lives at module scope (DEMON_SITEPAL_CROP) so edits take
+    // effect on the next frame. Face2 stays hidden until SitePal has a
+    // source AND the user has focused the Demon, so we never flash a
+    // blank skin-tone face during the initial load. Eyes + pupils get
+    // hidden alongside Face1 — the SitePal avatar paints its own eyes
+    // into the face texture, so leaving the geometry visible doubles
+    // them up (and the blink fade looks wrong on top of SitePal).
+    const sp = demonSitePalRef.current;
+    const sitePalReady = !!(sp.sourceEl && sp.cropCtx);
+    const showFace2 = useSitePalForDemon && sitePalReady;
+    if (demonFace1MeshRef.current) demonFace1MeshRef.current.visible = !showFace2;
+    if (demonFace2MeshRef.current) demonFace2MeshRef.current.visible = showFace2;
+    if (showFace2 && demonBlinkMeshesRef.current.length > 0) {
+      for (const m of demonBlinkMeshesRef.current) {
+        if (m) m.visible = false;
+      }
+    } else if (!showFace2 && demonBlinkMeshesRef.current.length > 0) {
+      for (const m of demonBlinkMeshesRef.current) {
+        if (m && m.visible === false) m.visible = true;
+      }
+    }
+    // Brows: hide alongside Face1 when SitePal is showing.
+    if (demonBrowMeshesRef.current.length > 0) {
+      for (const m of demonBrowMeshesRef.current) {
+        if (m) m.visible = !showFace2;
+      }
+    }
+    if (showFace2) {
+      const ctx = sp.cropCtx;
+      const canvas = sp.cropCanvas;
+      const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = DEMON_SITEPAL_CROP;
+      const f = DEMON_SITEPAL_FILTER;
+      ctx.fillStyle = '#9F7854';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      try {
+        ctx.save();
+        // CSS filter applied on the destination context — affects the
+        // drawImage that follows. Recomposed each frame so live edits
+        // (or panel sliders) take effect immediately.
+        ctx.filter = `saturate(${f.saturate}%) contrast(${f.contrast}%) brightness(${f.brightness}%) hue-rotate(${f.hueRotate}deg) sepia(${f.sepia}%)`;
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((rotateZ * Math.PI) / 180);
+        const xScale = Math.cos((rotateX * Math.PI) / 180);
+        ctx.scale(1, xScale);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+        ctx.drawImage(sp.sourceEl, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        ctx.filter = 'none';
+      } catch (e) {
+        // Source canvas not yet renderable (preserveDrawingBuffer race).
+      }
+      if (sp.texture) sp.texture.needsUpdate = true;
+    }
 
     // One-shot: establish camera-controls' internal spherical state at
     // load. setTarget alone doesn't always re-derive azimuth/polar from

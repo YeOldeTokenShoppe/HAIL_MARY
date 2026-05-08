@@ -12,6 +12,7 @@ import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
+import { useBuyModal } from "@/lib/useBuyModal";
 import TestimonialToasts from "@/components/TestimonialToasts";
 import InscribeModal from "@/components/InscribeModal";
 import { useCandles } from "@/hooks/useCandles";
@@ -2080,7 +2081,7 @@ export default function HomePage() {
   }, [userId]);
   const candleVariant = userId ? candleVariantChoice : "pillar";
   const router = useRouter();
-  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useBuyModal();
   const [showInscribeModal, setShowInscribeModal] = useState(false);
   const [chartHovered, setChartHovered] = useState(false);
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);

@@ -10,6 +10,7 @@ import SkewedHeading from '@/components/SkewedHeading';
 import { useUser } from '@clerk/nextjs';
 import Link from "next/link";
 import BuyModal from '@/components/BuyModal';
+import { useBuyModal } from '@/lib/useBuyModal';
 
 
 const OldsCoolTunnel = dynamic(() => import('@/components/OldsCoolTunnel'), {
@@ -50,7 +51,7 @@ export default function PortalPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [deviceDetected, setDeviceDetected] = useState(false);
   const [isTabletPortrait, setIsTabletPortrait] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth : false)
-  const [showBuyModal, setShowBuyModal] = useState(false)
+  const [showBuyModal, setShowBuyModal] = useBuyModal()
   
   
   

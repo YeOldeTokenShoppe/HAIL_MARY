@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import BuyModal from '@/components/BuyModal'
+import { useBuyModal } from '@/lib/useBuyModal'
 import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter, usePathname } from 'next/navigation'
@@ -42,7 +43,7 @@ export default function CarouselPage() {
   } = useMusic()
   const [isMobileView, setIsMobileView] = useState(false)
   const [fontLoaded, setFontLoaded] = useState(false)
-  const [showBuyModal, setShowBuyModal] = useState(false)
+  const [showBuyModal, setShowBuyModal] = useBuyModal()
   const [carouselBuyModalOpen, setCarouselBuyModalOpen] = useState(false)
   const [isPortalZoomed, setIsPortalZoomed] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)

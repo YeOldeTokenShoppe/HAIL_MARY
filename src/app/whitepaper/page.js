@@ -8,6 +8,7 @@ import CoinLoader from "@/components/CoinLoader";
 import CyberNav from "@/components/CyberNav";
 import NavControlsHome from "@/components/NavControlsHome";
 import BuyModal from "@/components/BuyModal";
+import { useBuyModal } from "@/lib/useBuyModal";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export default function WhitepaperPage() {
@@ -15,7 +16,7 @@ export default function WhitepaperPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isTabletPortrait, setIsTabletPortrait] = useState(false);
-  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useBuyModal();
 
   const { user } = useUser();
   const { t } = useLanguage();

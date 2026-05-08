@@ -15,6 +15,7 @@ import CyberNav from '@/components/CyberNav';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
 import BuyModal from '@/components/BuyModal';
+import { useBuyModal } from '@/lib/useBuyModal';
 
 
 export default function TokenomicsPage() {
@@ -26,7 +27,7 @@ export default function TokenomicsPage() {
   const [emoji, setEmoji] = useState("😇");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useBuyModal();
 
   useEffect(() => {
     setMounted(true);

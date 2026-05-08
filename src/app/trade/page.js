@@ -12,7 +12,7 @@ import Aurora from '@/components/Aurora';
 import StarField from '@/components/StarField';
 import Link from 'next/link';
 import PostProcessingEffects from '@/components/PostProcessingEffects';
-import CyborgTempleScene from '@/components/CyborgTempleScene';
+import CyborgTempleScene, { DEMON_SITEPAL_CONTAINER_ID } from '@/components/CyborgTempleScene';
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
@@ -27,9 +27,164 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import CoinLoader from '@/components/CoinLoader';
 import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
+import { useBuyModal } from '@/lib/useBuyModal';
 import EntryOverlay from '@/components/EntryOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
+import SitePalCropPanel from '@/components/SitePalCropPanel';
 import { useRouter } from 'next/navigation';
+
+// Mounts the SitePal embed offscreen so CyborgTempleScene can crop it
+// into a CanvasTexture and overlay it on the Demon's Face mesh. The
+// embed is loaded only while the Demon is focused — proof of concept;
+// once we want it persistent we can lift this into a parent always-on
+// mount and switch the audio with setPlayerVolume(0/7) instead. See the
+// equivalent in /main/page.js (SitePalEmbed) for the pattern.
+const DEMON_SITEPAL_ACCOUNT = "9308752";
+// context=1 (10th positional) is REQUIRED for Next.js per SitePal docs
+// — it switches the embed to the JS-framework bootstrap path and is
+// what makes setPlayerVolume / page-activation behave correctly. The
+// working /main embed uses context=1; using 0 here was breaking audio.
+const DEMON_SITEPAL_EMBED_PARAMS =
+  '9308752,600,800,"",1,1,2774900,0,1,1,"YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n",0,1';
+
+function DemonSitePalEmbed() {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    // Force preserveDrawingBuffer on every WebGL context created while
+    // SitePal is bootstrapping — without it, drawImage(canvas, ...) on
+    // the SitePal canvas paints black. Restored after bootstrap.
+    const origGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+      if (type === "webgl" || type === "webgl2" || type === "experimental-webgl") {
+        attrs = { ...attrs, preserveDrawingBuffer: true };
+      }
+      return origGetContext.call(this, type, attrs);
+    };
+
+    const script1 = document.createElement("script");
+    script1.src = `//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=${DEMON_SITEPAL_ACCOUNT}&js=0`;
+    script1.type = "text/javascript";
+
+    let restoreTimer;
+    script1.onload = () => {
+      const script2 = document.createElement("script");
+      script2.type = "text/javascript";
+      script2.textContent = `AC_VHost_Embed(${DEMON_SITEPAL_EMBED_PARAMS});`;
+      containerRef.current?.appendChild(script2);
+      restoreTimer = setTimeout(() => {
+        HTMLCanvasElement.prototype.getContext = origGetContext;
+      }, 5000);
+    };
+
+    document.head.appendChild(script1);
+
+    // Mute SitePal on scene load so the avatar doesn't talk until
+    // CyborgTempleScene unmutes it on Demon focus. Also raise a
+    // global flag so the source-canvas poll in CyborgTempleScene
+    // can accept the SitePal canvas immediately rather than waiting
+    // out a 15s timeout fallback for scenes that only render one
+    // <canvas> element.
+    window.__demonSitePalSceneLoaded = false;
+    window.vh_sceneLoaded = () => {
+      window.__demonSitePalSceneLoaded = true;
+      if (typeof window.setPlayerVolume === "function") {
+        window.setPlayerVolume(0);
+      }
+    };
+
+    // Keep vh_audioError so real failures (license / not found) show
+    // up. The vh_audioStarted/Ended callbacks were tripping SitePal's
+    // internal post-callback code with a "Cannot read 'audioId' of
+    // undefined" error and being defined at all seemed to suppress
+    // playback, so we leave them undefined.
+    window.vh_audioError = (audID, portal, errCode, errMsg) => {
+      console.warn('[Demon SitePal] vh_audioError', { audID, errCode, errMsg });
+    };
+
+    // Patch AudioContext to track every instance the embed creates so
+    // we can resume() them on the first user gesture. Browsers create
+    // suspended AudioContexts when audio elements are constructed
+    // pre-gesture, and SitePal's audio output goes silent if we don't
+    // resume them — even when setPlayerVolume(7) and sayAudio look
+    // healthy. Mirrors the working pattern in /main/page.js.
+    const OrigCtx = window.AudioContext || window.webkitAudioContext;
+    if (OrigCtx && !OrigCtx._patched) {
+      OrigCtx._instances = [];
+      const OrigConstructor = OrigCtx;
+      const PatchedCtx = function (...args) {
+        const instance = new OrigConstructor(...args);
+        OrigCtx._instances.push(instance);
+        return instance;
+      };
+      PatchedCtx.prototype = OrigConstructor.prototype;
+      PatchedCtx._patched = true;
+      PatchedCtx._instances = OrigCtx._instances;
+      window.AudioContext = PatchedCtx;
+    }
+
+    // Resume any suspended AudioContexts on first user interaction so
+    // the avatar can speak after the focus click. saySilent(0) is the
+    // SitePal-recommended page activation primer for JS frameworks.
+    // CAPTURE phase + document level: the 3D canvas calls
+    // event.stopPropagation() on click, which would silently swallow
+    // a window-bubble-phase listener — capture fires before the
+    // canvas handler runs, so we get our priming pass guaranteed.
+    let primed = false;
+    const resumeAudio = () => {
+      if (primed) return;
+      primed = true;
+      try {
+        if (typeof window.saySilent === "function") window.saySilent(0);
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx && Ctx._instances) {
+          Ctx._instances.forEach((c) => { try { c.resume(); } catch (e) {} });
+        }
+        if (window._vhssAudioCtx) {
+          try { window._vhssAudioCtx.resume(); } catch (e) {}
+        }
+      } catch (e) { /* swallow */ }
+    };
+    document.addEventListener("pointerdown", resumeAudio, true);
+    document.addEventListener("touchstart", resumeAudio, true);
+    document.addEventListener("keydown", resumeAudio, true);
+
+    return () => {
+      if (script1.parentNode) script1.parentNode.removeChild(script1);
+      if (restoreTimer) clearTimeout(restoreTimer);
+      HTMLCanvasElement.prototype.getContext = origGetContext;
+      document.removeEventListener("pointerdown", resumeAudio, true);
+      document.removeEventListener("touchstart", resumeAudio, true);
+      document.removeEventListener("keydown", resumeAudio, true);
+      delete window.vh_sceneLoaded;
+      delete window.vh_audioError;
+      delete window.__demonSitePalSceneLoaded;
+      if (containerRef.current) containerRef.current.innerHTML = "";
+    };
+  }, []);
+
+  return (
+    <div
+      id={DEMON_SITEPAL_CONTAINER_ID}
+      ref={containerRef}
+      style={{
+        // Keep the container ONSCREEN (position 0,0 not -9999) — browsers
+        // throttle WebGL render rate to ~1fps for offscreen canvases,
+        // which is what was causing the SitePal video to lag behind its
+        // audio. Opacity:0.01 + pointerEvents:none keeps it invisible
+        // and non-interactive while still receiving full GPU time.
+        position: "fixed",
+        left: 0,
+        top: 0,
+        width: 600,
+        height: 800,
+        opacity: 0.01,
+        pointerEvents: "none",
+        zIndex: -1,
+      }}
+    />
+  );
+}
 
 // Drop-in replacement for the previous <OrbitControls> rig. Uses
 // camera-controls under the hood so fly-to transitions (setLookAt with
@@ -272,7 +427,7 @@ export default function CyborgTemple() {
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
-  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useBuyModal();
   // Gated by localStorage — only auto-shows on first visit. The bottom-nav
   // CHOOSE PATH button reopens it on demand.
   const [showEntryOverlay, setShowEntryOverlay] = useState(false);
@@ -407,7 +562,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v14_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v23_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -641,6 +796,20 @@ export default function CyborgTemple() {
 
       {/* Dev camera-tuning panel — shows only when ?tune=1 is in URL */}
       <CameraTuningPanel />
+
+      {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal */}
+      <SitePalCropPanel />
+
+      {/* SitePal embed — mount as soon as the page hydrates so its
+          ~15s bootstrap (script + scene + audio buffers) runs in
+          parallel with the 3D model load instead of starting after
+          sceneReady. The embed is hidden offscreen and uses its own
+          tiny WebGL canvas, so concurrent loading with the main 3D
+          scene is fine. Mounted once and left in place — re-injecting
+          the SitePal script breaks its internal vhssHTML_scenes
+          globals. CyborgTempleScene toggles Face1/Face2 visibility +
+          audio volume on Demon focus. */}
+      {mounted && <DemonSitePalEmbed />}
           
       <div 
         style={{ 
@@ -1180,6 +1349,7 @@ export default function CyborgTemple() {
               disableCandleInteraction
               gameStarted={gameStarted}
               showCharacterHints={showCharacterHint && !focusedAgent}
+              useSitePalForDemon={focusedAgent === 'Demon'}
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 console.log(`CoinFace ${coinIndex} tapped`)

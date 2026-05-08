@@ -9,6 +9,7 @@ import CyberButton from "@/components/CyberButton";
 import CharacterSelect from "@/components/CharacterSelect";
 import GlitchTransition from "@/components/GlitchTransition";
 import BuyModal from "@/components/BuyModal";
+import { useBuyModal } from "@/lib/useBuyModal";
 import MainMobileNav from "@/components/MainMobileNav";
 import Confessional from "@/components/Confessional";
 import { useMusic } from "@/components/MusicContext";
@@ -254,7 +255,7 @@ export default function MainPage() {
     setShowMusicControls(show);
     if (show && !contextIsPlaying) play();
   }, [contextIsPlaying, play]);
-  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [buyModalOpen, setBuyModalOpen] = useBuyModal();
   const [activeCharIndex, setActiveCharIndex] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);

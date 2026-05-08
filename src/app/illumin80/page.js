@@ -7,6 +7,7 @@ import { useUser, SignInButton } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import { useWalletAuth } from '@/components/WalletAuthProvider'
 import BuyModal from '@/components/BuyModal'
+import { useBuyModal } from '@/lib/useBuyModal'
 import LightCandleModal from '@/components/LightCandleModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import { useRouter, usePathname } from 'next/navigation'
@@ -43,7 +44,7 @@ export default function ShrinePage() {
   const [isMobileView, setIsMobileView] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [fontLoaded, setFontLoaded] = useState(false)
-  const [showBuyModal, setShowBuyModal] = useState(false)
+  const [showBuyModal, setShowBuyModal] = useBuyModal()
   const [showLightCandleModal, setShowLightCandleModal] = useState(false)
   const [modalKey, setModalKey] = useState(0) // Force modal to remount by changing key
   const [isProcessingCandle, setIsProcessingCandle] = useState(false) // Prevent modal from reopening during processing

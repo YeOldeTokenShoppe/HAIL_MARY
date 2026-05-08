@@ -235,7 +235,10 @@ const BuyModal = ({ isOpen, onClose }) => {
 
       if (popupRef && !popupRef.closed) {
         popupRef.location.href = onrampUrl;
-        onClose();
+        // Intentionally do NOT close the modal — Coinbase opens in a new tab,
+        // and the user needs to come back to this tab to do Step 2 (swap
+        // ETH/USDC → RL80). Closing here makes them reopen the modal and
+        // can leave new users stuck.
       } else {
         // Synchronous window.open was blocked anyway — fall back to same-tab
         // navigation. Loses the modal/page state but completes the purchase.
@@ -607,19 +610,46 @@ const BuyModal = ({ isOpen, onClose }) => {
                 )}
               </h2>
 
-              {/* Description (hidden when not connected — replaced with onboarding copy) */}
+              {/* Two-step process explainer (connected users only) */}
               {walletAddress && (
-                <p style={{
-                  fontFamily: 'monospace',
-                  fontSize: isSmallPhone ? '11px' : '13px',
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  textAlign: 'center',
-                  lineHeight: '1.6',
-                  letterSpacing: '0.5px',
+                <div style={{
+                  width: '100%',
                   maxWidth: '320px',
+                  padding: isSmallPhone ? '10px 10px' : '12px 14px',
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  border: '1px solid rgba(253, 237, 0, 0.3)',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
                 }}>
-                  {t('buyModal.coinbaseDescription') || 'Purchase ETH or USDC on Base via Coinbase.'}
-                </p>
+                  <p style={{
+                    fontFamily: 'monospace',
+                    fontSize: isSmallPhone ? '10px' : '11px',
+                    fontWeight: '900',
+                    letterSpacing: '2px',
+                    color: '#fded00',
+                    textAlign: 'center',
+                    margin: 0,
+                    textTransform: 'uppercase',
+                  }}>
+                    {'>>'} HOW IT WORKS
+                  </p>
+                  <p style={{
+                    fontFamily: 'monospace',
+                    fontSize: isSmallPhone ? '10px' : '11px',
+                    color: 'rgba(255, 255, 255, 0.85)',
+                    textAlign: 'left',
+                    lineHeight: '1.5',
+                    margin: 0,
+                  }}>
+                    1. Click Buy — opens Coinbase in a new tab
+                    <br />
+                    2. Buy ETH or USDC with your card
+                    <br />
+                    3. Come back to this tab and swap below
+                  </p>
+                </div>
               )}
 
               {/* Buy / Connect Section */}
@@ -746,13 +776,13 @@ const BuyModal = ({ isOpen, onClose }) => {
                     <div style={{
                       width: '100%',
                       maxWidth: '320px',
-                      padding: isSmallPhone ? '10px 10px' : '12px 14px',
+                      padding: isSmallPhone ? '8px 10px' : '10px 12px',
                       background: 'rgba(0, 0, 0, 0.35)',
                       border: '1px solid rgba(0, 229, 114, 0.35)',
                       borderRadius: '4px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '10px',
+                      gap: '6px',
                       marginBottom: '4px',
                     }}>
                       <p style={{
@@ -766,19 +796,30 @@ const BuyModal = ({ isOpen, onClose }) => {
                       }}>
                         {'>>'} YOUR WALLET
                       </p>
-                      <CopyAddress address={walletAddress} label="Address" />
+                      <CopyAddress address={walletAddress} />
                       {ownerEoaAddress && <ExportWalletModal address={ownerEoaAddress} />}
                       <p style={{
                         fontFamily: 'monospace',
-                        fontSize: '10px',
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        lineHeight: '1.5',
+                        fontSize: '9.5px',
+                        color: 'rgba(255, 255, 255, 0.55)',
+                        lineHeight: '1.4',
                         margin: 0,
                       }}>
-                        Funds you buy will be deposited to this wallet. Export your private key any time to move it to another app.
+                        Funds land here. Export the key any time to move your wallet.
                       </p>
                     </div>
                   )}
+                  <span style={{
+                    fontFamily: 'monospace',
+                    fontSize: '10px',
+                    fontWeight: '900',
+                    letterSpacing: '3px',
+                    color: 'rgba(0, 229, 114, 0.85)',
+                    textTransform: 'uppercase',
+                    marginBottom: '-4px',
+                  }}>
+                    Step 1
+                  </span>
                   <button
                     onClick={handleBuy}
                     disabled={buyDisabled}
@@ -851,7 +892,20 @@ const BuyModal = ({ isOpen, onClose }) => {
                 <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(253, 237, 0, 0.4), transparent)' }} />
               </div>
 
-              {/* In-app Swap Section */}
+              {/* In-app Swap Section — STEP 2 label only when connected,
+                  since Step 1 (the Buy button) is also connect-gated. */}
+              {walletAddress && (
+                <span style={{
+                  fontFamily: 'monospace',
+                  fontSize: '10px',
+                  fontWeight: '900',
+                  letterSpacing: '3px',
+                  color: 'rgba(0, 229, 114, 0.85)',
+                  textTransform: 'uppercase',
+                }}>
+                  Step 2
+                </span>
+              )}
               <p style={{
                 fontFamily: 'monospace',
                 fontSize: isSmallPhone ? '11px' : '13px',
