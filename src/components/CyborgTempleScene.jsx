@@ -169,19 +169,19 @@ export const DEMON_SITEPAL_AUDIO_NAME = '11devil1';
 // Face2-mapping crop region for Detective_Face2. Tweak via the
 // SitePalCropPanel after selecting the Detective character.
 export const DETECTIVE_SITEPAL_CROP = {
- cropX: 217,
-  cropY: 72,
-  cropW: 199,
-  cropH: 200,
+  cropX: 209,
+  cropY: 65,
+  cropW: 200,
+  cropH: 199,
   rotateZ: 0,
   rotateX: 0,
 };
 export const DETECTIVE_SITEPAL_FILTER = {
-  saturate: 152,
-  contrast: 99,
-  brightness: 85,
-  hueRotate: 0,
-  sepia: 4,
+  saturate: 210,
+  contrast: 68,
+  brightness: 86,
+  hueRotate: -10,
+  sepia: 0,
 };
 // (Detective container id no longer needed — single host portal.)
 // Empty = use scene-level audio via replay() (which is what worked for
@@ -406,6 +406,15 @@ const CyborgTempleScene = ({
   // Refs for CoinFace avatar meshes — kept for future repurposing (e.g. leaderboard)
   const coinFaceRefs = useRef([null, null, null, null]) // CoinFace1-4
   const topSupporterBannerRefs = useRef([]) // TopText and x_logo meshes
+
+  // Screens (Screen1-4, ScreenA-D), the 4 main characters (Demon, Monk,
+  // RL80, Detective), and Angel require a double-click to focus, so
+  // accidental clicks don't zoom the camera. Track the first click here;
+  // the second click within 400ms proceeds. suppressNextDblClickRef stops
+  // the native dblclick handler (which unfocuses) from immediately undoing
+  // the focus we just triggered on the second click.
+  const pendingScreenClickRef = useRef(null);
+  const suppressNextDblClickRef = useRef(false);
 
   // Click animation state for coins
   const [clickedCoin, setClickedCoin] = useState(null);
@@ -2514,6 +2523,38 @@ const CyborgTempleScene = ({
         if (object.userData.clickable) {
           clickedOnAgent = true;
 
+          // Screens, the 4 main characters, and Angel require a
+          // double-click to focus the camera. A single click is too easy
+          // to fire accidentally while orbiting. Skip the gate when
+          // already focused on the same target so single-click
+          // toggle-unfocus still works.
+          {
+            const dblClickAgentId = object.userData.agentId;
+            const isDblClickTarget =
+              dblClickAgentId &&
+              (/^Screen[1-4A-D]$/.test(dblClickAgentId) ||
+                dblClickAgentId === 'Demon' ||
+                dblClickAgentId === 'Monk' ||
+                dblClickAgentId === 'RL80' ||
+                dblClickAgentId === 'Detective' ||
+                dblClickAgentId === 'Angel');
+            const alreadyFocusedOnThis = focusTarget && focusTarget.agentId === dblClickAgentId;
+            if (isDblClickTarget && !alreadyFocusedOnThis) {
+              const now = Date.now();
+              const pending = pendingScreenClickRef.current;
+              if (pending && pending.agentId === dblClickAgentId && now - pending.time < 400) {
+                pendingScreenClickRef.current = null;
+                // The browser will dispatch a `dblclick` after this second
+                // click — the existing handler unfocuses on dblclick, so we
+                // mark it to be consumed once.
+                suppressNextDblClickRef.current = true;
+              } else {
+                pendingScreenClickRef.current = { agentId: dblClickAgentId, time: now };
+                return;
+              }
+            }
+          }
+
           // Special handling for coins - trigger animation and show FocusedAgentCard
           if (object.userData.isCoin) {
 
@@ -3082,6 +3123,13 @@ const CyborgTempleScene = ({
 
     // Double-click to unfocus and return to default view
     const handleDblClick = () => {
+      // The Screen double-click-to-focus gesture in handleClick fires a
+      // native dblclick event right after; consume it once so we don't
+      // immediately unfocus what was just focused.
+      if (suppressNextDblClickRef.current) {
+        suppressNextDblClickRef.current = false;
+        return;
+      }
       if (!focusTarget) return;
 
       restoreDemonFromFocus();

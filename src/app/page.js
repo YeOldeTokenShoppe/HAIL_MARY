@@ -1966,9 +1966,34 @@ const UNISWAP_URL =
   "https://app.uniswap.org/explore/tokens/base/0x30d01555d88c76500a82754a1d53cac082a6cb75?inputCurrency=NATIVE";
 const GECKO_URL =
   "https://www.geckoterminal.com/base/pools/0x40d827acdbefd8ef46953e2b1ac87b8697b82203";
+const HERO_PULLQUOTE_INTERVAL_MS = 6800;
+const HERO_PULLQUOTES = [
+  {
+    text: "Domina nostra perpetui lucri, ora pro nobis.",
+    source: "Missale Degenorum",
+    gloss: "Our Lady of Perpetual Profit, pray for us.",
+    tone: "latin",
+  },
+  {
+    text: "I've compared the markets to a church with a casino attached.",
+    source: "Warren Buffett",
+    tone: "modern",
+  },
+  {
+    text: "Any sufficiently advanced technology is indistinguishable from magic.",
+    source: "Arthur C. Clarke",
+    tone: "modern",
+  },
+  {
+    text: "The future is already here, it's just not evenly distributed.",
+    source: "William Gibson",
+    tone: "modern",
+  },
+];
 
 export default function HomePage() {
   const [timeframeKey, setTimeframeKey] = useState("30m");
+  const [heroPullquoteIndex, setHeroPullquoteIndex] = useState(0);
   const tfOpt =
     TIMEFRAME_OPTIONS.find((o) => o.key === timeframeKey) ||
     TIMEFRAME_OPTIONS[0];
@@ -2098,6 +2123,17 @@ export default function HomePage() {
   useEffect(() => () => {
     if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
   }, []);
+  useEffect(() => {
+    if (HERO_PULLQUOTES.length < 2) return undefined;
+    const id = setInterval(() => {
+      setHeroPullquoteIndex(
+        (current) => (current + 1) % HERO_PULLQUOTES.length,
+      );
+    }, HERO_PULLQUOTE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
+  const heroPullquote =
+    HERO_PULLQUOTES[heroPullquoteIndex] || HERO_PULLQUOTES[0];
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   useEffect(() => {
     const check = () => setIsMobileDevice(window.innerWidth <= 768);
@@ -2454,17 +2490,27 @@ export default function HomePage() {
         <div className="hero-copy">
           <blockquote
             className="hero-pullquote"
-            title="Our Lady of Perpetual Profit, pray for us."
+            title={heroPullquote.gloss || undefined}
           >
-            <p className="hero-pullquote-latin">
-              Domina nostra perpetui lucri, ora pro nobis.
+            <p
+              key={heroPullquoteIndex}
+              className={`hero-pullquote-latin${
+                heroPullquote.tone === "modern" ? " hero-pullquote-modern" : ""
+              }`}
+              aria-live="polite"
+            >
+              {heroPullquote.tone === "modern"
+                ? `"${heroPullquote.text}"`
+                : heroPullquote.text}
             </p>
             <cite className="hero-pullquote-source">
-              Missale Degenorum
+              {heroPullquote.source}
             </cite>
-            <span className="hero-pullquote-gloss" aria-hidden="true">
-              Our Lady of Perpetual Profit, pray for us.
-            </span>
+            {heroPullquote.gloss ? (
+              <span className="hero-pullquote-gloss" aria-hidden="true">
+                {heroPullquote.gloss}
+              </span>
+            ) : null}
           </blockquote>
           <p className="hero-intro">
 Sharpen your discernment against scams in the liminal terminal. Submit your trade history for absolution. Scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order. Mater ex machina. </p>

@@ -31,7 +31,7 @@ import CoinLoader from '@/components/CoinLoader';
 import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
 import { useBuyModal } from '@/lib/useBuyModal';
-import EntryOverlay from '@/components/EntryOverlay';
+import TradeServiceRail from '@/components/TradeServiceRail';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
 import SitePalCropPanel from '@/components/SitePalCropPanel';
 import { useRouter } from 'next/navigation';
@@ -421,8 +421,9 @@ function CameraControlsRig({
       introCompleteRef.current = true;
     }
 
-    // Scripted intro fly-around: full 360° orbit + dolly-in over
-    // `introDuration` seconds. Smoothstep easing so it eases in and out.
+    // Scripted intro fly-around: 540° orbit (one full turn + an extra
+    // half-spin so the model lands with a different face forward) + dolly-in
+    // over `introDuration` seconds. Smoothstep easing so it eases in and out.
     if (
       !introCompleteRef.current &&
       autoRotate &&
@@ -436,7 +437,7 @@ function CameraControlsRig({
       const t = Math.min(introElapsedRef.current / introDuration, 1);
       const eased = t * t * (3 - 2 * t); // smoothstep
       const dir = autoRotateSpeed >= 0 ? 1 : -1;
-      const azimuth = dir * eased * Math.PI * 2;
+      const azimuth = dir * eased * Math.PI * 3;
       const polar = initialPolarRef.current;
       const distance = introStartDistance + (zoomEndDistance - introStartDistance) * eased;
       const it = initialTargetRef.current;
@@ -565,29 +566,18 @@ export default function CyborgTemple() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
   const [showBuyModal, setShowBuyModal] = useBuyModal();
-  // Gated by localStorage — only auto-shows on first visit. The bottom-nav
-  // CHOOSE PATH button reopens it on demand.
-  const [showEntryOverlay, setShowEntryOverlay] = useState(false);
   // Which modality the user has entered. null = lobby (no mode chosen).
   // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
   const [tradeMode, setTradeMode] = useState(null);
-  // Tracks whether game mode is actively running. Entry now goes straight
-  // into the scene — the previous intro overlay has been removed in favor
-  // of the bottom-nav SELECT OPTION button.
+  // Tracks whether game mode is actively running.
   const [gameStarted, setGameStarted] = useState(false);
-  const dismissEntryOverlay = () => {
-    setShowEntryOverlay(false);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('rl80_trade_overlay_seen', '1');
-    }
+  const enterGameMode = () => {
+    setTradeMode('game');
+    setGameStarted(true);
   };
-  const handleEntrySelect = (action) => {
-    console.log('[EntryOverlay] selected:', action);
-    if (action === 'game') {
-      setTradeMode('game');
-      setGameStarted(true);
-    }
-    dismissEntryOverlay();
+  const returnToServiceRail = () => {
+    setTradeMode(null);
+    setGameStarted(false);
   };
   // Stable camera rig inputs — without `useMemo`, these inline arrays would
   // get a new identity every render and re-mount the rig's effect, lurching
@@ -875,7 +865,7 @@ export default function CyborgTemple() {
   // would otherwise re-fire this effect and re-show the GIF. Hide
   // immediately on the first click/tap anywhere — they've engaged.
   useEffect(() => {
-    if (!sceneReady || showEntryOverlay || focusedAgent || userHasInteracted) return;
+    if (!sceneReady || focusedAgent || userHasInteracted) return;
     const showTimer = setTimeout(() => setShowHandTap(true), 12500);
     const hideTimer = setTimeout(() => setShowHandTap(false), 15500);
     const hideOnInteraction = () => {
@@ -889,7 +879,7 @@ export default function CyborgTemple() {
       clearTimeout(hideTimer);
       window.removeEventListener('pointerdown', hideOnInteraction);
     };
-  }, [sceneReady, showEntryOverlay, focusedAgent, userHasInteracted]);
+  }, [sceneReady, focusedAgent, userHasInteracted]);
 
   // Show the "tap a character" hint once the scene is visible. Auto-fade
   // after 6s; if the user clicks a character before then, hide immediately.
@@ -1773,10 +1763,12 @@ export default function CyborgTemple() {
             )}
 
             {/* Bottom Nav — rendered on both mobile and desktop, mirrors
-                /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY).
-                Hidden while EntryOverlay is up so it owns the screen. */}
-            {!showEntryOverlay && (
-            <MobileBottomNav
+                /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY). */}
+            <>
+              {tradeMode !== 'game' && !focusedAgent && (
+                <TradeServiceRail onSelect={enterGameMode} />
+              )}
+              <MobileBottomNav
                 hideWallet
                 accountOnLeft
                 /* Trade-style center: three side-by-side actions (BUY / HOLD /
@@ -1824,10 +1816,10 @@ export default function CyborgTemple() {
                     </div>
                   ) : (
                     <button
-                      onClick={() => setShowEntryOverlay(true)}
-                      aria-label="Select option"
+                      onClick={enterGameMode}
+                      aria-label="Judge a case"
                       style={{
-                        minWidth: 220,
+                        minWidth: 190,
                         height: 60,
                         padding: '10px 22px',
                         borderRadius: 10,
@@ -1843,7 +1835,7 @@ export default function CyborgTemple() {
                         boxShadow: '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
                       }}
                     >
-                      ✦ SELECT OPTION
+                      ✦ JUDGE CASE
                     </button>
                   )
                 }
@@ -1852,7 +1844,7 @@ export default function CyborgTemple() {
                    buttons have taken the center). Book slot (left) is BUY. */
                 onMenuClick={
                   tradeMode === 'game'
-                    ? () => setShowEntryOverlay(true)
+                    ? returnToServiceRail
                     : () => router.push('/')
                 }
                 menuIcon={
@@ -1911,33 +1903,13 @@ export default function CyborgTemple() {
                   </svg>
                 }
               />
-            )}
+            </>
 
             {/* Buy Modal — triggered from the repurposed menu slot */}
             <BuyModal
               isOpen={showBuyModal}
               onClose={() => setShowBuyModal(false)}
             />
-
-            {/* Entry Overlay — modality picker. Heavy black scrim makes the
-                scene barely visible; user can re-open via bottom-nav MENU. */}
-            {showEntryOverlay && sceneReady && (
-              <div
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  zIndex: 1500,
-                  background: 'rgba(0, 0, 0, 0.92)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                }}
-              >
-                <EntryOverlay
-                  onSelect={handleEntrySelect}
-                  onDismiss={dismissEntryOverlay}
-                />
-              </div>
-            )}
 
             {/* Mobile fullscreen CRT overlay for Screen1-4 taps. Rendered via
                 portal to escape the canvas/transform stack. */}

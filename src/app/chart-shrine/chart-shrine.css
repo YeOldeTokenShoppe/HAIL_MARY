@@ -568,6 +568,11 @@
 }
 
 .shrine-page.neon .hero-pullquote-latin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.7em;
   margin: 0;
   font-family: "UnifrakturCook", "Pirata One", serif;
   font-size: clamp(1.3rem, 2.5vw, 1.75rem);
@@ -579,6 +584,22 @@
     0 0 22px rgba(217, 45, 176, 0.25);
   text-wrap: balance;
   white-space: nowrap;
+  opacity: 0;
+  animation: heroPullquoteReveal 6800ms ease-in-out both;
+}
+
+.shrine-page.neon .hero-pullquote-modern {
+  max-width: 46ch;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: clamp(1rem, 1.85vw, 1.35rem);
+  font-style: italic;
+  line-height: 1.22;
+  color: #d6faff;
+  letter-spacing: 0.02em;
+  white-space: normal;
+  text-shadow:
+    0 0 9px rgba(42, 214, 238, 0.3),
+    0 0 22px rgba(217, 45, 176, 0.22);
 }
 
 .shrine-page.neon .hero-pullquote-source {
@@ -610,6 +631,34 @@
   letter-spacing: 0.02em;
   opacity: 0.7;
   margin-top: 2px;
+}
+
+@keyframes heroPullquoteReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+    filter: blur(2px);
+  }
+  9%,
+  78% {
+    opacity: 0.78;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+    filter: blur(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shrine-page.neon .hero-pullquote-latin {
+    opacity: 0.78;
+    animation: none;
+    transform: none;
+    filter: none;
+  }
 }
 
 @media (hover: none) {
