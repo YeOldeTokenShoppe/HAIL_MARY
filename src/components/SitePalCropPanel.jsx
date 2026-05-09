@@ -1,10 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
-  DEMON_SITEPAL_CROP,
-  DEMON_SITEPAL_FILTER,
-  DETECTIVE_SITEPAL_CROP,
-  DETECTIVE_SITEPAL_FILTER,
+  SITEPAL_PROJECTION_CONFIG,
 } from "@/components/CyborgTempleScene";
 
 /**
@@ -25,6 +22,18 @@ import {
 
 const STORAGE_KEY = "rl80_sitepal_crop_overrides_v2";
 
+function readJsonStorage(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn(`[SitePalCropPanel] Ignoring invalid saved tuning data for ${key}`, error);
+    try { localStorage.removeItem(key); } catch {}
+    return null;
+  }
+}
+
 const CROP_FIELDS = [
   { key: "cropX", min: 0, max: 600, step: 1 },
   { key: "cropY", min: 0, max: 800, step: 1 },
@@ -42,30 +51,25 @@ const FILTER_FIELDS = [
   { key: "sepia", min: 0, max: 100, step: 1 },
 ];
 
-// Per-character tuning targets. Add a new entry here to wire up
-// another character — the panel auto-renders a tab for each.
-const CHARACTERS = [
-  {
-    id: "Demon",
-    label: "Demon",
-    crop: DEMON_SITEPAL_CROP,
-    filter: DEMON_SITEPAL_FILTER,
-    cropConstName: "DEMON_SITEPAL_CROP",
-    filterConstName: "DEMON_SITEPAL_FILTER",
-    cropDefaults: { cropX: 190, cropY: 117, cropW: 125, cropH: 180, rotateZ: 0, rotateX: 0 },
-    filterDefaults: { saturate: 145, contrast: 108, brightness: 105, hueRotate: 0, sepia: 10 },
-  },
-  {
-    id: "Detective",
-    label: "Detective",
-    crop: DETECTIVE_SITEPAL_CROP,
-    filter: DETECTIVE_SITEPAL_FILTER,
-    cropConstName: "DETECTIVE_SITEPAL_CROP",
-    filterConstName: "DETECTIVE_SITEPAL_FILTER",
-    cropDefaults: { cropX: 190, cropY: 117, cropW: 125, cropH: 180, rotateZ: 0, rotateX: 0 },
-    filterDefaults: { saturate: 145, contrast: 108, brightness: 105, hueRotate: 0, sepia: 10 },
-  },
-];
+const TUNING_CONST_NAMES = {
+  Demon: { crop: "DEMON_SITEPAL_CROP", filter: "DEMON_SITEPAL_FILTER" },
+  Detective: { crop: "DETECTIVE_SITEPAL_CROP", filter: "DETECTIVE_SITEPAL_FILTER" },
+  Monk: { crop: "MONK_SITEPAL_CROP", filter: "MONK_SITEPAL_FILTER" },
+};
+
+// Per-character tuning targets. Add a new entry to
+// SITEPAL_PROJECTION_CONFIG and, optionally, TUNING_CONST_NAMES to wire
+// up another tab.
+const CHARACTERS = Object.entries(SITEPAL_PROJECTION_CONFIG).map(([id, config]) => ({
+  id,
+  label: config.label || id,
+  crop: config.crop,
+  filter: config.filter,
+  cropConstName: TUNING_CONST_NAMES[id]?.crop || `${id.toUpperCase()}_SITEPAL_CROP`,
+  filterConstName: TUNING_CONST_NAMES[id]?.filter || `${id.toUpperCase()}_SITEPAL_FILTER`,
+  cropDefaults: { cropX: 190, cropY: 117, cropW: 125, cropH: 180, rotateZ: 0, rotateX: 0 },
+  filterDefaults: { saturate: 145, contrast: 108, brightness: 105, hueRotate: 0, sepia: 10 },
+}));
 
 export default function SitePalCropPanel() {
   const [enabled, setEnabled] = useState(false);
@@ -83,17 +87,14 @@ export default function SitePalCropPanel() {
       hasHydratedRef.current = true;
       try {
         let stored = null;
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          stored = JSON.parse(raw);
-        } else {
+        stored = readJsonStorage(STORAGE_KEY);
+        if (!stored) {
           // Migration: the v1 schema was a flat object for the Demon
           // only ({ cropX, cropY, ..., filter: {...} }). Lift it into
           // the per-character v2 shape so previously-tuned values
           // aren't lost when this panel adds the character tabs.
-          const rawV1 = localStorage.getItem("rl80_sitepal_crop_overrides_v1");
-          if (rawV1) {
-            const v1 = JSON.parse(rawV1);
+          const v1 = readJsonStorage("rl80_sitepal_crop_overrides_v1");
+          if (v1) {
             const cropFromV1 = {};
             CROP_FIELDS.forEach(({ key }) => {
               if (typeof v1[key] === "number") cropFromV1[key] = v1[key];

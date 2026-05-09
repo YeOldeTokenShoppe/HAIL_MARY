@@ -34,6 +34,18 @@ const AGENT_IDS = [
 
 const STORAGE_KEY = "rl80_camera_tuner_overrides_v3";
 
+function readJsonStorage(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn(`[CameraTuningPanel] Ignoring invalid saved tuning data for ${key}`, error);
+    try { localStorage.removeItem(key); } catch {}
+    return null;
+  }
+}
+
 export default function CameraTuningPanel() {
   const [enabled, setEnabled] = useState(false);
   const [agentId, setAgentId] = useState("RL80");
@@ -51,9 +63,8 @@ export default function CameraTuningPanel() {
       if (typeof window === "undefined") return;
       const t = window.__cameraTuner;
       if (!t) return;
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const stored = JSON.parse(raw);
+      const stored = readJsonStorage(STORAGE_KEY);
+      if (!stored) return;
       if (stored.agents) {
         Object.keys(stored.agents).forEach((id) => {
           const s = t.settings[id];

@@ -149,15 +149,6 @@ export const DEMON_SITEPAL_FILTER = {
 // characters share one portal and swap scenes via loadSceneByID().
 export const DEMON_SITEPAL_CONTAINER_ID = "sitepal-container-host";
 
-// Per-character SitePal scene IDs. On character focus we call
-// window.loadSceneByID(SITEPAL_SCENE_IDS[character]) to swap the
-// portal's loaded scene to that character's avatar + audio. Single
-// portal scales to N characters with one WebGL/AudioContext.
-export const SITEPAL_SCENE_IDS = {
-  Demon: 2774900,
-  Detective: 2774916,
-};
-
 // On focus, the Demon plays a specific audio track from the SitePal
 // account by name (sayAudio in the SitePal API). The track has to
 // exist in the SitePal account that owns the embed; the lipsync /
@@ -170,8 +161,8 @@ export const DEMON_SITEPAL_AUDIO_NAME = '11devil1';
 // SitePalCropPanel after selecting the Detective character.
 export const DETECTIVE_SITEPAL_CROP = {
   cropX: 209,
-  cropY: 65,
-  cropW: 200,
+  cropY: 63,
+  cropW: 192,
   cropH: 199,
   rotateZ: 0,
   rotateX: 0,
@@ -187,6 +178,72 @@ export const DETECTIVE_SITEPAL_FILTER = {
 // Empty = use scene-level audio via replay() (which is what worked for
 // Demon — the published SitePal scene auto-plays its bound track).
 export const DETECTIVE_SITEPAL_AUDIO_NAME = '';
+
+// ── Monk / Saint GR80 SitePal config ─────────────────────────────
+// Face2-mapping crop region for Monk_Face2. Tweak via the
+// SitePalCropPanel after selecting the Monk character.
+export const MONK_SITEPAL_CROP = {
+  cropX: 249,
+  cropY: 150,
+  cropW: 160,
+  cropH: 205,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const MONK_SITEPAL_FILTER = {
+  saturate: 53,
+  contrast: 99,
+  brightness: 93,
+  hueRotate: -27,
+  sepia: 0,
+};
+export const MONK_SITEPAL_AUDIO_NAME = 'Introduction';
+
+// Per-character SitePal projection registry. This keeps scene metadata
+// in one place while crop/filter remain exported as mutable objects for
+// the live tuning panel. `hash` is retained from the character's embed
+// snippet for future direct-embed/context-specific flows; the current
+// shared host swaps scenes by `sceneId` via loadSceneByID().
+export const SITEPAL_PROJECTION_CONFIG = {
+  Demon: {
+    label: 'Demon',
+    sceneId: 2774900,
+    hash: 'YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n',
+    embedContext: 1,
+    crop: DEMON_SITEPAL_CROP,
+    filter: DEMON_SITEPAL_FILTER,
+    audioName: DEMON_SITEPAL_AUDIO_NAME,
+    speech: { type: 'audio', audioName: DEMON_SITEPAL_AUDIO_NAME, preferSceneAudio: true },
+    preload: true,
+  },
+  Detective: {
+    label: 'Detective',
+    sceneId: 2774916,
+    hash: '',
+    embedContext: 1,
+    crop: DETECTIVE_SITEPAL_CROP,
+    filter: DETECTIVE_SITEPAL_FILTER,
+    audioName: DETECTIVE_SITEPAL_AUDIO_NAME,
+    speech: { type: 'audio', audioName: DETECTIVE_SITEPAL_AUDIO_NAME, preferSceneAudio: true },
+    preload: true,
+  },
+  Monk: {
+    label: 'Monk',
+    sceneId: 2774449,
+    hash: 'k3t1S4jwAUw1jwOcSIldB1bvqnH0BViA',
+    embedContext: 0,
+    crop: MONK_SITEPAL_CROP,
+    filter: MONK_SITEPAL_FILTER,
+    audioName: MONK_SITEPAL_AUDIO_NAME,
+    speech: { type: 'audio', audioName: MONK_SITEPAL_AUDIO_NAME, preferSceneAudio: false },
+    preload: false,
+  },
+};
+
+// Back-compat convenience map used by the trade page and scene swap code.
+export const SITEPAL_SCENE_IDS = Object.fromEntries(
+  Object.entries(SITEPAL_PROJECTION_CONFIG).map(([key, config]) => [key, config.sceneId])
+);
 
 // Returns the active cameraPos/lookAtPos/orbitCenter for the given agent.
 // On mobile, MOBILE_CAMERA_OFFSET.y is added to the Y component of every
@@ -335,6 +392,7 @@ const CyborgTempleScene = ({
   showCharacterHints = false, // When true, render small "?" badges over each agent's head as a tap affordance
   useSitePalForDemon = false, // When true, overlay the SitePal avatar canvas onto the Demon's Face mesh. Parent should mount the SitePal embed into DEMON_SITEPAL_CONTAINER_ID.
   useSitePalForDetective = false, // Same as above, for the Detective character.
+  useSitePalForMonk = false, // Same shared SitePal portal, mapped onto Monk_Face2.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -471,6 +529,18 @@ const CyborgTempleScene = ({
   // is showing the SitePal avatar so they don't draw over its face.
   const demonBrowMeshesRef = useRef([]);
 
+  // Monk SitePal refs (Face1/Face2/Eyes + per-character crop canvas).
+  const monkFace1MeshRef = useRef(null);
+  const monkFace2MeshRef = useRef(null);
+  const monkEyesMeshRef = useRef(null);
+  const monkSitePalRef = useRef({
+    cropCanvas: null,
+    cropCtx: null,
+    texture: null,
+    material: null,
+    materialApplied: false,
+  });
+
   // Detective SitePal refs (Face1/Face2 + per-character crop canvas).
   // The SitePal source element itself is SHARED with the Demon (single
   // host portal, scene-swapped via loadSceneByID), so detectiveSitePalRef
@@ -601,6 +671,40 @@ const CyborgTempleScene = ({
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  const activateSitePalProjection = (characterId) => {
+    const config = SITEPAL_PROJECTION_CONFIG[characterId];
+    if (!config || typeof window === 'undefined') return;
+    try {
+      if (typeof window.saySilent === 'function') window.saySilent(0);
+      window.__sitePalDesiredVolume = 7;
+      if (window.__sitePalPreloading) {
+        window.__sitePalPreloading = false;
+        window.__sitePalPreloadQueue = null;
+      }
+      const dynamicSpeech = window.__sitePalSpeechOverrides?.[characterId];
+      window.__sitePalPendingSpeech = {
+        characterId,
+        sceneId: config.sceneId,
+        speech: dynamicSpeech || config.speech || { type: 'scene' },
+      };
+      const targetSceneId = config.sceneId;
+      const sameScene = window.__sitePalCurrentSceneId === targetSceneId;
+      console.log(`[${characterId} click] sceneLoaded=`, window.__sitePalSceneLoaded,
+        'currentSceneId=', window.__sitePalCurrentSceneId,
+        'targetSceneId=', targetSceneId, 'sameScene=', sameScene);
+      if (sameScene && window.__sitePalSceneLoaded === true) {
+        try { if (typeof window.setPlayerVolume === 'function') window.setPlayerVolume(7); } catch (e) { console.warn(`[${characterId}] setPlayerVolume err`, e); }
+        try { if (typeof window.__sitePalSpeakPending === 'function') window.__sitePalSpeakPending(window.__sitePalCurrentAudioName || null); } catch (e) { console.warn(`[${characterId}] speak err`, e); }
+      } else if (window.__sitePalSceneLoaded === true && typeof window.loadSceneByID === 'function') {
+        window.__sitePalSceneLoaded = false;
+        console.log(`[${characterId} click] loadSceneByID`, targetSceneId);
+        window.loadSceneByID(targetSceneId);
+      }
+    } catch (e) {
+      console.warn(`[${characterId} click err]`, e);
+    }
+  };
 
   // Poll rl80 price to detect buys — trigger H80Z (Demon) FistPump on price increase
   useEffect(() => {
@@ -795,8 +899,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v27_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v27.glb";
+    let modelPath = "/models/RL80_4anims_v32_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v32.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -986,6 +1090,22 @@ const CyborgTempleScene = ({
           child.traverse((bone) => {
             if (bone.isBone && /head/i.test(bone.name) && !monkHeadBoneRef.current) {
               monkHeadBoneRef.current = bone;
+            }
+            if ((bone.isMesh || bone.isGroup) &&
+                /^monk_face1([._]\w+)?$/i.test(bone.name || '') &&
+                !monkFace1MeshRef.current) {
+              monkFace1MeshRef.current = bone;
+            }
+            if (bone.isMesh &&
+                /^monk_face2([._]\w+)?$/i.test(bone.name || '') &&
+                !monkFace2MeshRef.current) {
+              monkFace2MeshRef.current = bone;
+              bone.visible = false;
+            }
+            if (bone.isMesh &&
+                /^monk_eyes([._]\w+)?$/i.test(bone.name || '') &&
+                !monkEyesMeshRef.current) {
+              monkEyesMeshRef.current = bone;
             }
           });
         }
@@ -2743,41 +2863,7 @@ const CyborgTempleScene = ({
             // framework activation), setPlayerVolume(7) unmutes, and
             // replay() restarts the scene from the top so the user
             // hears the full intro on each focus.
-            try {
-              if (typeof window !== 'undefined') {
-                if (typeof window.saySilent === 'function') window.saySilent(0);
-                window.__sitePalDesiredVolume = 7;
-                // Abort any in-flight preload so user clicks always
-                // win — the requested loadSceneByID below will
-                // interrupt whatever the preload was doing.
-                if (window.__sitePalPreloading) {
-                  window.__sitePalPreloading = false;
-                  window.__sitePalPreloadQueue = null;
-                }
-                const targetSceneId = SITEPAL_SCENE_IDS.Demon;
-                const sameScene = window.__sitePalCurrentSceneId === targetSceneId;
-                console.log('[Demon click] sceneLoaded=', window.__sitePalSceneLoaded,
-                  'currentSceneId=', window.__sitePalCurrentSceneId,
-                  'targetSceneId=', targetSceneId, 'sameScene=', sameScene);
-                if (sameScene) {
-                  // Same-scene path: best-effort. setPlayerVolume +
-                  // replay shouldn't crash even if scene is mid-boot;
-                  // worst case they're no-ops.
-                  try { if (typeof window.setPlayerVolume === 'function') window.setPlayerVolume(7); } catch (e) { console.warn('[Demon] setPlayerVolume err', e); }
-                  try { if (typeof window.replay === 'function') window.replay(); } catch (e) { console.warn('[Demon] replay err', e); }
-                } else if (window.__sitePalSceneLoaded === true && typeof window.loadSceneByID === 'function') {
-                  // Cross-scene swap: only safe when current scene is
-                  // fully loaded. Don't preemptively set
-                  // __sitePalCurrentSceneId — vh_sceneLoaded reads it
-                  // from getSceneAttributes() so our flag matches the
-                  // actually-loaded scene (loadSceneByID can silently
-                  // fall back to the prior scene on error).
-                  window.__sitePalSceneLoaded = false;
-                  console.log('[Demon click] loadSceneByID', targetSceneId);
-                  window.loadSceneByID(targetSceneId);
-                }
-              }
-            } catch (e) { console.warn('[Demon click err]', e); }
+            activateSitePalProjection('Demon');
             const demonActions = actionsRef.current['Demon'];
             const demonMixer = mixersRef.current['Demon'];
             if (demonActions && demonMixer) {
@@ -2878,6 +2964,7 @@ const CyborgTempleScene = ({
             }
           } else if (object.userData.agentId === 'Monk') {
             monkFocusedRef.current = true;
+            activateSitePalProjection('Monk');
             // Stop the attention-getting waving_over loop forever — user has
             // engaged with the monk; the game flow takes over from here.
             monkWaveStateRef.current.hasBeenFocused = true;
@@ -2967,33 +3054,7 @@ const CyborgTempleScene = ({
             }
           } else if (object.userData.agentId === 'Detective') {
             detectiveFocusedRef.current = true;
-            try {
-              if (typeof window !== 'undefined') {
-                if (typeof window.saySilent === 'function') window.saySilent(0);
-                window.__sitePalDesiredVolume = 7;
-                if (window.__sitePalPreloading) {
-                  window.__sitePalPreloading = false;
-                  window.__sitePalPreloadQueue = null;
-                }
-                const targetSceneId = SITEPAL_SCENE_IDS.Detective;
-                const sameScene = window.__sitePalCurrentSceneId === targetSceneId;
-                console.log('[Detective click] sceneLoaded=', window.__sitePalSceneLoaded,
-                  'currentSceneId=', window.__sitePalCurrentSceneId,
-                  'targetSceneId=', targetSceneId, 'sameScene=', sameScene);
-                if (sameScene) {
-                  try { if (typeof window.setPlayerVolume === 'function') window.setPlayerVolume(7); } catch (e) { console.warn('[Detective] setPlayerVolume err', e); }
-                  try { if (typeof window.replay === 'function') window.replay(); } catch (e) { console.warn('[Detective] replay err', e); }
-                } else if (window.__sitePalSceneLoaded === true && typeof window.loadSceneByID === 'function') {
-                  // See Demon block — don't preemptively set
-                  // currentSceneId; vh_sceneLoaded uses
-                  // getSceneAttributes() so our flag reflects the
-                  // ACTUAL loaded scene rather than our wishful one.
-                  window.__sitePalSceneLoaded = false;
-                  console.log('[Detective click] loadSceneByID', targetSceneId);
-                  window.loadSceneByID(targetSceneId);
-                }
-              }
-            } catch (e) { console.warn('[Detective click err]', e); }
+            activateSitePalProjection('Detective');
             const detectiveState = detectiveAnimStateRef.current;
             // Cross-fade whatever's playing → detective_idle while focused
             // so the close-up reads as attentive instead of mid-keystroke.
@@ -3294,12 +3355,7 @@ const CyborgTempleScene = ({
     };
   }, [loadedModel]);
 
-  // Detective crop canvas + material setup. Single host portal
-  // architecture: source canvas is shared with Demon, only the per-
-  // character crop canvas + Face2 material are unique.
-  useEffect(() => {
-    if (!loadedModel) return;
-    const state = detectiveSitePalRef.current;
+  const ensureProjectionMaterial = (state, face2Object) => {
     if (!state.cropCanvas) {
       const cropCanvas = document.createElement('canvas');
       cropCanvas.width = 512;
@@ -3324,10 +3380,19 @@ const CyborgTempleScene = ({
         side: THREE.DoubleSide,
       });
     }
-    if (!state.materialApplied && detectiveFace2MeshRef.current) {
-      detectiveFace2MeshRef.current.material = state.material;
+    if (!state.materialApplied && face2Object) {
+      face2Object.material = state.material;
       state.materialApplied = true;
     }
+  };
+
+  // Per-character crop canvas + material setup. The host portal/source
+  // canvas is shared, while each projected character owns a crop canvas
+  // and Face2 material.
+  useEffect(() => {
+    if (!loadedModel) return;
+    ensureProjectionMaterial(detectiveSitePalRef.current, detectiveFace2MeshRef.current);
+    ensureProjectionMaterial(monkSitePalRef.current, monkFace2MeshRef.current);
   }, [loadedModel]);
 
   // Drive SitePal audio with focus state. The SitePal API
@@ -3339,7 +3404,8 @@ const CyborgTempleScene = ({
   useEffect(() => {
     let cancelled = false;
     let stopTimer = null;
-    const target = useSitePalForDemon ? 7 : 0;
+    const anySitePalActive = useSitePalForDemon || useSitePalForDetective || useSitePalForMonk;
+    const target = anySitePalActive ? 7 : 0;
 
     const apply = () => {
       if (cancelled) return true;
@@ -3347,7 +3413,7 @@ const CyborgTempleScene = ({
       window.__sitePalDesiredVolume = target;
       if (typeof window.setPlayerVolume !== 'function') return false;
       try { window.setPlayerVolume(target); } catch (e) {}
-      if (!useSitePalForDemon && typeof window.stopSpeech === 'function') {
+      if (!anySitePalActive && typeof window.stopSpeech === 'function') {
         try { window.stopSpeech(); } catch (e) { /* swallow */ }
       }
       return true;
@@ -3363,37 +3429,7 @@ const CyborgTempleScene = ({
       cancelled = true;
       if (stopTimer) clearTimeout(stopTimer);
     };
-  }, [useSitePalForDemon]);
-
-  // Detective audio focus effect (parallel to Demon).
-  useEffect(() => {
-    let cancelled = false;
-    let stopTimer = null;
-    const target = useSitePalForDetective ? 7 : 0;
-
-    const apply = () => {
-      if (cancelled) return true;
-      if (typeof window === 'undefined') return false;
-      window.__sitePalDesiredVolume = target;
-      if (typeof window.setPlayerVolume !== 'function') return false;
-      try { window.setPlayerVolume(target); } catch (e) {}
-      if (!useSitePalForDetective && typeof window.stopSpeech === 'function') {
-        try { window.stopSpeech(); } catch (e) { /* swallow */ }
-      }
-      return true;
-    };
-
-    if (!apply()) {
-      const poll = setInterval(() => {
-        if (apply()) clearInterval(poll);
-      }, 300);
-      stopTimer = setTimeout(() => clearInterval(poll), 8000);
-    }
-    return () => {
-      cancelled = true;
-      if (stopTimer) clearTimeout(stopTimer);
-    };
-  }, [useSitePalForDetective]);
+  }, [useSitePalForDemon, useSitePalForDetective, useSitePalForMonk]);
 
   // Animation loop
   useFrame((state, delta) => {
@@ -3402,23 +3438,11 @@ const CyborgTempleScene = ({
       mat.uniforms.uTime.value = state.clock.elapsedTime;
     });
 
-    // SitePal-on-Demon per-frame block. Toggles Face1/Face2 visibility
-    // based on `useSitePalForDemon` and (only when active) crops the
-    // SitePal canvas into our 512x512 texture canvas. Tunable crop
-    // region lives at module scope (DEMON_SITEPAL_CROP) so edits take
-    // effect on the next frame. Face2 stays hidden until SitePal has a
-    // source AND the user has focused the Demon, so we never flash a
-    // blank skin-tone face during the initial load. Eyes + pupils get
-    // hidden alongside Face1 — the SitePal avatar paints its own eyes
-    // into the face texture, so leaving the geometry visible doubles
-    // them up (and the blink fade looks wrong on top of SitePal).
+    // SitePal projections. One shared host portal provides the active
+    // source canvas; each character owns a crop canvas + Face2 target.
+    // Add new characters by extending SITEPAL_PROJECTION_CONFIG and
+    // adding a projection entry below.
     const sp = demonSitePalRef.current;
-    // Re-resolve the active SitePal source canvas whenever the host
-    // portal swaps scenes (loadSceneByID may switch which <canvas>
-    // SitePal is rendering into, leaving our cached sourceEl stale —
-    // which made the Demon avatar keep painting onto the Detective's
-    // mesh after the swap). Bumped by vh_sceneLoaded in the trade
-    // page each time a scene finishes loading.
     if (typeof window !== 'undefined') {
       const v = window.__sitePalSceneVersion || 0;
       if (sp.lastSceneVersion !== v) {
@@ -3432,84 +3456,40 @@ const CyborgTempleScene = ({
         sp.lastSceneVersion = v;
       }
     }
-    // Single-portal architecture: only show Face2 when the host
-    // portal currently has the Demon scene loaded (otherwise we'd
-    // paint the Detective's avatar onto the Demon's face).
-    const onDemonScene =
-      typeof window !== 'undefined' &&
-      (window.__sitePalCurrentSceneId === SITEPAL_SCENE_IDS.Demon ||
-        window.__sitePalCurrentSceneId === undefined) &&
-      (window.__sitePalSceneLoaded === true ||
-        window.__sitePalCurrentSceneId === undefined);
-    const sitePalReady = !!(sp.sourceEl && sp.cropCtx && onDemonScene);
-    const showFace2 = useSitePalForDemon && sitePalReady;
-    if (demonFace1MeshRef.current) demonFace1MeshRef.current.visible = !showFace2;
-    if (demonFace2MeshRef.current) demonFace2MeshRef.current.visible = showFace2;
-    if (showFace2 && demonBlinkMeshesRef.current.length > 0) {
-      for (const m of demonBlinkMeshesRef.current) {
-        if (m) m.visible = false;
-      }
-    } else if (!showFace2 && demonBlinkMeshesRef.current.length > 0) {
-      for (const m of demonBlinkMeshesRef.current) {
-        if (m && m.visible === false) m.visible = true;
-      }
-    }
-    // Brows: hide alongside Face1 when SitePal is showing.
-    if (demonBrowMeshesRef.current.length > 0) {
-      for (const m of demonBrowMeshesRef.current) {
-        if (m) m.visible = !showFace2;
-      }
-    }
-    if (showFace2) {
-      const ctx = sp.cropCtx;
-      const canvas = sp.cropCanvas;
-      const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = DEMON_SITEPAL_CROP;
-      const f = DEMON_SITEPAL_FILTER;
-      ctx.fillStyle = '#9F7854';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      try {
-        ctx.save();
-        // CSS filter applied on the destination context — affects the
-        // drawImage that follows. Recomposed each frame so live edits
-        // (or panel sliders) take effect immediately.
-        ctx.filter = `saturate(${f.saturate}%) contrast(${f.contrast}%) brightness(${f.brightness}%) hue-rotate(${f.hueRotate}deg) sepia(${f.sepia}%)`;
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((rotateZ * Math.PI) / 180);
-        const xScale = Math.cos((rotateX * Math.PI) / 180);
-        ctx.scale(1, xScale);
-        ctx.translate(-canvas.width / 2, -canvas.height / 2);
-        ctx.drawImage(sp.sourceEl, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
-        ctx.filter = 'none';
-      } catch (e) {
-        // Source canvas not yet renderable (preserveDrawingBuffer race).
-      }
-      if (sp.texture) sp.texture.needsUpdate = true;
-    }
-
-    // ── Detective per-frame block ─────────────────────────────────
-    // Single-portal architecture: Detective reads from the SHARED
-    // SitePal source canvas (demonSitePalRef.sourceEl). Face2 only
-    // shows when the host portal currently has the Detective scene
-    // loaded — otherwise we'd paint the Demon's avatar onto the
-    // Detective's face mesh.
-    const dsp = detectiveSitePalRef.current;
     const sharedSource = sp.sourceEl;
-    const onDetectiveScene =
-      typeof window !== 'undefined' &&
-      window.__sitePalCurrentSceneId === SITEPAL_SCENE_IDS.Detective &&
-      window.__sitePalSceneLoaded === true;
-    const detectiveSitePalReady = !!(sharedSource && dsp.cropCtx && onDetectiveScene);
-    const showDetectiveFace2 = useSitePalForDetective && detectiveSitePalReady;
-    if (detectiveFace1MeshRef.current) detectiveFace1MeshRef.current.visible = !showDetectiveFace2;
-    if (detectiveFace2MeshRef.current) detectiveFace2MeshRef.current.visible = showDetectiveFace2;
-    if (detectiveEyesRef.current) detectiveEyesRef.current.visible = !showDetectiveFace2 && !detectiveBlinkStateRef.current.isBlinking;
-    if (detectiveClosedEyesRef.current && showDetectiveFace2) detectiveClosedEyesRef.current.visible = false;
-    if (showDetectiveFace2) {
-      const ctx = dsp.cropCtx;
-      const canvas = dsp.cropCanvas;
-      const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = DETECTIVE_SITEPAL_CROP;
-      const f = DETECTIVE_SITEPAL_FILTER;
+
+    const sitePalVisibility = { Demon: false, Detective: false, Monk: false };
+
+    const paintProjection = ({ id, enabled, state: projectionState, face1Ref, face2Ref, hideRefs = [], hideMeshes = [], allowInitialScene = false }) => {
+      const config = SITEPAL_PROJECTION_CONFIG[id];
+      if (!config) return false;
+      const onScene =
+        typeof window !== 'undefined' &&
+        (
+          window.__sitePalCurrentSceneId === config.sceneId ||
+          (allowInitialScene && window.__sitePalCurrentSceneId === undefined)
+        ) &&
+        (
+          window.__sitePalSceneLoaded === true ||
+          (allowInitialScene && window.__sitePalCurrentSceneId === undefined)
+        );
+      const ready = !!(sharedSource && projectionState.cropCtx && onScene);
+      const show = enabled && ready;
+
+      if (face1Ref?.current) face1Ref.current.visible = !show;
+      if (face2Ref?.current) face2Ref.current.visible = show;
+      hideRefs.forEach((ref) => {
+        if (ref?.current) ref.current.visible = !show;
+      });
+      hideMeshes.forEach((mesh) => {
+        if (mesh) mesh.visible = !show;
+      });
+
+      if (!show) return false;
+      const ctx = projectionState.cropCtx;
+      const canvas = projectionState.cropCanvas;
+      const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = config.crop;
+      const f = config.filter;
       ctx.fillStyle = '#9F7854';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       try {
@@ -3524,10 +3504,40 @@ const CyborgTempleScene = ({
         ctx.restore();
         ctx.filter = 'none';
       } catch (e) {
-        // source not yet renderable
+        // Source canvas not yet renderable (preserveDrawingBuffer race).
       }
-      if (dsp.texture) dsp.texture.needsUpdate = true;
+      if (projectionState.texture) projectionState.texture.needsUpdate = true;
+      return true;
+    };
+
+    sitePalVisibility.Demon = paintProjection({
+      id: 'Demon',
+      enabled: useSitePalForDemon,
+      state: sp,
+      face1Ref: demonFace1MeshRef,
+      face2Ref: demonFace2MeshRef,
+      hideMeshes: [...demonBlinkMeshesRef.current, ...demonBrowMeshesRef.current],
+      allowInitialScene: true,
+    });
+    sitePalVisibility.Detective = paintProjection({
+      id: 'Detective',
+      enabled: useSitePalForDetective,
+      state: detectiveSitePalRef.current,
+      face1Ref: detectiveFace1MeshRef,
+      face2Ref: detectiveFace2MeshRef,
+    });
+    if (sitePalVisibility.Detective) {
+      if (detectiveEyesRef.current) detectiveEyesRef.current.visible = false;
+      if (detectiveClosedEyesRef.current) detectiveClosedEyesRef.current.visible = false;
     }
+    sitePalVisibility.Monk = paintProjection({
+      id: 'Monk',
+      enabled: useSitePalForMonk,
+      state: monkSitePalRef.current,
+      face1Ref: monkFace1MeshRef,
+      face2Ref: monkFace2MeshRef,
+      hideRefs: [monkEyesMeshRef],
+    });
 
     // One-shot: establish camera-controls' internal spherical state at
     // load. setTarget alone doesn't always re-derive azimuth/polar from
@@ -4180,7 +4190,9 @@ const CyborgTempleScene = ({
     // Eyes + Pupil_L + Pupil_R, all faded together each blink). Uses the
     // multi-mesh demonBlinkMeshesRef when populated; falls back to the
     // single-mesh demonEyesRef for the legacy 'demon_eyes' rig.
-    const demonBlinkTargets = demonBlinkMeshesRef.current.length > 0
+    const demonBlinkTargets = sitePalVisibility.Demon
+      ? []
+      : demonBlinkMeshesRef.current.length > 0
       ? demonBlinkMeshesRef.current
       : (demonEyesRef.current ? [demonEyesRef.current] : []);
     if (demonBlinkTargets.length > 0) {
@@ -4234,7 +4246,7 @@ const CyborgTempleScene = ({
 
     // Detective eye blink (mesh-swap: Eyes ↔ Closedeyes). No-op when the
     // rig has no matching meshes — refs stay null in that case.
-    if (detectiveEyesRef.current) {
+    if (detectiveEyesRef.current && !sitePalVisibility.Detective) {
       const currentTime = state.clock.getElapsedTime() * 1000;
       const blink = detectiveBlinkStateRef.current;
       const closed = detectiveClosedEyesRef.current;

@@ -14,7 +14,7 @@ import Link from 'next/link';
 import PostProcessingEffects from '@/components/PostProcessingEffects';
 import CyborgTempleScene, {
   DEMON_SITEPAL_CONTAINER_ID,
-  SITEPAL_SCENE_IDS,
+  SITEPAL_PROJECTION_CONFIG,
 } from '@/components/CyborgTempleScene';
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
@@ -56,7 +56,7 @@ const HOST_SITEPAL_CONFIG = {
   containerId: DEMON_SITEPAL_CONTAINER_ID, // shared host container
   account: "9308752",
   // Initial scene is Demon (2774900). Other characters loaded via
-  // loadSceneByID(SITEPAL_SCENE_IDS.Detective), etc.
+  // loadSceneByID(SITEPAL_PROJECTION_CONFIG.Detective.sceneId), etc.
   embedParams: '9308752,600,800,"",1,1,2774900,0,1,1,"YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n",0,1',
 };
 
@@ -148,8 +148,10 @@ function SitePalHostEmbed({ config }) {
     // near-instant instead of taking ~3-5s. Last entry should be
     // the default character so we end up there for the actual UI.
     const PRELOAD_QUEUE = [
-      SITEPAL_SCENE_IDS.Detective,
-      SITEPAL_SCENE_IDS.Demon, // revert to default after preload
+      ...Object.entries(SITEPAL_PROJECTION_CONFIG)
+        .filter(([id, config]) => config.preload && id !== 'Demon')
+        .map(([, config]) => config.sceneId),
+      SITEPAL_PROJECTION_CONFIG.Demon.sceneId, // revert to default after preload
     ];
 
     const advancePreload = () => {
@@ -171,6 +173,69 @@ function SitePalHostEmbed({ config }) {
         window.__sitePalPreloading = false;
       }
     };
+
+    const speakPending = (fallbackAudioName = null) => {
+      const pending = window.__sitePalPendingSpeech;
+      if (pending && pending.sceneId && pending.sceneId !== window.__sitePalCurrentSceneId) {
+        return false;
+      }
+      const speech = pending?.speech || (
+        fallbackAudioName
+          ? { type: "audio", audioName: fallbackAudioName }
+          : { type: "scene" }
+      );
+
+      try {
+        let result = null;
+        if (speech.type === "scene" && pending) {
+          // For freshly loaded scenes, SitePal already has the scene's
+          // embedded audio bound in the scene data. Calling replay() here
+          // can replay the previous scene's audio buffer after a
+          // loadSceneByID swap, so just leave playback to the scene load.
+          console.log('[SitePal] using embedded scene audio');
+        } else if (speech.type === "audio" && typeof window.sayAudio === "function") {
+          try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
+          const audioName = speech.preferSceneAudio
+            ? (fallbackAudioName || speech.audioName)
+            : (speech.audioName || fallbackAudioName);
+          if (audioName) {
+            console.log('[SitePal] sayAudio(', audioName, ')');
+            result = window.sayAudio(audioName);
+          } else if (typeof window.replay === "function") {
+            result = window.replay();
+          }
+        } else if (speech.type === "text" && speech.text && typeof window.sayText === "function") {
+          const voice = speech.voice || "3";
+          const lang = speech.lang || 1;
+          const engine = speech.engine || 3;
+          console.log('[SitePal] sayText(', speech.text, ')');
+          if (speech.effect !== undefined && speech.effLevel !== undefined) {
+            result = window.sayText(speech.text, voice, lang, engine, speech.effect, speech.effLevel, speech.xData1, speech.xData2);
+          } else {
+            result = window.sayText(speech.text, voice, lang, engine);
+          }
+        } else if (speech.type === "scene" && typeof window.replay === "function") {
+          console.log('[SitePal] replay scene audio');
+          result = window.replay();
+        } else if (fallbackAudioName && typeof window.sayAudio === "function") {
+          try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
+          console.log('[SitePal] sayAudio(', fallbackAudioName, ')');
+          result = window.sayAudio(fallbackAudioName);
+        } else if (typeof window.replay === "function") {
+          result = window.replay();
+        }
+        if (pending) window.__sitePalPendingSpeech = null;
+        if (result && typeof result === "object" && result.status !== 0) {
+          console.warn("[SitePal] speech returned", result);
+        }
+        return true;
+      } catch (e) {
+        console.warn("[SitePal] speech error", e);
+        return false;
+      }
+    };
+
+    window.__sitePalSpeakPending = speakPending;
 
     window.vh_sceneLoaded = () => {
       let currentAudioName = null;
@@ -234,15 +299,7 @@ function SitePalHostEmbed({ config }) {
         try { window.setPlayerVolume(window.__sitePalDesiredVolume || 0); } catch (e) {}
       }
       if ((window.__sitePalDesiredVolume || 0) > 0) {
-        try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
-        try {
-          if (currentAudioName && typeof window.sayAudio === "function") {
-            console.log('[SitePal] sayAudio(', currentAudioName, ')');
-            window.sayAudio(currentAudioName);
-          } else if (typeof window.replay === "function") {
-            window.replay();
-          }
-        } catch (e) {}
+        speakPending(currentAudioName);
       }
     };
     window.vh_audioError = (audID, portal, errCode, errMsg) => {
@@ -689,7 +746,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v27_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v32_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -1474,6 +1531,7 @@ export default function CyborgTemple() {
               showCharacterHints={showCharacterHint && !focusedAgent}
               useSitePalForDemon={focusedAgent === 'Demon'}
               useSitePalForDetective={focusedAgent === 'Detective'}
+              useSitePalForMonk={focusedAgent === 'Monk'}
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 console.log(`CoinFace ${coinIndex} tapped`)
