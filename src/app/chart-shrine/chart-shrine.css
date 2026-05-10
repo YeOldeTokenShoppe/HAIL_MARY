@@ -1,5 +1,6 @@
 .shrine-page {
   min-height: 100vh;
+  min-height: 100svh;
   width: 100%;
   background: radial-gradient(
       1200px 800px at 50% 30%,
@@ -240,6 +241,8 @@
   inset: 0;
   z-index: 0;
   pointer-events: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   overflow: hidden;
 }
 /* Grab cursor only when the pointer is actually over the candle
@@ -920,6 +923,17 @@
   }
   .shrine-page.neon .altar-toggle {
     display: none;
+  }
+}
+
+/* iPad Safari in landscape is particularly prone to making a fixed
+   full-screen WebGL layer feel like it is catching scroll gestures.
+   Keep vertical panning native, and reserve enough real document height
+   below the chart for the fixed bottom dock/home indicator. */
+@media (min-width: 701px) and (max-width: 1180px) and (hover: none) {
+  .shrine-page {
+    padding-bottom: calc(220px + env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
   }
 }
 

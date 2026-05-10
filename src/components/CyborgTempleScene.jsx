@@ -121,9 +121,9 @@ export const ANGEL_POSITION_OFFSET = { x: -0.10, z: 0.01 };
 // each frame, so live edits take effect on the next paint.
 export const DEMON_SITEPAL_CROP = {
   cropX: 180,
-  cropY: 115,
-  cropW: 155,
-  cropH: 200,
+  cropY: 118,
+  cropW: 145,
+  cropH: 195,
   rotateZ: 0,
   rotateX: 0,
 };
@@ -137,11 +137,11 @@ export const DEMON_SITEPAL_CROP = {
 //   hueRotate: degrees (+ warmer when positive at low values, depends)
 //   sepia: 0-100, mixes in a warm tan tone for skin matching
 export const DEMON_SITEPAL_FILTER = {
-  saturate: 203,
+ saturate: 106,
   contrast: 102,
-  brightness: 87,
-  hueRotate: -7,
-  sepia: 26,
+  brightness: 73,
+  hueRotate: 0,
+  sepia: 20,
 };
 
 // DOM container id polled by the per-frame compositor. The trade page
@@ -168,9 +168,9 @@ export const DETECTIVE_SITEPAL_CROP = {
   rotateX: 0,
 };
 export const DETECTIVE_SITEPAL_FILTER = {
-  saturate: 210,
+saturate: 210,
   contrast: 68,
-  brightness: 86,
+  brightness: 82,
   hueRotate: -10,
   sepia: 0,
 };
@@ -899,8 +899,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v32_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v32.glb";
+    let modelPath = "/models/RL80_4anims_v33_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v33.glb";
     let usingFallback = false;
     const startTime = performance.now();
     

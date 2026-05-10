@@ -245,6 +245,7 @@ function StarfieldStatueScene({
         style={{
           background: 'transparent',
           borderRadius: '12px',
+          touchAction: 'pan-y',
           visibility: paused ? 'hidden' : 'visible',
         }}
       >
