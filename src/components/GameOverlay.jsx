@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 
 
 
@@ -6,9 +6,9 @@ import React, { useState, useEffect, useRef } from "react";
 // VERDICT MATH
 // ────────────────────────────────────────────────────────────────────────
 
-const VERDICT_PROBS = { believe: 0.15, abstain: 0.5, doubt: 0.85 };
+export const VERDICT_PROBS = { believe: 0.15, abstain: 0.5, doubt: 0.85 };
 
-function computeBrier(verdict, correctVerdict) {
+export function computeBrier(verdict, correctVerdict) {
   // correctVerdict is "believe" (project legitimate) or "doubt" (project is scam)
   // We score against the binary outcome: was it a scam? (1 = yes, 0 = no)
   const actual = correctVerdict === "doubt" ? 1 : 0;
@@ -20,7 +20,7 @@ function computeBrier(verdict, correctVerdict) {
 // SAMPLE CASE — replace via props once you wire up your case loader
 // ────────────────────────────────────────────────────────────────────────
 
-const SAMPLE_CASE = {
+export const SAMPLE_CASE = {
   id: "case-001",
   difficulty: "beginner",
   projectName: "PROPHET TOKEN",
@@ -35,12 +35,85 @@ const SAMPLE_CASE = {
     change24h: "+342%",
     socialScore: "8.2/10",
   },
+  // GR80 delivers this one-time rules speech as the *first* line on case 001 only,
+  // before his intro. Suppressed on subsequent cases (or when player has played before).
+  // Covers: (1) the question budget, (2) the verdict trio, (3) both scoring
+  // directions — Brier (lower-better, counterintuitive) vs accuracy (higher-better),
+  // and (4) the calibration intuition (bold-right wins, bold-wrong loses, abstain spared).
+  rulesIntro:
+    "Before we begin, friend — the rite is simple. You have three questions to " +
+    "spend across the four of us. Then you render your verdict: Believe, Abstain, " +
+    "or Doubt. Two scores judge you. Your Brier — lower is better, the closer to " +
+    "truth. Your accuracy — higher, as you would expect. Boldness rewards the seer " +
+    "and punishes the blind. Abstain when you do not see. Choose wisely.",
   stations: {
-    "st-gr80": {
-      character: "ST. GR80",
-      role: "CONTRACT FORENSICS",
+    monk: {
+      character: "Saint GR80",
+      role: "ETHOS · CREDIBILITY",
       sigil: "✠",
-      tagline: "The contract reveals what the website conceals.",
+      tagline: "Trust nothing the team says about itself. Watch what they've already done.",
+      // Per-station SitePal voice override for TTS fallback. GR80 speaks as
+      // "Gilbert" — UK English male in SitePal account 9308752.
+      //   voice 9 / lang 1 / engine 1  (Acapela; lang 1 covers English voices
+      //   here regardless of US/UK accent — the accent is part of the voice).
+      // Audio recordings bypass this entirely once wired into the case data.
+      voice: { voice: "9", lang: 1, engine: 1 },
+      // Pre-recorded — the audio file contains the full rules preamble + intro
+      // combined (per the locked convention). The runtime favors `audio` when
+      // SitePal `sayAudio` is available; `text` stays as the TTS fallback and
+      // for any future caption/transcript surface. Note: only the intro proper
+      // is in `text` here; if SitePal is unavailable, the existing logic in
+      // `/trade/page.js` concats `caseData.rulesIntro` in front of this text
+      // automatically, so the rules still get spoken on first visit.
+      intro: {
+        // NOTE on text content: tickers like "$PRPHT" get read by TTS as
+        // "dollar P R P H T" which is awful. The `text` field — used only
+        // for TTS fallback and any future caption surface — uses the
+        // speakable name ("Prophet Token"). The pre-recorded `audio` can
+        // pronounce it however GR80 chooses; the UI still shows "$PRPHT"
+        // in the top HUD strip and other label slots.
+        text:
+          "The Prophet Token. It claims prophecy — to see what is not yet " +
+          "written. Many have come with such promises; few have survived " +
+          "examination. Begin when you are ready.",
+        audio: "case001_monk_intro",
+      },
+      // Played on revisit (random pick from this pool, never the intro again).
+      returnLines: [
+        "Back so soon? The scriptures haven't changed.",
+        "You return. Good. Doubt is a holy path.",
+        "Step closer. Let us continue.",
+      ],
+      // Each question consumes 1 of the case's 3 scans. `reveals` matches an entry label
+      // so the right card surfaces on the monitor when the line plays.
+      questions: [
+        {
+          q: "Who built this?",
+          a: "The architect was born six days ago. A newborn cannot prophesy.",
+          reveals: "DEPLOYER WALLET AGE",
+        },
+        {
+          q: "What have they done before?",
+          a:
+            "Three idols. Two were rugged. The third still breathes — barely. " +
+            "A pattern, not a coincidence.",
+          reveals: "PRIOR OUTCOMES",
+        },
+        {
+          q: "Where did the funds come from?",
+          a:
+            "Through the Tornado. Through the veil. Money that does not wish " +
+            "to be remembered.",
+          reveals: "FUNDING SOURCE",
+        },
+        {
+          q: "Is the contract original?",
+          a:
+            "Eighty-five percent of these scriptures were written by another hand — " +
+            "and that hand has been known to strike.",
+          reveals: "CONTRACT ORIGINALITY",
+        },
+      ],
       entries: [
         { label: "DEPLOYER WALLET AGE", value: "Created 6 days ago", threat: "amber" },
         { label: "PRIOR DEPLOYS", value: "3 tokens in past 30 days", threat: "red" },
@@ -48,49 +121,202 @@ const SAMPLE_CASE = {
         { label: "FUNDING SOURCE", value: "Tornado Cash mixer wallet", threat: "red" },
         { label: "CONTRACT ORIGINALITY", value: "85% match to known rug template", threat: "red" },
       ],
-      summary: "Three prior rugs. Mixer-funded. Forked rug template.",
+      summary: "Three prior rugs. Mixer-funded. Forked template. Credibility is zero.",
+      // Plays immediately on verdict commit (before outcome reveal).
+      verdictReaction: {
+        believe: "...I will pray for you, then.",
+        abstain: "Wise. Better silent than to bear false witness.",
+        doubt:   "Faith was never blind. You see clearly.",
+      },
+      // Plays after outcome reveal. `aligned` = player's verdict matched ground truth;
+      // `missed` = wrong; `abstained` = chose Abstain regardless of truth.
+      vindication: {
+        aligned:   "As I feared.",
+        missed:    "We will rebuild your faith on firmer ground.",
+        abstained: "The faithful and the cautious survive.",
+      },
     },
-    "h80z": {
-      character: "H80Z",
-      role: "ADVERSARIAL READ",
+    demon: {
+      character: "John Barron",
+      role: "PATHOS · SENTIMENT",
       sigil: "✦",
-      tagline: "If I were running this scam, here's exactly what I'd do.",
+      tagline: "Sentiment is theater. Strip the script and read the cast.",
+      // Per-station SitePal voice override for TTS fallback. The runtime
+      // default (used for all other characters unless they specify) is voice
+      // "3". Barron needs a male voice — placeholder "2" is the typical
+      // SitePal Neural2 US-English male slot; adjust to whichever voice ID
+      // matches the male voice in your SitePal account 9308752. Audio
+      // recordings (when present) bypass this entirely.
+      voice: "2",
+      intro:
+        "These followers. Listen. Tremendous fake. The best fakes I've ever seen. Sad.",
+      returnLines: [
+        "You're back. Smart. Very smart.",
+        "Good. I was getting bored. Tremendous boredom.",
+        "Round two. Let's go.",
+      ],
+      questions: [
+        {
+          q: "How real is the following?",
+          a:
+            "Five thousand followers, eighty-one percent under fourteen days old. " +
+            "Botted. Plastic people, every one of them.",
+          reveals: "TWITTER FOLLOWERS",
+        },
+        {
+          q: "What's the community actually saying?",
+          a:
+            "Eighty-eight percent the same phrase. Copy-paste. Drone army. " +
+            "Nothing real anywhere.",
+          reveals: "TELEGRAM ACTIVITY",
+        },
+        {
+          q: "Who's promoting it?",
+          a:
+            "Three paid promoters. Two with rug histories. Repeat offenders! Same " +
+            "circle, every time. They don't even hide it.",
+          reveals: "KOL PROMOTERS",
+        },
+        {
+          q: "What about negative comments?",
+          a:
+            "Deleted. Four minutes, sometimes less. Total censorship. They cannot " +
+            "handle the truth.",
+          reveals: "FUD SUPPRESSION",
+        },
+      ],
       entries: [
         { label: "TWITTER FOLLOWERS", value: "5,200 — 81% under 14 days old", threat: "red" },
         { label: "TELEGRAM ACTIVITY", value: "88% repetitive shill phrases", threat: "red" },
         { label: "KOL PROMOTERS", value: "3 paid KOLs, 2 with rug histories", threat: "red" },
-        { label: "WHITEPAPER", value: "6 pages — tokenomics only, no architecture", threat: "amber" },
-        { label: "AI CLAIMS", value: "No GitHub repos, no model card, no demo", threat: "red" },
+        { label: "FUD SUPPRESSION", value: "Negative comments deleted within ~4 min", threat: "red" },
+        { label: "POST CADENCE", value: "Coordinated pumps every 90s across 12 accounts", threat: "red" },
       ],
-      summary: "Astroturfed community. Shill KOLs. Vapor narrative. Textbook setup.",
+      summary: "Astroturf. Bought voices. Sentiment is manufactured, not earned.",
+      verdictReaction: {
+        believe: "Your funeral. Beautiful funeral, but a funeral.",
+        abstain: "Smart move. Smartest in the room. Sometimes.",
+        doubt:   "Now you're thinking. Small winner. But a winner.",
+      },
+      vindication: {
+        aligned:   "Told you. Was I right? I was right.",
+        missed:    "Hurts, doesn't it. Hurts good. Remember it.",
+        abstained: "Cautious. Boring. Correct.",
+      },
     },
-    eugene: {
-      character: "EUGENE",
-      role: "WALLET CARTOGRAPHY",
+    marisol: {
+      character: "Detective Marisol",
+      role: "LOGOS · ONCHAIN",
       sigil: "✧",
-      tagline: "The holders tell on themselves if you watch where they herd.",
+      tagline: "The chain doesn't lie. Read the receipts.",
+      intro:
+        "Pull up a chair. The wallets tell the whole story if you know how to read 'em.",
+      returnLines: [
+        "Thought you might come back.",
+        "Pull up a chair again. Coffee's cold.",
+        "What've you got?",
+      ],
+      questions: [
+        {
+          q: "How concentrated is the supply?",
+          a:
+            "Top ten wallets hold seventy-one percent. Whales in a kiddie pool. " +
+            "They'll splash.",
+          reveals: "TOP 10 HOLDERS",
+        },
+        {
+          q: "Is the deployer wallet alone?",
+          a: "Twenty-two percent across fourteen connected wallets. Same hand, different gloves.",
+          reveals: "DEPLOYER CLUSTER",
+        },
+        {
+          q: "What's the trading volume doing?",
+          a:
+            "Sixty-three percent of volume bouncing between eight wallets. " +
+            "Wash trade. Smoke and mirrors.",
+          reveals: "WASH TRADING",
+        },
+        {
+          q: "Is liquidity locked?",
+          a: "Liquidity is unlocked. Zero team vesting. The door's open, the lights are off.",
+          reveals: "LP / VESTING",
+        },
+      ],
       entries: [
         { label: "TOP 10 HOLDERS", value: "Hold 71% of supply", threat: "red" },
         { label: "DEPLOYER CLUSTER", value: "22% spread across 14 connected wallets", threat: "red" },
-        { label: "FUNDING GRAPH", value: "12 of top 20 holders share a single funder", threat: "red" },
-        { label: "ORGANIC HOLDERS (EST.)", value: "~180 — remainder are sybils", threat: "red" },
-        { label: "MEDIAN WALLET AGE", value: "9 days (excl. deployer cluster)", threat: "amber" },
-      ],
-      summary: "Concentration is theatrical. Most holders are the same actor wearing different hats.",
-    },
-    virgil: {
-      character: "VIRGIL",
-      role: "PATTERN ANALYSIS",
-      sigil: "❖",
-      tagline: "Watch the flow, not the chart. The chart is for tourists.",
-      entries: [
-        { label: "BUY/SELL RATIO", value: "Buy volume = 87% of all trades", threat: "red" },
         { label: "WASH TRADING", value: "63% of volume bouncing among 8 wallets", threat: "red" },
-        { label: "LARGEST SELL", value: "$487 — no whales exiting yet", threat: "amber" },
         { label: "LP / VESTING", value: "LP unlocked. Zero team vesting.", threat: "red" },
         { label: "EXIT-WINDOW PATTERN", value: "Matches 3–7 day rug fingerprint", threat: "red" },
       ],
-      summary: "Volume is a hall of mirrors. The exit door is wide open.",
+      summary: "Concentration, wash, exit-ready LP. The data says they're already leaving.",
+      verdictReaction: {
+        believe: "Hope you're right, kid. Been wrong before. Not today, though.",
+        abstain: "Smart play. The case isn't always closed when you walk away.",
+        doubt:   "You see it. Most don't, 'til it's gone.",
+      },
+      vindication: {
+        aligned:   "Called it.",
+        missed:    "Walk it off. Wallet patterns aren't intuitive 'til you've seen a hundred.",
+        abstained: "Lived to investigate another day.",
+      },
+    },
+    eugene: {
+      character: "Eugene",
+      role: "MYTHOS · NARRATIVE",
+      sigil: "❖",
+      tagline: "Every rug wears a story. Find the seams.",
+      // Eugene is text-only — these lines render as HTML chat bubbles near her head,
+      // not TTS. Soft typing chime + bubble drop-in per line. (No SitePal scene for her.)
+      textOnly: true,
+      intro: "Heyyy ✨ — okay this story is giving something. Let's read between the lines 💫",
+      returnLines: [
+        "Back! ✨ Whatcha need?",
+        "Hiii again 💫",
+        "Ooh more questions — yes pls",
+      ],
+      questions: [
+        {
+          q: "What's the elevator pitch?",
+          a: "Six pages of tokenomics. Zero pages of architecture. The vibes are doing all the work 😅",
+          reveals: "WHITEPAPER",
+        },
+        {
+          q: "Where's the actual product?",
+          a: "No github. No model card. No demo. The 'AI' is invisible 🙃",
+          reveals: "AI CLAIMS",
+        },
+        {
+          q: "Have we seen this pitch before?",
+          a:
+            "Same 'AI prophecy engine' framing as four prior rugs. Like wearing your " +
+            "ex's outfit to a date with their twin 💀",
+          reveals: "PITCH PATTERN",
+        },
+        {
+          q: "Is the roadmap realistic?",
+          a: "'Mainnet to AGI alignment in 12 weeks' 🚩🚩🚩 babe. I cannot.",
+          reveals: "ROADMAP REALISM",
+        },
+      ],
+      entries: [
+        { label: "WHITEPAPER", value: "6 pages — tokenomics only, no architecture", threat: "amber" },
+        { label: "AI CLAIMS", value: "No GitHub repos, no model card, no demo", threat: "red" },
+        { label: "PITCH PATTERN", value: "Identical 'AI prophecy engine' framing to 4 prior rugs", threat: "red" },
+        { label: "ROADMAP REALISM", value: "Mainnet → 'AGI alignment' in 12 weeks", threat: "red" },
+        { label: "ORIGIN STORY", value: "Founder bio claims MIT lab; lab denies record", threat: "red" },
+      ],
+      summary: "The story is a costume. The narrative was bought off the shelf.",
+      verdictReaction: {
+        believe: "Oh sweetie. Okay. We can grow from this 💕",
+        abstain: "Smart. Sometimes the vibe is no thanks and that's a sentence ✨",
+        doubt:   "Yesss — you saw it. The bots couldn't fool you 💫",
+      },
+      vindication: {
+        aligned:   "Knew you had instincts! 💕",
+        missed:    "Hey — we all learn the patterns eventually ✨",
+        abstained: "You read the room. Half the skill is knowing when not to play 💫",
+      },
     },
   },
   maxScans: 3,
@@ -105,22 +331,61 @@ const SAMPLE_CASE = {
   },
 };
 
-const STATION_ORDER = ["st-gr80", "h80z", "eugene", "virgil"];
+// Normalize a dialogue value into { text, audio }. Any string in the case data
+// is treated as text-only (will use TTS via sayText); upgrading a line to
+// pre-recorded audio is as simple as replacing the string with
+// { text: "...", audio: "yourSitePalAudioName" }. `audio` always wins over `text`
+// at playback time when SitePal sayAudio is available.
+export function resolveLine(line) {
+  if (line == null) return null;
+  if (typeof line === 'string') return { text: line, audio: null };
+  if (typeof line === 'object') {
+    return { text: line.text || '', audio: line.audio || null };
+  }
+  return null;
+}
+
+// Pick a return line at random for a given station (used on revisits).
+// Returns the raw value (string or {text, audio}); resolve at speak/display.
+export function pickReturnLine(station) {
+  const pool = station?.returnLines;
+  if (!pool || pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Map a player's verdict + the correct verdict to which vindication key to play.
+// "aligned" = called it right; "missed" = called it wrong; "abstained" = sat it out.
+export function pickVindicationKey(verdict, correctVerdict) {
+  if (verdict === "abstain") return "abstained";
+  return verdict === correctVerdict ? "aligned" : "missed";
+}
+
+// Monk leads the lineup — they wave to open the game and speak the briefing.
+export const STATION_ORDER = ["monk", "demon", "marisol", "eugene"];
 
 // ────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ────────────────────────────────────────────────────────────────────────
 
-export default function LiminalTerminal({
+const LiminalTerminal = forwardRef(function LiminalTerminal({
   caseData = SAMPLE_CASE,
   onComplete,
-  showIntro = true,         // pass false for veteran players (read from localStorage in your scene wrapper)
-  onIntroDismissed,         // fires when player toggles "don't show again"
-  onStart,                  // fires when player clicks START — wire to your TTS/audio cue here
-}) {
+  showIntro = true,           // pass false for veteran players (read from localStorage in your scene wrapper)
+  onIntroDismissed,           // fires when player toggles "don't show again"
+  onStart,                    // fires when player clicks START — wire to your TTS/audio cue here
+  activeStation: activeStationProp,   // optional controlled prop — when defined, parent owns selection
+  onActiveStationChange,      // fires when overlay or scan changes the active station
+  hideVerdictBar = false,     // hide the bottom VerdictBar when the parent UI owns those buttons
+}, ref) {
   // Phases: "intro" → "playing" → "verdict given" (verdict state itself signals reveal)
   const [phase, setPhase] = useState(showIntro ? "intro" : "playing");
-  const [activeStation, setActiveStation] = useState(STATION_ORDER[0]);
+  const [activeStationInternal, setActiveStationInternal] = useState(STATION_ORDER[0]);
+  const isControlled = activeStationProp !== undefined && activeStationProp !== null;
+  const activeStation = isControlled ? activeStationProp : activeStationInternal;
+  const setActiveStation = (next) => {
+    if (!isControlled) setActiveStationInternal(next);
+    if (onActiveStationChange) onActiveStationChange(next);
+  };
   const [investigated, setInvestigated] = useState(new Set());
   const [verdict, setVerdict] = useState(null);
   const [brier, setBrier] = useState(null);
@@ -132,7 +397,7 @@ export default function LiminalTerminal({
 
   function startGame() {
     if (suppressIntro && onIntroDismissed) onIntroDismissed();
-    if (onStart) onStart();   // <-- trigger St. GR80 voiceline here
+    if (onStart) onStart();   // <-- parent wires Monk speech / scene focus here
     setPhase("playing");
   }
 
@@ -163,6 +428,13 @@ export default function LiminalTerminal({
     }
   }
 
+  useImperativeHandle(ref, () => ({
+    submitVerdict,
+    scanStation,
+    getPhase: () => phase,
+    hasVerdict: () => verdict !== null,
+  }), [phase, verdict, investigated]);
+
   return (
     <div className="lt-root">
       <style>{STYLES}</style>
@@ -187,7 +459,7 @@ export default function LiminalTerminal({
             scansRemaining={scansRemaining}
             onScan={() => scanStation(activeStation)}
           />
-          {phase === "playing" && (
+          {phase === "playing" && !hideVerdictBar && (
             <VerdictBar
               onVerdict={submitVerdict}
               enabled={hasInvestigated}
@@ -213,7 +485,9 @@ export default function LiminalTerminal({
       )}
     </div>
   );
-}
+});
+
+export default LiminalTerminal;
 
 // ────────────────────────────────────────────────────────────────────────
 // CASE HEADER

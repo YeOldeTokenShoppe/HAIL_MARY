@@ -522,6 +522,12 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
       const texture = window[textureGlobal]
       if (!canvas || !texture) return
 
+      // Yield to EvidenceScreens while it owns this canvas. The flag is set
+      // when the player is reading a question's evidence on this character's
+      // primary screen; cleared when activeAnswer clears (player taps CONTINUE
+      // or rotates to another consultant), and the ambient CRT content resumes.
+      if (canvas.dataset && canvas.dataset.evidenceActive === 'true') return
+
       const ctx = canvas.getContext('2d')
       const W = canvas.width
       const H = canvas.height

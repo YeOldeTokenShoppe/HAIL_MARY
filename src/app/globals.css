@@ -7672,3 +7672,18 @@ button[class*="SignInAuthMethodButtons-module__auth-btn"]:hover {
   border-color: #ffb700 !important;
   background-color: rgba(253, 237, 0, 0.08) !important;
 }
+
+/* Down-arrow bounce for the question-card "OR ↓" hint that points at the
+   character railway. Subtle vertical drift so the eye follows it. */
+@keyframes promptArrowBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(4px); }
+}
+
+/* One-shot fade-in for each newly-revealed chunk in ProgressiveText.
+   Uses `both` fill mode so the chunk starts at opacity 0 even before the
+   first frame paints — prevents a flash of full-opacity content on mount. */
+@keyframes progressiveTextFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

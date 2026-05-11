@@ -177,6 +177,12 @@ const DetectiveScreen = () => {
       const canvas = window['__screen3Canvas']
       const texture = window['__screen3Texture']
       if (!canvas || !texture) return
+
+      // Yield to EvidenceScreens while it owns this canvas (player is reading
+      // an evidence card on Marisol's primary screen). Resume when the flag
+      // clears (CONTINUE or rotate-away from the answer view).
+      if (canvas.dataset && canvas.dataset.evidenceActive === 'true') return
+
       const ctx = canvas.getContext('2d')
 
       const now = Date.now()

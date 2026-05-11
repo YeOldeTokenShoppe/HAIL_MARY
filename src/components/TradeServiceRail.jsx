@@ -4,10 +4,10 @@ const SERVICES = [
   {
     id: "game",
     eyebrow: "FREE",
-    title: "Judge Case",
+    title: "Token Trainer",
     desc: "Read evidence. Render verdict. Climb the board.",
     accent: "phos",
-    cta: "ENTER",
+    cta: "START",
   },
   {
     id: "analysis",

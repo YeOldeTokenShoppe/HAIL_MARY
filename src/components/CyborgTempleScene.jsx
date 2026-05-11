@@ -26,8 +26,8 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Demon: {
-    cameraPos: new THREE.Vector3(-0.58, -0.56, 2.16),
-    lookAtPos: new THREE.Vector3(1.015, -0.485, 0.325),
+ cameraPos: new THREE.Vector3(-0.375, -0.56, 2.215),
+    lookAtPos: new THREE.Vector3(1.785, -0.485, -0.22),
     orbitCenter: null,
   },
   Monk: {
@@ -149,12 +149,17 @@ export const DEMON_SITEPAL_FILTER = {
 // characters share one portal and swap scenes via loadSceneByID().
 export const DEMON_SITEPAL_CONTAINER_ID = "sitepal-container-host";
 
-// On focus, the Demon plays a specific audio track from the SitePal
-// account by name (sayAudio in the SitePal API). The track has to
-// exist in the SitePal account that owns the embed; the lipsync /
-// timing is bound to it server-side. Set to '' to disable speech
-// playback without ripping out the wiring.
-export const DEMON_SITEPAL_AUDIO_NAME = '11devil1';
+// On focus, the Demon plays an audio track from the SitePal account
+// by name (sayAudio in the SitePal API). Tracks must exist in the
+// SitePal account that owns the embed; the lipsync / timing is bound
+// server-side. activateSitePalProjection() picks one at click time
+// (avoiding immediate repeats). Empty array = fall back to the
+// scene's bound audio. Currently `preferSceneAudio: true` on the
+// Demon config means the scene's auto-loaded track wins when present,
+// so these names act as a fallback unless you flip preferSceneAudio.
+export const DEMON_SITEPAL_AUDIO_NAMES = [
+  '11devil1',
+];
 
 // ── Detective SitePal config (parallel to Demon) ────────────────
 // Face2-mapping crop region for Detective_Face2. Tweak via the
@@ -175,9 +180,10 @@ saturate: 210,
   sepia: 0,
 };
 // (Detective container id no longer needed — single host portal.)
-// Empty = use scene-level audio via replay() (which is what worked for
-// Demon — the published SitePal scene auto-plays its bound track).
-export const DETECTIVE_SITEPAL_AUDIO_NAME = '';
+// Empty array = use scene-level audio via replay() (which is what
+// worked for Demon — the published SitePal scene auto-plays its bound
+// track). Add named tracks here once you record them.
+export const DETECTIVE_SITEPAL_AUDIO_NAMES = [];
 
 // ── Monk / Saint GR80 SitePal config ─────────────────────────────
 // Face2-mapping crop region for Monk_Face2. Tweak via the
@@ -197,7 +203,13 @@ export const MONK_SITEPAL_FILTER = {
   hueRotate: -27,
   sepia: 0,
 };
-export const MONK_SITEPAL_AUDIO_NAME = 'Introduction';
+// Multiple short snippets for variety. activateSitePalProjection() picks
+// one at click time (avoiding immediate repeats) so the Monk doesn't say
+// the same line twice in a row. Names must match audio tracks saved in
+// the SitePal account on scene 2774449.
+export const MONK_SITEPAL_AUDIO_NAMES = [
+  'GR80 greeting 1',
+];
 
 // Per-character SitePal projection registry. This keeps scene metadata
 // in one place while crop/filter remain exported as mutable objects for
@@ -212,8 +224,8 @@ export const SITEPAL_PROJECTION_CONFIG = {
     embedContext: 1,
     crop: DEMON_SITEPAL_CROP,
     filter: DEMON_SITEPAL_FILTER,
-    audioName: DEMON_SITEPAL_AUDIO_NAME,
-    speech: { type: 'audio', audioName: DEMON_SITEPAL_AUDIO_NAME, preferSceneAudio: true },
+    audioNames: DEMON_SITEPAL_AUDIO_NAMES,
+    speech: { type: 'audio', preferSceneAudio: true },
     preload: true,
   },
   Detective: {
@@ -223,19 +235,19 @@ export const SITEPAL_PROJECTION_CONFIG = {
     embedContext: 1,
     crop: DETECTIVE_SITEPAL_CROP,
     filter: DETECTIVE_SITEPAL_FILTER,
-    audioName: DETECTIVE_SITEPAL_AUDIO_NAME,
-    speech: { type: 'audio', audioName: DETECTIVE_SITEPAL_AUDIO_NAME, preferSceneAudio: true },
+    audioNames: DETECTIVE_SITEPAL_AUDIO_NAMES,
+    speech: { type: 'audio', preferSceneAudio: true },
     preload: true,
   },
   Monk: {
     label: 'Monk',
     sceneId: 2774449,
-    hash: 'k3t1S4jwAUw1jwOcSIldB1bvqnH0BViA',
+    hash: 'SfJwD81CkTeyemxPllatiMuMQDBGhBgZ',
     embedContext: 0,
     crop: MONK_SITEPAL_CROP,
     filter: MONK_SITEPAL_FILTER,
-    audioName: MONK_SITEPAL_AUDIO_NAME,
-    speech: { type: 'audio', audioName: MONK_SITEPAL_AUDIO_NAME, preferSceneAudio: false },
+    audioNames: MONK_SITEPAL_AUDIO_NAMES,
+    speech: { type: 'audio', preferSceneAudio: false },
     preload: false,
   },
 };
@@ -393,6 +405,7 @@ const CyborgTempleScene = ({
   useSitePalForDemon = false, // When true, overlay the SitePal avatar canvas onto the Demon's Face mesh. Parent should mount the SitePal embed into DEMON_SITEPAL_CONTAINER_ID.
   useSitePalForDetective = false, // Same as above, for the Detective character.
   useSitePalForMonk = false, // Same shared SitePal portal, mapped onto Monk_Face2.
+  externalFocusAgent = null, // When set, sync internal focus to this agentId — lets the parent (e.g. the consultant railway in /trade) fly the camera to a character without an in-scene click. Pass `null` to clear focus.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -449,7 +462,152 @@ const CyborgTempleScene = ({
       if (window.__cameraTuner) delete window.__cameraTuner;
     };
   }, []);
-  
+
+  // Cross-fade a character into their idle animation and pause the random
+  // animation rotation. Mirrors the per-character handoffs the in-scene click
+  // already does (Monk → idle_monk, Detective → detective_idle, etc.) so
+  // that characters focused via the railway also settle into their idle
+  // pose while speaking, instead of continuing whatever ambient clip was
+  // playing (typing, disbelief, etc.). Fluffy is special — her clip is just
+  // paused since she has no idle/active distinction.
+  //
+  // The Demon's full in-scene focus sequence (idle → pointing → typing) is
+  // intentionally NOT replicated — the user wants every character on idle
+  // while the game-flow speech plays; pointing/typing during speech is the
+  // wrong read.
+  const applyCharacterFocusAnimation = (agentId) => {
+    const crossfadeToIdle = (actions, state, idlePattern) => {
+      if (!actions || !state) return;
+      const idleKey = Object.keys(actions).find((a) => idlePattern.test(a));
+      if (!idleKey) {
+        console.warn('[focus anim] idle pattern not matched for', agentId, 'available:', Object.keys(actions));
+        return;
+      }
+      const idleAction = actions[idleKey];
+      const prevAction = actions[state.currentAnimation];
+      const alreadyOn =
+        state.currentAnimation === idleKey &&
+        idleAction.isRunning && idleAction.isRunning();
+      if (!alreadyOn) {
+        if (prevAction && prevAction !== idleAction) {
+          prevAction.fadeOut(0.5);
+        }
+        idleAction.reset();
+        // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
+        idleAction.time = idleAction.getClip().duration * 0.05;
+        idleAction.setLoop(THREE.LoopRepeat);
+        idleAction.setEffectiveWeight(1);
+        idleAction.fadeIn(0.5);
+        idleAction.play();
+        state.currentAnimation = idleKey;
+      }
+      // Pause the random-rotation alternation while focused so the character
+      // stays on idle for the duration of the speech.
+      state.isPlayingSpecial = true;
+      state.nextSwitchDelay = 999999;
+      state.lastSwitchTime = Date.now();
+    };
+
+    if (agentId === 'Monk') {
+      crossfadeToIdle(actionsRef.current['Monk'], monkAnimStateRef.current, /idle_monk/i);
+    } else if (agentId === 'Demon') {
+      crossfadeToIdle(actionsRef.current['Demon'], demonAnimStateRef.current, /demon.*idle/i);
+    } else if (agentId === 'Detective') {
+      crossfadeToIdle(actionsRef.current['Detective'], detectiveAnimStateRef.current, /detective.*idle/i);
+    } else if (agentId === 'RL80') {
+      // RL80 prefers /(?:^|_)idle/ but the existing in-scene click falls
+      // back to typing if no idle is authored. We honor the same fallback.
+      const rl80Actions = actionsRef.current['RL80'];
+      if (rl80Actions) {
+        const animKeys = Object.keys(rl80Actions);
+        const pattern = animKeys.some((a) => /(?:^|_)idle/i.test(a))
+          ? /(?:^|_)idle/i
+          : /(?:^|_)typing/i;
+        crossfadeToIdle(rl80Actions, rl80AnimStateRef.current, pattern);
+      }
+    } else if (agentId === 'Fluffy') {
+      // Fluffy has no idle/active distinction — pause all clips so the cat
+      // sits still during the close-up (eliminates loop-seam glitch).
+      const fluffyActions = actionsRef.current['Fluffy'];
+      if (fluffyActions) {
+        Object.values(fluffyActions).forEach((action) => {
+          action.paused = true;
+        });
+      }
+    }
+  };
+
+  // External focus sync — when the parent passes a new `externalFocusAgent`
+  // (e.g. the player tapped a railway portrait in /trade), fly the camera to
+  // that character using the same AGENT_CAMERA_SETTINGS the in-scene click
+  // path uses. No-op when the requested agent is already focused, so this
+  // doesn't loop with the internal onClick → onAgentClick → focusedAgent
+  // → externalFocusAgent round-trip.
+  //
+  // We also mirror the per-character setup the in-scene click does:
+  //   • set the matching `*FocusedRef.current = true` so the head-tracks-
+  //     camera code path enables for that character
+  //   • call `activateSitePalProjection(agentId)` for voiced characters so
+  //     the right SitePal scene loads (face overlay paints the right face);
+  //     gameStarted branching inside that helper still suppresses the lobby
+  //     "meet" line during game mode
+  //   • latch `monkWaveStateRef.hasBeenFocused = true` on Monk focus so the
+  //     hail/beckon attention loop stops permanently for the session
+  useEffect(() => {
+    if (externalFocusAgent === undefined) return;
+    if (externalFocusAgent === null) {
+      setFocusTarget((prev) => prev ? null : prev);
+      return;
+    }
+
+    switch (externalFocusAgent) {
+      case 'Monk':
+        monkFocusedRef.current = true;
+        if (monkWaveStateRef.current) {
+          monkWaveStateRef.current.hasBeenFocused = true;
+          monkWaveStateRef.current.attentionActive = false;
+        }
+        activateSitePalProjection('Monk');
+        applyCharacterFocusAnimation('Monk');
+        break;
+      case 'Demon':
+        demonFocusedRef.current = true;
+        activateSitePalProjection('Demon');
+        applyCharacterFocusAnimation('Demon');
+        break;
+      case 'Detective':
+        detectiveFocusedRef.current = true;
+        activateSitePalProjection('Detective');
+        applyCharacterFocusAnimation('Detective');
+        break;
+      case 'RL80':
+        rl80FocusedRef.current = true;
+        applyCharacterFocusAnimation('RL80');
+        break;
+      case 'Fluffy':
+        fluffyFocusedRef.current = true;
+        applyCharacterFocusAnimation('Fluffy');
+        break;
+      default:
+        break;
+    }
+
+    setFocusTarget((prev) => {
+      if (prev && prev.agentId === externalFocusAgent) return prev;
+      const isOnMobile = isMobile || detectedMobile;
+      const resolved = resolveAgentSettings(externalFocusAgent, isOnMobile);
+      if (!resolved) return prev;
+      return {
+        position: resolved.cameraPos,
+        lookAt: resolved.lookAtPos,
+        orbitCenter: resolved.orbitCenter,
+        fov: isOnMobile ? 75 : undefined,
+        agentId: externalFocusAgent,
+        agentName: externalFocusAgent,
+      };
+    });
+  }, [externalFocusAgent, isMobile, detectedMobile]);
+
   // Hover state for coins
   const [hoveredCoin, setHoveredCoin] = useState(null);
   const coin1OriginalScale = useRef(null);
@@ -665,28 +823,94 @@ const CyborgTempleScene = ({
                              (window.innerWidth <= 768);
       setDetectedMobile(isMobileDevice);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Mirror the `gameStarted` prop into a ref so `activateSitePalProjection`
+  // (called from a useEffect-captured click handler) always reads the latest
+  // value. Without this, the click handler closes over a stale `gameStarted`
+  // and the "meet" lines could fire mid-game (or vice versa).
+  const gameStartedRef = useRef(gameStarted);
+  useEffect(() => {
+    gameStartedRef.current = gameStarted;
+  }, [gameStarted]);
 
   const activateSitePalProjection = (characterId) => {
     const config = SITEPAL_PROJECTION_CONFIG[characterId];
     if (!config || typeof window === 'undefined') return;
     try {
       if (typeof window.saySilent === 'function') window.saySilent(0);
-      window.__sitePalDesiredVolume = 7;
+      if (window.__sitePalSpeechRetryTimer) {
+        clearTimeout(window.__sitePalSpeechRetryTimer);
+        window.__sitePalSpeechRetryTimer = null;
+      }
+      window.__sitePalActiveSpeech = null;
+      if (typeof window.stopSpeech === 'function') {
+        try { window.stopSpeech(); } catch (e) {}
+      }
       if (window.__sitePalPreloading) {
         window.__sitePalPreloading = false;
         window.__sitePalPreloadQueue = null;
       }
+
+      // Game mode: skip the random "meet" line — the parent's speakLine
+      // path drives all in-game speech (intro / return / answer / reaction /
+      // vindication). We still need to load the right SitePal scene so the
+      // face overlay animates the right character.
+      //
+      // Volume stays at the normal 7 so sayText/sayAudio works downstream.
+      // To prevent vh_sceneLoaded from auto-playing the scene's default
+      // meet-line audio, we set pending speech to a `type:'audio'` request
+      // with a null audioName — runSpeechRequest's `type === 'audio' &&
+      // audioName` guard then fails through every branch, the request
+      // result is null, the retry timer fires a few silent attempts and
+      // gives up. Meanwhile the parent's speakLine fires its real game
+      // speech ~900ms after focus, which overwrites the no-op via token
+      // semantics so the retries bail out on their next tick.
+      const inGame = gameStartedRef.current;
+      if (inGame) {
+        window.__sitePalDesiredVolume = 7;
+        window.__sitePalPendingSpeech = {
+          characterId,
+          sceneId: config.sceneId,
+          speech: { type: 'audio', audioName: null },
+        };
+        const targetSceneId = config.sceneId;
+        const sameScene = window.__sitePalCurrentSceneId === targetSceneId;
+        if (sameScene && window.__sitePalSceneLoaded === true) {
+          // Same scene already up — nothing to do; the parent's speakLine
+          // will fire the game audio shortly.
+        } else if (window.__sitePalSceneLoaded === true && typeof window.loadSceneByID === 'function') {
+          window.__sitePalSceneLoaded = false;
+          window.loadSceneByID(targetSceneId);
+        }
+        return;
+      }
+
+      // Lobby mode — pick a random meet-line and play it on scene load.
+      window.__sitePalDesiredVolume = 7;
       const dynamicSpeech = window.__sitePalSpeechOverrides?.[characterId];
+      let resolvedSpeech = dynamicSpeech || config.speech || { type: 'scene' };
+      // If the character has an audioNames array, pick one (avoiding the
+      // last index used for this character) so repeated clicks vary the
+      // line. audioName takes precedence if explicitly set on speech.
+      if (!resolvedSpeech.audioName && Array.isArray(config.audioNames) && config.audioNames.length > 0) {
+        const names = config.audioNames;
+        const lastIdxMap = (window.__sitePalLastAudioIdx ||= {});
+        const last = lastIdxMap[characterId];
+        let idx = Math.floor(Math.random() * names.length);
+        if (names.length > 1 && idx === last) idx = (idx + 1) % names.length;
+        lastIdxMap[characterId] = idx;
+        resolvedSpeech = { ...resolvedSpeech, type: 'audio', audioName: names[idx] };
+      }
       window.__sitePalPendingSpeech = {
         characterId,
         sceneId: config.sceneId,
-        speech: dynamicSpeech || config.speech || { type: 'scene' },
+        speech: resolvedSpeech,
       };
       const targetSceneId = config.sceneId;
       const sameScene = window.__sitePalCurrentSceneId === targetSceneId;
@@ -899,8 +1123,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v33_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v33.glb";
+    let modelPath = "/models/RL80_4anims_v40_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v40.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -4339,7 +4563,7 @@ const CyborgTempleScene = ({
 
       // ~110° max turn so the monk can track the camera further around to
       // the right (was 1.2 rad ≈ 69°).
-      const maxHeadAngle = 1.92;
+      const maxHeadAngle = 1.42;
       const angleBetween = monkHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
       const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.9) : 0;
       const blendedWorldQuat = monkHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
