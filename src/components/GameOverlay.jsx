@@ -41,10 +41,10 @@ export const SAMPLE_CASE = {
   // directions — Brier (lower-better, counterintuitive) vs accuracy (higher-better),
   // and (4) the calibration intuition (bold-right wins, bold-wrong loses, abstain spared).
   rulesIntro:
-    "Before we begin, friend — the rite is simple. You have three questions to " +
+    "Welcome friend! Before we begin, the rite is simple. You have three questions to " +
     "spend across the four of us. Then you render your verdict: Believe, Abstain, " +
-    "or Doubt. Two scores judge you. Your Brier — lower is better, the closer to " +
-    "truth. Your accuracy — higher, as you would expect. Boldness rewards the seer " +
+    "or Doubt. Two scores judge you. Your Brier, lower is better, the closer to " +
+    "truth. Your accuracy, higher, as you would expect. Boldness rewards the seer " +
     "and punishes the blind. Abstain when you do not see. Choose wisely.",
   stations: {
     monk: {
@@ -73,44 +73,57 @@ export const SAMPLE_CASE = {
         // pronounce it however GR80 chooses; the UI still shows "$PRPHT"
         // in the top HUD strip and other label slots.
         text:
-          "The Prophet Token. It claims prophecy — to see what is not yet " +
-          "written. Many have come with such promises; few have survived " +
-          "examination. Begin when you are ready.",
+          "We first examine a token that claims prophecy - the Prophet token." +
+          "To see what is not yet written. Many have come with such promises;" +
+          "few have survived examination." +
+          "Begin when you are ready.",
         audio: "case001_monk_intro",
       },
       // Played on revisit (random pick from this pool, never the intro again).
       returnLines: [
         "Back so soon? The scriptures haven't changed.",
         "You return. Good. Doubt is a holy path.",
-        "Step closer. Let us continue.",
+        "Welcome back. Let us continue.",
       ],
       // Each question consumes 1 of the case's 3 scans. `reveals` matches an entry label
       // so the right card surfaces on the monitor when the line plays.
       questions: [
         {
           q: "Who built this?",
-          a: "The architect was born six days ago. A newborn cannot prophesy.",
+          a: {
+            text: "The architect was born six days ago. A newborn cannot prophesy.",
+            audio: "case001_monk_q1",
+          },
           reveals: "DEPLOYER WALLET AGE",
         },
         {
           q: "What have they done before?",
-          a:
-            "Three idols. Two were rugged. The third still breathes — barely. " +
-            "A pattern, not a coincidence.",
+          a: {
+            text:
+              "Three idols. Two were rugged. The third still breathes — barely. " +
+              "A pattern, not a coincidence.",
+            audio: "case001_monk_q2",
+          },
           reveals: "PRIOR OUTCOMES",
         },
         {
           q: "Where did the funds come from?",
-          a:
-            "Through the Tornado. Through the veil. Money that does not wish " +
-            "to be remembered.",
+          a: {
+            text:
+              "Through the Tornado. Through the veil. Money that does not wish " +
+              "to be remembered.",
+            audio: "case001_monk_q3",
+          },
           reveals: "FUNDING SOURCE",
         },
         {
           q: "Is the contract original?",
-          a:
-            "Eighty-five percent of these scriptures were written by another hand — " +
-            "and that hand has been known to strike.",
+          a: {
+            text:
+              "Eighty-five percent of these scriptures were written by another hand — " +
+              "and that hand has been known to strike.",
+            audio: "case001_monk_q4",
+          },
           reveals: "CONTRACT ORIGINALITY",
         },
       ],
@@ -123,17 +136,39 @@ export const SAMPLE_CASE = {
       ],
       summary: "Three prior rugs. Mixer-funded. Forked template. Credibility is zero.",
       // Plays immediately on verdict commit (before outcome reveal).
+      // NOTE on audio names: SitePal's audio-name field caps at 25 chars, so
+      // `react_believe` / `react_abstain` / `vind_abstained` got truncated on
+      // upload to `react_believ` / `react_abstai` / `vind_abstain`. The names
+      // here match what SitePal actually has registered — text is unchanged.
       verdictReaction: {
-        believe: "...I will pray for you, then.",
-        abstain: "Wise. Better silent than to bear false witness.",
-        doubt:   "Faith was never blind. You see clearly.",
+        believe: {
+          text: "...I will pray for you, then.",
+          audio: "case001_monk_react_believ",
+        },
+        abstain: {
+          text: "Wise. Better silent than to bear false witness.",
+          audio: "case001_monk_react_abstai",
+        },
+        doubt: {
+          text: "Faith was never blind. You see clearly.",
+          audio: "case001_monk_react_doubt",
+        },
       },
       // Plays after outcome reveal. `aligned` = player's verdict matched ground truth;
       // `missed` = wrong; `abstained` = chose Abstain regardless of truth.
       vindication: {
-        aligned:   "As I feared.",
-        missed:    "We will rebuild your faith on firmer ground.",
-        abstained: "The faithful and the cautious survive.",
+        aligned: {
+          text: "As I feared.",
+          audio: "case001_monk_vind_aligned",
+        },
+        missed: {
+          text: "We will rebuild your faith on firmer ground.",
+          audio: "case001_monk_vind_missed",
+        },
+        abstained: {
+          text: "The faithful and the cautious survive.",
+          audio: "case001_monk_vind_abstain",
+        },
       },
     },
     demon: {
@@ -148,40 +183,56 @@ export const SAMPLE_CASE = {
       // matches the male voice in your SitePal account 9308752. Audio
       // recordings (when present) bypass this entirely.
       voice: "2",
-      intro:
-        "These followers. Listen. Tremendous fake. The best fakes I've ever seen. Sad.",
+      intro: {
+        text: "These followers. Listen. Tremendous fake. The best fakes I've ever seen. Sad.",
+        audio: "case001_demon_intro",
+      },
+      // Character-wide return pool — same files play across all cases on
+      // revisits to Barron. Each picked at random by pickReturnLine().
       returnLines: [
-        "You're back. Smart. Very smart.",
-        "Good. I was getting bored. Tremendous boredom.",
-        "Round two. Let's go.",
+        { text: "You're back. Smart. Very smart.", audio: "demon_return_1" },
+        { text: "Good. I was getting bored. Tremendous boredom.", audio: "demon_return_2" },
+        { text: "Round two. Let's go.", audio: "demon_return_3" },
       ],
       questions: [
         {
           q: "How real is the following?",
-          a:
-            "Five thousand followers, eighty-one percent under fourteen days old. " +
-            "Botted. Plastic people, every one of them.",
+          a: {
+            text:
+              "Five thousand followers, eighty-one percent under fourteen days old. " +
+              "Botted. Plastic people, every one of them.",
+            audio: "case001_demon_q1",
+          },
           reveals: "TWITTER FOLLOWERS",
         },
         {
           q: "What's the community actually saying?",
-          a:
-            "Eighty-eight percent the same phrase. Copy-paste. Drone army. " +
-            "Nothing real anywhere.",
+          a: {
+            text:
+              "Eighty-eight percent the same phrase. Copy-paste. Drone army. " +
+              "Nothing real anywhere.",
+            audio: "case001_demon_q2",
+          },
           reveals: "TELEGRAM ACTIVITY",
         },
         {
           q: "Who's promoting it?",
-          a:
-            "Three paid promoters. Two with rug histories. Repeat offenders! Same " +
-            "circle, every time. They don't even hide it.",
+          a: {
+            text:
+              "Three paid promoters. Two with rug histories. Repeat offenders! Same " +
+              "circle, every time. They don't even hide it.",
+            audio: "case001_demon_q3",
+          },
           reveals: "KOL PROMOTERS",
         },
         {
           q: "What about negative comments?",
-          a:
-            "Deleted. Four minutes, sometimes less. Total censorship. They cannot " +
-            "handle the truth.",
+          a: {
+            text:
+              "Deleted. Four minutes, sometimes less. Total censorship. They can't " +
+              "handle the truth.",
+            audio: "case001_demon_q4",
+          },
           reveals: "FUD SUPPRESSION",
         },
       ],
@@ -193,52 +244,95 @@ export const SAMPLE_CASE = {
         { label: "POST CADENCE", value: "Coordinated pumps every 90s across 12 accounts", threat: "red" },
       ],
       summary: "Astroturf. Bought voices. Sentiment is manufactured, not earned.",
+      // SitePal 25-char audio-name cap forces truncation on react_believe /
+      // react_abstain / vind_aligned / vind_abstained — "demon" eats one
+      // more char than "monk", so different slots truncate compared to
+      // monk's set. Names below match what SitePal actually stored.
       verdictReaction: {
-        believe: "Your funeral. Beautiful funeral, but a funeral.",
-        abstain: "Smart move. Smartest in the room. Sometimes.",
-        doubt:   "Now you're thinking. Small winner. But a winner.",
+        believe: {
+          text: "Your funeral. Beautiful funeral, but a funeral.",
+          audio: "case001_demon_react_belie",
+        },
+        abstain: {
+          text: "Smart move. Smartest in the room. Sometimes.",
+          audio: "case001_demon_react_absta",
+        },
+        doubt: {
+          text: "Now you're thinking. Small winner. But a winner.",
+          audio: "case001_demon_react_doubt",
+        },
       },
       vindication: {
-        aligned:   "Told you. Was I right? I was right.",
-        missed:    "Hurts, doesn't it. Hurts good. Remember it.",
-        abstained: "Cautious. Boring. Correct.",
+        aligned: {
+          text: "Told you. Was I right? I was right.",
+          audio: "case001_demon_vind_aligne",
+        },
+        missed: {
+          text: "Hurts, doesn't it. Hurts good. Remember it.",
+          audio: "case001_demon_vind_missed",
+        },
+        abstained: {
+          text: "Cautious. Boring. Correct.",
+          audio: "case001_demon_vind_abstai",
+        },
       },
     },
     marisol: {
-      character: "Detective Marisol",
+      // Display name is "Detective Trinity" — the internal station key
+      // stays `marisol` so we don't have to refactor every reference to
+      // it across the scene, EvidenceScreens, EvidenceOverlay, railway,
+      // fullscreen overlay, etc. The player only sees the `character`
+      // value in the UI. Railway shortname derives from the last word,
+      // so the portrait label reads "TRINITY".
+      character: "Detective Trinity",
       role: "LOGOS · ONCHAIN",
       sigil: "✧",
       tagline: "The chain doesn't lie. Read the receipts.",
-      intro:
-        "Pull up a chair. The wallets tell the whole story if you know how to read 'em.",
+      intro: {
+        text: "Pull up a chair. The wallets tell the whole story if you know how to read them.",
+        audio: "case001_trinity_intro",
+      },
+      // Character-wide return pool — 2 lines for now (trinity_return_1, _2).
+      // Add a third later if you record one.
       returnLines: [
-        "Thought you might come back.",
-        "Pull up a chair again. Coffee's cold.",
-        "What've you got?",
+        { text: "Thought you might come back.", audio: "trinity_return_1" },
+        { text: "What've you got?", audio: "trinity_return_2" },
       ],
       questions: [
         {
           q: "How concentrated is the supply?",
-          a:
-            "Top ten wallets hold seventy-one percent. Whales in a kiddie pool. " +
-            "They'll splash.",
+          a: {
+            text:
+              "Top ten wallets hold seventy-one percent. Whales in a kiddie pool. " +
+              "They'll splash.",
+            audio: "case001_trinity_q1",
+          },
           reveals: "TOP 10 HOLDERS",
         },
         {
           q: "Is the deployer wallet alone?",
-          a: "Twenty-two percent across fourteen connected wallets. Same hand, different gloves.",
+          a: {
+            text: "Twenty-two percent across fourteen connected wallets. Same hand, different gloves.",
+            audio: "case001_trinity_q2",
+          },
           reveals: "DEPLOYER CLUSTER",
         },
         {
           q: "What's the trading volume doing?",
-          a:
-            "Sixty-three percent of volume bouncing between eight wallets. " +
-            "Wash trade. Smoke and mirrors.",
+          a: {
+            text:
+              "Sixty-three percent of volume bouncing between eight wallets. " +
+              "Wash trade. Smoke and mirrors.",
+            audio: "case001_trinity_q3",
+          },
           reveals: "WASH TRADING",
         },
         {
           q: "Is liquidity locked?",
-          a: "Liquidity is unlocked. Zero team vesting. The door's open, the lights are off.",
+          a: {
+            text: "Liquidity is unlocked. Zero team vesting. The door's open, the lights are off.",
+            audio: "case001_trinity_q4",
+          },
           reveals: "LP / VESTING",
         },
       ],
@@ -250,15 +344,38 @@ export const SAMPLE_CASE = {
         { label: "EXIT-WINDOW PATTERN", value: "Matches 3–7 day rug fingerprint", threat: "red" },
       ],
       summary: "Concentration, wash, exit-ready LP. The data says they're already leaving.",
+      // SitePal 25-char cap on audio names — "trinity" (7 chars) drops one
+      // more letter from each multi-syllable slot than "monk" (4 chars) or
+      // "demon" (5 chars), so react_doubt / vind_missed / vind_aligned all
+      // truncate here too (they fit for monk/demon). Names below match what
+      // SitePal actually stored.
       verdictReaction: {
-        believe: "Hope you're right, kid. Been wrong before. Not today, though.",
-        abstain: "Smart play. The case isn't always closed when you walk away.",
-        doubt:   "You see it. Most don't, 'til it's gone.",
+        believe: {
+          text: "Hope you're right, kid. Been wrong before. Not today, though.",
+          audio: "case001_trinity_react_bel",
+        },
+        abstain: {
+          text: "Smart play. The case isn't always closed when you walk away.",
+          audio: "case001_trinity_react_abs",
+        },
+        doubt: {
+          text: "You see it. Most don't, 'til it's gone.",
+          audio: "case001_trinity_react_dou",
+        },
       },
       vindication: {
-        aligned:   "Called it.",
-        missed:    "Walk it off. Wallet patterns aren't intuitive 'til you've seen a hundred.",
-        abstained: "Lived to investigate another day.",
+        aligned: {
+          text: "Called it.",
+          audio: "case001_trinity_vind_alig",
+        },
+        missed: {
+          text: "Walk it off. Wallet patterns aren't intuitive 'til you've seen a hundred.",
+          audio: "case001_trinity_vind_miss",
+        },
+        abstained: {
+          text: "Lived to investigate another day.",
+          audio: "case001_trinity_vind_abst",
+        },
       },
     },
     eugene: {

@@ -809,6 +809,51 @@ export default function CyborgTemple() {
   // on asking a question, or on character switch.
   const [currentSpeech, setCurrentSpeech] = useState(null);
   // shape: { stationKey, text, kind: 'intro' | 'return' } | null
+
+  // True while the focused character is actively delivering a line (audio
+  // playing or TTS in progress). Drives the 3D animation mode — idle while
+  // speaking, typing in between — so the character looks like they're
+  // looking up information between exchanges instead of just staring.
+  // Cleared via a setTimeout estimated from text length (matches
+  // ProgressiveText's reveal pace, ~70ms/char) — close enough to audio
+  // duration for the visual handoff to feel right.
+  const [speechActive, setSpeechActive] = useState(false);
+  const speechEndTimerRef = useRef(null);
+
+  // Hook SitePal's audio-end / speech-end callbacks to clear `speechActive`
+  // the moment the line actually finishes — much more accurate than the
+  // text-length safety-net timer in `speakLine` (which can undershoot when
+  // the audio file is longer than the displayed text, e.g. monk's first
+  // visit). Wraps any pre-existing handler so we don't stomp other code.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const clearLocalSpeechActive = () => {
+      setSpeechActive(false);
+      if (speechEndTimerRef.current) {
+        clearTimeout(speechEndTimerRef.current);
+        speechEndTimerRef.current = null;
+      }
+    };
+    const prevAudioStopped = window.vh_audioStopped;
+    const prevSpeechEnded = window.vh_speechEnded;
+    window.vh_audioStopped = function (audID, portal) {
+      try { clearLocalSpeechActive(); } catch (e) {}
+      if (typeof prevAudioStopped === 'function') {
+        try { prevAudioStopped.call(this, audID, portal); } catch (e) {}
+      }
+    };
+    window.vh_speechEnded = function (audID) {
+      try { clearLocalSpeechActive(); } catch (e) {}
+      if (typeof prevSpeechEnded === 'function') {
+        try { prevSpeechEnded.call(this, audID); } catch (e) {}
+      }
+    };
+    return () => {
+      window.vh_audioStopped = prevAudioStopped;
+      window.vh_speechEnded = prevSpeechEnded;
+    };
+  }, []);
+
   // GR80 delivers a one-time rules speech prepended to his intro on the player's
   // first-ever monk visit this session. Skipped on subsequent cases.
   const rulesSpokenRef = useRef(false);
@@ -848,17 +893,47 @@ export default function CyborgTemple() {
 
   // Speech helper: routes a case-data dialogue value (string or `{text, audio}`)
   // through SitePal's pending-speech queue and `runSpeechRequest` retry path —
-  // same pipeline the working lobby "meet" line uses. We were previously
-  // calling `window.sayAudio` directly which (a) bypassed the retry timer that
-  // tolerates audio-not-yet-loaded after a scene swap, (b) produced no console
-  // log, and (c) silently failed when the SitePal scene was still warming up.
+  // same pipeline the working lobby "meet" line uses.
+  //
+  // TTS fallback was REMOVED — pre-recorded audio is the only voice path now.
+  // Reasons: real-time TTS via `sayText` caused several recurring problems
+  // (em-dash 503s from Acapela engine 1, mismatched voice IDs across (engine,
+  // lang) combos, CORS preflight noise on tts/genC.php). Lines without an
+  // `audio` field are now silent — speechActive still flips on (so the
+  // character cross-fades to idle for the estimated duration) and the text
+  // still reveals in the widget, but no SitePal call is made. This keeps the
+  // dev flow clean during the recording phase: as each line's audio lands in
+  // the case data, it just starts playing.
   //
   // Eugene is text-only (no SitePal scene) — her lines surface as an HTML chat
   // bubble. The bubble persists until the player proceeds (asks another
   // question / CONTINUE / switches consultant); no time-based auto-dismiss.
-  const speakLine = useCallback((line, stationKey) => {
+  const speakLine = useCallback((line, stationKey, options) => {
     const resolved = resolveLine(line);
     if (!resolved || !resolved.text) return;
+
+    // Flip the focused character to idle (looking at camera) for the
+    // estimated duration of this line. SitePal's vh_audioStopped /
+    // vh_speechEnded callbacks (wired below) clear `speechActive` as soon
+    // as the actual audio ends — this setTimeout is a safety net only,
+    // so we make it generous. Caller may pass an explicit estimatedChars
+    // when the spoken audio differs from `resolved.text` (e.g. monk's
+    // first-visit recording contains rules + intro, but `intro.text` only
+    // has the intro proper — using just text.length would undershoot and
+    // flip back to typing mid-speech).
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current);
+      speechEndTimerRef.current = null;
+    }
+    setSpeechActive(true);
+    const charBudget = options?.estimatedChars ?? resolved.text.length;
+    // 100ms/char × generous floor and ceiling so the safety net only fires
+    // if callbacks somehow don't (network drop, scene-swap mid-line, etc.).
+    const safetyMs = Math.max(8000, Math.min(90000, charBudget * 100));
+    speechEndTimerRef.current = setTimeout(() => {
+      setSpeechActive(false);
+      speechEndTimerRef.current = null;
+    }, safetyMs);
 
     if (stationKey === 'eugene') {
       setEugeneBubble(resolved.text);
@@ -883,39 +958,15 @@ export default function CyborgTemple() {
         return;
       }
 
-      // Build the speech payload. Audio wins when present; otherwise TTS
-      // with the per-station voice override.
-      let speech;
-      if (resolved.audio) {
-        speech = { type: 'audio', audioName: resolved.audio };
-      } else {
-        // Per-station voice override. Each station may set a `voice` field in
-        // its case-data entry. Two shapes supported:
-        //   string  → just the SitePal voice ID; lang/engine fall back to
-        //             system defaults (lang 1, engine 3). Use when only the
-        //             voice ID changes (e.g. demon: "2" for a US male slot).
-        //   object  → { voice, lang?, engine? }. Use when lang or engine
-        //             need overriding (e.g. monk: { voice: "1", lang: 2,
-        //             engine: 1 } for Gilbert in English-UK / Acapela).
-        const v = caseData?.stations?.[stationKey]?.voice;
-        let voiceId = "3";
-        let lang = 1;
-        let engine = 3;
-        if (typeof v === 'string') {
-          voiceId = v;
-        } else if (v && typeof v === 'object') {
-          voiceId = v.voice || "3";
-          if (typeof v.lang === 'number') lang = v.lang;
-          if (typeof v.engine === 'number') engine = v.engine;
-        }
-        speech = {
-          type: 'text',
-          text: resolved.text,
-          voice: voiceId,
-          lang,
-          engine,
-        };
+      // No `audio` field → silent for now (line not yet recorded). The
+      // character still cross-fades to idle and the text reveals in the
+      // widget; speechActive's safety-net timer in speakLine clears it.
+      // No SitePal call avoids TTS-related errors (em-dash 503s, mismatched
+      // voice IDs, CORS noise) while recording is in progress.
+      if (!resolved.audio) {
+        return;
       }
+      const speech = { type: 'audio', audioName: resolved.audio };
 
       // Queue + fire through the existing speech pipeline. If the scene is
       // already loaded, speakPending plays now. If the swap is still in
@@ -1007,8 +1058,14 @@ export default function CyborgTemple() {
     // The text reveal starts immediately (above) — at ~70ms/char it'll
     // run slightly ahead of the recorded audio, but for the long intros
     // they re-converge by the middle of the paragraph.
+    // We pass `displayText.length` as the speech-active safety-net budget
+    // so monk's first-visit audio (rules+intro combined) doesn't undershoot
+    // and flip the character back to typing mid-speech.
+    const speakOptions = displayText
+      ? { estimatedChars: displayText.length }
+      : undefined;
     const t = setTimeout(() => {
-      if (toSpeak) speakLine(toSpeak, stationKey);
+      if (toSpeak) speakLine(toSpeak, stationKey, speakOptions);
     }, 900);
     return () => clearTimeout(t);
     // visitedStations is intentionally read inside the effect — including it in
@@ -1976,6 +2033,7 @@ export default function CyborgTemple() {
               useSitePalForDetective={focusedAgent === 'Detective'}
               useSitePalForMonk={focusedAgent === 'Monk'}
               externalFocusAgent={focusedAgent}
+              speechActive={speechActive}
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 console.log(`CoinFace ${coinIndex} tapped`)
@@ -2093,7 +2151,7 @@ export default function CyborgTemple() {
             RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Scans the tech tapestry for uncommon insights.' },
             Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Short seller. Insider trader.' },
             Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android theologian hell-bent on saving humanity from itself.' },
-            Detective: { name: 'Detective Marisol', pronunciation: '', tagline: 'Field agent for an interdimensional anti-fraud task force.' },
+            Detective: { name: 'Detective Trinity', pronunciation: '', tagline: 'Field agent for an interdimensional anti-fraud task force.' },
           };
           // In game mode, the in-scene evidence side panel takes over —
           // suppress the floating agent label so the two cards don't stack.

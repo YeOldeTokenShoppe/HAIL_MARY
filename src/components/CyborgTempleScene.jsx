@@ -406,6 +406,7 @@ const CyborgTempleScene = ({
   useSitePalForDetective = false, // Same as above, for the Detective character.
   useSitePalForMonk = false, // Same shared SitePal portal, mapped onto Monk_Face2.
   externalFocusAgent = null, // When set, sync internal focus to this agentId — lets the parent (e.g. the consultant railway in /trade) fly the camera to a character without an in-scene click. Pass `null` to clear focus.
+  speechActive = false, // When true, the focused character cross-fades to idle (speaking to player). When false, they cross-fade to typing (looking up info). Parent flips this when game-flow audio starts/ends.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -463,70 +464,79 @@ const CyborgTempleScene = ({
     };
   }, []);
 
-  // Cross-fade a character into their idle animation and pause the random
-  // animation rotation. Mirrors the per-character handoffs the in-scene click
-  // already does (Monk → idle_monk, Detective → detective_idle, etc.) so
-  // that characters focused via the railway also settle into their idle
-  // pose while speaking, instead of continuing whatever ambient clip was
-  // playing (typing, disbelief, etc.). Fluffy is special — her clip is just
-  // paused since she has no idle/active distinction.
+  // Cross-fade a character into either their idle or typing animation.
+  // Game-mode focus toggles between these two modes:
+  //   • mode='idle'   — character looks at the camera, attentive. Used while
+  //                     audio is actively playing (speaking to the player).
+  //   • mode='typing' — character looks down at their station, "looking up"
+  //                     info. Used between speech beats so they don't just
+  //                     stare. Default state on focus before audio starts.
+  // Fluffy has no idle/typing distinction — her clips just get paused.
   //
   // The Demon's full in-scene focus sequence (idle → pointing → typing) is
-  // intentionally NOT replicated — the user wants every character on idle
-  // while the game-flow speech plays; pointing/typing during speech is the
+  // intentionally NOT replicated for game-mode focus — the user wants every
+  // character on idle while speaking; pointing/typing-during-speech is the
   // wrong read.
-  const applyCharacterFocusAnimation = (agentId) => {
-    const crossfadeToIdle = (actions, state, idlePattern) => {
+  const applyCharacterFocusAnimation = (agentId, mode = 'idle') => {
+    const crossfadeTo = (actions, state, pattern) => {
       if (!actions || !state) return;
-      const idleKey = Object.keys(actions).find((a) => idlePattern.test(a));
-      if (!idleKey) {
-        console.warn('[focus anim] idle pattern not matched for', agentId, 'available:', Object.keys(actions));
+      const targetKey = Object.keys(actions).find((a) => pattern.test(a));
+      if (!targetKey) {
+        console.warn('[focus anim] pattern not matched for', agentId, mode, 'available:', Object.keys(actions));
         return;
       }
-      const idleAction = actions[idleKey];
+      const targetAction = actions[targetKey];
       const prevAction = actions[state.currentAnimation];
       const alreadyOn =
-        state.currentAnimation === idleKey &&
-        idleAction.isRunning && idleAction.isRunning();
+        state.currentAnimation === targetKey &&
+        targetAction.isRunning && targetAction.isRunning();
       if (!alreadyOn) {
-        if (prevAction && prevAction !== idleAction) {
+        if (prevAction && prevAction !== targetAction) {
           prevAction.fadeOut(0.5);
         }
-        idleAction.reset();
+        targetAction.reset();
         // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
-        idleAction.time = idleAction.getClip().duration * 0.05;
-        idleAction.setLoop(THREE.LoopRepeat);
-        idleAction.setEffectiveWeight(1);
-        idleAction.fadeIn(0.5);
-        idleAction.play();
-        state.currentAnimation = idleKey;
+        targetAction.time = targetAction.getClip().duration * 0.05;
+        targetAction.setLoop(THREE.LoopRepeat);
+        targetAction.setEffectiveWeight(1);
+        targetAction.fadeIn(0.5);
+        targetAction.play();
+        state.currentAnimation = targetKey;
       }
-      // Pause the random-rotation alternation while focused so the character
-      // stays on idle for the duration of the speech.
+      // Pause the random-rotation alternation while focused so the chosen
+      // clip stays in place (no surprise disbelief/fistpump interruptions).
       state.isPlayingSpecial = true;
       state.nextSwitchDelay = 999999;
       state.lastSwitchTime = Date.now();
     };
 
     if (agentId === 'Monk') {
-      crossfadeToIdle(actionsRef.current['Monk'], monkAnimStateRef.current, /idle_monk/i);
+      const pattern = mode === 'idle' ? /idle_monk/i : /typing_monk/i;
+      crossfadeTo(actionsRef.current['Monk'], monkAnimStateRef.current, pattern);
     } else if (agentId === 'Demon') {
-      crossfadeToIdle(actionsRef.current['Demon'], demonAnimStateRef.current, /demon.*idle/i);
+      const pattern = mode === 'idle' ? /demon.*idle/i : /demon.*typ/i;
+      crossfadeTo(actionsRef.current['Demon'], demonAnimStateRef.current, pattern);
     } else if (agentId === 'Detective') {
-      crossfadeToIdle(actionsRef.current['Detective'], detectiveAnimStateRef.current, /detective.*idle/i);
+      const pattern = mode === 'idle' ? /detective.*idle/i : /detective.*typ/i;
+      crossfadeTo(actionsRef.current['Detective'], detectiveAnimStateRef.current, pattern);
     } else if (agentId === 'RL80') {
-      // RL80 prefers /(?:^|_)idle/ but the existing in-scene click falls
-      // back to typing if no idle is authored. We honor the same fallback.
+      // RL80 falls back to the other mode's pattern if her preferred clip
+      // isn't authored (some rigs only ship idle, not typing or vice versa).
       const rl80Actions = actionsRef.current['RL80'];
       if (rl80Actions) {
         const animKeys = Object.keys(rl80Actions);
-        const pattern = animKeys.some((a) => /(?:^|_)idle/i.test(a))
-          ? /(?:^|_)idle/i
-          : /(?:^|_)typing/i;
-        crossfadeToIdle(rl80Actions, rl80AnimStateRef.current, pattern);
+        const idlePat = /(?:^|_)idle/i;
+        const typingPat = /(?:^|_)typing/i;
+        const wantIdle = mode === 'idle';
+        const hasIdle = animKeys.some((a) => idlePat.test(a));
+        const hasTyping = animKeys.some((a) => typingPat.test(a));
+        const pattern = wantIdle
+          ? (hasIdle ? idlePat : typingPat)
+          : (hasTyping ? typingPat : idlePat);
+        crossfadeTo(rl80Actions, rl80AnimStateRef.current, pattern);
       }
     } else if (agentId === 'Fluffy') {
-      // Fluffy has no idle/active distinction — pause all clips so the cat
+      // Fluffy has no idle/typing distinction — pause all clips so the cat
       // sits still during the close-up (eliminates loop-seam glitch).
       const fluffyActions = actionsRef.current['Fluffy'];
       if (fluffyActions) {
@@ -568,29 +578,28 @@ const CyborgTempleScene = ({
           monkWaveStateRef.current.attentionActive = false;
         }
         activateSitePalProjection('Monk');
-        applyCharacterFocusAnimation('Monk');
         break;
       case 'Demon':
         demonFocusedRef.current = true;
         activateSitePalProjection('Demon');
-        applyCharacterFocusAnimation('Demon');
         break;
       case 'Detective':
         detectiveFocusedRef.current = true;
         activateSitePalProjection('Detective');
-        applyCharacterFocusAnimation('Detective');
         break;
       case 'RL80':
         rl80FocusedRef.current = true;
-        applyCharacterFocusAnimation('RL80');
         break;
       case 'Fluffy':
         fluffyFocusedRef.current = true;
-        applyCharacterFocusAnimation('Fluffy');
         break;
       default:
         break;
     }
+    // Note: the actual idle/typing cross-fade is driven by the separate
+    // `applyCharacterFocusAnimation` effect below, which watches both
+    // externalFocusAgent and speechActive — so the character lands in the
+    // right mode based on whether audio is currently playing.
 
     setFocusTarget((prev) => {
       if (prev && prev.agentId === externalFocusAgent) return prev;
@@ -607,6 +616,20 @@ const CyborgTempleScene = ({
       };
     });
   }, [externalFocusAgent, isMobile, detectedMobile]);
+
+  // Animation mode driver — runs whenever the focused agent OR the speech
+  // state changes. Cross-fades the focused character into idle (while
+  // speaking) or typing (between speech beats). Without this, characters
+  // just stare at the player the whole time instead of appearing to look
+  // up information between exchanges.
+  useEffect(() => {
+    if (!externalFocusAgent) return;
+    const mode = speechActive ? 'idle' : 'typing';
+    applyCharacterFocusAnimation(externalFocusAgent, mode);
+    // applyCharacterFocusAnimation is defined inside the component and reads
+    // refs (which are stable), so it doesn't need to be in the dep list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalFocusAgent, speechActive]);
 
   // Hover state for coins
   const [hoveredCoin, setHoveredCoin] = useState(null);
@@ -838,6 +861,18 @@ const CyborgTempleScene = ({
   useEffect(() => {
     gameStartedRef.current = gameStarted;
   }, [gameStarted]);
+
+  // Gates per-character head-tracks-camera override in the useFrame blocks
+  // below. We want the head to follow the camera ONLY while the character
+  // is actively speaking (idle anim) — during the typing anim between
+  // speech beats, we let the animation drive the head naturally so the
+  // character appears to look down at their station, not at the player.
+  // Lobby clicks (gameStarted=false) always track — that path is unrelated
+  // to the game-flow speech state.
+  const shouldTrackHeadRef = useRef(true);
+  useEffect(() => {
+    shouldTrackHeadRef.current = !gameStarted || speechActive;
+  }, [gameStarted, speechActive]);
 
   const activateSitePalProjection = (characterId) => {
     const config = SITEPAL_PROJECTION_CONFIG[characterId];
@@ -4537,7 +4572,7 @@ const CyborgTempleScene = ({
     // OR while the attention-getter cycle is running, so the monk appears
     // to address the user across hail → idle → hail → beckon transitions.
     const monkIsPointing = monkWaveStateRef.current.attentionActive;
-    if ((monkFocusedRef.current || monkIsPointing) && monkHeadBoneRef.current) {
+    if ((monkFocusedRef.current || monkIsPointing) && monkHeadBoneRef.current && shouldTrackHeadRef.current) {
       const head = monkHeadBoneRef.current;
 
       if (!monkHeadBoneRef._baseQuat) {
@@ -4598,7 +4633,7 @@ const CyborgTempleScene = ({
     }
 
     // RL80 head look-at-camera override (only when focused on RL80)
-    if (rl80FocusedRef.current && rl80HeadBoneRef.current) {
+    if (rl80FocusedRef.current && rl80HeadBoneRef.current && shouldTrackHeadRef.current) {
       const head = rl80HeadBoneRef.current;
 
       if (!rl80HeadBoneRef._baseQuat) {
@@ -4648,7 +4683,7 @@ const CyborgTempleScene = ({
     // The flip-axis correction below is rig-specific; tune the divisor in
     // `Math.PI / N` (or change the axis) until the head reads as facing
     // the camera.
-    if (detectiveFocusedRef.current && detectiveHeadBoneRef.current) {
+    if (detectiveFocusedRef.current && detectiveHeadBoneRef.current && shouldTrackHeadRef.current) {
       const head = detectiveHeadBoneRef.current;
 
       if (!detectiveHeadBoneRef._baseQuat) {
@@ -4698,7 +4733,7 @@ const CyborgTempleScene = ({
 
     // Fluffy (cat) head look-at-camera override
     // Animation is paused, so we use world-space lookAt with no loop-seam concerns
-    if (fluffyFocusedRef.current && fluffyHeadBoneRef.current) {
+    if (fluffyFocusedRef.current && fluffyHeadBoneRef.current && shouldTrackHeadRef.current) {
       const head = fluffyHeadBoneRef.current;
 
       // Capture the base local quaternion once
@@ -4753,7 +4788,7 @@ const CyborgTempleScene = ({
     // Demon head look-at-camera override — only enabled when the focus
     // logic decided to skip the demon_pointing clip (camera moved off the
     // authored pose). Mirrors the Monk/RL80 pattern.
-    if (demonHeadTrackingRef.current && demonHeadBoneRef.current) {
+    if (demonHeadTrackingRef.current && demonHeadBoneRef.current && shouldTrackHeadRef.current) {
       const head = demonHeadBoneRef.current;
 
       if (!demonHeadBoneRef._baseQuat) {
