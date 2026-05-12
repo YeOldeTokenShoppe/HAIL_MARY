@@ -13,25 +13,9 @@ const SERVICES = [
     id: "analysis",
     eyebrow: "ANALYSIS",
     title: "Token Review",
-    desc: "Request a council scan of any token.",
+    desc: "Request a team analysis of any token.",
     accent: "cyan",
     cta: "QUEUE",
-  },
-  {
-    id: "audience",
-    eyebrow: "AUDIENCE",
-    title: "Private Counsel",
-    desc: "Text session with one TLT operator.",
-    accent: "amber",
-    cta: "REQUEST",
-  },
-  {
-    id: "indulgence",
-    eyebrow: "INDULGENCE",
-    title: "Absolution",
-    desc: "Confession, roast, or blessing by rite.",
-    accent: "magenta",
-    cta: "CHOOSE",
   },
 ];
 
@@ -158,7 +142,7 @@ const STYLES = `
 
 .tsr-options {
   display: grid;
-  grid-template-columns: 1.18fr 1fr 1fr 1fr;
+  grid-template-columns: 1.05fr 1fr;
   gap: 7px;
 }
 

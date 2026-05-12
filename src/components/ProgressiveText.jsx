@@ -84,18 +84,17 @@ export default function ProgressiveText({
     return () => timers.forEach(clearTimeout);
   }, [chunks, onComplete]);
 
-  // Windowed mode: translate the inner content upward so the bottom-most
-  // revealed chunk stays pinned to the bottom edge of the clipping
-  // container. Measures actual rendered heights so it adapts to wrapping
-  // at any width. Runs on every reveal so the scroll keeps pace with
-  // chunk additions.
+  // Windowed mode: container is capped at maxVisibleLines (via maxHeight, so
+  // short content doesn't reserve dead space) and made scrollable. On each
+  // new chunk we auto-scroll to the bottom so the latest line stays pinned to
+  // the visible window — but the user can scroll up at any time to re-read
+  // anything that's already been revealed (the previous clip-and-translate
+  // approach hid earlier chunks permanently).
   useEffect(() => {
     if (!maxVisibleLines) return;
-    if (!contentRef.current || !containerRef.current) return;
-    const contentH = contentRef.current.scrollHeight;
-    const containerH = containerRef.current.clientHeight;
-    const offset = Math.max(0, contentH - containerH);
-    contentRef.current.style.transform = `translateY(-${offset}px)`;
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    el.scrollTop = el.scrollHeight;
   }, [revealedCount, maxVisibleLines, text]);
 
   // Render ONLY revealed chunks. Each newly-mounted span runs the CSS
@@ -123,24 +122,19 @@ export default function ProgressiveText({
     <div
       ref={containerRef}
       style={{
-        height: `${maxVisibleLines * approxLineHeight}em`,
-        overflow: 'hidden',
+        maxHeight: `${maxVisibleLines * approxLineHeight}em`,
+        overflowY: 'auto',
+        scrollBehavior: 'smooth',
         // Soft fade at the top edge so older chunks dissolve out rather
         // than getting hard-cropped. Tight band (90%→100%) so almost the
         // full visible area is readable; the fade is a hint of dissolve,
         // not a translucent veil. Mask works in all modern browsers;
         // -webkit- variant for Safari.
-        maskImage: 'linear-gradient(to top, black 90%, transparent 100%)',
-        WebkitMaskImage: 'linear-gradient(to top, black 90%, transparent 100%)',
+        maskImage: 'linear-gradient(to top, black 92%, transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(to top, black 92%, transparent 100%)',
       }}
     >
-      <div
-        ref={contentRef}
-        style={{
-          transition: `transform ${SCROLL_DURATION_MS}ms ease`,
-          willChange: 'transform',
-        }}
-      >
+      <div ref={contentRef}>
         {chunkSpans}
       </div>
     </div>

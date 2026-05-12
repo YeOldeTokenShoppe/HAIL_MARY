@@ -810,6 +810,12 @@ export default function CyborgTemple() {
   const [currentSpeech, setCurrentSpeech] = useState(null);
   // shape: { stationKey, text, kind: 'intro' | 'return' } | null
 
+  // Queued next speech beat. Used to split the monk's first-visit rules
+  // preamble from his intro line — rules render first; CONTINUE swaps in the
+  // intro text. The audio for both is the single intro recording, which keeps
+  // playing across the swap.
+  const [pendingSpeech, setPendingSpeech] = useState(null);
+
   // True while the focused character is actively delivering a line (audio
   // playing or TTS in progress). Drives the 3D animation mode — idle while
   // speaking, typing in between — so the character looks like they're
@@ -857,6 +863,28 @@ export default function CyborgTemple() {
   // GR80 delivers a one-time rules speech prepended to his intro on the player's
   // first-ever monk visit this session. Skipped on subsequent cases.
   const rulesSpokenRef = useRef(false);
+
+  // Auto-advance from the current speech beat to any queued follow-up when
+  // the visual reveal of the current text finishes. The audio for split beats
+  // (e.g. monk's rules → intro) is one continuous recording, so without this
+  // the audio sails into the next section while the player still sees the
+  // first section's text until they click CONTINUE.
+  useEffect(() => {
+    if (!currentSpeech || !pendingSpeech) return;
+    const text = currentSpeech.text || '';
+    const chunks = text.match(/[^.!?—]+[.!?—]+\s*|[^.!?—]+$/g) || [text];
+    // Mirrors ProgressiveText's pacing: ~70ms/char with a 900ms floor per
+    // chunk. Slight lead so the swap lands just before the next audio
+    // sentence starts, avoiding a beat of stale text on screen.
+    let revealMs = 0;
+    chunks.forEach((c) => { revealMs += Math.max(900, c.length * 70); });
+    revealMs = Math.max(0, revealMs - 200);
+    const t = setTimeout(() => {
+      setCurrentSpeech(pendingSpeech);
+      setPendingSpeech(null);
+    }, revealMs);
+    return () => clearTimeout(t);
+  }, [currentSpeech, pendingSpeech]);
   const [verdict, setVerdict] = useState(null);
   const [brier, setBrier] = useState(null);
   // Derived: total questions asked across all stations, and what remains.
@@ -883,6 +911,38 @@ export default function CyborgTemple() {
   const returnToServiceRail = () => {
     setTradeMode(null);
     setGameStarted(false);
+    // Clear post-game state so the vindication useEffect doesn't refire when
+    // the player focuses a new character in the lobby (focusedAgent change
+    // would recompute vindicationDelivery against the stale verdict and
+    // schedule the wrong line ~1.8s later).
+    setVerdict(null);
+    setBrier(null);
+    setActiveAnswer(null);
+    setActiveReaction(null);
+    setCurrentSpeech(null);
+    setPendingSpeech(null);
+    // Drop focus so the camera unlocks and TradeServiceRail can render
+    // (it's gated on `!focusedAgent`).
+    setFocusedAgent(null);
+  };
+
+  // Hook for the post-verdict "NEXT CASE" button. There's only SAMPLE_CASE
+  // for now, so the button is disabled in the verdict modal — but the
+  // function is wired so when case 002+ data lands we can swap in a real
+  // case-list lookup and the UI doesn't have to change.
+  const nextCaseAvailable = false;
+  const advanceToNextCase = () => {
+    if (!nextCaseAvailable) return;
+    // Reset all game state, then re-enter game mode with the next case.
+    // (When case data is plural, also setCaseData(nextCase) here.)
+    setVerdict(null);
+    setBrier(null);
+    setActiveAnswer(null);
+    setActiveReaction(null);
+    setCurrentSpeech(null);
+    setPendingSpeech(null);
+    setFocusedAgent(null);
+    enterGameMode();
   };
   // Derive the overlay's active station from focusedAgent when in game mode.
   // Falls back to 'monk' (the opener) so the overlay renders something stable
@@ -1005,6 +1065,7 @@ export default function CyborgTemple() {
     // intro/return fires.
     setActiveAnswer(null);
     setCurrentSpeech(null);
+    setPendingSpeech(null);
     if (stationKey !== 'eugene') {
       setEugeneBubble(null);
     }
@@ -1014,20 +1075,26 @@ export default function CyborgTemple() {
     // currentSpeech was set inside the 900ms camera-fly timer, which left
     // the question list briefly visible during the fly-in.
     const isFirstVisit = !visitedStations.has(stationKey);
+    // If the player has already spent a scan elsewhere, they've effectively
+    // started the game — playing monk's full intro (which has the rules audio
+    // baked in) at that point would dump 30 seconds of orientation on top of
+    // an in-progress run. Treat first-visit-after-scans as a return.
+    const isMidGameMonkFirstVisit =
+      isFirstVisit && stationKey === 'monk' && scansUsed > 0;
     let toSpeak = null;
     let displayText = '';
     let kind = 'intro';
-    if (isFirstVisit) {
+    if (isFirstVisit && !isMidGameMonkFirstVisit) {
       setVisitedStations((prev) => {
         const next = new Set(prev);
         next.add(stationKey);
         return next;
       });
-      // Rules preamble: monk speaks them once on his first visit. If the
-      // intro has a pre-recorded audio, we assume that recording already
-      // contains the rules and play it as-is. Otherwise (TTS fallback) we
-      // concat the rules text in front of the intro text. The *displayed*
-      // text always includes the full content so the player reads along.
+      // Rules preamble: monk speaks them once on his first visit. The audio
+      // (single intro recording) is assumed to contain both the rules and the
+      // intro back-to-back, so we play it once but split the displayed text:
+      // rules render first, CONTINUE swaps in the intro text. Without audio,
+      // we concat for TTS fallback.
       const introLine = station.intro;
       const introResolved = resolveLine(introLine);
       const introText = introResolved?.text || '';
@@ -1036,12 +1103,27 @@ export default function CyborgTemple() {
       if (stationKey === 'monk' && !rulesSpokenRef.current && caseData.rulesIntro) {
         rulesSpokenRef.current = true;
         const rulesText = resolveLine(caseData.rulesIntro)?.text || '';
-        displayText = `${rulesText} ${introText}`.trim();
-        if (!introResolved?.audio) {
-          toSpeak = displayText;
+        if (rulesText) {
+          displayText = rulesText;
+          setPendingSpeech({ stationKey, text: introText, kind: 'intro' });
+          if (!introResolved?.audio) {
+            toSpeak = `${rulesText} ${introText}`.trim();
+          }
         }
       }
     } else {
+      // Mark visited on the mid-game monk path too, otherwise next visit
+      // would re-trigger first-visit logic and play the rules.
+      if (isMidGameMonkFirstVisit) {
+        setVisitedStations((prev) => {
+          const next = new Set(prev);
+          next.add(stationKey);
+          return next;
+        });
+        // Burn the rules flag so even a hypothetical re-entry won't try to
+        // play them again.
+        rulesSpokenRef.current = true;
+      }
       const ret = pickReturnLine(station);
       if (ret) {
         toSpeak = ret;
@@ -1050,7 +1132,10 @@ export default function CyborgTemple() {
       }
     }
 
-    if (displayText) {
+    // Eugene's dialog is rendered exclusively in her floating chat bubble
+    // (speakLine sets eugeneBubble for her). Skip currentSpeech for her so
+    // the bottom transcript doesn't duplicate the same line.
+    if (displayText && stationKey !== 'eugene') {
       setCurrentSpeech({ stationKey, text: displayText, kind });
     }
 
@@ -1125,16 +1210,36 @@ export default function CyborgTemple() {
     return { stationKey, character: station.character, line, text: resolved.text };
   }, [verdict, focusedAgent, caseData]);
 
-  // After verdict commit, wait ~1.8s for the reaction line to land, then
-  // speak the focused character's vindication line. Pass the raw line so
-  // speakLine can route to sayAudio if the user has uploaded a recording.
+  // After verdict commit, the reaction line speaks immediately (via
+  // submitVerdict). Vindication should follow only AFTER the reaction
+  // finishes — previously this was a hardcoded 1.8s wait, which worked
+  // for short reactions but cut into longer recordings (the detective's
+  // lines are 3–4s, so vind_alig would interrupt mid-react).
+  //
+  // Two paths:
+  //   • SitePal characters (monk/demon/detective): wait for speechActive
+  //     to clear — vh_audioStopped fires it the instant audio ends.
+  //   • Eugene: no SitePal callbacks, so speechActive lingers on the 8s
+  //     safety timer floor. Use a text-length-paced delay instead so her
+  //     vindication bubble doesn't sit 8 seconds behind.
+  const vindicationFiredForRef = useRef(null);
   useEffect(() => {
-    if (!vindicationDelivery) return;
+    if (!vindicationDelivery) {
+      vindicationFiredForRef.current = null;
+      return;
+    }
+    if (vindicationFiredForRef.current === vindicationDelivery.line) return;
+    const isEugene = vindicationDelivery.stationKey === 'eugene';
+    if (!isEugene && speechActive) return; // reaction still playing
+    const reactionMs = isEugene
+      ? Math.max(2200, (activeReaction?.text?.length || 0) * 70)
+      : 500;
+    vindicationFiredForRef.current = vindicationDelivery.line;
     const t = setTimeout(() => {
       speakLine(vindicationDelivery.line, vindicationDelivery.stationKey);
-    }, 1800);
+    }, reactionMs);
     return () => clearTimeout(t);
-  }, [vindicationDelivery, speakLine]);
+  }, [vindicationDelivery, speechActive, activeReaction, speakLine]);
 
   // Stable camera rig inputs — without `useMemo`, these inline arrays would
   // get a new identity every render and re-mount the rig's effect, lurching
@@ -1246,7 +1351,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v40_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v41_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -2362,8 +2467,6 @@ export default function CyborgTemple() {
                   <span style={{ color: '#3a6b54' }}>·</span>
                   <span style={{ color: '#8effc4' }}>{caseData.ticker}</span>
                   <span style={{ color: '#3a6b54' }}>·</span>
-                  <span>SCANS {scansRemaining}/{caseData.maxScans}</span>
-                  <span style={{ color: '#3a6b54' }}>·</span>
                   <span style={{ color: '#6db59a', fontStyle: 'italic' }}>
                     {focusedAgent && CHARACTER_TO_STATION[focusedAgent]
                       ? 'investigate or render verdict'
@@ -2415,10 +2518,61 @@ export default function CyborgTemple() {
                     pointerEvents: 'auto',
                   }}
                 >
+                  {/* Prominent scan counter — overlays the top-right of the
+                      console so the player always sees how many questions
+                      remain. Color shifts as the budget burns down. */}
+                  {(() => {
+                    const remaining = scansRemaining;
+                    const accent =
+                      remaining <= 0 ? '#ff3ea0'
+                      : remaining === 1 ? '#ffb84d'
+                      : '#8effc4';
+                    const accentSoft =
+                      remaining <= 0 ? 'rgba(255,62,160,0.45)'
+                      : remaining === 1 ? 'rgba(255,184,77,0.45)'
+                      : 'rgba(142,255,196,0.4)';
+                    return (
+                      <div
+                        aria-label={`${remaining} of ${caseData.maxScans} scans remaining`}
+                        style={{
+                          position: 'absolute',
+                          top: 6,
+                          right: 10,
+                          zIndex: 2,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          lineHeight: 1,
+                          color: accent,
+                          textShadow: `0 0 12px ${accentSoft}`,
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <div style={{
+                          fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+                          fontSize: isMobileView ? 30 : 36,
+                          fontWeight: 900,
+                          letterSpacing: '0.02em',
+                        }}>
+                          {remaining}
+                        </div>
+                        <div style={{
+                          marginTop: 2,
+                          fontSize: 8,
+                          letterSpacing: '0.24em',
+                          opacity: 0.85,
+                          fontWeight: 700,
+                        }}>
+                          {remaining === 1 ? 'SCAN LEFT' : 'SCANS LEFT'}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Top section: question content state machine, or a
                       "tap a consultant" hint when no character is focused. */}
                   {focusedAgent && CHARACTER_TO_STATION[focusedAgent] && gameStation ? (
-                  <div style={{ maxHeight: '46vh', overflowY: 'auto', padding: '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)' }}>
+                  <div style={{ minHeight: currentSpeech ? (isMobileView ? 180 : 210) : 0, maxHeight: '46vh', overflowY: 'auto', padding: '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)', display: 'flex', flexDirection: 'column' }}>
                     {(() => {
                       const stationKey = gameActiveStation;
                       const askedAtStation = asked[stationKey] || new Set();
@@ -2437,29 +2591,31 @@ export default function CyborgTemple() {
                       //    Continue back to questions (or to verdict if 0 scans).
                       if (isActiveAnswerHere) {
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                             <div style={{
-                              fontSize: 11,
+                              fontSize: 12,
                               color: '#6db59a',
                               fontStyle: 'italic',
                               lineHeight: 1.3,
                             }}>
                               "{activeAnswer.q}"
                             </div>
-                            <div style={{
-                              padding: '10px 12px',
-                              borderLeft: '2px solid #ff3ea0',
-                              background: 'rgba(255,62,160,0.05)',
-                            }}>
+                            {stationKey !== 'eugene' && (
                               <div style={{
-                                fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                fontSize: 13,
-                                color: '#c8ffe0',
-                                lineHeight: 1.4,
+                                padding: '14px 16px',
+                                borderLeft: '2px solid #ff3ea0',
+                                background: 'rgba(255,62,160,0.05)',
                               }}>
-                                "{resolveLine(activeAnswer.a)?.text || ''}"
+                                <div style={{
+                                  fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                  fontSize: isMobileView ? 22 : 24,
+                                  color: '#c8ffe0',
+                                  lineHeight: 1.45,
+                                }}>
+                                  "{resolveLine(activeAnswer.a)?.text || ''}"
+                                </div>
                               </div>
-                            </div>
+                            )}
                             {revealedEntry && (
                               <div
                                 style={{
@@ -2541,27 +2697,43 @@ export default function CyborgTemple() {
                       //    dump the whole script up front.
                       if (currentSpeech && currentSpeech.stationKey === stationKey) {
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 14,
+                            flex: 1,
+                            justifyContent: 'center',
+                          }}>
                             <div style={{
-                              padding: '10px 12px',
+                              padding: '14px 16px',
                               borderLeft: '2px solid #ff3ea0',
                               background: 'rgba(255,62,160,0.05)',
                             }}>
                               <div style={{
                                 fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                fontSize: isMobileView ? 18 : 17,
+                                fontSize: isMobileView ? 22 : 24,
                                 color: '#c8ffe0',
-                                lineHeight: 1.5,
+                                lineHeight: 1.45,
+                                textAlign: 'center',
                               }}>
                                 <ProgressiveText
                                   text={currentSpeech.text}
-                                  maxVisibleLines={isMobileView ? 2 : 3}
-                                  approxLineHeight={1.5}
+                                  maxVisibleLines={3}
+                                  approxLineHeight={1.45}
                                 />
                               </div>
                             </div>
                             <button
                               onClick={() => {
+                                // If a follow-up beat is queued (e.g. monk's
+                                // intro after his rules preamble), swap it in
+                                // instead of dismissing. The audio recording
+                                // continues playing across the swap.
+                                if (pendingSpeech) {
+                                  setCurrentSpeech(pendingSpeech);
+                                  setPendingSpeech(null);
+                                  return;
+                                }
                                 setCurrentSpeech(null);
                                 // Continue past the speech beat also clears
                                 // Eugene's bubble — she's the only character
@@ -2578,7 +2750,7 @@ export default function CyborgTemple() {
                                 fontSize: 10,
                                 letterSpacing: '0.22em',
                                 cursor: 'pointer',
-                                alignSelf: 'flex-start',
+                                alignSelf: 'center',
                               }}
                             >
                               ▸ CONTINUE
@@ -2718,11 +2890,11 @@ export default function CyborgTemple() {
                     background: 'rgba(2,5,8,0.4)',
                   }}>
                     {[
-                      { agentId: 'Monk',      stationKey: 'monk',    portrait: '/thumbnail_gr80.png' },
-                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_johnBarron.png' },
-                      { agentId: 'Detective', stationKey: 'marisol', portrait: '/thumbnail_marisol.png' },
-                      { agentId: 'RL80',      stationKey: 'eugene',  portrait: '/thumbnail_eugene.png' },
-                    ].map(({ agentId, stationKey, portrait }) => {
+                      { agentId: 'Monk',      stationKey: 'monk',    portrait: '/thumbnail_gr80.png',        label: 'ETHOS' },
+                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_johnBarron.png',  label: 'PATHOS' },
+                      { agentId: 'Detective', stationKey: 'marisol', portrait: '/thumbnail_marisol.png',     label: 'LOGOS' },
+                      { agentId: 'RL80',      stationKey: 'eugene',  portrait: '/thumbnail_eugene.png',      label: 'MYTHOS' },
+                    ].map(({ agentId, stationKey, portrait, label }) => {
                       const station = caseData.stations[stationKey];
                       if (!station) return null;
                       const isCurrent = focusedAgent === agentId;
@@ -2731,107 +2903,109 @@ export default function CyborgTemple() {
                       const totalQuestions = station.questions?.length || 0;
                       const remaining = Math.max(0, totalQuestions - askedCount);
                       const allAsked = remaining === 0;
-                      const shortName = station.character.split(' ').slice(-1)[0];
-                      const portraitSize = isMobileView ? 36 : 44;
+                      const shortName = label;
+                      const buttonW = isMobileView ? 72 : 92;
+                      const buttonH = isMobileView ? 88 : 110;
 
+                      const outOfScans = scansRemaining <= 0;
+                      const disabled = isCurrent || outOfScans;
                       return (
                         <button
                           key={agentId}
-                          onClick={() => { if (!isCurrent) setFocusedAgent(agentId); }}
-                          disabled={isCurrent}
-                          title={`${station.character} — ${station.role}`}
+                          onClick={() => { if (!disabled) setFocusedAgent(agentId); }}
+                          disabled={disabled}
+                          title={outOfScans && !isCurrent
+                            ? 'No scans left — render your verdict'
+                            : `${station.character} — ${station.role}`}
                           style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 2,
-                            minWidth: isMobileView ? 64 : 80,
-                            padding: isMobileView ? '6px 4px' : '8px 6px',
-                            background: isCurrent
-                              ? 'rgba(77,255,170,0.18)'
-                              : allAsked && isVisited
-                                ? 'rgba(120,80,0,0.12)'
-                                : 'rgba(10,58,38,0.18)',
+                            position: 'relative',
+                            width: buttonW,
+                            height: buttonH,
+                            padding: 0,
+                            overflow: 'hidden',
+                            background: 'rgba(10,58,38,0.18)',
                             border: isCurrent
-                              ? '1px solid #4dffaa'
+                              ? '2px solid #4dffaa'
                               : allAsked && isVisited
-                                ? '1px solid rgba(255,184,77,0.55)'
-                                : '1px solid rgba(77,255,170,0.28)',
-                            borderRadius: 7,
+                                ? '2px solid rgba(255,184,77,0.55)'
+                                : '2px solid rgba(255,62,160,0.55)',
+                            borderRadius: 9,
                             color: isCurrent ? '#8effc4' : allAsked && isVisited ? '#ffb84d' : '#c8ffe0',
-                            cursor: isCurrent ? 'default' : 'pointer',
+                            cursor: disabled ? (isCurrent ? 'default' : 'not-allowed') : 'pointer',
                             fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
                             boxShadow: isCurrent
-                              ? '0 0 12px rgba(77,255,170,0.45), inset 0 0 12px rgba(77,255,170,0.10)'
-                              : 'none',
+                              ? '0 0 14px rgba(77,255,170,0.55)'
+                              : '0 0 8px rgba(255,62,160,0.28)',
                             transition: 'all 0.18s ease',
-                            position: 'relative',
-                            opacity: isCurrent ? 1 : allAsked && isVisited ? 0.78 : 0.92,
+                            opacity: isCurrent ? 1 : outOfScans ? 0.4 : allAsked && isVisited ? 0.78 : 0.94,
+                            filter: outOfScans && !isCurrent ? 'grayscale(0.5)' : 'none',
                           }}
                         >
                           <img
                             src={portrait}
                             alt={station.character}
-                            width={portraitSize}
-                            height={portraitSize}
                             style={{
-                              width: portraitSize,
-                              height: portraitSize,
-                              borderRadius: '50%',
+                              position: 'absolute',
+                              inset: 0,
+                              width: '100%',
+                              height: '100%',
                               objectFit: 'cover',
-                              background: 'rgba(10,58,38,0.4)',
-                              border: isCurrent
-                                ? '2px solid #4dffaa'
-                                : allAsked && isVisited
-                                  ? '2px solid rgba(255,184,77,0.55)'
-                                  : '2px solid rgba(255,62,160,0.55)',
-                              boxShadow: isCurrent
-                                ? '0 0 12px rgba(77,255,170,0.6)'
-                                : '0 0 6px rgba(255,62,160,0.3)',
                               filter: allAsked && isVisited ? 'grayscale(0.35)' : 'none',
                               transition: 'all 0.2s ease',
                             }}
                           />
                           <div style={{
-                            fontSize: isMobileView ? 9 : 10,
-                            letterSpacing: '0.10em',
-                            color: 'inherit',
-                            textTransform: 'uppercase',
-                            marginTop: 3,
-                            fontWeight: 600,
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            padding: '14px 4px 5px',
+                            background: 'linear-gradient(180deg, rgba(2,5,8,0) 0%, rgba(2,5,8,0.78) 55%, rgba(2,5,8,0.92) 100%)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 1,
                           }}>
-                            {shortName}
-                          </div>
-                          <div style={{
-                            fontSize: 7,
-                            letterSpacing: '0.18em',
-                            color: allAsked && isVisited
-                              ? 'rgba(255,184,77,0.85)'
-                              : isCurrent
-                                ? 'rgba(142,255,196,0.75)'
+                            <div style={{
+                              fontSize: isMobileView ? 10 : 11,
+                              letterSpacing: '0.12em',
+                              color: 'inherit',
+                              textTransform: 'uppercase',
+                              fontWeight: 700,
+                              textShadow: '0 1px 4px rgba(0,0,0,0.85)',
+                            }}>
+                              {shortName}
+                            </div>
+                            <div style={{
+                              fontSize: 7,
+                              letterSpacing: '0.18em',
+                              color: allAsked && isVisited
+                                ? 'rgba(255,184,77,0.9)'
+                                : isCurrent
+                                  ? 'rgba(142,255,196,0.85)'
+                                  : isVisited
+                                    ? '#8fd4b6'
+                                    : 'rgba(200,255,224,0.7)',
+                              textTransform: 'uppercase',
+                              textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+                            }}>
+                              {allAsked && isVisited
+                                ? 'ASKED'
                                 : isVisited
-                                  ? '#6db59a'
-                                  : '#3a6b54',
-                            textTransform: 'uppercase',
-                            marginTop: 1,
-                          }}>
-                            {allAsked && isVisited
-                              ? 'ASKED'
-                              : isVisited
-                                ? `${remaining} LEFT`
-                                : 'TAP'}
+                                  ? `${remaining} LEFT`
+                                  : 'TAP'}
+                            </div>
                           </div>
                           {isVisited && !isCurrent && !allAsked && (
                             <div style={{
                               position: 'absolute',
-                              top: 4,
-                              right: 4,
-                              width: 6,
-                              height: 6,
+                              top: 5,
+                              right: 5,
+                              width: 7,
+                              height: 7,
                               borderRadius: '50%',
                               background: '#4dffaa',
-                              boxShadow: '0 0 6px #4dffaa',
+                              boxShadow: '0 0 8px #4dffaa',
                             }} />
                           )}
                         </button>
@@ -2893,8 +3067,9 @@ export default function CyborgTemple() {
                 </div>
               )}
 
-              {/* Reveal overlay — only after verdict is rendered. Centered card,
-                  dismissible. Verdict-result + Brier + ground truth + voice. */}
+              {/* Reveal overlay — only after verdict is rendered. Centered card.
+                  Dismissed only via the explicit NEXT CASE / BACK TO SERVICES
+                  buttons (the result is too important to dismiss by accident). */}
               {verdict && tradeMode === 'game' && typeof document !== 'undefined' &&
                 createPortal(
                   <div
@@ -2910,7 +3085,6 @@ export default function CyborgTemple() {
                       backdropFilter: 'blur(6px)',
                       WebkitBackdropFilter: 'blur(6px)',
                     }}
-                    onClick={returnToServiceRail}
                   >
                     {(() => {
                       const isCorrect = verdict === caseData.correctVerdict;
@@ -2968,22 +3142,52 @@ export default function CyborgTemple() {
                             </div>
                           </div>
 
-                          <button
-                            onClick={returnToServiceRail}
-                            style={{
-                              marginTop: 22,
-                              background: 'transparent',
-                              border: '1px solid #4dffaa',
-                              color: '#4dffaa',
-                              padding: '10px 32px',
-                              fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                              fontSize: 11,
-                              letterSpacing: '0.32em',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            ▸ CLOSE
-                          </button>
+                          <div style={{
+                            marginTop: 22,
+                            display: 'flex',
+                            gap: 10,
+                            justifyContent: 'center',
+                            flexWrap: 'wrap',
+                          }}>
+                            <button
+                              onClick={advanceToNextCase}
+                              disabled={!nextCaseAvailable}
+                              title={nextCaseAvailable ? undefined : 'More cases coming soon'}
+                              style={{
+                                background: nextCaseAvailable
+                                  ? 'linear-gradient(135deg, rgba(77,255,170,0.18), rgba(13,80,50,0.32))'
+                                  : 'transparent',
+                                border: `1px solid ${nextCaseAvailable ? 'rgba(77,255,170,0.85)' : 'rgba(77,255,170,0.25)'}`,
+                                color: nextCaseAvailable ? '#8effc4' : 'rgba(142,255,196,0.35)',
+                                padding: '10px 26px',
+                                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                letterSpacing: '0.32em',
+                                cursor: nextCaseAvailable ? 'pointer' : 'not-allowed',
+                                boxShadow: nextCaseAvailable
+                                  ? '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
+                                  : 'none',
+                              }}
+                            >
+                              {nextCaseAvailable ? '▸ NEXT CASE' : '▸ NEXT CASE — SOON'}
+                            </button>
+                            <button
+                              onClick={returnToServiceRail}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid rgba(110,181,154,0.55)',
+                                color: '#8fd4b6',
+                                padding: '10px 26px',
+                                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                fontSize: 11,
+                                letterSpacing: '0.32em',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ▸ BACK TO SERVICES
+                            </button>
+                          </div>
                         </div>
                       );
                     })()}

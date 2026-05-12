@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prophet — Verdict Mock</title>
+<style>
+  :root {
+    --lt-bg: #050a07;
+    --lt-bg-2: #0a1410;
+    --lt-frame: #0a3a26;
+    --lt-frame-bright: #0e6b44;
+    --lt-text: #c8ffe0;
+    --lt-text-dim: #6db59a;
+    --lt-text-faint: #3a6b54;
+    --lt-phos: #4dffaa;
+    --lt-phos-bright: #8effc4;
+    --lt-amber: #ffb84d;
+    --lt-red: #ff4d6d;
+    --lt-magenta: #ff3ea0;
+    --lt-violet: #b48cff;
+    --lt-cyan: #7be3ff;
+
+    --lt-mono: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+    --lt-display: 'Cinzel Decorative', 'Cinzel', Didot, 'Bodoni 72', serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #000; color: var(--lt-text); font-family: var(--lt-mono); }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+      radial-gradient(ellipse at top, rgba(13, 80, 50, 0.18), transparent 70%),
+      var(--lt-bg);
+  }
+
+  .stage {
+    position: relative;
+    width: min(1100px, 100%);
+    height: min(820px, 95vh);
+    border: 1px solid var(--lt-frame);
+    background:
+      radial-gradient(ellipse at top, rgba(13, 80, 50, 0.14), transparent 70%),
+      var(--lt-bg);
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 80px rgba(0, 255, 130, 0.05),
+      inset 0 0 1px rgba(77, 255, 170, 0.35);
+  }
+
+  /* CRT chrome */
+  .scanlines, .noise, .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 50;
+  }
+  .scanlines {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.20) 3px,
+      rgba(0, 0, 0, 0.20) 4px
+    );
+    mix-blend-mode: multiply;
+  }
+  .vignette {
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
+  }
+  .noise {
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+  }
+
+  .header {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: 14px 22px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: 3px; color: var(--lt-text-faint);
+    border-bottom: 1px solid var(--lt-frame);
+    background: linear-gradient(to bottom, rgba(13,80,50,0.1), transparent);
+    z-index: 5;
+  }
+  .header .tag { color: var(--lt-phos); }
+  .header .case-id { color: var(--lt-text-dim); }
+  .header .blink::after {
+    content: '▮'; margin-left: 6px; color: var(--lt-phos);
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .content {
+    position: absolute; inset: 50px 0 70px 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    padding: 24px 32px;
+    overflow: hidden;
+  }
+
+  /* ─── BEAT 1: TRUTH ─── */
+  .truth-block {
+    width: min(620px, 100%);
+    text-align: center;
+    margin-top: 8px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  .truth-block.is-in { opacity: 1; transform: translateY(0); }
+  .truth-tag {
+    font-size: 10px; letter-spacing: 4px; color: var(--lt-text-faint);
+    margin-bottom: 8px;
+  }
+  .truth-text {
+    font-family: var(--lt-display);
+    font-size: 18px;
+    color: var(--lt-text);
+    border: 1px solid var(--lt-frame);
+    padding: 14px 20px;
+    background: rgba(13, 80, 50, 0.08);
+    min-height: 64px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .truth-text .caret {
+    display: inline-block;
+    width: 9px; height: 18px;
+    background: var(--lt-phos);
+    margin-left: 4px;
+    vertical-align: middle;
+    animation: blink 1s steps(2) infinite;
+  }
+
+  /* ─── BEAT 2: VERDICT MATCH SLAM ─── */
+  .verdict-block {
+    margin-top: 18px;
+    display: flex; align-items: center; gap: 28px;
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+  .verdict-block.is-in { opacity: 1; }
+  .verdict-block.is-slam {
+    animation: slam .55s cubic-bezier(.2,.9,.25,1.05);
+  }
+  @keyframes slam {
+    0%   { transform: scale(1.18); filter: brightness(2); }
+    40%  { transform: scale(0.96); filter: brightness(1.2); }
+    100% { transform: scale(1); filter: brightness(1); }
+  }
+  .verdict-side {
+    text-align: center;
+    min-width: 130px;
+  }
+  .verdict-label {
+    font-size: 9px; letter-spacing: 3px; color: var(--lt-text-faint);
+    margin-bottom: 6px;
+  }
+  .verdict-name {
+    font-family: var(--lt-display);
+    font-size: 22px; letter-spacing: 3px;
+    padding: 8px 14px;
+    border: 1px solid var(--lt-frame);
+    color: var(--lt-text);
+  }
+  .verdict-side.you .verdict-name {
+    color: var(--lt-phos-bright);
+    border-color: var(--lt-phos);
+    box-shadow: 0 0 24px rgba(77,255,170,0.25), inset 0 0 12px rgba(77,255,170,0.10);
+  }
+  .verdict-match {
+    font-family: var(--lt-display);
+    font-size: 52px;
+    color: var(--lt-phos-bright);
+    text-shadow: 0 0 30px var(--lt-phos);
+    opacity: 0;
+    transform: scale(.7) rotate(-6deg);
+    transition: opacity .25s ease, transform .35s cubic-bezier(.2,.9,.25,1.4);
+  }
+  .verdict-match.is-in { opacity: 1; transform: scale(1) rotate(0); }
+  .verdict-match.miss {
+    color: var(--lt-red);
+    text-shadow: 0 0 30px rgba(255,77,109,0.7);
+  }
+  .verdict-match.abstain {
+    color: var(--lt-amber);
+    text-shadow: 0 0 30px rgba(255,184,77,0.5);
+  }
+
+  /* ─── BEAT 3: SCORE COUNTUP ─── */
+  .score-block {
+    margin-top: 18px;
+    display: flex;
+    border: 1px solid var(--lt-frame);
+    background: rgba(13, 80, 50, 0.05);
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+  .score-block.is-in { opacity: 1; }
+  .score-cell {
+    padding: 12px 26px;
+    text-align: center;
+    border-right: 1px solid var(--lt-frame);
+  }
+  .score-cell:last-child { border-right: none; }
+  .score-cell .label {
+    font-size: 9px; letter-spacing: 3px; color: var(--lt-text-faint);
+    margin-bottom: 4px;
+  }
+  .score-cell .value {
+    font-family: var(--lt-display);
+    font-size: 26px;
+    color: var(--lt-text);
+    font-variant-numeric: tabular-nums;
+  }
+  .score-cell .value.good {
+    color: var(--lt-phos-bright);
+    text-shadow: 0 0 12px rgba(77, 255, 170, 0.5);
+  }
+  .score-cell .value.mid { color: var(--lt-amber); }
+  .score-cell .value.bad { color: var(--lt-red); }
+  .grade-stamp {
+    display: inline-block;
+    transform: scale(.7);
+    opacity: 0;
+    transition: opacity .25s ease, transform .35s cubic-bezier(.2,.9,.25,1.5);
+  }
+  .grade-stamp.is-in { opacity: 1; transform: scale(1); }
+
+  /* ─── BEAT 4: QUARTET CHORUS ─── */
+  .chorus {
+    margin-top: 22px;
+    width: 100%;
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .consult {
+    border: 1px solid var(--lt-frame);
+    background: linear-gradient(to bottom, rgba(13,80,50,0.08), transparent);
+    padding: 12px 12px 14px;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .45s ease, transform .45s ease, box-shadow .35s ease, border-color .35s ease;
+    position: relative;
+  }
+  .consult.is-in { opacity: 1; transform: translateY(0); }
+  .consult.is-speaking {
+    border-color: var(--lt-phos);
+    box-shadow:
+      0 0 24px rgba(77, 255, 170, 0.20),
+      inset 0 0 24px rgba(77, 255, 170, 0.05);
+  }
+  .consult.aligned.is-speaking { border-color: var(--lt-phos); }
+  .consult.missed.is-speaking  { border-color: var(--lt-red); box-shadow: 0 0 24px rgba(255,77,109,0.20); }
+  .consult.abstained.is-speaking { border-color: var(--lt-amber); box-shadow: 0 0 24px rgba(255,184,77,0.20); }
+
+  .sigil {
+    font-family: var(--lt-display);
+    font-size: 30px;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .consult[data-station="monk"]    .sigil { color: var(--lt-phos-bright); text-shadow: 0 0 16px var(--lt-phos); }
+  .consult[data-station="demon"]   .sigil { color: var(--lt-magenta);    text-shadow: 0 0 16px rgba(255,62,160,.55); }
+  .consult[data-station="trinity"] .sigil { color: var(--lt-cyan);       text-shadow: 0 0 16px rgba(123,227,255,.55); }
+  .consult[data-station="eugene"]  .sigil { color: var(--lt-violet);     text-shadow: 0 0 16px rgba(180,140,255,.55); }
+
+  .consult .name {
+    font-family: var(--lt-display);
+    font-size: 12px; letter-spacing: 2px;
+    color: var(--lt-text);
+    margin-bottom: 2px;
+  }
+  .consult .role {
+    font-size: 8px; letter-spacing: 2px; color: var(--lt-text-faint);
+    margin-bottom: 8px;
+  }
+  .consult .bubble {
+    font-style: italic;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--lt-text);
+    min-height: 56px;
+    text-align: left;
+    padding: 8px 10px;
+    background: rgba(0,0,0,0.35);
+    border-left: 2px solid var(--lt-frame);
+  }
+  .consult.aligned.is-speaking .bubble   { border-left-color: var(--lt-phos); }
+  .consult.missed.is-speaking .bubble    { border-left-color: var(--lt-red); }
+  .consult.abstained.is-speaking .bubble { border-left-color: var(--lt-amber); }
+
+  .typing {
+    display: inline-block;
+    color: var(--lt-phos);
+    letter-spacing: 2px;
+    animation: dots 1.2s infinite steps(4);
+  }
+  @keyframes dots {
+    0%   { content: '.'; }
+    33%  { content: '..'; }
+    66%  { content: '...'; }
+    100% { content: '.'; }
+  }
+  .typing::after { content: '...'; animation: dots 1.2s infinite steps(4); }
+
+  /* Confetti */
+  .confetti {
+    position: absolute;
+    top: 0;
+    color: var(--lt-phos);
+    font-family: var(--lt-mono);
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 3;
+    animation: fall linear forwards;
+  }
+  @keyframes fall {
+    0%   { opacity: 0; transform: translateY(-20px); }
+    10%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(800px); }
+  }
+
+  /* ─── FOOTER / CONTROLS ─── */
+  .footer {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 14px 22px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--lt-frame);
+    background: linear-gradient(to top, rgba(13,80,50,0.10), transparent);
+    z-index: 5;
+  }
+  .btn {
+    font-family: var(--lt-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--lt-phos);
+    background: transparent;
+    border: 1px solid var(--lt-phos);
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover {
+    background: rgba(77,255,170,0.10);
+    box-shadow: 0 0 16px rgba(77,255,170,0.25);
+  }
+  .btn.ghost {
+    color: var(--lt-text-dim);
+    border-color: var(--lt-frame);
+  }
+  .btn.ghost:hover {
+    color: var(--lt-text);
+    border-color: var(--lt-frame-bright);
+  }
+
+  /* Progress dots */
+  .beats {
+    display: flex; gap: 6px;
+  }
+  .beats span {
+    width: 8px; height: 8px; border: 1px solid var(--lt-frame);
+    background: transparent;
+    transition: background .25s ease, border-color .25s ease;
+  }
+  .beats span.is-done { background: var(--lt-frame-bright); border-color: var(--lt-phos); }
+  .beats span.is-now  { background: var(--lt-phos); border-color: var(--lt-phos); box-shadow: 0 0 10px var(--lt-phos); }
+
+  /* Outcome selector — mock-only */
+  .outcome-row {
+    position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px;
+    z-index: 6;
+    opacity: 0.7;
+  }
+  .outcome-row button {
+    font-family: var(--lt-mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--lt-text-faint);
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--lt-frame);
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  .outcome-row button.active {
+    color: var(--lt-phos);
+    border-color: var(--lt-phos);
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="vignette"></div>
+  <div class="scanlines"></div>
+  <div class="noise"></div>
+
+  <div class="header">
+    <div><span class="tag">PROPHET // VERDICT REVEAL</span></div>
+    <div class="case-id">CASE 001 · $PRPHT</div>
+    <div class="blink">LIVE</div>
+  </div>
+
+  <div class="content">
+    <!-- BEAT 1: TRUTH -->
+    <div class="truth-block" id="truth">
+      <div class="truth-tag">// GROUND TRUTH</div>
+      <div class="truth-text">
+        <span id="truth-typed"></span><span class="caret" id="truth-caret"></span>
+      </div>
+    </div>
+
+    <!-- BEAT 2: VERDICT MATCH -->
+    <div class="verdict-block" id="verdict">
+      <div class="verdict-side you">
+        <div class="verdict-label">YOU RENDERED</div>
+        <div class="verdict-name" id="your-verdict">DOUBT</div>
+      </div>
+      <div class="verdict-match" id="match-glyph">✓</div>
+      <div class="verdict-side">
+        <div class="verdict-label">GROUND TRUTH</div>
+        <div class="verdict-name" id="truth-verdict">DOUBT</div>
+      </div>
+    </div>
+
+    <!-- BEAT 3: SCORE -->
+    <div class="score-block" id="score">
+      <div class="score-cell">
+        <div class="label">BRIER</div>
+        <div class="value good" id="brier-val">1.000</div>
+      </div>
+      <div class="score-cell">
+        <div class="label">GRADE</div>
+        <div class="value good"><span class="grade-stamp" id="grade-stamp">EXCELLENT</span></div>
+      </div>
+      <div class="score-cell">
+        <div class="label">SCANS</div>
+        <div class="value" id="scans-val">3/3</div>
+      </div>
+      <div class="score-cell">
+        <div class="label">RANK</div>
+        <div class="value good" id="rank-val">↑ 318</div>
+      </div>
+    </div>
+
+    <!-- BEAT 4: QUARTET CHORUS -->
+    <div class="chorus" id="chorus">
+      <div class="consult" data-station="monk" id="c-monk">
+        <div class="sigil">✟</div>
+        <div class="name">SAINT GR80</div>
+        <div class="role">ETHOS · DOCTRINE</div>
+        <div class="bubble" data-bubble></div>
+      </div>
+      <div class="consult" data-station="demon" id="c-demon">
+        <div class="sigil">✦</div>
+        <div class="name">JOHN BARRON</div>
+        <div class="role">PATHOS · SENTIMENT</div>
+        <div class="bubble" data-bubble></div>
+      </div>
+      <div class="consult" data-station="trinity" id="c-trinity">
+        <div class="sigil">✧</div>
+        <div class="name">DET. TRINITY</div>
+        <div class="role">LOGOS · ONCHAIN</div>
+        <div class="bubble" data-bubble></div>
+      </div>
+      <div class="consult" data-station="eugene" id="c-eugene">
+        <div class="sigil">❖</div>
+        <div class="name">EUGENE</div>
+        <div class="role">MYTHOS · NARRATIVE</div>
+        <div class="bubble" data-bubble></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="outcome-row">
+    <button data-outcome="aligned" class="active">SHOW: ALIGNED</button>
+    <button data-outcome="missed">MISSED</button>
+    <button data-outcome="abstained">ABSTAINED</button>
+  </div>
+
+  <div class="footer">
+    <button class="btn ghost" id="replay">▸ REPLAY</button>
+    <div class="beats" id="beats">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <button class="btn" id="continue">CONTINUE ▸</button>
+  </div>
+</div>
+
+<script>
+  // ── Case data (mirrors src/components/GameOverlay.jsx case 001) ──────────
+  const TRUTH_LINE = "PROPHET TOKEN was a serial-deployer rug. Pulled day 6. ~$340K extracted.";
+  const CORRECT = "DOUBT";
+
+  // verdict-specific score/grade for each outcome scenario
+  const OUTCOMES = {
+    aligned:   { your: "DOUBT",   match: "✓", matchClass: "",        brier: 0.023, grade: "EXCELLENT", gradeClass: "good", rank: "↑ 318",  rankClass: "good" },
+    missed:    { your: "BELIEVE", match: "✗", matchClass: "miss",    brier: 0.722, grade: "POOR",      gradeClass: "bad",  rank: "↓ 142",  rankClass: "bad" },
+    abstained: { your: "ABSTAIN", match: "◇", matchClass: "abstain", brier: 0.250, grade: "FAIR",      gradeClass: "mid",  rank: "→ 0",   rankClass: "" },
+  };
+
+  // Vindication lines — copied verbatim from GameOverlay.jsx case 001 data
+  const VOICES = {
+    monk: {
+      aligned:   "As I feared.",
+      missed:    "We will rebuild your faith on firmer ground.",
+      abstained: "The faithful and the cautious survive.",
+    },
+    demon: {
+      aligned:   "Told you. Was I right? I was right.",
+      missed:    "Hurts, doesn't it. Hurts good. Remember it.",
+      abstained: "Cautious. Boring. Correct.",
+    },
+    trinity: {
+      aligned:   "Called it.",
+      missed:    "Walk it off. Wallet patterns aren't intuitive 'til you've seen a hundred.",
+      abstained: "Lived to investigate another day.",
+    },
+    eugene: {
+      aligned:   "Knew you had instincts! \u{1F495}",
+      missed:    "Hey — we all learn the patterns eventually ✨",
+      abstained: "You read the room. Half the skill is knowing when not to play \u{1F4AB}",
+    },
+  };
+
+  const STATIONS = ["monk", "demon", "trinity", "eugene"];
+
+  // ── DOM refs ────────────────────────────────────────────────────────────
+  const stage = document.getElementById("stage");
+  const truthBlock = document.getElementById("truth");
+  const truthTyped = document.getElementById("truth-typed");
+  const truthCaret = document.getElementById("truth-caret");
+  const verdictBlock = document.getElementById("verdict");
+  const yourVerdict = document.getElementById("your-verdict");
+  const truthVerdict = document.getElementById("truth-verdict");
+  const matchGlyph = document.getElementById("match-glyph");
+  const scoreBlock = document.getElementById("score");
+  const brierVal = document.getElementById("brier-val");
+  const gradeStamp = document.getElementById("grade-stamp");
+  const scansVal = document.getElementById("scans-val");
+  const rankVal = document.getElementById("rank-val");
+  const beats = document.querySelectorAll("#beats span");
+  const outcomeBtns = document.querySelectorAll(".outcome-row button");
+  const replayBtn = document.getElementById("replay");
+
+  let currentOutcome = "aligned";
+  let timeouts = [];
+  let confettiIntervals = [];
+
+  function clearTimers() {
+    timeouts.forEach(clearTimeout);
+    timeouts = [];
+    confettiIntervals.forEach(clearInterval);
+    confettiIntervals = [];
+  }
+  function later(fn, ms) { const t = setTimeout(fn, ms); timeouts.push(t); return t; }
+
+  // ── Beat utilities ─────────────────────────────────────────────────────
+  function reset() {
+    clearTimers();
+    truthBlock.classList.remove("is-in");
+    truthTyped.textContent = "";
+    truthCaret.style.display = "inline-block";
+    verdictBlock.classList.remove("is-in", "is-slam");
+    matchGlyph.classList.remove("is-in", "miss", "abstain");
+    scoreBlock.classList.remove("is-in");
+    gradeStamp.classList.remove("is-in");
+    brierVal.textContent = "1.000";
+    brierVal.className = "value good";
+    rankVal.className = "value good";
+    document.querySelectorAll(".consult").forEach(c => {
+      c.classList.remove("is-in", "is-speaking", "aligned", "missed", "abstained");
+      c.querySelector("[data-bubble]").innerHTML = "";
+    });
+    beats.forEach(b => b.classList.remove("is-done", "is-now"));
+    // remove confetti
+    document.querySelectorAll(".confetti").forEach(c => c.remove());
+  }
+
+  function setBeat(i) {
+    beats.forEach((b, idx) => {
+      b.classList.toggle("is-done", idx < i);
+      b.classList.toggle("is-now", idx === i);
+    });
+  }
+
+  function typeInto(el, text, perChar = 22, done) {
+    let i = 0;
+    function step() {
+      if (i > text.length) { done && done(); return; }
+      el.textContent = text.slice(0, i);
+      i++;
+      later(step, perChar);
+    }
+    step();
+  }
+
+  function spawnConfetti(color, count, density) {
+    const glyphs = ["✦", "✧", "❖", "▮", "+", "/", "\\", "·", "✓"];
+    const w = stage.clientWidth;
+    let made = 0;
+    const id = setInterval(() => {
+      for (let k = 0; k < density; k++) {
+        const el = document.createElement("div");
+        el.className = "confetti";
+        el.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+        el.style.left = Math.random() * w + "px";
+        el.style.color = color;
+        el.style.fontSize = (10 + Math.random() * 14) + "px";
+        el.style.animationDuration = (1.6 + Math.random() * 1.4) + "s";
+        stage.appendChild(el);
+        setTimeout(() => el.remove(), 3200);
+      }
+      made++;
+      if (made >= count) { clearInterval(id); }
+    }, 90);
+    confettiIntervals.push(id);
+  }
+
+  function countDownBrier(target, ms = 900) {
+    const start = 1.000;
+    const t0 = performance.now();
+    function tick(now) {
+      const t = Math.min(1, (now - t0) / ms);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const v = start - (start - target) * eased;
+      brierVal.textContent = v.toFixed(3);
+      if (t < 1) requestAnimationFrame(tick);
+      else brierVal.textContent = target.toFixed(3);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ── Choreography ───────────────────────────────────────────────────────
+  function play(outcome) {
+    reset();
+    const o = OUTCOMES[outcome];
+
+    yourVerdict.textContent = o.your;
+    truthVerdict.textContent = CORRECT;
+    matchGlyph.textContent = o.match;
+    matchGlyph.classList.remove("miss", "abstain");
+    if (o.matchClass) matchGlyph.classList.add(o.matchClass);
+    brierVal.className = "value " + o.gradeClass;
+    rankVal.className = "value " + (o.rankClass || "");
+    gradeStamp.className = "grade-stamp"; // reset
+    gradeStamp.textContent = o.grade;
+
+    // BEAT 0 — small breath
+    setBeat(0);
+
+    // BEAT 1 — ground truth types in
+    later(() => {
+      setBeat(1);
+      truthBlock.classList.add("is-in");
+      later(() => {
+        typeInto(truthTyped, TRUTH_LINE, 18, () => {
+          truthCaret.style.display = "none";
+        });
+      }, 220);
+    }, 350);
+
+    // BEAT 2 — verdict slam
+    later(() => {
+      setBeat(2);
+      verdictBlock.classList.add("is-in");
+      later(() => {
+        matchGlyph.classList.add("is-in");
+        verdictBlock.classList.add("is-slam");
+        if (outcome === "aligned") spawnConfetti("#4dffaa", 6, 4);
+        if (outcome === "missed")  spawnConfetti("#ff4d6d", 4, 2);
+      }, 250);
+    }, 2600);
+
+    // BEAT 3 — score countdown + grade stamp
+    later(() => {
+      setBeat(3);
+      scoreBlock.classList.add("is-in");
+      later(() => countDownBrier(o.brier), 220);
+      later(() => gradeStamp.classList.add("is-in"), 1050);
+    }, 3700);
+
+    // BEAT 4 — quartet chorus
+    later(() => {
+      setBeat(4);
+      STATIONS.forEach((station, idx) => {
+        const card = document.querySelector(`#c-${station}`);
+        const bubble = card.querySelector("[data-bubble]");
+        const line = VOICES[station][outcome];
+        const role = outcome; // class
+
+        // card slides in
+        later(() => card.classList.add("is-in"), idx * 180);
+
+        // when it's this card's "turn" — speak
+        const speakAt = idx * 700 + 250;
+        later(() => {
+          card.classList.add("is-speaking", role);
+          bubble.innerHTML = '<span class="typing"></span>';
+        }, speakAt);
+        later(() => {
+          bubble.textContent = line;
+        }, speakAt + 520);
+        // dim the speaking ring after a moment so next card pops
+        later(() => {
+          card.classList.remove("is-speaking");
+        }, speakAt + 1400);
+      });
+    }, 4900);
+
+    // mark all beats done at the end
+    later(() => setBeat(5), 4900 + 4 * 700 + 800);
+  }
+
+  // ── Wiring ─────────────────────────────────────────────────────────────
+  outcomeBtns.forEach(b => b.addEventListener("click", () => {
+    outcomeBtns.forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    currentOutcome = b.dataset.outcome;
+    play(currentOutcome);
+  }));
+  replayBtn.addEventListener("click", () => play(currentOutcome));
+  document.getElementById("continue").addEventListener("click", () => {
+    // mock — would advance to next case
+    play(currentOutcome);
+  });
+
+  play(currentOutcome);
+</script>
+</body>
+</html>

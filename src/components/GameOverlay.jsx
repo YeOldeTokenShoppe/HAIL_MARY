@@ -41,11 +41,10 @@ export const SAMPLE_CASE = {
   // directions — Brier (lower-better, counterintuitive) vs accuracy (higher-better),
   // and (4) the calibration intuition (bold-right wins, bold-wrong loses, abstain spared).
   rulesIntro:
-    "Welcome friend! Before we begin, the rite is simple. You have three questions to " +
-    "spend across the four of us. Then you render your verdict: Believe, Abstain, " +
-    "or Doubt. Two scores judge you. Your Brier, lower is better, the closer to " +
-    "truth. Your accuracy, higher, as you would expect. Boldness rewards the seer " +
-    "and punishes the blind. Abstain when you do not see. Choose wisely.",
+    "Welcome friend. The rite is simple. You have three questions to spend across " +
+    "the four of us — then you render your verdict: Believe, Abstain, or Doubt. " +
+    "Boldness rewards the seer and punishes the blind. Abstain when you do not see. " +
+    "Choose wisely.",
   stations: {
     monk: {
       character: "Saint GR80",
@@ -184,14 +183,14 @@ export const SAMPLE_CASE = {
       // recordings (when present) bypass this entirely.
       voice: "2",
       intro: {
-        text: "These followers. Listen. Tremendous fake. The best fakes I've ever seen. Sad.",
+        text: "These followers. HA! I mean, come ON!",
         audio: "case001_demon_intro",
       },
       // Character-wide return pool — same files play across all cases on
       // revisits to Barron. Each picked at random by pickReturnLine().
       returnLines: [
         { text: "You're back. Smart. Very smart.", audio: "demon_return_1" },
-        { text: "Good. I was getting bored. Tremendous boredom.", audio: "demon_return_2" },
+        { text: "Good. You're back. I was getting bored.", audio: "demon_return_2" },
         { text: "Round two. Let's go.", audio: "demon_return_3" },
       ],
       questions: [
@@ -210,7 +209,8 @@ export const SAMPLE_CASE = {
           a: {
             text:
               "Eighty-eight percent the same phrase. Copy-paste. Drone army. " +
-              "Nothing real anywhere.",
+              "What you're seeing and what you're reading is NOT" +
+              "what's happening.",
             audio: "case001_demon_q2",
           },
           reveals: "TELEGRAM ACTIVITY",

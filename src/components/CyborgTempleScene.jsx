@@ -622,14 +622,18 @@ const CyborgTempleScene = ({
   // speaking) or typing (between speech beats). Without this, characters
   // just stare at the player the whole time instead of appearing to look
   // up information between exchanges.
+  //
+  // In lobby (pre-game) the focused character stays in idle regardless of
+  // speechActive — the player is reviewing character info cards, so they
+  // should be looking up at the camera, not heads-down typing.
   useEffect(() => {
     if (!externalFocusAgent) return;
-    const mode = speechActive ? 'idle' : 'typing';
+    const mode = !gameStarted || speechActive ? 'idle' : 'typing';
     applyCharacterFocusAnimation(externalFocusAgent, mode);
     // applyCharacterFocusAnimation is defined inside the component and reads
     // refs (which are stable), so it doesn't need to be in the dep list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalFocusAgent, speechActive]);
+  }, [externalFocusAgent, speechActive, gameStarted]);
 
   // Hover state for coins
   const [hoveredCoin, setHoveredCoin] = useState(null);
@@ -1158,8 +1162,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v40_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v40.glb";
+    let modelPath = "/models/RL80_4anims_v41_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v41.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -4571,8 +4575,13 @@ const CyborgTempleScene = ({
     // Monk head look-at-camera override — active when focused on the Monk
     // OR while the attention-getter cycle is running, so the monk appears
     // to address the user across hail → idle → hail → beckon transitions.
+    // The attention loop bypasses `shouldTrackHeadRef` (which goes false
+    // once gameStarted flips true) — without that bypass, GR80 would hail
+    // and beckon while staring straight ahead instead of at the player.
     const monkIsPointing = monkWaveStateRef.current.attentionActive;
-    if ((monkFocusedRef.current || monkIsPointing) && monkHeadBoneRef.current && shouldTrackHeadRef.current) {
+    const monkHeadGate =
+      monkIsPointing || (monkFocusedRef.current && shouldTrackHeadRef.current);
+    if (monkHeadGate && monkHeadBoneRef.current) {
       const head = monkHeadBoneRef.current;
 
       if (!monkHeadBoneRef._baseQuat) {
