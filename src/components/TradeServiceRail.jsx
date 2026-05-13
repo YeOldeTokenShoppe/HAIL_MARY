@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 
 const SERVICES = [
   {
@@ -7,7 +7,8 @@ const SERVICES = [
     title: "Token Trainer",
     desc: "Read evidence. Render verdict. Climb the board.",
     accent: "phos",
-    cta: "START",
+    cta: "SELECTED",
+    selected: true,
   },
   {
     id: "analysis",
@@ -15,46 +16,37 @@ const SERVICES = [
     title: "Token Review",
     desc: "Request a team analysis of any token.",
     accent: "cyan",
-    cta: "QUEUE",
+    cta: "SOON",
+    selected: false,
   },
 ];
 
-export default function TradeServiceRail({ onSelect }) {
-  const [activeId, setActiveId] = useState("game");
-  const activeService =
-    SERVICES.find((service) => service.id === activeId) || SERVICES[0];
-
-  const handleSelect = (service) => {
-    if (service.id === "game") onSelect?.(service.id);
-  };
+export default function TradeServiceRail() {
+  const shellAccent = SERVICES.find((s) => s.selected)?.accent ?? "phos";
 
   return (
     <div className="tsr-root" aria-label="Trade page services">
       <style>{STYLES}</style>
-      <div className={`tsr-shell tsr-${activeService.accent}`}>
+      <div className={`tsr-shell tsr-${shellAccent}`}>
         <div className="tsr-status">
           <span className="tsr-pip" aria-hidden />
           SERVICES ONLINE
         </div>
-        <div className="tsr-options">
-          {SERVICES.map((service) => {
-            const isActive = service.id === activeService.id;
-            return (
-              <button
-                key={service.id}
-                className={`tsr-card tsr-card-${service.accent}${isActive ? " is-active" : ""}${service.id !== "game" ? " is-inert" : ""}`}
-                onMouseEnter={() => setActiveId(service.id)}
-                onFocus={() => setActiveId(service.id)}
-                onClick={() => handleSelect(service)}
-                aria-disabled={service.id !== "game" || undefined}
-              >
-                <span className="tsr-card-eyebrow">{service.eyebrow}</span>
-                <span className="tsr-card-title">{service.title}</span>
-                <span className="tsr-card-desc">{service.desc}</span>
-                <span className="tsr-card-cta">{service.cta}</span>
-              </button>
-            );
-          })}
+        <div className="tsr-options" role="radiogroup" aria-label="Available services">
+          {SERVICES.map((service) => (
+            <div
+              key={service.id}
+              role="radio"
+              aria-checked={service.selected}
+              aria-disabled={!service.selected || undefined}
+              className={`tsr-card tsr-card-${service.accent}${service.selected ? " is-active" : " is-inert"}`}
+            >
+              <span className="tsr-card-eyebrow">{service.eyebrow}</span>
+              <span className="tsr-card-title">{service.title}</span>
+              <span className="tsr-card-desc">{service.desc}</span>
+              <span className="tsr-card-cta">{service.cta}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -156,11 +148,10 @@ const STYLES = `
   background:
     linear-gradient(180deg, rgba(10, 58, 38, 0.22), rgba(2, 5, 8, 0.46));
   color: #c8ffe0;
-  cursor: pointer;
+  cursor: default;
   text-align: left;
   font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
   transition:
-    transform 180ms ease,
     border-color 180ms ease,
     background 180ms ease,
     box-shadow 180ms ease;
@@ -176,29 +167,26 @@ const STYLES = `
   transition: opacity 180ms ease, transform 520ms ease;
 }
 
-.tsr-card:hover,
-.tsr-card:focus-visible,
 .tsr-card.is-active {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--card-accent) 72%, white 4%);
+  border-color: color-mix(in srgb, var(--card-accent) 80%, white 6%);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 10%, rgba(10, 58, 38, 0.2)), rgba(2, 5, 8, 0.5));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--card-accent) 22%, transparent);
+    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 14%, rgba(10, 58, 38, 0.22)), rgba(2, 5, 8, 0.52));
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--card-accent) 28%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 38%, transparent);
 }
 
-.tsr-card:hover::before,
-.tsr-card:focus-visible::before,
 .tsr-card.is-active::before {
   opacity: 1;
   transform: translateX(60%);
 }
 
 .tsr-card.is-inert {
-  cursor: default;
+  opacity: 0.72;
 }
 
 .tsr-card.is-inert .tsr-card-cta {
-  opacity: 0.46;
+  opacity: 0.5;
 }
 
 .tsr-card-phos { --card-accent: #8effc4; }

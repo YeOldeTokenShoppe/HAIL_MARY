@@ -236,6 +236,12 @@ function SitePalHostEmbed({ config }) {
         }
 
         clearSpeechRetryTimer();
+        // Retry budget bumped from 1200ms → 3500ms because mobile (cellular
+        // especially) often takes >1.2s to actually start sayAudio playback
+        // on the longer recordings. The retry calls stopSpeech() before its
+        // sayAudio, but on iOS stopSpeech doesn't reliably cancel an
+        // already-buffered original, so a too-eager retry plays the same
+        // audio twice with ~200ms offset.
         window.__sitePalSpeechRetryTimer = setTimeout(() => {
           const latest = window.__sitePalActiveSpeech;
           if (!latest || latest.token !== request.token || latest.started) return;
@@ -255,7 +261,7 @@ function SitePalHostEmbed({ config }) {
             });
             clearActiveSpeech();
           }
-        }, 1200);
+        }, 3500);
         return true;
       } catch (e) {
         console.warn("[SitePal] speech error", e);
@@ -864,6 +870,44 @@ export default function CyborgTemple() {
   // first-ever monk visit this session. Skipped on subsequent cases.
   const rulesSpokenRef = useRef(false);
 
+  // Cross-session: once the rules have played end-to-end (or been skipped),
+  // skip the rules preamble AND the GR80 attract loop on future visits.
+  // Version the key so future rule changes can force a replay.
+  const RULES_HEARD_KEY = 'rl80_rules_heard_v1';
+  const [rulesHeard, setRulesHeard] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (window.localStorage.getItem(RULES_HEARD_KEY) === '1') {
+        setRulesHeard(true);
+      }
+    } catch (e) {}
+  }, []);
+  const markRulesHeard = useCallback(() => {
+    setRulesHeard(true);
+    try { window.localStorage.setItem(RULES_HEARD_KEY, '1'); } catch (e) {}
+  }, []);
+  const replayRules = useCallback(() => {
+    try { window.localStorage.removeItem(RULES_HEARD_KEY); } catch (e) {}
+    setRulesHeard(false);
+    rulesSpokenRef.current = false;
+    // Drop monk from visitedStations so the first-visit branch (which carries
+    // the rules preamble) fires again next time he's focused.
+    setVisitedStations((prev) => {
+      const next = new Set(prev);
+      next.delete('monk');
+      return next;
+    });
+    // If the user is currently on monk, drop focus so re-focusing triggers
+    // the first-visit speech effect. Otherwise leave focus alone.
+    if (focusedAgent === 'Monk') {
+      try { if (typeof window.stopSpeech === 'function') window.stopSpeech(); } catch (e) {}
+      setCurrentSpeech(null);
+      setPendingSpeech(null);
+      setFocusedAgent(null);
+    }
+  }, [focusedAgent]);
+
   // Auto-advance from the current speech beat to any queued follow-up when
   // the visual reveal of the current text finishes. The audio for split beats
   // (e.g. monk's rules → intro) is one continuous recording, so without this
@@ -887,6 +931,13 @@ export default function CyborgTemple() {
   }, [currentSpeech, pendingSpeech]);
   const [verdict, setVerdict] = useState(null);
   const [brier, setBrier] = useState(null);
+  // Staged reveal for the verdict modal so the reaction audio and the
+  // vindication audio land on visually distinct beats:
+  //   null       — modal hidden
+  //   'weighing' — verdict locked; "weighing evidence" pulse; reaction plays
+  //   'reveal'   — icon + ground truth + grade fade in; silent pause
+  //   'vindicate'— vindication audio + final card row + buttons
+  const [revealPhase, setRevealPhase] = useState(null);
   // Derived: total questions asked across all stations, and what remains.
   const scansUsed = Object.values(asked).reduce((n, set) => n + set.size, 0);
   const scansRemaining = Math.max(0, caseData.maxScans - scansUsed);
@@ -907,6 +958,7 @@ export default function CyborgTemple() {
     rulesSpokenRef.current = false;
     setVerdict(null);
     setBrier(null);
+    setRevealPhase(null);
   };
   const returnToServiceRail = () => {
     setTradeMode(null);
@@ -917,6 +969,7 @@ export default function CyborgTemple() {
     // schedule the wrong line ~1.8s later).
     setVerdict(null);
     setBrier(null);
+    setRevealPhase(null);
     setActiveAnswer(null);
     setActiveReaction(null);
     setCurrentSpeech(null);
@@ -925,6 +978,17 @@ export default function CyborgTemple() {
     // (it's gated on `!focusedAgent`).
     setFocusedAgent(null);
   };
+
+  // Curtain-call reveal mode for the 3D scene. Engages during the 'reveal'
+  // and 'vindicate' phases so the blackout-and-stage transition lands on
+  // the dramatic beat (after the focused character's reaction). Maps the
+  // verdict against ground truth: aligned / missed / abstained.
+  const revealMode = useMemo(() => {
+    if (!verdict) return null;
+    if (revealPhase !== 'reveal' && revealPhase !== 'vindicate') return null;
+    if (verdict === 'abstain') return 'abstained';
+    return verdict === caseData.correctVerdict ? 'aligned' : 'missed';
+  }, [verdict, revealPhase, caseData.correctVerdict]);
 
   // Hook for the post-verdict "NEXT CASE" button. There's only SAMPLE_CASE
   // for now, so the button is disabled in the verdict modal — but the
@@ -937,6 +1001,7 @@ export default function CyborgTemple() {
     // (When case data is plural, also setCaseData(nextCase) here.)
     setVerdict(null);
     setBrier(null);
+    setRevealPhase(null);
     setActiveAnswer(null);
     setActiveReaction(null);
     setCurrentSpeech(null);
@@ -1100,7 +1165,7 @@ export default function CyborgTemple() {
       const introText = introResolved?.text || '';
       toSpeak = introLine;
       displayText = introText;
-      if (stationKey === 'monk' && !rulesSpokenRef.current && caseData.rulesIntro) {
+      if (stationKey === 'monk' && !rulesSpokenRef.current && !rulesHeard && caseData.rulesIntro) {
         rulesSpokenRef.current = true;
         const rulesText = resolveLine(caseData.rulesIntro)?.text || '';
         if (rulesText) {
@@ -1109,6 +1174,9 @@ export default function CyborgTemple() {
           if (!introResolved?.audio) {
             toSpeak = `${rulesText} ${introText}`.trim();
           }
+          // Persist across sessions so the rules preamble + attract loop
+          // don't fire on subsequent visits. `replayRules` clears this.
+          markRulesHeard();
         }
       }
     } else {
@@ -1184,14 +1252,20 @@ export default function CyborgTemple() {
     if (verdict) return;
     setVerdict(v);
     setBrier(computeBrier(v, caseData.correctVerdict));
-    // Play the focused character's immediate verdict reaction (before the
-    // reveal modal renders). Vindication fires ~1.8s later via the effect below.
+    setRevealPhase('weighing');
+    // Play the focused character's immediate verdict reaction. The reveal
+    // phase driver below transitions weighing → reveal (when reaction ends)
+    // → vindicate (after a beat for the player to absorb the truth).
     const stationKey = focusedAgent && CHARACTER_TO_STATION[focusedAgent];
     const station = stationKey && caseData.stations[stationKey];
     const reaction = station?.verdictReaction?.[v];
     if (reaction) {
       setActiveReaction({ stationKey, text: reaction });
       speakLine(reaction, stationKey);
+    } else {
+      // No reaction line for this character/verdict — skip the weighing
+      // beat and go straight to reveal.
+      setRevealPhase('reveal');
     }
   };
 
@@ -1210,36 +1284,45 @@ export default function CyborgTemple() {
     return { stationKey, character: station.character, line, text: resolved.text };
   }, [verdict, focusedAgent, caseData]);
 
-  // After verdict commit, the reaction line speaks immediately (via
-  // submitVerdict). Vindication should follow only AFTER the reaction
-  // finishes — previously this was a hardcoded 1.8s wait, which worked
-  // for short reactions but cut into longer recordings (the detective's
-  // lines are 3–4s, so vind_alig would interrupt mid-react).
+  // Reveal-phase driver.
   //
-  // Two paths:
-  //   • SitePal characters (monk/demon/detective): wait for speechActive
-  //     to clear — vh_audioStopped fires it the instant audio ends.
-  //   • Eugene: no SitePal callbacks, so speechActive lingers on the 8s
-  //     safety timer floor. Use a text-length-paced delay instead so her
-  //     vindication bubble doesn't sit 8 seconds behind.
+  // 'weighing' → 'reveal' : fires when the reaction audio ends. For SitePal
+  //   characters we wait on `speechActive` (which vh_audioStopped clears the
+  //   instant audio ends). For Eugene (no SitePal callbacks; speechActive
+  //   sticks on the 8s safety floor) we use a text-paced delay instead.
+  //
+  // 'reveal' → 'vindicate' : ~1.1s pause for the player to absorb the truth
+  //   card, then speak the vindication line. The vindicationFiredForRef
+  //   guard prevents the line from re-firing if other state churns the
+  //   effect.
   const vindicationFiredForRef = useRef(null);
   useEffect(() => {
-    if (!vindicationDelivery) {
+    if (!verdict) {
       vindicationFiredForRef.current = null;
       return;
     }
-    if (vindicationFiredForRef.current === vindicationDelivery.line) return;
-    const isEugene = vindicationDelivery.stationKey === 'eugene';
-    if (!isEugene && speechActive) return; // reaction still playing
-    const reactionMs = isEugene
-      ? Math.max(2200, (activeReaction?.text?.length || 0) * 70)
-      : 500;
-    vindicationFiredForRef.current = vindicationDelivery.line;
-    const t = setTimeout(() => {
+
+    if (revealPhase === 'weighing') {
+      const isEugene = (focusedAgent && CHARACTER_TO_STATION[focusedAgent]) === 'eugene';
+      if (!isEugene && speechActive) return; // reaction still playing
+      const reactionMs = isEugene
+        ? Math.max(2200, (activeReaction?.text?.length || 0) * 70)
+        : 350;
+      const t = setTimeout(() => setRevealPhase('reveal'), reactionMs);
+      return () => clearTimeout(t);
+    }
+
+    if (revealPhase === 'reveal') {
+      const t = setTimeout(() => setRevealPhase('vindicate'), 1100);
+      return () => clearTimeout(t);
+    }
+
+    if (revealPhase === 'vindicate' && vindicationDelivery) {
+      if (vindicationFiredForRef.current === vindicationDelivery.line) return;
+      vindicationFiredForRef.current = vindicationDelivery.line;
       speakLine(vindicationDelivery.line, vindicationDelivery.stationKey);
-    }, reactionMs);
-    return () => clearTimeout(t);
-  }, [vindicationDelivery, speechActive, activeReaction, speakLine]);
+    }
+  }, [verdict, revealPhase, vindicationDelivery, speechActive, activeReaction, focusedAgent, speakLine]);
 
   // Stable camera rig inputs — without `useMemo`, these inline arrays would
   // get a new identity every render and re-mount the rig's effect, lurching
@@ -1351,7 +1434,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v41_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v65_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -2133,12 +2216,14 @@ export default function CyborgTemple() {
               isMobile={isMobileView}
               disableCandleInteraction
               gameStarted={gameStarted}
+              attractMonk={gameStarted && !rulesHeard && !focusedAgent}
               showCharacterHints={showCharacterHint && !focusedAgent}
               useSitePalForDemon={focusedAgent === 'Demon'}
               useSitePalForDetective={focusedAgent === 'Detective'}
               useSitePalForMonk={focusedAgent === 'Monk'}
-              externalFocusAgent={focusedAgent}
+              externalFocusAgent={revealMode ? 'Stage' : focusedAgent}
               speechActive={speechActive}
+              revealMode={revealMode}
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 console.log(`CoinFace ${coinIndex} tapped`)
@@ -2196,17 +2281,17 @@ export default function CyborgTemple() {
                 modelRef={null}
                 onLoad={handleTickerLoad}
                 isMobile={isMobileView}
-                autoRotate={!focusedAgent}
+                autoRotate={!focusedAgent && !revealMode}
                 autoRotateSpeed={0.4}
               />
             )}
 
-          
+
             {/* Constellation */}
-            <ConstellationModel  
-              groupScale={[10, 10, 10]} 
-              groupPosition={[0, 15, -80]} 
-              isVisible={true} 
+            <ConstellationModel
+              groupScale={[10, 10, 10]}
+              groupPosition={[0, 15, -80]}
+              isVisible={true}
             />
 
             {/* Liminal Terminal preview — screens render cryptic teasers */}
@@ -2236,7 +2321,7 @@ export default function CyborgTemple() {
                 running an external tween alongside OrbitControls'
                 damping. Auto-orbit and limits replicated in the rig. */}
             <CameraControlsRig
-              autoRotate={!focusedAgent}
+              autoRotate={!focusedAgent && !revealMode}
               autoRotateSpeed={-0.8}
               initialPosition={cameraInitialPosition}
               initialTarget={cameraInitialTarget}
@@ -2256,7 +2341,7 @@ export default function CyborgTemple() {
             RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Scans the tech tapestry for uncommon insights.' },
             Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Short seller. Insider trader.' },
             Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android theologian hell-bent on saving humanity from itself.' },
-            Detective: { name: 'Detective Trinity', pronunciation: '', tagline: 'Field agent for an interdimensional anti-fraud task force.' },
+            Detective: { name: 'Detective Trinity', pronunciation: '', tagline: 'Field agent for an interdimensional cyber-crimes task force.' },
           };
           // In game mode, the in-scene evidence side panel takes over —
           // suppress the floating agent label so the two cards don't stack.
@@ -2433,7 +2518,7 @@ export default function CyborgTemple() {
                 /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY). */}
             <>
               {tradeMode !== 'game' && !focusedAgent && (
-                <TradeServiceRail onSelect={enterGameMode} />
+                <TradeServiceRail />
               )}
               {/* In-scene HUD strip — top of viewport, 40px tall, doesn't
                   block. Shows case name + scans remaining. */}
@@ -2459,7 +2544,7 @@ export default function CyborgTemple() {
                     color: '#c8ffe0',
                     fontSize: 11,
                     letterSpacing: '0.16em',
-                    pointerEvents: 'none',
+                    pointerEvents: 'auto',
                   }}
                 >
                   <span style={{ color: '#8effc4', fontWeight: 700 }}>// CASE</span>
@@ -2472,7 +2557,72 @@ export default function CyborgTemple() {
                       ? 'investigate or render verdict'
                       : 'click a character to investigate'}
                   </span>
+                  <button
+                    type="button"
+                    onClick={replayRules}
+                    aria-label="Replay how-to-play rules"
+                    title="Replay rules"
+                    style={{
+                      marginLeft: 6,
+                      width: 22,
+                      height: 22,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                      borderRadius: 999,
+                      border: '1px solid rgba(142,233,255,0.6)',
+                      background: 'rgba(8,28,36,0.55)',
+                      color: '#8ee9ff',
+                      fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      textShadow: '0 0 8px rgba(142,233,255,0.45)',
+                      boxShadow: '0 0 8px rgba(142,233,255,0.25)',
+                    }}
+                  >
+                    ?
+                  </button>
                 </div>
+              )}
+
+              {/* Skip-intro pill — visible only during the GR80 attract loop
+                  (game started, rules not yet heard, no character focused).
+                  Clicking it sets the rules-heard flag, which (a) breaks the
+                  attract loop on the next frame, (b) suppresses the rules
+                  preamble when the player does focus GR80. */}
+              {tradeMode === 'game'
+                && !verdict
+                && !rulesHeard
+                && !focusedAgent && (
+                <button
+                  type="button"
+                  onClick={markRulesHeard}
+                  aria-label="Skip intro"
+                  style={{
+                    position: 'fixed',
+                    top: 'calc(env(safe-area-inset-top, 0px) + 58px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 1051,
+                    padding: '6px 14px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(255,184,77,0.7)',
+                    background: 'linear-gradient(180deg, rgba(40,22,4,0.78), rgba(20,10,2,0.66))',
+                    color: '#ffcb74',
+                    fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: '0.22em',
+                    cursor: 'pointer',
+                    textShadow: '0 0 8px rgba(255,184,77,0.45)',
+                    boxShadow: '0 0 14px rgba(255,184,77,0.28)',
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  SKIP INTRO ›
+                </button>
               )}
 
               {/* EvidenceScreens — paints the active question's evidence card
@@ -2518,8 +2668,8 @@ export default function CyborgTemple() {
                     pointerEvents: 'auto',
                   }}
                 >
-                  {/* Prominent scan counter — overlays the top-right of the
-                      console so the player always sees how many questions
+                  {/* Prominent scan counter — centered header bar at the top of
+                      the console so the player can't miss how many questions
                       remain. Color shifts as the budget burns down. */}
                   {(() => {
                     const remaining = scansRemaining;
@@ -2535,33 +2685,33 @@ export default function CyborgTemple() {
                       <div
                         aria-label={`${remaining} of ${caseData.maxScans} scans remaining`}
                         style={{
-                          position: 'absolute',
-                          top: 6,
-                          right: 10,
-                          zIndex: 2,
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '6px 14px 8px',
+                          borderBottom: `1px solid ${accentSoft}`,
+                          background: `linear-gradient(180deg, ${accentSoft.replace(/0\.\d+\)/, '0.10)')}, rgba(2,5,8,0.0))`,
                           lineHeight: 1,
                           color: accent,
-                          textShadow: `0 0 12px ${accentSoft}`,
+                          textShadow: `0 0 14px ${accentSoft}`,
                           pointerEvents: 'none',
                         }}
                       >
                         <div style={{
                           fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                          fontSize: isMobileView ? 30 : 36,
+                          fontSize: isMobileView ? 48 : 60,
                           fontWeight: 900,
                           letterSpacing: '0.02em',
                         }}>
                           {remaining}
                         </div>
                         <div style={{
-                          marginTop: 2,
-                          fontSize: 8,
-                          letterSpacing: '0.24em',
-                          opacity: 0.85,
-                          fontWeight: 700,
+                          marginTop: 4,
+                          fontSize: isMobileView ? 10 : 11,
+                          letterSpacing: '0.26em',
+                          fontWeight: 800,
+                          opacity: 0.9,
                         }}>
                           {remaining === 1 ? 'SCAN LEFT' : 'SCANS LEFT'}
                         </div>
@@ -3067,7 +3217,10 @@ export default function CyborgTemple() {
                 </div>
               )}
 
-              {/* Reveal overlay — only after verdict is rendered. Centered card.
+              {/* Reveal ribbon — bottom-anchored strip so the curtain-call
+                  lineup gets the full upper frame. Same state machine as
+                  before (weighing → reveal → vindicate); only the layout
+                  changed from a right-side card to a horizontal ribbon.
                   Dismissed only via the explicit NEXT CASE / BACK TO SERVICES
                   buttons (the result is too important to dismiss by accident). */}
               {verdict && tradeMode === 'game' && typeof document !== 'undefined' &&
@@ -3075,120 +3228,266 @@ export default function CyborgTemple() {
                   <div
                     style={{
                       position: 'fixed',
-                      inset: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
                       zIndex: 10500,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 24,
-                      background: 'radial-gradient(ellipse at center, rgba(2,5,7,0.78) 0%, rgba(2,5,7,0.94) 100%)',
-                      backdropFilter: 'blur(6px)',
-                      WebkitBackdropFilter: 'blur(6px)',
+                      justifyContent: 'flex-end',
+                      gap: 10,
+                      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
+                      paddingLeft: 12,
+                      paddingRight: 12,
+                      // No backdrop / blur during reveal — let the 3D curtain
+                      // call breathe. The ribbon itself reads against the scene
+                      // thanks to its own border + glow.
+                      pointerEvents: 'none',
                     }}
                   >
+                    <style>{`
+                      @keyframes verdictWeighPulse {
+                        0%, 100% { opacity: 0.55; }
+                        50%      { opacity: 1;    }
+                      }
+                      @keyframes verdictDots {
+                        0%   { content: ''; }
+                        25%  { content: '.'; }
+                        50%  { content: '..'; }
+                        75%  { content: '...'; }
+                      }
+                      .reveal-dots::after {
+                        display: inline-block;
+                        width: 1.6em;
+                        text-align: left;
+                        animation: verdictDots 1.6s steps(4, end) infinite;
+                        content: '';
+                      }
+                      @keyframes ribbonRiseIn {
+                        from { opacity: 0; transform: translateY(14px); }
+                        to   { opacity: 1; transform: translateY(0);    }
+                      }
+                      .reveal-ribbon {
+                        animation: ribbonRiseIn 0.45s ease-out both;
+                      }
+                    `}</style>
                     {(() => {
                       const isCorrect = verdict === caseData.correctVerdict;
                       const isAbstain = verdict === 'abstain';
                       const grade = brier <= 0.05 ? 'EXCELLENT' : brier <= 0.15 ? 'STRONG' : brier <= 0.30 ? 'FAIR' : 'POOR';
                       const gradeColor = brier <= 0.15 ? '#8effc4' : brier <= 0.30 ? '#ffb84d' : '#ff4d6d';
+                      const revealed = revealPhase === 'reveal' || revealPhase === 'vindicate';
+                      const vindicated = revealPhase === 'vindicate';
+                      const verdictColor = revealed
+                        ? (isCorrect ? '#8effc4' : isAbstain ? '#c8ffe0' : '#ff4d6d')
+                        : '#6db59a';
+                      const verdictGlow = revealed
+                        ? (isCorrect ? '0 0 22px rgba(77,255,170,0.55)' : isAbstain ? '0 0 16px rgba(200,255,224,0.35)' : '0 0 22px rgba(255,77,109,0.55)')
+                        : 'none';
+                      const fadeIn = (visible) => ({
+                        opacity: visible ? 1 : 0,
+                        transform: visible ? 'translateY(0)' : 'translateY(6px)',
+                        transition: 'opacity 0.55s ease, transform 0.55s ease',
+                        pointerEvents: visible ? 'auto' : 'none',
+                      });
+                      const statBlock = (label, value, color) => (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
+                          <div style={{ fontSize: 8, letterSpacing: '0.24em', color: '#3a6b54' }}>{label}</div>
+                          <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: 20, color: color || '#c8ffe0', marginTop: 3, lineHeight: 1 }}>{value}</div>
+                        </div>
+                      );
                       return (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            width: 'min(560px, calc(100vw - 48px))',
-                            padding: '32px 32px 24px',
-                            background: 'linear-gradient(180deg, rgba(13,80,50,0.18), rgba(5,10,7,0.95))',
-                            border: '1px solid rgba(77,255,170,0.7)',
-                            boxShadow: '0 0 80px rgba(13,80,50,0.5)',
-                            color: '#c8ffe0',
-                            fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                            textAlign: 'center',
-                          }}
-                        >
-                          <div style={{ fontSize: 72, lineHeight: 1, color: isCorrect ? '#8effc4' : isAbstain ? '#6db59a' : '#ff4d6d', textShadow: isCorrect ? '0 0 36px #4dffaa' : isAbstain ? 'none' : '0 0 36px rgba(255,77,109,0.6)' }}>
-                            {isCorrect ? '✓' : isAbstain ? '◇' : '✗'}
-                          </div>
-                          <div style={{ fontSize: 9, letterSpacing: '0.32em', color: '#3a6b54', marginTop: 8 }}>YOU RENDERED</div>
-                          <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: 18, letterSpacing: '0.32em', color: '#8effc4', marginTop: 4 }}>
-                            {verdict.toUpperCase()}
-                          </div>
-
-                          <div style={{ marginTop: 22, padding: '14px 18px', border: '1px solid rgba(13,80,50,0.6)', background: 'rgba(13,80,50,0.08)' }}>
-                            <div style={{ fontSize: 9, letterSpacing: '0.26em', color: '#3a6b54', marginBottom: 6 }}>// GROUND TRUTH</div>
-                            <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: 14, color: '#c8ffe0' }}>{caseData.reveal.summary}</div>
-                          </div>
-
-                          <div style={{ marginTop: 18, display: 'flex', gap: 24, justifyContent: 'center', padding: '14px 24px', border: '1px solid rgba(13,80,50,0.6)' }}>
-                            <div>
-                              <div style={{ fontSize: 9, letterSpacing: '0.26em', color: '#3a6b54' }}>BRIER</div>
-                              <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: 22, color: gradeColor, marginTop: 4 }}>{brier.toFixed(3)}</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 9, letterSpacing: '0.26em', color: '#3a6b54' }}>GRADE</div>
-                              <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: 22, color: gradeColor, marginTop: 4 }}>{grade}</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 9, letterSpacing: '0.26em', color: '#3a6b54' }}>SCANS</div>
-                              <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: 22, color: '#c8ffe0', marginTop: 4 }}>{investigated.size}/{caseData.maxScans}</div>
-                            </div>
-                          </div>
-
-                          <div style={{ marginTop: 18, padding: '12px 18px', borderLeft: '2px solid #ff3ea0', background: 'rgba(255,62,160,0.05)', textAlign: 'left' }}>
-                            <div style={{ fontSize: 9, letterSpacing: '0.26em', color: '#3a6b54', marginBottom: 4 }}>
-                              // {vindicationDelivery ? vindicationDelivery.character.toUpperCase() : 'THE TERMINAL RESPONDS'}
-                            </div>
-                            <div style={{ fontStyle: 'italic', fontSize: 13, color: '#c8ffe0' }}>
+                        <>
+                          {/* Vindication quote — floats above the ribbon. Only
+                              shown in the final phase so the line lands as a
+                              payoff, not a footnote. */}
+                          {vindicated && (
+                            <div
+                              style={{
+                                width: 'min(720px, calc(100vw - 24px))',
+                                padding: '8px 14px 9px',
+                                borderLeft: '2px solid #ff3ea0',
+                                background: 'linear-gradient(90deg, rgba(255,62,160,0.18), rgba(255,62,160,0.04) 60%, rgba(2,5,8,0.0))',
+                                color: '#ffe2f1',
+                                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                fontStyle: 'italic',
+                                fontSize: 13,
+                                lineHeight: 1.35,
+                                pointerEvents: 'auto',
+                                ...fadeIn(true),
+                              }}
+                            >
+                              <span style={{
+                                display: 'inline-block',
+                                marginRight: 10,
+                                fontStyle: 'normal',
+                                fontSize: 9,
+                                letterSpacing: '0.24em',
+                                color: 'rgba(255,142,196,0.85)',
+                              }}>
+                                // {vindicationDelivery ? vindicationDelivery.character.toUpperCase() : 'THE TERMINAL'}
+                              </span>
                               "{vindicationDelivery ? vindicationDelivery.text : caseData.reveal.voices[verdict]}"
                             </div>
-                          </div>
+                          )}
 
-                          <div style={{
-                            marginTop: 22,
-                            display: 'flex',
-                            gap: 10,
-                            justifyContent: 'center',
-                            flexWrap: 'wrap',
-                          }}>
-                            <button
-                              onClick={advanceToNextCase}
-                              disabled={!nextCaseAvailable}
-                              title={nextCaseAvailable ? undefined : 'More cases coming soon'}
-                              style={{
-                                background: nextCaseAvailable
-                                  ? 'linear-gradient(135deg, rgba(77,255,170,0.18), rgba(13,80,50,0.32))'
-                                  : 'transparent',
-                                border: `1px solid ${nextCaseAvailable ? 'rgba(77,255,170,0.85)' : 'rgba(77,255,170,0.25)'}`,
-                                color: nextCaseAvailable ? '#8effc4' : 'rgba(142,255,196,0.35)',
-                                padding: '10px 26px',
-                                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                                fontSize: 11,
-                                fontWeight: 700,
-                                letterSpacing: '0.32em',
-                                cursor: nextCaseAvailable ? 'pointer' : 'not-allowed',
-                                boxShadow: nextCaseAvailable
-                                  ? '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
-                                  : 'none',
-                              }}
-                            >
-                              {nextCaseAvailable ? '▸ NEXT CASE' : '▸ NEXT CASE — SOON'}
-                            </button>
-                            <button
-                              onClick={returnToServiceRail}
-                              style={{
-                                background: 'transparent',
-                                border: '1px solid rgba(110,181,154,0.55)',
-                                color: '#8fd4b6',
-                                padding: '10px 26px',
-                                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                                fontSize: 11,
-                                letterSpacing: '0.32em',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              ▸ BACK TO SERVICES
-                            </button>
+                          <div
+                            className="reveal-ribbon"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              width: 'min(960px, calc(100vw - 24px))',
+                              display: 'flex',
+                              alignItems: 'stretch',
+                              gap: 0,
+                              padding: '10px 14px',
+                              background: 'linear-gradient(180deg, rgba(4,12,8,0.92), rgba(2,5,8,0.86))',
+                              border: '1px solid rgba(77,255,170,0.55)',
+                              borderRadius: 10,
+                              boxShadow: '0 0 28px rgba(77,255,170,0.22)',
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)',
+                              color: '#c8ffe0',
+                              fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                              pointerEvents: 'auto',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            {/* Cell A — verdict glyph + label */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              paddingRight: 14,
+                              borderRight: '1px solid rgba(77,255,170,0.18)',
+                              minWidth: 168,
+                            }}>
+                              <div style={{
+                                fontSize: 44,
+                                lineHeight: 1,
+                                color: verdictColor,
+                                textShadow: verdictGlow,
+                                transform: revealed ? 'scale(1)' : 'scale(0.92)',
+                                transition: 'color 0.6s ease, text-shadow 0.6s ease, transform 0.6s ease',
+                              }}>
+                                {revealed ? (isCorrect ? '✓' : isAbstain ? '◇' : '✗') : '◌'}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ fontSize: 8, letterSpacing: '0.28em', color: '#3a6b54' }}>YOU RENDERED</div>
+                                <div style={{
+                                  fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                  fontSize: 18,
+                                  letterSpacing: '0.22em',
+                                  color: '#8effc4',
+                                  marginTop: 2,
+                                  lineHeight: 1.1,
+                                }}>
+                                  {verdict.toUpperCase()}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Cell B — weighing pulse, OR ground-truth summary */}
+                            <div style={{
+                              flex: '1 1 220px',
+                              minWidth: 220,
+                              padding: '2px 14px',
+                              borderRight: '1px solid rgba(77,255,170,0.18)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                            }}>
+                              {!revealed ? (
+                                <div style={{
+                                  fontSize: 11,
+                                  letterSpacing: '0.26em',
+                                  color: '#6db59a',
+                                  animation: 'verdictWeighPulse 1.6s ease-in-out infinite',
+                                }}>
+                                  // WEIGHING EVIDENCE<span className="reveal-dots" />
+                                </div>
+                              ) : (
+                                <div style={fadeIn(true)}>
+                                  <div style={{ fontSize: 8, letterSpacing: '0.26em', color: '#3a6b54', marginBottom: 3 }}>// GROUND TRUTH</div>
+                                  <div style={{
+                                    fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                    fontSize: 13,
+                                    color: '#c8ffe0',
+                                    lineHeight: 1.35,
+                                  }}>
+                                    {caseData.reveal.summary}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Cell C — stats (BRIER · GRADE · SCANS) */}
+                            {revealed && (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 14,
+                                padding: '2px 14px',
+                                borderRight: '1px solid rgba(77,255,170,0.18)',
+                                ...fadeIn(true),
+                              }}>
+                                {statBlock('BRIER', brier.toFixed(3), gradeColor)}
+                                {statBlock('GRADE', grade, gradeColor)}
+                                {statBlock('SCANS', `${investigated.size}/${caseData.maxScans}`)}
+                              </div>
+                            )}
+
+                            {/* Cell D — actions */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '2px 0 2px 14px',
+                              ...fadeIn(vindicated),
+                            }}>
+                              <button
+                                onClick={advanceToNextCase}
+                                disabled={!nextCaseAvailable}
+                                title={nextCaseAvailable ? undefined : 'More cases coming soon'}
+                                style={{
+                                  background: nextCaseAvailable
+                                    ? 'linear-gradient(135deg, rgba(77,255,170,0.18), rgba(13,80,50,0.32))'
+                                    : 'transparent',
+                                  border: `1px solid ${nextCaseAvailable ? 'rgba(77,255,170,0.85)' : 'rgba(77,255,170,0.25)'}`,
+                                  color: nextCaseAvailable ? '#8effc4' : 'rgba(142,255,196,0.35)',
+                                  padding: '8px 14px',
+                                  fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  letterSpacing: '0.26em',
+                                  cursor: nextCaseAvailable ? 'pointer' : 'not-allowed',
+                                  boxShadow: nextCaseAvailable
+                                    ? '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
+                                    : 'none',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {nextCaseAvailable ? '▸ NEXT CASE' : '▸ NEXT — SOON'}
+                              </button>
+                              <button
+                                onClick={returnToServiceRail}
+                                style={{
+                                  background: 'transparent',
+                                  border: '1px solid rgba(110,181,154,0.55)',
+                                  color: '#8fd4b6',
+                                  padding: '8px 14px',
+                                  fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                  fontSize: 10,
+                                  letterSpacing: '0.26em',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                ▸ BACK
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        </>
                       );
                     })()}
                   </div>,
@@ -3250,9 +3549,9 @@ export default function CyborgTemple() {
                   ) : (
                     <button
                       onClick={enterGameMode}
-                      aria-label="Judge a case"
+                      aria-label="Start Token Trainer"
                       style={{
-                        minWidth: 190,
+                        minWidth: 220,
                         height: 60,
                         padding: '10px 22px',
                         borderRadius: 10,
@@ -3260,15 +3559,15 @@ export default function CyborgTemple() {
                         border: '1px solid rgba(77,255,170,0.85)',
                         color: '#8effc4',
                         fontFamily: "'Orbitron', monospace",
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: 800,
-                        letterSpacing: '0.22em',
+                        letterSpacing: '0.2em',
                         cursor: 'pointer',
                         textShadow: '0 0 10px rgba(77,255,170,0.55)',
                         boxShadow: '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
                       }}
                     >
-                      ✦ START
+                      ✦ START TOKEN TRAINER
                     </button>
                   )
                 }

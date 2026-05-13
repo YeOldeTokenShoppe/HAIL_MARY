@@ -95,6 +95,14 @@ export const AGENT_CAMERA_SETTINGS = {
     lookAtPos: new THREE.Vector3(1.615, -0.305, -1.015),
     orbitCenter: null,
   },
+  // Curtain-call framing for the reveal flow — wide, slightly elevated,
+  // fits all four characters on the platform with StageProps hidden.
+  // Placeholder; tune live with ?tune=1.
+  Stage: {
+    cameraPos: new THREE.Vector3(0, 0.7, 3.2),
+    lookAtPos: new THREE.Vector3(0, -0.3, 0),
+    orbitCenter: null,
+  },
 };
 
 // Holographic statue (the small floating figure above the workstation).
@@ -400,13 +408,15 @@ const CyborgTempleScene = ({
   templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
   disableCandleInteraction = false, // When true, XCandle nodes are not made clickable (no zoom-to-candle, no inspector)
   jackpotOnlyFistPump = false, // When true, FistPump only fires from slotMachineJackpot — removed from Demon's random alternation and the price-poll trigger
-  gameStarted = false, // When true, the monk_hail/monk_beckon attention-getter loop is allowed to run. Held off until the user clicks START in GameOverlay.
+  gameStarted = false, // When true, the focused character is in game-mode idle/typing handoff (vs lobby head-tracking). Held off until the user clicks START in GameOverlay.
+  attractMonk = false, // When true (game started AND first-time player), run the monk_hail/monk_beckon attention-getter loop. Returning players (rules already heard) get this set false so GR80 doesn't loop.
   showCharacterHints = false, // When true, render small "?" badges over each agent's head as a tap affordance
   useSitePalForDemon = false, // When true, overlay the SitePal avatar canvas onto the Demon's Face mesh. Parent should mount the SitePal embed into DEMON_SITEPAL_CONTAINER_ID.
   useSitePalForDetective = false, // Same as above, for the Detective character.
   useSitePalForMonk = false, // Same shared SitePal portal, mapped onto Monk_Face2.
   externalFocusAgent = null, // When set, sync internal focus to this agentId — lets the parent (e.g. the consultant railway in /trade) fly the camera to a character without an in-scene click. Pass `null` to clear focus.
   speechActive = false, // When true, the focused character cross-fades to idle (speaking to player). When false, they cross-fade to typing (looking up info). Parent flips this when game-flow audio starts/ends.
+  revealMode = null, // null | 'aligned' | 'missed' | 'abstained'. When set, hides the StageProps collection, flies the camera to the Stage preset, and plays each character's reaction animation. Parent sets this after the verdict is locked; clear it to restore the gameplay scene for the next case.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -477,6 +487,142 @@ const CyborgTempleScene = ({
   // intentionally NOT replicated for game-mode focus — the user wants every
   // character on idle while speaking; pointing/typing-during-speech is the
   // wrong read.
+  // Reaction animation map for the verdict-reveal curtain call. Outcome is
+  // the player's result against ground truth: aligned / missed / abstained.
+  // Where a character is missing a dedicated abstain clip we fall back to
+  // their idle — laconic stillness reads fine for Trinity, and a calm idle
+  // for Eugene (RL80) lets her bubble carry the moment.
+  const REACTION_PATTERNS = {
+    Monk:      { aligned: /monk_cheering/i,    missed: /monk_standPray/i,     abstained: /monk_standPray/i },
+    Demon:     { aligned: /demon_clapping/i,    missed: /demon_disappointed/i, abstained: /demon_shrug/i },
+    Detective: { aligned: /detective_clap/i,   missed: /detective_defeat/i, abstained: /detective_idle/i },
+    RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i,   abstained: /unicorn_idle/i },
+  };
+
+  const applyCharacterReaction = (agentId, outcome) => {
+    console.log('[reaction-debug] entered', { agentId, outcome });
+    const pattern = REACTION_PATTERNS[agentId]?.[outcome];
+    if (!pattern) {
+      console.log('[reaction-debug] no pattern for', agentId, outcome);
+      return;
+    }
+    const actions = actionsRef.current[agentId];
+    const state = (
+      agentId === 'Monk'      ? monkAnimStateRef.current      :
+      agentId === 'Demon'     ? demonAnimStateRef.current     :
+      agentId === 'Detective' ? detectiveAnimStateRef.current :
+      agentId === 'RL80'      ? rl80AnimStateRef.current      : null
+    );
+    if (!actions || !state) {
+      console.log('[reaction-debug] missing actions or state', { agentId, hasActions: !!actions, hasState: !!state });
+      return;
+    }
+    const targetKey = Object.keys(actions).find((a) => pattern.test(a));
+    if (!targetKey) {
+      console.log('[reaction-debug] pattern not matched for', agentId, outcome, 'available:', Object.keys(actions));
+      return;
+    }
+    console.log('[reaction-debug] resolved', {
+      agentId, outcome, targetKey,
+      prevKey: state.currentAnimation,
+      availableKeys: Object.keys(actions),
+      runningBefore: Object.entries(actions).filter(([, a]) => a.isRunning && a.isRunning()).map(([k]) => k),
+    });
+
+    // Shut down any character-specific attention-getting cycle so the reaction
+    // isn't immediately overwritten. In particular the Monk's hail/beckon/idle
+    // loop schedules setTimeouts that explicitly play idle_monk and reset
+    // isPlayingSpecial=false; those timeouts already check hasBeenFocused and
+    // early-return, so latching it here neutralizes them.
+    if (agentId === 'Monk' && monkWaveStateRef.current) {
+      monkWaveStateRef.current.hasBeenFocused = true;
+      monkWaveStateRef.current.attentionActive = false;
+    }
+    if (agentId === 'RL80' && unicornWaveStateRef.current) {
+      if (unicornWaveStateRef.current.timeoutId) {
+        clearTimeout(unicornWaveStateRef.current.timeoutId);
+        unicornWaveStateRef.current.timeoutId = null;
+      }
+      unicornWaveStateRef.current.armed = false;
+    }
+
+    const targetAction = actions[targetKey];
+    // Fade out every running action on this character, not just the one
+    // tracked in state.currentAnimation. Other cycles' setTimeouts can leave
+    // actions running that aren't reflected in state, and those would blend
+    // on top of the reaction and dominate (idle's explicit leg rotations
+    // beat the cheering animation's near-identity ones).
+    Object.values(actions).forEach((action) => {
+      if (action !== targetAction && action.isRunning && action.isRunning()) {
+        action.fadeOut(0.5);
+      }
+    });
+    targetAction.reset();
+    targetAction.time = targetAction.getClip().duration * 0.05;
+    targetAction.setLoop(THREE.LoopRepeat);
+    targetAction.setEffectiveWeight(1);
+    targetAction.fadeIn(0.5);
+    targetAction.play();
+    state.currentAnimation = targetKey;
+    state.isPlayingSpecial = true;
+    state.nextSwitchDelay = 999999;
+    state.lastSwitchTime = Date.now();
+
+    // Sanity check 250ms and 1500ms after play(). At 250ms we should see the
+    // crossfade in progress; at 1500ms (after the 0.5s fade completes plus a
+    // buffer for any pending setTimeouts to fire) only the reaction should be
+    // running at weight 1. Anything else running at 1500ms is a competitor.
+    const dumpRunning = (label, delay) => setTimeout(() => {
+      const running = Object.entries(actions)
+        .filter(([, a]) => a.isRunning && a.isRunning())
+        .map(([k, a]) => `${k}=w${a.getEffectiveWeight().toFixed(2)}@t${a.time.toFixed(2)}`)
+        .join(' | ');
+      console.log(`[reaction-debug] ${label} ${agentId}/${targetKey} →`, running);
+    }, delay);
+    dumpRunning('250ms', 250);
+    dumpRunning('1500ms', 1500);
+  };
+
+  // Restore a character to their default idle loop after the curtain call.
+  // Reverses the latching done by applyCharacterReaction so the regular
+  // animation alternation picks back up once revealMode clears — without
+  // this, BACK TO SERVICES leaves each character stuck on their reaction
+  // (state.isPlayingSpecial stays true, nextSwitchDelay = 999999).
+  const IDLE_PATTERNS = {
+    Monk:      /idle_monk/i,
+    Demon:     /demon_idle/i,
+    Detective: /detective_idle/i,
+    RL80:      /unicorn_idle/i,
+  };
+  const restoreCharacterIdle = (agentId) => {
+    const pattern = IDLE_PATTERNS[agentId];
+    const actions = actionsRef.current[agentId];
+    const state = (
+      agentId === 'Monk'      ? monkAnimStateRef.current      :
+      agentId === 'Demon'     ? demonAnimStateRef.current     :
+      agentId === 'Detective' ? detectiveAnimStateRef.current :
+      agentId === 'RL80'      ? rl80AnimStateRef.current      : null
+    );
+    if (!pattern || !actions || !state) return;
+    const idleKey = Object.keys(actions).find((a) => pattern.test(a));
+    if (!idleKey) return;
+    const idleAction = actions[idleKey];
+    Object.values(actions).forEach((action) => {
+      if (action !== idleAction && action.isRunning && action.isRunning()) {
+        action.fadeOut(0.4);
+      }
+    });
+    idleAction.reset();
+    idleAction.setLoop(THREE.LoopRepeat);
+    idleAction.setEffectiveWeight(1);
+    idleAction.fadeIn(0.4);
+    idleAction.play();
+    state.currentAnimation = idleKey;
+    state.isPlayingSpecial = false;
+    state.nextSwitchDelay = 0;
+    state.lastSwitchTime = Date.now();
+  };
+
   const applyCharacterFocusAnimation = (agentId, mode = 'idle') => {
     const crossfadeTo = (actions, state, pattern) => {
       if (!actions || !state) return;
@@ -634,6 +780,82 @@ const CyborgTempleScene = ({
     // refs (which are stable), so it doesn't need to be in the dep list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalFocusAgent, speechActive, gameStarted]);
+
+  // Verdict-reveal curtain call. When the parent flips revealMode to an
+  // outcome, play each character's reaction animation in place. The scene
+  // stays as-is (props visible, default camera framing) — the parent gates
+  // externalFocusAgent off during reveal so the camera returns to the wide
+  // default that frames all four characters.
+  // Stage-lineup positions for the curtain call. Tuned by eye — adjust
+  // x/y/z to taste. Rotation is in radians; 0 means the character keeps
+  // their authored facing, π flips them around. The empties' world
+  // transforms get overridden during reveal and restored after.
+  const STAGE_LINEUP = useMemo(() => ({
+    Monk_empty:      { position: [-0.75, 0.18, 0], rotation: [0, 0, 0] },
+    Demon_Empty:     { position: [-0.25, 0.18, 0], rotation: [0, 0, 0] },
+    Detective_Empty: { position: [ 0.25, 0.18, 0], rotation: [0, 0, 0] },
+    RL80_Empty:      { position: [ 0.75, 0.3,  0], rotation: [0, Math.PI, 0] },
+    Unicorn_Empty:   { position: [ 0.75, 0.3,  0], rotation: [0, Math.PI, 0] },
+  }), []);
+
+  useEffect(() => {
+    if (!loadedModel) return;
+    const stageProps = loadedModel.getObjectByName('StageProps');
+    if (stageProps) {
+      stageProps.visible = !revealMode;
+      // Defensive: also flip every direct child, in case anything walks
+      // the props subtree and reads child.visible independently.
+      stageProps.children.forEach((c) => { c.visible = !revealMode; });
+    }
+    if (!revealMode) return;
+
+    // Snapshot then override each character's transform to the stage
+    // lineup. Saved values live on a Map so cleanup restores them
+    // verbatim regardless of any other transform writes during reveal.
+    const transformSnapshot = new Map();
+    Object.entries(STAGE_LINEUP).forEach(([name, target]) => {
+      const obj = loadedModel.getObjectByName(name);
+      if (!obj) return;
+      transformSnapshot.set(obj, {
+        position: obj.position.clone(),
+        rotation: obj.rotation.clone(),
+      });
+      obj.position.set(...target.position);
+      obj.rotation.set(...target.rotation);
+    });
+
+    ['Monk', 'Demon', 'Detective', 'RL80'].forEach((agentId) => {
+      applyCharacterReaction(agentId, revealMode);
+    });
+
+    return () => {
+      transformSnapshot.forEach((orig, obj) => {
+        obj.position.copy(orig.position);
+        obj.rotation.copy(orig.rotation);
+      });
+      // Wind down each character's reaction so the regular animation
+      // alternation can resume. Without this, BACK TO SERVICES leaves
+      // every character looping their curtain-call clip forever.
+      ['Monk', 'Demon', 'Detective', 'RL80'].forEach((agentId) => {
+        restoreCharacterIdle(agentId);
+      });
+      // Allow the Monk hail/beckon attract loop to re-engage on the next
+      // game (gated on attractMonk in the parent + hasBeenFocused here).
+      // For the lobby return after a verdict the parent passes
+      // attractMonk=false anyway, but resetting this avoids leaving a
+      // stale latch that would survive into a fresh session.
+      if (monkWaveStateRef.current) {
+        monkWaveStateRef.current.hasBeenFocused = false;
+        monkWaveStateRef.current.attentionActive = false;
+        monkWaveStateRef.current.everInitialized = false;
+        monkWaveStateRef.current.nextFireTime = 0;
+      }
+    };
+    // applyCharacterReaction / restoreCharacterIdle read stable refs and
+    // aren't worth re-creating; exclude them from deps to avoid spurious
+    // re-runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealMode, loadedModel, STAGE_LINEUP]);
 
   // Hover state for coins
   const [hoveredCoin, setHoveredCoin] = useState(null);
@@ -877,6 +1099,14 @@ const CyborgTempleScene = ({
   useEffect(() => {
     shouldTrackHeadRef.current = !gameStarted || speechActive;
   }, [gameStarted, speechActive]);
+
+  // Mirrors revealMode into a ref so per-frame head-tracking gates can flip
+  // every character into camera-follow during the curtain call without
+  // needing the focus refs to be set.
+  const revealModeRef = useRef(null);
+  useEffect(() => {
+    revealModeRef.current = revealMode;
+  }, [revealMode]);
 
   const activateSitePalProjection = (characterId) => {
     const config = SITEPAL_PROJECTION_CONFIG[characterId];
@@ -1162,8 +1392,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v41_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v41.glb";
+    let modelPath = "/models/RL80_4anims_v65_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v65.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1214,7 +1444,53 @@ const CyborgTempleScene = ({
         }
         
         const templeScene = gltf.scene;
+
+      // ── TEMP smoke test for v43 import (reveal flow) ──
+      // Remove once StageProps + reaction clips are verified.
+      const _stageProps = templeScene.getObjectByName('StageProps');
+      console.log('[reveal-smoke] StageProps node:', _stageProps);
+      console.log('[reveal-smoke] StageProps child count:', _stageProps ? _stageProps.children.length : 'NOT FOUND');
+      console.log('[reveal-smoke] animation clips:', gltf.animations.map(a => a.name));
+
       
+      const _expected = [
+        'monk_standPray', 'monk_cheering',
+        'demon_clapping', 'demon_disappointed', 'demon_shrug',
+        'detective_clap', 'detective_defeat',
+        'unicorn_dancing', 'unicorn_disappointed',
+      ];
+
+      const _cheer = gltf.animations.find(a => a.name === 'monk_cheering');
+const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
+console.log('[reveal-smoke] monk_cheering tracks:', _cheer?.tracks.length, _cheer?.tracks.map(t => t.name));
+console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _stand?.tracks.map(t => t.name));
+      const _present = new Set(gltf.animations.map(a => a.name.toLowerCase()));
+      const _missing = _expected.filter(n => ![..._present].some(p => p.includes(n.toLowerCase())));
+      console.log('[reveal-smoke] missing reaction clips:', _missing.length ? _missing : 'none — all present');
+      if (typeof window !== 'undefined') {
+        window.__templeScene = templeScene;
+        window.__gltf = gltf;
+        window.__debugMonkBones = () => {
+          const clip = window.__gltf.animations.find(a => a.name === 'idle_monk');
+          const trackBones = [...new Set(clip.tracks.map(t => t.name.split('.')[0]))].slice(0, 15);
+
+          const monk = window.__gltf.scene.getObjectByName('Monk_empty')
+                    || window.__gltf.scene.getObjectByName('Armature_001')
+                    || window.__gltf.scene.getObjectByName('Armature.001');
+          const monkBones = [];
+          monk?.traverse(n => { if (n.isBone) monkBones.push(n.name); });
+
+          const missing = trackBones.filter(b => !monkBones.includes(b));
+          return {
+            monkRootName: monk?.name,
+            trackBones,
+            monkBonesSample: monkBones.slice(0, 15),
+            monkBoneCount: monkBones.length,
+            trackBonesNotFoundInMonk: missing,
+          };
+        };
+      }
+
       // Store the loaded model in state for external access
       setLoadedModel(templeScene);
       
@@ -1230,18 +1506,39 @@ const CyborgTempleScene = ({
       
       // First, identify all animated characters and create mixers for each
       const animatedCharacters = {};
-      
+
+      // Capture each character's REST head pose at load. The head-tracking
+      // override math relies on a stable rest reference for the rotation
+      // clamp; without this, refs would re-capture mid-animation when their
+      // gate first fires (e.g. when the curtain call enables tracking on
+      // characters that were never focused), producing a near-zero clamp
+      // that visibly stalls the look-at.
+      const captureHeadRestPose = (boneRef) => {
+        const bone = boneRef?.current;
+        if (!bone) return;
+        boneRef._baseQuat = bone.quaternion.clone();
+        bone.updateWorldMatrix(true, false);
+        boneRef._baseWorldQuat = new THREE.Quaternion();
+        bone.getWorldQuaternion(boneRef._baseWorldQuat);
+      };
+
       // Find all animated objects in the scene
       templeScene.traverse((child) => {
         if (child.name === 'RL80_Empty' || child.name === 'Unicorn_Empty') {
           animatedCharacters['RL80'] = child;
-          // Find head bone in skeleton for look-at-camera (works for both
-          // the original RL80 rig and the unicorn rig).
+          // Gather head-bone candidates, then prefer exact "head" → non-leaf
+          // → first match. Naive first-/head/i would grab unskinned leaves
+          // like Head_end / HeadTip and silently no-op the look-at.
+          const rl80HeadCandidates = [];
           child.traverse((bone) => {
-            if (bone.isBone && /head/i.test(bone.name) && !rl80HeadBoneRef.current) {
-              rl80HeadBoneRef.current = bone;
-            }
+            if (bone.isBone && /head/i.test(bone.name)) rl80HeadCandidates.push(bone);
           });
+          rl80HeadBoneRef.current =
+            rl80HeadCandidates.find(b => /^head$/i.test(b.name)) ||
+            rl80HeadCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
+            rl80HeadCandidates[0] ||
+            null;
+          captureHeadRestPose(rl80HeadBoneRef);
           // V2 model: the unicorn's mesh sits under Unicorn_Empty but its
           // Mixamo armature (Root_1, with mixamorig* bones) is a SIBLING in
           // the scene root — so we wire its descendant meshes to the click
@@ -1256,6 +1553,19 @@ const CyborgTempleScene = ({
                 if (!ourLadyRef.current) ourLadyRef.current = obj;
               }
             });
+            // Author-fix: unicorn ships facing 90° off. Rotate the
+            // *armature* (Root_1 sibling) — the mesh is skinned to those
+            // bones, so rotating Unicorn_Empty has no visible effect.
+            // +Math.PI/2 = 90° CCW viewed from above (Y-up, right-handed).
+            const unicornArmature =
+              templeScene.getObjectByName('Root_1') ||
+              templeScene.getObjectByName('Root_1.001') ||
+              templeScene.getObjectByName('Armature_Unicorn');
+            if (unicornArmature) {
+              unicornArmature.rotation.y += Math.PI / 2;
+            } else {
+              console.warn('[CyborgTempleScene] Unicorn armature (Root_1) not found — rotation skipped');
+            }
           }
         }
         else if (child.name === 'Demon_Empty' || child.name === 'Devil_empty' || child.name === 'Devil_Empty') {
@@ -1329,6 +1639,7 @@ const CyborgTempleScene = ({
             headCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
             headCandidates[0] ||
             null;
+          captureHeadRestPose(demonHeadBoneRef);
 
           // One-shot inventory: dumps every named Mesh / Group under
           // Demon_Empty so we can see exactly what's there (helpful
@@ -1349,11 +1660,12 @@ const CyborgTempleScene = ({
         }
         else if (child.name === 'Monk_empty') {
           animatedCharacters['Monk'] = child;
-          // Find head bone in Monk skeleton for look-at-camera
+          // Find head bone in Monk skeleton for look-at-camera. Smart
+          // selection (exact "head" → non-leaf → first match) avoids
+          // grabbing unskinned leaves that wouldn't visibly rotate.
+          const monkHeadCandidates = [];
           child.traverse((bone) => {
-            if (bone.isBone && /head/i.test(bone.name) && !monkHeadBoneRef.current) {
-              monkHeadBoneRef.current = bone;
-            }
+            if (bone.isBone && /head/i.test(bone.name)) monkHeadCandidates.push(bone);
             if ((bone.isMesh || bone.isGroup) &&
                 /^monk_face1([._]\w+)?$/i.test(bone.name || '') &&
                 !monkFace1MeshRef.current) {
@@ -1371,6 +1683,12 @@ const CyborgTempleScene = ({
               monkEyesMeshRef.current = bone;
             }
           });
+          monkHeadBoneRef.current =
+            monkHeadCandidates.find(b => /^head$/i.test(b.name)) ||
+            monkHeadCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
+            monkHeadCandidates[0] ||
+            null;
+          captureHeadRestPose(monkHeadBoneRef);
         }
         else if (child.name === 'Fluffy_Empty') {
           animatedCharacters['Fluffy'] = child;
@@ -1380,6 +1698,7 @@ const CyborgTempleScene = ({
               fluffyHeadBoneRef.current = obj;
             }
           });
+          captureHeadRestPose(fluffyHeadBoneRef);
         }
         else if (child.name === 'Detective_Empty') {
           animatedCharacters['Detective'] = child;
@@ -1387,10 +1706,9 @@ const CyborgTempleScene = ({
           // eye meshes. Two-pass to be deterministic regardless of traversal
           // order: gather all meshes first, then resolve refs from the list.
           const meshes = [];
+          const detectiveHeadCandidates = [];
           child.traverse((obj) => {
-            if (obj.isBone && /head/i.test(obj.name) && !detectiveHeadBoneRef.current) {
-              detectiveHeadBoneRef.current = obj;
-            }
+            if (obj.isBone && /head/i.test(obj.name)) detectiveHeadCandidates.push(obj);
             if (obj.isMesh) meshes.push(obj);
             // Detective_Face1 / Detective_Face2 capture (Mesh OR Group;
             // a multi-material Face1 becomes a Group after GLTFLoader
@@ -1432,6 +1750,12 @@ const CyborgTempleScene = ({
             detectiveClosedEyesRef.current = closedEyes;
             closedEyes.visible = false;
           }
+          detectiveHeadBoneRef.current =
+            detectiveHeadCandidates.find(b => /^head$/i.test(b.name)) ||
+            detectiveHeadCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
+            detectiveHeadCandidates[0] ||
+            null;
+          captureHeadRestPose(detectiveHeadBoneRef);
         }
         // Point.003 sits near the angel — tinted to match the altar
         // spotlight color so the angel surface picks up a green cast.
@@ -3828,7 +4152,7 @@ const CyborgTempleScene = ({
       const charActions = actionsRef.current?.[charName];
       if (!charActions) return;
       Object.keys(charActions).forEach((name) => {
-        if (!/typ|idle/i.test(name) || /wav/i.test(name)) return;
+        if (!/typ|idle|clap/i.test(name) || /wav/i.test(name)) return;
         const action = charActions[name];
         if (!action.isRunning() || action.paused) return;
         const dur = action.getClip().duration;
@@ -4188,7 +4512,7 @@ const CyborgTempleScene = ({
     // one-shot, returns to the monk's regular loop. Stops once the user has
     // focused on the monk (game flow takes over from there). Held off until
     // the user clicks START in GameOverlay (gameStarted prop).
-    if (gameStarted && actionsRef.current['Monk'] && !monkWaveStateRef.current.hasBeenFocused && !monkFocusedRef.current) {
+    if (attractMonk && actionsRef.current['Monk'] && !monkWaveStateRef.current.hasBeenFocused && !monkFocusedRef.current) {
       const monkActions = actionsRef.current['Monk'];
       // Attention-getter cycle: hail → idle (head still tracks camera) → hail
       // → idle → … → beckon (every 4–5 hails) → idle → repeat. Loops until
@@ -4580,7 +4904,9 @@ const CyborgTempleScene = ({
     // and beckon while staring straight ahead instead of at the player.
     const monkIsPointing = monkWaveStateRef.current.attentionActive;
     const monkHeadGate =
-      monkIsPointing || (monkFocusedRef.current && shouldTrackHeadRef.current);
+      monkIsPointing
+      || revealModeRef.current
+      || (monkFocusedRef.current && shouldTrackHeadRef.current);
     if (monkHeadGate && monkHeadBoneRef.current) {
       const head = monkHeadBoneRef.current;
 
@@ -4635,26 +4961,24 @@ const CyborgTempleScene = ({
       // Once close enough to the anim pose, stop overriding.
       if (monkHeadBoneRef._smoothedQuat.angleTo(animQuat) < 0.01) {
         monkHeadBoneRef._smoothedQuat = null;
-        monkHeadBoneRef._baseQuat = null;
-        monkHeadBoneRef._baseWorldQuat = null;
         monkHeadBoneRef._dummy = null;
       }
     }
 
     // RL80 head look-at-camera override (only when focused on RL80)
-    if (rl80FocusedRef.current && rl80HeadBoneRef.current && shouldTrackHeadRef.current) {
+    if (rl80HeadBoneRef.current && rl80FocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current) {
       const head = rl80HeadBoneRef.current;
 
-      if (!rl80HeadBoneRef._baseQuat) {
-        rl80HeadBoneRef._baseQuat = head.quaternion.clone();
-        head.updateWorldMatrix(true, false);
-        rl80HeadBoneRef._baseWorldQuat = new THREE.Quaternion();
-        head.getWorldQuaternion(rl80HeadBoneRef._baseWorldQuat);
-      }
-
+      // Snapshot the head's CURRENT animation pose — what the mixer just
+      // wrote this frame. The look-at override below caps deviation from
+      // THIS pose, not from a load-time bind, so the head follows the
+      // body's animation (neck/spine rotation) with only a small
+      // camera-tracking nudge layered on top.
       head.updateWorldMatrix(true, false);
       const headWorldPos = new THREE.Vector3();
       head.getWorldPosition(headWorldPos);
+      const animWorldQuat = new THREE.Quaternion();
+      head.getWorldQuaternion(animWorldQuat);
 
       if (!rl80HeadBoneRef._dummy) {
         rl80HeadBoneRef._dummy = new THREE.Object3D();
@@ -4662,29 +4986,51 @@ const CyborgTempleScene = ({
       const dummy = rl80HeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
       dummy.lookAt(camera.position);
-      // Same skeleton as Monk — start with same correction, tune if needed
-      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 0.5);
-      dummy.quaternion.multiply(flip);
 
-      const maxHeadAngle = 1.2;
-      const angleBetween = rl80HeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
-      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
-      const blendedWorldQuat = rl80HeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+      // Rig forward-axis correction — unicorn's snout is along the head
+      // bone's local +Z, not the Three.js default -Z, so flip 180° around
+      // Y to point +Z at the camera.
+      const RL80_FORWARD_FIX = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        Math.PI,
+      );
+      dummy.quaternion.multiply(RL80_FORWARD_FIX);
+
+      // Symmetric yaw/pitch clamp relative to the CURRENT pose. Decompose
+      // (lookAt − currentPose) in current-pose's frame, clamp each axis
+      // around zero, recompose, apply.
+      const maxYaw   = 0.6;  // ~34° left/right
+      const maxPitch = 0.4;  // ~23° up/down
+      const maxRoll  = 0.0;
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+      const animFrameOffset = animWorldQuat
+        .clone()
+        .invert()
+        .multiply(dummy.quaternion);
+      const e = new THREE.Euler().setFromQuaternion(animFrameOffset, 'YXZ');
+      // Rest-frame Y was inverted relative to visual left/right (diagnosed
+      // earlier with the Math.PI flip), so negate yaw before clamping.
+      e.y = clamp(-e.y, -maxYaw,   maxYaw);
+      e.x = clamp(e.x,  -maxPitch, maxPitch);
+      e.z = clamp(e.z,  -maxRoll,  maxRoll);
+      const clampedOffset = new THREE.Quaternion().setFromEuler(e);
+      const targetWorldQuat = animWorldQuat.clone().multiply(clampedOffset);
 
       const parentWorldQuat = new THREE.Quaternion();
       head.parent.getWorldQuaternion(parentWorldQuat);
-      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+      const targetLocal = parentWorldQuat.clone().invert().multiply(targetWorldQuat);
 
+      // Smoothing: slerp from current local toward the clamped target so
+      // the camera-tracking nudge eases in across frames instead of
+      // snapping. Smoothed state is reset on gate close (below).
       if (!rl80HeadBoneRef._smoothedQuat) {
         rl80HeadBoneRef._smoothedQuat = head.quaternion.clone();
       }
-      rl80HeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
-
+      rl80HeadBoneRef._smoothedQuat.slerp(targetLocal, 0.15);
       head.quaternion.copy(rl80HeadBoneRef._smoothedQuat);
     } else if (rl80HeadBoneRef._smoothedQuat) {
       rl80HeadBoneRef._smoothedQuat = null;
-      rl80HeadBoneRef._baseQuat = null;
-      rl80HeadBoneRef._baseWorldQuat = null;
       rl80HeadBoneRef._dummy = null;
     }
 
@@ -4692,7 +5038,7 @@ const CyborgTempleScene = ({
     // The flip-axis correction below is rig-specific; tune the divisor in
     // `Math.PI / N` (or change the axis) until the head reads as facing
     // the camera.
-    if (detectiveFocusedRef.current && detectiveHeadBoneRef.current && shouldTrackHeadRef.current) {
+    if (detectiveHeadBoneRef.current && detectiveFocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current) {
       const head = detectiveHeadBoneRef.current;
 
       if (!detectiveHeadBoneRef._baseQuat) {
@@ -4735,14 +5081,12 @@ const CyborgTempleScene = ({
       head.quaternion.copy(detectiveHeadBoneRef._smoothedQuat);
     } else if (detectiveHeadBoneRef._smoothedQuat) {
       detectiveHeadBoneRef._smoothedQuat = null;
-      detectiveHeadBoneRef._baseQuat = null;
-      detectiveHeadBoneRef._baseWorldQuat = null;
       detectiveHeadBoneRef._dummy = null;
     }
 
     // Fluffy (cat) head look-at-camera override
     // Animation is paused, so we use world-space lookAt with no loop-seam concerns
-    if (fluffyFocusedRef.current && fluffyHeadBoneRef.current && shouldTrackHeadRef.current) {
+    if (fluffyHeadBoneRef.current && (revealModeRef.current || (fluffyFocusedRef.current && shouldTrackHeadRef.current))) {
       const head = fluffyHeadBoneRef.current;
 
       // Capture the base local quaternion once
@@ -4790,14 +5134,13 @@ const CyborgTempleScene = ({
       head.quaternion.copy(fluffyHeadBoneRef._smoothedQuat);
     } else if (fluffyHeadBoneRef._smoothedQuat) {
       fluffyHeadBoneRef._smoothedQuat = null;
-      fluffyHeadBoneRef._baseQuat = null;
       fluffyHeadBoneRef._dummy = null;
     }
 
     // Demon head look-at-camera override — only enabled when the focus
     // logic decided to skip the demon_pointing clip (camera moved off the
     // authored pose). Mirrors the Monk/RL80 pattern.
-    if (demonHeadTrackingRef.current && demonHeadBoneRef.current && shouldTrackHeadRef.current) {
+    if (demonHeadBoneRef.current && demonHeadTrackingRef.current && shouldTrackHeadRef.current && !revealModeRef.current) {
       const head = demonHeadBoneRef.current;
 
       if (!demonHeadBoneRef._baseQuat) {
@@ -4817,9 +5160,11 @@ const CyborgTempleScene = ({
       const dummy = demonHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
       dummy.lookAt(camera.position);
-      // Rig-specific yaw correction. If the head ends up looking the wrong
-      // way, adjust the divisor in `Math.PI / N` (or change the axis).
-      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 0.5);
+      // Rig-specific yaw correction. The demon's head bone forward axis
+      // doesn't line up with lookAt's local -Z, so we rotate 90° around Y.
+      // If it ends up pitched up/down instead of facing camera, switch the
+      // axis vector to (1,0,0) or (0,0,1).
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
       dummy.quaternion.multiply(flip);
 
       // ~85° max turn — wider than the 70° default but conservative enough
@@ -4848,8 +5193,6 @@ const CyborgTempleScene = ({
       head.quaternion.copy(demonHeadBoneRef._smoothedQuat);
       if (demonHeadBoneRef._smoothedQuat.angleTo(animQuat) < 0.01) {
         demonHeadBoneRef._smoothedQuat = null;
-        demonHeadBoneRef._baseQuat = null;
-        demonHeadBoneRef._baseWorldQuat = null;
         demonHeadBoneRef._dummy = null;
       }
     }
