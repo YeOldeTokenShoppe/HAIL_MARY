@@ -3396,10 +3396,12 @@ export default function CyborgTemple() {
                       position: 'fixed',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      // Sits just above the bottom console (which is anchored
-                      // 5.5rem above the safe-area bottom and is ~14-16rem
-                      // tall in the answer/speech states on mobile).
-                      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 22rem)',
+                      // Anchored just below the top HUD strip (which sits at
+                      // safe-area + 8px and is ~30px tall on mobile). Reads
+                      // as a passive newsreel at the top — keeps the
+                      // character mid-screen clear and the thumb-zone at
+                      // the bottom free for taps.
+                      top: 'calc(env(safe-area-inset-top, 0px) + 48px)',
                       zIndex: 1058,
                       maxWidth: 'calc(100vw - 24px)',
                       padding: '8px 14px',

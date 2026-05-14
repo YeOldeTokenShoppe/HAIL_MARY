@@ -2644,7 +2644,7 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
         while (groupRef.current.children.length > 0) {
           groupRef.current.remove(groupRef.current.children[0]);
         }
-        
+
         // Dispose of materials and geometries
         groupRef.current.traverse((child) => {
           if (child.geometry) {
@@ -2659,6 +2659,24 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
           }
         });
       }
+
+      // Dispose SitePal projection textures. Each character ref holds a
+      // 512x512 CanvasTexture (~1MB GPU) and a backing HTMLCanvasElement
+      // (~1MB CPU). Material.dispose() does NOT dispose its `map`, and
+      // the per-effect cleanups for these refs don't release them either,
+      // so without this they leak per CyborgTempleScene unmount.
+      [monkSitePalRef, detectiveSitePalRef, demonSitePalRef].forEach((ref) => {
+        const s = ref.current;
+        if (!s) return;
+        if (s.texture) { try { s.texture.dispose(); } catch (e) {} }
+        if (s.material) { try { s.material.dispose(); } catch (e) {} }
+        s.texture = null;
+        s.material = null;
+        s.cropCanvas = null;
+        s.cropCtx = null;
+        s.sourceEl = null;
+        s.materialApplied = false;
+      });
     };
   }, []); // Empty dependency array - only run once on mount
 
