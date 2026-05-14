@@ -2716,7 +2716,7 @@ export default function CyborgTemple() {
                     position: 'fixed',
                     left: '50%',
                     bottom: isMobileView
-                      ? 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)'
+                      ? 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)'
                       : '5.5rem',
                     transform: 'translateX(-50%)',
                     zIndex: 1055,
@@ -2740,8 +2740,9 @@ export default function CyborgTemple() {
                 >
                   {/* Prominent scan counter — centered header bar at the top of
                       the console so the player can't miss how many questions
-                      remain. Color shifts as the budget burns down. */}
-                  {(() => {
+                      remain. Color shifts as the budget burns down. On mobile
+                      this is replaced by the compact pill in the top HUD. */}
+                  {!isMobileView && (() => {
                     const remaining = scansRemaining;
                     const accent =
                       remaining <= 0 ? '#ff3ea0'
@@ -2898,27 +2899,45 @@ export default function CyborgTemple() {
                                 </div>
                               </div>
                             )}
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <button
-                                onClick={() => {
-                                  setActiveAnswer(null);
-                                  // CONTINUE counts as "proceeding past the
-                                  // answer," so dismiss Eugene's bubble too.
-                                  setEugeneBubble(null);
-                                }}
-                                style={{
-                                  background: 'transparent',
-                                  border: '1px solid #4dffaa',
-                                  color: '#4dffaa',
-                                  padding: '6px 14px',
-                                  fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                                  fontSize: 10,
-                                  letterSpacing: '0.22em',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                ▸ {scansRemaining > 0 ? 'CONTINUE' : 'RENDER VERDICT'}
-                              </button>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                              {scansRemaining > 0 && (
+                                <button
+                                  onClick={() => {
+                                    setActiveAnswer(null);
+                                    // CONTINUE counts as "proceeding past the
+                                    // answer," so dismiss Eugene's bubble too.
+                                    setEugeneBubble(null);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: '1px solid #4dffaa',
+                                    color: '#4dffaa',
+                                    padding: '6px 14px',
+                                    fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                    fontSize: 10,
+                                    letterSpacing: '0.22em',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  ▸ CONTINUE
+                                </button>
+                              )}
+                              {/* No scans left: collapse the dismiss-and-show-prompt
+                                  step; the bottom-nav verdict buttons are the
+                                  direct path. Nudge the player toward them so
+                                  the evidence view doesn't feel like a dead end. */}
+                              {scansRemaining <= 0 && (
+                                <div style={{
+                                  fontSize: 11,
+                                  color: '#8effc4',
+                                  fontStyle: 'italic',
+                                  letterSpacing: '0.04em',
+                                  textShadow: '0 0 8px rgba(77,255,170,0.45)',
+                                  animation: 'lt-fade-in 0.5s ease-out',
+                                }}>
+                                  ↓ Choose Trust, Abstain, or Doubt to render your verdict.
+                                </div>
+                              )}
                               {/* Mobile-essential, desktop-handy: expand the
                                   evidence card into the viewport via the same
                                   FullscreenCRTOverlay the in-scene screen tap
@@ -3102,7 +3121,7 @@ export default function CyborgTemple() {
                       //    sitting directly below this section makes the
                       //    "switch consultant" affordance obvious by adjacency.
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobileView ? 4 : 6 }}>
                           {unaskedQuestions.map(({ q, idx }) => (
                             <button
                               key={idx}
@@ -3113,10 +3132,10 @@ export default function CyborgTemple() {
                                 border: '1px solid rgba(77,255,170,0.25)',
                                 borderLeft: '2px solid #4dffaa',
                                 color: '#c8ffe0',
-                                padding: '8px 12px',
+                                padding: isMobileView ? '5px 10px' : '8px 12px',
                                 fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                                fontSize: 12,
-                                lineHeight: 1.35,
+                                fontSize: isMobileView ? 11 : 12,
+                                lineHeight: 1.3,
                                 cursor: 'pointer',
                                 transition: 'background 0.15s, border-color 0.15s',
                               }}
@@ -3133,9 +3152,11 @@ export default function CyborgTemple() {
                               {q.q}
                             </button>
                           ))}
-                          <div style={{ fontSize: 9, letterSpacing: '0.18em', color: '#3a6b54', marginTop: 2, textAlign: 'right' }}>
-                            each question costs 1 of {scansRemaining} {scansRemaining === 1 ? 'scan' : 'scans'}
-                          </div>
+                          {!isMobileView && (
+                            <div style={{ fontSize: 9, letterSpacing: '0.18em', color: '#3a6b54', marginTop: 2, textAlign: 'right' }}>
+                              each question costs 1 of {scansRemaining} {scansRemaining === 1 ? 'scan' : 'scans'}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -3161,10 +3182,66 @@ export default function CyborgTemple() {
                   <div style={{
                     display: 'flex',
                     gap: isMobileView ? 5 : 8,
-                    padding: isMobileView ? '4px 6px' : '6px 8px',
+                    padding: isMobileView ? '2px 6px 3px' : '6px 8px',
                     justifyContent: 'center',
+                    alignItems: 'center',
                     background: 'rgba(2,5,8,0.4)',
                   }}>
+                    {/* Inline scan counter — sits as the first tile in the
+                        consultant railway so the player can't miss it. Same
+                        height as the portrait tiles; narrower since it's
+                        just a number. Color follows the same red/amber/green
+                        threshold the desktop header uses. */}
+                    {isMobileView && (() => {
+                      const r = scansRemaining;
+                      const accent = r <= 0 ? '#ff3ea0' : r === 1 ? '#ffb84d' : '#8effc4';
+                      const soft = r <= 0 ? 'rgba(255,62,160,0.55)'
+                        : r === 1 ? 'rgba(255,184,77,0.55)'
+                        : 'rgba(142,255,196,0.55)';
+                      return (
+                        <div
+                          aria-label={`${r} of ${caseData.maxScans} scans remaining`}
+                          style={{
+                            width: 66,
+                            height: 72,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 2,
+                            color: accent,
+                            textShadow: `0 0 10px ${soft}`,
+                            lineHeight: 1,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          <div style={{
+                            fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+                            fontSize: 26,
+                            fontWeight: 900,
+                            letterSpacing: '0.02em',
+                          }}>
+                            {r}
+                          </div>
+                          <div style={{
+                            fontSize: 7,
+                            letterSpacing: '0.18em',
+                            fontWeight: 800,
+                            opacity: 0.9,
+                          }}>
+                            {r === 1 ? 'SCAN' : 'SCANS'}
+                          </div>
+                          <div style={{
+                            fontSize: 7,
+                            letterSpacing: '0.10em',
+                            fontWeight: 700,
+                            opacity: 0.75,
+                          }}>
+                            REMAINING
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {[
                       { agentId: 'Monk',      stationKey: 'monk',    portrait: '/thumbnail_gr80.png',        label: 'ETHOS' },
                       { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_johnBarron.png',  label: 'PATHOS' },
@@ -3265,11 +3342,13 @@ export default function CyborgTemple() {
                               textTransform: 'uppercase',
                               textShadow: '0 1px 3px rgba(0,0,0,0.85)',
                             }}>
-                              {allAsked && isVisited
-                                ? 'ASKED'
-                                : isVisited
-                                  ? `${remaining} LEFT`
-                                  : 'TAP'}
+                              {outOfScans && !isCurrent
+                                ? '—'
+                                : allAsked && isVisited
+                                  ? 'ASKED'
+                                  : isVisited
+                                    ? `${Math.min(remaining, scansRemaining)} LEFT`
+                                    : 'TAP'}
                             </div>
                           </div>
                           {isVisited && !isCurrent && !allAsked && (
