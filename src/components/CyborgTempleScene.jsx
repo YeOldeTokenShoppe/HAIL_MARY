@@ -435,6 +435,15 @@ const CyborgTempleScene = ({
   const angelEmptyRef = useRef(); // Parent container for angel and coins
   const angelRef = useRef();
   const angelSpotTarget = useMemo(() => new THREE.Object3D(), []);
+  // Per-character spotlight targets for the curtain call. Positioned at
+  // each character's stage-lineup x, mid-chest height, so the spotlights
+  // converge on their torsos. Created once and reused via primitive refs.
+  const curtainSpotTargets = useMemo(() => [
+    { name: 'Monk',      x: -0.75, color: '#8effc4', missColor: '#ff6e6e', neutralColor: '#dceede', ref: new THREE.Object3D() },
+    { name: 'Demon',     x: -0.25, color: '#8effc4', missColor: '#ff6e6e', neutralColor: '#dceede', ref: new THREE.Object3D() },
+    { name: 'Detective', x:  0.25, color: '#8effc4', missColor: '#ff6e6e', neutralColor: '#dceede', ref: new THREE.Object3D() },
+    { name: 'RL80',      x:  0.75, color: '#8effc4', missColor: '#ff6e6e', neutralColor: '#dceede', ref: new THREE.Object3D() },
+  ], []);
   const coin1Ref = useRef();
   const coin2Ref = useRef();
   const coin3Ref = useRef();
@@ -5393,25 +5402,59 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
                 hover={false}
                 rotate={true}
               /> */}
-              <primitive
-                object={angelSpotTarget}
-                position={[cfg.position[0], cfg.position[1] + 15, cfg.position[2]]}
-              />
-                                                                     
-  <SpotLight                                                                                                                                                
-    position={[-0.05, 1.52, 0]}                          
-    target={angelSpotTarget}
-    angle={0.35}
-    castShadow                                                                                                                                              
-    intensity={1}
-    penumbra={0.1}                                                                                                                                          
-    // color={'#0bcd2e'}       
-        color={'#e9f1ea'}                               
-    distance={15}
-    opacity={0.2}
-    // attenuation={12}                                                                                                                                        
-    // anglePower={8}
-  />              
+              {/* Angel spotlight — hidden during the curtain call since the
+                  angel itself is part of StageProps (which is invisible while
+                  revealMode is set). Without this gate the cone keeps shining
+                  upward into empty air. */}
+              {!revealMode && (
+                <>
+                  <primitive
+                    object={angelSpotTarget}
+                    position={[cfg.position[0], cfg.position[1] + 15, cfg.position[2]]}
+                  />
+                  <SpotLight
+                    position={[-0.05, 1.52, 0]}
+                    target={angelSpotTarget}
+                    angle={0.35}
+                    castShadow
+                    intensity={1}
+                    penumbra={0.1}
+                    color={'#e9f1ea'}
+                    distance={15}
+                    opacity={0.2}
+                  />
+                </>
+              )}
+              {/* Curtain-call spotlights — one per character, color keyed to
+                  the outcome: green for aligned, red for missed, soft white
+                  for abstained. Each light's target is a primitive Object3D
+                  parked at the character's chest height. Only mounted while
+                  revealMode is set so they cost nothing during gameplay. */}
+              {revealMode && curtainSpotTargets.map((t) => {
+                const color = revealMode === 'aligned' ? t.color
+                  : revealMode === 'missed' ? t.missColor
+                  : t.neutralColor;
+                return (
+                  <group key={t.name}>
+                    <primitive
+                      object={t.ref}
+                      position={[t.x, 1.1, 0]}
+                    />
+                    <SpotLight
+                      position={[t.x, 3.4, 1.0]}
+                      target={t.ref}
+                      angle={0.42}
+                      penumbra={0.55}
+                      intensity={9}
+                      distance={6.5}
+                      color={color}
+                      opacity={0.6}
+                      attenuation={3}
+                      anglePower={6}
+                    />
+                  </group>
+                );
+              })}
             </>
           );
         })()}

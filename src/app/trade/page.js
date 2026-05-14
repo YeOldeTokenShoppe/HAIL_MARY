@@ -3489,14 +3489,26 @@ export default function CyborgTemple() {
                       position: 'fixed',
                       left: 0,
                       right: 0,
-                      bottom: 0,
+                      // Mobile: anchor to top so the curtain-call characters
+                      // keep the lower frame (which is where the camera puts
+                      // them at their authored y-positions). Desktop: stays
+                      // at the bottom, where there's enough room either way.
+                      ...(isMobileView
+                        ? {
+                            top: 0,
+                            justifyContent: 'flex-start',
+                            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+                          }
+                        : {
+                            bottom: 0,
+                            justifyContent: 'flex-end',
+                            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
+                          }),
                       zIndex: 10500,
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'flex-end',
                       gap: 10,
-                      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
                       paddingLeft: 12,
                       paddingRight: 12,
                       // No backdrop / blur during reveal — let the 3D curtain
