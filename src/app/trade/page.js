@@ -8,6 +8,7 @@ import FullscreenChatOverlay from '@/components/FullscreenChatOverlay';
 import EvidenceScreens from '@/components/EvidenceScreens';
 import EvidenceOverlay, { hasRichVisual } from '@/components/EvidenceOverlay';
 import ProgressiveText from '@/components/ProgressiveText';
+import LiveCaption from '@/components/LiveCaption';
 import { CameraControls, Stats, Cloud, Clouds } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import ConstellationModel from '@/components/ConstellationModel';
@@ -35,7 +36,7 @@ import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
 import { useBuyModal } from '@/lib/useBuyModal';
 import TradeServiceRail from '@/components/TradeServiceRail';
-import { SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine } from '@/components/GameOverlay';
+import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine } from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
 import SitePalCropPanel from '@/components/SitePalCropPanel';
 import { useRouter } from 'next/navigation';
@@ -428,13 +429,30 @@ function SitePalHostEmbed({ config }) {
       window.AudioContext = PatchedCtx;
     }
 
-    let primed = false;
+    // Audio unlock for iOS/iPadOS. The previous one-shot `primed` flag
+    // permanently disarmed after ANY first pointerdown — but on iPadOS
+    // saySilent(0) doesn't actually unlock audio (zero-duration play),
+    // so a stray early touch (scroll, dismiss) consumed the only attempt
+    // and the actual START click did nothing. Now: keep attempting on
+    // each gesture, with a real silent-buffer Web Audio play that DOES
+    // unlock iOS, until the context is running.
     const resumeAudio = () => {
-      if (primed) return;
-      primed = true;
       try {
         if (typeof window.saySilent === "function") window.saySilent(0);
         const Ctx = window.AudioContext || window.webkitAudioContext;
+        const ctx = window.__rl80UnlockCtx || (Ctx ? new Ctx() : null);
+        if (ctx) {
+          window.__rl80UnlockCtx = ctx;
+          if (ctx.state === "suspended" && typeof ctx.resume === "function") {
+            ctx.resume().catch(() => {});
+          }
+          try {
+            const src = ctx.createBufferSource();
+            src.buffer = ctx.createBuffer(1, 1, 22050);
+            src.connect(ctx.destination);
+            src.start(0);
+          } catch (e) {}
+        }
         if (Ctx && Ctx._instances) {
           Ctx._instances.forEach((c) => { try { c.resume(); } catch (e) {} });
         }
@@ -759,6 +777,10 @@ const STATION_TO_CHARACTER = Object.fromEntries(
   Object.entries(CHARACTER_TO_STATION).map(([agent, station]) => [station, agent])
 );
 
+const createEmptyAskedMap = () => Object.fromEntries(
+  STATION_ORDER.map((stationKey) => [stationKey, new Set()])
+);
+
 
 
 export default function CyborgTemple() {
@@ -786,20 +808,24 @@ export default function CyborgTemple() {
   // Tracks whether game mode is actively running.
   const [gameStarted, setGameStarted] = useState(false);
   // Liminal Terminal game state — lifted out of the old modal so the in-scene
-  // UI can read/write it directly. SAMPLE_CASE is the only case for now; once
-  // a case loader exists, this becomes a useState pulled from the loader.
-  const caseData = SAMPLE_CASE;
+  // UI can read/write it directly. Free case files live in GameOverlay for now;
+  // when a loader exists, this index can become the current case id.
+  const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
+  const caseData = CASE_FILES[currentCaseIndex] || SAMPLE_CASE;
   // Question-level tracking (model B): a scan = one question, 3 questions total
   // across all 4 characters. `asked` maps station key → Set of question indices.
-  const [asked, setAsked] = useState(() => ({
-    monk: new Set(), demon: new Set(), marisol: new Set(), eugene: new Set(),
-  }));
+  const [asked, setAsked] = useState(createEmptyAskedMap);
   // Stations the player has rotated to at least once — drives intro vs return
   // micro-line selection. Reset on enterGameMode.
   const [visitedStations, setVisitedStations] = useState(() => new Set());
   // The currently-displayed Q&A in the side panel. Cleared on character switch
   // or when the player taps a new question. `null` = show the question list.
   const [activeAnswer, setActiveAnswer] = useState(null);
+  // Close the transcript whenever the answer changes so each new line
+  // starts with just the live caption (player can re-open if they want).
+  useEffect(() => {
+    setShowTranscript(false);
+  }, [activeAnswer]);
   // The verdict-reaction line currently displayed by the focused character
   // (immediate response on Believe/Abstain/Doubt commit, before the reveal modal).
   const [activeReaction, setActiveReaction] = useState(null);
@@ -830,6 +856,11 @@ export default function CyborgTemple() {
   // ProgressiveText's reveal pace, ~70ms/char) — close enough to audio
   // duration for the visual handoff to feel right.
   const [speechActive, setSpeechActive] = useState(false);
+  // Per-answer toggle for the static transcript inside the answer panel.
+  // The live caption is always shown (mid-screen, subtitle-style); the
+  // transcript is the optional read-along surface for when you missed
+  // a sentence and want to re-read it.
+  const [showTranscript, setShowTranscript] = useState(false);
   const speechEndTimerRef = useRef(null);
 
   // Hook SitePal's audio-end / speech-end callbacks to clear `speechActive`
@@ -949,9 +980,44 @@ export default function CyborgTemple() {
     return s;
   }, [asked]);
   const enterGameMode = () => {
+    // iOS/iPadOS Safari blocks audio that isn't triggered synchronously
+    // from a user gesture. START is a real click, so use this window to
+    // unlock both audio paths the app uses:
+    //   (1) Web Audio API — play a 1-frame silent buffer to flip the
+    //       AudioContext to 'running' state.
+    //   (2) SitePal — call saySilent(0) AND set volume so the very next
+    //       speakLine (which fires from a useEffect outside gesture
+    //       context) plays. Without this, character intros stay silent
+    //       on tablet until some later in-gesture speakLine (e.g. the
+    //       verdict reaction from the Doubt button) does the unlock.
+    try {
+      if (typeof window !== 'undefined') {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          const ctx = window.__rl80UnlockCtx || new Ctx();
+          window.__rl80UnlockCtx = ctx;
+          if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+            ctx.resume().catch(() => {});
+          }
+          const src = ctx.createBufferSource();
+          src.buffer = ctx.createBuffer(1, 1, 22050);
+          src.connect(ctx.destination);
+          src.start(0);
+        }
+        window.__sitePalDesiredVolume = 7;
+        if (typeof window.setPlayerVolume === 'function') {
+          try { window.setPlayerVolume(7); } catch (e) {}
+        }
+        if (typeof window.saySilent === 'function') {
+          try { window.saySilent(0); } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
     setTradeMode('game');
     setGameStarted(true);
-    setAsked({ monk: new Set(), demon: new Set(), marisol: new Set(), eugene: new Set() });
+    setCurrentCaseIndex(0);
+    setAsked(createEmptyAskedMap());
     setVisitedStations(new Set());
     setActiveAnswer(null);
     setActiveReaction(null);
@@ -990,24 +1056,24 @@ export default function CyborgTemple() {
     return verdict === caseData.correctVerdict ? 'aligned' : 'missed';
   }, [verdict, revealPhase, caseData.correctVerdict]);
 
-  // Hook for the post-verdict "NEXT CASE" button. There's only SAMPLE_CASE
-  // for now, so the button is disabled in the verdict modal — but the
-  // function is wired so when case 002+ data lands we can swap in a real
-  // case-list lookup and the UI doesn't have to change.
-  const nextCaseAvailable = false;
+  // Hook for the post-verdict "NEXT CASE" button. These first files are the
+  // free training ladder; premium case loading can replace this array later.
+  const nextCaseAvailable = currentCaseIndex < CASE_FILES.length - 1;
   const advanceToNextCase = () => {
     if (!nextCaseAvailable) return;
-    // Reset all game state, then re-enter game mode with the next case.
-    // (When case data is plural, also setCaseData(nextCase) here.)
+    setCurrentCaseIndex((idx) => Math.min(idx + 1, CASE_FILES.length - 1));
+    setAsked(createEmptyAskedMap());
+    setVisitedStations(new Set());
     setVerdict(null);
     setBrier(null);
     setRevealPhase(null);
     setActiveAnswer(null);
     setActiveReaction(null);
+    setEugeneBubble(null);
     setCurrentSpeech(null);
     setPendingSpeech(null);
     setFocusedAgent(null);
-    enterGameMode();
+    rulesSpokenRef.current = true;
   };
   // Derive the overlay's active station from focusedAgent when in game mode.
   // Falls back to 'monk' (the opener) so the overlay renders something stable
@@ -2526,14 +2592,15 @@ export default function CyborgTemple() {
                 <div
                   style={{
                     position: 'fixed',
-                    top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+                    top: `calc(env(safe-area-inset-top, 0px) + ${isMobileView ? 8 : 12}px)`,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     zIndex: 1050,
-                    padding: '8px 16px',
+                    padding: isMobileView ? '5px 10px' : '8px 16px',
+                    maxWidth: isMobileView ? 'calc(100vw - 12px)' : undefined,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 14,
+                    gap: isMobileView ? 8 : 14,
                     background: 'linear-gradient(180deg, rgba(4,12,8,0.86), rgba(2,5,8,0.74))',
                     border: '1px solid rgba(77,255,170,0.55)',
                     borderRadius: 6,
@@ -2542,30 +2609,33 @@ export default function CyborgTemple() {
                     WebkitBackdropFilter: 'blur(8px)',
                     fontFamily: "'IBM Plex Mono', 'SF Mono', Menlo, monospace",
                     color: '#c8ffe0',
-                    fontSize: 11,
-                    letterSpacing: '0.16em',
+                    fontSize: isMobileView ? 9 : 11,
+                    letterSpacing: isMobileView ? '0.12em' : '0.16em',
                     pointerEvents: 'auto',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <span style={{ color: '#8effc4', fontWeight: 700 }}>// CASE</span>
+                  {!isMobileView && <span style={{ color: '#8effc4', fontWeight: 700 }}>// CASE</span>}
                   <span>{caseData.projectName}</span>
                   <span style={{ color: '#3a6b54' }}>·</span>
                   <span style={{ color: '#8effc4' }}>{caseData.ticker}</span>
-                  <span style={{ color: '#3a6b54' }}>·</span>
-                  <span style={{ color: '#6db59a', fontStyle: 'italic' }}>
-                    {focusedAgent && CHARACTER_TO_STATION[focusedAgent]
-                      ? 'investigate or render verdict'
-                      : 'click a character to investigate'}
-                  </span>
+                  {!isMobileView && <span style={{ color: '#3a6b54' }}>·</span>}
+                  {!isMobileView && (
+                    <span style={{ color: '#6db59a', fontStyle: 'italic' }}>
+                      {focusedAgent && CHARACTER_TO_STATION[focusedAgent]
+                        ? 'investigate or render verdict'
+                        : 'click a character to investigate'}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={replayRules}
                     aria-label="Replay how-to-play rules"
                     title="Replay rules"
                     style={{
-                      marginLeft: 6,
-                      width: 22,
-                      height: 22,
+                      marginLeft: isMobileView ? 2 : 6,
+                      width: isMobileView ? 18 : 22,
+                      height: isMobileView ? 18 : 22,
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -2575,7 +2645,7 @@ export default function CyborgTemple() {
                       background: 'rgba(8,28,36,0.55)',
                       color: '#8ee9ff',
                       fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                      fontSize: 11,
+                      fontSize: isMobileView ? 9 : 11,
                       fontWeight: 800,
                       cursor: 'pointer',
                       textShadow: '0 0 8px rgba(142,233,255,0.45)',
@@ -2653,7 +2723,7 @@ export default function CyborgTemple() {
                     width: isMobileView
                       ? 'calc(100vw - 12px)'
                       : 'min(540px, calc(100vw - 24px))',
-                    maxHeight: '70vh',
+                    maxHeight: isMobileView ? '58vh' : '70vh',
                     display: 'flex',
                     flexDirection: 'column',
                     background: 'linear-gradient(180deg, rgba(4,12,8,0.92), rgba(2,5,8,0.82))',
@@ -2686,10 +2756,11 @@ export default function CyborgTemple() {
                         aria-label={`${remaining} of ${caseData.maxScans} scans remaining`}
                         style={{
                           display: 'flex',
-                          flexDirection: 'column',
+                          flexDirection: isMobileView ? 'row' : 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: '6px 14px 8px',
+                          gap: isMobileView ? 8 : 0,
+                          padding: isMobileView ? '4px 10px 5px' : '6px 14px 8px',
                           borderBottom: `1px solid ${accentSoft}`,
                           background: `linear-gradient(180deg, ${accentSoft.replace(/0\.\d+\)/, '0.10)')}, rgba(2,5,8,0.0))`,
                           lineHeight: 1,
@@ -2700,16 +2771,16 @@ export default function CyborgTemple() {
                       >
                         <div style={{
                           fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                          fontSize: isMobileView ? 48 : 60,
+                          fontSize: isMobileView ? 26 : 60,
                           fontWeight: 900,
                           letterSpacing: '0.02em',
                         }}>
                           {remaining}
                         </div>
                         <div style={{
-                          marginTop: 4,
-                          fontSize: isMobileView ? 10 : 11,
-                          letterSpacing: '0.26em',
+                          marginTop: isMobileView ? 0 : 4,
+                          fontSize: isMobileView ? 9 : 11,
+                          letterSpacing: isMobileView ? '0.20em' : '0.26em',
                           fontWeight: 800,
                           opacity: 0.9,
                         }}>
@@ -2722,7 +2793,7 @@ export default function CyborgTemple() {
                   {/* Top section: question content state machine, or a
                       "tap a consultant" hint when no character is focused. */}
                   {focusedAgent && CHARACTER_TO_STATION[focusedAgent] && gameStation ? (
-                  <div style={{ minHeight: currentSpeech ? (isMobileView ? 180 : 210) : 0, maxHeight: '46vh', overflowY: 'auto', padding: '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ minHeight: currentSpeech ? (isMobileView ? 120 : 210) : 0, maxHeight: isMobileView ? '38vh' : '46vh', overflowY: 'auto', padding: isMobileView ? '8px 10px' : '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)', display: 'flex', flexDirection: 'column' }}>
                     {(() => {
                       const stationKey = gameActiveStation;
                       const askedAtStation = asked[stationKey] || new Set();
@@ -2741,9 +2812,9 @@ export default function CyborgTemple() {
                       //    Continue back to questions (or to verdict if 0 scans).
                       if (isActiveAnswerHere) {
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobileView ? 6 : 10 }}>
                             <div style={{
-                              fontSize: 12,
+                              fontSize: isMobileView ? 11 : 12,
                               color: '#6db59a',
                               fontStyle: 'italic',
                               lineHeight: 1.3,
@@ -2751,28 +2822,67 @@ export default function CyborgTemple() {
                               "{activeAnswer.q}"
                             </div>
                             {stationKey !== 'eugene' && (
-                              <div style={{
-                                padding: '14px 16px',
-                                borderLeft: '2px solid #ff3ea0',
-                                background: 'rgba(255,62,160,0.05)',
-                              }}>
+                              isMobileView ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowTranscript((v) => !v)}
+                                    style={{
+                                      alignSelf: 'flex-start',
+                                      background: 'transparent',
+                                      border: '1px solid rgba(255,62,160,0.5)',
+                                      color: '#ff8fc4',
+                                      padding: '4px 10px',
+                                      borderRadius: 4,
+                                      fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                      fontSize: 9,
+                                      letterSpacing: '0.22em',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {showTranscript ? '▴ HIDE TRANSCRIPT' : '▾ SHOW TRANSCRIPT'}
+                                  </button>
+                                  {showTranscript && (
+                                    <div style={{
+                                      padding: '8px 10px',
+                                      borderLeft: '2px solid #ff3ea0',
+                                      background: 'rgba(255,62,160,0.05)',
+                                    }}>
+                                      <div style={{
+                                        fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                        fontSize: 15,
+                                        color: '#c8ffe0',
+                                        lineHeight: 1.4,
+                                      }}>
+                                        "{resolveLine(activeAnswer.a)?.text || ''}"
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
                                 <div style={{
-                                  fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                  fontSize: isMobileView ? 22 : 24,
-                                  color: '#c8ffe0',
-                                  lineHeight: 1.45,
+                                  padding: '14px 16px',
+                                  borderLeft: '2px solid #ff3ea0',
+                                  background: 'rgba(255,62,160,0.05)',
                                 }}>
-                                  "{resolveLine(activeAnswer.a)?.text || ''}"
+                                  <div style={{
+                                    fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                    fontSize: 24,
+                                    color: '#c8ffe0',
+                                    lineHeight: 1.45,
+                                  }}>
+                                    "{resolveLine(activeAnswer.a)?.text || ''}"
+                                  </div>
                                 </div>
-                              </div>
+                              )
                             )}
                             {revealedEntry && (
                               <div
                                 style={{
                                   display: 'grid',
-                                  gridTemplateColumns: '110px 1fr 18px',
-                                  gap: 10,
-                                  padding: '8px 10px',
+                                  gridTemplateColumns: isMobileView ? '88px 1fr 16px' : '110px 1fr 18px',
+                                  gap: isMobileView ? 6 : 10,
+                                  padding: isMobileView ? '6px 8px' : '8px 10px',
                                   background: revealedEntry.threat === 'red' ? 'rgba(120,0,30,0.18)'
                                     : revealedEntry.threat === 'amber' ? 'rgba(120,80,0,0.16)'
                                     : 'rgba(10,58,38,0.20)',
@@ -2930,7 +3040,23 @@ export default function CyborgTemple() {
                               ALL QUESTIONS SPENT
                             </div>
                             <div style={{ fontSize: 12, color: '#c8ffe0', fontStyle: 'italic', lineHeight: 1.5, maxWidth: 280 }}>
-                              Render your verdict below — Believe, Abstain, or Doubt.
+                              Render your verdict below — Trust, Abstain, or Doubt.
+                            </div>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 3,
+                              fontSize: 10,
+                              lineHeight: 1.35,
+                              color: '#9ed6bb',
+                              maxWidth: 280,
+                              textAlign: 'left',
+                              fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                              letterSpacing: '0.02em',
+                            }}>
+                              <div><span style={{ color: '#8effc4', fontWeight: 700 }}>TRUST</span> — evidence supports legitimacy</div>
+                              <div><span style={{ color: '#dcdce4', fontWeight: 700 }}>ABSTAIN</span> — signal is incomplete or mixed</div>
+                              <div><span style={{ color: '#ff8a8a', fontWeight: 700 }}>DOUBT</span> — evidence supports deception or severe risk</div>
                             </div>
                           </div>
                         );
@@ -3034,8 +3160,8 @@ export default function CyborgTemple() {
                       rotates the platform / flies camera / loads SitePal scene. */}
                   <div style={{
                     display: 'flex',
-                    gap: isMobileView ? 6 : 8,
-                    padding: '6px 8px',
+                    gap: isMobileView ? 5 : 8,
+                    padding: isMobileView ? '4px 6px' : '6px 8px',
                     justifyContent: 'center',
                     background: 'rgba(2,5,8,0.4)',
                   }}>
@@ -3054,8 +3180,8 @@ export default function CyborgTemple() {
                       const remaining = Math.max(0, totalQuestions - askedCount);
                       const allAsked = remaining === 0;
                       const shortName = label;
-                      const buttonW = isMobileView ? 72 : 92;
-                      const buttonH = isMobileView ? 88 : 110;
+                      const buttonW = isMobileView ? 58 : 92;
+                      const buttonH = isMobileView ? 72 : 110;
 
                       const outOfScans = scansRemaining <= 0;
                       const disabled = isCurrent || outOfScans;
@@ -3109,7 +3235,7 @@ export default function CyborgTemple() {
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            padding: '14px 4px 5px',
+                            padding: isMobileView ? '10px 3px 3px' : '14px 4px 5px',
                             background: 'linear-gradient(180deg, rgba(2,5,8,0) 0%, rgba(2,5,8,0.78) 55%, rgba(2,5,8,0.92) 100%)',
                             display: 'flex',
                             flexDirection: 'column',
@@ -3117,7 +3243,7 @@ export default function CyborgTemple() {
                             gap: 1,
                           }}>
                             <div style={{
-                              fontSize: isMobileView ? 10 : 11,
+                              fontSize: isMobileView ? 9 : 11,
                               letterSpacing: '0.12em',
                               color: 'inherit',
                               textTransform: 'uppercase',
@@ -3164,6 +3290,60 @@ export default function CyborgTemple() {
                   </div>
                 </div>
               )}
+
+              {/* Floating subtitle — mobile only. Mirrors the spoken line
+                  one sentence at a time, paced ~70ms/char and gated on
+                  speechActive so it pauses with the audio. Sits above the
+                  bottom console (which has been shrunk for mobile) and
+                  below the top HUD so the avatar's mouth remains visible. */}
+              {tradeMode === 'game' && !verdict && isMobileView && (() => {
+                // Caption is for question-answer playback only. Intros,
+                // returns, reactions etc. go through `currentSpeech` and
+                // render via the panel's ProgressiveText (teleprompter
+                // style, retains multiple lines — better for long monologues).
+                const captionText =
+                  activeAnswer && CHARACTER_TO_STATION[focusedAgent] === activeAnswer.stationKey
+                    ? resolveLine(activeAnswer.a)?.text
+                    : null;
+                if (!captionText) return null;
+                // Eugene has no SitePal audio — skip the live caption for
+                // her (her chat bubble plays the same role).
+                if (focusedAgent === 'RL80') return null;
+                return (
+                  <LiveCaption
+                    text={captionText}
+                    isPlaying={speechActive}
+                    style={{
+                      position: 'fixed',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      // Sits just above the bottom console (which is anchored
+                      // 5.5rem above the safe-area bottom and is ~14-16rem
+                      // tall in the answer/speech states on mobile).
+                      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 22rem)',
+                      zIndex: 1058,
+                      maxWidth: 'calc(100vw - 24px)',
+                      padding: '8px 14px',
+                      background: 'rgba(2,5,8,0.78)',
+                      borderLeft: '2px solid #ff3ea0',
+                      borderRadius: 4,
+                      backdropFilter: 'blur(6px)',
+                      WebkitBackdropFilter: 'blur(6px)',
+                      color: '#c8ffe0',
+                      fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                      fontSize: 18,
+                      lineHeight: 1.35,
+                      textAlign: 'center',
+                      textShadow: '0 1px 6px rgba(0,0,0,0.85)',
+                      pointerEvents: 'none',
+                      // Hide visually while the static transcript is open
+                      // (caption + transcript = redundant). Component stays
+                      // mounted so the per-sentence timer doesn't reset.
+                      visibility: showTranscript ? 'hidden' : 'visible',
+                    }}
+                  />
+                );
+              })()}
 
               {/* Eugene's text bubble — she's TTS-less because SitePal can't
                   drive a unicorn head. When she's focused and has a current
@@ -3511,10 +3691,10 @@ export default function CyborgTemple() {
                       }}
                     >
                       {[
-                        { label: 'Believe', verdict: 'believe', bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)' },
-                        { label: 'Abstain', verdict: 'abstain', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)' },
-                        { label: 'Doubt',   verdict: 'doubt',   bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)' },
-                      ].map(({ label, verdict: v, bg, border }) => {
+                        { label: 'Trust', verdict: 'trust', bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)', desc: 'Trust — evidence supports legitimacy' },
+                        { label: 'Abstain', verdict: 'abstain', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)', desc: 'Abstain — signal is incomplete or mixed' },
+                        { label: 'Doubt',   verdict: 'doubt',   bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)', desc: 'Doubt — evidence supports deception or severe risk' },
+                      ].map(({ label, verdict: v, bg, border, desc }) => {
                         const enabled = investigated.size > 0 && !verdict;
                         const onClick = () => { if (enabled) submitVerdict(v); };
                         return (
@@ -3522,7 +3702,8 @@ export default function CyborgTemple() {
                           key={label}
                           onClick={onClick}
                           disabled={!enabled}
-                          title={!enabled && investigated.size === 0 ? 'Investigate at least one station first' : undefined}
+                          aria-label={desc}
+                          title={!enabled && investigated.size === 0 ? 'Investigate at least one station first' : desc}
                           style={{
                             minWidth: 70,
                             height: 60,
