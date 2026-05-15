@@ -40,11 +40,21 @@ export const SAMPLE_CASE = {
   // Covers: (1) the question budget, (2) the verdict trio, (3) both scoring
   // directions — Brier (lower-better, counterintuitive) vs accuracy (higher-better),
   // and (4) the calibration intuition (bold-right wins, bold-wrong loses, abstain spared).
-  rulesIntro:
-    "Welcome friend. The rite is simple. You have three questions to spend across " +
-    "the four of us — then you render your verdict: Believe, Abstain, or Doubt. " +
-    "Boldness rewards the seer and punishes the blind. Abstain when you do not see. " +
-    "Choose wisely.",
+// Separate recording from monk's intro so first-visit players who've
+// heard the rules before in a prior session don't get them again. The
+// runtime plays this audio FIRST on first visit, then chains to
+// `stations.monk.intro.audio` when this one ends. If `rulesHeard` is
+// true, this whole audio is skipped and only the intro plays.
+rulesIntro: {
+  text:
+    "Welcome, friend. The rite is simple. You may spend three questions across " +
+    "the four of us. Then you render judgment: Trust, Abstain, or Doubt. " +
+    "Trust when the evidence holds. Doubt when the pattern breaks faith. " +
+    "Abstain when the signal is incomplete. A clear call is rewarded; a false " +
+    "one leaves a mark. Choose with care.",
+  audio: "case001_monk_rules",
+},
+
   stations: {
     monk: {
       character: "Saint GR80",
@@ -56,7 +66,7 @@ export const SAMPLE_CASE = {
       //   voice 9 / lang 1 / engine 1  (Acapela; lang 1 covers English voices
       //   here regardless of US/UK accent — the accent is part of the voice).
       // Audio recordings bypass this entirely once wired into the case data.
-      voice: { voice: "9", lang: 1, engine: 1 },
+      voice: { voice: "9", lang: 1, engine: 7 },
       // Pre-recorded — the audio file contains the full rules preamble + intro
       // combined (per the locked convention). The runtime favors `audio` when
       // SitePal `sayAudio` is available; `text` stays as the TTS fallback and
@@ -88,7 +98,7 @@ export const SAMPLE_CASE = {
       // so the right card surfaces on the monitor when the line plays.
       questions: [
         {
-          q: "Who is asking for our trust?",
+          q: "What do we know about the deployer?",
           a: {
             text: "The deployer wallet is six days old. A fresh mask can still hold an old face.",
             audio: "case001_monk_q1",
@@ -115,15 +125,15 @@ export const SAMPLE_CASE = {
           },
           reveals: "FUNDING SOURCE",
         },
-        {
-          q: "Did they write the contract?",
-          a: {
-            text:
-              "Eighty-five percent matches a prior rug template, including the same owner escape hatch. " +
-              "They changed the prophecy. They kept the knife.",
-            audio: "case001_monk_q4",
-          },
-          reveals: "CONTRACT ORIGINALITY",
+       {
+  q: "Has this contract appeared before?",
+  a: {
+    text:
+      "Eighty-five percent matches a prior rug template, including the same owner escape hatch. " +
+      "They changed the prophecy. They kept the knife.",
+    audio: "case001_monk_q4",
+  },
+  reveals: "CONTRACT ORIGINALITY",
         },
       ],
       entries: [
@@ -224,16 +234,17 @@ export const SAMPLE_CASE = {
           },
           reveals: "KOL PROMOTERS",
         },
-        {
-          q: "What happens to criticism?",
-          a: {
-            text:
-              "Critical replies disappear in under four minutes. A believer answers doubts. " +
-              "A trap deletes them.",
-            audio: "case001_demon_q4",
-          },
-          reveals: "FUD SUPPRESSION",
-        },
+       {
+  q: "How does the team handle hard questions?",
+  a: {
+    text:
+      "Critical replies disappear in under four minutes. A believer answers doubts. " +
+      "A trap deletes them.",
+    audio: "case001_demon_q4",
+  },
+  reveals: "FUD SUPPRESSION",
+}
+
       ],
       entries: [
         { label: "TWITTER FOLLOWERS", value: "5,200 — 81% under 14 days old", threat: "red" },
@@ -248,19 +259,20 @@ export const SAMPLE_CASE = {
       // more char than "monk", so different slots truncate compared to
       // monk's set. Names below match what SitePal actually stored.
       verdictReaction: {
-        believe: {
-          text: "Your funeral. Beautiful funeral, but a funeral.",
-          audio: "case001_demon_react_belie",
-        },
-        abstain: {
-          text: "Smart move. Smartest in the room. Sometimes.",
-          audio: "case001_demon_react_absta",
-        },
-        doubt: {
-          text: "Now you're thinking. Small winner. But a winner.",
-          audio: "case001_demon_react_doubt",
-        },
-      },
+  believe: {
+    text: "You're trusting the applause. That's how the exit liquidity gets a soundtrack.",
+    audio: "case001_demon_react_belie",
+  },
+  abstain: {
+    text: "Fine. You stepped out of the crowd before it started running.",
+    audio: "case001_demon_react_absta",
+  },
+  doubt: {
+    text: "There it is. When the crowd sounds purchased, don't buy the ticket.",
+    audio: "case001_demon_react_doubt",
+  },
+},
+
       vindication: {
         aligned: {
           text: "Told you. Was I right? I was right.",

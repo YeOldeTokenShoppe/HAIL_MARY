@@ -1401,8 +1401,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v65_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v65.glb";
+    let modelPath = "/models/RL80_4anims_v66_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v66.glb";
     let usingFallback = false;
     const startTime = performance.now();
     

@@ -186,8 +186,16 @@ function SitePalHostEmbed({ config }) {
       }
     };
 
+    const clearSpeechInitTimer = () => {
+      if (window.__sitePalSpeechInitTimer) {
+        clearTimeout(window.__sitePalSpeechInitTimer);
+        window.__sitePalSpeechInitTimer = null;
+      }
+    };
+
     const clearActiveSpeech = () => {
       clearSpeechRetryTimer();
+      clearSpeechInitTimer();
       window.__sitePalPendingSpeech = null;
       window.__sitePalActiveSpeech = null;
     };
@@ -207,6 +215,16 @@ function SitePalHostEmbed({ config }) {
         if (isRetry || request.attempts === 1) {
           try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
         }
+        // Re-assert interruptMode=1 right before sayAudio. setStatus is
+        // also set in vh_sceneLoaded, but SitePal lives in a cross-origin
+        // iframe and we can't observe its state — explicitly re-asserting
+        // here is cheap and makes sure a new sayAudio interrupts whatever
+        // is playing instead of being queued/overlaid.
+        try {
+          if (typeof window.setStatus === "function") {
+            window.setStatus(1, 0, 0, 1, 0);
+          }
+        } catch (e) {}
 
         if (request.type === "audio" && request.audioName && typeof window.sayAudio === "function") {
           if (request.attempts === 1 && typeof window.loadAudio === "function") {
@@ -311,8 +329,19 @@ function SitePalHostEmbed({ config }) {
       }
 
       clearSpeechRetryTimer();
+      clearSpeechInitTimer();
       window.__sitePalActiveSpeech = request;
-      setTimeout(() => runSpeechRequest(request, false), 160);
+      // Track the init setTimeout so stopSitePalAudio can cancel a
+      // pending sayAudio call that hasn't fired yet. SitePal's docs are
+      // clear that stopSpeech() can't prevent "speech that has not yet
+      // begun" — once this elapses, sayAudio runs and the audio buffers
+      // and plays regardless of stopSpeech. So we cancel the timer
+      // itself when the user moves on.
+      //
+      window.__sitePalSpeechInitTimer = setTimeout(() => {
+        window.__sitePalSpeechInitTimer = null;
+        runSpeechRequest(request, false);
+      }, 160);
       return true;
     };
 
@@ -500,6 +529,33 @@ function SitePalHostEmbed({ config }) {
       }}
     />
   );
+}
+
+// Debug probe — logs renderer.info (memory.textures, memory.geometries,
+// render.calls, render.triangles) once a few seconds after first paint
+// so we can see what's actually allocated on the GPU. Re-logs every
+// 5s to catch growth over time. Remove or guard behind a debug flag
+// once GPU memory is back under control.
+function GpuMemoryProbe() {
+  const loggedAtRef = useRef(0);
+  useFrame((state) => {
+    const now = performance.now();
+    // First log at ~2s (lets the GLB finish loading), then every 5s.
+    const interval = loggedAtRef.current === 0 ? 2000 : 5000;
+    if (now - loggedAtRef.current < interval) return;
+    loggedAtRef.current = now;
+    const heapMB = typeof performance !== 'undefined' && performance.memory
+      ? (performance.memory.totalJSHeapSize / 1048576).toFixed(1)
+      : 'n/a';
+    console.log('[GPU]', {
+      textures: state.gl.info.memory.textures,
+      geometries: state.gl.info.memory.geometries,
+      calls: state.gl.info.render.calls,
+      triangles: state.gl.info.render.triangles,
+      jsHeapMB: heapMB,
+    });
+  });
+  return null;
 }
 
 // Drop-in replacement for the previous <OrbitControls> rig. Uses
@@ -821,11 +877,6 @@ export default function CyborgTemple() {
   // The currently-displayed Q&A in the side panel. Cleared on character switch
   // or when the player taps a new question. `null` = show the question list.
   const [activeAnswer, setActiveAnswer] = useState(null);
-  // Close the transcript whenever the answer changes so each new line
-  // starts with just the live caption (player can re-open if they want).
-  useEffect(() => {
-    setShowTranscript(false);
-  }, [activeAnswer]);
   // The verdict-reaction line currently displayed by the focused character
   // (immediate response on Believe/Abstain/Doubt commit, before the reveal modal).
   const [activeReaction, setActiveReaction] = useState(null);
@@ -856,12 +907,18 @@ export default function CyborgTemple() {
   // ProgressiveText's reveal pace, ~70ms/char) — close enough to audio
   // duration for the visual handoff to feel right.
   const [speechActive, setSpeechActive] = useState(false);
-  // Per-answer toggle for the static transcript inside the answer panel.
-  // The live caption is always shown (mid-screen, subtitle-style); the
-  // transcript is the optional read-along surface for when you missed
-  // a sentence and want to re-read it.
-  const [showTranscript, setShowTranscript] = useState(false);
   const speechEndTimerRef = useRef(null);
+  // Audio follow-up queued for after the current line's audio ends.
+  // Used for the monk's rules → intro chain (two separate recordings).
+  // Cleared when consumed (audio-end handler or manual CONTINUE).
+  const pendingAudioRef = useRef(null);
+  // Mirror pendingSpeech into a ref so the wrapped vh_audio* callbacks
+  // can read it without closure-staleness (the wrappers are installed
+  // once at mount but need to see the latest pending text).
+  const pendingSpeechRef = useRef(null);
+  useEffect(() => {
+    pendingSpeechRef.current = pendingSpeech;
+  }, [pendingSpeech]);
 
   // Hook SitePal's audio-end / speech-end callbacks to clear `speechActive`
   // the moment the line actually finishes — much more accurate than the
@@ -877,8 +934,31 @@ export default function CyborgTemple() {
         speechEndTimerRef.current = null;
       }
     };
+    // Advance the queued follow-up beat (e.g. monk's rules → intro)
+    // when the current audio ends NATURALLY. Important: only hook this
+    // off `vh_audioEnded` (the SitePal documented natural-end callback),
+    // NOT `vh_audioStopped` / `vh_speechEnded` — those fire on any stop
+    // including the `stopSpeech()` calls that runSpeechRequest uses to
+    // clear the way before sayAudio. Hooking the wrong callback caused
+    // the intro to chain on top of itself: stopSpeech fired during the
+    // intro's own start sequence, re-entered advanceQueuedSpeech, and
+    // launched a second intro alongside the first.
+    const advanceQueuedSpeech = () => {
+      const pending = pendingSpeechRef.current;
+      const queuedAudio = pendingAudioRef.current;
+      if (!pending && !queuedAudio) return;
+      if (pending) {
+        setCurrentSpeech(pending);
+        setPendingSpeech(null);
+      }
+      if (queuedAudio) {
+        pendingAudioRef.current = null;
+        speakLine(queuedAudio.line, queuedAudio.stationKey, queuedAudio.options);
+      }
+    };
     const prevAudioStopped = window.vh_audioStopped;
     const prevSpeechEnded = window.vh_speechEnded;
+    const prevAudioEnded = window.vh_audioEnded;
     window.vh_audioStopped = function (audID, portal) {
       try { clearLocalSpeechActive(); } catch (e) {}
       if (typeof prevAudioStopped === 'function') {
@@ -891,9 +971,17 @@ export default function CyborgTemple() {
         try { prevSpeechEnded.call(this, audID); } catch (e) {}
       }
     };
+    window.vh_audioEnded = function (audID, portal) {
+      // Natural end only — safe to advance the queued follow-up here.
+      try { advanceQueuedSpeech(); } catch (e) {}
+      if (typeof prevAudioEnded === 'function') {
+        try { prevAudioEnded.call(this, audID, portal); } catch (e) {}
+      }
+    };
     return () => {
       window.vh_audioStopped = prevAudioStopped;
       window.vh_speechEnded = prevSpeechEnded;
+      window.vh_audioEnded = prevAudioEnded;
     };
   }, []);
 
@@ -946,6 +1034,11 @@ export default function CyborgTemple() {
   // first section's text until they click CONTINUE.
   useEffect(() => {
     if (!currentSpeech || !pendingSpeech) return;
+    // When audio chaining is queued (e.g. monk's rules → intro, two
+    // separate recordings), let the audio-end callback drive the swap
+    // so text and audio stay in lockstep. The text-paced timer below
+    // is the legacy fallback for cases where audio ends aren't wired.
+    if (pendingAudioRef.current) return;
     const text = currentSpeech.text || '';
     const chunks = text.match(/[^.!?—]+[.!?—]+\s*|[^.!?—]+$/g) || [text];
     // Mirrors ProgressiveText's pacing: ~70ms/char with a 900ms floor per
@@ -1055,6 +1148,79 @@ export default function CyborgTemple() {
     if (verdict === 'abstain') return 'abstained';
     return verdict === caseData.correctVerdict ? 'aligned' : 'missed';
   }, [verdict, revealPhase, caseData.correctVerdict]);
+
+  // Forceful stop for SitePal audio. Per the SitePal docs, stopSpeech()
+  // only halts audio that's currently speaking — it "does not prevent
+  // speech that has not yet begun." So our biggest leak was the 160ms
+  // init setTimeout inside speakPending: that scheduled sayAudio call
+  // fires regardless of how many stopSpeech() invocations land before
+  // it, and the resulting audio plays over whatever new line we kicked
+  // off afterward. The fix is to cancel that init timer + the retry
+  // timer here (the speakPending code stores them as window globals
+  // specifically so we can reach in). Then we still call stopSpeech()
+  // for any audio that DID start, and pause DOM <audio> elements as a
+  // belt-and-suspenders fallback for platforms where stopSpeech misses
+  // an HTMLAudioElement that's mid-buffer.
+  const stopSitePalAudio = useCallback(() => {
+    let initTimerCleared = false;
+    let retryTimerCleared = false;
+    let domAudiosPaused = 0;
+    try {
+      if (typeof window !== 'undefined') {
+        if (window.__sitePalSpeechInitTimer) {
+          clearTimeout(window.__sitePalSpeechInitTimer);
+          window.__sitePalSpeechInitTimer = null;
+          initTimerCleared = true;
+        }
+        if (window.__sitePalSpeechRetryTimer) {
+          clearTimeout(window.__sitePalSpeechRetryTimer);
+          window.__sitePalSpeechRetryTimer = null;
+          retryTimerCleared = true;
+        }
+        window.__sitePalPendingSpeech = null;
+        window.__sitePalActiveSpeech = null;
+      }
+    } catch (e) {}
+    try {
+      if (typeof window !== 'undefined' && typeof window.stopSpeech === 'function') {
+        window.stopSpeech();
+      }
+    } catch (e) {}
+    try {
+      if (typeof document === 'undefined') return;
+      const musicAudio = (typeof window !== 'undefined' && window.__globalAudioInstance)
+        ? window.__globalAudioInstance.audio
+        : null;
+      const pauseAudio = (a) => {
+        if (a === musicAudio) return; // never touch the music
+        try {
+          if (!a.paused) {
+            a.pause();
+            try { a.currentTime = 0; } catch (e) {}
+            domAudiosPaused += 1;
+          }
+        } catch (e) {}
+      };
+      document.querySelectorAll('audio').forEach(pauseAudio);
+      // Same-origin iframes too (SitePal sometimes nests its audio there).
+      document.querySelectorAll('iframe').forEach((frame) => {
+        try {
+          const doc = frame.contentDocument || frame.contentWindow?.document;
+          if (!doc) return;
+          doc.querySelectorAll('audio').forEach(pauseAudio);
+        } catch (e) {
+          // cross-origin — can't reach in; nothing we can do
+        }
+      });
+    } catch (e) {}
+    console.log('[stopSitePalAudio]', {
+      initTimerCleared,
+      retryTimerCleared,
+      domAudiosPaused,
+      sitepalAudiosFound: typeof document !== 'undefined' ? document.querySelectorAll('audio').length : 0,
+      iframesFound: typeof document !== 'undefined' ? document.querySelectorAll('iframe').length : 0,
+    });
+  }, []);
 
   // Hook for the post-verdict "NEXT CASE" button. These first files are the
   // free training ladder; premium case loading can replace this array later.
@@ -1190,13 +1356,29 @@ export default function CyborgTemple() {
     if (!stationKey) return;
     const station = caseData.stations[stationKey];
     if (!station) return;
+    // Cut the previous character's in-flight audio synchronously. Without
+    // this, switching mid-line lets the old audio keep playing for the
+    // ~900ms camera-fly delay + another ~160ms before runSpeechRequest's
+    // own stopSpeech fires — long enough to overlap the new character's
+    // intro. Also clear the safety-net timer + speechActive so the old
+    // speech is fully torn down.
+    stopSitePalAudio();
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current);
+      speechEndTimerRef.current = null;
+    }
+    setSpeechActive(false);
+
     // Clear any prior answer / speech beat when switching to a new character.
     // Also clear Eugene's persistent bubble if she's no longer focused, so
     // revisiting her later doesn't flash the previous line before her new
-    // intro/return fires.
+    // intro/return fires. The queued follow-up audio (e.g. monk's intro
+    // chained after rules) is also dropped so a mid-rules switch doesn't
+    // resurrect monk's intro inside the new character's beat.
     setActiveAnswer(null);
     setCurrentSpeech(null);
     setPendingSpeech(null);
+    pendingAudioRef.current = null;
     if (stationKey !== 'eugene') {
       setEugeneBubble(null);
     }
@@ -1221,11 +1403,12 @@ export default function CyborgTemple() {
         next.add(stationKey);
         return next;
       });
-      // Rules preamble: monk speaks them once on his first visit. The audio
-      // (single intro recording) is assumed to contain both the rules and the
-      // intro back-to-back, so we play it once but split the displayed text:
-      // rules render first, CONTINUE swaps in the intro text. Without audio,
-      // we concat for TTS fallback.
+      // Rules preamble: monk speaks them once on his first visit. The rules
+      // and intro now live in SEPARATE recordings (`case001_monk_rules` +
+      // `case001_monk_intro`) so that subsequent sessions can skip the
+      // rules audio entirely when `rulesHeard` is true. The rules audio
+      // plays first; the audio-end handler in this file picks up the
+      // queued intro audio + swaps the displayed text when rules ends.
       const introLine = station.intro;
       const introResolved = resolveLine(introLine);
       const introText = introResolved?.text || '';
@@ -1233,11 +1416,25 @@ export default function CyborgTemple() {
       displayText = introText;
       if (stationKey === 'monk' && !rulesSpokenRef.current && !rulesHeard && caseData.rulesIntro) {
         rulesSpokenRef.current = true;
-        const rulesText = resolveLine(caseData.rulesIntro)?.text || '';
+        const rulesResolved = resolveLine(caseData.rulesIntro);
+        const rulesText = rulesResolved?.text || '';
         if (rulesText) {
           displayText = rulesText;
           setPendingSpeech({ stationKey, text: introText, kind: 'intro' });
-          if (!introResolved?.audio) {
+          if (rulesResolved?.audio) {
+            // Two-track path: play rules audio now, queue intro audio
+            // for the audio-end handler to chain. speakLine receives
+            // `caseData.rulesIntro` (the object) so the rules audio
+            // fires; the intro is queued via the audio ref.
+            toSpeak = caseData.rulesIntro;
+            pendingAudioRef.current = {
+              line: introLine,
+              stationKey,
+              options: introText ? { estimatedChars: introText.length } : undefined,
+            };
+          } else if (!introResolved?.audio) {
+            // No-audio fallback (e.g. during dev before recording): TTS
+            // path concats rules + intro into a single sayText call.
             toSpeak = `${rulesText} ${introText}`.trim();
           }
           // Persist across sessions so the rules preamble + attract loop
@@ -1300,6 +1497,15 @@ export default function CyborgTemple() {
     if (asked[stationKey]?.has(idx)) return;
     const q = caseData.stations[stationKey]?.questions?.[idx];
     if (!q) return;
+    // Cut any in-flight audio synchronously before the new line starts —
+    // covers the case where the player taps a question while the intro
+    // (or a previous answer's audio) is still playing.
+    stopSitePalAudio();
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current);
+      speechEndTimerRef.current = null;
+    }
+    setSpeechActive(false);
     setAsked((prev) => {
       const next = { ...prev };
       next[stationKey] = new Set(next[stationKey]);
@@ -1500,7 +1706,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v65_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v66_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -2097,6 +2303,7 @@ export default function CyborgTemple() {
           <fog attach="fog" args={context80sMode ? ['#1a0033', 50, 300] : ['#000000', 20, 200]} />
           <Suspense fallback={null}>
             <ambientLight intensity={1.5} />
+            <GpuMemoryProbe />
             <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} />
             
             {/* Synthwave sunset for 80s mode - desktop only */}
@@ -2822,60 +3029,28 @@ export default function CyborgTemple() {
                             }}>
                               "{activeAnswer.q}"
                             </div>
-                            {stationKey !== 'eugene' && (
-                              isMobileView ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowTranscript((v) => !v)}
-                                    style={{
-                                      alignSelf: 'flex-start',
-                                      background: 'transparent',
-                                      border: '1px solid rgba(255,62,160,0.5)',
-                                      color: '#ff8fc4',
-                                      padding: '4px 10px',
-                                      borderRadius: 4,
-                                      fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                                      fontSize: 9,
-                                      letterSpacing: '0.22em',
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    {showTranscript ? '▴ HIDE TRANSCRIPT' : '▾ SHOW TRANSCRIPT'}
-                                  </button>
-                                  {showTranscript && (
-                                    <div style={{
-                                      padding: '8px 10px',
-                                      borderLeft: '2px solid #ff3ea0',
-                                      background: 'rgba(255,62,160,0.05)',
-                                    }}>
-                                      <div style={{
-                                        fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                        fontSize: 15,
-                                        color: '#c8ffe0',
-                                        lineHeight: 1.4,
-                                      }}>
-                                        "{resolveLine(activeAnswer.a)?.text || ''}"
-                                      </div>
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
+                            {/* Desktop: keep the inline Cinzel quote — there's
+                                room for it and it reads nicely next to the
+                                evidence card. Mobile: the floating top
+                                caption is the sole surface for the spoken
+                                line; the inline quote is dropped to keep
+                                the panel compact. Eugene is always skipped
+                                — her pink bubble already serves this role. */}
+                            {stationKey !== 'eugene' && !isMobileView && (
+                              <div style={{
+                                padding: '14px 16px',
+                                borderLeft: '2px solid #ff3ea0',
+                                background: 'rgba(255,62,160,0.05)',
+                              }}>
                                 <div style={{
-                                  padding: '14px 16px',
-                                  borderLeft: '2px solid #ff3ea0',
-                                  background: 'rgba(255,62,160,0.05)',
+                                  fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                  fontSize: 24,
+                                  color: '#c8ffe0',
+                                  lineHeight: 1.45,
                                 }}>
-                                  <div style={{
-                                    fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                    fontSize: 24,
-                                    color: '#c8ffe0',
-                                    lineHeight: 1.45,
-                                  }}>
-                                    "{resolveLine(activeAnswer.a)?.text || ''}"
-                                  </div>
+                                  "{resolveLine(activeAnswer.a)?.text || ''}"
                                 </div>
-                              )
+                              </div>
                             )}
                             {revealedEntry && (
                               <div
@@ -2979,38 +3154,64 @@ export default function CyborgTemple() {
                           <div style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: 14,
+                            gap: isMobileView ? 8 : 14,
                             flex: 1,
                             justifyContent: 'center',
                           }}>
-                            <div style={{
-                              padding: '14px 16px',
-                              borderLeft: '2px solid #ff3ea0',
-                              background: 'rgba(255,62,160,0.05)',
-                            }}>
+                            {/* Desktop: teleprompter ProgressiveText inline.
+                                Mobile: rely entirely on the floating top
+                                caption — panel is just the CONTINUE button. */}
+                            {!isMobileView && (
                               <div style={{
-                                fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                fontSize: isMobileView ? 22 : 24,
-                                color: '#c8ffe0',
-                                lineHeight: 1.45,
-                                textAlign: 'center',
+                                padding: '14px 16px',
+                                borderLeft: '2px solid #ff3ea0',
+                                background: 'rgba(255,62,160,0.05)',
                               }}>
-                                <ProgressiveText
-                                  text={currentSpeech.text}
-                                  maxVisibleLines={3}
-                                  approxLineHeight={1.45}
-                                />
+                                <div style={{
+                                  fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                  fontSize: 24,
+                                  color: '#c8ffe0',
+                                  lineHeight: 1.45,
+                                  textAlign: 'center',
+                                }}>
+                                  <ProgressiveText
+                                    text={currentSpeech.text}
+                                    maxVisibleLines={3}
+                                    approxLineHeight={1.45}
+                                  />
+                                </div>
                               </div>
-                            </div>
+                            )}
                             <button
                               onClick={() => {
+                                // Stop whatever's currently speaking. This
+                                // covers BOTH branches below — pressing
+                                // CONTINUE mid-line should silence the
+                                // audio regardless of whether there's a
+                                // queued follow-up or we're just dismissing
+                                // the beat.
+                                stopSitePalAudio();
+                                if (speechEndTimerRef.current) {
+                                  clearTimeout(speechEndTimerRef.current);
+                                  speechEndTimerRef.current = null;
+                                }
+                                setSpeechActive(false);
                                 // If a follow-up beat is queued (e.g. monk's
-                                // intro after his rules preamble), swap it in
-                                // instead of dismissing. The audio recording
-                                // continues playing across the swap.
+                                // intro after his rules preamble), swap it
+                                // in instead of dismissing — and play its
+                                // audio. The stopSpeech above kills the
+                                // outgoing rules audio first.
                                 if (pendingSpeech) {
                                   setCurrentSpeech(pendingSpeech);
                                   setPendingSpeech(null);
+                                  const queuedAudio = pendingAudioRef.current;
+                                  if (queuedAudio) {
+                                    pendingAudioRef.current = null;
+                                    // stopSitePalAudio above already
+                                    // killed the rules audio — fire the
+                                    // intro audio fresh.
+                                    speakLine(queuedAudio.line, queuedAudio.stationKey, queuedAudio.options);
+                                  }
                                   return;
                                 }
                                 setCurrentSpeech(null);
@@ -3376,14 +3577,19 @@ export default function CyborgTemple() {
                   bottom console (which has been shrunk for mobile) and
                   below the top HUD so the avatar's mouth remains visible. */}
               {tradeMode === 'game' && !verdict && isMobileView && (() => {
-                // Caption is for question-answer playback only. Intros,
-                // returns, reactions etc. go through `currentSpeech` and
-                // render via the panel's ProgressiveText (teleprompter
-                // style, retains multiple lines — better for long monologues).
+                // Caption covers both question-answer playback AND speech
+                // beats (intros, returnLines, reactions). When a SitePal
+                // line is active, only one of activeAnswer / currentSpeech
+                // is set for the focused character — whichever matches
+                // wins as the live caption source.
+                const stationForFocus = CHARACTER_TO_STATION[focusedAgent];
                 const captionText =
-                  activeAnswer && CHARACTER_TO_STATION[focusedAgent] === activeAnswer.stationKey
+                  (activeAnswer && stationForFocus === activeAnswer.stationKey
                     ? resolveLine(activeAnswer.a)?.text
-                    : null;
+                    : null)
+                  || (currentSpeech && stationForFocus === currentSpeech.stationKey
+                    ? currentSpeech.text
+                    : null);
                 if (!captionText) return null;
                 // Eugene has no SitePal audio — skip the live caption for
                 // her (her chat bubble plays the same role).
@@ -3417,10 +3623,6 @@ export default function CyborgTemple() {
                       textAlign: 'center',
                       textShadow: '0 1px 6px rgba(0,0,0,0.85)',
                       pointerEvents: 'none',
-                      // Hide visually while the static transcript is open
-                      // (caption + transcript = redundant). Component stays
-                      // mounted so the per-sentence timer doesn't reset.
-                      visibility: showTranscript ? 'hidden' : 'visible',
                     }}
                   />
                 );
