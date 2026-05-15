@@ -839,6 +839,26 @@ const createEmptyAskedMap = () => Object.fromEntries(
 
 
 
+// Read `?case=` from the URL so a specific case can be loaded directly,
+// without having to play through prior cases first. Accepts:
+//   ?case=case-002   — full id
+//   ?case=002        — id suffix
+//   ?case=2          — 1-based position in CASE_FILES
+// Unknown or missing values fall back to the first case.
+function pickInitialCaseIndex(caseFiles) {
+  if (typeof window === 'undefined') return 0;
+  const raw = new URLSearchParams(window.location.search).get('case');
+  if (!raw) return 0;
+  const trimmed = raw.trim().toLowerCase();
+  const byId = caseFiles.findIndex((c) => c.id.toLowerCase() === trimmed);
+  if (byId >= 0) return byId;
+  const bySuffix = caseFiles.findIndex((c) => c.id.toLowerCase().endsWith(`-${trimmed}`));
+  if (bySuffix >= 0) return bySuffix;
+  const n = parseInt(trimmed, 10);
+  if (Number.isFinite(n) && n >= 1 && n <= caseFiles.length) return n - 1;
+  return 0;
+}
+
 export default function CyborgTemple() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -866,7 +886,11 @@ export default function CyborgTemple() {
   // Liminal Terminal game state — lifted out of the old modal so the in-scene
   // UI can read/write it directly. Free case files live in GameOverlay for now;
   // when a loader exists, this index can become the current case id.
-  const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
+  const [currentCaseIndex, setCurrentCaseIndex] = useState(() => pickInitialCaseIndex(CASE_FILES));
+  // Dropdown that lets the player (or dev) jump straight to any case from
+  // the in-game HUD strip. Lives next to the project name display.
+  const [caseMenuOpen, setCaseMenuOpen] = useState(false);
+  const caseMenuRef = useRef(null);
   const caseData = CASE_FILES[currentCaseIndex] || SAMPLE_CASE;
   // Question-level tracking (model B): a scan = one question, 3 questions total
   // across all 4 characters. `asked` maps station key → Set of question indices.
@@ -1225,9 +1249,11 @@ export default function CyborgTemple() {
   // Hook for the post-verdict "NEXT CASE" button. These first files are the
   // free training ladder; premium case loading can replace this array later.
   const nextCaseAvailable = currentCaseIndex < CASE_FILES.length - 1;
-  const advanceToNextCase = () => {
-    if (!nextCaseAvailable) return;
-    setCurrentCaseIndex((idx) => Math.min(idx + 1, CASE_FILES.length - 1));
+  // Reset every per-case piece of state and load `index`. Used by both the
+  // NEXT CASE button and the case-picker dropdown in the HUD strip.
+  const jumpToCase = (index) => {
+    if (index < 0 || index >= CASE_FILES.length) return;
+    setCurrentCaseIndex(index);
     setAsked(createEmptyAskedMap());
     setVisitedStations(new Set());
     setVerdict(null);
@@ -1241,6 +1267,26 @@ export default function CyborgTemple() {
     setFocusedAgent(null);
     rulesSpokenRef.current = true;
   };
+  const advanceToNextCase = () => {
+    if (!nextCaseAvailable) return;
+    jumpToCase(currentCaseIndex + 1);
+  };
+
+  // Close the case-picker dropdown when the player clicks/taps outside it.
+  useEffect(() => {
+    if (!caseMenuOpen) return;
+    const handler = (e) => {
+      if (caseMenuRef.current && !caseMenuRef.current.contains(e.target)) {
+        setCaseMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [caseMenuOpen]);
   // Derive the overlay's active station from focusedAgent when in game mode.
   // Falls back to 'monk' (the opener) so the overlay renders something stable
   // before the player has clicked any character.
@@ -2823,7 +2869,134 @@ export default function CyborgTemple() {
                   }}
                 >
                   {!isMobileView && <span style={{ color: '#8effc4', fontWeight: 700 }}>// CASE</span>}
-                  <span>{caseData.projectName}</span>
+                  <div ref={caseMenuRef} style={{ position: 'relative', display: 'inline-flex' }}>
+                    <button
+                      type="button"
+                      onClick={() => setCaseMenuOpen((o) => !o)}
+                      aria-haspopup="listbox"
+                      aria-expanded={caseMenuOpen}
+                      aria-label="Choose case"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: isMobileView ? '3px 8px' : '4px 10px',
+                        background: caseMenuOpen
+                          ? 'rgba(77,255,170,0.18)'
+                          : 'rgba(77,255,170,0.07)',
+                        border: '1px solid rgba(142,255,196,0.55)',
+                        color: 'inherit',
+                        font: 'inherit',
+                        letterSpacing: 'inherit',
+                        cursor: 'pointer',
+                        borderRadius: 4,
+                        boxShadow: caseMenuOpen
+                          ? 'inset 0 0 10px rgba(77,255,170,0.18)'
+                          : '0 0 6px rgba(77,255,170,0.10)',
+                        transition: 'background 0.12s ease, box-shadow 0.12s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!caseMenuOpen) {
+                          e.currentTarget.style.background = 'rgba(77,255,170,0.14)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!caseMenuOpen) {
+                          e.currentTarget.style.background = 'rgba(77,255,170,0.07)';
+                        }
+                      }}
+                    >
+                      {caseData.projectName}
+                      <span
+                        aria-hidden
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: isMobileView ? 14 : 16,
+                          height: isMobileView ? 14 : 16,
+                          fontSize: isMobileView ? 11 : 13,
+                          lineHeight: 1,
+                          color: '#8effc4',
+                          background: 'rgba(77,255,170,0.18)',
+                          borderRadius: 3,
+                          transform: caseMenuOpen ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.15s ease',
+                        }}
+                      >
+                        ▾
+                      </span>
+                    </button>
+                    {caseMenuOpen && (
+                      <div
+                        role="listbox"
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: -6,
+                          marginTop: 8,
+                          minWidth: 220,
+                          maxHeight: '60vh',
+                          overflowY: 'auto',
+                          background: 'linear-gradient(180deg, rgba(4,12,8,0.96), rgba(2,5,8,0.96))',
+                          border: '1px solid rgba(77,255,170,0.55)',
+                          borderRadius: 6,
+                          boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 0 18px rgba(77,255,170,0.18)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          padding: 4,
+                          zIndex: 1051,
+                        }}
+                      >
+                        {CASE_FILES.map((c, i) => {
+                          const isCurrent = i === currentCaseIndex;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              role="option"
+                              aria-selected={isCurrent}
+                              onClick={() => {
+                                setCaseMenuOpen(false);
+                                if (!isCurrent) jumpToCase(i);
+                              }}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                gap: 2,
+                                width: '100%',
+                                padding: '8px 10px',
+                                background: isCurrent ? 'rgba(77,255,170,0.12)' : 'transparent',
+                                border: 'none',
+                                borderLeft: `2px solid ${isCurrent ? '#8effc4' : 'transparent'}`,
+                                borderRadius: 3,
+                                cursor: isCurrent ? 'default' : 'pointer',
+                                textAlign: 'left',
+                                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                color: '#c8ffe0',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isCurrent) e.currentTarget.style.background = 'rgba(77,255,170,0.08)';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isCurrent) e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              <span style={{ fontSize: 9, letterSpacing: '0.18em', color: isCurrent ? '#8effc4' : '#6db59a' }}>
+                                {c.id.toUpperCase()}
+                                {isCurrent && ' ·  CURRENT'}
+                              </span>
+                              <span style={{ fontSize: 11, color: '#c8ffe0' }}>
+                                {c.projectName}
+                                <span style={{ color: '#8effc4', marginLeft: 8 }}>{c.ticker}</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <span style={{ color: '#3a6b54' }}>·</span>
                   <span style={{ color: '#8effc4' }}>{caseData.ticker}</span>
                   {!isMobileView && <span style={{ color: '#3a6b54' }}>·</span>}
@@ -2862,44 +3035,6 @@ export default function CyborgTemple() {
                     ?
                   </button>
                 </div>
-              )}
-
-              {/* Skip-intro pill — visible only during the GR80 attract loop
-                  (game started, rules not yet heard, no character focused).
-                  Clicking it sets the rules-heard flag, which (a) breaks the
-                  attract loop on the next frame, (b) suppresses the rules
-                  preamble when the player does focus GR80. */}
-              {tradeMode === 'game'
-                && !verdict
-                && !rulesHeard
-                && !focusedAgent && (
-                <button
-                  type="button"
-                  onClick={markRulesHeard}
-                  aria-label="Skip intro"
-                  style={{
-                    position: 'fixed',
-                    top: 'calc(env(safe-area-inset-top, 0px) + 58px)',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    zIndex: 1051,
-                    padding: '6px 14px',
-                    borderRadius: 999,
-                    border: '1px solid rgba(255,184,77,0.7)',
-                    background: 'linear-gradient(180deg, rgba(40,22,4,0.78), rgba(20,10,2,0.66))',
-                    color: '#ffcb74',
-                    fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                    fontSize: 10,
-                    fontWeight: 800,
-                    letterSpacing: '0.22em',
-                    cursor: 'pointer',
-                    textShadow: '0 0 8px rgba(255,184,77,0.45)',
-                    boxShadow: '0 0 14px rgba(255,184,77,0.28)',
-                    pointerEvents: 'auto',
-                  }}
-                >
-                  SKIP INTRO ›
-                </button>
               )}
 
               {/* EvidenceScreens — paints the active question's evidence card
@@ -4167,10 +4302,11 @@ export default function CyborgTemple() {
                 };
 
                 // Rich-visual path
-                if (liveEntry && stationForScreen && hasRichVisual(stationKey, liveEntry)) {
+                if (liveEntry && stationForScreen && hasRichVisual(caseData.id, stationKey, liveEntry)) {
                   return (
                     <EvidenceOverlay
                       isActive={true}
+                      caseId={caseData.id}
                       stationKey={stationKey}
                       station={stationForScreen}
                       entry={liveEntry}

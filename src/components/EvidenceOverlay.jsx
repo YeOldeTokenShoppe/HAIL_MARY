@@ -6,6 +6,8 @@ import Pie from './evidenceVisuals/Pie';
 import Timeline from './evidenceVisuals/Timeline';
 import Comparison from './evidenceVisuals/Comparison';
 import Checklist from './evidenceVisuals/Checklist';
+import Image from './evidenceVisuals/Image';
+import SignalStack from './evidenceVisuals/SignalStack';
 
 // EvidenceOverlay — fullscreen "monitor view" of a single piece of evidence,
 // reachable from the unified widget's ▸ VIEW ON SCREEN button or from
@@ -318,11 +320,18 @@ const TELEGRAM_PHRASES = [
   { status: 'warn', label: '"How does the AI actually work?"',   value: '× 1', sublabel: 'deleted within 4 min · user banned' },
 ];
 
-// Registry: keyed `${stationKey}:${entry.label}` → renderer config.
-// Add new evidence visuals by appending entries here.
+// Registry: keyed `${caseId}:${stationKey}:${entry.label}` → renderer
+// config. The `caseId` prefix is required — without it, two cases that
+// happen to share a station/label string (e.g. both have a `marisol:TOP 10
+// HOLDERS` entry) would render the same visual, leaking one case's
+// evidence into another. The per-case `entry.visual` override on case
+// files is the preferred place to put new visuals; this global registry
+// remains for the case-001 set already built here.
+// Add a new entry: prefix the key with the case id (e.g.
+// `'case-003:monk:NEW LABEL'`).
 const EVIDENCE_VISUALS = {
   // ─── Marisol · LOGOS · ONCHAIN ───────────────────────────────────────
-  'marisol:WASH TRADING': {
+  'case-001:marisol:WASH TRADING': {
     component: FlowGraph,
     props: {
       layout: 'circular',
@@ -335,7 +344,7 @@ const EVIDENCE_VISUALS = {
       'continuously — inflating the chart while no real demand exists.',
     metric: { label: 'WASH %', value: '63%' },
   },
-  'marisol:TOP 10 HOLDERS': {
+  'case-001:marisol:TOP 10 HOLDERS': {
     component: Pie,
     props: {
       slices: TOP10_HOLDERS_SLICES,
@@ -349,7 +358,7 @@ const EVIDENCE_VISUALS = {
       'to dump whenever they decide the inflows have peaked.',
     metric: { label: 'CONCENTRATION', value: 'CRITICAL' },
   },
-  'marisol:DEPLOYER CLUSTER': {
+  'case-001:marisol:DEPLOYER CLUSTER': {
     component: FlowGraph,
     props: {
       layout: 'radial',
@@ -365,7 +374,7 @@ const EVIDENCE_VISUALS = {
   },
 
   // ─── Saint GR80 · ETHOS · CREDIBILITY ────────────────────────────────
-  'monk:FUNDING SOURCE': {
+  'case-001:monk:FUNDING SOURCE': {
     component: FlowGraph,
     props: {
       layout: 'linear',
@@ -378,7 +387,7 @@ const EVIDENCE_VISUALS = {
       'fund the deployer. The mixer hop is the only reason to do this.',
     metric: { label: 'HOPS', value: '3' },
   },
-  'monk:DEPLOYER WALLET AGE': {
+  'case-001:monk:DEPLOYER WALLET AGE': {
     component: Timeline,
     props: {
       events: DEPLOYER_WALLET_TIMELINE,
@@ -392,7 +401,7 @@ const EVIDENCE_VISUALS = {
   },
 
   // ─── John Barron · PATHOS · SENTIMENT ────────────────────────────────
-  'demon:TWITTER FOLLOWERS': {
+  'case-001:demon:TWITTER FOLLOWERS': {
     component: Pie,
     props: {
       slices: FOLLOWER_AGE_SLICES,
@@ -406,7 +415,7 @@ const EVIDENCE_VISUALS = {
       'This audience was bought, not earned.',
     metric: { label: '<14 DAYS', value: '81%' },
   },
-  'demon:FUD SUPPRESSION': {
+  'case-001:demon:FUD SUPPRESSION': {
     component: Timeline,
     props: {
       events: FUD_SUPPRESSION_TIMELINE,
@@ -420,7 +429,7 @@ const EVIDENCE_VISUALS = {
   },
 
   // ─── Eugene · MYTHOS · NARRATIVE ─────────────────────────────────────
-  'eugene:ROADMAP REALISM': {
+  'case-001:eugene:ROADMAP REALISM': {
     component: Timeline,
     props: {
       events: ROADMAP_TIMELINE,
@@ -432,7 +441,7 @@ const EVIDENCE_VISUALS = {
       'a six-page whitepaper with no architecture certainly won\'t.',
     metric: { label: 'CREDIBILITY', value: '0%' },
   },
-  'eugene:WHITEPAPER': {
+  'case-001:eugene:WHITEPAPER': {
     component: Checklist,
     props: { items: WHITEPAPER_PAGES, title: 'PAGE-BY-PAGE AUDIT' },
     caption:
@@ -440,7 +449,7 @@ const EVIDENCE_VISUALS = {
       'no math, no audit. The whitepaper is a marketing deck wearing a costume.',
     metric: { label: 'PAGES', value: '6/6 TKN' },
   },
-  'eugene:AI CLAIMS': {
+  'case-001:eugene:AI CLAIMS': {
     component: Checklist,
     props: { items: AI_CLAIMS_CHECKLIST, title: 'AI VERIFICATION' },
     caption:
@@ -448,7 +457,7 @@ const EVIDENCE_VISUALS = {
       'is invisible because there is no AI.',
     metric: { label: 'VERIFIED', value: '0/5' },
   },
-  'eugene:PITCH PATTERN': {
+  'case-001:eugene:PITCH PATTERN': {
     component: Comparison,
     props: { panels: PITCH_PATTERN_PANELS, direction: 'column' },
     caption:
@@ -458,7 +467,7 @@ const EVIDENCE_VISUALS = {
   },
 
   // ─── Continued — Saint GR80 ─────────────────────────────────────────
-  'monk:PRIOR OUTCOMES': {
+  'case-001:monk:PRIOR OUTCOMES': {
     component: Comparison,
     props: { panels: PRIOR_OUTCOMES_PANELS, direction: 'row' },
     caption:
@@ -466,7 +475,7 @@ const EVIDENCE_VISUALS = {
       'The fourth is currently pumping. Pattern recognition is not optional here.',
     metric: { label: 'PRIOR RUGS', value: '3/3' },
   },
-  'monk:CONTRACT ORIGINALITY': {
+  'case-001:monk:CONTRACT ORIGINALITY': {
     component: Comparison,
     props: { panels: CONTRACT_DIFF_PANELS, direction: 'row' },
     caption:
@@ -476,7 +485,7 @@ const EVIDENCE_VISUALS = {
   },
 
   // ─── Continued — John Barron ────────────────────────────────────────
-  'demon:TELEGRAM ACTIVITY': {
+  'case-001:demon:TELEGRAM ACTIVITY': {
     component: Checklist,
     props: { items: TELEGRAM_PHRASES, title: 'PHRASE FREQUENCY' },
     caption:
@@ -484,7 +493,7 @@ const EVIDENCE_VISUALS = {
       'different handles. One real question slipped through. It was deleted in four minutes.',
     metric: { label: 'REPETITION', value: '88%' },
   },
-  'demon:KOL PROMOTERS': {
+  'case-001:demon:KOL PROMOTERS': {
     component: Checklist,
     props: { items: KOL_CHECKLIST, title: 'PAID PROMOTERS' },
     caption:
@@ -494,7 +503,7 @@ const EVIDENCE_VISUALS = {
   },
 
   // ─── Continued — Marisol ────────────────────────────────────────────
-  'marisol:LP / VESTING': {
+  'case-001:marisol:LP / VESTING': {
     component: Checklist,
     props: { items: LP_VESTING_CHECKLIST, title: 'EXIT-READINESS CHECK' },
     caption:
@@ -504,9 +513,35 @@ const EVIDENCE_VISUALS = {
   },
 };
 
-function hasRichVisual(stationKey, entry) {
-  if (!stationKey || !entry) return false;
-  return Boolean(EVIDENCE_VISUALS[`${stationKey}:${entry.label}`]);
+// String-keyed registry so case .js files can reference visualization
+// components without importing React (they stay pure data). Per-case
+// overrides set `entry.visual.component` to one of these names.
+const COMPONENT_REGISTRY = { FlowGraph, Pie, Timeline, Comparison, Checklist, Image, SignalStack };
+
+// Resolve a visual config for an entry. Lookup order:
+//   1. `entry.visual` on the case file (per-case override — wins)
+//   2. Global `EVIDENCE_VISUALS[caseId:stationKey:label]`
+// Returns null if nothing is registered. The returned shape matches
+// EVIDENCE_VISUALS entries: { component, props, caption, metric }.
+function resolveEntryVisual(caseId, stationKey, entry) {
+  if (!stationKey || !entry) return null;
+  if (entry.visual) {
+    const ref = entry.visual.component;
+    const Comp = typeof ref === 'string' ? COMPONENT_REGISTRY[ref] : ref;
+    if (!Comp) return null;
+    return {
+      component: Comp,
+      props: entry.visual.props || {},
+      caption: entry.visual.caption,
+      metric: entry.visual.metric,
+    };
+  }
+  if (!caseId) return null;
+  return EVIDENCE_VISUALS[`${caseId}:${stationKey}:${entry.label}`] || null;
+}
+
+function hasRichVisual(caseId, stationKey, entry) {
+  return Boolean(resolveEntryVisual(caseId, stationKey, entry));
 }
 
 // Export the predicate so the parent route can decide whether to mount
@@ -515,6 +550,7 @@ export { hasRichVisual };
 
 export default function EvidenceOverlay({
   isActive,
+  caseId,
   stationKey,
   station,
   entry,
@@ -532,7 +568,7 @@ export default function EvidenceOverlay({
 
   if (!isActive || !station || !entry) return null;
 
-  const config = EVIDENCE_VISUALS[`${stationKey}:${entry.label}`];
+  const config = resolveEntryVisual(caseId, stationKey, entry);
   const accent = THREAT_ACCENT[entry.threat] || THREAT_ACCENT.green;
 
   const Visualization = config?.component || null;

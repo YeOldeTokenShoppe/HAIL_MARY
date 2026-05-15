@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 // FlowGraph — reusable SVG primitive for node-and-arrow evidence visuals.
 // Drives multiple case-001 evidence types: wash-trading loop (circular),
@@ -16,13 +16,30 @@ import React from 'react';
 //
 // All edges animate (stroke-dashoffset marching) so the graph reads as
 // "live data flow" rather than a static diagram.
+//
+// Responsive: `linear` flows rotate 90° on narrow viewports — nodes flow
+// top-to-bottom in a tall viewBox so the column uses screen height, and
+// external labels move to the right of each node (otherwise they'd sit
+// directly on the arrows between adjacent nodes).
 
 const NODE_RADIUS = 22;
 const PADDING = 80;
+const MOBILE_BREAKPOINT = 560;
 
-function computePositions({ nodes, layout, radius, centerNode }) {
+function useIsNarrow(breakpoint) {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const check = () => setNarrow(window.innerWidth < breakpoint);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [breakpoint]);
+  return narrow;
+}
+
+function computePositions({ nodes, layout, radius, centerNode, vertical }) {
   if (layout === 'circular') {
-    // Evenly distribute around a circle, starting at the top (-90deg).
     return nodes.map((node, i) => {
       const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
       return {
@@ -33,16 +50,19 @@ function computePositions({ nodes, layout, radius, centerNode }) {
     });
   }
   if (layout === 'linear') {
-    // Horizontal row, evenly spaced.
+    // Evenly spaced along a single axis — horizontal by default, vertical
+    // when the container demands it (mobile).
     const step = nodes.length === 1 ? 0 : (radius * 2) / (nodes.length - 1);
-    return nodes.map((node, i) => ({
-      ...node,
-      x: -radius + step * i,
-      y: 0,
-    }));
+    return nodes.map((node, i) => {
+      const offset = -radius + step * i;
+      return {
+        ...node,
+        x: vertical ? 0 : offset,
+        y: vertical ? offset : 0,
+      };
+    });
   }
   if (layout === 'radial') {
-    // One central node, others orbit around it.
     const orbiters = nodes.filter((n) => n.id !== centerNode);
     const center = nodes.find((n) => n.id === centerNode);
     const positioned = [];
@@ -85,6 +105,9 @@ export default function FlowGraph({
   highlightId = null,
   radius = 140,
 }) {
+  const isNarrow = useIsNarrow(MOBILE_BREAKPOINT);
+  const isLinearVertical = layout === 'linear' && isNarrow;
+
   const accent =
     threat === 'red'   ? '#ff4d6d' :
     threat === 'amber' ? '#ffb84d' :
@@ -94,11 +117,21 @@ export default function FlowGraph({
     threat === 'amber' ? 'rgba(255,184,77,0.18)' :
                          'rgba(77,255,170,0.18)';
 
-  const positioned = computePositions({ nodes, layout, radius, centerNode });
+  const positioned = computePositions({ nodes, layout, radius, centerNode, vertical: isLinearVertical });
   const positionMap = Object.fromEntries(positioned.map((n) => [n.id, n]));
 
-  const viewBoxRadius = radius + PADDING;
-  const viewBox = `${-viewBoxRadius} ${-viewBoxRadius} ${2 * viewBoxRadius} ${2 * viewBoxRadius}`;
+  // Square viewBox for most layouts; tall-and-narrow for linear-vertical
+  // so the rotated column uses the full available height on mobile. Width
+  // budget allows for external labels to the right of each node.
+  let viewBox;
+  if (isLinearVertical) {
+    const halfW = NODE_RADIUS + 70;
+    const halfH = radius + PADDING;
+    viewBox = `${-halfW} ${-halfH} ${2 * halfW} ${2 * halfH}`;
+  } else {
+    const viewBoxRadius = radius + PADDING;
+    viewBox = `${-viewBoxRadius} ${-viewBoxRadius} ${2 * viewBoxRadius} ${2 * viewBoxRadius}`;
+  }
 
   return (
     <svg
@@ -213,12 +246,18 @@ export default function FlowGraph({
             {node.sublabel && !node.badge && (
               <text className="fg-node-sublabel" dy={9}>{node.sublabel}</text>
             )}
-            {/* External label below the node, outside the circle */}
+            {/* External label: below the node horizontally, to the right
+                of the node when the linear flow has been rotated vertical
+                (otherwise it would collide with the arrow to the next node). */}
             {node.externalLabel && (
               <text
                 className="fg-node-label"
-                dy={NODE_RADIUS + 16}
-                style={{ fontSize: 8 }}
+                dx={isLinearVertical ? NODE_RADIUS + 14 : 0}
+                dy={isLinearVertical ? 3 : NODE_RADIUS + 16}
+                style={{
+                  fontSize: 8,
+                  textAnchor: isLinearVertical ? 'start' : 'middle',
+                }}
               >
                 {node.externalLabel}
               </text>

@@ -1,21 +1,39 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-// Timeline — horizontal time axis with event markers. Drives multiple
-// case-001 evidence types: GR80/DEPLOYER WALLET AGE (wallet activity over
-// time), Barron/FUD SUPPRESSION (comment-deleted intervals), Eugene/ROADMAP
+// Timeline — time axis with event markers. Drives multiple case-001
+// evidence types: GR80/DEPLOYER WALLET AGE (wallet activity over time),
+// Barron/FUD SUPPRESSION (comment-deleted intervals), Eugene/ROADMAP
 // REALISM (milestone feasibility).
 //
 //   events: [{ position: 0-1, label, sublabel?, tone? ('red'|'amber'|'green'), highlight? }]
 //   startLabel, endLabel: axis caps
 //   threat: 'red' | 'amber' | 'green'  → drives the axis bar accent
 //
-// Events alternate above/below the axis to avoid label collisions. The
-// highlighted event gets a bigger marker + glow so the eye lands on the
-// punchline of the story (e.g. "wallet that's only 6 days old just deployed
-// a third token").
+// Responsive: horizontal SVG on wide viewports (labels alternate above/
+// below the axis), vertical stack on narrow viewports (each event gets a
+// full row — survives long labels and high event counts without overlap).
+
+const MOBILE_BREAKPOINT = 560;
+
+const TONE_COLOR = {
+  red:   '#ff4d6d',
+  amber: '#ffb84d',
+  green: '#4dffaa',
+};
 
 const PADDING_X = 60;
-const PADDING_Y = 100;
+
+function useIsNarrow(breakpoint) {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const check = () => setNarrow(window.innerWidth < breakpoint);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [breakpoint]);
+  return narrow;
+}
 
 export default function Timeline({
   events = [],
@@ -25,18 +43,44 @@ export default function Timeline({
   width = 560,
   height = 240,
 }) {
-  const accent =
-    threat === 'red'   ? '#ff4d6d' :
-    threat === 'amber' ? '#ffb84d' :
-                         '#4dffaa';
+  const accent = TONE_COLOR[threat] || TONE_COLOR.green;
+  const isNarrow = useIsNarrow(MOBILE_BREAKPOINT);
 
+  // Sort events by position; both layouts walk start → end.
+  const sorted = [...events].sort((a, b) => (a.position || 0) - (b.position || 0));
+
+  if (isNarrow) {
+    return (
+      <VerticalTimeline
+        events={sorted}
+        accent={accent}
+        startLabel={startLabel}
+        endLabel={endLabel}
+      />
+    );
+  }
+
+  return (
+    <HorizontalTimeline
+      events={sorted}
+      accent={accent}
+      startLabel={startLabel}
+      endLabel={endLabel}
+      width={width}
+      height={height}
+    />
+  );
+}
+
+// ─── Horizontal (desktop) ───────────────────────────────────────────────
+// Original alternating-above/below SVG axis. Labels stay readable when
+// there's enough horizontal room (~80px per event).
+
+function HorizontalTimeline({ events, accent, startLabel, endLabel, width, height }) {
   const axisY = height / 2;
   const axisX0 = PADDING_X;
   const axisX1 = width - PADDING_X;
   const axisLen = axisX1 - axisX0;
-
-  // Sort events by position (defensive — labels alternate based on index)
-  const sorted = [...events].sort((a, b) => (a.position || 0) - (b.position || 0));
 
   return (
     <svg
@@ -106,7 +150,7 @@ export default function Timeline({
       ))}
 
       {/* Event markers (alternating above/below) */}
-      {sorted.map((event, i) => {
+      {events.map((event, i) => {
         const x = axisX0 + axisLen * Math.max(0, Math.min(1, event.position || 0));
         const above = i % 2 === 0;
         const labelY = above ? axisY - 36 : axisY + 50;
@@ -116,7 +160,6 @@ export default function Timeline({
         const cls = event.highlight ? 'tl-marker-highlight' : `tl-marker ${toneClass}`;
         return (
           <g key={`ev-${i}`}>
-            {/* Connector line from marker to label */}
             <line
               className="tl-marker-line"
               x1={x}
@@ -147,5 +190,122 @@ export default function Timeline({
         );
       })}
     </svg>
+  );
+}
+
+// ─── Vertical (mobile) ──────────────────────────────────────────────────
+// HTML/CSS so labels render at native font size regardless of how many
+// events there are. Events flow top-to-bottom, axis line runs down the
+// left through the marker column.
+
+function VerticalTimeline({ events, accent, startLabel, endLabel }) {
+  return (
+    <div
+      style={{
+        padding: '14px 18px',
+        fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+        height: '100%',
+        overflowY: 'auto',
+      }}
+    >
+      <div
+        style={{
+          color: '#6db59a',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          marginBottom: 14,
+          paddingLeft: 32,
+          textTransform: 'uppercase',
+        }}
+      >
+        ▸ {startLabel}
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        {/* Axis runs through the center of the 14px marker column. */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 6,
+            top: 8,
+            bottom: 8,
+            width: 2,
+            background: accent,
+            opacity: 0.55,
+          }}
+        />
+
+        {events.map((event, i) => {
+          const toneColor = TONE_COLOR[event.tone] || accent;
+          const borderColor = event.highlight ? accent : toneColor;
+          return (
+            <div
+              key={`ev-${i}`}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 14,
+                marginBottom: 18,
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  flex: '0 0 14px',
+                  width: 14,
+                  height: 14,
+                  borderRadius: '50%',
+                  border: `2px solid ${borderColor}`,
+                  background: event.highlight ? accent : '#050a07',
+                  boxShadow: event.highlight ? `0 0 10px ${accent}` : 'none',
+                  boxSizing: 'border-box',
+                  marginTop: 2,
+                  zIndex: 1,
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    color: event.highlight ? accent : '#c8ffe0',
+                    fontSize: 13,
+                    fontWeight: event.highlight ? 700 : 400,
+                    lineHeight: 1.3,
+                    letterSpacing: event.highlight ? '0.04em' : 'normal',
+                  }}
+                >
+                  {event.label}
+                </div>
+                {event.sublabel && (
+                  <div
+                    style={{
+                      color: '#6db59a',
+                      fontSize: 10,
+                      letterSpacing: '0.06em',
+                      marginTop: 3,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {event.sublabel}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        style={{
+          color: '#6db59a',
+          fontSize: 10,
+          letterSpacing: '0.18em',
+          marginTop: 4,
+          paddingLeft: 32,
+          textTransform: 'uppercase',
+        }}
+      >
+        ▸ {endLabel}
+      </div>
+    </div>
   );
 }
