@@ -29,7 +29,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 //     height to land on a sentence boundary.
 
 const MS_PER_CHAR = 70;       // ~natural speaking pace
-const MIN_CHUNK_MS = 900;     // floor so very short chunks don't strobe
+// Floor so short chunks linger long enough to match the dramatic pauses
+// the voice actor naturally takes between snappy 1–2 word lines (e.g.
+// Barron's "Cheaply. Loudly. Badly." cadence). 900ms was too tight,
+// 1500ms still raced the audio — 2200ms lands close to the cadence
+// of voice-acted recordings without feeling sluggish for normal lines
+// (which are gated by the per-char rate, not this floor).
+const MIN_CHUNK_MS = 2200;
 const FADE_DURATION_MS = 420; // each chunk's opacity transition
 const SCROLL_DURATION_MS = 420;
 
@@ -47,42 +53,76 @@ export default function ProgressiveText({
   onComplete,
   maxVisibleLines,
   approxLineHeight = 1.5,
+  // Defaults true for backwards compat. Pass `speechActive` to gate the
+  // reveal on actual audio playback — without this, reveal starts on
+  // mount (during the camera fly-in) and races ahead of the voice.
+  isPlaying = true,
+  // Optional: total duration to spread the reveal across, matching the
+  // recorded audio length. When set, chunks are scheduled proportionally
+  // to their character counts so the last chunk lands just before audio
+  // ends. Falls back to the char-pacing math when null/undefined.
+  audioDurationMs = null,
 }) {
   const chunks = useMemo(() => splitIntoChunks(text), [text]);
   const [revealedCount, setRevealedCount] = useState(0);
   const contentRef = useRef(null);
   const containerRef = useRef(null);
 
+  // First chunk visible immediately so the panel isn't empty during the
+  // pre-audio gap. Resets when the text changes.
   useEffect(() => {
-    if (chunks.length === 0) {
-      setRevealedCount(0);
-      return;
-    }
-    // First chunk shows immediately so there's no awkward empty pause.
-    setRevealedCount(1);
+    setRevealedCount(chunks.length > 0 ? 1 : 0);
+  }, [chunks]);
 
+  useEffect(() => {
+    if (chunks.length === 0) return;
     if (chunks.length === 1) {
       if (typeof onComplete === 'function') onComplete();
       return;
     }
+    // Hold at chunk 1 until audio actually starts, then schedule the
+    // remaining chunks. If audio pauses mid-line, the timers still tick
+    // (since we don't clear them on isPlaying flips) — for the typical
+    // play-once case this is fine; revisit if pause/resume is added.
+    if (!isPlaying) return;
 
     const timers = [];
     let cumulative = 0;
-    for (let i = 1; i < chunks.length; i++) {
-      const prevLen = chunks[i - 1].length;
-      const delay = Math.max(MIN_CHUNK_MS, prevLen * MS_PER_CHAR);
-      cumulative += delay;
-      timers.push(
-        setTimeout(() => {
-          setRevealedCount(i + 1);
-          if (i === chunks.length - 1 && typeof onComplete === 'function') {
-            onComplete();
-          }
-        }, cumulative)
-      );
+    if (audioDurationMs && audioDurationMs > 0) {
+      // Distribute remaining chunks proportionally to their char counts
+      // across the audio's actual duration. The first chunk is already
+      // showing (T=0); each subsequent chunk's delay is the prior
+      // chunk's share of the total characters times the audio duration.
+      const totalChars = chunks.reduce((sum, c) => sum + c.length, 0) || 1;
+      for (let i = 1; i < chunks.length; i++) {
+        const prevLen = chunks[i - 1].length;
+        cumulative += (prevLen / totalChars) * audioDurationMs;
+        timers.push(
+          setTimeout(() => {
+            setRevealedCount(i + 1);
+            if (i === chunks.length - 1 && typeof onComplete === 'function') {
+              onComplete();
+            }
+          }, cumulative)
+        );
+      }
+    } else {
+      for (let i = 1; i < chunks.length; i++) {
+        const prevLen = chunks[i - 1].length;
+        const delay = Math.max(MIN_CHUNK_MS, prevLen * MS_PER_CHAR);
+        cumulative += delay;
+        timers.push(
+          setTimeout(() => {
+            setRevealedCount(i + 1);
+            if (i === chunks.length - 1 && typeof onComplete === 'function') {
+              onComplete();
+            }
+          }, cumulative)
+        );
+      }
     }
     return () => timers.forEach(clearTimeout);
-  }, [chunks, onComplete]);
+  }, [chunks, isPlaying, audioDurationMs, onComplete]);
 
   // Windowed mode: container is capped at maxVisibleLines (via maxHeight, so
   // short content doesn't reserve dead space) and made scrollable. On each

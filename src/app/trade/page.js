@@ -936,6 +936,22 @@ export default function CyborgTemple() {
   // Used for the monk's rules → intro chain (two separate recordings).
   // Cleared when consumed (audio-end handler or manual CONTINUE).
   const pendingAudioRef = useRef(null);
+  // Tracks the audID of the most recently STARTED SitePal audio. Used to
+  // gate `vh_audioEnded` so the queued chain only advances when the audio
+  // that actually ended is the one we were waiting on. Without this, a
+  // stale natural-end from a previous audio (e.g., the SitePal scene's
+  // default sound finishing after we focus-switched and queued the
+  // rules→intro chain) would prematurely swap the rules text → intro
+  // text BEFORE the rules audio even gets a chance to start playing —
+  // which presents as "GR80 speaks the rules but the intro transcript
+  // appears." Reset whenever we explicitly stop SitePal audio.
+  const lastStartedAudIDRef = useRef(null);
+  // Charbudget stashed by speakLine for SitePal characters, consumed by
+  // vh_audioStarted to arm the safety-net timer. We defer flipping
+  // `speechActive` until the audio actually starts (rather than at
+  // speakLine call time) so the text reveal lines up with the voice
+  // instead of leading it by the camera-fly + SitePal-init delay.
+  const pendingSpeechBudgetRef = useRef(0);
   // Mirror pendingSpeech into a ref so the wrapped vh_audio* callbacks
   // can read it without closure-staleness (the wrappers are installed
   // once at mount but need to see the latest pending text).
@@ -980,9 +996,35 @@ export default function CyborgTemple() {
         speakLine(queuedAudio.line, queuedAudio.stationKey, queuedAudio.options);
       }
     };
+    const prevAudioStarted = window.vh_audioStarted;
     const prevAudioStopped = window.vh_audioStopped;
     const prevSpeechEnded = window.vh_speechEnded;
     const prevAudioEnded = window.vh_audioEnded;
+    window.vh_audioStarted = function (audID, portal) {
+      // Record which audio is now actually playing so vh_audioEnded can
+      // tell a real natural-end of THIS audio apart from a stale event.
+      if (audID) lastStartedAudIDRef.current = audID;
+      // Audio just began — flip speechActive on now (not when speakLine
+      // queued it ~1s ago) so the text reveal kicks off in lockstep
+      // with the voice. Arm the safety-net here too so it counts down
+      // from the actual audio start, not from the queue moment.
+      setSpeechActive(true);
+      if (speechEndTimerRef.current) {
+        clearTimeout(speechEndTimerRef.current);
+        speechEndTimerRef.current = null;
+      }
+      const charBudget = pendingSpeechBudgetRef.current || 0;
+      if (charBudget > 0) {
+        const safetyMs = Math.max(8000, Math.min(90000, charBudget * 100));
+        speechEndTimerRef.current = setTimeout(() => {
+          setSpeechActive(false);
+          speechEndTimerRef.current = null;
+        }, safetyMs);
+      }
+      if (typeof prevAudioStarted === 'function') {
+        try { prevAudioStarted.call(this, audID, portal); } catch (e) {}
+      }
+    };
     window.vh_audioStopped = function (audID, portal) {
       try { clearLocalSpeechActive(); } catch (e) {}
       if (typeof prevAudioStopped === 'function') {
@@ -996,13 +1038,24 @@ export default function CyborgTemple() {
       }
     };
     window.vh_audioEnded = function (audID, portal) {
-      // Natural end only — safe to advance the queued follow-up here.
-      try { advanceQueuedSpeech(); } catch (e) {}
+      // Only advance the chain if this end-event matches the audio that
+      // actually started playing most recently. Stale events (e.g., a
+      // previous scene's default audio ending after focus-switch) would
+      // have a mismatched or missing audID and must NOT advance the
+      // queue — otherwise the chain swaps rules text → intro text
+      // before the rules audio even gets to start, presenting as
+      // "speaks the rules but the intro transcript appears."
+      const matches = audID && lastStartedAudIDRef.current === audID;
+      if (matches) {
+        lastStartedAudIDRef.current = null;
+        try { advanceQueuedSpeech(); } catch (e) {}
+      }
       if (typeof prevAudioEnded === 'function') {
         try { prevAudioEnded.call(this, audID, portal); } catch (e) {}
       }
     };
     return () => {
+      window.vh_audioStarted = prevAudioStarted;
       window.vh_audioStopped = prevAudioStopped;
       window.vh_speechEnded = prevSpeechEnded;
       window.vh_audioEnded = prevAudioEnded;
@@ -1065,11 +1118,13 @@ export default function CyborgTemple() {
     if (pendingAudioRef.current) return;
     const text = currentSpeech.text || '';
     const chunks = text.match(/[^.!?—]+[.!?—]+\s*|[^.!?—]+$/g) || [text];
-    // Mirrors ProgressiveText's pacing: ~70ms/char with a 900ms floor per
-    // chunk. Slight lead so the swap lands just before the next audio
-    // sentence starts, avoiding a beat of stale text on screen.
+    // Mirrors ProgressiveText's pacing: ~70ms/char with a 2200ms floor per
+    // chunk (raised from 900→1500→2200 so short chunks like Barron's
+    // "Cheaply. Loudly. Badly." don't outrun the audio). Slight lead so
+    // the swap lands just before the next audio sentence starts,
+    // avoiding a beat of stale text on screen.
     let revealMs = 0;
-    chunks.forEach((c) => { revealMs += Math.max(900, c.length * 70); });
+    chunks.forEach((c) => { revealMs += Math.max(2200, c.length * 70); });
     revealMs = Math.max(0, revealMs - 200);
     const t = setTimeout(() => {
       setCurrentSpeech(pendingSpeech);
@@ -1189,6 +1244,10 @@ export default function CyborgTemple() {
     let initTimerCleared = false;
     let retryTimerCleared = false;
     let domAudiosPaused = 0;
+    // Drop the tracked "last started" audID — if stopSpeech misses an
+    // already-started audio that ends naturally moments later, we don't
+    // want vh_audioEnded to treat it as the chain's expected source.
+    lastStartedAudIDRef.current = null;
     try {
       if (typeof window !== 'undefined') {
         if (window.__sitePalSpeechInitTimer) {
@@ -1328,20 +1387,28 @@ export default function CyborgTemple() {
       clearTimeout(speechEndTimerRef.current);
       speechEndTimerRef.current = null;
     }
-    setSpeechActive(true);
     const charBudget = options?.estimatedChars ?? resolved.text.length;
-    // 100ms/char × generous floor and ceiling so the safety net only fires
-    // if callbacks somehow don't (network drop, scene-swap mid-line, etc.).
-    const safetyMs = Math.max(8000, Math.min(90000, charBudget * 100));
-    speechEndTimerRef.current = setTimeout(() => {
-      setSpeechActive(false);
-      speechEndTimerRef.current = null;
-    }, safetyMs);
 
     if (stationKey === 'eugene') {
+      // Eugene has no SitePal audio — flip speechActive immediately so
+      // her bubble's typing animation and the safety-net timer start
+      // right away.
+      setSpeechActive(true);
+      const safetyMs = Math.max(8000, Math.min(90000, charBudget * 100));
+      speechEndTimerRef.current = setTimeout(() => {
+        setSpeechActive(false);
+        speechEndTimerRef.current = null;
+      }, safetyMs);
       setEugeneBubble(resolved.text);
       return;
     }
+
+    // SitePal characters: stash the budget so the vh_audioStarted wrap
+    // can flip speechActive=true and arm the safety net the moment audio
+    // actually begins playing. Without this deferral, speechActive flips
+    // here (~900ms before audible start) and the text reveal races
+    // ahead of the voice by the camera-fly + SitePal-init delay.
+    pendingSpeechBudgetRef.current = charBudget;
     if (typeof window === 'undefined') return;
     try {
       // Ensure volume is up — activateSitePalProjection may have touched it
@@ -1466,7 +1533,12 @@ export default function CyborgTemple() {
         const rulesText = rulesResolved?.text || '';
         if (rulesText) {
           displayText = rulesText;
-          setPendingSpeech({ stationKey, text: introText, kind: 'intro' });
+          setPendingSpeech({
+            stationKey,
+            text: introText,
+            kind: 'intro',
+            audioDurationMs: introResolved?.audioDurationMs || null,
+          });
           if (rulesResolved?.audio) {
             // Two-track path: play rules audio now, queue intro audio
             // for the audio-end handler to chain. speakLine receives
@@ -1512,8 +1584,17 @@ export default function CyborgTemple() {
     // Eugene's dialog is rendered exclusively in her floating chat bubble
     // (speakLine sets eugeneBubble for her). Skip currentSpeech for her so
     // the bottom transcript doesn't duplicate the same line.
+    // Pull the audioDurationMs of whichever line drives the CURRENT
+    // displayed text (rules first if the chain fires, otherwise intro
+    // or return). Lets ProgressiveText/LiveCaption pace the reveal to
+    // the actual audio length rather than the char-count fallback.
+    let displayAudioDurationMs = null;
+    if (toSpeak) {
+      const toSpeakResolved = resolveLine(toSpeak);
+      displayAudioDurationMs = toSpeakResolved?.audioDurationMs || null;
+    }
     if (displayText && stationKey !== 'eugene') {
-      setCurrentSpeech({ stationKey, text: displayText, kind });
+      setCurrentSpeech({ stationKey, text: displayText, kind, audioDurationMs: displayAudioDurationMs });
     }
 
     // Audio plays after a short delay so the camera fly-in lands first.
@@ -3311,6 +3392,8 @@ export default function CyborgTemple() {
                                 }}>
                                   <ProgressiveText
                                     text={currentSpeech.text}
+                                    isPlaying={speechActive}
+                                    audioDurationMs={currentSpeech.audioDurationMs}
                                     maxVisibleLines={3}
                                     approxLineHeight={1.45}
                                   />
@@ -3718,12 +3801,23 @@ export default function CyborgTemple() {
                 // is set for the focused character — whichever matches
                 // wins as the live caption source.
                 const stationForFocus = CHARACTER_TO_STATION[focusedAgent];
+                const activeAnswerResolved =
+                  activeAnswer && stationForFocus === activeAnswer.stationKey
+                    ? resolveLine(activeAnswer.a)
+                    : null;
                 const captionText =
-                  (activeAnswer && stationForFocus === activeAnswer.stationKey
-                    ? resolveLine(activeAnswer.a)?.text
-                    : null)
+                  activeAnswerResolved?.text
                   || (currentSpeech && stationForFocus === currentSpeech.stationKey
                     ? currentSpeech.text
+                    : null);
+                // Per-line audio duration override: questions surface their
+                // own duration via activeAnswer; intros/returns/reactions
+                // surface theirs via currentSpeech (set by the focused-agent
+                // effect from the line that's actually being spoken).
+                const captionDurationMs =
+                  activeAnswerResolved?.audioDurationMs
+                  || (currentSpeech && stationForFocus === currentSpeech.stationKey
+                    ? currentSpeech.audioDurationMs
                     : null);
                 if (!captionText) return null;
                 // Eugene has no SitePal audio — skip the live caption for
@@ -3733,6 +3827,7 @@ export default function CyborgTemple() {
                   <LiveCaption
                     text={captionText}
                     isPlaying={speechActive}
+                    audioDurationMs={captionDurationMs}
                     style={{
                       position: 'fixed',
                       left: '50%',
@@ -4178,7 +4273,7 @@ export default function CyborgTemple() {
                         boxShadow: '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
                       }}
                     >
-                      ✦ START TOKEN TRAINER
+                      ✦ START TOKEN FORENSICS
                     </button>
                   )
                 }

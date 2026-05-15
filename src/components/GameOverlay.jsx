@@ -31,9 +31,17 @@ export { SAMPLE_CASE, CASE_002, CASE_FILES, CASES } from "./game/cases";
 // at playback time when SitePal sayAudio is available.
 export function resolveLine(line) {
   if (line == null) return null;
-  if (typeof line === 'string') return { text: line, audio: null };
+  if (typeof line === 'string') return { text: line, audio: null, audioDurationMs: null };
   if (typeof line === 'object') {
-    return { text: line.text || '', audio: line.audio || null };
+    return {
+      text: line.text || '',
+      audio: line.audio || null,
+      // Optional per-line override: when set, the reveal components pace
+      // chunks proportionally across this duration so text and voice
+      // land together. Without it they fall back to char-count pacing,
+      // which can lag behind slow-spoken or heavily-paused lines.
+      audioDurationMs: typeof line.audioDurationMs === 'number' ? line.audioDurationMs : null,
+    };
   }
   return null;
 }

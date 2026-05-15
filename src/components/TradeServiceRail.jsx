@@ -3,9 +3,9 @@ import React from "react";
 const SERVICES = [
   {
     id: "game",
-    eyebrow: "FREE",
-    title: "Token Trainer",
-    desc: "Read evidence. Render verdict. Climb the board.",
+    eyebrow: "LEARN",
+    title: "Token Forensics",
+    desc: "Three questions. One verdict.",
     accent: "phos",
     cta: "SELECTED",
     selected: true,
