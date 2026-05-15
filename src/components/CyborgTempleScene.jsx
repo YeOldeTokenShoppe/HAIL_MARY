@@ -1401,8 +1401,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v66_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v66.glb";
+    let modelPath = "/models/RL80_4anims_v68_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v68.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1941,6 +1941,42 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
                     !t.name.startsWith('Detective_Face1.') &&
                     !t.name.startsWith('Detective_Face2.')
                 );
+              }
+
+              // demon_pointing / demon_victory ship without Root.position
+              // and Root.quaternion tracks (the Root bone sits between
+              // Demon_Empty and Pelvis). With no track driving Root, three.js
+              // restores it to the GLB bind pose, which sits a hair off the
+              // idle pose and visibly flips the character beneath the chair.
+              // Borrow idle's Root tracks so Root stays put across clips.
+              // demon_pointing and demon_victory ship without Root tracks
+              // (the Root bone sits between Demon_Empty and Pelvis). With
+              // nothing driving Root, three.js' PropertyMixer falls back to
+              // the bind pose, which sits ~1.6° off idle — small in isolation
+              // but visibly twists the character around when blended into a
+              // crossfade. Borrow the missing tracks from demon_idle.
+              // GLTFLoader renames duplicate node names by appending _N, so
+              // the bone may load as 'Root' or 'Root_1' depending on which
+              // skeleton was traversed first (Demon shares Root/Hand_L/Hand_R
+              // names with Detective).
+              if (charName === 'Demon' && /demon_(pointing|victory)/i.test(animName)) {
+                const rootRe = /^Root(_\d+)?\.(position|quaternion)$/;
+                const haveRoot = cleanedAnimation.tracks.some((t) => rootRe.test(t.name));
+                if (!haveRoot) {
+                  const idleClip = gltf.animations.find((a) => /demon_idle/i.test(a.name));
+                  if (idleClip) {
+                    const rootTracks = idleClip.tracks
+                      .filter((t) => rootRe.test(t.name))
+                      .map((t) => t.clone());
+                    if (rootTracks.length) {
+                      cleanedAnimation = new THREE.AnimationClip(
+                        cleanedAnimation.name,
+                        cleanedAnimation.duration,
+                        [...cleanedAnimation.tracks, ...rootTracks]
+                      );
+                    }
+                  }
+                }
               }
 
               // Unicorn_waving: keep only arm-bone quaternion tracks (drop
