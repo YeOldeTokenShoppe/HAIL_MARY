@@ -394,10 +394,18 @@ function SitePalHostEmbed({ config }) {
         window.__sitePalPreloading = true;
         window.__sitePalPreloadQueue = PRELOAD_QUEUE.slice();
         console.log('[SitePal] starting preload', window.__sitePalPreloadQueue);
-        // Mute, then kick off after a beat so the initial paint can
-        // happen first.
+        // Mute AND stopSpeech — the published scene has a bound audio
+        // (`11devil1`) that SitePal auto-plays on embed load. setPlayerVolume(0)
+        // alone leaves that audio queued in the AudioContext (suspended
+        // pre-gesture), so it leaks out audibly on the user's first
+        // click. stopSpeech kills it before the buffer can be queued
+        // for resume. (Subsequent preload swaps already do this — only
+        // the initial load was missing the stop.)
         if (typeof window.setPlayerVolume === "function") {
           try { window.setPlayerVolume(0); } catch (e) {}
+        }
+        if (typeof window.stopSpeech === "function") {
+          try { window.stopSpeech(); } catch (e) {}
         }
         setTimeout(advancePreload, 250);
         return;
@@ -437,6 +445,14 @@ function SitePalHostEmbed({ config }) {
         characterId: active.characterId,
         audioName: active.audioName,
       });
+      // Consumer hook: lets the parent component react to actual audio
+      // start (e.g., flip speechActive=true so text reveals fire in
+      // lockstep with the voice). Wrapping vh_audioStarted from outside
+      // is fragile because this assignment runs after the SitePal script
+      // loads asynchronously and would clobber the wrap.
+      if (typeof window.__onSitePalAudioStarted === 'function') {
+        try { window.__onSitePalAudioStarted(audID, portal); } catch (e) {}
+      }
       clearActiveSpeech();
     };
 
@@ -467,6 +483,17 @@ function SitePalHostEmbed({ config }) {
     // unlock iOS, until the context is running.
     const resumeAudio = () => {
       try {
+        // Kill any audio that SitePal queued before this gesture — most
+        // notably the published Demon scene's bound `11devil1` greeting,
+        // which auto-plays on embed load. The vh_sceneLoaded mute keeps
+        // it silent until now, but resuming the AudioContext below
+        // would otherwise release the queued buffer at full volume.
+        // Runs in capture phase before any onClick handler, so a
+        // legitimate Demon click still queues + plays the greeting
+        // afterwards via activateSitePalProjection.
+        if (typeof window.stopSpeech === "function") {
+          try { window.stopSpeech(); } catch (e) {}
+        }
         if (typeof window.saySilent === "function") window.saySilent(0);
         const Ctx = window.AudioContext || window.webkitAudioContext;
         const ctx = window.__rl80UnlockCtx || (Ctx ? new Ctx() : null);
@@ -878,6 +905,10 @@ export default function CyborgTemple() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
   const [showBuyModal, setShowBuyModal] = useBuyModal();
+  // Confirm dialog for leaving an in-progress case via the bottom-nav MENU
+  // button. Without this, a single mistaken tap wipes asked/visitedStations/
+  // verdict and dumps the player back to the service rail.
+  const [showLeaveGameConfirm, setShowLeaveGameConfirm] = useState(false);
   // Which modality the user has entered. null = lobby (no mode chosen).
   // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
   const [tradeMode, setTradeMode] = useState(null);
@@ -996,11 +1027,17 @@ export default function CyborgTemple() {
         speakLine(queuedAudio.line, queuedAudio.stationKey, queuedAudio.options);
       }
     };
-    const prevAudioStarted = window.vh_audioStarted;
     const prevAudioStopped = window.vh_audioStopped;
     const prevSpeechEnded = window.vh_speechEnded;
     const prevAudioEnded = window.vh_audioEnded;
-    window.vh_audioStarted = function (audID, portal) {
+    // Register a hook on the SitePal pipeline's vh_audioStarted (see the
+    // setter in the SitePal pipeline effect for the call site). Wrapping
+    // window.vh_audioStarted directly doesn't survive — the pipeline
+    // setter runs asynchronously after the SitePal script loads and
+    // overwrites any wrap installed before it. The hook approach lets
+    // us run logic from inside the canonical handler.
+    const prevAudioStartedHook = window.__onSitePalAudioStarted;
+    window.__onSitePalAudioStarted = (audID, portal) => {
       // Record which audio is now actually playing so vh_audioEnded can
       // tell a real natural-end of THIS audio apart from a stale event.
       if (audID) lastStartedAudIDRef.current = audID;
@@ -1015,14 +1052,18 @@ export default function CyborgTemple() {
       }
       const charBudget = pendingSpeechBudgetRef.current || 0;
       if (charBudget > 0) {
-        const safetyMs = Math.max(8000, Math.min(90000, charBudget * 100));
+        // Floor at 14s instead of 8s so multi-sentence intros with
+        // dramatic pauses (audio routinely runs 11–14s) don't get the
+        // safety net to chop them off mid-line. Per-line audioDurationMs
+        // overrides could feed in here too if more precision is needed.
+        const safetyMs = Math.max(14000, Math.min(90000, charBudget * 100));
         speechEndTimerRef.current = setTimeout(() => {
           setSpeechActive(false);
           speechEndTimerRef.current = null;
         }, safetyMs);
       }
-      if (typeof prevAudioStarted === 'function') {
-        try { prevAudioStarted.call(this, audID, portal); } catch (e) {}
+      if (typeof prevAudioStartedHook === 'function') {
+        try { prevAudioStartedHook(audID, portal); } catch (e) {}
       }
     };
     window.vh_audioStopped = function (audID, portal) {
@@ -1055,7 +1096,7 @@ export default function CyborgTemple() {
       }
     };
     return () => {
-      window.vh_audioStarted = prevAudioStarted;
+      window.__onSitePalAudioStarted = prevAudioStartedHook;
       window.vh_audioStopped = prevAudioStopped;
       window.vh_speechEnded = prevSpeechEnded;
       window.vh_audioEnded = prevAudioEnded;
@@ -1144,6 +1185,28 @@ export default function CyborgTemple() {
   // Derived: total questions asked across all stations, and what remains.
   const scansUsed = Object.values(asked).reduce((n, set) => n + set.size, 0);
   const scansRemaining = Math.max(0, caseData.maxScans - scansUsed);
+  // First-case tutorial gate: case-001 requires the player to start with
+  // GR80/ETHOS (the Monk) so he can deliver the rules audio. The other
+  // consultant buttons stay locked until the player either taps Monk this
+  // session OR the rules have been heard in a prior session (rulesHeard
+  // persists in localStorage). Only applies to the first case.
+  const mustStartWithMonk =
+    caseData.id === 'case-001' && !rulesHeard && !visitedStations.has('monk');
+  // Gate the scan-counter "punch" animation by 3s after entering game mode
+  // (when the counter first mounts), so the initial pop doesn't fire
+  // instantly on Start Token Forensics. Subsequent tick-down pops (via
+  // key={remaining}) fire instantly once this is true. Resets when the
+  // player leaves game mode so the next session re-arms the delay.
+  const [scanPunchArmed, setScanPunchArmed] = useState(false);
+  useEffect(() => {
+    if (tradeMode !== 'game') {
+      setScanPunchArmed(false);
+      return;
+    }
+    setScanPunchArmed(false);
+    const t = setTimeout(() => setScanPunchArmed(true), 6000);
+    return () => clearTimeout(t);
+  }, [tradeMode]);
   // Derived: stations with at least one asked question. Used by the reveal
   // modal's "scans used" indicator and by tab/portrait state styling later.
   const investigated = useMemo(() => {
@@ -1833,7 +1896,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v68_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v69_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -2197,6 +2260,19 @@ export default function CyborgTemple() {
             opacity: 1;
             transform: scale(1.12);
           }
+        }
+
+        @keyframes scanPunch {
+          0%   { transform: scale(1);    filter: brightness(1); }
+          18%  { transform: scale(1.75); filter: brightness(1.7); }
+          42%  { transform: scale(0.88); filter: brightness(1.15); }
+          68%  { transform: scale(1.14); filter: brightness(1.05); }
+          100% { transform: scale(1);    filter: brightness(1); }
+        }
+
+        @keyframes scanBreath {
+          0%, 100% { transform: scale(1);     opacity: 0.92; }
+          50%      { transform: scale(1.09);  opacity: 1; }
         }
       `}</style>
       
@@ -2630,6 +2706,14 @@ export default function CyborgTemple() {
               }}
               onAgentClick={(agentId) => {
                 if (agentId) {
+                  // First-case tutorial gate: in case-001 the player must tap
+                  // GR80/Monk first so the rules audio plays. Ignore taps on
+                  // other consultants until Monk has been focused this session
+                  // (or rules were heard in a prior session).
+                  if (mustStartWithMonk && agentId !== 'Monk' &&
+                      !/^Screen[1-4]$/.test(agentId) && !/^Screen[A-D]$/.test(agentId)) {
+                    return;
+                  }
                   setFocusedAgent(agentId);
                   if (!userHasInteracted) {
                     setTimeout(() => {
@@ -3193,12 +3277,20 @@ export default function CyborgTemple() {
                           pointerEvents: 'none',
                         }}
                       >
-                        <div style={{
-                          fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                          fontSize: isMobileView ? 26 : 60,
-                          fontWeight: 900,
-                          letterSpacing: '0.02em',
-                        }}>
+                        <div
+                          key={remaining}
+                          style={{
+                            fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+                            fontSize: isMobileView ? 26 : 60,
+                            fontWeight: 900,
+                            letterSpacing: '0.02em',
+                            transformOrigin: 'center',
+                            willChange: 'transform, filter',
+                            animation: scanPunchArmed
+                              ? 'scanPunch 1.2s cubic-bezier(0.2, 1.5, 0.4, 1) both, scanBreath 2.6s ease-in-out 0.9s infinite'
+                              : 'none',
+                          }}
+                        >
                           {remaining}
                         </div>
                         <div style={{
@@ -3374,32 +3466,45 @@ export default function CyborgTemple() {
                             flex: 1,
                             justifyContent: 'center',
                           }}>
-                            {/* Desktop: teleprompter ProgressiveText inline.
-                                Mobile: rely entirely on the floating top
-                                caption — panel is just the CONTINUE button. */}
-                            {!isMobileView && (
+                            {/* Inline transcript. Desktop: ProgressiveText
+                                teleprompter (accumulates chunks). Mobile:
+                                LiveCaption — one sentence at a time, like
+                                closed captioning, so the panel doesn't
+                                cram four lines of small text on a phone.
+                                Both replace the floating top caption for
+                                speech beats so the character's face stays
+                                clear. */}
+                            <div style={{
+                              padding: isMobileView ? '8px 10px' : '14px 16px',
+                              borderLeft: '2px solid #ff3ea0',
+                              background: 'rgba(255,62,160,0.05)',
+                            }}>
                               <div style={{
-                                padding: '14px 16px',
-                                borderLeft: '2px solid #ff3ea0',
-                                background: 'rgba(255,62,160,0.05)',
+                                fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                                fontSize: isMobileView ? 15 : 24,
+                                color: '#c8ffe0',
+                                lineHeight: 1.4,
+                                textAlign: 'center',
+                                minHeight: isMobileView ? '2.8em' : undefined,
                               }}>
-                                <div style={{
-                                  fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                  fontSize: 24,
-                                  color: '#c8ffe0',
-                                  lineHeight: 1.45,
-                                  textAlign: 'center',
-                                }}>
+                                {isMobileView ? (
+                                  <LiveCaption
+                                    text={currentSpeech.text}
+                                    isPlaying={speechActive}
+                                    audioDurationMs={currentSpeech.audioDurationMs}
+                                    persistLastChunk
+                                  />
+                                ) : (
                                   <ProgressiveText
                                     text={currentSpeech.text}
                                     isPlaying={speechActive}
                                     audioDurationMs={currentSpeech.audioDurationMs}
                                     maxVisibleLines={3}
-                                    approxLineHeight={1.45}
+                                    approxLineHeight={1.4}
                                   />
-                                </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                             <button
                               onClick={() => {
                                 // Stop whatever's currently speaking. This
@@ -3634,12 +3739,20 @@ export default function CyborgTemple() {
                             pointerEvents: 'none',
                           }}
                         >
-                          <div style={{
-                            fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                            fontSize: 26,
-                            fontWeight: 900,
-                            letterSpacing: '0.02em',
-                          }}>
+                          <div
+                            key={r}
+                            style={{
+                              fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+                              fontSize: 26,
+                              fontWeight: 900,
+                              letterSpacing: '0.02em',
+                              transformOrigin: 'center',
+                              willChange: 'transform, filter',
+                              animation: scanPunchArmed
+                                ? 'scanPunch 0.8s cubic-bezier(0.2, 1.5, 0.4, 1) both, scanBreath 2.6s ease-in-out 0.9s infinite'
+                                : 'none',
+                            }}
+                          >
                             {r}
                           </div>
                           <div style={{
@@ -3680,15 +3793,18 @@ export default function CyborgTemple() {
                       const buttonH = isMobileView ? 72 : 110;
 
                       const outOfScans = scansRemaining <= 0;
-                      const disabled = isCurrent || outOfScans;
+                      const lockedToMonk = mustStartWithMonk && agentId !== 'Monk';
+                      const disabled = isCurrent || outOfScans || lockedToMonk;
                       return (
                         <button
                           key={agentId}
                           onClick={() => { if (!disabled) setFocusedAgent(agentId); }}
                           disabled={disabled}
-                          title={outOfScans && !isCurrent
-                            ? 'No scans left — render your verdict'
-                            : `${station.character} — ${station.role}`}
+                          title={lockedToMonk
+                            ? 'Tap ETHOS first — he sets the rules'
+                            : outOfScans && !isCurrent
+                              ? 'No scans left — render your verdict'
+                              : `${station.character} — ${station.role}`}
                           style={{
                             position: 'relative',
                             width: buttonW,
@@ -3709,8 +3825,20 @@ export default function CyborgTemple() {
                               ? '0 0 14px rgba(77,255,170,0.55)'
                               : '0 0 8px rgba(255,62,160,0.28)',
                             transition: 'all 0.18s ease',
-                            opacity: isCurrent ? 1 : outOfScans ? 0.4 : allAsked && isVisited ? 0.78 : 0.94,
-                            filter: outOfScans && !isCurrent ? 'grayscale(0.5)' : 'none',
+                            opacity: isCurrent
+                              ? 1
+                              : lockedToMonk
+                                ? 0.32
+                                : outOfScans
+                                  ? 0.4
+                                  : allAsked && isVisited
+                                    ? 0.78
+                                    : 0.94,
+                            filter: lockedToMonk
+                              ? 'grayscale(0.7)'
+                              : outOfScans && !isCurrent
+                                ? 'grayscale(0.5)'
+                                : 'none',
                           }}
                         >
                           <img
@@ -3793,32 +3921,21 @@ export default function CyborgTemple() {
                   one sentence at a time, paced ~70ms/char and gated on
                   speechActive so it pauses with the audio. Sits above the
                   bottom console (which has been shrunk for mobile) and
-                  below the top HUD so the avatar's mouth remains visible. */}
+                  below the top HUD so the avatar's mouth remains visible.
+
+                  Speech beats (intros, returnLines, reactions) are now
+                  rendered inline in the bottom panel next to CONTINUE, so
+                  this floating caption is reserved for question-answer
+                  playback (activeAnswer) only — keeps the character's face
+                  clear during the intro read-along. */}
               {tradeMode === 'game' && !verdict && isMobileView && (() => {
-                // Caption covers both question-answer playback AND speech
-                // beats (intros, returnLines, reactions). When a SitePal
-                // line is active, only one of activeAnswer / currentSpeech
-                // is set for the focused character — whichever matches
-                // wins as the live caption source.
                 const stationForFocus = CHARACTER_TO_STATION[focusedAgent];
                 const activeAnswerResolved =
                   activeAnswer && stationForFocus === activeAnswer.stationKey
                     ? resolveLine(activeAnswer.a)
                     : null;
-                const captionText =
-                  activeAnswerResolved?.text
-                  || (currentSpeech && stationForFocus === currentSpeech.stationKey
-                    ? currentSpeech.text
-                    : null);
-                // Per-line audio duration override: questions surface their
-                // own duration via activeAnswer; intros/returns/reactions
-                // surface theirs via currentSpeech (set by the focused-agent
-                // effect from the line that's actually being spoken).
-                const captionDurationMs =
-                  activeAnswerResolved?.audioDurationMs
-                  || (currentSpeech && stationForFocus === currentSpeech.stationKey
-                    ? currentSpeech.audioDurationMs
-                    : null);
+                const captionText = activeAnswerResolved?.text || null;
+                const captionDurationMs = activeAnswerResolved?.audioDurationMs || null;
                 if (!captionText) return null;
                 // Eugene has no SitePal audio — skip the live caption for
                 // her (her chat bubble plays the same role).
@@ -4279,10 +4396,12 @@ export default function CyborgTemple() {
                 }
                 /* Right slot: in lobby it's HOME; in game mode it becomes
                    MENU so the path picker is always reachable (verdict
-                   buttons have taken the center). Book slot (left) is BUY. */
+                   buttons have taken the center). Book slot (left) is BUY.
+                   Mid-case (game mode, no verdict yet) → confirm first so a
+                   stray tap doesn't nuke an in-progress investigation. */
                 onMenuClick={
                   tradeMode === 'game'
-                    ? returnToServiceRail
+                    ? (verdict ? returnToServiceRail : () => setShowLeaveGameConfirm(true))
                     : () => router.push('/')
                 }
                 menuIcon={
@@ -4348,6 +4467,104 @@ export default function CyborgTemple() {
               isOpen={showBuyModal}
               onClose={() => setShowBuyModal(false)}
             />
+
+            {/* Leave-game confirm — fires when the bottom-nav MENU is tapped
+                during an active case. Post-verdict the MENU passes through
+                without prompting (the case is already resolved). */}
+            {showLeaveGameConfirm && typeof document !== 'undefined' &&
+              createPortal(
+                <div
+                  onClick={() => setShowLeaveGameConfirm(false)}
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 11000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 16,
+                    background: 'rgba(2,5,8,0.62)',
+                    backdropFilter: 'blur(6px)',
+                    WebkitBackdropFilter: 'blur(6px)',
+                  }}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="leave-game-title"
+                    style={{
+                      width: 'min(420px, 100%)',
+                      padding: '18px 18px 16px',
+                      background: 'linear-gradient(180deg, rgba(4,12,8,0.94), rgba(2,5,8,0.9))',
+                      border: '1px solid rgba(77,255,170,0.55)',
+                      borderRadius: 12,
+                      boxShadow: '0 0 28px rgba(77,255,170,0.22)',
+                      color: '#c8ffe0',
+                      fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                    }}
+                  >
+                    <div
+                      id="leave-game-title"
+                      style={{
+                        fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                        fontSize: 18,
+                        letterSpacing: '0.12em',
+                        color: '#8effc4',
+                        textShadow: '0 0 12px rgba(77,255,170,0.4)',
+                        marginBottom: 8,
+                      }}
+                    >
+                      LEAVE CASE FILE?
+                    </div>
+                    <div style={{ fontSize: 13, lineHeight: 1.45, color: '#a8d8c2', marginBottom: 16 }}>
+                      Your scans, notes, and progress on this case will be discarded. You can pick a new path from the lobby.
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowLeaveGameConfirm(false)}
+                        style={{
+                          padding: '9px 16px',
+                          background: 'transparent',
+                          color: '#c8ffe0',
+                          border: '1px solid rgba(77,255,170,0.35)',
+                          borderRadius: 8,
+                          fontFamily: 'inherit',
+                          fontSize: 12,
+                          letterSpacing: '0.18em',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        STAY
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowLeaveGameConfirm(false);
+                          returnToServiceRail();
+                        }}
+                        style={{
+                          padding: '9px 16px',
+                          background: 'rgba(255,77,109,0.14)',
+                          color: '#ff8aa0',
+                          border: '1px solid rgba(255,77,109,0.55)',
+                          borderRadius: 8,
+                          fontFamily: 'inherit',
+                          fontSize: 12,
+                          letterSpacing: '0.18em',
+                          cursor: 'pointer',
+                          textShadow: '0 0 8px rgba(255,77,109,0.35)',
+                        }}
+                      >
+                        LEAVE CASE
+                      </button>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )
+            }
 
             {/* Fullscreen evidence / preview overlay for Screen1-4. Mobile
                 opens this when the player taps the screen mesh in-scene; the

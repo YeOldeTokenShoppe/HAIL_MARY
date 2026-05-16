@@ -1,4 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import html2canvas from 'html2canvas';
+import { resolveEntryVisual, THREAT_ACCENT } from './EvidenceOverlay';
 
 // EvidenceScreens — when the player asks a question and `activeAnswer` is set,
 // paint a CRT-style "evidence reveal" card onto the focused character's primary
@@ -7,6 +10,16 @@ import { useEffect } from 'react';
 // (CRTScreen, DetectiveScreen) check and skip — so when the player taps
 // CONTINUE and `activeAnswer` clears, the ambient terminal/leaderboard/scope
 // content automatically resumes. No re-wiring of VideoScreens required.
+//
+// Two painting paths:
+//   • Rich path — when resolveEntryVisual returns a registered visualization,
+//     mount the same React component into a hidden DOM node, snapshot it with
+//     html2canvas, and drawImage onto the screen canvas. The character's
+//     workstation screen ends up mirroring the fullscreen overlay the player
+//     can pull up via "VIEW ON SCREEN", so the world feels like it's sharing
+//     the same information as the player.
+//   • Simple path — fallback canvas-drawn card for entries without a
+//     registered visual.
 //
 // Mapping (station key → screen canvas global):
 //   monk    → Screen1 (Saint GR80)
@@ -149,11 +162,44 @@ function clearAllEvidenceFlags() {
   });
 }
 
+// Target dimensions for the snapshot. Matches the on-mesh screen canvases
+// (512×320 from VideoScreens.jsx). The hidden mount renders at this size;
+// html2canvas's `scale` param oversamples to keep the rasterized result
+// sharp when zoomed in. 2× → 1024×640 effective resolution.
+const SNAPSHOT_W = 512;
+const SNAPSHOT_H = 320;
+const SNAPSHOT_SCALE = 2;
+
+// Resolve which (station, entry) the rich path should mirror. Returned
+// null when there's no rich visual registered for this entry, in which
+// case the basic canvas painter is used.
+function resolveRichTarget(activeAnswer, caseData) {
+  if (!activeAnswer) return null;
+  const { stationKey, reveals } = activeAnswer;
+  const station = caseData?.stations?.[stationKey];
+  const entry = station?.entries?.find((e) => e.label === reveals);
+  if (!station || !entry) return null;
+  const config = resolveEntryVisual(caseData?.id, stationKey, entry);
+  if (!config) return null;
+  return { stationKey, station, entry, config };
+}
+
 export default function EvidenceScreens({ activeAnswer, caseData }) {
+  const mountRef = useRef(null);
+
+  const rich = useMemo(
+    () => resolveRichTarget(activeAnswer, caseData),
+    [activeAnswer, caseData],
+  );
+  // Stable identity for the snapshot effect — entries are stable within
+  // a case file, so {station}:{label} uniquely identifies the rich tree.
+  const richKey = rich ? `${rich.stationKey}:${rich.entry.label}` : null;
+
+  // Simple painter path: fires for both no-active-answer (clear flags)
+  // AND active-answer-but-no-rich-visual (paint the basic card). The
+  // rich path runs as a separate effect below and overwrites the canvas
+  // once its snapshot completes.
   useEffect(() => {
-    // Always clear flags first so a stale character's flag doesn't keep
-    // CRTScreen frozen when the player asks a question of a different
-    // consultant (or clears the answer entirely).
     clearAllEvidenceFlags();
 
     if (!activeAnswer) return;
@@ -175,11 +221,195 @@ export default function EvidenceScreens({ activeAnswer, caseData }) {
     texture.needsUpdate = true;
   }, [activeAnswer, caseData]);
 
+  // Rich-path snapshot. Runs after the hidden mount has rendered (via
+  // requestAnimationFrame so layout has settled), rasterizes it, then
+  // drawImages onto the matching screen canvas. The basic card painted
+  // above lives on the canvas as an instant placeholder until this
+  // resolves — typically 100-300ms — then gets overwritten.
+  useEffect(() => {
+    if (!rich) return;
+    if (typeof window === 'undefined') return;
+    const node = mountRef.current;
+    if (!node) return;
+
+    const target = STATION_TO_CANVAS[rich.stationKey];
+    const canvas = window[target?.canvas];
+    const texture = window[target?.texture];
+    if (!canvas || !texture) return;
+
+    let cancelled = false;
+
+    // Wait one frame so the React tree we just painted into the hidden
+    // mount has committed to the DOM and laid out.
+    const rafId = requestAnimationFrame(() => {
+      html2canvas(node, {
+        backgroundColor: '#050a07',
+        scale: SNAPSHOT_SCALE,
+        width: SNAPSHOT_W,
+        height: SNAPSHOT_H,
+        logging: false,
+        useCORS: true,
+      })
+        .then((snapshot) => {
+          // Bail if a new rich target was selected (or the player
+          // dismissed the answer) while html2canvas was working — the
+          // effect-cleanup flips `cancelled` to true and the basic
+          // painter has already restored the next state's placeholder.
+          if (cancelled) return;
+          if (!canvas.dataset.evidenceActive) return;
+
+          const ctx = canvas.getContext('2d');
+          const W = canvas.width;
+          const H = canvas.height;
+          ctx.fillStyle = '#050a07';
+          ctx.fillRect(0, 0, W, H);
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(snapshot, 0, 0, W, H);
+          // Scanlines — match the in-overlay scanline overlay so the
+          // mesh and the overlay read as the same CRT.
+          ctx.fillStyle = 'rgba(0,0,0,0.18)';
+          for (let yy = 0; yy < H; yy += 3) {
+            ctx.fillRect(0, yy, W, 1);
+          }
+          texture.needsUpdate = true;
+        })
+        .catch(() => {
+          // html2canvas can throw on certain fonts/colors — leave the
+          // basic painter's output in place silently.
+        });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+    };
+  }, [richKey]);
+
   // Unmount cleanup — clear flags so a navigation away from /trade doesn't
   // leave the ambient painters silenced.
   useEffect(() => {
     return () => clearAllEvidenceFlags();
   }, []);
 
-  return null;
+  // Hidden snapshot mount. Lives off-screen at the screen-canvas's
+  // native size so html2canvas captures the same dimensions we'll
+  // drawImage into. Aria-hidden + pointerEvents: none + transform off
+  // the viewport so it never affects layout or screen readers.
+  const Visualization = rich?.config?.component || null;
+  const visualizationProps = rich?.config
+    ? { ...rich.config.props, threat: rich.entry.threat }
+    : null;
+  const accent = rich ? THREAT_ACCENT[rich.entry.threat] || THREAT_ACCENT.green : null;
+
+  const hiddenMount = (rich && typeof document !== 'undefined')
+    ? createPortal(
+        <div
+          ref={mountRef}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: 0,
+            width: SNAPSHOT_W,
+            height: SNAPSHOT_H,
+            pointerEvents: 'none',
+            background: '#050a07',
+            color: '#c8ffe0',
+            fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: `1px solid ${accent.color}`,
+          }}
+        >
+          {/* Header band — mirrors EvidenceOverlay's header */}
+          <div style={{
+            background: accent.color,
+            color: '#050a07',
+            padding: '5px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+          }}>
+            <span>▸ {rich.station.character?.toUpperCase()} — {(rich.station.role || '').toUpperCase()}</span>
+            <span style={{ opacity: 0.65 }}>// EVIDENCE</span>
+          </div>
+
+          {/* Reveal label + metric */}
+          <div style={{
+            padding: '5px 10px',
+            borderBottom: '1px solid rgba(77,255,170,0.18)',
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}>
+            <div style={{ fontSize: 8, letterSpacing: '0.22em', color: '#6db59a' }}>
+              // {rich.entry.label}
+            </div>
+            {rich.config?.metric && (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <div style={{ fontSize: 7, letterSpacing: '0.22em', color: '#6db59a' }}>
+                  {rich.config.metric.label}
+                </div>
+                <div style={{
+                  fontFamily: "'Cinzel Decorative','Cinzel',serif",
+                  fontSize: 14,
+                  color: accent.color,
+                }}>
+                  {rich.config.metric.value}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Visualization */}
+          <div style={{
+            flex: 1,
+            padding: '6px 6px',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {Visualization && <Visualization {...visualizationProps} />}
+          </div>
+
+          {/* Caption */}
+          {rich.config?.caption && (
+            <div style={{
+              padding: '4px 10px',
+              fontSize: 8,
+              color: '#c8ffe0',
+              fontStyle: 'italic',
+              lineHeight: 1.3,
+              borderTop: '1px solid rgba(77,255,170,0.18)',
+            }}>
+              {rich.config.caption}
+            </div>
+          )}
+
+          {/* Verdict bar */}
+          <div style={{
+            background: accent.color,
+            color: '#050a07',
+            padding: '4px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: '0.22em',
+          }}>
+            <span>{accent.verdict}</span>
+            <span style={{ opacity: 0.75, fontWeight: 500 }}>// MIRRORED</span>
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return hiddenMount;
 }

@@ -546,7 +546,9 @@ function hasRichVisual(caseId, stationKey, entry) {
 
 // Export the predicate so the parent route can decide whether to mount
 // EvidenceOverlay vs. the legacy text-typewriter (FullscreenCRTOverlay).
-export { hasRichVisual };
+// resolveEntryVisual is also exported so EvidenceScreens can mirror the
+// same visualization onto the in-scene workstation screen canvases.
+export { hasRichVisual, resolveEntryVisual, THREAT_ACCENT };
 
 export default function EvidenceOverlay({
   isActive,
@@ -615,7 +617,10 @@ export default function EvidenceOverlay({
           cursor: 'default',
         }}
       >
-        {/* Header band — like a CRT title bar */}
+        {/* Header band — like a CRT title bar. Close button on the right
+            because on mobile the inner card fills the viewport, leaving
+            almost no backdrop margin to tap; "tap anywhere to close" alone
+            is not enough of a target. */}
         <div
           style={{
             background: accent.color,
@@ -624,13 +629,39 @@ export default function EvidenceOverlay({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            gap: 10,
             fontSize: 12,
             fontWeight: 700,
             letterSpacing: '0.18em',
           }}
         >
           <span>▸ {station.character?.toUpperCase()} — {(station.role || '').toUpperCase()}</span>
-          <span style={{ opacity: 0.65 }}>// EVIDENCE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ opacity: 0.65 }}>// EVIDENCE</span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close evidence"
+              style={{
+                background: 'rgba(5,10,7,0.18)',
+                border: '1px solid rgba(5,10,7,0.55)',
+                color: '#050a07',
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 14,
+                lineHeight: 1,
+                fontWeight: 800,
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Reveal label band */}
@@ -730,8 +761,20 @@ export default function EvidenceOverlay({
           </div>
         )}
 
-        {/* Verdict bar */}
+        {/* Verdict bar — also a close target. The inner card stops click
+            propagation so the backdrop-close doesn't fire from inside the
+            card; explicit onClick here makes the bottom hint behave the
+            way it reads. */}
         <div
+          onClick={onClose}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onClose?.();
+            }
+          }}
           style={{
             background: accent.color,
             color: '#050a07',
@@ -742,10 +785,11 @@ export default function EvidenceOverlay({
             fontSize: 11,
             fontWeight: 700,
             letterSpacing: '0.22em',
+            cursor: 'pointer',
           }}
         >
           <span>{accent.verdict}</span>
-          <span style={{ opacity: 0.75, fontWeight: 500 }}>tap anywhere to close</span>
+          <span style={{ opacity: 0.85, fontWeight: 600 }}>tap to close ✕</span>
         </div>
 
         {/* Scanlines overlay — sells the CRT illusion */}

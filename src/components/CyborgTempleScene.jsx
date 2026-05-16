@@ -790,6 +790,47 @@ const CyborgTempleScene = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalFocusAgent, speechActive, gameStarted]);
 
+  // Demon periodic head-glance — while the demon is the focused agent and
+  // speech is active, occasionally turn his head to look at the viewer for
+  // a beat, then release. Drives demonGlanceActiveRef; the per-frame head
+  // look-at-camera override picks it up alongside demonHeadTrackingRef.
+  // Hold-then-glance cycle: idle for HOLD_MS, glance for GLANCE_MS, repeat,
+  // each window randomized so it doesn't feel metronomic.
+  useEffect(() => {
+    // Lobby-mode intros also flip speechActive when the player taps a
+    // character card, but glancing during that framing looks wrong (the
+    // lobby camera angle isn't set up for a head turn). Restrict the
+    // scheduler to in-game speech only.
+    if (!gameStarted || externalFocusAgent !== 'Demon' || !speechActive) {
+      demonGlanceActiveRef.current = false;
+      return;
+    }
+    let timer = null;
+    let cancelled = false;
+    const HOLD_MIN = 4000, HOLD_MAX = 7000;
+    const GLANCE_MIN = 1500, GLANCE_MAX = 2500;
+    const rand = (min, max) => min + Math.random() * (max - min);
+    const scheduleHold = () => {
+      if (cancelled) return;
+      demonGlanceActiveRef.current = false;
+      timer = setTimeout(scheduleGlance, rand(HOLD_MIN, HOLD_MAX));
+    };
+    const scheduleGlance = () => {
+      if (cancelled) return;
+      demonGlanceActiveRef.current = true;
+      timer = setTimeout(scheduleHold, rand(GLANCE_MIN, GLANCE_MAX));
+    };
+    // Start on a hold so the demon doesn't immediately snap his head over
+    // the moment audio begins — gives the pointing/typing animation a beat
+    // to read before the first glance.
+    scheduleHold();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      demonGlanceActiveRef.current = false;
+    };
+  }, [gameStarted, externalFocusAgent, speechActive]);
+
   // Verdict-reveal curtain call. When the parent flips revealMode to an
   // outcome, play each character's reaction animation in place. The scene
   // stays as-is (props visible, default camera framing) — the parent gates
@@ -916,6 +957,11 @@ const CyborgTempleScene = ({
   // play idle with the head-look-at-camera override (mirrors Monk/RL80
   // tracking). Cleared on un-focus.
   const demonHeadTrackingRef = useRef(false);
+  // Periodic-glance flag, independent of demonHeadTrackingRef so the
+  // permanent camera-drift track and the glance scheduler don't clobber
+  // each other. The per-frame look-at-camera override fires when EITHER
+  // ref is true.
+  const demonGlanceActiveRef = useRef(false);
   const demonFocusedRef = useRef(false); // true when camera is zoomed in on Demon
   const monkHeadBoneRef = useRef();
   const monkFocusedRef = useRef(false); // true when camera is zoomed in on Monk
@@ -1401,8 +1447,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v68_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v68.glb";
+    let modelPath = "/models/RL80_4anims_v69_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v69.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -5200,10 +5246,11 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
       fluffyHeadBoneRef._dummy = null;
     }
 
-    // Demon head look-at-camera override — only enabled when the focus
-    // logic decided to skip the demon_pointing clip (camera moved off the
-    // authored pose). Mirrors the Monk/RL80 pattern.
-    if (demonHeadBoneRef.current && demonHeadTrackingRef.current && shouldTrackHeadRef.current && !revealModeRef.current) {
+    // Demon head look-at-camera override — fires when EITHER the camera
+    // has drifted off the authored pose (demonHeadTrackingRef, set in the
+    // focus sequence) OR the speech-glance scheduler is currently in a
+    // glance window (demonGlanceActiveRef). Mirrors the Monk/RL80 pattern.
+    if (demonHeadBoneRef.current && (demonHeadTrackingRef.current || demonGlanceActiveRef.current) && shouldTrackHeadRef.current && !revealModeRef.current) {
       const head = demonHeadBoneRef.current;
 
       if (!demonHeadBoneRef._baseQuat) {
@@ -5222,20 +5269,19 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
       }
       const dummy = demonHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
+      // Full lookAt with no flip — matches the Monk's working tracker at
+      // line 5034. The demon's bone forward axis is local -Z (same as
+      // Monk), so lookAt aligns it with the camera direction without any
+      // correction rotation. The maxHeadAngle clamp below caps the turn
+      // so the head doesn't wrap into uncanny territory.
       dummy.lookAt(camera.position);
-      // Rig-specific yaw correction. The demon's head bone forward axis
-      // doesn't line up with lookAt's local -Z, so we rotate 90° around Y.
-      // If it ends up pitched up/down instead of facing camera, switch the
-      // axis vector to (1,0,0) or (0,0,1).
-      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-      dummy.quaternion.multiply(flip);
 
       // ~85° max turn — wider than the 70° default but conservative enough
       // not to wrap the neck. 1.92 (Monk) lets the head spin past the
       // natural range here.
-      const maxHeadAngle = 1.55;
+      const maxHeadAngle = 1.75;
       const angleBetween = demonHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
-      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.85) : 0;
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 1.25) : 0;
       const blendedWorldQuat = demonHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
 
       const parentWorldQuat = new THREE.Quaternion();

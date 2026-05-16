@@ -24,7 +24,7 @@ function splitIntoChunks(text) {
   return parts.map((s) => s.trim()).filter(Boolean);
 }
 
-export default function LiveCaption({ text, isPlaying, style, onDone, audioDurationMs = null }) {
+export default function LiveCaption({ text, isPlaying, style, onDone, audioDurationMs = null, persistLastChunk = false }) {
   const chunks = useMemo(() => splitIntoChunks(text), [text]);
   const [index, setIndex] = useState(0);
   // Tracks whether the audio for THIS line ever started. Lets us
@@ -98,7 +98,9 @@ export default function LiveCaption({ text, isPlaying, style, onDone, audioDurat
   // Once the audio has played and stopped, drop the caption — otherwise
   // the last chunk (often a 1-word punchline like "Badly.") sits alone
   // at the top of the screen indefinitely after the voice actor
-  // finishes.
-  if (hasPlayed && !isPlaying) return null;
+  // finishes. Inline callers (e.g. an intro panel with a CONTINUE
+  // button) pass `persistLastChunk` so the final line lingers as a
+  // read-along surface until the player advances.
+  if (hasPlayed && !isPlaying && !persistLastChunk) return null;
   return <div style={style}>{chunks[index]}</div>;
 }

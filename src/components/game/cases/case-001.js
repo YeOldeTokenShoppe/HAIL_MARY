@@ -84,7 +84,7 @@ rulesIntro: {
           reveals: "DEPLOYER WALLET AGE",
         },
         {
-          q: "Does the team have a past?",
+          q: "Does the team have any history?",
           a: {
             text:
           "Three earlier launches trace back to this cluster. Two rugged. " +
