@@ -56,8 +56,12 @@ export function pickReturnLine(station) {
 
 // Map a player's verdict + the correct verdict to which vindication key to play.
 // "aligned" = called it right; "missed" = called it wrong; "abstained" = sat it out.
+// When `correctVerdict` is null (Token Review service — no ground truth)
+// every outcome falls through to "abstained" so the case doesn't grade
+// the player against a non-existent answer key.
 export function pickVindicationKey(verdict, correctVerdict) {
   if (verdict === "abstain") return "abstained";
+  if (correctVerdict == null) return "abstained";
   return verdict === correctVerdict ? "aligned" : "missed";
 }
 

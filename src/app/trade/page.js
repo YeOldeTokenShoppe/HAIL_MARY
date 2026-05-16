@@ -35,6 +35,8 @@ import CoinLoader from '@/components/CoinLoader';
 import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
 import { useBuyModal } from '@/lib/useBuyModal';
+import ReviewFunnel from '@/components/ReviewFunnel';
+import ConsensusRibbon from '@/components/ConsensusRibbon';
 import TradeServiceRail from '@/components/TradeServiceRail';
 import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine } from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
@@ -909,6 +911,10 @@ export default function CyborgTemple() {
   // button. Without this, a single mistaken tap wipes asked/visitedStations/
   // verdict and dumps the player back to the service rail.
   const [showLeaveGameConfirm, setShowLeaveGameConfirm] = useState(false);
+  // Token Review funnel — opened from TradeServiceRail's "Token Review" tile.
+  // At this stage the funnel just builds a stub case object on Confirm; the
+  // x402 paywall and live data layer land in subsequent passes.
+  const [showReviewFunnel, setShowReviewFunnel] = useState(false);
   // Which modality the user has entered. null = lobby (no mode chosen).
   // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
   const [tradeMode, setTradeMode] = useState(null);
@@ -922,7 +928,27 @@ export default function CyborgTemple() {
   // the in-game HUD strip. Lives next to the project name display.
   const [caseMenuOpen, setCaseMenuOpen] = useState(false);
   const caseMenuRef = useRef(null);
-  const caseData = CASE_FILES[currentCaseIndex] || SAMPLE_CASE;
+  // Runtime-generated case from the Token Review service. When set, it
+  // overrides the hand-authored case files; cleared by returnToServiceRail.
+  // Identified at runtime by `correctVerdict == null` (reviews have no
+  // ground truth; outcome resolves to 'abstained' regardless of verdict).
+  const [reviewCase, setReviewCase] = useState(null);
+  const caseData = reviewCase || CASE_FILES[currentCaseIndex] || SAMPLE_CASE;
+  // Mirror caseData into a ref so the speech queue (whose useCallback
+  // identity we don't want to invalidate every render) can read the
+  // current station voice configs for TTS fallback in review mode.
+  const caseDataRef = useRef(caseData);
+  useEffect(() => { caseDataRef.current = caseData; }, [caseData]);
+  // The Token Review service hands off a runtime-generated case. We
+  // detect it via the presence of a reviewCase override OR (defensively)
+  // a null correctVerdict on the active case data. Several UI surfaces
+  // branch on this:
+  //   • Bottom-nav center slot shows "READ TEAM VERDICT" instead of
+  //     the Trust/Abstain/Doubt trio (the team renders the verdict,
+  //     not the player).
+  //   • Verdict ribbon renders the consensus meter instead of the
+  //     player-grading layout.
+  const isReviewMode = !!reviewCase || caseData?.correctVerdict == null;
   // Question-level tracking (model B): a scan = one question, 3 questions total
   // across all 4 characters. `asked` maps station key → Set of question indices.
   const [asked, setAsked] = useState(createEmptyAskedMap);
@@ -1183,8 +1209,14 @@ export default function CyborgTemple() {
   //   'vindicate'— vindication audio + final card row + buttons
   const [revealPhase, setRevealPhase] = useState(null);
   // Derived: total questions asked across all stations, and what remains.
+  // Token Review service lifts the cap — the team has already composed
+  // their full read, so the player should be able to drill into any
+  // character without budgeting questions. Forensic cases (case-001/002/003)
+  // keep the 3-scan rule since the cap is part of the calibration game.
   const scansUsed = Object.values(asked).reduce((n, set) => n + set.size, 0);
-  const scansRemaining = Math.max(0, caseData.maxScans - scansUsed);
+  const scansRemaining = (reviewCase || caseData?.correctVerdict == null)
+    ? Infinity
+    : Math.max(0, caseData.maxScans - scansUsed);
   // First-case tutorial gate: case-001 requires the player to start with
   // GR80/ETHOS (the Monk) so he can deliver the rules audio. The other
   // consultant buttons stay locked until the player either taps Monk this
@@ -1252,6 +1284,7 @@ export default function CyborgTemple() {
     setTradeMode('game');
     setGameStarted(true);
     setCurrentCaseIndex(0);
+    setReviewCase(null);
     setAsked(createEmptyAskedMap());
     setVisitedStations(new Set());
     setActiveAnswer(null);
@@ -1261,9 +1294,29 @@ export default function CyborgTemple() {
     setBrier(null);
     setRevealPhase(null);
   };
+  // Token Review entry — same reset shape as enterGameMode, but the case
+  // body comes from the generated reviewCase instead of the CASE_FILES
+  // array. tradeMode stays as 'game' so the entire game UI (HUD, question
+  // panel, EvidenceScreens, verdict ribbon) lights up unchanged; the
+  // review identity is implicit in caseData.correctVerdict being null.
+  const enterReviewMode = (reviewCaseObj) => {
+    if (!reviewCaseObj) return;
+    setReviewCase(reviewCaseObj);
+    setTradeMode('game');
+    setGameStarted(true);
+    setAsked(createEmptyAskedMap());
+    setVisitedStations(new Set());
+    setActiveAnswer(null);
+    setActiveReaction(null);
+    rulesSpokenRef.current = true; // skip rules on reviews — players got them in forensics
+    setVerdict(null);
+    setBrier(null);
+    setRevealPhase(null);
+  };
   const returnToServiceRail = () => {
     setTradeMode(null);
     setGameStarted(false);
+    setReviewCase(null);
     // Clear post-game state so the vindication useEffect doesn't refire when
     // the player focuses a new character in the lobby (focusedAgent change
     // would recompute vindicationDelivery against the stale verdict and
@@ -1288,6 +1341,10 @@ export default function CyborgTemple() {
     if (!verdict) return null;
     if (revealPhase !== 'reveal' && revealPhase !== 'vindicate') return null;
     if (verdict === 'abstain') return 'abstained';
+    // Token Review cases carry no ground truth — every outcome falls
+    // through to 'abstained' so the verdict screen stays neutral (no
+    // phantom right/wrong grading against a non-existent answer key).
+    if (caseData.correctVerdict == null) return 'abstained';
     return verdict === caseData.correctVerdict ? 'aligned' : 'missed';
   }, [verdict, revealPhase, caseData.correctVerdict]);
 
@@ -1491,12 +1548,55 @@ export default function CyborgTemple() {
         return;
       }
 
-      // No `audio` field → silent for now (line not yet recorded). The
-      // character still cross-fades to idle and the text reveals in the
-      // widget; speechActive's safety-net timer in speakLine clears it.
-      // No SitePal call avoids TTS-related errors (em-dash 503s, mismatched
-      // voice IDs, CORS noise) while recording is in progress.
+      // No `audio` field → no pre-recorded line. Two sub-paths:
+      //   • Station has a `voice` config (review mode for monk/demon/
+      //     marisol) → push a sayText request through the SitePal
+      //     queue so the character actually speaks the LLM text.
+      //   • Station has no voice config (recorded case files where a
+      //     line is still pending recording) → silent placeholder
+      //     animation only; just flip speechActive + arm the safety
+      //     timer so the on-screen reveal still runs.
       if (!resolved.audio) {
+        const station = caseDataRef.current?.stations?.[stationKey];
+        const voiceCfg = station?.voice;
+        const voice = typeof voiceCfg === 'string' ? voiceCfg : voiceCfg?.voice;
+        const lang = typeof voiceCfg === 'object' ? voiceCfg?.lang : undefined;
+        const engine = typeof voiceCfg === 'object' ? voiceCfg?.engine : undefined;
+
+        if (voice) {
+          const speech = {
+            type: 'text',
+            text: resolved.text,
+            voice,
+            lang,
+            engine,
+          };
+          window.__sitePalPendingSpeech = {
+            characterId,
+            sceneId: sceneConfig.sceneId,
+            speech,
+          };
+          if (
+            window.__sitePalSceneLoaded === true &&
+            window.__sitePalCurrentSceneId === sceneConfig.sceneId &&
+            typeof window.__sitePalSpeakPending === 'function'
+          ) {
+            window.__sitePalSpeakPending(null);
+          }
+          // speechActive is flipped on by the vh_audioStarted callback
+          // once SitePal actually begins playback. The text branch
+          // shares that callback path with the audio branch.
+          return;
+        }
+
+        // Silent fallback (no voice config, no recording). Mirrors the
+        // Eugene branch above so reveal animations still tick.
+        setSpeechActive(true);
+        const safetyMs = Math.max(4000, Math.min(60000, charBudget * 70));
+        speechEndTimerRef.current = setTimeout(() => {
+          setSpeechActive(false);
+          speechEndTimerRef.current = null;
+        }, safetyMs);
         return;
       }
       const speech = { type: 'audio', audioName: resolved.audio };
@@ -1710,10 +1810,31 @@ export default function CyborgTemple() {
     speakLine(q.a, stationKey);
   };
 
+  // Token Review path — the four characters render their own verdicts
+  // via the LLM pipeline; the player just opens the report. Skips the
+  // weighing → reveal → vindicate state machine (no character reaction
+  // to play since the player didn't choose anything) and jumps straight
+  // to 'vindicate' so the consensus ribbon renders immediately.
+  const revealTeamVerdict = () => {
+    if (verdict) return;
+    // Stash the team's plurality leaning as the "verdict" so the existing
+    // gating on `verdict` flips the ribbon on. Defaults to 'abstain' if
+    // somehow the consensus block is missing.
+    const teamVerdict = caseData?.consensus?.leaning;
+    const v = ['believe', 'doubt', 'abstain', 'dormant', 'split'].includes(teamVerdict)
+      ? teamVerdict
+      : 'abstain';
+    setVerdict(v);
+    setBrier(null);
+    setRevealPhase('vindicate');
+  };
+
   const submitVerdict = (v) => {
     if (verdict) return;
     setVerdict(v);
-    setBrier(computeBrier(v, caseData.correctVerdict));
+    // No Brier score for reviews (no ground truth) — leave it null so the
+    // verdict ribbon's grade chip can suppress itself.
+    setBrier(caseData.correctVerdict == null ? null : computeBrier(v, caseData.correctVerdict));
     setRevealPhase('weighing');
     // Play the focused character's immediate verdict reaction. The reveal
     // phase driver below transitions weighing → reveal (when reaction ends)
@@ -3002,7 +3123,11 @@ export default function CyborgTemple() {
                 /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY). */}
             <>
               {tradeMode !== 'game' && !focusedAgent && (
-                <TradeServiceRail />
+                <TradeServiceRail
+                  onSelect={(serviceId) => {
+                    if (serviceId === 'analysis') setShowReviewFunnel(true);
+                  }}
+                />
               )}
               {/* In-scene HUD strip — top of viewport, 40px tall, doesn't
                   block. Shows case name + scans remaining. */}
@@ -3033,7 +3158,29 @@ export default function CyborgTemple() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {!isMobileView && <span style={{ color: '#8effc4', fontWeight: 700 }}>// CASE</span>}
+                  {!isMobileView && (
+                    <span style={{ color: '#8effc4', fontWeight: 700 }}>
+                      {reviewCase ? '// REVIEW' : '// CASE'}
+                    </span>
+                  )}
+                  {reviewCase ? (
+                    // Review mode — case is bound to the resolved token, so
+                    // the file picker is replaced with a plain label. The
+                    // dropdown's CASE_FILES choices would be no-ops while
+                    // reviewCase overrides currentCaseIndex anyway.
+                    <span
+                      style={{
+                        padding: isMobileView ? '3px 8px' : '4px 10px',
+                        background: 'rgba(142,233,255,0.10)',
+                        border: '1px solid rgba(142,233,255,0.55)',
+                        color: '#c8ffe0',
+                        borderRadius: 4,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {caseData.projectName}
+                    </span>
+                  ) : (
                   <div ref={caseMenuRef} style={{ position: 'relative', display: 'inline-flex' }}>
                     <button
                       type="button"
@@ -3162,6 +3309,7 @@ export default function CyborgTemple() {
                       </div>
                     )}
                   </div>
+                  )}
                   <span style={{ color: '#3a6b54' }}>·</span>
                   <span style={{ color: '#8effc4' }}>{caseData.ticker}</span>
                   {!isMobileView && <span style={{ color: '#3a6b54' }}>·</span>}
@@ -3248,8 +3396,10 @@ export default function CyborgTemple() {
                   {/* Prominent scan counter — centered header bar at the top of
                       the console so the player can't miss how many questions
                       remain. Color shifts as the budget burns down. On mobile
-                      this is replaced by the compact pill in the top HUD. */}
-                  {!isMobileView && (() => {
+                      this is replaced by the compact pill in the top HUD.
+                      Hidden in Token Review mode — there's no scan budget to
+                      surface there. */}
+                  {!isMobileView && !isReviewMode && (() => {
                     const remaining = scansRemaining;
                     const accent =
                       remaining <= 0 ? '#ff3ea0'
@@ -3441,7 +3591,7 @@ export default function CyborgTemple() {
                                     cursor: 'pointer',
                                   }}
                                 >
-                                  ▸ VIEW ON SCREEN
+                                  ▸ VIEW EVIDENCE
                                 </button>
                               )}
                             </div>
@@ -3627,7 +3777,9 @@ export default function CyborgTemple() {
                               NOTHING MORE TO ASK HERE
                             </div>
                             <div style={{ fontSize: 12, color: '#c8ffe0', fontStyle: 'italic', lineHeight: 1.5, maxWidth: 280 }}>
-                              Try another consultant — {scansRemaining} {scansRemaining === 1 ? 'question' : 'questions'} remaining.
+                              {isReviewMode
+                                ? 'Try another consultant for their angle on this token.'
+                                : `Try another consultant — ${scansRemaining} ${scansRemaining === 1 ? 'question' : 'questions'} remaining.`}
                             </div>
                             <div style={{
                               fontSize: 22,
@@ -3676,7 +3828,7 @@ export default function CyborgTemple() {
                               {q.q}
                             </button>
                           ))}
-                          {!isMobileView && (
+                          {!isMobileView && !isReviewMode && (
                             <div style={{ fontSize: 9, letterSpacing: '0.18em', color: '#3a6b54', marginTop: 2, textAlign: 'right' }}>
                               each question costs 1 of {scansRemaining} {scansRemaining === 1 ? 'scan' : 'scans'}
                             </div>
@@ -3715,8 +3867,9 @@ export default function CyborgTemple() {
                         consultant railway so the player can't miss it. Same
                         height as the portrait tiles; narrower since it's
                         just a number. Color follows the same red/amber/green
-                        threshold the desktop header uses. */}
-                    {isMobileView && (() => {
+                        threshold the desktop header uses. Hidden in Token
+                        Review mode — no scan budget there. */}
+                    {isMobileView && !isReviewMode && (() => {
                       const r = scansRemaining;
                       const accent = r <= 0 ? '#ff3ea0' : r === 1 ? '#ffb84d' : '#8effc4';
                       const soft = r <= 0 ? 'rgba(255,62,160,0.55)'
@@ -3894,7 +4047,9 @@ export default function CyborgTemple() {
                                 : allAsked && isVisited
                                   ? 'ASKED'
                                   : isVisited
-                                    ? `${Math.min(remaining, scansRemaining)} LEFT`
+                                    ? (isReviewMode
+                                        ? `${remaining} LEFT`
+                                        : `${Math.min(remaining, scansRemaining)} LEFT`)
                                     : 'TAP'}
                             </div>
                           </div>
@@ -4094,7 +4249,15 @@ export default function CyborgTemple() {
                         animation: ribbonRiseIn 0.45s ease-out both;
                       }
                     `}</style>
-                    {(() => {
+                    {isReviewMode && caseData?.consensus ? (
+                      <ConsensusRibbon
+                        consensus={caseData.consensus}
+                        stations={caseData.stations}
+                        token={{ projectName: caseData.projectName, ticker: caseData.ticker, chain: caseData.chain }}
+                        isMobileView={isMobileView}
+                        onClose={returnToServiceRail}
+                      />
+                    ) : (() => {
                       const isCorrect = verdict === caseData.correctVerdict;
                       const isAbstain = verdict === 'abstain';
                       const grade = brier <= 0.05 ? 'EXCELLENT' : brier <= 0.15 ? 'STRONG' : brier <= 0.30 ? 'FAIR' : 'POOR';
@@ -4311,7 +4474,8 @@ export default function CyborgTemple() {
                           </div>
                         </>
                       );
-                    })()}
+                    })()
+                    }
                   </div>,
                   document.body
                 )}
@@ -4323,7 +4487,49 @@ export default function CyborgTemple() {
                    placeholders for now. */
                 onBuyClick={() => {}}
                 centerSlot={
-                  tradeMode === 'game' ? (
+                  tradeMode === 'game' && isReviewMode ? (
+                    // Review mode — the team renders the verdict, not
+                    // the player. Single READ TEAM VERDICT button stays
+                    // disabled until they've asked at least one question
+                    // (otherwise the consensus screen would render
+                    // before they've engaged with any character).
+                    (() => {
+                      const enabled = investigated.size > 0 && !verdict;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => { if (enabled) revealTeamVerdict(); }}
+                          disabled={!enabled}
+                          aria-label="Read the team's verdict on this token"
+                          title={enabled
+                            ? "Read the team's consensus"
+                            : "Talk to at least one character first"}
+                          style={{
+                            minWidth: 220,
+                            height: 60,
+                            padding: '10px 18px',
+                            borderRadius: 10,
+                            background: enabled
+                              ? 'linear-gradient(135deg, rgba(142,233,255,0.20), rgba(13,50,80,0.32))'
+                              : 'rgba(20,30,40,0.45)',
+                            border: `1px solid ${enabled ? 'rgba(142,233,255,0.85)' : 'rgba(142,233,255,0.25)'}`,
+                            color: enabled ? '#c8efff' : 'rgba(200,239,255,0.35)',
+                            fontFamily: "'Orbitron', monospace",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            letterSpacing: '0.18em',
+                            cursor: enabled ? 'pointer' : 'not-allowed',
+                            textShadow: enabled ? '0 0 10px rgba(142,233,255,0.55)' : 'none',
+                            boxShadow: enabled
+                              ? '0 0 14px rgba(142,233,255,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
+                              : 'none',
+                          }}
+                        >
+                          ✦ READ TEAM VERDICT
+                        </button>
+                      );
+                    })()
+                  ) : tradeMode === 'game' ? (
                     <div
                       style={{
                         display: 'flex',
@@ -4466,6 +4672,21 @@ export default function CyborgTemple() {
             <BuyModal
               isOpen={showBuyModal}
               onClose={() => setShowBuyModal(false)}
+            />
+
+            {/* Token Review funnel — triggered from the service-rail tile.
+                On Confirm, the funnel hands back a case-file-shaped object
+                generated from the resolved token. Next step will route that
+                object into the game machinery (tradeMode === 'review'); for
+                now we just log and close, matching the "step 1 funnel only"
+                scope. */}
+            <ReviewFunnel
+              isOpen={showReviewFunnel}
+              onClose={() => setShowReviewFunnel(false)}
+              onConfirm={(generatedCase) => {
+                setShowReviewFunnel(false);
+                enterReviewMode(generatedCase);
+              }}
             />
 
             {/* Leave-game confirm — fires when the bottom-nav MENU is tapped

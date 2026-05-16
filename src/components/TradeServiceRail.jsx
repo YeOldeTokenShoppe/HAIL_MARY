@@ -9,6 +9,7 @@ const SERVICES = [
     accent: "phos",
     cta: "SELECTED",
     selected: true,
+    interactive: false, // entered via the bottom Start button
   },
   {
     id: "analysis",
@@ -16,12 +17,13 @@ const SERVICES = [
     title: "Token Review",
     desc: "Request a team analysis of any token.",
     accent: "cyan",
-    cta: "SOON",
+    cta: "BEGIN",
     selected: false,
+    interactive: true,
   },
 ];
 
-export default function TradeServiceRail() {
+export default function TradeServiceRail({ onSelect } = {}) {
   const shellAccent = SERVICES.find((s) => s.selected)?.accent ?? "phos";
 
   return (
@@ -33,20 +35,44 @@ export default function TradeServiceRail() {
           SERVICES ONLINE
         </div>
         <div className="tsr-options" role="radiogroup" aria-label="Available services">
-          {SERVICES.map((service) => (
-            <div
-              key={service.id}
-              role="radio"
-              aria-checked={service.selected}
-              aria-disabled={!service.selected || undefined}
-              className={`tsr-card tsr-card-${service.accent}${service.selected ? " is-active" : " is-inert"}`}
-            >
-              <span className="tsr-card-eyebrow">{service.eyebrow}</span>
-              <span className="tsr-card-title">{service.title}</span>
-              <span className="tsr-card-desc">{service.desc}</span>
-              <span className="tsr-card-cta">{service.cta}</span>
-            </div>
-          ))}
+          {SERVICES.map((service) => {
+            const handleClick = service.interactive && onSelect
+              ? () => onSelect(service.id)
+              : undefined;
+            const className = [
+              'tsr-card',
+              `tsr-card-${service.accent}`,
+              service.selected ? 'is-active' : '',
+              !service.selected && !service.interactive ? 'is-inert' : '',
+              service.interactive ? 'is-interactive' : '',
+            ].filter(Boolean).join(' ');
+            return (
+              <div
+                key={service.id}
+                role={service.interactive ? 'button' : 'radio'}
+                tabIndex={service.interactive ? 0 : -1}
+                aria-checked={service.interactive ? undefined : service.selected}
+                aria-disabled={!service.selected && !service.interactive || undefined}
+                onClick={handleClick}
+                onKeyDown={
+                  handleClick
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleClick();
+                        }
+                      }
+                    : undefined
+                }
+                className={className}
+              >
+                <span className="tsr-card-eyebrow">{service.eyebrow}</span>
+                <span className="tsr-card-title">{service.title}</span>
+                <span className="tsr-card-desc">{service.desc}</span>
+                <span className="tsr-card-cta">{service.cta}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -187,6 +213,25 @@ const STYLES = `
 
 .tsr-card.is-inert .tsr-card-cta {
   opacity: 0.5;
+}
+
+.tsr-card.is-interactive {
+  cursor: pointer;
+}
+
+.tsr-card.is-interactive:hover,
+.tsr-card.is-interactive:focus-visible {
+  border-color: color-mix(in srgb, var(--card-accent) 80%, white 6%);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 14%, rgba(10, 58, 38, 0.22)), rgba(2, 5, 8, 0.52));
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--card-accent) 28%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 38%, transparent);
+  outline: none;
+}
+
+.tsr-card.is-interactive .tsr-card-cta {
+  opacity: 1;
 }
 
 .tsr-card-phos { --card-accent: #8effc4; }
