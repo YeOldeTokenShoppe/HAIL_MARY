@@ -367,7 +367,7 @@ rulesIntro: {
           audio: "case001_trinity_vind_alig",
         },
         missed: {
-          text: "Walk it off. Wallet patterns are not intuitive until you have watched a hundred exits.",
+          text: "Walk it off. Wallet patterns are not intuitive until you have watched a hundred.",
           audio: "case001_trinity_vind_miss",
         },
         abstained: {

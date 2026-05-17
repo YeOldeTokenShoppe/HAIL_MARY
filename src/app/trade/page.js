@@ -181,6 +181,27 @@ function SitePalHostEmbed({ config }) {
       }
     };
 
+    // Warm SitePal's audio cache for the just-loaded scene. loadAudio()
+    // fetches+buffers the named track without playing it, so the first
+    // sayAudio after a real click skips the cold fetch (~200–800ms saved
+    // on the first per-character intro). Tracked in __sitePalLoadedAudio
+    // so we don't re-fetch the same name on every scene re-enter.
+    const preloadAudioForScene = (sceneId) => {
+      if (typeof window === "undefined" || typeof window.loadAudio !== "function") return;
+      const config = Object.values(SITEPAL_PROJECTION_CONFIG)
+        .find((c) => c.sceneId === sceneId);
+      const names = Array.isArray(config?.audioNames) ? config.audioNames : [];
+      if (names.length === 0) return;
+      const loaded = (window.__sitePalLoadedAudio ||= new Set());
+      names.forEach((name) => {
+        if (!name || loaded.has(name)) return;
+        try {
+          window.loadAudio(name);
+          loaded.add(name);
+        } catch (e) {}
+      });
+    };
+
     const clearSpeechRetryTimer = () => {
       if (window.__sitePalSpeechRetryTimer) {
         clearTimeout(window.__sitePalSpeechRetryTimer);
@@ -340,10 +361,19 @@ function SitePalHostEmbed({ config }) {
       // and plays regardless of stopSpeech. So we cancel the timer
       // itself when the user moves on.
       //
+      // Fast path: when the active scene is already loaded and matches
+      // the request (no swap pending), use a 0ms timer instead of 160.
+      // We still go through setTimeout so clearSpeechInitTimer can win
+      // the race if the user clicks away mid-task. The 160ms gap is
+      // preserved when a scene swap is in flight so SitePal has time
+      // to settle interruptMode/volume after loadSceneByID.
+      const sceneReady = window.__sitePalSceneLoaded === true
+        && (!request.sceneId || request.sceneId === window.__sitePalCurrentSceneId);
+      const initDelayMs = sceneReady ? 0 : 160;
       window.__sitePalSpeechInitTimer = setTimeout(() => {
         window.__sitePalSpeechInitTimer = null;
         runSpeechRequest(request, false);
-      }, 160);
+      }, initDelayMs);
       return true;
     };
 
@@ -383,6 +413,7 @@ function SitePalHostEmbed({ config }) {
         if (typeof window.stopSpeech === "function") {
           try { window.stopSpeech(); } catch (e) {}
         }
+        preloadAudioForScene(window.__sitePalCurrentSceneId);
         // Brief delay before advancing so SitePal can settle.
         setTimeout(advancePreload, 150);
         return;
@@ -396,6 +427,7 @@ function SitePalHostEmbed({ config }) {
         window.__sitePalPreloading = true;
         window.__sitePalPreloadQueue = PRELOAD_QUEUE.slice();
         console.log('[SitePal] starting preload', window.__sitePalPreloadQueue);
+        preloadAudioForScene(window.__sitePalCurrentSceneId);
         // Mute AND stopSpeech — the published scene has a bound audio
         // (`11devil1`) that SitePal auto-plays on embed load. setPlayerVolume(0)
         // alone leaves that audio queued in the AudioContext (suspended
@@ -915,6 +947,9 @@ export default function CyborgTemple() {
   // At this stage the funnel just builds a stub case object on Confirm; the
   // x402 paywall and live data layer land in subsequent passes.
   const [showReviewFunnel, setShowReviewFunnel] = useState(false);
+  // Service-rail selection — drives both the active tile and the bottom
+  // Start button's label/action. 'game' = Token Forensics, 'analysis' = Token Review.
+  const [selectedService, setSelectedService] = useState('game');
   // Which modality the user has entered. null = lobby (no mode chosen).
   // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
   const [tradeMode, setTradeMode] = useState(null);
@@ -2017,7 +2052,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v69_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v70_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -2821,6 +2856,12 @@ export default function CyborgTemple() {
               externalFocusAgent={revealMode ? 'Stage' : focusedAgent}
               speechActive={speechActive}
               revealMode={revealMode}
+              showEugeneLobbyBubble={tradeMode !== 'game' && focusedAgent === 'RL80'}
+              eugeneGameBubble={
+                tradeMode === 'game' && !verdict && focusedAgent === 'RL80'
+                  ? eugeneBubble
+                  : null
+              }
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 console.log(`CoinFace ${coinIndex} tapped`)
@@ -2943,14 +2984,21 @@ export default function CyborgTemple() {
         {/* Floating Character Label on Focus */}
         {(() => {
           const agentInfo = {
-            RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Scans the tech tapestry for uncommon insights.' },
+            RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Every story wants to be a myth. The rare ones earn it.' },
             Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Short seller. Insider trader.' },
             Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android theologian hell-bent on saving humanity from itself.' },
             Detective: { name: 'Detective Trinity', pronunciation: '', tagline: 'Field agent for an interdimensional cyber-crimes task force.' },
           };
           // In game mode, the in-scene evidence side panel takes over —
           // suppress the floating agent label so the two cards don't stack.
-          const info = tradeMode !== 'game' && focusedAgent && agentInfo[focusedAgent];
+          // Eugene is also suppressed here in lobby: she speaks via chat
+          // bubble (rendered below), not the generic gold card — keeps her
+          // medium consistent between lobby and game.
+          const info =
+            tradeMode !== 'game' &&
+            focusedAgent &&
+            focusedAgent !== 'RL80' &&
+            agentInfo[focusedAgent];
           // On mobile, place the label as a bottom banner above the bottom
           // nav so it doesn't overlap the focused character. On desktop,
           // keep the right-side floating card.
@@ -3124,9 +3172,8 @@ export default function CyborgTemple() {
             <>
               {tradeMode !== 'game' && !focusedAgent && (
                 <TradeServiceRail
-                  onSelect={(serviceId) => {
-                    if (serviceId === 'analysis') setShowReviewFunnel(true);
-                  }}
+                  selectedId={selectedService}
+                  onSelect={setSelectedService}
                 />
               )}
               {/* In-scene HUD strip — top of viewport, 40px tall, doesn't
@@ -3450,7 +3497,7 @@ export default function CyborgTemple() {
                           fontWeight: 800,
                           opacity: 0.9,
                         }}>
-                          {remaining === 1 ? 'SCAN LEFT' : 'SCANS LEFT'}
+                          {remaining === 1 ? 'QUESTION LEFT' : 'QUESTIONS LEFT'}
                         </div>
                       </div>
                     );
@@ -4130,57 +4177,10 @@ export default function CyborgTemple() {
                 );
               })()}
 
-              {/* Eugene's text bubble — she's TTS-less because SitePal can't
-                  drive a unicorn head. When she's focused and has a current
-                  line, render it as a chat bubble overlaying the upper canvas.
-                  Auto-clears via speakLine's timer. Positioned to read as if
-                  coming from her direction, not 3D-anchored to her head bone
-                  (that's a later polish pass). */}
-              {tradeMode === 'game' && !verdict && focusedAgent === 'RL80' && eugeneBubble && (
-                <div
-                  style={{
-                    position: 'fixed',
-                    top: 'calc(env(safe-area-inset-top, 0px) + 64px)',
-                    left: isMobileView ? '50%' : 'calc(50% - 80px)',
-                    transform: 'translateX(-50%)',
-                    zIndex: 1060,
-                    maxWidth: 'min(360px, calc(100vw - 24px))',
-                    padding: '12px 16px 14px',
-                    background: 'linear-gradient(180deg, rgba(255,235,250,0.96), rgba(255,210,240,0.96))',
-                    border: '1px solid rgba(255,62,160,0.6)',
-                    borderRadius: 16,
-                    boxShadow: '0 6px 24px rgba(255,62,160,0.32), 0 0 0 4px rgba(255,255,255,0.4) inset',
-                    color: '#3a0f2b',
-                    fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                    fontSize: 13,
-                    lineHeight: 1.45,
-                    pointerEvents: 'none',
-                    transition: 'opacity 0.2s ease',
-                  }}
-                >
-                  <div style={{
-                    position: 'absolute',
-                    bottom: -10,
-                    left: 36,
-                    width: 0,
-                    height: 0,
-                    borderLeft: '10px solid transparent',
-                    borderRight: '10px solid transparent',
-                    borderTop: '12px solid rgba(255,210,240,0.96)',
-                    filter: 'drop-shadow(0 2px 1px rgba(255,62,160,0.3))',
-                  }} />
-                  <div style={{
-                    fontSize: 9,
-                    letterSpacing: '0.22em',
-                    color: 'rgba(140,30,90,0.7)',
-                    marginBottom: 4,
-                    textTransform: 'uppercase',
-                  }}>
-                    @eugene
-                  </div>
-                  <div>{eugeneBubble}</div>
-                </div>
-              )}
+              {/* Eugene's in-game dialogue bubble now renders inside the 3D
+                  scene (CyborgTempleScene's `eugeneGameBubble` prop), anchored
+                  to her head bone so it tracks her in world space and stays
+                  out of her head/horn footprint. */}
 
               {/* Reveal ribbon — bottom-anchored strip so the curtain-call
                   lineup gets the full upper frame. Same state machine as
@@ -4576,28 +4576,36 @@ export default function CyborgTemple() {
                       })}
                     </div>
                   ) : (
-                    <button
-                      onClick={enterGameMode}
-                      aria-label="Start Token Trainer"
-                      style={{
-                        minWidth: 220,
-                        height: 60,
-                        padding: '10px 22px',
-                        borderRadius: 10,
-                        background: 'linear-gradient(135deg, rgba(77,255,170,0.18), rgba(13,80,50,0.32))',
-                        border: '1px solid rgba(77,255,170,0.85)',
-                        color: '#8effc4',
-                        fontFamily: "'Orbitron', monospace",
-                        fontSize: 12,
-                        fontWeight: 800,
-                        letterSpacing: '0.2em',
-                        cursor: 'pointer',
-                        textShadow: '0 0 10px rgba(77,255,170,0.55)',
-                        boxShadow: '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
-                      }}
-                    >
-                      ✦ START TOKEN FORENSICS
-                    </button>
+                    (() => {
+                      const isReview = selectedService === 'analysis';
+                      const accent = isReview
+                        ? { border: 'rgba(142,233,255,0.85)', text: '#8ee9ff', shadow: 'rgba(142,233,255,0.55)', glow: 'rgba(142,233,255,0.35)', tint: 'rgba(13,50,80,0.32)', soft: 'rgba(142,233,255,0.18)' }
+                        : { border: 'rgba(77,255,170,0.85)', text: '#8effc4', shadow: 'rgba(77,255,170,0.55)', glow: 'rgba(77,255,170,0.35)', tint: 'rgba(13,80,50,0.32)', soft: 'rgba(77,255,170,0.18)' };
+                      return (
+                        <button
+                          onClick={isReview ? () => setShowReviewFunnel(true) : enterGameMode}
+                          aria-label={isReview ? 'Start Token Review' : 'Start Token Forensics'}
+                          style={{
+                            minWidth: 220,
+                            height: 60,
+                            padding: '10px 22px',
+                            borderRadius: 10,
+                            background: `linear-gradient(135deg, ${accent.soft}, ${accent.tint})`,
+                            border: `1px solid ${accent.border}`,
+                            color: accent.text,
+                            fontFamily: "'Orbitron', monospace",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            letterSpacing: '0.2em',
+                            cursor: 'pointer',
+                            textShadow: `0 0 10px ${accent.shadow}`,
+                            boxShadow: `0 0 14px ${accent.glow}, inset 0 1px 0 rgba(255,255,255,0.1)`,
+                          }}
+                        >
+                          {isReview ? '✦ START TOKEN REVIEW' : '✦ START TOKEN FORENSICS'}
+                        </button>
+                      );
+                    })()
                   )
                 }
                 /* Right slot: in lobby it's HOME; in game mode it becomes

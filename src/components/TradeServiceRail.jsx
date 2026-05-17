@@ -7,9 +7,6 @@ const SERVICES = [
     title: "Token Forensics",
     desc: "Three questions. One verdict.",
     accent: "phos",
-    cta: "SELECTED",
-    selected: true,
-    interactive: false, // entered via the bottom Start button
   },
   {
     id: "analysis",
@@ -17,14 +14,12 @@ const SERVICES = [
     title: "Token Review",
     desc: "Request a team analysis of any token.",
     accent: "cyan",
-    cta: "BEGIN",
-    selected: false,
-    interactive: true,
   },
 ];
 
-export default function TradeServiceRail({ onSelect } = {}) {
-  const shellAccent = SERVICES.find((s) => s.selected)?.accent ?? "phos";
+export default function TradeServiceRail({ selectedId = "game", onSelect } = {}) {
+  const activeService = SERVICES.find((s) => s.id === selectedId) ?? SERVICES[0];
+  const shellAccent = activeService.accent;
 
   return (
     <div className="tsr-root" aria-label="Trade page services">
@@ -36,23 +31,21 @@ export default function TradeServiceRail({ onSelect } = {}) {
         </div>
         <div className="tsr-options" role="radiogroup" aria-label="Available services">
           {SERVICES.map((service) => {
-            const handleClick = service.interactive && onSelect
+            const isSelected = service.id === activeService.id;
+            const handleClick = !isSelected && onSelect
               ? () => onSelect(service.id)
               : undefined;
             const className = [
               'tsr-card',
               `tsr-card-${service.accent}`,
-              service.selected ? 'is-active' : '',
-              !service.selected && !service.interactive ? 'is-inert' : '',
-              service.interactive ? 'is-interactive' : '',
+              isSelected ? 'is-active' : 'is-interactive',
             ].filter(Boolean).join(' ');
             return (
               <div
                 key={service.id}
-                role={service.interactive ? 'button' : 'radio'}
-                tabIndex={service.interactive ? 0 : -1}
-                aria-checked={service.interactive ? undefined : service.selected}
-                aria-disabled={!service.selected && !service.interactive || undefined}
+                role="radio"
+                tabIndex={0}
+                aria-checked={isSelected}
                 onClick={handleClick}
                 onKeyDown={
                   handleClick
@@ -69,7 +62,7 @@ export default function TradeServiceRail({ onSelect } = {}) {
                 <span className="tsr-card-eyebrow">{service.eyebrow}</span>
                 <span className="tsr-card-title">{service.title}</span>
                 <span className="tsr-card-desc">{service.desc}</span>
-                <span className="tsr-card-cta">{service.cta}</span>
+                <span className="tsr-card-cta">{isSelected ? 'SELECTED' : 'SELECT'}</span>
               </div>
             );
           })}

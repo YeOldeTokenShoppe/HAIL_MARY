@@ -417,6 +417,8 @@ const CyborgTempleScene = ({
   externalFocusAgent = null, // When set, sync internal focus to this agentId — lets the parent (e.g. the consultant railway in /trade) fly the camera to a character without an in-scene click. Pass `null` to clear focus.
   speechActive = false, // When true, the focused character cross-fades to idle (speaking to player). When false, they cross-fade to typing (looking up info). Parent flips this when game-flow audio starts/ends.
   revealMode = null, // null | 'aligned' | 'missed' | 'abstained'. When set, hides the StageProps collection, flies the camera to the Stage preset, and plays each character's reaction animation. Parent sets this after the verdict is locked; clear it to restore the gameplay scene for the next case.
+  showEugeneLobbyBubble = false, // When true (lobby + RL80 focused), render Eugene's in-scene intro chat bubble anchored to her head bone. Lets her introduce herself in her own medium (chat bubble) without overlaying her head.
+  eugeneGameBubble = null, // String dialogue line for Eugene's in-game speech. When set, renders the same head-anchored chat bubble but with just the dialogue content. Mutually exclusive with the lobby intro variant.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -971,6 +973,11 @@ const CyborgTempleScene = ({
   const detectiveHeadBoneRef = useRef();
   // Hint marker group refs (positioned each frame from the head bones)
   const rl80HintRef = useRef();
+  // Anchor for Eugene's lobby chat bubble. Position is updated every frame to
+  // track her head bone (plus a small Y offset) so the bubble follows her in
+  // world space, while a CSS transform on the rendered HTML shifts it up-left
+  // of the anchor so her head/horn never gets covered.
+  const eugeneLobbyBubbleRef = useRef();
   const demonHintRef = useRef();
   const monkHintRef = useRef();
   const fluffyHintRef = useRef();
@@ -1447,8 +1454,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v69_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v69.glb";
+    let modelPath = "/models/RL80_4anims_v70_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v70.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -5484,6 +5491,20 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
     //     }
     //   }
     // }
+
+    // Eugene's lobby chat bubble anchor — track her head bone in world space
+    // so the bubble follows her idle bob. The Y bump puts the anchor just
+    // above her horn so the bubble's bottom-right tail tip lands in clear
+    // space when the CSS transform shifts it up-left of the anchor.
+    if (eugeneLobbyBubbleRef.current && rl80HeadBoneRef.current) {
+      const headWorldPos = new THREE.Vector3();
+      rl80HeadBoneRef.current.getWorldPosition(headWorldPos);
+      eugeneLobbyBubbleRef.current.position.set(
+        headWorldPos.x ,
+        headWorldPos.y ,
+        headWorldPos.z + 0.2,
+      );
+    }
   });
 
   // Always return the group that contains the model
@@ -5559,6 +5580,99 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
           );
         })()}
       </group>
+      {(showEugeneLobbyBubble || eugeneGameBubble) && (
+        <group ref={eugeneLobbyBubbleRef} position={[0, 9999, 0]}>
+          <Html zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
+            <div
+              style={{
+                // Anchor sits just above Eugene's horn (set in useFrame). The
+                // bubble extends UP and to the LEFT from there via this
+                // translate, so the bottom-right tail tip lands at the anchor
+                // and the bubble body stays clear of her head/horn footprint.
+                transform: 'translate(-100%, -50%)',
+                width: 'min(300px, 70vw)',
+                padding: '12px 16px 14px',
+                background:
+                  'linear-gradient(180deg, rgba(255,235,250,0.96), rgba(255,210,240,0.96))',
+                border: '1px solid rgba(255,62,160,0.6)',
+                borderRadius: 16,
+                boxShadow:
+                  '0 6px 24px rgba(255,62,160,0.32), 0 0 0 4px rgba(255,255,255,0.4) inset',
+                color: '#3a0f2b',
+                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                fontSize: 13,
+                lineHeight: 1.45,
+                position: 'relative',
+                // Explicit non-blocking. drei's `<Html>` `style` prop sets
+                // pointerEvents on the projection wrapper, but the transform
+                // we apply on this inner div creates a fresh stacking
+                // context that can swallow clicks meant for the character
+                // mesh underneath — specifically the click-on-focused-agent
+                // unfocus toggle in handleClick (around line 3490). Setting
+                // it explicitly here lets every click pass straight through.
+                pointerEvents: 'none',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: -10,
+                  right: 18,
+                  width: 0,
+                  height: 0,
+                  borderLeft: '10px solid transparent',
+                  borderRight: '10px solid transparent',
+                  borderTop: '12px solid rgba(255,210,240,0.96)',
+                  filter: 'drop-shadow(0 2px 1px rgba(255,62,160,0.3))',
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: '0.22em',
+                  color: 'rgba(140,30,90,0.7)',
+                  marginBottom: 4,
+                  textTransform: 'uppercase',
+                }}
+              >
+                @eugene
+              </div>
+              {showEugeneLobbyBubble ? (
+                <>
+                  <div
+                    style={{
+                      fontFamily: "'Pirata One', serif",
+                      fontSize: 22,
+                      color: '#8a0e58',
+                      letterSpacing: 0.5,
+                      lineHeight: 1.05,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Eugene
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: '0.08em',
+                      color: 'rgba(140,30,90,0.6)',
+                      fontStyle: 'italic',
+                      marginBottom: 8,
+                    }}
+                  >
+                    /yoo-JEEN/
+                  </div>
+                  <div style={{ fontStyle: 'italic' }}>
+                    Every story wants to be a myth. The rare ones earn it.
+                  </div>
+                </>
+              ) : (
+                <div>{eugeneGameBubble}</div>
+              )}
+            </div>
+          </Html>
+        </group>
+      )}
       {showCharacterHints && [
         { id: 'RL80', ref: rl80HintRef },
         { id: 'Demon', ref: demonHintRef },
