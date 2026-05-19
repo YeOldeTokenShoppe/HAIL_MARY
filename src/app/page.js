@@ -13,8 +13,7 @@ import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
-import TestimonialToasts from "@/components/TestimonialToasts";
-import InscribeModal from "@/components/InscribeModal";
+import ReliquaryRail from "@/components/ReliquaryRail";
 import { useCandles } from "@/hooks/useCandles";
 import {
   readCandle,
@@ -2107,7 +2106,6 @@ export default function HomePage() {
   const candleVariant = userId ? candleVariantChoice : "pillar";
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useBuyModal();
-  const [showInscribeModal, setShowInscribeModal] = useState(false);
   const [chartHovered, setChartHovered] = useState(false);
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
@@ -2513,7 +2511,8 @@ export default function HomePage() {
             ) : null}
           </blockquote>
           <p className="hero-intro">
-Sharpen your discernment against scams in the liminal terminal. Submit your trade history for absolution. Scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order. Mater ex machina. </p>
+Sharpen your discernment against scams or play the Trading Card Game in the liminal terminal. Scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order. Mater ex machina. 
+</p>
         </div>
 
         <div className="shrine-column">
@@ -2960,8 +2959,7 @@ Sharpen your discernment against scams in the liminal terminal. Submit your trad
           {
             key: 'terminal',
             label: 'TLT',
-            title: 'The Liminal Terminal — preview',
-            comingSoon: true,
+            title: 'The Liminal Terminal',
             onClick: () => { window.location.href = '/trade'; },
             icon: (
               <svg
@@ -2990,7 +2988,7 @@ Sharpen your discernment against scams in the liminal terminal. Submit your trad
         extraRight={[
           {
             key: 'lode',
-            label: 'LODE',
+            label: 'MOTHER LODE',
             title: 'Mother Lode — coming soon',
             comingSoon: true,
             icon: (
@@ -3022,13 +3020,7 @@ Sharpen your discernment against scams in the liminal terminal. Submit your trad
         initialTab="wallet"
       />
 
-      <TestimonialToasts onInscribeClick={() => setShowInscribeModal(true)} />
-
-      <InscribeModal
-        isOpen={showInscribeModal}
-        onClose={() => setShowInscribeModal(false)}
-        candleLit={candleLit}
-      />
+      <ReliquaryRail />
 
       {/* <div ref={debugRef} className="candle-debug" /> */}
 

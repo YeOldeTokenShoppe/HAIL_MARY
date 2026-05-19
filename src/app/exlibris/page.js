@@ -259,7 +259,7 @@ export default function ModelViewerPage() {
         extraRight={[
           {
             key: 'lode',
-            label: 'LODE',
+            label: 'MOTHER LODE',
             title: 'Mother Lode — coming soon',
             comingSoon: true,
             icon: (

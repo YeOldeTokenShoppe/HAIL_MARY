@@ -948,7 +948,8 @@ export default function CyborgTemple() {
   // x402 paywall and live data layer land in subsequent passes.
   const [showReviewFunnel, setShowReviewFunnel] = useState(false);
   // Service-rail selection — drives both the active tile and the bottom
-  // Start button's label/action. 'game' = Token Forensics, 'analysis' = Token Review.
+  // Start button's label/action.
+  // 'game' = Token Task Force, 'analysis' = Token Review.
   const [selectedService, setSelectedService] = useState('game');
   // Which modality the user has entered. null = lobby (no mode chosen).
   // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
@@ -1256,12 +1257,21 @@ export default function CyborgTemple() {
   // GR80/ETHOS (the Monk) so he can deliver the rules audio. The other
   // consultant buttons stay locked until the player either taps Monk this
   // session OR the rules have been heard in a prior session (rulesHeard
-  // persists in localStorage). Only applies to the first case.
+  // persists in localStorage). Only applies to the first case AND only in
+  // game mode — the lobby is meant to be freely explorable so the player
+  // can meet all four characters before committing to play. (Also: the
+  // gate's resolution paths — markRulesHeard and the visitedStations add
+  // for Monk — only run inside the game-mode speech effect, so leaving the
+  // gate active in the lobby permanently locks out the other characters
+  // until the player enters the game on this device.)
   const mustStartWithMonk =
-    caseData.id === 'case-001' && !rulesHeard && !visitedStations.has('monk');
+    tradeMode === 'game' &&
+    caseData.id === 'case-001' &&
+    !rulesHeard &&
+    !visitedStations.has('monk');
   // Gate the scan-counter "punch" animation by 3s after entering game mode
   // (when the counter first mounts), so the initial pop doesn't fire
-  // instantly on Start Token Forensics. Subsequent tick-down pops (via
+  // instantly on Start Token Task Force. Subsequent tick-down pops (via
   // key={remaining}) fire instantly once this is true. Resets when the
   // player leaves game mode so the next session re-arms the delay.
   const [scanPunchArmed, setScanPunchArmed] = useState(false);
@@ -2495,8 +2505,8 @@ export default function CyborgTemple() {
               className="custom-title"
               style={{
                 position: "relative",
-                left: isMobileView ? "1rem" : "2rem",
-                // top: "1.5rem",
+                left: isMobileView ? "1rem" : "1rem",
+                top: isMobileView ? "0rem" : "-2rem",
                 color: "#f6f5f1ff",
                 fontFamily: "UnifrakturCook, serif",
                 textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
@@ -2519,18 +2529,18 @@ export default function CyborgTemple() {
               }}
             >
             <span className="title-line" style={{ display: 'block', position: 'relative' }}>The</span>
-            <span className="title-line" style={{ display: 'block', marginLeft: "2rem",position: 'relative' }}>
+            <span className="title-line" style={{ display: 'block', marginLeft: isMobileView ? "1rem" : "2rem",position: 'relative' }}>
 
               <span style={{ fontSize: "2rem" }}></span>
                 Liminal
             </span>
-            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Terminal</span>
+            <span className="title-line" style={{ display: 'block', marginLeft: isMobileView ? "2rem" : "4rem", position: 'relative' }}>Terminal</span>
           </h1>
 
           {/* Diagonal "COMING SOON" corner ribbon — cyber-styled, neon green
               on a dark glass plate, clipped by the parent's overflow:hidden
               so it reads as a corner-pinned banner. */}
-          <div
+          {/* <div
             style={{
               position: 'absolute',
               top: isMobileView ? '4em' : '4.5em',
@@ -2575,7 +2585,7 @@ export default function CyborgTemple() {
             }}>
               Soon!
             </span>
-          </div>
+          </div> */}
 
         {/* Temple Description Panel - Separate from RL80 logo */}
         <div 
@@ -3170,7 +3180,7 @@ export default function CyborgTemple() {
             {/* Bottom Nav — rendered on both mobile and desktop, mirrors
                 /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY). */}
             <>
-              {tradeMode !== 'game' && !focusedAgent && (
+              {!tradeMode && !focusedAgent && (
                 <TradeServiceRail
                   selectedId={selectedService}
                   onSelect={setSelectedService}
@@ -4480,8 +4490,8 @@ export default function CyborgTemple() {
                   document.body
                 )}
               <MobileBottomNav
-                hideWallet
-                accountOnLeft
+                  hideWallet
+                  accountOnLeft
                 /* Trade-style center: three side-by-side actions (BUY / HOLD /
                    SELL). BUY opens the existing BuyModal; HOLD and SELL are
                    placeholders for now. */
@@ -4581,10 +4591,13 @@ export default function CyborgTemple() {
                       const accent = isReview
                         ? { border: 'rgba(142,233,255,0.85)', text: '#8ee9ff', shadow: 'rgba(142,233,255,0.55)', glow: 'rgba(142,233,255,0.35)', tint: 'rgba(13,50,80,0.32)', soft: 'rgba(142,233,255,0.18)' }
                         : { border: 'rgba(77,255,170,0.85)', text: '#8effc4', shadow: 'rgba(77,255,170,0.55)', glow: 'rgba(77,255,170,0.35)', tint: 'rgba(13,80,50,0.32)', soft: 'rgba(77,255,170,0.18)' };
+                      const handleStart = isReview
+                        ? () => setShowReviewFunnel(true)
+                        : enterGameMode;
                       return (
                         <button
-                          onClick={isReview ? () => setShowReviewFunnel(true) : enterGameMode}
-                          aria-label={isReview ? 'Start Token Review' : 'Start Token Forensics'}
+                          onClick={handleStart}
+                          aria-label={isReview ? 'Start Token Review' : 'Start Token Task Force'}
                           style={{
                             minWidth: 220,
                             height: 60,

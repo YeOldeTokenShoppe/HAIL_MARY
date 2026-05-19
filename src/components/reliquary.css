@@ -1,0 +1,192 @@
+:root {
+  --rel-gold: #f1d77a;
+  --rel-gold-dim: #b88d3d;
+  --rel-green: #83c84e;
+  --rel-cyan: #2ad6ee;
+  --rel-violet: #c597ff;
+  --rel-text: #e9e3d4;
+  --rel-muted: #9f967f;
+}
+
+.reliquary-rail {
+  position: fixed;
+  top: 7%;
+  right: 16px;
+  z-index: 60;
+  width: 290px;
+  max-width: calc(100vw - 28px);
+  max-height: calc(100vh - 14%);
+  pointer-events: auto;
+  color: var(--rel-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.reliquary-status,
+.reliquary-description {
+  font-family: "Cinzel", serif;
+  text-transform: uppercase;
+}
+
+/* ───── DESCRIPTION ───── */
+.reliquary-description {
+  margin: 0;
+  text-align: center;
+  color: var(--rel-text);
+  font-size: 11px;
+  letter-spacing: 2.2px;
+  text-shadow: 0 0 12px rgba(241, 215, 122, 0.18);
+}
+
+/* ───── STATUS PILL ───── */
+.reliquary-status {
+  align-self: center;
+  border: 1px solid;
+  border-radius: 2px;
+  padding: 4px 9px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+}
+
+.reliquary-status--live {
+  border-color: rgba(131, 200, 78, 0.5);
+  background: rgba(24, 48, 21, 0.42);
+  color: var(--rel-green);
+  box-shadow: 0 0 12px rgba(131, 200, 78, 0.18);
+}
+
+.reliquary-status--soon {
+  border-color: rgba(197, 151, 255, 0.5);
+  background: rgba(36, 24, 56, 0.5);
+  color: var(--rel-violet);
+  box-shadow: 0 0 12px rgba(197, 151, 255, 0.2);
+}
+
+/* ───── FEATURE (no box) ───── */
+.reliquary-feature {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ───── RELIC IMAGE (mouse + touch parallax tilt) ───── */
+.reliquary-image-wrap {
+  display: flex;
+  justify-content: center;
+  perspective: 1100px;
+  perspective-origin: 50% 40%;
+  cursor: pointer;
+  /* Let the browser handle vertical scrolling so users can swipe past
+     the section, but route horizontal / idle touches to our tilt JS. */
+  touch-action: pan-y;
+  /* Shadow lifts with --lift just like TradingCard's hero box-shadow */
+  filter:
+    drop-shadow(0 calc(14px + 10px * var(--lift, 0)) calc(22px + 14px * var(--lift, 0)) rgba(0, 0, 0, 0.55))
+    drop-shadow(0 0 calc(16px + 14px * var(--lift, 0)) rgba(131, 200, 78, calc(0.18 + 0.18 * var(--lift, 0))));
+  transition: filter 220ms ease;
+}
+
+.reliquary-image {
+  display: block;
+  width: min(100%, 230px);
+  max-height: 42vh;
+  object-fit: contain;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ───── TRADING CARD PREVIEW ───── */
+.reliquary-card-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.reliquary-card-frame {
+  /* No filter / overflow here — a parent filter flattens the card's
+     3D perspective and clipping would crop the tilted corners. */
+  position: relative;
+  display: inline-block;
+}
+
+/* ───── CAROUSEL DOTS (anchored under the article) ───── */
+.reliquary-controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.reliquary-dot {
+  width: 22px;
+  height: 3px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(241, 215, 122, 0.24);
+  cursor: pointer;
+  padding: 0;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.reliquary-dot:hover {
+  background: rgba(241, 215, 122, 0.5);
+}
+
+.reliquary-dot.is-active {
+  background: var(--rel-gold);
+  box-shadow: 0 0 8px rgba(241, 215, 122, 0.75);
+}
+
+/* ───── SLIDE TRANSITION ───── */
+@keyframes reliquary-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.reliquary-feature.is-entering {
+  animation: reliquary-slide-in 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (max-width: 1180px) {
+  .reliquary-rail {
+    width: 264px;
+  }
+
+  .reliquary-image {
+    width: min(100%, 190px);
+    max-height: 32vh;
+  }
+}
+
+/* Mobile: rail leaves its fixed top-right perch and flows inline at the
+   end of <body>, below the 3D scene — users scroll to reveal it. */
+@media (max-width: 900px) {
+  .reliquary-rail {
+    position: static;
+    top: auto;
+    right: auto;
+    width: 100%;
+    max-width: 360px;
+    max-height: none;
+    margin: 28px auto calc(140px + env(safe-area-inset-bottom, 0px));
+    padding: 32px 16px 24px;
+  }
+
+  .reliquary-image {
+    width: min(100%, 220px);
+    max-height: none;
+  }
+}

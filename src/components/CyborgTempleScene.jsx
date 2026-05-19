@@ -932,6 +932,12 @@ const CyborgTempleScene = ({
   // the focus we just triggered on the second click.
   const pendingScreenClickRef = useRef(null);
   const suppressNextDblClickRef = useRef(false);
+  // Touch focus: when handleTouchStart focuses a character directly (bypassing
+  // the dblclick gate that desktop uses), the browser may still fire a
+  // synthesized click event from the same touch. handleClick consumes one
+  // click whenever this flag is true so the click doesn't re-enter the focus
+  // pipeline and accidentally toggle-unfocus the character we just focused.
+  const suppressNextSynthesizedClickRef = useRef(false);
 
   // Click animation state for coins
   const [clickedCoin, setClickedCoin] = useState(null);
@@ -1595,11 +1601,35 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
           child.traverse((bone) => {
             if (bone.isBone && /head/i.test(bone.name)) rl80HeadCandidates.push(bone);
           });
+          // V2 model fallback: the unicorn's Mixamo armature (Root_1 with
+          // mixamorig* bones) is a SIBLING of Unicorn_Empty in the scene
+          // root, not a descendant. The traversal above only walks
+          // RL80_Empty/Unicorn_Empty children, so on the V2 build it finds
+          // zero candidates and rl80HeadBoneRef ends up null — which
+          // silently breaks anything that depends on her head position
+          // (the head-tracks-camera look-at, the lobby chat-bubble
+          // anchor). Mirror the armature lookup used below for the
+          // 90°-rotation fix-up and harvest head bones from there too.
+          if (rl80HeadCandidates.length === 0) {
+            const unicornArmature =
+              templeScene.getObjectByName('Root_1') ||
+              templeScene.getObjectByName('Root_1.001') ||
+              templeScene.getObjectByName('Armature_Unicorn');
+            if (unicornArmature) {
+              unicornArmature.traverse((bone) => {
+                if (bone.isBone && /head/i.test(bone.name)) rl80HeadCandidates.push(bone);
+              });
+            }
+          }
           rl80HeadBoneRef.current =
             rl80HeadCandidates.find(b => /^head$/i.test(b.name)) ||
+            rl80HeadCandidates.find(b => /mixamorig.*head/i.test(b.name) && !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
             rl80HeadCandidates.find(b => !/(_?end|_?tip|_?nub)$/i.test(b.name)) ||
             rl80HeadCandidates[0] ||
             null;
+          if (!rl80HeadBoneRef.current) {
+            console.warn('[CyborgTempleScene] RL80 head bone not found — head-anchored UI will park off-screen');
+          }
           captureHeadRestPose(rl80HeadBoneRef);
           // V2 model: the unicorn's mesh sits under Unicorn_Empty but its
           // Mixamo armature (Root_1, with mixamorig* bones) is a SIBLING in
@@ -3140,6 +3170,147 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
         }
       }
 
+      // Toggle-unfocus on touch. Native `click` / `dblclick` paths in
+      // handleClick / handleDblClick aren't reliable on touch — OrbitControls'
+      // tap-vs-pan heuristic frequently swallows them — so we reproduce the
+      // unfocus dance from handleClick (line ~3490) directly here.
+      //
+      // Rule: when focused, ANY tap unfocuses, UNLESS the tap clearly hits
+      // a DIFFERENT character's mesh (in which case the player is trying
+      // to switch consultant — defer to handleClick's dblclick-to-focus
+      // gate). Screens, walls, the back wall, empty space, and the focused
+      // character's own mesh all count as "unfocus me" taps.
+      //
+      // This is broader than the desktop click toggle (which requires
+      // hitting the focused character's mesh specifically). The reason:
+      // some focus-camera framings (notably Monk's, whose lookAt sits
+      // past his body so the back wall fills the screen center) make the
+      // character's mesh hard to hit precisely with a tap. On desktop the
+      // user can aim with a mouse; on touch the natural gesture is "tap
+      // anywhere to dismiss."
+      //
+      // Skipped when `touchedSomething` is true (a coin or CoinFace was
+      // handled above) so coin taps stay coin taps.
+      //
+      // Idempotent on the touchstart + touchend pair: the first call sets
+      // focusTarget.agentId to null (Reset transition), so the second
+      // call's outer gate fails and it no-ops.
+      console.log('[touch] event', {
+        type: event.type,
+        focusTargetAgent: focusTarget?.agentId,
+        touchedSomething,
+        intersectsCount: intersects.length,
+      });
+
+      const CHARACTER_AGENT_IDS = new Set([
+        'Monk',
+        'Demon',
+        'Detective',
+        'RL80',
+        'Fluffy',
+      ]);
+
+      // Focus-on-touch: bypass the dblclick gate that handleClick uses for
+      // desktop. On iOS Safari, the second synthesized click of a double-tap
+      // is frequently swallowed by the browser's tap-to-zoom heuristic, so
+      // the dblclick gate's `pending` check never reconciles and focus never
+      // fires. Tap directly = focus directly. We forward the agentId via
+      // onAgentClick; the parent's mustStartWithMonk gate still applies.
+      //
+      // Fires only on touchstart (skipped on touchend) so a single physical
+      // tap doesn't double-focus. Skipped when a coin/CoinFace was already
+      // handled (touchedSomething) or when we're already focused on something
+      // (the unfocus block below handles that case instead).
+      if (
+        event.type === 'touchstart' &&
+        !focusTarget &&
+        !touchedSomething
+      ) {
+        for (let i = 0; i < intersects.length; i++) {
+          let object = intersects[i].object;
+          if (!object.userData.clickable) {
+            let walker = object.parent;
+            while (walker && walker !== groupRef.current) {
+              if (walker.userData?.clickable) {
+                object = walker;
+                break;
+              }
+              walker = walker.parent;
+            }
+          }
+          if (!object.userData.clickable) continue;
+          const aid = object.userData.agentId;
+          if (CHARACTER_AGENT_IDS.has(aid)) {
+            console.log('[touch] focus', { aid });
+            if (event.cancelable) event.preventDefault();
+            if (onAgentClick) onAgentClick(aid);
+            // Suppress the synthesized click that fires shortly after this
+            // touchstart — without this, handleClick re-enters the
+            // toggle-unfocus path (because focusTarget will be set by then)
+            // and immediately reverses the focus we just established.
+            suppressNextSynthesizedClickRef.current = true;
+            return;
+          }
+          break;
+        }
+      }
+
+      if (focusTarget && focusTarget.agentId && !touchedSomething) {
+        let hitDifferentCharacter = false;
+        for (let i = 0; i < intersects.length; i++) {
+          let object = intersects[i].object;
+          const hitName = object.name;
+          const hitAgentBefore = object.userData.agentId;
+          const hitClickableBefore = object.userData.clickable;
+          if (!object.userData.clickable) {
+            let walker = object.parent;
+            while (walker && walker !== groupRef.current) {
+              if (walker.userData?.clickable) {
+                object = walker;
+                break;
+              }
+              walker = walker.parent;
+            }
+          }
+          console.log('[touch] intersect', i, {
+            hitName,
+            hitAgentBefore,
+            hitClickableBefore,
+            resolvedAgent: object.userData.agentId,
+            resolvedClickable: object.userData.clickable,
+          });
+          if (!object.userData.clickable) continue;
+          const aid = object.userData.agentId;
+          if (
+            CHARACTER_AGENT_IDS.has(aid) &&
+            aid !== focusTarget.agentId
+          ) {
+            hitDifferentCharacter = true;
+            break;
+          }
+          // Same character, screen, angel, xcandle, etc. — none of these
+          // should block the unfocus.
+          break;
+        }
+        console.log('[touch] unfocus decision', { hitDifferentCharacter });
+        if (!hitDifferentCharacter) {
+          if (event.cancelable) {
+            event.preventDefault();
+          }
+          restoreAllFromFocus();
+          if (onAgentClick) onAgentClick(null);
+          setFocusTarget({
+            position: sceneDefaultPose.position.clone(),
+            lookAt: sceneDefaultPose.target.clone(),
+            fov: isMobile ? 55 : 50,
+            agentId: null,
+            agentName: 'Reset',
+          });
+          setTimeout(() => {
+            setFocusTarget(null);
+          }, 1000);
+        }
+      }
     };
 
     // Function to trigger coin click animation
@@ -3307,6 +3478,14 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
 
       // Safety check for groupRef
       if (!groupRef.current) return;
+
+      // Touch focus already handled this gesture — consume the synthesized
+      // click so the desktop-only dblclick gate and toggle-unfocus paths
+      // don't re-enter the pipeline and undo what handleTouchStart just did.
+      if (suppressNextSynthesizedClickRef.current) {
+        suppressNextSynthesizedClickRef.current = false;
+        return;
+      }
 
       // Calculate mouse position in normalized device coordinates
       const rect = gl.domElement.getBoundingClientRect();

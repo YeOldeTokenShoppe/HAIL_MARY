@@ -4,7 +4,7 @@ const SERVICES = [
   {
     id: "game",
     eyebrow: "LEARN",
-    title: "Token Forensics",
+    title: "Token Task Force",
     desc: "Three questions. One verdict.",
     accent: "phos",
   },
@@ -14,6 +14,15 @@ const SERVICES = [
     title: "Token Review",
     desc: "Request a team analysis of any token.",
     accent: "cyan",
+  },
+  {
+    id: "terminal-traders",
+    eyebrow: "CARDS",
+    title: "Terminal Traders",
+    desc: "The Trading Card Game.",
+    accent: "magenta",
+    disabled: true,
+    cta: "COMING SOON",
   },
 ];
 
@@ -32,20 +41,22 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
         <div className="tsr-options" role="radiogroup" aria-label="Available services">
           {SERVICES.map((service) => {
             const isSelected = service.id === activeService.id;
-            const handleClick = !isSelected && onSelect
+            const isDisabled = !!service.disabled;
+            const handleClick = !isSelected && !isDisabled && onSelect
               ? () => onSelect(service.id)
               : undefined;
             const className = [
               'tsr-card',
               `tsr-card-${service.accent}`,
-              isSelected ? 'is-active' : 'is-interactive',
+              isDisabled ? 'is-disabled' : isSelected ? 'is-active' : 'is-interactive',
             ].filter(Boolean).join(' ');
             return (
               <div
                 key={service.id}
                 role="radio"
-                tabIndex={0}
+                tabIndex={isDisabled ? -1 : 0}
                 aria-checked={isSelected}
+                aria-disabled={isDisabled}
                 onClick={handleClick}
                 onKeyDown={
                   handleClick
@@ -62,7 +73,7 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
                 <span className="tsr-card-eyebrow">{service.eyebrow}</span>
                 <span className="tsr-card-title">{service.title}</span>
                 <span className="tsr-card-desc">{service.desc}</span>
-                <span className="tsr-card-cta">{isSelected ? 'SELECTED' : 'SELECT'}</span>
+                <span className="tsr-card-cta">{service.cta || (isSelected ? 'SELECTED' : 'SELECT')}</span>
               </div>
             );
           })}
@@ -153,7 +164,7 @@ const STYLES = `
 
 .tsr-options {
   display: grid;
-  grid-template-columns: 1.05fr 1fr;
+  grid-template-columns: 1.05fr 1fr 1fr;
   gap: 7px;
 }
 
@@ -225,6 +236,17 @@ const STYLES = `
 
 .tsr-card.is-interactive .tsr-card-cta {
   opacity: 1;
+}
+
+.tsr-card.is-disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  filter: grayscale(0.18);
+}
+
+.tsr-card.is-disabled .tsr-card-cta {
+  opacity: 1;
+  color: var(--card-accent);
 }
 
 .tsr-card-phos { --card-accent: #8effc4; }
@@ -300,7 +322,7 @@ const STYLES = `
     justify-content: center;
   }
   .tsr-options {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .tsr-card {
     min-height: 72px;
@@ -320,19 +342,38 @@ const STYLES = `
     letter-spacing: 0.16em;
   }
   .tsr-options {
+    position: relative;
     display: flex;
     gap: 6px;
     overflow-x: auto;
     padding-bottom: 2px;
     scroll-snap-type: x mandatory;
+    /* Soft right-edge taper — narrow enough not to swallow the peek. */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(100% - 14px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      black 0,
+      black calc(100% - 14px),
+      transparent 100%
+    );
   }
   .tsr-options::-webkit-scrollbar {
     display: none;
   }
+  /* Two cards + a fixed ~60px peek of the third regardless of viewport
+     width. (50% minus half the gap minus the peek allowance.) */
   .tsr-card {
-    flex: 0 0 180px;
+    flex: 0 0 calc(50% - 36px);
     min-height: 78px;
-    scroll-snap-align: center;
+    scroll-snap-align: start;
+  }
+  .tsr-card:last-child {
+    scroll-snap-align: end;
   }
 }
 `;
