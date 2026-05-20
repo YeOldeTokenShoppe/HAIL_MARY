@@ -2243,7 +2243,7 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
         console.error('[CyborgTempleScene] currentGroupRef is null, falling back to scene');
         scene.add(anchorGroup);
       }
-      
+
       // Find the specific meshes and add click handlers
       templeScene.traverse((child) => {
 

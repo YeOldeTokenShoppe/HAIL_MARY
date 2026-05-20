@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const RARITY_ACCENT = {
   Common: "#9cfce9",
@@ -42,6 +42,7 @@ export default function TradingCard({
   interactive = true,
 }) {
   const cardRef = useRef(null);
+  const interactingRef = useRef(false);
   const [tilt, setTilt] = useState({
     rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0,
   });
@@ -70,18 +71,46 @@ export default function TradingCard({
 
   const handleMove = (event) => {
     if (!interactive) return;
+    interactingRef.current = true;
     applyAt(event.clientX, event.clientY);
   };
 
   const handleTouch = (event) => {
     if (!interactive) return;
+    interactingRef.current = true;
     const t = event.touches[0];
     if (t) applyAt(t.clientX, t.clientY);
   };
 
   const handleLeave = () => {
+    interactingRef.current = false;
     setTilt({ rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0 });
   };
+
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now) => {
+      if (!interactingRef.current) {
+        const t = (now - start) / 1000;
+        // virtual cursor traces a slow Lissajous so the foil sways with the tilt
+        const x = 50 + Math.sin(t * 0.7) * 28;
+        const y = 50 + Math.sin(t * 0.45 + Math.PI / 3) * 22;
+        const dx = (x - 50) / 50;
+        const dy = (y - 50) / 50;
+        const hyp = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+        setTilt({
+          mx: x, my: y, posx: x, posy: y, hyp,
+          rx: dy * -3.5,
+          ry: dx * 4.5,
+          lift: 0.35,
+        });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   return (
     <div
@@ -417,11 +446,15 @@ const CARD_STYLES = `
     border-color: transparent;
     box-shadow: none;
   }
-  .tc-card.is-overlaid .tc-move,
-  .tc-card.is-overlaid .tc-battle {
+  .tc-card.is-overlaid .tc-move {
     background: transparent;
     border-color: transparent;
     box-shadow: none;
+  }
+  .tc-card.is-overlaid .tc-battle {
+    background: linear-gradient(180deg, rgba(0,0,0,.72), rgba(0,0,0,.85));
+    border-color: rgba(217,180,74,.55);
+    box-shadow: 0 4px 14px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05);
   }
   .tc-card.is-overlaid .tc-flavor {
     background: transparent;
@@ -1093,6 +1126,7 @@ const CARD_STYLES = `
 
   .tc-ability-body {
     min-width: 0;
+    padding-top: 28px;
   }
 
   .tc-style-chip {
@@ -1213,6 +1247,7 @@ const CARD_STYLES = `
   /* ───── FLAVOR ───── */
   .tc-flavor {
     margin: 0;
+    bottom: 20px;
     padding: 6px 14px 16px;
     font-family: "Georgia", "Times New Roman", serif;
     font-style: italic;
@@ -1228,14 +1263,15 @@ const CARD_STYLES = `
   /* ───── BATTLE STRIP ───── */
   .tc-battle {
     display: grid;
-    top: -28px;
+    top: -34px;
     grid-template-columns: 1fr auto 1fr auto 1fr;
     align-items: center;
-    gap: 14px;
-    padding: 16px 20px;
+    gap: 8px;
+    padding: 5px 14px;
+    // margin: 0 36px;
     background: linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,.95));
-    border-top: 2px solid rgba(217,180,74,.6);
-    border-bottom: 2px solid rgba(217,180,74,.6);
+    border-top: 4px solid rgba(217,180,74,.6);
+    border-bottom: 4px solid rgba(217,180,74,.6);
     border-radius: 8px;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
   }
@@ -1258,7 +1294,7 @@ const CARD_STYLES = `
 
   .tc-battle-stat strong {
     font-family: Impact, sans-serif;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 0.8;
     color: #fff7ce;
     letter-spacing: .02em;
@@ -1270,7 +1306,7 @@ const CARD_STYLES = `
 
   .tc-battle-bolts span {
     display: inline-block;
-    font-size: 24px;
+    font-size: 16px;
     color: #ffe066;
     text-shadow: 0 0 6px rgba(255,200,80,.6);
   }

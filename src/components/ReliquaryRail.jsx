@@ -49,7 +49,7 @@ function RelicImage({ src, alt }) {
   );
 }
 
-const TCG_PREVIEW = {
+const EUGENE = {
   name: "Eugene",
   subtitle: "Unihood",
   cardType: "Trader",
@@ -74,6 +74,56 @@ const TCG_PREVIEW = {
   foilStyle: "v",
 };
 
+const SAINT = {
+  name: "Saint GR80",
+  subtitle: "The Holo Roller",
+  cardType: "Trader",
+  style: "Logos",
+  rarity: "Legendary",
+  edition: "3/80",
+  startingCred: 24,
+  startingPortfolio: 0,
+  ability: {
+    name: "Doctrine of Patience",
+    badgeImage: "/abilityBadge.png",
+    text: "Skip your draw to convert 1 Loss into +6 Cred. The market rewards the faithful.",
+  },
+  weakness: "Hype Waves",
+  resistance: "FUD",
+  pivotCost: 2,
+  flavorText: "Blessed are the holders, for they shall inherit the bag.",
+  backgroundImage: "/TCG/trader_monk.webp",
+  artFocus: "center 30%",
+  artZoom: 1.2,
+  overlayImage: "/cardOverlay_monk.webp",
+  foilStyle: "v",
+};
+
+const BARRON = {
+  name: "John Barron",
+  subtitle: "Pit Demon",
+  cardType: "Trader",
+  style: "Chaos",
+  rarity: "Mythic",
+  edition: "2/80",
+  startingCred: 18,
+  startingPortfolio: 0,
+  ability: {
+    name: "Liquidation Feast",
+    badgeImage: "/abilityBadge.png",
+    text: "When an opponent gets rugged, gain +4 Cred and draw a Market card.",
+  },
+  weakness: "Diamond Hands",
+  resistance: "Volatility",
+  pivotCost: 3,
+  flavorText: "Every red candle is a whisper from the pit.",
+  backgroundImage: "/TCG/traderDemon.webp",
+  artFocus: "center 32%",
+  artZoom: 1.2,
+  overlayImage: "/cardOverlay_demon.webp",
+  foilStyle: "v",
+};
+
 const FEATURES = [
   {
     id: "freshener-0080",
@@ -81,15 +131,31 @@ const FEATURES = [
     status: "live",
     statusLabel: "Available Now",
     description: "Virtual Wallet Freshener",
-    image: "/airFreshener6.webp",
+    image: "/airFreshener11.png",
   },
   {
-    id: "tcg-genesis",
+    id: "tcg-eugene",
     kind: "card",
     status: "soon",
     statusLabel: "Coming Soon",
     description: "The Trading Card Game",
-    card: TCG_PREVIEW,
+    card: EUGENE,
+  },
+  {
+    id: "tcg-saint",
+    kind: "card",
+    status: "soon",
+    statusLabel: "Coming Soon",
+    description: "The Trading Card Game",
+    card: SAINT,
+  },
+  {
+    id: "tcg-barron",
+    kind: "card",
+    status: "soon",
+    statusLabel: "Coming Soon",
+    description: "The Trading Card Game",
+    card: BARRON,
   },
 ];
 

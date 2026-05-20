@@ -25,6 +25,57 @@ const EUGENE = {
   backgroundImage: "/TCG/traderUnicorn.webp",
   artFocus: "center 28%",
   artZoom: 1.25,
+  overlayImage: "/cardOverlay.webp",
+};
+
+const SAINT = {
+  name: "Saint GR80",
+  subtitle: "The Holo Roller",
+  cardType: "Trader",
+  style: "Logos",
+  rarity: "Legendary",
+  edition: "3/80",
+  startingCred: 24,
+  startingPortfolio: 0,
+  ability: {
+    name: "Doctrine of Patience",
+    icon: "\u{1F4FF}",
+    badgeImage: "/abilityBadge.png",
+    text: "Skip your draw to convert 1 Loss into +6 Cred. The market rewards the faithful.",
+  },
+  weakness: "Hype Waves",
+  resistance: "FUD",
+  pivotCost: 2,
+  flavorText: "Blessed are the holders, for they shall inherit the bag.",
+  backgroundImage: "/TCG/trader_monk.webp",
+  artFocus: "center 30%",
+  artZoom: 1.2,
+  overlayImage: "/cardOverlay_monk.webp",
+};
+
+const DEMON = {
+  name: "John Barron",
+  subtitle: "Pit Demon",
+  cardType: "Trader",
+  style: "Chaos",
+  rarity: "Mythic",
+  edition: "2/80",
+  startingCred: 18,
+  startingPortfolio: 0,
+  ability: {
+    name: "Liquidation Feast",
+    icon: "\u{1F525}",
+    badgeImage: "/abilityBadge.png",
+    text: "When an opponent gets rugged, gain +4 Cred and draw a Market card.",
+  },
+  weakness: "Diamond Hands",
+  resistance: "Volatility",
+  pivotCost: 3,
+  flavorText: "Every red candle is a whisper from the pit.",
+  backgroundImage: "/TCG/traderDemon.webp",
+  artFocus: "center 32%",
+  artZoom: 1.2,
+  overlayImage: "/cardOverlay_demon.webp",
 };
 
 const MARISOL = {
@@ -64,12 +115,17 @@ export default function CardTemplatePage() {
   const [artZoom, setArtZoom] = useState(1.25);
   const [useOverlay, setUseOverlay] = useState(true);
   const [foilStyle, setFoilStyle] = useState("hero");
-  const base = active === "eugene" ? EUGENE : active === "marisol" ? MARISOL : NO_ART;
+  const base =
+    active === "eugene" ? EUGENE :
+    active === "demon" ? DEMON :
+    active === "saint" ? SAINT :
+    active === "marisol" ? MARISOL :
+    NO_ART;
   const card = {
     ...base,
     artFocus: base.backgroundImage ? `center ${artFocusY}%` : null,
     artZoom: base.backgroundImage ? artZoom : 1,
-    overlayImage: useOverlay ? "/cardOverlay.webp" : null,
+    overlayImage: useOverlay ? (base.overlayImage || "/cardOverlay.webp") : null,
     foilStyle,
   };
 
@@ -106,6 +162,18 @@ export default function CardTemplatePage() {
             onClick={() => setActive("eugene")}
           >
             Eugene — Mythic
+          </button>
+          <button
+            className={active === "demon" ? "is-active" : ""}
+            onClick={() => setActive("demon")}
+          >
+            John Barron — Mythic
+          </button>
+          <button
+            className={active === "saint" ? "is-active" : ""}
+            onClick={() => setActive("saint")}
+          >
+            Saint GR80 — Legendary
           </button>
           <button
             className={active === "marisol" ? "is-active" : ""}
