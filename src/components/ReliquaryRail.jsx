@@ -185,6 +185,7 @@ function ReliquaryRailInner() {
   // (no swapping mid-rotation), but a fresh face appears on each load.
   // Picked client-side after mount to avoid SSR hydration mismatches.
   const [tcgCard, setTcgCard] = useState(null);
+  const [cardFlipped, setCardFlipped] = useState(false);
   const railRef = useRef(null);
   const inView = useInView(railRef, {
     amount: 0.1,
@@ -242,9 +243,37 @@ function ReliquaryRailInner() {
                 ) : (
                   <div className="reliquary-card-wrap">
                     <div className="reliquary-card-frame">
-                      {tcgCard && (
-                        <TradingCard data={tcgCard} scale={0.34} interactive />
-                      )}
+                      <div
+                        className={`reliquary-card-flipper${cardFlipped ? " is-flipped" : ""}`}
+                        onClick={() => setCardFlipped((f) => !f)}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={cardFlipped}
+                        aria-label="Flip trading card"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setCardFlipped((f) => !f);
+                          }
+                        }}
+                        style={{ "--card-flip": cardFlipped ? "180deg" : "0deg" }}
+                      >
+                        <div className="reliquary-card-face reliquary-card-face--front">
+                          {tcgCard && (
+                            <TradingCard data={tcgCard} scale={0.34} interactive />
+                          )}
+                        </div>
+                        <div className="reliquary-card-face reliquary-card-face--back">
+                          <img
+                            src="/cardBack.webp"
+                            alt=""
+                            aria-hidden="true"
+                            draggable={false}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
