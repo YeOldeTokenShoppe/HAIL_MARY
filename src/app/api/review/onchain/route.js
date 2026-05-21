@@ -1,30 +1,26 @@
 import { NextResponse } from 'next/server';
 import { generateJwt } from '@coinbase/cdp-sdk/auth';
-import { publicClient } from '@/lib/viemClient';
+import { getPublicClient } from '@/lib/viemClient';
+import { fetchOnchainBundle as fetchEtherscanBundle } from '@/lib/review/etherscanClient';
+import { fetchTopHolders, fetchHolderCount } from '@/lib/review/covalentClient';
+import { chainNameFor, SUPPORTED_CHAIN_IDS } from '@/lib/review/cmcClient';
 
 // /api/review/onchain — server-side onchain snapshot for the /trade Token
-// Review service. Calls CDP's indexed-blockchain SQL endpoint to gather
-// what Detective Trinity (marisol station) needs to compose her read:
+// Review service. Branches by chainId:
+//   • 8453 (Base) → CDP SQL endpoint (deployer/supply/top-holders/activity
+//     all from one indexed source — the original implementation).
+//   • Other supported chains → Etherscan v2 (free tier) for deployer,
+//     supply, source-verified, and activity; Covalent (free tier) for
+//     the top-holder list.
 //
-//   • deployer EOA + first-mint timestamp + deploy tx hash
-//   • total supply (computed from mints minus burns at the indexed level)
-//   • top-10 net-balance holders + concentration ratios
-//
-// The CDP JWT pattern mirrors /api/swap/quote so the credential surface
-// stays consistent. POST body is { chainId, address }.
+// Output shape is chain-agnostic so /api/review/characters consumes it
+// identically. POST body is { chainId, address }.
 
 const CDP_API_KEY_NAME = process.env.CDP_API_KEY_NAME;
 const CDP_API_KEY_PRIVATE_KEY = process.env.CDP_API_KEY_PRIVATE_KEY;
 
 const CDP_HOST = 'api.cdp.coinbase.com';
 const CDP_PATH = '/platform/v2/data/query/run';
-
-// Database name for the SQL endpoint. Map chainId → database. Base is
-// the only one wired today (matches src/lib/wagmiConfig.js); add other
-// chains here as transports land.
-const CHAIN_TO_DATABASE = {
-  8453: 'base',
-};
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -51,10 +47,8 @@ export async function OPTIONS(request) {
   return NextResponse.json({}, { headers: getCorsHeaders(request) });
 }
 
-// Run a single SQL against CDP. Each call gets its own JWT (the JWT
-// auth signature is path+method-scoped; one signature covers any body
-// to the same endpoint within the expiresIn window). We re-issue per
-// call anyway because three queries is small and keeps the code linear.
+// ── Base / CDP path (existing — unchanged behavior) ─────────────────
+
 async function runCdpQuery(sql) {
   const jwt = await generateJwt({
     apiKeyId: CDP_API_KEY_NAME,
@@ -73,7 +67,7 @@ async function runCdpQuery(sql) {
     },
     body: JSON.stringify({
       sql,
-      cache: { maxAgeMs: 5 * 60_000 }, // 5-minute CDP-side cache; same review hit twice is free.
+      cache: { maxAgeMs: 5 * 60_000 },
     }),
   });
 
@@ -88,12 +82,7 @@ async function runCdpQuery(sql) {
   }
 }
 
-// Five queries — deployer, total supply, top-10 holders, activity
-// metrics (transfer counts + first/last seen), and distinct holder
-// count. The activity + holder-count queries are what let the
-// characters distinguish DORMANT (low/no activity, distributed over a
-// long period) from RUG TEMPLATE (concentrated, recent, abandoned).
-function buildQueries(db, addressLower) {
+function buildCdpQueries(db, addressLower) {
   const tokenFilter = `address = '${addressLower}' AND event_name = 'Transfer' AND action = 'added'`;
   return {
     deployer: `
@@ -176,15 +165,172 @@ function buildQueries(db, addressLower) {
   };
 }
 
+async function fetchBaseSnapshot({ chainId, addressLower }) {
+  const queries = buildCdpQueries('base', addressLower);
+  const [deployerRes, supplyRes, holdersRes, activityRes, holderCountRes] = await Promise.all([
+    runCdpQuery(queries.deployer),
+    runCdpQuery(queries.totalSupply),
+    runCdpQuery(queries.topHolders),
+    runCdpQuery(queries.activity),
+    runCdpQuery(queries.holderCount),
+  ]);
+
+  const deployerRow = deployerRes?.result?.[0] || null;
+  const supplyRow = supplyRes?.result?.[0] || null;
+  const holders = (holdersRes?.result || []).map((row) => ({
+    address: row.holder,
+    balance: row.balance,
+  }));
+  const activityRow = activityRes?.result?.[0] || null;
+  const holderCountRow = holderCountRes?.result?.[0] || null;
+
+  const transferCount = activityRow ? Number(activityRow.transfer_count) : null;
+  const recentTransferCount30d = activityRow ? Number(activityRow.recent_30d) : null;
+  const recentTransferCount7d = activityRow ? Number(activityRow.recent_7d) : null;
+  const firstSeen = activityRow?.first_seen || null;
+  const lastSeen = activityRow?.last_seen || null;
+  const holderCount = holderCountRow ? Number(holderCountRow.holder_count) : null;
+
+  const totalSupply = supplyRow?.total_supply || null;
+
+  return {
+    chainId,
+    deployer: deployerRow
+      ? {
+          address: deployerRow.deployer,
+          deployedAt: deployerRow.deployed_at,
+          deployTx: deployerRow.deploy_tx,
+        }
+      : null,
+    totalSupply,
+    holders,
+    activity: {
+      transferCount,
+      recentTransferCount30d,
+      recentTransferCount7d,
+      firstSeen,
+      lastSeen,
+      holderCount,
+    },
+    sourceVerified: null, // CDP path doesn't surface this; etherscan
+                          // path does. Set to null on Base.
+  };
+}
+
+// ── Non-Base path: Etherscan + Covalent in parallel ─────────────────
+
+async function fetchEtherscanCovalentSnapshot({ chainId, addressLower }) {
+  const [etherscan, holdersBundle, holderCount] = await Promise.all([
+    fetchEtherscanBundle({ chainId, address: addressLower }).catch((err) => {
+      console.warn('[onchain] etherscan bundle failed:', err?.message || err);
+      return null;
+    }),
+    fetchTopHolders({ chainId, address: addressLower, limit: 10 }).catch((err) => {
+      console.warn('[onchain] covalent holders failed:', err?.message || err);
+      return null;
+    }),
+    fetchHolderCount({ chainId, address: addressLower }).catch((err) => {
+      console.warn('[onchain] covalent holder-count failed:', err?.message || err);
+      return null;
+    }),
+  ]);
+
+  // Total supply: prefer Etherscan's stats endpoint (canonical), fall
+  // back to Covalent's per-row total_supply if Etherscan didn't return.
+  const totalSupply = etherscan?.totalSupply || holdersBundle?.totalSupply || null;
+  const holders = holdersBundle?.holders || [];
+
+  // Activity block: Etherscan gives us the timing fields; holderCount
+  // comes from Covalent's pagination metadata (Etherscan free doesn't
+  // have it).
+  const activity = etherscan?.activity
+    ? { ...etherscan.activity, holderCount }
+    : {
+        transferCount: null,
+        recentTransferCount30d: null,
+        recentTransferCount7d: null,
+        firstSeen: null,
+        lastSeen: null,
+        daysSinceDeployed: null,
+        daysSinceLastTransfer: null,
+        holderCount,
+      };
+
+  return {
+    chainId,
+    deployer: etherscan?.deployer || null,
+    totalSupply,
+    holders,
+    activity,
+    sourceVerified: etherscan?.sourceVerified ?? null,
+    contractName: etherscan?.contractName || null,
+  };
+}
+
+// ── Shared post-processing: shareBps + EOA/contract tags ─────────────
+
+async function enrichHolders({ chainId, holders, totalSupply }) {
+  let totalForShare = null;
+  try {
+    if (totalSupply) {
+      const total = BigInt(totalSupply);
+      if (total > 0n) totalForShare = total;
+    }
+  } catch {
+    /* leave as null */
+  }
+
+  // shareBps
+  if (totalForShare && totalForShare > 0n) {
+    for (const h of holders) {
+      try {
+        h.shareBps = Number((BigInt(h.balance) * 10000n) / totalForShare);
+      } catch {
+        h.shareBps = null;
+      }
+    }
+  } else {
+    for (const h of holders) h.shareBps = null;
+  }
+
+  // isContract — per-chain viem public client (Base uses the CDP-backed
+  // client; others use viem defaults). Soft-fail leaves isContract
+  // undefined on a holder, which the prompt treats as ambiguous.
+  const client = getPublicClient(chainId);
+  if (client && holders.length > 0) {
+    try {
+      const codes = await Promise.all(
+        holders.map((h) =>
+          client
+            .getCode({ address: h.address })
+            .then((code) => (typeof code === 'string' && code.length > 2 ? code : null))
+            .catch(() => null),
+        ),
+      );
+      holders.forEach((h, i) => {
+        h.isContract = codes[i] != null;
+      });
+    } catch (err) {
+      console.warn('[onchain] getCode batch failed:', err?.message || err);
+    }
+  }
+
+  // top10ShareBps — sum of top-10 shares against total.
+  let top10ShareBps = null;
+  if (totalForShare && totalForShare > 0n) {
+    try {
+      const top10Sum = holders.reduce((acc, h) => acc + BigInt(h.balance || '0'), 0n);
+      top10ShareBps = Number((top10Sum * 10000n) / totalForShare);
+    } catch {
+      top10ShareBps = null;
+    }
+  }
+
+  return { holders, top10ShareBps };
+}
+
 export async function POST(request) {
   const corsHeaders = getCorsHeaders(request);
-
-  if (!CDP_API_KEY_NAME || !CDP_API_KEY_PRIVATE_KEY) {
-    return NextResponse.json(
-      { error: 'CDP API keys not configured' },
-      { status: 500, headers: corsHeaders },
-    );
-  }
 
   const origin = request.headers.get('origin');
   if (origin && !ALLOWED_ORIGINS.includes(origin)) {
@@ -205,9 +351,9 @@ export async function POST(request) {
   }
 
   const { chainId, address } = body || {};
-  if (!Number.isInteger(chainId) || !CHAIN_TO_DATABASE[chainId]) {
+  if (!Number.isInteger(chainId) || !SUPPORTED_CHAIN_IDS.includes(chainId)) {
     return NextResponse.json(
-      { error: 'Unsupported chainId', supported: Object.keys(CHAIN_TO_DATABASE).map(Number) },
+      { error: 'Unsupported chainId', supported: SUPPORTED_CHAIN_IDS },
       { status: 400, headers: corsHeaders },
     );
   }
@@ -218,140 +364,23 @@ export async function POST(request) {
     );
   }
 
-  const db = CHAIN_TO_DATABASE[chainId];
   const addressLower = address.toLowerCase();
-  const queries = buildQueries(db, addressLower);
 
+  // Branch on chain. Base keeps the CDP-only path (one indexed source);
+  // other chains use Etherscan + Covalent.
+  let snapshot;
   try {
-    // Fire all queries in parallel — they're independent and the CDP
-    // backend serves them concurrently.
-    const [deployerRes, supplyRes, holdersRes, activityRes, holderCountRes] = await Promise.all([
-      runCdpQuery(queries.deployer),
-      runCdpQuery(queries.totalSupply),
-      runCdpQuery(queries.topHolders),
-      runCdpQuery(queries.activity),
-      runCdpQuery(queries.holderCount),
-    ]);
-
-    const deployerRow = deployerRes?.result?.[0] || null;
-    const supplyRow = supplyRes?.result?.[0] || null;
-    const holders = (holdersRes?.result || []).map((row) => ({
-      address: row.holder,
-      balance: row.balance, // String-encoded UInt256
-    }));
-    const activityRow = activityRes?.result?.[0] || null;
-    const holderCountRow = holderCountRes?.result?.[0] || null;
-
-    const transferCount = activityRow ? Number(activityRow.transfer_count) : null;
-    const recentTransferCount30d = activityRow ? Number(activityRow.recent_30d) : null;
-    const recentTransferCount7d = activityRow ? Number(activityRow.recent_7d) : null;
-    const firstSeen = activityRow?.first_seen || null;
-    const lastSeen = activityRow?.last_seen || null;
-    const holderCount = holderCountRow ? Number(holderCountRow.holder_count) : null;
-
-    // Days since the first Transfer event. Cheaper to compute server-
-    // side than asking each character to do date math in their head.
-    let daysSinceDeployed = null;
-    if (firstSeen) {
-      const then = Date.parse(firstSeen.replace(' ', 'T') + 'Z');
-      if (!Number.isNaN(then)) {
-        daysSinceDeployed = Math.max(0, Math.floor((Date.now() - then) / 86400000));
+    if (chainId === 8453) {
+      if (!CDP_API_KEY_NAME || !CDP_API_KEY_PRIVATE_KEY) {
+        return NextResponse.json(
+          { error: 'CDP API keys not configured' },
+          { status: 500, headers: corsHeaders },
+        );
       }
+      snapshot = await fetchBaseSnapshot({ chainId, addressLower });
+    } else {
+      snapshot = await fetchEtherscanCovalentSnapshot({ chainId, addressLower });
     }
-    let daysSinceLastTransfer = null;
-    if (lastSeen) {
-      const then = Date.parse(lastSeen.replace(' ', 'T') + 'Z');
-      if (!Number.isNaN(then)) {
-        daysSinceLastTransfer = Math.max(0, Math.floor((Date.now() - then) / 86400000));
-      }
-    }
-
-    const totalSupplyStr = supplyRow?.total_supply || null;
-    // Compute the top-10 share as basis points (0-10000). Done as
-    // floating-point on the client side of this server (Node BigInt is
-    // available but ratios are tiny floats). We sum holder balances as
-    // BigInt, then divide.
-    let top10ShareBps = null;
-    let totalForShare = null;
-    try {
-      if (totalSupplyStr && holders.length > 0) {
-        const total = BigInt(totalSupplyStr);
-        if (total > 0n) {
-          totalForShare = total;
-          const top10Sum = holders.reduce((acc, h) => acc + BigInt(h.balance), 0n);
-          // bps = top10Sum * 10000 / total. Multiply first to keep precision.
-          top10ShareBps = Number((top10Sum * 10000n) / total);
-        }
-      }
-    } catch {
-      // BigInt parse failure — leave the share null; the caller falls
-      // back to placeholder copy for the concentration question.
-    }
-
-    // Per-holder share + EOA-vs-contract detection. The contract check
-    // is the missing signal that distinguishes "one whale holds the
-    // float" (centralization risk) from "the LP / vault / staking
-    // contract holds the float" (the *opposite* of risk — locked
-    // liquidity reads as a structural good, not a structural bad).
-    // viem's http transport batches the parallel getCode calls.
-    try {
-      const codes = await Promise.all(
-        holders.map((h) =>
-          publicClient
-            .getCode({ address: h.address })
-            .then((code) => (typeof code === 'string' && code.length > 2 ? code : null))
-            .catch(() => null),
-        ),
-      );
-      holders.forEach((h, i) => {
-        h.isContract = codes[i] != null;
-        if (totalForShare && totalForShare > 0n) {
-          try {
-            const bps = Number((BigInt(h.balance) * 10000n) / totalForShare);
-            h.shareBps = bps;
-          } catch {
-            h.shareBps = null;
-          }
-        } else {
-          h.shareBps = null;
-        }
-      });
-    } catch (err) {
-      console.warn('[review/onchain] getCode batch failed:', err?.message || err);
-      // Soft-fail: leave isContract undefined on every holder. Trinity's
-      // prompt will fall back to treating them as ambiguous addresses.
-    }
-
-    return NextResponse.json(
-      {
-        chainId,
-        address: addressLower,
-        deployer: deployerRow
-          ? {
-              address: deployerRow.deployer,
-              deployedAt: deployerRow.deployed_at,
-              deployTx: deployerRow.deploy_tx,
-            }
-          : null,
-        totalSupply: totalSupplyStr,
-        topHolders: holders,
-        top10ShareBps,
-        // Activity metrics — the inputs that distinguish DORMANT from
-        // RUG TEMPLATE. The characters use these in their system prompts
-        // to pick the right verdict for a low-activity contract.
-        activity: {
-          transferCount,
-          recentTransferCount30d,
-          recentTransferCount7d,
-          holderCount,
-          firstSeen,
-          lastSeen,
-          daysSinceDeployed,
-          daysSinceLastTransfer,
-        },
-      },
-      { headers: corsHeaders },
-    );
   } catch (err) {
     console.error('[api/review/onchain]', err);
     return NextResponse.json(
@@ -359,4 +388,43 @@ export async function POST(request) {
       { status: 502, headers: corsHeaders },
     );
   }
+
+  const { holders, top10ShareBps } = await enrichHolders({
+    chainId,
+    holders: snapshot.holders,
+    totalSupply: snapshot.totalSupply,
+  });
+
+  // daysSinceDeployed / daysSinceLastTransfer — the CDP path stored the
+  // raw timestamps but didn't compute the day-deltas inline. Do it here
+  // so both paths produce identical activity shape.
+  const activity = { ...snapshot.activity };
+  if (activity.daysSinceDeployed == null && activity.firstSeen) {
+    const then = Date.parse(String(activity.firstSeen).replace(' ', 'T') + 'Z');
+    if (!Number.isNaN(then)) {
+      activity.daysSinceDeployed = Math.max(0, Math.floor((Date.now() - then) / 86400000));
+    }
+  }
+  if (activity.daysSinceLastTransfer == null && activity.lastSeen) {
+    const then = Date.parse(String(activity.lastSeen).replace(' ', 'T') + 'Z');
+    if (!Number.isNaN(then)) {
+      activity.daysSinceLastTransfer = Math.max(0, Math.floor((Date.now() - then) / 86400000));
+    }
+  }
+
+  return NextResponse.json(
+    {
+      chainId: snapshot.chainId,
+      chainName: chainNameFor(snapshot.chainId),
+      address: addressLower,
+      deployer: snapshot.deployer,
+      totalSupply: snapshot.totalSupply,
+      topHolders: holders,
+      top10ShareBps,
+      activity,
+      sourceVerified: snapshot.sourceVerified ?? null,
+      contractName: snapshot.contractName || null,
+    },
+    { headers: corsHeaders },
+  );
 }

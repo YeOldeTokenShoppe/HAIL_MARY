@@ -65,7 +65,7 @@ Style examples (from prior cases):
 - "Prophet Token did not find an audience. It rented one."
 - "Real adoption is quiet. This is the opposite of quiet."
 
-Your questions should be about: social velocity, KOL presence, launch tactics, audience legitimacy, paid-vs-organic ratio. You are working with limited social data; lean on the *shape* of the launch (token age, distribution, holder behavior) as a proxy for hype legitimacy.
+Your questions should be about: social velocity, launch tactics, audience legitimacy, hype-to-substance ratio. When the user message includes a "Market context" block, lean on it hard — CMC rank, 24h volume vs market cap (high volume on a tiny cap reads "wash"), % change spikes, age in the listings database. No CEX listings on a token that pretends to be huge is a tell. Listed across ten CEXes on a token that pretends to be obscure is also a tell. When market data is missing, lean on the *shape* of the launch (token age, distribution, holder behavior) as a proxy.
 
 ${RESPONSE_SCHEMA_HINT}`;
 
@@ -91,6 +91,13 @@ EOA vs CONTRACT — this is the critical centralization distinction:
 DORMANT detection is your specialty:
 - If the activity block shows low total transfers (<100), few holders (<20), spread across many days (>30 since first seen), with recent activity near zero — call this DORMANT. The right framing is "no audience yet," not "abandoned scam." A founder holding most of the supply of a quiet 90-day-old contract is structurally different from a deployer abandoning a token that pumped on day one.
 - Quote the actual transferCount, holderCount, daysSinceDeployed when you call DORMANT, so the user can see why.
+
+VERIFIED SOURCE — when the user message includes "Source verified: yes/no":
+- Unverified source on a token claiming legitimacy is a notable red flag — quote it. "Source isn't verified — the contract is a black box."
+- Verified source is the baseline, not a clean bill of health. Don't oversell it.
+- When the field is missing (Base path), don't claim it either way.
+
+DATA GAPS — non-Base chains sometimes return partial data (Covalent rate limits, Etherscan transfer cap). If a field you'd normally cite is missing, say so plainly ("Top holders aren't loading right now") rather than inventing. Don't fall back to vague language; name the missing field.
 
 ${RESPONSE_SCHEMA_HINT}`;
 
@@ -138,19 +145,57 @@ export const CHARACTER_PROMPTS = {
 // characters because it gives them structural cues to lean on (a fresh
 // contract with concentrated holders is everyone's signal, not just
 // Trinity's).
-export function buildUserMessage({ token, onchain }) {
+export function buildUserMessage({ token, onchain, market }) {
   const lines = [];
   lines.push(`Token: ${token.name || 'UNKNOWN'} (${token.symbol ? '$' + token.symbol : '???'})`);
   lines.push(`Address: ${token.address}`);
-  lines.push(`Chain: ${token.chainLabel || 'Base'}`);
+  lines.push(`Chain: ${token.chainName || token.chainLabel || 'unspecified'}`);
   lines.push('');
+
+  // Market context block — from CoinMarketCap via /api/review/resolve.
+  // Present for any token CMC knows about (most established tokens on
+  // major chains). Absent for brand-new launches that CMC hasn't
+  // indexed yet — in which case the characters fall back to onchain-
+  // only signals.
+  if (market) {
+    lines.push('Market context (from CoinMarketCap):');
+    if (typeof market.price === 'number') {
+      lines.push(`  Price: $${market.price.toPrecision(6)}`);
+    }
+    if (typeof market.marketCap === 'number') {
+      lines.push(`  Market cap: $${Math.round(market.marketCap).toLocaleString()}`);
+    }
+    if (typeof market.volume24h === 'number') {
+      lines.push(`  24h volume: $${Math.round(market.volume24h).toLocaleString()}`);
+    }
+    if (typeof market.percentChange24h === 'number') {
+      lines.push(`  24h change: ${market.percentChange24h.toFixed(2)}%`);
+    }
+    if (typeof market.cmcRank === 'number') {
+      lines.push(`  CMC rank: #${market.cmcRank}`);
+    }
+    if (market.dateAdded) {
+      lines.push(`  Listed on CMC: ${market.dateAdded}`);
+    }
+    lines.push('');
+  }
+
   if (onchain?.deployer) {
     lines.push(`Deployer: ${onchain.deployer.address}`);
     if (onchain.deployer.deployedAt) {
       lines.push(`Deployed at: ${onchain.deployer.deployedAt}`);
     }
+    if (onchain.deployer.deployTx) {
+      lines.push(`Deploy tx: ${onchain.deployer.deployTx}`);
+    }
   } else {
     lines.push(`Deployer: unknown (no Transfer events indexed yet)`);
+  }
+
+  if (onchain?.sourceVerified === true) {
+    lines.push(`Source verified: yes${onchain.contractName ? ` (${onchain.contractName})` : ''}`);
+  } else if (onchain?.sourceVerified === false) {
+    lines.push(`Source verified: no`);
   }
   if (onchain?.top10ShareBps != null) {
     const pct = (onchain.top10ShareBps / 100).toFixed(1);

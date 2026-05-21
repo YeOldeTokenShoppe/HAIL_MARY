@@ -29,6 +29,11 @@ const CHAIN_LABEL = {
   42161: 'Arbitrum',
   10: 'Optimism',
   137: 'Polygon',
+  56: 'BNB Chain',
+  43114: 'Avalanche',
+  59144: 'Linea',
+  81457: 'Blast',
+  7777777: 'Zora',
 };
 
 // Default SitePal voice configs per station. Engine 3 is the default

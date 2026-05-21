@@ -30,6 +30,13 @@
   text-transform: uppercase;
 }
 
+/* Section heading — hidden on desktop (where the rail is a tight
+   fixed top-right column) and shown only at the mobile breakpoint
+   where the rail flows inline and benefits from a wordmark. */
+.reliquary-heading {
+  display: none;
+}
+
 /* ───── DESCRIPTION ───── */
 .reliquary-description {
   margin: 0;
@@ -78,6 +85,11 @@
 .reliquary-image-wrap {
   display: flex;
   justify-content: center;
+  /* Explicit width so the tilter's `width: min(100%, 230px)` has a
+     concrete value to resolve against — otherwise the wrap is content-
+     sized (a flex item of a column-flex parent with align-items:center),
+     creating a circular dependency that collapses the tilter to 0. */
+  width: 100%;
   perspective: 1100px;
   perspective-origin: 50% 40%;
   cursor: pointer;
@@ -91,16 +103,43 @@
   transition: filter 220ms ease;
 }
 
-.reliquary-image {
+/* Tilter owns the explicit bounding box. aspect-ratio matches the
+   freshener assets (1032×1523) so the box height is deterministic;
+   both faces inside fill this box exactly — no chance of front and
+   back landing at slightly different positions on flip. */
+.reliquary-image-tilter {
+  position: relative;
   display: block;
   width: min(100%, 230px);
-  max-height: 42vh;
-  object-fit: contain;
+  aspect-ratio: 1032 / 1523;
+  margin-inline: auto;
   transform-style: preserve-3d;
   transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.reliquary-image-flipper {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateY(var(--flip, 0deg));
+  transition: transform 520ms cubic-bezier(0.55, 0.05, 0.3, 1);
+}
+
+.reliquary-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   pointer-events: none;
   user-select: none;
+}
+
+.reliquary-image--back {
+  transform: rotateY(180deg);
 }
 
 /* ───── TRADING CARD PREVIEW ───── */
@@ -165,9 +204,8 @@
     width: 264px;
   }
 
-  .reliquary-image {
+  .reliquary-image-tilter {
     width: min(100%, 190px);
-    max-height: 32vh;
   }
 }
 
@@ -183,10 +221,45 @@
     max-height: none;
     margin: 28px auto calc(140px + env(safe-area-inset-bottom, 0px));
     padding: 32px 16px 24px;
+    /* Framed alcove — dark-purple panel so the freshener's dark edges
+       have something to silhouette against, with a hair-thin magenta
+       border-top echoing the nav bar's accent for visual cohesion. */
+    background: linear-gradient(
+      180deg,
+      rgba(35, 12, 55, 0.75) 0%,
+      rgba(18, 5, 32, 0.9) 100%
+    );
+    border-radius: 14px;
+    border-top: 1px solid rgba(255, 0, 255, 0.25);
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 0 28px rgba(217, 45, 176, 0.08);
   }
 
-  .reliquary-image {
+  .reliquary-image-tilter {
     width: min(100%, 220px);
-    max-height: none;
+  }
+
+  /* Mirrors .section-title from chart-shrine.css — UnifrakturCook gold
+     with cyan/magenta neon glow, slight skew for kinetic feel. Sized
+     down a touch from "Mater ex Machina" since this heading scopes the
+     rail (sub-section) rather than a top-level content band. */
+  .reliquary-heading {
+    display: inline-block;
+    align-self: center;
+    margin: 0 auto 14px;
+    font-family: "UnifrakturCook", serif;
+    color: #d4af37;
+    font-size: clamp(2rem, 5.5vw, 2.8rem);
+    font-weight: 900;
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    transform: rotate(-3deg) skew(-8deg);
+    transform-origin: center;
+    text-shadow:
+      0 0 12px rgba(42, 214, 238, 0.55),
+      0 0 28px rgba(42, 214, 238, 0.35),
+      0 0 52px rgba(217, 45, 176, 0.4),
+      2px 2px 0 rgba(0, 0, 0, 0.6);
   }
 }

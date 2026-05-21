@@ -305,7 +305,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400, headers: corsHeaders });
   }
 
-  const { token, onchain } = body || {};
+  const { token, onchain, market } = body || {};
   if (!token || typeof token !== 'object' || !token.address) {
     return NextResponse.json({ error: 'Missing token info' }, { status: 400, headers: corsHeaders });
   }
@@ -405,7 +405,7 @@ export async function POST(request) {
   const responseHeaders = { ...corsHeaders, 'X-PAYMENT-RESPONSE': paymentResponseHeader };
 
   // ── LLM pipeline (existing) ─────────────────────────────────────
-  const userMsg = buildUserMessage({ token, onchain });
+  const userMsg = buildUserMessage({ token, onchain, market });
 
   const stationKeys = ['monk', 'demon', 'marisol', 'eugene'];
   const results = await Promise.all(

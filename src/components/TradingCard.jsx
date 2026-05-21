@@ -40,6 +40,7 @@ export default function TradingCard({
   data,
   scale = 1,
   interactive = true,
+  cornerBadge = null,
 }) {
   const cardRef = useRef(null);
   const interactingRef = useRef(false);
@@ -321,6 +322,12 @@ export default function TradingCard({
         </div>
 
         <div className="tc-edge" />
+
+        {cornerBadge && (
+          <div className="tc-corner-badge" aria-hidden="true">
+            <span>{cornerBadge}</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -403,6 +410,47 @@ const CARD_STYLES = `
       inset 0 0 0 4px rgba(0,0,0,.55),
       inset 0 0 0 5px color-mix(in srgb, var(--rarity) 60%, #d9b44a 40%),
       inset 0 0 80px rgba(0,0,0,.5);
+  }
+
+  /* Diagonal corner stamp ("COMING SOON" / "PROMO" / etc).
+     Sits inside .tc-card so it inherits the card's tilt + scale; the
+     parent's overflow:hidden + 32px border-radius clip the tail. */
+  .tc-corner-badge {
+    position: absolute;
+    top: 70px;
+    right: -130px;
+    z-index: 10;
+    width: 440px;
+    padding: 16px 0;
+    transform: rotate(45deg);
+    transform-origin: center;
+    text-align: center;
+    background: linear-gradient(
+      180deg,
+      #3a1f5c 0%,
+      #2a1542 55%,
+      #1a0b2e 100%
+    );
+    border-top: 1px solid rgba(241, 215, 122, 0.55);
+    border-bottom: 1px solid rgba(197, 151, 255, 0.45);
+    box-shadow:
+      0 6px 18px rgba(0, 0, 0, 0.6),
+      0 0 32px rgba(197, 151, 255, 0.35);
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .tc-corner-badge span {
+    display: inline-block;
+    font-family: "Cinzel", serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #f1d77a;
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.85),
+      0 0 12px rgba(241, 215, 122, 0.55);
   }
 
   /* ───── Full-card overlay PNG (decorative frame + cosmic FX + ABILITY badge) ───── */

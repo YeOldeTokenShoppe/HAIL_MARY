@@ -7,9 +7,10 @@ import "./reliquary.css";
 
 const REST_TILT = { rx: 0, ry: 0, lift: 0 };
 
-function RelicImage({ src, alt }) {
+function RelicImage({ src, backSrc, alt }) {
   const wrapRef = useRef(null);
   const [tilt, setTilt] = useState(REST_TILT);
+  const [flipped, setFlipped] = useState(false);
 
   const applyAt = (clientX, clientY) => {
     if (!wrapRef.current) return;
@@ -27,6 +28,9 @@ function RelicImage({ src, alt }) {
     if (t) applyAt(t.clientX, t.clientY);
   };
   const handleLeave = () => setTilt(REST_TILT);
+  const handleClick = () => {
+    if (backSrc) setFlipped((f) => !f);
+  };
 
   return (
     <div
@@ -38,13 +42,33 @@ function RelicImage({ src, alt }) {
       onTouchMove={handleTouch}
       onTouchEnd={handleLeave}
       onTouchCancel={handleLeave}
+      onClick={handleClick}
       style={{
         "--rx": `${tilt.rx}deg`,
         "--ry": `${tilt.ry}deg`,
         "--lift": tilt.lift,
+        "--flip": flipped ? "180deg" : "0deg",
       }}
     >
-      <img className="reliquary-image" src={src} alt={alt} draggable={false} />
+      <div className="reliquary-image-tilter">
+        <div className="reliquary-image-flipper">
+          <img
+            className="reliquary-image reliquary-image--front"
+            src={src}
+            alt={alt}
+            draggable={false}
+          />
+          {backSrc && (
+            <img
+              className="reliquary-image reliquary-image--back"
+              src={backSrc}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -124,6 +148,10 @@ const BARRON = {
   foilStyle: "v",
 };
 
+// Pool of TCG previews — one is picked at random per page load so
+// returning visitors see different faces without us paying for a carousel.
+const TCG_POOL = [EUGENE, SAINT, BARRON];
+
 const FEATURES = [
   {
     id: "freshener-0080",
@@ -131,31 +159,15 @@ const FEATURES = [
     status: "live",
     statusLabel: "Available Now",
     description: "Virtual Wallet Freshener",
-    image: "/airFreshener11.png",
+    image: "/airFreshener12.webp",
+    backImage: "/airFreshener12_back.webp",
   },
   {
-    id: "tcg-eugene",
+    id: "tcg-preview",
     kind: "card",
     status: "soon",
     statusLabel: "Coming Soon",
     description: "The Trading Card Game",
-    card: EUGENE,
-  },
-  {
-    id: "tcg-saint",
-    kind: "card",
-    status: "soon",
-    statusLabel: "Coming Soon",
-    description: "The Trading Card Game",
-    card: SAINT,
-  },
-  {
-    id: "tcg-barron",
-    kind: "card",
-    status: "soon",
-    statusLabel: "Coming Soon",
-    description: "The Trading Card Game",
-    card: BARRON,
   },
 ];
 
@@ -164,10 +176,15 @@ const ROTATE_MS = 7200;
 export default function ReliquaryRail() {
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Pick once per mount so the same face stays during the rail's lifetime
+  // (no swapping mid-rotation), but a fresh face appears on each load.
+  // Picked client-side after mount to avoid SSR hydration mismatches.
+  const [tcgCard, setTcgCard] = useState(null);
   const active = FEATURES[activeIndex];
 
   useEffect(() => {
     setMounted(true);
+    setTcgCard(TCG_POOL[Math.floor(Math.random() * TCG_POOL.length)]);
   }, []);
 
   useEffect(() => {
@@ -183,19 +200,35 @@ export default function ReliquaryRail() {
   return createPortal(
     <>
       <aside className="reliquary-rail" aria-label="The Reliquary">
+        <h2 className="reliquary-heading">The Reliquary</h2>
         <article key={active.id} className="reliquary-feature is-entering">
-          <span
-            className={`reliquary-status reliquary-status--${active.status}`}
-          >
-            {active.statusLabel}
-          </span>
+          {active.kind === "relic" && (
+            <span
+              className={`reliquary-status reliquary-status--${active.status}`}
+            >
+              {active.statusLabel}
+            </span>
+          )}
 
           {active.kind === "relic" ? (
-            <RelicImage src={active.image} alt={active.description} />
+            <RelicImage
+              src={active.image}
+              backSrc={active.backImage}
+              alt={active.description}
+            />
           ) : (
             <div className="reliquary-card-wrap">
               <div className="reliquary-card-frame">
-                <TradingCard data={active.card} scale={0.34} interactive />
+                {tcgCard && (
+                  <TradingCard
+                    data={tcgCard}
+                    scale={0.34}
+                    interactive
+                    cornerBadge={
+                      active.status === "soon" ? "Coming Soon" : null
+                    }
+                  />
+                )}
               </div>
             </div>
           )}

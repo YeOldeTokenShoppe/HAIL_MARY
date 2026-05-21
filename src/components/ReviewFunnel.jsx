@@ -9,20 +9,21 @@ import generateReviewCase from './game/cases/generateReviewCase';
 import { fetchWithX402 } from '@/lib/review/x402Client';
 
 // ReviewFunnel — multi-step "request a custom token review" flow on /trade.
-// Wallet check → contract address input → name/symbol/decimals resolved
-// via wagmi → confirmation card → onConfirm(reviewCase).
+// Wallet check → contract address input → chain auto-detect (CMC) →
+// confirmation card → x402-paid Claude pipeline → onConfirm(reviewCase).
 //
-// This is step 1 of the broader x402-paid review service. NO payment is
-// taken at this stage; on Confirm the funnel just hands the parent a
-// case-file-shaped object built by generateReviewCase. Payment + real
-// data + LLM dialogue land in subsequent passes.
+// Chain resolution: POST /api/review/resolve sends the pasted address
+// to CoinMarketCap. CMC's contract-address index covers ~50 chains so a
+// single lookup tells us which chain the token lives on, picks the
+// most-trafficked deployment, and returns market context (price/cap/
+// volume/CEX age) that flows into the characters' prompt.
 //
-// Currently fixed to Base (matches wagmiConfig.js — Base is the only
-// chain in the transport map). The chain picker is intentionally
-// deferred until the data layer can serve other chains.
+// Fallback: if CMC doesn't know the address (brand-new launch CMC
+// hasn't indexed yet), we fall back to the original Base/wagmi
+// ERC-20 read path so freshly-deployed Base tokens still review.
 
-const SUPPORTED_CHAIN_ID = 8453; // Base
-const SUPPORTED_CHAIN_LABEL = 'Base';
+const BASE_CHAIN_ID = 8453;
+const BASE_CHAIN_NAME = 'Base';
 
 // Display copy for the paywall step. Server enforces the actual price
 // from the x402 challenge; this is just for UI honesty before the
@@ -36,7 +37,7 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
   // Form state.
   const [rawInput, setRawInput] = useState('');
   // Set to the validated address when the player submits — drives the
-  // ERC-20 read. Reset to null when they edit or cancel.
+  // resolve fetch + ERC-20 fallback. Reset to null when they edit.
   const [resolvingAddress, setResolvingAddress] = useState(null);
 
   const normalizedInput = useMemo(() => rawInput.trim(), [rawInput]);
@@ -45,61 +46,139 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
     [normalizedInput],
   );
 
+  // Resolution state machine.
+  //   'detecting'    — POST /api/review/resolve is in-flight
+  //   'resolved'     — CMC returned a chain + market data
+  //   'base-fallback'— CMC unknown; trying wagmi ERC-20 reads on Base
+  //   'failed'       — both paths failed
+  //   'idle'         — no address submitted
+  const [resolveStatus, setResolveStatus] = useState('idle');
+  const [resolved, setResolved] = useState(null);
+
   // Reset funnel state whenever it opens fresh.
   useEffect(() => {
     if (isOpen) {
       setRawInput('');
       setResolvingAddress(null);
+      setResolved(null);
+      setResolveStatus('idle');
     }
   }, [isOpen]);
 
-  // Batched ERC-20 reads: name, symbol, decimals. Gated on
-  // resolvingAddress so the query only fires after the player submits a
-  // valid input, not on every keystroke.
-  const readContracts = useMemo(
+  // CMC chain-detect + market lookup. Fires once per submitted address.
+  useEffect(() => {
+    if (!resolvingAddress) {
+      setResolveStatus('idle');
+      setResolved(null);
+      return;
+    }
+    let cancelled = false;
+    setResolveStatus('detecting');
+    setResolved(null);
+    fetch('/api/review/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: resolvingAddress }),
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`resolve ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        if (data.unknown) {
+          // CMC doesn't know the address. Fall back to Base + wagmi —
+          // covers newly-deployed Base tokens CMC hasn't indexed yet.
+          setResolveStatus('base-fallback');
+        } else {
+          setResolved({
+            chainId: data.chainId,
+            chainName: data.chainName,
+            address: data.address,
+            name: data.name,
+            symbol: data.symbol,
+            decimals: data.decimals,
+            market: data.market,
+            alternatives: Array.isArray(data.alternatives) ? data.alternatives : [],
+            logo: data.logo || null,
+          });
+          setResolveStatus('resolved');
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('[ReviewFunnel] resolve failed:', err);
+        setResolveStatus('base-fallback');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvingAddress]);
+
+  // Base/wagmi fallback — only runs when CMC came back unknown OR the
+  // resolve endpoint itself errored. Reads name/symbol/decimals
+  // directly from the Base ERC-20 contract.
+  const fallbackEnabled = resolveStatus === 'base-fallback' && !!resolvingAddress;
+  const fallbackContracts = useMemo(
     () =>
-      resolvingAddress
+      fallbackEnabled
         ? [
-            { address: resolvingAddress, abi: erc20Abi, functionName: 'name',     chainId: SUPPORTED_CHAIN_ID },
-            { address: resolvingAddress, abi: erc20Abi, functionName: 'symbol',   chainId: SUPPORTED_CHAIN_ID },
-            { address: resolvingAddress, abi: erc20Abi, functionName: 'decimals', chainId: SUPPORTED_CHAIN_ID },
+            { address: resolvingAddress, abi: erc20Abi, functionName: 'name',     chainId: BASE_CHAIN_ID },
+            { address: resolvingAddress, abi: erc20Abi, functionName: 'symbol',   chainId: BASE_CHAIN_ID },
+            { address: resolvingAddress, abi: erc20Abi, functionName: 'decimals', chainId: BASE_CHAIN_ID },
           ]
         : [],
-    [resolvingAddress],
+    [fallbackEnabled, resolvingAddress],
   );
 
-  const { data: readData, error: readError, isLoading: isReading } = useReadContracts({
-    contracts: readContracts,
-    query: { enabled: !!resolvingAddress },
+  const {
+    data: fallbackData,
+    error: fallbackError,
+    isLoading: fallbackLoading,
+  } = useReadContracts({
+    contracts: fallbackContracts,
+    query: { enabled: fallbackEnabled },
   });
 
-  const resolved = useMemo(() => {
-    if (!resolvingAddress || !readData) return null;
-    const [nameRes, symbolRes, decimalsRes] = readData;
-    if (nameRes?.status !== 'success' || symbolRes?.status !== 'success') return null;
-    return {
-      chainId: SUPPORTED_CHAIN_ID,
+  // When the fallback finishes, fold the result into `resolved` so the
+  // rest of the funnel (onchain fetch, confirm step) doesn't have to
+  // know which path produced the data.
+  useEffect(() => {
+    if (resolveStatus !== 'base-fallback') return;
+    if (fallbackLoading) return;
+    if (fallbackError || !fallbackData) {
+      setResolveStatus('failed');
+      return;
+    }
+    const [nameRes, symbolRes, decimalsRes] = fallbackData;
+    if (nameRes?.status !== 'success' || symbolRes?.status !== 'success') {
+      setResolveStatus('failed');
+      return;
+    }
+    setResolved({
+      chainId: BASE_CHAIN_ID,
+      chainName: BASE_CHAIN_NAME,
       address: resolvingAddress,
       name: String(nameRes.result),
       symbol: String(symbolRes.result),
       decimals: decimalsRes?.status === 'success' ? Number(decimalsRes.result) : 18,
-    };
-  }, [resolvingAddress, readData]);
+      market: null,
+      alternatives: [],
+      logo: null,
+    });
+    setResolveStatus('resolved');
+  }, [resolveStatus, fallbackLoading, fallbackError, fallbackData, resolvingAddress]);
 
-  // Distinguish "still loading" from "loaded but the contract isn't ERC-20".
-  const resolveFailed =
-    !!resolvingAddress && !isReading && !resolved && (!!readError || !!readData);
-
-  // Onchain snapshot — fires in parallel with the wagmi reads. Trinity
-  // (marisol) station consumes this to compose her actual onchain read.
-  // Failure here is non-blocking: we still let the user begin the review
-  // and Trinity just falls back to placeholder copy.
+  // Onchain snapshot — fires in parallel with character resolution.
+  // Trinity (marisol station) consumes this to compose her actual
+  // onchain read. Failure here is non-blocking: we still let the user
+  // begin the review and Trinity falls back to placeholder copy.
   const [onchain, setOnchain] = useState(null);
   const [onchainLoading, setOnchainLoading] = useState(false);
   const [onchainError, setOnchainError] = useState(null);
 
   useEffect(() => {
-    if (!resolvingAddress) {
+    if (!resolved) {
       setOnchain(null);
       setOnchainError(null);
       return;
@@ -110,7 +189,7 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
     fetch('/api/review/onchain', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chainId: SUPPORTED_CHAIN_ID, address: resolvingAddress }),
+      body: JSON.stringify({ chainId: resolved.chainId, address: resolved.address }),
     })
       .then(async (res) => {
         if (!res.ok) throw new Error(`onchain ${res.status}`);
@@ -130,7 +209,7 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
     return () => {
       cancelled = true;
     };
-  }, [resolvingAddress]);
+  }, [resolved]);
 
   const handleSubmit = () => {
     if (!inputIsValid) return;
@@ -169,18 +248,16 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
             address: resolved.address,
             name: resolved.name,
             symbol: resolved.symbol,
-            chainLabel: SUPPORTED_CHAIN_LABEL,
+            chainName: resolved.chainName,
+            // Back-compat: older `chainLabel` field still accepted by
+            // characterPrompts.buildUserMessage as a fallback.
+            chainLabel: resolved.chainName,
           },
           onchain,
+          market: resolved.market || null,
         },
-        // Flip the UI to "compiling" the moment the user accepts the
-        // wallet prompt — fetchWithX402 calls onChallenge BEFORE
-        // signing, but we want the visual update to happen AFTER the
-        // sig is captured (i.e. inside signTypedDataAsync). Simpler:
-        // we'll flip in the same place we call this, post-sign.
         signTypedDataAsync: async (typedData) => {
           const sig = await signTypedDataAsync(typedData);
-          // Signature in hand → server will verify + settle next.
           setPayStatus('compiling');
           return sig;
         },
@@ -191,9 +268,7 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
       // Hard fail — the user either rejected the wallet prompt, the
       // signature was rejected, or settle failed (e.g. insufficient
       // USDC). Drop them back to the Confirm card with the reason; the
-      // case is NOT built. Different from the previous soft-fail policy
-      // because the user is paying — we shouldn't silently proceed
-      // with a degraded result if the LLM pipeline never ran.
+      // case is NOT built.
       console.warn('[ReviewFunnel] x402 + character compile failed:', err);
       setPayError(humanizePaymentError(err));
       setPayStatus('idle');
@@ -208,24 +283,20 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
   const handleClose = () => {
     setRawInput('');
     setResolvingAddress(null);
+    setResolved(null);
+    setResolveStatus('idle');
     onClose?.();
   };
 
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
-  // Three visual states inside the dialog body.
+  // Visual states.
   let body = null;
   if (compiling) {
-    // Outermost branch — once Confirm fires the paid pipeline, the
-    // funnel sits on this screen through the wallet-signing prompt
-    // ('signing') and the LLM compile ('compiling'). Backdrop-tap
-    // is still allowed (handleClose resets state) so users can bail.
     body = <CompilingStep phase={payStatus} />;
   } else if (!isConnected) {
-    body = (
-      <ConnectWalletPrompt onConnect={() => setShowWalletModal(true)} />
-    );
+    body = <ConnectWalletPrompt onConnect={() => setShowWalletModal(true)} />;
   } else if (!resolvingAddress) {
     body = (
       <AddressInputStep
@@ -236,14 +307,21 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
         normalizedInput={normalizedInput}
       />
     );
-  } else if (isReading) {
-    body = <ResolvingStep address={resolvingAddress} />;
-  } else if (resolveFailed) {
+  } else if (resolveStatus === 'detecting' || (resolveStatus === 'base-fallback' && fallbackLoading)) {
+    body = (
+      <ResolvingStep
+        address={resolvingAddress}
+        usingFallback={resolveStatus === 'base-fallback'}
+      />
+    );
+  } else if (resolveStatus === 'failed') {
     body = (
       <ResolveErrorStep
         address={resolvingAddress}
         onRetry={() => {
           setResolvingAddress(null);
+          setResolved(null);
+          setResolveStatus('idle');
         }}
       />
     );
@@ -251,7 +329,11 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
     body = (
       <ConfirmStep
         token={resolved}
-        onEdit={() => setResolvingAddress(null)}
+        onEdit={() => {
+          setResolvingAddress(null);
+          setResolved(null);
+          setResolveStatus('idle');
+        }}
         onConfirm={handleConfirm}
         onchainLoading={onchainLoading}
         onchainReady={!!onchain}
@@ -448,8 +530,9 @@ function AddressInputStep({ value, onChange, onSubmit, canSubmit, normalizedInpu
     <>
       <StepTitle>PASTE TOKEN ADDRESS</StepTitle>
       <StepHelp>
-        Paste a contract address on {SUPPORTED_CHAIN_LABEL}. We will look up the
-        token name and ticker before you confirm the request.
+        Paste a contract address from any major EVM chain (Ethereum, Base,
+        Optimism, Arbitrum, Polygon, BNB, Avalanche, Linea, Blast, Zora).
+        We'll detect the chain and look up the token before you confirm.
       </StepHelp>
       <input
         type="text"
@@ -491,13 +574,24 @@ function AddressInputStep({ value, onChange, onSubmit, canSubmit, normalizedInpu
   );
 }
 
-function ResolvingStep({ address }) {
+function ResolvingStep({ address, usingFallback }) {
   return (
     <>
-      <StepTitle>READING CONTRACT…</StepTitle>
+      <StepTitle>{usingFallback ? 'CHECKING BASE…' : 'DETECTING CHAIN…'}</StepTitle>
       <StepHelp>
-        Calling <code>name()</code>, <code>symbol()</code>, and <code>decimals()</code> on
-        {' '}{address.slice(0, 6)}…{address.slice(-4)} on {SUPPORTED_CHAIN_LABEL}.
+        {usingFallback ? (
+          <>
+            CoinMarketCap hasn't indexed{' '}
+            {address.slice(0, 6)}…{address.slice(-4)} yet. Trying a direct
+            ERC-20 read on Base.
+          </>
+        ) : (
+          <>
+            Asking CoinMarketCap which chain{' '}
+            {address.slice(0, 6)}…{address.slice(-4)} lives on, and pulling
+            its market context.
+          </>
+        )}
       </StepHelp>
       <div style={{ fontSize: 11, color: '#6db59a', fontStyle: 'italic' }}>
         Hold tight — the chain is talking back.
@@ -511,10 +605,9 @@ function ResolveErrorStep({ address, onRetry }) {
     <>
       <StepTitle>COULDN'T READ THAT CONTRACT</StepTitle>
       <StepHelp>
-        The ERC-20 read failed for{' '}
-        <strong style={{ color: '#c8ffe0' }}>{address.slice(0, 6)}…{address.slice(-4)}</strong>{' '}
-        on {SUPPORTED_CHAIN_LABEL}. It might not be ERC-20, or the contract may live on a
-        different chain. Nothing was charged.
+        Neither CoinMarketCap nor a direct Base read returned token data for{' '}
+        <strong style={{ color: '#c8ffe0' }}>{address.slice(0, 6)}…{address.slice(-4)}</strong>.
+        It might not be ERC-20, or it may live on an unsupported chain. Nothing was charged.
       </StepHelp>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <SecondaryButton onClick={onRetry}>▸ TRY ANOTHER ADDRESS</SecondaryButton>
@@ -617,8 +710,38 @@ function ConfirmStep({ token, onEdit, onConfirm, onchainLoading, onchainReady, o
           {token.address}
         </div>
         <div style={{ fontSize: 10, color: '#6db59a', letterSpacing: '0.18em', marginTop: 6 }}>
-          // {SUPPORTED_CHAIN_LABEL} · {token.decimals} decimals
+          // {token.chainName} · {token.decimals} decimals
         </div>
+        {token.alternatives && token.alternatives.length > 0 && (
+          <div style={{ fontSize: 10, color: '#6db59a', marginTop: 4, fontStyle: 'italic' }}>
+            // also deployed on: {token.alternatives.map((a) => a.chainName).join(', ')}
+          </div>
+        )}
+        {token.market && (
+          <div
+            style={{
+              marginTop: 10,
+              paddingTop: 10,
+              borderTop: '1px solid rgba(142,233,255,0.18)',
+              fontSize: 11,
+              color: '#8ee9ff',
+              lineHeight: 1.5,
+            }}
+          >
+            {typeof token.market.price === 'number' && (
+              <div>price ${token.market.price.toPrecision(4)}</div>
+            )}
+            {typeof token.market.marketCap === 'number' && (
+              <div>mcap ${Math.round(token.market.marketCap).toLocaleString()}</div>
+            )}
+            {typeof token.market.percentChange24h === 'number' && (
+              <div>
+                24h {token.market.percentChange24h >= 0 ? '+' : ''}
+                {token.market.percentChange24h.toFixed(2)}%
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div
         style={{

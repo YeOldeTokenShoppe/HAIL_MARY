@@ -245,6 +245,42 @@
   -webkit-overflow-scrolling: touch;
   overflow: hidden;
 }
+
+/* Mobile: the canvas scrolls away with the page instead of staying
+   pinned, so the ReliquaryRail (which flows inline after shrine-page)
+   lands on a clean black body background instead of fighting the
+   busy 3D scene for attention. */
+@media (max-width: 900px) {
+  .shrine-page.neon {
+    position: relative;
+  }
+
+  .shrine-page.neon .scene-background {
+    position: absolute;
+    inset: auto;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100svh;
+    /* Soft alpha fade at the bottom 25% of the canvas so it dissolves
+       into the content area below instead of hard-cutting. Keeps the
+       canvas crisp at the top (no color overlay) while smoothing the
+       canvas → void boundary. */
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      black 0%,
+      black 75%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      black 0%,
+      black 75%,
+      transparent 100%
+    );
+  }
+}
 /* Grab cursor only when the pointer is actually over the candle
    geometry (R3F's onPointerOver toggles `candle-hover` on the bg).
    Without the candle-hover gate, the grab cursor would blanket the
@@ -383,6 +419,42 @@
 
 .shrine-page.neon .our-lady-title .title-line-profit {
   margin-left: 4.2rem;
+}
+
+/* Section heading that ties the below-canvas content back to the hero
+   title visually. Mirrors .our-lady-title's font / color / glow and
+   borrows its skew + multi-line stagger for matching authority. */
+.shrine-page.neon .section-title {
+  display: inline-block;
+  font-family: "UnifrakturCook", serif;
+  color: #d4af37;
+  font-size: clamp(2.4rem, 6.5vw, 3.4rem);
+  font-weight: 900;
+  line-height: 0.85;
+  margin: 0 auto 18px;
+  letter-spacing: 0.02em;
+  transform: rotate(-4deg) skew(-10deg);
+  transform-origin: center;
+  text-shadow:
+    0 0 12px rgba(42, 214, 238, 0.55),
+    0 0 28px rgba(42, 214, 238, 0.35),
+    0 0 52px rgba(217, 45, 176, 0.4),
+    2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.shrine-page.neon .section-title-line {
+  display: block;
+  position: relative;
+}
+
+.shrine-page.neon .section-title-of {
+  font-size: 0.65em;
+  opacity: 0.85;
+  margin-right: 0.2em;
+}
+
+.shrine-page.neon .section-title-line-tail {
+  margin-left: 2.4rem;
 }
 
 /* Candle melt debug readout — fixed, monospace, easy to spot while iterating. */
@@ -597,12 +669,12 @@
   font-size: clamp(1rem, 1.85vw, 1.35rem);
   font-style: italic;
   line-height: 1.22;
-  color: #d6faff;
+  color: #f1d77a;
   letter-spacing: 0.02em;
   white-space: normal;
   text-shadow:
-    0 0 9px rgba(42, 214, 238, 0.3),
-    0 0 22px rgba(217, 45, 176, 0.22);
+    0 0 10px rgba(241, 215, 122, 0.35),
+    0 0 22px rgba(217, 45, 176, 0.25);
 }
 
 .shrine-page.neon .hero-pullquote-source {
@@ -638,7 +710,7 @@
 
 @keyframes heroPullquoteReveal {
   0% {
-    opacity: 0;
+    opacity: 0.32;
     transform: translateY(5px);
     filter: blur(2px);
   }
@@ -649,7 +721,7 @@
     filter: blur(0);
   }
   100% {
-    opacity: 0;
+    opacity: 0.32;
     transform: translateY(-4px);
     filter: blur(2px);
   }
@@ -750,9 +822,13 @@
   .shrine-page.neon .offering-strip {
     gap: 8px;
   }
-  /* Push the text + chart further down so the statue's head isn't hidden. */
+  /* Push the text + chart down so the heading lands at the canvas's
+     fade-out boundary (canvas mask starts fading at 75%, so 80vh puts
+     the heading in the dissolving zone rather than floating in a black
+     void below it). Quote / intro / chart follow the heading's offset. */
   .shrine-page.neon .hero-band {
-    margin-top: 65vh;
+    margin-top: 80vh;
+    margin-top: 80svh;
   }
   /* Translucent backdrop sits just inside the chart's ornate frame so
      the text box and chart share the same visual left edge. The SVG's

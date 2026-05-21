@@ -2486,6 +2486,12 @@ export default function HomePage() {
 
       <div className="hero-band">
         <div className="hero-copy">
+          <h2 className="section-title">
+            <span className="section-title-line">Mater</span>
+            <span className="section-title-line section-title-line-tail">
+              <span className="section-title-of">ex </span>Machina
+            </span>
+          </h2>
           <blockquote
             className="hero-pullquote"
             title={heroPullquote.gloss || undefined}
@@ -2511,7 +2517,7 @@ export default function HomePage() {
             ) : null}
           </blockquote>
           <p className="hero-intro">
-Sharpen your discernment against scams or play the Trading Card Game in the liminal terminal. Scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order. Mater ex machina. 
+Sharpen your discernment against scams or play the Trading Card Game in the liminal terminal. Scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order.
 </p>
         </div>
 
@@ -2942,7 +2948,7 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
         isUserSignedIn={isConnected}
         show80sButton={false}
         isMobile
-        neonMode
+        is80sMode
         /* Book slot (left of center) is the BUY button — placed nearer
            to the chart so buying intent and action sit in the same zone.
            Pulses while the chart is hovered to tie intent to action. */
