@@ -27,7 +27,7 @@ const PILLARS = [
     tagline: "ever flowing",
     color: "#d92db0",
     description:
-      "100% burned.",
+      "100% of LP tokens burned.",
   },
 ];
 

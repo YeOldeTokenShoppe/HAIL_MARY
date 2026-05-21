@@ -3056,13 +3056,20 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
       {/* <div ref={debugRef} className="candle-debug" /> */}
 
       {/* Social Links - Bottom Right */}
+      {/* The `social-stack` class opts this container out of the
+         `.shrine-page.neon > *:not(...)` rule in chart-shrine.css that
+         force-sets `position: relative` on direct children of <main>.
+         Without it, our inline `position: fixed` was being overridden
+         on mobile, causing the icons to render mid-page (where the user
+         scrolled to) instead of pinned to the viewport — and taps on
+         the right side opened x.com / t.me / farcaster.xyz tabs. */}
       <div
+        className="social-stack"
         style={{
           position: "fixed",
-          bottom: "5rem",
+          bottom: isMobileDevice ? "10rem" : "5rem",
           right: "2rem",
           left: "auto",
-          transform: isMobileDevice ? "translateY(-50%)" : "none",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -3070,7 +3077,15 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
           zIndex: 1001,
           pointerEvents: hideSocials ? "none" : "auto",
           opacity: hideSocials ? 0 : 1,
-          transition: "opacity 0.3s ease",
+          /* visibility is inherited and disables hit-testing on
+             descendants — pointer-events:none on this container alone
+             didn't, because each <a> child has its own implicit
+             pointer-events:auto. Delaying the visibility change until
+             the opacity fade completes preserves the smooth hide. */
+          visibility: hideSocials ? "hidden" : "visible",
+          transition: hideSocials
+            ? "opacity 0.3s ease, visibility 0s linear 0.3s"
+            : "opacity 0.3s ease, visibility 0s linear 0s",
         }}
       >
         <a
