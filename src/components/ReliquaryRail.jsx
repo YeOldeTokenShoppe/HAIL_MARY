@@ -260,7 +260,11 @@ function ReliquaryRailInner() {
                       >
                         <div className="reliquary-card-face reliquary-card-face--front">
                           {tcgCard && (
-                            <TradingCard data={tcgCard} scale={0.34} interactive />
+                            <TradingCard
+                              data={tcgCard}
+                              scale={0.34}
+                              interactive={false}
+                            />
                           )}
                         </div>
                         <div className="reliquary-card-face reliquary-card-face--back">

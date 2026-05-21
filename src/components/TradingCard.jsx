@@ -89,6 +89,12 @@ export default function TradingCard({
   };
 
   useEffect(() => {
+    // Skip the 60fps resting Lissajous when the card is non-interactive
+    // (e.g. small Reliquary preview). Every tick re-renders the multi-layer
+    // foil (mix-blend-mode + 4 background gradients) and was pushing iOS
+    // Safari past its GPU ceiling when the card was also wrapped in a
+    // second 3D context for flipping.
+    if (!interactive) return undefined;
     let raf = 0;
     const start = performance.now();
     const tick = (now) => {
@@ -111,7 +117,7 @@ export default function TradingCard({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [interactive]);
 
   return (
     <div
