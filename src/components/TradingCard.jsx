@@ -156,6 +156,8 @@ export default function TradingCard({
             src={data.overlayImage}
             alt=""
             draggable={false}
+            loading="lazy"
+            decoding="async"
           />
         )}
 
@@ -168,6 +170,8 @@ export default function TradingCard({
                 src={data.backgroundImage}
                 alt={`${data.name} artwork`}
                 draggable={false}
+                loading="lazy"
+                decoding="async"
                 style={{
                   objectPosition: data.artFocus || "center 38%",
                   transform: `scale(${data.artZoom || 1.55}) translate(

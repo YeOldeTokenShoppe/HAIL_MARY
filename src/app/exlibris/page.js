@@ -214,7 +214,7 @@ export default function ModelViewerPage() {
         userImage={user?.imageUrl}
         show80sButton={false}
         isMobile
-        neonMode
+        is80sMode
         /* Book slot (left) is the BUY button — kept in the same position
            as the root page so the BUY affordance is consistent across
            the app. */
@@ -231,8 +231,7 @@ export default function ModelViewerPage() {
           {
             key: 'terminal',
             label: 'TERMINAL',
-            title: 'The Liminal Terminal — preview',
-            comingSoon: true,
+            title: 'The Liminal Terminal',
             onClick: () => { window.location.href = '/trade'; },
             icon: (
               <svg

@@ -1,0 +1,371 @@
+/* Holy Trin80 — mobile-only sacred-geometry section that names the
+   three pillars of the RL80 mythos. Sits just above the Reliquary in
+   the mobile flow and shares the alcove treatment so they read as
+   sibling sections. */
+
+.holy-trin {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .holy-trin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: calc(100% - 32px);
+    max-width: 360px;
+    margin: 28px auto 0;
+    padding: 32px 16px 28px;
+    background: linear-gradient(
+      180deg,
+      rgba(35, 12, 55, 0.75) 0%,
+      rgba(18, 5, 32, 0.9) 100%
+    );
+    border-top: 1px solid rgba(255, 0, 255, 0.25);
+    border-radius: 14px;
+    color: #f1d77a;
+    text-align: center;
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 0 28px rgba(217, 45, 176, 0.08);
+  }
+
+  /* Mirrors .reliquary-heading so the two sections read as siblings. */
+  .holy-trin-heading {
+    display: inline-block;
+    margin: 0 auto 22px;
+    font-family: "UnifrakturCook", serif;
+    color: #d4af37;
+    font-size: clamp(2rem, 5.5vw, 2.8rem);
+    font-weight: 900;
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    transform: rotate(-3deg) skew(-8deg);
+    transform-origin: center;
+    text-shadow:
+      0 0 12px rgba(42, 214, 238, 0.55),
+      0 0 28px rgba(42, 214, 238, 0.35),
+      0 0 52px rgba(217, 45, 176, 0.4),
+      2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  /* Diagram canvas — aspect ratio matches the SVG viewBox so corner
+     labels can be placed by percentage and line up with vertex pixels.
+     overflow: visible so labels can extend just past the triangle
+     stroke without being clipped. */
+  .holy-trin-diagram {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 300 / 280;
+    max-width: 320px;
+    margin: 6px auto 4px;
+    overflow: visible;
+  }
+
+  .holy-trin-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* Center medallion label — RL80 wordmark inside the circle. */
+  .holy-trin-center {
+    position: absolute;
+    left: 50%;
+    /* y=173 in a 280-tall viewBox = 61.79% */
+    top: 61.79%;
+    transform: translate(-50%, -50%);
+    font-family: "Cinzel", serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1.8px;
+    color: #f1d77a;
+    text-shadow:
+      0 0 6px rgba(241, 215, 122, 0.6),
+      0 0 14px rgba(217, 45, 176, 0.4);
+    pointer-events: none;
+  }
+
+  /* Corner labels — anchored at each triangle vertex, then translated
+     outward so the label sits just past the stroke rather than on it.
+     Rendered as <button> elements so they're tappable and accessible;
+     default button chrome is reset. */
+  .holy-trin-corner {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+    background: none;
+    border: 0;
+    padding: 6px 8px;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: filter 220ms ease;
+  }
+
+  .holy-trin-corner:focus-visible {
+    outline: 1px dashed rgba(241, 215, 122, 0.7);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+
+  /* Active (tapped) pillar — label brightens, surrounding glow blooms
+     so the eye registers the connection between the tapped corner and
+     the tooltip that appears below. */
+  .holy-trin-corner.is-active .holy-trin-label {
+    filter: brightness(1.25);
+    text-shadow:
+      0 0 14px color-mix(in srgb, var(--corner-color) 80%, transparent),
+      0 0 30px color-mix(in srgb, var(--corner-color) 55%, transparent),
+      1px 1px 0 rgba(0, 0, 0, 0.6),
+      2px 2px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  /* Top apex: (150, 40) → (50%, 14.29%). Label sits above the apex. */
+  .holy-trin-corner--secur80 {
+    top: 14.29%;
+    left: 50%;
+    transform: translate(-50%, calc(-100% - 6px));
+  }
+
+  /* Bottom-left: (40, 240) → (13.33%, 85.71%). Label sits below + left. */
+  .holy-trin-corner--util80 {
+    top: 85.71%;
+    left: 13.33%;
+    transform: translate(calc(-50% - 4px), 14px);
+  }
+
+  /* Bottom-right: (260, 240) → (86.67%, 85.71%). Label sits below + right. */
+  .holy-trin-corner--liquid80 {
+    top: 85.71%;
+    left: 86.67%;
+    transform: translate(calc(-50% + 4px), 14px);
+  }
+
+  .holy-trin-label {
+    font-family: "Fjalla One", sans-serif;
+    font-size: 17px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--corner-color);
+    transform: skew(-8deg);
+    text-shadow:
+      0 0 8px color-mix(in srgb, var(--corner-color) 55%, transparent),
+      1px 1px 0 rgba(0, 0, 0, 0.6),
+      2px 2px 0 rgba(0, 0, 0, 0.45);
+  }
+
+  .holy-trin-tagline {
+    font-family: "Cinzel", serif;
+    font-style: italic;
+    font-size: 9.5px;
+    letter-spacing: 0.6px;
+    color: rgba(241, 215, 122, 0.68);
+    text-transform: none;
+  }
+}
+
+/* ───── SCROLL-TRIGGERED REVEAL ─────
+   Heading unblurs first, then the diagram fades up, then the triangle
+   stroke draws itself in. Stagger gives the section a sense of being
+   "constructed" rather than just appearing. */
+.holy-trin .holy-trin-heading {
+  opacity: 0;
+  transform: rotate(-3deg) skew(-8deg) translateY(8px);
+  filter: blur(4px);
+  transition:
+    opacity 700ms ease,
+    transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    filter 700ms ease;
+}
+
+.holy-trin.is-revealed .holy-trin-heading {
+  opacity: 1;
+  transform: rotate(-3deg) skew(-8deg) translateY(0);
+  filter: blur(0);
+}
+
+.holy-trin .holy-trin-diagram {
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 700ms ease 220ms,
+    transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1) 220ms;
+}
+
+.holy-trin.is-revealed .holy-trin-diagram {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Triangle stroke draws itself in via dashoffset.
+   Perimeter ≈ 2 × (side). For our isoceles-ish triangle:
+   side ≈ √(110² + 200²) ≈ 228, base = 220, total ≈ 676. Round up
+   to 720 so the dasharray fully covers and animates clean to 0. */
+.holy-trin-path {
+  stroke-dasharray: 720;
+  stroke-dashoffset: 720;
+}
+
+.holy-trin.is-revealed .holy-trin-path {
+  animation: holy-trin-draw 1200ms cubic-bezier(0.22, 0.61, 0.36, 1) 380ms
+    forwards;
+}
+
+@keyframes holy-trin-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Vertices and spokes ride in with the diagram fade — no separate
+   per-element delay needed. Medallion gets a faint pulse once revealed
+   so the eye is drawn to the center wordmark. */
+.holy-trin.is-revealed .holy-trin-medallion {
+  animation: holy-trin-medallion-pulse 3.4s ease-in-out 1100ms infinite;
+}
+
+@keyframes holy-trin-medallion-pulse {
+  0%,
+  100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ───── TOOLTIP ─────
+   Shared area below the diagram that shows the active pillar's
+   description. Single slot prevents layout jumps and gives the copy
+   enough room to breathe; corner color tints the border so the
+   spatial connection back to the tapped pillar stays legible. */
+.holy-trin-tooltip {
+  margin: 30px auto 0;
+  width: 100%;
+  max-width: 290px;
+  min-height: 64px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.42);
+  border-radius: 8px;
+  border-top: 1px solid var(--tooltip-color, rgba(241, 215, 122, 0.25));
+  box-shadow: 0 0 18px
+    color-mix(in srgb, var(--tooltip-color, #d4af37) 12%, transparent);
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 320ms ease,
+    transform 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 320ms ease,
+    box-shadow 320ms ease;
+}
+
+.holy-trin-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.holy-trin-tooltip-title {
+  font-family: "Fjalla One", sans-serif;
+  font-size: 13px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--tooltip-color, #f1d77a);
+  text-shadow: 0 0 8px
+    color-mix(in srgb, var(--tooltip-color, #d4af37) 45%, transparent);
+}
+
+.holy-trin-tooltip-text {
+  font-family: "Cinzel", serif;
+  font-style: italic;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: rgba(241, 215, 122, 0.85);
+}
+
+/* ───── SECTION DIVIDER ─────
+   Slim gold rule with a centered glyph (default: ∞). Placed between
+   sibling sections to mark a transition without leaning on the alcove
+   border. Gradient fade on each side so the rule doesn't hard-cut at
+   the column edges. */
+.section-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 280px;
+  margin: 4px auto;
+  pointer-events: none;
+}
+
+/* Lines on either side — gradient fade from transparent at the outer
+   edge to ~70% gold at the inner end where the arrowhead sits. Real
+   spans (not pseudo-elements) so each can carry its own ::after for
+   the arrow. */
+.section-divider-line {
+  position: relative;
+  flex: 1;
+  height: 1px;
+  box-shadow: 0 0 6px rgba(212, 175, 55, 0.25);
+}
+
+.section-divider-line--left {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(212, 175, 55, 0.7) 100%
+  );
+}
+
+.section-divider-line--right {
+  background: linear-gradient(
+    90deg,
+    rgba(212, 175, 55, 0.7) 0%,
+    transparent 100%
+  );
+}
+
+/* Tiny circles at the inner end of each line, sitting on top of the
+   gradient where it's at full strength. Same gold + glow as the line
+   shadow so they read as part of the same ornament. */
+.section-divider-line::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d4af37;
+  box-shadow: 0 0 6px rgba(212, 175, 55, 0.6);
+}
+
+.section-divider-line--left::after {
+  right: 0;
+  transform: translate(50%, -50%);
+}
+
+.section-divider-line--right::after {
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+
+.section-divider-icon {
+  font-family: "Cinzel", serif;
+  font-size: 20px;
+  line-height: 1;
+  color: #d4af37;
+  text-shadow:
+    0 0 8px rgba(212, 175, 55, 0.5),
+    0 0 16px rgba(212, 175, 55, 0.25);
+}

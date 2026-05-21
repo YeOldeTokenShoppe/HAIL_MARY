@@ -6,6 +6,7 @@ import { useGLTF, Stats } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useAccount, useDisconnect, useReadContract } from "wagmi";
+import { useInView } from "framer-motion";
 import { erc20Abi } from "viem";
 import { RL80_ADDRESS } from "@/lib/contracts";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
@@ -14,6 +15,8 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import ReliquaryRail from "@/components/ReliquaryRail";
+import HolyTrinSection from "@/components/HolyTrinSection";
+import DropInTitle from "../components/DropInTitle";
 import { useCandles } from "@/hooks/useCandles";
 import {
   readCandle,
@@ -1990,6 +1993,22 @@ const HERO_PULLQUOTES = [
   },
 ];
 
+function MobileSectionDropInTitle() {
+  const ref = useRef(null);
+  const inView = useInView(ref, { amount: 0.01, margin: "200px 0px" });
+  return (
+    <div ref={ref} className="section-title-wrap">
+      <DropInTitle
+        lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
+        colors={["#00ff00", "#f4e4c1", "#ffd700"]}
+        fontSize={{ mobile: "2.5rem", desktop: "4rem" }}
+        isMobile
+        triggerAnimation={inView}
+      />
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [timeframeKey, setTimeframeKey] = useState("30m");
   const [heroPullquoteIndex, setHeroPullquoteIndex] = useState(0);
@@ -2139,6 +2158,7 @@ export default function HomePage() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
   // On mobile the social stack sits over the chart once the user scrolls
   // into the hero-band. Fade it out past a short threshold so it doesn't
   // cover the candles. iOS Safari sometimes scrolls the body/html rather
@@ -2486,12 +2506,7 @@ export default function HomePage() {
 
       <div className="hero-band">
         <div className="hero-copy">
-          <h2 className="section-title">
-            <span className="section-title-line">Mater</span>
-            <span className="section-title-line section-title-line-tail">
-              <span className="section-title-of">ex </span>Machina
-            </span>
-          </h2>
+          {isMobileDevice && <MobileSectionDropInTitle />}
           <blockquote
             className="hero-pullquote"
             title={heroPullquote.gloss || undefined}
@@ -2555,6 +2570,16 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
           </div> */}
         </div>
       </div>
+
+      {isMobileDevice && <HolyTrinSection />}
+
+      {isMobileDevice && (
+        <div className="section-divider" role="separator" aria-hidden="true">
+          <span className="section-divider-line section-divider-line--left" />
+          <span className="section-divider-icon">∞</span>
+          <span className="section-divider-line section-divider-line--right" />
+        </div>
+      )}
 
       {/* <div className="offering-strip">
         <h2 className="offering-title">Light a Candle</h2>
@@ -2964,7 +2989,7 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
         extraLeft={[
           {
             key: 'terminal',
-            label: 'TLT',
+            label: 'Terminal',
             title: 'The Liminal Terminal',
             onClick: () => { window.location.href = '/trade'; },
             icon: (

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useInView } from "framer-motion";
 import TradingCard from "./TradingCard";
 import "./reliquary.css";
 
@@ -57,6 +58,8 @@ function RelicImage({ src, backSrc, alt }) {
             src={src}
             alt={alt}
             draggable={false}
+            loading="lazy"
+            decoding="async"
           />
           {backSrc && (
             <img
@@ -65,6 +68,8 @@ function RelicImage({ src, backSrc, alt }) {
               alt=""
               aria-hidden="true"
               draggable={false}
+              loading="lazy"
+              decoding="async"
             />
           )}
         </div>
@@ -168,22 +173,27 @@ const FEATURES = [
     status: "soon",
     statusLabel: "Coming Soon",
     description: "The Trading Card Game",
+    tagline: "Eighty traders, one faithful winner.",
   },
 ];
 
 const ROTATE_MS = 7200;
 
-export default function ReliquaryRail() {
-  const [mounted, setMounted] = useState(false);
+function ReliquaryRailInner() {
   const [activeIndex, setActiveIndex] = useState(0);
   // Pick once per mount so the same face stays during the rail's lifetime
   // (no swapping mid-rotation), but a fresh face appears on each load.
   // Picked client-side after mount to avoid SSR hydration mismatches.
   const [tcgCard, setTcgCard] = useState(null);
+  const railRef = useRef(null);
+  const inView = useInView(railRef, {
+    amount: 0.1,
+    margin: "120px 0px",
+    once: true,
+  });
   const active = FEATURES[activeIndex];
 
   useEffect(() => {
-    setMounted(true);
     setTcgCard(TCG_POOL[Math.floor(Math.random() * TCG_POOL.length)]);
   }, []);
 
@@ -195,14 +205,19 @@ export default function ReliquaryRail() {
     return () => window.clearInterval(id);
   }, []);
 
-  if (!mounted) return null;
-
   return createPortal(
     <>
-      <aside className="reliquary-rail" aria-label="The Reliquary">
+      <aside
+        ref={railRef}
+        className={`reliquary-rail${inView ? " is-revealed" : ""}`}
+        aria-label="The Reliquary"
+      >
         <h2 className="reliquary-heading">The Reliquary</h2>
+        <p className="reliquary-subheading">
+          Wares and rites of the order.
+        </p>
         <article key={active.id} className="reliquary-feature is-entering">
-          {active.kind === "relic" && (
+          {active.statusLabel && (
             <span
               className={`reliquary-status reliquary-status--${active.status}`}
             >
@@ -220,14 +235,7 @@ export default function ReliquaryRail() {
             <div className="reliquary-card-wrap">
               <div className="reliquary-card-frame">
                 {tcgCard && (
-                  <TradingCard
-                    data={tcgCard}
-                    scale={0.34}
-                    interactive
-                    cornerBadge={
-                      active.status === "soon" ? "Coming Soon" : null
-                    }
-                  />
+                  <TradingCard data={tcgCard} scale={0.34} interactive />
                 )}
               </div>
             </div>
@@ -235,6 +243,9 @@ export default function ReliquaryRail() {
 
           {active.description && (
             <p className="reliquary-description">{active.description}</p>
+          )}
+          {active.tagline && (
+            <p className="reliquary-tagline">{active.tagline}</p>
           )}
         </article>
 
@@ -258,4 +269,13 @@ export default function ReliquaryRail() {
     </>,
     document.body,
   );
+}
+
+export default function ReliquaryRail() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted) return null;
+  return <ReliquaryRailInner />;
 }

@@ -253,6 +253,12 @@
 @media (max-width: 900px) {
   .shrine-page.neon {
     position: relative;
+    /* On mobile the Reliquary flows inline below <main> (portaled to
+       body) and provides its own dock clearance via a 140px+ bottom
+       margin. The 132px bottom padding inherited from .shrine-page is
+       therefore dead space between the last in-main child (HolyTrin)
+       and the portaled Reliquary — collapse it here. */
+    padding-bottom: 0;
   }
 
   .shrine-page.neon .scene-background {

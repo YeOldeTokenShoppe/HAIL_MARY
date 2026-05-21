@@ -32,8 +32,10 @@
 
 /* Section heading — hidden on desktop (where the rail is a tight
    fixed top-right column) and shown only at the mobile breakpoint
-   where the rail flows inline and benefits from a wordmark. */
-.reliquary-heading {
+   where the rail flows inline and benefits from a wordmark. The
+   subheading sits with the heading and follows the same rule. */
+.reliquary-heading,
+.reliquary-subheading {
   display: none;
 }
 
@@ -45,6 +47,20 @@
   font-size: 11px;
   letter-spacing: 2.2px;
   text-shadow: 0 0 12px rgba(241, 215, 122, 0.18);
+}
+
+/* Subdescription flavor line — sets the mood for a feature in one
+   short sentence. Italic + lowered opacity to read as flavor copy
+   rather than a heading. */
+.reliquary-tagline {
+  margin: -6px 0 0;
+  text-align: center;
+  font-family: "Cinzel", serif;
+  font-style: italic;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: rgba(241, 215, 122, 0.7);
+  text-transform: none;
 }
 
 /* ───── STATUS PILL ───── */
@@ -199,6 +215,61 @@
   animation: reliquary-slide-in 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
+/* ───── SCROLL-TRIGGERED REVEAL ─────
+   When the rail scrolls into view, the gothic wordmark unblurs and
+   settles, then the feature panel rises into place. Once-only so it
+   reads as a section entrance, not a flicker on every scrub. */
+.reliquary-rail .reliquary-heading {
+  opacity: 0;
+  transform: rotate(-3deg) skew(-8deg) translateY(8px);
+  filter: blur(4px);
+  transition:
+    opacity 700ms ease,
+    transform 700ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    filter 700ms ease;
+}
+
+.reliquary-rail.is-revealed .reliquary-heading {
+  opacity: 1;
+  transform: rotate(-3deg) skew(-8deg) translateY(0);
+  filter: blur(0);
+  animation: reliquary-heading-pulse 1.6s ease 600ms 1 both;
+}
+
+@keyframes reliquary-heading-pulse {
+  0%,
+  100% {
+    text-shadow:
+      0 0 12px rgba(42, 214, 238, 0.55),
+      0 0 28px rgba(42, 214, 238, 0.35),
+      0 0 52px rgba(217, 45, 176, 0.4),
+      2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+  45% {
+    text-shadow:
+      0 0 18px rgba(42, 214, 238, 0.85),
+      0 0 42px rgba(42, 214, 238, 0.55),
+      0 0 78px rgba(217, 45, 176, 0.7),
+      2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Feature panel rises into place ~250ms after the heading starts,
+   for a clean stagger. The existing .is-entering swap animation
+   still owns the in-section transition between cards. */
+.reliquary-rail .reliquary-feature {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 620ms ease 250ms,
+    transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1) 250ms;
+}
+
+.reliquary-rail.is-revealed .reliquary-feature {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @media (max-width: 1180px) {
   .reliquary-rail {
     width: 264px;
@@ -247,7 +318,7 @@
   .reliquary-heading {
     display: inline-block;
     align-self: center;
-    margin: 0 auto 14px;
+    margin: 0 auto 6px;
     font-family: "UnifrakturCook", serif;
     color: #d4af37;
     font-size: clamp(2rem, 5.5vw, 2.8rem);
@@ -262,4 +333,38 @@
       0 0 52px rgba(217, 45, 176, 0.4),
       2px 2px 0 rgba(0, 0, 0, 0.6);
   }
+
+  /* Short blurb under the heading — italic Cinzel in a faded gold so
+     it reads as supplementary text rather than competing with the
+     gothic wordmark above or the feature panel below. */
+  .reliquary-subheading {
+    display: block;
+    align-self: center;
+    margin: 0 auto 14px;
+    max-width: 280px;
+    font-family: "Cinzel", serif;
+    font-style: italic;
+    font-size: 12px;
+    line-height: 1.35;
+    letter-spacing: 0.4px;
+    color: rgba(241, 215, 122, 0.72);
+    text-align: center;
+    text-shadow: 0 0 8px rgba(241, 215, 122, 0.15);
+  }
+}
+
+/* ───── SUBHEADING REVEAL ─────
+   Same fade-up as the heading but with a small delay so the eye
+   reads heading → blurb → feature panel in sequence. */
+.reliquary-rail .reliquary-subheading {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 600ms ease 150ms,
+    transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1) 150ms;
+}
+
+.reliquary-rail.is-revealed .reliquary-subheading {
+  opacity: 1;
+  transform: translateY(0);
 }
