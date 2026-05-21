@@ -216,38 +216,49 @@ function ReliquaryRailInner() {
         <p className="reliquary-subheading">
           Wares and rites of the order.
         </p>
-        <article key={active.id} className="reliquary-feature is-entering">
-          {active.statusLabel && (
-            <span
-              className={`reliquary-status reliquary-status--${active.status}`}
-            >
-              {active.statusLabel}
-            </span>
-          )}
-
-          {active.kind === "relic" ? (
-            <RelicImage
-              src={active.image}
-              backSrc={active.backImage}
-              alt={active.description}
-            />
-          ) : (
-            <div className="reliquary-card-wrap">
-              <div className="reliquary-card-frame">
-                {tcgCard && (
-                  <TradingCard data={tcgCard} scale={0.34} interactive />
+        <div className="reliquary-feature-stack">
+          {FEATURES.map((feat) => {
+            const isActive = feat.id === active.id;
+            return (
+              <article
+                key={feat.id}
+                className={`reliquary-feature${isActive ? " is-active" : ""}`}
+                aria-hidden={!isActive}
+              >
+                {feat.statusLabel && (
+                  <span
+                    className={`reliquary-status reliquary-status--${feat.status}`}
+                  >
+                    {feat.statusLabel}
+                  </span>
                 )}
-              </div>
-            </div>
-          )}
 
-          {active.description && (
-            <p className="reliquary-description">{active.description}</p>
-          )}
-          {active.tagline && (
-            <p className="reliquary-tagline">{active.tagline}</p>
-          )}
-        </article>
+                {feat.kind === "relic" ? (
+                  <RelicImage
+                    src={feat.image}
+                    backSrc={feat.backImage}
+                    alt={feat.description}
+                  />
+                ) : (
+                  <div className="reliquary-card-wrap">
+                    <div className="reliquary-card-frame">
+                      {tcgCard && (
+                        <TradingCard data={tcgCard} scale={0.34} interactive />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {feat.description && (
+                  <p className="reliquary-description">{feat.description}</p>
+                )}
+                {feat.tagline && (
+                  <p className="reliquary-tagline">{feat.tagline}</p>
+                )}
+              </article>
+            );
+          })}
+        </div>
 
         {FEATURES.length > 1 && (
           <div className="reliquary-controls" aria-label="Feature carousel">
