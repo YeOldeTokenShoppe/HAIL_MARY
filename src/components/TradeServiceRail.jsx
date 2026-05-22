@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const SERVICES = [
   {
@@ -17,7 +17,7 @@ const SERVICES = [
   },
   {
     id: "terminal-traders",
-    eyebrow: "CARDS",
+    eyebrow: "PLAY",
     title: "Terminal Traders",
     desc: "The Trading Card Game.",
     accent: "magenta",
@@ -30,10 +30,55 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
   const activeService = SERVICES.find((s) => s.id === selectedId) ?? SERVICES[0];
   const shellAccent = activeService.accent;
 
+  // Mobile collapses the rail into a single pill (active service + chevron)
+  // by default; tapping the pill expands a popover above it with the full
+  // chooser. Desktop ignores this state — CSS hides the pill at >520px and
+  // shows the options inline.
+  const [expanded, setExpanded] = useState(false);
+  const rootRef = useRef(null);
+
+  // Dismiss popover on outside-tap / Escape so the user isn't stranded
+  // with the options floating over the canvas.
+  useEffect(() => {
+    if (!expanded) return;
+    const onPointerDown = (e) => {
+      if (rootRef.current && !rootRef.current.contains(e.target)) {
+        setExpanded(false);
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [expanded]);
+
   return (
-    <div className="tsr-root" aria-label="Trade page services">
+    <div
+      ref={rootRef}
+      className={`tsr-root${expanded ? ' is-expanded' : ''}`}
+      aria-label="Trade page services"
+    >
       <style>{STYLES}</style>
       <div className={`tsr-shell tsr-${shellAccent}`}>
+        {/* Mobile-only collapsed pill. Hidden by CSS on desktop. */}
+        <button
+          type="button"
+          className={`tsr-pill tsr-card-${activeService.accent}`}
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={`Active service: ${activeService.title}. Tap to ${expanded ? 'close' : 'change'}.`}
+        >
+          <span className="tsr-pip" aria-hidden />
+          <span className="tsr-pill-eyebrow">{activeService.eyebrow}</span>
+          <span className="tsr-pill-sep" aria-hidden>·</span>
+          <span className="tsr-pill-title">{activeService.title}</span>
+          <span className="tsr-pill-chevron" aria-hidden>▾</span>
+        </button>
         <div className="tsr-status">
           <span className="tsr-pip" aria-hidden />
           SERVICES ONLINE
@@ -43,7 +88,11 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
             const isSelected = service.id === activeService.id;
             const isDisabled = !!service.disabled;
             const handleClick = !isSelected && !isDisabled && onSelect
-              ? () => onSelect(service.id)
+              ? () => {
+                  onSelect(service.id);
+                  // Auto-collapse mobile popover after a choice is made.
+                  setExpanded(false);
+                }
               : undefined;
             const className = [
               'tsr-card',
@@ -106,7 +155,7 @@ const STYLES = `
   padding: 8px;
   border: 1px solid color-mix(in srgb, var(--tsr-accent) 62%, transparent);
   background:
-    linear-gradient(180deg, rgba(4, 12, 8, 0.86), rgba(2, 5, 8, 0.74)),
+    linear-gradient(180deg, rgba(6, 8, 14, 0.88), rgba(2, 3, 6, 0.78)),
     radial-gradient(circle at 18% 50%, var(--tsr-accent-faint), transparent 56%);
   box-shadow:
     0 0 28px var(--tsr-accent-soft),
@@ -142,7 +191,7 @@ const STYLES = `
   gap: 8px;
   min-width: 132px;
   padding: 0 14px;
-  border-right: 1px solid rgba(142, 255, 196, 0.2);
+  border-right: 1px solid rgba(180, 180, 200, 0.18);
   color: var(--tsr-accent);
   font-family: 'Orbitron', 'IBM Plex Mono', monospace;
   font-size: 9px;
@@ -171,13 +220,13 @@ const STYLES = `
 .tsr-card {
   position: relative;
   min-height: 78px;
-  padding: 11px 12px 10px;
+  padding: 11px 12px 10px 20px;
   overflow: hidden;
-  border: 1px solid rgba(110, 181, 154, 0.28);
-  border-top-color: color-mix(in srgb, var(--card-accent) 58%, rgba(110, 181, 154, 0.28));
+  border: 1px solid color-mix(in srgb, var(--card-accent) 48%, rgba(140, 150, 170, 0.2));
+  border-top-color: color-mix(in srgb, var(--card-accent) 78%, transparent);
   background:
-    linear-gradient(180deg, rgba(10, 58, 38, 0.22), rgba(2, 5, 8, 0.46));
-  color: #c8ffe0;
+    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 14%, rgba(8, 10, 16, 0.55)), color-mix(in srgb, var(--card-accent) 4%, rgba(2, 3, 6, 0.5)));
+  color: #e4ecf2;
   cursor: default;
   text-align: left;
   font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
@@ -185,6 +234,25 @@ const STYLES = `
     border-color 180ms ease,
     background 180ms ease,
     box-shadow 180ms ease;
+}
+
+/* Left-edge accent strip — gives each card a quick read of its color
+   even when not selected. Sits inside the padding so it doesn't shift
+   the text. */
+.tsr-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 5px;
+  border-radius: 0 3px 3px 0;
+  background: var(--card-accent);
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--card-accent) 75%, transparent),
+    0 0 24px color-mix(in srgb, var(--card-accent) 35%, transparent);
+  opacity: 0.85;
+  transition: opacity 180ms ease, box-shadow 180ms ease;
 }
 
 .tsr-card::before {
@@ -198,12 +266,17 @@ const STYLES = `
 }
 
 .tsr-card.is-active {
-  border-color: color-mix(in srgb, var(--card-accent) 80%, white 6%);
+  border-color: color-mix(in srgb, var(--card-accent) 90%, white 8%);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 14%, rgba(10, 58, 38, 0.22)), rgba(2, 5, 8, 0.52));
+    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 28%, rgba(8, 10, 16, 0.45)), color-mix(in srgb, var(--card-accent) 8%, rgba(2, 3, 6, 0.55)));
   box-shadow:
-    0 0 22px color-mix(in srgb, var(--card-accent) 28%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 38%, transparent);
+    0 0 28px color-mix(in srgb, var(--card-accent) 45%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 55%, transparent);
+}
+
+.tsr-card.is-active::after {
+  opacity: 1;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--card-accent) 80%, transparent);
 }
 
 .tsr-card.is-active::before {
@@ -227,11 +300,17 @@ const STYLES = `
 .tsr-card.is-interactive:focus-visible {
   border-color: color-mix(in srgb, var(--card-accent) 80%, white 6%);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 14%, rgba(10, 58, 38, 0.22)), rgba(2, 5, 8, 0.52));
+    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 16%, rgba(8, 10, 16, 0.5)), rgba(2, 3, 6, 0.55));
   box-shadow:
-    0 0 22px color-mix(in srgb, var(--card-accent) 28%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 38%, transparent);
+    0 0 22px color-mix(in srgb, var(--card-accent) 32%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 42%, transparent);
   outline: none;
+}
+
+.tsr-card.is-interactive:hover::after,
+.tsr-card.is-interactive:focus-visible::after {
+  opacity: 0.9;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--card-accent) 70%, transparent);
 }
 
 .tsr-card.is-interactive .tsr-card-cta {
@@ -265,26 +344,27 @@ const STYLES = `
 
 .tsr-card-eyebrow {
   color: var(--card-accent);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.22em;
   line-height: 1;
   margin-bottom: 7px;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--card-accent) 60%, transparent);
 }
 
 .tsr-card-title {
-  color: #effff5;
+  color: #f3f6fa;
   font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
   font-size: 14px;
   letter-spacing: 0.06em;
   line-height: 1.05;
-  text-shadow: 0 0 12px color-mix(in srgb, var(--card-accent) 26%, transparent);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--card-accent) 32%, transparent);
 }
 
 .tsr-card-desc {
   max-width: 21ch;
   margin-top: 6px;
-  color: #78b89d;
+  color: rgba(200, 210, 222, 0.62);
   font-size: 10px;
   line-height: 1.35;
 }
@@ -298,12 +378,25 @@ const STYLES = `
   font-size: 8px;
   font-weight: 900;
   letter-spacing: 0.18em;
-  opacity: 0.72;
+  opacity: 0.85;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--card-accent) 55%, transparent);
+}
+
+/* Collapsed-pill view of the rail — hidden on desktop, becomes the
+   default visible state on narrow viewports (≤520px). The full chooser
+   slides up over it as a popover when expanded. */
+.tsr-pill {
+  display: none;
 }
 
 @keyframes tsr-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.35; transform: scale(0.72); }
+}
+
+@keyframes tsr-popover-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 900px) {
@@ -334,46 +427,110 @@ const STYLES = `
     bottom: calc(78px + env(safe-area-inset-bottom));
     width: calc(100vw - 14px);
   }
+  /* Shell becomes a single-row pill container. The status block hides
+     (the pill embeds its own pip), the cards hide unless expanded. */
   .tsr-shell {
-    padding: 6px;
+    position: relative;
+    grid-template-columns: 1fr;
+    padding: 4px;
+    gap: 0;
   }
   .tsr-status {
-    font-size: 8px;
-    letter-spacing: 0.16em;
-  }
-  .tsr-options {
-    position: relative;
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scroll-snap-type: x mandatory;
-    /* Soft right-edge taper — narrow enough not to swallow the peek. */
-    -webkit-mask-image: linear-gradient(
-      to right,
-      black 0,
-      black calc(100% - 14px),
-      transparent 100%
-    );
-            mask-image: linear-gradient(
-      to right,
-      black 0,
-      black calc(100% - 14px),
-      transparent 100%
-    );
-  }
-  .tsr-options::-webkit-scrollbar {
     display: none;
   }
-  /* Two cards + a fixed ~60px peek of the third regardless of viewport
-     width. (50% minus half the gap minus the peek allowance.) */
-  .tsr-card {
-    flex: 0 0 calc(50% - 36px);
-    min-height: 78px;
-    scroll-snap-align: start;
+
+  /* Pill — the always-visible mobile chrome. Shows the active service so
+     the user knows what's selected without expanding. */
+  .tsr-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 12px;
+    background: transparent;
+    border: none;
+    color: var(--tsr-accent);
+    cursor: pointer;
+    font-family: 'Orbitron', 'IBM Plex Mono', monospace;
+    text-align: left;
+    /* The button's own outline ring isn't needed — the surrounding shell
+       already reads as a focusable surface. Keep keyboard outline though. */
+    outline: none;
   }
-  .tsr-card:last-child {
-    scroll-snap-align: end;
+  .tsr-pill:focus-visible {
+    outline: 2px solid var(--tsr-accent);
+    outline-offset: -2px;
+  }
+  .tsr-pill-eyebrow {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    color: var(--card-accent);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--card-accent) 30%, transparent);
+  }
+  .tsr-pill-sep {
+    opacity: 0.45;
+    color: rgba(200, 210, 222, 0.7);
+    font-size: 11px;
+  }
+  .tsr-pill-title {
+    flex: 1;
+    min-width: 0;
+    font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: #effff5;
+    text-shadow: 0 0 10px color-mix(in srgb, var(--card-accent) 24%, transparent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tsr-pill-chevron {
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--tsr-accent);
+    transition: transform 220ms ease;
+  }
+  .tsr-root.is-expanded .tsr-pill-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* Collapsed: hide the chooser entirely. */
+  .tsr-root:not(.is-expanded) .tsr-options {
+    display: none;
+  }
+
+  /* Expanded: chooser becomes an absolute popover above the shell.
+     Anchored to .tsr-root (the nearest positioned ancestor). */
+  .tsr-root.is-expanded .tsr-options {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid color-mix(in srgb, var(--tsr-accent) 62%, transparent);
+    background:
+      linear-gradient(180deg, rgba(6, 8, 14, 0.94), rgba(2, 3, 6, 0.9)),
+      radial-gradient(circle at 18% 50%, var(--tsr-accent-faint), transparent 56%);
+    box-shadow:
+      0 0 28px var(--tsr-accent-soft),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overflow: visible;
+    /* Override the horizontal-scroll mask from the desktop-mobile rule. */
+    -webkit-mask-image: none;
+            mask-image: none;
+    animation: tsr-popover-in 200ms ease-out;
+  }
+  .tsr-root.is-expanded .tsr-card {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 64px;
+    scroll-snap-align: none;
   }
 }
 `;

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
@@ -704,6 +705,115 @@ const CyborgTempleScene = ({
     }
   };
 
+  // Demon's focus sequence: hold idle while the camera flies in (~2s),
+  // play demon_pointing once, then settle into demon_typing. Triggered
+  // from the externalFocusAgent effect so both the desktop click path
+  // (which goes through handleClick → onAgentClick → parent → effect) and
+  // the touch path (handleTouchStart → onAgentClick → parent → effect)
+  // run the same sequence. Previously this lived inline in handleClick,
+  // which meant touch users never saw the pointing animation.
+  //
+  // expectedCameraPos: the authored focus pose. If the user has manually
+  // orbited away from it before pointing fires, the pointing animation
+  // (authored to address the camera directly) would gesture into empty
+  // space — skip pointing in that case and let head-tracking take over.
+  const startDemonFocusSequence = (expectedCameraPos) => {
+    const demonActions = actionsRef.current['Demon'];
+    const demonMixer = mixersRef.current['Demon'];
+    if (!demonActions || !demonMixer) return;
+
+    const idleKey = Object.keys(demonActions).find(a => /demon.*idle/i.test(a));
+    const pointingKey = Object.keys(demonActions).find(a => /demon.*pointing/i.test(a));
+    const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a));
+    const demonState = demonAnimStateRef.current;
+
+    if (!idleKey) {
+      console.warn('[Demon] demon_idle animation not found. Available:', Object.keys(demonActions));
+      return;
+    }
+
+    // Re-entrancy guard: if a sequence is already in flight for this focus
+    // (isPlayingSpecial is cleared in restoreDemonFromFocus on unfocus),
+    // don't restart it. Prevents double-fire if anything ever invokes this
+    // twice in the same focus session.
+    if (demonState.isPlayingSpecial) return;
+
+    const crossfadeTo = (key, { loop = THREE.LoopRepeat, fade = 0.3 } = {}) => {
+      if (!key || !demonActions[key]) return null;
+      const action = demonActions[key];
+      // No-op if we're already on this clip and it's running — otherwise
+      // reset()+fadeIn would briefly pull its weight to 0 with no other
+      // action fading in to fill the gap, and three.js blends the missing
+      // weight against the bind pose (T-pose flash). Just refresh
+      // loop/clamp settings.
+      const alreadyOn =
+        demonState.currentAnimation === key &&
+        action.isRunning && action.isRunning();
+      if (alreadyOn) {
+        action.setLoop(loop);
+        if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
+        return action;
+      }
+      const prev = demonActions[demonState.currentAnimation];
+      if (prev && prev !== action) {
+        prev.fadeOut(fade);
+      }
+      action.reset();
+      // Skip the bind-pose first frame — Mixamo clips anchor a T-pose at
+      // time=0, which flashes through the cross-fade.
+      action.time = action.getClip().duration * 0.05;
+      action.setLoop(loop);
+      if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
+      action.setEffectiveWeight(1);
+      action.fadeIn(fade);
+      action.play();
+      demonState.currentAnimation = key;
+      return action;
+    };
+
+    demonState.isPlayingSpecial = true;
+    demonState.nextSwitchDelay = 999999;
+    demonState.lastSwitchTime = Date.now();
+    demonState.focusSequenceTimers = demonState.focusSequenceTimers || [];
+
+    // Stage 1: fade to idle while camera flies in.
+    crossfadeTo(idleKey, { fade: 0.5 });
+
+    if (!pointingKey) return;
+
+    // Stage 2: after camera settles (~2s), play pointing once unless the
+    // user orbited away from the authored focus pose.
+    const t1 = setTimeout(() => {
+      if (!demonFocusedRef.current) return;
+
+      if (expectedCameraPos) {
+        const tolerance = 0.5; // meters
+        const distSq = camera.position.distanceToSquared(expectedCameraPos);
+        if (distSq > tolerance * tolerance) {
+          // Camera drifted — keep idle, head-look override takes over.
+          demonHeadTrackingRef.current = true;
+          return;
+        }
+      }
+
+      const pointingAction = crossfadeTo(pointingKey, { loop: THREE.LoopOnce, fade: 0.3 });
+      if (!pointingAction) return;
+
+      const onFinished = (e) => {
+        if (e.action !== pointingAction) return;
+        demonMixer.removeEventListener('finished', onFinished);
+        demonState.focusSequenceListener = null;
+        if (!demonFocusedRef.current) return;
+        // Stage 3: settle into demon_typing for the rest of focus (or
+        // idle if typing isn't authored).
+        crossfadeTo(typingKey || idleKey, { fade: 0.3 });
+      };
+      demonMixer.addEventListener('finished', onFinished);
+      demonState.focusSequenceListener = onFinished;
+    }, 2000);
+    demonState.focusSequenceTimers.push(t1);
+  };
+
   // External focus sync — when the parent passes a new `externalFocusAgent`
   // (e.g. the player tapped a railway portrait in /trade), fly the camera to
   // that character using the same AGENT_CAMERA_SETTINGS the in-scene click
@@ -723,7 +833,18 @@ const CyborgTempleScene = ({
   useEffect(() => {
     if (externalFocusAgent === undefined) return;
     if (externalFocusAgent === null) {
-      setFocusTarget((prev) => prev ? null : prev);
+      // Don't clobber an in-flight Reset transition. The internal unfocus
+      // paths (toggle-click, Escape, screenGoBack) synchronously do
+      // onAgentClick(null) + setFocusTarget({Reset}) in the same batch.
+      // Without this guard, this effect re-runs after the batch and nulls
+      // out the Reset before useFrame can dispatch the fly-back, so the
+      // camera never returns to sceneDefaultPose. Reset's own setTimeout
+      // clears focusTarget after the ~1s transition completes.
+      setFocusTarget((prev) => {
+        if (!prev) return prev;
+        if (prev.agentName === 'Reset') return prev;
+        return null;
+      });
       return;
     }
 
@@ -736,10 +857,17 @@ const CyborgTempleScene = ({
         }
         activateSitePalProjection('Monk');
         break;
-      case 'Demon':
+      case 'Demon': {
         demonFocusedRef.current = true;
         activateSitePalProjection('Demon');
+        // Kick off the idle → pointing → typing sequence. This path is the
+        // single source of truth for both desktop click and touch tap;
+        // handleClick no longer runs it inline. Pass the authored cameraPos
+        // so the sequence skips pointing if the user orbited the camera away.
+        const demonResolved = resolveAgentSettings('Demon', isMobile || detectedMobile);
+        startDemonFocusSequence(demonResolved?.cameraPos || null);
         break;
+      }
       case 'Detective':
         detectiveFocusedRef.current = true;
         activateSitePalProjection('Detective');
@@ -938,6 +1066,11 @@ const CyborgTempleScene = ({
   // click whenever this flag is true so the click doesn't re-enter the focus
   // pipeline and accidentally toggle-unfocus the character we just focused.
   const suppressNextSynthesizedClickRef = useRef(false);
+  // Mouse-down position for tap-vs-drag detection. Browsers fire `click`
+  // even after a drag (OrbitControls' rotate gesture), so the
+  // tap-anywhere-to-unfocus path measures pointer movement itself and only
+  // dismisses focus when movement is below a small threshold.
+  const mouseDownPosRef = useRef(null);
 
   // Click animation state for coins
   const [clickedCoin, setClickedCoin] = useState(null);
@@ -3539,6 +3672,7 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
                 dblClickAgentId === 'Monk' ||
                 dblClickAgentId === 'RL80' ||
                 dblClickAgentId === 'Detective' ||
+                dblClickAgentId === 'Fluffy' ||
                 dblClickAgentId === 'Angel');
             const alreadyFocusedOnThis = focusTarget && focusTarget.agentId === dblClickAgentId;
             if (isDblClickTarget && !alreadyFocusedOnThis) {
@@ -3731,119 +3865,21 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
             });
           }
           
-          // Demon focus sequence: idle while the camera flies in (~2s),
-          // then play demon_pointing once, then settle into demon_typing.
-          // The pointing clip is authored to address the camera directly,
-          // so no head-look or spine override is needed.
+          // Demon: activate SitePal here so the audio unmute happens
+          // synchronously within the user click gesture (iOS Safari needs
+          // this — calls from the externalFocusAgent effect run after
+          // render commit, outside the gesture context).
+          //
+          // The idle → pointing → typing animation sequence is NOT run
+          // inline anymore — it's driven by the externalFocusAgent effect
+          // via startDemonFocusSequence(), so the touch path
+          // (handleTouchStart, which bypasses handleClick) sees pointing
+          // too. The round-trip is: onAgentClick('Demon') → parent
+          // setFocusedAgent → externalFocusAgent prop change → effect →
+          // startDemonFocusSequence().
           if (object.userData.agentId === 'Demon') {
             demonFocusedRef.current = true;
-            // SitePal speech control, synchronous within the click
-            // gesture. The published scene auto-plays its bound audio
-            // (`11devil1`) when the embed loads — we mute on load via
-            // vh_sceneLoaded and unmute here. Mirror /main pattern:
-            // saySilent(0) primes the page (SitePal's official JS
-            // framework activation), setPlayerVolume(7) unmutes, and
-            // replay() restarts the scene from the top so the user
-            // hears the full intro on each focus.
             activateSitePalProjection('Demon');
-            const demonActions = actionsRef.current['Demon'];
-            const demonMixer = mixersRef.current['Demon'];
-            if (demonActions && demonMixer) {
-              const idleKey = Object.keys(demonActions).find(a => /demon.*idle/i.test(a));
-              const pointingKey = Object.keys(demonActions).find(a => /demon.*pointing/i.test(a));
-              const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a));
-              const demonState = demonAnimStateRef.current;
-
-              const crossfadeTo = (key, { loop = THREE.LoopRepeat, fade = 0.3 } = {}) => {
-                if (!key || !demonActions[key]) return null;
-                const action = demonActions[key];
-                // No-op if we're already on this clip and it's running —
-                // otherwise reset()+fadeIn would briefly pull its weight to
-                // 0 with no other action fading in to fill the gap, and
-                // three.js blends the missing weight against the bind pose
-                // (T-pose flash). Just refresh loop/clamp settings.
-                const alreadyOn =
-                  demonState.currentAnimation === key &&
-                  action.isRunning && action.isRunning();
-                if (alreadyOn) {
-                  action.setLoop(loop);
-                  if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
-                  return action;
-                }
-                const prev = demonActions[demonState.currentAnimation];
-                if (prev && prev !== action) {
-                  prev.fadeOut(fade);
-                }
-                action.reset();
-                // Skip the bind-pose first frame — Mixamo clips anchor a
-                // T-pose at time=0, which flashes through the cross-fade.
-                action.time = action.getClip().duration * 0.05;
-                action.setLoop(loop);
-                if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
-                action.setEffectiveWeight(1);
-                action.fadeIn(fade);
-                action.play();
-                demonState.currentAnimation = key;
-                return action;
-              };
-
-              if (idleKey) {
-                // Pause the random-animation rotation while focused.
-                demonState.isPlayingSpecial = true;
-                demonState.nextSwitchDelay = 999999;
-                demonState.lastSwitchTime = Date.now();
-                demonState.focusSequenceTimers = demonState.focusSequenceTimers || [];
-
-                // Stage 1: fade to idle while camera flies in.
-                crossfadeTo(idleKey, { fade: 0.5 });
-
-                if (pointingKey) {
-                  // Stage 2: after the camera has settled (~2s), play
-                  // pointing once — UNLESS the user has manually moved the
-                  // camera away from the authored focus pose. The clip is
-                  // animated to address the camera at settings.cameraPos;
-                  // from any other angle the demon ends up gesturing into
-                  // empty space. In that case, stay on idle and switch on
-                  // the head-look-at-camera override instead, like the
-                  // other characters do.
-                  const expectedCameraPos = settings && settings.cameraPos
-                    ? settings.cameraPos.clone()
-                    : null;
-                  const t1 = setTimeout(() => {
-                    if (!demonFocusedRef.current) return;
-
-                    if (expectedCameraPos) {
-                      const tolerance = 0.5; // meters
-                      const distSq = camera.position.distanceToSquared(expectedCameraPos);
-                      if (distSq > tolerance * tolerance) {
-                        // Camera drifted — keep the demon on idle and let
-                        // the per-frame head override track the camera.
-                        demonHeadTrackingRef.current = true;
-                        return;
-                      }
-                    }
-
-                    const pointingAction = crossfadeTo(pointingKey, { loop: THREE.LoopOnce, fade: 0.3 });
-                    if (!pointingAction) return;
-
-                    const onFinished = (e) => {
-                      if (e.action !== pointingAction) return;
-                      demonMixer.removeEventListener('finished', onFinished);
-                      demonState.focusSequenceListener = null;
-                      if (!demonFocusedRef.current) return;
-                      // Stage 3: settle into demon_typing for the rest of
-                      // focus (or idle if typing isn't authored).
-                      crossfadeTo(typingKey || idleKey, { fade: 0.3 });
-                    };
-                    demonMixer.addEventListener('finished', onFinished);
-                    demonState.focusSequenceListener = onFinished;
-                  }, 2000);
-                  demonState.focusSequenceTimers.push(t1);
-                }
-              } else {
-                console.warn('[Demon] demon_idle animation not found. Available:', Object.keys(demonActions));
-              }
-            }
           } else if (object.userData.agentId === 'Monk') {
             monkFocusedRef.current = true;
             activateSitePalProjection('Monk');
@@ -3996,7 +4032,23 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
         }
       }
       
-      // Single click away no longer unfocuses — use double-click or Escape instead
+      // Tap-anywhere-to-unfocus: when focused, a click on empty space (or
+      // any non-clickable hit) returns to overview. Skipped during reveal
+      // mode (camera locked to Stage) and when the pointer moved more than
+      // ~6px between pointerdown and click, so OrbitControls' rotate
+      // gesture doesn't double as a dismiss.
+      if (!clickedOnAgent && focusTarget && !revealMode) {
+        const down = mouseDownPosRef.current;
+        mouseDownPosRef.current = null;
+        const wasTap =
+          down &&
+          Math.hypot(event.clientX - down.x, event.clientY - down.y) < 6;
+        if (wasTap) {
+          window.dispatchEvent(new CustomEvent('screenGoBack'));
+        }
+      } else {
+        mouseDownPosRef.current = null;
+      }
     };
     
     // Listen for screenGoBack event (from on-screen buttons)
@@ -4032,6 +4084,12 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
     const handlePointerDown = (event) => {
       // Safety check for groupRef
       if (!groupRef.current) return;
+
+      // Record mouse position for tap-vs-drag detection used by the
+      // tap-anywhere-to-unfocus path in handleClick.
+      if (event.pointerType === 'mouse') {
+        mouseDownPosRef.current = { x: event.clientX, y: event.clientY };
+      }
 
       // Only handle if it's a touch/pen input (not mouse)
       if (event.pointerType === 'touch' || event.pointerType === 'pen') {
@@ -4111,10 +4169,10 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
       window.removeEventListener('screenGoBack', handleScreenGoBack);
       gl.domElement.style.cursor = 'default';
     };
-  }, [gl, camera, onAgentClick, loadedModel, focusTarget, originalCameraPosition, hoveredCoin, 
+  }, [gl, camera, onAgentClick, loadedModel, focusTarget, originalCameraPosition, hoveredCoin,
       coin1OriginalScale, coin1OriginalEmissive, coin2OriginalScale, coin2OriginalEmissive,
-      coin3OriginalScale, coin3OriginalEmissive, coin4OriginalScale, coin4OriginalEmissive, 
-      isOnMobile, clickedCoin, onCoinFaceTap]); // Added dependencies
+      coin3OriginalScale, coin3OriginalEmissive, coin4OriginalScale, coin4OriginalEmissive,
+      isOnMobile, clickedCoin, onCoinFaceTap, revealMode]); // Added dependencies
 
   
 
@@ -5759,15 +5817,114 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
           );
         })()}
       </group>
-      {(showEugeneLobbyBubble || eugeneGameBubble) && (
+      {/* Mobile bubble — rendered as a position:fixed overlay portaled to
+          document.body. The outer drei <Html> is what R3F's reconciler
+          sees (a registered three.js component); inside it, regular React
+          DOM is allowed, and createPortal hops to document.body where no
+          ancestor transform interferes with position:fixed.
+          Bypasses head-bone tracking entirely, which was unreliable on
+          mobile: Eugene's lobby framing puts her horn near the right edge,
+          so the in-scene bubble's left-extending anchor pushed the body
+          off the viewport. */}
+      {(showEugeneLobbyBubble || eugeneGameBubble) && isOnMobile && (
+        <Html>
+          {typeof document !== 'undefined' && createPortal(
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 'min(300px, calc(100vw - 24px))',
+                padding: '12px 16px 14px',
+                background:
+                  'linear-gradient(180deg, rgba(255,235,250,0.96), rgba(255,210,240,0.96))',
+                border: '1px solid rgba(255,62,160,0.6)',
+                borderRadius: 16,
+                boxShadow:
+                  '0 6px 24px rgba(255,62,160,0.32), 0 0 0 4px rgba(255,255,255,0.4) inset',
+                color: '#3a0f2b',
+                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                fontSize: 13,
+                lineHeight: 1.45,
+                zIndex: 30,
+                pointerEvents: 'none',
+              }}
+            >
+              {/* Downward-pointing tail centered along the bottom edge. */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: -10,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '10px solid transparent',
+                  borderRight: '10px solid transparent',
+                  borderTop: '12px solid rgba(255,210,240,0.96)',
+                  filter: 'drop-shadow(0 2px 1px rgba(255,62,160,0.3))',
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: '0.22em',
+                  color: 'rgba(140,30,90,0.7)',
+                  marginBottom: 4,
+                  textTransform: 'uppercase',
+                }}
+              >
+                @eugene
+              </div>
+              {showEugeneLobbyBubble ? (
+                <>
+                  <div
+                    style={{
+                      fontFamily: "'Pirata One', serif",
+                      fontSize: 22,
+                      color: '#8a0e58',
+                      letterSpacing: 0.5,
+                      lineHeight: 1.05,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Eugene
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: '0.08em',
+                      color: 'rgba(140,30,90,0.6)',
+                      fontStyle: 'italic',
+                      marginBottom: 8,
+                    }}
+                  >
+                    /yoo-JEEN/
+                  </div>
+                  <div style={{ fontStyle: 'italic' }}>
+                    Every story wants to be a myth. The rare ones earn it.
+                  </div>
+                </>
+              ) : (
+                <div>{eugeneGameBubble}</div>
+              )}
+            </div>,
+            document.body,
+          )}
+        </Html>
+      )}
+
+      {/* Desktop bubble — head-bone-tracked, in-scene via drei <Html>. */}
+      {(showEugeneLobbyBubble || eugeneGameBubble) && !isOnMobile && (
         <group ref={eugeneLobbyBubbleRef} position={[0, 9999, 0]}>
           <Html zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
             <div
               style={{
-                // Anchor sits just above Eugene's horn (set in useFrame). The
-                // bubble extends UP and to the LEFT from there via this
-                // translate, so the bottom-right tail tip lands at the anchor
-                // and the bubble body stays clear of her head/horn footprint.
+                // Anchor sits just above Eugene's horn (set in useFrame).
+                // Bubble extends UP and to the LEFT from there via this
+                // translate, so the bottom-right tail tip lands at the
+                // anchor and the bubble body stays clear of her head/horn.
                 transform: 'translate(-100%, -50%)',
                 width: 'min(300px, 70vw)',
                 padding: '12px 16px 14px',
@@ -5893,3 +6050,4 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
 CyborgTempleScene.displayName = 'CyborgTempleScene';
 
 export default CyborgTempleScene;
+              

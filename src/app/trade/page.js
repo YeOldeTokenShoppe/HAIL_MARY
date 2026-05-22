@@ -1025,6 +1025,15 @@ export default function CyborgTemple() {
   // duration for the visual handoff to feel right.
   const [speechActive, setSpeechActive] = useState(false);
   const speechEndTimerRef = useRef(null);
+  // Mobile-only: gates the inline CONTINUE button so it doesn't appear
+  // until the player has actually heard the line (audio started AND
+  // ended). Lets the speech-beat panel render compact during the
+  // line — caption only — and grow when the player's turn arrives.
+  // Reset on every new currentSpeech; flipped true by the speechActive
+  // false→true→false transition, or by a length-based safety net if
+  // audio never starts.
+  const [speechReady, setSpeechReady] = useState(false);
+  const hasHeardSpeechRef = useRef(false);
   // Audio follow-up queued for after the current line's audio ends.
   // Used for the monk's rules → intro chain (two separate recordings).
   // Cleared when consumed (audio-end handler or manual CONTINUE).
@@ -1206,6 +1215,35 @@ export default function CyborgTemple() {
       setFocusedAgent(null);
     }
   }, [focusedAgent]);
+
+  // Reset speechReady when the active beat changes. Also arms a length-based
+  // safety net so CONTINUE eventually appears even if SitePal audio is denied
+  // (iOS silent mode, missing recording, etc) — without it the panel would
+  // sit caption-only forever.
+  useEffect(() => {
+    setSpeechReady(false);
+    hasHeardSpeechRef.current = false;
+    if (!currentSpeech) return;
+    const text = currentSpeech.text || '';
+    // Generous budget: ~100ms/char + 4s buffer, floored at 10s. Audio normally
+    // ends before this and flips speechReady via the speechActive effect; this
+    // only fires if the audio path failed entirely.
+    const fallbackMs = Math.max(10000, text.length * 100 + 4000);
+    const t = setTimeout(() => setSpeechReady(true), fallbackMs);
+    return () => clearTimeout(t);
+  }, [currentSpeech]);
+
+  // Drive speechReady from the audio lifecycle: mark "started" while audio
+  // is playing, then flip ready true on the next transition to false.
+  useEffect(() => {
+    if (speechActive) {
+      hasHeardSpeechRef.current = true;
+      return;
+    }
+    if (hasHeardSpeechRef.current) {
+      setSpeechReady(true);
+    }
+  }, [speechActive]);
 
   // Auto-advance from the current speech beat to any queued follow-up when
   // the visual reveal of the current text finishes. The audio for split beats
@@ -3049,6 +3087,49 @@ export default function CyborgTemple() {
           };
           return (
             <div style={baseStyle}>
+              {/* Close affordance — explicit return-to-overview button.
+                  Parent card has pointerEvents: 'none' so the rest of the
+                  card stays click-through (tap-anywhere-to-unfocus); the
+                  button itself opts back in. */}
+              <button
+                type="button"
+                aria-label="Return to overview"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('screenGoBack'));
+                  }
+                }}
+                style={{
+                  position: 'absolute',
+                  top: isMobileView ? '0.3rem' : '0.35rem',
+                  right: isMobileView ? '0.5rem' : '0.5rem',
+                  width: isMobileView ? '1.75rem' : '1.5rem',
+                  height: isMobileView ? '1.75rem' : '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(218, 165, 32, 0.7)',
+                  fontFamily: "'Orbitron', 'Courier New', monospace",
+                  fontSize: isMobileView ? '1.1rem' : '1rem',
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                  transition: 'color 0.15s ease, transform 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#daa520';
+                  e.currentTarget.style.transform = 'scale(1.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'rgba(218, 165, 32, 0.7)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                ×
+              </button>
               <div style={{
                 fontFamily: "'Pirata One', serif",
                 fontSize: isMobileView ? '1.6rem' : '1.4rem',
@@ -3516,7 +3597,7 @@ export default function CyborgTemple() {
                   {/* Top section: question content state machine, or a
                       "tap a consultant" hint when no character is focused. */}
                   {focusedAgent && CHARACTER_TO_STATION[focusedAgent] && gameStation ? (
-                  <div style={{ minHeight: currentSpeech ? (isMobileView ? 120 : 210) : 0, maxHeight: isMobileView ? '38vh' : '46vh', overflowY: 'auto', padding: isMobileView ? '8px 10px' : '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ minHeight: currentSpeech ? (isMobileView ? 0 : 210) : 0, maxHeight: isMobileView ? '38vh' : '46vh', overflowY: 'auto', padding: isMobileView ? '8px 10px' : '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)', display: 'flex', flexDirection: 'column' }}>
                     {(() => {
                       const stationKey = gameActiveStation;
                       const askedAtStation = asked[stationKey] || new Set();
@@ -3665,13 +3746,22 @@ export default function CyborgTemple() {
                       //    ~70ms/char) to trail the audio rather than
                       //    dump the whole script up front.
                       if (currentSpeech && currentSpeech.stationKey === stationKey) {
+                        // Mobile: panel runs in two compact phases —
+                        //   1) caption-only while audio plays (no
+                        //      CONTINUE button taking space below),
+                        //   2) CONTINUE-only after audio ends (caption
+                        //      hidden so the panel collapses to button
+                        //      height). Desktop keeps the simultaneous
+                        //      transcript + CONTINUE layout.
+                        const showContinue = !isMobileView || speechReady;
+                        const showCaption = !isMobileView || !speechReady;
                         return (
                           <div style={{
                             display: 'flex',
                             flexDirection: 'column',
                             gap: isMobileView ? 8 : 14,
-                            flex: 1,
-                            justifyContent: 'center',
+                            flex: isMobileView ? '0 1 auto' : 1,
+                            justifyContent: isMobileView ? 'flex-start' : 'center',
                           }}>
                             {/* Inline transcript. Desktop: ProgressiveText
                                 teleprompter (accumulates chunks). Mobile:
@@ -3681,6 +3771,7 @@ export default function CyborgTemple() {
                                 Both replace the floating top caption for
                                 speech beats so the character's face stays
                                 clear. */}
+                            {showCaption && (
                             <div style={{
                               padding: isMobileView ? '8px 10px' : '14px 16px',
                               borderLeft: '2px solid #ff3ea0',
@@ -3692,14 +3783,13 @@ export default function CyborgTemple() {
                                 color: '#c8ffe0',
                                 lineHeight: 1.4,
                                 textAlign: 'center',
-                                minHeight: isMobileView ? '2.8em' : undefined,
+                                minHeight: isMobileView ? '1.4em' : undefined,
                               }}>
                                 {isMobileView ? (
                                   <LiveCaption
                                     text={currentSpeech.text}
                                     isPlaying={speechActive}
                                     audioDurationMs={currentSpeech.audioDurationMs}
-                                    persistLastChunk
                                   />
                                 ) : (
                                   <ProgressiveText
@@ -3712,6 +3802,8 @@ export default function CyborgTemple() {
                                 )}
                               </div>
                             </div>
+                            )}
+                            {showContinue && (
                             <button
                               onClick={() => {
                                 // Stop whatever's currently speaking. This
@@ -3761,10 +3853,12 @@ export default function CyborgTemple() {
                                 letterSpacing: '0.22em',
                                 cursor: 'pointer',
                                 alignSelf: 'center',
+                                animation: isMobileView ? 'lt-fade-in 0.35s ease-out' : undefined,
                               }}
                             >
                               ▸ CONTINUE
                             </button>
+                            )}
                           </div>
                         );
                       }
@@ -4588,9 +4682,29 @@ export default function CyborgTemple() {
                   ) : (
                     (() => {
                       const isReview = selectedService === 'analysis';
+                      // Two-stop gradient + a magenta-echo outer halo so the
+                      // button doesn't read as a flat green/cyan tile against
+                      // the magenta-edged nav bar. The echo color matches the
+                      // MobileBottomNav's m80 border/box-shadow palette.
                       const accent = isReview
-                        ? { border: 'rgba(142,233,255,0.85)', text: '#8ee9ff', shadow: 'rgba(142,233,255,0.55)', glow: 'rgba(142,233,255,0.35)', tint: 'rgba(13,50,80,0.32)', soft: 'rgba(142,233,255,0.18)' }
-                        : { border: 'rgba(77,255,170,0.85)', text: '#8effc4', shadow: 'rgba(77,255,170,0.55)', glow: 'rgba(77,255,170,0.35)', tint: 'rgba(13,80,50,0.32)', soft: 'rgba(77,255,170,0.18)' };
+                        ? {
+                            border: 'rgba(142,233,255,0.95)',
+                            text: '#d6faff',
+                            shadow: 'rgba(142,233,255,0.7)',
+                            glow: 'rgba(142,233,255,0.5)',
+                            tint: 'rgba(13,50,80,0.4)',
+                            soft: 'rgba(142,233,255,0.32)',
+                            peak: 'rgba(142,233,255,0.55)',
+                          }
+                        : {
+                            border: 'rgba(120,255,180,0.95)',
+                            text: '#d6ffe5',
+                            shadow: 'rgba(77,255,170,0.7)',
+                            glow: 'rgba(77,255,170,0.5)',
+                            tint: 'rgba(13,80,50,0.4)',
+                            soft: 'rgba(77,255,170,0.32)',
+                            peak: 'rgba(120,255,180,0.55)',
+                          };
                       const handleStart = isReview
                         ? () => setShowReviewFunnel(true)
                         : enterGameMode;
@@ -4603,7 +4717,7 @@ export default function CyborgTemple() {
                             height: 60,
                             padding: '10px 22px',
                             borderRadius: 10,
-                            background: `linear-gradient(135deg, ${accent.soft}, ${accent.tint})`,
+                            background: `linear-gradient(135deg, ${accent.peak} 0%, ${accent.soft} 38%, ${accent.tint} 100%)`,
                             border: `1px solid ${accent.border}`,
                             color: accent.text,
                             fontFamily: "'Orbitron', monospace",
@@ -4611,8 +4725,8 @@ export default function CyborgTemple() {
                             fontWeight: 800,
                             letterSpacing: '0.2em',
                             cursor: 'pointer',
-                            textShadow: `0 0 10px ${accent.shadow}`,
-                            boxShadow: `0 0 14px ${accent.glow}, inset 0 1px 0 rgba(255,255,255,0.1)`,
+                            textShadow: `0 0 12px ${accent.shadow}`,
+                            boxShadow: `0 0 18px ${accent.glow}, 0 0 32px rgba(217,45,176,0.22), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.25)`,
                           }}
                         >
                           {isReview ? '✦ START TOKEN REVIEW' : '✦ START TOKEN FORENSICS'}
@@ -4676,7 +4790,7 @@ export default function CyborgTemple() {
                 userImage={user?.imageUrl}
                 show80sButton={false}
                 isMobile
-                neonMode
+                is80sMode
                 onBookClick={() => setShowBuyModal(true)}
                 bookLabel="BUY"
                 bookTitle="Buy RL80"
