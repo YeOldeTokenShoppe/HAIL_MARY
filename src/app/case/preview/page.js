@@ -29,6 +29,7 @@ const PLACEHOLDER_CASE = {
 
 export default function CaseFilePreviewPage() {
   const [skip, setSkip] = useState(false);
+  const [entrance, setEntrance] = useState('slide');
   const [mountKey, setMountKey] = useState(0);
 
   // Read URL flags after mount (client-only) so SSR and hydration agree.
@@ -36,19 +37,43 @@ export default function CaseFilePreviewPage() {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     if (params.has('skip')) setSkip(true);
+    const mode = params.get('mode');
+    if (mode === 'drop' || mode === 'slide') setEntrance(mode);
   }, []);
+
+  const replay = (nextEntrance) => {
+    if (nextEntrance) setEntrance(nextEntrance);
+    setSkip(false);
+    setMountKey((k) => k + 1);
+  };
 
   return (
     <main style={pageStyles.root}>
-      {/* Dev-only replay control — easier than reloading. Hidden in print. */}
-      <button
-        type="button"
-        onClick={() => { setSkip(false); setMountKey((k) => k + 1); }}
-        style={pageStyles.replay}
-      >
-        ▸ REPLAY
-      </button>
-      <CaseFileScene key={mountKey} caseData={PLACEHOLDER_CASE} skipAnimation={skip} />
+      <div style={pageStyles.controls}>
+        <button
+          type="button"
+          onClick={() => replay('slide')}
+          style={{ ...pageStyles.button, ...(entrance === 'slide' ? pageStyles.buttonActive : null) }}
+        >
+          ▸ SLIDE
+        </button>
+        <button
+          type="button"
+          onClick={() => replay('drop')}
+          style={{ ...pageStyles.button, ...(entrance === 'drop' ? pageStyles.buttonActive : null) }}
+        >
+          ▸ DROP
+        </button>
+        <button type="button" onClick={() => replay()} style={pageStyles.button}>
+          ▸ REPLAY
+        </button>
+      </div>
+      <CaseFileScene
+        key={mountKey}
+        caseData={PLACEHOLDER_CASE}
+        skipAnimation={skip}
+        entrance={entrance}
+      />
     </main>
   );
 }
@@ -62,19 +87,29 @@ const pageStyles = {
     background: 'radial-gradient(ellipse at 50% 30%, #1a0d2e 0%, #0a0612 70%)',
     position: 'relative',
   },
-  replay: {
+  controls: {
     position: 'fixed',
     top: 16,
     right: 16,
     zIndex: 10,
+    display: 'flex',
+    gap: 8,
+  },
+  button: {
     padding: '8px 14px',
     background: 'rgba(13,50,80,0.4)',
-    border: '1px solid rgba(142,233,255,0.6)',
+    border: '1px solid rgba(142,233,255,0.45)',
     color: '#8ee9ff',
     fontFamily: "'Orbitron', monospace",
     fontSize: 11,
     letterSpacing: '0.2em',
     cursor: 'pointer',
     borderRadius: 4,
+  },
+  buttonActive: {
+    background: 'rgba(13,80,50,0.45)',
+    border: '1px solid rgba(77,255,170,0.85)',
+    color: '#8effc4',
+    boxShadow: '0 0 12px rgba(77,255,170,0.35)',
   },
 };
