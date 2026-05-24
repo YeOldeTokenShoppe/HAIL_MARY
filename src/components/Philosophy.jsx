@@ -1409,6 +1409,10 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
   // overlay hides and the viewer takes over. Desktop is unaffected — the
   // heading sits top-right and doesn't compete with the 3D scrolls.
   const [hasOpenedScroll, setHasOpenedScroll] = useState(false);
+  // Mobile only: tracks whether the iframe has finished loading the
+  // user's first chosen scroll so we can reveal it (and hide the heading)
+  // in the same frame — avoids the brief flash of the preloaded scroll5.
+  const [mobileScrollLoaded, setMobileScrollLoaded] = useState(false);
   const [magnifiedZoom, setMagnifiedZoom] = useState(1.25); // Track zoom level for magnified view
   const [showPlainText, setShowPlainText] = useState(false); // Toggle plain text view
   const scrollIframeRef = useRef(null);
@@ -1859,14 +1863,26 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
               // Don't transition if already transitioning
               if (isTransitioning) return;
 
+              const newSrc = `${scrollPath}?device=${deviceType}&lang=${locale}`;
+
+              // First mobile click: the iframe isn't mounted yet (we don't
+              // preload anything to avoid a flash of the default scroll).
+              // Set the chosen src and reveal — the heading stays up until
+              // onLoad fires so the swap looks like one beat.
+              if (!hasOpenedScroll && isMobile) {
+                setCurrentScrollSrc(newSrc);
+                setHasOpenedScroll(true);
+                return;
+              }
+
               // First tap on any scroll dismisses the mobile heading/intro
               // overlay so the viewer becomes fully visible.
               setHasOpenedScroll(true);
 
               // Store next scroll with device parameter
-              setNextScrollSrc(`${scrollPath}?device=${deviceType}&lang=${locale}`);
+              setNextScrollSrc(newSrc);
               setIsTransitioning(true);
-              
+
               // Hide iframe during transition
               const iframe = isDesktop || isTablet ? scrollIframeRef.current : mobileScrollIframeRef.current;
               if (iframe) {
@@ -1876,7 +1892,14 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
             }}
             onBallClick={() => setShowNumerology(true)}
             onPyramidClick={() => {}} // Disabled for now
-            onBookClick={onBookClick}
+            onBookClick={() => {
+              // Tearing down the mobile scroll viewer so the book overlay
+              // can take focus. Next scroll tap will mount a fresh iframe
+              // and re-trigger the load-then-reveal flow.
+              setHasOpenedScroll(false);
+              setMobileScrollLoaded(false);
+              if (onBookClick) onBookClick();
+            }}
             onBookHoverChange={onBookHoverChange}
           />
           <Environment preset="night" />
@@ -2032,7 +2055,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                 borderRadius: '8px'
               }}
             >
-              {/* Mobile magnify button - positioned better */}
+              {/* Mobile magnify button - hidden until first scroll opens */}
               <button
                 onClick={() => {
                   setMagnifiedZoom(1.25); // Reset zoom to default when opening
@@ -2050,7 +2073,8 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                   cursor: 'pointer',
                   fontSize: isMobile ? '2.5rem' : '2.5rem',
                   zIndex: 10,
-                  pointerEvents: 'auto',
+                  pointerEvents: hasOpenedScroll && mobileScrollLoaded ? 'auto' : 'none',
+                  visibility: hasOpenedScroll && mobileScrollLoaded ? 'visible' : 'hidden',
                   width: isMobile ? '3.5rem' : '2.5rem',
                   height: isMobile ? '3.5rem' : '2.5rem',
                   display: 'flex',
@@ -2073,22 +2097,25 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                 🔍
               </button>
               
-              <iframe
-                ref={mobileScrollIframeRef}
-                src={currentScrollSrc}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  pointerEvents: 'auto', // Allow iframe interaction
-                  background: 'transparent',
-                  opacity: 0.85,
-                  mixBlendMode: 'screen',
-                  borderRadius: '8px',
-                  transition: 'opacity 0.5s'
-                }}
-                title="Scroll Overlay"
-              />
+              {hasOpenedScroll && (
+                <iframe
+                  ref={mobileScrollIframeRef}
+                  src={currentScrollSrc}
+                  onLoad={() => setMobileScrollLoaded(true)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    pointerEvents: mobileScrollLoaded ? 'auto' : 'none',
+                    background: 'transparent',
+                    opacity: mobileScrollLoaded ? 0.85 : 0,
+                    mixBlendMode: 'screen',
+                    borderRadius: '8px',
+                    transition: 'opacity 0.5s'
+                  }}
+                  title="Scroll Overlay"
+                />
+              )}
 
               {/* Mobile heading + intro overlay — occupies the same bottom
                   strip as the scroll viewer and covers it until the reader
@@ -2096,7 +2123,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                   the top half of the screen clear so the glowing scrolls
                   are fully tappable, which was the core bug: the old
                   top-left heading was intercepting tap targets on mobile. */}
-              {!isMiniApp && !hasOpenedScroll && (
+              {!isMiniApp && !(hasOpenedScroll && mobileScrollLoaded) && (
                 <div
                   style={{
                     position: 'absolute',
@@ -2104,11 +2131,11 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                     zIndex: 11,
                     padding: '0.9rem 1rem',
                     borderRadius: '8px',
-                    background:
-                      'linear-gradient(135deg, rgba(194, 154, 77, 0.28) 0%, rgba(28, 18, 10, 0.92) 35%, rgba(28, 18, 10, 0.94) 65%, rgba(194, 154, 77, 0.28) 100%)',
-                    border: '2px double #8e662b',
-                    boxShadow:
-                      'inset 0 0 24px rgba(142, 102, 43, 0.35), 0 3px 10px rgba(0, 0, 0, 0.55)',
+                    // background:
+                    //   'linear-gradient(135deg, rgba(194, 154, 77, 0.28) 0%, rgba(28, 18, 10, 0.92) 35%, rgba(28, 18, 10, 0.94) 65%, rgba(194, 154, 77, 0.28) 100%)',
+                    // border: '2px double #8e662b',
+                    // boxShadow:
+                    //   'inset 0 0 24px rgba(142, 102, 43, 0.35), 0 3px 10px rgba(0, 0, 0, 0.55)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -2134,7 +2161,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                   <p
                     style={{
                       color: '#d4af37',
-                      fontSize: '0.78rem',
+                      fontSize: '1.2rem',
                       fontWeight: 500,
                       letterSpacing: '0.02em',
                       lineHeight: 1.3,
@@ -2150,7 +2177,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                   <p
                     style={{
                       color: '#8e662b',
-                      fontSize: '0.72rem',
+                      fontSize: '1rem',
                       margin: 0,
                       letterSpacing: '0.05em',
                       textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',

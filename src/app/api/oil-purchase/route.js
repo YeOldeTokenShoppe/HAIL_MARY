@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import {
   db,
   doc,
-  getDoc,
-  setDoc,
   collection,
   query,
   where,
@@ -12,111 +10,48 @@ import {
   serverTimestamp,
 } from "@/lib/firebaseServer";
 import { PREMIUM_PRICES, getItemCategory } from "@/lib/oilPremium";
-import { getRL80Price } from "@/lib/oilPrice";
+import { useFacilitator } from "x402/verify";
+import { exact } from "x402/schemes";
+import { createFacilitatorConfig } from "@coinbase/x402";
 
-// Contracts on Base
-const RL80_ADDRESS = "0x30D01555d88c76500a82754A1D53cAc082A6CB75";
+// USDC on Base (mainnet)
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-const BURN_ADDRESS = "0x000000000000000000000000000000000000dead";
+const X402_VERSION = 1;
 
-// ERC-20 Transfer event topic
-const TRANSFER_TOPIC =
-  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+// CDP facilitator — bridge memory's CDP_API_KEY_NAME/PRIVATE_KEY env names
+// to @coinbase/x402's expected CDP_API_KEY_ID/SECRET.
+const facilitatorConfig = createFacilitatorConfig(
+  process.env.CDP_API_KEY_ID || process.env.CDP_API_KEY_NAME,
+  process.env.CDP_API_KEY_SECRET || process.env.CDP_API_KEY_PRIVATE_KEY,
+);
+const { verify, settle } = useFacilitator(facilitatorConfig);
 
-const MIN_CONFIRMATIONS = 5;
-
-async function baseRpc(method, params) {
-  const url = process.env.BASE_RPC_URL;
-  if (!url) throw new Error("BASE_RPC_URL not configured");
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(json.error.message);
-  return json.result;
+function computeTotalUsdc(itemIds) {
+  let total = 0;
+  for (const id of itemIds) {
+    const category = getItemCategory(id);
+    if (!category) throw new Error(`Unknown item: ${id}`);
+    total += PREMIUM_PRICES[category].usdc;
+  }
+  return total;
 }
 
-async function verifyTransaction(txHash, itemIds, currency) {
-  const receipt = await baseRpc("eth_getTransactionReceipt", [txHash]);
-  if (!receipt) throw new Error("Transaction not found or not yet mined");
-  if (receipt.status !== "0x1") throw new Error("Transaction reverted");
-
-  // Check confirmations
-  const currentBlock = await baseRpc("eth_blockNumber", []);
-  const txBlock = parseInt(receipt.blockNumber, 16);
-  const headBlock = parseInt(currentBlock, 16);
-  if (headBlock - txBlock < MIN_CONFIRMATIONS) {
-    throw new Error(`Need ${MIN_CONFIRMATIONS} confirmations, have ${headBlock - txBlock}`);
-  }
-
-  // Calculate total USD across all items
-  let totalUsdc = 0;
-  for (const itemId of itemIds) {
-    const category = getItemCategory(itemId);
-    if (!category) throw new Error(`Unknown item: ${itemId}`);
-    totalUsdc += PREMIUM_PRICES[category].usdc;
-  }
-
-  if (currency === "rl80") {
-    // Verify RL80 burn — Transfer to address(0) or 0x...dead
-    const burnPadded0 = "0x" + "0".repeat(64);
-    const burnPaddedDead = "0x" + BURN_ADDRESS.slice(2).toLowerCase().padStart(64, "0");
-
-    const burnLog = receipt.logs.find(
-      (log) =>
-        log.address.toLowerCase() === RL80_ADDRESS.toLowerCase() &&
-        log.topics[0] === TRANSFER_TOPIC &&
-        (log.topics[2]?.toLowerCase() === burnPadded0 ||
-         log.topics[2]?.toLowerCase() === burnPaddedDead)
-    );
-
-    if (!burnLog) throw new Error("No RL80 burn found in transaction");
-
-    // RL80 has 18 decimals
-    const amount = BigInt(burnLog.data);
-    const burnedTokens = Number(amount / BigInt(10 ** 18));
-
-    // Dynamic pricing: fetch live RL80/USD price from pool
-    const { rl80PriceUsd } = await getRL80Price();
-    const requiredTokens = Math.ceil(totalUsdc / rl80PriceUsd);
-    // Allow 10% tolerance for price movement between quote and execution
-    const minRequired = Math.floor(requiredTokens * 0.9);
-
-    if (burnedTokens < minRequired) {
-      throw new Error(`Burn too low: got ${burnedTokens.toLocaleString()} RL80, need ~${requiredTokens.toLocaleString()} ($${totalUsdc})`);
-    }
-
-    return { type: "RL80_BURN", amount: burnedTokens, usdValue: totalUsdc };
-  }
-
-  if (currency === "usdc") {
-    // Verify USDC transfer to treasury
-    const treasury = process.env.OIL_PURCHASE_TREASURY;
-    if (!treasury) throw new Error("OIL_PURCHASE_TREASURY not configured");
-
-    const recipientPadded = "0x" + treasury.slice(2).toLowerCase().padStart(64, "0");
-    const usdcLog = receipt.logs.find(
-      (log) =>
-        log.address.toLowerCase() === USDC_ADDRESS.toLowerCase() &&
-        log.topics[0] === TRANSFER_TOPIC &&
-        log.topics[2]?.toLowerCase() === recipientPadded
-    );
-
-    if (!usdcLog) throw new Error("No USDC transfer to treasury found in transaction");
-
-    // USDC has 6 decimals
-    const amount = parseInt(usdcLog.data, 16);
-    const required = totalUsdc * 1_000_000;
-    if (amount < required) {
-      throw new Error(`Payment too low: got $${(amount / 1e6).toFixed(2)}, need $${totalUsdc}`);
-    }
-
-    return { type: "USDC", amount };
-  }
-
-  throw new Error(`Unknown currency: ${currency}`);
+function buildPaymentRequirements(itemIds, totalUsdc, resourceUrl) {
+  const treasury = process.env.OIL_PURCHASE_TREASURY;
+  if (!treasury) throw new Error("OIL_PURCHASE_TREASURY not configured");
+  return {
+    scheme: "exact",
+    network: "base",
+    maxAmountRequired: String(totalUsdc * 1_000_000), // USDC has 6 decimals
+    resource: resourceUrl,
+    description: `Unlock ${itemIds.length} oil rig ${itemIds.length === 1 ? "item" : "items"}`,
+    mimeType: "application/json",
+    payTo: treasury,
+    maxTimeoutSeconds: 120,
+    asset: USDC_ADDRESS,
+    // EIP-712 domain for USDC on Base — required for transferWithAuthorization
+    extra: { name: "USD Coin", version: "2" },
+  };
 }
 
 export async function POST(req) {
@@ -125,59 +60,124 @@ export async function POST(req) {
       return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
     }
 
-    const { userId, txHash, itemIds, currency } = await req.json();
-    if (!userId || !txHash || !itemIds?.length || !currency) {
+    const { userId, itemIds } = await req.json();
+    if (!userId || !itemIds?.length) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Verify the on-chain payment covers total for all items
-    let payment;
+    let totalUsdc;
     try {
-      payment = await verifyTransaction(txHash, itemIds, currency);
+      totalUsdc = computeTotalUsdc(itemIds);
     } catch (err) {
-      return NextResponse.json({ error: `Payment verification failed: ${err.message}` }, { status: 400 });
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    if (totalUsdc <= 0) {
+      return NextResponse.json({ error: "Nothing to charge" }, { status: 400 });
     }
 
-    // Atomic write with replay & duplicate prevention
+    const paymentRequirements = buildPaymentRequirements(itemIds, totalUsdc, req.url);
+
+    // No payment header → return 402 with requirements so x402-fetch can sign + retry.
+    const paymentHeader = req.headers.get("x-payment");
+    if (!paymentHeader) {
+      return NextResponse.json(
+        {
+          x402Version: X402_VERSION,
+          error: "X-PAYMENT header required",
+          accepts: [paymentRequirements],
+        },
+        { status: 402 },
+      );
+    }
+
+    let payload;
+    try {
+      payload = exact.decodePayment(paymentHeader);
+    } catch (err) {
+      return NextResponse.json(
+        { x402Version: X402_VERSION, error: `Invalid payment payload: ${err.message}` },
+        { status: 402 },
+      );
+    }
+
+    const verifyResult = await verify(payload, paymentRequirements);
+    if (!verifyResult.isValid) {
+      return NextResponse.json(
+        {
+          x402Version: X402_VERSION,
+          error: `Payment verification failed: ${verifyResult.invalidReason || "unknown"}`,
+        },
+        { status: 402 },
+      );
+    }
+
+    // Use the EIP-3009 authorization nonce as the dedupe key — USDC enforces
+    // single-use on-chain, so this nonce will never legitimately appear twice.
+    const nonce = payload.payload?.authorization?.nonce;
+    if (!nonce) {
+      return NextResponse.json(
+        { error: "Payment payload missing nonce" },
+        { status: 400 },
+      );
+    }
+
     const userDocRef = doc(db, "oilPurchases", userId);
     const receiptsCol = collection(db, "oilPurchases", userId, "receipts");
 
-    await runTransaction(db, async (transaction) => {
-      // Check for duplicate txHash
-      const txQuery = query(receiptsCol, where("txHash", "==", txHash));
-      const txSnap = await getDocs(txQuery);
-      if (!txSnap.empty) {
-        throw new Error("Transaction hash already used");
-      }
+    try {
+      await runTransaction(db, async (transaction) => {
+        const nonceQuery = query(receiptsCol, where("nonce", "==", nonce));
+        const nonceSnap = await getDocs(nonceQuery);
+        if (!nonceSnap.empty) {
+          throw new Error("Payment nonce already used");
+        }
 
-      // Check if any already owned
-      const userSnap = await transaction.get(userDocRef);
-      const existing = userSnap.exists() ? userSnap.data()?.unlocked || {} : {};
-      const alreadyOwned = itemIds.filter((id) => existing[id]);
-      if (alreadyOwned.length > 0) {
-        throw new Error(`Already owned: ${alreadyOwned.join(", ")}`);
-      }
+        const userSnap = await transaction.get(userDocRef);
+        const existing = userSnap.exists() ? userSnap.data()?.unlocked || {} : {};
+        const alreadyOwned = itemIds.filter((id) => existing[id]);
+        if (alreadyOwned.length > 0) {
+          throw new Error(`Already owned: ${alreadyOwned.join(", ")}`);
+        }
 
-      // Write unlocks for all items
-      const unlockData = { updatedAt: serverTimestamp() };
-      for (const id of itemIds) {
-        unlockData[`unlocked.${id}`] = true;
-      }
-      transaction.set(userDocRef, unlockData, { merge: true });
+        const unlockData = { updatedAt: serverTimestamp() };
+        for (const id of itemIds) {
+          unlockData[`unlocked.${id}`] = true;
+        }
+        transaction.set(userDocRef, unlockData, { merge: true });
 
-      // Write receipt to subcollection
-      const receiptRef = doc(receiptsCol);
-      transaction.set(receiptRef, {
-        txHash,
-        itemIds,
-        currency,
-        paymentType: payment.type,
-        paymentAmount: payment.amount,
-        createdAt: serverTimestamp(),
+        const receiptRef = doc(receiptsCol);
+        transaction.set(receiptRef, {
+          nonce,
+          itemIds,
+          currency: "usdc",
+          paymentType: "X402",
+          paymentAmount: totalUsdc * 1_000_000,
+          createdAt: serverTimestamp(),
+        });
       });
-    });
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
 
-    return NextResponse.json({ ok: true, itemIds });
+    // Settle on-chain via the facilitator. If settle fails after the unlock
+    // was granted, we still return the unlock — refund logic would belong
+    // in a separate reconciliation pass.
+    let settleResult;
+    try {
+      settleResult = await settle(payload, paymentRequirements);
+    } catch (err) {
+      console.error("[oil-purchase] Settle failed:", err.message);
+      settleResult = { success: false, error: err.message };
+    }
+
+    const response = NextResponse.json({ ok: true, itemIds, settle: settleResult });
+    if (settleResult?.transaction) {
+      response.headers.set(
+        "x-payment-response",
+        Buffer.from(JSON.stringify(settleResult)).toString("base64"),
+      );
+    }
+    return response;
   } catch (err) {
     console.error("[oil-purchase] Error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

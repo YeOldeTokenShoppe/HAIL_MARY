@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useUser, useClerk, UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -337,6 +338,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
   }, [timeRemaining, userPolaroids]); */
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   /* Helper function removed
   // Helper function to format time remaining
@@ -362,7 +364,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
     onClose();
   };
 
-  return (
+  return createPortal(
     <>
       <div className={`modal-overlay${theme === 'industrial' ? ' theme-industrial' : ''}`} onClick={onClose}>
         <div className="unified-modal" onClick={(e) => e.stopPropagation()}>
@@ -442,16 +444,15 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
                 ) : (
                   <div className="account-signed-out">
                     <div className="account-signed-out-glyph" aria-hidden="true">
-                      {/* Quill — visually anchors the "inscribe a testimonial" copy */}
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M20 4 9 15l-3 3-3-3 11-11h6Z" />
                         <path d="m14 5 5 5" />
                         <path d="M9 15h2.5L14 12.5" />
                       </svg>
                     </div>
-                    <p className="account-signed-out-eyebrow">Testimonial access</p>
+                    <p className="account-signed-out-eyebrow">Account access</p>
                     <p className="account-signed-out-body">
-                      Sign in to inscribe a testimonial and follow your account across devices.
+                      Sign in to unlock the full experience and follow your account across devices.
                     </p>
                     <button
                       className="action-button account-signed-out-cta"
@@ -1140,6 +1141,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
           border-radius: 3px;
         }
       `}</style>
-    </>
+    </>,
+    document.body
   );
 }

@@ -162,7 +162,7 @@ function hexToRGB(hex) {
 
 export default function ShaderText({
   text = "HAIL MARY",
-  font = "'Blackletter Outline', serif",
+  font = "'Blackletter', serif",
   fontWeight = 900,
   width,
   height,
@@ -280,105 +280,123 @@ export default function ShaderText({
     const H = container.offsetHeight;
     if (W === 0 || H === 0) return;
 
-    const renderer = new WebGLRenderer({ antialias: true, alpha: true });
-    const pr = Math.min(devicePixelRatio, 2);
-    renderer.setPixelRatio(pr);
-    renderer.setSize(W, H);
-    renderer.domElement.style.display = "block";
-    canvasRef.current = renderer.domElement;
-    container.appendChild(renderer.domElement);
+    let cancelled = false;
+    let cleanup = () => {};
 
-    const scene = new Scene();
-    const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
-
-    const maskCanvas = document.createElement("canvas");
-    const maskCtx = maskCanvas.getContext("2d");
-    const maskTexRef = { current: null };
     const fontStr = `${fontWeight} 300px ${font}`;
 
-    const upper = Array.isArray(text)
-      ? text.map((s) => String(s).toUpperCase())
-      : String(text).toUpperCase();
-    const tex = buildMask(renderer, maskCanvas, maskCtx, maskTexRef, W, H, upper, fontStr);
+    // Canvas 2D does not trigger @font-face loading the way DOM elements do;
+    // without this wait, the mask is drawn before the font is registered and
+    // the canvas silently falls back to the next family in `font`.
+    const fontReady = (typeof document !== "undefined" && document.fonts)
+      ? document.fonts.load(fontStr).catch(() => {})
+      : Promise.resolve();
 
-    const bgRGB = hexToRGB(colorBg);
-    const fillRGB = hexToRGB(colorFill);
-    const outlineRGB = hexToRGB(colorOutline);
+    fontReady.then(() => {
+      if (cancelled) return;
 
-    const uniforms = {
-      uTime: { value: 0.0 },
-      uRes: { value: new Vector2(W * pr, H * pr) },
-      uMouse: { value: new Vector2(0.5, 0.5) },
-      uDensity: { value: density },
-      uSpeed: { value: speed },
-      uTurb: { value: turbulence },
-      uMask: { value: tex },
-      uR0: { value: new Vector4(0, 0, -1, 0) },
-      uR1: { value: new Vector4(0, 0, -1, 0) },
-      uR2: { value: new Vector4(0, 0, -1, 0) },
-      uR3: { value: new Vector4(0, 0, -1, 0) },
-      uColorBg: { value: bgRGB },
-      uColorFill: { value: fillRGB },
-      uColorOutline: { value: outlineRGB },
-      uOutlineWidth: { value: outlineWidth },
-    };
+      const renderer = new WebGLRenderer({ antialias: true, alpha: true });
+      const pr = Math.min(devicePixelRatio, 2);
+      renderer.setPixelRatio(pr);
+      renderer.setSize(W, H);
+      renderer.domElement.style.display = "block";
+      canvasRef.current = renderer.domElement;
+      container.appendChild(renderer.domElement);
 
-    const material = new ShaderMaterial({
-      uniforms,
-      vertexShader: `void main(){ gl_Position = vec4(position, 1.0); }`,
-      fragmentShader,
-      transparent: true,
-    });
-    scene.add(new Mesh(new PlaneGeometry(2, 2), material));
+      const scene = new Scene();
+      const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    // Mouse tracking relative to canvas
-    const onMouseMove = (e) => {
-      const rect = container.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = 1 - (e.clientY - rect.top) / rect.height;
-      uniforms.uMouse.value.set(x, y);
-    };
+      const maskCanvas = document.createElement("canvas");
+      const maskCtx = maskCanvas.getContext("2d");
+      const maskTexRef = { current: null };
 
-    // Click ripples
-    let rippleIndex = 0;
-    const rippleSlots = [uniforms.uR0, uniforms.uR1, uniforms.uR2, uniforms.uR3];
-    const onClick = (e) => {
-      const rect = container.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = 1 - (e.clientY - rect.top) / rect.height;
-      rippleSlots[rippleIndex % 4].value.set(x, y, uniforms.uTime.value, 1);
-      rippleIndex++;
-    };
+      const upper = Array.isArray(text)
+        ? text.map((s) => String(s).toUpperCase())
+        : String(text).toUpperCase();
+      const tex = buildMask(renderer, maskCanvas, maskCtx, maskTexRef, W, H, upper, fontStr);
 
-    container.addEventListener("mousemove", onMouseMove);
-    container.addEventListener("click", onClick);
+      const bgRGB = hexToRGB(colorBg);
+      const fillRGB = hexToRGB(colorFill);
+      const outlineRGB = hexToRGB(colorOutline);
 
-    let elapsed = 0;
-    let lastTimestamp = null;
-    let animId;
+      const uniforms = {
+        uTime: { value: 0.0 },
+        uRes: { value: new Vector2(W * pr, H * pr) },
+        uMouse: { value: new Vector2(0.5, 0.5) },
+        uDensity: { value: density },
+        uSpeed: { value: speed },
+        uTurb: { value: turbulence },
+        uMask: { value: tex },
+        uR0: { value: new Vector4(0, 0, -1, 0) },
+        uR1: { value: new Vector4(0, 0, -1, 0) },
+        uR2: { value: new Vector4(0, 0, -1, 0) },
+        uR3: { value: new Vector4(0, 0, -1, 0) },
+        uColorBg: { value: bgRGB },
+        uColorFill: { value: fillRGB },
+        uColorOutline: { value: outlineRGB },
+        uOutlineWidth: { value: outlineWidth },
+      };
 
-    const loop = (timestamp) => {
+      const material = new ShaderMaterial({
+        uniforms,
+        vertexShader: `void main(){ gl_Position = vec4(position, 1.0); }`,
+        fragmentShader,
+        transparent: true,
+      });
+      scene.add(new Mesh(new PlaneGeometry(2, 2), material));
+
+      const onMouseMove = (e) => {
+        const rect = container.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        const y = 1 - (e.clientY - rect.top) / rect.height;
+        uniforms.uMouse.value.set(x, y);
+      };
+
+      let rippleIndex = 0;
+      const rippleSlots = [uniforms.uR0, uniforms.uR1, uniforms.uR2, uniforms.uR3];
+      const onClick = (e) => {
+        const rect = container.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        const y = 1 - (e.clientY - rect.top) / rect.height;
+        rippleSlots[rippleIndex % 4].value.set(x, y, uniforms.uTime.value, 1);
+        rippleIndex++;
+      };
+
+      container.addEventListener("mousemove", onMouseMove);
+      container.addEventListener("click", onClick);
+
+      let elapsed = 0;
+      let lastTimestamp = null;
+      let animId;
+
+      const loop = (timestamp) => {
+        animId = requestAnimationFrame(loop);
+        const dt = lastTimestamp === null ? 0 : Math.min((timestamp - lastTimestamp) / 1000, 0.05);
+        lastTimestamp = timestamp;
+        elapsed += dt;
+        uniforms.uTime.value = elapsed;
+        renderer.render(scene, camera);
+      };
       animId = requestAnimationFrame(loop);
-      const dt = lastTimestamp === null ? 0 : Math.min((timestamp - lastTimestamp) / 1000, 0.05);
-      lastTimestamp = timestamp;
-      elapsed += dt;
-      uniforms.uTime.value = elapsed;
-      renderer.render(scene, camera);
-    };
-    animId = requestAnimationFrame(loop);
 
-    stateRef.current = { renderer, uniforms, animId, onMouseMove, onClick };
+      stateRef.current = { renderer, uniforms, animId, onMouseMove, onClick };
+
+      cleanup = () => {
+        cancelAnimationFrame(animId);
+        container.removeEventListener("mousemove", onMouseMove);
+        container.removeEventListener("click", onClick);
+        renderer.dispose();
+        material.dispose();
+        if (maskTexRef.current) maskTexRef.current.dispose();
+        if (container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
+      };
+    });
 
     return () => {
-      cancelAnimationFrame(animId);
-      container.removeEventListener("mousemove", onMouseMove);
-      container.removeEventListener("click", onClick);
-      renderer.dispose();
-      material.dispose();
-      if (maskTexRef.current) maskTexRef.current.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
+      cancelled = true;
+      cleanup();
     };
   }, [text, font, fontWeight, colorBg, colorFill, colorOutline, outlineWidth, density, speed, turbulence, buildMask]);
 

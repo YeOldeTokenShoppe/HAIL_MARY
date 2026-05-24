@@ -22,6 +22,7 @@
     "@coinbase/cdp-sdk": "^1.46.1",
     "@coinbase/cdp-wagmi": "^0.0.101",
     "@coinbase/wallet-sdk": "^4.3.7",
+    "@coinbase/x402": "^2.1.0",
     "@farcaster/miniapp-sdk": "^0.2.3",
     "@metamask/sdk": "^0.33.1",
     "@react-three/drei": "^10.6.1",
@@ -31,6 +32,7 @@
     "@tanstack/react-query": "^5.90.20",
     "@wagmi/core": "^3.4.3",
     "@walletconnect/ethereum-provider": "^2.23.9",
+    "animejs": "^4.4.1",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",
@@ -59,7 +61,9 @@
     "three-stdlib": "^2.36.1",
     "tone": "^15.1.22",
     "viem": "^2.45.2",
-    "wagmi": "^3.4.2"
+    "wagmi": "^3.4.2",
+    "x402": "^1.2.0",
+    "x402-fetch": "^1.2.0"
   },
   "devDependencies": {
     "@types/react": "19.2.14",

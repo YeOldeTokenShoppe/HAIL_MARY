@@ -77,6 +77,7 @@ export default function MobileBottomNav({
   // When `comingSoon` is set the slot renders dimmed with a SOON badge.
   extraLeft = [],
   extraRight = [],
+  hideMenu = false,
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -931,26 +932,28 @@ export default function MobileBottomNav({
           {/* RIGHT 2 — Menu (or custom slot if menuIcon override is provided).
               When overridden, the hamburger animation + first-run hint are
               skipped since the slot is no longer a menu toggle. */}
-          <button
-            className="btm-nav-item btm-nav-menu"
-            onClick={handleMenuClick}
-          >
-            <div className={`btm-nav-icon ${isMenuOpen && !menuIcon ? 'menu-open-icon' : ''}`} style={{ position: 'relative' }}>
-              {menuIcon ? (
-                menuIcon
-              ) : (
-                <>
-                  {showMenuHint && <span className="btm-menu-hint" />}
-                  <div className={`btm-menu-lines ${isMenuOpen ? 'btm-menu-open' : ''}`}>
-                    <span className="btm-menu-line" />
-                    <span className="btm-menu-line" />
-                    <span className="btm-menu-line" />
-                  </div>
-                </>
-              )}
-            </div>
-            <span className={`btm-nav-label ${isMenuOpen && !menuIcon ? 'active-label' : ''}`}>{menuLabel}</span>
-          </button>
+          {!hideMenu && (
+            <button
+              className="btm-nav-item btm-nav-menu"
+              onClick={handleMenuClick}
+            >
+              <div className={`btm-nav-icon ${isMenuOpen && !menuIcon ? 'menu-open-icon' : ''}`} style={{ position: 'relative' }}>
+                {menuIcon ? (
+                  menuIcon
+                ) : (
+                  <>
+                    {showMenuHint && <span className="btm-menu-hint" />}
+                    <div className={`btm-menu-lines ${isMenuOpen ? 'btm-menu-open' : ''}`}>
+                      <span className="btm-menu-line" />
+                      <span className="btm-menu-line" />
+                      <span className="btm-menu-line" />
+                    </div>
+                  </>
+                )}
+              </div>
+              <span className={`btm-nav-label ${isMenuOpen && !menuIcon ? 'active-label' : ''}`}>{menuLabel}</span>
+            </button>
+          )}
 
         </div>
       </div>

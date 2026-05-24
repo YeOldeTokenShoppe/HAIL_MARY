@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { OrbitControls, Cloud, Clouds } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -410,9 +412,16 @@ export default function OilPage() {
 
   // Read mode from URL search params (avoids useSearchParams / Suspense issues)
   const [mode, setMode] = useState("active");
+  const [previewMode, setPreviewMode] = useState(false);
+  // Ref mirror of previewMode so write-handler gates aren't fooled by a
+  // stale useCallback closure (handlers don't need previewMode in their deps).
+  const previewModeRef = useRef(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setMode(params.get("mode") || "active");
+    const preview = params.get("preview") === "1";
+    setPreviewMode(preview);
+    previewModeRef.current = preview;
     // Capture referral code from URL and store in localStorage
     const refCode = params.get("ref");
     if (refCode) {
@@ -445,8 +454,9 @@ export default function OilPage() {
   const isTest = mode === "test";
   const [testDay, setTestDay] = useState(0);
   const { user } = useUser();
-  const { walletAddress, tokenBalance, isWalletConnected, activeAccount } = useWalletAuth();
+  const { walletAddress, tokenBalance, isWalletConnected } = useWalletAuth();
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -454,6 +464,15 @@ export default function OilPage() {
   // Premium purchases
   const [unlockedItems, setUnlockedItems] = useState(new Set());
   const [purchaseModalItem, setPurchaseModalItem] = useState(null);
+
+  // Auto-close the account modal once a wallet is connected mid-purchase,
+  // so the user returns to PumpPurchaseModal (which sits underneath) to see
+  // the GET USDC / PAY NOW button instead of being stuck on the wallet view.
+  useEffect(() => {
+    if (walletAddress && purchaseModalItem && showAccountModal) {
+      setShowAccountModal(false);
+    }
+  }, [walletAddress, purchaseModalItem, showAccountModal]);
 
   // Game state
   const [gamePhase, setGamePhase] = useState("ticket_sale");
@@ -691,22 +710,31 @@ export default function OilPage() {
   const [claimJumpMode, setClaimJumpMode] = useState(false);
   const [chatModalPlotKey, setChatModalPlotKey] = useState(null);
 
-  // Admin: save settings to Firestore when they change
-  // Uses a ref for current values so the callback identity is stable (no dependency cascade)
+  // Admin: save settings via /api/oil-settings (Admin SDK, password-gated).
+  // Direct client writes to oilGame/* are blocked by Firestore rules — prize
+  // money is on the line, so settings can only be mutated server-side.
+  // Uses a ref for current values so the callback identity is stable.
   const gameSettingsRef = useRef({ blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay, gameStartDate });
   gameSettingsRef.current = { blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay, gameStartDate };
   const saveGameSettings = useCallback(async (overrides = {}) => {
-    if (!db || !isAdmin || !adminAuthed) return;
+    if (!isAdmin || !adminAuthed || !adminPassword) return;
     try {
-      await setDoc(doc(db, "oilGame", "settings"), {
-        ...gameSettingsRef.current,
-        updatedAt: serverTimestamp(),
-        ...overrides,
-      }, { merge: true });
+      const res = await fetch("/api/oil-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminPassword,
+          settings: { ...gameSettingsRef.current, ...overrides },
+        }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        throw new Error(error || `HTTP ${res.status}`);
+      }
     } catch (err) {
       console.error("Failed to save game settings:", err);
     }
-  }, [isAdmin, adminAuthed]);
+  }, [isAdmin, adminAuthed, adminPassword]);
 
   // Mobile tab view
   const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "surface" | "xsec"
@@ -771,6 +799,7 @@ export default function OilPage() {
   }, [user?.id]);
 
   const handlePurchaseRequest = useCallback((items) => {
+    if (previewModeRef.current) return;
     // Accept single item or array
     setPurchaseModalItem(Array.isArray(items) ? items : [items]);
   }, []);
@@ -790,6 +819,7 @@ export default function OilPage() {
   }, [userDrill]);
 
   const handleSaveUsername = useCallback(async () => {
+    if (previewModeRef.current) return;
     if (!user?.id || !db || !username.trim() || !userDrill) return;
     setUsernameSaving(true);
     try {
@@ -890,6 +920,7 @@ export default function OilPage() {
   // Rogue consequence — apply addon deletion / graffiti / poop when rogue reaches target
   const consequenceAppliedRef = useRef(new Set());
   const handleRogueConsequence = useCallback((ev) => {
+    if (previewModeRef.current) return;
     if (!ev.consequence || consequenceAppliedRef.current.has(ev.id)) return;
     consequenceAppliedRef.current.add(ev.id);
     const { type, plotDocId, addonSlot } = ev.consequence;
@@ -966,6 +997,7 @@ export default function OilPage() {
 
   // Save pump config (called from SAVE button)
   const handleConfigSave = useCallback(async () => {
+    if (previewModeRef.current) return;
     if (!user?.id || !db || selectedX === null || sliceY === null || !isConfigOwner) return;
     const docId = getConfigDocId(selectedX, sliceY);
     if (!docId) return;
@@ -1313,6 +1345,7 @@ export default function OilPage() {
 
   // ── Click-to-drill handler — one layer per click, capped by playerDepth (time + bonus) ──
   const handleDailyDrill = useCallback(async () => {
+    if (previewModeRef.current) return;
     if (!user?.id || !db || selectedX === null || drillStatus !== "ready") return;
     const col = userDrill?.col ?? selectedX;
     const row = userDrill?.row ?? sliceY;
@@ -1358,6 +1391,7 @@ export default function OilPage() {
 
   // ── Claim Jump handler ──
   const handleClaimJump = useCallback(async (newCol, newRow) => {
+    if (previewModeRef.current) return;
     if (!user?.id || !db || !userDrill) return;
     const targetKey = `${newCol}_${newRow}`;
     const targetPlot = allPlotsMap[targetKey];
@@ -1422,6 +1456,7 @@ export default function OilPage() {
 
   // ── Transfer Plot handler ──
   const handleTransferPlot = useCallback(async (recipientUsername, transferUpgrades) => {
+    if (previewModeRef.current) return { error: "Preview mode — sign up to play" };
     if (!user?.id || !db || !userDrill || userDrill.col == null) {
       return { error: "You don't own a plot to transfer" };
     }
@@ -1547,55 +1582,41 @@ export default function OilPage() {
     }
   }, [user?.id, userDrill]);
 
-  // Tank drain handler — always updates UI, persists to Firestore when possible
+  // Tank drain handler — updates UI optimistically, persists via /api/oil-tank-drain.
+  // Server is the only writer to oilGame/communityStorage (rules locked).
   const handleTankDrain = useCallback(async () => {
+    if (previewModeRef.current) return;
     if (playerExtracted === 0) return;
-    // Always update UI locally
     const delta = Math.max(0, playerExtracted - lastDrainSnapshot);
     if (delta === 0) return;
     setTankDrained(true);
     setLastDrainSnapshot(playerExtracted);
     setCommunityOil(prev => prev + delta);
-    // Persist to Firestore if signed in
-    if (user?.id && db) {
+    if (userDrill) {
+      const newTotal = (userDrill.totalCollected || 0) + delta;
+      const newDrains = (userDrill.tankDrains || 0) + 1;
+      setUserDrill(prev => prev ? { ...prev, totalCollected: newTotal, tankDrains: newDrains, lastDrainExtracted: playerExtracted } : prev);
+    }
+    if (user?.id) {
       try {
-        // Increment community storage atomically
-        await setDoc(doc(db, "oilGame", "communityStorage"), {
-          totalOil: increment(delta),
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-        // Update user drill record
-        if (userDrill) {
-          const newTotal = (userDrill.totalCollected || 0) + delta;
-          const newDrains = (userDrill.tankDrains || 0) + 1;
-          setUserDrill(prev => prev ? { ...prev, totalCollected: newTotal, tankDrains: newDrains, lastDrainExtracted: playerExtracted } : prev);
-          await setDoc(doc(db, "oilDrills", user.id), {
+        const res = await fetch("/api/oil-tank-drain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             userId: user.id,
-            col: userDrill.col,
-            row: userDrill.row,
-            drillDay: userDrill.drillDay,
-            lastDrillDate: userDrill.lastDrillDate,
-            totalCollected: newTotal,
-            tankDrains: newDrains,
-            lastDrainExtracted: playerExtracted,
-            ...(username.trim() ? { username: username.trim() } : {}),
-            updatedAt: serverTimestamp(),
-          });
+            playerExtracted,
+            username: username?.trim() || undefined,
+          }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({}));
+          throw new Error(error || `HTTP ${res.status}`);
         }
       } catch (err) {
         console.error("Failed to save tank drain:", err);
       }
-      // Mark this user's active gusher events as done
-      const myGushers = gusherEvents.filter((e) => e.userId === user.id);
-      for (const ev of myGushers) {
-        try {
-          await updateDoc(doc(db, "gusherEvents", ev.id), { status: "done" });
-        } catch (e) {
-          // ignore — may already be done
-        }
-      }
     }
-  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot, username, gusherEvents]);
+  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot, username]);
 
   // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
@@ -1799,7 +1820,7 @@ export default function OilPage() {
       <div style={isMobile ? m.statGrid : styles.statGrid}>
         <StatBlock s={styles} accentColor={theme.accent} label="TOTAL OIL" value={<AnimNum value={stats.totalOil} />} unit="USDC" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={stats.deposits.length} />
-        <StatBlock s={styles} accentColor={theme.accent} label="CLAIMS" value={gridSize * gridSize} />
+        <StatBlock s={styles} accentColor={theme.accent} label="AVAILABLE CLAIMS" value={`${(gridSize * gridSize) - Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length}/${gridSize * gridSize}`} />
         <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={stats.totalOil > 0 ? `${(playerExtracted / stats.totalOil * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
         <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
         {!isAdmin && !isReport && effectiveDrillDay > 0 && (
@@ -1980,9 +2001,9 @@ export default function OilPage() {
         }}
       >
         {selectedX !== null
-          ? `CLAIM (${selectedX}, ${sliceY}) INSPECTOR`
+          ? `CLAIM (${selectedX + 1}, ${sliceY + 1}) INSPECTOR`
           : userDrill?.col != null
-            ? `YOUR CLAIM (${userDrill.col}, ${userDrill.row}) — TAP TO VIEW`
+            ? `YOUR CLAIM (${userDrill.col + 1}, ${userDrill.row + 1}) — TAP TO VIEW`
             : "SELECT A CLAIM"}
       </h3>
 
@@ -2470,7 +2491,7 @@ export default function OilPage() {
 
   // ── Pre-game phase gates ──
   const userHasPlot = userDrill?.col != null;
-  if (gamePhase === "ticket_sale") {
+  if (gamePhase === "ticket_sale" && !previewMode) {
     return (
       <OilQualify
         theme={theme}
@@ -2533,6 +2554,44 @@ export default function OilPage() {
     >
       END GAME
     </button>
+  );
+
+  const previewBanner = previewMode && (
+    <div style={{
+      width: "100%",
+      padding: "8px 16px",
+      background: "linear-gradient(90deg, rgba(212,168,84,0.95), rgba(184,146,46,0.95))",
+      borderBottom: "1px solid #8b6914",
+      color: "#1a1408",
+      fontFamily: "'Share Tech Mono', monospace",
+      fontSize: 11,
+      letterSpacing: "0.12em",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+      flexWrap: "wrap",
+      boxShadow: "0 2px 12px rgba(0,0,0,0.25)",
+      position: "relative",
+      zIndex: 100,
+    }}>
+      <span style={{ fontWeight: 700 }}>PREVIEW MODE</span>
+      <span style={{ opacity: 0.8 }}>Sign up to actually play and claim a plot</span>
+      <a
+        href="/oil"
+        style={{
+          padding: "3px 10px",
+          background: "#1a1408",
+          color: "#d4a854",
+          borderRadius: 2,
+          textDecoration: "none",
+          fontWeight: 700,
+          letterSpacing: "0.15em",
+        }}
+      >
+        GO TO SIGN-UP &rarr;
+      </a>
+    </div>
   );
 
   const gameEndedBanner = isAdmin && gameEnded && (
@@ -2616,7 +2675,7 @@ export default function OilPage() {
               onClick={() => handleSelectClaim({ x: userDrill.col, y: userDrill.row })}
               style={drillBtnStyles.active}
             >
-              GO TO YOUR CLAIM ({Math.min(userDrill.col, gridSize - 1)}, {Math.min(userDrill.row, gridSize - 1)})
+              GO TO YOUR CLAIM ({Math.min(userDrill.col, gridSize - 1) + 1}, {Math.min(userDrill.row, gridSize - 1) + 1})
             </button>
           ) : (
             <button disabled style={drillBtnStyles.disabled}>SELECT A CLAIM</button>
@@ -2629,7 +2688,7 @@ export default function OilPage() {
             onClick={() => handleSelectClaim({ x: userDrill.col, y: userDrill.row })}
             style={drillBtnStyles.active}
           >
-            GO TO YOUR CLAIM ({Math.min(userDrill?.col ?? 0, gridSize - 1)}, {Math.min(userDrill?.row ?? 0, gridSize - 1)})
+            GO TO YOUR CLAIM ({Math.min(userDrill?.col ?? 0, gridSize - 1) + 1}, {Math.min(userDrill?.row ?? 0, gridSize - 1) + 1})
           </button>
         </div>
       )}
@@ -2766,7 +2825,7 @@ export default function OilPage() {
   const playerDrillPanel = !isAdmin && !isReport && effectiveDrillDay > 0 && activeUserDrill && (
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
-        YOUR CLAIM ({activeUserDrill.col}, {activeUserDrill.row})
+        YOUR CLAIM ({activeUserDrill.col + 1}, {activeUserDrill.row + 1})
       </h3>
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
@@ -3030,6 +3089,7 @@ export default function OilPage() {
   if (isMobile) {
     return (
       <div style={m.root}>
+        {previewBanner}
         <div style={styles.scanlines} />
         <div style={styles.grain} />
         <style>{`.nav-mobile-home { background: transparent !important; border: none !important; box-shadow: none !important; }`}</style>
@@ -3047,13 +3107,28 @@ export default function OilPage() {
             </div>
             <div>
               <h1 style={{ ...styles.title, fontSize: 12, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                <span style={{ fontFamily: "'Blackletter', serif", fontWeight: 900, color: theme.accent }}>HAIL MARY</span>
+                <span>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
               <p style={styles.subtitle}>OIL PROSPECTOR</p>
             </div>
           </div>
-          <div style={styles.headerRight} />
+          <div style={styles.headerRight}>
+            <button
+              onClick={() => { contextIsPlaying ? pause() : play(); }}
+              title={contextIsPlaying ? "Pause music" : "Play music"}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 40, height: 40, borderRadius: 10,
+                background: "rgba(212, 175, 55, 0.05)",
+                border: "1.5px solid rgba(212, 175, 55, 0.2)",
+                color: theme.accent, cursor: "pointer", padding: 0,
+                flexShrink: 0, fontSize: 20, fontFamily: "inherit",
+              }}
+            >
+              {contextIsPlaying ? "⏸" : "♫"}
+            </button>
+          </div>
         </header>
 
         {/* Seed bar — admin/report only */}
@@ -3095,7 +3170,7 @@ export default function OilPage() {
         <div style={m.scroll}>
           {/* 3D Voxel */}
           {mobileTab === "3d" && (
-            <div id="oil-canvas" style={{ ...m.canvasWrap, marginBottom: -60 }}>
+            <div id="oil-canvas" style={m.canvasWrap}>
               <CleanCanvas
                 camera={{ position: [0, 3.5, 4], fov: 50 }}
                 style={{ width: "100%", height: "100%" }}
@@ -3308,7 +3383,7 @@ export default function OilPage() {
           {(isAdmin || isReport) && depositsPanel}
           <HowToPlayPanel isMobile darkMode={darkMode} />
           <OilVerifyExplainer isMobile darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -3339,15 +3414,23 @@ export default function OilPage() {
           onPlayMusic={() => play()}
           onStopMusic={() => pause()}
           onSkipTrack={() => nextTrack()}
-          onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+          hideMenu
+          hideMusicOnMobile
+          hideWallet
           onUserClick={() => {}}
           isUserSignedIn={!!user}
-          isMenuOpen={isMenuOpen}
           userImage={user?.imageUrl}
           onBuyClick={() => setShowBuyModal(true)}
           isMobile
           show80sButton={false}
           darkMode={darkMode}
+          extraLeft={[{
+            key: "home",
+            label: "HOME",
+            title: "Return to shrine",
+            onClick: () => router.push("/"),
+            icon: <img src="/brand-mark-mono.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
+          }]}
         />
 
         {/* Buy Modal */}
@@ -3359,11 +3442,12 @@ export default function OilPage() {
         {purchaseModalItem && (
           <PumpPurchaseModal
             items={purchaseModalItem}
-            activeAccount={activeAccount}
+            activeAccount={walletAddress}
             userId={user?.id}
             onComplete={handlePurchaseComplete}
             onClose={() => setPurchaseModalItem(null)}
             onConnectWallet={() => setShowAccountModal(true)}
+            onGetUsdc={() => setShowBuyModal(true)}
           />
         )}
 
@@ -3373,12 +3457,12 @@ export default function OilPage() {
         />
 
         {/* CyberNav Menu Panel */}
-        <CyberNav
+        {/* <CyberNav
           position="fixed"
           isOpen={isMenuOpen}
           onClose={() => setIsMenuOpen(false)}
           showButton={false}
-        />
+        /> */}
 
         {cssAnimations}
 
@@ -3400,6 +3484,7 @@ export default function OilPage() {
   // ═══════════════════════════════════════════════════════════
   return (
     <div style={styles.root}>
+      {previewBanner}
       <div style={styles.scanlines} />
       <div style={styles.grain} />
       <style>{`.nav-mobile-home { background: transparent !important; border: none !important; box-shadow: none !important; }`}</style>
@@ -3435,15 +3520,28 @@ export default function OilPage() {
           <span style={styles.statusText}>
             {gameEnded ? "GAME ENDED" : "SURVEY ACTIVE"}
           </span>
+          <Link
+            href="/"
+            title="Return to shrine"
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 40, height: 40, borderRadius: 10,
+              background: "rgba(212, 175, 55, 0.05)",
+              border: "1.5px solid rgba(212, 175, 55, 0.2)",
+              color: theme.accent, textDecoration: "none",
+              flexShrink: 0,
+            }}
+          >
+            <img src="/brand-mark-mono.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
+          </Link>
           <NavControlsHome
             isPlaying={contextIsPlaying}
             onPlayMusic={() => play()}
             onStopMusic={() => pause()}
             onSkipTrack={() => nextTrack()}
-            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            hideMenu
             onUserClick={() => {}}
             isUserSignedIn={!!user}
-            isMenuOpen={isMenuOpen}
             userImage={user?.imageUrl}
             show80sButton={false}
             hideMusicOnMobile
@@ -3703,7 +3801,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && depositsPanel}
             <HowToPlayPanel darkMode={darkMode} />
             <OilVerifyExplainer darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}
@@ -3776,13 +3874,19 @@ export default function OilPage() {
       {purchaseModalItem && (
         <PumpPurchaseModal
           items={purchaseModalItem}
-          activeAccount={activeAccount}
+          activeAccount={walletAddress}
           userId={user?.id}
           onComplete={handlePurchaseComplete}
           onClose={() => setPurchaseModalItem(null)}
           onConnectWallet={() => setShowAccountModal(true)}
+          onGetUsdc={() => setShowBuyModal(true)}
         />
       )}
+
+      <BuyModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
+      />
 
       <UnifiedAccountModal
         isOpen={showAccountModal}
@@ -4564,6 +4668,7 @@ function getMobileStyles(t) { return {
     overflowY: "auto",
     overflowX: "hidden",
     WebkitOverflowScrolling: "touch",
+    paddingBottom: "calc(110px + env(safe-area-inset-bottom, 0px))",
   },
 
   seedBar: {

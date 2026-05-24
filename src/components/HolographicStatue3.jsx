@@ -824,11 +824,13 @@ function HolographicStatue3({
     }
 
     if (statueRef.current && groupRef.current) {
-      // Apply hover animation to the anchor group only if hover is enabled
-      if (hover) {
-        groupRef.current.anchor.position.y =
-          initialY.current + Math.sin(state.clock.elapsedTime * 0.5) * 0.3;
-      }
+      const bob = hover ? Math.sin(state.clock.elapsedTime * 0.5) * 0.3 : 0;
+
+      groupRef.current.anchor.position.set(
+        position[0],
+        initialY.current + bob,
+        position[2]
+      );
 
       // Apply rotation to the rotation group only if rotate is enabled
       if (rotate) {

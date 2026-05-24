@@ -263,6 +263,18 @@ function flameFbm1D(t) {
   return flameNoise1D(t) * 0.65 + flameNoise1D(t * 2.3 + 17.1) * 0.35;
 }
 
+function rootScrollDepth() {
+  if (typeof window === "undefined") return 0;
+
+  const viewportHeight = Math.max(window.innerHeight || 1, 1);
+  const progress = window.scrollY / (viewportHeight * 0.72);
+  return Math.min(Math.max(progress, 0), 1);
+}
+
+function smoothRootScrollDepth(value) {
+  return value * value * (3 - 2 * value);
+}
+
 // useGLTF caches the scene across mounts, so we cache the ORIGINAL
 // export-time scale the first time we see each Wax mesh. Otherwise a
 // subsequent mount would read back our previously-melted scale and treat
@@ -355,6 +367,15 @@ function HeroAltarObject({
   const reconstParticlesRef = useRef(null);
   const reconstParticleDataRef = useRef([]);
   const reconstWarnedRef = useRef(false);
+  // Smoothed scroll depth used by the camera-anchored placement below.
+  // Without this, scroll micro-jitter (trackpad momentum, scroll-snap) feeds
+  // straight into the candle's translateY and the visible-toggle threshold,
+  // making the candle vibrate as it approaches the fade-out boundary.
+  const smoothedDepthRef = useRef(0)
+  // Hysteresis state for the visibility toggle — once hidden, stays hidden
+  // until depth drops well below the threshold, so noise at the boundary
+  // can't flip it on/off.
+  const visibilityRef = useRef(true)
   // Wick landing target in group-local coords — recomputed on each spawn
   // from the current melt mesh's world position. Shared between spawn
   // (for start positions) and update (for landing interpolation).
@@ -1418,12 +1439,25 @@ function HeroAltarObject({
     };
   }, [variant]);
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera }, delta) => {
     if (!groupRef.current) return;
+    const targetDepth = smoothRootScrollDepth(rootScrollDepth());
+    // Exponential smoothing — same approach as CraneShotCamera, so the
+    // candle and camera move on matched timescales. dt-based smoothing
+    // stays frame-rate independent.
+    const smoothing = 1 - Math.exp(-delta * 8);
+    smoothedDepthRef.current += (targetDepth - smoothedDepthRef.current) * smoothing;
+    const depth = smoothedDepthRef.current;
+
+    // Hysteresis: hide at 0.97, show again only when depth drops below 0.93.
+    if (visibilityRef.current && depth >= 0.97) visibilityRef.current = false;
+    else if (!visibilityRef.current && depth < 0.93) visibilityRef.current = true;
+    groupRef.current.visible = visibilityRef.current;
+
     groupRef.current.position.copy(camera.position);
     groupRef.current.quaternion.copy(camera.quaternion);
     groupRef.current.translateX(isMobileRef.current ? -0.04 : 0.15);
-    groupRef.current.translateY(-1.0);
+    groupRef.current.translateY(-1.0 - depth * 1.4);
     groupRef.current.translateZ(-1.1);
 
     // Melt the candle over the lit window. Flame + wick are parented to
@@ -2466,7 +2500,6 @@ export default function HomePage() {
       className={`shrine-page neon${
         showSignInNudge || showCandlePicker ? " has-overlay" : ""
       }`}
-      style={{ background: "#000" }}
     >
       <div className="scene-background">
         <StarfieldStatueScene
@@ -2478,6 +2511,7 @@ export default function HomePage() {
           }}
           statueProps={{ scale: [3, 3, 3] }}
           cameraRadius={2.2}
+          scrollDepth
         >
           <HeroAltarObject
             candleLit={candleLit}
@@ -2571,15 +2605,20 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
         </div>
       </div>
 
-      {isMobileDevice && <HolyTrinSection />}
+      <div className="below-fold-chamber">
+        <HolyTrinSection />
 
-      {isMobileDevice && (
+        {/* Trading Card Game section parked for now — keep the imports
+            and component file intact so we can re-enable when ready.
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
           <span className="section-divider-icon">∞</span>
           <span className="section-divider-line section-divider-line--right" />
         </div>
-      )}
+
+        <ReliquaryRail />
+        */}
+      </div>
 
       {/* <div className="offering-strip">
         <h2 className="offering-title">Light a Candle</h2>
@@ -3021,7 +3060,8 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
             key: 'lode',
             label: 'MOTHER LODE',
             title: 'Mother Lode — coming soon',
-            comingSoon: true,
+              onClick: () => { window.location.href = '/oil'; },
+            comingSoon: false,
             icon: (
               <svg
                 viewBox="0 0 24 24"
@@ -3050,8 +3090,6 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
         onClose={() => setShowAccountModal(false)}
         initialTab="wallet"
       />
-
-      <ReliquaryRail />
 
       {/* <div ref={debugRef} className="candle-debug" /> */}
 

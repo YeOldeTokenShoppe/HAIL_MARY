@@ -9,19 +9,167 @@
 }
 
 .reliquary-rail {
-  position: fixed;
-  top: 7%;
-  right: 16px;
+  position: relative;
+  isolation: isolate;
+  top: auto;
+  right: auto;
   z-index: 60;
-  width: 290px;
-  max-width: calc(100vw - 28px);
-  max-height: calc(100vh - 14%);
+  width: min(100% - 48px, 880px);
+  max-width: 880px;
+  max-height: none;
+  margin: 86vh auto calc(150px + env(safe-area-inset-bottom, 0px));
+  padding: clamp(34px, 5vw, 52px) clamp(20px, 5vw, 54px)
+    clamp(30px, 5vw, 46px);
   pointer-events: auto;
   color: var(--rel-text);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 30, 34, 0.72) 0%,
+    rgba(10, 8, 22, 0.84) 100%
+  );
+  backdrop-filter: blur(2px);
+  border-radius: 14px;
+  border-top: 1px solid rgba(131, 200, 78, 0.38);
+  border-bottom: 1px solid rgba(42, 214, 238, 0.14);
+  box-shadow:
+    0 14px 42px rgba(0, 0, 0, 0.46),
+    0 0 34px rgba(42, 214, 238, 0.12),
+    0 0 78px rgba(131, 200, 78, 0.07);
+}
+
+/* --- Desktop two-column split (visual left | text right) -------------
+   Mirrors the Holy Trin80 layout but flipped so the page alternates
+   sides between the two sections. Mobile keeps the existing single
+   column centered stack. */
+@media (min-width: 901px) {
+  .reliquary-rail {
+    width: min(100% - 64px, 1280px);
+    max-width: 1280px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: clamp(32px, 4vw, 72px);
+    align-items: start;
+    padding: clamp(56px, 6vw, 88px) clamp(40px, 5vw, 80px);
+    /* Strip the panel chrome on desktop — let the section breathe over
+       the chart scene instead of sitting inside a card. */
+    background: none;
+    backdrop-filter: none;
+    border-top: none;
+    border-bottom: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  /* Decorative glow was tuned for the centered card layout — in the
+     split layout it shows as a bright horizontal band between columns. */
+  .reliquary-rail::before { display: none; }
+
+  /* Thin vertical rule between the two columns — mirrors the holy-trin
+     divider with the Reliquary's green/cyan palette. */
+  .reliquary-rail::after {
+    content: "";
+    position: absolute;
+    top: 14%;
+    bottom: 14%;
+    left: 50%;
+    width: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(131, 200, 78, 0.28) 35%,
+      rgba(42, 214, 238, 0.22) 65%,
+      transparent 100%
+    );
+  }
+
+  /* Visual breathing room — scale up the feature visual so it carries
+     more weight against the section-big heading. transform-origin keeps
+     the visual top pinned to the layout top, so `align-items: start`
+     aligns the visual's visible top with the heading. Applied to both
+     feature kinds (trading card + relic image) so they stay matched as
+     the carousel cycles between them. */
+  .reliquary-visual .reliquary-card-wrap,
+  .reliquary-visual .reliquary-image-wrap {
+    transform: scale(1.7);
+    transform-origin: top center;
+  }
+  /* Transform scaling doesn't grow the layout box, so reserve room below
+     the card visually with padding on the visual column — otherwise the
+     scaled card overlaps the controls / dots beneath it. */
+  .reliquary-visual {
+    padding-bottom: clamp(80px, 12vw, 180px);
+  }
+  .reliquary-visual {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .reliquary-text {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(18px, 2vw, 28px);
+    text-align: left;
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .reliquary-text .reliquary-heading {
+    margin: 0;
+    font-size: clamp(2.6rem, 4.6vw, 4.6rem);
+    align-self: flex-start;
+  }
+  .reliquary-text .reliquary-subheading {
+    margin: 0;
+    font-size: clamp(1rem, 1.15vw, 1.2rem);
+    opacity: 0.8;
+  }
+  .reliquary-lead {
+    margin: 0;
+    color: #d8efe2;
+    font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
+    font-size: clamp(1.05rem, 1.25vw, 1.35rem);
+    line-height: 1.55;
+    max-width: 38ch;
+    letter-spacing: 0.01em;
+    opacity: 0.88;
+  }
+  .reliquary-rail > .reliquary-controls {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: center;
+  }
+}
+@media (max-width: 900px) {
+  .reliquary-lead { display: none; }
+}
+
+.reliquary-rail::before {
+  content: "";
+  position: absolute;
+  inset: 16% -18vw auto;
+  height: 360px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(42, 214, 238, 0.11),
+      transparent 66%
+    ),
+    radial-gradient(
+      ellipse at 50% 76%,
+      rgba(131, 200, 78, 0.08),
+      transparent 58%
+    );
+  filter: blur(5px);
 }
 
 .reliquary-status,
@@ -30,13 +178,38 @@
   text-transform: uppercase;
 }
 
-/* Section heading — hidden on desktop (where the rail is a tight
-   fixed top-right column) and shown only at the mobile breakpoint
-   where the rail flows inline and benefits from a wordmark. The
-   subheading sits with the heading and follows the same rule. */
-.reliquary-heading,
+.reliquary-heading {
+  display: inline-block;
+  align-self: center;
+  margin: 0 auto 6px;
+  font-family: "UnifrakturCook", serif;
+  color: #d4af37;
+  font-size: clamp(2.4rem, 4.2vw, 4rem);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  transform: rotate(-3deg) skew(-8deg);
+  transform-origin: center;
+  text-shadow:
+    0 0 12px rgba(42, 214, 238, 0.55),
+    0 0 28px rgba(42, 214, 238, 0.35),
+    0 0 52px rgba(217, 45, 176, 0.4),
+    2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
 .reliquary-subheading {
-  display: none;
+  display: block;
+  align-self: center;
+  margin: 0 auto 18px;
+  max-width: 320px;
+  font-family: "Cinzel", serif;
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.4px;
+  color: rgba(241, 215, 122, 0.72);
+  text-align: center;
+  text-shadow: 0 0 8px rgba(241, 215, 122, 0.15);
 }
 
 /* ───── DESCRIPTION ───── */
@@ -147,7 +320,7 @@
 .reliquary-image-tilter {
   position: relative;
   display: block;
-  width: min(100%, 230px);
+  width: min(100%, 280px);
   aspect-ratio: 1032 / 1523;
   margin-inline: auto;
   transform-style: preserve-3d;
@@ -356,13 +529,13 @@
   opacity: 1;
 }
 
-@media (max-width: 1180px) {
+@media (min-width: 901px) and (max-width: 1180px) {
   .reliquary-rail {
-    width: 264px;
+    width: min(100% - 48px, 760px);
   }
 
   .reliquary-image-tilter {
-    width: min(100%, 190px);
+    width: min(100%, 250px);
   }
 }
 
@@ -370,27 +543,51 @@
    end of <body>, below the 3D scene — users scroll to reveal it. */
 @media (max-width: 900px) {
   .reliquary-rail {
-    position: static;
+    position: relative;
+    isolation: isolate;
     top: auto;
     right: auto;
     width: 100%;
     max-width: 360px;
     max-height: none;
-    margin: 28px auto calc(140px + env(safe-area-inset-bottom, 0px));
+    margin: 76vh auto calc(140px + env(safe-area-inset-bottom, 0px));
     padding: 32px 16px 24px;
-    /* Framed alcove — dark-purple panel so the freshener's dark edges
-       have something to silhouette against, with a hair-thin magenta
-       border-top echoing the nav bar's accent for visual cohesion. */
+    /* Framed reliquary case — cooler than the Trin80 violet alcove so
+       stacked mobile sections alternate instead of repeating the same
+       purple note. */
     background: linear-gradient(
       180deg,
-      rgba(35, 12, 55, 0.75) 0%,
-      rgba(18, 5, 32, 0.9) 100%
+      rgba(6, 30, 34, 0.74) 0%,
+      rgba(10, 8, 22, 0.86) 100%
     );
     border-radius: 14px;
-    border-top: 1px solid rgba(255, 0, 255, 0.25);
+    border-top: 1px solid rgba(131, 200, 78, 0.38);
+    border-bottom: 1px solid rgba(42, 214, 238, 0.14);
     box-shadow:
       0 8px 28px rgba(0, 0, 0, 0.45),
-      0 0 28px rgba(217, 45, 176, 0.08);
+      0 0 30px rgba(42, 214, 238, 0.12),
+      0 0 70px rgba(131, 200, 78, 0.07);
+  }
+
+  .reliquary-rail::before {
+    content: "";
+    position: absolute;
+    inset: 16% -34px auto;
+    height: 300px;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        circle at 50% 50%,
+        rgba(42, 214, 238, 0.12),
+        transparent 66%
+      ),
+      radial-gradient(
+        ellipse at 50% 78%,
+        rgba(131, 200, 78, 0.08),
+        transparent 58%
+      );
+    filter: blur(5px);
   }
 
   .reliquary-image-tilter {

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useInView } from "framer-motion";
 import TradingCard from "./TradingCard";
 import "./reliquary.css";
@@ -159,15 +158,6 @@ const TCG_POOL = [EUGENE, SAINT, BARRON];
 
 const FEATURES = [
   {
-    id: "freshener-0080",
-    kind: "relic",
-    status: "live",
-    statusLabel: "Available Now",
-    description: "Virtual Wallet Freshener",
-    image: "/airFreshener12.webp",
-    backImage: "/airFreshener12_back.webp",
-  },
-  {
     id: "tcg-preview",
     kind: "card",
     status: "soon",
@@ -179,6 +169,23 @@ const FEATURES = [
 
 const ROTATE_MS = 7200;
 
+// Tracks the desktop breakpoint so we can gate the TradingCard's resting
+// Lissajous holo animation — on mobile the per-frame multi-layer foil
+// re-render was pushing iOS Safari past its GPU ceiling, so the card runs
+// static there. Mirrors the .reliquary-rail @media (min-width: 901px) gate.
+function useIsDesktopReliquary() {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mq = window.matchMedia("(min-width: 901px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isDesktop;
+}
+
 function ReliquaryRailInner() {
   const [activeIndex, setActiveIndex] = useState(0);
   // Pick once per mount so the same face stays during the rail's lifetime
@@ -186,6 +193,7 @@ function ReliquaryRailInner() {
   // Picked client-side after mount to avoid SSR hydration mismatches.
   const [tcgCard, setTcgCard] = useState(null);
   const [cardFlipped, setCardFlipped] = useState(false);
+  const isDesktop = useIsDesktopReliquary();
   const railRef = useRef(null);
   const inView = useInView(railRef, {
     amount: 0.1,
@@ -206,17 +214,24 @@ function ReliquaryRailInner() {
     return () => window.clearInterval(id);
   }, []);
 
-  return createPortal(
-    <>
-      <aside
-        ref={railRef}
-        className={`reliquary-rail${inView ? " is-revealed" : ""}`}
-        aria-label="The Reliquary"
-      >
-        <h2 className="reliquary-heading">The Reliquary</h2>
-        <p className="reliquary-subheading">
-          Wares and rites of the order.
-        </p>
+  return (
+    <aside
+      ref={railRef}
+      className={`reliquary-rail${inView ? " is-revealed" : ""}`}
+      aria-label="The Trading Card Game"
+    >
+        <div className="reliquary-text">
+          <h2 className="reliquary-heading">The Trading Card Game</h2>
+          <p className="reliquary-subheading">
+            Coming soon — eighty traders dealt in foil and prophecy.
+          </p>
+          <p className="reliquary-lead">
+            Saints, demons, and meme-unicorns rendered in holographic
+            scripture. When the game ships, you'll draft a deck of
+            believers and let the market decide who keeps the faith.
+          </p>
+        </div>
+        <div className="reliquary-visual">
         <div className="reliquary-feature-stack">
           {FEATURES.map((feat) => {
             const isActive = feat.id === active.id;
@@ -263,7 +278,7 @@ function ReliquaryRailInner() {
                             <TradingCard
                               data={tcgCard}
                               scale={0.34}
-                              interactive={false}
+                              interactive={isDesktop}
                             />
                           )}
                         </div>
@@ -309,17 +324,11 @@ function ReliquaryRailInner() {
             ))}
           </div>
         )}
-      </aside>
-    </>,
-    document.body,
+        </div>
+    </aside>
   );
 }
 
 export default function ReliquaryRail() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  if (!mounted) return null;
   return <ReliquaryRailInner />;
 }

@@ -11,29 +11,71 @@ import MobileCandleOrbital, { CandleOrbitalEffects } from './MobileCandleOrbital
 import BackgroundChart from './BackgroundChart'
 
 // Crane shot loop - sweeps low to high and back while gently orbiting
-function CraneShotCamera({ target = [0, 0.5, 0], radius = 2.0, orbitSpeed = 0.12, craneSpeed = 0.15, heightRange = [-0.5, 1.8] }) {
+function getRootScrollProgress() {
+  if (typeof window === 'undefined') return 0
+
+  const maxScroll =
+    document.documentElement.scrollHeight - window.innerHeight
+  const travel = Math.max(window.innerHeight * 3.4, maxScroll, 1)
+  const progress = window.scrollY / travel
+  return Math.min(Math.max(progress, 0), 1)
+}
+
+function smoothProgress(value) {
+  return value * value * (3 - 2 * value)
+}
+
+function CraneShotCamera({
+  target = [0, 0.5, 0],
+  radius = 2.0,
+  orbitSpeed = 0.12,
+  craneSpeed = 0.15,
+  heightRange = [-0.5, 1.8],
+  scrollDepth = false,
+}) {
   const { camera } = useThree()
   const timeRef = useRef(0)
-  const lookTarget = new THREE.Vector3(...target)
+  const depthRef = useRef(0)
+  const cameraPositionRef = useRef(new THREE.Vector3())
+  const lookTarget = useRef(new THREE.Vector3(...target))
+  const desiredPosition = useRef(new THREE.Vector3())
+  const desiredTarget = useRef(new THREE.Vector3(...target))
 
   useFrame((_, delta) => {
     timeRef.current += delta
 
     const t = timeRef.current
+    const targetDepth = scrollDepth ? smoothProgress(getRootScrollProgress()) : 0
+    const smoothing = 1 - Math.exp(-delta * 5)
+    depthRef.current += (targetDepth - depthRef.current) * smoothing
+    const depth = depthRef.current
 
-    // Gentle orbit
-    const x = radius * Math.sin(t * orbitSpeed)
-    const z = radius * Math.cos(t * orbitSpeed)
+    // Gentle orbit in the hero, easing toward a straight elevator descent
+    // below the fold so the statue keeps its physical scale and perspective.
+    const orbitX = radius * Math.sin(t * orbitSpeed)
+    const orbitZ = radius * Math.cos(t * orbitSpeed)
+    const x = orbitX * (1 - depth)
+    const z = orbitZ * (1 - depth) + radius * depth
 
-    // Crane sweep: smooth ease between low and high using smoothstep-like motion
+    // Crane sweep in the hero, then a simple downward ride as the page scrolls.
     const raw = 0.5 + 0.5 * Math.sin(t * craneSpeed - Math.PI / 2)
     const eased = raw * raw * (3 - 2 * raw) // smoothstep for natural acceleration/deceleration
     const yMin = heightRange[0]
     const yMax = heightRange[1]
-    const y = yMin + (yMax - yMin) * eased
+    const craneY = yMin + (yMax - yMin) * eased
+    const y = craneY * (1 - depth) + (-9.3 * depth)
 
-    camera.position.set(x, y, z)
-    camera.lookAt(lookTarget)
+    desiredPosition.current.set(x, y, z)
+    desiredTarget.current.set(
+      target[0],
+      target[1] - depth * 9.3,
+      target[2]
+    )
+    cameraPositionRef.current.copy(camera.position)
+    cameraPositionRef.current.lerp(desiredPosition.current, smoothing)
+    camera.position.copy(cameraPositionRef.current)
+    lookTarget.current.lerp(desiredTarget.current, smoothing)
+    camera.lookAt(lookTarget.current)
   })
 
   return null
@@ -52,6 +94,7 @@ function StarfieldStatueScene({
   onStatueLoad,
   showStats = false,
   paused = false,
+  scrollDepth = false,
   children,
 }) {
   const router = useRouter()
@@ -251,7 +294,11 @@ function StarfieldStatueScene({
       >
         <Suspense fallback={null}>
           {/* Crane shot loop camera */}
-          <CraneShotCamera target={cameraTarget} radius={cameraRadius} />
+          <CraneShotCamera
+            target={cameraTarget}
+            radius={cameraRadius}
+            scrollDepth={scrollDepth}
+          />
 
           {/* Ambient lighting */}
           <ambientLight intensity={0.3} />
@@ -273,13 +320,13 @@ function StarfieldStatueScene({
 
           {/* Cylindrical background chart */}
           <BackgroundChart
-            position={[0, -2, 0]}
+            position={[0, -3.5, 0]}
             radius={4}
-            height={18.5}
+            height={23}
             pointCount={120}
             color="#00ff88"
             glowColor="#00ffaa"
-            opacity={0.5}
+            opacity={0.85}
             scrollSpeed={0.5}
             verticalLines={48}
           />

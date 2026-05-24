@@ -1,16 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  db,
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  runTransaction,
-  serverTimestamp,
-  Timestamp,
-} from "@/lib/firebaseServer";
+import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 
 // USDC on Base — 6 decimals
 const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -80,10 +69,6 @@ async function verifyTransaction(txHash) {
 
 export async function POST(req) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
-    }
-
     const { userId, clerkName, clerkAvatar, txHash } = await req.json();
     if (!userId || !txHash) {
       return NextResponse.json({ error: "Missing userId or txHash" }, { status: 400 });
@@ -97,41 +82,35 @@ export async function POST(req) {
       return NextResponse.json({ error: `Payment verification failed: ${err.message}` }, { status: 400 });
     }
 
-    // Atomic ticket creation
-    const settingsRef = doc(db, "oilGame", "settings");
-    const ticketsCol = collection(db, "oilTickets");
+    const db = getAdminDb();
+    const settingsRef = db.collection("oilGame").doc("settings");
+    const ticketsCol = db.collection("oilTickets");
 
-    const result = await runTransaction(db, async (transaction) => {
-      // Check user doesn't already have a ticket
-      const existingQuery = query(ticketsCol, where("userId", "==", userId));
-      const existingSnap = await getDocs(existingQuery);
+    const result = await db.runTransaction(async (t) => {
+      // Uniqueness checks via queries — Admin SDK supports query reads in transactions
+      const existingSnap = await t.get(ticketsCol.where("userId", "==", userId));
       if (!existingSnap.empty) {
         throw new Error("User already has a ticket");
       }
 
-      // Check tx hash hasn't been used
-      const txQuery = query(ticketsCol, where("txHash", "==", txHash));
-      const txSnap = await getDocs(txQuery);
+      const txSnap = await t.get(ticketsCol.where("txHash", "==", txHash));
       if (!txSnap.empty) {
         throw new Error("Transaction hash already used");
       }
 
-      // Read current ticket count
-      const settingsSnap = await transaction.get(settingsRef);
-      const currentCount = settingsSnap.exists() ? (settingsSnap.data().ticketCount || 0) : 0;
+      const settingsSnap = await t.get(settingsRef);
+      const currentCount = settingsSnap.exists ? (settingsSnap.data().ticketCount || 0) : 0;
       const purchaseOrder = currentCount + 1;
 
-      // Increment ticket count in settings
-      transaction.update(settingsRef, { ticketCount: purchaseOrder });
+      t.update(settingsRef, { ticketCount: purchaseOrder });
 
-      // Create ticket doc
-      const ticketRef = doc(ticketsCol);
-      transaction.set(ticketRef, {
+      const ticketRef = ticketsCol.doc();
+      t.set(ticketRef, {
         userId,
         clerkName: clerkName || "Anonymous",
         clerkAvatar: clerkAvatar || null,
         purchaseOrder,
-        purchasedAt: serverTimestamp(),
+        purchasedAt: FieldValue.serverTimestamp(),
         txHash,
         paymentType: payment.type,
         paymentAmount: payment.amount,

@@ -1,39 +1,400 @@
-/* Holy Trin80 — mobile-only sacred-geometry section that names the
-   three pillars of the RL80 mythos. Sits just above the Reliquary in
-   the mobile flow and shares the alcove treatment so they read as
-   sibling sections. */
+/* Holy Trin80 — sacred-geometry section that names the three pillars
+   of the RL80 mythos. On wide screens it lives below the first hero
+   viewport; on mobile it sits just above the Reliquary. */
 
-.holy-trin {
-  display: none;
-}
+/* IoskeleyMono now defined globally in globals.css with self-hosted
+   /fonts/ paths — no @font-face needed here. */
 
-@media (max-width: 900px) {
-  .holy-trin {
+/* --- Desktop two-column split (text left | visual right) -------------
+   Mobile (<=900px) keeps the existing centered single-column layout
+   from the @media block further down. */
+@media (min-width: 901px) {
+  /* Doubled `.holy-trin.holy-trin` so this rule wins on specificity over
+     the bare `.holy-trin { background: gradient }` declaration further
+     down in the file — without it, source order let the panel chrome
+     leak back in on desktop. */
+  .holy-trin.holy-trin {
+    width: min(100% - 64px, 1280px);
+    display: grid;
+    /* Widened text column so the heading has a real shot at fitting on
+       one line and the descriptions wrap to fewer lines — both reduce
+       the text-column's total height and bring it closer to the
+       triangle's height. */
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: clamp(32px, 4vw, 72px);
+    align-items: start;
+    text-align: left;
+    padding: clamp(56px, 6vw, 88px) clamp(40px, 5vw, 80px);
+    /* Strip the panel chrome on desktop — let the section breathe over
+       the chart scene instead of sitting inside a card. */
+    background: none;
+    backdrop-filter: none;
+    border-top: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  /* Decorative glow was tuned for the centered card layout — in the
+     split layout it shows as a bright horizontal band between columns. */
+  .holy-trin::before { display: none; }
+
+  /* Thin vertical rule between the two columns — fades at top/bottom
+     so it feels ornamental rather than a hard divider. */
+  .holy-trin::after {
+    content: "";
+    position: absolute;
+    top: 14%;
+    bottom: 14%;
+    left: 50%;
+    width: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(212, 175, 55, 0.32) 35%,
+      rgba(42, 214, 238, 0.22) 65%,
+      transparent 100%
+    );
+  }
+
+  /* Visual breathing room — bump the diagram so it carries more weight
+     against the section-big heading. */
+  .holy-trin-visual .holy-trin-diagram {
+    width: min(100%, 820px);
+  }
+  /* Revert visual to top-align (was center) — both columns now start
+     at the same baseline; the column height-matching is being handled
+     by shrinking the text column instead of floating the visual. */
+  .holy-trin-text {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(18px, 2vw, 28px);
+  }
+  .holy-trin-text .holy-trin-heading {
+    margin: 0;
+    /* Trimmed further so the heading fits one line within the widened
+       text column — two-line wrap was the biggest contributor to text
+       column height. */
+    font-size: clamp(2.4rem, 4vw, 4.2rem);
+    align-self: flex-start;
+    /* Layered glow for "pop" — three-color halo matches the triangle's
+       gradient stroke. */
+    text-shadow:
+      0 0 14px rgba(42, 214, 238, 0.7),
+      0 0 36px rgba(212, 175, 55, 0.4),
+      0 0 64px rgba(217, 45, 176, 0.45),
+      2px 2px 0 rgba(0, 0, 0, 0.7);
+  }
+  /* Pillar list under the heading — short kicker line with each pillar
+     name color-keyed to its vertex, separated by middle dots. */
+  .holy-trin-subtitle {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    font-family: "Cinzel", serif;
+    text-align: left;
+  }
+  .holy-trin-subtitle-name {
+    color: var(--pillar-color);
+    font-size: clamp(1rem, 1.25vw, 1.3rem);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 10px color-mix(in srgb, var(--pillar-color) 50%, transparent),
+      0 0 22px color-mix(in srgb, var(--pillar-color) 25%, transparent);
+  }
+  .holy-trin-subtitle-sep {
+    color: rgba(241, 215, 122, 0.55);
+    font-size: clamp(1rem, 1.25vw, 1.3rem);
+    font-weight: 400;
+  }
+
+  /* Pillar descriptions — full doctrine. Each item: color-keyed name
+     above, body copy below, color-coded left rule for visual continuity
+     with the vertex on the triangle. */
+  .holy-trin-pillars {
+    list-style: none;
+    margin: clamp(8px, 1vw, 16px) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    /* Tightened gap so the three pillar blocks stack into a shorter
+       overall column — text column height should be closer to the
+       triangle's. */
+    gap: clamp(14px, 1.6vw, 22px);
+  }
+  .holy-trin-pillar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 14px;
+    border-left: 2px solid color-mix(in srgb, var(--pillar-color) 55%, transparent);
+    font-family: "Cinzel", serif;
+    text-align: left;
+  }
+  .holy-trin-pillar-name {
+    color: var(--pillar-color);
+    font-size: clamp(1.05rem, 1.3vw, 1.4rem);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 10px color-mix(in srgb, var(--pillar-color) 55%, transparent),
+      0 0 22px color-mix(in srgb, var(--pillar-color) 30%, transparent);
+  }
+  .holy-trin-pillar-desc {
+    margin: 0;
+    color: #e9d4a0;
+    /* IoskeleyMono — section-specific monospace. Reads as inscription /
+       tablet / decree, which fits the doctrine register. Defined via
+       @font-face at the top of this file. */
+    font-family: "IoskeleyMono", "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 400;
+    /* Mono characters carry more horizontal weight than proportional —
+       drop the body size a notch so the descriptions don't dominate. */
+    font-size: clamp(0.92rem, 1.05vw, 1.12rem);
+    line-height: 1.6;
+    letter-spacing: 0;
+    opacity: 0.95;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  }
+  .holy-trin-visual {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: calc(100% - 32px);
-    max-width: 360px;
-    margin: 28px auto 0;
-    padding: 32px 16px 28px;
-    background: linear-gradient(
-      180deg,
-      rgba(35, 12, 55, 0.75) 0%,
-      rgba(18, 5, 32, 0.9) 100%
+    justify-content: center;
+    gap: 8px;
+  }
+  .holy-trin-visual .holy-trin-diagram {
+    width: min(100%, 480px);
+  }
+}
+/* Hide the lead on mobile — only used in the desktop split layout for now */
+@media (max-width: 900px) {
+  .holy-trin-lead { display: none; }
+}
+
+.holy-trin {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(100% - 48px, 880px);
+  margin: clamp(280px, 85vh, 880px) auto 22px;
+  padding: clamp(36px, 5vw, 56px) clamp(20px, 5vw, 54px)
+    clamp(34px, 5vw, 50px);
+  background: linear-gradient(
+    180deg,
+    rgba(33, 10, 49, 0.72) 0%,
+    rgba(18, 5, 32, 0.82) 100%
+  );
+  backdrop-filter: blur(2px);
+  border-radius: 14px;
+  border-top: 1px solid rgba(255, 0, 255, 0.28);
+  color: #f1d77a;
+  text-align: center;
+  box-shadow:
+    0 18px 54px rgba(0, 0, 0, 0.42),
+    0 0 42px rgba(217, 45, 176, 0.12),
+    inset 0 1px 0 rgba(214, 250, 255, 0.08);
+  pointer-events: auto;
+  touch-action: pan-y;
+  overflow-anchor: none;
+}
+
+.holy-trin::before {
+  content: "";
+  position: absolute;
+  inset: 18% -18vw auto;
+  height: 360px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(217, 45, 176, 0.11),
+      transparent 64%
+    ),
+    radial-gradient(
+      ellipse at 50% 76%,
+      rgba(42, 214, 238, 0.08),
+      transparent 60%
     );
-    border-top: 1px solid rgba(255, 0, 255, 0.25);
-    border-radius: 14px;
+  filter: blur(4px);
+}
+
+/* Mirrors .reliquary-heading so the two sections read as siblings. */
+.holy-trin-heading {
+  display: inline-block;
+  margin: 0 auto clamp(22px, 3vw, 34px);
+  font-family: "UnifrakturCook", serif;
+  color: #d4af37;
+  font-size: clamp(2.4rem, 4.2vw, 4rem);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  transform: rotate(-3deg) skew(-8deg);
+  transform-origin: center;
+  text-shadow:
+    0 0 12px rgba(42, 214, 238, 0.55),
+    0 0 28px rgba(42, 214, 238, 0.35),
+    0 0 52px rgba(217, 45, 176, 0.4),
+    2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.holy-trin-diagram {
+  position: relative;
+  width: min(100%, 430px);
+  aspect-ratio: 300 / 280;
+  margin: 6px auto 4px;
+  overflow: visible;
+}
+
+.holy-trin-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.holy-trin-center {
+  position: absolute;
+  left: 50%;
+  top: 61.79%;
+  transform: translate(-50%, -50%);
+  font-family: "Cinzel", serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #f1d77a;
+  text-shadow:
+    0 0 6px rgba(241, 215, 122, 0.6),
+    0 0 14px rgba(217, 45, 176, 0.4);
+  pointer-events: none;
+}
+
+.holy-trin-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 6px 8px;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 220ms ease;
+}
+
+.holy-trin-corner:focus-visible {
+  outline: 1px dashed rgba(241, 215, 122, 0.7);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.holy-trin-corner.is-active .holy-trin-label {
+  filter: brightness(1.25);
+  text-shadow:
+    0 0 14px color-mix(in srgb, var(--corner-color) 80%, transparent),
+    0 0 30px color-mix(in srgb, var(--corner-color) 55%, transparent),
+    1px 1px 0 rgba(0, 0, 0, 0.6),
+    2px 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.holy-trin-corner--integr80 {
+  top: 14.29%;
+  left: 50%;
+  transform: translate(-50%, calc(-100% - 6px));
+}
+
+.holy-trin-corner--util80 {
+  top: 85.71%;
+  left: 13.33%;
+  transform: translate(calc(-50% - 4px), 14px);
+}
+
+.holy-trin-corner--liquid80 {
+  top: 85.71%;
+  left: 86.67%;
+  transform: translate(calc(-50% + 4px), 14px);
+}
+
+.holy-trin-label {
+  font-family: "Fjalla One", sans-serif;
+  font-size: 20px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--corner-color);
+  transform: skew(-8deg);
+  text-shadow:
+    0 0 8px color-mix(in srgb, var(--corner-color) 55%, transparent),
+    1px 1px 0 rgba(0, 0, 0, 0.6),
+    2px 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.holy-trin-tagline {
+  font-family: "Cinzel", serif;
+  font-style: italic;
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+  color: rgba(241, 215, 122, 0.68);
+  text-transform: none;
+}
+
+.section-divider {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 900px) {
+  /* Match the desktop redesign: strip the card chrome so the section
+     breathes over the chart scene, and stack the text column above the
+     diagram (the JSX renders .holy-trin-text first, then .holy-trin-visual,
+     so the natural flex order is the correct vertical sequence). */
+  .holy-trin {
+    width: calc(100% - 32px);
+    max-width: 460px;
+    margin: clamp(220px, 75vh, 600px) auto 0;
+    padding: 32px 8px 28px;
+    gap: 18px;
+    background: none;
+    backdrop-filter: none;
+    border-top: none;
+    border-radius: 0;
     color: #f1d77a;
     text-align: center;
-    box-shadow:
-      0 8px 28px rgba(0, 0, 0, 0.45),
-      0 0 28px rgba(217, 45, 176, 0.08);
+    box-shadow: none;
+  }
+
+  .holy-trin::before {
+    inset: 18% -34px auto;
+    height: 260px;
+    background:
+      radial-gradient(
+        circle at 50% 50%,
+        rgba(217, 45, 176, 0.16),
+        transparent 66%
+      ),
+      radial-gradient(
+        ellipse at 50% 78%,
+        rgba(42, 214, 238, 0.08),
+        transparent 58%
+      );
   }
 
   /* Mirrors .reliquary-heading so the two sections read as siblings. */
   .holy-trin-heading {
     display: inline-block;
-    margin: 0 auto 22px;
+    margin: 0 auto 4px;
     font-family: "UnifrakturCook", serif;
     color: #d4af37;
     font-size: clamp(2rem, 5.5vw, 2.8rem);
@@ -47,6 +408,71 @@
       0 0 28px rgba(42, 214, 238, 0.35),
       0 0 52px rgba(217, 45, 176, 0.4),
       2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  /* Text column wraps heading + pillar list. Heading stays centered
+     (mobile convention) but the pillar copy is left-aligned so the
+     color-keyed left rule has something to anchor against. */
+  .holy-trin-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    width: 100%;
+  }
+
+  /* Mirror desktop's pillar list — color-keyed left rule, name above
+     doctrine, mono description. Sizes scaled down for the narrow
+     viewport. */
+  .holy-trin-pillars {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+  }
+  .holy-trin-pillar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 12px;
+    border-left: 2px solid color-mix(in srgb, var(--pillar-color) 55%, transparent);
+    text-align: left;
+  }
+  .holy-trin-pillar-name {
+    color: var(--pillar-color);
+    font-family: "Cinzel", serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 10px color-mix(in srgb, var(--pillar-color) 55%, transparent),
+      0 0 22px color-mix(in srgb, var(--pillar-color) 30%, transparent);
+  }
+  .holy-trin-pillar-desc {
+    margin: 0;
+    color: #e9d4a0;
+    font-family: "IoskeleyMono", "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 400;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    letter-spacing: 0;
+    opacity: 0.95;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Visual column — diagram + corner labels + tooltip. Sits below the
+     pillar list via flex order. */
+  .holy-trin-visual {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-top: 6px;
   }
 
   /* Diagram canvas — aspect ratio matches the SVG viewBox so corner
@@ -71,20 +497,8 @@
 
   /* Center medallion label — RL80 wordmark inside the circle. */
   .holy-trin-center {
-    position: absolute;
-    left: 50%;
-    /* y=173 in a 280-tall viewBox = 61.79% */
-    top: 61.79%;
-    transform: translate(-50%, -50%);
-    font-family: "Cinzel", serif;
-    font-weight: 700;
     font-size: 12px;
     letter-spacing: 1.8px;
-    color: #f1d77a;
-    text-shadow:
-      0 0 6px rgba(241, 215, 122, 0.6),
-      0 0 14px rgba(217, 45, 176, 0.4);
-    pointer-events: none;
   }
 
   /* Corner labels — anchored at each triangle vertex, then translated
@@ -92,43 +506,11 @@
      Rendered as <button> elements so they're tappable and accessible;
      default button chrome is reset. */
   .holy-trin-corner {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    white-space: nowrap;
-    background: none;
-    border: 0;
     padding: 6px 8px;
-    margin: 0;
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: filter 220ms ease;
-  }
-
-  .holy-trin-corner:focus-visible {
-    outline: 1px dashed rgba(241, 215, 122, 0.7);
-    outline-offset: 4px;
-    border-radius: 4px;
-  }
-
-  /* Active (tapped) pillar — label brightens, surrounding glow blooms
-     so the eye registers the connection between the tapped corner and
-     the tooltip that appears below. */
-  .holy-trin-corner.is-active .holy-trin-label {
-    filter: brightness(1.25);
-    text-shadow:
-      0 0 14px color-mix(in srgb, var(--corner-color) 80%, transparent),
-      0 0 30px color-mix(in srgb, var(--corner-color) 55%, transparent),
-      1px 1px 0 rgba(0, 0, 0, 0.6),
-      2px 2px 0 rgba(0, 0, 0, 0.45);
   }
 
   /* Top apex: (150, 40) → (50%, 14.29%). Label sits above the apex. */
-  .holy-trin-corner--secur80 {
+  .holy-trin-corner--integr80 {
     top: 14.29%;
     left: 50%;
     transform: translate(-50%, calc(-100% - 6px));
@@ -239,6 +621,88 @@
   50% {
     opacity: 1;
   }
+}
+
+/* ───── BIG DIAGRAM ANIMATIONS ─────
+   Aura breathing, orbital rings, perimeter energy flow, and vertex halos.
+   Gated behind prefers-reduced-motion so the section degrades gracefully
+   for motion-sensitive users (the static composition still reads). */
+
+/* Aura — pulsing radial glow behind the whole triangle. */
+.holy-trin-aura {
+  transform-origin: 150px 155px;
+  transform-box: view-box;
+  opacity: 0.7;
+}
+
+/* Orbital rings — set rotation pivot to the SVG viewBox center. */
+.holy-trin-orbit {
+  transform-box: view-box;
+  transform-origin: 150px 155px;
+}
+.holy-trin-orbit--inner {
+  transform-origin: 150px 173px;
+}
+
+/* Perimeter energy flow — a short dash that travels around the triangle.
+   Perimeter ≈ 676; using 716 stroke-dashoffset = ~one full lap. */
+.holy-trin-energy {
+  stroke-dasharray: 38 678;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Vertex halos start invisible — pulse in once revealed. */
+.holy-trin-halo {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .holy-trin.is-revealed .holy-trin-aura {
+    animation: holy-trin-aura-breathe 5s ease-in-out 600ms infinite;
+  }
+  .holy-trin.is-revealed .holy-trin-orbit--outer {
+    animation: holy-trin-spin-cw 80s linear infinite;
+  }
+  .holy-trin.is-revealed .holy-trin-orbit--inner {
+    animation: holy-trin-spin-ccw 22s linear infinite;
+  }
+  .holy-trin.is-revealed .holy-trin-energy {
+    animation: holy-trin-energy-flow 7s linear 1600ms infinite;
+  }
+  .holy-trin.is-revealed .holy-trin-halo--top {
+    animation: holy-trin-halo-pulse 3s ease-in-out 1400ms infinite;
+  }
+  .holy-trin.is-revealed .holy-trin-halo--bl {
+    animation: holy-trin-halo-pulse 3s ease-in-out 2400ms infinite;
+  }
+  .holy-trin.is-revealed .holy-trin-halo--br {
+    animation: holy-trin-halo-pulse 3s ease-in-out 3400ms infinite;
+  }
+}
+
+@keyframes holy-trin-spin-cw {
+  to { transform: rotate(360deg); }
+}
+@keyframes holy-trin-spin-ccw {
+  to { transform: rotate(-360deg); }
+}
+@keyframes holy-trin-aura-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+@keyframes holy-trin-energy-flow {
+  0%   { stroke-dashoffset: 0;    opacity: 0; }
+  6%   { opacity: 1; }
+  94%  { opacity: 1; }
+  100% { stroke-dashoffset: -716; opacity: 0; }
+}
+@keyframes holy-trin-halo-pulse {
+  0%, 100% { opacity: 0;    transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(2.2); }
 }
 
 /* ───── TOOLTIP ─────

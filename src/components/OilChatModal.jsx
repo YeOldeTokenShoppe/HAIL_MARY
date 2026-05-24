@@ -207,7 +207,7 @@ export default function OilChatModal({
               PLOT MESSAGES
             </span>
             <span style={{ fontFamily: mono, fontSize: 11, color: c.muted }}>
-              [{plotKey.replace("_", ",")}]
+              {(() => { const [cx, cy] = plotKey.split("_").map(Number); return `[${cx + 1},${cy + 1}]`; })()}
             </span>
           </div>
           <button

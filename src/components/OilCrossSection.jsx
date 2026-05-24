@@ -66,7 +66,7 @@ export default function OilCrossSection({
         fontSize: 9, color: t.inspectorKey || t.muted, marginBottom: 6,
         textAlign: "center", letterSpacing: "0.08em",
       }}>
-        CROSS-SECTION &mdash; Row Y={sliceY}, looking across X
+        CROSS-SECTION &mdash; Row Y={sliceY + 1}, looking across X
       </div>
 
       {/* Y-Slice Selector */}
@@ -90,7 +90,7 @@ export default function OilCrossSection({
                 padding: 0,
               }}
             >
-              {y}
+              {y + 1}
             </button>
           ))}
         </div>
@@ -174,7 +174,7 @@ export default function OilCrossSection({
           padding: "3px 0", fontSize: 7, color: t.muted, textAlign: "center",
         }}>
           {Array.from({ length: gridX }, (_, x) => (
-            <span key={x}>{x}</span>
+            <span key={x}>{x + 1}</span>
           ))}
         </div>
         <div style={{
