@@ -1,14 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  db,
-  doc,
-  getDoc,
-  setDoc,
-  collection,
-  getDocs,
-  serverTimestamp,
-  arrayUnion,
-} from "@/lib/firebaseServer";
+import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { getRL80Price, getRL80Balance } from "@/lib/oilPrice";
 
 const QUALIFICATION_THRESHOLD_USD = 20;
@@ -55,10 +46,6 @@ export async function GET(req) {
 // When a player becomes disqualified, their oilPlots cell is released
 export async function POST(req) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
-    }
-
     const { adminPassword } = await req.json();
 
     // Admin auth — same pattern as other oil admin routes
@@ -67,11 +54,13 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const db = getAdminDb();
+
     // Get current RL80 price
     const price = await getRL80Price();
 
     // Read all registered players from oilQualified collection
-    const snap = await getDocs(collection(db, "oilQualified"));
+    const snap = await db.collection("oilQualified").get();
     const players = [];
     snap.forEach((d) => players.push({ id: d.id, ...d.data() }));
 
@@ -92,40 +81,40 @@ export async function POST(req) {
         if (qualified) qualifiedCount++;
 
         // Update player doc with snapshot results
-        await setDoc(doc(db, "oilQualified", player.id), {
+        await db.collection("oilQualified").doc(player.id).set({
           qualified,
           lastSnapshotBalance: balanceNum.toString(),
           lastSnapshotUsdValue: Math.round(usdValue * 100) / 100,
-          lastSnapshotAt: serverTimestamp(),
+          lastSnapshotAt: FieldValue.serverTimestamp(),
         }, { merge: true });
 
         // If player just became disqualified, release their plot
         if (!qualified && wasQualified) {
           try {
             // Read their oilDrills doc for col/row
-            const drillSnap = await getDoc(doc(db, "oilDrills", player.id));
-            if (drillSnap.exists()) {
+            const drillSnap = await db.collection("oilDrills").doc(player.id).get();
+            if (drillSnap.exists) {
               const drillData = drillSnap.data();
               if (drillData.col != null && drillData.row != null) {
                 const plotKey = `${drillData.col}_${drillData.row}`;
                 // Release the plot
-                await setDoc(doc(db, "oilPlots", plotKey), {
+                await db.collection("oilPlots").doc(plotKey).set({
                   currentOwnerId: null,
                   disqualified: true,
-                  ownerHistory: arrayUnion({
+                  ownerHistory: FieldValue.arrayUnion({
                     userId: player.id,
                     releasedAt: new Date().toISOString(),
                     reason: "disqualified",
                   }),
                 }, { merge: true });
                 // Clear col/row in oilDrills
-                await setDoc(doc(db, "oilDrills", player.id), {
+                await db.collection("oilDrills").doc(player.id).set({
                   col: null,
                   row: null,
-                  updatedAt: serverTimestamp(),
+                  updatedAt: FieldValue.serverTimestamp(),
                 }, { merge: true });
                 // Clear in oilQualified
-                await setDoc(doc(db, "oilQualified", player.id), {
+                await db.collection("oilQualified").doc(player.id).set({
                   plotCol: null,
                   plotRow: null,
                 }, { merge: true });
@@ -150,13 +139,13 @@ export async function POST(req) {
     }
 
     // Save snapshot summary
-    await setDoc(doc(db, "oilGame", "lastSnapshot"), {
+    await db.collection("oilGame").doc("lastSnapshot").set({
       price: price.rl80PriceUsd,
       ethPrice: price.ethPriceUsd,
       qualifiedCount,
       totalChecked: players.length,
       threshold: QUALIFICATION_THRESHOLD_USD,
-      timestamp: serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       results,
     });
 

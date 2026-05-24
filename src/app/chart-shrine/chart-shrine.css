@@ -9,7 +9,10 @@
       #050102 100%
     );
   color: #e9d48d;
-  font-family: "IBM Plex Serif", Georgia, serif;
+  /* IoskeleyMono — primary body face for the shrine page. Cascades to
+     any descendant that doesn't set its own font-family (gothic title,
+     Cinzel pillar names, Pirata One quotes keep their explicit fonts). */
+  font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
   /* Bottom padding reserves room for the fixed mobile dock (visible at all
      viewport sizes on the /home shrine) plus ~40px of breathing room. */
   padding: 32px 20px calc(132px + env(safe-area-inset-bottom, 0px));
@@ -17,6 +20,22 @@
   flex-direction: column;
   align-items: center;
   gap: 20px;
+}
+
+html:has(.shrine-page.neon),
+body:has(.shrine-page.neon) {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  scroll-behavior: auto;
+  touch-action: pan-y;
+}
+
+.shrine-page.neon {
+  position: relative;
+  background: #000;
+  touch-action: pan-y;
 }
 
 .shrine-stage {
@@ -50,7 +69,7 @@
     0 4px 20px rgba(0, 0, 0, 0.6),
     0 0 0 1px rgba(241, 215, 122, 0.15) inset;
   color: #e9d48d;
-  font-family: "IBM Plex Serif", Georgia, serif;
+  font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
   font-size: 12px;
   pointer-events: none;
   z-index: 5;
@@ -230,7 +249,8 @@
   /* margin-top: 8vh; */
 }
 
-/* Full-page hologram background: the scene lives behind all page content. */
+/* Hero hologram background: the scene belongs to the first shrine viewport,
+   then the page scrolls into a calmer content chamber below it. */
 /* pointer-events: auto so the R3F canvas can receive drag events on the
    hero candle (drag-to-spin). All page UI sits at z-index >= 1 above this
    layer, so their own handlers still win for their regions — only empty
@@ -240,7 +260,10 @@
   position: fixed;
   inset: 0;
   z-index: 0;
-  pointer-events: auto;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  pointer-events: none;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   overflow: hidden;
@@ -253,39 +276,21 @@
 @media (max-width: 900px) {
   .shrine-page.neon {
     position: relative;
-    /* On mobile the Reliquary flows inline below <main> (portaled to
-       body) and provides its own dock clearance via a 140px+ bottom
-       margin. The 132px bottom padding inherited from .shrine-page is
-       therefore dead space between the last in-main child (HolyTrin)
-       and the portaled Reliquary — collapse it here. */
+    background: #000;
+    /* Below-fold sections provide their own dock clearance via margin,
+       so the inherited 132px bottom padding would only create dead
+       space after the content chamber. */
     padding-bottom: 0;
   }
 
-  .shrine-page.neon .scene-background {
-    position: absolute;
-    inset: auto;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    height: 100svh;
-    /* Soft alpha fade at the bottom 25% of the canvas so it dissolves
-       into the content area below instead of hard-cutting. Keeps the
-       canvas crisp at the top (no color overlay) while smoothing the
-       canvas → void boundary. */
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      black 0%,
-      black 75%,
-      transparent 100%
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      black 0%,
-      black 75%,
-      transparent 100%
-    );
+  .shrine-page.neon .below-fold-chamber {
+    width: calc(100% + 16px);
+    margin: 15vh -8px 0;
+    min-height: 300vh;
+    padding: 1px 8px calc(190px + env(safe-area-inset-bottom, 0px));
+    background: transparent;
   }
+
 }
 /* Grab cursor only when the pointer is actually over the candle
    geometry (R3F's onPointerOver toggles `candle-hover` on the bg).
@@ -302,13 +307,13 @@
   cursor: grabbing;
 }
 
-/* Stack inline content above the fixed scene-background. Fixed-position
+/* Stack inline content above the hero scene-background. Fixed-position
    overlays (mobile dock, auth slot, sign-in nudge, candle picker) are
    excluded so they stay pinned to the viewport instead of flowing
    inline — this selector's specificity otherwise overrides their own
    `position: fixed`. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.reliquary-rail) {
   position: relative;
   z-index: 1;
   /* Don't eat pointer events over the canvas — these are decorative
@@ -322,7 +327,7 @@
 /* Safety net: keep any interactive descendant of those wrappers
    clickable even though the parent is pointer-events:none. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack)
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.reliquary-rail)
   :is(a, button, input, select, textarea, label, [role="button"], [tabindex]) {
   pointer-events: auto;
 }
@@ -330,7 +335,7 @@
 /* Soft vignette / darkening over the background so overlaid content reads. */
 .shrine-page.neon::before {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
@@ -338,9 +343,33 @@
     radial-gradient(
       ellipse at center,
       rgba(0, 0, 0, 0) 35%,
-      rgba(0, 0, 0, 0.55) 75%,
-      rgba(0, 0, 0, 0.85) 100%
+      rgba(0, 0, 0, 0.35) 75%,
+      rgba(0, 0, 0, 0.62) 100%
     );
+}
+
+.shrine-page.neon .below-fold-chamber {
+  position: relative;
+  z-index: 2;
+  width: calc(100% + 40px);
+  margin: 60vh -20px 0;
+  min-height: 320vh;
+  padding: 1px 20px calc(280px + env(safe-area-inset-bottom, 0px));
+  pointer-events: auto;
+  touch-action: pan-y;
+  overflow-anchor: none;
+  contain: paint;
+  background: transparent;
+  box-shadow: none;
+  scroll-margin-top: 0;
+}
+
+.shrine-page.neon .below-fold-chamber::before {
+  content: none;
+}
+
+.shrine-page.neon .below-fold-chamber * {
+  touch-action: pan-y;
 }
 
 .shrine-page.neon .hero-copy {
@@ -364,6 +393,14 @@
 .shrine-page.neon .hero-copy,
 .shrine-page.neon .hero-copy * {
   cursor: auto;
+}
+
+.shrine-page.neon .hero-band,
+.shrine-page.neon .shrine-column,
+.shrine-page.neon .shrine-stage,
+.shrine-page.neon .shrine-wrap,
+.shrine-page.neon .shrine-svg {
+  touch-action: pan-y;
 }
 
 /* Chart + action buttons stacked below the text in the left column. */
@@ -671,7 +708,7 @@
 
 .shrine-page.neon .hero-pullquote-modern {
   max-width: 46ch;
-  font-family: "IBM Plex Serif", Georgia, serif;
+  font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
   font-size: clamp(1rem, 1.85vw, 1.35rem);
   font-style: italic;
   line-height: 1.22;
@@ -684,7 +721,7 @@
 }
 
 .shrine-page.neon .hero-pullquote-source {
-  font-family: "IBM Plex Serif", Georgia, serif;
+  font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
   font-style: italic;
   font-size: 0.78rem;
   color: #a8c8d8;
@@ -704,7 +741,7 @@
    desktop reveal-on-hover moment is preserved. */
 .shrine-page.neon .hero-pullquote-gloss {
   display: none;
-  font-family: "IBM Plex Serif", Georgia, serif;
+  font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
   font-style: italic;
   font-size: 0.75rem;
   color: #8fa8b8;
@@ -756,7 +793,7 @@
 }
 
 .shrine-page.neon .hero-intro {
-  font-family: "IBM Plex Serif", Georgia, serif;
+  font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
   color: #a8c8d8;
   font-size: 0.95rem;
   line-height: 1.45;
@@ -802,7 +839,7 @@
 }
 
 .shrine-page.neon .offering-text {
-  font-family: "IBM Plex Serif", Georgia, serif;
+  font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
   color: #a8c8d8;
   font-size: 14px;
   line-height: 1.6;

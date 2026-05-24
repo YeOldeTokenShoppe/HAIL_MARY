@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Link from "next/link";
+import ShaderText from "@/components/ShaderText";
+import NoiseBackground from "@/components/NoiseBackground";
 import { SignInButton } from "@clerk/nextjs";
 import { WalletConnectionModal } from "@/components/WalletConnectionModal";
 import NavControlsHome from "@/components/NavControlsHome";
@@ -8,7 +11,6 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import CyberNav from "@/components/CyberNav";
 import { useMusic } from "@/components/MusicContext";
-import ShaderText from "@/components/ShaderText";
 import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, serverTimestamp, arrayUnion, increment } from "@/lib/firebaseClient";
 
 const QUALIFICATION_THRESHOLD = 20; // $20 USD worth of RL80
@@ -16,8 +18,18 @@ const GRID_SIZE = 10; // Fixed 10x10 grid
 const MAX_BONUS_DRILLS = 10;
 const REFERRAL_BONUS = 3;
 
+// RL80 trades sub-cent — fixed-decimal display loses all significant digits
+// for prices below ~$0.0001. Scale precision to the magnitude of the value.
+function formatRl80Price(p) {
+  if (p == null || !Number.isFinite(p)) return "—";
+  if (p >= 1) return p.toFixed(4);
+  if (p >= 0.01) return p.toFixed(5);
+  if (p >= 0.0001) return p.toFixed(7);
+  return p.toFixed(10);
+}
+
 export default function OilQualify({
-  theme,
+  theme: themeProp,
   darkMode,
   isMobile,
   user,
@@ -48,7 +60,15 @@ export default function OilQualify({
   const [claiming, setClaiming] = useState(false);
   const [shareNote, setShareNote] = useState(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
   const certRef = useRef(null);
+
+  useEffect(() => {
+    if (!lightboxSrc) return;
+    const onKey = (e) => { if (e.key === "Escape") setLightboxSrc(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxSrc]);
 
   // Auto-detect X/Twitter username from Clerk OAuth (if user signed in via X)
   useEffect(() => {
@@ -119,6 +139,18 @@ export default function OilQualify({
         setXCheckingFollow(false);
       });
   }, [xUsername]);
+
+  // OilQualify is locked into a dark iridescent aesthetic for the ticket-sale
+  // page regardless of the global darkMode pref — shadow theme so every
+  // theme.text/textStrong/muted token reads correctly on the dark scrims.
+  const theme = useMemo(() => ({
+    ...themeProp,
+    text: "#e8dcc8",
+    textStrong: "#fbecd0",
+    muted: "#b8a890",
+    border: "rgba(212, 168, 84, 0.25)",
+    bg: "#1a0d24",
+  }), [themeProp]);
 
   const qualifiedPlayers = useMemo(
     () => players.filter((p) => p.qualified),
@@ -359,26 +391,68 @@ export default function OilQualify({
     ? Math.ceil((QUALIFICATION_THRESHOLD - usdValue) / (rl80Price || 1))
     : 0;
 
+  // Parse theme.bg hex into [r,g,b] floats so the shader can premix its
+  // noise onto the same color as the rest of the page.
+  const bgFloats = useMemo(() => {
+    const hex = (theme.bg || "#f5efe6").replace("#", "");
+    return [
+      parseInt(hex.slice(0, 2), 16) / 255,
+      parseInt(hex.slice(2, 4), 16) / 255,
+      parseInt(hex.slice(4, 6), 16) / 255,
+    ];
+  }, [theme.bg]);
+
   return (
     <div style={{
       minHeight: "100vh",
-      background: theme.bg,
       color: theme.text,
       fontFamily: mono,
       position: "relative",
     }}>
+      {/* Ambient noise background — fully opaque, premixes gold noise onto
+          theme.bg in the shader so it IS the page background. Sits at z:1.
+          Page content below is wrapped in a z:2 layer so it stacks above. */}
+      <NoiseBackground
+        bgColor={[0.10, 0.05, 0.14]} // deep midnight plum — darker than theme.bg
+        palette={[
+          [0.20, 0.06, 0.40], // dark indigo violet
+          [0.55, 0.15, 0.50], // dusty fuchsia
+          [0.65, 0.40, 0.35], // muted terracotta
+        ]}
+        mix={0.55}
+        speed={0.00003}
+        scale={3}
+      />
+      <div style={{ position: "relative", zIndex: 2 }}>
+
       {/* Nav Controls (desktop only — mobile uses MobileBottomNav) */}
       {!isMobile && (
-        <div style={{ position: "fixed", top: 12, right: 12, zIndex: 100 }}>
+        <style>{`.nav-mobile-home { background: transparent !important; border: none !important; box-shadow: none !important; }`}</style>
+      )}
+      {!isMobile && (
+        <div style={{ position: "fixed", top: 12, right: 12, zIndex: 100, display: "flex", alignItems: "center", gap: 6 }}>
+          <a
+            href="/"
+            title="Return to shrine"
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 40, height: 40, borderRadius: 10,
+              background: "rgba(212, 175, 55, 0.05)",
+              border: "1.5px solid rgba(212, 175, 55, 0.2)",
+              color: theme.accent, textDecoration: "none",
+              flexShrink: 0,
+            }}
+          >
+            <img src="/brand-mark-mono.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
+          </a>
           <NavControlsHome
             isPlaying={contextIsPlaying}
             onPlayMusic={() => play()}
             onStopMusic={() => pause()}
             onSkipTrack={() => nextTrack()}
-            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            hideMenu
             onUserClick={() => {}}
             isUserSignedIn={!!user}
-            isMenuOpen={isMenuOpen}
             userImage={user?.imageUrl}
             show80sButton={false}
           />
@@ -387,18 +461,19 @@ export default function OilQualify({
 
       {/* Hero Header */}
       <div style={{
-        borderBottom: `1px solid ${theme.border}`,
-        background: theme.headerBg,
+        // Hero is transparent so NoiseBackground shows through here — no
+        // borderBottom either, otherwise it floats as a stray line over the noise.
+        background: "transparent",
         padding: isMobile ? "32px 16px 24px" : "48px 32px 36px",
         textAlign: "center",
         position: "relative",
         overflow: "hidden",
       }}>
         {/* Decorative corner brackets */}
-        <div style={{ position: "absolute", top: 12, left: 12, width: 20, height: 20, borderTop: `2px solid ${theme.gold}44`, borderLeft: `2px solid ${theme.gold}44` }} />
-        <div style={{ position: "absolute", top: 12, right: 12, width: 20, height: 20, borderTop: `2px solid ${theme.gold}44`, borderRight: `2px solid ${theme.gold}44` }} />
-        <div style={{ position: "absolute", bottom: 12, left: 12, width: 20, height: 20, borderBottom: `2px solid ${theme.gold}44`, borderLeft: `2px solid ${theme.gold}44` }} />
-        <div style={{ position: "absolute", bottom: 12, right: 12, width: 20, height: 20, borderBottom: `2px solid ${theme.gold}44`, borderRight: `2px solid ${theme.gold}44` }} />
+        <div style={{ position: "absolute", top: 12, left: 12, width: 20, height: 20, borderTop: `2px solid ${theme.gold}`, borderLeft: `2px solid ${theme.gold}` }} />
+        <div style={{ position: "absolute", top: 12, right: 12, width: 20, height: 20, borderTop: `2px solid ${theme.gold}`, borderRight: `2px solid ${theme.gold}` }} />
+        <div style={{ position: "absolute", bottom: 12, left: 12, width: 20, height: 20, borderBottom: `2px solid ${theme.gold}`, borderLeft: `2px solid ${theme.gold}` }} />
+        <div style={{ position: "absolute", bottom: 12, right: 12, width: 20, height: 20, borderBottom: `2px solid ${theme.gold}`, borderRight: `2px solid ${theme.gold}` }} />
 
         <div style={{ fontSize: 10, letterSpacing: "0.4em", color: theme.muted, marginBottom: 8 }}>
           EST. 2026
@@ -406,13 +481,17 @@ export default function OilQualify({
         <h1 style={{
           margin: 0,
           lineHeight: 1.2,
-          color: theme.textStrong,
+          // color: theme.textStrong,
+          color: 'gold',
+          fontFamily: "'Holtwood One SC', serif",
+          fontSize: isMobile ? 32 : 64,
+          position: "relative",
         }}>
-          <ShaderText
-            text="HAIL MARY"
+          {/* <ShaderText
+            // text="HAIL MARY"
             font="'Blackletter', serif"
-            fontWeight={900}
-            height={isMobile ? 40 : 90}
+            // fontWeight={700}
+            height={isMobile ? 56 : 110}
             colorBg={darkMode ? "#12161c" : "#f5efe6"}
             colorFill={theme.gold}
             density={12}
@@ -420,7 +499,8 @@ export default function OilQualify({
             turbulence={0.45}
             outlineWidth={3.5}
             colorOutline={"#00000048"}
-          />
+          /> */}
+          HAIL MARY
           <span style={{
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: isMobile ? 18 : 48,
@@ -430,19 +510,31 @@ export default function OilQualify({
         </h1>
         <div style={{ width: 40, height: 1, background: theme.gold, margin: "12px auto" }} />
         <div style={{
-          fontSize: isMobile ? 12 : 14,
-          letterSpacing: "0.35em",
-          color: theme.gold,
+          display: "inline-block",
+          padding: isMobile ? "10px 18px" : "12px 24px",
+          marginTop: 4,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 4,
+          background: "rgba(20, 12, 28, 0.55)",
+          backdropFilter: "blur(24px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          color: "#e8dcc8",
         }}>
-          PLAYER QUALIFICATION
-        </div>
-        <div style={{
-          fontSize: 10,
-          color: theme.muted,
-          marginTop: 8,
-          letterSpacing: "0.1em",
-        }}>
-          HOLD ${QUALIFICATION_THRESHOLD}+ USD OF RL80 & FOLLOW @RL80TOKEN
+          <div style={{
+            fontSize: isMobile ? 12 : 14,
+            letterSpacing: "0.35em",
+            color: theme.gold,
+          }}>
+            PLAYER QUALIFICATION
+          </div>
+          <div style={{
+            fontSize: 10,
+            color: theme.text,
+            marginTop: 8,
+            letterSpacing: "0.1em",
+          }}>
+            HOLD ${QUALIFICATION_THRESHOLD}+ USD OF RL80 & FOLLOW @RL80TOKEN
+          </div>
         </div>
 
         {/* Hero image — Claim Certificate with dynamic fields */}
@@ -454,43 +546,50 @@ export default function OilQualify({
           overflow: "hidden",
         }}>
           <img src="/ClaimCertificate.webp" alt="Claim Certificate" style={{ width: "100%", display: "block" }} />
-          {/* Dynamic field overlays — positioned over the blank lines on the certificate */}
-          {userPlayer && userHasPlot && (() => {
+          {/* Dynamic field overlays — fill in progressively as the user advances
+              through the funnel (sign in → register → claim plot). Each field
+              renders independently so the certificate previews what a completed
+              claim will look like, as enticement. */}
+          {(() => {
             const certFont = "'Share Tech Mono', monospace";
             const inkColor = "#3a2a18";
+            const placeholderColor = "rgba(58, 42, 24, 0.32)";
             const rot = "rotate(-5.5deg)";
             const fieldStyle = {
               position: "absolute",
               fontFamily: certFont,
-              color: inkColor,
               whiteSpace: "nowrap",
               pointerEvents: "none",
               transform: rot,
             };
-            const plotCol = userPlotEntry?.col ?? userPlayer.plotCol;
-            const plotRow = userPlotEntry?.row ?? userPlayer.plotRow;
-            const claimDate = userPlayer.pickedAt?.toDate?.()
-              ? userPlayer.pickedAt.toDate()
-              : userPlayer.pickedAt?.seconds
-              ? new Date(userPlayer.pickedAt.seconds * 1000)
-              : new Date();
+            const claimId = walletAddress
+              ? walletAddress.slice(0, 10).toUpperCase()
+              : user?.id
+              ? user.id.slice(0, 10).toUpperCase()
+              : null;
+            const grantedTo = user?.fullName || user?.firstName || (user ? "Anonymous" : null);
+            const plotCol = userPlotEntry?.col ?? userPlayer?.plotCol;
+            const plotRow = userPlotEntry?.row ?? userPlayer?.plotRow;
+            const hasPlot = plotCol != null && plotRow != null;
+            const pickedRaw = userPlayer?.pickedAt;
+            const claimDate = pickedRaw?.toDate?.()
+              ? pickedRaw.toDate()
+              : pickedRaw?.seconds
+              ? new Date(pickedRaw.seconds * 1000)
+              : new Date(); // default to today as a preview before the plot is locked in
             const dateStr = claimDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
             return (
               <>
-                {/* CLAIM ID */}
-                <div style={{ ...fieldStyle, top: "52%", left: "50%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700 }}>
-                  {walletAddress ? walletAddress.slice(0, 10).toUpperCase() : user?.id?.slice(0, 10).toUpperCase()}
+                <div style={{ ...fieldStyle, top: "52%", left: "50%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700, color: claimId ? inkColor : placeholderColor }}>
+                  {claimId || "[ CLAIM ID ]"}
                 </div>
-                {/* PLOT COORDS */}
-                <div style={{ ...fieldStyle, top: "60%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700 }}>
-                  ({plotCol}, {plotRow})
+                <div style={{ ...fieldStyle, top: "60%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700, color: hasPlot ? inkColor : placeholderColor }}>
+                  {hasPlot ? `(${plotCol}, ${plotRow})` : "( COL , ROW )"}
                 </div>
-                {/* Granted to */}
-                <div style={{ ...fieldStyle, top: "69%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700 }}>
-                  {user?.fullName || user?.firstName || "Anonymous"}
+                <div style={{ ...fieldStyle, top: "69%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700, color: grantedTo ? inkColor : placeholderColor }}>
+                  {grantedTo || "[ YOUR NAME ]"}
                 </div>
-                {/* DATE */}
-                <div style={{ ...fieldStyle, top: "83%", left: "40%", fontSize: isMobile ? "2.4vw" : 12, fontWeight: 700 }}>
+                <div style={{ ...fieldStyle, top: "83%", left: "40%", fontSize: isMobile ? "2.4vw" : 12, fontWeight: 700, color: pickedRaw ? inkColor : placeholderColor }}>
                   {dateStr}
                 </div>
               </>
@@ -720,7 +819,10 @@ export default function OilQualify({
           padding: isMobile ? "24px 16px" : "32px 20px",
           border: `1px solid ${theme.gold}33`,
           borderRadius: 4,
-          background: `linear-gradient(180deg, ${theme.gold}06, ${theme.gold}02)`,
+          background: "rgba(20, 12, 28, 0.55)",
+          backdropFilter: "blur(24px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          color: "#e8dcc8",
           marginBottom: 24,
         }}>
           <div style={{
@@ -770,7 +872,10 @@ export default function OilQualify({
           padding: isMobile ? 16 : 20,
           border: `1px solid ${theme.border}`,
           borderRadius: 4,
-          background: theme.tintBg,
+          background: "rgba(20, 12, 28, 0.55)",
+          backdropFilter: "blur(24px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          color: "#e8dcc8",
         }}>
           <div style={{
             fontSize: 10,
@@ -793,7 +898,7 @@ export default function OilQualify({
                 <div style={{
                   fontSize: 18,
                   fontWeight: 700,
-                  color: `${theme.gold}66`,
+                  color: theme.gold,
                   lineHeight: 1,
                   minWidth: 28,
                 }}>
@@ -819,44 +924,38 @@ export default function OilQualify({
           gap: 12,
           marginBottom: 24,
         }}>
-          <div style={{
-            aspectRatio: "4 / 3",
-            borderRadius: 4,
-            border: `1px dashed ${theme.gold}33`,
-            background: `linear-gradient(160deg, ${theme.gold}06, transparent)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-          }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 28, opacity: 0.15 }}>&#9968;</div>
-              <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.muted, marginTop: 4 }}>
-                <img src="/plotPic1.webp" alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-              </div>
-            </div>
-          </div>
-          <div style={{
-            aspectRatio: "4 / 3",
-            borderRadius: 4,
-            border: `1px dashed ${theme.gold}33`,
-            background: `linear-gradient(160deg, ${theme.gold}06, transparent)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-          }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 28, opacity: 0.15 }}>&#9638;</div>
-              <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.muted, marginTop: 4 }}>
-                <img src="/plotPic4.webp" alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-              </div>
-            </div>
-          </div>
+          {["/plotPic5.webp", "/plotPic6.webp"].map((src) => (
+            <button
+              key={src}
+              type="button"
+              onClick={() => setLightboxSrc(src)}
+              style={{
+                aspectRatio: "4 / 3",
+                borderRadius: 4,
+                border: `1px dashed ${theme.gold}33`,
+                background: `linear-gradient(160deg, ${theme.gold}06, transparent)`,
+                overflow: "hidden",
+                padding: 0,
+                cursor: "zoom-in",
+              }}
+              aria-label="View larger"
+            >
+              <img src={src} alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </button>
+          ))}
         </div>
 
         {/* Qualification Section */}
-        <div style={{ marginBottom: 24 }}>
+        <div style={{
+          marginBottom: 24,
+          padding: isMobile ? 16 : 20,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 4,
+          background: "rgba(20, 12, 28, 0.55)",
+          backdropFilter: "blur(24px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          color: "#e8dcc8",
+        }}>
           <div style={{
             fontSize: 10,
             letterSpacing: "0.2em",
@@ -867,6 +966,31 @@ export default function OilQualify({
           }}>
             QUALIFY TO PLAY
           </div>
+
+          {/* Secondary CTA — prospects who haven't signed up yet can peek inside */}
+          <Link
+            href="/oil?preview=1"
+            style={{
+              display: "block",
+              textAlign: "center",
+              padding: "12px 16px",
+              marginBottom: 18,
+              background: `linear-gradient(180deg, rgba(212,168,84,0.28), rgba(212,168,84,0.14))`,
+              border: `1px solid ${theme.gold}`,
+              borderRadius: 4,
+              color: theme.gold,
+              textDecoration: "none",
+              fontFamily: mono,
+              transition: "all 0.15s",
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.18em" }}>
+              PREVIEW THE GAME &rarr;
+            </div>
+            <div style={{ fontSize: 10, color: "#e8dcc8", marginTop: 4, letterSpacing: "0.06em" }}>
+              See the rigs and grid before claiming a plot
+            </div>
+          </Link>
 
           {!user ? (
             <div style={{
@@ -1530,6 +1654,12 @@ export default function OilQualify({
                 border: `1px solid ${theme.border}`,
                 borderRadius: 3,
                 textAlign: "center",
+                // Frosted scrim — keeps the noise visible through the card
+                // while giving text a stable contrast surface.
+                background: "rgba(20, 12, 28, 0.55)",
+                backdropFilter: "blur(24px) saturate(1.2)",
+                WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+                color: "#e8dcc8",
               }}
             >
               <div style={{ fontSize: 9, letterSpacing: "0.2em", color: theme.muted, marginBottom: 4 }}>
@@ -1544,7 +1674,16 @@ export default function OilQualify({
         </div>
 
         {/* Registered Players */}
-        <div style={{ marginBottom: 24 }}>
+        <div style={{
+          marginBottom: 24,
+          padding: isMobile ? 14 : 18,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 4,
+          background: "rgba(20, 12, 28, 0.55)",
+          backdropFilter: "blur(24px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          color: "#e8dcc8",
+        }}>
           <div style={{
             fontSize: 10,
             letterSpacing: "0.2em",
@@ -1667,7 +1806,10 @@ export default function OilQualify({
           padding: isMobile ? 14 : 18,
           border: `1px solid ${theme.border}`,
           borderRadius: 4,
-          background: theme.tintBg,
+          background: "rgba(20, 12, 28, 0.55)",
+          backdropFilter: "blur(24px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          color: "#e8dcc8",
         }}>
           <div style={{
             fontSize: 10,
@@ -1704,16 +1846,37 @@ export default function OilQualify({
             border: `1px solid ${theme.border}`,
             borderRadius: 4,
             textAlign: "center",
+            background: "rgba(20, 12, 28, 0.55)",
+            backdropFilter: "blur(24px) saturate(1.2)",
+            WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+            color: "#e8dcc8",
           }}>
             <div style={{ fontSize: 9, letterSpacing: "0.2em", color: theme.muted, marginBottom: 4 }}>
               CURRENT RL80 PRICE
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: theme.gold }}>
-              ${rl80Price.toFixed(6)}
+              ${formatRl80Price(rl80Price)}
             </div>
             <div style={{ fontSize: 9, color: theme.muted, marginTop: 2 }}>
               via Uniswap V2 on Base
             </div>
+            <button
+              onClick={() => setShowBuyModal(true)}
+              style={{
+                marginTop: 10,
+                padding: "6px 14px",
+                background: "rgba(0, 82, 255, 0.12)",
+                border: "1px solid rgba(0, 82, 255, 0.35)",
+                borderRadius: 3,
+                color: theme.textStrong,
+                fontFamily: "var(--font-mono, monospace)",
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                cursor: "pointer",
+              }}
+            >
+              BUY RL80 ON COINBASE →
+            </button>
           </div>
         )}
 
@@ -1770,7 +1933,7 @@ export default function OilQualify({
                 }}>
                   {snapshotResult.error
                     ? `Error: ${snapshotResult.error}`
-                    : `Snapshot complete: ${snapshotResult.qualifiedCount}/${snapshotResult.totalChecked} qualified at $${snapshotResult.price?.toFixed(6)}/RL80`}
+                    : `Snapshot complete: ${snapshotResult.qualifiedCount}/${snapshotResult.totalChecked} qualified at $${formatRl80Price(snapshotResult.price)}/RL80`}
                 </div>
               )}
 
@@ -1851,21 +2014,30 @@ export default function OilQualify({
         </div>
       </div>
 
-      {/* Bottom Mobile Nav */}
+      {/* Bottom Mobile Nav — same layout as /oil game page:
+          hide music/wallet/menu, add HOME via extraLeft. */}
       {isMobile && <MobileBottomNav
         isPlaying={contextIsPlaying}
         onPlayMusic={() => play()}
         onStopMusic={() => pause()}
         onSkipTrack={() => nextTrack()}
-        onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+        hideMenu
+        hideMusicOnMobile
+        hideWallet
         onUserClick={() => {}}
         isUserSignedIn={!!user}
-        isMenuOpen={isMenuOpen}
         userImage={user?.imageUrl}
         onBuyClick={() => setShowBuyModal(true)}
         isMobile={isMobile}
         show80sButton={false}
-        darkMode={darkMode}
+        darkMode
+        extraLeft={[{
+          key: "home",
+          label: "HOME",
+          title: "Return to shrine",
+          onClick: () => { window.location.href = "/"; },
+          icon: <img src="/brand-mark-mono.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
+        }]}
       />}
 
       {/* Buy Modal */}
@@ -1874,6 +2046,38 @@ export default function OilQualify({
         onClose={() => setShowBuyModal(false)}
       />
 
+      {/* Image lightbox — click outside or Esc to close */}
+      {lightboxSrc && (
+        <div
+          onClick={() => setLightboxSrc(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            cursor: "zoom-out",
+            padding: 24,
+          }}
+        >
+          <img
+            src={lightboxSrc}
+            alt="Oil rig at sunset"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "min(95vw, 1400px)",
+              maxHeight: "92vh",
+              objectFit: "contain",
+              borderRadius: 4,
+              boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6)",
+              cursor: "default",
+            }}
+          />
+        </div>
+      )}
+
       {/* CyberNav Menu Panel */}
       <CyberNav
         position="fixed"
@@ -1881,6 +2085,7 @@ export default function OilQualify({
         onClose={() => setIsMenuOpen(false)}
         showButton={false}
       />
+      </div>
     </div>
   );
 }

@@ -33,6 +33,26 @@
   font-display: swap;
 }
 
+/* IoskeleyMono — primary body face for the shrine page. WOFF2 is the
+   ~30-50% smaller modern format (every browser since ~2018 supports it);
+   TTF kept as fallback for the unlikely older client. */
+@font-face {
+  font-family: 'IoskeleyMono';
+  src: url('/fonts/IoskeleyMono-Regular.woff2') format('woff2'),
+       url('/fonts/IoskeleyMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IoskeleyMono';
+  src: url('/fonts/IoskeleyMono-Bold.woff2') format('woff2'),
+       url('/fonts/IoskeleyMono-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Noto Sans Mono - supports CJK, Cyrillic, Arabic, Devanagari, and more */
 @font-face {
   font-family: "Noto Sans Mono";
@@ -217,6 +237,26 @@ canvas {
   font-style: normal;
   font-display: block; /* Block rendering until font loads */
 }
+
+
+
+@font-face {
+  font-family: 'Manufacturing Consent';
+  src: url('/fonts/ManufacturingConsent-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+
+  font-family: "Holtwood One SC";
+  src: url("/fonts/HoltwoodOneSC-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 
 
 @font-face {

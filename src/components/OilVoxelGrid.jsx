@@ -3138,7 +3138,7 @@ export default function OilVoxelGrid({
             anchorY="middle"
             font={undefined}
           >
-            {`X${i}`}
+            {`X${i + 1}`}
           </Text>
         );
       })}
@@ -3156,7 +3156,7 @@ export default function OilVoxelGrid({
             anchorY="middle"
             font={undefined}
           >
-            {`Y${i}`}
+            {`Y${i + 1}`}
           </Text>
         );
       })}

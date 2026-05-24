@@ -1,7 +1,19 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId } from "@/lib/oilPremium";
+import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId, PREMIUM_PRICES } from "@/lib/oilPremium";
+
+// Small price tag rendered on locked items in place of the old lock icon.
+const priceChipStyle = {
+  marginLeft: 5,
+  padding: "0 5px",
+  borderRadius: 2,
+  background: "rgba(22, 163, 74, 0.22)",
+  border: "1px solid rgba(22, 101, 52, 0.7)",
+  color: "#166534",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+};
 
 // ── Zone definitions ─────────────────────────────────────────────────────────
 export const PUMP_ZONES = [
@@ -742,6 +754,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
             <div style={styles.themeButtons}>
               {Object.entries(THEME_PRESETS).map(([key, theme]) => {
                 const locked = isPremiumTheme(key) && !unlockedItems.has(makePurchaseId("theme", key));
+                const isActive = previewThemeKey === key;
                 return (
                   <button
                     key={key}
@@ -750,15 +763,14 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                       ...styles.themeBtn,
                       fontSize: mFs,
                       padding: isMobile ? "5px 10px" : "3px 7px",
-                      color: locked ? c.muted : c.btnText,
-                      border: locked ? `1px dashed ${c.btnBorder}` : `1px solid ${c.btnBorder}`,
-                      background: locked ? "transparent" : c.btnBg,
-                      opacity: locked ? 0.7 : 1,
+                      color: isActive ? c.activeText : c.btnText,
+                      border: `1px solid ${isActive ? c.activeBorder : c.btnBorder}`,
+                      background: isActive ? c.activeBg : c.btnBg,
                     }}
-                    title={locked ? `${theme.label} (Premium — click to preview)` : theme.label}
+                    title={locked ? `${theme.label} — ${PREMIUM_PRICES.theme.usdc} USDC to unlock` : theme.label}
                   >
-                    {locked && <span style={{ marginRight: 3, fontSize: mFs - 1 }}>&#128274;</span>}
                     {theme.label}
+                    {locked && <span style={{ ...priceChipStyle, fontSize: mFs - 1 }}>{PREMIUM_PRICES.theme.usdc} USDC</span>}
                   </button>
                 );
               })}
@@ -945,7 +957,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
             {/* Security camera toggle — requires sign to be visible */}
             <div style={{ opacity: config.showSign ? 1 : 0.35, pointerEvents: config.showSign ? "auto" : "none" }}>
               <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>
-                SECURITY CAM {!unlockedItems.has("camera") && <span style={{ fontSize: mFs - 1 }}>&#128274;</span>}
+                SECURITY CAM {!unlockedItems.has("camera") && <span style={{ ...priceChipStyle, fontSize: mFs - 1 }}>{PREMIUM_PRICES.accessory.usdc} USDC</span>}
               </span>
               <button
                 onClick={() => onChange({ ...config, showCamera: !config.showCamera })}
@@ -1023,8 +1035,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                         cursor: "pointer",
                       }}
                     >
-                      {fenceLocked && <span style={{ marginRight: 3, fontSize: mFs - 2 }}>&#128274;</span>}
                       {f.label}
+                      {fenceLocked && <span style={{ ...priceChipStyle, fontSize: mFs - 2 }}>{PREMIUM_PRICES.fence.usdc} USDC</span>}
                     </button>
                   );
                 })}
@@ -1213,7 +1225,10 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                           background: item.color, flexShrink: 0,
                           boxShadow: item.emissive ? `0 0 4px ${item.color}` : "none",
                         }} />
-                        <span>{addonLocked ? `\u{1F512} ${item.label}` : item.label}</span>
+                        <span style={{ display: "inline-flex", alignItems: "center" }}>
+                          {item.label}
+                          {addonLocked && <span style={{ ...priceChipStyle, fontSize: mFs - 1 }}>{PREMIUM_PRICES.addon.usdc} USDC</span>}
+                        </span>
                       </button>
                     );
                   })}
@@ -1236,18 +1251,21 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                       disabled={owned}
                       style={{
                         padding: isMobile ? "4px 8px" : "3px 7px",
-                        background: owned ? "rgba(74,222,128,0.1)" : "transparent",
-                        border: owned ? `1px solid rgba(74,222,128,0.3)` : `1px dashed ${c.btnBorder}`,
+                        background: owned ? "rgba(22,163,74,0.18)" : c.btnBg,
+                        border: owned ? `1px solid rgba(22,163,74,0.55)` : `1px solid ${c.btnBorder}`,
                         borderRadius: 2,
-                        color: owned ? "#4ade80" : c.muted,
+                        color: owned ? "#16a34a" : c.btnText,
                         fontFamily: "'Share Tech Mono', monospace",
                         fontSize: mFs - 1,
                         letterSpacing: "0.08em",
                         cursor: owned ? "default" : "pointer",
-                        opacity: owned ? 0.6 : 0.7,
                       }}
                     >
-                      {owned ? `SLOT ${slotNum} \u2713` : `\u{1F512} SLOT ${slotNum}`}
+                      {owned ? (
+                        <>SLOT {slotNum} &#10003;</>
+                      ) : (
+                        <>SLOT {slotNum} <span style={{ ...priceChipStyle, fontSize: mFs - 2 }}>{PREMIUM_PRICES.slotUnlock.usdc} USDC</span></>
+                      )}
                     </button>
                   );
                 })}

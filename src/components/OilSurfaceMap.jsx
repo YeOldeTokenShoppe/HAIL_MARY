@@ -56,7 +56,7 @@ export default function OilSurfaceMap({
           <span key={x} style={{
             fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
             display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
-          }}>{x}</span>
+          }}>{x + 1}</span>
         ))}
       </div>
       <div style={{ display: "flex" }}>
@@ -71,7 +71,7 @@ export default function OilSurfaceMap({
               <span key={y} style={{
                 fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
                 display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
-              }}>{y}</span>
+              }}>{y + 1}</span>
             );
           })}
         </div>

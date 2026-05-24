@@ -137,7 +137,7 @@ const globalCandleCache = {
 };
 
 // Orbital candle component that receives a cloned VCANDLE
-function OrbitalCandle({ angle, radius, candleObject, index, onClick, transitionState, isViewerOpen }) {
+function OrbitalCandle({ angle, radius, candleObject, index, onClick, transitionState, isViewerOpen, yOffset = 0 }) {
   const groupRef = useRef();
   const candleRef = useRef();
   const frozenTimeRef = useRef(null);
@@ -169,16 +169,17 @@ function OrbitalCandle({ angle, radius, candleObject, index, onClick, transition
       }
     });
 
-    // Alternate wax colors between red and green
+    // Red/green wax — shuffled (not alternating) via a per-index hash so
+    // the same candle keeps its color across re-renders.
+    const hash = Math.sin(index * 127.1 + 311.7) * 43758.5453;
+    const isRed = (hash - Math.floor(hash)) < 0.35;
+    const waxColor = isRed ? 0xcc2222 : 0x22cc22;
+
     candleObject.traverse((child) => {
       if (child.isMesh && child.name?.toLowerCase() === 'wax') {
         const waxMaterial = child.material.clone();
         createdMaterialsRef.current.push(waxMaterial);
-        if (index % 2 === 0) {
-          waxMaterial.color = new THREE.Color(0xcc2222);
-        } else {
-          waxMaterial.color = new THREE.Color(0x22cc22);
-        }
+        waxMaterial.color = new THREE.Color(waxColor);
         child.material = waxMaterial;
       }
     });
@@ -307,7 +308,7 @@ function OrbitalCandle({ angle, radius, candleObject, index, onClick, transition
         
         const x = Math.cos(orbitAngle) * effectiveRadius * 1.3;
         const z = Math.sin(orbitAngle) * effectiveRadius * 0.7;
-        const y = Math.sin(orbitAngle * 2) * 0.9 + Math.sin(currentTime * 2 + index) * 0.1;
+        const y = yOffset + Math.sin(orbitAngle * 2) * 0.9 + Math.sin(currentTime * 2 + index) * 0.1;
         
         groupRef.current.position.set(x, y, z);
         
@@ -361,7 +362,11 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
   const [transitionStartTime, setTransitionStartTime] = useState(0);
 
   // Configuration for the Illumin80
-  const VISIBLE_CANDLES = 8;
+  const VISIBLE_CANDLES = 48;
+  // Helix spread — total vertical range candles occupy, centered on the
+  // group's y. Roughly matches the BackgroundChart's vertical extent so the
+  // candle column fills the visible chart from near-bottom to near-top.
+  const HELIX_SPREAD = 23;
   const ROTATION_INTERVAL = 15000; // 15 seconds between rotations
   const TRANSITION_DURATION = 2000; // 2 second fade transition
 
@@ -575,10 +580,14 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
   }, [currentPage, totalPages, candleCount, onPaginationChange, handleSetCurrentPage]);
 
   return (
-    <group ref={groupRef} position={[0, -0.3, 0]}>
-      {/* The candles */}
+    <group ref={groupRef} position={[0, -3.5, 0]}>
+      {/* The candles — helix: even angular spread + linear vertical spread */}
       {combinedData.map((item, index) => {
-        const angle = (index / Math.min(combinedData.length, 8)) * Math.PI * 2;
+        const total = combinedData.length;
+        const angle = (index / total) * Math.PI * 4;
+        const yOffset = total > 1
+          ? (index / (total - 1) - 0.5) * HELIX_SPREAD
+          : 0;
         return (
           <OrbitalCandle
             key={item.originalName || index}
@@ -586,6 +595,7 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
             radius={1.5}
             candleObject={item.candleObject}
             index={index}
+            yOffset={yOffset}
             onClick={onCandleClick}
             transitionState={transitionState}
             isViewerOpen={isViewerOpen}

@@ -8,7 +8,7 @@ function BackgroundChart({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   radius = 3,
-  height = 2,
+  height = 4,
   pointCount = 120,
   color = '#00ff88',
   glowColor = '#00ffaa',
@@ -16,7 +16,7 @@ function BackgroundChart({
   scrollSpeed = 0.3,
   lineWidth = 2,
   gridLines = 15,
-  verticalLines = 24,
+  verticalLines = 48,
   barOpacity = 0.05,
   barColor = '#8855ff',
   barMaxHeight = 0.5,
@@ -91,16 +91,50 @@ function BackgroundChart({
   const glowMaterial = useMemo(() => new THREE.LineBasicMaterial({
     color: new THREE.Color(glowColor),
     transparent: true,
-    opacity: opacity * 0.3,
+    opacity: opacity * 0.85,
     linewidth: lineWidth * 3,
     blending: THREE.AdditiveBlending,
+    depthWrite: false,
   }), [glowColor, opacity, lineWidth])
+
+  // Softer outer pass — same geometry, lower opacity, brighter tint. Stacking
+  // two additive passes fakes a wider glow since WebGL ignores linewidth.
+  const outerGlowMaterial = useMemo(() => {
+    const c = new THREE.Color(glowColor)
+    c.lerp(new THREE.Color('#ffffff'), 0.35)
+    return new THREE.LineBasicMaterial({
+      color: c,
+      transparent: true,
+      opacity: opacity * 0.05,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  }, [glowColor, opacity])
 
   const gridMaterial = useMemo(() => new THREE.LineBasicMaterial({
     color: new THREE.Color(color),
     transparent: true,
-    opacity: 0.1,
+    opacity: 0.2,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   }), [color])
+
+  // Ambient haze — faint additive cylinder rendered from the inside so the
+  // whole tube feels lit from within. Very low opacity so it doesn't wash
+  // the statue silhouette out.
+  const hazeMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: new THREE.Color(glowColor),
+    transparent: true,
+    opacity: 0.01,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    depthWrite: false,
+  }), [glowColor])
+
+  const hazeGeometry = useMemo(
+    () => new THREE.CylinderGeometry(radius * 0.995, radius * 0.995, height, 64, 1, true),
+    [radius, height]
+  )
 
   // Bar geometry and material (wide box, unit height - scaled per instance)
   const barGeometry = useMemo(() => {
@@ -149,20 +183,21 @@ function BackgroundChart({
       glowLineRef.current.geometry.attributes.position.needsUpdate = true
     }
 
-    // Update volume bars
+    // Update volume bars — wave motion around the cylinder. Phases are
+    // multiples of the bar's angle, so adjacent bars stay correlated and
+    // the whole ring breathes as a coherent wave (mimics momentum buildup
+    // and decay across a volume series rather than per-bar noise).
     if (barsRef.current) {
       for (let i = 0; i < verticalLines; i++) {
-        const hash = Math.sin(i * 127.1 + 311.7) * 43758.5453
-        const barSeed = hash - Math.floor(hash)
-        const tv = volumeSeed + barSeed * 100
-        const v1 = Math.abs(Math.sin(tv * 0.4 + i * 2.3)) * 0.35
-        const v2 = Math.abs(Math.sin(tv * 1.1 + i * 5.7 + 1.3)) * 0.25
-        const v3 = Math.abs(Math.sin(tv * 0.7 + i * 11.1 + 4.0)) * 0.2
-        const spike = Math.pow(Math.abs(Math.sin(tv * 0.3 + i * 3.9)), 6) * 0.5
-        const raw = 0.05 + v1 + v2 + v3 + spike
-        const value = raw > 0.95 ? 0.95 : raw
-
         const angle = (i / verticalLines) * Math.PI * 2
+        const w1 = Math.sin(angle + volumeSeed * 0.6) * 0.30
+        const w2 = Math.sin(angle * 2 - volumeSeed * 0.4 + 1.3) * 0.18
+        const w3 = Math.sin(angle * 3 + volumeSeed * 0.9 + 2.7) * 0.10
+        const spikeBase = Math.sin(angle + volumeSeed * 0.5)
+        const spike = Math.pow(spikeBase > 0 ? spikeBase : 0, 8) * 0.22
+        const raw = 0.4 + w1 + w2 + w3 + spike
+        const value = raw < 0.05 ? 0.05 : raw > 0.95 ? 0.95 : raw
+
         const x = Math.cos(angle) * radius
         const z = Math.sin(angle) * radius
         const barHeight = value * barMaxHeight * height
@@ -182,13 +217,19 @@ function BackgroundChart({
 
   return (
     <group position={position} rotation={rotation}>
+      {/* Ambient haze — soft additive glow inside the cylinder */}
+      <mesh geometry={hazeGeometry} material={hazeMaterial} />
+
       {/* Cylindrical grid background */}
       <lineSegments ref={gridRef} geometry={gridGeometry} material={gridMaterial} />
 
       {/* Volume bars */}
       <instancedMesh ref={barsRef} args={[barGeometry, barMaterial, verticalLines]} />
 
-      {/* Glow line (behind) */}
+      {/* Outer glow (shares glowGeometry — animated in the same useFrame pass) */}
+      <lineLoop geometry={glowGeometry} material={outerGlowMaterial} />
+
+      {/* Inner glow */}
       <lineLoop ref={glowLineRef} geometry={glowGeometry} material={glowMaterial} />
 
       {/* Main line */}

@@ -1,36 +1,21 @@
 import { NextResponse } from "next/server";
-import {
-  db,
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  orderBy,
-  updateDoc,
-  serverTimestamp,
-  Timestamp,
-} from "@/lib/firebaseServer";
+import { getAdminDb, FieldValue, Timestamp } from "@/lib/firebaseAdmin";
 
 export async function POST(req) {
   try {
-    if (!db) {
-      return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
-    }
-
     const { adminPassword } = await req.json();
 
-    // Verify admin
     const correct = process.env.ADMIN_PASSWORD;
     if (!correct || adminPassword !== correct) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Read current game settings
-    const settingsRef = doc(db, "oilGame", "settings");
-    const settingsSnap = await getDoc(settingsRef);
-    if (!settingsSnap.exists()) {
+    const db = getAdminDb();
+    const settingsRef = db.collection("oilGame").doc("settings");
+    const ticketsCol = db.collection("oilTickets");
+
+    const settingsSnap = await settingsRef.get();
+    if (!settingsSnap.exists) {
       return NextResponse.json({ error: "Game settings not found" }, { status: 404 });
     }
 
@@ -43,26 +28,19 @@ export async function POST(req) {
     const gridSize = settings.gridSize || 10;
     const pickWindowMinutes = settings.pickWindowMinutes || 120;
 
-    // Find the current picker's ticket
-    const ticketsCol = collection(db, "oilTickets");
-    const pickerQuery = query(ticketsCol, where("purchaseOrder", "==", currentPick));
-    const pickerSnap = await getDocs(pickerQuery);
-
+    const pickerSnap = await ticketsCol.where("purchaseOrder", "==", currentPick).get();
     if (pickerSnap.empty) {
       return NextResponse.json({ error: "No ticket for current pick order" }, { status: 404 });
     }
-
     const pickerDoc = pickerSnap.docs[0];
 
-    // Get all taken plots
-    const allTicketsSnap = await getDocs(query(ticketsCol, where("plotCol", "!=", null)));
+    const allTicketsSnap = await ticketsCol.where("plotCol", "!=", null).get();
     const takenPlots = new Set();
     allTicketsSnap.forEach((d) => {
       const t = d.data();
       takenPlots.add(`${t.plotCol},${t.plotRow}`);
     });
 
-    // Find available plots
     const available = [];
     for (let col = 0; col < gridSize; col++) {
       for (let row = 0; row < gridSize; row++) {
@@ -76,22 +54,19 @@ export async function POST(req) {
       return NextResponse.json({ error: "No available plots" }, { status: 400 });
     }
 
-    // Assign random plot
     const pick = available[Math.floor(Math.random() * available.length)];
 
-    // Update picker's ticket
-    await updateDoc(pickerDoc.ref, {
+    await pickerDoc.ref.update({
       plotCol: pick.col,
       plotRow: pick.row,
-      pickedAt: serverTimestamp(),
+      pickedAt: FieldValue.serverTimestamp(),
       skipped: true,
     });
 
-    // Advance to next picker + set new deadline
     const newDeadline = Timestamp.fromDate(
       new Date(Date.now() + pickWindowMinutes * 60 * 1000)
     );
-    await updateDoc(settingsRef, {
+    await settingsRef.update({
       currentPickOrder: currentPick + 1,
       pickDeadline: newDeadline,
     });

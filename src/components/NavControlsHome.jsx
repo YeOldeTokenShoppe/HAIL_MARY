@@ -24,7 +24,8 @@ export default function NavControlsHome({
   onHelpClick = null,
   showHelpActive = false,
   hideMusicOnMobile = false,
-  hideUserOnMobile = false
+  hideUserOnMobile = false,
+  hideMenu = false
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -302,6 +303,7 @@ export default function NavControlsHome({
           cursor: pointer;
           overflow: hidden;
           position: relative;
+          padding: 0;
           transition: all 0.2s ease;
         }
         
@@ -460,22 +462,6 @@ export default function NavControlsHome({
           object-fit: cover !important;
         }
 
-        .avatar-status-mobile {
-          position: absolute;
-          bottom: 1px;
-          right: 1px;
-          width: 8px;
-          height: 8px;
-          background: #00ff88;
-          border-radius: 50%;
-          border: 1px solid #0d0d1a;
-          box-shadow: 0 0 4px rgba(0, 255, 136, 0.6);
-        }
-
-        .avatar-status-mobile.offline {
-          background: #666;
-          box-shadow: none;
-        }
 
         /* Hamburger - Consistent with other buttons */
         .menu-button-mobile {
@@ -852,33 +838,22 @@ export default function NavControlsHome({
               title="Account"
             >
               {clerkUser?.imageUrl ? (
-                <img 
-                  src={clerkUser.imageUrl} 
-                  alt="Avatar" 
-                  style={{ 
-                    width: '40px', 
-                    height: '40px',
-                    minWidth: '40px',
-                    minHeight: '40px',
-                    maxWidth: '40px',
-                    maxHeight: '40px',
+                <img
+                  src={clerkUser.imageUrl}
+                  alt="Avatar"
+                  style={{
+                    position: 'absolute',
+                    inset: '-1.5px',
+                    width: 'calc(100% + 3px)',
+                    height: 'calc(100% + 3px)',
                     objectFit: 'cover',
-                    borderRadius: '8px',
                     display: 'block'
                   }}
                 />
               ) : (
                 <span style={{ fontSize: '2rem' }}>{emoji}</span>
               )}
-              {isWalletConnected && (
-                <div 
-                  className="avatar-status-mobile" 
-                  style={{ 
-                    background: '#00f5d4',
-                    boxShadow: '0 0 4px rgba(0, 245, 212, 0.6)'
-                  }}
-                />
-              )}
+            
             </button>
           ) : (
             <button
@@ -894,17 +869,19 @@ export default function NavControlsHome({
         )}
 
         {/* Menu */}
-        <button
-          className={`menu-button-mobile ${isMenuOpen ? 'open' : ''}`}
-          onClick={handleMenuClick}
-        >
-          {showMenuHint && (
-            <span className="menu-hint-ring" />
-          )}
-          <span className="menu-line-mobile" />
-          <span className="menu-line-mobile" />
-          <span className="menu-line-mobile" />
-        </button>
+        {!hideMenu && (
+          <button
+            className={`menu-button-mobile ${isMenuOpen ? 'open' : ''}`}
+            onClick={handleMenuClick}
+          >
+            {showMenuHint && (
+              <span className="menu-hint-ring" />
+            )}
+            <span className="menu-line-mobile" />
+            <span className="menu-line-mobile" />
+            <span className="menu-line-mobile" />
+          </button>
+        )}
       </div>
 
       </div>

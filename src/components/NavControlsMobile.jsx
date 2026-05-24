@@ -129,22 +129,6 @@ export default function NavControlsMobile({
           position: relative;
         }
 
-        .avatar-status-mobile {
-          position: absolute;
-          bottom: 1px;
-          right: 1px;
-          width: 8px;
-          height: 8px;
-          background: #00ff88;
-          border-radius: 50%;
-          border: 1px solid #0d0d1a;
-          box-shadow: 0 0 4px rgba(0, 255, 136, 0.6);
-        }
-
-        .avatar-status-mobile.offline {
-          background: #666;
-          box-shadow: none;
-        }
 
         /* Hamburger - Consistent size */
         .menu-button-mobile {
