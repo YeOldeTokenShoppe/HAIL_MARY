@@ -240,8 +240,8 @@ export default function ModelViewerPage() {
         extraRight={[
           {
             key: 'lode',
-            label: 'MOTHER LODE',
-            title: 'Mother Lode — coming soon',
+            label: 'Hail Mary PC',
+            title: 'Hail Mary Prospecting Co — coming soon',
             onClick: () => { window.location.href = '/oil'; },
             comingSoon: false,
             icon: (

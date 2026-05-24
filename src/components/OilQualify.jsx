@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import Link from "next/link";
 import ShaderText from "@/components/ShaderText";
 import NoiseBackground from "@/components/NoiseBackground";
 import { SignInButton } from "@clerk/nextjs";
@@ -502,8 +501,9 @@ export default function OilQualify({
           /> */}
           HAIL MARY
           <span style={{
+            marginLeft: '1rem',
             fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: isMobile ? 18 : 48,
+            fontSize: isMobile ? 28 : 48,
             letterSpacing: "0.25em",
             display: "block",
           }}>PROSPECTING CO.</span>
@@ -924,7 +924,7 @@ export default function OilQualify({
           gap: 12,
           marginBottom: 24,
         }}>
-          {["/plotPic5.webp", "/plotPic6.webp"].map((src) => (
+          {["/plotPic5.webp", "/plotPic7.webp"].map((src) => (
             <button
               key={src}
               type="button"
@@ -932,7 +932,7 @@ export default function OilQualify({
               style={{
                 aspectRatio: "4 / 3",
                 borderRadius: 4,
-                border: `1px dashed ${theme.gold}33`,
+                border: `2px solid ${theme.gold}`,
                 background: `linear-gradient(160deg, ${theme.gold}06, transparent)`,
                 overflow: "hidden",
                 padding: 0,
@@ -967,8 +967,11 @@ export default function OilQualify({
             QUALIFY TO PLAY
           </div>
 
-          {/* Secondary CTA — prospects who haven't signed up yet can peek inside */}
-          <Link
+          {/* Secondary CTA — prospects who haven't signed up yet can peek inside.
+              Plain <a> (not next/link) so we force a full nav: OilPage stays
+              mounted on client-side routes to itself and its one-shot effect
+              wouldn't re-read ?preview=1. */}
+          <a
             href="/oil?preview=1"
             style={{
               display: "block",
@@ -990,7 +993,7 @@ export default function OilQualify({
             <div style={{ fontSize: 10, color: "#e8dcc8", marginTop: 4, letterSpacing: "0.06em" }}>
               See the rigs and grid before claiming a plot
             </div>
-          </Link>
+          </a>
 
           {!user ? (
             <div style={{
@@ -1784,19 +1787,19 @@ export default function OilQualify({
         <div style={{
           marginBottom: 24,
           borderRadius: 4,
-          border: `1px dashed ${theme.gold}33`,
+          border: `2px solid ${theme.gold}`,
           background: `linear-gradient(170deg, ${theme.gold}05, ${theme.gold}0a, ${theme.gold}03)`,
           display: "flex",
-          alignItems: "center",
+          // alignItems: "center",
           justifyContent: "center",
           overflow: "hidden",
           position: "relative",
         }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 32, opacity: 0.12 }}>&#127956;</div>
-            <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.muted, marginTop: 4 }}>
+            {/* <div style={{ fontSize: 32, opacity: 0.12 }}>&#127956;</div> */}
+            {/* <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.muted, marginTop: 4 }}> */}
               <img src="/moneyShot.png" alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-            </div>
+            {/* </div> */}
           </div>
         </div>
 

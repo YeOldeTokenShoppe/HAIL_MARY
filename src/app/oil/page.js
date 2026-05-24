@@ -2490,6 +2490,11 @@ export default function OilPage() {
   }
 
   // ── Pre-game phase gates ──
+  // Hold render until Firestore settings arrive so the default "ticket_sale"
+  // state doesn't briefly render OilQualify on top of an in-progress game.
+  if (!settingsLoaded && !previewMode) {
+    return <div style={{ width: "100vw", height: "100vh", background: theme.bg }} />;
+  }
   const userHasPlot = userDrill?.col != null;
   if (gamePhase === "ticket_sale" && !previewMode) {
     return (

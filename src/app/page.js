@@ -2566,7 +2566,7 @@ export default function HomePage() {
             ) : null}
           </blockquote>
           <p className="hero-intro">
-Sharpen your discernment against scams or play the Trading Card Game in the liminal terminal. Scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order.
+Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment against scams in the Liminal Terminal, or scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order.
 </p>
         </div>
 
@@ -3058,8 +3058,8 @@ Sharpen your discernment against scams or play the Trading Card Game in the limi
         extraRight={[
           {
             key: 'lode',
-            label: 'MOTHER LODE',
-            title: 'Mother Lode — coming soon',
+            label: 'Hail Mary PC',
+            title: 'Hail Mary Prospecting Co — coming soon',
               onClick: () => { window.location.href = '/oil'; },
             comingSoon: false,
             icon: (

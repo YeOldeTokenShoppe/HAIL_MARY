@@ -6,8 +6,9 @@ import { ROGUE_CATALOG } from "@/components/RogueCharacter";
 export default function RogueAdminPanel({ rogueEvents = [], gridSize = 10, darkMode, adminPassword }) {
   const [charType, setCharType] = useState(ROGUE_CATALOG[0]?.id || "dinosaur");
   const [autoTarget, setAutoTarget] = useState(true);
-  const [targetCol, setTargetCol] = useState(0);
-  const [targetRow, setTargetRow] = useState(0);
+  // 1-indexed in the UI; we subtract 1 before sending to the API which uses 0-indexed cells.
+  const [targetCol, setTargetCol] = useState(1);
+  const [targetRow, setTargetRow] = useState(1);
   const [deploying, setDeploying] = useState(false);
   const [lastResult, setLastResult] = useState(null);
 
@@ -55,8 +56,8 @@ export default function RogueAdminPanel({ rogueEvents = [], gridSize = 10, darkM
       if (autoTarget) {
         body.autoTarget = true;
       } else {
-        body.targetCol = Number(targetCol);
-        body.targetRow = Number(targetRow);
+        body.targetCol = Number(targetCol) - 1;
+        body.targetRow = Number(targetRow) - 1;
       }
 
       const res = await fetch("/api/oil-rogue", {
@@ -227,8 +228,8 @@ export default function RogueAdminPanel({ rogueEvents = [], gridSize = 10, darkM
             <input
               style={s.input}
               type="number"
-              min={0}
-              max={gridSize - 1}
+              min={1}
+              max={gridSize}
               value={targetCol}
               onChange={(e) => setTargetCol(e.target.value)}
             />
@@ -238,8 +239,8 @@ export default function RogueAdminPanel({ rogueEvents = [], gridSize = 10, darkM
             <input
               style={s.input}
               type="number"
-              min={0}
-              max={gridSize - 1}
+              min={1}
+              max={gridSize}
               value={targetRow}
               onChange={(e) => setTargetRow(e.target.value)}
             />
@@ -270,7 +271,7 @@ export default function RogueAdminPanel({ rogueEvents = [], gridSize = 10, darkM
         >
           {lastResult.ok ? (
             <>
-              <div>{`Deployed! → (${lastResult.targetCol},${lastResult.targetRow}) | ${lastResult.consequence?.type || "none"} | slot:${lastResult.consequence?.addonSlot ?? "none"} | ${lastResult.consequence?.addonId ?? ""}${lastResult.telegramSent ? " | TG sent" : ""}`}</div>
+              <div>{`Deployed! → (${lastResult.targetCol + 1},${lastResult.targetRow + 1}) | ${lastResult.consequence?.type || "none"} | slot:${lastResult.consequence?.addonSlot ?? "none"} | ${lastResult.consequence?.addonId ?? ""}${lastResult.telegramSent ? " | TG sent" : ""}`}</div>
               {lastResult.pathDebug && (
                 <div style={{ marginTop: 4, color: c.muted, wordBreak: "break-all" }}>
                   Path: {lastResult.pathDebug}
@@ -289,7 +290,7 @@ export default function RogueAdminPanel({ rogueEvents = [], gridSize = 10, darkM
           {activeEvents.map((ev) => (
             <div key={ev.id} style={s.eventRow}>
               <span>
-                {ev.characterType?.toUpperCase()} → ({ev.targetCol},{ev.targetRow})
+                {ev.characterType?.toUpperCase()} → ({ev.targetCol + 1},{ev.targetRow + 1})
                 {ev.path ? ` [${ev.path.length}wp]` : ""}
               </span>
               <button style={s.doneBtn} onClick={() => markDone(ev.id)}>
