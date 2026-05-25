@@ -141,6 +141,7 @@ const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ss
 const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
 const OilPlotChat = dynamic(() => import("@/components/OilPlotChat"), { ssr: false });
 const CoreSamplePanel = dynamic(() => import("@/components/CoreSamplePanel"), { ssr: false });
+const DrillHUD = dynamic(() => import("@/components/DrillHUD"), { ssr: false });
 const OilChatModal = dynamic(() => import("@/components/OilChatModal"), { ssr: false });
 const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
 // OilPlotDraft removed — plot picking now merged into OilQualify
@@ -294,11 +295,10 @@ function CameraShake({ shakeRef }) {
     if (!active.current || !basePos.current) return;
 
     elapsed.current += delta;
-    const RUMBLE_DURATION = 3.0;
-    // Gentle fade in then slow fade out
+    const RUMBLE_DURATION = 5.0;
     const t = elapsed.current / RUMBLE_DURATION;
-    const envelope = t < 0.1 ? t / 0.1 : Math.max(0, 1 - (t - 0.1) / 0.9);
-    const amp = 0.015 * envelope;
+    const envelope = t < 0.05 ? t / 0.05 : Math.max(0, 1 - (t - 0.05) / 0.95);
+    const amp = 0.02 * envelope;
     // Smooth perlin-like rumble using layered sin waves
     const e = elapsed.current;
     const ox = Math.sin(e * 7.3) * 0.6 + Math.sin(e * 13.1) * 0.4;
@@ -1045,51 +1045,49 @@ export default function OilPage() {
   // In active game mode, hide oil data from 2D views
   const showOilData = isAdmin || isReport;
 
-  const blankClaimTotals = useMemo(() =>
-    stats.claimTotals.map((c) => ({ ...c, oil: 0, total: 0 })),
-    [stats.claimTotals]
-  );
-
-  const blankGrid3D = useMemo(() => {
+  // Community-visible grid: reveals oil data at every plot up to its drilled depth
+  const communityGrid3D = useMemo(() => {
+    if (showOilData) return stats.grid3D;
     const g = [];
     for (let x = 0; x < gridSize; x++) {
       g[x] = [];
       for (let y = 0; y < gridSize; y++) {
-        g[x][y] = new Array(DEPTH_Z).fill(0);
+        const plotKey = `${x}_${y}`;
+        const plotDepth = allPlotsMap[plotKey]?.drillDay ?? 0;
+        const row = new Array(DEPTH_Z).fill(0);
+        for (let z = 0; z < Math.min(plotDepth, DEPTH_Z); z++) {
+          row[z] = stats.grid3D[x]?.[y]?.[z] ?? 0;
+        }
+        g[x][y] = row;
       }
     }
     return g;
-  }, [gridSize]);
+  }, [showOilData, stats.grid3D, allPlotsMap, gridSize]);
 
-  // Depth-limited grid: only reveals the player's drilled column up to effectiveDrillDay
-  // Shallow-copies only the outer array + the single affected column/row (was 2000 array clones)
-  const playerGrid3D = useMemo(() => {
-    if (showOilData || selectedX === null || !activeUserDrill) return blankGrid3D;
-    const col = activeUserDrill.col;
-    const row = activeUserDrill.row;
-    if (col == null || row == null || col >= gridSize || row >= gridSize) return blankGrid3D;
-    const g = [...blankGrid3D]; // shallow copy outer array (just references)
-    const newCol = [...g[col]]; // shallow copy the one column
-    const newRow = [...newCol[row]]; // clone the one depth array
-    for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
-      newRow[z] = stats.grid3D[col]?.[row]?.[z] ?? 0;
-    }
-    newCol[row] = newRow;
-    g[col] = newCol;
-    return g;
-  }, [showOilData, selectedX, activeUserDrill, effectiveDrillDay, stats.grid3D, blankGrid3D]);
+  const communityClaimTotals = useMemo(() => {
+    if (showOilData) return stats.claimTotals;
+    return stats.claimTotals.map((c) => {
+      const plotKey = `${c.x}_${c.y}`;
+      const plotDepth = allPlotsMap[plotKey]?.drillDay ?? 0;
+      let sum = 0;
+      for (let z = 0; z < Math.min(plotDepth, DEPTH_Z); z++) {
+        sum += stats.grid3D[c.x]?.[c.y]?.[z] ?? 0;
+      }
+      return { ...c, oil: sum, total: sum };
+    });
+  }, [showOilData, stats.claimTotals, stats.grid3D, allPlotsMap]);
 
-  const playerMaxOil = useMemo(() => {
-    if (showOilData || selectedX === null || !activeUserDrill) return 0;
+  const communityMaxOil = useMemo(() => {
     let max = 0;
-    const col = activeUserDrill.col;
-    const row = activeUserDrill.row;
-    for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
-      const v = stats.grid3D[col]?.[row]?.[z] ?? 0;
-      if (v > max) max = v;
+    for (let x = 0; x < gridSize; x++) {
+      for (let y = 0; y < gridSize; y++) {
+        for (let z = 0; z < DEPTH_Z; z++) {
+          if (communityGrid3D[x]?.[y]?.[z] > max) max = communityGrid3D[x][y][z];
+        }
+      }
     }
     return max;
-  }, [showOilData, selectedX, activeUserDrill, effectiveDrillDay, stats.grid3D]);
+  }, [communityGrid3D, gridSize]);
 
   // Player extracted oil total
   const playerExtracted = useMemo(() => {
@@ -1178,6 +1176,13 @@ export default function OilPage() {
     return 0;
   }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D]);
 
+  const drilledOilValue = useMemo(() => {
+    if (selectedX === null || effectiveDrillDay === 0) return 0;
+    const depthIndex = effectiveDrillDay - 1;
+    if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
+    return stats.grid3D[selectedX]?.[sliceY]?.[depthIndex] ?? 0;
+  }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D]);
+
   // Tank overflow gusher — fires once when tankFill first crosses 1.0
   const tankOverflowed = useRef(false);
   const [tankGusher, setTankGusher] = useState(0);
@@ -1231,10 +1236,15 @@ export default function OilPage() {
   // Camera shake — ref-driven, no state re-renders
   const shakeRef = useRef(0);
 
+  const strikeShakeTimeout = useRef(null);
   useEffect(() => {
     if (oilStrike > 0) {
-      shakeRef.current = 1;
+      if (strikeShakeTimeout.current) clearTimeout(strikeShakeTimeout.current);
+      strikeShakeTimeout.current = setTimeout(() => {
+        shakeRef.current = 1;
+      }, 10000);
     }
+    return () => { if (strikeShakeTimeout.current) clearTimeout(strikeShakeTimeout.current); };
   }, [oilStrike]);
 
   useEffect(() => {
@@ -2926,7 +2936,7 @@ export default function OilPage() {
         </div>
       )}
       {/* Claim Jump toggle */}
-      {gamePhase === "active" && (
+      {gamePhase === "active" && !isTest && userDrill && (
         <div style={{ marginBottom: 8 }}>
           <button
             onClick={() => setClaimJumpMode((m) => !m)}
@@ -3051,7 +3061,7 @@ export default function OilPage() {
         {Array.from({ length: DEPTH_Z }, (_, d) => {
           const drilled = d < effectiveDrillDay;
           const oil = drilled ? (stats.grid3D[activeUserDrill.col]?.[activeUserDrill.row]?.[d] ?? 0) : 0;
-          const barWidth = drilled && playerMaxOil > 0 ? (oil / playerMaxOil) * 100 : 0;
+          const barWidth = drilled && communityMaxOil > 0 ? (oil / communityMaxOil) * 100 : 0;
           return (
             <div key={d} style={styles.depthRow}>
               <span style={{
@@ -3249,6 +3259,15 @@ export default function OilPage() {
                 <CameraShake shakeRef={shakeRef} />
               </CleanCanvas>
               {cctvOverlay}
+              <DrillHUD
+                drillEvent={drillEvent}
+                depthLevel={effectiveDrillDay}
+                maxDepth={DEPTH_Z}
+                oilStrike={oilStrike}
+                oilValue={drilledOilValue}
+                maxOil={stats.maxOil}
+                drillProximity={drillProximity}
+              />
               <div style={{ ...styles.cornerBracket, top: 6, left: 6 }} />
               <div style={{ ...styles.cornerBracket, top: 6, right: 6, transform: "scaleX(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, left: 6, transform: "scaleY(-1)" }} />
@@ -3335,7 +3354,7 @@ export default function OilPage() {
           {mobileTab === "surface" && (
             <div style={m.section}>
               <OilSurfaceMap
-                claimTotals={showOilData ? stats.claimTotals : blankClaimTotals}
+                claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
                 maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
@@ -3354,8 +3373,8 @@ export default function OilPage() {
           {mobileTab === "xsec" && (
             <div style={m.section}>
               <OilCrossSection
-                grid3D={showOilData ? stats.grid3D : playerGrid3D}
-                maxCellValue={showOilData ? stats.maxOil : playerMaxOil}
+                grid3D={showOilData ? stats.grid3D : communityGrid3D}
+                maxCellValue={showOilData ? stats.maxOil : communityMaxOil}
                 sliceY={sliceY}
                 selectedX={selectedX}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
@@ -3371,6 +3390,16 @@ export default function OilPage() {
           {/* Panels below active view */}
           {testStepper}
           {drillButton}
+          <DrillHUD
+            drillEvent={drillEvent}
+            depthLevel={effectiveDrillDay}
+            maxDepth={DEPTH_Z}
+            oilStrike={oilStrike}
+            oilValue={drilledOilValue}
+            maxOil={stats.maxOil}
+            drillProximity={drillProximity}
+            darkMode={darkMode}
+          />
           {playerDrillPanel}
           {isAdmin && parametersPanel}
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
@@ -3389,6 +3418,9 @@ export default function OilPage() {
             isMobile
             gridX={gridSize}
             gridY={gridSize}
+            selectedX={selectedX}
+            selectedY={sliceY}
+            drillDepth={effectiveDrillDay}
           />
           {leaderboardPanel}
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
@@ -3468,6 +3500,8 @@ export default function OilPage() {
         <UnifiedAccountModal
           isOpen={showAccountModal}
           onClose={() => setShowAccountModal(false)}
+          theme="industrial"
+          unlockedItems={unlockedItems}
         />
 
         {/* CyberNav Menu Panel */}
@@ -3763,7 +3797,7 @@ export default function OilPage() {
           <div style={styles.midColumn}>
             <div style={styles.midPanel}>
               <OilSurfaceMap
-                claimTotals={showOilData ? stats.claimTotals : blankClaimTotals}
+                claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
                 maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
@@ -3778,8 +3812,8 @@ export default function OilPage() {
             </div>
             <div style={{ ...styles.midPanel, flex: 1, minHeight: 0 }}>
               <OilCrossSection
-                grid3D={showOilData ? stats.grid3D : playerGrid3D}
-                maxCellValue={showOilData ? stats.maxOil : playerMaxOil}
+                grid3D={showOilData ? stats.grid3D : communityGrid3D}
+                maxCellValue={showOilData ? stats.maxOil : communityMaxOil}
                 sliceY={sliceY}
                 selectedX={selectedX}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
@@ -3802,6 +3836,16 @@ export default function OilPage() {
           }}>
             {testStepper}
             {drillButton}
+            <DrillHUD
+              drillEvent={drillEvent}
+              depthLevel={effectiveDrillDay}
+              maxDepth={DEPTH_Z}
+              oilStrike={oilStrike}
+              oilValue={drilledOilValue}
+              maxOil={stats.maxOil}
+              drillProximity={drillProximity}
+              darkMode={darkMode}
+            />
             {playerDrillPanel}
             {isAdmin && parametersPanel}
             {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
@@ -3813,6 +3857,9 @@ export default function OilPage() {
               darkMode={darkMode}
               gridX={gridSize}
               gridY={gridSize}
+              selectedX={selectedX}
+              selectedY={sliceY}
+              drillDepth={effectiveDrillDay}
             />
             {leaderboardPanel}
             <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
@@ -3914,6 +3961,7 @@ export default function OilPage() {
         onClose={() => setShowAccountModal(false)}
         theme="industrial"
         initialTab="wallet"
+        unlockedItems={unlockedItems}
       />
     </div>
   );

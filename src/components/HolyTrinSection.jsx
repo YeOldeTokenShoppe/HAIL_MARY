@@ -27,7 +27,7 @@ const PILLARS = [
   {
     id: "liquid80",
     label: "Liquid80",
-    tagline: "ever flowing",
+    tagline: "secured",
     color: "#d92db0",
     description:
       "LP tokens burned. Liquidity locked permanently — Small pool, but unruggable.",
@@ -70,7 +70,8 @@ export default function HolyTrinSection() {
         <DropInTitle
           lines={["The Holy", "Trin80", "of Tokens"]}
           colors={["#2ad6ee", "#d4af37", "#d92db0"]}
-          fontSize={{ mobile: "2rem", desktop: "3.4rem" }}
+          fontSize={{ mobile: "3rem", desktop: "3.4rem" }}
+          isMobile={typeof window !== "undefined" && window.innerWidth <= 900}
           triggerAnimation={inView}
           instanceId="holy-trin-heading"
         />

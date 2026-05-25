@@ -285,7 +285,7 @@ body:has(.shrine-page.neon) {
 
   .shrine-page.neon .below-fold-chamber {
     width: calc(100% + 16px);
-    margin: 15vh -8px 0;
+    margin: 40vh -8px 0;
     min-height: 300vh;
     padding: 1px 8px calc(190px + env(safe-area-inset-bottom, 0px));
     background: transparent;
@@ -352,7 +352,7 @@ body:has(.shrine-page.neon) {
   position: relative;
   z-index: 2;
   width: calc(100% + 40px);
-  margin: 60vh -20px 0;
+  margin: 85vh -20px 0;
   min-height: 320vh;
   padding: 1px 20px calc(280px + env(safe-area-inset-bottom, 0px));
   pointer-events: auto;
@@ -370,6 +370,35 @@ body:has(.shrine-page.neon) {
 
 .shrine-page.neon .below-fold-chamber * {
   touch-action: pan-y;
+}
+
+.shrine-page.neon .hero-intro-chart {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto 10rem;
+  pointer-events: auto;
+}
+
+.shrine-page.neon .hero-intro-chart .shrine-stage {
+  width: 100%;
+  max-width: none;
+}
+
+.shrine-page.neon .below-fold-chamber .section-title-wrap {
+  padding-top: 20px;
+  margin: 0 auto 16px;
+  text-align: center;
+}
+
+.shrine-page.neon .hero-copy--below-fold {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  max-width: 580px;
+  margin: 0 auto 22px;
+  text-align: center;
+  align-items: center;
 }
 
 .shrine-page.neon .hero-copy {
@@ -805,6 +834,7 @@ body:has(.shrine-page.neon) {
 @media (max-width: 900px) {
   .shrine-page.neon .hero-band {
     gap: 24px;
+    align-items: center;
   }
   .shrine-page.neon .hero-copy {
     align-items: center;
@@ -813,14 +843,15 @@ body:has(.shrine-page.neon) {
     padding: 28px 18px 24px;
     background: linear-gradient(
       180deg,
-      rgba(35, 12, 55, 0.74) 0%,
-      rgba(18, 5, 32, 0.86) 100%
+      rgba(4, 8, 15, 0.65) 0%,
+      rgba(2, 5, 9, 0.65) 50%,
+      rgba(0, 0, 0, 0.65) 100%
     );
-    border-top: 1px solid rgba(255, 0, 255, 0.25);
+    border-top: 1px solid rgba(42, 214, 238, 0.15);
     border-radius: 14px;
     box-shadow:
       0 8px 28px rgba(0, 0, 0, 0.45),
-      0 0 28px rgba(217, 45, 176, 0.08);
+      0 0 14px rgba(42, 214, 238, 0.06);
   }
   .shrine-page.neon .our-lady-title {
     transform-origin: center;
@@ -889,13 +920,32 @@ body:has(.shrine-page.neon) {
      FRAME_PAD (26 of 600 viewBox) puts the visible frame ~2.17% in
      from the SVG's edge on each side. */
   .shrine-page.neon .hero-copy {
-    background: rgba(0, 0, 0, 0.5);
+    background: linear-gradient(
+      180deg,
+      rgba(4, 8, 15, 0.65) 0%,
+      rgba(2, 5, 9, 0.65) 50%,
+      rgba(0, 0, 0, 0.65) 100%
+    );
+    border-top: 1px solid rgba(42, 214, 238, 0.15);
+    border-radius: 14px;
     padding: 14px 16px;
-    border-radius: 4px;
     box-sizing: border-box;
     width: 95.67%;
     margin-left: 2.17%;
     align-self: flex-start;
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 0 14px rgba(42, 214, 238, 0.06);
+  }
+  .shrine-page.neon .hero-copy.hero-copy--below-fold {
+    background: none;
+    border-top: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0 16px;
+    width: auto;
+    margin-left: 0;
+    align-self: center;
   }
 }
 
@@ -910,14 +960,22 @@ body:has(.shrine-page.neon) {
      so a 10px margin + 560px cap makes the backdrop sit flush inside
      the visible frame. */
   .shrine-page.neon .hero-copy {
-    background: rgba(0, 0, 0, 0.5);
+    background: linear-gradient(
+      180deg,
+      rgba(35, 12, 55, 0.74) 0%,
+      rgba(18, 5, 32, 0.86) 100%
+    );
+    border-top: 1px solid rgba(255, 0, 255, 0.25);
+    border-radius: 14px;
     padding: 14px 16px;
-    border-radius: 4px;
     box-sizing: border-box;
     width: 100%;
     max-width: 560px;
     margin-left: 10px;
     align-self: flex-start;
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 0 28px rgba(217, 45, 176, 0.08);
   }
 }
 

@@ -257,6 +257,215 @@ function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio }) 
   );
 }
 
+function PersonalCoreTube({ column, maxOil, drillDepth, dark }) {
+  const tubeX = 42;
+  const tubeY = 10;
+  const tubeW = 56;
+  const tubeH = 260;
+  const bandH = tubeH / DEPTH_Z;
+  const colors = dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
+  const svgW = 270;
+  const svgH = tubeH + 24;
+  const drilledH = Math.min(drillDepth, DEPTH_Z) * bandH;
+  const unknownFill = dark ? "#141820" : "#e0d8cc";
+  const unknownStroke = dark ? "#1e2430" : "#d0c8b8";
+
+  let bestDrilledZ = -1;
+  let bestVal = 0;
+  for (let z = 0; z < Math.min(drillDepth, DEPTH_Z); z++) {
+    if ((column[z] || 0) > bestVal) { bestVal = column[z]; bestDrilledZ = z; }
+  }
+
+  return (
+    <svg
+      width="100%"
+      height={svgH}
+      viewBox={`0 0 ${svgW} ${svgH}`}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: "block" }}
+      aria-hidden="true"
+    >
+      <defs>
+        <filter id="personal-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <clipPath id="personal-clip">
+          <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={8} />
+        </clipPath>
+        <pattern id="unknown-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6"
+            stroke={dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"}
+            strokeWidth="2" />
+        </pattern>
+      </defs>
+
+      {/* Tube background */}
+      <rect
+        x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={8}
+        fill={dark ? "rgba(18,10,22,0.6)" : "rgba(200,190,175,0.3)"}
+      />
+
+      <g clipPath="url(#personal-clip)">
+        {/* Drilled layers — real results */}
+        {column.map((value, z) => {
+          if (z >= drillDepth) return null;
+          const tier = classifyDensity(value, maxOil);
+          const c = colors[tier];
+          return (
+            <rect
+              key={z}
+              x={tubeX} y={tubeY + z * bandH}
+              width={tubeW} height={bandH + 0.5}
+              fill={c.fill} opacity={c.opacity}
+            />
+          );
+        })}
+
+        {/* Strata lines in drilled zone */}
+        <g opacity="0.2" stroke={dark ? "#e8d9b8" : "#8a7d6b"} strokeWidth="0.4" fill="none">
+          {[4, 8, 12, 16].filter(z => z < drillDepth).map((z) => (
+            <line key={z}
+              x1={tubeX} y1={tubeY + z * bandH}
+              x2={tubeX + tubeW} y2={tubeY + z * bandH}
+            />
+          ))}
+        </g>
+
+        {/* Unknown zone — hatched pattern */}
+        {drillDepth < DEPTH_Z && (
+          <>
+            <rect
+              x={tubeX} y={tubeY + drilledH}
+              width={tubeW} height={tubeH - drilledH}
+              fill={unknownFill}
+            />
+            <rect
+              x={tubeX} y={tubeY + drilledH}
+              width={tubeW} height={tubeH - drilledH}
+              fill="url(#unknown-hatch)"
+            />
+          </>
+        )}
+
+        {/* Drill boundary line */}
+        {drillDepth > 0 && drillDepth < DEPTH_Z && (
+          <line
+            x1={tubeX} y1={tubeY + drilledH}
+            x2={tubeX + tubeW} y2={tubeY + drilledH}
+            stroke={dark ? "#d4a854" : "#b8922e"} strokeWidth="1.5" opacity="0.7"
+          />
+        )}
+      </g>
+
+      {/* Tube outline */}
+      <rect
+        x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={8}
+        fill="none" stroke={dark ? "#d4a854" : "#b8922e"} strokeWidth="0.8" opacity="0.5"
+      />
+
+      {/* Glass highlight */}
+      <rect
+        x={tubeX + 3} y={tubeY + 4} width={5} height={tubeH - 8} rx={2.5}
+        fill={dark ? "rgba(232,217,184,0.06)" : "rgba(255,255,255,0.15)"}
+      />
+
+      {/* Depth ticks — LEFT */}
+      <g fontFamily='"Share Tech Mono", monospace' fontSize="9"
+         fill={dark ? "rgba(212,168,84,0.55)" : "rgba(139,115,85,0.6)"} letterSpacing="0.05em">
+        {[0, 5, 10, 15, 19].map((z) => {
+          const yPos = tubeY + z * bandH + bandH * 0.5;
+          const isDrilled = z < drillDepth;
+          return (
+            <g key={z} opacity={isDrilled ? 1 : 0.35}>
+              <line
+                x1={tubeX - 5} y1={yPos}
+                x2={tubeX} y2={yPos}
+                stroke={dark ? "rgba(212,168,84,0.3)" : "rgba(139,115,85,0.3)"}
+                strokeWidth="0.6"
+              />
+              <text x={tubeX - 8} y={yPos + 3} textAnchor="end">
+                {z + 1}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+
+      {/* RIGHT side — callouts for drilled zone */}
+      <g fontFamily='"Share Tech Mono", monospace' letterSpacing="0.08em">
+        {/* Drill depth marker */}
+        {drillDepth > 0 && drillDepth < DEPTH_Z && (
+          <>
+            <line
+              x1={tubeX + tubeW} y1={tubeY + drilledH}
+              x2={tubeX + tubeW + 14} y2={tubeY + drilledH}
+              stroke={dark ? "#d4a854" : "#b8922e"} strokeWidth="0.8" opacity="0.6"
+            />
+            <text
+              x={tubeX + tubeW + 18} y={tubeY + drilledH + 3}
+              fontSize="9" fill={dark ? "#d4a854" : "#b8922e"} letterSpacing="0.1em"
+            >
+              DRILL HEAD
+            </text>
+            <text
+              x={tubeX + tubeW + 18} y={tubeY + drilledH + 14}
+              fontSize="8" fill={dark ? "#6a7888" : "#8b7d6b"}
+            >
+              LV {drillDepth}/{DEPTH_Z}
+            </text>
+          </>
+        )}
+
+        {/* Unknown zone label */}
+        {drillDepth < DEPTH_Z && (
+          <text
+            x={tubeX + tubeW + 18}
+            y={tubeY + drilledH + (tubeH - drilledH) / 2 + 3}
+            fontSize="8" fill={dark ? "#3a4454" : "#b8b0a4"} letterSpacing="0.15em"
+          >
+            UNCHARTED
+          </text>
+        )}
+
+        {/* Best find marker */}
+        {bestDrilledZ >= 0 && bestVal > 0 && (
+          (() => {
+            const cy = tubeY + bestDrilledZ * bandH + bandH * 0.5;
+            const tier = classifyDensity(bestVal, maxOil);
+            if (tier < 3) return null;
+            return (
+              <>
+                <g filter="url(#personal-glow)">
+                  <circle cx={tubeX + tubeW * 0.5} cy={cy} r="3" fill="#e87a2b">
+                    <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
+                    <animate attributeName="r" values="3;4.2;3" dur="1.6s" repeatCount="indefinite" />
+                  </circle>
+                </g>
+                <line
+                  x1={tubeX + tubeW} y1={cy}
+                  x2={tubeX + tubeW + 14} y2={cy}
+                  stroke="#e87a2b" strokeWidth="0.6" opacity="0.5"
+                />
+                <text
+                  x={tubeX + tubeW + 18} y={cy + 3}
+                  fontSize="9" fill="#e87a2b" letterSpacing="0.12em"
+                  style={{ filter: "drop-shadow(0 0 2px rgba(232,122,43,0.5))" }}
+                >
+                  {colors[tier].label}
+                </text>
+              </>
+            );
+          })()
+        )}
+      </g>
+    </svg>
+  );
+}
+
 function Legend({ dark }) {
   const colors = dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
   return (
@@ -294,8 +503,12 @@ export default function CoreSamplePanel({
   defaultExpanded = false,
   gridX = 10,
   gridY = 10,
+  selectedX = null,
+  selectedY = null,
+  drillDepth = 0,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [coreTab, setCoreTab] = useState("personal");
   const [analysisState, setAnalysisState] = useState("idle");
   const [revealRatio, setRevealRatio] = useState(0);
   const rafRef = useRef(null);
@@ -358,7 +571,29 @@ export default function CoreSamplePanel({
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, []);
 
+  const personalColumn = useMemo(() => {
+    if (selectedX === null || selectedY === null || !grid3D) return null;
+    const col = [];
+    for (let z = 0; z < DEPTH_Z; z++) col.push(grid3D[selectedX]?.[selectedY]?.[z] ?? 0);
+    return col;
+  }, [grid3D, selectedX, selectedY]);
+
+  const hasClaim = selectedX !== null && selectedY !== null && drillDepth > 0;
+
   if (!grid3D || avgColumn.length === 0) return null;
+
+  const tabStyle = (active) => ({
+    fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 10, fontWeight: active ? 600 : 400,
+    letterSpacing: "0.12em",
+    color: active ? c.accent : c.muted,
+    background: "none",
+    border: "none",
+    borderBottom: active ? `2px solid ${c.accent}` : "2px solid transparent",
+    padding: "4px 10px",
+    cursor: "pointer",
+    textTransform: "uppercase",
+  });
 
   return (
     <div style={{
@@ -395,15 +630,77 @@ export default function CoreSamplePanel({
 
       {expanded && (
         <div style={{ marginTop: 10 }}>
+          {/* Sub-tabs */}
           <div style={{
-            fontSize: 10, color: c.muted, letterSpacing: "0.1em",
-            fontFamily: "'Share Tech Mono', monospace",
-            textAlign: "center", marginBottom: 8, lineHeight: 1.5,
+            display: "flex", justifyContent: "center", gap: 4,
+            marginBottom: 10,
+            borderBottom: `1px solid ${dark ? "#2a2e36" : "#d4c8b4"}`,
+            paddingBottom: 6,
           }}>
-            COMPOSITE FIELD SURVEY
-            <br />
-            DEPTH LEVELS 1–{DEPTH_Z}
+            <button style={tabStyle(coreTab === "personal")} onClick={() => setCoreTab("personal")}>
+              YOUR CLAIM
+            </button>
+            <button style={tabStyle(coreTab === "field")} onClick={() => setCoreTab("field")}>
+              FIELD SURVEY
+            </button>
           </div>
+
+          {coreTab === "personal" && (
+            hasClaim && personalColumn ? (
+              <div>
+                <div style={{
+                  fontSize: 10, color: c.muted, letterSpacing: "0.1em",
+                  fontFamily: "'Share Tech Mono', monospace",
+                  textAlign: "center", marginBottom: 8, lineHeight: 1.5,
+                }}>
+                  PLOT ({selectedX}, {selectedY}) — DRILL LOG
+                </div>
+                <PersonalCoreTube
+                  column={personalColumn}
+                  maxOil={maxOil}
+                  drillDepth={drillDepth}
+                  dark={dark}
+                />
+                <Legend dark={dark} />
+                <div style={{
+                  fontSize: 9, color: dark ? "#5a6878" : "#908878",
+                  fontFamily: "'Share Tech Mono', monospace",
+                  textAlign: "center", marginTop: 8,
+                  letterSpacing: "0.06em", lineHeight: 1.5,
+                }}>
+                  {drillDepth < DEPTH_Z
+                    ? `${DEPTH_Z - drillDepth} layers remain. Keep drilling.`
+                    : "Full depth reached."}
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                textAlign: "center", padding: "20px 10px",
+                fontFamily: "'Share Tech Mono', monospace",
+              }}>
+                <div style={{ fontSize: 24, marginBottom: 8, opacity: 0.5 }}>⛏️</div>
+                <div style={{
+                  fontSize: 10, color: c.muted, letterSpacing: "0.1em", lineHeight: 1.6,
+                }}>
+                  {selectedX === null
+                    ? "Select a claim to see your drill log."
+                    : "Start drilling to build your core sample."}
+                </div>
+              </div>
+            )
+          )}
+
+          {coreTab === "field" && (
+            <>
+              <div style={{
+                fontSize: 10, color: c.muted, letterSpacing: "0.1em",
+                fontFamily: "'Share Tech Mono', monospace",
+                textAlign: "center", marginBottom: 8, lineHeight: 1.5,
+              }}>
+                COMPOSITE FIELD SURVEY
+                <br />
+                DEPTH LEVELS 1–{DEPTH_Z}
+              </div>
 
           {analysisState === "idle" ? (
             <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
@@ -483,6 +780,8 @@ export default function CoreSamplePanel({
                 </>
               )}
             </>
+            )}
+          </>
           )}
         </div>
       )}

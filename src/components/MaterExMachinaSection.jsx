@@ -30,7 +30,8 @@ export default function MaterExMachinaSection() {
         <DropInTitle
           lines={["Mater ex", "Machina"]}
           colors={["#d4af37", "#2ad6ee"]}
-          fontSize={{ mobile: "2rem", desktop: "3.4rem" }}
+          fontSize={{ mobile: "3rem", desktop: "3.4rem" }}
+          isMobile={typeof window !== "undefined" && window.innerWidth <= 900}
           triggerAnimation={inView}
           instanceId="mater-heading"
         />
@@ -72,7 +73,7 @@ export default function MaterExMachinaSection() {
           <p>
             Some called it a miracle. Or was it simply a pattern that paid off?
             St. GR80, android monk and scholar of the algorithmic
-            age, transcribes what the bots already knew. The source signal remains unidentified.
+            age, transcribes what the bots already knew. The source signal remains shrouded in mystery.
           </p>
         </div>
       </div>

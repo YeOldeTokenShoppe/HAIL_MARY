@@ -338,6 +338,7 @@ export default function MobileBottomNav({
           position: relative;
           background: transparent;
           border: none;
+          overflow: hidden;
         }
 
         .btm-nav-icon.active-state {

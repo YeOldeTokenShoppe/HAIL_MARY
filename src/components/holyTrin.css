@@ -361,18 +361,12 @@
     max-width: 360px;
     margin: clamp(220px, 75vh, 600px) auto 0;
     padding: 32px 16px 28px;
-    background: linear-gradient(
-      180deg,
-      rgba(35, 12, 55, 0.74) 0%,
-      rgba(18, 5, 32, 0.86) 100%
-    );
-    border-top: 1px solid rgba(255, 0, 255, 0.25);
-    border-radius: 14px;
+    background: none;
+    border-top: none;
+    border-radius: 0;
     color: #f1d77a;
     text-align: center;
-    box-shadow:
-      0 8px 28px rgba(0, 0, 0, 0.45),
-      0 0 28px rgba(217, 45, 176, 0.08);
+    box-shadow: none;
   }
 
   .holy-trin::before {

@@ -116,3 +116,12 @@ env:
     secret: ONRAMP_AUTH_SECRET
     availability:
       - RUNTIME
+  - variable: TELEGRAM_BOT_TOKEN
+    secret: TELEGRAM_BOT_TOKEN
+    availability:
+      - RUNTIME
+  - variable: NEXT_PUBLIC_TELEGRAM_BOT_NAME
+    secret: NEXT_PUBLIC_TELEGRAM_BOT_NAME
+    availability:
+      - BUILD
+      - RUNTIME

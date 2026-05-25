@@ -2027,6 +2027,11 @@ const HERO_PULLQUOTES = [
     source: "William Gibson",
     tone: "modern",
   },
+    {
+    text: "Every trade is a Hail Mary.",
+    source: "",
+    tone: "modern",
+  },
 ];
 
 function MobileSectionDropInTitle() {
@@ -2037,7 +2042,7 @@ function MobileSectionDropInTitle() {
       <DropInTitle
         lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
         colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-        fontSize={{ mobile: "2.5rem", desktop: "4rem" }}
+        fontSize={{ mobile: "3rem", desktop: "3.4rem" }}
         isMobile
         triggerAnimation={inView}
       />
@@ -2540,9 +2545,24 @@ export default function HomePage() {
         </h1>
       </div>
 
-      <div className="hero-band">
-        <div className="hero-copy">
-          {isMobileDevice && <MobileSectionDropInTitle />}
+      <div className="below-fold-chamber">
+        <div className="hero-intro-chart">
+          <div
+            className="shrine-stage"
+            onMouseEnter={() => setChartHovered(true)}
+            onMouseLeave={() => setChartHovered(false)}
+          >
+            <ChartShrine
+              {...data}
+              palette="chrome"
+              timeframeKey={timeframeKey}
+              onTimeframeChange={setTimeframeKey}
+            />
+          </div>
+        </div>
+
+        <MobileSectionDropInTitle />
+        <div className="hero-copy hero-copy--below-fold">
           <blockquote
             className="hero-pullquote"
             title={heroPullquote.gloss || undefined}
@@ -2572,42 +2592,12 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
 </p>
         </div>
 
-        <div className="shrine-column">
-          <div
-            className="shrine-stage"
-            onMouseEnter={() => setChartHovered(true)}
-            onMouseLeave={() => setChartHovered(false)}
-          >
-            <ChartShrine
-              {...data}
-              palette="chrome"
-              timeframeKey={timeframeKey}
-              onTimeframeChange={setTimeframeKey}
-            />
-          </div>
-
-          {/* <div className="shrine-actions">
-            <a
-              className="shrine-btn"
-              href={UNISWAP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Swap on Uniswap
-            </a>
-            <a
-              className="shrine-btn"
-              href={GECKO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Live chart on GeckoTerminal
-            </a>
-          </div> */}
+        <div className="section-divider" role="separator" aria-hidden="true">
+          <span className="section-divider-line section-divider-line--left" />
+          <span className="section-divider-icon">&#x2020;</span>
+          <span className="section-divider-line section-divider-line--right" />
         </div>
-      </div>
 
-      <div className="below-fold-chamber">
         <MaterExMachinaSection />
 
         <div className="section-divider" role="separator" aria-hidden="true">

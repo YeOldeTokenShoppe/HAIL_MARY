@@ -839,13 +839,13 @@ export default function NavControlsHome({
             >
               {clerkUser?.imageUrl ? (
                 <img
-                  src={clerkUser.imageUrl}
+                  src={`${clerkUser.imageUrl}?width=200&height=200&quality=100&fit=crop`}
                   alt="Avatar"
                   style={{
                     position: 'absolute',
-                    inset: '-1.5px',
-                    width: 'calc(100% + 3px)',
-                    height: 'calc(100% + 3px)',
+                    inset: '-8px',
+                    width: 'calc(100% + 16px)',
+                    height: 'calc(100% + 16px)',
                     objectFit: 'cover',
                     display: 'block'
                   }}

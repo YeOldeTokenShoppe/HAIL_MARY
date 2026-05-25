@@ -1378,19 +1378,27 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const strikingRef = useRef(false);   // true during gusher overflow
   const strikeFlashRef = useRef(false); // true during timed oil-strike flash
   const strikeFlashTimer = useRef(0);
-  const STRIKE_FLASH_DURATION = 3.0;
+  const STRIKE_FLASH_DURATION = 4.0;
   const strikeLightRef = useRef(); // dynamic point light
 
   // Ground shake on oil strike
   const shakeRef = useRef(false);
   const shakeTimerRef = useRef(0);
-  const SHAKE_DURATION = 2.5;
+  const SHAKE_DURATION = 4.0;
+
+  // ── Staged drill reveal — delay oil strike visuals for suspense ────────────
+  const STRIKE_REVEAL_DELAY = 10.0;
+  const pendingStrikeRef = useRef(false);
+  const pendingStrikeTimer = useRef(0);
+  const drillMasterTimer = useRef(0);
+  const drillActiveRef = useRef(false);
+  const DRILL_TOTAL_DURATION = 18.0;
 
   // ── Drill effects (every drill, not just oil strikes) ──────────────────────
   // Drill rumble — lighter shake, separate from oil-strike shake
   const drillShakeRef = useRef(false);
   const drillShakeTimerRef = useRef(0);
-  const DRILL_SHAKE_DURATION = 7.0;
+  const DRILL_SHAKE_DURATION = 16.0;
   const DRILL_SHAKE_MAG = 0.002;
 
   // Dust burst particles
@@ -1402,17 +1410,17 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const dustLifeRef = useRef(new Float32Array(DUST_COUNT));
   const dustGeoRef = useRef();
   const dustMatRef = useRef();
-  const DUST_DURATION = 5.0;
+  const DUST_DURATION = 14.0;
 
   // Gauge needle twitch on dry drill
   const drillGaugeTwitchRef = useRef(false);
   const drillGaugeTwitchTimer = useRef(0);
-  const DRILL_GAUGE_TWITCH_DURATION = 5.0;
+  const DRILL_GAUGE_TWITCH_DURATION = 16.0;
 
   // Near-miss amber proximity pulse
   const proximityFlashRef = useRef(false);
   const proximityTimerRef = useRef(0);
-  const PROXIMITY_FLASH_DURATION = 8.0;
+  const PROXIMITY_FLASH_DURATION = 14.0;
   const drillProximityRef = useRef(0);
   drillProximityRef.current = drillProximity;
 
@@ -1656,19 +1664,25 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, []);
 
-  // Trigger timed strobe + shake when oilStrike fires on the highlighted rig
+  // Buffer oil strike visuals — delay reveal for suspense during drill sequence
   useEffect(() => {
     if (oilStrike > 0 && highlighted) {
-      strikeFlashRef.current = true;
-      strikeFlashTimer.current = 0;
-      shakeRef.current = true;
-      shakeTimerRef.current = 0;
-      // Reset drained state so new oil cycle can fill normally
-      drainedRef.current = false;
-      drainingRef.current = false;
-      setTankDraining(false);
+      pendingStrikeRef.current = true;
+      pendingStrikeTimer.current = 0;
     }
   }, [oilStrike, highlighted]);
+
+  // Reveal the buffered oil strike after the suspense delay
+  const revealStrike = useCallback(() => {
+    strikeFlashRef.current = true;
+    strikeFlashTimer.current = 0;
+    shakeRef.current = true;
+    shakeTimerRef.current = 0;
+    drainedRef.current = false;
+    drainingRef.current = false;
+    setTankDraining(false);
+    pendingStrikeRef.current = false;
+  }, []);
 
   // Trigger gusher particles only when tank overflows (fill >= 1.0)
   const wasOverflowing = useRef(false);
@@ -1710,19 +1724,22 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   }, []);
 
   const prevDrillEvent = useRef(0);
+  const dustWaveCount = useRef(0);
   useEffect(() => {
     if (drillEvent > 0 && drillEvent !== prevDrillEvent.current && highlighted) {
       prevDrillEvent.current = drillEvent;
+      // Start master drill timer
+      drillActiveRef.current = true;
+      drillMasterTimer.current = 0;
+      dustWaveCount.current = 0;
       // 1. Drill rumble (every drill)
       drillShakeRef.current = true;
       drillShakeTimerRef.current = 0;
-      // 2. Dust burst (every drill)
+      // 2. Initial dust burst
       initDust();
-      // 3. Gauge twitch (dry drills only — oilStrike === 0)
-      if (oilStrike === 0) {
-        drillGaugeTwitchRef.current = true;
-        drillGaugeTwitchTimer.current = 0;
-      }
+      // 3. Gauge twitch (every drill now — builds suspense)
+      drillGaugeTwitchRef.current = true;
+      drillGaugeTwitchTimer.current = 0;
       // 4. Amber proximity pulse (near-miss)
       if (drillProximity > 0 && oilStrike === 0) {
         proximityFlashRef.current = true;
@@ -1915,14 +1932,49 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
 
+    // ── Staged drill master timer — controls phases and delayed reveal ──
+    if (drillActiveRef.current) {
+      drillMasterTimer.current += delta;
+      const mt = drillMasterTimer.current;
+
+      // Spawn additional dust waves during boring phase (every ~3 seconds)
+      const waveInterval = 3.0;
+      const expectedWaves = Math.floor(mt / waveInterval);
+      if (expectedWaves > dustWaveCount.current && mt < STRIKE_REVEAL_DELAY) {
+        dustWaveCount.current = expectedWaves;
+        initDust();
+      }
+
+      // Reveal buffered oil strike after delay
+      if (pendingStrikeRef.current) {
+        pendingStrikeTimer.current += delta;
+        if (pendingStrikeTimer.current >= STRIKE_REVEAL_DELAY) {
+          revealStrike();
+        }
+      }
+
+      // End master timer
+      if (mt >= DRILL_TOTAL_DURATION) {
+        drillActiveRef.current = false;
+      }
+    }
+
     // ── Drill rumble — lighter shake, coexists with oil-strike shake ──
     if (shakeGroup && drillShakeRef.current) {
       drillShakeTimerRef.current += delta;
       const dt = drillShakeTimerRef.current;
       if (dt < DRILL_SHAKE_DURATION) {
-        const decay = 1 - dt / DRILL_SHAKE_DURATION;
-        const mag = decay * DRILL_SHAKE_MAG;
-        // Only apply if oil-strike shake isn't active (it's stronger)
+        // Phased intensity: ramp up during boring, peak near reveal, decay after
+        const revealT = STRIKE_REVEAL_DELAY;
+        let intensity;
+        if (dt < revealT * 0.3) {
+          intensity = 0.3 + 0.7 * (dt / (revealT * 0.3));
+        } else if (dt < revealT) {
+          intensity = 1.0 + 0.5 * ((dt - revealT * 0.3) / (revealT * 0.7));
+        } else {
+          intensity = 1.5 * Math.max(0, 1 - (dt - revealT) / (DRILL_SHAKE_DURATION - revealT));
+        }
+        const mag = intensity * DRILL_SHAKE_MAG;
         if (!shakeRef.current) {
           shakeGroup.position.x = position[0] + (Math.random() - 0.5) * 2 * mag;
           shakeGroup.position.y = position[1] + (Math.random() - 0.5) * 2 * mag;
@@ -1975,14 +2027,33 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
 
-    // ── Gauge needle twitch on dry drill ──
+    // ── Gauge needle — phased behavior during drill sequence ──
     if (drillGaugeTwitchRef.current) {
       drillGaugeTwitchTimer.current += delta;
       const gt = drillGaugeTwitchTimer.current;
       if (gt < DRILL_GAUGE_TWITCH_DURATION) {
-        // Damped sine wave — seismograph-like twitch
-        const amplitude = 0.35; // ~30° worth of fill offset
-        gaugePressureOffset.current = amplitude * Math.exp(-gt * 1.5) * Math.sin(gt * 8);
+        const revealT = STRIKE_REVEAL_DELAY;
+        const hasPendingStrike = pendingStrikeRef.current;
+        let amplitude, freq, decay;
+        if (gt < revealT * 0.5) {
+          // Phase 1: initial seismograph twitch
+          amplitude = 0.2;
+          freq = 6;
+          decay = Math.exp(-gt * 0.3);
+        } else if (gt < revealT) {
+          // Phase 2: building intensity — instruments detecting something
+          const ramp = (gt - revealT * 0.5) / (revealT * 0.5);
+          amplitude = hasPendingStrike ? 0.2 + ramp * 0.4 : 0.15;
+          freq = hasPendingStrike ? 6 + ramp * 8 : 5;
+          decay = 1;
+        } else {
+          // Phase 3: post-reveal settling
+          const postT = gt - revealT;
+          amplitude = hasPendingStrike ? 0.5 : 0.2;
+          freq = 4;
+          decay = Math.exp(-postT * 1.5);
+        }
+        gaugePressureOffset.current = amplitude * decay * Math.sin(gt * freq);
       } else {
         drillGaugeTwitchRef.current = false;
         gaugePressureOffset.current = 0;

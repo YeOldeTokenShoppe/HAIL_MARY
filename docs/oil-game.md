@@ -113,22 +113,126 @@ Reads all registered players, checks balances. When a player drops below thresho
 **Body:** `{ adminPassword }`
 **Returns:** `{ ok, price, qualifiedCount, totalChecked, timestamp }`
 
+## Core Sample Panel
+
+Collapsible panel in the right sidebar (`src/components/CoreSamplePanel.jsx`) with two sub-tabs:
+
+### YOUR CLAIM (Personal Core)
+- Shows the 20-layer depth column at the player's specific claim (x, y)
+- **Drilled layers**: color-coded by actual oil value (SHALE → SANDSTONE → OIL SAND → CRUDE → RICH VEIN)
+- **Undrilled layers**: hatched "UNCHARTED" zone below the drill head
+- Best find marked with pulsing orange dot
+- Updates each time the player drills — even dry layers fill in a new band
+
+### FIELD SURVEY (Composite Core)
+- Single core tube averaging oil density across all 100 plots at each depth level
+- "RUN CORE ANALYSIS" button triggers a 2.8-second top-to-bottom reveal animation
+- Shows the depth bias visually (deeper = richer) without revealing location-specific data
+- Callout labels auto-generated for significant zones, pulsing PEAK DENSITY marker
+
+## Drill HUD (Instrument Gauges)
+
+Always-visible gauge panel in the right sidebar (`src/components/DrillHUD.jsx`) with three arc gauges:
+
+| Gauge | Shows |
+|-------|-------|
+| DEPTH | Current drill level |
+| PRESSURE | Fluctuating PSI reading during drill, locks to result |
+| DENSITY | Material classification (g/cm³ during drill, tier label after) |
+
+### Drill Animation Phases (~18 seconds total)
+
+| Phase | Time | Behavior |
+|-------|------|----------|
+| DRILLING | 0-6s | Pressure fluctuates, density at 0, dust bursts every 3s, rig rumble builds |
+| ANALYZING SAMPLE | 6-10s | Pressure spikes, density flickers, gauge agitation increases for oil finds |
+| RESULT | 10s | Gauges snap to final values (BARREN / TRACE / OIL SAND / CRUDE / RICH VEIN) |
+| AREA SCAN | 12.5s | Transitions to proximity reading for nearby deposits |
+
+### Preliminary Area Scan
+After the result, gauges show a proximity-based reading using `drillProximity` (max oil in 3x3x3 cube, 1 cell radius):
+- **NOMINAL** (< 5%) — barely moves
+- **TRACE ACTIVITY** (5-15%) — slight reading
+- **ELEVATED READINGS** (15-35%) — moderate signal
+- **ANOMALOUS SIGNAL** (35%+) — strong nearby deposits
+
+Density gauge shows "???" during the scan. Label reads "AREA SCAN" (not "NEXT LAYER") to avoid implying the signal is directly below.
+
+### 3D Animation (OilVoxelGrid.jsx)
+Oil strike visual effects are **delayed 10 seconds** (`STRIKE_REVEAL_DELAY`) to create suspense:
+- Dust spawns in waves every ~3s during boring phase
+- Drill rumble ramps from 30% → 150% intensity across the sequence
+- Gauge needle behavior differs subtly for oil vs dry (builds agitation before oil reveals)
+- Camera shake delayed to coincide with the strike reveal
+
+## Community Drill Data
+
+Surface view and cross-section grids show **all players' drilled data**, not just the current player's column. Each cell reveals oil values up to that plot's `drillDay` from Firestore `oilPlots`.
+
+- Computed in `communityGrid3D` / `communityClaimTotals` memos
+- Data is live via `allPlotsMap` Firestore listener — updates in real-time as players drill
+- Creates an evolving intelligence map that gets richer each day
+- Strategic implication: waiting to drill lets you observe others' results, but you lose days
+
+## Telegram Integration
+
+### Bot: `@hailmary_securitybot`
+- Webhook: `https://rl80.com/api/oil-telegram-webhook`
+- Linking: `/start {clerkUserId}` command stores `chatId` in `oilTelegram/{userId}`
+
+### Notifications
+1. **Text alert** (immediate): `POST /api/oil-rogue` sends rogue intrusion details when plot has camera enabled
+2. **CCTV footage** (after recording): `useCctvRecorder` uploads 14s WebM to Firebase Storage, then `POST /api/oil-telegram-cctv` sends the video to Telegram via `sendVideo` (falls back to `sendDocument` → text link)
+
+### Firestore
+| Collection | Purpose |
+|------------|---------|
+| `oilTelegram/{userId}` | `chatId`, `username`, `linkedAt` |
+| `cctvRecordings/{docId}` | `downloadUrl`, `storagePath`, `eventType`, `col`, `row`, `durationMs` |
+
+## Assets Tab (UnifiedAccountModal)
+
+New "Assets" tab in the account modal showing all premium items the player owns, grouped by category (Themes, Fences, Add-ons, Accessories, Slot Unlocks). Items persist across all game rounds — stored in `oilPurchases/{userId}.unlocked`. Supports both `cyber` and `industrial` themes.
+
+## Premium Items
+
+| Category | Price | Examples |
+|----------|-------|---------|
+| Theme | 5 USDC | Full Chrome, Dragonforge, Celestial Execution, Metal AF |
+| Fence | 3 USDC | Iron, White Picket, Stone |
+| Add-on | 3 USDC | T-Rex, Pet Zombie, Tubeman |
+| Accessory | 5 USDC | Security Camera |
+| Slot Unlock | 5 USDC | Addon Slot 4, Slot 5 |
+
+Purchases are permanent account-level unlocks via x402 on-chain payment. Free items: stock themes, chainlink fence, most addons (flamingo, gravestone, sunflowers, gnome, etc.), text signs.
+
 ## Key Files
 
-| File | Changes |
+| File | Purpose |
 |------|---------|
-| `src/components/OilQualify.jsx` | Registration + inline plot picking (merged), fixed 10x10 grid, $500 USDC copy |
-| `src/app/oil/page.js` | oilPlots subscription, drill handler (writes to both oilPlots + oilDrills), claim jump handler, phase gates, drillStatus with pre-game/max-actions |
-| `src/components/OilSurfaceMap.jsx` | allPlotsMap prop, ownership coloring, claim-jump mode with pulsing cells |
-| `src/app/api/oil-qualify/route.js` | Disqualification releases oilPlots cells |
-| `src/lib/firebaseClient.js` | Added arrayUnion export |
-| `src/lib/firebaseServer.js` | Added arrayUnion export |
+| `src/app/oil/page.js` | Main game page — drill handler, community grid, drill HUD, core sample, Telegram shake delay |
+| `src/components/CoreSamplePanel.jsx` | Core sample panel — personal drill log + field survey with animation |
+| `src/components/DrillHUD.jsx` | Instrument gauges — phased drill animation, area scan |
+| `src/components/OilVoxelGrid.jsx` | 3D scene — pumpjacks, staged drill effects, delayed strike reveal |
+| `src/components/OilSurfaceMap.jsx` | 2D grid — ownership coloring, claim-jump mode |
+| `src/components/OilQualify.jsx` | Registration + plot picking |
+| `src/components/UnifiedAccountModal.jsx` | Account/Wallet/Assets tabs |
+| `src/components/PimpMyPumpPanel.jsx` | Pump customization + premium item shop |
+| `src/hooks/useCctvRecorder.js` | CCTV recording + Firebase upload + Telegram delivery |
+| `src/lib/oilDistribution.js` | Deterministic 3D oil distribution from block hash |
+| `src/lib/oilPremium.js` | Premium item registry, pricing, free/premium classification |
+| `src/app/api/oil-rogue/route.js` | Rogue deployment + Telegram text alerts |
+| `src/app/api/oil-telegram-webhook/route.js` | Telegram bot linking |
+| `src/app/api/oil-telegram-cctv/route.js` | CCTV footage delivery to Telegram |
+| `src/app/api/oil-purchase/route.js` | x402 premium purchase handler |
+| `src/app/api/oil-seed-test/route.js` | Admin: seed fake players for testing |
+| `src/app/api/oil-qualify/route.js` | Qualification check + admin snapshot |
 
 ## Rogue Characters System
 
-Admin-deployed animated characters that roam the grid, cause mischief (eating add-ons, leaving graffiti), and trigger Telegram security alerts for camera-equipped plots.
+Animated characters that roam the grid and cause mischief. Deployed by admin or automatically on a schedule. Trigger Telegram security alerts for camera-equipped plots.
 
-### How It Works
+### How It Works (Current)
 
 1. Admin opens Rogue Deploy panel in `/oil?mode=admin`
 2. Picks a character type, target cell (col/row), hits DEPLOY
@@ -136,6 +240,33 @@ Admin-deployed animated characters that roam the grid, cause mischief (eating ad
 4. All clients receive the event via `onSnapshot` → a `RogueCharacter` renders the animated GLB on the 3D grid
 5. Character lifecycle: Spawn at grid edge → Walk to target → Act → Leave
 6. Rogue characters appear in CCTV feeds automatically
+
+### Consequences v2 (Planned)
+
+Rogues create engagement hooks that pull players back to the game. Most consequences require player attention to fix (visit UI, tap to clean/repair), not money. The dinosaur is the genuine threat.
+
+| Rogue | Consequence | Severity | Player Fix |
+|-------|------------|----------|------------|
+| Crudingo (bird) | Poops on plot | Cosmetic | Visit UI → tap to clean |
+| Troll | Graffiti on pad | Cosmetic | Visit UI → tap to clean |
+| Blue Demon | Damages an addon (visual degradation, not deletion) | Moderate | Visit UI → tap to repair |
+| Dinosaur | **Steals 20-30% of stored tank oil** | Real loss | Cannot undo — the oil is gone |
+
+Design principles:
+- **Without camera**: player doesn't know damage happened until they visit
+- **With camera**: Telegram alert on rogue spawn (early warning), footage recorded on arrival
+- **Dinosaur defense**: camera triggers early "INTRUDER EN ROUTE" Telegram alert with inline "ACTIVATE DEFENSE" button. Player taps before rogue arrives → rogue repelled, oil safe. Miss the window → oil stolen. Response window ~10-15 seconds (rogue walk time across grid).
+- Cleanup actions (poop, graffiti, repair) are small satisfying interactions — makes the plot feel owned
+
+### Auto-Deployment (Planned)
+
+Rogues should also deploy automatically, not just manually by admin:
+- Scheduled/random spawns (e.g., 2-4 rogues per day during active game phase)
+- Random target selection weighted toward plots with more stored oil (dinosaurs target rich tanks)
+- Character type randomized or on a rotation
+- Could use a Firebase scheduled function or a cron-triggered API route
+- Admin manual deploy remains available for special events or testing
+- Auto-deploy frequency and rogue mix configurable in `oilGame/settings`
 
 ## Post-Game Payout
 

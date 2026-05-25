@@ -4466,7 +4466,7 @@ body {
   height: 3rem !important;
   z-index: 0;
 }
-.cl-avatarBox.cl-userButtonAvatarBox.cl-internal-1j7ahlv {
+/* .cl-avatarBox.cl-userButtonAvatarBox.cl-internal-1j7ahlv {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -4477,7 +4477,7 @@ body {
   height: 3rem !important;
   object-fit: cover;
   border-radius: 10% !important;
-}
+} */
 
 .cl-internal-1v5sfok { 
   border-radius: 12px !important;
@@ -4487,7 +4487,7 @@ body {
   border-radius: 12px !important;
 }
 
-.cl-avatarBox.cl-userButtonAvatarBox.cl-internal-1j7ahlv {
+/* .cl-avatarBox.cl-userButtonAvatarBox.cl-internal-1j7ahlv {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -4495,7 +4495,7 @@ body {
   height: 3rem !important;
   object-fit: cover;
   border-radius: 10% !important;
-}
+} */
 cl-internal-89wd6s {
   width: 2.5rem !important;
   height: 2.5rem !important;

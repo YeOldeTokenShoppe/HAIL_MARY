@@ -146,7 +146,117 @@ function WalletConnectOptions({ connectExternal, connectingMethod, isMobile, the
   );
 }
 
-export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', theme = 'cyber' }) {
+const ITEM_LABELS = {
+  theme_chrome: "Full Chrome", theme_dragonforge: "Dragonforge", theme_celestial: "Celestial Execution",
+  theme_midnightSovereign: "Midnight Sovereign", theme_metalAF: "Metal AF", theme_whiteGold: "White Gold",
+  fence_iron: "Iron Fence", fence_whitePicket: "White Picket Fence", fence_stone: "Stone Fence",
+  addon_dinosaur: "T-Rex", addon_zombie: "Pet Zombie", addon_tubeMan: "Tubeman",
+  camera: "Security Camera",
+  slotUnlock_4: "Addon Slot 4", slotUnlock_5: "Addon Slot 5",
+};
+
+const ITEM_CATEGORIES = {
+  theme: { label: "THEMES", icon: "🎨" },
+  fence: { label: "FENCES", icon: "🔒" },
+  addon: { label: "ADD-ONS", icon: "🦖" },
+  accessory: { label: "ACCESSORIES", icon: "📹" },
+  slotUnlock: { label: "SLOT UNLOCKS", icon: "🔓" },
+};
+
+function getCategory(itemId) {
+  if (itemId.startsWith("theme_")) return "theme";
+  if (itemId.startsWith("fence_")) return "fence";
+  if (itemId.startsWith("addon_")) return "addon";
+  if (itemId.startsWith("slotUnlock_")) return "slotUnlock";
+  if (itemId === "camera") return "accessory";
+  return "other";
+}
+
+function AssetsTabContent({ unlockedItems, ind }) {
+  const items = [...(unlockedItems || [])];
+  const grouped = {};
+  for (const id of items) {
+    const cat = getCategory(id);
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(id);
+  }
+
+  const catOrder = ["theme", "fence", "addon", "accessory", "slotUnlock"];
+  const accent = ind ? "#d4a854" : "#00f5d4";
+  const muted = ind ? "#8a8070" : "rgba(255,255,255,0.5)";
+  const textColor = ind ? "#c8c0b4" : "#fff";
+  const cardBg = ind ? "rgba(212,168,84,0.06)" : "rgba(0,245,212,0.06)";
+  const cardBorder = ind ? "rgba(212,168,84,0.2)" : "rgba(0,245,212,0.2)";
+  const font = ind ? "'Share Tech Mono', monospace" : "'Orbitron', monospace";
+
+  if (items.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "2rem 1rem" }}>
+        <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.6 }}>🛢️</div>
+        <p style={{ color: muted, fontFamily: font, fontSize: ind ? 11 : 12, letterSpacing: ind ? "0.1em" : "normal", lineHeight: 1.6 }}>
+          No premium items yet.
+          <br />
+          Visit <span style={{ color: accent }}>PIMP MY PUMP</span> to browse upgrades.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ fontSize: ind ? 10 : 11, color: muted, fontFamily: font, letterSpacing: ind ? "0.12em" : "0.05em", textAlign: "center" }}>
+        {items.length} PREMIUM ITEM{items.length !== 1 ? "S" : ""} UNLOCKED
+      </div>
+      {catOrder.filter((cat) => grouped[cat]?.length > 0).map((cat) => {
+        const meta = ITEM_CATEGORIES[cat] || { label: cat.toUpperCase(), icon: "📦" };
+        return (
+          <div key={cat}>
+            <div style={{
+              fontSize: ind ? 10 : 11, fontWeight: 600, color: accent,
+              fontFamily: font, letterSpacing: ind ? "0.15em" : "0.1em",
+              marginBottom: 6, display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <span>{meta.icon}</span> {meta.label}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {grouped[cat].map((id) => (
+                <div key={id} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "8px 10px",
+                  background: cardBg,
+                  border: `1px solid ${cardBorder}`,
+                  borderRadius: ind ? 3 : 8,
+                }}>
+                  <span style={{
+                    fontSize: ind ? 11 : 12, color: textColor,
+                    fontFamily: font, letterSpacing: ind ? "0.08em" : "normal",
+                  }}>
+                    {ITEM_LABELS[id] || id}
+                  </span>
+                  <span style={{
+                    fontSize: ind ? 9 : 10, color: accent, fontFamily: font,
+                    letterSpacing: ind ? "0.1em" : "0.05em", opacity: 0.8,
+                  }}>
+                    OWNED
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      <div style={{
+        fontSize: ind ? 9 : 10, color: muted, fontFamily: font,
+        letterSpacing: ind ? "0.08em" : "normal", textAlign: "center",
+        lineHeight: 1.5, marginTop: 4,
+      }}>
+        Items persist across all game rounds.
+      </div>
+    </div>
+  );
+}
+
+export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', theme = 'cyber', unlockedItems }) {
   const { user } = useUser();
   const { signOut, openSignIn } = useClerk();
   const pathname = usePathname();
@@ -161,6 +271,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
   } = useWalletAuth();
   const { evmAccounts } = useEvmAccounts();
   const ownerEoaAddress = evmAccounts?.[0]?.address || null;
+  const ind = theme === 'industrial';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [connectingMethod, setConnectingMethod] = useState(null); // Track which method is connecting
@@ -384,6 +495,12 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
             >
               Wallet
             </button>
+            <button
+              className={`modal-tab ${activeTab === 'assets' ? 'active' : ''}`}
+              onClick={() => setActiveTab('assets')}
+            >
+              Assets
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -553,6 +670,10 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
                     theme={theme}
                   />
                 )}
+              </div>
+            ) : activeTab === 'assets' ? (
+              <div className="assets-content">
+                <AssetsTabContent unlockedItems={unlockedItems} ind={ind} />
               </div>
             ) : null}
           </div>

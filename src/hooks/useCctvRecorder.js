@@ -187,6 +187,22 @@ export default function useCctvRecorder(cctvCanvasRef, selectedCol, selectedRow,
             r.id === localEntry.id ? { ...r, downloadUrl } : r
           )
         );
+
+        // Send footage to Telegram
+        if (userIdRef.current) {
+          fetch("/api/oil-telegram-cctv", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: userIdRef.current,
+              downloadUrl,
+              eventId: meta?.eventId || null,
+              eventType: meta?.eventType || "unknown",
+              col: meta?.col ?? null,
+              row: meta?.row ?? null,
+            }),
+          }).catch((err) => console.warn("CCTV: Telegram send failed", err));
+        }
       } catch (err) {
         console.error("CCTV: Upload failed", err);
         // Local blob URL still works for this session
