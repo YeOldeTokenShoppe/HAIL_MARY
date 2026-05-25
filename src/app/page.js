@@ -16,6 +16,8 @@ import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import ReliquaryRail from "@/components/ReliquaryRail";
 import HolyTrinSection from "@/components/HolyTrinSection";
+import MaterExMachinaSection from "@/components/MaterExMachinaSection";
+import BusinessSection from "@/components/BusinessSection";
 import DropInTitle from "../components/DropInTitle";
 import { useCandles } from "@/hooks/useCandles";
 import {
@@ -2606,7 +2608,23 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
       </div>
 
       <div className="below-fold-chamber">
+        <MaterExMachinaSection />
+
+        <div className="section-divider" role="separator" aria-hidden="true">
+          <span className="section-divider-line section-divider-line--left" />
+          <span className="section-divider-icon">&#x2020;</span>
+          <span className="section-divider-line section-divider-line--right" />
+        </div>
+
         <HolyTrinSection />
+
+        <div className="section-divider" role="separator" aria-hidden="true">
+          <span className="section-divider-line section-divider-line--left" />
+          <span className="section-divider-icon">&#x2021;</span>
+          <span className="section-divider-line section-divider-line--right" />
+        </div>
+
+        {/* <BusinessSection /> */}
 
         {/* Trading Card Game section parked for now — keep the imports
             and component file intact so we can re-enable when ready.

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useInView } from "framer-motion";
 import ScrambleText from "./ScrambleText";
+import DropInTitle from "./DropInTitle";
 import "./holyTrin.css";
 
 const PILLARS = [
@@ -20,7 +21,7 @@ const PILLARS = [
     tagline: "in use",
     color: "#d4af37",
     description:
-      "A share of revenue from x402-powered services flows to stakers through immutable code. Verifiable on Basescan. Plus a growing ecosystem of games, creative works, and tools built on the RL80 cosmology.",
+      "A share of revenue from x402-powered services flows to stakers through immutable code. Verifiable on Basescan. Plus a growing ecosystem of games, economic zones, and tools built on the RL80 cosmology.",
   },
 
   {
@@ -29,7 +30,7 @@ const PILLARS = [
     tagline: "ever flowing",
     color: "#d92db0",
     description:
-      "LP tokens burned. Liquidity locked permanently — not even the founder can withdraw it. Small pool, but unruggable.",
+      "LP tokens burned. Liquidity locked permanently — Small pool, but unruggable.",
   },
 ];
 
@@ -66,7 +67,13 @@ export default function HolyTrinSection() {
       aria-label="The Holy Trin80"
     >
       <div className="holy-trin-text">
-        <h2 className="holy-trin-heading">The Holy Trin80</h2>
+        <DropInTitle
+          lines={["The Holy", "Trin80", "of Tokens"]}
+          colors={["#2ad6ee", "#d4af37", "#d92db0"]}
+          fontSize={{ mobile: "2rem", desktop: "3.4rem" }}
+          triggerAnimation={inView}
+          instanceId="holy-trin-heading"
+        />
         {/* <p className="holy-trin-subtitle">
           {PILLARS.map((p, i) => (
             <React.Fragment key={p.id}>

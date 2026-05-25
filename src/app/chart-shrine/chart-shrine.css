@@ -313,7 +313,7 @@ body:has(.shrine-page.neon) {
    inline — this selector's specificity otherwise overrides their own
    `position: fixed`. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.reliquary-rail) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail) {
   position: relative;
   z-index: 1;
   /* Don't eat pointer events over the canvas — these are decorative
@@ -327,7 +327,7 @@ body:has(.shrine-page.neon) {
 /* Safety net: keep any interactive descendant of those wrappers
    clickable even though the parent is pointer-events:none. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.reliquary-rail)
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail)
   :is(a, button, input, select, textarea, label, [role="button"], [tabindex]) {
   pointer-events: auto;
 }
@@ -810,6 +810,17 @@ body:has(.shrine-page.neon) {
     align-items: center;
     text-align: center;
     max-width: 90vw;
+    padding: 28px 18px 24px;
+    background: linear-gradient(
+      180deg,
+      rgba(35, 12, 55, 0.74) 0%,
+      rgba(18, 5, 32, 0.86) 100%
+    );
+    border-top: 1px solid rgba(255, 0, 255, 0.25);
+    border-radius: 14px;
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 0 28px rgba(217, 45, 176, 0.08);
   }
   .shrine-page.neon .our-lady-title {
     transform-origin: center;

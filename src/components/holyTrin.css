@@ -155,7 +155,7 @@
     /* Mono characters carry more horizontal weight than proportional —
        drop the body size a notch so the descriptions don't dominate. */
     font-size: clamp(0.92rem, 1.05vw, 1.12rem);
-    line-height: 1.6;
+    line-height: 1.2;
     letter-spacing: 0;
     opacity: 0.95;
     text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
@@ -356,23 +356,23 @@
 }
 
 @media (max-width: 900px) {
-  /* Match the desktop redesign: strip the card chrome so the section
-     breathes over the chart scene, and stack the text column above the
-     diagram (the JSX renders .holy-trin-text first, then .holy-trin-visual,
-     so the natural flex order is the correct vertical sequence). */
   .holy-trin {
     width: calc(100% - 32px);
-    max-width: 460px;
+    max-width: 360px;
     margin: clamp(220px, 75vh, 600px) auto 0;
-    padding: 32px 8px 28px;
-    gap: 18px;
-    background: none;
-    backdrop-filter: none;
-    border-top: none;
-    border-radius: 0;
+    padding: 32px 16px 28px;
+    background: linear-gradient(
+      180deg,
+      rgba(35, 12, 55, 0.74) 0%,
+      rgba(18, 5, 32, 0.86) 100%
+    );
+    border-top: 1px solid rgba(255, 0, 255, 0.25);
+    border-radius: 14px;
     color: #f1d77a;
     text-align: center;
-    box-shadow: none;
+    box-shadow:
+      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 0 28px rgba(217, 45, 176, 0.08);
   }
 
   .holy-trin::before {
@@ -394,7 +394,7 @@
   /* Mirrors .reliquary-heading so the two sections read as siblings. */
   .holy-trin-heading {
     display: inline-block;
-    margin: 0 auto 4px;
+    margin: 0 auto 22px;
     font-family: "UnifrakturCook", serif;
     color: #d4af37;
     font-size: clamp(2rem, 5.5vw, 2.8rem);
@@ -408,71 +408,6 @@
       0 0 28px rgba(42, 214, 238, 0.35),
       0 0 52px rgba(217, 45, 176, 0.4),
       2px 2px 0 rgba(0, 0, 0, 0.6);
-  }
-
-  /* Text column wraps heading + pillar list. Heading stays centered
-     (mobile convention) but the pillar copy is left-aligned so the
-     color-keyed left rule has something to anchor against. */
-  .holy-trin-text {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 18px;
-    width: 100%;
-  }
-
-  /* Mirror desktop's pillar list — color-keyed left rule, name above
-     doctrine, mono description. Sizes scaled down for the narrow
-     viewport. */
-  .holy-trin-pillars {
-    list-style: none;
-    margin: 4px 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    width: 100%;
-  }
-  .holy-trin-pillar {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding-left: 12px;
-    border-left: 2px solid color-mix(in srgb, var(--pillar-color) 55%, transparent);
-    text-align: left;
-  }
-  .holy-trin-pillar-name {
-    color: var(--pillar-color);
-    font-family: "Cinzel", serif;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    text-shadow:
-      0 0 10px color-mix(in srgb, var(--pillar-color) 55%, transparent),
-      0 0 22px color-mix(in srgb, var(--pillar-color) 30%, transparent);
-  }
-  .holy-trin-pillar-desc {
-    margin: 0;
-    color: #e9d4a0;
-    font-family: "IoskeleyMono", "IBM Plex Mono", ui-monospace, monospace;
-    font-weight: 400;
-    font-size: 0.86rem;
-    line-height: 1.55;
-    letter-spacing: 0;
-    opacity: 0.95;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
-  }
-
-  /* Visual column — diagram + corner labels + tooltip. Sits below the
-     pillar list via flex order. */
-  .holy-trin-visual {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    margin-top: 6px;
   }
 
   /* Diagram canvas — aspect ratio matches the SVG viewBox so corner

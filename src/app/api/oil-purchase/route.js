@@ -36,6 +36,73 @@ function computeTotalUsdc(itemIds) {
   return total;
 }
 
+// Bazaar discovery metadata — lives on outputSchema per x402 v1 spec.
+// The CDP facilitator extracts this and catalogs the endpoint on first
+// successful settle, making it findable via the discovery APIs at
+// https://api.cdp.coinbase.com/platform/v2/x402/discovery/*
+const DISCOVERY_METADATA = {
+  name: "RL80 Oil Game — Premium Items",
+  description:
+    "Unlock cosmetic premium items for the RL80 oil-rig game on rl80.com. " +
+    "Pay-per-item in USDC on Base. Items include rig themes ($5), fences ($3), " +
+    "yard add-ons ($3), accessories like security cameras ($5), and extra " +
+    "add-on slot unlocks ($5). One purchase request may bundle multiple item IDs. " +
+    "Payments settle to rl80treasury.base.eth on Base.",
+  discoverable: true,
+  bodyType: "json",
+  input: {
+    userId: "user_clerk_id_string",
+    itemIds: ["theme_chrome", "fence_brick", "addon_alligator"],
+  },
+  inputSchema: {
+    type: "object",
+    required: ["userId", "itemIds"],
+    properties: {
+      userId: {
+        type: "string",
+        description: "Clerk user ID of the buyer; receipt + unlock are written under this ID.",
+      },
+      itemIds: {
+        type: "array",
+        minItems: 1,
+        description:
+          "Premium item IDs. Prefixes determine category & price: theme_* ($5), " +
+          "fence_* ($3), addon_* ($3), slotUnlock_* ($5); special: 'camera' ($5).",
+        items: {
+          type: "string",
+          pattern: "^(theme_|fence_|addon_|slotUnlock_|camera$).+",
+        },
+      },
+    },
+  },
+  output: {
+    ok: true,
+    itemIds: ["theme_chrome"],
+    settle: { success: true, transaction: "0x..." },
+  },
+  outputSchema: {
+    type: "object",
+    required: ["ok", "itemIds"],
+    properties: {
+      ok: { type: "boolean", description: "True when unlock + settlement succeeded." },
+      itemIds: {
+        type: "array",
+        items: { type: "string" },
+        description: "Item IDs that were unlocked for the user.",
+      },
+      settle: {
+        type: "object",
+        description: "Facilitator settle result (transaction hash on success).",
+        properties: {
+          success: { type: "boolean" },
+          transaction: { type: "string" },
+          error: { type: "string" },
+        },
+      },
+    },
+  },
+};
+
 function buildPaymentRequirements(itemIds, totalUsdc, resourceUrl) {
   const treasury = process.env.OIL_PURCHASE_TREASURY;
   if (!treasury) throw new Error("OIL_PURCHASE_TREASURY not configured");
@@ -49,6 +116,7 @@ function buildPaymentRequirements(itemIds, totalUsdc, resourceUrl) {
     payTo: treasury,
     maxTimeoutSeconds: 120,
     asset: USDC_ADDRESS,
+    outputSchema: DISCOVERY_METADATA,
     // EIP-712 domain for USDC on Base — required for transferWithAuthorization
     extra: { name: "USD Coin", version: "2" },
   };

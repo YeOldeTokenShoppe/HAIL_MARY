@@ -140,6 +140,7 @@ const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { 
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
 const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
 const OilPlotChat = dynamic(() => import("@/components/OilPlotChat"), { ssr: false });
+const CoreSamplePanel = dynamic(() => import("@/components/CoreSamplePanel"), { ssr: false });
 const OilChatModal = dynamic(() => import("@/components/OilChatModal"), { ssr: false });
 const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
 // OilPlotDraft removed — plot picking now merged into OilQualify
@@ -3381,6 +3382,14 @@ export default function OilPage() {
           {(isAdmin || isReport) && demoDrillPanel}
           {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
+          <CoreSamplePanel
+            grid3D={stats.grid3D}
+            maxOil={stats.maxOil}
+            darkMode={darkMode}
+            isMobile
+            gridX={gridSize}
+            gridY={gridSize}
+          />
           {leaderboardPanel}
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
           {(isAdmin || isReport) && topClaimsPanel}
@@ -3798,6 +3807,13 @@ export default function OilPage() {
             {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
+            <CoreSamplePanel
+              grid3D={stats.grid3D}
+              maxOil={stats.maxOil}
+              darkMode={darkMode}
+              gridX={gridSize}
+              gridY={gridSize}
+            />
             {leaderboardPanel}
             <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
             {(isAdmin || isReport) && inspectorPanel}
