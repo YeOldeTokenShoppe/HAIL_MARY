@@ -1902,10 +1902,13 @@ body:has(.shrine-page.neon) {
 
 @media (max-width: 700px) {
   .chart-widget {
-    top: 8px;
-    right: 8px;
-    width: 180px;
-    height: 114px;
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 275px;
+    height: 174px;
+    margin: 80vh auto 24px;
+    z-index: 2;
   }
   .cw-shards {
     width: 130px;

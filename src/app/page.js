@@ -2542,14 +2542,6 @@ export default function HomePage() {
 
       <CommunityCandles />
 
-      <ChartWidget
-        candles={data.candles}
-        latestPrice={data.latestPrice}
-        priceChange24h={data.priceChange24h}
-        marketCap={data.marketCap}
-        loading={data.loading}
-      />
-
       <div className="hero-header">
         <h1 className="our-lady-title">
           <span className="title-line">Our Lady</span>
@@ -2559,6 +2551,14 @@ export default function HomePage() {
           <span className="title-line title-line-profit">Profit</span>
         </h1>
       </div>
+
+      <ChartWidget
+        candles={data.candles}
+        latestPrice={data.latestPrice}
+        priceChange24h={data.priceChange24h}
+        marketCap={data.marketCap}
+        loading={data.loading}
+      />
 
       <div className="below-fold-chamber">
         {/* <div className="hero-intro-chart">
