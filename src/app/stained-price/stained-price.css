@@ -1,0 +1,382 @@
+.stained-price-page {
+  --ink: #120d14;
+  --paper: #f6f0df;
+  --lead: #09070b;
+  --amber: #f4bf45;
+  --cyan: #1ed7d2;
+  --rose: #f4478f;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(244, 191, 69, 0.28), transparent 24rem),
+    radial-gradient(circle at 85% 72%, rgba(30, 215, 210, 0.2), transparent 28rem),
+    linear-gradient(145deg, #0e1114 0%, #25151e 48%, #08090d 100%);
+  color: var(--paper);
+  font-family: "Crimson Pro", Georgia, serif;
+}
+
+.stained-price-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 74px 74px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+}
+
+.price-scene {
+  position: absolute;
+  inset: 0;
+  perspective: 900px;
+  transform-style: preserve-3d;
+  opacity: 0.82;
+}
+
+.scene-plane {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70vmin;
+  height: 70vmin;
+  border: 1px solid rgba(255, 244, 194, 0.16);
+  background:
+    linear-gradient(45deg, transparent 48%, rgba(255, 255, 255, 0.13) 49%, rgba(255, 255, 255, 0.13) 51%, transparent 52%),
+    linear-gradient(-45deg, transparent 48%, rgba(255, 255, 255, 0.09) 49%, rgba(255, 255, 255, 0.09) 51%, transparent 52%);
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%) rotateX(64deg) rotateZ(45deg);
+}
+
+.scene-plane-a {
+  animation: driftA 14s ease-in-out infinite alternate;
+}
+
+.scene-plane-b {
+  width: 54vmin;
+  height: 54vmin;
+  border-color: rgba(30, 215, 210, 0.18);
+  transform: translate(-50%, -50%) rotateX(62deg) rotateZ(8deg) translateZ(-90px);
+  animation: driftB 18s ease-in-out infinite alternate;
+}
+
+.scene-plane-c {
+  width: 42vmin;
+  height: 42vmin;
+  border-color: rgba(244, 71, 143, 0.18);
+  transform: translate(-50%, -50%) rotateX(68deg) rotateZ(72deg) translateZ(70px);
+  animation: driftC 12s ease-in-out infinite alternate;
+}
+
+.scene-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 76vmin;
+  height: 18vmin;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotateX(74deg) rotateZ(-12deg);
+}
+
+.orbit-two {
+  width: 52vmin;
+  height: 14vmin;
+  border-color: rgba(244, 191, 69, 0.22);
+  transform: translate(-50%, -50%) rotateX(76deg) rotateZ(38deg);
+}
+
+.price-stage {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.78fr) minmax(22rem, 1.08fr) minmax(12rem, 0.5fr);
+  align-items: center;
+  gap: clamp(1rem, 3vw, 3.5rem);
+  padding: clamp(1.25rem, 4vw, 4rem);
+}
+
+.price-copy {
+  max-width: 27rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.9rem;
+  color: var(--amber);
+  font: 800 0.75rem/1 "Orbitron", sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.price-copy h1 {
+  max-width: 10ch;
+  margin: 0;
+  color: #fff7db;
+  font: 900 clamp(3.4rem, 8vw, 7.5rem) / 0.78 "UnifrakturCook", Georgia, serif;
+  letter-spacing: 0;
+  text-shadow: 0 0 34px rgba(244, 191, 69, 0.25);
+}
+
+.lede {
+  max-width: 26rem;
+  margin: 1.3rem 0 0;
+  color: rgba(246, 240, 223, 0.74);
+  font-size: clamp(1.05rem, 1.8vw, 1.3rem);
+  line-height: 1.45;
+}
+
+.glass-shell {
+  justify-self: center;
+  width: min(72vw, 39rem);
+  aspect-ratio: 1.08;
+  display: grid;
+  place-items: center;
+  perspective: 900px;
+  transform: rotateX(2deg) rotateY(-7deg);
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 26px 44px rgba(0, 0, 0, 0.5));
+}
+
+.glass-viz {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.leadwork {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform-style: preserve-3d;
+  animation: compositeSway 16s ease-in-out infinite alternate;
+}
+
+.price-shard {
+  cursor: pointer;
+  outline: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+  animation: shardTurn var(--spin-speed, 18s) linear var(--spin-delay, 0s) infinite;
+  transition: opacity 180ms ease, transform 220ms ease, filter 220ms ease;
+}
+
+.price-shard polygon {
+  stroke: var(--lead);
+  stroke-width: 9;
+  stroke-linejoin: round;
+  fill-opacity: 0.82;
+}
+
+.price-shard .shine {
+  fill: rgba(255, 255, 255, 0.22);
+  mix-blend-mode: screen;
+}
+
+.price-shard text {
+  fill: #fffbea;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: rgba(6, 5, 8, 0.72);
+  pointer-events: none;
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0;
+}
+
+.price-shard .symbol {
+  font-size: 23px;
+  font-weight: 900;
+  stroke-width: 6px;
+}
+
+.price-shard .price {
+  font-size: 26px;
+  font-weight: 900;
+  stroke-width: 7px;
+}
+
+.price-shard .change {
+  font-size: 16px;
+  font-weight: 800;
+  stroke-width: 5px;
+}
+
+.price-shard .up {
+  fill: #efffb7;
+}
+
+.price-shard .down {
+  fill: #ffd7e6;
+}
+
+.price-shard:hover,
+.price-shard:focus,
+.price-shard.is-active {
+  filter: brightness(1.12) saturate(1.14);
+  animation-play-state: paused;
+}
+
+.price-shard:hover polygon,
+.price-shard:focus polygon,
+.price-shard.is-active polygon {
+  stroke-width: 11;
+}
+
+.price-card {
+  align-self: center;
+  justify-self: start;
+  width: min(100%, 15rem);
+  padding-left: 1rem;
+  border-left: 1px solid rgba(255, 244, 194, 0.28);
+}
+
+.card-kicker,
+.card-change {
+  display: block;
+  font: 800 0.78rem/1 "Orbitron", sans-serif;
+  color: var(--amber);
+  letter-spacing: 0.13em;
+}
+
+.price-card strong {
+  display: block;
+  margin: 0.5rem 0 0.35rem;
+  color: #fff8d8;
+  font: 900 clamp(2rem, 4vw, 3.8rem) / 0.92 "Orbitron", sans-serif;
+  letter-spacing: 0;
+}
+
+.price-card p {
+  margin: 0.85rem 0 0;
+  color: rgba(246, 240, 223, 0.7);
+  font-size: 1.1rem;
+}
+
+.card-change.up {
+  color: #cfff70;
+}
+
+.card-change.down {
+  color: #ff9dbd;
+}
+
+@keyframes driftA {
+  from {
+    transform: translate(-52%, -49%) rotateX(64deg) rotateZ(45deg);
+  }
+  to {
+    transform: translate(-48%, -52%) rotateX(58deg) rotateZ(55deg);
+  }
+}
+
+@keyframes driftB {
+  from {
+    transform: translate(-47%, -53%) rotateX(62deg) rotateZ(8deg) translateZ(-90px);
+  }
+  to {
+    transform: translate(-52%, -48%) rotateX(70deg) rotateZ(18deg) translateZ(-70px);
+  }
+}
+
+@keyframes driftC {
+  from {
+    transform: translate(-54%, -50%) rotateX(68deg) rotateZ(72deg) translateZ(70px);
+  }
+  to {
+    transform: translate(-48%, -54%) rotateX(61deg) rotateZ(64deg) translateZ(110px);
+  }
+}
+
+@keyframes compositeSway {
+  from {
+    transform: rotateY(-10deg) rotateX(3deg);
+  }
+  to {
+    transform: rotateY(10deg) rotateX(-2deg);
+  }
+}
+
+@keyframes shardTurn {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+@media (max-width: 920px) {
+  .price-stage {
+    grid-template-columns: 1fr;
+    align-content: center;
+    gap: 1.3rem;
+  }
+
+  .price-copy {
+    max-width: 42rem;
+  }
+
+  .price-copy h1 {
+    max-width: 12ch;
+  }
+
+  .glass-shell {
+    width: min(94vw, 34rem);
+    transform: none;
+  }
+
+  .price-card {
+    justify-self: stretch;
+    width: auto;
+    padding-left: 0;
+    padding-top: 1rem;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 244, 194, 0.28);
+  }
+}
+
+@media (max-width: 560px) {
+  .stained-price-page {
+    overflow: auto;
+  }
+
+  .price-stage {
+    padding: 1.1rem;
+  }
+
+  .price-copy h1 {
+    font-size: 3.4rem;
+  }
+
+  .lede {
+    font-size: 1rem;
+  }
+
+  .glass-shell {
+    width: 100%;
+  }
+
+  .price-shard .symbol {
+    font-size: 20px;
+  }
+
+  .price-shard .price {
+    font-size: 22px;
+  }
+
+  .price-shard .change {
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-plane,
+  .leadwork,
+  .price-shard {
+    animation: none;
+  }
+}

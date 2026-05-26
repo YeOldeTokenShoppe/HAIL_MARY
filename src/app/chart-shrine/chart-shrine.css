@@ -317,7 +317,7 @@ body:has(.shrine-page.neon) {
    inline — this selector's specificity otherwise overrides their own
    `position: fixed`. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.chart-widget) {
   position: relative;
   z-index: 1;
   /* Don't eat pointer events over the canvas — these are decorative
@@ -713,9 +713,11 @@ body:has(.shrine-page.neon) {
   border-right: 2px solid rgba(217, 45, 176, 0.45);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 6px;
   text-align: center;
   max-width: 56ch;
+  min-height: 6.5em;
 }
 
 .shrine-page.neon .hero-pullquote-latin {
@@ -827,7 +829,7 @@ body:has(.shrine-page.neon) {
 
 .shrine-page.neon .hero-intro {
   font-family: "IoskeleyMono", "IBM Plex Serif", Georgia, serif;
-  color: #a8c8d8;
+  color: #e9d4a0;
   font-size: 0.95rem;
   line-height: 1.45;
   letter-spacing: 0.02em;
@@ -1777,4 +1779,136 @@ body:has(.shrine-page.neon) {
     font-size: 14px;
   }
 
+}
+
+/* ── Chart Widget — glass shards ─────────────────────────────────── */
+
+.chart-widget {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 900;
+  width: 240px;
+  height: 152px;          /* 768 × 485 design ratio, scaled */
+  pointer-events: auto;   /* canvas inside is clickable */
+  overflow: visible;      /* shards can fly out during shatter */
+  filter:
+    drop-shadow(0 0 60px rgba(255, 245, 220, 0.18))
+    drop-shadow(0 16px 28px rgba(0, 0, 0, 0.55));
+}
+
+.chart-widget__stage {
+  /* JS sets transform: scale(...) based on wrapper width */
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.cw-shards {
+  position: relative;
+  width: 180px;
+  height: 180px;
+}
+
+.cw-shard {
+  position: absolute;
+  width: inherit;
+  height: inherit;
+}
+
+.cw-shard::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  height: 100vh;
+  width: 1px;
+  background: rgba(238, 238, 238, 0.15);
+  z-index: -1;
+}
+
+.cw-shard--1 { top: 40px; left: 20px; }
+.cw-shard--2 { top: 0;    left: 80px; }
+.cw-shard--3 { top: 10px; left: -25px; }
+
+@keyframes cwShardSpin {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(360deg); }
+}
+
+.cw-shard-svg {
+  position: relative;
+  mix-blend-mode: screen;
+  animation-name: cwShardSpin;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.cw-shard-svg--1 {
+  fill: #00FFFF;
+  opacity: 0.55;
+  animation-duration: 30s;
+}
+.cw-shard-svg--2 {
+  fill: #FF00FF;
+  opacity: 0.55;
+  animation-duration: 23s;
+}
+.cw-shard-svg--3 {
+  fill: #FFFF00;
+  opacity: 0.55;
+  animation-duration: 15s;
+}
+
+/* glass shine highlight */
+.cw-shine {
+  fill: rgba(255, 255, 255, 0.18);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  clip-path: inset(0 0 55% 0);
+}
+
+/* price text on shard — Orbitron, dark stroke for legibility */
+.cw-text {
+  fill: #fffbea;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: rgba(6, 5, 8, 0.72);
+  pointer-events: none;
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0;
+}
+
+.cw-symbol {
+  font-size: 22px;
+  font-weight: 900;
+  stroke-width: 6px;
+}
+
+.cw-price {
+  font-size: 26px;
+  font-weight: 900;
+  stroke-width: 7px;
+}
+
+.cw-change {
+  font-size: 16px;
+  font-weight: 800;
+  stroke-width: 5px;
+}
+
+.cw-up   { fill: #efffb7; }
+.cw-down { fill: #ffd7e6; }
+
+@media (max-width: 700px) {
+  .chart-widget {
+    top: 8px;
+    right: 8px;
+    width: 180px;
+    height: 114px;
+  }
+  .cw-shards {
+    width: 130px;
+    height: 130px;
+  }
 }

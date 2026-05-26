@@ -240,8 +240,9 @@
 .mater-name {
   display: inline;
   color: #d92db0;
-  font-family: "Cinzel", serif;
+  font-family: "Blackletter", serif;
   font-weight: 700;
+  font-size: 1rem;
   font-style: italic;
   text-shadow:
     0 0 10px rgba(217, 45, 176, 0.55),

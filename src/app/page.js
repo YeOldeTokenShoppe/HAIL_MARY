@@ -11,6 +11,7 @@ import { erc20Abi } from "viem";
 import { RL80_ADDRESS } from "@/lib/contracts";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
+import ChartWidget from "@/components/ChartWidget";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
@@ -67,6 +68,7 @@ const VOTIVE_IMAGE_PRESETS = [
   },
   { key: "queenOfHearts", src: "/queenOfHearts1.jpg", label: "Queen of Hearts" },
   { key: "heart", src: "/images/sacreCoeur.webp", thumbnail: "/images/sacreCoeur.webp", label: "Heart" },
+    { key: "MotherOfMemes", src: "/images/face.png", thumbnail: "/images/face.png", label: "Mother of Memes" },
 ];
 // A small curated palette for the wax tint, plus a "default" entry that
 // restores the baked color. Users can also enter any hex via the color
@@ -78,7 +80,8 @@ const VOTIVE_TINT_PRESETS = [
   { key: "amber", hex: "#d49f3a", label: "Amber" },
   { key: "rose", hex: "#e57aa7", label: "Rose" },
   { key: "violet", hex: "#8b5fbf", label: "Violet" },
-  { key: "jade", hex: "#4aa876", label: "Jade" },
+  { key: "jade", hex: "#0ef178", label: "Jade" },
+  { key: "cyan", hex: "#14f7ff", label: "Cyan" },
 ];
 function readCandleVariant(userId) {
   if (!userId || typeof window === "undefined") return null;
@@ -158,6 +161,7 @@ const CANDLE_VARIANTS = {
     // out. See `flameMeltShrinkRate` on the votive for the full
     // explanation — same value keeps the two variants consistent.
     flameMeltShrinkRate: 0.4,
+    flameScale: 0.55,
   },
   votive: {
     modelPath: "/models/tinyVotiveOnly2.glb",
@@ -2028,11 +2032,11 @@ const HERO_PULLQUOTES = [
     source: "William Gibson",
     tone: "modern",
   },
-    {
-    text: "Every trade is a Hail Mary.",
-    source: "",
-    tone: "modern",
-  },
+  //   {
+  //   text: "Every trade is a Hail Mary.",
+  //   source: "",
+  //   tone: "modern",
+  // },
 ];
 
 function MobileSectionDropInTitle() {
@@ -2538,6 +2542,14 @@ export default function HomePage() {
 
       <CommunityCandles />
 
+      <ChartWidget
+        candles={data.candles}
+        latestPrice={data.latestPrice}
+        priceChange24h={data.priceChange24h}
+        marketCap={data.marketCap}
+        loading={data.loading}
+      />
+
       <div className="hero-header">
         <h1 className="our-lady-title">
           <span className="title-line">Our Lady</span>
@@ -2549,7 +2561,7 @@ export default function HomePage() {
       </div>
 
       <div className="below-fold-chamber">
-        <div className="hero-intro-chart">
+        {/* <div className="hero-intro-chart">
           <div
             className="shrine-stage"
             onMouseEnter={() => setChartHovered(true)}
@@ -2562,7 +2574,7 @@ export default function HomePage() {
               onTimeframeChange={setTimeframeKey}
             />
           </div>
-        </div>
+        </div> */}
 
         <MobileSectionDropInTitle />
         <div className="hero-copy hero-copy--below-fold">
@@ -2723,7 +2735,7 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
             >
               <span className="candle-picker-tile-label">Votive</span>
               <span className="candle-picker-tile-desc">
-                Our Lady of Guadalupe
+                Glass votive with customizable image and wax color
               </span>
             </button>
           </div>
@@ -2811,7 +2823,7 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
                 })()}
               </div>
               <p className="votive-upload-hint">
-                Portrait images (~2:3) look best. Uploads are resized and
+                Uploads are resized and
                 saved only on this device.
               </p>
               {votiveUploadError && (

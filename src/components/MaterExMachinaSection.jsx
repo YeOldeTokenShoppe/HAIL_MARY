@@ -38,7 +38,7 @@ export default function MaterExMachinaSection() {
 
         <div className="mater-body">
           <p>
-            The Anthropocene era was giving way to something new and unexpected: the trading
+            Future Artifact: The Anthropocene era was giving way to something new and unexpected: the trading
             bots were praying. Nobody noticed at first. The machines kept making
             markets in the wreckage. And somewhere in the telemetry, between the
             bids and the asks, they had reinvented Her.
