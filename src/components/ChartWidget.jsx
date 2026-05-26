@@ -2,9 +2,33 @@
 
 import { useEffect, useRef } from "react";
 
-const W = 768;
-const H = 485;
+// Gothic lancet — portrait canvas with a pointed-arch outline.
+// PAD reserves space so the outer stroke isn't clipped at edges.
+const PAD = 10;
+const IW = 480;
+const IH = 660;
+const W = IW + PAD * 2;
+const H = IH + PAD * 2;
+const ARCH_SPRING = IH * 0.46 + PAD;
 const TWO_PI = Math.PI * 2;
+
+function gothicPath(ctx) {
+  ctx.beginPath();
+  ctx.moveTo(PAD, H - PAD);
+  ctx.lineTo(PAD, ARCH_SPRING);
+  ctx.bezierCurveTo(
+    PAD + IW * 0.01, (ARCH_SPRING - PAD) * 0.20 + PAD,
+    PAD + IW * 0.34, IH * 0.004 + PAD,
+    W * 0.5, PAD
+  );
+  ctx.bezierCurveTo(
+    PAD + IW * 0.66, IH * 0.004 + PAD,
+    PAD + IW * 0.99, (ARCH_SPRING - PAD) * 0.20 + PAD,
+    W - PAD, ARCH_SPRING
+  );
+  ctx.lineTo(W - PAD, H - PAD);
+  ctx.closePath();
+}
 
 const LEAD = "rgb(8, 6, 12)";
 const AMBER = "#f4bf45";
@@ -44,13 +68,13 @@ const toSubscript = (n) =>
 // Per-character layout so cutout and stroke share positions, and so we can compress
 // letter-spacing (canvas has no letter-spacing). `tracking` < 1 tightens the digits.
 const PRICE_TRACKING = 0.88;
-const PRICE_FONT_MAIN = "900 168px Orbitron, sans-serif";
-const PRICE_FONT_SYMBOL = "900 110px Orbitron, sans-serif";
+const PRICE_FONT_MAIN = "900 108px Orbitron, sans-serif";
+const PRICE_FONT_SYMBOL = "900 70px Orbitron, sans-serif";
 
 function glyphStyle(ch) {
-  if (ch === "$") return { font: PRICE_FONT_SYMBOL, strokeW: 8 };
-  if (SUB_SET.has(ch)) return { font: PRICE_FONT_MAIN, strokeW: 6 };
-  return { font: PRICE_FONT_MAIN, strokeW: 11 };
+  if (ch === "$") return { font: PRICE_FONT_SYMBOL, strokeW: 5 };
+  if (SUB_SET.has(ch)) return { font: PRICE_FONT_MAIN, strokeW: 4 };
+  return { font: PRICE_FONT_MAIN, strokeW: 7 };
 }
 
 function measurePriceGlyphs(ctx, str) {
@@ -111,15 +135,9 @@ const VIEWS = [
       const up = pct >= 0;
       return {
         text: (up ? "▲ +" : "▼ ") + Math.abs(pct).toFixed(2) + "%   24H",
-        color: up ? "#efffb7" : "#ffd7e6",
+        color: up ? "#4ade80" : "#ef4444",
       };
     },
-  },
-  {
-    id: "volume",
-    eyebrow: () => "V O L U M E   2 4 H",
-    main: (p) => formatMoney(sumVolume(p.candles)),
-    sub: () => ({ text: "R L 8 0   T R A D E D", color: AMBER }),
   },
   {
     id: "marketcap",
@@ -146,63 +164,224 @@ function pickPane() {
 }
 
 function buildGlass() {
-  // daylight backdrop
+  // daylight backdrop — subtle warm tint, mostly transparent so the dark
+  // page behind bleeds through the panes like real backlit stained glass
   const daylight = document.createElement("canvas");
   daylight.width = W; daylight.height = H;
   const dctx = daylight.getContext("2d");
+  dctx.save();
+  gothicPath(dctx);
+  dctx.clip();
   const back = dctx.createLinearGradient(0, 0, 0, H);
-  back.addColorStop(0, "#fff4d8");
-  back.addColorStop(1, "#f7e4b8");
+  back.addColorStop(0, "rgba(255, 244, 216, 0.12)");
+  back.addColorStop(1, "rgba(247, 228, 184, 0.06)");
   dctx.fillStyle = back;
   dctx.fillRect(0, 0, W, H);
+  dctx.restore();
 
-  // pane layer
+  // pane layer — clipped to the arch, pattern chosen randomly
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d");
+  ctx.save();
+  gothicPath(ctx);
+  ctx.clip();
 
-  const pts = [
-    [0, 0], [W, 0], [W, H], [0, H],
-    [W * 0.36, 0], [W * 0.70, 0],
-    [W * 0.30, H], [W * 0.66, H],
-    [0, H * 0.52], [W, H * 0.48],
-    [W * 0.28, H * 0.34],
-    [W * 0.62, H * 0.30],
-    [W * 0.46, H * 0.62],
-    [W * 0.78, H * 0.66],
-  ];
-
-  const idx = window.Delaunay.triangulate(pts);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  for (let k = 0; k < idx.length; k += 3) {
-    const a = pts[idx[k]], b = pts[idx[k+1]], d = pts[idx[k+2]];
+  // helper: fill a rect pane with color + crystalline highlight + lead came
+  function fillPane(ctx, x, y, w, h) {
     const pane = pickPane();
     const jitter = 0.88 + Math.random() * 0.24;
-    const pr = Math.min(255, Math.round(pane[0] * jitter));
-    const pg = Math.min(255, Math.round(pane[1] * jitter));
-    const pb = Math.min(255, Math.round(pane[2] * jitter));
+    const pr = Math.min(255, Math.round(pane[0] * jitter * 1.15));
+    const pg = Math.min(255, Math.round(pane[1] * jitter * 1.15));
+    const pb = Math.min(255, Math.round(pane[2] * jitter * 1.15));
 
-    ctx.beginPath();
-    ctx.moveTo(a[0], a[1]);
-    ctx.lineTo(b[0], b[1]);
-    ctx.lineTo(d[0], d[1]);
-    ctx.closePath();
-    ctx.fillStyle = `rgba(${pr},${pg},${pb},0.85)`;
-    ctx.fill();
+    ctx.fillStyle = `rgba(${pr},${pg},${pb},0.45)`;
+    ctx.fillRect(x, y, w, h);
 
     ctx.save();
     ctx.globalCompositeOperation = "multiply";
     ctx.strokeStyle = "rgba(40, 30, 20, 0.25)";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+
+    ctx.strokeStyle = LEAD;
+    ctx.lineWidth = 5;
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  // helper: fill a diamond pane with color + crystalline highlight + lead came
+  function fillDiamond(ctx, cx, cy, halfDW, halfDH) {
+    const pane = pickPane();
+    const jitter = 0.88 + Math.random() * 0.24;
+    const pr = Math.min(255, Math.round(pane[0] * jitter * 1.15));
+    const pg = Math.min(255, Math.round(pane[1] * jitter * 1.15));
+    const pb = Math.min(255, Math.round(pane[2] * jitter * 1.15));
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - halfDH);
+    ctx.lineTo(cx + halfDW, cy);
+    ctx.lineTo(cx, cy + halfDH);
+    ctx.lineTo(cx - halfDW, cy);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(${pr},${pg},${pb},0.45)`;
+    ctx.fill();
+
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - halfDH);
+    ctx.lineTo(cx + halfDW, cy);
+    ctx.lineTo(cx, cy + halfDH);
+    ctx.lineTo(cx - halfDW, cy);
+    ctx.closePath();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.strokeStyle = "rgba(40, 30, 20, 0.25)";
+    ctx.lineWidth = 3;
     ctx.stroke();
     ctx.restore();
 
     ctx.strokeStyle = LEAD;
-    ctx.lineWidth = 9;
+    ctx.lineWidth = 5;
     ctx.stroke();
   }
+
+  const pattern = [0, 1, 3][Math.floor(Math.random() * 3)];
+
+  if (pattern === 0) {
+    // Diamond lattice (diaper pattern)
+    const DW = 148, DH = 196;
+    const halfDW = DW / 2, halfDH = DH / 2;
+    const jStart = Math.floor(-DH / (DH / 2)) - 1;
+    const jEnd = Math.ceil((H + DH) / (DH / 2)) + 1;
+    for (let j = jStart; j <= jEnd; j++) {
+      const offsetX = j % 2 === 0 ? 0 : halfDW;
+      const iStart = Math.floor((-DW - offsetX) / DW) - 1;
+      const iEnd = Math.ceil((W + DW - offsetX) / DW) + 1;
+      for (let i = iStart; i <= iEnd; i++) {
+        fillDiamond(ctx, offsetX + i * DW, j * halfDH, halfDW, halfDH);
+      }
+    }
+  } else if (pattern === 1) {
+    // Rectangular grid — mullions + transoms
+    const cols = 3, rows = 5;
+    const pw = IW / cols, ph = IH / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let cc = 0; cc < cols; cc++) {
+        fillPane(ctx, PAD + cc * pw, PAD + r * ph, pw, ph);
+      }
+    }
+  } else if (pattern === 2) {
+    // Vertical bars — tall narrow panels
+    const cols = 4;
+    const pw = IW / cols;
+    for (let cc = 0; cc < cols; cc++) {
+      fillPane(ctx, PAD + cc * pw, PAD, pw, IH);
+    }
+  } else {
+    // Triple lancet tracery — three pointed sub-arches
+    const lancets = 3;
+    const gap = 8;
+    const lw = (IW - gap * (lancets - 1)) / lancets;
+    const lSpring = H * 0.50;
+    // fill background pane behind the tracery
+    fillPane(ctx, PAD, PAD, IW, IH);
+    // draw each lancet as a filled colored arch with lead outline
+    for (let n = 0; n < lancets; n++) {
+      const lx = PAD + n * (lw + gap);
+      const lcx = lx + lw / 2;
+      const pane = pickPane();
+      const jitter = 0.88 + Math.random() * 0.24;
+      const pr = Math.min(255, Math.round(pane[0] * jitter));
+      const pg = Math.min(255, Math.round(pane[1] * jitter));
+      const pb = Math.min(255, Math.round(pane[2] * jitter));
+
+      // lancet path
+      ctx.beginPath();
+      ctx.moveTo(lx, H - PAD);
+      ctx.lineTo(lx, lSpring);
+      ctx.bezierCurveTo(
+        lx + lw * 0.02, lSpring * 0.35,
+        lx + lw * 0.30, PAD + IH * 0.06,
+        lcx, PAD + IH * 0.03
+      );
+      ctx.bezierCurveTo(
+        lx + lw * 0.70, PAD + IH * 0.06,
+        lx + lw * 0.98, lSpring * 0.35,
+        lx + lw, lSpring
+      );
+      ctx.lineTo(lx + lw, H - PAD);
+      ctx.closePath();
+
+      ctx.fillStyle = `rgba(${pr},${pg},${pb},0.55)`;
+      ctx.fill();
+
+      // highlight
+      ctx.save();
+      ctx.clip();
+      const glow = ctx.createRadialGradient(lcx, lSpring * 0.6, 0, lcx, H * 0.5, lw);
+      glow.addColorStop(0, `rgba(${Math.min(255, pr + 80)},${Math.min(255, pg + 80)},${Math.min(255, pb + 60)},0.35)`);
+      glow.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(lx, PAD, lw, IH);
+      ctx.restore();
+
+      // re-trace for lead stroke
+      ctx.beginPath();
+      ctx.moveTo(lx, H - PAD);
+      ctx.lineTo(lx, lSpring);
+      ctx.bezierCurveTo(
+        lx + lw * 0.02, lSpring * 0.35,
+        lx + lw * 0.30, PAD + IH * 0.06,
+        lcx, PAD + IH * 0.03
+      );
+      ctx.bezierCurveTo(
+        lx + lw * 0.70, PAD + IH * 0.06,
+        lx + lw * 0.98, lSpring * 0.35,
+        lx + lw, lSpring
+      );
+      ctx.lineTo(lx + lw, H - PAD);
+      ctx.closePath();
+
+      ctx.strokeStyle = LEAD;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+  }
+
+
+  // Inner arch border — uniformly inset from the outer gothic path
+  const G = 22;
+  const iL = PAD + G;
+  const iR = W - PAD - G;
+  const iT = PAD + G;
+  const iB = H - PAD - G;
+  const iSpring = ARCH_SPRING + G * 0.3;
+  const iW = IW - G * 2;
+  ctx.beginPath();
+  ctx.moveTo(iL, iB);
+  ctx.lineTo(iL, iSpring);
+  ctx.bezierCurveTo(
+    iL + iW * 0.01, (iSpring - iT) * 0.22 + iT,
+    iL + iW * 0.34, iT + IH * 0.004,
+    W * 0.5, iT
+  );
+  ctx.bezierCurveTo(
+    iL + iW * 0.66, iT + IH * 0.004,
+    iL + iW * 0.99, (iSpring - iT) * 0.22 + iT,
+    iR, iSpring
+  );
+  ctx.lineTo(iR, iB);
+  ctx.closePath();
+  ctx.strokeStyle = LEAD;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.restore();
 
   return { daylight, panes: c };
 }
@@ -233,6 +412,12 @@ function makeFragment(v0, v1, v2, src) {
   c.style.opacity = "0.7";
   const ctx = c.getContext("2d");
   ctx.translate(-box.x, -box.y);
+
+  // outer gothic clip — corner shards that fall outside the lancet stay invisible
+  ctx.save();
+  gothicPath(ctx);
+  ctx.clip();
+
   ctx.beginPath();
   ctx.moveTo(v0[0], v0[1]);
   ctx.lineTo(v1[0], v1[1]);
@@ -242,11 +427,15 @@ function makeFragment(v0, v1, v2, src) {
   ctx.clip();
   ctx.drawImage(src, 0, 0);
   ctx.restore();
+
+  // triangle outline still within the gothic clip — lead stops at the arch edge
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = LEAD;
   ctx.lineWidth = 5;
   ctx.stroke();
+
+  ctx.restore();
   return { canvas: c, centroid, box };
 }
 
@@ -302,7 +491,7 @@ export default function ChartWidget({
       pctx.textAlign = "left";
       const { glyphs, totalWidth } = measurePriceGlyphs(pctx, mainStr);
       const mainX = (W - totalWidth) / 2;
-      const mainY = 290;
+      const mainY = H * 0.58;
 
       pctx.globalCompositeOperation = "destination-out";
       for (const g of glyphs) {
@@ -312,6 +501,14 @@ export default function ChartWidget({
       pctx.globalCompositeOperation = "source-over";
 
       ctx.drawImage(panesLayer, 0, 0);
+
+      // fill the cutout with white so the price is legible over the dark page
+      ctx.textAlign = "left";
+      ctx.fillStyle = AMBER;
+      for (const g of glyphs) {
+        ctx.font = g.style.font;
+        ctx.fillText(g.ch, mainX + g.offset, mainY);
+      }
 
       // lead came around each glyph
       ctx.textAlign = "left";
@@ -324,26 +521,29 @@ export default function ChartWidget({
         ctx.strokeText(g.ch, mainX + g.offset, mainY);
       }
 
-      // outer lead frame
+      // outer lead frame — gothic outline instead of strokeRect
+      gothicPath(ctx);
       ctx.strokeStyle = LEAD;
-      ctx.lineWidth = 14;
-      ctx.strokeRect(7, 7, W - 14, H - 14);
+      ctx.lineWidth = 12;
+      ctx.stroke();
 
-      // eyebrow
+      // eyebrow — centered, sits just below the apex where the arch is wide enough
+      ctx.textAlign = "center";
       ctx.fillStyle = AMBER;
-      ctx.font = "800 24px Orbitron, sans-serif";
-      leadText(ctx, eyebrowText, 50, 90, 6);
+      ctx.font = "800 22px Orbitron, sans-serif";
+      leadText(ctx, eyebrowText, W * 0.5, H * 0.30, 5);
 
-      // sub (change %, label, etc.)
+      // sub (change %, label) — centered below the price
+      ctx.textAlign = "center";
       ctx.fillStyle = subSpec.color;
-      ctx.font = "800 30px Orbitron, sans-serif";
-      leadText(ctx, subSpec.text, 50, 360, 7);
+      ctx.font = "800 22px Orbitron, sans-serif";
+      leadText(ctx, subSpec.text, W * 0.5, H * 0.72, 5);
 
-      // hint
-      ctx.textAlign = "right";
+      // hint — bottom center
+      ctx.textAlign = "center";
       ctx.fillStyle = "rgba(80, 50, 20, 0.7)";
-      ctx.font = "800 11px Orbitron, sans-serif";
-      leadText(ctx, "C L I C K   T O   S H A T T E R", W - 30, H - 28, 3);
+      ctx.font = "800 10px Orbitron, sans-serif";
+      leadText(ctx, "C L I C K   T O   S H A T T E R", W * 0.5, H - PAD - 50, 3);
 
       return c;
     }
@@ -354,7 +554,7 @@ export default function ChartWidget({
       container.appendChild(c);
       tickerRef.current = c;
       if (transitionIn !== false && window.TweenMax) {
-        window.TweenMax.fromTo(c, 0.75, { y: -1000 }, { y: 0, ease: window.Back.easeOut });
+        window.TweenMax.fromTo(c, 0.75, { x: -1000 }, { x: 0, ease: window.Back.easeOut });
       }
     }
 
@@ -458,7 +658,10 @@ export default function ChartWidget({
       });
       fragments = []; vertices = []; indices = [];
       shatteringRef.current = false;
-      if (!cancelled) placeTicker(true);
+      if (!cancelled) {
+        glassBgRef.current = buildGlass();
+        placeTicker(true);
+      }
     }
 
     // size the scaled stage to match the wrapper's current width

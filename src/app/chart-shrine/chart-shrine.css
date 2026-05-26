@@ -317,7 +317,7 @@ body:has(.shrine-page.neon) {
    inline — this selector's specificity otherwise overrides their own
    `position: fixed`. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.chart-widget) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail) {
   position: relative;
   z-index: 1;
   /* Don't eat pointer events over the canvas — these are decorative
@@ -1784,14 +1784,14 @@ body:has(.shrine-page.neon) {
 /* ── Chart Widget — glass shards ─────────────────────────────────── */
 
 .chart-widget {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 900;
-  width: 240px;
-  height: 152px;          /* 768 × 485 design ratio, scaled */
-  pointer-events: auto;   /* canvas inside is clickable */
-  overflow: visible;      /* shards can fly out during shatter */
+  align-self: flex-start;
+  margin-left: 12%;
+  margin-top: 2%;
+  z-index: 2;
+  width: 22vw;
+  aspect-ratio: 500 / 680;
+  pointer-events: auto;
+  overflow: visible;
   filter:
     drop-shadow(0 0 60px rgba(255, 245, 220, 0.18))
     drop-shadow(0 16px 28px rgba(0, 0, 0, 0.55));
@@ -1906,7 +1906,7 @@ body:has(.shrine-page.neon) {
     top: auto;
     right: auto;
     width: 275px;
-    height: 174px;
+    height: 378px;
     margin: 80vh auto 24px;
     z-index: 2;
   }
