@@ -157,6 +157,10 @@ export default function OilQualify({
     muted: "#b8a890",
     border: "rgba(212, 168, 84, 0.25)",
     bg: "#1a0d24",
+    panelBg: "rgba(20, 12, 28, 0.55)",
+    inputBg: "rgba(30, 18, 40, 0.7)",
+    barBg: "rgba(212, 168, 84, 0.12)",
+    tintBg: "rgba(20, 12, 28, 0.55)",
   }), [themeProp]);
 
   const qualifiedPlayers = useMemo(
@@ -1000,24 +1004,40 @@ export default function OilQualify({
           gap: 12,
           marginBottom: 24,
         }}>
-          {["/plotPic5.webp", "/plotPic7.webp"].map((src) => (
-            <button
-              key={src}
-              type="button"
-              onClick={() => setLightboxSrc(src)}
-              style={{
-                aspectRatio: "4 / 3",
-                borderRadius: 4,
-                border: `2px solid ${theme.gold}`,
-                background: `linear-gradient(160deg, ${theme.gold}06, transparent)`,
-                overflow: "hidden",
-                padding: 0,
-                cursor: "zoom-in",
-              }}
-              aria-label="View larger"
-            >
-              <img src={src} alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-            </button>
+          {[
+            { src: "/plotPic5.webp", caption: "Customize your rig" },
+            { src: "/plotPic7.webp", caption: "Oil deposits determined by cryptographic hash" },
+          ].map(({ src, caption }) => (
+            <div key={src}>
+              <button
+                type="button"
+                onClick={() => setLightboxSrc(src)}
+                style={{
+                  aspectRatio: "4 / 3",
+                  borderRadius: 4,
+                  border: `2px solid ${theme.gold}`,
+                  background: `linear-gradient(160deg, ${theme.gold}06, transparent)`,
+                  overflow: "hidden",
+                  padding: 0,
+                  cursor: "zoom-in",
+                  width: "100%",
+                }}
+                aria-label="View larger"
+              >
+                <img src={src} alt={caption} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </button>
+              <div style={{
+                padding: "6px 4px",
+                fontSize: 10,
+                fontStyle: "italic",
+                color: theme.muted,
+                letterSpacing: "0.04em",
+                lineHeight: 1.5,
+                textAlign: "center",
+              }}>
+                {caption}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -1156,6 +1176,9 @@ export default function OilQualify({
               border: `1px solid ${theme.border}`,
               borderRadius: 4,
               background: theme.panelBg,
+              backdropFilter: "blur(24px) saturate(1.2)",
+              WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+              color: "#e8dcc8",
             }}>
               {/* Wallet & Balance Info */}
               <div style={{ marginBottom: 16 }}>
@@ -1859,24 +1882,42 @@ export default function OilQualify({
           </div>
         </div>
 
-        {/* Panorama image */}
+        {/* Panorama images */}
         <div style={{
           marginBottom: 24,
-          borderRadius: 4,
-          border: `2px solid ${theme.gold}`,
-          background: `linear-gradient(170deg, ${theme.gold}05, ${theme.gold}0a, ${theme.gold}03)`,
-          display: "flex",
-          // alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-          position: "relative",
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: 12,
         }}>
-          <div style={{ textAlign: "center" }}>
-            {/* <div style={{ fontSize: 32, opacity: 0.12 }}>&#127956;</div> */}
-            {/* <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.muted, marginTop: 4 }}> */}
-              <img src="/moneyShot.png" alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-            {/* </div> */}
-          </div>
+          {[
+            { src: "/moneyShot.png", caption: "A gusher!" },
+            { src: "/images/hell.webp", caption: "A demon is accidentally released from a hell pocket in the shale" },
+          ].map(({ src, caption }) => (
+            <div key={src}>
+              <div style={{
+                borderRadius: 4,
+                border: `2px solid ${theme.gold}`,
+                background: `linear-gradient(170deg, ${theme.gold}05, ${theme.gold}0a, ${theme.gold}03)`,
+                overflow: "hidden",
+                aspectRatio: "4 / 3",
+              }}>
+                <img src={src} alt={caption || "Oil rig at sunset"} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </div>
+              {caption && (
+                <div style={{
+                  padding: "6px 4px",
+                  fontSize: 10,
+                  fontStyle: "italic",
+                  color: theme.muted,
+                  letterSpacing: "0.04em",
+                  lineHeight: 1.5,
+                  textAlign: "center",
+                }}>
+                  {caption}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
 
         {/* Rules */}
