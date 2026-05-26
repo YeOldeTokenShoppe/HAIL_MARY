@@ -34,6 +34,7 @@ import {
   clearLocalCandle,
 } from "@/lib/localCandle";
 import { fireCandleIgnitionPulse } from "@/utils/candleIgnitionPulse";
+import CommunityCandles from "@/components/CommunityCandles";
 import "./chart-shrine/chart-shrine.css";
 
 // Preload only the anon-default pillar candle. The votive GLB is
@@ -2534,6 +2535,8 @@ export default function HomePage() {
           {/* <Stats className="r3f-stats" /> */}
         </StarfieldStatueScene>
       </div>
+
+      <CommunityCandles />
 
       <div className="hero-header">
         <h1 className="our-lady-title">

@@ -34,7 +34,7 @@ export function generateOilDistribution3D({
   gridY = 10,
   depthZ = 20,
   totalOilBudget = 500000,
-  numberOfDeposits = 8,
+  numberOfDeposits = 5,
   radiusMin = 0.8,
   radiusMax = 3.0,
   richnessMin = 0.6,
@@ -136,5 +136,24 @@ export function generateOilDistribution3D({
     }
   }
 
-  return { grid, deposits, maxOil };
+  // ── Hell pockets: specific cells that trigger a bad event when drilled ──
+  // Use a separate RNG stream so adding/removing hell pockets doesn't shift
+  // oil deposit positions (the main rand has already been consumed above).
+  const hellRng = createRNG(blockHash + "_hell");
+  const numberOfHellPockets = Math.max(1, Math.floor(gridX * gridY * 0.03)); // ~3% of grid
+  const hellPockets = [];
+  const usedCells = new Set();
+  for (let i = 0; i < numberOfHellPockets * 3 && hellPockets.length < numberOfHellPockets; i++) {
+    const hx = Math.floor(hellRng() * gridX);
+    const hy = Math.floor(hellRng() * gridY);
+    const hz = Math.floor(hellRng() * (depthZ - 2)) + 2; // never at surface (z>=2)
+    const key = `${hx}_${hy}_${hz}`;
+    if (usedCells.has(key)) continue;
+    // Skip cells that contain significant oil — don't punish a jackpot
+    if (grid[hx]?.[hy]?.[hz] > 0) continue;
+    usedCells.add(key);
+    hellPockets.push({ x: hx, y: hy, z: hz });
+  }
+
+  return { grid, deposits, maxOil, hellPockets };
 }

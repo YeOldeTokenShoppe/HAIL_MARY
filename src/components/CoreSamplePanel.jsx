@@ -257,7 +257,7 @@ function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio }) 
   );
 }
 
-function PersonalCoreTube({ column, maxOil, drillDepth, dark }) {
+function PersonalCoreTube({ column, maxOil, drillDepth, dark, hellDepths = [] }) {
   const tubeX = 42;
   const tubeY = 10;
   const tubeW = 56;
@@ -431,6 +431,40 @@ function PersonalCoreTube({ column, maxOil, drillDepth, dark }) {
           </text>
         )}
 
+        {/* Hell pocket markers */}
+        {hellDepths.filter(z => z < drillDepth).map((z) => {
+          const cy = tubeY + z * bandH + bandH * 0.5;
+          return (
+            <g key={`hell-${z}`}>
+              <rect
+                x={tubeX} y={tubeY + z * bandH}
+                width={tubeW} height={bandH + 0.5}
+                fill="#cc1100" opacity="0.35"
+                clipPath="url(#personal-clip)"
+              />
+              <g filter="url(#personal-glow)">
+                <circle cx={tubeX + tubeW * 0.5} cy={cy} r="3" fill="#ff2200">
+                  <animate attributeName="opacity" values="1;0.3;1" dur="0.8s" repeatCount="indefinite" />
+                  <animate attributeName="r" values="3;5;3" dur="0.8s" repeatCount="indefinite" />
+                </circle>
+              </g>
+              <line
+                x1={tubeX + tubeW} y1={cy}
+                x2={tubeX + tubeW + 14} y2={cy}
+                stroke="#ff2200" strokeWidth="0.6" opacity="0.7"
+              />
+              <text
+                x={tubeX + tubeW + 18} y={cy + 3}
+                fontSize="8" fill="#ff2200" letterSpacing="0.1em"
+                fontFamily='"Share Tech Mono", monospace'
+                style={{ filter: "drop-shadow(0 0 3px rgba(255,34,0,0.6))" }}
+              >
+                DEMONIC FORCE
+              </text>
+            </g>
+          );
+        })}
+
         {/* Best find marker */}
         {bestDrilledZ >= 0 && bestVal > 0 && (
           (() => {
@@ -506,6 +540,7 @@ export default function CoreSamplePanel({
   selectedX = null,
   selectedY = null,
   drillDepth = 0,
+  hellPockets = [],
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [coreTab, setCoreTab] = useState("personal");
@@ -577,6 +612,13 @@ export default function CoreSamplePanel({
     for (let z = 0; z < DEPTH_Z; z++) col.push(grid3D[selectedX]?.[selectedY]?.[z] ?? 0);
     return col;
   }, [grid3D, selectedX, selectedY]);
+
+  const hellDepthsForPlot = useMemo(() => {
+    if (selectedX === null || selectedY === null) return [];
+    return hellPockets
+      .filter(hp => hp.x === selectedX && hp.y === selectedY)
+      .map(hp => hp.z);
+  }, [hellPockets, selectedX, selectedY]);
 
   const hasClaim = selectedX !== null && selectedY !== null && drillDepth > 0;
 
@@ -660,6 +702,7 @@ export default function CoreSamplePanel({
                   maxOil={maxOil}
                   drillDepth={drillDepth}
                   dark={dark}
+                  hellDepths={hellDepthsForPlot}
                 />
                 <Legend dark={dark} />
                 <div style={{

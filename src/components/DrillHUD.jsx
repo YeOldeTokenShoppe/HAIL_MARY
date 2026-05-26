@@ -111,6 +111,8 @@ export default function DrillHUD({
   maxOil = 1,
   drillProximity = 0,
   darkMode = true,
+  hellActive = false,
+  demonBlockade = null,
 }) {
   const [phase, setPhase] = useState("standby");
   const [pressure, setPressure] = useState(0);
@@ -203,13 +205,23 @@ export default function DrillHUD({
   }, [drillEvent, animate, oilValue, maxOil, drillProximity]);
 
   const dark = darkMode;
-  const bg = dark ? "rgba(212,168,84,0.06)" : "rgba(90,64,16,0.04)";
-  const border = dark ? "rgba(212,168,84,0.2)" : "rgba(90,64,16,0.18)";
+  const hellColor = "#ff2200";
+  const isHellOrBlockade = hellActive || demonBlockade?.active;
+  const bg = isHellOrBlockade ? "rgba(204,17,0,0.08)" : (dark ? "rgba(212,168,84,0.06)" : "rgba(90,64,16,0.04)");
+  const border = isHellOrBlockade ? "rgba(255,34,0,0.4)" : (dark ? "rgba(212,168,84,0.2)" : "rgba(90,64,16,0.18)");
   const sectionBorder = dark ? "#2a2e36" : "#d4c8b4";
   const mutedColor = dark ? "#6a7888" : "#8b7d6b";
   const accentColor = dark ? "#d4a854" : "#5a4010";
   const isPrelim = phase === "preliminary";
   const isDrilling = phase === "drilling" || phase === "analyzing";
+  const displayPressure = isHellOrBlockade ? 99 : pressure;
+  const displayDensity = isHellOrBlockade ? 99 : density;
+  const displayStatus = hellActive
+    ? "DEMONIC FORCE DETECTED"
+    : demonBlockade?.active
+      ? `OIL BLOCKADE — BOUNTY: ${demonBlockade.bountyAmount || 0} USDC`
+      : status;
+  const displayStatusColor = isHellOrBlockade ? hellColor : statusColor;
 
   return (
     <div style={{
@@ -229,14 +241,14 @@ export default function DrillHUD({
         {/* Status line */}
         <div style={{
           fontSize: 10, fontWeight: 600, letterSpacing: "0.18em",
-          color: statusColor || (isDrilling ? accentColor : mutedColor),
+          color: displayStatusColor || (isDrilling ? accentColor : mutedColor),
           fontFamily: "'Share Tech Mono', monospace",
           textAlign: "center",
-          textShadow: statusColor && statusColor !== "#6e6050" ? `0 0 6px ${statusColor}` : "none",
+          textShadow: displayStatusColor && displayStatusColor !== "#6e6050" ? `0 0 6px ${displayStatusColor}` : "none",
           minHeight: 14,
           transition: "color 0.5s",
         }}>
-          {status}
+          {displayStatus}
         </div>
 
         {/* Gauges */}
@@ -251,12 +263,13 @@ export default function DrillHUD({
             dark={dark}
           />
           <GaugeArc
-            value={pressure}
+            value={displayPressure}
             max={100}
             label="PRESSURE"
             unit="PSI"
             color={
-              isPrelim
+              hellActive ? hellColor
+              : isPrelim
                 ? (statusColor || mutedColor)
                 : statusColor && statusColor !== "#6e6050"
                   ? statusColor
@@ -266,18 +279,21 @@ export default function DrillHUD({
             dark={dark}
           />
           <GaugeArc
-            value={density}
+            value={displayDensity}
             max={100}
             label="DENSITY"
             unit={
-              isPrelim
-                ? "???"
-                : phase === "result" && statusColor
-                  ? status.replace("RESULT: ", "")
-                  : "g/cm³"
+              hellActive
+                ? "HELL"
+                : isPrelim
+                  ? "???"
+                  : phase === "result" && statusColor
+                    ? status.replace("RESULT: ", "")
+                    : "g/cm³"
             }
             color={
-              isPrelim
+              hellActive ? hellColor
+              : isPrelim
                 ? mutedColor
                 : statusColor || (dark ? "#8a98a8" : "#6e6050")
             }

@@ -283,6 +283,10 @@ body:has(.shrine-page.neon) {
     padding-bottom: 0;
   }
 
+  .shrine-page.neon .hero-header {
+    padding-top: 4rem;
+  }
+
   .shrine-page.neon .below-fold-chamber {
     width: calc(100% + 16px);
     margin: 40vh -8px 0;

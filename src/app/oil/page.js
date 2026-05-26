@@ -319,7 +319,7 @@ function CameraShake({ shakeRef }) {
 
 function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY) {
   return useMemo(() => {
-    const { grid, deposits, maxOil } = generateOilDistribution3D({
+    const { grid, deposits, maxOil, hellPockets } = generateOilDistribution3D({
       blockHash,
       gridX,
       gridY,
@@ -347,7 +347,13 @@ function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY
     const sorted = [...claimTotals].sort((a, b) => b.oil - a.oil);
     const dryClaims = claimTotals.filter((c) => c.oil === 0).length;
 
-    return { grid3D: grid, claimTotals, sorted, deposits, maxOil, totalOil, dryClaims, maxClaimTotal };
+    // Build a fast lookup for hell pockets: "x_y_z" → true
+    const hellMap = {};
+    for (const hp of hellPockets) {
+      hellMap[`${hp.x}_${hp.y}_${hp.z}`] = true;
+    }
+
+    return { grid3D: grid, claimTotals, sorted, deposits, maxOil, totalOil, dryClaims, maxClaimTotal, hellPockets, hellMap };
   }, [blockHash, numberOfDeposits, totalOilBudget, gridX, gridY]);
 }
 
@@ -526,7 +532,7 @@ export default function OilPage() {
   const [isRevealed, setIsRevealed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
-  const [numberOfDeposits, setNumberOfDeposits] = useState(8);
+  const [numberOfDeposits, setNumberOfDeposits] = useState(5);
   const [totalOilBudget, setTotalOilBudget] = useState(500);
   const [gridSize, setGridSize] = useState(10);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -630,6 +636,51 @@ export default function OilPage() {
     });
     return () => unsub();
   }, []);
+
+  // Demon bounty — live listener for active demon events
+  const [demonBounty, setDemonBounty] = useState(null);
+  useEffect(() => {
+    if (!db) return;
+    const q = query(
+      collection(db, "demonBounty"),
+      where("status", "in", ["active", "flying", "waiting"]),
+      orderBy("createdAt", "desc"),
+      limit(1),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      if (snap.empty) {
+        setDemonBounty(null);
+      } else {
+        const d = snap.docs[0];
+        setDemonBounty({ id: d.id, ...d.data() });
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Demon blockade — global flag that blocks all drilling
+  const [demonBlockade, setDemonBlockade] = useState(null);
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(doc(db, "oilGame", "demonBlockade"), (snap) => {
+      if (snap.exists()) {
+        setDemonBlockade(snap.data());
+      } else {
+        setDemonBlockade(null);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Derived: is the current user the stunned summoner?
+  const isSummonerStunned = useMemo(() => {
+    if (!demonBlockade?.active || !user?.id) return false;
+    if (demonBlockade.summonerId !== user.id) return false;
+    const stunEnd = demonBlockade.stunEndsAt?.toMillis?.() ?? demonBlockade.stunEndsAt?.seconds * 1000;
+    return stunEnd ? Date.now() < stunEnd : false;
+  }, [demonBlockade, user?.id]);
+
+  const isBlockadeActive = demonBlockade?.active === true;
 
   // Gusher events — live listener for active oil gushers across all players
   const [gusherEvents, setGusherEvents] = useState([]);
@@ -868,15 +919,17 @@ export default function OilPage() {
   // Drill status — click-to-drill, but ceiling is time-gated (passiveDepth + bonusDrills)
   const drillStatus = useMemo(() => {
     if (!user && !isTest) return "sign-in";
+    if (isSummonerStunned) return "stunned";
+    if (isBlockadeActive) return "blockade";
     if (gamePhase === "ticket_sale") return "pre-game";
     if (selectedX === null && userDrill?.col != null) return "wrong-claim";
     if (selectedX === null) return "no-claim";
     if (userDrill && (userDrill.col !== selectedX || userDrill.row !== sliceY)) return "wrong-claim";
     const currentDepth = userPlotState?.drillDay ?? userDrill?.drillDay ?? 0;
     if (currentDepth >= MAX_DEPTH) return "max-depth";
-    if (currentDepth >= playerDepth) return "depth-ceiling"; // caught up to time-gated ceiling
+    if (currentDepth >= playerDepth) return "depth-ceiling";
     return "ready";
-  }, [user, gamePhase, selectedX, sliceY, userDrill, userPlotState, playerDepth]);
+  }, [user, gamePhase, selectedX, sliceY, userDrill, userPlotState, playerDepth, isSummonerStunned, isBlockadeActive]);
 
   // Panel collapse for full 3D view
   const [panelsCollapsed, setPanelsCollapsed] = useState(false);
@@ -1105,9 +1158,93 @@ export default function OilPage() {
 
   const selectedClaimIndex = selectedX !== null ? sliceY * gridSize + selectedX : null;
 
-  // Session-local drain tracking
+  // Session-local drain tracking (declared early — used by hell pocket detection)
   const [tankDrained, setTankDrained] = useState(false);
   const [lastDrainSnapshot, setLastDrainSnapshot] = useState(0);
+
+  // ── Hell pocket state ──
+  // Local visual state is driven by either:
+  // 1. The Firestore demonBounty listener (multiplayer — all clients see it)
+  // 2. Local detection for admin/test mode (single-player preview)
+  const [hellActive, setHellActive] = useState(false);
+  const [hellCol, setHellCol] = useState(null);
+  const [hellRow, setHellRow] = useState(null);
+  const hellTimeoutRef = useRef(null);
+  const prevEnvPresetRef = useRef(null);
+
+  // Sync hell visuals from Firestore demonBounty (multiplayer)
+  useEffect(() => {
+    if (demonBounty && ["active", "flying", "waiting"].includes(demonBounty.status)) {
+      if (!hellActive) prevEnvPresetRef.current = envPreset;
+      setEnvPreset("night");
+      setHellActive(true);
+      setHellCol(demonBounty.summonerCol);
+      setHellRow(demonBounty.summonerRow);
+    } else if (!demonBounty && hellActive && !hellTimeoutRef.current) {
+      setHellActive(false);
+      setHellCol(null);
+      setHellRow(null);
+      setEnvPreset(prevEnvPresetRef.current || "day");
+    }
+  }, [demonBounty]);
+
+  // Reactive hell pocket detection — fires the API for real players, or local-only for admin/test
+  const lastHellCheckRef = useRef(null);
+  const hellApiCalledRef = useRef(false);
+  useEffect(() => {
+    if (selectedX === null) return;
+    const col = activeUserDrill?.col ?? selectedX;
+    const row = activeUserDrill?.row ?? sliceY;
+    const checkKey = `${col}_${row}_${effectiveDrillDay}`;
+    if (checkKey === lastHellCheckRef.current) return;
+    lastHellCheckRef.current = checkKey;
+    for (let z = 0; z < effectiveDrillDay; z++) {
+      const hellKey = `${col}_${row}_${z}`;
+      if (stats.hellMap[hellKey] && !hellActive) {
+        if (user?.id && !isAdmin && !isTest && !hellApiCalledRef.current) {
+          // Real player — call the API to create a demon bounty event
+          hellApiCalledRef.current = true;
+          const unbankedOil = Math.max(0, playerExtracted - (lastDrainSnapshot || 0));
+          fetch("/api/oil-demon-bounty", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.id,
+              username: username?.trim() || user?.firstName || "Anonymous",
+              col,
+              row,
+              unbankedOil,
+            }),
+          }).then(r => r.json()).then(data => {
+            if (data.ok) {
+              // Visuals will be driven by the Firestore listener
+              console.log("[HELL] Demon bounty created:", data.bountyId);
+            }
+            hellApiCalledRef.current = false;
+          }).catch(err => {
+            console.error("[HELL] API call failed:", err);
+            hellApiCalledRef.current = false;
+          });
+        } else {
+          // Admin/test mode — local-only visual effects
+          prevEnvPresetRef.current = envPreset;
+          setEnvPreset("night");
+          setHellActive(true);
+          setHellCol(col);
+          setHellRow(row);
+          if (hellTimeoutRef.current) clearTimeout(hellTimeoutRef.current);
+          hellTimeoutRef.current = setTimeout(() => {
+            setHellActive(false);
+            setHellCol(null);
+            setHellRow(null);
+            setEnvPreset(prevEnvPresetRef.current || "day");
+            hellTimeoutRef.current = null;
+          }, 12000);
+        }
+        break;
+      }
+    }
+  }, [selectedX, sliceY, effectiveDrillDay, activeUserDrill, stats.hellMap, hellActive, envPreset, user?.id, isAdmin, isTest, playerExtracted, lastDrainSnapshot, username]);
 
   // Reset drained state when cell or drill depth changes
   useEffect(() => {
@@ -1395,10 +1532,11 @@ export default function OilPage() {
           console.error("Failed to write gusher event:", e);
         }
       }
+      // Hell pocket detection is handled by the reactive useEffect
     } catch (err) {
       console.error("Failed to save drill:", err);
     }
-  }, [user?.id, selectedX, sliceY, userDrill, userPlotState, drillStatus, username, stats.grid3D]);
+  }, [user?.id, selectedX, sliceY, userDrill, userPlotState, drillStatus, username, stats.grid3D, stats.hellMap, envPreset]);
 
   // ── Claim Jump handler ──
   const handleClaimJump = useCallback(async (newCol, newRow) => {
@@ -1629,6 +1767,100 @@ export default function OilPage() {
     }
   }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot, username]);
 
+  // Bounty claimed toast
+  const [bountyToast, setBountyToast] = useState(null);
+  const bountyToastTimer = useRef(null);
+
+  // Stun countdown — ticks every second while summoner is stunned
+  const [stunRemaining, setStunRemaining] = useState(0);
+  useEffect(() => {
+    if (!isSummonerStunned || !demonBlockade?.stunEndsAt) {
+      setStunRemaining(0);
+      return;
+    }
+    const stunEnd = demonBlockade.stunEndsAt.toMillis?.() ?? demonBlockade.stunEndsAt.seconds * 1000;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((stunEnd - Date.now()) / 1000));
+      setStunRemaining(left);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isSummonerStunned, demonBlockade?.stunEndsAt]);
+
+  // Watch for bounty claim by anyone (Firestore status goes to "claimed")
+  const prevBountyStatusRef = useRef(null);
+  useEffect(() => {
+    if (!db) return;
+    const q = query(
+      collection(db, "demonBounty"),
+      where("status", "==", "claimed"),
+      orderBy("claimedAt", "desc"),
+      limit(1),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      if (snap.empty) return;
+      const d = snap.docs[0];
+      const data = d.data();
+      if (prevBountyStatusRef.current === d.id) return;
+      prevBountyStatusRef.current = d.id;
+      setBountyToast({
+        hunterUsername: data.hunterUsername || "Anonymous",
+        bountyAmount: data.bountyAmount || 0,
+        isYou: data.hunterId === user?.id,
+      });
+      if (bountyToastTimer.current) clearTimeout(bountyToastTimer.current);
+      bountyToastTimer.current = setTimeout(() => setBountyToast(null), 8000);
+    });
+    return () => unsub();
+  }, [user?.id]);
+
+  // Claim the demon bounty — player clicks the demon in 3D
+  const handleClaimBounty = useCallback(async () => {
+    // Test/admin mode — local dismiss
+    if (!demonBounty?.id) {
+      setHellActive(false);
+      setHellCol(null);
+      setHellRow(null);
+      setEnvPreset(prevEnvPresetRef.current || "day");
+      if (hellTimeoutRef.current) { clearTimeout(hellTimeoutRef.current); hellTimeoutRef.current = null; }
+      setBountyToast({ dismissed: true, bountyAmount: 0, isYou: false });
+      if (bountyToastTimer.current) clearTimeout(bountyToastTimer.current);
+      bountyToastTimer.current = setTimeout(() => setBountyToast(null), 8000);
+      return;
+    }
+    if (!user?.id) return;
+    try {
+      const res = await fetch("/api/oil-demon-bounty", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bountyId: demonBounty.id,
+          hunterId: user.id,
+          hunterUsername: username?.trim() || user?.firstName || "Anonymous",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("[HELL] Bounty claim failed:", data.error);
+        return;
+      }
+      if (data.dismissed) {
+        setBountyToast({
+          hunterUsername: null,
+          bountyAmount: 0,
+          isYou: false,
+          dismissed: true,
+        });
+        if (bountyToastTimer.current) clearTimeout(bountyToastTimer.current);
+        bountyToastTimer.current = setTimeout(() => setBountyToast(null), 8000);
+      }
+      // Non-dismissed claims are handled by the Firestore listener
+    } catch (err) {
+      console.error("[HELL] Bounty claim error:", err);
+    }
+  }, [demonBounty?.id, user?.id, username]);
+
   // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
     if (selectedX === null || isDrilling) return;
@@ -1710,6 +1942,44 @@ export default function OilPage() {
         }}>
           {hitRate}%
         </span>
+      </div>
+      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
+        <span style={styles.paramLabel}>MAX CLAIM</span>
+        <span style={{
+          fontFamily: "'Orbitron', monospace",
+          fontSize: 13,
+          fontWeight: 700,
+          color: theme.accent,
+        }}>
+          {stats.maxClaimTotal} USDC
+        </span>
+      </div>
+      <div style={{ marginTop: 4, fontSize: 9, color: theme.muted, lineHeight: 1.6 }}>
+        {stats.sorted.slice(0, 5).map((c, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>#{i + 1} ({c.x},{c.y})</span>
+            <span style={{ color: c.oil > 0 ? theme.textStrong : theme.muted }}>{c.oil} USDC</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
+        <span style={{ ...styles.paramLabel, color: "#cc3333" }}>HELL POCKETS</span>
+        <span style={{
+          fontFamily: "'Orbitron', monospace",
+          fontSize: 13,
+          fontWeight: 700,
+          color: "#cc3333",
+        }}>
+          {stats.hellPockets.length}
+        </span>
+      </div>
+      <div style={{ marginTop: 2, fontSize: 9, color: "#cc3333", lineHeight: 1.6 }}>
+        {stats.hellPockets.map((hp, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>#{i + 1} plot ({hp.x + 1},{hp.y + 1})</span>
+            <span>depth {hp.z + 1}</span>
+          </div>
+        ))}
       </div>
       <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
         <span style={styles.paramLabel}>START DATE</span>
@@ -2194,6 +2464,25 @@ export default function OilPage() {
     </div>
   );
 
+  const hellPocketsPanel = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3 style={{
+        ...(isMobile ? m.sectionTitle : styles.panelTitle),
+        color: "#cc3333",
+      }}>HELL POCKETS ({stats.hellPockets.length})</h3>
+      <div style={isMobile ? m.depositGrid : styles.depositList}>
+        {stats.hellPockets.map((hp, i) => (
+          <div key={i} style={{ ...styles.depositRow, borderColor: "rgba(204,51,51,0.2)" }}>
+            <span style={{ ...styles.depositIndex, color: "#cc3333" }}>{String(i + 1).padStart(2, "0")}</span>
+            <span style={styles.depositCoord}>
+              plot ({hp.x + 1}, {hp.y + 1}) depth {hp.z + 1}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const controlButtons = (
     <>
       <button
@@ -2249,6 +2538,10 @@ export default function OilPage() {
       @keyframes tankPulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
+      }
+      @keyframes demonBannerPulse {
+        0%, 100% { box-shadow: 0 4px 30px rgba(255,34,0,0.3); }
+        50% { box-shadow: 0 4px 50px rgba(255,34,0,0.6); }
       }
     `}</style>
   );
@@ -2648,6 +2941,163 @@ export default function OilPage() {
   );
 
   // Mode badge for header
+  // ── Demon Bounty Notification Banner ──
+  const testBlockade = (isTest || isAdmin) && hellActive && !demonBlockade ? {
+    active: true,
+    summonerUsername: "TEST PLAYER",
+    bountyAmount: 42,
+    targetCol: hellCol ?? 0,
+    targetRow: hellRow ?? 0,
+  } : null;
+  const activeDemonBlockade = demonBlockade?.active ? demonBlockade : testBlockade;
+
+  const demonBanner = (isBlockadeActive || hellActive) && activeDemonBlockade && (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 9999,
+      padding: "10px 16px",
+      background: "linear-gradient(180deg, rgba(140,10,0,0.95), rgba(80,5,0,0.9))",
+      borderBottom: "2px solid rgba(255,34,0,0.6)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      textAlign: "center",
+      fontFamily: "'Share Tech Mono', monospace",
+      animation: "demonBannerPulse 2s ease-in-out infinite",
+    }}>
+      <div style={{
+        fontSize: isMobile ? 12 : 14,
+        fontWeight: 700,
+        letterSpacing: "0.2em",
+        color: "#ff4422",
+        textShadow: "0 0 10px rgba(255,34,0,0.6)",
+        marginBottom: 4,
+      }}>
+        {isSummonerStunned
+          ? "YOU UNLEASHED HELL"
+          : `${activeDemonBlockade.summonerUsername?.toUpperCase() || "SOMEONE"} UNLEASHED HELL`}
+      </div>
+      <div style={{
+        fontSize: isMobile ? 10 : 12,
+        letterSpacing: "0.15em",
+        color: "#ffccaa",
+        display: "flex",
+        justifyContent: "center",
+        gap: isMobile ? 12 : 24,
+        flexWrap: "wrap",
+      }}>
+        <span>BOUNTY: {activeDemonBlockade.bountyAmount || 0} USDC + 3 BONUS DRILLS</span>
+        <span>TARGET: ({(activeDemonBlockade.targetCol ?? 0) + 1}, {(activeDemonBlockade.targetRow ?? 0) + 1})</span>
+      </div>
+      {isSummonerStunned && (
+        <div style={{
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          color: "#ff6644",
+          marginTop: 4,
+        }}>
+          INCAPACITATED — {stunRemaining > 0
+            ? `${Math.floor(stunRemaining / 60)}:${String(stunRemaining % 60).padStart(2, "0")} REMAINING`
+            : "RECOVERING..."}
+        </div>
+      )}
+      {!isSummonerStunned && activeDemonBlockade?.summonerId === user?.id && (
+        <div style={{
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          color: "#ffaa88",
+          marginTop: 4,
+        }}>
+          CLICK THE DEMON TO DISMISS IT — BOUNTY RETURNS TO COMMUNITY POOL
+        </div>
+      )}
+      {!isSummonerStunned && activeDemonBlockade?.summonerId !== user?.id && (
+        <div style={{
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          color: "#ffaa88",
+          marginTop: 4,
+        }}>
+          ALL DRILLING HALTED — CLICK THE DEMON TO CLAIM THE BOUNTY
+        </div>
+      )}
+    </div>
+  );
+
+  const claimBountyButton = (isBlockadeActive || (hellActive && activeDemonBlockade)) && !isSummonerStunned && (
+    <button
+      onClick={handleClaimBounty}
+      style={{
+        position: "fixed",
+        bottom: isMobile ? 80 : 32,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 9998,
+        padding: isMobile ? "14px 28px" : "16px 36px",
+        background: "linear-gradient(180deg, #cc2200, #881100)",
+        border: "2px solid #ff4422",
+        borderRadius: 6,
+        color: "#fff",
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: isMobile ? 13 : 15,
+        fontWeight: 700,
+        letterSpacing: "0.2em",
+        cursor: "pointer",
+        boxShadow: "0 0 30px rgba(255,34,0,0.5), 0 0 60px rgba(255,34,0,0.2)",
+        animation: "demonBannerPulse 1.5s ease-in-out infinite",
+        textTransform: "uppercase",
+      }}
+    >
+      {activeDemonBlockade?.summonerId === user?.id
+        ? "DISMISS DEMON"
+        : "BANISH DEMON — CLAIM BOUNTY"}
+    </button>
+  );
+
+  const bountyClaimedBanner = bountyToast && (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 9999,
+      padding: "12px 16px",
+      background: "linear-gradient(180deg, rgba(20,100,20,0.95), rgba(10,60,10,0.9))",
+      borderBottom: "2px solid rgba(80,200,80,0.5)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      textAlign: "center",
+      fontFamily: "'Share Tech Mono', monospace",
+    }}>
+      <div style={{
+        fontSize: isMobile ? 12 : 14,
+        fontWeight: 700,
+        letterSpacing: "0.2em",
+        color: "#44dd44",
+        textShadow: "0 0 10px rgba(68,221,68,0.5)",
+        marginBottom: 4,
+      }}>
+        {bountyToast.dismissed
+          ? "DEMON DISMISSED — BOUNTY RETURNED TO POOL"
+          : bountyToast.isYou
+            ? "YOU BANISHED THE DEMON!"
+            : `DEMON BANISHED BY ${bountyToast.hunterUsername?.toUpperCase()}`}
+      </div>
+      {!bountyToast.dismissed && (
+        <div style={{
+          fontSize: isMobile ? 10 : 12,
+          letterSpacing: "0.15em",
+          color: "#aaddaa",
+        }}>
+          BOUNTY CLAIMED: {bountyToast.bountyAmount} USDC + 3 BONUS DRILLS
+          {bountyToast.isYou && " — DRILLING RESUMED"}
+        </div>
+      )}
+    </div>
+  );
+
   const modeBadge = (isAdmin || isReport) && (
     <span style={{
       padding: "2px 8px",
@@ -2682,6 +3132,26 @@ export default function OilPage() {
       {drillStatus === "sign-in" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={drillBtnStyles.disabled}>SIGN IN TO PLAY</button>
+        </div>
+      )}
+      {drillStatus === "stunned" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={{ ...drillBtnStyles.disabled, borderColor: "#ff2200", color: "#ff2200" }}>
+            INCAPACITATED {stunRemaining > 0 ? `${Math.floor(stunRemaining / 60)}:${String(stunRemaining % 60).padStart(2, "0")}` : ""}
+          </button>
+          <div style={{ ...drillBtnStyles.depth, color: "#ff2200" }}>
+            YOU UNLEASHED HELL
+          </div>
+        </div>
+      )}
+      {drillStatus === "blockade" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={{ ...drillBtnStyles.disabled, borderColor: "#ff2200", color: "#ff2200" }}>
+            OIL BLOCKADE
+          </button>
+          <div style={{ ...drillBtnStyles.depth, color: "#ff2200" }}>
+            DEMON LOOSE — CLICK IT TO CLAIM BOUNTY
+          </div>
         </div>
       )}
       {drillStatus === "no-claim" && (
@@ -3234,6 +3704,11 @@ export default function OilPage() {
                     onRogueConsequence={handleRogueConsequence}
                     envPreset={envPreset}
                     plotsWithMessages={plotsWithMessages}
+                    hellActive={hellActive}
+                    hellCol={hellCol}
+                    hellRow={hellRow}
+                    demonBounty={demonBounty}
+                    onClaimBounty={handleClaimBounty}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -3267,6 +3742,7 @@ export default function OilPage() {
                 oilValue={drilledOilValue}
                 maxOil={stats.maxOil}
                 drillProximity={drillProximity}
+                hellActive={hellActive}
               />
               <div style={{ ...styles.cornerBracket, top: 6, left: 6 }} />
               <div style={{ ...styles.cornerBracket, top: 6, right: 6, transform: "scaleX(-1)" }} />
@@ -3399,6 +3875,8 @@ export default function OilPage() {
             maxOil={stats.maxOil}
             drillProximity={drillProximity}
             darkMode={darkMode}
+            hellActive={hellActive}
+            demonBlockade={demonBlockade}
           />
           {playerDrillPanel}
           {isAdmin && parametersPanel}
@@ -3421,12 +3899,14 @@ export default function OilPage() {
             selectedX={selectedX}
             selectedY={sliceY}
             drillDepth={effectiveDrillDay}
+            hellPockets={stats.hellPockets}
           />
           {leaderboardPanel}
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
+          {(isAdmin || isReport) && hellPocketsPanel}
           <HowToPlayPanel isMobile darkMode={darkMode} />
           <OilVerifyExplainer isMobile darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
@@ -3513,6 +3993,9 @@ export default function OilPage() {
         /> */}
 
         {cssAnimations}
+        {demonBanner}
+        {bountyClaimedBanner}
+        {claimBountyButton}
 
         {chatModalPlotKey && (
           <OilChatModal
@@ -3666,6 +4149,9 @@ export default function OilPage() {
                 onRogueConsequence={handleRogueConsequence}
                 envPreset={envPreset}
                 plotsWithMessages={plotsWithMessages}
+                hellActive={hellActive}
+                hellCol={hellCol}
+                hellRow={hellRow}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -3845,6 +4331,7 @@ export default function OilPage() {
               maxOil={stats.maxOil}
               drillProximity={drillProximity}
               darkMode={darkMode}
+              hellActive={hellActive}
             />
             {playerDrillPanel}
             {isAdmin && parametersPanel}
@@ -3860,6 +4347,7 @@ export default function OilPage() {
               selectedX={selectedX}
               selectedY={sliceY}
               drillDepth={effectiveDrillDay}
+              hellPockets={stats.hellPockets}
             />
             {leaderboardPanel}
             <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
@@ -3867,6 +4355,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
+          {(isAdmin || isReport) && hellPocketsPanel}
             <HowToPlayPanel darkMode={darkMode} />
             <OilVerifyExplainer darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
             <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
@@ -3918,6 +4407,9 @@ export default function OilPage() {
       />
 
       {cssAnimations}
+      {demonBanner}
+      {bountyClaimedBanner}
+      {claimBountyButton}
 
       <PolaroidSnapshot
         trigger={snapshotTrigger}

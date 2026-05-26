@@ -61,7 +61,7 @@ export default function OilQualify({
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const certRef = useRef(null);
-  const [signatureName, setSignatureName] = useState("");
+  const [signatureName, setSignatureName] = useState("dev team");
 
   useEffect(() => {
     if (!lightboxSrc) return;
@@ -605,7 +605,7 @@ export default function OilQualify({
                     position: "absolute",
                     top: "80%",
                     right: "15%",
-                    fontFamily: "'Permanent Marker', cursive",
+                    fontFamily: "'Homemade Apple', cursive",
                     fontSize: isMobile ? "3.5vw" : 18,
                     color: inkColor,
                     pointerEvents: "none",

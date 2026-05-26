@@ -21,8 +21,32 @@ const PLACEHOLDER_CASE = {
     logoUrl: null,
   },
   verdict: 'WANTED',
-  investigators: [],
-  timestamp: new Date().toISOString(),
+  // §7 schema + characterId for portrait/role lookup. Quotes are in
+  // each character's voice per CHARACTER_PROMPTS so the dossier reads
+  // like the four really filed a report.
+  investigators: [
+    {
+      characterId: 'monk',
+      quote: 'The deployer wallet is six days old. New wallet, old habits.',
+      confidence: 78,
+    },
+    {
+      characterId: 'demon',
+      quote: 'Loud where it should be quiet. Cheaply. Loudly. Badly.',
+      confidence: 64,
+    },
+    {
+      characterId: 'marisol',
+      quote: 'Top wallet holds 41% across 312 holders. Read the receipts.',
+      confidence: 86,
+    },
+    {
+      characterId: 'eugene',
+      quote: 'I have seen this pitch five times this month. Three are zero.',
+      confidence: 71,
+    },
+  ],
+  timestamp: '2026-05-25T18:30:00Z',
   supplicantWallet: null,
   isHolderOfRL80: false,
 };

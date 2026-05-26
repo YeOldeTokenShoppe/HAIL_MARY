@@ -3,7 +3,7 @@
 import { useRef, useMemo, useEffect, useCallback, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Text, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
+import { Text, Html, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
@@ -1082,7 +1082,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, hasMessages = false, onEnvelopeClick }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, hasMessages = false, onEnvelopeClick, hellActive = false }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -1757,6 +1757,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   tankFillRef.current = tankFill;
   const pumpConfigRef = useRef(pumpConfig);
   pumpConfigRef.current = pumpConfig;
+  const hellActiveRef = useRef(hellActive);
+  hellActiveRef.current = hellActive;
   const highlightedRef = useRef(highlighted);
   highlightedRef.current = highlighted;
   const hasMessagesRef = useRef(hasMessages);
@@ -1829,19 +1831,33 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
     if (needle) {
-      const fill = Math.max(0, Math.min(currentFill, 1.0) - gaugePressureOffset.current);
+      const hellOverride = hellActiveRef.current;
+      const fill = hellOverride ? 1.0 : Math.max(0, Math.min(currentFill, 1.0) - gaugePressureOffset.current);
       const targetAngle = gaugeBaseRotX.current - fill * 225 * (Math.PI / 180);
-      needle.rotation.x += (targetAngle - needle.rotation.x) * Math.min(delta * 3, 1);
+      const lerpSpeed = hellOverride ? 8 : 3;
+      needle.rotation.x += (targetAngle - needle.rotation.x) * Math.min(delta * lerpSpeed, 1);
 
       // Pressure label visibility — based on needle's actual lerped position, not raw fill
       const displayAngleDeg = Math.abs(needle.rotation.x - gaugeBaseRotX.current) * (180 / Math.PI);
-      if (textLowRef.current) textLowRef.current.visible = displayAngleDeg < 85;
-      if (textMedRef.current) textMedRef.current.visible = displayAngleDeg >= 85 && displayAngleDeg < 210;
+      if (textLowRef.current) textLowRef.current.visible = !hellOverride && displayAngleDeg < 85;
+      if (textMedRef.current) textMedRef.current.visible = !hellOverride && displayAngleDeg >= 85 && displayAngleDeg < 210;
       if (textHighRef.current) {
-        const highOn = displayAngleDeg >= 210;
-        // Flash when tank >= 90% capacity (angle >= 202.5°)
-        const flashing = displayAngleDeg >= 202.5;
-        textHighRef.current.visible = highOn && (!flashing || Math.sin(performance.now() * 0.012) > 0);
+        if (hellOverride) {
+          // Rapid red flash during hell event
+          textHighRef.current.visible = Math.sin(performance.now() * 0.02) > 0;
+          if (textHighRef.current.material) {
+            textHighRef.current.material.color.set(0xff2200);
+            textHighRef.current.material.emissive.set(0xff2200);
+            textHighRef.current.material.emissiveIntensity = 2;
+          }
+        } else {
+          const highOn = displayAngleDeg >= 210;
+          const flashing = displayAngleDeg >= 202.5;
+          textHighRef.current.visible = highOn && (!flashing || Math.sin(performance.now() * 0.012) > 0);
+          if (textHighRef.current.material) {
+            textHighRef.current.material.emissiveIntensity = 0;
+          }
+        }
       }
     }
 
@@ -2566,7 +2582,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
 
 useGLTF.preload("/models/OilTower.glb");
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, plotsWithMessages = {}, onEnvelopeClick }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -2655,6 +2671,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             envPreset={envPreset}
             hasMessages={!!plotsWithMessages[`${col}_${row}`]}
             onEnvelopeClick={() => onEnvelopeClick?.(col, row)}
+            hellActive={hellActive && col === hellCol && row === hellRow}
             onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
             onDoubleClick={() => isSelected ? onZoomOut?.() : onFlyTo?.(col, row)}
           />
@@ -2942,6 +2959,84 @@ function ShaderGusher({ position, envPreset }) {
   );
 }
 
+// ── Hell Demon — spawns from below when a hell pocket is drilled ───────────
+useGLTF.preload("/models/diablo.glb");
+
+function HellDemon({ position, clickable = false, onClick }) {
+  const { scene, animations } = useGLTF("/models/diablo.glb");
+  const cloned = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+  useEffect(() => () => disposeScene(cloned), [cloned]);
+  const mixerRef = useRef();
+  const groupRef = useRef();
+  const riseRef = useRef(0);
+
+  useEffect(() => {
+    if (!animations || animations.length === 0) return;
+    const mixer = new THREE.AnimationMixer(cloned);
+    mixerRef.current = mixer;
+    const idleClip = animations.find(c => /idle/i.test(c.name))
+      || animations.find(c => /look.around/i.test(c.name))
+      || animations[0];
+    if (idleClip) {
+      const action = mixer.clipAction(idleClip);
+      action.play();
+    }
+    return () => mixer.stopAllAction();
+  }, [cloned, animations]);
+
+  useFrame((_, delta) => {
+    if (mixerRef.current) mixerRef.current.update(delta);
+    if (groupRef.current) {
+      riseRef.current = Math.min(riseRef.current + delta * 0.8, 1);
+      const rise = riseRef.current;
+      const eased = 1 - Math.pow(1 - rise, 3);
+      groupRef.current.position.y = position[1] + eased * 0.3 - (1 - eased) * 0.5;
+      groupRef.current.rotation.y += delta * 0.8;
+    }
+  });
+
+  return (
+    <group ref={groupRef} position={[position[0], position[1] - 0.5, position[2]]}>
+      <primitive object={cloned} scale={0.12} />
+      <pointLight color="#ff2200" intensity={8} distance={3} decay={2} position={[0, 0.3, 0]} />
+      {clickable && (
+        <Html
+          center
+          position={[0, 0.6, 0]}
+          zIndexRange={[9999, 9999]}
+          style={{ pointerEvents: "none" }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              pointerEvents: "auto",
+              width: 80,
+              height: 80,
+              borderRadius: "50%",
+              background: "rgba(255,34,0,0.2)",
+              border: "3px solid rgba(255,68,34,0.7)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10,
+              color: "#ff4422",
+              letterSpacing: "0.12em",
+              fontWeight: 700,
+              boxShadow: "0 0 20px rgba(255,34,0,0.4), 0 0 40px rgba(255,34,0,0.2)",
+              textShadow: "0 0 8px rgba(255,34,0,0.6)",
+            }}
+          >
+            BANISH
+          </button>
+        </Html>
+      )}
+    </group>
+  );
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function OilVoxelGrid({
@@ -2950,7 +3045,7 @@ export default function OilVoxelGrid({
   gridY = 10,
   depthZ = 20,
   cellSize = 1,
-  numberOfDeposits = 8,
+  numberOfDeposits = 5,
   totalOilBudget = 500,
   revealProgress = 0,
   animateReveal = false,
@@ -2977,6 +3072,11 @@ export default function OilVoxelGrid({
   envPreset,
   plotsWithMessages = {},
   onEnvelopeClick,
+  hellActive = false,
+  hellCol = null,
+  hellRow = null,
+  demonBounty = null,
+  onClaimBounty,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -3009,11 +3109,11 @@ export default function OilVoxelGrid({
   const worldH = depthZ * depthCellSize;
   const worldD = gridY * cellSize;
 
-  const deposits = useMemo(() => {
-    const { deposits } = generateOilDistribution3D({
+  const { deposits, hellPockets: generatedHellPockets } = useMemo(() => {
+    const result = generateOilDistribution3D({
       blockHash, gridX, gridY, depthZ, totalOilBudget, numberOfDeposits, depthBias: 0.35,
     });
-    return deposits;
+    return { deposits: result.deposits, hellPockets: result.hellPockets };
   }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, totalOilBudget]);
 
   // Build fragment shader with deposit data baked in as constants
@@ -3070,6 +3170,28 @@ export default function OilVoxelGrid({
         </mesh>
       )}
 
+      {/* Hell pocket markers — red glowing spheres in the underground */}
+      {(animateReveal || revealProgress > 0) && generatedHellPockets.map((hp, i) => {
+        const hx = -worldW / 2 + hp.x * cellSize + cellSize / 2;
+        const hy = -hp.z * depthCellSize;
+        const hz = worldD / 2 - hp.y * cellSize - cellSize / 2;
+        return (
+          <group key={`hell-${i}`} position={[hx, hy, hz]}>
+            <mesh>
+              <sphereGeometry args={[cellSize * 0.2, 12, 8]} />
+              <meshStandardMaterial
+                color="#ff1100"
+                emissive="#ff2200"
+                emissiveIntensity={2}
+                transparent
+                opacity={0.85}
+              />
+            </mesh>
+            <pointLight color="#ff2200" intensity={3} distance={cellSize * 1.5} decay={2} />
+          </group>
+        );
+      })}
+
       {/* Opaque ground block — hidden once reveal starts */}
       {!animateReveal && revealProgress === 0 && (
         <mesh position={[0, -worldH / 2, 0]} material={groundMaterials}>
@@ -3111,6 +3233,9 @@ export default function OilVoxelGrid({
             envPreset={envPreset}
             plotsWithMessages={plotsWithMessages}
             onEnvelopeClick={onEnvelopeClick}
+            hellActive={hellActive}
+            hellCol={hellCol}
+            hellRow={hellRow}
           />
           {rogueEvents.map((ev) => (
             <RogueCharacter
@@ -3125,6 +3250,28 @@ export default function OilVoxelGrid({
               onConsequence={onRogueConsequence}
             />
           ))}
+          {hellActive && hellCol != null && hellRow != null && !demonBounty && (
+            <HellDemon
+              position={[
+                -worldW / 2 + hellCol * cellSize + cellSize / 2,
+                0,
+                worldD / 2 - hellRow * cellSize - cellSize / 2,
+              ]}
+              clickable
+              onClick={onClaimBounty}
+            />
+          )}
+          {demonBounty && ["active", "flying", "waiting"].includes(demonBounty.status) && (
+            <HellDemon
+              position={[
+                -worldW / 2 + (demonBounty.status === "active" ? demonBounty.summonerCol : demonBounty.targetCol) * cellSize + cellSize / 2,
+                0,
+                worldD / 2 - (demonBounty.status === "active" ? demonBounty.summonerRow : demonBounty.targetRow) * cellSize - cellSize / 2,
+              ]}
+              clickable={["active", "flying", "waiting"].includes(demonBounty.status)}
+              onClick={onClaimBounty}
+            />
+          )}
           {gusherEvents
             .filter((ev) => ev.userId !== currentUserId)
             .map((ev) => (
