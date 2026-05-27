@@ -31,9 +31,10 @@ import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
-  day:   { sky: "#7da4c9", skyBottom: null, ambient: 1.2, dirA: 15.5, dirB: 15.6, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
+  day:   { sky: "#7da4c9", skyBottom: null, ambient: 0.6, dirA: 4.0, dirB: 3.0, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
   dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
   night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.15, dirA: 0.3, dirB: 0.2, point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: null },
+  hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } },
 };
 
 // ── Theme color maps (UI only — 3D canvas unaffected) ────────────────────────
@@ -92,7 +93,7 @@ const skyGradientShader = {
   `,
 };
 
-const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2 }) {
+const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false }) {
   const topCol = useMemo(() => new THREE.Color(skyColor), [skyColor]);
   const bottomCol = useMemo(() => skyBottom ? new THREE.Color(skyBottom) : null, [skyBottom]);
   const uniforms = useMemo(() => ({
@@ -100,11 +101,12 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
     bottomColor: { value: bottomCol ?? topCol },
   }), []); // stable ref — update values below
 
-  // Update uniform values without recreating the object
   useEffect(() => {
     uniforms.topColor.value = topCol;
     uniforms.bottomColor.value = bottomCol ?? topCol;
   }, [topCol, bottomCol, uniforms]);
+
+  const cloudColor = hell ? "#3a0000" : undefined;
 
   return (
     <group>
@@ -122,15 +124,199 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
           <meshBasicMaterial color={skyColor} side={THREE.BackSide} depthWrite={false} />
         )}
       </mesh>
-      <Clouds material={THREE.MeshBasicMaterial}>
-        <Cloud position={[-8, 10, -12]} speed={0.02} opacity={cloudOpacity * 1.25} width={1.2} depth={0.15} segments={4} />
-        <Cloud position={[14, 12, -6]} speed={0.03} opacity={cloudOpacity} width={1.5} depth={0.12} segments={4} />
-        <Cloud position={[3, 11, 16]} speed={0.015} opacity={cloudOpacity * 1.1} width={1} depth={0.1} segments={3} />
-        <Cloud position={[-12, 13, 8]} speed={0.025} opacity={cloudOpacity * 0.9} width={1.8} depth={0.15} segments={4} />
-        <Cloud position={[18, 9, 14]} speed={0.02} opacity={cloudOpacity} width={0.8} depth={0.1} segments={3} />
-        <Cloud position={[-4, 14, -18]} speed={0.01} opacity={cloudOpacity * 0.75} width={1.3} depth={0.12} segments={3} />
-        <Cloud position={[10, 12, -16]} speed={0.02} opacity={cloudOpacity * 0.9} width={1} depth={0.1} segments={3} />
-      </Clouds>
+      {hell && <hemisphereLight args={["#ff2200", "#330000", 2.5]} position={[0, 5, 0]} />}
+      {/* Internal cloud glow — lights embedded in the cloud volumes */}
+      {hell && <>
+        <pointLight position={[-5, 8, -6]}  color="#ff3300" intensity={4} distance={20} decay={1.5} />
+        <pointLight position={[8, 7, -3]}   color="#cc2200" intensity={3} distance={18} decay={1.5} />
+        <pointLight position={[0, 9, 8]}    color="#ff4400" intensity={3.5} distance={18} decay={1.5} />
+        <pointLight position={[-10, 7, 5]}  color="#cc3300" intensity={3} distance={16} decay={1.5} />
+        <pointLight position={[12, 8, 7]}   color="#ff2200" intensity={3} distance={18} decay={1.5} />
+      </>}
+      {hell ? (
+        <Clouds material={THREE.MeshLambertMaterial}>
+          {/* Low canopy layer */}
+          <Cloud position={[-5, 8, -6]}   speed={0.45} opacity={0.7}  color="#bbbbbb" width={12} depth={2.5} segments={12} />
+          <Cloud position={[8, 7, -3]}     speed={0.48} opacity={0.65} color="#aaaaaa" width={14} depth={3}   segments={14} />
+          <Cloud position={[0, 9, 8]}      speed={0.42} opacity={0.7}  color="#cccccc" width={10} depth={2}   segments={10} />
+          <Cloud position={[-10, 7, 5]}    speed={0.2}  opacity={0.6}  color="#b0b0b0" width={13} depth={3}   segments={12} />
+          <Cloud position={[12, 8, 7]}     speed={0.45} opacity={0.65} color="#bbbbbb" width={11} depth={2.5} segments={10} />
+          {/* Upper towers */}
+          <Cloud position={[-3, 14, -12]}  speed={0.41}  opacity={0.55} color="#999999" width={16} depth={4}   segments={14} />
+          <Cloud position={[6, 12, -10]}   speed={0.46} opacity={0.6}  color="#cccccc" width={13} depth={3}   segments={12} />
+          <Cloud position={[-8, 13, 10]}   speed={0.44} opacity={0.55} color="#b0b0b0" width={14} depth={3.5} segments={12} />
+          <Cloud position={[10, 15, 4]}    speed={0.4}  opacity={0.5}  color="#999999" width={15} depth={3}   segments={14} />
+        </Clouds>
+      ) : (
+        <Clouds material={THREE.MeshBasicMaterial}>
+          <Cloud position={[-8, 10, -12]} speed={0.02} opacity={cloudOpacity * 1.25} width={1.2} depth={0.15} segments={4} />
+          <Cloud position={[14, 12, -6]} speed={0.03} opacity={cloudOpacity} width={1.5} depth={0.12} segments={4} />
+          <Cloud position={[3, 11, 16]} speed={0.015} opacity={cloudOpacity * 1.1} width={1} depth={0.1} segments={3} />
+          <Cloud position={[-12, 13, 8]} speed={0.025} opacity={cloudOpacity * 0.9} width={1.8} depth={0.15} segments={4} />
+          <Cloud position={[18, 9, 14]} speed={0.02} opacity={cloudOpacity} width={0.8} depth={0.1} segments={3} />
+          <Cloud position={[-4, 14, -18]} speed={0.01} opacity={cloudOpacity * 0.75} width={1.3} depth={0.12} segments={3} />
+          <Cloud position={[10, 12, -16]} speed={0.02} opacity={cloudOpacity * 0.9} width={1} depth={0.1} segments={3} />
+        </Clouds>
+      )}
+    </group>
+  );
+});
+
+// ── Hell sky effects — embers, pulsing lights, ground glow ──────────────────
+const EMBER_COUNT = 300;
+const _emberPositions = new Float32Array(EMBER_COUNT * 3);
+const _emberVelocities = new Float32Array(EMBER_COUNT * 3);
+const _emberLifetimes = new Float32Array(EMBER_COUNT);
+const _emberSizes = new Float32Array(EMBER_COUNT);
+for (let i = 0; i < EMBER_COUNT; i++) {
+  _emberPositions[i * 3] = (Math.random() - 0.5) * 40;
+  _emberPositions[i * 3 + 1] = Math.random() * 20;
+  _emberPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+  _emberVelocities[i * 3] = (Math.random() - 0.5) * 0.6;
+  _emberVelocities[i * 3 + 1] = 0.8 + Math.random() * 2.5;
+  _emberVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.6;
+  _emberLifetimes[i] = Math.random();
+  _emberSizes[i] = 0.04 + Math.random() * 0.1;
+}
+
+function HellLightning() {
+  const lightARef = useRef();
+  const lightBRef = useRef();
+  const stateRef = useRef({
+    nextStrike: 1 + Math.random() * 3,
+    timer: 0,
+    active: -1,       // which light is flashing (-1 = none)
+    flashTimer: 0,
+    flashes: 0,
+    flashCount: 0,
+  });
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    const s = stateRef.current;
+    const lights = [lightARef.current, lightBRef.current];
+
+    // Zero both when idle
+    lights.forEach(l => { if (l) l.intensity = 0; });
+
+    if (s.active === -1) {
+      s.timer += dt;
+      if (s.timer >= s.nextStrike) {
+        s.active = Math.random() > 0.5 ? 1 : 0;
+        s.flashTimer = 0;
+        s.flashCount = 0;
+        s.flashes = 1 + Math.floor(Math.random() * 3);
+      }
+      return;
+    }
+
+    const light = lights[s.active];
+    if (!light) { s.active = -1; return; }
+
+    s.flashTimer += dt;
+    const onDur = 0.05;
+    const offDur = 0.1;
+    const cycle = onDur + offDur;
+    const pos = s.flashTimer % cycle;
+
+    if (pos < onDur) {
+      const t = pos / onDur;
+      light.intensity = 80 * (1 - t);
+      light.color.lerpColors(
+        new THREE.Color("#ffffff"),
+        new THREE.Color("#ff4400"),
+        t,
+      );
+    }
+
+    if (pos >= onDur && s.flashTimer > (s.flashCount + 1) * cycle - offDur * 0.5) {
+      s.flashCount++;
+    }
+
+    if (s.flashCount >= s.flashes) {
+      s.active = -1;
+      s.timer = 0;
+      s.nextStrike = 2 + Math.random() * 5;
+    }
+  });
+
+  return (
+    <group>
+      <pointLight ref={lightARef} position={[-10, 12, -10]} color="#ffffff" intensity={0} distance={200} decay={0.5} />
+      <pointLight ref={lightBRef} position={[12, 11, 8]} color="#ffffff" intensity={0} distance={200} decay={0.5} />
+    </group>
+  );
+}
+
+const HellSkyEffects = memo(function HellSkyEffects() {
+  const pointsRef = useRef();
+  const pulseRef = useRef();
+  const pulse2Ref = useRef();
+
+  const positions = useMemo(() => new Float32Array(_emberPositions), []);
+  const velocities = useMemo(() => new Float32Array(_emberVelocities), []);
+  const lifetimes = useMemo(() => new Float32Array(_emberLifetimes), []);
+  const sizes = useMemo(() => new Float32Array(_emberSizes), []);
+
+  const emberGeom = useMemo(() => {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
+    return geom;
+  }, [positions, sizes]);
+
+  const emberMat = useMemo(() => new THREE.PointsMaterial({
+    size: 0.12,
+    sizeAttenuation: true,
+    color: new THREE.Color("#ff4400"),
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  }), []);
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    const posArr = positions;
+    for (let i = 0; i < EMBER_COUNT; i++) {
+      lifetimes[i] += dt * (0.15 + sizes[i] * 2);
+      if (lifetimes[i] > 1) {
+        lifetimes[i] = 0;
+        posArr[i * 3] = (Math.random() - 0.5) * 30;
+        posArr[i * 3 + 1] = -1 + Math.random() * 2;
+        posArr[i * 3 + 2] = (Math.random() - 0.5) * 30;
+        velocities[i * 3] = (Math.random() - 0.5) * 0.3;
+        velocities[i * 3 + 1] = 0.5 + Math.random() * 1.5;
+        velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+      }
+      posArr[i * 3] += velocities[i * 3] * dt;
+      posArr[i * 3 + 1] += velocities[i * 3 + 1] * dt;
+      posArr[i * 3 + 2] += velocities[i * 3 + 2] * dt;
+      posArr[i * 3] += Math.sin(lifetimes[i] * 8 + i) * 0.02;
+    }
+    if (pointsRef.current) {
+      pointsRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+
+    const t = performance.now() * 0.001;
+    emberMat.opacity = 0.5 + 0.3 * Math.sin(t * 2.1);
+
+    if (pulseRef.current) {
+      pulseRef.current.intensity = 3 + 2 * Math.sin(t * 1.3);
+      pulseRef.current.color.setHSL(0.02 + 0.01 * Math.sin(t * 0.7), 1, 0.5);
+    }
+    if (pulse2Ref.current) {
+      pulse2Ref.current.intensity = 2 + 1.5 * Math.sin(t * 1.8 + 1.5);
+    }
+  });
+
+  return (
+    <group>
+      <points ref={pointsRef} geometry={emberGeom} material={emberMat} />
+      <pointLight ref={pulseRef} position={[0, 3, 0]} color="#ff2200" intensity={3} distance={40} decay={2} />
+      <pointLight ref={pulse2Ref} position={[-6, 1, 8]} color="#ff6600" intensity={2} distance={25} decay={2} />
+      <pointLight position={[8, 2, -5]} color="#880000" intensity={1.5} distance={20} decay={2} />
+      <HellLightning />
     </group>
   );
 });
@@ -1176,7 +1362,7 @@ export default function OilPage() {
   useEffect(() => {
     if (demonBounty && ["active", "flying", "waiting"].includes(demonBounty.status)) {
       if (!hellActive) prevEnvPresetRef.current = envPreset;
-      setEnvPreset("night");
+      setEnvPreset("hell");
       setHellActive(true);
       setHellCol(demonBounty.summonerCol);
       setHellRow(demonBounty.summonerRow);
@@ -1228,7 +1414,7 @@ export default function OilPage() {
         } else {
           // Admin/test mode — local-only visual effects
           prevEnvPresetRef.current = envPreset;
-          setEnvPreset("night");
+          setEnvPreset("hell");
           setHellActive(true);
           setHellCol(col);
           setHellRow(row);
@@ -3662,7 +3848,8 @@ export default function OilPage() {
                 style={{ width: "100%", height: "100%" }}
                 gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
-                <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+                <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
+                {envPreset === "hell" && <HellSkyEffects />}
                 {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
                 {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} />}
@@ -4107,7 +4294,8 @@ export default function OilPage() {
             style={{ width: "100%", height: "100%" }}
             gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
-            <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+            <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
+            {envPreset === "hell" && <HellSkyEffects />}
             {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
             {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
             {fireworksOn && <Fireworks quality={2} shellSize={2} />}

@@ -2582,6 +2582,84 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
 
 useGLTF.preload("/models/OilTower.glb");
 
+// ── Animated amber border highlight for selected plot ───────────────────────
+const _borderVert = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const _borderFrag = `
+  uniform float uTime;
+  uniform float uBorderWidth;
+  varying vec2 vUv;
+  void main() {
+    vec2 uv = vUv;
+    float bw = uBorderWidth;
+    float inside = step(bw, uv.x) * step(bw, uv.y) * step(bw, 1.0 - uv.x) * step(bw, 1.0 - uv.y);
+    if (inside > 0.5) discard;
+
+    // figure out which edge we're on and get a 0-1 coordinate along it
+    float dL = uv.x;
+    float dR = 1.0 - uv.x;
+    float dB = uv.y;
+    float dT = 1.0 - uv.y;
+    float minD = min(min(dL, dR), min(dB, dT));
+
+    float edge;
+    if (minD == dB)      edge = uv.x;
+    else if (minD == dR) edge = 1.0 + uv.y;
+    else if (minD == dT) edge = 2.0 + (1.0 - uv.x);
+    else                 edge = 3.0 + (1.0 - uv.y);
+
+    // rectangular dashes — hard edges, marching around perimeter
+    float dashes = 6.0;
+    float duty = 0.6;
+    float f = fract(edge * dashes - uTime * 0.8);
+    float pattern = step(1.0 - duty, f);
+
+    if (pattern < 0.5) discard;
+
+    // warm amber
+    vec3 amber = vec3(0.85, 0.65, 0.25);
+    vec3 bright = vec3(1.0, 0.88, 0.5);
+    float breath = 0.75 + 0.25 * sin(uTime * 1.5);
+    vec3 col = mix(amber, bright, 0.4);
+    float alpha = breath * 0.9;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function PlotBorderHighlight({ position, cellSize }) {
+  const matRef = useRef();
+  const shaderArgs = useMemo(() => ({
+    uniforms: {
+      uTime: { value: 0 },
+      uBorderWidth: { value: 0.035 },
+    },
+    vertexShader: _borderVert,
+    fragmentShader: _borderFrag,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -10,
+    polygonOffsetUnits: -10,
+  }), []);
+
+  useFrame((_, delta) => {
+    if (matRef.current) matRef.current.uniforms.uTime.value += delta;
+  });
+
+  return (
+    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[cellSize, cellSize]} />
+      <shaderMaterial ref={matRef} args={[shaderArgs]} />
+    </mesh>
+  );
+}
+
 function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
@@ -2613,37 +2691,16 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
     if (selectedCol < 0 || selectedCol >= gridX || selectedRow < 0 || selectedRow >= gridY) return null;
     const x = -worldW / 2 + selectedCol * cellSize + cellSize / 2;
     const z = worldD / 2 - selectedRow * cellSize - cellSize / 2;
-    return [x, 0.01, z]; // slightly above surface to avoid z-fighting
+    return [x, 0.02, z];
   }, [selectedCol, selectedRow, cellSize, worldW, worldD, gridX, gridY]);
 
   return (
     <>
       {/* Oil Tower in the center 4 cells */}
       <OilTower position={towerPos} communityOil={communityOil} totalOilBudget={totalOilBudget} />
-      {/* Highlight on the selected grid square */}
+      {/* Animated border outline on the selected grid square */}
       {selectedPos && (
-        <group position={selectedPos}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[cellSize, cellSize]} />
-            <meshBasicMaterial color={0x2fb74f} transparent opacity={0.45} depthWrite={false} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
-          </mesh>
-          <lineLoop>
-            <bufferGeometry>
-              <bufferAttribute
-                attach="attributes-position"
-                array={new Float32Array([
-                  -cellSize / 2, 0, -cellSize / 2,
-                   cellSize / 2, 0, -cellSize / 2,
-                   cellSize / 2, 0,  cellSize / 2,
-                  -cellSize / 2, 0,  cellSize / 2,
-                ])}
-                count={4}
-                itemSize={3}
-              />
-            </bufferGeometry>
-            <lineBasicMaterial color={0xd4a854} />
-          </lineLoop>
-        </group>
+        <PlotBorderHighlight position={selectedPos} cellSize={cellSize} />
       )}
       {items.map(({ key, position, col, row }) => {
         // Drill all if no selection, otherwise only the selected cell
