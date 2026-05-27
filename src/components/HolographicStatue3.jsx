@@ -667,7 +667,7 @@ function HolographicStatue3({
           void main() {
             float d = length(vUv - 0.5) * 2.0;
             // Soft exponential falloff — diffuse cloud, no hard edge
-            float glow = exp(-d * 2.4);
+            float glow = exp(-d * 4.0);
             float pulse = sin(uTime * 1.2) * 0.08 + 0.92;
             float alpha = glow * uIntensity * pulse;
             gl_FragColor = vec4(uColor * alpha, alpha);
@@ -682,7 +682,7 @@ function HolographicStatue3({
 
       // Size the billboard based on the statue's bounding box
       const glowSize = box.getSize(new THREE.Vector3());
-      const glowRadius = Math.max(glowSize.x, glowSize.y, glowSize.z) * 1.5;
+      const glowRadius = Math.max(glowSize.x, glowSize.y, glowSize.z) * 2.5;
       const glowPlane = new THREE.Mesh(
         new THREE.PlaneGeometry(glowRadius, glowRadius),
         glowMaterial
