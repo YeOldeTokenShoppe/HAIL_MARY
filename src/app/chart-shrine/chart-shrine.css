@@ -1802,7 +1802,7 @@ body:has(.shrine-page.neon) {
   margin-left: 12%;
   margin-top: 2%;
   z-index: 2;
-  width: 22vw;
+  width: 30vw;
   aspect-ratio: 500 / 900;
   pointer-events: auto;
   overflow: visible;

@@ -10,7 +10,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
     gap: clamp(32px, 4vw, 72px);
-    align-items: start;
+    align-items: center;
     text-align: left;
     padding: clamp(56px, 6vw, 88px) clamp(40px, 5vw, 80px);
     background: none;
@@ -42,7 +42,7 @@
   .mater-visual {
     position: relative;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
   }
 
