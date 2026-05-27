@@ -720,6 +720,12 @@ body:has(.shrine-page.neon) {
   min-height: 6.5em;
 }
 
+@media (hover: none) {
+  .shrine-page.neon .hero-pullquote {
+    min-height: 8.5em;
+  }
+}
+
 .shrine-page.neon .hero-pullquote-latin {
   display: flex;
   align-items: center;
@@ -849,14 +855,14 @@ body:has(.shrine-page.neon) {
     padding: 28px 18px 24px;
     background: linear-gradient(
       180deg,
-      rgba(4, 8, 15, 0.65) 0%,
-      rgba(2, 5, 9, 0.65) 50%,
-      rgba(0, 0, 0, 0.65) 100%
+      rgba(4, 8, 15, 0.35) 0%,
+      rgba(2, 5, 9, 0.35) 30%,
+      rgba(0, 0, 0, 0.35) 60%
     );
     border-top: 1px solid rgba(42, 214, 238, 0.15);
     border-radius: 14px;
     box-shadow:
-      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 8px 28px rgba(0, 0, 0, 0.3),
       0 0 14px rgba(42, 214, 238, 0.06);
   }
   .shrine-page.neon .our-lady-title {
@@ -966,18 +972,18 @@ body:has(.shrine-page.neon) {
      so a 10px margin + 560px cap makes the backdrop sit flush inside
      the visible frame. */
   .shrine-page.neon .hero-copy {
-    background: linear-gradient(
+    /* background: linear-gradient(
       180deg,
       rgba(35, 12, 55, 0.74) 0%,
-      rgba(18, 5, 32, 0.86) 100%
-    );
+      rgba(18, 5, 32, 0.86) 30%
+    ); */
     border-top: 1px solid rgba(255, 0, 255, 0.25);
     border-radius: 14px;
     padding: 14px 16px;
     box-sizing: border-box;
     width: 100%;
     max-width: 560px;
-    margin-left: 10px;
+    /* margin-left: 10px; */
     align-self: flex-start;
     box-shadow:
       0 8px 28px rgba(0, 0, 0, 0.45),

@@ -1,19 +1,15 @@
 "use client";
 
 import React, { useRef } from "react";
-import dynamic from "next/dynamic";
 import { useInView } from "framer-motion";
 import DropInTitle from "./DropInTitle";
 import "./BusinessSection.css";
 
-const NoiseSphere = dynamic(() => import("./NoiseSphere"), { ssr: false });
-
 export default function BusinessSection() {
   const ref = useRef(null);
   const inView = useInView(ref, {
-    amount: 0.15,
-    margin: "120px 0px",
-    once: true,
+    amount: 0.01,
+    margin: "200px 0px",
   });
 
   return (
@@ -22,37 +18,44 @@ export default function BusinessSection() {
       className={`biz-section${inView ? " is-revealed" : ""}`}
       aria-label="A Rather Unusual Opportun80"
     >
-      <div className="biz-visual">
-        <NoiseSphere className="biz-goop" />
+      <div className="biz-visual" style={{ position: "relative", marginTop: "2rem" }}>
+        <span className="biz-filigree-tl" aria-hidden="true">&#x2766;</span>
+        <span className="biz-filigree-tr" aria-hidden="true">&#x2766;</span>
+        <span className="biz-filigree-bl" aria-hidden="true">&#x2766;</span>
+        <span className="biz-filigree-br" aria-hidden="true">&#x2766;</span>
+        <img
+          src="/carousel_images/img12.jpg"
+          alt=""
+          className="biz-image"
+        />
       </div>
 
       <div className="biz-text">
         <DropInTitle
-          lines={["Stake", "Your", "Claim!"]}
+          lines={["Witness", "the halo", "effect"]}
           colors={["#2ad6ee", "#d4af37", "#d92db0"]}
           fontSize={{ mobile: "2rem", desktop: "3.4rem" }}
           triggerAnimation={inView}
           instanceId="biz-heading"
         />
 
-        <div className="biz-body">
+        <div className="biz-body" style={{ marginTop: "1.5rem" }}>
           <p>
-            Most tokens promise you the future. This one promises you a prayer.
-            The returns are spiritual. The losses, tax-deductible in certain
-            jurisdictions of the soul.
+            <strong>Coming Soon</strong> — Earn USDC on revenue from features and services by staking RL80.
+          </p>
+
+          <p><strong>How it works:</strong></p>
+
+          <p>
+            Customer pays USDC for a service or asset. USDC arrives at the
+            RevenueRouter contract. The Router splits it: 30% to stakers, 70%
+            to operations. The Router has no override. The split has no setter.
+            The destination addresses are immutable.
           </p>
 
           <p>
-            RL80 is not financial advice. It is not even financial. It is a
-            votive offering minted on Base, traded on faith, and governed by
-            nothing except the immutable conviction that the line must go up —
-            because the bots said so.
-          </p>
-
-          <p>
-            There is no roadmap. There is only the road. And on that road, a
-            procession of monks, machines, and market makers — all walking
-            toward the same impossible coordinate on the chart.
+            Verify on Basescan. The wallet is public. The code is public. The
+            flow is auditable by anyone.
           </p>
         </div>
       </div>

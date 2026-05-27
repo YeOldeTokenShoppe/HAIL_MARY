@@ -6,6 +6,10 @@ import { db, doc, onSnapshot } from "@/lib/firebaseClient";
 // scheduled Cloud Function hasn't yet written marketData/rl80, and for
 // environments where Firestore isn't initialized.
 const FALLBACK_POLL_MS = 60_000;
+// If Firestore hasn't delivered data within this window, switch to the
+// API route. Covers stalled WebSocket connections (common on iPadOS
+// Safari with ITP / content blockers).
+const FIRESTORE_TIMEOUT_MS = 5_000;
 
 function stddev(nums) {
   if (nums.length < 2) return 0;
@@ -130,23 +134,28 @@ export function useCandles({ count = 18, days = 1, aggregate = 1 } = {}) {
 
     const ref = doc(db, "marketData", "rl80");
     let gotData = false;
+    // Guard against stalled Firestore connections (common on iPadOS
+    // Safari): if onSnapshot hasn't delivered after FIRESTORE_TIMEOUT_MS,
+    // switch to the API route so the price still appears.
+    const timeoutId = setTimeout(() => {
+      if (!gotData && !cancelled) fetchFallback();
+    }, FIRESTORE_TIMEOUT_MS);
     const unsub = onSnapshot(
       ref,
       (snap) => {
         if (cancelled) return;
         if (!snap.exists()) {
-          // First-deploy safety net: if the cron hasn't written the doc yet,
-          // fall back to the API route so the chart renders immediately.
           if (!gotData) fetchFallback();
           return;
         }
         gotData = true;
+        clearTimeout(timeoutId);
         const raw = snap.data() || {};
         setState({ ...applyTimeframe(raw, { count, days, aggregate }), loading: false });
       },
       (err) => {
         if (cancelled) return;
-        // On listener error, fall back to the API route.
+        clearTimeout(timeoutId);
         fetchFallback();
         setState((s) => ({ ...s, error: err.message }));
       },
@@ -154,6 +163,7 @@ export function useCandles({ count = 18, days = 1, aggregate = 1 } = {}) {
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       unsub();
       fallbackAbortRef.current?.abort();
     };

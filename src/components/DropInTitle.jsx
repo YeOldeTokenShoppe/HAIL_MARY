@@ -1,55 +1,65 @@
 'use client';
 
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback } from 'react';
 import { gsap } from 'gsap';
 
-// Main DropInTitle component
-export default function DropInTitle({ 
+export default function DropInTitle({
   lines = ["Prosper80", "for All", "Human80!"],
   colors = ["#e55643", "#2b9f5e", "#f1c83c"],
   fontSize = { mobile: "2.5rem", desktop: "4rem" },
   isMobile = false,
   onAnimationComplete = () => {},
   triggerAnimation = true,
-  instanceId // Allow manual override if needed
+  instanceId
 }) {
-  // Generate a stable ID based on the content, not random values
   const stableId = useMemo(() => {
     if (instanceId) return instanceId;
-    // Create a deterministic ID based on the lines content
     const contentHash = lines.join('').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
     return `dropin-${contentHash}`;
   }, [instanceId, lines]);
   const containerRef = useRef(null);
-  
-  const playAnimation = () => {
+  const playAnimation = useCallback(() => {
     if (!containerRef.current) return;
-    
+
     const tl = gsap.timeline({
       onComplete: onAnimationComplete
     });
-    
-    // Animate each letter span - use containerRef to scope the animation
-    tl.fromTo(containerRef.current.querySelectorAll('.title-letter'), 
-      { 
-        opacity: 0, 
-        bottom: -80 
+
+    tl.fromTo(containerRef.current.querySelectorAll('.title-letter'),
+      {
+        opacity: 0,
+        bottom: -80
       },
-      { 
-        opacity: 1, 
+      {
+        opacity: 1,
         bottom: 0,
         duration: 0.5,
         ease: "back.out(1.7)",
         stagger: 0.05
       }
     );
-  };
-  
+  }, [onAnimationComplete]);
+
   useEffect(() => {
     if (triggerAnimation) {
       playAnimation();
     }
-  }, [triggerAnimation]);
+  }, [triggerAnimation, playAnimation]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          playAnimation();
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [playAnimation]);
   
   return (
     <div ref={containerRef} style={{
@@ -81,6 +91,7 @@ export default function DropInTitle({
           min-width: 10px;
           min-height: 10px;
           position: relative;
+          opacity: 0;
           filter: brightness(1.1);
         }
       `}</style>

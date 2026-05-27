@@ -30,6 +30,16 @@ function gothicPath(ctx) {
   ctx.closePath();
 }
 
+const ROUND_R = W * 0.5 - PAD;
+const ROUND_CX = W * 0.5;
+const ROUND_CY = H * 0.5;
+
+function roundPath(ctx) {
+  ctx.beginPath();
+  ctx.arc(ROUND_CX, ROUND_CY, ROUND_R, 0, TWO_PI);
+  ctx.closePath();
+}
+
 const LEAD = "rgb(8, 6, 12)";
 const AMBER = "#f4bf45";
 
@@ -818,7 +828,7 @@ function leadText(ctx, str, x, y, strokeW) {
   ctx.fillText(str, x, y);
 }
 
-function makeFragment(v0, v1, v2, src) {
+function makeFragment(v0, v1, v2, src, clipFn) {
   const xMin = Math.min(v0[0], v1[0], v2[0]);
   const xMax = Math.max(v0[0], v1[0], v2[0]);
   const yMin = Math.min(v0[1], v1[1], v2[1]);
@@ -836,9 +846,8 @@ function makeFragment(v0, v1, v2, src) {
   const ctx = c.getContext("2d");
   ctx.translate(-box.x, -box.y);
 
-  // outer gothic clip — corner shards that fall outside the lancet stay invisible
   ctx.save();
-  gothicPath(ctx);
+  (clipFn || gothicPath)(ctx);
   ctx.clip();
 
   ctx.beginPath();
@@ -874,6 +883,7 @@ export default function ChartWidget({
   const tickerRef = useRef(null);
   const shatteringRef = useRef(false);
   const glassBgRef = useRef(null);
+  const glassIndexRef = useRef(0);
   const propsRef = useRef({});
   const viewIndexRef = useRef(0);
   const replaceFnRef = useRef(null);
@@ -901,14 +911,20 @@ export default function ChartWidget({
 
       // Draw the stained glass image with a backlit glass effect
       const img = glassBgRef.current;
+      const clipFn = glassIndexRef.current === 2 ? roundPath : gothicPath;
       if (img.naturalWidth) {
         ctx.save();
-        gothicPath(ctx);
+        clipFn(ctx);
         ctx.clip();
-        const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight) * 0.97;
+        const isRound = glassIndexRef.current === 2;
+        const fitDim = isRound ? ROUND_R * 2 : null;
+        const scale = isRound
+          ? Math.max(fitDim / img.naturalWidth, fitDim / img.naturalHeight)
+          : Math.max(W / img.naturalWidth, H / img.naturalHeight) * 0.97;
         const dw = img.naturalWidth * scale;
         const dh = img.naturalHeight * scale;
-        const dx = (W - dw) / 2, dy = (H - dh) / 2;
+        const dx = isRound ? ROUND_CX - dw / 2 : (W - dw) / 2;
+        const dy = isRound ? ROUND_CY - dh / 2 : (H - dh) / 2;
 
         // Base image at reduced opacity for translucency
         ctx.globalAlpha = 0.75;
@@ -1060,7 +1076,8 @@ export default function ChartWidget({
       const tl0 = new window.TimelineMax({ onComplete: shatterComplete });
       for (let i = 0; i < indices.length; i += 3) {
         const p0 = vertices[indices[i]], p1 = vertices[indices[i+1]], p2 = vertices[indices[i+2]];
-        const f = makeFragment(p0, p1, p2, ticker);
+        const shatterClip = glassIndexRef.current === 2 ? roundPath : gothicPath;
+        const f = makeFragment(p0, p1, p2, ticker, shatterClip);
         const dx = f.centroid[0] - clickPosition[0];
         const dy = f.centroid[1] - clickPosition[1];
         const d = Math.sqrt(dx*dx + dy*dy);
@@ -1087,6 +1104,7 @@ export default function ChartWidget({
       shatteringRef.current = false;
       if (!cancelled) {
         glassIndex = (glassIndex + 1) % glassImages.length;
+        glassIndexRef.current = glassIndex;
         glassBgRef.current = glassImages[glassIndex];
         placeTicker(true);
         if (sweepCanvasEl) sweepCanvasEl.style.opacity = "1";
@@ -1103,13 +1121,14 @@ export default function ChartWidget({
     const ro = new ResizeObserver(applyScale);
     ro.observe(wrapper);
 
-    const GLASS_SRCS = ["/images/SG_GR80.webp", "/images/SG_Crusader.webp"];
+    const GLASS_SRCS = ["/images/SG_GR80.webp", "/images/SG_Crusader.webp", "/images/SG_Round.webp"];
     const glassImages = GLASS_SRCS.map((src) => {
       const img = new Image();
       img.src = src;
       return img;
     });
     let glassIndex = 0;
+    glassIndexRef.current = 0;
 
     Promise.all([
       loadScript(DELAUNAY_SRC),
@@ -1140,7 +1159,7 @@ export default function ChartWidget({
           const sctx = sweepCanvas.getContext("2d");
           sctx.clearRect(0, 0, W, H);
           sctx.save();
-          gothicPath(sctx);
+          (glassIndexRef.current === 2 ? roundPath : gothicPath)(sctx);
           sctx.clip();
           const bandX = W * 0.5 + Math.sin(sweepPhase) * W * 0.6;
           const bandY = H * 0.3 + Math.cos(sweepPhase * 0.7) * H * 0.15;

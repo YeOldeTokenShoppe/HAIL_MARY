@@ -37,9 +37,8 @@ const PILLARS = [
 export default function HolyTrinSection() {
   const ref = useRef(null);
   const inView = useInView(ref, {
-    amount: 0.15,
-    margin: "120px 0px",
-    once: true,
+    amount: 0.01,
+    margin: "200px 0px",
   });
   const [activeId, setActiveId] = useState(null);
   const active = PILLARS.find((p) => p.id === activeId) || null;

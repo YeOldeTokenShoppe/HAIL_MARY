@@ -2547,7 +2547,7 @@ export default function HomePage() {
         </StarfieldStatueScene>
       </div>
 
-      <CommunityCandles />
+      {/* <CommunityCandles /> */}
 
       <div className="hero-header">
         <h1 className="our-lady-title">
@@ -2636,7 +2636,7 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
           <span className="section-divider-line section-divider-line--right" />
         </div>
 
-        {/* <BusinessSection /> */}
+        <BusinessSection />
 
         {/* Trading Card Game section parked for now — keep the imports
             and component file intact so we can re-enable when ready.

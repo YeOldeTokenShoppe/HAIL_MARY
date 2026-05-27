@@ -166,7 +166,7 @@
    margin lives on the Mater section — collapse the Holy Trinity's
    own hero-gap down to a normal section spacing. */
 .mater-section ~ .section-divider ~ .holy-trin {
-  margin-top: clamp(20px, 3vw, 40px);
+  margin-top: 12rem;
 }
 
 .mater-heading {

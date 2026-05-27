@@ -185,16 +185,83 @@
   margin-bottom: 0;
 }
 
-/* Goop container */
-.biz-goop {
-  width: 100%;
-  max-width: 400px;
+.biz-visual {
+  --fil-cyan: rgba(42, 214, 238, 0.55);
+  --fil-gold: rgba(212, 175, 55, 0.6);
+  --fil-mag: rgba(217, 45, 176, 0.45);
+  position: relative;
+  padding: 18px;
+  max-width: 436px;
 }
 
-.biz-goop .goop-svg {
-  display: block;
+.biz-visual::before,
+.biz-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 14px;
+}
+
+.biz-visual::before {
+  border: 1.5px solid var(--fil-gold);
+  mask-image:
+    linear-gradient(180deg, #000 0%, transparent 20%, transparent 80%, #000 100%),
+    linear-gradient(90deg, #000 0%, transparent 20%, transparent 80%, #000 100%);
+  mask-composite: intersect;
+  -webkit-mask-image:
+    linear-gradient(180deg, #000 0%, transparent 20%, transparent 80%, #000 100%),
+    linear-gradient(90deg, #000 0%, transparent 20%, transparent 80%, #000 100%);
+  -webkit-mask-composite: source-in;
+  box-shadow:
+    inset 0 0 18px rgba(212, 175, 55, 0.15),
+    0 0 18px rgba(212, 175, 55, 0.1);
+}
+
+.biz-visual::after {
+  border: 1px solid var(--fil-cyan);
+  inset: 6px;
+  border-radius: 12px;
+  mask-image:
+    linear-gradient(180deg, #000 0%, transparent 25%, transparent 75%, #000 100%),
+    linear-gradient(90deg, #000 0%, transparent 25%, transparent 75%, #000 100%);
+  mask-composite: intersect;
+  -webkit-mask-image:
+    linear-gradient(180deg, #000 0%, transparent 25%, transparent 75%, #000 100%),
+    linear-gradient(90deg, #000 0%, transparent 25%, transparent 75%, #000 100%);
+  -webkit-mask-composite: source-in;
+  box-shadow: inset 0 0 12px rgba(42, 214, 238, 0.1);
+}
+
+.biz-filigree-tl,
+.biz-filigree-tr,
+.biz-filigree-bl,
+.biz-filigree-br {
+  position: absolute;
+  z-index: 1;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: #d4af37;
+  text-shadow:
+    0 0 8px rgba(212, 175, 55, 0.6),
+    0 0 20px rgba(42, 214, 238, 0.3);
+  pointer-events: none;
+}
+.biz-filigree-tl { top: -4px; left: -2px; }
+.biz-filigree-tr { top: -4px; right: -2px; transform: scaleX(-1); }
+.biz-filigree-bl { bottom: -4px; left: -2px; transform: scaleY(-1); }
+.biz-filigree-br { bottom: -4px; right: -2px; transform: scale(-1); }
+
+.biz-image {
   width: 100%;
+  max-width: 400px;
   height: auto;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+  filter:
+    drop-shadow(0 0 12px rgba(217, 45, 176, 0.4))
+    drop-shadow(0 0 30px rgba(42, 214, 238, 0.3));
 }
 
 /* ───── SCROLL-TRIGGERED REVEAL ───── */

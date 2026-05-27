@@ -11,9 +11,8 @@ const AsciiReveal = dynamic(() => import("./AsciiReveal"), { ssr: false });
 export default function MaterExMachinaSection() {
   const ref = useRef(null);
   const inView = useInView(ref, {
-    amount: 0.15,
-    margin: "120px 0px",
-    once: true,
+    amount: 0.01,
+    margin: "200px 0px",
   });
 
   return (
