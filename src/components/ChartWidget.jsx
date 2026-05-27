@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 // PAD reserves space so the outer stroke isn't clipped at edges.
 const PAD = 10;
 const IW = 480;
-const IH = 880;
+const IH = 751;
 const W = IW + PAD * 2;
 const H = IH + PAD * 2;
 const ARCH_SPRING = IH * 0.38 + PAD;
@@ -143,7 +143,7 @@ const VIEWS = [
     id: "marketcap",
     eyebrow: () => "M A R K E T   C A P",
     main: (p) => formatMoney(p.marketCap),
-    sub: () => ({ text: "F U L L Y   D I L U T E D", color: AMBER }),
+    sub: () => ({ text: "Y O U ' R E   E A R L Y", color: AMBER }),
   },
 ];
 const VIEW_ROTATE_MS = 7000;
@@ -899,7 +899,31 @@ export default function ChartWidget({
       c.style.cursor = "pointer";
       const ctx = c.getContext("2d");
 
-      ctx.drawImage(glassBgRef.current.daylight, 0, 0);
+      // Draw the stained glass image with a backlit glass effect
+      const img = glassBgRef.current;
+      if (img.naturalWidth) {
+        ctx.save();
+        gothicPath(ctx);
+        ctx.clip();
+        const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight) * 0.97;
+        const dw = img.naturalWidth * scale;
+        const dh = img.naturalHeight * scale;
+        const dx = (W - dw) / 2, dy = (H - dh) / 2;
+
+        // Base image at reduced opacity for translucency
+        ctx.globalAlpha = 0.75;
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.globalAlpha = 1.0;
+
+        // Screen pass to brighten — simulates light passing through glass
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.globalAlpha = 1.0;
+        ctx.globalCompositeOperation = "source-over";
+
+        ctx.restore();
+      }
 
       const view = VIEWS[viewIndexRef.current];
       const props = propsRef.current;
@@ -907,35 +931,17 @@ export default function ChartWidget({
       const mainStr = view.main(props);
       const subSpec = view.sub(props);
 
-      // cut the main value out of a clone of the pane layer
-      const panesLayer = document.createElement("canvas");
-      panesLayer.width = W; panesLayer.height = H;
-      const pctx = panesLayer.getContext("2d");
-      pctx.drawImage(glassBgRef.current.panes, 0, 0);
-
-      pctx.textAlign = "left";
-      const { glyphs, totalWidth } = measurePriceGlyphs(pctx, mainStr);
+      ctx.textAlign = "left";
+      const { glyphs, totalWidth } = measurePriceGlyphs(ctx, mainStr);
       const mainX = (W - totalWidth) / 2;
       const mainY = H * 0.58;
 
-      pctx.globalCompositeOperation = "destination-out";
-      for (const g of glyphs) {
-        pctx.font = g.style.font;
-        pctx.fillText(g.ch, mainX + g.offset, mainY);
-      }
-      pctx.globalCompositeOperation = "source-over";
-
-      ctx.drawImage(panesLayer, 0, 0);
-
-      // fill the cutout with white so the price is legible over the dark page
-      ctx.textAlign = "left";
+      // price text with lead outline
       ctx.fillStyle = AMBER;
       for (const g of glyphs) {
         ctx.font = g.style.font;
         ctx.fillText(g.ch, mainX + g.offset, mainY);
       }
-
-      // lead came around each glyph
       ctx.textAlign = "left";
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -945,32 +951,6 @@ export default function ChartWidget({
         ctx.lineWidth = g.style.strokeW;
         ctx.strokeText(g.ch, mainX + g.offset, mainY);
       }
-
-      // Ornate stone frame — layered strokes simulate carved stone
-      gothicPath(ctx);
-      ctx.strokeStyle = "rgba(0,0,0,0.55)";
-      ctx.lineWidth = 22;
-      ctx.stroke();
-
-      gothicPath(ctx);
-      ctx.strokeStyle = "rgb(52,42,32)";
-      ctx.lineWidth = 16;
-      ctx.stroke();
-
-      gothicPath(ctx);
-      ctx.strokeStyle = "rgba(110,90,65,0.30)";
-      ctx.lineWidth = 12;
-      ctx.stroke();
-
-      gothicPath(ctx);
-      ctx.strokeStyle = "rgba(8,6,4,0.85)";
-      ctx.lineWidth = 5;
-      ctx.stroke();
-
-      gothicPath(ctx);
-      ctx.strokeStyle = "rgba(180,155,110,0.12)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
 
       // eyebrow — centered, sits just below the apex where the arch is wide enough
       ctx.textAlign = "center";
@@ -1065,9 +1045,10 @@ export default function ChartWidget({
           vertices.push([x, y]);
         }
       });
+      const inset = W * 0.04;
       vertices.forEach((p) => {
-        p[0] = clamp(p[0], 0, W);
-        p[1] = clamp(p[1], 0, H);
+        p[0] = clamp(p[0], inset, W - inset);
+        p[1] = clamp(p[1], inset, H - inset);
       });
       indices = window.Delaunay.triangulate(vertices);
     }
@@ -1105,7 +1086,8 @@ export default function ChartWidget({
       fragments = []; vertices = []; indices = [];
       shatteringRef.current = false;
       if (!cancelled) {
-        glassBgRef.current = buildGlass();
+        glassIndex = (glassIndex + 1) % glassImages.length;
+        glassBgRef.current = glassImages[glassIndex];
         placeTicker(true);
         if (sweepCanvasEl) sweepCanvasEl.style.opacity = "1";
       }
@@ -1121,11 +1103,23 @@ export default function ChartWidget({
     const ro = new ResizeObserver(applyScale);
     ro.observe(wrapper);
 
-    Promise.all([loadScript(DELAUNAY_SRC), loadScript(GSAP_SRC)])
+    const GLASS_SRCS = ["/images/SG_GR80.webp", "/images/SG_Crusader.webp"];
+    const glassImages = GLASS_SRCS.map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img;
+    });
+    let glassIndex = 0;
+
+    Promise.all([
+      loadScript(DELAUNAY_SRC),
+      loadScript(GSAP_SRC),
+      ...glassImages.map((img) => new Promise((r) => { img.onload = r; img.onerror = r; })),
+    ])
       .then(() => {
         if (cancelled) return;
         window.TweenMax.set(container, { perspective: 500 });
-        glassBgRef.current = buildGlass();
+        glassBgRef.current = glassImages[glassIndex];
         placeTicker(false);
         resetRotateTimer();
 

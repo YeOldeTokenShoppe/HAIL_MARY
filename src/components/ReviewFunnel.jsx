@@ -87,8 +87,9 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
       .then((data) => {
         if (cancelled) return;
         if (data.unknown) {
-          // CMC doesn't know the address. Fall back to Base + wagmi —
-          // covers newly-deployed Base tokens CMC hasn't indexed yet.
+          if (data._debug) {
+            console.warn('[ReviewFunnel] resolve debug:', data._debug);
+          }
           setResolveStatus('base-fallback');
         } else {
           setResolved({
@@ -577,19 +578,18 @@ function AddressInputStep({ value, onChange, onSubmit, canSubmit, normalizedInpu
 function ResolvingStep({ address, usingFallback }) {
   return (
     <>
-      <StepTitle>{usingFallback ? 'CHECKING BASE…' : 'DETECTING CHAIN…'}</StepTitle>
+      <StepTitle>{usingFallback ? 'SCANNING CHAINS…' : 'DETECTING CHAIN…'}</StepTitle>
       <StepHelp>
         {usingFallback ? (
           <>
-            CoinMarketCap hasn't indexed{' '}
-            {address.slice(0, 6)}…{address.slice(-4)} yet. Trying a direct
-            ERC-20 read on Base.
+            Running a last-resort ERC-20 read on Base for{' '}
+            {address.slice(0, 6)}…{address.slice(-4)}.
           </>
         ) : (
           <>
-            Asking CoinMarketCap which chain{' '}
-            {address.slice(0, 6)}…{address.slice(-4)} lives on, and pulling
-            its market context.
+            Resolving which chain{' '}
+            {address.slice(0, 6)}…{address.slice(-4)} lives on and pulling
+            market context.
           </>
         )}
       </StepHelp>
@@ -605,9 +605,10 @@ function ResolveErrorStep({ address, onRetry }) {
     <>
       <StepTitle>COULDN'T READ THAT CONTRACT</StepTitle>
       <StepHelp>
-        Neither CoinMarketCap nor a direct Base read returned token data for{' '}
-        <strong style={{ color: '#c8ffe0' }}>{address.slice(0, 6)}…{address.slice(-4)}</strong>.
-        It might not be ERC-20, or it may live on an unsupported chain. Nothing was charged.
+        Couldn't find a valid ERC-20 at{' '}
+        <strong style={{ color: '#c8ffe0' }}>{address.slice(0, 6)}…{address.slice(-4)}</strong>{' '}
+        on any supported chain (Ethereum, Base, Optimism, Arbitrum, Polygon, BNB, Avalanche, Linea, Blast, Zora).
+        Double-check the address. Nothing was charged.
       </StepHelp>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <SecondaryButton onClick={onRetry}>▸ TRY ANOTHER ADDRESS</SecondaryButton>

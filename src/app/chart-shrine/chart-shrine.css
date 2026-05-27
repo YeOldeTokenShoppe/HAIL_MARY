@@ -1519,14 +1519,22 @@ body:has(.shrine-page.neon) {
 }
 
 .votive-image-presets {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
   gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.votive-image-presets::-webkit-scrollbar {
+  display: none;
 }
 
 .votive-image-tile {
   position: relative;
-  aspect-ratio: 1 / 1;
+  flex: 0 0 60px;
+  height: 60px;
   padding: 0;
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(241, 215, 122, 0.18);
@@ -1915,4 +1923,17 @@ body:has(.shrine-page.neon) {
     width: 130px;
     height: 130px;
   }
+}
+
+/* ── Candle countdown timer inside picker panel ── */
+.candle-picker-timer {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  font-variant-numeric: tabular-nums;
+  color: #f1d77a;
+  text-align: center;
+  margin: -4px 0 8px;
+  text-shadow: 0 0 6px rgba(241, 215, 122, 0.4);
+  opacity: 0.85;
 }

@@ -125,3 +125,8 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: NEXT_PUBLIC_COINMARKETCAP
+    secret: NEXT_PUBLIC_COINMARKETCAP
+    availability:
+      - BUILD
+      - RUNTIME

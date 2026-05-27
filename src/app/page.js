@@ -69,6 +69,7 @@ const VOTIVE_IMAGE_PRESETS = [
   { key: "queenOfHearts", src: "/queenOfHearts1.jpg", label: "Queen of Hearts" },
   { key: "heart", src: "/images/sacreCoeur.webp", thumbnail: "/images/sacreCoeur.webp", label: "Heart" },
     { key: "MotherOfMemes", src: "/images/face.png", thumbnail: "/images/face.png", label: "Mother of Memes" },
+        { key: "RL80Power", src: "/images/RL80_KNUCKLES.webp", thumbnail: "/images/RL80_KNUCKLES.webp", label: "RL80 Power" },
 ];
 // A small curated palette for the wax tint, plus a "default" entry that
 // restores the baked color. Users can also enter any hex via the color
@@ -306,6 +307,7 @@ function HeroAltarObject({
   votiveImage = null,
   votiveTint = null,
   onHoverChange = null,
+  onTap = null,
 }) {
   const variantConfig = CANDLE_VARIANTS[variant] ?? CANDLE_VARIANTS.pillar;
   const { scene } = useGLTF(variantConfig.modelPath);
@@ -1812,8 +1814,6 @@ function HeroAltarObject({
       }
     }
 
-    // Debug readout — update at ~4Hz via direct DOM write so we don't
-    // trigger React re-renders.
     if (debugRef?.current) {
       const nowPerf = performance.now();
       if (nowPerf - lastDebugUpdateRef.current > 250) {
@@ -1846,10 +1846,15 @@ function HeroAltarObject({
           so the candle can't be tilted off vertical. */}
       <group
         ref={candleSpinRef}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onTap) onTap();
+        }}
         onPointerOver={(e) => {
           e.stopPropagation();
           if (onHoverChange) onHoverChange(true);
           if (typeof document !== "undefined") {
+            document.body.style.cursor = "pointer";
             const bg = document.querySelector(".scene-background");
             if (bg) bg.classList.add("candle-hover");
           }
@@ -1858,6 +1863,7 @@ function HeroAltarObject({
           e.stopPropagation();
           if (onHoverChange) onHoverChange(false);
           if (typeof document !== "undefined") {
+            document.body.style.cursor = "";
             const bg = document.querySelector(".scene-background");
             if (bg) bg.classList.remove("candle-hover");
           }
@@ -2535,6 +2541,7 @@ export default function HomePage() {
             votiveImage={votiveImage}
             votiveTint={votiveTint}
             onHoverChange={setCandleObjectHovered}
+            onTap={toggleCandle}
           />
           {/* <Stats className="r3f-stats" /> */}
         </StarfieldStatueScene>
@@ -2694,6 +2701,11 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
           aria-label="Choose your candle"
         >
           <p className="flame-nudge-title">Choose your candle</p>
+          {candleLit && litAt && (
+            <div className="candle-picker-timer">
+              {formatRemaining(litAt, meltDuration)}
+            </div>
+          )}
           {!canCustomize && (
             <div className="candle-picker-lock">
               <p className="candle-picker-lock-text">
@@ -2933,40 +2945,28 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
            (menu slot). Music and Wallet slots are suppressed. */
         hideWallet
         accountOnLeft
-        /* Repurpose the center FAB as the candle light toggle. */
-        onBuyClick={toggleCandle}
+        onBuyClick={candleLit ? () => setShowBuyModal(true) : doLight}
         centerHighlight={candleObjectHovered}
         centerLabel={
           candleLit ? (
-            userId ? (
-              /* Signed-in + lit: the FAB's job pivots from "extinguish"
-                 (rare) to "change your candle" (the more valuable
-                 action for the faithful). Lucide settings-2 glyph —
-                 two sliders — reads as "adjust". Extinguish lives
-                 inside the picker as a secondary action. */
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  width: 28,
-                  height: 28,
-                  display: "block",
-                  color: "#f1d77a",
-                }}
-                aria-hidden="true"
-              >
-                <path d="M14 17H5" />
-                <path d="M19 7h-9" />
-                <circle cx="17" cy="17" r="3" />
-                <circle cx="7" cy="7" r="3" />
-              </svg>
-            ) : (
-              "LIT"
-            )
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                width: 28,
+                height: 28,
+                display: "block",
+                color: "#f1d77a",
+              }}
+              aria-hidden="true"
+            >
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
           ) : (
             <img
               src="/images/flame.svg"
@@ -2975,41 +2975,8 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
             />
           )
         }
-        centerSubLabel={
-          candleLit && litAt ? (
-            <span
-              style={{
-                display: "inline-flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-              }}
-            >
-              <span>CANDLE</span>
-              <span
-                style={{
-                  fontSize: 9,
-                  letterSpacing: "1.2px",
-                  color: "#f1d77a",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {formatRemaining(litAt, meltDuration)}
-              </span>
-            </span>
-          ) : (
-            "LIGHT CANDLE"
-          )
-        }
-        centerTitle={
-          candleLit
-            ? userId
-              ? "Change candle"
-              : "Extinguish candle"
-            : "Light candle"
-        }
-        /* Filling gold arc around the FAB — 0 when just lit, 1 at
-           burnout. Only rendered while a candle is actually lit. */
+        centerSubLabel={candleLit ? "BUY RL80" : "LIGHT CANDLE"}
+        centerTitle={candleLit ? "Buy RL80" : "Light candle"}
         centerProgress={candleLit ? meltProgress : null}
         /* Menu slot routes to /exlibris. */
         onMenuClick={() => router.push('/exlibris')}

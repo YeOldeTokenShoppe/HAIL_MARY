@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { erc20Abi } from 'viem';
-import { getTokenByAddress, chainNameFor } from '@/lib/review/cmcClient';
+import { getTokenByAddress, chainNameFor, SUPPORTED_CHAIN_IDS } from '@/lib/review/cmcClient';
 import { getPublicClient } from '@/lib/viemClient';
 
 // /api/review/resolve — paste-and-detect endpoint for the /trade Token
@@ -15,16 +15,18 @@ import { getPublicClient } from '@/lib/viemClient';
 //           alternatives: [{ chainId, chainName, address }]  // other chains it deploys to
 //         }
 // Or on unknown:
-//         { unknown: true }
+//         { unknown: true, _debug: '...' }
 //
 // Free of x402 — chain detection is cheap and we don't want a wallet
 // prompt before the user even knows their address is a real token.
 // CMC cost (and Anthropic cost downstream) is folded into the
 // /api/review/characters x402 charge.
 //
-// If CMC has no record of the address we return { unknown: true }; the
-// client falls back to the original Base/CDP path. That covers brand-
-// new launches that CMC hasn't indexed yet.
+// Resolution strategy:
+//   1. CMC chain-detect (covers ~50 chains, returns market context).
+//   2. If CMC fails — direct ERC-20 reads on all 10 supported chains
+//      in parallel. First chain that responds with valid name+symbol wins.
+//   3. If both fail → { unknown: true, _debug }.
 
 const ALLOWED_ORIGINS = [
   'https://rl80.com',
@@ -101,25 +103,70 @@ export async function POST(request) {
     );
   }
 
-  // Step 1 — CMC chain-detect. Soft-fail to "unknown" on any error so
-  // the client always has a path forward (Base fallback).
+  // Step 1 — CMC chain-detect. Soft-fail so the fallback probes can
+  // still resolve the token.
   let cmc = null;
+  let cmcDebug = null;
   try {
     cmc = await getTokenByAddress(address);
+    if (!cmc) {
+      cmcDebug = 'CMC returned no data for this address';
+    } else if (!cmc.primary) {
+      cmcDebug = `CMC found token "${cmc.name || '?'}" (id ${cmc.cmcId}) but no platform matched a supported chain`;
+    }
   } catch (err) {
-    console.warn('[review/resolve] CMC lookup failed:', err?.message || err);
+    cmcDebug = `CMC lookup threw: ${err?.message || err}`;
+  }
+  if (cmcDebug) {
+    console.warn(`[review/resolve] ${address}: ${cmcDebug}`);
   }
 
   if (!cmc || !cmc.primary) {
-    return NextResponse.json({ unknown: true }, { headers: corsHeaders });
+    // Step 2 — CMC miss. Probe all supported chains in parallel via
+    // direct ERC-20 reads. First chain with valid name+symbol wins.
+    const probeResults = await Promise.all(
+      SUPPORTED_CHAIN_IDS.map((chainId) =>
+        readErc20OnChain({ chainId, address }).then((r) =>
+          r?.name && r?.symbol ? { chainId, ...r } : null,
+        ),
+      ),
+    );
+
+    const found = probeResults.find((r) => r != null) || null;
+
+    if (!found) {
+      console.warn(`[review/resolve] ${address}: all fallbacks failed`);
+      return NextResponse.json(
+        { unknown: true, _debug: cmcDebug || 'all resolution paths failed' },
+        { headers: corsHeaders },
+      );
+    }
+
+    console.info(
+      `[review/resolve] ${address}: resolved via erc20-probe → ${chainNameFor(found.chainId)} (${found.symbol})`,
+    );
+
+    return NextResponse.json(
+      {
+        chainId: found.chainId,
+        chainName: chainNameFor(found.chainId),
+        address: address.toLowerCase(),
+        name: found.name,
+        symbol: found.symbol,
+        decimals: found.decimals ?? 18,
+        market: null,
+        cmcId: null,
+        logo: null,
+        alternatives: [],
+      },
+      { headers: corsHeaders },
+    );
   }
 
   const { chainId, chainName, address: resolvedAddress } = cmc.primary;
 
-  // Step 2 — fill in decimals (CMC's `/v2/cryptocurrency/info` doesn't
+  // Step 3 — fill in decimals (CMC's `/v2/cryptocurrency/info` doesn't
   // include them) and double-check name/symbol against the contract.
-  // If the chain-specific RPC fails (rate limit, unsupported chain),
-  // fall back to CMC's name/symbol and a sensible decimals default.
   const onchainErc20 = await readErc20OnChain({ chainId, address: resolvedAddress });
 
   return NextResponse.json(

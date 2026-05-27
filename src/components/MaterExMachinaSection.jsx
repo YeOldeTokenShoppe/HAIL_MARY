@@ -28,8 +28,8 @@ export default function MaterExMachinaSection() {
 
       <div className="mater-text">
         <DropInTitle
-          lines={["Mater ex", "Machina"]}
-          colors={["#d4af37", "#2ad6ee"]}
+          lines={["Mater", "ex", "Machina"]}
+          colors={["#d4af37", "#f4e4c1", "#00ff00"]}
           fontSize={{ mobile: "3rem", desktop: "3.4rem" }}
           isMobile={typeof window !== "undefined" && window.innerWidth <= 900}
           triggerAnimation={inView}
