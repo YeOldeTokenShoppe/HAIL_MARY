@@ -289,7 +289,7 @@ body:has(.shrine-page.neon) {
 
   .shrine-page.neon .below-fold-chamber {
     width: calc(100% + 16px);
-    margin: 40vh -8px 0;
+    margin: 4vh -8px 0;
     min-height: 300vh;
     padding: 1px 8px calc(190px + env(safe-area-inset-bottom, 0px));
     background: transparent;
@@ -356,7 +356,7 @@ body:has(.shrine-page.neon) {
   position: relative;
   z-index: 2;
   width: calc(100% + 40px);
-  margin: 85vh -20px 0;
+  margin: 35vh -20px 0;
   min-height: 320vh;
   padding: 1px 20px calc(280px + env(safe-area-inset-bottom, 0px));
   pointer-events: auto;
@@ -1789,11 +1789,12 @@ body:has(.shrine-page.neon) {
   margin-top: 2%;
   z-index: 2;
   width: 22vw;
-  aspect-ratio: 500 / 680;
+  aspect-ratio: 500 / 900;
   pointer-events: auto;
   overflow: visible;
   filter:
-    drop-shadow(0 0 60px rgba(255, 245, 220, 0.18))
+    drop-shadow(0 0 90px rgba(255, 245, 220, 0.25))
+    drop-shadow(0 0 40px rgba(255, 230, 180, 0.14))
     drop-shadow(0 16px 28px rgba(0, 0, 0, 0.55));
 }
 
@@ -1907,7 +1908,7 @@ body:has(.shrine-page.neon) {
     right: auto;
     width: 275px;
     height: 378px;
-    margin: 80vh auto 24px;
+    margin: 380vh auto 24px;
     z-index: 2;
   }
   .cw-shards {
