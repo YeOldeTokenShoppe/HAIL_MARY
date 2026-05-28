@@ -15,7 +15,6 @@
   "dependencies": {
     "@clerk/nextjs": "^6.31.1",
     "@clerk/themes": "^2.4.46",
-    "@coinbase/cbpay-js": "^2.4.0",
     "@coinbase/cdp-core": "^0.0.101",
     "@coinbase/cdp-hooks": "^0.0.101",
     "@coinbase/cdp-react": "^0.0.101",
@@ -60,6 +59,7 @@
     "three-good-godrays": "^0.11.2",
     "three-stdlib": "^2.36.1",
     "tone": "^15.1.22",
+    "twilio": "^6.0.2",
     "viem": "^2.45.2",
     "wagmi": "^3.4.2",
     "x402": "^1.2.0",

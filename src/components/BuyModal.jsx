@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useConnect, useSignMessage } from 'wagmi';
+import { useConnect } from 'wagmi';
 import dynamic from 'next/dynamic';
 // useEvmAccounts surfaces the user's EOA(s). Required for ExportWalletModal:
 // for accounts that have a smart account, wagmi's address is the smart
@@ -10,7 +10,7 @@ import dynamic from 'next/dynamic';
 // exported. New users with createOnLogin:'eoa' have only an EOA and the
 // EOA matches the wagmi address; users from earlier rounds with smart
 // accounts get the EOA owner here.
-import { useEvmAccounts } from '@coinbase/cdp-hooks';
+import { useEvmAccounts, useCurrentUser } from '@coinbase/cdp-hooks';
 // Load CDP React components client-only — the package reads localStorage at
 // module init, which throws ReferenceError during Next SSR and turns every
 // page importing BuyModal into a 404. ssr:false defers evaluation to the
@@ -38,6 +38,7 @@ const ExportWalletModal = dynamic(
 import { useLanguage } from './LanguageProvider';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import SwapForm from './SwapForm';
+import PhoneVerification from './PhoneVerification';
 
 const CONNECTORS = [
   { id: 'coinbaseWalletSDK', label: 'COINBASE' },
@@ -49,8 +50,16 @@ const BuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallPhone, setIsSmallPhone] = useState(false);
-  const [isAuthorizing, setIsAuthorizing] = useState(false);
-  const [authError, setAuthError] = useState(null);
+  const [onrampStep, setOnrampStep] = useState('idle');
+  const [phoneData, setPhoneData] = useState(null);
+  const [purchaseCurrency, setPurchaseCurrency] = useState('ETH');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentLink, setPaymentLink] = useState(null);
+  const [orderData, setOrderData] = useState(null);
+  const [onrampError, setOnrampError] = useState(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('GUEST_CHECKOUT_APPLE_PAY');
+  const iframeRef = useRef(null);
   // Portal so the modal escapes .shrine-page.neon's forced position: relative
   // rule and the 3D Canvas stacking context — otherwise iPad Safari can
   // composite the WebGL canvas over the backdrop between frames.
@@ -61,8 +70,7 @@ const BuyModal = ({ isOpen, onClose }) => {
   const { evmAccounts } = useEvmAccounts();
   const ownerEoaAddress = evmAccounts?.[0]?.address || null;
   const { connectAsync, connectors: wagmiConnectors } = useConnect();
-  const { signMessageAsync } = useSignMessage();
-  const instanceRef = useRef(null);
+  const { currentUser: cdpUser } = useCurrentUser();
   const [pendingConnectorId, setPendingConnectorId] = useState(null);
   // Hide the METAMASK button when no browser wallet extension is
   // present. With `extensionOnly: true` on the connector, clicking it
@@ -80,10 +88,10 @@ const BuyModal = ({ isOpen, onClose }) => {
   );
 
   const handleConnect = useCallback(async (connectorId) => {
-    setAuthError(null);
+    setOnrampError(null);
     const connector = wagmiConnectors.find((c) => c.id === connectorId);
     if (!connector) {
-      setAuthError(`Connector ${connectorId} not available on this device`);
+      setOnrampError(`Connector ${connectorId} not available on this device`);
       return;
     }
     setPendingConnectorId(connectorId);
@@ -91,7 +99,7 @@ const BuyModal = ({ isOpen, onClose }) => {
       await connectAsync({ connector });
     } catch (err) {
       const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
-      setAuthError(userRejected ? null : (err?.shortMessage || err?.message || 'Wallet connect failed'));
+      setOnrampError(userRejected ? null : (err?.shortMessage || err?.message || 'Wallet connect failed'));
     } finally {
       setPendingConnectorId(null);
     }
@@ -153,122 +161,142 @@ const BuyModal = ({ isOpen, onClose }) => {
     };
   }, [isOpen]);
 
-  // Cleanup any onramp instance on modal close.
+  // Reset onramp state when modal closes
   useEffect(() => {
     if (isOpen) return;
-    if (instanceRef.current) {
-      instanceRef.current.destroy();
-      instanceRef.current = null;
-    }
-    setIsAuthorizing(false);
-    setAuthError(null);
+    setOnrampStep('idle');
+    setPhoneData(null);
+    setPaymentAmount('');
+    setPaymentLink(null);
+    setOrderData(null);
+    setOnrampError(null);
+    setTermsAccepted(false);
   }, [isOpen]);
 
-  const handleBuy = useCallback(async () => {
-    if (!walletAddress || isAuthorizing) return;
-
-    // Open a placeholder tab synchronously while we still have the user-gesture
-    // context. Mobile Safari (and Chrome to a lesser degree) silently blocks
-    // window.open() called from async callbacks — even initOnRamp's default
-    // 'new_tab' fails because it runs after the nonce/sign/auth/session chain.
-    // Opening 'about:blank' synchronously gets us a tab handle now; we redirect
-    // it to the actual onramp URL once we have the session token.
-    const popupRef = window.open('about:blank', '_blank');
-
-    setAuthError(null);
-    setIsAuthorizing(true);
+  // Auto-detect Apple Pay vs Google Pay. ApplePaySession.canMakePayments
+  // throws on insecure contexts (http://localhost), so guard it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
-      // 1) Ask the server for a nonce + canonical message + HMAC envelope.
-      const nonceRes = await fetch('/api/onramp-nonce', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: walletAddress }),
-      });
-      const nonceData = await nonceRes.json();
-      if (!nonceRes.ok || !nonceData.message || !nonceData.envelope) {
-        throw new Error(nonceData.error || 'Failed to get authorization nonce');
+      if (window.ApplePaySession?.canMakePayments?.()) {
+        setPaymentMethod('GUEST_CHECKOUT_APPLE_PAY');
+        return;
       }
+    } catch {
+      // ApplePaySession exists but throws (e.g., insecure context). Fall through.
+      if (window.ApplePaySession) {
+        setPaymentMethod('GUEST_CHECKOUT_APPLE_PAY');
+        return;
+      }
+    }
+    setPaymentMethod('GUEST_CHECKOUT_GOOGLE_PAY');
+  }, []);
 
-      // 2) Wallet signs the message (proves ownership of the destination address).
-      const signature = await signMessageAsync({ message: nonceData.message });
+  // Advance to phone verification when wallet connects
+  useEffect(() => {
+    if (!walletAddress || !isOpen) return;
+    if (onrampStep === 'idle') setOnrampStep('phone');
+  }, [walletAddress, isOpen, onrampStep]);
 
-      // 3) Exchange the wallet signature for a short-lived session JWT.
-      const authRes = await fetch('/api/onramp-auth', {
+  // Listen for postMessage events from the payment iframe
+  useEffect(() => {
+    if (onrampStep !== 'iframe') return;
+    const handler = (event) => {
+      const name = event?.data?.eventName;
+      if (!name || !name.startsWith('onramp_api.')) return;
+      const errorMsg = event?.data?.data?.errorMessage;
+      switch (name) {
+        case 'onramp_api.load_error':
+          setOnrampError(errorMsg || 'Payment page failed to load. Please try again.');
+          setOnrampStep('error');
+          break;
+        case 'onramp_api.commit_success':
+        case 'onramp_api.polling_success':
+          setOnrampStep('success');
+          break;
+        case 'onramp_api.commit_error':
+          setOnrampError(errorMsg || 'Payment could not be completed. Please try again.');
+          setOnrampStep('error');
+          break;
+        case 'onramp_api.cancel':
+          setOnrampStep('amount');
+          setPaymentLink(null);
+          break;
+        case 'onramp_api.polling_error':
+          setOnrampError('Confirmation timed out. Check your wallet — funds may still arrive.');
+          setOnrampStep('error');
+          break;
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onrampStep]);
+
+  const handlePhoneVerified = useCallback((data) => {
+    setPhoneData(data);
+    setOnrampStep('amount');
+  }, []);
+
+  const handleCreateOrder = useCallback(async () => {
+    if (!walletAddress || !phoneData || !paymentAmount || !termsAccepted) return;
+    setOnrampStep('submitting');
+    setOnrampError(null);
+    try {
+      const methods = cdpUser?.authenticationMethods || {};
+      const email =
+        methods.email?.email ||
+        methods.google?.email ||
+        methods.apple?.email ||
+        methods.x?.email;
+      if (!email) {
+        throw new Error('Verified email not available. Please sign in again with email or a provider that shares your email.');
+      }
+      const res = await fetch('/api/onramp-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          address: walletAddress,
-          message: nonceData.message,
-          envelope: nonceData.envelope,
-          signature,
+          destinationAddress: walletAddress,
+          email,
+          phoneVerificationToken: phoneData.phoneVerificationToken,
+          paymentMethod,
+          purchaseCurrency,
+          paymentAmount,
+          partnerUserRef: cdpUser?.userId || walletAddress,
         }),
       });
-      const authData = await authRes.json();
-      if (!authRes.ok || !authData.token) {
-        throw new Error(authData.error || 'Failed to authenticate');
+      const data = await res.json();
+      if (!res.ok) {
+        let detailMsg = '';
+        if (data.detail) {
+          try {
+            const parsed = JSON.parse(data.detail);
+            detailMsg = parsed.errorMessage || parsed.message || data.detail;
+          } catch {
+            detailMsg = data.detail;
+          }
+        }
+        console.error('CDP order error detail:', data);
+        throw new Error(detailMsg || data.error || 'Failed to create order');
       }
-
-      // 4) Use the JWT to mint a CDP Onramp session token. Custom header
-      // (X-Onramp-Auth) instead of Authorization so Clerk middleware
-      // doesn't try to verify our token as a Clerk session JWT.
-      const sessionRes = await fetch('/api/onramp-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Onramp-Auth': `Bearer ${authData.token}`,
-        },
-      });
-      const sessionData = await sessionRes.json();
-      if (!sessionRes.ok || !sessionData.token) {
-        throw new Error(sessionData.error || 'Failed to get session token');
+      setOrderData(data.order);
+      let linkUrl = data.paymentLink?.url;
+      if (linkUrl && process.env.NODE_ENV !== 'production') {
+        const sandboxFlag = paymentMethod === 'GUEST_CHECKOUT_APPLE_PAY'
+          ? 'useApplePaySandbox=true'
+          : 'useGooglePaySandbox=true';
+        if (!linkUrl.includes(sandboxFlag)) {
+          const sep = linkUrl.includes('?') ? '&' : '?';
+          linkUrl += `${sep}${sandboxFlag}`;
+        }
       }
-
-      // 5) Build the Coinbase Onramp URL and redirect the placeholder tab.
-      // Per CDP guidance, when using a session token only the sessionToken
-      // (and optional UX hints) belong in the URL — the destination address
-      // and assets are already bound to the token server-side. Including
-      // `addresses` here would expose the user's wallet address in the URL.
-      const onrampUrl = new URL('https://pay.coinbase.com/buy/select-asset');
-      onrampUrl.searchParams.set('sessionToken', sessionData.token);
-      onrampUrl.searchParams.set('defaultNetwork', 'base');
-      onrampUrl.searchParams.set('defaultExperience', 'buy');
-
-      if (popupRef && !popupRef.closed) {
-        popupRef.location.href = onrampUrl;
-        // Intentionally do NOT close the modal — Coinbase opens in a new tab,
-        // and the user needs to come back to this tab to do Step 2 (swap
-        // ETH/USDC → RL80). Closing here makes them reopen the modal and
-        // can leave new users stuck.
-      } else {
-        // Synchronous window.open was blocked anyway — fall back to same-tab
-        // navigation. Loses the modal/page state but completes the purchase.
-        window.location.href = onrampUrl;
-      }
+      setPaymentLink(linkUrl);
+      setOnrampStep('iframe');
     } catch (err) {
-      if (popupRef && !popupRef.closed) {
-        popupRef.close();
-      }
-      console.error('Onramp authorization failed:', err);
-      const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
-      setAuthError(userRejected ? null : (err?.message || 'Authorization failed'));
-    } finally {
-      setIsAuthorizing(false);
+      console.error('Onramp order failed:', err);
+      setOnrampError(err?.message || 'Failed to create order');
+      setOnrampStep('error');
     }
-  }, [walletAddress, isAuthorizing, signMessageAsync, onClose]);
-
-  const buyStage = !walletAddress
-    ? 'connectWallet'
-    : isAuthorizing
-    ? 'authorizing'
-    : 'ready';
-  const buyLabel =
-    buyStage === 'connectWallet'
-      ? (t('buyModal.connectWallet') || 'CONNECT WALLET')
-      : buyStage === 'authorizing'
-      ? (t('buyModal.authorizing') || 'AUTHORIZING...')
-      : (t('buyModal.buyWithCoinbase') || 'BUY WITH COINBASE');
-  const buyDisabled = buyStage === 'authorizing';
-  const buyClickable = !buyDisabled;
+  }, [walletAddress, phoneData, paymentAmount, purchaseCurrency, paymentMethod, termsAccepted, cdpUser]);
 
   if (!isOpen || !mounted) return null;
 
@@ -643,11 +671,11 @@ const BuyModal = ({ isOpen, onClose }) => {
                     lineHeight: '1.5',
                     margin: 0,
                   }}>
-                    1. Click Buy — opens Coinbase in a new tab
+                    1. Verify your phone (US only, one-time)
                     <br />
-                    2. Buy ETH or USDC with your card
+                    2. Buy ETH or USDC with Apple/Google Pay
                     <br />
-                    3. Come back to this tab and swap below
+                    3. Swap below for RL80
                   </p>
                 </div>
               )}
@@ -820,56 +848,329 @@ const BuyModal = ({ isOpen, onClose }) => {
                   }}>
                     Step 1
                   </span>
-                  <button
-                    onClick={handleBuy}
-                    disabled={buyDisabled}
-                  style={{
-                    fontFamily: 'monospace',
-                    fontSize: isSmallPhone ? '14px' : '16px',
-                    fontWeight: '900',
-                    textTransform: 'uppercase',
-                    letterSpacing: '3px',
-                    color: '#000',
-                    background: buyClickable
-                      ? 'linear-gradient(135deg, #00e572, #00c85d)'
-                      : 'rgba(100, 100, 100, 0.5)',
-                    border: 'none',
-                    padding: isSmallPhone ? '14px 28px' : '16px 40px',
-                    cursor: buyClickable ? 'pointer' : 'wait',
-                    clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
-                    transition: 'all 0.3s ease',
-                    animation: buyStage === 'ready' ? 'pulse-glow 2s infinite' : 'none',
-                    position: 'relative',
-                    minWidth: isSmallPhone ? '200px' : '240px',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (buyClickable) {
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                      e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '';
-                  }}
-                >
-                  {buyLabel}
-                </button>
-                </>
-              )}
 
-              {authError && (
-                <p style={{
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  color: '#ff4d4d',
-                  textAlign: 'center',
-                  letterSpacing: '1px',
-                  margin: 0,
-                  maxWidth: '320px',
-                }}>
-                  {authError}
-                </p>
+                  {/* Phone verification step */}
+                  {onrampStep === 'phone' && (
+                    <PhoneVerification
+                      isSmallPhone={isSmallPhone}
+                      isMobile={isMobile}
+                      onVerified={handlePhoneVerified}
+                    />
+                  )}
+
+                  {/* Amount + terms step */}
+                  {onrampStep === 'amount' && (
+                    <div style={{
+                      width: '100%',
+                      maxWidth: '320px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                      alignItems: 'center',
+                    }}>
+                      <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                        {['ETH', 'USDC'].map((cur) => (
+                          <button
+                            key={cur}
+                            onClick={() => setPurchaseCurrency(cur)}
+                            style={{
+                              flex: 1,
+                              fontFamily: 'monospace',
+                              fontSize: isSmallPhone ? '11px' : '12px',
+                              fontWeight: '900',
+                              letterSpacing: '2px',
+                              color: purchaseCurrency === cur ? '#000' : 'rgba(255,255,255,0.7)',
+                              background: purchaseCurrency === cur
+                                ? 'linear-gradient(135deg, #00e572, #00c85d)'
+                                : 'rgba(255,255,255,0.1)',
+                              border: purchaseCurrency === cur
+                                ? 'none'
+                                : '1px solid rgba(255,255,255,0.2)',
+                              padding: isSmallPhone ? '8px' : '10px',
+                              cursor: 'pointer',
+                              borderRadius: '4px',
+                              transition: 'all 0.2s ease',
+                            }}
+                          >
+                            {cur}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        width: '100%',
+                      }}>
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontSize: isSmallPhone ? '18px' : '22px',
+                          fontWeight: '900',
+                          color: 'rgba(255,255,255,0.5)',
+                        }}>
+                          $
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={paymentAmount}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            if ((val.match(/\./g) || []).length <= 1) {
+                              setPaymentAmount(val);
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            fontFamily: 'monospace',
+                            fontSize: isSmallPhone ? '18px' : '22px',
+                            fontWeight: '700',
+                            color: '#fff',
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            border: '1px solid rgba(0, 229, 114, 0.4)',
+                            borderRadius: '4px',
+                            padding: isSmallPhone ? '10px 12px' : '12px 14px',
+                            outline: 'none',
+                            letterSpacing: '1px',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontSize: '10px',
+                          color: 'rgba(255,255,255,0.5)',
+                          letterSpacing: '1px',
+                        }}>
+                          USD
+                        </span>
+                      </div>
+
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '8px',
+                        width: '100%',
+                        cursor: 'pointer',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                          style={{ marginTop: '2px', accentColor: '#00e572', cursor: 'pointer' }}
+                        />
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontSize: '9px',
+                          color: 'rgba(255,255,255,0.6)',
+                          lineHeight: '1.5',
+                        }}>
+                          I agree to the Coinbase{' '}
+                          <a href="https://www.coinbase.com/legal/guest-checkout/us" target="_blank" rel="noopener noreferrer" style={{ color: '#00e572' }}>Terms</a>,{' '}
+                          <a href="https://www.coinbase.com/legal/user_agreement" target="_blank" rel="noopener noreferrer" style={{ color: '#00e572' }}>User Agreement</a>, and{' '}
+                          <a href="https://www.coinbase.com/legal/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#00e572' }}>Privacy Policy</a>.
+                        </span>
+                      </label>
+
+                      <button
+                        onClick={handleCreateOrder}
+                        disabled={!paymentAmount || !termsAccepted || parseFloat(paymentAmount) < 5}
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: isSmallPhone ? '13px' : '15px',
+                          fontWeight: '900',
+                          textTransform: 'uppercase',
+                          letterSpacing: '2px',
+                          color: '#000',
+                          background: (!paymentAmount || !termsAccepted || parseFloat(paymentAmount) < 5)
+                            ? 'rgba(100, 100, 100, 0.5)'
+                            : 'linear-gradient(135deg, #00e572, #00c85d)',
+                          border: 'none',
+                          padding: isSmallPhone ? '14px 28px' : '16px 40px',
+                          cursor: (!paymentAmount || !termsAccepted || parseFloat(paymentAmount) < 5) ? 'not-allowed' : 'pointer',
+                          clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+                          transition: 'all 0.3s ease',
+                          animation: (paymentAmount && termsAccepted && parseFloat(paymentAmount) >= 5) ? 'pulse-glow 2s infinite' : 'none',
+                          width: '100%',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (paymentAmount && termsAccepted) {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '';
+                        }}
+                      >
+                        {paymentMethod === 'GUEST_CHECKOUT_APPLE_PAY' ? 'PAY WITH APPLE PAY' : 'PAY WITH GOOGLE PAY'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Creating order */}
+                  {onrampStep === 'submitting' && (
+                    <p style={{
+                      fontFamily: 'monospace',
+                      fontSize: isSmallPhone ? '12px' : '14px',
+                      fontWeight: '900',
+                      letterSpacing: '3px',
+                      color: '#fded00',
+                      textAlign: 'center',
+                      animation: 'pulse-glow 1.5s infinite',
+                    }}>
+                      CREATING ORDER...
+                    </p>
+                  )}
+
+                  {/* Payment iframe */}
+                  {onrampStep === 'iframe' && paymentLink && (
+                    <div style={{
+                      width: '100%',
+                      maxWidth: '320px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      alignItems: 'center',
+                    }}>
+                      <iframe
+                        ref={iframeRef}
+                        src={paymentLink}
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
+                        referrerPolicy="no-referrer"
+                        allow="payment; camera; microphone; clipboard-write"
+                        style={{
+                          width: '100%',
+                          height: '360px',
+                          border: '1px solid rgba(0, 229, 114, 0.3)',
+                          borderRadius: '8px',
+                          background: 'rgba(0, 0, 0, 0.4)',
+                        }}
+                      />
+                      <p style={{
+                        fontFamily: 'monospace',
+                        fontSize: '9px',
+                        color: 'rgba(255,255,255,0.4)',
+                        textAlign: 'center',
+                        letterSpacing: '1px',
+                        margin: 0,
+                      }}>
+                        Complete payment above. Do not close this window.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Success */}
+                  {onrampStep === 'success' && (
+                    <div style={{
+                      width: '100%',
+                      maxWidth: '320px',
+                      padding: isSmallPhone ? '14px' : '18px',
+                      background: 'rgba(0, 229, 114, 0.1)',
+                      border: '1px solid rgba(0, 229, 114, 0.4)',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <span style={{ fontSize: '28px' }}>&#10003;</span>
+                      <p style={{
+                        fontFamily: 'monospace',
+                        fontSize: isSmallPhone ? '12px' : '14px',
+                        fontWeight: '900',
+                        letterSpacing: '2px',
+                        color: '#00e572',
+                        textAlign: 'center',
+                        margin: 0,
+                        textTransform: 'uppercase',
+                      }}>
+                        FUNDS ON THE WAY
+                      </p>
+                      <p style={{
+                        fontFamily: 'monospace',
+                        fontSize: '10px',
+                        color: 'rgba(255,255,255,0.7)',
+                        textAlign: 'center',
+                        lineHeight: '1.5',
+                        margin: 0,
+                      }}>
+                        {purchaseCurrency} will arrive in your wallet shortly. Use Step 2 below to swap for RL80.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setOnrampStep('amount');
+                          setPaymentLink(null);
+                          setOrderData(null);
+                          setPaymentAmount('');
+                          setTermsAccepted(false);
+                        }}
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '10px',
+                          color: 'rgba(255,255,255,0.5)',
+                          background: 'none',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '4px',
+                          padding: '6px 16px',
+                          cursor: 'pointer',
+                          letterSpacing: '1px',
+                          marginTop: '4px',
+                        }}
+                      >
+                        BUY MORE
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {onrampStep === 'error' && (
+                    <div style={{
+                      width: '100%',
+                      maxWidth: '320px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <p style={{
+                        fontFamily: 'monospace',
+                        fontSize: '11px',
+                        color: '#ff4d4d',
+                        textAlign: 'center',
+                        letterSpacing: '1px',
+                        margin: 0,
+                      }}>
+                        {onrampError}
+                      </p>
+                      <button
+                        onClick={() => {
+                          setOnrampStep('amount');
+                          setOnrampError(null);
+                          setPaymentLink(null);
+                        }}
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: isSmallPhone ? '12px' : '13px',
+                          fontWeight: '900',
+                          letterSpacing: '2px',
+                          color: '#000',
+                          background: 'linear-gradient(135deg, #fded00, #ffb700)',
+                          border: 'none',
+                          padding: isSmallPhone ? '10px 18px' : '12px 22px',
+                          cursor: 'pointer',
+                          clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
+                          transition: 'all 0.2s ease',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        TRY AGAIN
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Divider */}

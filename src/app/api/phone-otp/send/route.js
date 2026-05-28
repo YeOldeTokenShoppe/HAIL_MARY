@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server';
-import {
-  buildOnrampAuthMessage,
-  generateNonce,
-  signEnvelope,
-  NONCE_TTL_MS,
-} from '@/lib/onrampAuth';
+import twilio from 'twilio';
 
 const ALLOWED_ORIGINS = [
   'https://rl80.com',
@@ -31,10 +26,13 @@ export async function OPTIONS(request) {
 export async function POST(request) {
   const corsHeaders = getCorsHeaders(request);
 
-  const secret = process.env.ONRAMP_AUTH_SECRET;
-  if (!secret) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+  if (!sid || !token || !verifyServiceSid) {
     return NextResponse.json(
-      { error: 'Onramp auth secret not configured' },
+      { error: 'Phone verification service not configured' },
       { status: 500, headers: corsHeaders }
     );
   }
@@ -48,32 +46,28 @@ export async function POST(request) {
   }
 
   try {
-    const { address } = await request.json();
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    const { phoneNumber } = await request.json();
+    if (!phoneNumber || !/^\+1\d{10}$/.test(phoneNumber)) {
       return NextResponse.json(
-        { error: 'Valid wallet address is required' },
+        { error: 'Valid US phone number in E.164 format is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    const checksumAddress = address;
-    const nonce = generateNonce();
-    const expiresAt = Date.now() + NONCE_TTL_MS;
-    const message = buildOnrampAuthMessage({
-      address: checksumAddress,
-      nonce,
-      expiresAt,
-    });
-    const envelope = signEnvelope(message, secret);
+    const client = twilio(sid, token);
+    const verification = await client.verify.v2
+      .services(verifyServiceSid)
+      .verifications.create({ to: phoneNumber, channel: 'sms' });
 
     return NextResponse.json(
-      { message, envelope, expiresAt },
+      { status: verification.status },
       { headers: corsHeaders }
     );
   } catch (error) {
-    console.error('Onramp nonce error:', error);
+    console.error('Phone OTP send error:', error);
+    const msg = error?.message || 'Failed to send verification code';
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: msg },
       { status: 500, headers: corsHeaders }
     );
   }
