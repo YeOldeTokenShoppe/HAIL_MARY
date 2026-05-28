@@ -2558,60 +2558,54 @@ export default function HomePage() {
         </h1>
       </div>
 
-      <ChartWidget
-        candles={data.candles}
-        latestPrice={data.latestPrice}
-        priceChange24h={data.priceChange24h}
-        marketCap={data.marketCap}
-        loading={data.loading}
-      />
-
       <div className="below-fold-chamber">
-        {/* <div className="hero-intro-chart">
-          <div
-            className="shrine-stage"
-            onMouseEnter={() => setChartHovered(true)}
-            onMouseLeave={() => setChartHovered(false)}
-          >
-            <ChartShrine
-              {...data}
-              palette="chrome"
-              timeframeKey={timeframeKey}
-              onTimeframeChange={setTimeframeKey}
-            />
-          </div>
-        </div> */}
-
-        <MobileSectionDropInTitle />
-        <div className="hero-copy hero-copy--below-fold">
-          <blockquote
-            className="hero-pullquote"
-            title={heroPullquote.gloss || undefined}
-          >
-            <p
-              key={heroPullquoteIndex}
-              className={`hero-pullquote-latin${
-                heroPullquote.tone === "modern" ? " hero-pullquote-modern" : ""
-              }`}
-              aria-live="polite"
-            >
-              {heroPullquote.tone === "modern"
-                ? `"${heroPullquote.text}"`
-                : heroPullquote.text}
-            </p>
-            <cite className="hero-pullquote-source">
-              {heroPullquote.source}
-            </cite>
-            {heroPullquote.gloss ? (
-              <span className="hero-pullquote-gloss" aria-hidden="true">
-                {heroPullquote.gloss}
-              </span>
-            ) : null}
-          </blockquote>
-          <p className="hero-intro">
+        <section
+          className="intro-chart-section"
+          aria-label="Prosper80 for all Human80"
+        >
+          <div className="intro-chart-section__text">
+            <MobileSectionDropInTitle />
+            <div className="hero-copy hero-copy--below-fold">
+              <blockquote
+                className="hero-pullquote"
+                title={heroPullquote.gloss || undefined}
+              >
+                <p
+                  key={heroPullquoteIndex}
+                  className={`hero-pullquote-latin${
+                    heroPullquote.tone === "modern" ? " hero-pullquote-modern" : ""
+                  }`}
+                  aria-live="polite"
+                >
+                  {heroPullquote.tone === "modern"
+                    ? `"${heroPullquote.text}"`
+                    : heroPullquote.text}
+                </p>
+                <cite className="hero-pullquote-source">
+                  {heroPullquote.source}
+                </cite>
+                {heroPullquote.gloss ? (
+                  <span className="hero-pullquote-gloss" aria-hidden="true">
+                    {heroPullquote.gloss}
+                  </span>
+                ) : null}
+              </blockquote>
+              <p className="hero-intro">
 Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment against scams in the Liminal Terminal, or scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order.
 </p>
-        </div>
+            </div>
+          </div>
+
+          <div className="intro-chart-section__visual">
+            <ChartWidget
+              candles={data.candles}
+              latestPrice={data.latestPrice}
+              priceChange24h={data.priceChange24h}
+              marketCap={data.marketCap}
+              loading={data.loading}
+            />
+          </div>
+        </section>
 
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
@@ -3002,6 +2996,17 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
         show80sButton={false}
         isMobile
         is80sMode
+        /* Left slot starts as BUY (book slot) while the candle is unlit;
+           once the center FAB flips to BUY RL80, the left slot falls
+           through to the default account/login slot. */
+        onBookClick={candleLit ? undefined : () => setShowBuyModal(true)}
+        bookLabel="BUY"
+        bookIcon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        }
         extraLeft={[
           {
             key: 'terminal',

@@ -7,7 +7,9 @@
   .biz-section.biz-section {
     width: min(100% - 64px, 1280px);
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    /* Reversed: text-left, visual-right. 1.25fr/1fr keeps the text
+       column the wider one, matching the prior balance. */
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     gap: clamp(32px, 4vw, 72px);
     align-items: end;
     text-align: left;
@@ -17,6 +19,12 @@
     border-top: none;
     box-shadow: none;
     border-radius: 0;
+  }
+
+  /* Move the text into the first grid column so the JSX reading order
+     (visual first, text second) renders as text-left, visual-right. */
+  .biz-text {
+    order: -1;
   }
 
   .biz-section::before { display: none; }

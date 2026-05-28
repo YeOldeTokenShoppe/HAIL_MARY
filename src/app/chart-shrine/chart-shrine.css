@@ -1931,6 +1931,133 @@ body:has(.shrine-page.neon) {
   }
 }
 
+/* ── Intro + Chart 2-column section ─────────────────────────────────
+   Combines the DropInTitle / pullquote / hero-intro copy on the left
+   with the ChartWidget on the right. Mirrors the HolyTrin and Mater
+   sections' grid: text-left, visual-right on desktop; stacked on
+   mobile. The chart's standalone positioning (12% margin-left, 30vw
+   width, 380vh mobile margin) is overridden so it sits naturally in
+   the visual column. */
+.intro-chart-section {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 35rem auto 22px;
+  color: #f1d77a;
+  pointer-events: auto;
+  touch-action: pan-y;
+  overflow-anchor: none;
+}
+
+@media (min-width: 901px) {
+  .intro-chart-section.intro-chart-section {
+    width: min(100% - 64px, 1280px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: clamp(32px, 4vw, 72px);
+    align-items: center;
+    text-align: left;
+    padding: clamp(56px, 6vw, 88px) clamp(40px, 5vw, 80px);
+    background: none;
+    backdrop-filter: none;
+    border-top: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  /* Visual on the left, text on the right — keeps the JSX text-first
+     for reading order while flipping the visual presentation. */
+  .intro-chart-section__visual {
+    order: -1;
+  }
+
+  .intro-chart-section::after {
+    content: "";
+    position: absolute;
+    top: 14%;
+    bottom: 14%;
+    left: 50%;
+    width: 1px;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(212, 175, 55, 0.32) 35%,
+      rgba(42, 214, 238, 0.22) 65%,
+      transparent 100%
+    );
+  }
+
+  .intro-chart-section__text {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(18px, 2vw, 28px);
+    align-items: flex-start;
+  }
+
+  .intro-chart-section__text .section-title-wrap {
+    padding-top: 0;
+    margin: 0;
+    text-align: left;
+  }
+
+  .intro-chart-section__text .hero-copy--below-fold {
+    margin: 0;
+    max-width: none;
+    text-align: left;
+    align-items: flex-start;
+  }
+
+  .intro-chart-section__visual {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Neutralize the chart's standalone positioning when it lives inside
+     this section — the section grid handles placement. */
+  .intro-chart-section__visual .chart-widget {
+    align-self: center;
+    margin: 0;
+    width: min(100%, 340px);
+  }
+}
+
+@media (max-width: 900px) {
+  .intro-chart-section {
+    width: calc(100% - 32px);
+    max-width: 480px;
+    margin-top: clamp(150px, 3vw, 40px);
+    padding: 32px 16px 28px;
+    text-align: center;
+  }
+
+  .intro-chart-section__text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .intro-chart-section__visual {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* Override the .chart-widget mobile rule (380vh margin) so the chart
+     sits in document flow inside the stacked layout. */
+  .intro-chart-section__visual .chart-widget {
+    width: 264px;
+    height: auto;
+    aspect-ratio: 500 / 900;
+    margin: 0 auto;
+  }
+}
+
 /* ── Candle countdown timer inside picker panel ── */
 .candle-picker-timer {
   font-family: var(--font-mono, monospace);

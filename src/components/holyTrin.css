@@ -16,11 +16,10 @@
   .holy-trin.holy-trin {
     width: min(100% - 64px, 1280px);
     display: grid;
-    /* Widened text column so the heading has a real shot at fitting on
-       one line and the descriptions wrap to fewer lines — both reduce
-       the text-column's total height and bring it closer to the
-       triangle's height. */
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    /* Reversed: visual-left, text-right. The 1fr/1.25fr ratio keeps
+       the text column the wider one of the two, matching the prior
+       balance — just on the opposite side. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
     gap: clamp(32px, 4vw, 72px);
     align-items:end;
     text-align: left;
@@ -32,6 +31,11 @@
     border-top: none;
     box-shadow: none;
     border-radius: 0;
+  }
+  /* Move the visual into the first grid column so the JSX reading order
+     (text first, visual second) renders as visual-left, text-right. */
+  .holy-trin-visual {
+    order: -1;
   }
   /* Decorative glow was tuned for the centered card layout — in the
      split layout it shows as a bright horizontal band between columns. */

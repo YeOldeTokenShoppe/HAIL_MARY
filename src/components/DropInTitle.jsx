@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { gsap } from 'gsap';
 
 export default function DropInTitle({
@@ -18,13 +18,31 @@ export default function DropInTitle({
     return `dropin-${contentHash}`;
   }, [instanceId, lines]);
   const containerRef = useRef(null);
-  const playAnimation = useCallback(() => {
+  // Latch the play state: both `triggerAnimation` (framer-motion
+  // useInView in callers) and the internal IntersectionObserver re-fire
+  // every time the section scrolls out and back into view, and the
+  // observer effect itself can re-attach mid-scroll if any dependency
+  // identity changes. Without the latch, those re-fires stack new GSAP
+  // timelines on top of each other and the title visibly keeps
+  // re-animating.
+  const hasPlayedRef = useRef(false);
+  const timelineRef = useRef(null);
+  // Pinned ref for the consumer's onComplete so playAnimation never
+  // recaptures an identity-churning inline callback (the default
+  // `() => {}` is a new function every render).
+  const onCompleteRef = useRef(onAnimationComplete);
+  useEffect(() => {
+    onCompleteRef.current = onAnimationComplete;
+  }, [onAnimationComplete]);
+  const playAnimation = () => {
     if (!containerRef.current) return;
-
+    if (hasPlayedRef.current) return;
+    hasPlayedRef.current = true;
+    timelineRef.current?.kill();
     const tl = gsap.timeline({
-      onComplete: onAnimationComplete
+      onComplete: () => onCompleteRef.current?.()
     });
-
+    timelineRef.current = tl;
     tl.fromTo(containerRef.current.querySelectorAll('.title-letter'),
       {
         opacity: 0,
@@ -38,13 +56,13 @@ export default function DropInTitle({
         stagger: 0.05
       }
     );
-  }, [onAnimationComplete]);
+  };
 
   useEffect(() => {
     if (triggerAnimation) {
       playAnimation();
     }
-  }, [triggerAnimation, playAnimation]);
+  }, [triggerAnimation]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -59,7 +77,11 @@ export default function DropInTitle({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [playAnimation]);
+  }, []);
+
+  useEffect(() => () => {
+    timelineRef.current?.kill();
+  }, []);
   
   return (
     <div ref={containerRef} style={{
