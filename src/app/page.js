@@ -2177,7 +2177,6 @@ export default function HomePage() {
   const candleVariant = userId ? candleVariantChoice : "pillar";
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useBuyModal();
-  const [chartHovered, setChartHovered] = useState(false);
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
@@ -3003,18 +3002,6 @@ Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Shar
         show80sButton={false}
         isMobile
         is80sMode
-        /* Book slot (left of center) is the BUY button — placed nearer
-           to the chart so buying intent and action sit in the same zone.
-           Pulses while the chart is hovered to tie intent to action. */
-        onBookClick={() => setShowBuyModal(true)}
-        bookHighlight={chartHovered}
-        bookLabel="BUY"
-        bookIcon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
-            <line x1="12" y1="1" x2="12" y2="23" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        }
         extraLeft={[
           {
             key: 'terminal',
