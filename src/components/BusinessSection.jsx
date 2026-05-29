@@ -41,13 +41,14 @@ export default function BusinessSection() {
 
         <div className="biz-body" style={{ marginTop: "1.5rem" }}>
           <p>
-            <strong>Coming Soon</strong> — Earn USDC on revenue from features and services by staking RL80.
+            <strong>Coming Soon</strong> — Enjoy the reflected glory of Our Lady with 
+            tiered access to site services when you hold RL80 tokens.
           </p>
 
-          <p><strong>How it works:</strong></p>
+          {/* <p><strong>How it works:</strong></p> */}
 
-          <p>
-            Customer pays USDC for a service or asset. USDC arrives at the
+          {/* <p>
+            RL80 patrons pay USDC for a service or asset. USDC arrives at the
             RevenueRouter contract. The Router splits it: 30% to stakers, 70%
             to operations. The Router has no override. The split has no setter.
             The destination addresses are immutable.
@@ -56,7 +57,7 @@ export default function BusinessSection() {
           <p>
             Verify on Basescan. The wallet is public. The code is public. The
             flow is auditable by anyone.
-          </p>
+          </p> */}
         </div>
       </div>
     </section>

@@ -29,6 +29,45 @@ import useCctvRecorder from "@/hooks/useCctvRecorder";
 import PumpPurchaseModal from "@/components/PumpPurchaseModal";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 
+// ── FPS probe (perf testing via ?stats=1) ───────────────────────────────────
+// Lives inside the R3F canvas, but renders its readout into a plain DOM element
+// appended to document.body so it's reliably visible on mobile (the stats.js
+// overlay gets hidden under the address bar). Updates textContent twice a second
+// without any React re-render, so it doesn't skew the measurement.
+function FpsProbe() {
+  const elRef = useRef(null);
+  const acc = useRef({ frames: 0, time: 0 });
+  useEffect(() => {
+    const el = document.createElement("div");
+    el.style.cssText = [
+      "position:fixed", "top:72px", "left:8px", "z-index:2147483647",
+      "background:rgba(0,0,0,0.78)", "color:#39ff14",
+      "font:bold 18px/1.25 ui-monospace,Menlo,monospace",
+      "padding:6px 10px", "border-radius:6px", "pointer-events:none",
+      "white-space:pre",
+    ].join(";");
+    el.textContent = "measuring…";
+    document.body.appendChild(el);
+    elRef.current = el;
+    return () => { el.remove(); elRef.current = null; };
+  }, []);
+  useFrame((state, delta) => {
+    const a = acc.current;
+    a.frames += 1;
+    a.time += delta;
+    if (a.time >= 0.5 && elRef.current) {
+      const fps = a.frames / a.time;
+      const r = state.gl.info.render;
+      const tris = r.triangles >= 1e6 ? `${(r.triangles / 1e6).toFixed(1)}M` : `${(r.triangles / 1e3).toFixed(0)}k`;
+      elRef.current.textContent =
+        `${fps.toFixed(0)} FPS  ${(1000 / fps).toFixed(1)} ms\n${r.calls} calls  ${tris} tris`;
+      a.frames = 0;
+      a.time = 0;
+    }
+  });
+  return null;
+}
+
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
   day:   { sky: "#7da4c9", skyBottom: null, ambient: 0.6, dirA: 4.0, dirB: 3.0, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
@@ -605,6 +644,7 @@ export default function OilPage() {
 
   // Read mode from URL search params (avoids useSearchParams / Suspense issues)
   const [mode, setMode] = useState("active");
+  const [showStats, setShowStats] = useState(false); // FPS overlay via ?stats=1
   const [previewMode, setPreviewMode] = useState(false);
   // Ref mirror of previewMode so write-handler gates aren't fooled by a
   // stale useCallback closure (handlers don't need previewMode in their deps).
@@ -612,6 +652,11 @@ export default function OilPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setMode(params.get("mode") || "active");
+    // FPS overlay: ?stats=1 enables (and persists), ?stats=0 disables.
+    const statsParam = params.get("stats");
+    if (statsParam === "1") { setShowStats(true); localStorage.setItem("oil_stats", "1"); }
+    else if (statsParam === "0") { setShowStats(false); localStorage.removeItem("oil_stats"); }
+    else { setShowStats(localStorage.getItem("oil_stats") === "1"); }
     const preview = params.get("preview") === "1";
     setPreviewMode(preview);
     previewModeRef.current = preview;
@@ -3845,6 +3890,7 @@ export default function OilPage() {
             <div id="oil-canvas" style={m.canvasWrap}>
               <CleanCanvas
                 camera={{ position: [0, 3.5, 4], fov: 50 }}
+                dpr={[1, 1.5]}
                 style={{ width: "100%", height: "100%" }}
                 gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
@@ -3899,6 +3945,7 @@ export default function OilPage() {
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
+                {showStats && <FpsProbe />}
                 {introComplete ? (
                   <>
                     <OrbitControls
@@ -4291,6 +4338,7 @@ export default function OilPage() {
         }}>
           <CleanCanvas
             camera={{ position: [0, 8, 8], fov: 50 }}
+            dpr={[1, 1.5]}
             style={{ width: "100%", height: "100%" }}
             gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
@@ -4343,6 +4391,7 @@ export default function OilPage() {
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
+            {showStats && <FpsProbe />}
             {introComplete ? (
               <>
                 <OrbitControls

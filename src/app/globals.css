@@ -6805,6 +6805,19 @@ div[data-three] {
 /* Ensure Stats panels dont block clicks */
 .stats-monitor {
   pointer-events: none !important;
+  /* Beat the oil page's overlays (max z-index 9999) and clear the mobile
+     header/notch so the FPS panel is actually visible during perf testing. */
+  z-index: 2147483647 !important;
+  top: 72px !important;
+  left: 8px !important;
+}
+
+/* On phones the default 80px panel is too small to read — scale it up. */
+@media (max-width: 768px) {
+  .stats-monitor {
+    transform: scale(2.2);
+    transform-origin: top left;
+  }
 }
 
 /* Remove the overly broad rule that was blocking everything */

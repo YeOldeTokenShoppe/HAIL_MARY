@@ -8,6 +8,7 @@ import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 // Configure Draco decoder for compressed GLB models (e.g. t-rex)
 useGLTF.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
@@ -25,6 +26,19 @@ function disposeScene(obj) {
     }
   });
 }
+
+// Perf diagnostic: ?noanim=1 freezes all rig/addon animation (skips every
+// AnimationMixer.update) so we can isolate the CPU cost of 100 mixers from the
+// draw-call/geometry cost. Read once at module load — reload to toggle.
+const NO_ANIM = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("noanim") === "1";
+
+// Perf SPIKE: ?merge=1 replaces the 100 individual Pumpjack components with ONE
+// instanced, vertex-colored merged rig (1 draw call for the whole field, no
+// customization/animation/interactivity). Pure measurement to confirm whether
+// draw calls are the FPS ceiling. Reload to toggle.
+const MERGE_RIGS = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("merge") === "1";
 
 // ── Shared CCTV state (module-level, Pumpjack writes → CctvRenderer reads) ──
 const _cctvState = {
@@ -796,6 +810,7 @@ function AddonAnimatedGLB({ item, slotPos, rotation = 0 }) {
   useFrame((_, delta) => {
     const mixer = mixerRef.current;
     if (!mixer) return;
+    if (NO_ANIM) return;
     mixer.update(delta);
 
     const idle = idleActionRef.current;
@@ -916,6 +931,7 @@ function AddonTubeMan({ item, slotPos, rotation = 0 }) {
   }, [cloned]);
 
   useFrame((_, delta) => {
+    if (NO_ANIM) return;
     timeRef.current += delta;
     const t = timeRef.current;
 
@@ -1780,10 +1796,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     // Non-highlighted pumpjacks: throttle animation to every 3rd frame, skip all interactive logic
     if (!highlightedRef.current) {
       frameSkip.current = (frameSkip.current + 1) % 3;
-      if (frameSkip.current === 0) mixer.update(delta * 3);
+      if (!NO_ANIM && frameSkip.current === 0) mixer.update(delta * 3);
       return;
     }
-    if (!pumpPausedRef.current) {
+    if (!pumpPausedRef.current && !NO_ANIM) {
       mixer.update(delta);
     }
 
@@ -2660,6 +2676,72 @@ function PlotBorderHighlight({ position, cellSize }) {
   );
 }
 
+// ── Perf spike: build one merged, vertex-colored rig geometry from the GLB ───
+// Each plot becomes ONE merged mesh: sub-mesh geometries baked into rig-local
+// space, vertex-colored per zone from that plot's pumpConfig (textured/unknown
+// parts fall back to a mid gray instead of white). ~1 draw call per rig.
+const _MERGE_GRAY = new THREE.Color(0x8a8a8a);
+const _MERGE_TMP = new THREE.Color();
+
+// SPIKE proof: a distinct vivid color per customizable zone, so each rig renders
+// as an obviously multi-colored scheme in its single merged mesh. Real per-zone
+// config colors override these. (Production reads only config / sampled colors.)
+const _ZONE_TEST_PALETTE = {
+  pad: "#e74c3c", foundation: "#e67e22", motorBox: "#f1c40f", crankWheel: "#2ecc71",
+  beam: "#1abc9c", counterweight: "#3498db", horseHead: "#9b59b6", drillPipe: "#e84393",
+  machinePanel: "#00cec9", tankScaffold: "#fdcb6e", signFrame: "#6c5ce7",
+  pipes: "#fab1a0", valve: "#55efc4",
+};
+
+// Pick the bake color for a source mesh: the player's chosen zone color if set,
+// else (spike) the zone's vivid test color, else gray.
+function rigBakeColor(child, config) {
+  let zoneId = MESH_TO_ZONE[child.name];
+  if (!zoneId && child.name?.startsWith("SignFrame")) zoneId = "signFrame";
+  const custom = zoneId && config?.[zoneId]?.color;
+  if (custom) return _MERGE_TMP.set(custom);
+  if (zoneId && _ZONE_TEST_PALETTE[zoneId]) return _MERGE_TMP.set(_ZONE_TEST_PALETTE[zoneId]);
+  return _MERGE_TMP.copy(_MERGE_GRAY);
+}
+
+function buildColoredRig(scene, config) {
+  scene.updateMatrixWorld(true);
+  const geoms = [];
+  scene.traverse((child) => {
+    if (!child.isMesh || !child.geometry) return;
+    let g = child.geometry.clone();
+    g.applyMatrix4(child.matrixWorld);
+    Object.keys(g.attributes).forEach((a) => {
+      if (a !== "position" && a !== "normal") g.deleteAttribute(a);
+    });
+    if (g.index) g = g.toNonIndexed();
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const col = rigBakeColor(child, config);
+    const n = g.attributes.position.count;
+    const colors = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b; }
+    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geoms.push(g);
+  });
+  return mergeGeometries(geoms, false);
+}
+
+function MergedRigField({ scene, items, allPumpConfigs }) {
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.55, metalness: 0.35,
+  }), []);
+  const rigs = useMemo(() => items.map((it) => {
+    const config = allPumpConfigs[`${it.col}_${it.row}`]?.config || null;
+    return { key: it.key, position: it.position, geo: buildColoredRig(scene, config) };
+  }), [scene, items, allPumpConfigs]);
+  useEffect(() => () => { rigs.forEach((r) => r.geo.dispose()); }, [rigs]);
+  useEffect(() => () => mat.dispose(), [mat]);
+
+  return rigs.map((r) => (
+    <mesh key={r.key} geometry={r.geo} material={mat} position={r.position} scale={PUMPJACK_SCALE} />
+  ));
+}
+
 function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
@@ -2702,7 +2784,8 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
       {selectedPos && (
         <PlotBorderHighlight position={selectedPos} cellSize={cellSize} />
       )}
-      {items.map(({ key, position, col, row }) => {
+      {MERGE_RIGS && <MergedRigField scene={scene} items={items} allPumpConfigs={allPumpConfigs} />}
+      {!MERGE_RIGS && items.map(({ key, position, col, row }) => {
         // Drill all if no selection, otherwise only the selected cell
         const active = selectedCol === null || (col === selectedCol && row === selectedRow);
         const isSelected = selectedCol !== null && col === selectedCol && row === selectedRow;

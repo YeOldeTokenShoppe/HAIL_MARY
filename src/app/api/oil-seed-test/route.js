@@ -1,14 +1,71 @@
 import { NextResponse } from "next/server";
-import {
-  db, doc, setDoc, collection, getDocs, deleteDoc, serverTimestamp,
-} from "@/lib/firebaseServer";
+import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 
 const FAKE_NAMES = [
   "DrillSgt", "PetroMax", "OilBaron99", "GusherQueen", "DeepStrike",
   "ShaleHunter", "CrudeDude", "BarrelRoll", "PumpKing", "WildcatWilma",
   "DerrickDan", "SpudMuffin", "BlackGold", "RigPig", "BitBorer",
   "SlickRick", "PipelinePat", "WellDone", "DrillerThriller", "TexOil",
+  "RoughneckRose", "CrudeAwakening", "BoreHoleBob", "FrackMaster", "OilSlick",
 ];
+
+// ── Realistic customization pools (drawn from public assets + addon catalog) ──
+// Sign images are real files in /public — exercising the full-res TextureLoader
+// path that the perf concern centers on (no downscaling/atlas yet).
+const SIGN_IMAGES = [
+  "/LandGradient1.webp", "/LandGradient2.webp", "/LandGradient3.webp",
+  "/IlluminatedManuscript1.webp", "/IlluminatedManuscript2.webp",
+  "/IlluminatedManuscript3.webp", "/ClaimCertificate.webp",
+];
+// Static addons (cheap-ish: GLB clone only). Animated ones cost an extra mixer.
+const STATIC_ADDONS = ["flamingo", "gravestone", "sunflowers", "gnome", "palmTree", "pumpkinPatch", "goldRocks", "skeleton"];
+const ANIMATED_ADDONS = ["zombie"]; // per-frame AnimationMixer
+const FENCE_TYPES = ["chainlink", "iron", "whitePicket", "stone"];
+const BODY_COLORS = ["#c0392b", "#2980b9", "#27ae60", "#8e44ad", "#f39c12", "#16a085"];
+
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// Build a realistic-mix pump config for fake user index `i`.
+// `tubeManSet` is a Set of indices that get the (expensive) TubeMan addon.
+function buildFakeConfig(i, tubeManSet) {
+  const config = {
+    signImageUrl: pick(SIGN_IMAGES), // every plot gets a sign image
+    showSign: true,
+  };
+
+  // ~25% get a security camera (only renders with sign visible — it is)
+  if (Math.random() < 0.25) config.showCamera = true;
+
+  // ~30% get a fence
+  if (Math.random() < 0.3) config.fenceType = pick(FENCE_TYPES);
+
+  // ~50% get a body/horse-head color (cheap flat-color override)
+  if (Math.random() < 0.5) {
+    const c = pick(BODY_COLORS);
+    config.beam = { preset: "stock", color: c };
+    config.horseHead = { preset: "stock", color: c };
+  }
+
+  // Addons. A couple of designated indices always get the heavy TubeMan.
+  const addons = {};
+  if (tubeManSet.has(i)) {
+    addons["0"] = { id: "tubeMan", rot: 0 };
+  }
+  // ~60% get 1–2 (other) addons in the remaining front slots
+  if (Math.random() < 0.6) {
+    const slots = ["1", "2"].filter((s) => !addons[s]);
+    const count = Math.random() < 0.5 ? 1 : 2;
+    for (let n = 0; n < count && slots.length; n++) {
+      const slot = slots.shift();
+      // Occasionally an animated addon (extra mixer) for realism
+      const id = Math.random() < 0.2 ? pick(ANIMATED_ADDONS) : pick(STATIC_ADDONS);
+      addons[slot] = { id, rot: Math.floor(Math.random() * 4) };
+    }
+  }
+  if (Object.keys(addons).length) config.addons = addons;
+
+  return config;
+}
 
 export async function POST(req) {
   try {
@@ -18,24 +75,32 @@ export async function POST(req) {
     if (!correct || password !== correct) {
       return NextResponse.json({ ok: false }, { status: 401 });
     }
+    const db = getAdminDb();
     if (!db) {
       return NextResponse.json({ ok: false, error: "DB unavailable" }, { status: 503 });
     }
 
     // Clear previous fake data if requested
     if (clear) {
-      const plotSnap = await getDocs(collection(db, "oilPlots"));
-      const drillSnap = await getDocs(collection(db, "oilDrills"));
+      const plotSnap = await db.collection("oilPlots").get();
+      const drillSnap = await db.collection("oilDrills").get();
+      const configSnap = await db.collection("pumpConfigs").get();
       let cleared = 0;
       for (const d of plotSnap.docs) {
         if (d.data().currentOwnerId?.startsWith("fake_")) {
-          await deleteDoc(doc(db, "oilPlots", d.id));
+          await d.ref.delete();
           cleared++;
         }
       }
       for (const d of drillSnap.docs) {
         if (d.id.startsWith("fake_")) {
-          await deleteDoc(doc(db, "oilDrills", d.id));
+          await d.ref.delete();
+          cleared++;
+        }
+      }
+      for (const d of configSnap.docs) {
+        if (d.id.startsWith("fake_") || d.data().userId?.startsWith("fake_")) {
+          await d.ref.delete();
           cleared++;
         }
       }
@@ -45,7 +110,7 @@ export async function POST(req) {
     }
 
     // Build a set of already-claimed plots
-    const existingSnap = await getDocs(collection(db, "oilPlots"));
+    const existingSnap = await db.collection("oilPlots").get();
     const claimed = new Set();
     existingSnap.docs.forEach((d) => {
       if (d.data().currentOwnerId) claimed.add(d.id);
@@ -56,7 +121,13 @@ export async function POST(req) {
     const maxDepth = 20;
     const seeded = [];
 
-    for (let i = 0; i < Math.min(count, FAKE_NAMES.length); i++) {
+    const total = Math.min(count, FAKE_NAMES.length);
+    // Designate ~2 players to get the (expensive) TubeMan addon
+    const tubeManSet = new Set();
+    if (total > 0) tubeManSet.add(Math.floor(total * 0.3));
+    if (total > 4) tubeManSet.add(Math.floor(total * 0.7));
+
+    for (let i = 0; i < total; i++) {
       const userId = `fake_${i}`;
       const username = FAKE_NAMES[i];
 
@@ -77,7 +148,7 @@ export async function POST(req) {
       const drillDay = Math.min(maxDepth, Math.floor(1 + Math.random() * 14 + Math.random() * 5));
 
       // Write oilPlots
-      await setDoc(doc(db, "oilPlots", key), {
+      await db.collection("oilPlots").doc(key).set({
         col,
         row,
         drillDay,
@@ -87,7 +158,7 @@ export async function POST(req) {
       });
 
       // Write oilDrills
-      await setDoc(doc(db, "oilDrills", userId), {
+      await db.collection("oilDrills").doc(userId).set({
         userId,
         col,
         row,
@@ -97,10 +168,28 @@ export async function POST(req) {
         bonusDrills: Math.floor(Math.random() * 3),
         claimJumpsUsed: 0,
         tankDrains: 0,
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
 
-      seeded.push({ userId, username, col, row, drillDay });
+      // Write pumpConfigs — the customization layer the perf test targets
+      // (sign image texture + addons + fence + optional camera). Doc id matches
+      // the client format: `${userId}_${col}_${row}`.
+      const config = buildFakeConfig(i, tubeManSet);
+      await db.collection("pumpConfigs").doc(`${userId}_${key}`).set({
+        userId,
+        col,
+        row,
+        config,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      seeded.push({
+        userId, username, col, row, drillDay,
+        sign: !!config.signImageUrl,
+        camera: !!config.showCamera,
+        fence: config.fenceType || null,
+        addons: config.addons ? Object.values(config.addons).map((a) => a.id) : [],
+      });
     }
 
     return NextResponse.json({ ok: true, seeded: seeded.length, players: seeded });

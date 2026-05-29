@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Synty Mouth Mesh — Azure Viseme Demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #1a1a20; color: #e8e8ee;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden; }
+  #canvas-container { position: absolute; inset: 0; }
+  #ui {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    background: rgba(20,20,28,0.88); backdrop-filter: blur(8px);
+    padding: 14px 16px; border-radius: 10px;
+    width: 320px; max-height: calc(100vh - 24px); overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  #ui h1 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+  #ui h2 { margin: 14px 0 4px; font-size: 11px; color: #8a8aff; text-transform: uppercase; letter-spacing: 0.08em; }
+  #ui label { display: block; font-size: 11px; color: #9b9bb0; margin: 8px 0 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #ui input, #ui select, #ui textarea {
+    width: 100%; box-sizing: border-box;
+    background: #0e0e14; color: #e8e8ee; border: 1px solid #2a2a3a;
+    border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit;
+  }
+  #ui textarea { resize: vertical; min-height: 56px; }
+  #ui .row { display: flex; gap: 6px; }
+  #ui .row > * { flex: 1; }
+  #ui button {
+    width: 100%; margin-top: 10px; padding: 8px;
+    background: #5b5bff; color: white; border: 0; border-radius: 6px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  #ui button.secondary { background: #2a2a3a; margin-top: 0; }
+  #status { margin-top: 10px; font-size: 12px; color: #9b9bb0; min-height: 16px; }
+  #mouthPreview { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  #mouthPreview canvas { width: 42px; height: 42px; background: #2a2a3a; border-radius: 4px; cursor: pointer; }
+  #mouthPreview canvas.active { outline: 2px solid #8a8aff; }
+  .hint { font-size: 11px; color: #6b6b80; margin-top: 4px; line-height: 1.4; }
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+<div id="ui">
+  <h1>Synty Mouth Mesh Demo</h1>
+
+  <h2>Azure</h2>
+  <label>Speech Key</label>
+  <input id="key" type="password" value="" placeholder="paste Key 1" />
+  <label>Region</label>
+  <input id="region" placeholder="e.g. eastus" value="eastus" />
+  <label>Voice (en-US neural)</label>
+  <select id="voice">
+  
+    <option>en-US-GuyNeural</option>
+
+  </select>
+
+  <h2>Character</h2>
+  <label>Model URL (.glb or .fbx)</label>
+  <div class="row">
+    <input id="modelUrl" value="/models/testCharacter.glb" placeholder="paste your .glb URL" />
+    <button id="loadModel" class="secondary" style="flex: 0 0 auto; width: auto;">Load</button>
+  </div>
+  <label>Target mesh name</label>
+  <input id="targetMesh" value="Mouth" />
+  <div class="hint">The mesh with UVs already fit to the mouth images.</div>
+
+  <h2>Mouth shapes (click to preview on model)</h2>
+  <div id="mouthPreview"></div>
+  <div class="hint">Loaded from <code>mouth/*.png</code>. Click a thumb to force that shape — useful for checking UV alignment.</div>
+
+  <h2>Debug</h2>
+  <label style="display: flex; align-items: center; gap: 6px;">
+    <input id="debugBg" type="checkbox" style="width: auto;" />
+    <span style="text-transform: none; font-size: 12px; color: #e8e8ee;">Paint canvas bright red (confirm target mesh)</span>
+  </label>
+  <button id="listMeshes" class="secondary" style="margin-top: 8px;">List meshes in console</button>
+
+  <h2>Speak</h2>
+  <textarea id="text">Hey there! Watch my mouth move as I talk.</textarea>
+  <button id="speak">Speak</button>
+  <div id="status">Ready.</div>
+</div>
+
+<script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const setStatus = (m) => { document.getElementById('status').textContent = m; };
+
+// ---------- Load mouth PNGs ----------
+const MOUTH_NAMES = ['closed','slight','wide','oh','ee','lipbite'];
+const mouthCanvases = {};
+
+function newCanvas(w = 256, h = 256) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+await Promise.all(MOUTH_NAMES.map(n => new Promise((resolve) => {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    const c = newCanvas(img.width, img.height);
+    c.getContext('2d').drawImage(img, 0, 0);
+    mouthCanvases[n] = c;
+    resolve();
+  };
+  img.onerror = () => {
+    console.warn(`Failed to load mouth/${n}.png`);
+    mouthCanvases[n] = newCanvas();
+    resolve();
+  };
+  img.src = `mouth/${n}.png`;
+})));
+
+// Preview thumbnails — click to force a mouth shape
+const mouthPreview = document.getElementById('mouthPreview');
+const previewThumbs = {};
+for (const name of MOUTH_NAMES) {
+  const thumb = newCanvas(64, 64);
+  thumb.getContext('2d').drawImage(mouthCanvases[name], 0, 0, 64, 64);
+  thumb.title = name;
+  thumb.addEventListener('click', () => {
+    setMouth(name);
+    for (const k in previewThumbs) previewThumbs[k].classList.toggle('active', k === name);
+  });
+  previewThumbs[name] = thumb;
+  mouthPreview.appendChild(thumb);
+}
+
+// ---------- Viseme → mouth lookup ----------
+const VISEME_TO_MOUTH = [
+  'closed','slight','wide','oh','slight','slight','ee','oh','oh','wide',
+  'oh','wide','slight','slight','slight','ee','oh','slight','lipbite','slight','slight','closed'
+];
+
+// ---------- Live canvas — holds the current mouth sprite (full canvas) ----------
+const faceCanvas = newCanvas(512, 512);
+const faceCtx = faceCanvas.getContext('2d');
+const faceTexture = new THREE.CanvasTexture(faceCanvas);
+faceTexture.colorSpace = THREE.SRGBColorSpace;
+
+let mouthMesh = null;
+
+// Crossfade between mouth shapes
+let prevMouth = 'closed', currMouth = 'closed';
+let transitionStart = 0;
+const TRANSITION_MS = 110;
+const ANTICIPATION_MS = 50; // start moving the mouth slightly before the sound arrives
+
+function setMouth(name) {
+  if (name === currMouth) return;
+  prevMouth = currMouth;
+  currMouth = name;
+  transitionStart = performance.now();
+}
+
+function renderFace(now) {
+  if (!mouthMesh) return;
+  const W = faceCanvas.width, H = faceCanvas.height;
+  const tRaw = Math.min(1, Math.max(0, (now - transitionStart) / TRANSITION_MS));
+  // Smoothstep easing — turns the linear crossfade into a soft ease-in-out
+  const t = tRaw * tRaw * (3 - 2 * tRaw);
+  const debug = document.getElementById('debugBg').checked;
+
+  faceCtx.clearRect(0, 0, W, H);
+
+  if (debug) {
+    faceCtx.fillStyle = '#ff2244';
+    faceCtx.fillRect(0, 0, W, H);
+  } else {
+    if (t < 1 && mouthCanvases[prevMouth]) {
+      faceCtx.globalAlpha = 1 - t;
+      faceCtx.drawImage(mouthCanvases[prevMouth], 0, 0, W, H);
+    }
+    if (mouthCanvases[currMouth]) {
+      faceCtx.globalAlpha = t;
+      faceCtx.drawImage(mouthCanvases[currMouth], 0, 0, W, H);
+    }
+    faceCtx.globalAlpha = 1;
+  }
+
+  faceTexture.needsUpdate = true;
+}
+
+// ---------- Three.js scene ----------
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a20);
+
+const camera = new THREE.PerspectiveCamera(28, window.innerWidth / window.innerHeight, 0.01, 100);
+camera.position.set(0, 1.65, 1.5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.6, 0);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+keyLight.position.set(2, 3, 2);
+scene.add(keyLight);
+
+// ---------- Model loading ----------
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
+const gltfLoader = new GLTFLoader();
+gltfLoader.setDRACOLoader(dracoLoader);
+const fbxLoader = new FBXLoader();
+
+let model = null;
+
+function findMeshByName(root, targetName) {
+  let found = null;
+  // Exact match first
+  root.traverse(obj => {
+    if (!found && obj.isMesh && obj.name === targetName) found = obj;
+  });
+  // Case-insensitive contains as fallback
+  if (!found) {
+    const lower = targetName.toLowerCase();
+    root.traverse(obj => {
+      if (!found && obj.isMesh && obj.name.toLowerCase().includes(lower)) found = obj;
+    });
+  }
+  return found;
+}
+
+function findHeadForCamera(root) {
+  let head = null;
+  root.traverse(obj => {
+    if (obj.isBone && /head/i.test(obj.name) && !head) head = obj;
+  });
+  return head;
+}
+
+function attachToMouthMesh() {
+  const targetName = document.getElementById('targetMesh').value.trim() || 'Mouth';
+  mouthMesh = findMeshByName(model, targetName);
+  if (!mouthMesh) {
+    setStatus(`No "${targetName}" mesh found. Click "List meshes" to see what's available.`);
+    console.warn(`[mouth] no mesh named "${targetName}" found`);
+    return;
+  }
+
+  console.log('[mouth] target mesh:', mouthMesh.name);
+  console.log('[mouth] geometry has UVs:', !!mouthMesh.geometry?.attributes?.uv);
+  console.log('[mouth] original material:', mouthMesh.material);
+
+  const matIsArray = Array.isArray(mouthMesh.material);
+  const origMat = matIsArray ? mouthMesh.material[0] : mouthMesh.material;
+
+  // Clone existing material (or make a fresh one) and swap in our canvas texture
+  const newMat = origMat
+    ? origMat.clone()
+    : new THREE.MeshStandardMaterial({ color: 0xffffff });
+  newMat.map = faceTexture;
+  newMat.transparent = true;     // mouth PNGs likely have alpha
+  newMat.alphaTest = 0.01;       // discard fully-transparent pixels
+  newMat.side = THREE.DoubleSide; // small face-plate meshes often need this
+  newMat.needsUpdate = true;
+
+  mouthMesh.material = matIsArray
+    ? mouthMesh.material.map(() => newMat)
+    : newMat;
+
+  // Match the original texture's flipY convention if there was one
+  if (origMat?.map) faceTexture.flipY = origMat.map.flipY;
+  faceTexture.needsUpdate = true;
+
+  setStatus(`Bound to "${mouthMesh.name}". Click a thumb to preview, or hit Speak.`);
+}
+
+async function loadModel(url) {
+  const ext = url.split('?')[0].split('.').pop().toLowerCase();
+  const loader = ext === 'fbx' ? fbxLoader : gltfLoader;
+  return new Promise((resolve, reject) => {
+    loader.load(url,
+      (asset) => {
+        const root = asset.scene || asset;
+        if (model) scene.remove(model);
+        model = root;
+        if (ext === 'fbx') model.scale.setScalar(0.01);
+        scene.add(model);
+
+        attachToMouthMesh();
+
+        // Aim camera at head
+        const head = findHeadForCamera(model);
+        const target = new THREE.Vector3();
+        if (head) head.getWorldPosition(target);
+        else {
+          const box = new THREE.Box3().setFromObject(model);
+          target.set(0, box.max.y - 0.1, 0);
+        }
+        controls.target.copy(target);
+        camera.position.set(target.x, target.y, target.z + 0.7);
+        controls.update();
+        resolve();
+      },
+      undefined,
+      (err) => { console.error(err); reject(err); }
+    );
+  });
+}
+
+document.getElementById('loadModel').addEventListener('click', async () => {
+  const url = document.getElementById('modelUrl').value.trim();
+  if (!url) { setStatus('Paste a model URL first.'); return; }
+  setStatus('Loading model…');
+  try { await loadModel(url); }
+  catch (e) { setStatus('Load failed: ' + (e.message || e)); }
+});
+
+document.getElementById('listMeshes').addEventListener('click', () => {
+  if (!model) { console.log('[meshes] no model loaded'); return; }
+  console.group('[meshes] all meshes');
+  model.traverse(o => {
+    if (o.isMesh) {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      console.log(o.name,
+        '| materials:', mats.map(m => m?.name || '(unnamed)').join(', '),
+        '| has UVs:', !!o.geometry?.attributes?.uv,
+        '| has map:', mats.some(m => m?.map));
+    }
+  });
+  console.groupEnd();
+});
+
+// Auto-load whatever's in the URL field
+window.addEventListener('load', () => {
+  const url = document.getElementById('modelUrl').value.trim();
+  if (url) loadModel(url).catch(e => setStatus('Load failed: ' + (e.message || e)));
+});
+
+// ---------- Viseme timeline + render loop ----------
+let visemeEvents = [];
+let audioStartTime = 0;
+let speaking = false;
+
+function findCurrentMouth(elapsed) {
+  let lo = 0, hi = visemeEvents.length - 1, ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (visemeEvents[mid].t <= elapsed) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+  }
+  return ans >= 0 ? visemeEvents[ans].mouth : 'closed';
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  const now = performance.now();
+  if (speaking && visemeEvents.length > 0) {
+    const elapsed = now - audioStartTime;
+    // Anticipation: look slightly ahead so the mouth starts forming before the sound
+    const target = findCurrentMouth(elapsed + ANTICIPATION_MS);
+    if (target !== currMouth) setMouth(target);
+  }
+  renderFace(now);
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---------- Azure speech ----------
+document.getElementById('speak').addEventListener('click', () => {
+  const speechKey = document.getElementById('key').value.trim();
+  const region = document.getElementById('region').value.trim();
+  const voice = document.getElementById('voice').value;
+  const text = document.getElementById('text').value;
+  if (!speechKey || !region) { setStatus('Enter Azure key and region.'); return; }
+
+  setStatus('Synthesizing…');
+  visemeEvents = [];
+  setMouth('closed');
+
+  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+  <voice name="${voice}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</voice>
+</speak>`;
+
+  const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, region);
+  const player = new SpeechSDK.SpeakerAudioDestination();
+  player.onAudioStart = () => {
+    audioStartTime = performance.now();
+    speaking = true;
+    setStatus('Speaking…');
+  };
+  player.onAudioEnd = () => {
+    speaking = false;
+    setTimeout(() => { setMouth('closed'); setStatus('Done.'); }, 150);
+  };
+  const audioConfig = SpeechSDK.AudioConfig.fromSpeakerOutput(player);
+  const synthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig, audioConfig);
+
+  synthesizer.visemeReceived = (s, e) => {
+    const mouth = VISEME_TO_MOUTH[e.visemeId] || 'closed';
+    visemeEvents.push({ t: e.audioOffset / 10000, mouth });
+    visemeEvents.sort((a, b) => a.t - b.t);
+  };
+
+  synthesizer.speakSsmlAsync(ssml,
+    () => synthesizer.close(),
+    (err) => { console.error(err); setStatus('Error: ' + err); synthesizer.close(); });
+});
+</script>
+</body>
+</html>
