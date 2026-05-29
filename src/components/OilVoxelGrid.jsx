@@ -2676,37 +2676,41 @@ function PlotBorderHighlight({ position, cellSize }) {
   );
 }
 
-// ── Perf spike: build one merged, vertex-colored rig geometry from the GLB ───
-// Each plot becomes ONE merged mesh: sub-mesh geometries baked into rig-local
-// space, vertex-colored per zone from that plot's pumpConfig (textured/unknown
-// parts fall back to a mid gray instead of white). ~1 draw call per rig.
+// ── Idle-rig merge: collapse each idle plot's rig into ONE draw call ─────────
+// Build the merged base rig geometry ONCE (per-vertex zone id + sampled base
+// color tracked), then per plot clone it and compute just the color attribute
+// from that plot's pumpConfig zone colors. ~1 draw call per idle rig.
 const _MERGE_GRAY = new THREE.Color(0x8a8a8a);
-const _MERGE_TMP = new THREE.Color();
 
-// SPIKE proof: a distinct vivid color per customizable zone, so each rig renders
-// as an obviously multi-colored scheme in its single merged mesh. Real per-zone
-// config colors override these. (Production reads only config / sampled colors.)
-const _ZONE_TEST_PALETTE = {
-  pad: "#e74c3c", foundation: "#e67e22", motorBox: "#f1c40f", crankWheel: "#2ecc71",
-  beam: "#1abc9c", counterweight: "#3498db", horseHead: "#9b59b6", drillPipe: "#e84393",
-  machinePanel: "#00cec9", tankScaffold: "#fdcb6e", signFrame: "#6c5ce7",
-  pipes: "#fab1a0", valve: "#55efc4",
-};
-
-// Pick the bake color for a source mesh: the player's chosen zone color if set,
-// else (spike) the zone's vivid test color, else gray.
-function rigBakeColor(child, config) {
-  let zoneId = MESH_TO_ZONE[child.name];
-  if (!zoneId && child.name?.startsWith("SignFrame")) zoneId = "signFrame";
-  const custom = zoneId && config?.[zoneId]?.color;
-  if (custom) return _MERGE_TMP.set(custom);
-  if (zoneId && _ZONE_TEST_PALETTE[zoneId]) return _MERGE_TMP.set(_ZONE_TEST_PALETTE[zoneId]);
-  return _MERGE_TMP.copy(_MERGE_GRAY);
+// Average color of a texture, via a 1×1 downscale draw (browser box-filters it).
+// Same-origin GLB textures aren't CORS-tainted, so getImageData is safe.
+function avgTextureColor(tex) {
+  const img = tex?.image;
+  if (!img || !img.width) return null;
+  try {
+    const c = document.createElement("canvas");
+    c.width = 1; c.height = 1;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return new THREE.Color(d[0] / 255, d[1] / 255, d[2] / 255);
+  } catch { return null; }
 }
 
-function buildColoredRig(scene, config) {
+// Representative flat color for a non-customizable mesh: sampled texture tone,
+// else its non-white base color, else gray.
+function meshBaseColor(mat) {
+  const t = avgTextureColor(mat?.map);
+  if (t) return t;
+  const c = mat?.color;
+  if (c && !(c.r > 0.96 && c.g > 0.96 && c.b > 0.96)) return c.clone();
+  return _MERGE_GRAY.clone();
+}
+
+function buildBaseRig(scene) {
   scene.updateMatrixWorld(true);
   const geoms = [];
+  const meta = []; // { count, zoneId, base } per source mesh, in merge order
   scene.traverse((child) => {
     if (!child.isMesh || !child.geometry) return;
     let g = child.geometry.clone();
@@ -2716,25 +2720,63 @@ function buildColoredRig(scene, config) {
     });
     if (g.index) g = g.toNonIndexed();
     if (!g.attributes.normal) g.computeVertexNormals();
-    const col = rigBakeColor(child, config);
-    const n = g.attributes.position.count;
-    const colors = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b; }
-    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    let zoneId = MESH_TO_ZONE[child.name];
+    if (!zoneId && child.name?.startsWith("SignFrame")) zoneId = "signFrame";
+    meta.push({ count: g.attributes.position.count, zoneId: zoneId || null, base: meshBaseColor(child.material) });
     geoms.push(g);
   });
-  return mergeGeometries(geoms, false);
+  const geometry = mergeGeometries(geoms, false);
+  geometry.computeBoundingSphere();
+  geoms.forEach((g) => g.dispose());
+
+  // Per-vertex zone id + base color, so a plot can be recolored without merging
+  const total = geometry.attributes.position.count;
+  const vZone = new Array(total);
+  const vBase = new Float32Array(total * 3);
+  let o = 0;
+  for (const m of meta) {
+    for (let i = 0; i < m.count; i++) {
+      vZone[o + i] = m.zoneId;
+      vBase[(o + i) * 3] = m.base.r;
+      vBase[(o + i) * 3 + 1] = m.base.g;
+      vBase[(o + i) * 3 + 2] = m.base.b;
+    }
+    o += m.count;
+  }
+  return { geometry, vZone, vBase, total };
+}
+
+function rigColorAttribute(base, config) {
+  const { vZone, vBase, total } = base;
+  const colors = new Float32Array(total * 3);
+  const tmp = new THREE.Color();
+  for (let i = 0; i < total; i++) {
+    const zid = vZone[i];
+    const custom = zid && config?.[zid]?.color;
+    if (custom) {
+      tmp.set(custom);
+      colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
+    } else {
+      colors[i * 3] = vBase[i * 3]; colors[i * 3 + 1] = vBase[i * 3 + 1]; colors[i * 3 + 2] = vBase[i * 3 + 2];
+    }
+  }
+  return new THREE.BufferAttribute(colors, 3);
 }
 
 function MergedRigField({ scene, items, allPumpConfigs }) {
+  const base = useMemo(() => buildBaseRig(scene), [scene]);
   const mat = useMemo(() => new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.55, metalness: 0.35,
   }), []);
   const rigs = useMemo(() => items.map((it) => {
     const config = allPumpConfigs[`${it.col}_${it.row}`]?.config || null;
-    return { key: it.key, position: it.position, geo: buildColoredRig(scene, config) };
-  }), [scene, items, allPumpConfigs]);
-  useEffect(() => () => { rigs.forEach((r) => r.geo.dispose()); }, [rigs]);
+    const geo = base.geometry.clone(); // own position/normal + boundingSphere
+    geo.setAttribute("color", rigColorAttribute(base, config));
+    return { key: it.key, position: it.position, geo };
+  }), [base, items, allPumpConfigs]);
+
+  useEffect(() => () => rigs.forEach((r) => r.geo.dispose()), [rigs]);
+  useEffect(() => () => base.geometry.dispose(), [base]);
   useEffect(() => () => mat.dispose(), [mat]);
 
   return rigs.map((r) => (
