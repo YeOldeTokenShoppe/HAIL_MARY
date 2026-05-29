@@ -14,10 +14,13 @@ service firebase.storage {
       allow write: if false;
     }
 
-    // Sign images — scoped by userId folder
+    // Sign images — scoped by userId folder. Capped + image-only so a bad/modified
+    // client can't drop an oversized texture into the shared scene. Client resizes
+    // to <=512px WebP (~20-40KB) before upload; 1MB is generous headroom.
     match /signImages/{userId}/{allPaths=**} {
       allow read: if true;
-      allow write: if true;
+      allow write: if request.resource.size < 1 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
     }
 
     // CCTV recordings — public read, write limited to webm under 10MB

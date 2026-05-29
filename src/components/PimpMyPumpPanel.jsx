@@ -3,6 +3,42 @@
 import { useState, useCallback, useMemo } from "react";
 import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId, PREMIUM_PRICES } from "@/lib/oilPremium";
 
+// Normalize an uploaded sign image to <=maxDim px (preserving aspect) and re-encode
+// as WebP before it's stored. /oil is a shared scene — every player loads each
+// other's sign as a GPU texture, so bounding it here keeps the field cheap for all.
+// (A Storage rule also caps file size server-side as a guardrail.)
+async function resizeSignImage(file, maxDim = 512, quality = 0.85) {
+  let img;
+  let bmp = null;
+  try {
+    bmp = await createImageBitmap(file);
+    img = bmp;
+  } catch {
+    img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      const u = URL.createObjectURL(file);
+      el.onload = () => { URL.revokeObjectURL(u); resolve(el); };
+      el.onerror = (e) => { URL.revokeObjectURL(u); reject(e); };
+      el.src = u;
+    });
+  }
+  const w = img.width || 1;
+  const h = img.height || 1;
+  const scale = Math.min(1, maxDim / Math.max(w, h));
+  const cw = Math.max(1, Math.round(w * scale));
+  const ch = Math.max(1, Math.round(h * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = cw;
+  canvas.height = ch;
+  canvas.getContext("2d").drawImage(img, 0, 0, cw, ch);
+  if (bmp?.close) bmp.close();
+  // WebP first (smallest); fall back to PNG where WebP encode isn't supported
+  // (older Safari). Both stay well under the 1MB Storage cap at <=512px.
+  let blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+  if (!blob) blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  return blob;
+}
+
 // Small price tag rendered on locked items in place of the old lock icon.
 const priceChipStyle = {
   marginLeft: 5,
@@ -929,12 +965,18 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                     type="file"
                     accept="image/*"
                     style={{ display: "none" }}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
-                      if (!file) return;
-                      const url = URL.createObjectURL(file);
-                      onChange({ ...config, signImageUrl: url });
                       e.target.value = "";
+                      if (!file) return;
+                      let blob = null;
+                      try {
+                        blob = await resizeSignImage(file, 512, 0.85);
+                      } catch {
+                        blob = null; // fall back to original on any decode/encode error
+                      }
+                      const url = URL.createObjectURL(blob || file);
+                      onChange({ ...config, signImageUrl: url });
                     }}
                   />
                 </label>

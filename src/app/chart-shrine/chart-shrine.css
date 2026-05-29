@@ -1803,7 +1803,10 @@ body:has(.shrine-page.neon) {
   margin-top: 2%;
   z-index: 2;
   width: 30vw;
-  aspect-ratio: 500 / 900;
+  /* Matches the stage's true design box: W=500, H=771 (IW 480 + PAD*2 by
+     IH 751 + PAD*2 in ChartWidget.jsx). A taller ratio left dead space
+     below the chart. */
+  aspect-ratio: 500 / 771;
   pointer-events: auto;
   overflow: visible;
   filter:
@@ -1921,7 +1924,8 @@ body:has(.shrine-page.neon) {
     top: auto;
     right: auto;
     width: 275px;
-    height: 378px;
+    height: auto;
+    aspect-ratio: 500 / 771;
     margin: 380vh auto 24px;
     z-index: 2;
   }
@@ -2049,11 +2053,16 @@ body:has(.shrine-page.neon) {
   }
 
   /* Override the .chart-widget mobile rule (380vh margin) so the chart
-     sits in document flow inside the stacked layout. */
+     sits in document flow inside the stacked layout. position: relative is
+     required so the absolutely-positioned .chart-widget__stage anchors to
+     this wrapper — otherwise (in the 701–900px range where neither the
+     wrapper nor __visual is positioned) the stage escapes to
+     .intro-chart-section and overlaps the text column. */
   .intro-chart-section__visual .chart-widget {
+    position: relative;
     width: 264px;
     height: auto;
-    aspect-ratio: 500 / 900;
+    aspect-ratio: 500 / 771;
     margin: 0 auto;
   }
 }

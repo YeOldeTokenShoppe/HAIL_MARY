@@ -25,44 +25,39 @@ const BODY_COLORS = ["#c0392b", "#2980b9", "#27ae60", "#8e44ad", "#f39c12", "#16
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// Build a realistic-mix pump config for fake user index `i`.
-// `tubeManSet` is a Set of indices that get the (expensive) TubeMan addon.
-function buildFakeConfig(i, tubeManSet) {
+// Build a maxed-out pump config for fake user index `i`. Every plot gets a sign
+// and add-ons. `tubeManSet` = indices that get the (expensive) TubeMan; the
+// `animatedMap` = index → "dinosaur" | "zombie" (animated mixer add-ons).
+function buildFakeConfig(i, tubeManSet, animatedMap) {
   const config = {
     signImageUrl: pick(SIGN_IMAGES), // every plot gets a sign image
     showSign: true,
   };
 
-  // ~25% get a security camera (only renders with sign visible — it is)
-  if (Math.random() < 0.25) config.showCamera = true;
+  if (Math.random() < 0.3) config.showCamera = true;       // ~30% camera
+  if (Math.random() < 0.4) config.fenceType = pick(FENCE_TYPES); // ~40% fence
 
-  // ~30% get a fence
-  if (Math.random() < 0.3) config.fenceType = pick(FENCE_TYPES);
-
-  // ~50% get a body/horse-head color (cheap flat-color override)
-  if (Math.random() < 0.5) {
+  // ~60% get a body/horse-head color (cheap flat-color override)
+  if (Math.random() < 0.6) {
     const c = pick(BODY_COLORS);
     config.beam = { preset: "stock", color: c };
     config.horseHead = { preset: "stock", color: c };
   }
 
-  // Addons. A couple of designated indices always get the heavy TubeMan.
+  // Add-ons — designated animated ones in fixed slots, plus 1–2 static ones so
+  // every plot is decorated. (dinosaur is restricted to slots 3/4 in the catalog.)
   const addons = {};
-  if (tubeManSet.has(i)) {
-    addons["0"] = { id: "tubeMan", rot: 0 };
+  if (tubeManSet.has(i)) addons["0"] = { id: "tubeMan", rot: 0 };
+  const animal = animatedMap.get(i);
+  if (animal === "dinosaur") addons["3"] = { id: "dinosaur", rot: 0 };
+  else if (animal === "zombie") addons["1"] = { id: "zombie", rot: 0 };
+
+  const freeSlots = ["2", "5", "6", "7"].filter((s) => !addons[s]);
+  const nStatic = 1 + (Math.random() < 0.5 ? 1 : 0);
+  for (let n = 0; n < nStatic && freeSlots.length; n++) {
+    addons[freeSlots.shift()] = { id: pick(STATIC_ADDONS), rot: Math.floor(Math.random() * 4) };
   }
-  // ~60% get 1–2 (other) addons in the remaining front slots
-  if (Math.random() < 0.6) {
-    const slots = ["1", "2"].filter((s) => !addons[s]);
-    const count = Math.random() < 0.5 ? 1 : 2;
-    for (let n = 0; n < count && slots.length; n++) {
-      const slot = slots.shift();
-      // Occasionally an animated addon (extra mixer) for realism
-      const id = Math.random() < 0.2 ? pick(ANIMATED_ADDONS) : pick(STATIC_ADDONS);
-      addons[slot] = { id, rot: Math.floor(Math.random() * 4) };
-    }
-  }
-  if (Object.keys(addons).length) config.addons = addons;
+  config.addons = addons;
 
   return config;
 }
@@ -121,27 +116,30 @@ export async function POST(req) {
     const maxDepth = 20;
     const seeded = [];
 
-    const total = Math.min(count, FAKE_NAMES.length);
-    // Designate ~2 players to get the (expensive) TubeMan addon
+    // All unclaimed cells, in order — assigned deterministically so a large
+    // count fills the whole grid (vs. random picking which leaves gaps).
+    const freeCells = [];
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        const key = `${col}_${row}`;
+        if (!claimed.has(key)) freeCells.push({ col, row, key });
+      }
+    }
+    const total = Math.min(count, freeCells.length);
+
+    // Spread ~10 TubeMen and ~10 animated (dinosaur/zombie) across the field.
     const tubeManSet = new Set();
-    if (total > 0) tubeManSet.add(Math.floor(total * 0.3));
-    if (total > 4) tubeManSet.add(Math.floor(total * 0.7));
+    const animatedMap = new Map();
+    for (let i = 0; i < total; i++) {
+      if (i % 10 === 3) tubeManSet.add(i);
+      if (i % 10 === 7) animatedMap.set(i, (Math.floor(i / 10) % 2 === 0) ? "dinosaur" : "zombie");
+    }
 
     for (let i = 0; i < total; i++) {
       const userId = `fake_${i}`;
-      const username = FAKE_NAMES[i];
+      const username = FAKE_NAMES[i] || `Wildcat${i}`;
 
-      // Pick a random unclaimed plot
-      let col, row, key;
-      let attempts = 0;
-      do {
-        col = Math.floor(Math.random() * gridSize);
-        row = Math.floor(Math.random() * gridSize);
-        key = `${col}_${row}`;
-        attempts++;
-      } while (claimed.has(key) && attempts < 200);
-
-      if (claimed.has(key)) continue;
+      const { col, row, key } = freeCells[i];
       claimed.add(key);
 
       // Random drill depth — weighted toward moderate depths
@@ -174,7 +172,7 @@ export async function POST(req) {
       // Write pumpConfigs — the customization layer the perf test targets
       // (sign image texture + addons + fence + optional camera). Doc id matches
       // the client format: `${userId}_${col}_${row}`.
-      const config = buildFakeConfig(i, tubeManSet);
+      const config = buildFakeConfig(i, tubeManSet, animatedMap);
       await db.collection("pumpConfigs").doc(`${userId}_${key}`).set({
         userId,
         col,

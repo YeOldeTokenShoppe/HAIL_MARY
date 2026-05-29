@@ -2591,7 +2591,7 @@ export default function HomePage() {
                 ) : null}
               </blockquote>
               <p className="hero-intro">
-Stake RL80 for rewards, or stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment against scams in the Liminal Terminal, or scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order.
+Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment against scams in the Liminal Terminal, or scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order.
 </p>
             </div>
           </div>

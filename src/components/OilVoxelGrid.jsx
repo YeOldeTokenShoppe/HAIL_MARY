@@ -34,11 +34,12 @@ const NO_ANIM = typeof window !== "undefined"
   && new URLSearchParams(window.location.search).get("noanim") === "1";
 
 // Perf SPIKE: ?merge=1 replaces the 100 individual Pumpjack components with ONE
-// instanced, vertex-colored merged rig (1 draw call for the whole field, no
-// customization/animation/interactivity). Pure measurement to confirm whether
-// draw calls are the FPS ceiling. Reload to toggle.
-const MERGE_RIGS = typeof window !== "undefined"
-  && new URLSearchParams(window.location.search).get("merge") === "1";
+// Merged idle rigs (1 draw call each) + instanced static decorations are the
+// DEFAULT. `?legacy=1` falls back to the old all-full-Pumpjacks path for
+// comparison/debugging. Reload to toggle.
+const LEGACY_RIGS = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("legacy") === "1";
+const MERGE_RIGS = !LEGACY_RIGS;
 
 // ── Shared CCTV state (module-level, Pumpjack writes → CctvRenderer reads) ──
 const _cctvState = {
@@ -1564,14 +1565,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           child.userData._panelLightCloned = true;
         }
       }
-      // Envelope mesh — message indicator
+      // Envelope mesh — removed from the scene (messages handled in the panel)
       if (child.name === "Envelope") {
-        envelopeRef.current = child;
         child.visible = false;
-        if (!child.userData._envelopeCloned) {
-          child.material = child.material.clone();
-          child.userData._envelopeCloned = true;
-        }
       }
     });
   }, [clonedScene]);
@@ -1781,18 +1777,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   hasMessagesRef.current = hasMessages;
   const frameSkip = useRef(Math.floor(Math.random() * 3)); // stagger so not all idle rigs spike on same frame
   useFrame(({ clock }, delta) => {
-    // Envelope message indicator — gentle green pulse (runs for all pumpjacks)
-    const env = envelopeRef.current;
-    if (env) {
-      env.visible = hasMessagesRef.current;
-      if (hasMessagesRef.current) {
-        const pulse = (Math.sin(clock.elapsedTime * 3) + 1) / 2;
-        env.material.emissive.setHex(0x00ff44);
-        env.material.emissiveIntensity = 0.5 + pulse * 2.5;
-        env.material.color.setHex(0x22cc44);
-      }
-    }
-
     // Non-highlighted pumpjacks: throttle animation to every 3rd frame, skip all interactive logic
     if (!highlightedRef.current) {
       frameSkip.current = (frameSkip.current + 1) % 3;
@@ -2682,68 +2666,172 @@ function PlotBorderHighlight({ position, cellSize }) {
 // from that plot's pumpConfig zone colors. ~1 draw call per idle rig.
 const _MERGE_GRAY = new THREE.Color(0x8a8a8a);
 
-// Average color of a texture, via a 1×1 downscale draw (browser box-filters it).
-// Same-origin GLB textures aren't CORS-tainted, so getImageData is safe.
-function avgTextureColor(tex) {
+// Cache a texture's full pixel data once (the model uses Synty-style color-swatch
+// ATLASES, so we must sample at each part's UV, not average the whole atlas).
+const _texDataCache = new WeakMap();
+function getTexData(tex) {
   const img = tex?.image;
   if (!img || !img.width) return null;
+  if (_texDataCache.has(tex)) return _texDataCache.get(tex);
+  let entry = null;
   try {
     const c = document.createElement("canvas");
-    c.width = 1; c.height = 1;
+    c.width = img.width; c.height = img.height;
     const ctx = c.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, 1, 1);
-    const d = ctx.getImageData(0, 0, 1, 1).data;
-    return new THREE.Color(d[0] / 255, d[1] / 255, d[2] / 255);
-  } catch { return null; }
+    ctx.drawImage(img, 0, 0);
+    entry = { data: ctx.getImageData(0, 0, img.width, img.height).data, w: img.width, h: img.height };
+  } catch { entry = null; }
+  _texDataCache.set(tex, entry);
+  return entry;
 }
-
-// Representative flat color for a non-customizable mesh: sampled texture tone,
-// else its non-white base color, else gray.
-function meshBaseColor(mat) {
-  const t = avgTextureColor(mat?.map);
-  if (t) return t;
-  const c = mat?.color;
-  if (c && !(c.r > 0.96 && c.g > 0.96 && c.b > 0.96)) return c.clone();
-  return _MERGE_GRAY.clone();
+// Sample the atlas at a UV (glTF: flipY=false, UV origin top-left → canvas origin).
+function sampleTexData(td, u, v, out) {
+  u -= Math.floor(u); v -= Math.floor(v); // wrap into [0,1)
+  const x = Math.min(td.w - 1, Math.max(0, (u * td.w) | 0));
+  const y = Math.min(td.h - 1, Math.max(0, (v * td.h) | 0));
+  const i = (y * td.w + x) * 4;
+  return out.setRGB(td.data[i] / 255, td.data[i + 1] / 255, td.data[i + 2] / 255);
 }
 
 function buildBaseRig(scene) {
   scene.updateMatrixWorld(true);
   const geoms = [];
-  const meta = []; // { count, zoneId, base } per source mesh, in merge order
+  const colorChunks = []; // Float32Array(count*3) per mesh, in merge order
+  const metalChunks = []; // Float32Array(count) per mesh
+  const roughChunks = []; // Float32Array(count) per mesh
+  const zoneChunks = [];   // { zoneId, count } per mesh
+  const tmp = new THREE.Color();
+  // Sign + frame are pulled OUT of the merge so they only appear on plots with
+  // showSign (rendered per-plot by IdleSign). signGeo keeps UV for the image.
+  let signGeo = null;
+  const frameGeoms = [];
+  const camGeoms = [];
   scene.traverse((child) => {
     if (!child.isMesh || !child.geometry) return;
+    if (child.name === "Envelope") return; // removed from scene
+    // Security camera — only on plots with showCamera (rendered by IdleSign)
+    if (child.name.startsWith("Security_Camera")) {
+      let cg = child.geometry.clone();
+      cg.applyMatrix4(child.matrixWorld);
+      if (cg.index) cg = cg.toNonIndexed();
+      if (!cg.attributes.normal) cg.computeVertexNormals();
+      const cn = cg.attributes.position.count;
+      const ccol = new Float32Array(cn * 3);
+      const cc = child.material?.color || _MERGE_GRAY;
+      for (let i = 0; i < cn; i++) { ccol[i * 3] = cc.r; ccol[i * 3 + 1] = cc.g; ccol[i * 3 + 2] = cc.b; }
+      cg.setAttribute("color", new THREE.BufferAttribute(ccol, 3));
+      Object.keys(cg.attributes).forEach((a) => {
+        if (a !== "position" && a !== "normal" && a !== "color") cg.deleteAttribute(a);
+      });
+      camGeoms.push(cg);
+      return;
+    }
+    if (child.name === "Sign") {
+      const sg = child.geometry.clone();
+      sg.applyMatrix4(child.matrixWorld);
+      Object.keys(sg.attributes).forEach((a) => {
+        if (a !== "position" && a !== "normal" && a !== "uv") sg.deleteAttribute(a);
+      });
+      signGeo = sg;
+      return;
+    }
+    if (child.name === "Sign_Back") return; // sign quad is double-sided
+    if (child.name.startsWith("SignFrame")) {
+      let fg = child.geometry.clone();
+      fg.applyMatrix4(child.matrixWorld);
+      if (fg.index) fg = fg.toNonIndexed();
+      if (!fg.attributes.normal) fg.computeVertexNormals();
+      const fn = fg.attributes.position.count;
+      const fcol = new Float32Array(fn * 3);
+      const fc = child.material?.color || _MERGE_GRAY;
+      for (let i = 0; i < fn; i++) { fcol[i * 3] = fc.r; fcol[i * 3 + 1] = fc.g; fcol[i * 3 + 2] = fc.b; }
+      fg.setAttribute("color", new THREE.BufferAttribute(fcol, 3));
+      Object.keys(fg.attributes).forEach((a) => {
+        if (a !== "position" && a !== "normal" && a !== "color") fg.deleteAttribute(a);
+      });
+      frameGeoms.push(fg);
+      return;
+    }
     let g = child.geometry.clone();
     g.applyMatrix4(child.matrixWorld);
+    if (g.index) g = g.toNonIndexed();
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const n = g.attributes.position.count;
+    const uv = g.attributes.uv;
+
+    let zoneId = MESH_TO_ZONE[child.name];
+    if (!zoneId && child.name?.startsWith("SignFrame")) zoneId = "signFrame";
+
+    // Per-vertex base color: sample the atlas swatch at each vertex's UV; for
+    // untextured (flat-material) parts use the material color. This reproduces
+    // the textured look (copper pipes etc.) on the merged rig in one draw call.
+    const hasMap = !!child.material?.map;
+    const td = hasMap ? getTexData(child.material.map) : null;
+    const cols = new Float32Array(n * 3);
+    if (td && uv) {
+      for (let i = 0; i < n; i++) {
+        sampleTexData(td, uv.getX(i), uv.getY(i), tmp);
+        cols[i * 3] = tmp.r; cols[i * 3 + 1] = tmp.g; cols[i * 3 + 2] = tmp.b;
+      }
+    } else {
+      const c = child.material?.color || _MERGE_GRAY;
+      for (let i = 0; i < n; i++) { cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b; }
+    }
+
+    // Per-vertex finish: textured "detail/metal" parts read reflective; flat
+    // painted parts stay more matte. Drives the material via onBeforeCompile.
+    const metalVal = hasMap ? 0.8 : 0.3;
+    const roughVal = hasMap ? 0.4 : 0.5;
+    const mArr = new Float32Array(n); mArr.fill(metalVal);
+    const rArr = new Float32Array(n); rArr.fill(roughVal);
+
     Object.keys(g.attributes).forEach((a) => {
       if (a !== "position" && a !== "normal") g.deleteAttribute(a);
     });
-    if (g.index) g = g.toNonIndexed();
-    if (!g.attributes.normal) g.computeVertexNormals();
-    let zoneId = MESH_TO_ZONE[child.name];
-    if (!zoneId && child.name?.startsWith("SignFrame")) zoneId = "signFrame";
-    meta.push({ count: g.attributes.position.count, zoneId: zoneId || null, base: meshBaseColor(child.material) });
     geoms.push(g);
+    colorChunks.push(cols);
+    metalChunks.push(mArr);
+    roughChunks.push(rArr);
+    zoneChunks.push({ zoneId: zoneId || null, count: n });
   });
   const geometry = mergeGeometries(geoms, false);
   geometry.computeBoundingSphere();
   geoms.forEach((g) => g.dispose());
 
-  // Per-vertex zone id + base color, so a plot can be recolored without merging
+  // Per-vertex zone id + base color, aligned to the merged vertex order.
+  // Metalness/roughness are config-independent → bake straight onto the base
+  // geometry as attributes (clone() copies them to every plot).
   const total = geometry.attributes.position.count;
   const vZone = new Array(total);
   const vBase = new Float32Array(total * 3);
-  let o = 0;
-  for (const m of meta) {
-    for (let i = 0; i < m.count; i++) {
-      vZone[o + i] = m.zoneId;
-      vBase[(o + i) * 3] = m.base.r;
-      vBase[(o + i) * 3 + 1] = m.base.g;
-      vBase[(o + i) * 3 + 2] = m.base.b;
-    }
-    o += m.count;
+  const aMetal = new Float32Array(total);
+  const aRough = new Float32Array(total);
+  let o = 0, co = 0;
+  for (let k = 0; k < colorChunks.length; k++) {
+    const cols = colorChunks[k];
+    const z = zoneChunks[k];
+    vBase.set(cols, co); co += cols.length;
+    aMetal.set(metalChunks[k], o);
+    aRough.set(roughChunks[k], o);
+    for (let i = 0; i < z.count; i++) vZone[o + i] = z.zoneId;
+    o += z.count;
   }
-  return { geometry, vZone, vBase, total };
+  geometry.setAttribute("aMetalness", new THREE.BufferAttribute(aMetal, 1));
+  geometry.setAttribute("aRoughness", new THREE.BufferAttribute(aRough, 1));
+
+  let signFrameGeo = null;
+  if (frameGeoms.length) {
+    signFrameGeo = mergeGeometries(frameGeoms, false);
+    signFrameGeo.computeBoundingSphere();
+    frameGeoms.forEach((g) => g.dispose());
+  }
+  let signCamGeo = null;
+  if (camGeoms.length) {
+    signCamGeo = mergeGeometries(camGeoms, false);
+    signCamGeo.computeBoundingSphere();
+    camGeoms.forEach((g) => g.dispose());
+  }
+  return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo };
 }
 
 function rigColorAttribute(base, config) {
@@ -2763,25 +2851,295 @@ function rigColorAttribute(base, config) {
   return new THREE.BufferAttribute(colors, 3);
 }
 
-function MergedRigField({ scene, items, allPumpConfigs }) {
-  const base = useMemo(() => buildBaseRig(scene), [scene]);
+// Distance-gated wrapper for the EXPENSIVE animated add-ons (per-frame mixers).
+// Mounts within `threshold` and scales in over ~0.25s so they ease in instead
+// of popping; stays mounted through a brief scale-out before unmounting.
+function FadeInGroup({ position, threshold, children }) {
+  const [mounted, setMounted] = useState(false);
+  const grpRef = useRef();
+  const appear = useRef(0);
+  const target = useRef(0);
+  const skip = useRef(0);
+  const _v = useMemo(() => new THREE.Vector3(position[0], position[1], position[2]), [position]);
+  useFrame(({ camera }, delta) => {
+    skip.current = (skip.current + 1) % 5;
+    if (skip.current === 0) {
+      const d = camera.position.distanceTo(_v);
+      const want = target.current > 0.5 ? d < threshold * 1.3 : d < threshold;
+      target.current = want ? 1 : 0;
+      if (want && !mounted) setMounted(true);
+    }
+    if (!mounted || !grpRef.current) return;
+    appear.current += (target.current - appear.current) * Math.min(delta * 4, 1);
+    grpRef.current.scale.setScalar(Math.max(appear.current, 0.0001));
+    if (target.current === 0 && appear.current < 0.02) setMounted(false);
+  });
+  if (!mounted) return null;
+  return <group ref={grpRef} position={position} scale={0.0001}>{children}</group>;
+}
+
+// Animated add-ons only (per-frame mixers — can't be instanced). Distance-gated
+// via FadeInGroup. Static add-ons/fences/signs are instanced in StaticDecoField.
+function IdleDecorations({ position, config, threshold }) {
+  const animAddons = useMemo(() => {
+    const a = {};
+    Object.entries(config.addons || {}).forEach(([slot, val]) => {
+      const id = typeof val === "string" ? val : val?.id;
+      const item = ADDON_CATALOG.find((c) => c.id === id);
+      if (item?.animated) a[slot] = val;
+    });
+    return a;
+  }, [config.addons]);
+  if (Object.keys(animAddons).length === 0) return null;
+  return (
+    <FadeInGroup position={position} threshold={threshold}>
+      <PlotAddons addons={animAddons} />
+    </FadeInGroup>
+  );
+}
+
+// ── Instanced static decorations — one draw call per type across the field ───
+// Instance every sub-mesh of a GLB model across all its placements.
+function InstancedGLB({ model, placements, scale }) {
+  const { scene } = useGLTF(model);
+  const parts = useMemo(() => {
+    scene.updateMatrixWorld(true);
+    const out = [];
+    scene.traverse((c) => {
+      if (c.isMesh && c.geometry) {
+        const g = c.geometry.clone();
+        g.applyMatrix4(c.matrixWorld);
+        out.push({ geometry: g, material: c.material });
+      }
+    });
+    return out;
+  }, [scene]);
+  useEffect(() => () => parts.forEach((p) => p.geometry.dispose()), [parts]);
+  const refs = useRef([]);
+  useEffect(() => {
+    const dummy = new THREE.Object3D();
+    parts.forEach((_, mi) => {
+      const inst = refs.current[mi];
+      if (!inst) return;
+      placements.forEach((p, i) => {
+        const sx = p.slot ? p.slot.x : 0, sy = p.slot ? p.slot.y : 0, sz = p.slot ? p.slot.z : 0;
+        dummy.position.set(p.pos[0] + sx, p.pos[1] + sy, p.pos[2] + sz);
+        dummy.rotation.set(0, p.rotY || 0, 0);
+        dummy.scale.setScalar(scale);
+        dummy.updateMatrix();
+        inst.setMatrixAt(i, dummy.matrix);
+      });
+      inst.instanceMatrix.needsUpdate = true;
+      inst.computeBoundingSphere();
+    });
+  }, [parts, placements, scale]);
+  if (!placements.length) return null;
+  return parts.map((p, mi) => (
+    <instancedMesh key={mi} ref={(el) => { refs.current[mi] = el; }} args={[p.geometry, p.material, placements.length]} />
+  ));
+}
+
+// Instance a single (already rig-local) geometry across plot positions.
+function InstancedGeo({ geometry, material, positions, scale }) {
+  const ref = useRef();
+  useEffect(() => {
+    const inst = ref.current;
+    if (!inst) return;
+    const dummy = new THREE.Object3D();
+    positions.forEach((pos, i) => {
+      dummy.position.set(pos[0], pos[1], pos[2]);
+      dummy.scale.setScalar(scale);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    inst.computeBoundingSphere();
+  }, [geometry, positions, scale]);
+  if (!geometry || !positions.length) return null;
+  return <instancedMesh ref={ref} args={[geometry, material, positions.length]} />;
+}
+
+// Sign image quads sharing one texture → one instanced draw call per image URL.
+function InstancedSign({ geometry, url, positions }) {
+  const ref = useRef();
+  const [tex, setTex] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = "anonymous";
+    loader.load(url, (t) => {
+      if (!alive) { t.dispose(); return; }
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = THREE.RepeatWrapping;
+      t.repeat.x = -1; t.offset.x = 1;
+      setTex(t);
+    });
+    return () => { alive = false; };
+  }, [url]);
+  useEffect(() => () => tex?.dispose(), [tex]);
   const mat = useMemo(() => new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.55, metalness: 0.35,
+    color: 0xffffff, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.0,
   }), []);
+  useEffect(() => {
+    if (!tex) return;
+    mat.map = tex; mat.emissive = new THREE.Color(0xffffff);
+    mat.emissiveMap = tex; mat.emissiveIntensity = 0.8; mat.needsUpdate = true;
+  }, [tex, mat]);
+  useEffect(() => () => mat.dispose(), [mat]);
+  useEffect(() => {
+    const inst = ref.current;
+    if (!inst) return;
+    const dummy = new THREE.Object3D();
+    positions.forEach((pos, i) => {
+      dummy.position.set(pos[0], pos[1], pos[2]);
+      dummy.scale.setScalar(PUMPJACK_SCALE);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    inst.computeBoundingSphere();
+  }, [positions, tex]);
+  if (!geometry || !positions.length || !tex) return null;
+  return <instancedMesh ref={ref} args={[geometry, mat, positions.length]} />;
+}
+
+// Gather all idle-plot static decorations and render them as instanced batches.
+function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, base, frameMat }) {
+  const groups = useMemo(() => {
+    const addonGroups = {};   // model -> [{pos, slot, rotY}]
+    const fenceGroups = {};   // model -> { scale, list:[{pos}] }
+    const framePositions = []; // showSign plots
+    const camPositions = [];   // showCamera plots
+    const signGroups = {};     // imageUrl -> [pos]
+    items.forEach((it) => {
+      if (it.col === selectedCol && it.row === selectedRow) return;
+      const cfg = allPumpConfigs[`${it.col}_${it.row}`]?.config;
+      if (!cfg) return;
+      Object.entries(cfg.addons || {}).forEach(([slotKey, val]) => {
+        const id = typeof val === "string" ? val : val?.id;
+        const rot = typeof val === "string" ? 0 : (val?.rot || 0);
+        const item = ADDON_CATALOG.find((c) => c.id === id);
+        if (!item || item.animated || !item.model) return; // animated handled per-plot
+        const slot = ADDON_SLOTS[parseInt(slotKey, 10)];
+        if (!slot) return;
+        (addonGroups[item.model] ||= []).push({ pos: it.position, slot, rotY: rot * Math.PI / 2 });
+      });
+      if (cfg.fenceType) {
+        const f = FENCE_CATALOG.find((c) => c.id === cfg.fenceType);
+        if (f) { (fenceGroups[f.model] ||= { scale: f.scale, list: [] }).list.push({ pos: it.position }); }
+      }
+      if (cfg.showSign) {
+        framePositions.push(it.position);
+        if (cfg.showCamera) camPositions.push(it.position);
+        if (cfg.signImageUrl) (signGroups[cfg.signImageUrl] ||= []).push(it.position);
+      }
+    });
+    return { addonGroups, fenceGroups, framePositions, camPositions, signGroups };
+  }, [items, allPumpConfigs, selectedCol, selectedRow]);
+
+  return (
+    <>
+      {Object.entries(groups.addonGroups).map(([model, placements]) => (
+        <InstancedGLB key={`a-${model}`} model={model} placements={placements} scale={PUMPJACK_SCALE} />
+      ))}
+      {Object.entries(groups.fenceGroups).map(([model, { scale, list }]) => (
+        <InstancedGLB key={`f-${model}`} model={model} placements={list} scale={scale} />
+      ))}
+      {base.signFrameGeo && (
+        <InstancedGeo geometry={base.signFrameGeo} material={frameMat} positions={groups.framePositions} scale={PUMPJACK_SCALE} />
+      )}
+      {base.signCamGeo && (
+        <InstancedGeo geometry={base.signCamGeo} material={frameMat} positions={groups.camPositions} scale={PUMPJACK_SCALE} />
+      )}
+      {Object.entries(groups.signGroups).map(([url, positions]) => (
+        <InstancedSign key={`s-${url}`} geometry={base.signGeo} url={url} positions={positions} />
+      ))}
+    </>
+  );
+}
+
+function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut }) {
+  const base = useMemo(() => buildBaseRig(scene), [scene]);
+  // Per-vertex metalness/roughness (from aMetalness/aRoughness attributes) so
+  // textured metal parts catch studio-env reflections while painted parts stay
+  // matte — recovering the close-up rig's metallic sheen at ~1 draw call.
+  const mat = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 1.0, metalness: 1.0,
+      envMap: envMap || null, envMapIntensity: 1.3,
+    });
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nattribute float aMetalness;\nattribute float aRoughness;\nvarying float vMetalnessV;\nvarying float vRoughnessV;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvMetalnessV = aMetalness;\nvRoughnessV = aRoughness;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying float vMetalnessV;\nvarying float vRoughnessV;")
+        .replace("#include <roughnessmap_fragment>", "float roughnessFactor = vRoughnessV;")
+        .replace("#include <metalnessmap_fragment>", "float metalnessFactor = vMetalnessV;");
+    };
+    return m;
+  }, [envMap]);
+  // Build all rigs once (not keyed on selection) — selection only toggles
+  // visibility, so clicking a plot doesn't rebuild 100 geometries.
   const rigs = useMemo(() => items.map((it) => {
     const config = allPumpConfigs[`${it.col}_${it.row}`]?.config || null;
     const geo = base.geometry.clone(); // own position/normal + boundingSphere
     geo.setAttribute("color", rigColorAttribute(base, config));
-    return { key: it.key, position: it.position, geo };
+    return { key: it.key, position: it.position, col: it.col, row: it.row, geo };
   }), [base, items, allPumpConfigs]);
 
   useEffect(() => () => rigs.forEach((r) => r.geo.dispose()), [rigs]);
-  useEffect(() => () => base.geometry.dispose(), [base]);
+  useEffect(() => () => {
+    base.geometry.dispose();
+    base.signGeo?.dispose();
+    base.signFrameGeo?.dispose();
+    base.signCamGeo?.dispose();
+  }, [base]);
   useEffect(() => () => mat.dispose(), [mat]);
 
-  return rigs.map((r) => (
-    <mesh key={r.key} geometry={r.geo} material={mat} position={r.position} scale={PUMPJACK_SCALE} />
-  ));
+  // Shared material for instanced sign frames + cameras (vertex-colored metal).
+  const frameMat = useMemo(() => new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.5, metalness: 0.5,
+    envMap: envMap || null, envMapIntensity: 1.0, side: THREE.DoubleSide,
+  }), [envMap]);
+  useEffect(() => () => frameMat.dispose(), [frameMat]);
+
+  const decoThreshold = (cellSize || 0.5) * 6;
+
+  return (
+    <>
+      {rigs.map((r) => {
+        const isSelected = r.col === selectedCol && r.row === selectedRow;
+        const cfg = allPumpConfigs[`${r.col}_${r.row}`]?.config || null;
+        return (
+          <group key={r.key}>
+            <mesh
+              geometry={r.geo}
+              material={mat}
+              position={r.position}
+              scale={PUMPJACK_SCALE}
+              visible={!isSelected}
+              onClick={(e) => { e.stopPropagation(); onSelectCell?.(r.col, r.row); onFlyTo?.(r.col, r.row); }}
+              onDoubleClick={(e) => { e.stopPropagation(); if (isSelected) onZoomOut?.(); else onFlyTo?.(r.col, r.row); }}
+            />
+            {!isSelected && cfg?.addons && (
+              <IdleDecorations position={r.position} config={cfg} threshold={decoThreshold} />
+            )}
+          </group>
+        );
+      })}
+      {/* Static decorations (signs, frames, cameras, fences, non-animated add-ons)
+          instanced by type — one draw call each across the whole field. */}
+      <StaticDecoField
+        items={items}
+        allPumpConfigs={allPumpConfigs}
+        selectedCol={selectedCol}
+        selectedRow={selectedRow}
+        base={base}
+        frameMat={frameMat}
+      />
+    </>
+  );
 }
 
 function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
@@ -2826,11 +3184,27 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
       {selectedPos && (
         <PlotBorderHighlight position={selectedPos} cellSize={cellSize} />
       )}
-      {MERGE_RIGS && <MergedRigField scene={scene} items={items} allPumpConfigs={allPumpConfigs} />}
-      {!MERGE_RIGS && items.map(({ key, position, col, row }) => {
+      {MERGE_RIGS && (
+        <MergedRigField
+          scene={scene}
+          items={items}
+          allPumpConfigs={allPumpConfigs}
+          envMap={envMap}
+          cellSize={cellSize}
+          selectedCol={selectedCol}
+          selectedRow={selectedRow}
+          onSelectCell={onSelectCell}
+          onFlyTo={onFlyTo}
+          onZoomOut={onZoomOut}
+        />
+      )}
+      {items.map(({ key, position, col, row }) => {
         // Drill all if no selection, otherwise only the selected cell
         const active = selectedCol === null || (col === selectedCol && row === selectedRow);
         const isSelected = selectedCol !== null && col === selectedCol && row === selectedRow;
+        // In merge mode only the selected plot renders a full rig; the rest come
+        // from MergedRigField (1 draw call each).
+        if (MERGE_RIGS && !isSelected) return null;
         const cellEntry = allPumpConfigs[`${col}_${row}`];
         const cellConfig = isSelected ? pumpConfig : cellEntry?.config || null;
         return (

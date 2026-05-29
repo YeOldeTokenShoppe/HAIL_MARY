@@ -21,7 +21,7 @@ const PILLARS = [
     tagline: "in use",
     color: "#d4af37",
     description:
-      "A share of revenue from x402-powered services flows to stakers through immutable code. Verifiable on Basescan. Plus a growing ecosystem of games, economic zones, and services built on the RL80 cosmology.",
+      "Get access to the growing ecosystem of games and services built on the RL80 cosmology.",
   },
 
   {
