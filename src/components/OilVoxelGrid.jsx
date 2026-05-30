@@ -1254,7 +1254,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   // Apply custom image to Sign mesh when URL changes
   // Uses onBeforeCompile to flip UVs on back face so text is legible from both sides
+  // Gated on signMeshReady so the texture is (re)applied once the clonedScene
+  // traversal has populated signRef — otherwise, when this rig mounts with the
+  // URL already present (e.g. selecting an existing plot), this effect would run
+  // before the traversal sets signRef, bail on the early return, and never re-run.
   const signImageUrl = pumpConfig?.signImageUrl || null;
+  const [signMeshReady, setSignMeshReady] = useState(false);
   useEffect(() => {
     const sign = signRef.current;
     if (!sign) return;
@@ -1305,7 +1310,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         back.material.needsUpdate = true;
       }
     }
-  }, [signImageUrl]);
+  }, [signImageUrl, signMeshReady]);
 
   // ── Fuel Tank liquid fill ──────────────────────────────────────────────────
   // Find the tank mesh and compute its group-local bounding box (after all GLB
@@ -1570,6 +1575,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         child.visible = false;
       }
     });
+    // Signal that signRef/signBackRef are now populated so the sign-image effect
+    // (re)runs and applies the custom texture, even if the URL was already set at mount.
+    setSignMeshReady(true);
   }, [clonedScene]);
 
   // Steam vent particles — triggered by wheel click
