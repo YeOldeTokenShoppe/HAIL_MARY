@@ -607,10 +607,10 @@ export default function OilQualify({
                 {signatureName && (
                   <div style={{
                     position: "absolute",
-                    top: "80%",
+                    top: "82%",
                     right: "15%",
                     fontFamily: "'Homemade Apple', cursive",
-                    fontSize: isMobile ? "3.5vw" : 18,
+                    fontSize: isMobile ? "0.5em" : 15,
                     color: inkColor,
                     pointerEvents: "none",
                     transform: rot,

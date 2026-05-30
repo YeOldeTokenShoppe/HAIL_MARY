@@ -5,6 +5,10 @@ const MAX_BONUS_DRILLS = 10;
 const BOUNTY_BONUS_DRILLS = 3;
 const BOUNTY_USDC = 5; // deducted from community pool
 const STUN_DURATION_MS = 2 * 60 * 1000; // 2 minutes
+// A loose demon is a transient event — after this it's considered stale and any
+// client may auto-expire it (so an unclaimed/orphaned bounty can't keep relighting
+// hell forever on refresh).
+const BOUNTY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // POST — Create a demon bounty event (called when a player drills a hell pocket)
 export async function POST(req) {
@@ -67,6 +71,7 @@ export async function POST(req) {
 
     const now = Timestamp.now();
     const stunEndsAt = Timestamp.fromMillis(now.toMillis() + STUN_DURATION_MS);
+    const expiresAt = Timestamp.fromMillis(now.toMillis() + BOUNTY_TTL_MS);
 
     // Create the bounty event
     const bountyRef = await db.collection("demonBounty").add({
@@ -82,6 +87,7 @@ export async function POST(req) {
       hunterUsername: null,
       createdAt: FieldValue.serverTimestamp(),
       stunEndsAt,
+      expiresAt,
     });
 
     // Set the global blockade
@@ -96,6 +102,7 @@ export async function POST(req) {
       targetCol,
       targetRow,
       stunEndsAt,
+      expiresAt,
       startedAt: FieldValue.serverTimestamp(),
     });
 
@@ -179,7 +186,9 @@ export async function PATCH(req) {
       if (!snap.exists) throw new Error("Bounty not found");
 
       const bounty = snap.data();
-      if (bounty.status !== "waiting") {
+      // The capture challenge now lives client-side (timed banish), so the
+      // bounty stays "active" for its whole life and is claimable throughout.
+      if (!["active", "flying", "waiting"].includes(bounty.status)) {
         throw new Error("Bounty is not claimable (status: " + bounty.status + ")");
       }
 
@@ -268,8 +277,13 @@ export async function DELETE(req) {
 
       // Admin override
       const isAdmin = password && password === process.env.ADMIN_PASSWORD;
-      // Auto-expiry: check if bounty has expired
-      const isExpired = bounty.expiresAt && Date.now() > bounty.expiresAt.toMillis();
+      // Auto-expiry: expired by explicit expiresAt, OR simply older than the TTL
+      // (covers legacy/orphaned docs created before expiresAt existed).
+      const expMs = bounty.expiresAt?.toMillis?.();
+      const createdMs = bounty.createdAt?.toMillis?.();
+      const isExpired =
+        (expMs && Date.now() > expMs) ||
+        (createdMs && Date.now() - createdMs > BOUNTY_TTL_MS);
 
       if (!isAdmin && !isExpired) {
         return NextResponse.json({ error: "Unauthorized — bounty not expired" }, { status: 401 });

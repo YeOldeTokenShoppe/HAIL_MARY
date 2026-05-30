@@ -222,6 +222,7 @@ Purchases are permanent account-level unlocks via x402 on-chain payment. Free it
 | `src/lib/oilDistribution.js` | Deterministic 3D oil distribution from block hash |
 | `src/lib/oilPremium.js` | Premium item registry, pricing, free/premium classification |
 | `src/app/api/oil-rogue/route.js` | Rogue deployment + Telegram text alerts |
+| `src/app/api/oil-demon-bounty/route.js` | Hell demon bounty lifecycle (create / claim / expire) |
 | `src/app/api/oil-telegram-webhook/route.js` | Telegram bot linking |
 | `src/app/api/oil-telegram-cctv/route.js` | CCTV footage delivery to Telegram |
 | `src/app/api/oil-purchase/route.js` | x402 premium purchase handler |
@@ -267,6 +268,76 @@ Rogues should also deploy automatically, not just manually by admin:
 - Could use a Firebase scheduled function or a cron-triggered API route
 - Admin manual deploy remains available for special events or testing
 - Auto-deploy frequency and rogue mix configurable in `oilGame/settings`
+
+## Hell Demon (Bounty Hunt)
+
+A special multiplayer event triggered when a player drills into a **hell pocket** (`stats.hellMap`).
+Unlike rogues (admin/auto-deployed mischief), the demon is a player-driven, grid-wide event with a
+shared bounty and a skill-based capture. Implemented as `HellDemon` in `OilVoxelGrid.jsx`, driven by
+the `demonBounty` Firestore collection + `oilGame/demonBlockade` doc.
+
+### Trigger & Lifecycle
+
+1. A player drills a cell whose column contains a hell pocket → `/oil` POSTs to
+   `/api/oil-demon-bounty` (real players; admin/test mode runs a local-only preview instead).
+2. The API creates a `demonBounty` doc (`status: "active"`) and sets the global `demonBlockade`:
+   - Picks a random **victim plot** (another player's occupied cell) as the demon's target.
+   - Computes a **bounty** = up to 5 USDC from the community pool + the summoner's unbanked tank oil
+     (the summoner's tank is drained as the cost of unleashing hell).
+   - **Stuns the summoner** for 2 minutes (`stunEndsAt`) — they can't drill or catch the demon until it expires.
+   - Sets the env preset to `hell` and halts all drilling globally while the demon is loose.
+3. A Telegram alert fires to the victim plot owner if their plot has a camera.
+4. All clients render the demon via the `demonBounty` listener; it appears in CCTV feeds automatically.
+
+### Demon Behavior (client-side, `HellDemon`)
+
+A phase state machine in `useFrame` (same idioms as `RogueCharacter.jsx`):
+
+`spawn` (rises from below) → `transit_turn` (turns to face the victim) → `transit_walk` (walks across
+the grid on the ground via `Walk Forward In Place`) → **wander loop** (`Turn Left/Right` →
+`Walk Forward In Place` between nearby cells, with `idle`/`Look Around` **pause** windows and
+`Slash`/`Projectile Attack` **mischief** — purely cosmetic, no stat impact).
+
+Movement is deterministic via a seeded PRNG (keyed on the bountyId) so every client animates roughly
+the same wander path without extra Firestore writes. The authoritative sync point is the bounty
+`status` — when it goes to `claimed`/`dismissed`, every client removes the demon.
+
+### Capture — Timing Challenge
+
+The demon is **only banishable during its vulnerable pause windows** (when it stops to idle / look
+around — it glows brighter and a 3D **BANISH** ring appears). Clicking it (the body or the ring) then:
+- **During a pause** → banish: it shrinks and sinks with a burst, then claims the bounty.
+- **While moving/attacking** → it dodges to a new cell with a taunt ("THE DEMON DODGES"). No banish.
+- **During the spawn/fly/land intro** → it can't be caught at all.
+
+There is no always-on banish button — catching the demon in its window is the only way.
+
+### Claiming Outcomes (`PATCH /api/oil-demon-bounty`)
+
+The claim is gated by `status in ["active","flying","waiting"]` (the challenge lives client-side, so
+the bounty stays `active` for its whole life and is claimable throughout) and runs in a transaction:
+
+| Who catches it | Result |
+|----------------|--------|
+| **A hunter** (anyone but the summoner) | Earns the bounty USDC (`totalCollected`) + up to 3 bonus drills; blockade clears |
+| **The summoner** (only after stun expires) | Dismisses it — bounty returns to the community pool, no reward |
+
+A stunned summoner is blocked from catching their own demon client-side (`demonCapturable`) so the
+visual never desyncs from a server rejection. `DELETE` force-expires a stale bounty (admin or
+auto-expiry), returning the bounty to the community pool.
+
+### Data Model
+
+| Collection / Doc | Purpose |
+|------------------|---------|
+| `demonBounty/{id}` | `status` (`active`→`claimed`/`dismissed`/`expired`), `summoner*`/`target*` cells, `bountyAmount`, `hunter*`, `stunEndsAt` |
+| `oilGame/demonBlockade` | Global single-demon lock: `active`, `bountyId`, bounty/target info, `stunEndsAt` |
+
+### Tuning Knobs (`HellDemon`, top of the section in `OilVoxelGrid.jsx`)
+
+Phase durations (`DEMON_*_DUR`), `DEMON_PAUSE_DUR` (size of the catchable window), `DEMON_WALK_SPEED`,
+`DEMON_WANDER_RADIUS`, and two visual offsets: `DEMON_GROUND_Y` (raise if the model sits sunk) and
+`DEMON_YAW_OFFSET` (if it faces the wrong way).
 
 ## Post-Game Payout
 

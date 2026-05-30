@@ -3515,47 +3515,459 @@ function ShaderGusher({ position, envPreset }) {
   );
 }
 
-// ── Hell Demon — spawns from below when a hell pocket is drilled ───────────
+// ── Hell Demon — spawns from below, flies to a victim plot, roams the field
+//    making mischief, and must be caught during a vulnerable pause window ─────
 useGLTF.preload("/models/diablo.glb");
 
-function HellDemon({ position, clickable = false, onClick }) {
+// Deterministic PRNG so every client animates the same wander path from a
+// shared seed (the bountyId). Frame timing still drifts between clients, but
+// the authoritative sync point is the Firestore "claimed"/"dismissed" status.
+function demonHashSeed(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return h >>> 0;
+}
+function demonMulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const demonClamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// Phase timing (seconds) / movement tuning
+const DEMON_SPAWN_DUR = 1.8;
+const DEMON_GROUND_Y = 0;        // raise if the model sits sunk into the plot
+const DEMON_TRANSIT_SPEED = 0.15;  // cross-grid ground-walk speed (units/sec)
+const DEMON_WALK_SPEED = 0.125;    // short wander-hop walk speed
+const DEMON_TURN_DUR = 0.4;
+const DEMON_PAUSE_DUR = 2.6;   // the vulnerable / catchable window
+const DEMON_MISCHIEF_DUR = 1.6;
+const DEMON_FLEE_DUR = 0.7;
+const DEMON_BANISH_DUR = 1.0;
+const DEMON_WANDER_RADIUS = 2; // cells around the victim plot
+const DEMON_YAW_OFFSET = 0;    // tweak if the model faces the wrong way
+const DEMON_SPAWN_OFFSET_Z = 0.2; // nudge the spawn toward the wellhead (world +z)
+
+function HellDemon({
+  summonerCol = 0,
+  summonerRow = 0,
+  targetCol = 0,
+  targetRow = 0,
+  cellSize = 1,
+  worldW = 10,
+  worldD = 10,
+  gridX = 10,
+  gridY = 10,
+  seed = "demon",
+  clickable = false,
+  onBanish,
+  onMiss,
+}) {
   const { scene, animations } = useGLTF("/models/diablo.glb");
   const cloned = useMemo(() => SkeletonUtils.clone(scene), [scene]);
   useEffect(() => () => disposeScene(cloned), [cloned]);
-  const mixerRef = useRef();
-  const groupRef = useRef();
-  const riseRef = useRef(0);
 
+  // Drive a manual AnimationMixer (mixer.update is called in our useFrame).
+  // NOTE: every clip in diablo.glb animates per-bone *translation* (not just
+  // rotation) — the limb motion lives in the .position tracks, so we use the
+  // raw clips unmodified. The locomotion clips ("Walk Forward In Place",
+  // "Turn Left/Right") have no root forward motion, so the group translate
+  // (below) is what carries the demon across the grid with no sliding.
+  const mixerRef = useRef(null);
+  const actionsRef = useRef({});
   useEffect(() => {
-    if (!animations || animations.length === 0) return;
     const mixer = new THREE.AnimationMixer(cloned);
     mixerRef.current = mixer;
-    const idleClip = animations.find(c => /idle/i.test(c.name))
-      || animations.find(c => /look.around/i.test(c.name))
-      || animations[0];
-    if (idleClip) {
-      const action = mixer.clipAction(idleClip);
-      action.play();
-    }
-    return () => mixer.stopAllAction();
+    const map = {};
+    (animations || []).forEach((clip) => {
+      map[clip.name] = mixer.clipAction(clip);
+    });
+    actionsRef.current = map;
+    return () => {
+      mixer.stopAllAction();
+      mixer.uncacheRoot(cloned);
+      mixerRef.current = null;
+      actionsRef.current = {};
+    };
   }, [cloned, animations]);
+
+  const groupRef = useRef();
+  const lightRef = useRef();
+  const sparkRef = useRef();
+  const [vulnerable, setVulnerable] = useState(false);
+  const [done, setDone] = useState(false);
+
+  // Cell-center → world position (cell centers are where the rigs sit)
+  const cellToWorld = useCallback(
+    (c, r) =>
+      new THREE.Vector3(
+        -worldW / 2 + c * cellSize + cellSize / 2,
+        0,
+        worldD / 2 - r * cellSize - cellSize / 2,
+      ),
+    [worldW, worldD, cellSize],
+  );
+
+  // Grid-line intersection (i,j) → world position. Every cell has a pumpjack at
+  // its CENTER, so the demon travels along these "streets" between pads and only
+  // ever moves one axis at a time, never cutting diagonally through a rig.
+  const nodeToWorld = useCallback(
+    (i, j) =>
+      new THREE.Vector3(
+        -worldW / 2 + i * cellSize,
+        0,
+        worldD / 2 - j * cellSize,
+      ),
+    [worldW, worldD, cellSize],
+  );
+
+  // Seeded RNG — stable per demon
+  const rng = useMemo(() => demonMulberry32(demonHashSeed(String(seed))), [seed]);
+
+  // Animation crossfade helper (fuzzy match against the diablo clip names).
+  // Pass a single matcher, or an ARRAY of matchers to blend several clips at
+  // once (e.g. [/walk/, /look.?around/] = walk while glancing around — both at
+  // full weight, the same way the glTF viewer plays them together).
+  const curSetRef = useRef("");
+  const playAnim = (kw, loop = true) => {
+    const actions = actionsRef.current;
+    const kws = Array.isArray(kw) ? kw : [kw];
+    // Always case-insensitive — clip names are capitalized ("Walk Forward In
+    // Place", "Spawn", "Turn Left"), so a bare /walk/ would never match.
+    const keys = kws
+      .map((k) => {
+        const re = k instanceof RegExp
+          ? (k.flags.includes("i") ? k : new RegExp(k.source, k.flags + "i"))
+          : new RegExp(k, "i");
+        return Object.keys(actions).find((name) => re.test(name));
+      })
+      .filter(Boolean);
+    if (!keys.length) return;
+    const setId = keys.join("|") + (loop ? "L" : "O");
+    if (curSetRef.current === setId) return;
+    curSetRef.current = setId;
+    const keep = new Set(keys);
+    Object.entries(actions).forEach(([name, act]) => {
+      if (!keep.has(name)) act.fadeOut(0.25);
+    });
+    keys.forEach((name) => {
+      const a = actions[name];
+      a.reset();
+      a.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
+      a.clampWhenFinished = !loop;
+      a.fadeIn(0.25).play();
+    });
+  };
+
+  // Phase machine state (refs so the useFrame closure never goes stale)
+  const phaseRef = useRef("spawn");
+  const tRef = useRef(0);
+  const phaseInitRef = useRef(false);
+  const fromRef = useRef(new THREE.Vector3());
+  const toRef = useRef(new THREE.Vector3());
+  const segDurRef = useRef(1);
+  const headingRef = useRef(0);
+  const turnFromRef = useRef(0);
+  const turnDeltaRef = useRef(0);
+  // Movement is in intersection-node space {i,j}. Home node = the NW corner of
+  // the victim cell (a street point right beside the rig).
+  const homeNodeRef = useRef({ i: targetCol, j: targetRow });
+  const wanderNodeRef = useRef({ i: targetCol, j: targetRow });
+  const curSegNodeRef = useRef({ i: targetCol, j: targetRow });
+  const pathRef = useRef([]);            // remaining {i,j} waypoints
+  const onPathDoneRef = useRef(null);    // called when the path empties
+  const walkSpeedRef = useRef(DEMON_WALK_SPEED);
+  const vulnerableRef = useRef(false);
+  const roamingRef = useRef(false); // false during the spawn→victim intro trek
+
+  const setPhase = (p) => {
+    phaseRef.current = p;
+    tRef.current = 0;
+    phaseInitRef.current = false;
+  };
+  const setVuln = (v) => {
+    vulnerableRef.current = v;
+    setVulnerable(v);
+  };
+
+  // Pick a street node within DEMON_WANDER_RADIUS of the victim plot that shares
+  // ONE axis with where we are now — so the walk segment runs straight along a
+  // grid line (a street between pads) and never diagonals across a rig.
+  const pickWanderNode = () => {
+    const home = homeNodeRef.current;
+    const cur = wanderNodeRef.current;
+    for (let n = 0; n < 6; n++) {
+      let i = cur.i;
+      let j = cur.j;
+      if (rng() < 0.5) {
+        i = demonClamp(home.i + Math.round((rng() * 2 - 1) * DEMON_WANDER_RADIUS), 0, gridX);
+      } else {
+        j = demonClamp(home.j + Math.round((rng() * 2 - 1) * DEMON_WANDER_RADIUS), 0, gridY);
+      }
+      if (i !== cur.i || j !== cur.j) return { i, j };
+    }
+    return { i: cur.i, j: cur.j };
+  };
+
+  // Walk the demon through a queue of street nodes, one straight segment at a
+  // time (turn to face → walk). Calls onDone when the queue empties.
+  const nextSegment = (g) => {
+    const path = pathRef.current;
+    if (!path.length) { onPathDoneRef.current?.(g); return; }
+    const node = path.shift();
+    curSegNodeRef.current = node;
+    const toW = nodeToWorld(node.i, node.j);
+    fromRef.current.copy(g.position);
+    fromRef.current.y = DEMON_GROUND_Y;
+    toRef.current.set(toW.x, DEMON_GROUND_Y, toW.z);
+    const d = fromRef.current.distanceTo(toRef.current);
+    segDurRef.current = Math.max(0.3, d / walkSpeedRef.current);
+    const dir = toRef.current.clone().sub(fromRef.current);
+    const targetHeading = dir.lengthSq() > 1e-4 ? Math.atan2(dir.x, dir.z) : headingRef.current;
+    turnFromRef.current = headingRef.current;
+    let dh = targetHeading - headingRef.current;
+    while (dh > Math.PI) dh -= Math.PI * 2;
+    while (dh < -Math.PI) dh += Math.PI * 2;
+    turnDeltaRef.current = dh;
+    setVuln(false);
+    setPhase("walk_turn");
+    playAnim(dh >= 0 ? /turn.?left/ : /turn.?right/);
+  };
+  const beginPath = (g, nodes, speed, onDone) => {
+    pathRef.current = nodes.slice();
+    walkSpeedRef.current = speed;
+    onPathDoneRef.current = onDone;
+    nextSegment(g);
+  };
+
+  // After arriving at a wander node: glance/pause or stop to make mischief.
+  const afterWander = (g) => {
+    wanderNodeRef.current = curSegNodeRef.current;
+    if (rng() < 0.6) setPhase("wander_pause");
+    else startMischief(g);
+  };
+  // Single wander hop to a nearby street node.
+  const startWalk = (g) => {
+    beginPath(g, [pickWanderNode()], DEMON_WALK_SPEED, afterWander);
+  };
+
+  // Cross-grid trek from the summoner plot to the victim plot, routed as an
+  // L along the streets (horizontal run, then vertical) so it stays off rigs.
+  const startTransit = (g) => {
+    const s = { i: summonerCol, j: summonerRow };
+    const h = { i: targetCol, j: targetRow };
+    homeNodeRef.current = h;
+    // First step off the well/pad onto the street (the demon spawns at the cell
+    // center), then L-route along the streets to the victim plot.
+    const nodes = [s];
+    const corner = { i: h.i, j: s.j };
+    if (corner.i !== s.i || corner.j !== s.j) nodes.push(corner);
+    if (h.i !== corner.i || h.j !== corner.j) nodes.push(h);
+    beginPath(g, nodes, DEMON_TRANSIT_SPEED, () => {
+      wanderNodeRef.current = homeNodeRef.current;
+      roamingRef.current = true; // now catchable
+      setPhase("wander_pause");
+    });
+  };
+
+  // Face a nearby cell (the rig!) and play an attack — stays in place.
+  const startMischief = (g) => {
+    const home = homeNodeRef.current;
+    const fc = demonClamp(home.i + (rng() < 0.5 ? -1 : 0), 0, gridX - 1);
+    const fr = demonClamp(home.j + (rng() < 0.5 ? -1 : 0), 0, gridY - 1);
+    const fW = cellToWorld(fc, fr);
+    const dir = new THREE.Vector3(fW.x - g.position.x, 0, fW.z - g.position.z);
+    if (dir.lengthSq() > 1e-4) headingRef.current = Math.atan2(dir.x, dir.z);
+    g.rotation.y = headingRef.current + DEMON_YAW_OFFSET;
+    setVuln(false);
+    setPhase("wander_mischief");
+    playAnim(rng() < 0.5 ? /slash/ : /projectile/, false);
+  };
+
+  // Mistimed click → dash to a nearby street node with a taunt.
+  const beginFlee = () => {
+    const g = groupRef.current;
+    if (!g) return;
+    const node = pickWanderNode();
+    curSegNodeRef.current = node;
+    const toW = nodeToWorld(node.i, node.j);
+    fromRef.current.copy(g.position);
+    fromRef.current.y = DEMON_GROUND_Y;
+    toRef.current.set(toW.x, DEMON_GROUND_Y, toW.z);
+    const dir = toRef.current.clone().sub(fromRef.current);
+    if (dir.lengthSq() > 1e-4) headingRef.current = Math.atan2(dir.x, dir.z);
+    setVuln(false);
+    setPhase("flee");
+    playAnim(/walk/);
+  };
+
+  const beginBanish = () => {
+    if (phaseRef.current === "banish") return;
+    setVuln(false);
+    setPhase("banish");
+    playAnim(/slash/, false);
+  };
+
+  const WANDER_PHASES = ["walk_turn", "walk_move", "wander_mischief", "wander_pause"];
+  const handleClick = (e) => {
+    if (e?.stopPropagation) e.stopPropagation();
+    if (!clickable || done) return;
+    const ph = phaseRef.current;
+    if (ph === "banish") return;
+    if (!roamingRef.current) return; // can't be caught during the intro trek
+    if (vulnerableRef.current && ph === "wander_pause") {
+      beginBanish();
+    } else if (WANDER_PHASES.includes(ph)) {
+      // It's roaming but not in the catchable window — it dodges away.
+      beginFlee();
+      onMiss?.();
+    }
+  };
 
   useFrame((_, delta) => {
     if (mixerRef.current) mixerRef.current.update(delta);
-    if (groupRef.current) {
-      riseRef.current = Math.min(riseRef.current + delta * 0.8, 1);
-      const rise = riseRef.current;
-      const eased = 1 - Math.pow(1 - rise, 3);
-      groupRef.current.position.y = position[1] + eased * 0.3 - (1 - eased) * 0.5;
-      groupRef.current.rotation.y += delta * 0.8;
+    const g = groupRef.current;
+    if (!g || done) return;
+    tRef.current += delta;
+    const t = tRef.current;
+    const phase = phaseRef.current;
+    const init = !phaseInitRef.current;
+    if (init) phaseInitRef.current = true;
+
+    // Spawn point = the summoner's drill well (cell CENTER, under the rig), so
+    // the demon erupts from the borehole rather than off at a plot corner.
+    // Nudged along +z to land in the wellhead area of the pad.
+    const sWorld = cellToWorld(summonerCol, summonerRow);
+    sWorld.z += DEMON_SPAWN_OFFSET_Z;
+
+    // Hellish light pulse — brighter while vulnerable to telegraph the window
+    if (lightRef.current && phase !== "banish") {
+      const base = phase === "wander_pause" ? 12 : 6;
+      const amp = phase === "wander_pause" ? 2 : 0.6;
+      lightRef.current.intensity = base + Math.sin(t * 6) * amp;
+    }
+
+    switch (phase) {
+      case "spawn": {
+        if (init) {
+          g.position.set(sWorld.x, DEMON_GROUND_Y - 0.5, sWorld.z);
+          g.scale.setScalar(1);
+          playAnim(/spawn/, false);
+        }
+        const f = demonClamp(t / DEMON_SPAWN_DUR, 0, 1);
+        const ease = 1 - Math.pow(1 - f, 3);
+        g.position.y = DEMON_GROUND_Y - 0.5 + ease * 0.5;
+        g.rotation.y += delta * 1.2;
+        if (f >= 1) startTransit(g);
+        break;
+      }
+      case "walk_turn": {
+        const f = demonClamp(t / DEMON_TURN_DUR, 0, 1);
+        const ease = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+        g.rotation.y = turnFromRef.current + turnDeltaRef.current * ease + DEMON_YAW_OFFSET;
+        if (f >= 1) {
+          headingRef.current = turnFromRef.current + turnDeltaRef.current;
+          setPhase("walk_move");
+        }
+        break;
+      }
+      case "walk_move": {
+        if (init) playAnim([/walk/, /look.?around/]);
+        const f = demonClamp(t / segDurRef.current, 0, 1);
+        g.position.lerpVectors(fromRef.current, toRef.current, f);
+        g.position.y = DEMON_GROUND_Y;
+        g.rotation.y = headingRef.current + DEMON_YAW_OFFSET;
+        if (f >= 1) nextSegment(g); // next waypoint, or fire the path's onDone
+        break;
+      }
+      case "wander_pause": {
+        if (init) {
+          playAnim(rng() < 0.5 ? /look.?around/ : /idle/);
+          setVuln(true);
+        }
+        if (t >= DEMON_PAUSE_DUR) {
+          setVuln(false);
+          if (rng() < 0.45) startMischief(g);
+          else startWalk(g);
+        }
+        break;
+      }
+      case "wander_mischief": {
+        const f = demonClamp(t / DEMON_MISCHIEF_DUR, 0, 1);
+        if (sparkRef.current) {
+          const sf = Math.sin(f * Math.PI);
+          sparkRef.current.visible = true;
+          sparkRef.current.material.opacity = sf * 0.9;
+          sparkRef.current.scale.setScalar(0.6 + sf * 0.9);
+        }
+        if (t >= DEMON_MISCHIEF_DUR) {
+          if (sparkRef.current) {
+            sparkRef.current.visible = false;
+            sparkRef.current.material.opacity = 0;
+          }
+          startWalk(g);
+        }
+        break;
+      }
+      case "flee": {
+        const f = demonClamp(t / DEMON_FLEE_DUR, 0, 1);
+        const ease = 1 - Math.pow(1 - f, 2);
+        g.position.lerpVectors(fromRef.current, toRef.current, ease);
+        g.position.y = DEMON_GROUND_Y + Math.sin(f * Math.PI) * 0.25;
+        g.rotation.y = headingRef.current + DEMON_YAW_OFFSET;
+        if (f >= 1) {
+          wanderNodeRef.current = curSegNodeRef.current;
+          setPhase("wander_pause");
+        }
+        break;
+      }
+      case "banish": {
+        const f = demonClamp(t / DEMON_BANISH_DUR, 0, 1);
+        g.scale.setScalar(1 - f);
+        g.position.y = DEMON_GROUND_Y - f * 0.6;
+        g.rotation.y += delta * 8;
+        if (lightRef.current) lightRef.current.intensity = 14 * (1 - f);
+        if (sparkRef.current) {
+          sparkRef.current.visible = true;
+          sparkRef.current.material.opacity = Math.sin(f * Math.PI);
+          sparkRef.current.scale.setScalar(0.5 + f * 3);
+        }
+        if (f >= 1) {
+          setDone(true);
+          onBanish?.();
+        }
+        break;
+      }
+      default:
+        break;
     }
   });
 
+  if (done) return null;
+
   return (
-    <group ref={groupRef} position={[position[0], position[1] - 0.5, position[2]]}>
+    <group ref={groupRef} onPointerDown={handleClick}>
       <primitive object={cloned} scale={0.12} />
-      <pointLight color="#ff2200" intensity={8} distance={3} decay={2} position={[0, 0.3, 0]} />
-      {clickable && (
+      <pointLight ref={lightRef} color="#ff2200" intensity={6} distance={3} decay={2} position={[0, 0.3, 0]} />
+      {/* Mischief / banish spark — additive, untextured (safe on iOS) */}
+      <mesh ref={sparkRef} position={[0, 0.25, 0.18]} visible={false}>
+        <icosahedronGeometry args={[0.12, 1]} />
+        <meshBasicMaterial
+          color="#ff6633"
+          transparent
+          opacity={0}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* BANISH ring — only appears during the catchable pause window */}
+      {clickable && vulnerable && (
         <Html
           center
           position={[0, 0.6, 0]}
@@ -3563,7 +3975,7 @@ function HellDemon({ position, clickable = false, onClick }) {
           style={{ pointerEvents: "none" }}
         >
           <button
-            onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+            onClick={(e) => { e.stopPropagation(); beginBanish(); }}
             onPointerDown={(e) => e.stopPropagation()}
             style={{
               pointerEvents: "auto",
@@ -3571,18 +3983,19 @@ function HellDemon({ position, clickable = false, onClick }) {
               height: 80,
               borderRadius: "50%",
               background: "rgba(255,34,0,0.2)",
-              border: "3px solid rgba(255,68,34,0.7)",
+              border: "3px solid rgba(255,68,34,0.85)",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontFamily: "'Share Tech Mono', monospace",
               fontSize: 10,
-              color: "#ff4422",
+              color: "#ff6644",
               letterSpacing: "0.12em",
               fontWeight: 700,
-              boxShadow: "0 0 20px rgba(255,34,0,0.4), 0 0 40px rgba(255,34,0,0.2)",
-              textShadow: "0 0 8px rgba(255,34,0,0.6)",
+              boxShadow: "0 0 24px rgba(255,34,0,0.6), 0 0 48px rgba(255,34,0,0.3)",
+              textShadow: "0 0 8px rgba(255,34,0,0.7)",
+              animation: "demonBannerPulse 0.9s ease-in-out infinite",
             }}
           >
             BANISH
@@ -3632,7 +4045,12 @@ export default function OilVoxelGrid({
   hellCol = null,
   hellRow = null,
   demonBounty = null,
+  demonTargetCol = null,
+  demonTargetRow = null,
+  demonSeed = null,
+  demonCapturable = true,
   onClaimBounty,
+  onDemonMiss,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -3808,24 +4226,36 @@ export default function OilVoxelGrid({
           ))}
           {hellActive && hellCol != null && hellRow != null && !demonBounty && (
             <HellDemon
-              position={[
-                -worldW / 2 + hellCol * cellSize + cellSize / 2,
-                0,
-                worldD / 2 - hellRow * cellSize - cellSize / 2,
-              ]}
-              clickable
-              onClick={onClaimBounty}
+              summonerCol={hellCol}
+              summonerRow={hellRow}
+              targetCol={demonTargetCol ?? hellCol}
+              targetRow={demonTargetRow ?? hellRow}
+              cellSize={cellSize}
+              worldW={worldW}
+              worldD={worldD}
+              gridX={gridX}
+              gridY={gridY}
+              seed={demonSeed || `local_${hellCol}_${hellRow}`}
+              clickable={demonCapturable}
+              onBanish={onClaimBounty}
+              onMiss={onDemonMiss}
             />
           )}
           {demonBounty && ["active", "flying", "waiting"].includes(demonBounty.status) && (
             <HellDemon
-              position={[
-                -worldW / 2 + (demonBounty.status === "active" ? demonBounty.summonerCol : demonBounty.targetCol) * cellSize + cellSize / 2,
-                0,
-                worldD / 2 - (demonBounty.status === "active" ? demonBounty.summonerRow : demonBounty.targetRow) * cellSize - cellSize / 2,
-              ]}
-              clickable={["active", "flying", "waiting"].includes(demonBounty.status)}
-              onClick={onClaimBounty}
+              summonerCol={demonBounty.summonerCol}
+              summonerRow={demonBounty.summonerRow}
+              targetCol={demonBounty.targetCol ?? demonBounty.summonerCol}
+              targetRow={demonBounty.targetRow ?? demonBounty.summonerRow}
+              cellSize={cellSize}
+              worldW={worldW}
+              worldD={worldD}
+              gridX={gridX}
+              gridY={gridY}
+              seed={demonBounty.id}
+              clickable={demonCapturable}
+              onBanish={onClaimBounty}
+              onMiss={onDemonMiss}
             />
           )}
           {gusherEvents

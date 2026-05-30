@@ -342,6 +342,9 @@ const PASSIVE_DRILLS = 10;
 const MAX_BONUS_DRILLS = 10;
 const MAX_DEPTH = 20;
 const FREE_CLAIM_JUMPS = 2;
+// A loose demon is transient — bounties older than this are stale/orphaned and
+// get auto-expired client-side (must match BOUNTY_TTL_MS in the API route).
+const DEMON_BOUNTY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Continuous orbit exactly like the Three.js horse example. Stops when user interacts.
 function CameraFlyIn({ onComplete, mobile = false }) {
@@ -627,7 +630,8 @@ export default function OilPage() {
   const [envPreset, setEnvPreset] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("oil_envPreset");
-      if (saved && ENV_PRESETS[saved]) return saved;
+      // "hell" is a transient event state, never a restorable user choice.
+      if (saved && saved !== "hell" && ENV_PRESETS[saved]) return saved;
     }
     return "day";
   });
@@ -638,7 +642,11 @@ export default function OilPage() {
     }
     return false;
   });
-  useEffect(() => { localStorage.setItem("oil_envPreset", envPreset); }, [envPreset]);
+  // Don't persist the transient "hell" preset — otherwise a reload during a
+  // demon event restores hell forever. Keep the last real preset saved instead.
+  useEffect(() => {
+    if (envPreset !== "hell") localStorage.setItem("oil_envPreset", envPreset);
+  }, [envPreset]);
   useEffect(() => { localStorage.setItem("oil_darkMode", String(darkMode)); }, [darkMode]);
   const theme = THEMES[darkMode ? "dark" : "light"];
   const styles = useMemo(() => getStyles(theme), [theme]);
@@ -836,10 +844,25 @@ export default function OilPage() {
     const unsub = onSnapshot(q, (snap) => {
       if (snap.empty) {
         setDemonBounty(null);
-      } else {
-        const d = snap.docs[0];
-        setDemonBounty({ id: d.id, ...d.data() });
+        return;
       }
+      const d = snap.docs[0];
+      const data = d.data();
+      // Self-heal: a demon is a transient event. If this one is older than the
+      // TTL it's stale/orphaned (e.g. left active by an unclaimable test demon),
+      // so ignore it (no hell) and fire-and-forget an expiry so it stops
+      // re-lighting hell on every refresh.
+      const createdMs = data.createdAt?.toMillis?.() ?? 0;
+      if (createdMs && Date.now() - createdMs > DEMON_BOUNTY_TTL_MS) {
+        setDemonBounty(null);
+        fetch("/api/oil-demon-bounty", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bountyId: d.id }),
+        }).catch(() => {});
+        return;
+      }
+      setDemonBounty({ id: d.id, ...data });
     });
     return () => unsub();
   }, []);
@@ -1443,13 +1466,15 @@ export default function OilPage() {
           setHellCol(col);
           setHellRow(row);
           if (hellTimeoutRef.current) clearTimeout(hellTimeoutRef.current);
+          // Long safety net only — in test/admin mode the demon should normally
+          // be cleared by catching it (handleClaimBounty), not by this timeout.
           hellTimeoutRef.current = setTimeout(() => {
             setHellActive(false);
             setHellCol(null);
             setHellRow(null);
             setEnvPreset(prevEnvPresetRef.current || "day");
             hellTimeoutRef.current = null;
-          }, 12000);
+          }, 90000);
         }
         break;
       }
@@ -2027,13 +2052,18 @@ export default function OilPage() {
 
   // Claim the demon bounty — player clicks the demon in 3D
   const handleClaimBounty = useCallback(async () => {
-    // Test/admin mode — local dismiss
+    // Always turn off the local hell visuals immediately on banish — regardless
+    // of mode, signed-in state, or whether the server PATCH below succeeds. The
+    // PATCH (for a real bounty) still awards it and clears the blockade for the
+    // other clients via the Firestore listener.
+    setHellActive(false);
+    setHellCol(null);
+    setHellRow(null);
+    setEnvPreset(prevEnvPresetRef.current || "day");
+    if (hellTimeoutRef.current) { clearTimeout(hellTimeoutRef.current); hellTimeoutRef.current = null; }
+
+    // Test/admin mode (no server bounty) — just the local dismiss toast.
     if (!demonBounty?.id) {
-      setHellActive(false);
-      setHellCol(null);
-      setHellRow(null);
-      setEnvPreset(prevEnvPresetRef.current || "day");
-      if (hellTimeoutRef.current) { clearTimeout(hellTimeoutRef.current); hellTimeoutRef.current = null; }
       setBountyToast({ dismissed: true, bountyAmount: 0, isYou: false });
       if (bountyToastTimer.current) clearTimeout(bountyToastTimer.current);
       bountyToastTimer.current = setTimeout(() => setBountyToast(null), 8000);
@@ -2070,6 +2100,30 @@ export default function OilPage() {
       console.error("[HELL] Bounty claim error:", err);
     }
   }, [demonBounty?.id, user?.id, username]);
+
+  // Deterministic victim plot for the local/test demon (the multiplayer path
+  // gets its target from the Firestore bounty instead).
+  const localDemonTarget = useMemo(() => {
+    if (hellCol == null || hellRow == null) return null;
+    const g = gridSize;
+    const tc = (hellCol + 3 + (hellRow % 4)) % g;
+    let tr = (hellRow + 4 + (hellCol % 3)) % g;
+    if (tc === hellCol && tr === hellRow) tr = (tr + 1) % g;
+    return { col: tc, row: tr };
+  }, [hellCol, hellRow, gridSize]);
+
+  // A stunned summoner can't catch their own demon (the server would reject it
+  // anyway — blocking client-side avoids a banish that Firestore then refuses).
+  const demonCapturable = !isSummonerStunned;
+
+  // Mistimed click on the roaming demon → it dodges away; flash a taunt.
+  const [demonTaunt, setDemonTaunt] = useState(false);
+  const demonTauntTimer = useRef(null);
+  const handleDemonMiss = useCallback(() => {
+    setDemonTaunt(true);
+    if (demonTauntTimer.current) clearTimeout(demonTauntTimer.current);
+    demonTauntTimer.current = setTimeout(() => setDemonTaunt(false), 1500);
+  }, []);
 
   // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
@@ -3241,7 +3295,7 @@ export default function OilPage() {
           color: "#ffaa88",
           marginTop: 4,
         }}>
-          CLICK THE DEMON TO DISMISS IT — BOUNTY RETURNS TO COMMUNITY POOL
+          CATCH THE DEMON WHEN IT STOPS TO DISMISS IT — BOUNTY RETURNS TO COMMUNITY POOL
         </div>
       )}
       {!isSummonerStunned && activeDemonBlockade?.summonerId !== user?.id && (
@@ -3251,40 +3305,39 @@ export default function OilPage() {
           color: "#ffaa88",
           marginTop: 4,
         }}>
-          ALL DRILLING HALTED — CLICK THE DEMON TO CLAIM THE BOUNTY
+          ALL DRILLING HALTED — CATCH THE DEMON WHEN IT STOPS TO CLAIM THE BOUNTY
         </div>
       )}
     </div>
   );
 
-  const claimBountyButton = (isBlockadeActive || (hellActive && activeDemonBlockade)) && !isSummonerStunned && (
-    <button
-      onClick={handleClaimBounty}
+  // Banishing now happens by catching the roaming demon during its vulnerable
+  // pause window (the 3D BANISH ring / demon body), not via an always-on button.
+  // This element is the "it dodged!" taunt shown after a mistimed click.
+  const claimBountyButton = demonTaunt && (
+    <div
       style={{
         position: "fixed",
         bottom: isMobile ? 80 : 32,
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 9998,
-        padding: isMobile ? "14px 28px" : "16px 36px",
-        background: "linear-gradient(180deg, #cc2200, #881100)",
-        border: "2px solid #ff4422",
+        padding: isMobile ? "12px 24px" : "14px 30px",
+        background: "linear-gradient(180deg, rgba(90,5,0,0.95), rgba(50,3,0,0.92))",
+        border: "2px solid rgba(255,68,34,0.7)",
         borderRadius: 6,
-        color: "#fff",
+        color: "#ffb499",
         fontFamily: "'Share Tech Mono', monospace",
-        fontSize: isMobile ? 13 : 15,
+        fontSize: isMobile ? 12 : 14,
         fontWeight: 700,
         letterSpacing: "0.2em",
-        cursor: "pointer",
-        boxShadow: "0 0 30px rgba(255,34,0,0.5), 0 0 60px rgba(255,34,0,0.2)",
-        animation: "demonBannerPulse 1.5s ease-in-out infinite",
+        boxShadow: "0 0 30px rgba(255,34,0,0.45)",
         textTransform: "uppercase",
+        pointerEvents: "none",
       }}
     >
-      {activeDemonBlockade?.summonerId === user?.id
-        ? "DISMISS DEMON"
-        : "BANISH DEMON — CLAIM BOUNTY"}
-    </button>
+      THE DEMON DODGES — WAIT FOR IT TO STOP
+    </div>
   );
 
   const bountyClaimedBanner = bountyToast && (
@@ -3941,7 +3994,11 @@ export default function OilPage() {
                     hellCol={hellCol}
                     hellRow={hellRow}
                     demonBounty={demonBounty}
+                    demonTargetCol={localDemonTarget?.col}
+                    demonTargetRow={localDemonTarget?.row}
+                    demonCapturable={demonCapturable}
                     onClaimBounty={handleClaimBounty}
+                    onDemonMiss={handleDemonMiss}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -4392,6 +4449,12 @@ export default function OilPage() {
                 hellActive={hellActive}
                 hellCol={hellCol}
                 hellRow={hellRow}
+                demonBounty={demonBounty}
+                demonTargetCol={localDemonTarget?.col}
+                demonTargetRow={localDemonTarget?.row}
+                demonCapturable={demonCapturable}
+                onClaimBounty={handleClaimBounty}
+                onDemonMiss={handleDemonMiss}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
