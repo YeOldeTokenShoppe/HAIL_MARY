@@ -11,7 +11,9 @@ export async function POST(req) {
     if (!userId || typeof userId !== "string") {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
-    if (typeof playerExtracted !== "number" || playerExtracted < 0 || !Number.isFinite(playerExtracted)) {
+    // playerExtracted is only needed for the legacy fallback path; default it.
+    const pe = typeof playerExtracted === "number" ? playerExtracted : 0;
+    if (pe < 0 || !Number.isFinite(pe)) {
       return NextResponse.json({ error: "Invalid playerExtracted" }, { status: 400 });
     }
 
@@ -20,40 +22,46 @@ export async function POST(req) {
     const communityRef = db.collection("oilGame").doc("communityStorage");
 
     // Transaction ensures concurrent drain calls from the same user can't
-    // double-count: the second one reads the already-advanced lastDrainExtracted.
+    // double-count: the second one reads the already-zeroed tankOil (or the
+    // already-advanced lastDrainExtracted on the legacy path).
     const result = await db.runTransaction(async (t) => {
       const drillSnap = await t.get(drillRef);
       if (!drillSnap.exists) {
         throw new Error("No drill record for user");
       }
       const drill = drillSnap.data();
-      const lastDrain = drill.lastDrainExtracted || 0;
-      const delta = playerExtracted - lastDrain;
 
-      if (delta <= 0) {
-        return { delta: 0, newTotal: drill.totalCollected || 0 };
+      let delta;
+      const drillUpdate = { updatedAt: FieldValue.serverTimestamp() };
+
+      if (typeof drill.tankOil === "number" && drill.tankOil > 0) {
+        // Preferred: explicit tankOil accumulator written by the strike loop.
+        delta = drill.tankOil;
+        drillUpdate.tankOil = 0;
+        drillUpdate.lastDrainExtracted = pe; // keep legacy marker aligned
+      } else {
+        // Legacy delta model (data predating the strike loop).
+        const lastDrain = drill.lastDrainExtracted || 0;
+        delta = pe - lastDrain;
+        if (delta <= 0) {
+          return { delta: 0, newTotal: drill.totalCollected || 0 };
+        }
+        drillUpdate.lastDrainExtracted = pe;
       }
 
-      const newTotal = (drill.totalCollected || 0) + delta;
-      const newDrains = (drill.tankDrains || 0) + 1;
+      drillUpdate.totalCollected = (drill.totalCollected || 0) + delta;
+      drillUpdate.tankDrains = (drill.tankDrains || 0) + 1;
+      if (typeof username === "string" && username.trim()) {
+        drillUpdate.username = username.trim();
+      }
 
       t.set(communityRef, {
         totalOil: FieldValue.increment(delta),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
-
-      const drillUpdate = {
-        totalCollected: newTotal,
-        tankDrains: newDrains,
-        lastDrainExtracted: playerExtracted,
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-      if (typeof username === "string" && username.trim()) {
-        drillUpdate.username = username.trim();
-      }
       t.set(drillRef, drillUpdate, { merge: true });
 
-      return { delta, newTotal, newDrains };
+      return { delta, newTotal: drillUpdate.totalCollected, newDrains: drillUpdate.tankDrains };
     });
 
     // Mark this user's active gusher events as done. Best-effort, outside

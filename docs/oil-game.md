@@ -2,6 +2,125 @@
 
 A 3D oil exploration game where players claim land on a fixed 10x10 grid and drill for $500 USDC hidden in procedurally generated underground deposits.
 
+## Economy & Timing Model (Proposed)
+
+> **Status: design proposal, not yet implemented.** This section captures the intended direction for game pacing, the local tank, theft, and prize economics. Where it conflicts with the *current* implementation described below (daily-drill cadence in **Core Mechanics**, dino tank-theft in **Rogue Characters → Consequences v2**, literal `totalCollected` payout in **Post-Game Payout**), this section is the target model and supersedes those.
+
+### Design through-line
+
+The goal is **constant ambient curiosity** (players compulsively check "did my rig strike?") instead of a predictable daily-appointment loop, while keeping the game **fair, growth-friendly, and never punishing players for being offline** — important because oil is real money.
+
+### Game timing — three independent layers
+
+Timing is three separate knobs, mixed-and-matched:
+
+| Layer | Decision | Rationale |
+|-------|----------|-----------|
+| **Macro** (game lifecycle) | **Rolling seasons** — back-to-back fixed rounds, each with a start/end | A fixed prize needs an end to rank winners and pay out; rolling keeps the game "always on" and lets traction compound season-over-season |
+| **Meso** (player cadence) | **Continuous pump** — kill the 24h drill gate; rig runs 24/7 | Removes the "23 hours until next drill" dead time that trains players to ignore the game |
+| **Micro** (strike reveal) | **Armed rig + random-hour strike** on lump-sum blocks | Variable *timing* of reward (not outcome) drives compulsive checking |
+
+**Lump-sum blocks (Family A), not flow-rate.** A block's oil is already fixed by the deterministic block-hash distribution — whether it's dry, holds crude, or is a hell pocket is decided up front. The **only** thing randomized is *when* the rig finishes a block and reveals it. The strike is never random in outcome, only in reveal time — which keeps it fair and un-cheatable.
+
+**The strike mechanic.** The rig is "armed." Once per day it resolves the next block at a **random hour the player can't predict** (variants: one guaranteed strike at a random hour; per-hour dice roll; or a jittered drill-time so it "breaks through overnight"). A server cron rolls each armed rig forward, schedules strikes, writes to Firestore, and fires the existing Telegram alert. The player's only ongoing decision is **whether to keep drilling deeper** — deeper = richer, but more dry-block risk. That single milk-vs-gamble choice preserves agency in an otherwise idle loop.
+
+> Offline strikes require server-authoritative scheduling (a Firebase scheduled function / cron route — the same pattern already planned for rogue auto-deploy).
+
+### Local tank & banking
+
+Keep the local tank, **remove the hard capacity cap.** The cap's only real job was forcing visits — and the dinosaur already does that better, while a cap actively punishes the offline gusher the random-strike design is built to create.
+
+- **Banked oil (`totalCollected`) is the player's safe, scored money.** Nothing can reduce it.
+- **Un-banked oil (`tankOil`, new field on `oilDrills`)** sits exposed; the more you let pile up, the more is at risk — so exposure scales with hoarding, which pressures players to bank *without* a cap.
+- Optional **soft cap with auto-bank overflow**: tank holds up to X exposed barrels; beyond X, oil auto-secures to the main tank. Keeps a satisfying fill-meter and guarantees no offline gusher is ever lost. Slightly softens dino stakes on big strikes — add only if the meter UX matters.
+- **End-of-season:** auto-bank any un-banked oil so nobody loses winnings to timing luck (unless a frantic "bank before the buzzer" finale is wanted).
+
+### Theft → "contested capture"
+
+Because oil is real money, **earned/banked oil must never be stealable.** Loss aversion + money taken while offline by something uncontrollable = the fastest way to destroy trust (and to start looking like something regulators dislike). Note the existing design already refuses to *delete* paid addons (visual degradation only) — this applies that same principle consistently.
+
+- **Banked oil is sacrosanct. Period.**
+- Reframe theft as **contested capture**: the threat doesn't steal *your* oil, it tries to make off with a **gusher not yet banked** — and you (or other hunters) race to stop/claim it. Mental model becomes "I might miss out on extra," never "I lost what was mine."
+- Any loss must be **preventable and self-determined** — only un-banked oil, only after a fair defense window (the camera/defense path already exists). Timing luck must never cost money.
+- The **demon is already fine** (self-inflicted summon cost, defense window, redistributive bounty). The thing to rework is the **dino stealing 20–30% of a random victim's tank offline** → convert to a contested-capture event (dino *en route* to a gusher; bank/defend in time).
+
+### Prize pool — oil as a scoreboard
+
+The buried oil is a **scoreboard**, not the literal payout. At season end the full pot splits **in proportion to each player's score**:
+
+> payout = (your oil found ÷ total oil found) × pot
+
+This guarantees the **entire pot always pays out** regardless of turnout — the "money left in the ground" problem disappears with no dynamic grid resizing. Competition is preserved (rich-vein finders earn a bigger slice). Players keep the *feeling* of extracting money while the accounting redistributes the remainder at payout.
+
+Grid size becomes a **feel/contention** dial, not an economic one: fixed 10×10 is fine (runs sparse at low turnout, EV stays high), or size **once at registration close** for a packed board. Because the distribution is deterministic from a block hash, **resize only once at the `ticket_sale → active` transition — never mid-game** (it would move oil out from under active rigs).
+
+### Scaling & referrals
+
+A **fixed** pot that always fully pays is **zero-sum** — every referred player dilutes everyone's slice, which kills the referral flywheel (and makes the existing extra-depth referral reward just claw back self-inflicted dilution). Two independent decisions:
+
+- **Pot *size*:** must **scale with participation** (not fixed) so referrals are positive-sum.
+- **Pot *distribution*:** proportional score (above) — this was never the problem; it's what guarantees full payout.
+
+Keep the **extra-depth referral reward** unchanged — under proportional split it's a personal *kicker* (more depth → higher score → bigger slice) on top of a pot that now grows when you recruit.
+
+### Funding — sponsorship + dev revenue (separate buckets)
+
+| Bucket | Source | Notes |
+|--------|--------|-------|
+| **Prize pool** | Sponsors (external, additive) + treasury-seeded floor | Additive money keeps referrals positive-sum; nobody's slice shrinks |
+| **Dev income** | Premium add-on sales (3–5 USDC via x402) | Kept fully separate — the dev getting paid never reduces the prize |
+
+- **Per-qualified-wallet sponsor bounty:** pitch sponsors "$X base + $Y per qualified wallet, up to a cap." Same deal from two angles — a **referral incentive** for players *and* a **user-acquisition deal** for the sponsor. Makes the pot scale with signups within a season.
+- **3D ad inventory:** derricks, edge billboards, the main tank (title sponsor), blimps, loading screens, CCTV overlay. The game manufactures **shareable media** (CCTV clips → Telegram) = organic, measurable impressions on real onchain wallets.
+- **Coinbase/CDP angle:** the game already exercises the full CDP stack (onramp, swap, embedded wallets, x402, CDP RPC on Base) → a live **case study** worth pitching to Coinbase ecosystem/devrel, not just a logo slot.
+- **Bootstrap first:** keep the **$500 treasury floor**, run 1–2 self-funded seasons to generate traction metrics, *then* pitch sponsors. Don't architect the launch to require them.
+- **Regulatory posture:** a sponsor-funded prize with entry = holding tokens reads as a promotional contest/sweepstakes (safer than a player-funded pooled-stakes game). Get a lawyer's eyes once money scales.
+
+### Resource theming (fluids only, for now)
+
+The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc. — but restricted to **fluids** so the pump/tank/drain/overflow/gusher loop above applies unchanged. Solid-mining (gold, diamonds, buried treasure) is a **future build**: a sibling game mode with its own extraction verb (mine, not pump) and machine, sharing only the grid/claim/season/economy engine — explicitly out of scope now.
+
+- **Three layers:** engine (resource-agnostic, operates on abstract `units`) / resource theme (name, color, VFX, verb, tank visual — a config in `oilGame/settings`) / extraction physics (fluid only for now).
+- **Keep internal "oil" naming** (`oilPlots`, `oilDrills`, `oilGame`, `/oil`) — it's the engine's substrate label; renaming the data model buys nothing. Separate internal naming (stays "oil") from the **player-facing substance** (read from a `resourceTheme` config). New strike/tank code should pull substance labels from that config rather than hardcoding "oil."
+- Default substance is an open creative call (oil = legible/built; goo = fits the hell/demon theme, brand-safe, more shareable). A hybrid is on the table: oil baseline + otherworldly goo as the rare jackpot strike tied to hell pockets.
+
+### Decided & implementation status
+
+**Decided (2026-05-30):**
+- **Strike timing:** one guaranteed strike per UTC day at a per-rig **deterministic-but-unpredictable hour** (`hash(userId + date) % 24`) — stable across ticks, no extra writes, idempotent.
+- **Cadence:** **auto-advance, depth = cap.** The rig drills one layer deeper per day automatically (no action budget); the old "20 drill actions" becomes the 20-layer depth floor. Agency lives in plot choice + banking timing.
+- **Tank:** **uncapped.** `tankOil` grows freely; dino risk scales with hoarding instead of a cap.
+
+**Implemented (server core — Slice 1):**
+- `src/app/api/oil-strike-tick/route.js` — the strike loop. Hourly-safe, idempotent per day, reuses `generateOilDistribution3D` + `getAdminDb` (single source of truth). Manual test: `GET /api/oil-strike-tick?password=<ADMIN_PASSWORD>&force=1`.
+- `functions/index.js` → `oilStrikeTick` — hourly Firebase scheduled function that pings the route (needs `CRON_SECRET`; `APP_URL` optional). Deploy with `firebase deploy --only functions`.
+- New `oilDrills` fields written by the striker: `tankOil`, `lastStrikeDate`, `lastStrikeAt`, `lastStrikeOil`, `lastStrikeDepth`, `lastStrikeHell`, `armed`, `rigDepleted`.
+
+**Implemented (client wiring — Slice 2):**
+- `oilInTank` now reads the authoritative `tankOil` (falls back to the legacy derived model for pre-loop data). This also fixes a latent bug: the old derived tank summed *all* layers `0..drillDay`, wrongly crediting a claim-jumper for oil a previous owner drilled — `tankOil` counts only layers *this* rig struck.
+- `/api/oil-tank-drain` banks `tankOil → totalCollected` and zeroes the tank when present; keeps the legacy delta model as a fallback. Idempotent under concurrent drains.
+- The demon bounty drains the real un-banked tank (`tankOil`).
+- Manual `handleDailyDrill` now also accumulates `tankOil` (mirrors the strike loop) so admin/test drilling stays consistent.
+- The strike is **surfaced through the existing reactive pipeline**: the cron advancing `oilPlots.drillDay` flows through the `oilPlots` listener → `effectiveDrillDay` → the existing `oilStrike` effect + 3D gusher visual + DrillHUD gauges. A returning player sees the strike animation on load.
+
+**Implemented (hell-pocket → demon):**
+- Bounty creation extracted to `src/lib/oilDemon.js` (`createDemonBounty`), shared by the player-facing `POST /api/oil-demon-bounty` and the strike loop — no logic drift.
+- A hell-pocket strike in `oil-strike-tick` now summons the demon: `unbankedOil` = the rig's post-strike tank, which the creator drains (the cost of unleashing hell). The striker also respects the global blockade (skips the tick while a demon is loose) and stops striking remaining rigs once one is summoned.
+- **Bug fixed in the extraction:** the old `POST` called `communitySnap.exists()` (a method) on an **admin** snapshot where `exists` is a property → it threw, so the real-player hell→demon path was 500-ing (masked because admin/test mode uses a local preview, not the API). The shared lib uses the property form. Also: the old "drain summoner's tank" block was a no-op (only re-wrote `lastDrainExtracted`); it now correctly zeroes `tankOil`.
+
+**Implemented (auto-pump UI — Slice 3):**
+- New `drillStatus === "auto-pumping"` for real players: replaces the manual DRILL button with a non-clickable "⛏ RIG PUMPING" indicator + depth bar, the last-strike result (`depth N — struck X` / `dry layer`), and a "strikes once a day at an hour you can't predict" hint. `rigDepleted` falls through to "max-depth".
+- Manual drilling is cleanly disabled for real players (drillStatus never "ready" for them, and `handleDailyDrill` already guards on `"ready"`); **admin/test keep the manual DRILL path** for verification.
+- **Mobile overlap fix (pre-existing bug):** the mobile 3D tab rendered `DrillHUD` twice — once inside the canvas wrap and once in the control block below — so the gauges crowded/overlapped the drill button. Removed the in-canvas copy; now one `DrillHUD` per layout (mobile control block / desktop side panel), matching desktop.
+
+**Remaining UI polish (optional):**
+- A "while you were away" summary toast (uses `lastStrikeAt`/`lastStrikeOil`/`lastStrikeDepth`) — the result is currently surfaced inline in the pump indicator + via the existing 3D strike visual, so this is purely a flourish.
+
+**Open decisions:**
+- EV-per-player as the game grows: **flat** (pot scales ~linearly with players — maximally referral-friendly) vs **gently declining** (sub-linear — early players keep an edge).
+- End-of-season un-banked oil: auto-bank vs "bank before the buzzer" finale.
+- Default substance: oil vs goo vs hybrid (oil baseline + goo jackpot).
+
 ## Game Phase Flow
 
 The game progresses through three phases, controlled by `gamePhase` in Firestore:

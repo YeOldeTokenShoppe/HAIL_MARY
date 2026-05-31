@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { getAdminDb, FieldValue, Timestamp } from "@/lib/firebaseAdmin";
+import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
+import {
+  createDemonBounty,
+  MAX_BONUS_DRILLS,
+  BOUNTY_BONUS_DRILLS,
+  BOUNTY_TTL_MS,
+} from "@/lib/oilDemon";
 
-const MAX_BONUS_DRILLS = 10;
-const BOUNTY_BONUS_DRILLS = 3;
-const BOUNTY_USDC = 5; // deducted from community pool
-const STUN_DURATION_MS = 2 * 60 * 1000; // 2 minutes
-// A loose demon is a transient event — after this it's considered stale and any
-// client may auto-expire it (so an unclaimed/orphaned bounty can't keep relighting
-// hell forever on refresh).
-const BOUNTY_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-// POST — Create a demon bounty event (called when a player drills a hell pocket)
+// POST — Create a demon bounty event (called when a player drills a hell pocket).
+// The creation logic is shared with the server-side strike loop via createDemonBounty.
 export async function POST(req) {
   try {
     const { userId, username, col, row, unbankedOil } = await req.json();
@@ -23,146 +21,12 @@ export async function POST(req) {
     }
 
     const db = getAdminDb();
+    const result = await createDemonBounty(db, { userId, username, col, row, unbankedOil });
 
-    // Check for existing active demon — only one at a time
-    const activeSnap = await db.collection("demonBounty")
-      .where("status", "in", ["active", "flying", "waiting"])
-      .limit(1)
-      .get();
-
-    if (!activeSnap.empty) {
+    if (!result.ok) {
       return NextResponse.json({ error: "A demon is already loose" }, { status: 409 });
     }
-
-    // Pick a random occupied plot (not the summoner's) as the demon's target
-    const plotsSnap = await db.collection("oilPlots").get();
-    const candidates = [];
-    plotsSnap.forEach((d) => {
-      const data = d.data();
-      if (data.currentOwnerId && data.currentOwnerId !== userId) {
-        candidates.push({ col: data.col, row: data.row, ownerId: data.currentOwnerId });
-      }
-    });
-
-    // If no other occupied plots, demon stays at summoner's plot
-    let targetCol = col;
-    let targetRow = row;
-    if (candidates.length > 0) {
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      targetCol = pick.col;
-      targetRow = pick.row;
-    }
-
-    // Compute bounty: deduct up to $BOUNTY_USDC from the community pool
-    const communityRef = db.collection("oilGame").doc("communityStorage");
-    const communitySnap = await communityRef.get();
-    const communityTotal = communitySnap.exists() ? (communitySnap.data().totalOil || 0) : 0;
-    const poolBounty = Math.min(BOUNTY_USDC, communityTotal);
-    const tankBounty = Math.max(0, Math.round(unbankedOil || 0));
-    const bountyAmount = poolBounty + tankBounty;
-
-    // Deduct the pool portion from community storage
-    if (poolBounty > 0) {
-      await communityRef.set({
-        totalOil: FieldValue.increment(-poolBounty),
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-    }
-
-    const now = Timestamp.now();
-    const stunEndsAt = Timestamp.fromMillis(now.toMillis() + STUN_DURATION_MS);
-    const expiresAt = Timestamp.fromMillis(now.toMillis() + BOUNTY_TTL_MS);
-
-    // Create the bounty event
-    const bountyRef = await db.collection("demonBounty").add({
-      status: "active",
-      summonerId: userId,
-      summonerUsername: username || "Anonymous",
-      summonerCol: col,
-      summonerRow: row,
-      targetCol,
-      targetRow,
-      bountyAmount,
-      hunterId: null,
-      hunterUsername: null,
-      createdAt: FieldValue.serverTimestamp(),
-      stunEndsAt,
-      expiresAt,
-    });
-
-    // Set the global blockade
-    await db.collection("oilGame").doc("demonBlockade").set({
-      active: true,
-      bountyId: bountyRef.id,
-      summonerId: userId,
-      summonerUsername: username || "Anonymous",
-      bountyAmount,
-      summonerCol: col,
-      summonerRow: row,
-      targetCol,
-      targetRow,
-      stunEndsAt,
-      expiresAt,
-      startedAt: FieldValue.serverTimestamp(),
-    });
-
-    // Drain summoner's unbanked oil (reset their tank)
-    if (bountyAmount > 0) {
-      const drillRef = db.collection("oilDrills").doc(userId);
-      const drillSnap = await drillRef.get();
-      if (drillSnap.exists) {
-        const drill = drillSnap.data();
-        await drillRef.set({
-          lastDrainExtracted: drill.lastDrainExtracted || 0,
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-      }
-    }
-
-    // Telegram alert to target plot owner (if they have a camera)
-    if (candidates.length > 0) {
-      try {
-        const targetPlot = candidates.find(c => c.col === targetCol && c.row === targetRow);
-        if (targetPlot?.ownerId) {
-          const configSnap = await db.collection("pumpConfigs")
-            .where("userId", "==", targetPlot.ownerId)
-            .where("col", "==", targetCol)
-            .where("row", "==", targetRow)
-            .limit(1)
-            .get();
-
-          const hasCamera = !configSnap.empty && configSnap.docs[0].data()?.config?.showCamera;
-          if (hasCamera) {
-            const tgDoc = await db.collection("oilTelegram").doc(targetPlot.ownerId).get();
-            if (tgDoc.exists) {
-              const { chatId } = tgDoc.data();
-              const botToken = process.env.TELEGRAM_BOT_TOKEN;
-              if (botToken && chatId) {
-                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    chat_id: chatId,
-                    text: `🔥 DEMON INCOMING — Plot (${targetCol + 1}, ${targetRow + 1})\n${username || "Someone"} unleashed hell!\nBounty: ${bountyAmount} USDC + ${BOUNTY_BONUS_DRILLS} bonus drills\nClick the demon to claim the bounty!`,
-                  }),
-                });
-              }
-            }
-          }
-        }
-      } catch (tgErr) {
-        console.error("[oil-demon-bounty] Telegram alert failed:", tgErr.message);
-      }
-    }
-
-    return NextResponse.json({
-      ok: true,
-      bountyId: bountyRef.id,
-      targetCol,
-      targetRow,
-      bountyAmount,
-      stunEndsAt: stunEndsAt.toMillis(),
-    });
+    return NextResponse.json(result);
   } catch (err) {
     console.error("[oil-demon-bounty] POST error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

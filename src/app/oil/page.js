@@ -1035,7 +1035,7 @@ export default function OilPage() {
     const unsub = onSnapshot(doc(db, "oilDrills", user.id), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0 });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -1111,7 +1111,7 @@ export default function OilPage() {
 
   // In test mode, synthesize a userDrill from the selected cell
   const activeUserDrill = isTest && selectedX !== null
-    ? { col: selectedX, row: sliceY, drillDay: testDay, lastDrillDate: null, lastDrainExtracted: 0, totalCollected: 0, tankDrains: 0 }
+    ? { col: selectedX, row: sliceY, drillDay: testDay, lastDrillDate: null, lastDrainExtracted: 0, totalCollected: 0, tankDrains: 0, tankOil: null }
     : userDrill;
 
   // Cell depth from oilPlots (persists across owners) — or computed playerDepth for active players
@@ -1136,9 +1136,14 @@ export default function OilPage() {
     if (userDrill && (userDrill.col !== selectedX || userDrill.row !== sliceY)) return "wrong-claim";
     const currentDepth = userPlotState?.drillDay ?? userDrill?.drillDay ?? 0;
     if (currentDepth >= MAX_DEPTH) return "max-depth";
+    // Continuous-pump model: real players don't click to drill — the rig strikes
+    // once a day on its own. Admin/test keep manual drilling for verification.
+    if (!isAdmin && !isTest && !isReport) {
+      return userDrill?.rigDepleted ? "max-depth" : "auto-pumping";
+    }
     if (currentDepth >= playerDepth) return "depth-ceiling";
     return "ready";
-  }, [user, gamePhase, selectedX, sliceY, userDrill, userPlotState, playerDepth, isSummonerStunned, isBlockadeActive]);
+  }, [user, gamePhase, selectedX, sliceY, userDrill, userPlotState, playerDepth, isSummonerStunned, isBlockadeActive, isAdmin, isTest, isReport]);
 
   // Panel collapse for full 3D view
   const [panelsCollapsed, setPanelsCollapsed] = useState(false);
@@ -1437,7 +1442,9 @@ export default function OilPage() {
         if (user?.id && !isAdmin && !isTest && !hellApiCalledRef.current) {
           // Real player — call the API to create a demon bounty event
           hellApiCalledRef.current = true;
-          const unbankedOil = Math.max(0, playerExtracted - (lastDrainSnapshot || 0));
+          const unbankedOil = userDrill?.tankOil != null
+            ? Math.max(0, userDrill.tankOil)
+            : Math.max(0, playerExtracted - (lastDrainSnapshot || 0));
           fetch("/api/oil-demon-bounty", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1498,11 +1505,14 @@ export default function OilPage() {
     if (isTest) setLastDrainSnapshot(0);
   }, [isTest, selectedX, sliceY]);
 
-  // Oil currently in tank = total extracted minus snapshot at last drain
+  // Oil currently in tank. The strike loop writes an explicit `tankOil` accumulator
+  // (only the layers THIS rig struck — correct across claim-jumps to pre-drilled
+  // cells). Fall back to the legacy derived model for data predating the loop.
   const oilInTank = useMemo(() => {
+    if (userDrill?.tankOil != null) return Math.max(0, userDrill.tankOil);
     if (playerExtracted === 0) return 0;
     return Math.max(0, playerExtracted - lastDrainSnapshot);
-  }, [playerExtracted, lastDrainSnapshot]);
+  }, [userDrill?.tankOil, playerExtracted, lastDrainSnapshot]);
 
   // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
@@ -1735,8 +1745,10 @@ export default function OilPage() {
     const plotKey = `${col}_${row}`;
     const currentCellDepth = userPlotState?.drillDay ?? 0;
     const nextCellDepth = currentCellDepth + 1;
-    // Optimistic local update
-    setUserDrill((prev) => prev ? { ...prev, drillDay: nextCellDepth } : prev);
+    // Optimistic local update. Mirror the strike loop: a drill accumulates the
+    // drilled layer's oil into tankOil (the authoritative un-banked balance).
+    const oilAtDepth = stats.grid3D[col]?.[row]?.[nextCellDepth - 1] ?? 0;
+    setUserDrill((prev) => prev ? { ...prev, drillDay: nextCellDepth, tankOil: (prev.tankOil || 0) + oilAtDepth, lastStrikeOil: oilAtDepth, lastStrikeDepth: nextCellDepth } : prev);
     try {
       // Update oilPlots (cell depth)
       await setDoc(doc(db, "oilPlots", plotKey), {
@@ -1748,10 +1760,12 @@ export default function OilPage() {
         col,
         row,
         ...(username.trim() ? { username: username.trim() } : {}),
+        tankOil: increment(oilAtDepth),
+        lastStrikeOil: oilAtDepth,
+        lastStrikeDepth: nextCellDepth,
         updatedAt: serverTimestamp(),
       }, { merge: true });
       // Broadcast gusher event if oil exists at this depth
-      const oilAtDepth = stats.grid3D[col]?.[row]?.[nextCellDepth - 1] ?? 0;
       if (oilAtDepth > 0) {
         try {
           await addDoc(collection(db, "gusherEvents"), {
@@ -1970,16 +1984,16 @@ export default function OilPage() {
   // Server is the only writer to oilGame/communityStorage (rules locked).
   const handleTankDrain = useCallback(async () => {
     if (previewModeRef.current) return;
-    if (playerExtracted === 0) return;
-    const delta = Math.max(0, playerExtracted - lastDrainSnapshot);
-    if (delta === 0) return;
+    // Bank whatever is currently in the tank (tankOil when present, else legacy).
+    const delta = oilInTank;
+    if (delta <= 0) return;
     setTankDrained(true);
-    setLastDrainSnapshot(playerExtracted);
+    setLastDrainSnapshot(playerExtracted); // keep legacy marker aligned
     setCommunityOil(prev => prev + delta);
     if (userDrill) {
       const newTotal = (userDrill.totalCollected || 0) + delta;
       const newDrains = (userDrill.tankDrains || 0) + 1;
-      setUserDrill(prev => prev ? { ...prev, totalCollected: newTotal, tankDrains: newDrains, lastDrainExtracted: playerExtracted } : prev);
+      setUserDrill(prev => prev ? { ...prev, totalCollected: newTotal, tankDrains: newDrains, tankOil: 0, lastDrainExtracted: playerExtracted } : prev);
     }
     if (user?.id) {
       try {
@@ -2000,7 +2014,7 @@ export default function OilPage() {
         console.error("Failed to save tank drain:", err);
       }
     }
-  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot, username]);
+  }, [user?.id, userDrill, oilInTank, playerExtracted, username]);
 
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
@@ -3494,6 +3508,33 @@ export default function OilPage() {
           </div>
         </div>
       )}
+      {drillStatus === "auto-pumping" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={{ ...drillBtnStyles.active, cursor: "default" }}>
+            ⛏ RIG PUMPING
+          </button>
+          <div style={drillBtnStyles.depth}>DEPTH {cellDepth}/{MAX_DEPTH}</div>
+          {/* Depth progress bar — fills as the rig auto-strikes deeper */}
+          <div style={{ width: "100%", maxWidth: 220, height: 10, background: theme.barBg, borderRadius: 4, overflow: "hidden", border: `1px solid ${theme.border}`, position: "relative" }}>
+            <div style={{
+              width: `${(cellDepth / MAX_DEPTH) * 100}%`,
+              height: "100%",
+              background: `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
+              position: "absolute", left: 0, top: 0,
+            }} />
+          </div>
+          {userDrill?.lastStrikeDepth != null ? (
+            <div style={drillBtnStyles.hint}>
+              Last strike: depth {userDrill.lastStrikeDepth}{userDrill.lastStrikeOil > 0 ? ` — struck ${userDrill.lastStrikeOil.toLocaleString()}` : " — dry layer"}
+            </div>
+          ) : (
+            <div style={drillBtnStyles.hint}>Your rig drills on its own — no clicking needed.</div>
+          )}
+          <div style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.06em", fontStyle: "italic", textAlign: "center", maxWidth: 220 }}>
+            It strikes once a day — at an hour you can&apos;t predict. Keep an eye on it.
+          </div>
+        </div>
+      )}
       {drillStatus === "ready" && (
         <div style={drillBtnStyles.wrap}>
           <button onClick={handleDailyDrill} style={drillBtnStyles.active}>
@@ -4024,16 +4065,10 @@ export default function OilPage() {
                 <CameraShake shakeRef={shakeRef} />
               </CleanCanvas>
               {cctvOverlay}
-              <DrillHUD
-                drillEvent={drillEvent}
-                depthLevel={effectiveDrillDay}
-                maxDepth={DEPTH_Z}
-                oilStrike={oilStrike}
-                oilValue={drilledOilValue}
-                maxOil={stats.maxOil}
-                drillProximity={drillProximity}
-                hellActive={hellActive}
-              />
+              {/* DrillHUD renders once in the control block below the canvas
+                  (matches desktop). It used to also render here, inside the
+                  canvas wrap, which showed the gauges twice on the 3D tab and
+                  crowded/overlapped the drill control. */}
               <div style={{ ...styles.cornerBracket, top: 6, left: 6 }} />
               <div style={{ ...styles.cornerBracket, top: 6, right: 6, transform: "scaleX(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, left: 6, transform: "scaleY(-1)" }} />

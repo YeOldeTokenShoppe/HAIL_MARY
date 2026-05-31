@@ -1021,3 +1021,30 @@ exports.refreshRl80MarketManual = onRequest({
     res.status(500).json({error: err.message});
   }
 });
+
+// ── Oil game: continuous-pump strike loop ───────────────────────────────────
+// Hourly trigger that pings the Next.js route holding the strike logic. The
+// route is the single source of truth (it reuses generateOilDistribution3D and
+// firebaseAdmin), so the cron never drifts from what the client renders.
+// Each armed rig strikes once/day at its own unpredictable hour; the route's
+// per-day idempotency guard makes running every hour safe.
+exports.oilStrikeTick = onSchedule({
+  schedule: "0 * * * *",
+  timeZone: "UTC",
+  memory: "256MiB",
+  timeoutSeconds: 120,
+  secrets: ["CRON_SECRET"],
+}, async () => {
+  const base = process.env.APP_URL ||
+    "https://pumpkin--hailmary-3ff6c.us-central1.hosted.app";
+  try {
+    const res = await fetch(base + "/api/oil-strike-tick", {
+      method: "POST",
+      headers: {Authorization: "Bearer " + process.env.CRON_SECRET},
+    });
+    const body = await res.json().catch(() => ({}));
+    logger.info("[oilStrikeTick] tick complete", {status: res.status, body});
+  } catch (err) {
+    logger.error("[oilStrikeTick] tick failed:", err);
+  }
+});
