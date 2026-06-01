@@ -4611,6 +4611,7 @@ export default function OilPage() {
             drillProximity={drillProximity}
             darkMode={uiDark}
             parabolum={parabolum}
+            hud={hudMode}
             hellActive={hellActive}
             demonBlockade={demonBlockade}
           />
@@ -5084,6 +5085,7 @@ export default function OilPage() {
               drillProximity={drillProximity}
               darkMode={uiDark}
               parabolum={parabolum}
+              hud={hudMode}
               hellActive={hellActive}
             />
             {playerDrillPanel}

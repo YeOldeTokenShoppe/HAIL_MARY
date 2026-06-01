@@ -119,6 +119,7 @@ export default function DrillHUD({
   drillProximity = 0,
   darkMode = true,
   parabolum = false,
+  hud = false,
   hellActive = false,
   demonBlockade = null,
 }) {
@@ -128,6 +129,10 @@ export default function DrillHUD({
   parabolumRef.current = parabolum;
   const darkRef = useRef(darkMode);
   darkRef.current = darkMode;
+  // HUD reuses the Parabolum (dark) violet status palette so the readout matches
+  // the violet selection highlights.
+  const hudRef = useRef(hud);
+  hudRef.current = hud;
   const [pressure, setPressure] = useState(0);
   const [density, setDensity] = useState(0);
   const [status, setStatus] = useState("STANDBY");
@@ -172,7 +177,7 @@ export default function DrillHUD({
       const tier = classifyTier(val, mx);
       const info = DENSITY_LABELS[tier];
       setStatus(`RESULT: ${info.label}`);
-      setStatusColor(parabolumRef.current ? (darkRef.current ? DENSITY_COLORS_PARA_DARK : DENSITY_COLORS_PARA_LIGHT)[tier] : info.color);
+      setStatusColor((parabolumRef.current || hudRef.current) ? (darkRef.current ? DENSITY_COLORS_PARA_DARK : DENSITY_COLORS_PARA_LIGHT)[tier] : info.color);
       setPressure(val > 0 ? 80 + (tier / 4) * 19 : 3 + Math.random() * 8);
       setDensity(val > 0 ? 55 + (tier / 4) * 44 : 1 + Math.random() * 4);
     }
@@ -190,7 +195,7 @@ export default function DrillHUD({
         setPressure(prelimP);
         setDensity(0);
         setStatus(`AREA SCAN: ${prelim.label}`);
-        setStatusColor(parabolumRef.current ? (darkRef.current ? PRELIM_COLORS_PARA_DARK : PRELIM_COLORS_PARA_LIGHT)[prelimIdx] : prelim.color);
+        setStatusColor((parabolumRef.current || hudRef.current) ? (darkRef.current ? PRELIM_COLORS_PARA_DARK : PRELIM_COLORS_PARA_LIGHT)[prelimIdx] : prelim.color);
         setPhase("preliminary");
       }, PRELIM_DELAY);
       return;
