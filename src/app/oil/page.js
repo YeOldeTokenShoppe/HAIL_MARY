@@ -36,11 +36,11 @@ const ENV_PRESETS = {
   dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
   night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.38, dirA: 1.1, dirB: 0.6, dirAColor: "#aac4ff", dirBColor: "#6a80c0", point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: { sky: "#2e3650", ground: "#161824", intensity: 0.4 } },
   hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } },
-  // Backdrop for HUD mode — a colorful sunset: deep indigo-blue overhead melting
+  // Backdrop for Geode mode — a colorful sunset: deep indigo-blue overhead melting
   // into a warm rose/amber horizon. Lighter than night so the field stays alive,
-  // but saturated and dusky enough that the cool frosted-glass HUD panels read as
+  // but saturated and dusky enough that the cool frosted-glass Geode panels read as
   // glowing glass rather than muddy brown. Warm key light + cool fill.
-  hudDusk: { sky: "#1613d7", skyBottom: "#8519d3", ambient: 0.56, dirA: 2.8, dirB: 1.4, dirAColor: "#ffc890", dirBColor: "#88b0e0", point: "#e09060", cloudOpacity: 0.22, fog: "#4a3f55", hemi: { sky: "#5a5a88", ground: "#3a2e3a", intensity: 0.5 } },
+  GeodeDusk: { sky: "#1613d7", skyBottom: "#8519d3", ambient: 0.56, dirA: 2.8, dirB: 1.4, dirAColor: "#ffc890", dirBColor: "#88b0e0", point: "#e09060", cloudOpacity: 0.22, fog: "#4a3f55", hemi: { sky: "#5a5a88", ground: "#3a2e3a", intensity: 0.5 } },
   // Self-contained scene for Parabolum — an arcane violet twilight. Brighter
   // ambient than night (which left the ground near-black) so the field reads,
   // with violet key/fill/point lights to match the Parabolum console.
@@ -121,12 +121,12 @@ const THEMES = {
     btnText: "#c9b3e6", btnBg: "rgba(123,45,214,0.16)",
     cornerBorder: "rgba(164,92,255,0.3)",
   },
-  // HUD — mirrors the SpaceScene prospecting-HUD palette (the `HUD` constant in
+  // Geode — mirrors the SpaceScene prospecting-Geode palette (the `Geode` constant in
   // SpaceScene.jsx): gold/cyan/orange accents floating on a translucent
   // indigo-black panel. A standalone reskin of the overlay chrome, toggled
   // independently of the day/dark/parabolum controls. Cyan rides on the `green`
   // token (status + positive readouts); orange rides on `warn`.
-  hud: {
+  Geode: {
     bg: "#0f141c", text: "#aebccb", textStrong: "#e8d9b8", accent: "#d4a854",
     muted: "#7e94a6", border: "rgba(107,199,209,0.24)", borderLight: "rgba(107,199,209,0.14)",
     panelBg: "rgba(15,22,30,0.08)", headerBg: "rgba(13,19,27,0.66)",
@@ -536,7 +536,7 @@ const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ss
 const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
 const OilPlotChat = dynamic(() => import("@/components/OilPlotChat"), { ssr: false });
 const CoreSamplePanel = dynamic(() => import("@/components/CoreSamplePanel"), { ssr: false });
-const DrillHUD = dynamic(() => import("@/components/DrillHUD"), { ssr: false });
+const DrillGeode = dynamic(() => import("@/components/DrillGeode"), { ssr: false });
 const OilChatModal = dynamic(() => import("@/components/OilChatModal"), { ssr: false });
 const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
 // OilPlotDraft removed — plot picking now merged into OilQualify
@@ -903,21 +903,21 @@ export default function OilPage() {
     }
     return false;
   });
-  // HUD overlay reskin — gold/cyan/orange-on-dark prospecting console (mirrors
-  // the SpaceScene HUD). The translucent panels need a dark backdrop to read as
-  // glowing glass, so HUD mode also swaps the 3D scene to a deep, cool dusk
-  // (not full night — that's too dark). Toggling HUD off restores the user's
+  // Geode overlay reskin — gold/cyan/orange-on-dark prospecting console (mirrors
+  // the SpaceScene Geode). The translucent panels need a dark backdrop to read as
+  // glowing glass, so Geode mode also swaps the 3D scene to a deep, cool dusk
+  // (not full night — that's too dark). Toggling Geode off restores the user's
   // chosen scene. Mutually exclusive with parabolum (the toggles clear each other).
-  const [hudMode, setHudMode] = useState(() => {
+  const [GeodeMode, setGeodeMode] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("oil_hudMode") === "true";
+      return localStorage.getItem("oil_GeodeMode") === "true";
     }
     return false;
   });
-  // Active scene lighting: HUD forces the dusk backdrop and Parabolum forces its
+  // Active scene lighting: Geode forces the dusk backdrop and Parabolum forces its
   // own violet-lit scene (both are self-contained themed looks, independent of
   // the day/dusk/night presets); otherwise the user's selected time-of-day.
-  const env = ENV_PRESETS[hudMode ? "hudDusk" : parabolum ? "parabolumEnv" : envPreset];
+  const env = ENV_PRESETS[GeodeMode ? "GeodeDusk" : parabolum ? "parabolumEnv" : envPreset];
   // Don't persist the transient "hell" preset — otherwise a reload during a
   // demon event restores hell forever. Keep the last real preset saved instead.
   useEffect(() => {
@@ -925,12 +925,12 @@ export default function OilPage() {
   }, [envPreset]);
   useEffect(() => { localStorage.setItem("oil_darkMode", String(darkMode)); }, [darkMode]);
   useEffect(() => { localStorage.setItem("oil_parabolum", String(parabolum)); }, [parabolum]);
-  useEffect(() => { localStorage.setItem("oil_hudMode", String(hudMode)); }, [hudMode]);
+  useEffect(() => { localStorage.setItem("oil_GeodeMode", String(GeodeMode)); }, [GeodeMode]);
   // Parabolum overrides light/dark for the UI chrome when active, but still
   // Parabolum is a self-contained dark violet look (its own violet scene), so it
   // always uses the dark console — there's no Parabolum "day" variant.
-  const themeKey = hudMode
-    ? "hud"
+  const themeKey = GeodeMode
+    ? "Geode"
     : parabolum
       ? "parabolumDark"
       : envPreset === "solstice"
@@ -938,9 +938,9 @@ export default function OilPage() {
         : (darkMode ? "dark" : "light");
   const theme = THEMES[themeKey];
   // Effective dark flag for the child overlay panels (CoreSamplePanel, How-To,
-  // inspector, etc.). HUD, Parabolum, and dark mode are all dark aesthetics, so
+  // inspector, etc.). Geode, Parabolum, and dark mode are all dark aesthetics, so
   // their panels render dark even when the day/night toggle is on "day".
-  const uiDark = darkMode || hudMode || parabolum;
+  const uiDark = darkMode || GeodeMode || parabolum;
   const styles = useMemo(() => getStyles(theme), [theme]);
   const m = useMemo(() => getMobileStyles(theme), [theme]);
   const drillBtnStyles = useMemo(() => getDrillStyles(theme), [theme]);
@@ -1174,13 +1174,35 @@ export default function OilPage() {
     return () => unsub();
   }, []);
 
-  // Derived: is the current user the stunned summoner?
-  const isSummonerStunned = useMemo(() => {
-    if (!demonBlockade?.active || !user?.id) return false;
-    if (demonBlockade.summonerId !== user.id) return false;
-    const stunEnd = demonBlockade.stunEndsAt?.toMillis?.() ?? demonBlockade.stunEndsAt?.seconds * 1000;
-    return stunEnd ? Date.now() < stunEnd : false;
-  }, [demonBlockade, user?.id]);
+  // Is the current user the summoner of the active blockade?
+  const isBlockadeSummoner = !!(
+    demonBlockade?.active && user?.id && demonBlockade.summonerId === user.id
+  );
+  // Stun countdown. A plain useMemo over Date.now() never recomputes when
+  // wall-clock time passes, so it would leave the summoner "INCAPACITATED"
+  // forever once the timer hit zero. Drive it from a 1s interval instead so the
+  // stun actually releases and the demon becomes dismissable.
+  const [stunRemaining, setStunRemaining] = useState(0);
+  const [stunActive, setStunActive] = useState(false);
+  useEffect(() => {
+    const stunEnd =
+      demonBlockade?.stunEndsAt?.toMillis?.() ??
+      (demonBlockade?.stunEndsAt?.seconds ? demonBlockade.stunEndsAt.seconds * 1000 : 0);
+    if (!isBlockadeSummoner || !stunEnd) {
+      setStunRemaining(0);
+      setStunActive(false);
+      return;
+    }
+    const tick = () => {
+      const leftMs = stunEnd - Date.now();
+      setStunRemaining(Math.max(0, Math.ceil(leftMs / 1000)));
+      setStunActive(leftMs > 0);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isBlockadeSummoner, demonBlockade?.stunEndsAt]);
+  const isSummonerStunned = isBlockadeSummoner && stunActive;
 
   const isBlockadeActive = demonBlockade?.active === true;
 
@@ -1383,15 +1405,32 @@ export default function OilPage() {
     setPurchaseModalItem(null);
   }, []);
 
+  // The player's own plot, sourced from the SAME data the surface map uses for its
+  // persistent "isMine" highlight (oilPlots ownership) — so auto-select and the
+  // cross-section agree with the surface even when oilDrills.col is stale/null.
+  const myPlot = useMemo(() => {
+    if (!user?.id) return null;
+    for (const key in allPlotsMap) {
+      if (allPlotsMap[key]?.currentOwnerId === user.id) {
+        const [c, r] = key.split("_").map(Number);
+        return { col: c, row: r };
+      }
+    }
+    return null;
+  }, [allPlotsMap, user?.id]);
+
   // Auto-select the user's claim on load
   const didAutoSelect = useRef(false);
   useEffect(() => {
-    if (userDrill?.col != null && !didAutoSelect.current) {
+    if (didAutoSelect.current) return;
+    const col = userDrill?.col ?? myPlot?.col;
+    const row = userDrill?.row ?? myPlot?.row;
+    if (col != null) {
       didAutoSelect.current = true;
-      setSelectedX(userDrill.col);
-      setSliceY(userDrill.row);
+      setSelectedX(col);
+      setSliceY(row ?? 0);
     }
-  }, [userDrill]);
+  }, [userDrill, myPlot]);
 
   const handleSaveUsername = useCallback(async () => {
     if (previewModeRef.current) return;
@@ -1716,7 +1755,7 @@ export default function OilPage() {
   // Cross-section highlight column: the active selection, or fall back to the
   // player's own claim column so it always marks the same column the surface map
   // emphasizes (the isMine plot) even when nothing is actively selected.
-  const xsecCol = selectedX !== null ? selectedX : (userDrill?.col ?? null);
+  const xsecCol = selectedX !== null ? selectedX : (userDrill?.col ?? myPlot?.col ?? null);
 
   // Session-local drain tracking (declared early — used by hell pocket detection)
   const [tankDrained, setTankDrained] = useState(false);
@@ -1752,13 +1791,23 @@ export default function OilPage() {
   const lastHellCheckRef = useRef(null);
   const hellApiCalledRef = useRef(false);
   useEffect(() => {
-    if (selectedX === null) return;
-    const col = activeUserDrill?.col ?? selectedX;
-    const row = activeUserDrill?.row ?? sliceY;
-    const checkKey = `${col}_${row}_${effectiveDrillDay}`;
+    // Which cell + depth represents the player drilling into a hell pocket?
+    // Real players: their OWN plot at their OWN drill depth — so merely
+    // inspecting/selecting other cells around the grid never summons a demon.
+    // Test/admin: the selected cell, so it can be triggered on demand.
+    const useSelection = isTest || isAdmin;
+    const col = useSelection ? selectedX : userDrill?.col;
+    const row = useSelection ? sliceY : userDrill?.row;
+    const depth = useSelection ? effectiveDrillDay : (userDrill?.drillDay ?? 0);
+    if (col == null || row == null || depth === 0) return;
+    const checkKey = `${col}_${row}_${depth}`;
     if (checkKey === lastHellCheckRef.current) return;
     lastHellCheckRef.current = checkKey;
-    for (let z = 0; z < effectiveDrillDay; z++) {
+    // Only the just-drilled (deepest) layer counts as "drilling into" the
+    // pocket. Scanning every layer would re-summon a demon on every drill that
+    // goes deeper than a pocket you already passed.
+    {
+      const z = depth - 1;
       const hellKey = `${col}_${row}_${z}`;
       if (stats.hellMap[hellKey] && !hellActive) {
         if (user?.id && !isAdmin && !isTest && !hellApiCalledRef.current) {
@@ -1805,10 +1854,9 @@ export default function OilPage() {
             hellTimeoutRef.current = null;
           }, 90000);
         }
-        break;
       }
     }
-  }, [selectedX, sliceY, effectiveDrillDay, activeUserDrill, stats.hellMap, hellActive, envPreset, user?.id, isAdmin, isTest, playerExtracted, lastDrainSnapshot, username]);
+  }, [selectedX, sliceY, effectiveDrillDay, userDrill, stats.hellMap, hellActive, envPreset, user?.id, isAdmin, isTest, playerExtracted, lastDrainSnapshot, username]);
 
   // Reset drained state when cell or drill depth changes
   useEffect(() => {
@@ -2394,21 +2442,6 @@ export default function OilPage() {
   const bountyToastTimer = useRef(null);
 
   // Stun countdown — ticks every second while summoner is stunned
-  const [stunRemaining, setStunRemaining] = useState(0);
-  useEffect(() => {
-    if (!isSummonerStunned || !demonBlockade?.stunEndsAt) {
-      setStunRemaining(0);
-      return;
-    }
-    const stunEnd = demonBlockade.stunEndsAt.toMillis?.() ?? demonBlockade.stunEndsAt.seconds * 1000;
-    const tick = () => {
-      const left = Math.max(0, Math.ceil((stunEnd - Date.now()) / 1000));
-      setStunRemaining(left);
-    };
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [isSummonerStunned, demonBlockade?.stunEndsAt]);
 
   // Watch for bounty claim by anyone (Firestore status goes to "claimed")
   const prevBountyStatusRef = useRef(null);
@@ -4410,7 +4443,7 @@ export default function OilPage() {
                 <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
                 <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
                 <group position={[0, 1, 0]}>
-                  {hudMode && <FieldUnderglow />}
+                  {GeodeMode && <FieldUnderglow />}
                   <OilVoxelGrid
                     blockHash={blockHash}
                     numberOfDeposits={numberOfDeposits}
@@ -4477,7 +4510,7 @@ export default function OilPage() {
                 <CameraShake shakeRef={shakeRef} />
               </CleanCanvas>
               {cctvOverlay}
-              {/* DrillHUD renders once in the control block below the canvas
+              {/* DrillGeode renders once in the control block below the canvas
                   (matches desktop). It used to also render here, inside the
                   canvas wrap, which showed the gauges twice on the 3D tab and
                   crowded/overlapped the drill control. */}
@@ -4536,8 +4569,8 @@ export default function OilPage() {
                 <div style={TOOLBAR_DIVIDER} />
                 <button
                   title="Solstice theme"
-                  onClick={() => { setEnvPreset("solstice"); setParabolum(false); setHudMode(false); setDarkMode(false); setFireworksOn(false); }}
-                  style={toolbarBtn(envPreset === "solstice" && !parabolum && !hudMode, 26)}
+                  onClick={() => { setEnvPreset("solstice"); setParabolum(false); setGeodeMode(false); setDarkMode(false); setFireworksOn(false); }}
+                  style={toolbarBtn(envPreset === "solstice" && !parabolum && !GeodeMode, 26)}
                 >✺</button>
                 <button
                   title={darkMode ? "Dark theme (active)" : "Dark theme"}
@@ -4546,13 +4579,13 @@ export default function OilPage() {
                 >{darkMode ? "●" : "◐"}</button>
                 <button
                   title="Parabolum theme"
-                  onClick={() => { setParabolum((p) => !p); setHudMode(false); }}
+                  onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
                   style={toolbarBtn(parabolum, 26, "violet")}
                 >◈</button>
                 <button
-                  title="HUD console theme"
-                  onClick={() => { setHudMode((h) => !h); setParabolum(false); }}
-                  style={toolbarBtn(hudMode, 26, "cyan")}
+                  title="Geode theme"
+                  onClick={() => { setGeodeMode((h) => !h); setParabolum(false); }}
+                  style={toolbarBtn(GeodeMode, 26, "cyan")}
                 >⊞</button>
                 </div>
               </div>
@@ -4601,7 +4634,7 @@ export default function OilPage() {
           {/* Panels below active view */}
           {testStepper}
           {drillButton}
-          <DrillHUD
+          <DrillGeode
             drillEvent={drillEvent}
             depthLevel={effectiveDrillDay}
             maxDepth={DEPTH_Z}
@@ -4611,7 +4644,7 @@ export default function OilPage() {
             drillProximity={drillProximity}
             darkMode={uiDark}
             parabolum={parabolum}
-            hud={hudMode}
+            Geode={GeodeMode}
             hellActive={hellActive}
             demonBlockade={demonBlockade}
           />
@@ -4631,7 +4664,7 @@ export default function OilPage() {
             maxOil={stats.maxOil}
             darkMode={uiDark}
             parabolum={parabolum}
-            hud={hudMode}
+            Geode={GeodeMode}
             isMobile
             gridX={gridSize}
             gridY={gridSize}
@@ -4877,7 +4910,7 @@ export default function OilPage() {
             <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
             <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
             <group position={[0, 5, 0]}>
-              {hudMode && <FieldUnderglow />}
+              {GeodeMode && <FieldUnderglow />}
               <OilVoxelGrid
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
@@ -5000,8 +5033,8 @@ export default function OilPage() {
             <div style={TOOLBAR_DIVIDER} />
             <button
               title="Solstice theme"
-              onClick={() => { setEnvPreset("solstice"); setParabolum(false); setHudMode(false); setDarkMode(false); setFireworksOn(false); }}
-              style={toolbarBtn(envPreset === "solstice" && !parabolum && !hudMode, 28)}
+              onClick={() => { setEnvPreset("solstice"); setParabolum(false); setGeodeMode(false); setDarkMode(false); setFireworksOn(false); }}
+              style={toolbarBtn(envPreset === "solstice" && !parabolum && !GeodeMode, 28)}
             >✺</button>
             <button
               title={darkMode ? "Dark theme (active)" : "Dark theme"}
@@ -5010,13 +5043,13 @@ export default function OilPage() {
             >{darkMode ? "●" : "◐"}</button>
             <button
               title="Parabolum theme"
-              onClick={() => { setParabolum((p) => !p); setHudMode(false); }}
+              onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
               style={toolbarBtn(parabolum, 28, "violet")}
             >◈</button>
             <button
-              title="HUD console theme"
-              onClick={() => { setHudMode((h) => !h); setParabolum(false); }}
-              style={toolbarBtn(hudMode, 28, "cyan")}
+              title="Geode theme"
+              onClick={() => { setGeodeMode((h) => !h); setParabolum(false); }}
+              style={toolbarBtn(GeodeMode, 28, "cyan")}
             >⊞</button>
             </div>
             <button
@@ -5075,7 +5108,7 @@ export default function OilPage() {
           }}>
             {testStepper}
             {drillButton}
-            <DrillHUD
+            <DrillGeode
               drillEvent={drillEvent}
               depthLevel={effectiveDrillDay}
               maxDepth={DEPTH_Z}
@@ -5085,7 +5118,7 @@ export default function OilPage() {
               drillProximity={drillProximity}
               darkMode={uiDark}
               parabolum={parabolum}
-              hud={hudMode}
+              Geode={GeodeMode}
               hellActive={hellActive}
             />
             {playerDrillPanel}
@@ -5098,7 +5131,7 @@ export default function OilPage() {
               maxOil={stats.maxOil}
               darkMode={uiDark}
               parabolum={parabolum}
-              hud={hudMode}
+              Geode={GeodeMode}
               gridX={gridSize}
               gridY={gridSize}
               selectedX={selectedX}

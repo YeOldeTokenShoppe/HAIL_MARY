@@ -601,7 +601,7 @@ export default function OilQualify({
                 <div style={{
                   position: "absolute",
                   top: "82%",
-                  right: "15%",
+                  right: "20%",
                   fontFamily: "'Homemade Apple', cursive",
                   fontSize: isMobile ? "0.5em" : 15,
                   color: inkColor,
@@ -610,7 +610,7 @@ export default function OilQualify({
                   opacity: 0.85,
                   whiteSpace: "nowrap",
                 }}>
-                  Hail Mary Prospecting Co.
+                  Mary
                 </div>
               </>
             );
