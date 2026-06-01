@@ -30,13 +30,33 @@ const DENSITY_COLORS_LIGHT = [
   { fill: "#c05a10", opacity: 0.95, label: "RICH VEIN" },
 ];
 
-function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio }) {
+// Parabolum (dark) — arcane violet strata glowing on indigo-black.
+const DENSITY_COLORS_PARABOLUM_DARK = [
+  { fill: "#1f1530", opacity: 0.5, label: "SHALE" },
+  { fill: "#4a2d7a", opacity: 0.6, label: "SANDSTONE" },
+  { fill: "#7b3dd6", opacity: 0.72, label: "OIL SAND" },
+  { fill: "#a45cff", opacity: 0.85, label: "CRUDE" },
+  { fill: "#d89bff", opacity: 0.95, label: "RICH VEIN" },
+];
+
+// Parabolum (light) — iridescent slick: teal → cyan-blue → violet → magenta.
+const DENSITY_COLORS_PARABOLUM_LIGHT = [
+  { fill: "#bee0db", opacity: 0.5, label: "SHALE" },
+  { fill: "#5ab4c8", opacity: 0.64, label: "SANDSTONE" },
+  { fill: "#4e7fd0", opacity: 0.76, label: "OIL SAND" },
+  { fill: "#8a3dd6", opacity: 0.86, label: "CRUDE" },
+  { fill: "#c81f8a", opacity: 0.95, label: "RICH VEIN" },
+];
+
+const PARABOLUM_COLORS = (dark) => (dark ? DENSITY_COLORS_PARABOLUM_DARK : DENSITY_COLORS_PARABOLUM_LIGHT);
+
+function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio, parabolum = false }) {
   const tubeX = 42;
   const tubeY = 10;
   const tubeW = 56;
   const tubeH = 260;
   const bandH = tubeH / DEPTH_Z;
-  const colors = dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
+  const colors = parabolum ? PARABOLUM_COLORS(dark) : dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
   const svgW = 270;
   const svgH = tubeH + 24;
   const fillHeight = tubeH * Math.min(1, Math.max(0, revealRatio));
@@ -257,13 +277,13 @@ function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio }) 
   );
 }
 
-function PersonalCoreTube({ column, maxOil, drillDepth, dark, hellDepths = [] }) {
+function PersonalCoreTube({ column, maxOil, drillDepth, dark, hellDepths = [], parabolum = false }) {
   const tubeX = 42;
   const tubeY = 10;
   const tubeW = 56;
   const tubeH = 260;
   const bandH = tubeH / DEPTH_Z;
-  const colors = dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
+  const colors = parabolum ? PARABOLUM_COLORS(dark) : dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
   const svgW = 270;
   const svgH = tubeH + 24;
   const drilledH = Math.min(drillDepth, DEPTH_Z) * bandH;
@@ -500,8 +520,8 @@ function PersonalCoreTube({ column, maxOil, drillDepth, dark, hellDepths = [] })
   );
 }
 
-function Legend({ dark }) {
-  const colors = dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
+function Legend({ dark, parabolum = false }) {
+  const colors = parabolum ? PARABOLUM_COLORS(dark) : dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
   return (
     <div style={{
       display: "flex", flexWrap: "wrap", gap: "4px 10px",
@@ -533,6 +553,7 @@ export default function CoreSamplePanel({
   grid3D,
   maxOil,
   darkMode = false,
+  parabolum = false,
   isMobile = false,
   defaultExpanded = false,
   gridX = 10,
@@ -550,7 +571,17 @@ export default function CoreSamplePanel({
   const startRef = useRef(0);
 
   const dark = darkMode;
-  const c = dark ? {
+  const c = parabolum ? (dark ? {
+    accent: "#c79bff", muted: "#7a6a9c",
+    sectionBorder: "#2a1d44",
+    btnBg: "rgba(123,45,214,0.16)", btnBorder: "rgba(164,92,255,0.35)",
+    btnBgHover: "rgba(123,45,214,0.28)",
+  } : {
+    accent: "#7a2dd6", muted: "#5e7178",
+    sectionBorder: "#c8dcd9",
+    btnBg: "rgba(123,45,214,0.08)", btnBorder: "rgba(106,45,176,0.28)",
+    btnBgHover: "rgba(123,45,214,0.16)",
+  }) : dark ? {
     accent: "#d4a854", muted: "#6a7888",
     sectionBorder: "#2a2e36",
     btnBg: "rgba(212,168,84,0.12)", btnBorder: "rgba(212,168,84,0.3)",
@@ -703,8 +734,9 @@ export default function CoreSamplePanel({
                   drillDepth={drillDepth}
                   dark={dark}
                   hellDepths={hellDepthsForPlot}
+                  parabolum={parabolum}
                 />
-                <Legend dark={dark} />
+                <Legend dark={dark} parabolum={parabolum} />
                 <div style={{
                   fontSize: 9, color: dark ? "#5a6878" : "#908878",
                   fontFamily: "'Share Tech Mono', monospace",
@@ -775,6 +807,7 @@ export default function CoreSamplePanel({
                 peakDepth={peakDepth}
                 dark={dark}
                 revealRatio={revealRatio}
+                parabolum={parabolum}
               />
 
               {analysisState === "running" && (
@@ -789,7 +822,7 @@ export default function CoreSamplePanel({
 
               {analysisState === "complete" && (
                 <>
-                  <Legend dark={dark} />
+                  <Legend dark={dark} parabolum={parabolum} />
                   <div style={{
                     fontSize: 9, color: dark ? "#5a6878" : "#908878",
                     fontFamily: "'Share Tech Mono', monospace",

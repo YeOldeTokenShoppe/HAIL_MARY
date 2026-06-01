@@ -1,6 +1,20 @@
 "use client";
 
-function getSurfaceColor(value, maxValue, dark) {
+function getSurfaceColor(value, maxValue, dark, parabolum) {
+  if (parabolum) {
+    if (value === 0) return dark ? "#1a1030" : "#dfeae8";
+    const tp = Math.min(value / maxValue, 1);
+    if (dark) {
+      // Parabolum (dark): deep indigo → arcane violet → glowing lilac
+      if (tp < 0.3) return `rgb(${Math.round(44 + tp * 100)}, ${Math.round(24 + tp * 50)}, ${Math.round(70 + tp * 150)})`;
+      if (tp < 0.6) return `rgb(${Math.round(90 + tp * 110)}, ${Math.round(48 + tp * 70)}, ${Math.round(160 + tp * 110)})`;
+      return `rgb(${Math.round(168 + tp * 70)}, ${Math.round(108 + tp * 90)}, ${Math.round(210 + tp * 40)})`;
+    }
+    // Parabolum (light): iridescent slick — teal → cyan-blue → violet → magenta
+    if (tp < 0.3) { const p = tp / 0.3; return `rgb(${Math.round(176 - p * 80)}, ${Math.round(216 - p * 66)}, ${Math.round(214 - p * 8)})`; }
+    if (tp < 0.6) { const p = (tp - 0.3) / 0.3; return `rgb(${Math.round(96 + p * 44)}, ${Math.round(150 - p * 92)}, ${Math.round(206 + p * 6)})`; }
+    { const p = (tp - 0.6) / 0.4; return `rgb(${Math.round(140 + p * 60)}, ${Math.round(58 - p * 30)}, ${Math.round(212 - p * 74)})`; }
+  }
   if (value === 0) return dark ? "#2a2a34" : "#e8e0d4";
   const t = Math.min(value / maxValue, 1);
   if (dark) {
@@ -26,8 +40,9 @@ export default function OilSurfaceMap({
   claimJumpMode = false,
   onClaimJump,
   currentUserId,
+  parabolum = false,
 }) {
-  const dark = theme?.bg === "#12161c";
+  const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717";
   const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#5a8a3a", accent: "#7a5a1a" };
 
   return (
@@ -105,7 +120,7 @@ export default function OilSurfaceMap({
             } else if (isJumpTarget) {
               bg = dark ? "rgba(212,168,84,0.15)" : "rgba(212,168,84,0.12)";
             } else {
-              bg = getSurfaceColor(claim.total, maxClaimTotal, dark);
+              bg = getSurfaceColor(claim.total, maxClaimTotal, dark, parabolum);
             }
 
             return (

@@ -92,7 +92,7 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 - **Tank:** **uncapped.** `tankOil` grows freely; dino risk scales with hoarding instead of a cap.
 
 **Implemented (server core — Slice 1):**
-- `src/app/api/oil-strike-tick/route.js` — the strike loop. Hourly-safe, idempotent per day, reuses `generateOilDistribution3D` + `getAdminDb` (single source of truth). Manual test: `GET /api/oil-strike-tick?password=<ADMIN_PASSWORD>&force=1`.
+- `src/app/api/oil-strike-tick/route.js` — the strike loop. Hourly-safe, idempotent per day, reuses `generateOilDistribution3D` + `getAdminDb` (single source of truth). Manual test: `GET /api/oil-strike-tick?password=<ADMIN_PASSWORD>&force=1` (add `&deep=N`, 1–20, to drill N layers in one call for testing — bypasses the once-per-day guard; affects all claimed rigs; Telegram suppressed during deep drills). `&scout=1` returns the richest cells (no writes) so a tester can aim a rig — gives 0-based `col`/`row`, the on-screen `label` (col+1,row+1), and `bestLayer`.
 - `functions/index.js` → `oilStrikeTick` — hourly Firebase scheduled function that pings the route (needs `CRON_SECRET`; `APP_URL` optional). Deploy with `firebase deploy --only functions`.
 - New `oilDrills` fields written by the striker: `tankOil`, `lastStrikeDate`, `lastStrikeAt`, `lastStrikeOil`, `lastStrikeDepth`, `lastStrikeHell`, `armed`, `rigDepleted`.
 
@@ -116,9 +116,13 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 **Remaining UI polish (optional):**
 - A "while you were away" summary toast (uses `lastStrikeAt`/`lastStrikeOil`/`lastStrikeDepth`) — the result is currently surfaced inline in the pump indicator + via the existing 3D strike visual, so this is purely a flourish.
 
+**Decided (2026-05-31):**
+- **End-of-season un-banked oil → credited to the player, never lost.** Un-banked `tankOil` belongs to the player; banking *during* the season is optional theft-protection (the dino can take a % of un-banked oil), not a scoring gate. Payout = `totalCollected` + any remaining `tankOil`. No "bank before the buzzer" pressure. **Implementation TODO:** `scripts/oil-payout.js` reads only `totalCollected` today — either sweep all `tankOil → totalCollected` at season end, or sum both in the payout.
+- **EV-per-player: flat floor, trending up — never declining.** Pot scales at least linearly with participation (per-qualified-wallet sponsor bounty) so EV stays flat as the game grows; as traction attracts bigger sponsorships the pot grows faster than headcount and EV *rises*. Growth always rewards existing players → referrals stay strongly positive-sum.
+
+**Tank meter copy (done 2026-05-31):** relabeled to reflect the uncapped tank — header "TANK · UNBANKED", readout shows raw `{tankOil} USDC` (no `/cap`), and the over-threshold prompt is "TANK HEAVY — BANK SOON" (button) instead of "TANK FULL". `TANK_CAPACITY = 5` now only drives the meter's red "bank soon" threshold, not a storage limit.
+
 **Open decisions:**
-- EV-per-player as the game grows: **flat** (pot scales ~linearly with players — maximally referral-friendly) vs **gently declining** (sub-linear — early players keep an edge).
-- End-of-season un-banked oil: auto-bank vs "bank before the buzzer" finale.
 - Default substance: oil vs goo vs hybrid (oil baseline + goo jackpot).
 
 ## Game Phase Flow

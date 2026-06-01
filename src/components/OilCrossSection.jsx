@@ -2,7 +2,26 @@
 
 const DEPTH_Z = 20;
 
-function getOilColor(value, maxValue, dark) {
+function getOilColor(value, maxValue, dark, parabolum) {
+  if (parabolum) {
+    const tp = Math.min(value / maxValue, 1);
+    if (dark) {
+      if (value === 0) return "#160d26";
+      // Parabolum (dark): indigo strata → arcane violet → glowing lilac vein
+      if (tp < 0.15) { const p = tp / 0.15; return `rgb(${Math.round(38 + p * 26)}, ${Math.round(22 + p * 20)}, ${Math.round(58 + p * 40)})`; }
+      if (tp < 0.35) { const p = (tp - 0.15) / 0.2; return `rgb(${Math.round(64 + p * 46)}, ${Math.round(42 + p * 24)}, ${Math.round(98 + p * 60)})`; }
+      if (tp < 0.6)  { const p = (tp - 0.35) / 0.25; return `rgb(${Math.round(110 + p * 50)}, ${Math.round(66 + p * 30)}, ${Math.round(158 + p * 60)})`; }
+      if (tp < 0.8)  { const p = (tp - 0.6) / 0.2; return `rgb(${Math.round(160 + p * 40)}, ${Math.round(96 + p * 36)}, ${Math.round(218 + p * 25)})`; }
+      const p = (tp - 0.8) / 0.2; return `rgb(${Math.round(200 + p * 40)}, ${Math.round(132 + p * 50)}, ${Math.round(243 + p * 12)})`;
+    }
+    // Parabolum (light): iridescent slick — teal → cyan-blue → violet → magenta
+    if (value === 0) return "#e6efed";
+    if (tp < 0.15) { const p = tp / 0.15; return `rgb(${Math.round(190 - p * 70)}, ${Math.round(224 - p * 28)}, ${Math.round(220 - p * 10)})`; }
+    if (tp < 0.35) { const p = (tp - 0.15) / 0.2; return `rgb(${Math.round(120 - p * 42)}, ${Math.round(196 - p * 46)}, ${Math.round(210)})`; }
+    if (tp < 0.6)  { const p = (tp - 0.35) / 0.25; return `rgb(${Math.round(78 + p * 32)}, ${Math.round(150 - p * 60)}, ${Math.round(210 + p * 4)})`; }
+    if (tp < 0.8)  { const p = (tp - 0.6) / 0.2; return `rgb(${Math.round(110 + p * 40)}, ${Math.round(90 - p * 38)}, ${Math.round(214 - p * 14)})`; }
+    const p = (tp - 0.8) / 0.2; return `rgb(${Math.round(150 + p * 50)}, ${Math.round(52 - p * 24)}, ${Math.round(200 - p * 66)})`;
+  }
   if (value === 0) return dark ? "#1e1e26" : "#ede6da";
   const t = Math.min(value / maxValue, 1);
   if (dark) {
@@ -56,8 +75,9 @@ export default function OilCrossSection({
   theme,
   gridX = 10,
   gridY = 10,
+  parabolum = false,
 }) {
-  const dark = theme?.bg === "#12161c";
+  const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717";
   const t = theme || { text: "#5a4e3e", muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", accent: "#7a5a1a", gold: "#d4a854", goldBorder: "#b8922e", textStrong: "#3e2e10", inspectorKey: "#8b7d6b", seedLabel: "#8b7355" };
 
   return (
@@ -127,7 +147,7 @@ export default function OilCrossSection({
               const isDrilledCell = isSelected && z < drillDepth;
               const selectBorder = dark ? "#d4a854" : "#8b6914";
               // Tint selected column so it's visible even when all values are 0
-              const baseBg = getOilColor(value, maxCellValue, dark);
+              const baseBg = getOilColor(value, maxCellValue, dark, parabolum);
               const selectedTint = isSelected && value === 0
                 ? (dark ? "rgba(212,168,84,0.08)" : "rgba(139,105,20,0.06)")
                 : baseBg;
@@ -194,7 +214,7 @@ export default function OilCrossSection({
           {Array.from({ length: 30 }, (_, i) => (
             <div key={i} style={{
               flex: 1,
-              background: getOilColor((i / 30) * maxCellValue, maxCellValue, dark),
+              background: getOilColor((i / 30) * maxCellValue, maxCellValue, dark, parabolum),
             }} />
           ))}
         </div>

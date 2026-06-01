@@ -23,7 +23,7 @@ import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import StarField from "@/components/StarField";
 import ConstellationModel from '@/components/ConstellationModel';
 import Fireworks from "@/components/Fireworks";
-import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, orderBy, limit, addDoc, runTransaction, arrayUnion, getDocs } from "@/lib/firebaseClient";
+import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, orderBy, limit, addDoc, runTransaction, arrayUnion, getDocs, deleteDoc } from "@/lib/firebaseClient";
 import RogueAdminPanel from "@/components/RogueAdminPanel";
 import useCctvRecorder from "@/hooks/useCctvRecorder";
 import PumpPurchaseModal from "@/components/PumpPurchaseModal";
@@ -32,6 +32,7 @@ import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
   day:   { sky: "#7da4c9", skyBottom: null, ambient: 0.6, dirA: 4.0, dirB: 3.0, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
+  solstice: { sky: "#36aee2", skyBottom: "#aee6c0", ambient: 0.82, dirA: 5.2, dirB: 2.4, dirAColor: "#fff2b8", dirBColor: "#7fd8ff", point: "#ffd45a", cloudOpacity: 0.34, fog: "#d8c86a", hemi: { sky: "#80ddff", ground: "#e6b758", intensity: 0.72 } },
   dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
   night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.15, dirA: 0.3, dirB: 0.2, point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: null },
   hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } },
@@ -68,6 +69,62 @@ const THEMES = {
     inspectorKey: "#7a8898", depthUndrilled: "#404a58",
     btnText: "#b0bcc8", btnBg: "rgba(80,120,160,0.12)",
     cornerBorder: "rgba(212,168,84,0.2)",
+  },
+  solsticeLight: {
+    bg: "#f6edce", text: "#4c422e", textStrong: "#241b0c", accent: "#0c7786",
+    muted: "#756c55", border: "rgba(156,132,72,0.42)", borderLight: "rgba(78,177,190,0.28)",
+    panelBg: "rgba(255,248,222,0.91)", headerBg: "rgba(255,246,215,0.95)",
+    inputBg: "rgba(255,253,236,0.82)", barBg: "rgba(210,190,128,0.24)", tintBg: "rgba(47,168,188,0.075)",
+    green: "#2f8f55", greenBg: "rgba(47,143,85,0.1)",
+    warn: "#b46618", red: "#b64230",
+    gold: "#e0ad3c", goldBorder: "#b98218",
+    scanline: "rgba(17,109,126,0.025)",
+    statusText: "#2f8f55", seedLabel: "#7b693d", seedValue: "#0c7786",
+    rankClaim: "#776843", rankOil: "#4c422e", rankBarBg: "rgba(217,196,128,0.32)",
+    inspectorKey: "#7b693d", depthUndrilled: "#9e9066",
+    btnText: "#315b5f", btnBg: "rgba(47,168,188,0.1)",
+    cornerBorder: "rgba(12,119,134,0.35)",
+    panelWash: "linear-gradient(135deg, rgba(255,255,245,0.72) 0%, rgba(255,244,199,0.88) 48%, rgba(219,246,231,0.68) 100%)",
+    panelLine: "linear-gradient(90deg, rgba(12,119,134,0.02), rgba(12,119,134,0.18), rgba(224,173,60,0.18), rgba(12,119,134,0.02))",
+    statWash: "linear-gradient(135deg, rgba(255,255,241,0.72), rgba(255,232,162,0.2) 55%, rgba(83,188,198,0.12))",
+    softShadow: "inset 0 1px 0 rgba(255,255,255,0.72), 0 10px 28px rgba(151,116,29,0.08)",
+  },
+  // Parabolum (dark) — arcane violet reskin. The "extracted material" stops
+  // reading as crude oil and becomes a mysterious glowing fluid; the prospecting
+  // UI shifts to a deep-indigo console lit by violet/lilac glow. Independent of
+  // the day/dusk/night/hell env presets (toggled separately from time-of-day).
+  parabolumDark: {
+    bg: "#0c0717", text: "#b9a3d6", textStrong: "#e6d4ff", accent: "#b07bff",
+    muted: "#7a6a9c", border: "#2a1d44", borderLight: "#221836",
+    panelBg: "rgba(14,8,26,0.95)", headerBg: "rgba(14,8,26,0.97)",
+    inputBg: "#1a1030", barBg: "#1e1436", tintBg: "rgba(123,45,214,0.1)",
+    green: "#5ad6b0", greenBg: "rgba(90,214,176,0.12)",
+    warn: "#e0913c", red: "#ff5c93",
+    gold: "#c79bff", goldBorder: "#7b2dd6",
+    scanline: "rgba(199,123,255,0.035)",
+    statusText: "#8ad6c0", seedLabel: "#8a7aae", seedValue: "#a892c8",
+    rankClaim: "#a892c8", rankOil: "#c9b3e6", rankBarBg: "#241836",
+    inspectorKey: "#8a7aae", depthUndrilled: "#4a3a66",
+    btnText: "#c9b3e6", btnBg: "rgba(123,45,214,0.16)",
+    cornerBorder: "rgba(164,92,255,0.3)",
+  },
+  // Parabolum (light) — iridescent oil-slick. A cool teal-tinted console with
+  // violet UI accents; the fluid sweeps teal → blue → violet → magenta like a
+  // petrol sheen on water. Teal base vs violet/magenta fluid = the tension.
+  parabolumLight: {
+    bg: "#eaf1ef", text: "#2e3d44", textStrong: "#13211f", accent: "#7a2dd6",
+    muted: "#5e7178", border: "#c8dcd9", borderLight: "#bad0cd",
+    panelBg: "rgba(234,241,239,0.95)", headerBg: "rgba(234,241,239,0.97)",
+    inputBg: "#e0ebe9", barBg: "#d8e6e3", tintBg: "rgba(123,45,214,0.07)",
+    green: "#1a9e8f", greenBg: "rgba(26,158,143,0.1)",
+    warn: "#c06a1a", red: "#c81f8a",
+    gold: "#8a3dd6", goldBorder: "#5a1db0",
+    scanline: "rgba(20,120,130,0.02)",
+    statusText: "#1591a0", seedLabel: "#5e7178", seedValue: "#4e646a",
+    rankClaim: "#4e646a", rankOil: "#2e3d44", rankBarBg: "#d8e6e3",
+    inspectorKey: "#5e7178", depthUndrilled: "#9ab0b2",
+    btnText: "#2e3d44", btnBg: "rgba(123,45,214,0.08)",
+    cornerBorder: "rgba(21,145,160,0.32)",
   },
 };
 
@@ -320,6 +377,52 @@ const HellSkyEffects = memo(function HellSkyEffects() {
     </group>
   );
 });
+
+function SolsticeSkyEffects() {
+  const ringRef = useRef();
+  const flareRef = useRef();
+  const beamRef = useRef();
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ringRef.current) {
+      ringRef.current.rotation.z = t * 0.035;
+      const s = 1 + Math.sin(t * 0.7) * 0.025;
+      ringRef.current.scale.setScalar(s);
+    }
+    if (flareRef.current) {
+      flareRef.current.material.opacity = 0.18 + Math.sin(t * 0.55) * 0.035;
+    }
+    if (beamRef.current) {
+      beamRef.current.rotation.z = -0.35 + Math.sin(t * 0.22) * 0.04;
+      beamRef.current.material.opacity = 0.11 + Math.sin(t * 0.4) * 0.025;
+    }
+  });
+
+  return (
+    <group>
+      <group position={[-18, 28, -45]} rotation={[0.18, -0.18, 0]}>
+        <mesh>
+          <circleGeometry args={[8.5, 64]} />
+          <meshBasicMaterial color="#fff1a8" transparent opacity={0.84} depthWrite={false} fog={false} />
+        </mesh>
+        <mesh ref={flareRef} position={[0, 0, -0.03]}>
+          <circleGeometry args={[15.5, 64]} />
+          <meshBasicMaterial color="#ffc84a" transparent opacity={0.2} depthWrite={false} fog={false} />
+        </mesh>
+        <mesh ref={ringRef} position={[0, 0, -0.05]}>
+          <ringGeometry args={[9.7, 10.2, 96]} />
+          <meshBasicMaterial color="#f9d35f" transparent opacity={0.44} depthWrite={false} fog={false} />
+        </mesh>
+      </group>
+      <mesh ref={beamRef} position={[-5, 13, -25]} rotation={[0.42, 0.08, -0.35]}>
+        <planeGeometry args={[34, 9]} />
+        <meshBasicMaterial color="#ffe58a" transparent opacity={0.11} depthWrite={false} fog={false} side={THREE.DoubleSide} />
+      </mesh>
+      <pointLight position={[-13, 18, -28]} color="#ffd66b" intensity={2.2} distance={90} decay={1.1} />
+    </group>
+  );
+}
 
 const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr: false });
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
@@ -642,13 +745,30 @@ export default function OilPage() {
     }
     return false;
   });
+  // Parabolum material theme — independent of the day/dusk/night env presets.
+  // When on, the UI shifts to the arcane violet console AND the extracted fluid
+  // glows violet in the 3D scene (threaded into OilVoxelGrid below).
+  const [parabolum, setParabolum] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("oil_parabolum") === "true";
+    }
+    return false;
+  });
   // Don't persist the transient "hell" preset — otherwise a reload during a
   // demon event restores hell forever. Keep the last real preset saved instead.
   useEffect(() => {
     if (envPreset !== "hell") localStorage.setItem("oil_envPreset", envPreset);
   }, [envPreset]);
   useEffect(() => { localStorage.setItem("oil_darkMode", String(darkMode)); }, [darkMode]);
-  const theme = THEMES[darkMode ? "dark" : "light"];
+  useEffect(() => { localStorage.setItem("oil_parabolum", String(parabolum)); }, [parabolum]);
+  // Parabolum overrides light/dark for the UI chrome when active, but still
+  // honors the dark-mode toggle by picking its own dark/light lighting.
+  const themeKey = parabolum
+    ? (darkMode ? "parabolumDark" : "parabolumLight")
+    : envPreset === "solstice"
+      ? "solsticeLight"
+      : (darkMode ? "dark" : "light");
+  const theme = THEMES[themeKey];
   const styles = useMemo(() => getStyles(theme), [theme]);
   const m = useMemo(() => getMobileStyles(theme), [theme]);
   const drillBtnStyles = useMemo(() => getDrillStyles(theme), [theme]);
@@ -819,6 +939,7 @@ export default function OilPage() {
   // ── Username ──
   const [username, setUsername] = useState("");
   const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameSaved, setUsernameSaved] = useState(false);
 
   // Rogue events — live listener for active rogue characters
   const [rogueEvents, setRogueEvents] = useState([]);
@@ -969,6 +1090,8 @@ export default function OilPage() {
 
   // Claim jump state
   const [claimJumpMode, setClaimJumpMode] = useState(false);
+  const [claimToast, setClaimToast] = useState(null);
+  const claimToastTimer = useRef(null);
   const [chatModalPlotKey, setChatModalPlotKey] = useState(null);
 
   // Admin: save settings via /api/oil-settings (Admin SDK, password-gated).
@@ -1009,6 +1132,25 @@ export default function OilPage() {
   // Snapshot trigger for PolaroidSnapshot
   const [snapshotTrigger, setSnapshotTrigger] = useState(false);
   const [fireworksOn, setFireworksOn] = useState(false);
+  // Remember the env preset active before fireworks switched the scene to night,
+  // so toggling fireworks off restores the user's original lighting.
+  const fireworksPrevPresetRef = useRef(null);
+  const toggleFireworks = useCallback(() => {
+    setFireworksOn((on) => {
+      if (!on) {
+        // Turning on: remember current preset, then switch to night if needed
+        fireworksPrevPresetRef.current = envPreset;
+        if (envPreset !== "night") setEnvPreset("night");
+      } else {
+        // Turning off: restore the preset we had before launching fireworks
+        if (fireworksPrevPresetRef.current && fireworksPrevPresetRef.current !== "night") {
+          setEnvPreset(fireworksPrevPresetRef.current);
+        }
+        fireworksPrevPresetRef.current = null;
+      }
+      return !on;
+    });
+  }, [envPreset]);
 
   // Reset snapshot trigger after timeout (fallback if user dismisses without onComplete)
   useEffect(() => {
@@ -1085,12 +1227,16 @@ export default function OilPage() {
     setUsernameSaving(true);
     try {
       await setDoc(doc(db, "oilDrills", user.id), { username: username.trim(), updatedAt: serverTimestamp() }, { merge: true });
+      setUsernameSaved(true);
     } catch (err) {
       console.error("Failed to save username:", err);
     } finally {
       setUsernameSaving(false);
     }
   }, [user?.id, username, userDrill]);
+
+  // Reset the "SAVED" confirmation once the name is edited again.
+  useEffect(() => { setUsernameSaved(false); }, [username]);
 
   // Countdown timer to next 00:00 UTC
   // Countdown timer moved to isolated DrillCountdown component to avoid full-page re-renders
@@ -1509,10 +1655,14 @@ export default function OilPage() {
   // (only the layers THIS rig struck — correct across claim-jumps to pre-drilled
   // cells). Fall back to the legacy derived model for data predating the loop.
   const oilInTank = useMemo(() => {
-    if (userDrill?.tankOil != null) return Math.max(0, userDrill.tankOil);
+    // Real players use the strike loop's authoritative tankOil. Admin/test/report
+    // run on demoDay/testDay-driven extraction (no live loop), so derive there.
+    if (!isAdmin && !isTest && !isReport && userDrill?.tankOil != null) {
+      return Math.max(0, userDrill.tankOil);
+    }
     if (playerExtracted === 0) return 0;
     return Math.max(0, playerExtracted - lastDrainSnapshot);
-  }, [userDrill?.tankOil, playerExtracted, lastDrainSnapshot]);
+  }, [isAdmin, isTest, isReport, userDrill?.tankOil, playerExtracted, lastDrainSnapshot]);
 
   // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
@@ -1546,10 +1696,19 @@ export default function OilPage() {
 
   // Detect oil strike: keyed by effectiveDrillDay so each layer triggers independently
   const oilStrikeDay = useRef(-1);
+  const oilStrikeCell = useRef(null);
   const oilStrike = useMemo(() => {
     if (selectedX === null || effectiveDrillDay === 0) return 0;
+    const cell = `${selectedX}_${sliceY}`;
     const depthIndex = effectiveDrillDay - 1;
     if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
+    // Selecting / zooming to a different rig changes effectiveDrillDay but is NOT
+    // a strike — reset the baseline for the new cell and stay quiet.
+    if (cell !== oilStrikeCell.current) {
+      oilStrikeCell.current = cell;
+      oilStrikeDay.current = effectiveDrillDay;
+      return 0;
+    }
     const oilAtDepth = stats.grid3D[selectedX]?.[sliceY]?.[depthIndex] ?? 0;
     if (oilAtDepth > 0 && effectiveDrillDay !== oilStrikeDay.current) {
       oilStrikeDay.current = effectiveDrillDay;
@@ -1585,12 +1744,21 @@ export default function OilPage() {
   // Drill event counter — increments on every drill (oil or dry), triggers visual effects
   const [drillEvent, setDrillEvent] = useState(0);
   const prevDrillDay = useRef(effectiveDrillDay);
+  const prevDrillCell = useRef(null);
   useEffect(() => {
+    const cell = selectedX === null ? null : `${selectedX}_${sliceY}`;
+    // Switching / zooming to a different rig changes effectiveDrillDay but is NOT a
+    // drill — reset the baseline silently so navigation doesn't replay the burst.
+    if (cell !== prevDrillCell.current) {
+      prevDrillCell.current = cell;
+      prevDrillDay.current = effectiveDrillDay;
+      return;
+    }
     if (effectiveDrillDay > prevDrillDay.current && effectiveDrillDay > 0) {
       setDrillEvent((prev) => prev + 1);
     }
     prevDrillDay.current = effectiveDrillDay;
-  }, [effectiveDrillDay]);
+  }, [effectiveDrillDay, selectedX, sliceY]);
 
   // Drill proximity — max oil value in the 26 neighboring cells (3x3x3 cube minus self)
   const drillProximity = useMemo(() => {
@@ -1836,6 +2004,10 @@ export default function OilPage() {
           row: newRow,
           claimJumpsUsed: newJumps,
           bonusDrills: newBonus,
+          // Re-arm the rig at the fresh cell — otherwise a rig that bottomed out
+          // at its old plot would stay depleted and the strike loop would skip it.
+          armed: true,
+          rigDepleted: false,
           updatedAt: serverTimestamp(),
         });
         // Update oilQualified
@@ -1845,6 +2017,31 @@ export default function OilPage() {
           plotRow: newRow,
         });
       });
+      // Carry the player's pump customization to the new cell. Configs are stored
+      // per-cell (pumpConfigs/{userId}_{col}_{row}) while unlocks are account-level —
+      // so without this a jump lands on a default pump even though you own everything.
+      try {
+        const oldCfgRef = doc(db, "pumpConfigs", `${user.id}_${oldCol}_${oldRow}`);
+        const oldCfgSnap = await getDoc(oldCfgRef);
+        if (oldCfgSnap.exists() && oldCfgSnap.data().config) {
+          await setDoc(doc(db, "pumpConfigs", `${user.id}_${newCol}_${newRow}`), {
+            userId: user.id,
+            col: newCol,
+            row: newRow,
+            config: oldCfgSnap.data().config,
+            updatedAt: serverTimestamp(),
+          });
+          // Strip the released plot back to a default pump so leftover add-ons
+          // don't make it look owned/unavailable to other players.
+          await deleteDoc(oldCfgRef);
+        }
+      } catch (e) {
+        console.error("Failed to carry pump config on claim jump:", e);
+      }
+      // Explicit confirmation that the jump landed (coords shown as the on-screen label).
+      setClaimToast({ col: newCol, row: newRow });
+      if (claimToastTimer.current) clearTimeout(claimToastTimer.current);
+      claimToastTimer.current = setTimeout(() => setClaimToast(null), 5000);
       setClaimJumpMode(false);
       handleFlyTo(newCol, newRow);
     } catch (err) {
@@ -3396,6 +3593,33 @@ export default function OilPage() {
     </div>
   );
 
+  const claimToastBanner = claimToast && (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 9999,
+      padding: "12px 16px",
+      background: "linear-gradient(180deg, rgba(120,90,20,0.95), rgba(70,50,10,0.9))",
+      borderBottom: "2px solid rgba(212,168,84,0.6)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      textAlign: "center",
+      fontFamily: "'Share Tech Mono', monospace",
+    }}>
+      <div style={{
+        fontSize: isMobile ? 12 : 14,
+        fontWeight: 700,
+        letterSpacing: "0.2em",
+        color: "#e8c878",
+        textShadow: "0 0 10px rgba(212,168,84,0.5)",
+      }}>
+        CLAIM JUMPED — PLOT ({claimToast.col + 1}, {claimToast.row + 1})
+      </div>
+    </div>
+  );
+
   const modeBadge = (isAdmin || isReport) && (
     <span style={{
       padding: "2px 8px",
@@ -3633,7 +3857,7 @@ export default function OilPage() {
   );
 
   // ── Player Drill Panel (depth profile for active players) ──
-  const playerDrillPanel = !isAdmin && !isReport && effectiveDrillDay > 0 && activeUserDrill && (
+  const playerDrillPanel = !isAdmin && !isReport && activeUserDrill && (
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
         YOUR CLAIM ({activeUserDrill.col + 1}, {activeUserDrill.row + 1})
@@ -3676,7 +3900,7 @@ export default function OilPage() {
               opacity: usernameSaving ? 0.5 : 1,
             }}
           >
-            {usernameSaving ? "..." : "SAVE"}
+            {usernameSaving ? "..." : usernameSaved ? "SAVED ✓" : "SAVE"}
           </button>
         </div>
       )}
@@ -3802,9 +4026,9 @@ export default function OilPage() {
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3,
         }}>
-          <span style={{ fontSize: 11, letterSpacing: "0.12em", color: theme.accent }}>TANK</span>
+          <span style={{ fontSize: 11, letterSpacing: "0.12em", color: theme.accent }}>TANK · UNBANKED</span>
           <span style={{ fontSize: 11, letterSpacing: "0.08em", color: tankFill >= 1.0 && !tankDrained ? theme.red : theme.muted }}>
-            {tankDrained ? 0 : oilInTank.toLocaleString()} / {TANK_CAPACITY.toLocaleString()}
+            {tankDrained ? 0 : oilInTank.toLocaleString()} USDC
           </span>
         </div>
         <div style={{
@@ -3822,14 +4046,22 @@ export default function OilPage() {
             transition: "width 0.4s ease",
           }} />
         </div>
-        {tankFill >= 1.0 && !tankDrained && (
-          <div style={{
-            fontSize: 10, letterSpacing: "0.12em", color: theme.red, marginTop: 4, textAlign: "center",
-            animation: "tankPulse 1.2s ease-in-out infinite",
-            fontWeight: 700,
-          }}>
-            TANK FULL — HIT THE RED BUTTON ON YOUR PUMP!
-          </div>
+        {oilInTank > 0 && !tankDrained && (
+          <button
+            onClick={handleTankDrain}
+            style={{
+              width: "100%", marginTop: 6, padding: "6px 12px",
+              border: `1px solid ${tankFill >= 1.0 ? theme.red : theme.border}`,
+              borderRadius: 3, cursor: "pointer",
+              background: tankFill >= 1.0 ? `${theme.red}22` : "transparent",
+              color: tankFill >= 1.0 ? theme.red : theme.accent,
+              fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10, letterSpacing: "0.12em", fontWeight: tankFill >= 1.0 ? 700 : 400,
+              animation: tankFill >= 1.0 ? "tankPulse 1.2s ease-in-out infinite" : "none",
+            }}
+          >
+            {tankFill >= 1.0 ? "TANK HEAVY — BANK SOON" : "BANK OIL TO STORAGE"}
+          </button>
         )}
         {tankDrained && (
           <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.green, marginTop: 2, textAlign: "right" }}>
@@ -3990,14 +4222,15 @@ export default function OilPage() {
               >
                 <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
                 {envPreset === "hell" && <HellSkyEffects />}
+                {envPreset === "solstice" && <SolsticeSkyEffects />}
                 {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
                 {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} />}
                 {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
                 <ambientLight intensity={env.ambient} />
                 {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
-                <directionalLight position={[10, 15, 10]} intensity={env.dirA} />
-                <directionalLight position={[-5, 10, -5]} intensity={env.dirB} />
+                <directionalLight position={[10, 15, 10]} intensity={env.dirA} color={env.dirAColor || "#ffffff"} />
+                <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
                 <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
                 <group position={[0, 1, 0]}>
                   <OilVoxelGrid
@@ -4030,6 +4263,7 @@ export default function OilPage() {
                     onRogueArrive={handleRogueArrive}
                     onRogueConsequence={handleRogueConsequence}
                     envPreset={envPreset}
+                    parabolum={parabolum}
                     plotsWithMessages={plotsWithMessages}
                     hellActive={hellActive}
                     hellCol={hellCol}
@@ -4078,7 +4312,7 @@ export default function OilPage() {
               </div>
               <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, display: "flex", gap: 4 }}>
                 <button
-                  onClick={() => { if (!fireworksOn && envPreset !== "night") setEnvPreset("night"); setFireworksOn(f => !f); }}
+                  onClick={toggleFireworks}
                   title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
                   style={{
                     width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
@@ -4111,7 +4345,7 @@ export default function OilPage() {
                 </button>
               </div>
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10, display: "flex", gap: 3 }}>
-                {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
+                {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["solstice", <svg key="solstice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v3"/><path d="M12 19v3"/><path d="M4.22 4.22l2.12 2.12"/><path d="M17.66 17.66l2.12 2.12"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.22 19.78l2.12-2.12"/><path d="M17.66 6.34l2.12-2.12"/><circle cx="12" cy="12" r="5"/><path d="M9.5 12.5c1.2 1 3.8 1 5 0"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
                   <button
                     key={key}
                     onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
@@ -4147,6 +4381,25 @@ export default function OilPage() {
                     padding: 0,
                   }}
                 >{darkMode ? "●" : "◐"}</button>
+                <button
+                  title="Parabolum"
+                  onClick={() => setParabolum((p) => !p)}
+                  style={{
+                    width: 26, height: 26,
+                    background: parabolum ? "rgba(123,45,214,0.35)" : "rgba(212,168,84,0.1)",
+                    border: `1px solid ${parabolum ? "#7b2dd6" : theme.cornerBorder}`,
+                    borderRadius: 3,
+                    color: parabolum ? "#d8b8ff" : theme.accent,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 0,
+                    boxShadow: parabolum ? "0 0 8px rgba(123,45,214,0.7)" : "none",
+                    textShadow: parabolum ? "0 0 6px rgba(199,123,255,0.9)" : "none",
+                  }}
+                >◈</button>
               </div>
             </div>
           )}
@@ -4160,6 +4413,7 @@ export default function OilPage() {
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 theme={theme}
+                parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
                 allPlotsMap={allPlotsMap}
@@ -4182,6 +4436,7 @@ export default function OilPage() {
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
                 theme={theme}
+                parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
               />
@@ -4200,6 +4455,7 @@ export default function OilPage() {
             maxOil={stats.maxOil}
             drillProximity={drillProximity}
             darkMode={darkMode}
+            parabolum={parabolum}
             hellActive={hellActive}
             demonBlockade={demonBlockade}
           />
@@ -4218,6 +4474,7 @@ export default function OilPage() {
             grid3D={stats.grid3D}
             maxOil={stats.maxOil}
             darkMode={darkMode}
+            parabolum={parabolum}
             isMobile
             gridX={gridSize}
             gridY={gridSize}
@@ -4325,7 +4582,18 @@ export default function OilPage() {
         {cssAnimations}
         {demonBanner}
         {bountyClaimedBanner}
+        {claimToastBanner}
         {claimBountyButton}
+
+        <PolaroidSnapshot
+          trigger={snapshotTrigger}
+          captureElementId="oil-canvas"
+          label="Diversifying my investment portfolio!"
+          referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : null}
+          onComplete={() => {
+            setTimeout(() => setSnapshotTrigger(false), 100);
+          }}
+        />
 
         {chatModalPlotKey && (
           <OilChatModal
@@ -4440,14 +4708,15 @@ export default function OilPage() {
           >
             <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
             {envPreset === "hell" && <HellSkyEffects />}
+            {envPreset === "solstice" && <SolsticeSkyEffects />}
             {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
             {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
             {fireworksOn && <Fireworks quality={2} shellSize={2} />}
             {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
             <ambientLight intensity={env.ambient} />
             {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
-            <directionalLight position={[10, 15, 10]} intensity={env.dirA} />
-            <directionalLight position={[-5, 10, -5]} intensity={env.dirB} />
+            <directionalLight position={[10, 15, 10]} intensity={env.dirA} color={env.dirAColor || "#ffffff"} />
+            <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
             <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
             <group position={[0, 5, 0]}>
               <OilVoxelGrid
@@ -4480,6 +4749,7 @@ export default function OilPage() {
                 onRogueArrive={handleRogueArrive}
                 onRogueConsequence={handleRogueConsequence}
                 envPreset={envPreset}
+                parabolum={parabolum}
                 plotsWithMessages={plotsWithMessages}
                 hellActive={hellActive}
                 hellCol={hellCol}
@@ -4525,7 +4795,7 @@ export default function OilPage() {
           </div>
           <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, display: "flex", gap: 4 }}>
             <button
-              onClick={() => { if (!fireworksOn && envPreset !== "night") setEnvPreset("night"); setFireworksOn(f => !f); }}
+              onClick={toggleFireworks}
               title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
               style={{
                 width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
@@ -4558,7 +4828,7 @@ export default function OilPage() {
             </button>
           </div>
           <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, display: "flex", alignItems: "center", gap: 3 }}>
-            {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
+            {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["solstice", <svg key="solstice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v3"/><path d="M12 19v3"/><path d="M4.22 4.22l2.12 2.12"/><path d="M17.66 17.66l2.12 2.12"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.22 19.78l2.12-2.12"/><path d="M17.66 6.34l2.12-2.12"/><circle cx="12" cy="12" r="5"/><path d="M9.5 12.5c1.2 1 3.8 1 5 0"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
               <button
                 key={key}
                 onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
@@ -4595,6 +4865,25 @@ export default function OilPage() {
               }}
             >{darkMode ? "●" : "◐"}</button>
             <button
+              title="Parabolum"
+              onClick={() => setParabolum((p) => !p)}
+              style={{
+                width: 28, height: 28,
+                background: parabolum ? "rgba(123,45,214,0.35)" : "rgba(212,168,84,0.1)",
+                border: `1px solid ${parabolum ? "#7b2dd6" : theme.cornerBorder}`,
+                borderRadius: 3,
+                color: parabolum ? "#d8b8ff" : theme.accent,
+                fontSize: 14,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
+                boxShadow: parabolum ? "0 0 8px rgba(123,45,214,0.7)" : "none",
+                textShadow: parabolum ? "0 0 6px rgba(199,123,255,0.9)" : "none",
+              }}
+            >◈</button>
+            <button
               onClick={() => setPanelsCollapsed((p) => !p)}
               style={{
                 padding: "5px 10px",
@@ -4626,6 +4915,7 @@ export default function OilPage() {
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 theme={theme}
+                parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
                 allPlotsMap={allPlotsMap}
@@ -4644,6 +4934,7 @@ export default function OilPage() {
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
                 theme={theme}
+                parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
               />
@@ -4669,6 +4960,7 @@ export default function OilPage() {
               maxOil={stats.maxOil}
               drillProximity={drillProximity}
               darkMode={darkMode}
+              parabolum={parabolum}
               hellActive={hellActive}
             />
             {playerDrillPanel}
@@ -4680,6 +4972,7 @@ export default function OilPage() {
               grid3D={stats.grid3D}
               maxOil={stats.maxOil}
               darkMode={darkMode}
+              parabolum={parabolum}
               gridX={gridSize}
               gridY={gridSize}
               selectedX={selectedX}
@@ -4752,6 +5045,7 @@ export default function OilPage() {
       {cssAnimations}
       {demonBanner}
       {bountyClaimedBanner}
+      {claimToastBanner}
       {claimBountyButton}
 
       <PolaroidSnapshot
@@ -5023,7 +5317,7 @@ function getStyles(t) { return {
   root: {
     width: "100vw",
     height: "100vh",
-    background: t.bg,
+    background: t.panelWash ? `${t.panelWash}, ${t.bg}` : t.bg,
     position: "relative",
     overflow: "hidden",
     fontFamily: "'Share Tech Mono', 'Orbitron', monospace",
@@ -5062,8 +5356,9 @@ function getStyles(t) { return {
     padding: "0 20px",
     zIndex: 20,
     borderBottom: `1px solid ${t.border}`,
-    background: `linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)`,
+    background: t.panelWash ? `${t.panelLine}, linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)` : `linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)`,
     backdropFilter: "blur(12px)",
+    boxShadow: t.softShadow || "none",
   },
 
   headerLeft: {
@@ -5129,7 +5424,7 @@ function getStyles(t) { return {
     alignItems: "center",
     gap: 10,
     padding: "0 20px",
-    background: t.tintBg,
+    background: t.panelWash ? `${t.panelLine}, ${t.tintBg}` : t.tintBg,
     borderBottom: `1px solid ${t.border}`,
     zIndex: 15,
   },
@@ -5205,25 +5500,29 @@ function getStyles(t) { return {
     gap: 0,
     overflow: "hidden",
     borderRight: `1px solid ${t.border}`,
+    background: t.panelWash || "transparent",
   },
 
   midPanel: {
     padding: "10px 12px",
     borderBottom: `1px solid ${t.border}`,
+    background: t.panelWash || "transparent",
   },
 
   // Right side panel
   sidePanel: {
     overflowY: "auto",
     overflowX: "hidden",
-    background: t.panelBg,
+    background: t.panelWash ? `${t.panelWash}, ${t.panelBg}` : t.panelBg,
     backdropFilter: "blur(16px)",
     transition: "opacity 0.5s ease, transform 0.5s ease",
+    boxShadow: t.softShadow || "none",
   },
 
   panelSection: {
     padding: "12px 14px",
     borderBottom: `1px solid ${t.border}`,
+    background: t.panelLine ? `${t.panelLine} left bottom / 100% 1px no-repeat` : "transparent",
   },
 
   panelTitle: {
@@ -5251,9 +5550,10 @@ function getStyles(t) { return {
 
   statBlock: {
     padding: "6px 8px",
-    background: t.tintBg,
+    background: t.statWash || t.tintBg,
     border: `1px solid ${t.border}`,
     borderRadius: 3,
+    boxShadow: t.softShadow || "none",
   },
 
   statLabel: {
@@ -5545,7 +5845,7 @@ function getMobileStyles(t) { return {
   root: {
     width: "100vw",
     height: "100dvh",
-    background: t.bg,
+    background: t.panelWash ? `${t.panelWash}, ${t.bg}` : t.bg,
     position: "relative",
     overflow: "hidden",
     fontFamily: "'Share Tech Mono', 'Orbitron', monospace",
@@ -5563,8 +5863,9 @@ function getMobileStyles(t) { return {
     padding: "0 12px",
     zIndex: 20,
     borderBottom: `1px solid ${t.border}`,
-    background: `linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)`,
+    background: t.panelWash ? `${t.panelLine}, linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)` : `linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)`,
     backdropFilter: "blur(12px)",
+    boxShadow: t.softShadow || "none",
   },
 
   scroll: {
@@ -5573,6 +5874,7 @@ function getMobileStyles(t) { return {
     overflowX: "hidden",
     WebkitOverflowScrolling: "touch",
     paddingBottom: "calc(110px + env(safe-area-inset-bottom, 0px))",
+    background: t.panelWash || "transparent",
   },
 
   seedBar: {
@@ -5580,7 +5882,7 @@ function getMobileStyles(t) { return {
     alignItems: "center",
     gap: 8,
     padding: "6px 12px",
-    background: t.tintBg,
+    background: t.panelWash ? `${t.panelLine}, ${t.tintBg}` : t.tintBg,
     borderBottom: `1px solid ${t.border}`,
   },
 
@@ -5595,6 +5897,7 @@ function getMobileStyles(t) { return {
   section: {
     padding: "12px 12px",
     borderBottom: `1px solid ${t.border}`,
+    background: t.panelLine ? `${t.panelLine} left bottom / 100% 1px no-repeat` : "transparent",
   },
 
   sectionTitle: {
@@ -5629,14 +5932,14 @@ function getMobileStyles(t) { return {
     gap: 8,
     padding: "8px 12px",
     borderBottom: `1px solid ${t.border}`,
-    background: t.tintBg,
+    background: t.panelWash ? `${t.panelLine}, ${t.tintBg}` : t.tintBg,
   },
 
   tabBar: {
     flexShrink: 0,
     display: "flex",
     borderBottom: `1px solid ${t.border}`,
-    background: t.headerBg,
+    background: t.panelWash ? `${t.panelLine}, ${t.headerBg}` : t.headerBg,
   },
 
   tab: {
@@ -5656,6 +5959,6 @@ function getMobileStyles(t) { return {
   tabActive: {
     color: t.accent,
     borderBottom: `2px solid ${t.goldBorder}`,
-    background: "rgba(212,168,84,0.1)",
+    background: t.btnBg,
   },
 }; }

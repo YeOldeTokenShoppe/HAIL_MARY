@@ -20,6 +20,13 @@ const PRELIM_LEVELS = [
   { label: "ANOMALOUS SIGNAL", color: "#e87a2b", threshold: 0.35 },
 ];
 
+// Parabolum status-readout colors (index-aligned with the arrays above).
+const DENSITY_COLORS_PARA_DARK = ["#6a5a86", "#8a72b8", "#a45cff", "#c79bff", "#e0b8ff"];
+// Iridescent slick (light): teal → cyan-blue → violet → magenta
+const DENSITY_COLORS_PARA_LIGHT = ["#3f8a90", "#2f8fc0", "#4e5fd0", "#8a3dd6", "#c81f8a"];
+const PRELIM_COLORS_PARA_DARK = ["#6a5a86", "#8a72b8", "#a45cff", "#d89bff"];
+const PRELIM_COLORS_PARA_LIGHT = ["#3f8a90", "#2f8fc0", "#7a3dd6", "#c81f8a"];
+
 function classifyTier(value, maxOil) {
   if (value === 0) return 0;
   const t = maxOil > 0 ? value / maxOil : 0;
@@ -111,10 +118,16 @@ export default function DrillHUD({
   maxOil = 1,
   drillProximity = 0,
   darkMode = true,
+  parabolum = false,
   hellActive = false,
   demonBlockade = null,
 }) {
   const [phase, setPhase] = useState("standby");
+  // Mirrors for the zero-dep animate() callback to read current theme state.
+  const parabolumRef = useRef(parabolum);
+  parabolumRef.current = parabolum;
+  const darkRef = useRef(darkMode);
+  darkRef.current = darkMode;
   const [pressure, setPressure] = useState(0);
   const [density, setDensity] = useState(0);
   const [status, setStatus] = useState("STANDBY");
@@ -159,7 +172,7 @@ export default function DrillHUD({
       const tier = classifyTier(val, mx);
       const info = DENSITY_LABELS[tier];
       setStatus(`RESULT: ${info.label}`);
-      setStatusColor(info.color);
+      setStatusColor(parabolumRef.current ? (darkRef.current ? DENSITY_COLORS_PARA_DARK : DENSITY_COLORS_PARA_LIGHT)[tier] : info.color);
       setPressure(val > 0 ? 80 + (tier / 4) * 19 : 3 + Math.random() * 8);
       setDensity(val > 0 ? 55 + (tier / 4) * 44 : 1 + Math.random() * 4);
     }
@@ -170,13 +183,14 @@ export default function DrillHUD({
         const prox = pendingProximity.current;
         const mx = pendingMaxOil.current;
         const prelim = getPrelimLevel(prox, mx);
+        const prelimIdx = PRELIM_LEVELS.indexOf(prelim);
         const proxRatio = mx > 0 ? prox / mx : 0;
         const prelimP = 5 + proxRatio * 65;
         setPrelimPressure(prelimP);
         setPressure(prelimP);
         setDensity(0);
         setStatus(`AREA SCAN: ${prelim.label}`);
-        setStatusColor(prelim.color);
+        setStatusColor(parabolumRef.current ? (darkRef.current ? PRELIM_COLORS_PARA_DARK : PRELIM_COLORS_PARA_LIGHT)[prelimIdx] : prelim.color);
         setPhase("preliminary");
       }, PRELIM_DELAY);
       return;

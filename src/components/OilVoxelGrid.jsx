@@ -178,6 +178,7 @@ function buildFragShader({ deposits, gridX, gridY, depthZ, cellSize, depthCellSi
   precision highp float;
 
   uniform float uReveal;
+  uniform float uParabolum;
 
   varying vec3 vOrigin;
   varying vec3 vDirection;
@@ -232,9 +233,10 @@ ${depositLines}
     vec3 color = vec3(0.0);
     float alpha = 0.0;
 
-    vec3 colLow  = vec3(0.15, 0.08, 0.02);
-    vec3 colMid  = vec3(0.35, 0.18, 0.05);
-    vec3 colHigh = vec3(0.85, 0.55, 0.15);
+    // Crude (amber) → Parabolum (arcane violet glow), mixed by uParabolum
+    vec3 colLow  = mix(vec3(0.15, 0.08, 0.02), vec3(0.10, 0.04, 0.20), uParabolum);
+    vec3 colMid  = mix(vec3(0.35, 0.18, 0.05), vec3(0.32, 0.10, 0.58), uParabolum);
+    vec3 colHigh = mix(vec3(0.85, 0.55, 0.15), vec3(0.62, 0.30, 1.05), uParabolum);
 
     for (float t = tHit.x; t < tHit.y; t += stepSize) {
       vec3 worldPos = vOrigin + rayDir * t;
@@ -249,7 +251,7 @@ ${depositLines}
           oilColor = mix(colMid, colHigh, (intensity - 0.5) * 2.0);
         }
 
-        float glow = 1.0 + intensity * 2.0;
+        float glow = 1.0 + intensity * (2.0 + uParabolum * 1.6);
         oilColor *= glow;
 
         float sampleAlpha = clamp(d * 0.35, 0.0, 1.0);
@@ -298,6 +300,7 @@ varying vec2 vUv;
 uniform float uTime;
 uniform float uOpacity;
 uniform float uNightMode;
+uniform float uParabolum;
 uniform vec2 uResolution;
 
 // Hash and noise
@@ -390,13 +393,18 @@ void main() {
   midOil = mix(midOil, midOilNight, uNightMode);
   highlight = mix(highlight, highlightNight, uNightMode);
 
+  // Parabolum: arcane violet gusher (overrides night when active)
+  darkOil = mix(darkOil, vec3(0.04, 0.01, 0.10), uParabolum);
+  midOil = mix(midOil, vec3(0.12, 0.04, 0.26), uParabolum);
+  highlight = mix(highlight, vec3(0.34, 0.16, 0.60), uParabolum);
+
   float colorNoise = scroll2 * 0.5 + 0.5;
   vec3 col = mix(darkOil, midOil, colorNoise);
   col = mix(col, highlight, pow(max(density, 0.0), 4.0) * 0.6);
 
-  // Night emissive glow — adds a blue luminance boost along edges and core
-  float emissive = uNightMode * (0.3 + 0.4 * pow(max(density, 0.0), 2.0));
-  col += vec3(0.05, 0.1, 1.35) * emissive;
+  // Night/Parabolum emissive glow — blue at night, violet for Parabolum
+  float emissive = max(uNightMode, uParabolum) * (0.3 + 0.4 * pow(max(density, 0.0), 2.0));
+  col += mix(vec3(0.05, 0.1, 1.35), vec3(0.85, 0.30, 1.5), uParabolum) * emissive;
 
   // ── Alpha compositing ──
   float alpha = shape * density * uOpacity;
@@ -491,21 +499,23 @@ function buildFillGeometry(fill, radius, length, segments = 48) {
   return geo;
 }
 
-function TankLiquid({ tankBounds, tankFill, envPreset }) {
+function TankLiquid({ tankBounds, tankFill, envPreset, parabolum = false }) {
   const meshRef = useRef();
   const displayFill = useRef(0);
   const lastQuantizedFill = useRef(-1);
   const isNight = envPreset === "night";
+  const isSolstice = envPreset === "solstice";
 
   const oilMat = useMemo(() => new THREE.MeshStandardMaterial({
-    color: isNight ? 0x0d1aff : 0x1a0e05,
-    roughness: 0.3,
+    // Parabolum overrides time-of-day: a glowing violet fluid in the tank
+    color: parabolum ? 0x3a0e5c : (isNight ? 0x0d1aff : isSolstice ? 0x4a2704 : 0x1a0e05),
+    roughness: parabolum ? 0.2 : 0.3,
     metalness: 0.1,
     transparent: true,
     opacity: 0.97,
-    emissive: isNight ? 0x0510aa : 0x000000,
-    emissiveIntensity: isNight ? 0.4 : 0,
-  }), [isNight]);
+    emissive: parabolum ? 0x7b2dd6 : (isNight ? 0x0510aa : isSolstice ? 0xffa51a : 0x000000),
+    emissiveIntensity: parabolum ? 0.55 : (isNight ? 0.4 : isSolstice ? 0.12 : 0),
+  }), [isNight, isSolstice, parabolum]);
 
   // Tank geometry params — the tank is a horizontal cylinder
   // sizeX is the tank's cross-section width (diameter), sizeZ is the length
@@ -1099,7 +1109,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, hasMessages = false, onEnvelopeClick, hellActive = false }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, hasMessages = false, onEnvelopeClick, hellActive = false }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -1645,6 +1655,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     uTime: { value: 0 },
     uOpacity: { value: 1.0 },
     uNightMode: { value: 0.0 },
+    uParabolum: { value: 0.0 },
     uResolution: { value: new THREE.Vector2(256, 512) },
   });
 
@@ -1684,12 +1695,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, []);
 
-  // Buffer oil strike visuals — delay reveal for suspense during drill sequence
+  // Buffer oil strike visuals — delay reveal for suspense during drill sequence.
+  // Edge-triggered on a NEW strike value so selecting/zooming to a rig (or a fresh
+  // mount carrying a stale value) doesn't replay the geyser.
+  const prevStrike = useRef(oilStrike);
   useEffect(() => {
-    if (oilStrike > 0 && highlighted) {
+    if (oilStrike > 0 && oilStrike !== prevStrike.current && highlighted) {
       pendingStrikeRef.current = true;
       pendingStrikeTimer.current = 0;
     }
+    prevStrike.current = oilStrike;
   }, [oilStrike, highlighted]);
 
   // Reveal the buffered oil strike after the suspense delay
@@ -1743,7 +1758,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, []);
 
-  const prevDrillEvent = useRef(0);
+  // Baseline to the current drillEvent: in merge mode the selected rig mounts
+  // fresh on every selection, so starting at 0 would replay the drill burst when
+  // the prop is already > 0. We only want a burst on a genuine NEW drill.
+  const prevDrillEvent = useRef(drillEvent);
   const dustWaveCount = useRef(0);
   useEffect(() => {
     if (drillEvent > 0 && drillEvent !== prevDrillEvent.current && highlighted) {
@@ -1752,9 +1770,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       drillActiveRef.current = true;
       drillMasterTimer.current = 0;
       dustWaveCount.current = 0;
-      // 1. Drill rumble (every drill)
-      drillShakeRef.current = true;
-      drillShakeTimerRef.current = 0;
+      // 1. Drill rumble — reserve the shudder for something momentous: on, or one
+      //    cell away from, a deposit (oilStrike / drillProximity), or while a demon
+      //    is loose. Plain barren drilling still spits dust (drillActiveRef below)
+      //    but doesn't shake.
+      if (oilStrike > 0 || drillProximity > 0 || hellActive) {
+        drillShakeRef.current = true;
+        drillShakeTimerRef.current = 0;
+      }
       // 2. Initial dust burst
       initDust();
       // 3. Gauge twitch (every drill now — builds suspense)
@@ -1766,7 +1789,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         proximityTimerRef.current = 0;
       }
     }
-  }, [drillEvent, highlighted, oilStrike, drillProximity, initDust]);
+  }, [drillEvent, highlighted, oilStrike, drillProximity, hellActive, initDust]);
 
   // Store drillDay and tankFill in refs so useFrame always has the latest values
   const drillDayRef = useRef(drillDay);
@@ -2181,7 +2204,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         geyserMeshRef.current.visible = true;
       }
       // Keep pump head parts oil-stained while gusher is active
-      const stainColor = 0x1a0e05;
+      const stainColor = parabolum ? 0x2a0f4a : 0x1a0e05;
       if (headPumpRef.current?.material) headPumpRef.current.material.color.set(stainColor);
       if (strawRef.current?.material) strawRef.current.material.color.set(stainColor);
       cylPumpRefs.current.forEach((m) => { if (m.material) m.material.color.set(stainColor); });
@@ -2193,6 +2216,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
       if (geyserMatRef.current) {
         geyserMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
+        geyserMatRef.current.uniforms.uParabolum.value = parabolum ? 1.0 : 0.0;
         geyserMatRef.current.uniforms.uTime.value += delta;
         // Fade out near end of one-shot gusher
         const fade = overflowing ? 1.0
@@ -2309,8 +2333,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       return;
     }
 
-    // RedButton click — drain tank, stop gusher, reset gauge
-    if (e.object && e.object.name === "RedButton" && highlighted) {
+    // RedButton click — drain tank, stop gusher, reset gauge. Walk up parents and
+    // tolerate GLTF "_N" suffixes so a click on a child mesh of the button still counts.
+    let isRedButton = false;
+    for (let rb = e.object; rb; rb = rb.parent) {
+      if (rb.name === "RedButton" || (typeof rb.name === "string" && rb.name.startsWith("RedButton"))) { isRedButton = true; break; }
+    }
+    if (isRedButton && highlighted) {
       if (!drainingRef.current && tankFillRef.current > 0) {
         drainingRef.current = true;
         drainFillRef.current = Math.min(tankFillRef.current, 1.0);
@@ -2373,7 +2402,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         onPointerOut={() => { document.body.style.cursor = "auto"; }}
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
-      {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} />}
+      {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
       {/* Red alert point light — only on selected rig, intensity driven by useFrame */}
       {highlighted && (
         <>
@@ -3150,7 +3179,7 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
   );
 }
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, parabolum = false, plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -3233,6 +3262,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             tankFill={isSelected ? tankFill : 0}
             onTankDrain={isSelected ? onTankDrain : undefined}
             envPreset={envPreset}
+            parabolum={parabolum}
             hasMessages={!!plotsWithMessages[`${col}_${row}`]}
             onEnvelopeClick={() => onEnvelopeClick?.(col, row)}
             hellActive={hellActive && col === hellCol && row === hellRow}
@@ -3379,7 +3409,7 @@ const _neutralDropletTex = (() => {
 
 const SHADER_GUSHER_PARTICLES = 300;
 
-function ShaderGusher({ position, envPreset }) {
+function ShaderGusher({ position, envPreset, parabolum = false }) {
   const meshRef = useRef();
   const shaderMatRef = useRef();
   const camPosRef = useRef(new THREE.Vector3());
@@ -3388,6 +3418,7 @@ function ShaderGusher({ position, envPreset }) {
     uTime: { value: 0 },
     uOpacity: { value: 1.0 },
     uNightMode: { value: 0.0 },
+    uParabolum: { value: 0.0 },
     uResolution: { value: new THREE.Vector2(256, 512) },
   });
 
@@ -3427,6 +3458,7 @@ function ShaderGusher({ position, envPreset }) {
     if (shaderMatRef.current) {
       shaderMatRef.current.uniforms.uTime.value += delta;
       shaderMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
+      shaderMatRef.current.uniforms.uParabolum.value = parabolum ? 1.0 : 0.0;
     }
     const mesh = meshRef.current;
     if (mesh) {
@@ -3461,8 +3493,12 @@ function ShaderGusher({ position, envPreset }) {
     if (geoRef.current) geoRef.current.attributes.position.needsUpdate = true;
     if (ptMatRef.current) {
       ptMatRef.current.opacity = 0.5;
-      if (envPreset === "night") {
+      if (parabolum) {
+        ptMatRef.current.color.setRGB(0.34, 0.14, 0.6);
+      } else if (envPreset === "night") {
         ptMatRef.current.color.setRGB(0.08, 0.15, 0.45);
+      } else if (envPreset === "solstice") {
+        ptMatRef.current.color.setRGB(0.32, 0.16, 0.02);
       } else {
         ptMatRef.current.color.setRGB(0.1, 0.055, 0.02);
       }
@@ -3478,7 +3514,7 @@ function ShaderGusher({ position, envPreset }) {
       <pointLight
         ref={lightRef}
         position={[0, 0.5, 0]}
-        color={0xff2200}
+        color={parabolum ? 0xa45cff : envPreset === "solstice" ? 0xffb13d : 0xff2200}
         intensity={1.5}
         distance={4}
         decay={2}
@@ -4047,6 +4083,7 @@ export default function OilVoxelGrid({
   onRogueArrive,
   onRogueConsequence,
   envPreset,
+  parabolum = false,
   plotsWithMessages = {},
   onEnvelopeClick,
   hellActive = false,
@@ -4073,18 +4110,51 @@ export default function OilVoxelGrid({
   const topoTex = useTexture("/topography1.webp");
   topoTex.wrapS = topoTex.wrapT = THREE.RepeatWrapping;
 
+  const groundPalette = useMemo(() => {
+    if (envPreset === "solstice") {
+      return {
+        top: "#b99557",
+        bottom: "#6b4a26",
+        side: "#a8793a",
+        wire: 0xd6b351,
+      };
+    }
+    if (envPreset === "night") {
+      return {
+        top: "#5a5f78",
+        bottom: "#242234",
+        side: "#4e5268",
+        wire: 0x7280a8,
+      };
+    }
+    if (envPreset === "hell") {
+      return {
+        top: "#553018",
+        bottom: "#1c0c08",
+        side: "#4b2413",
+        wire: 0xaa3c20,
+      };
+    }
+    return {
+      top: "#8b7355",
+      bottom: "#5a4030",
+      side: "#ffffff",
+      wire: 0x8b7355,
+    };
+  }, [envPreset]);
+
   // 6 materials for box faces: +x, -x, +y (top), -y (bottom), +z, -z
   const groundMaterials = useMemo(() => {
     const revealed = revealProgress > 0;
     const op = revealed ? 0.15 : 1;
     const shared = { transparent: true, depthWrite: !revealed, depthTest: !revealed, opacity: op };
-    const topMat = new THREE.MeshStandardMaterial({ map: topoTex, color: "#8b7355", roughness: 0.9, metalness: 0.05, ...shared });
-    const bottomMat = new THREE.MeshStandardMaterial({ color: "#5a4030", roughness: 0.95, metalness: 0.02, ...shared });
-    const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.85, metalness: 0.05, ...shared });
+    const topMat = new THREE.MeshStandardMaterial({ map: topoTex, color: groundPalette.top, roughness: 0.9, metalness: 0.05, ...shared });
+    const bottomMat = new THREE.MeshStandardMaterial({ color: groundPalette.bottom, roughness: 0.95, metalness: 0.02, ...shared });
+    const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, color: groundPalette.side, roughness: 0.85, metalness: 0.05, ...shared });
     const mats = [sideMat, sideMat, topMat, bottomMat, sideMat, sideMat];
     groundMatsRef.current = mats;
     return mats;
-  }, [sideTex, topoTex, revealProgress]);
+  }, [sideTex, topoTex, revealProgress, groundPalette]);
 
   const depthCellSize = cellSize * 0.5;
   const worldW = gridX * cellSize;
@@ -4108,7 +4178,13 @@ export default function OilVoxelGrid({
 
   const shaderUniforms = useMemo(() => ({
     uReveal: { value: revealProgress },
-  }), [revealProgress]);
+    uParabolum: { value: parabolum ? 1 : 0 },
+  }), [revealProgress, parabolum]);
+
+  // Sync Parabolum flag into the live volume material
+  useEffect(() => {
+    if (matRef.current) matRef.current.uniforms.uParabolum.value = parabolum ? 1 : 0;
+  }, [parabolum]);
 
   // Sync reveal
   useEffect(() => {
@@ -4185,7 +4261,7 @@ export default function OilVoxelGrid({
       <group position={[0, -worldH / 2, 0]}>
         <lineSegments>
           <edgesGeometry args={[new THREE.BoxGeometry(worldW, worldH, worldD)]} />
-          <lineBasicMaterial color={0x8b7355} transparent opacity={0.5} />
+          <lineBasicMaterial color={groundPalette.wire} transparent opacity={envPreset === "solstice" ? 0.62 : 0.5} />
         </lineSegments>
 
         <group position={[0, worldH / 2, 0]}>
@@ -4213,6 +4289,7 @@ export default function OilVoxelGrid({
             communityOil={communityOil}
             totalOilBudget={totalOilBudget}
             envPreset={envPreset}
+            parabolum={parabolum}
             plotsWithMessages={plotsWithMessages}
             onEnvelopeClick={onEnvelopeClick}
             hellActive={hellActive}
@@ -4277,6 +4354,7 @@ export default function OilVoxelGrid({
                   worldD / 2 - ev.row * cellSize - cellSize / 2,
                 ]}
                 envPreset={envPreset}
+                parabolum={parabolum}
               />
             ))}
           {Array.from({ length: gridX + 1 }, (_, i) => {

@@ -56,7 +56,7 @@ async function notifyTelegram(db, userId, text) {
   }
 }
 
-async function runTick({ force = false } = {}) {
+async function runTick({ force = false, deep = 1 } = {}) {
   const db = getAdminDb();
 
   const settingsSnap = await db.collection("oilGame").doc("settings").get();
@@ -97,6 +97,9 @@ async function runTick({ force = false } = {}) {
   // Once a hell pocket summons a demon, the blockade halts drilling — stop
   // striking the remaining rigs this tick so we don't drill through the halt.
   let summonedThisTick = false;
+  // Admin deep-drill (deep > 1) bypasses the once-per-day guard so a single call
+  // can drill multiple layers (test convenience). Normal hourly ticks keep deep = 1.
+  const ignoreDayGuard = deep > 1;
 
   for (const docSnap of drillsSnap.docs) {
     const drill = docSnap.data();
@@ -107,7 +110,7 @@ async function runTick({ force = false } = {}) {
     // Must hold a claimed plot, be armed, not already struck today, not bottomed out.
     if (col == null || row == null) { summary.skipped++; continue; }
     if (drill.armed === false || drill.rigDepleted) { summary.skipped++; continue; }
-    if (drill.lastStrikeDate === today) { summary.skipped++; continue; }
+    if (!ignoreDayGuard && drill.lastStrikeDate === today) { summary.skipped++; continue; }
     if (!force && hour < strikeHourFor(userId, today)) { summary.skipped++; continue; }
 
     const cellKey = `${col}_${row}`;
@@ -115,70 +118,74 @@ async function runTick({ force = false } = {}) {
     const drillRef = db.collection("oilDrills").doc(userId);
 
     try {
-      const outcome = await db.runTransaction(async (t) => {
-        const plotSnap = await t.get(plotRef);
-        const drillNow = (await t.get(drillRef)).data() || drill;
+      // deep > 1 (admin) drills several layers in one call; deep = 1 is the normal tick.
+      for (let i = 0; i < deep; i++) {
+        const outcome = await db.runTransaction(async (t) => {
+          const plotSnap = await t.get(plotRef);
+          const drillNow = (await t.get(drillRef)).data() || drill;
 
-        // Re-check the day guard inside the txn (idempotent under concurrent ticks).
-        if (drillNow.lastStrikeDate === today) return { status: "already_struck" };
+          // Re-check the day guard inside the txn (idempotent under concurrent ticks).
+          if (!ignoreDayGuard && drillNow.lastStrikeDate === today) return { status: "already_struck" };
 
-        const currentDepth = (plotSnap.exists ? plotSnap.data().drillDay : 0) || 0;
-        if (currentDepth >= depthZ) {
-          // Rig has reached the floor — disarm it; nothing left to strike.
-          t.set(drillRef, { armed: false, rigDepleted: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-          return { status: "depleted" };
-        }
-
-        const newDepth = currentDepth + 1;
-        const layerIndex = currentDepth; // layers 0..drillDay-1 are revealed
-        const oilAtLayer = grid?.[col]?.[row]?.[layerIndex] ?? 0;
-        const isHell = hellSet.has(`${col}_${row}_${layerIndex}`);
-
-        t.set(plotRef, {
-          col, row,
-          drillDay: newDepth,
-          lastStrikeAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-        t.set(drillRef, {
-          userId,
-          tankOil: FieldValue.increment(oilAtLayer),
-          lastStrikeDate: today,
-          lastStrikeAt: FieldValue.serverTimestamp(),
-          lastStrikeOil: oilAtLayer,
-          lastStrikeDepth: newDepth,
-          lastStrikeHell: isHell,
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-
-        return { status: "struck", oil: oilAtLayer, depth: newDepth, isHell, username: drillNow.username || null, newTank: (drillNow.tankOil || 0) + oilAtLayer };
-      });
-
-      if (outcome.status === "struck") {
-        summary.struck++;
-        strikes.push({ userId, col, row, ...outcome });
-
-        if (outcome.isHell) {
-          // Hell pocket → summon the demon via the shared creator (identical to the
-          // player path). unbankedOil = the rig's post-strike tank; createDemonBounty
-          // drains it as the cost of unleashing hell.
-          try {
-            const demon = await createDemonBounty(db, {
-              userId,
-              username: outcome.username,
-              col, row,
-              unbankedOil: outcome.newTank,
-            });
-            if (demon.ok) {
-              summonedThisTick = true;
-              summary.demonsSummoned++;
-              await notifyTelegram(db, userId,
-                `🔥 <b>YOUR RIG BREACHED A HELL POCKET!</b>\nA demon is loose on the field — your unbanked tank fueled the bounty. Drilling is halted until it's banished.`);
-            }
-          } catch (err) {
-            console.error(`[oil-strike-tick] demon summon failed for ${userId}:`, err.message);
+          const currentDepth = (plotSnap.exists ? plotSnap.data().drillDay : 0) || 0;
+          if (currentDepth >= depthZ) {
+            // Rig has reached the floor — disarm it; nothing left to strike.
+            t.set(drillRef, { armed: false, rigDepleted: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+            return { status: "depleted" };
           }
-        } else {
+
+          const newDepth = currentDepth + 1;
+          const layerIndex = currentDepth; // layers 0..drillDay-1 are revealed
+          const oilAtLayer = grid?.[col]?.[row]?.[layerIndex] ?? 0;
+          const isHell = hellSet.has(`${col}_${row}_${layerIndex}`);
+
+          t.set(plotRef, {
+            col, row,
+            drillDay: newDepth,
+            lastStrikeAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+
+          t.set(drillRef, {
+            userId,
+            tankOil: FieldValue.increment(oilAtLayer),
+            lastStrikeDate: today,
+            lastStrikeAt: FieldValue.serverTimestamp(),
+            lastStrikeOil: oilAtLayer,
+            lastStrikeDepth: newDepth,
+            lastStrikeHell: isHell,
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+
+          return { status: "struck", oil: oilAtLayer, depth: newDepth, isHell, username: drillNow.username || null, newTank: (drillNow.tankOil || 0) + oilAtLayer };
+        });
+
+        if (outcome.status === "struck") {
+          summary.struck++;
+          strikes.push({ userId, col, row, ...outcome });
+
+          if (outcome.isHell) {
+            // Hell pocket → summon the demon via the shared creator (identical to the
+            // player path). unbankedOil = the rig's post-strike tank; createDemonBounty
+            // drains it as the cost of unleashing hell.
+            try {
+              const demon = await createDemonBounty(db, {
+                userId,
+                username: outcome.username,
+                col, row,
+                unbankedOil: outcome.newTank,
+              });
+              if (demon.ok) {
+                summonedThisTick = true;
+                summary.demonsSummoned++;
+                await notifyTelegram(db, userId,
+                  `🔥 <b>YOUR RIG BREACHED A HELL POCKET!</b>\nA demon is loose on the field — your unbanked tank fueled the bounty. Drilling is halted until it's banished.`);
+              }
+            } catch (err) {
+              console.error(`[oil-strike-tick] demon summon failed for ${userId}:`, err.message);
+            }
+            break; // hell halts drilling (blockade) — end this rig's run
+          }
+
           // Normal strike: reuse gusherEvents so the existing 3D strike visual fires.
           if (outcome.oil > 0) {
             await db.collection("gusherEvents").add({
@@ -190,16 +197,20 @@ async function runTick({ force = false } = {}) {
               status: "active",
             });
           }
-          // Best-effort retention hook — fire-and-forget Telegram alert.
-          const msg = outcome.oil > 0
-            ? `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col}, ${row}) hit ${outcome.oil} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.`
-            : `🪨 Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`;
-          await notifyTelegram(db, userId, msg);
+          // Best-effort retention hook — skipped during deep admin drills to avoid spam.
+          if (deep === 1) {
+            const msg = outcome.oil > 0
+              ? `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col}, ${row}) hit ${outcome.oil} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.`
+              : `🪨 Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`;
+            await notifyTelegram(db, userId, msg);
+          }
+        } else if (outcome.status === "depleted") {
+          summary.depleted++;
+          break;
+        } else {
+          summary.skipped++;
+          break;
         }
-      } else if (outcome.status === "depleted") {
-        summary.depleted++;
-      } else {
-        summary.skipped++;
       }
     } catch (err) {
       summary.errors++;
@@ -210,6 +221,66 @@ async function runTick({ force = false } = {}) {
   return { ok: true, date: today, hour, ...summary, strikes };
 }
 
+// Admin scout: reveal where the oil is (no writes) so a tester can aim a rig.
+// Returns the richest columns by total oil, with both 0-based coords and the
+// on-screen (col+1, row+1) label.
+async function scoutOil() {
+  const db = getAdminDb();
+  const settingsSnap = await db.collection("oilGame").doc("settings").get();
+  const settings = settingsSnap.exists ? settingsSnap.data() : {};
+  if (!settings.blockHash) return { ok: false, error: "no_block_hash" };
+
+  const gridSize = settings.gridSize || 10;
+  const depthZ = settings.depthZ || DEFAULT_DEPTH_Z;
+  const { grid } = generateOilDistribution3D({
+    blockHash: settings.blockHash,
+    gridX: gridSize,
+    gridY: gridSize,
+    depthZ,
+    totalOilBudget: settings.totalOilBudget || 500000,
+    numberOfDeposits: settings.numberOfDeposits || 5,
+  });
+
+  const cells = [];
+  for (let x = 0; x < gridSize; x++) {
+    for (let y = 0; y < gridSize; y++) {
+      let total = 0, best = 0, bestDepth = -1;
+      for (let z = 0; z < depthZ; z++) {
+        const v = grid?.[x]?.[y]?.[z] ?? 0;
+        total += v;
+        if (v > best) { best = v; bestDepth = z; }
+      }
+      if (total > 0) {
+        cells.push({
+          col: x, row: y,
+          label: `(${x + 1}, ${y + 1})`, // on-screen grid label
+          total: Math.round(total),
+          best: Math.round(best),
+          bestLayer: bestDepth + 1, // 1-based depth, matches DEPTH N/20
+        });
+      }
+    }
+  }
+  cells.sort((a, b) => b.total - a.total);
+  return { ok: true, gridSize, depthZ, richest: cells.slice(0, 10) };
+}
+
+// Admin test helper: reset a single user's claim-jump counter (and re-arm the rig)
+// so a tester can keep relocating. Targeted by userId so it can't affect others.
+async function grantJumps(userId) {
+  const db = getAdminDb();
+  const ref = db.collection("oilDrills").doc(userId);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, error: "no_drill_doc" };
+  await ref.set({
+    claimJumpsUsed: 0,
+    armed: true,
+    rigDepleted: false,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return { ok: true, granted: userId, claimJumpsUsed: 0 };
+}
+
 function authorized(req) {
   const auth = req.headers.get("authorization") || "";
   const cronSecret = process.env.CRON_SECRET;
@@ -217,7 +288,8 @@ function authorized(req) {
   const url = new URL(req.url);
   const pw = url.searchParams.get("password");
   if (process.env.ADMIN_PASSWORD && pw === process.env.ADMIN_PASSWORD) {
-    return { ok: true, cron: false, force: url.searchParams.get("force") === "1" };
+    const deep = Math.max(1, Math.min(parseInt(url.searchParams.get("deep") || "1", 10) || 1, 20));
+    return { ok: true, cron: false, force: url.searchParams.get("force") === "1", deep, scout: url.searchParams.get("scout") === "1", grant: url.searchParams.get("grant") };
   }
   return { ok: false };
 }
@@ -226,7 +298,9 @@ async function handle(req) {
   const a = authorized(req);
   if (!a.ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   try {
-    const result = await runTick({ force: a.force });
+    const result = a.grant ? await grantJumps(a.grant)
+      : a.scout ? await scoutOil()
+      : await runTick({ force: a.force, deep: a.deep });
     return NextResponse.json(result);
   } catch (err) {
     console.error("[oil-strike-tick] Error:", err.message);

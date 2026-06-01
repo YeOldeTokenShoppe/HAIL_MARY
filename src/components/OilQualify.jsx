@@ -61,7 +61,6 @@ export default function OilQualify({
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const certRef = useRef(null);
-  const [signatureName, setSignatureName] = useState("dev team");
 
   useEffect(() => {
     if (!lightboxSrc) return;
@@ -69,13 +68,6 @@ export default function OilQualify({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxSrc]);
-
-  // Pre-fill signature once user loads
-  useEffect(() => {
-    if (user && !signatureName) {
-      setSignatureName("dev team");
-    }
-  }, [user]);
 
   // Auto-detect X/Twitter username from Clerk OAuth (if user signed in via X)
   useEffect(() => {
@@ -604,78 +596,26 @@ export default function OilQualify({
                 <div style={{ ...fieldStyle, top: "83%", left: "40%", fontSize: isMobile ? "2.4vw" : 12, fontWeight: 700, color: pickedRaw ? inkColor : placeholderColor }}>
                   {dateStr}
                 </div>
-                {signatureName && (
-                  <div style={{
-                    position: "absolute",
-                    top: "82%",
-                    right: "15%",
-                    fontFamily: "'Homemade Apple', cursive",
-                    fontSize: isMobile ? "0.5em" : 15,
-                    color: inkColor,
-                    pointerEvents: "none",
-                    transform: rot,
-                    opacity: 0.85,
-                    whiteSpace: "nowrap",
-                  }}>
-                    {signatureName}
-                  </div>
-                )}
+                {/* Authorizing signature — the certificate is issued/signed by
+                    the company granting the claim, not the player. */}
+                <div style={{
+                  position: "absolute",
+                  top: "82%",
+                  right: "15%",
+                  fontFamily: "'Homemade Apple', cursive",
+                  fontSize: isMobile ? "0.5em" : 15,
+                  color: inkColor,
+                  pointerEvents: "none",
+                  transform: rot,
+                  opacity: 0.85,
+                  whiteSpace: "nowrap",
+                }}>
+                  Hail Mary Prospecting Co.
+                </div>
               </>
             );
           })()}
         </div>
-
-        {/* Signature Field — shown when user has claimed a plot */}
-        {userPlayer && userHasPlot && (
-          <div style={{
-            margin: "16px auto 0",
-            maxWidth: 480,
-            padding: "12px 16px",
-            border: `1px solid ${theme.border}`,
-            borderRadius: 4,
-            background: "rgba(20, 12, 28, 0.55)",
-            backdropFilter: "blur(24px) saturate(1.2)",
-            WebkitBackdropFilter: "blur(24px) saturate(1.2)",
-          }}>
-            <div style={{ fontSize: 10, letterSpacing: "0.2em", color: theme.gold, fontWeight: 700, marginBottom: 8 }}>
-              SIGN YOUR CLAIM
-            </div>
-            <div style={{
-              position: "relative",
-              borderRadius: 3,
-              overflow: "hidden",
-              border: `1px solid ${signatureName ? theme.green + "44" : theme.border}`,
-              background: "rgba(245, 239, 230, 0.92)",
-            }}>
-              <style>{`.oil-sig-input::placeholder { color: rgba(58, 42, 24, 0.3); font-family: 'Permanent Marker', cursive; }`}</style>
-              <input
-                className="oil-sig-input"
-                type="text"
-                placeholder="Type your name to sign"
-                value={signatureName}
-                onChange={(e) => setSignatureName(e.target.value)}
-                maxLength={30}
-                style={{
-                  width: "100%",
-                  padding: "16px 20px",
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                  fontFamily: "'Permanent Marker', cursive",
-                  fontSize: 22,
-                  color: "#3a2a18",
-                  textAlign: "center",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-            {signatureName && (
-              <div style={{ fontSize: 9, color: theme.green, marginTop: 6, textAlign: "center" }}>
-                Signature applied to certificate above
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Share buttons — only when certificate has data */}
         {userPlayer && userHasPlot && (
