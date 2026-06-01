@@ -34,8 +34,17 @@ const ENV_PRESETS = {
   day:   { sky: "#7da4c9", skyBottom: null, ambient: 0.6, dirA: 4.0, dirB: 3.0, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
   solstice: { sky: "#36aee2", skyBottom: "#aee6c0", ambient: 0.82, dirA: 5.2, dirB: 2.4, dirAColor: "#fff2b8", dirBColor: "#7fd8ff", point: "#ffd45a", cloudOpacity: 0.34, fog: "#d8c86a", hemi: { sky: "#80ddff", ground: "#e6b758", intensity: 0.72 } },
   dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
-  night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.15, dirA: 0.3, dirB: 0.2, point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: null },
+  night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.38, dirA: 1.1, dirB: 0.6, dirAColor: "#aac4ff", dirBColor: "#6a80c0", point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: { sky: "#2e3650", ground: "#161824", intensity: 0.4 } },
   hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } },
+  // Backdrop for HUD mode — a colorful sunset: deep indigo-blue overhead melting
+  // into a warm rose/amber horizon. Lighter than night so the field stays alive,
+  // but saturated and dusky enough that the cool frosted-glass HUD panels read as
+  // glowing glass rather than muddy brown. Warm key light + cool fill.
+  hudDusk: { sky: "#1613d7", skyBottom: "#8519d3", ambient: 0.56, dirA: 2.8, dirB: 1.4, dirAColor: "#ffc890", dirBColor: "#88b0e0", point: "#e09060", cloudOpacity: 0.22, fog: "#4a3f55", hemi: { sky: "#5a5a88", ground: "#3a2e3a", intensity: 0.5 } },
+  // Self-contained scene for Parabolum — an arcane violet twilight. Brighter
+  // ambient than night (which left the ground near-black) so the field reads,
+  // with violet key/fill/point lights to match the Parabolum console.
+  parabolumEnv: { sky: "#1a0f2e", skyBottom: "#3a1f5c", ambient: 0.55, dirA: 2.4, dirB: 1.2, dirAColor: "#e8d0ff", dirBColor: "#9a7ad6", point: "#a45cff", cloudOpacity: 0.2, fog: "#1f1438", hemi: { sky: "#4a2d7a", ground: "#2a1f3a", intensity: 0.55 } },
 };
 
 // ── Theme color maps (UI only — 3D canvas unaffected) ────────────────────────
@@ -88,6 +97,10 @@ const THEMES = {
     panelLine: "linear-gradient(90deg, rgba(12,119,134,0.02), rgba(12,119,134,0.18), rgba(224,173,60,0.18), rgba(12,119,134,0.02))",
     statWash: "linear-gradient(135deg, rgba(255,255,241,0.72), rgba(255,232,162,0.2) 55%, rgba(83,188,198,0.12))",
     softShadow: "inset 0 1px 0 rgba(255,255,255,0.72), 0 10px 28px rgba(151,116,29,0.08)",
+    // Surface-map / cross-section backgrounds — light cyan to match the teal
+    // accent font (instead of the default cream). mapBg = container, mapEmpty =
+    // undrilled/empty cells. Other themes leave these unset → cream fallback.
+    mapBg: "#cfe9eb", mapEmpty: "#e3f4f4",
   },
   // Parabolum (dark) — arcane violet reskin. The "extracted material" stops
   // reading as crude oil and becomes a mysterious glowing fluid; the prospecting
@@ -108,23 +121,38 @@ const THEMES = {
     btnText: "#c9b3e6", btnBg: "rgba(123,45,214,0.16)",
     cornerBorder: "rgba(164,92,255,0.3)",
   },
-  // Parabolum (light) — iridescent oil-slick. A cool teal-tinted console with
-  // violet UI accents; the fluid sweeps teal → blue → violet → magenta like a
-  // petrol sheen on water. Teal base vs violet/magenta fluid = the tension.
-  parabolumLight: {
-    bg: "#eaf1ef", text: "#2e3d44", textStrong: "#13211f", accent: "#7a2dd6",
-    muted: "#5e7178", border: "#c8dcd9", borderLight: "#bad0cd",
-    panelBg: "rgba(234,241,239,0.95)", headerBg: "rgba(234,241,239,0.97)",
-    inputBg: "#e0ebe9", barBg: "#d8e6e3", tintBg: "rgba(123,45,214,0.07)",
-    green: "#1a9e8f", greenBg: "rgba(26,158,143,0.1)",
-    warn: "#c06a1a", red: "#c81f8a",
-    gold: "#8a3dd6", goldBorder: "#5a1db0",
-    scanline: "rgba(20,120,130,0.02)",
-    statusText: "#1591a0", seedLabel: "#5e7178", seedValue: "#4e646a",
-    rankClaim: "#4e646a", rankOil: "#2e3d44", rankBarBg: "#d8e6e3",
-    inspectorKey: "#5e7178", depthUndrilled: "#9ab0b2",
-    btnText: "#2e3d44", btnBg: "rgba(123,45,214,0.08)",
-    cornerBorder: "rgba(21,145,160,0.32)",
+  // HUD — mirrors the SpaceScene prospecting-HUD palette (the `HUD` constant in
+  // SpaceScene.jsx): gold/cyan/orange accents floating on a translucent
+  // indigo-black panel. A standalone reskin of the overlay chrome, toggled
+  // independently of the day/dark/parabolum controls. Cyan rides on the `green`
+  // token (status + positive readouts); orange rides on `warn`.
+  hud: {
+    bg: "#0f141c", text: "#aebccb", textStrong: "#e8d9b8", accent: "#d4a854",
+    muted: "#7e94a6", border: "rgba(107,199,209,0.24)", borderLight: "rgba(107,199,209,0.14)",
+    panelBg: "rgba(15,22,30,0.08)", headerBg: "rgba(13,19,27,0.66)",
+    inputBg: "rgba(22,32,42,0.5)", barBg: "rgba(107,199,209,0.12)", tintBg: "rgba(107,199,209,0.06)",
+    green: "#6bc7d1", greenBg: "rgba(107,199,209,0.12)",
+    warn: "#e87a2b", red: "#e0563c",
+    gold: "#d4a854", goldBorder: "#b8922e",
+    scanline: "rgba(107,199,209,0.04)",
+    statusText: "#6bc7d1", seedLabel: "#7e94a6", seedValue: "#9fc4cf",
+    rankClaim: "#8aa0b0", rankOil: "#cbd9e2", rankBarBg: "rgba(107,199,209,0.14)",
+    inspectorKey: "#7e94a6", depthUndrilled: "#3a4754",
+    btnText: "#bfe0e6", btnBg: "rgba(107,199,209,0.1)",
+    cornerBorder: "rgba(107,199,209,0.32)",
+    // Cool frosted-glass panel — a cyan-led wash with a gold counterpoint, a
+    // cyan/gold accent line, and a cream top-highlight. The low panel opacity
+    // lets the sunset bleed through as colored glass, not an opaque brown slab.
+    titleCool: "#6bc7d1", titleCoolBorder: "rgba(107,199,209,0.7)",
+    panelWash: "linear-gradient(160deg, rgba(107,199,209,0.10) 0%, rgba(170,210,220,0.03) 50%, rgba(212,168,84,0.06) 100%)",
+    panelLine: "linear-gradient(90deg, rgba(107,199,209,0.05), rgba(107,199,209,0.40), rgba(212,168,84,0.34), rgba(107,199,209,0.05))",
+    statWash: "linear-gradient(150deg, rgba(107,199,209,0.08), rgba(15,22,30,0.16) 55%, rgba(212,168,84,0.05))",
+    softShadow: "inset 0 1px 0 rgba(190,224,230,0.10), 0 10px 30px rgba(0,0,0,0.4)",
+    // Selection highlight FILL — arcane violet (the cyan border stays via t.green).
+    // Used by the surface map + cross-section selected column.
+    selectFill: "rgba(176,123,255,0.5)",
+    selectOverlay: "rgba(176,123,255,0.22)",
+    selectHatch: "rgba(176,123,255,0.45)",
   },
 };
 
@@ -149,6 +177,51 @@ const skyGradientShader = {
     }
   `,
 };
+
+// Colored glow hovering just beneath the floating oil-field cube. The cube's
+// bottom face sits at local y = -worldH (≈ -10 for the default 20-level grid),
+// so this sits a touch below it. Placeholder color for now — placement first.
+function FieldUnderglow({ y = -6, color = "#e88409", size = 40, drop = 3 }) {
+  // Soft radial-gradient sprite (camera-facing) so the glow has feathered edges
+  // instead of a hard sphere silhouette. Keeps default depthTest so the cube
+  // occludes the upper half and the glow spills out from beneath the field.
+  // The light stays just under the field (casting the dusky surface color), but
+  // the sprite's bright core is dropped into open space below the cube so the
+  // glow reads as light from *below* rather than from within the field; its
+  // faint outer falloff still bleeds up to keep the surface dusk.
+  const texture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const s = 128;
+    const c = document.createElement("canvas");
+    c.width = c.height = s;
+    const ctx = c.getContext("2d");
+    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.5)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    return new THREE.CanvasTexture(c);
+  }, []);
+  return (
+    <group position={[0, y, 0]}>
+      <sprite position={[0, -drop, 0]} scale={[size, size, 1]}>
+        <spriteMaterial
+          map={texture}
+          color={color}
+          transparent
+          opacity={0.85}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </sprite>
+      {/* No pointLight: an omni light here under-lit the tall water tower and
+          threw an uneven hotspot on the grid ground at certain angles. The
+          additive sprite is screen-space and carries the glow without shading
+          any geometry. */}
+    </group>
+  );
+}
 
 const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false }) {
   const topCol = useMemo(() => new THREE.Color(skyColor), [skyColor]);
@@ -379,47 +452,80 @@ const HellSkyEffects = memo(function HellSkyEffects() {
 });
 
 function SolsticeSkyEffects() {
-  const ringRef = useRef();
-  const flareRef = useRef();
-  const beamRef = useRef();
+  const sunRef = useRef();
+
+  // Soft radiant sun: a single camera-facing sprite with a hot white-gold core
+  // that fades smoothly into a warm corona — reads as glowing light blooming
+  // outward, not a flat disc + hard ring (the old "target/moon" look).
+  const sunTexture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const s = 256;
+    const c = document.createElement("canvas");
+    c.width = c.height = s;
+    const ctx = c.getContext("2d");
+    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    g.addColorStop(0.0, "rgba(255,252,238,1)");   // hot core
+    g.addColorStop(0.18, "rgba(255,244,200,1)");  // disc body
+    g.addColorStop(0.32, "rgba(255,212,120,0.72)"); // warm edge
+    g.addColorStop(0.55, "rgba(255,184,92,0.26)");  // corona
+    g.addColorStop(1.0, "rgba(255,170,80,0)");    // fade out
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    return new THREE.CanvasTexture(c);
+  }, []);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    if (ringRef.current) {
-      ringRef.current.rotation.z = t * 0.035;
-      const s = 1 + Math.sin(t * 0.7) * 0.025;
-      ringRef.current.scale.setScalar(s);
-    }
-    if (flareRef.current) {
-      flareRef.current.material.opacity = 0.18 + Math.sin(t * 0.55) * 0.035;
-    }
-    if (beamRef.current) {
-      beamRef.current.rotation.z = -0.35 + Math.sin(t * 0.22) * 0.04;
-      beamRef.current.material.opacity = 0.11 + Math.sin(t * 0.4) * 0.025;
+    if (sunRef.current) {
+      // Gentle "breathing" so it feels alive without pulsing distractingly.
+      const s = 40 * (1 + Math.sin(t * 0.5) * 0.012);
+      sunRef.current.scale.set(s, s, 1);
+      sunRef.current.material.opacity = 0.95 + Math.sin(t * 0.5) * 0.05;
     }
   });
 
   return (
     <group>
-      <group position={[-18, 28, -45]} rotation={[0.18, -0.18, 0]}>
-        <mesh>
-          <circleGeometry args={[8.5, 64]} />
-          <meshBasicMaterial color="#fff1a8" transparent opacity={0.84} depthWrite={false} fog={false} />
-        </mesh>
-        <mesh ref={flareRef} position={[0, 0, -0.03]}>
-          <circleGeometry args={[15.5, 64]} />
-          <meshBasicMaterial color="#ffc84a" transparent opacity={0.2} depthWrite={false} fog={false} />
-        </mesh>
-        <mesh ref={ringRef} position={[0, 0, -0.05]}>
-          <ringGeometry args={[9.7, 10.2, 96]} />
-          <meshBasicMaterial color="#f9d35f" transparent opacity={0.44} depthWrite={false} fog={false} />
-        </mesh>
-      </group>
-      <mesh ref={beamRef} position={[-5, 13, -25]} rotation={[0.42, 0.08, -0.35]}>
-        <planeGeometry args={[34, 9]} />
-        <meshBasicMaterial color="#ffe58a" transparent opacity={0.11} depthWrite={false} fog={false} side={THREE.DoubleSide} />
-      </mesh>
+      <sprite ref={sunRef} position={[-18, 28, -45]} scale={[40, 40, 1]}>
+        <spriteMaterial map={sunTexture} transparent opacity={1} depthWrite={false} fog={false} />
+      </sprite>
       <pointLight position={[-13, 18, -28]} color="#ffd66b" intensity={2.2} distance={90} decay={1.1} />
+    </group>
+  );
+}
+
+// Moon for the Parabolum sky — a textured sphere lit by the scene's violet
+// directional lights (so it shows a soft terminator), with a faint emissive so
+// the shadow side never goes fully black. Texture loaded imperatively to avoid
+// a Suspense boundary.
+function ParabolumMoon() {
+  const ref = useRef();
+  const [tex, setTex] = useState(null);
+  useEffect(() => {
+    let active = true;
+    new THREE.TextureLoader().load("/lunar_color.jpg", (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      if (active) setTex(t);
+    });
+    return () => { active = false; };
+  }, []);
+  useFrame((_, delta) => {
+    if (ref.current) ref.current.rotation.y += delta * 0.02; // slow drift
+  });
+  if (!tex) return null;
+  return (
+    <group position={[-16, 26, -46]}>
+      <mesh ref={ref} rotation={[0.2, 0.5, 0.08]}>
+        <sphereGeometry args={[5, 48, 48]} />
+        <meshStandardMaterial
+          map={tex}
+          emissiveMap={tex}
+          emissive="#8a82c8"
+          emissiveIntensity={1.95}
+          roughness={1}
+          metalness={0}
+        />
+      </mesh>
     </group>
   );
 }
@@ -706,6 +812,50 @@ function useIsMobile(breakpoint = 900) {
   return isMobile;
 }
 
+// ── Floating scene/theme toolbar (top-right over the 3D canvas) ──────────────
+// Fixed bright-on-dark styling so the icons stay readable against ANY sky,
+// independent of the active UI theme (whose accent is dark in light modes).
+const TOOLBAR_TRAY = {
+  display: "flex", alignItems: "center", gap: 3,
+  padding: 4, borderRadius: 8,
+  background: "rgba(14,16,24,0.55)",
+  backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
+};
+const TOOLBAR_DIVIDER = { width: 1, height: 18, background: "rgba(255,255,255,0.2)", margin: "0 3px", flexShrink: 0 };
+const TOOLBAR_PILL = {
+  padding: "0 12px", height: 28, borderRadius: 8,
+  background: "rgba(14,16,24,0.55)",
+  backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
+  color: "rgba(245,232,200,0.85)", fontFamily: "'Share Tech Mono', monospace",
+  fontSize: 11, letterSpacing: "0.1em", cursor: "pointer",
+  display: "flex", alignItems: "center", gap: 5,
+};
+// active = highlighted; variant tints the active state (gold/violet/cyan).
+function toolbarBtn(active, size = 28, variant = "gold") {
+  const V = {
+    gold:   { bg: "rgba(255,210,120,0.26)", border: "rgba(255,210,120,0.65)", color: "#ffe08a", glow: null },
+    violet: { bg: "rgba(123,45,214,0.30)",  border: "#7b2dd6", color: "#d8b8ff", glow: "rgba(123,45,214,0.7)" },
+    cyan:   { bg: "rgba(107,199,209,0.26)", border: "#6bc7d1", color: "#6bc7d1", glow: "rgba(107,199,209,0.6)" },
+  }[variant];
+  return {
+    width: size, height: size,
+    background: active ? V.bg : "transparent",
+    border: `1px solid ${active ? V.border : "rgba(255,255,255,0.12)"}`,
+    borderRadius: 3,
+    color: active ? V.color : "rgba(245,232,200,0.8)",
+    fontFamily: "'Share Tech Mono', monospace",
+    fontSize: size >= 28 ? 14 : 13,
+    cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+    boxShadow: active && V.glow ? `0 0 8px ${V.glow}` : "none",
+    textShadow: active && V.glow ? `0 0 6px ${V.color}` : "none",
+  };
+}
+
 export default function OilPage() {
   const isMobile = useIsMobile();
 
@@ -738,7 +888,6 @@ export default function OilPage() {
     }
     return "day";
   });
-  const env = ENV_PRESETS[envPreset];
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("oil_darkMode") === "true";
@@ -754,6 +903,21 @@ export default function OilPage() {
     }
     return false;
   });
+  // HUD overlay reskin — gold/cyan/orange-on-dark prospecting console (mirrors
+  // the SpaceScene HUD). The translucent panels need a dark backdrop to read as
+  // glowing glass, so HUD mode also swaps the 3D scene to a deep, cool dusk
+  // (not full night — that's too dark). Toggling HUD off restores the user's
+  // chosen scene. Mutually exclusive with parabolum (the toggles clear each other).
+  const [hudMode, setHudMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("oil_hudMode") === "true";
+    }
+    return false;
+  });
+  // Active scene lighting: HUD forces the dusk backdrop and Parabolum forces its
+  // own violet-lit scene (both are self-contained themed looks, independent of
+  // the day/dusk/night presets); otherwise the user's selected time-of-day.
+  const env = ENV_PRESETS[hudMode ? "hudDusk" : parabolum ? "parabolumEnv" : envPreset];
   // Don't persist the transient "hell" preset — otherwise a reload during a
   // demon event restores hell forever. Keep the last real preset saved instead.
   useEffect(() => {
@@ -761,14 +925,22 @@ export default function OilPage() {
   }, [envPreset]);
   useEffect(() => { localStorage.setItem("oil_darkMode", String(darkMode)); }, [darkMode]);
   useEffect(() => { localStorage.setItem("oil_parabolum", String(parabolum)); }, [parabolum]);
+  useEffect(() => { localStorage.setItem("oil_hudMode", String(hudMode)); }, [hudMode]);
   // Parabolum overrides light/dark for the UI chrome when active, but still
-  // honors the dark-mode toggle by picking its own dark/light lighting.
-  const themeKey = parabolum
-    ? (darkMode ? "parabolumDark" : "parabolumLight")
-    : envPreset === "solstice"
-      ? "solsticeLight"
-      : (darkMode ? "dark" : "light");
+  // Parabolum is a self-contained dark violet look (its own violet scene), so it
+  // always uses the dark console — there's no Parabolum "day" variant.
+  const themeKey = hudMode
+    ? "hud"
+    : parabolum
+      ? "parabolumDark"
+      : envPreset === "solstice"
+        ? "solsticeLight"
+        : (darkMode ? "dark" : "light");
   const theme = THEMES[themeKey];
+  // Effective dark flag for the child overlay panels (CoreSamplePanel, How-To,
+  // inspector, etc.). HUD, Parabolum, and dark mode are all dark aesthetics, so
+  // their panels render dark even when the day/night toggle is on "day".
+  const uiDark = darkMode || hudMode || parabolum;
   const styles = useMemo(() => getStyles(theme), [theme]);
   const m = useMemo(() => getMobileStyles(theme), [theme]);
   const drillBtnStyles = useMemo(() => getDrillStyles(theme), [theme]);
@@ -1541,6 +1713,10 @@ export default function OilPage() {
     : 0;
 
   const selectedClaimIndex = selectedX !== null ? sliceY * gridSize + selectedX : null;
+  // Cross-section highlight column: the active selection, or fall back to the
+  // player's own claim column so it always marks the same column the surface map
+  // emphasizes (the isMine plot) even when nothing is actively selected.
+  const xsecCol = selectedX !== null ? selectedX : (userDrill?.col ?? null);
 
   // Session-local drain tracking (declared early — used by hell pocket detection)
   const [tankDrained, setTankDrained] = useState(false);
@@ -2595,13 +2771,13 @@ export default function OilPage() {
       {blockHash && (
         <div style={{
           marginTop: 6, padding: "5px 8px",
-          background: darkMode ? "rgba(180,160,130,0.06)" : "rgba(180,160,130,0.08)",
-          border: `1px solid ${darkMode ? "#444" : "#d4c8b4"}`,
+          background: uiDark ? "rgba(180,160,130,0.06)" : "rgba(180,160,130,0.08)",
+          border: `1px solid ${uiDark ? "#444" : "#d4c8b4"}`,
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
         }}>
           <span style={{
             fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
-            color: darkMode ? "#8a8070" : "#8b7d6b", letterSpacing: "0.12em",
+            color: uiDark ? "#8a8070" : "#8b7d6b", letterSpacing: "0.12em",
           }}>
             SEED HASH
           </span>
@@ -2609,7 +2785,7 @@ export default function OilPage() {
             title={blockHash}
             style={{
               fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
-              color: darkMode ? "#8a8070" : "#8b7d6b",
+              color: uiDark ? "#8a8070" : "#8b7d6b",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               maxWidth: "65%", textAlign: "right", cursor: "pointer",
             }}
@@ -3279,7 +3455,7 @@ export default function OilPage() {
     return (
       <OilQualify
         theme={theme}
-        darkMode={darkMode}
+        darkMode={uiDark}
         isMobile={isMobile}
         user={user}
         isAdmin={isAdmin && adminAuthed}
@@ -3658,7 +3834,7 @@ export default function OilPage() {
       )}
       {drillStatus === "stunned" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={{ ...drillBtnStyles.disabled, borderColor: "#ff2200", color: "#ff2200" }}>
+          <button disabled style={{ ...drillBtnStyles.disabled, border: "1px solid #ff2200", color: "#ff2200" }}>
             INCAPACITATED {stunRemaining > 0 ? `${Math.floor(stunRemaining / 60)}:${String(stunRemaining % 60).padStart(2, "0")}` : ""}
           </button>
           <div style={{ ...drillBtnStyles.depth, color: "#ff2200" }}>
@@ -3668,7 +3844,7 @@ export default function OilPage() {
       )}
       {drillStatus === "blockade" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={{ ...drillBtnStyles.disabled, borderColor: "#ff2200", color: "#ff2200" }}>
+          <button disabled style={{ ...drillBtnStyles.disabled, border: "1px solid #ff2200", color: "#ff2200" }}>
             OIL BLOCKADE
           </button>
           <div style={{ ...drillBtnStyles.depth, color: "#ff2200" }}>
@@ -4222,7 +4398,8 @@ export default function OilPage() {
               >
                 <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
                 {envPreset === "hell" && <HellSkyEffects />}
-                {envPreset === "solstice" && <SolsticeSkyEffects />}
+                {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
+                {parabolum && <ParabolumMoon />}
                 {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
                 {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} />}
@@ -4233,6 +4410,7 @@ export default function OilPage() {
                 <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
                 <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
                 <group position={[0, 1, 0]}>
+                  {hudMode && <FieldUnderglow />}
                   <OilVoxelGrid
                     blockHash={blockHash}
                     numberOfDeposits={numberOfDeposits}
@@ -4331,7 +4509,8 @@ export default function OilPage() {
                   </svg>
                 </button>
                 <button
-                  onClick={() => setSnapshotTrigger(true)}
+                  title="Snapshot"
+              onClick={() => setSnapshotTrigger(true)}
                   style={{
                     width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
                     background: "rgba(212,168,84,0.15)", border: `1px solid ${theme.cornerBorder}`,
@@ -4344,62 +4523,38 @@ export default function OilPage() {
                   </svg>
                 </button>
               </div>
-              <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10, display: "flex", gap: 3 }}>
-                {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["solstice", <svg key="solstice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v3"/><path d="M12 19v3"/><path d="M4.22 4.22l2.12 2.12"/><path d="M17.66 17.66l2.12 2.12"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.22 19.78l2.12-2.12"/><path d="M17.66 6.34l2.12-2.12"/><circle cx="12" cy="12" r="5"/><path d="M9.5 12.5c1.2 1 3.8 1 5 0"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
+              <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10 }}>
+                <div style={TOOLBAR_TRAY}>
+                {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
                   <button
                     key={key}
+                    title={key[0].toUpperCase() + key.slice(1)}
                     onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
-                    style={{
-                      width: 26, height: 26,
-                      background: envPreset === key ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
-                      border: envPreset === key ? `1px solid ${theme.goldBorder}` : `1px solid ${theme.cornerBorder}`,
-                      borderRadius: 3,
-                      color: theme.accent,
-                      fontFamily: "'Share Tech Mono', monospace",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 0,
-                    }}
+                    style={toolbarBtn(envPreset === key, 26)}
                   >{icon}</button>
                 ))}
+                <div style={TOOLBAR_DIVIDER} />
                 <button
+                  title="Solstice theme"
+                  onClick={() => { setEnvPreset("solstice"); setParabolum(false); setHudMode(false); setDarkMode(false); setFireworksOn(false); }}
+                  style={toolbarBtn(envPreset === "solstice" && !parabolum && !hudMode, 26)}
+                >✺</button>
+                <button
+                  title={darkMode ? "Dark theme (active)" : "Dark theme"}
                   onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
-                  style={{
-                    width: 26, height: 26,
-                    background: darkMode ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
-                    border: `1px solid ${darkMode ? theme.goldBorder : theme.cornerBorder}`,
-                    borderRadius: 3,
-                    color: theme.accent,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                  }}
+                  style={toolbarBtn(darkMode, 26)}
                 >{darkMode ? "●" : "◐"}</button>
                 <button
-                  title="Parabolum"
-                  onClick={() => setParabolum((p) => !p)}
-                  style={{
-                    width: 26, height: 26,
-                    background: parabolum ? "rgba(123,45,214,0.35)" : "rgba(212,168,84,0.1)",
-                    border: `1px solid ${parabolum ? "#7b2dd6" : theme.cornerBorder}`,
-                    borderRadius: 3,
-                    color: parabolum ? "#d8b8ff" : theme.accent,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                    boxShadow: parabolum ? "0 0 8px rgba(123,45,214,0.7)" : "none",
-                    textShadow: parabolum ? "0 0 6px rgba(199,123,255,0.9)" : "none",
-                  }}
+                  title="Parabolum theme"
+                  onClick={() => { setParabolum((p) => !p); setHudMode(false); }}
+                  style={toolbarBtn(parabolum, 26, "violet")}
                 >◈</button>
+                <button
+                  title="HUD console theme"
+                  onClick={() => { setHudMode((h) => !h); setParabolum(false); }}
+                  style={toolbarBtn(hudMode, 26, "cyan")}
+                >⊞</button>
+                </div>
               </div>
             </div>
           )}
@@ -4431,7 +4586,7 @@ export default function OilPage() {
                 grid3D={showOilData ? stats.grid3D : communityGrid3D}
                 maxCellValue={showOilData ? stats.maxOil : communityMaxOil}
                 sliceY={sliceY}
-                selectedX={selectedX}
+                selectedX={xsecCol}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
@@ -4454,14 +4609,14 @@ export default function OilPage() {
             oilValue={drilledOilValue}
             maxOil={stats.maxOil}
             drillProximity={drillProximity}
-            darkMode={darkMode}
+            darkMode={uiDark}
             parabolum={parabolum}
             hellActive={hellActive}
             demonBlockade={demonBlockade}
           />
           {playerDrillPanel}
           {isAdmin && parametersPanel}
-          {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
+          {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
           {testGusherButton && (
             <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
               {testGusherButton}
@@ -4473,8 +4628,9 @@ export default function OilPage() {
           <CoreSamplePanel
             grid3D={stats.grid3D}
             maxOil={stats.maxOil}
-            darkMode={darkMode}
+            darkMode={uiDark}
             parabolum={parabolum}
+            hud={hudMode}
             isMobile
             gridX={gridSize}
             gridY={gridSize}
@@ -4484,14 +4640,14 @@ export default function OilPage() {
             hellPockets={stats.hellPockets}
           />
           {leaderboardPanel}
-          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
+          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
-          <HowToPlayPanel isMobile darkMode={darkMode} />
-          <OilVerifyExplainer isMobile darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+          <HowToPlayPanel isMobile darkMode={uiDark} />
+          <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -4536,7 +4692,7 @@ export default function OilPage() {
           onBuyClick={() => setShowBuyModal(true)}
           isMobile
           show80sButton={false}
-          darkMode={darkMode}
+          darkMode={uiDark}
           extraLeft={[{
             key: "home",
             label: "HOME",
@@ -4708,7 +4864,8 @@ export default function OilPage() {
           >
             <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
             {envPreset === "hell" && <HellSkyEffects />}
-            {envPreset === "solstice" && <SolsticeSkyEffects />}
+            {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
+            {parabolum && <ParabolumMoon />}
             {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
             {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
             {fireworksOn && <Fireworks quality={2} shellSize={2} />}
@@ -4719,6 +4876,7 @@ export default function OilPage() {
             <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
             <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
             <group position={[0, 5, 0]}>
+              {hudMode && <FieldUnderglow />}
               <OilVoxelGrid
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
@@ -4814,6 +4972,7 @@ export default function OilPage() {
               </svg>
             </button>
             <button
+              title="Snapshot"
               onClick={() => setSnapshotTrigger(true)}
               style={{
                 width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
@@ -4827,78 +4986,42 @@ export default function OilPage() {
               </svg>
             </button>
           </div>
-          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, display: "flex", alignItems: "center", gap: 3 }}>
-            {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["solstice", <svg key="solstice-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v3"/><path d="M12 19v3"/><path d="M4.22 4.22l2.12 2.12"/><path d="M17.66 17.66l2.12 2.12"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.22 19.78l2.12-2.12"/><path d="M17.66 6.34l2.12-2.12"/><circle cx="12" cy="12" r="5"/><path d="M9.5 12.5c1.2 1 3.8 1 5 0"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
+          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={TOOLBAR_TRAY}>
+            {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
               <button
                 key={key}
+                title={key[0].toUpperCase() + key.slice(1)}
                 onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
-                style={{
-                  width: 28, height: 28,
-                  background: envPreset === key ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
-                  border: envPreset === key ? `1px solid ${theme.goldBorder}` : `1px solid ${theme.cornerBorder}`,
-                  borderRadius: 3,
-                  color: theme.accent,
-                  fontFamily: "'Share Tech Mono', monospace",
-                  fontSize: 14,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 0,
-                }}
+                style={toolbarBtn(envPreset === key, 28)}
               >{icon}</button>
             ))}
+            <div style={TOOLBAR_DIVIDER} />
             <button
+              title="Solstice theme"
+              onClick={() => { setEnvPreset("solstice"); setParabolum(false); setHudMode(false); setDarkMode(false); setFireworksOn(false); }}
+              style={toolbarBtn(envPreset === "solstice" && !parabolum && !hudMode, 28)}
+            >✺</button>
+            <button
+              title={darkMode ? "Dark theme (active)" : "Dark theme"}
               onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
-              style={{
-                width: 28, height: 28,
-                background: darkMode ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
-                border: `1px solid ${darkMode ? theme.goldBorder : theme.cornerBorder}`,
-                borderRadius: 3,
-                color: theme.accent,
-                fontSize: 14,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0,
-              }}
+              style={toolbarBtn(darkMode, 28)}
             >{darkMode ? "●" : "◐"}</button>
             <button
-              title="Parabolum"
-              onClick={() => setParabolum((p) => !p)}
-              style={{
-                width: 28, height: 28,
-                background: parabolum ? "rgba(123,45,214,0.35)" : "rgba(212,168,84,0.1)",
-                border: `1px solid ${parabolum ? "#7b2dd6" : theme.cornerBorder}`,
-                borderRadius: 3,
-                color: parabolum ? "#d8b8ff" : theme.accent,
-                fontSize: 14,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0,
-                boxShadow: parabolum ? "0 0 8px rgba(123,45,214,0.7)" : "none",
-                textShadow: parabolum ? "0 0 6px rgba(199,123,255,0.9)" : "none",
-              }}
+              title="Parabolum theme"
+              onClick={() => { setParabolum((p) => !p); setHudMode(false); }}
+              style={toolbarBtn(parabolum, 28, "violet")}
             >◈</button>
             <button
+              title="HUD console theme"
+              onClick={() => { setHudMode((h) => !h); setParabolum(false); }}
+              style={toolbarBtn(hudMode, 28, "cyan")}
+            >⊞</button>
+            </div>
+            <button
+              title={panelsCollapsed ? "Show side panel" : "Hide side panel"}
               onClick={() => setPanelsCollapsed((p) => !p)}
-              style={{
-                padding: "5px 10px",
-                background: "rgba(212,168,84,0.15)",
-                border: `1px solid ${theme.goldBorder}`,
-                borderRadius: 3,
-                color: theme.accent,
-                fontFamily: "'Share Tech Mono', monospace",
-                fontSize: 11,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-              }}
+              style={TOOLBAR_PILL}
             >
               {panelsCollapsed ? "◂ SHOW PANEL" : "HIDE PANEL ▸"}
             </button>
@@ -4929,7 +5052,7 @@ export default function OilPage() {
                 grid3D={showOilData ? stats.grid3D : communityGrid3D}
                 maxCellValue={showOilData ? stats.maxOil : communityMaxOil}
                 sliceY={sliceY}
-                selectedX={selectedX}
+                selectedX={xsecCol}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
@@ -4959,20 +5082,21 @@ export default function OilPage() {
               oilValue={drilledOilValue}
               maxOil={stats.maxOil}
               drillProximity={drillProximity}
-              darkMode={darkMode}
+              darkMode={uiDark}
               parabolum={parabolum}
               hellActive={hellActive}
             />
             {playerDrillPanel}
             {isAdmin && parametersPanel}
-            {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
+            {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
             <CoreSamplePanel
               grid3D={stats.grid3D}
               maxOil={stats.maxOil}
-              darkMode={darkMode}
+              darkMode={uiDark}
               parabolum={parabolum}
+              hud={hudMode}
               gridX={gridSize}
               gridY={gridSize}
               selectedX={selectedX}
@@ -4981,15 +5105,15 @@ export default function OilPage() {
               hellPockets={stats.hellPockets}
             />
             {leaderboardPanel}
-            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
+            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
-            <HowToPlayPanel darkMode={darkMode} />
-            <OilVerifyExplainer darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+            <HowToPlayPanel darkMode={uiDark} />
+            <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}
@@ -5529,7 +5653,7 @@ function getStyles(t) { return {
     margin: "0 0 10px",
     fontSize: 11,
     fontWeight: 600,
-    color: t.accent,
+    color: t.titleCool || t.accent,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
     display: "flex",
@@ -5539,7 +5663,7 @@ function getStyles(t) { return {
 
   rankIcon: {
     fontSize: 10,
-    color: t.accent,
+    color: t.titleCool || t.accent,
   },
 
   statGrid: {
@@ -5904,7 +6028,7 @@ function getMobileStyles(t) { return {
     margin: "0 0 10px",
     fontSize: 11,
     fontWeight: 600,
-    color: t.accent,
+    color: t.titleCool || t.accent,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
     display: "flex",
@@ -5957,8 +6081,8 @@ function getMobileStyles(t) { return {
   },
 
   tabActive: {
-    color: t.accent,
-    borderBottom: `2px solid ${t.goldBorder}`,
+    color: t.titleCool || t.accent,
+    borderBottom: `2px solid ${t.titleCoolBorder || t.goldBorder}`,
     background: t.btnBg,
   },
 }; }

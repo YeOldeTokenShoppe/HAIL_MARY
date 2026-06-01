@@ -42,7 +42,8 @@ export default function OilSurfaceMap({
   currentUserId,
   parabolum = false,
 }) {
-  const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717";
+  // Dark-theme bgs: dark (#12161c), parabolumDark (#0c0717), hud (#0f141c).
+  const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717" || theme?.bg === "#0f141c";
   const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#5a8a3a", accent: "#7a5a1a" };
 
   return (
@@ -93,7 +94,7 @@ export default function OilSurfaceMap({
         <div style={{
           display: "grid", gridTemplateColumns: `repeat(${gridX}, 1fr)`,
           gap: 2, padding: 8,
-          background: t.inputBg, border: `1px solid ${t.borderLight}`, flex: 1,
+          background: t.mapBg || t.inputBg, border: `1px solid ${t.borderLight}`, flex: 1,
         }}>
           {claimTotals.map((claim, i) => {
             const plotKey = `${claim.x}_${claim.y}`;
@@ -110,7 +111,7 @@ export default function OilSurfaceMap({
             // Determine cell background
             let bg;
             if (claim.index === selectedClaimIndex) {
-              bg = dark ? "rgba(122,170,90,0.7)" : "rgba(90, 138, 58, 0.7)";
+              bg = t.selectFill || (dark ? "rgba(122,170,90,0.7)" : "rgba(90, 138, 58, 0.7)");
             } else if (isMine) {
               bg = dark ? "rgba(90,138,58,0.3)" : "rgba(90,138,58,0.2)";
             } else if (isOwned) {
@@ -119,6 +120,8 @@ export default function OilSurfaceMap({
               bg = dark ? "rgba(180,140,60,0.2)" : "rgba(180,140,60,0.15)";
             } else if (isJumpTarget) {
               bg = dark ? "rgba(212,168,84,0.15)" : "rgba(212,168,84,0.12)";
+            } else if (claim.total === 0 && t.mapEmpty) {
+              bg = t.mapEmpty;
             } else {
               bg = getSurfaceColor(claim.total, maxClaimTotal, dark, parabolum);
             }

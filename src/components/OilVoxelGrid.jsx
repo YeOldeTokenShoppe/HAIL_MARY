@@ -3102,8 +3102,12 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
   // matte — recovering the close-up rig's metallic sheen at ~1 draw call.
   const mat = useMemo(() => {
     const m = new THREE.MeshStandardMaterial({
+      // `color` multiplies the baked vertex colors — knocks back the bright white
+      // plastic (counterweight/base) so the rigs don't blow out against the dark
+      // dusk ground. Lower envMapIntensity also tames the shiny metal hotspots.
+      color: new THREE.Color(0xaaaaaa),
       vertexColors: true, roughness: 1.0, metalness: 1.0,
-      envMap: envMap || null, envMapIntensity: 1.3,
+      envMap: envMap || null, envMapIntensity: 0.9,
     });
     m.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
@@ -4111,6 +4115,14 @@ export default function OilVoxelGrid({
   topoTex.wrapS = topoTex.wrapT = THREE.RepeatWrapping;
 
   const groundPalette = useMemo(() => {
+    if (parabolum) {
+      return {
+        top: "#5a4a78",
+        bottom: "#2a1d44",
+        side: "#4a3a66",
+        wire: 0xa45cff,
+      };
+    }
     if (envPreset === "solstice") {
       return {
         top: "#b99557",
@@ -4121,10 +4133,10 @@ export default function OilVoxelGrid({
     }
     if (envPreset === "night") {
       return {
-        top: "#5a5f78",
-        bottom: "#242234",
-        side: "#4e5268",
-        wire: 0x7280a8,
+        top: "#6a7090",
+        bottom: "#2c2a40",
+        side: "#5e6478",
+        wire: 0x8290c0,
       };
     }
     if (envPreset === "hell") {
@@ -4141,7 +4153,7 @@ export default function OilVoxelGrid({
       side: "#ffffff",
       wire: 0x8b7355,
     };
-  }, [envPreset]);
+  }, [envPreset, parabolum]);
 
   // 6 materials for box faces: +x, -x, +y (top), -y (bottom), +z, -z
   const groundMaterials = useMemo(() => {

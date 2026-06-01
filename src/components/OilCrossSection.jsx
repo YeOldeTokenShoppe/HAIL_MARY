@@ -77,7 +77,8 @@ export default function OilCrossSection({
   gridY = 10,
   parabolum = false,
 }) {
-  const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717";
+  // Dark-theme bgs: dark (#12161c), parabolumDark (#0c0717), hud (#0f141c).
+  const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717" || theme?.bg === "#0f141c";
   const t = theme || { text: "#5a4e3e", muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", accent: "#7a5a1a", gold: "#d4a854", goldBorder: "#b8922e", textStrong: "#3e2e10", inspectorKey: "#8b7d6b", seedLabel: "#8b7355" };
 
   return (
@@ -89,37 +90,45 @@ export default function OilCrossSection({
         CROSS-SECTION &mdash; Row Y={sliceY + 1}, looking across X
       </div>
 
-      {/* Y-Slice Selector */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, justifyContent: "center" }}>
-        <span style={{ fontSize: 9, color: t.seedLabel || t.muted, letterSpacing: "0.15em", flexShrink: 0 }}>Y</span>
-        <div style={{ display: "flex", gap: 2 }}>
-          {Array.from({ length: gridY }, (_, y) => (
-            <button
-              key={y}
-              onClick={() => onSliceY(y)}
-              style={{
-                width: 22, height: 20,
-                background: sliceY === y ? t.gold : t.inputBg,
-                border: `1px solid ${sliceY === y ? t.goldBorder : t.borderLight}`,
-                borderRadius: 2,
-                color: sliceY === y ? t.textStrong : (t.inspectorKey || t.muted),
-                fontFamily: "'Share Tech Mono', monospace",
-                fontSize: 9,
-                cursor: "pointer",
-                transition: "all 0.15s",
-                padding: 0,
-              }}
-            >
-              {y + 1}
-            </button>
-          ))}
+      {/* Y-Slice Selector — spread across the grid width (marginLeft 28 matches
+          the cross-section below) so each button lines up over its column, and
+          highlighted in the same green as the selected column. */}
+      <div style={{ position: "relative", marginLeft: 28, marginBottom: 6 }}>
+        <span style={{
+          position: "absolute", left: -28, top: "50%", transform: "translateY(-50%)",
+          fontSize: 9, color: t.seedLabel || t.muted, letterSpacing: "0.15em",
+        }}>Y</span>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridY}, 1fr)`, gap: 2 }}>
+          {Array.from({ length: gridY }, (_, y) => {
+            const sel = sliceY === y;
+            return (
+              <button
+                key={y}
+                onClick={() => onSliceY(y)}
+                style={{
+                  height: 20,
+                  background: sel ? (t.green || "#3a7a20") : t.inputBg,
+                  border: `1px solid ${sel ? (t.green || "#3a7a20") : t.borderLight}`,
+                  borderRadius: 2,
+                  color: sel ? t.textStrong : (t.inspectorKey || t.muted),
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: 9,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  padding: 0,
+                }}
+              >
+                {y + 1}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div style={{
         position: "relative",
         border: `1px solid ${t.borderLight}`,
-        background: t.inputBg,
+        background: t.mapBg || t.inputBg,
         marginLeft: 28,
       }}>
         <div style={{
@@ -145,11 +154,15 @@ export default function OilCrossSection({
               const value = grid3D[x][sliceY][z];
               const isSelected = x === selectedX;
               const isDrilledCell = isSelected && z < drillDepth;
-              const selectBorder = dark ? "#d4a854" : "#8b6914";
+              // Match the surface-view selection highlight (green) so the two
+              // views read as the same selection.
+              const selectBorder = t.green || "#3a7a20";
               // Tint selected column so it's visible even when all values are 0
-              const baseBg = getOilColor(value, maxCellValue, dark, parabolum);
+              const baseBg = (value === 0 && t.mapEmpty)
+                ? t.mapEmpty
+                : getOilColor(value, maxCellValue, dark, parabolum);
               const selectedTint = isSelected && value === 0
-                ? (dark ? "rgba(212,168,84,0.08)" : "rgba(139,105,20,0.06)")
+                ? (t.selectOverlay || (dark ? "rgba(122,170,90,0.1)" : "rgba(90,138,58,0.1)"))
                 : baseBg;
               return (
                 <div
@@ -165,11 +178,19 @@ export default function OilCrossSection({
                     boxSizing: "border-box",
                   }}
                 >
+                  {isSelected && (
+                    <div style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: t.selectOverlay || (dark ? "rgba(122,170,90,0.18)" : "rgba(90,138,58,0.16)"),
+                      pointerEvents: "none",
+                    }} />
+                  )}
                   {isDrilledCell && (
                     <div style={{
                       position: "absolute",
                       inset: 0,
-                      background: `repeating-linear-gradient(45deg, transparent, transparent 2px, ${dark ? "rgba(212,168,84,0.3)" : "rgba(139,105,20,0.25)"} 2px, ${dark ? "rgba(212,168,84,0.3)" : "rgba(139,105,20,0.25)"} 4px)`,
+                      background: `repeating-linear-gradient(45deg, transparent, transparent 2px, ${t.selectHatch || (dark ? "rgba(122,170,90,0.35)" : "rgba(90,138,58,0.3)")} 2px, ${t.selectHatch || (dark ? "rgba(122,170,90,0.35)" : "rgba(90,138,58,0.3)")} 4px)`,
                     }} />
                   )}
                   {isSelected && z === drillDepth && drillDepth > 0 && drillDepth < DEPTH_Z && (

@@ -554,6 +554,7 @@ export default function CoreSamplePanel({
   maxOil,
   darkMode = false,
   parabolum = false,
+  hud = false,
   isMobile = false,
   defaultExpanded = false,
   gridX = 10,
@@ -571,7 +572,15 @@ export default function CoreSamplePanel({
   const startRef = useRef(0);
 
   const dark = darkMode;
-  const c = parabolum ? (dark ? {
+  // HUD console — cyan chrome (tabs, headings, callouts) around the gold/amber
+  // core tube, mirroring the SpaceScene prospecting HUD. Takes precedence over
+  // the day/dark/parabolum palettes; the stratigraphy colors stay amber.
+  const c = hud ? {
+    accent: "#6bc7d1", muted: "#7e94a6",
+    sectionBorder: "rgba(107,199,209,0.18)",
+    btnBg: "rgba(107,199,209,0.1)", btnBorder: "rgba(107,199,209,0.35)",
+    btnBgHover: "rgba(107,199,209,0.2)",
+  } : parabolum ? (dark ? {
     accent: "#c79bff", muted: "#7a6a9c",
     sectionBorder: "#2a1d44",
     btnBg: "rgba(123,45,214,0.16)", btnBorder: "rgba(164,92,255,0.35)",
