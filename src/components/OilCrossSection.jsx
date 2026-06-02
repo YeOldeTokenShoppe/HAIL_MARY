@@ -2,66 +2,24 @@
 
 const DEPTH_Z = 20;
 
-function getOilColor(value, maxValue, dark, parabolum) {
-  if (parabolum) {
-    const tp = Math.min(value / maxValue, 1);
-    if (dark) {
-      if (value === 0) return "#160d26";
-      // Parabolum (dark): indigo strata → arcane violet → glowing lilac vein
-      if (tp < 0.15) { const p = tp / 0.15; return `rgb(${Math.round(38 + p * 26)}, ${Math.round(22 + p * 20)}, ${Math.round(58 + p * 40)})`; }
-      if (tp < 0.35) { const p = (tp - 0.15) / 0.2; return `rgb(${Math.round(64 + p * 46)}, ${Math.round(42 + p * 24)}, ${Math.round(98 + p * 60)})`; }
-      if (tp < 0.6)  { const p = (tp - 0.35) / 0.25; return `rgb(${Math.round(110 + p * 50)}, ${Math.round(66 + p * 30)}, ${Math.round(158 + p * 60)})`; }
-      if (tp < 0.8)  { const p = (tp - 0.6) / 0.2; return `rgb(${Math.round(160 + p * 40)}, ${Math.round(96 + p * 36)}, ${Math.round(218 + p * 25)})`; }
-      const p = (tp - 0.8) / 0.2; return `rgb(${Math.round(200 + p * 40)}, ${Math.round(132 + p * 50)}, ${Math.round(243 + p * 12)})`;
-    }
-    // Parabolum (light): iridescent slick — teal → cyan-blue → violet → magenta
-    if (value === 0) return "#e6efed";
-    if (tp < 0.15) { const p = tp / 0.15; return `rgb(${Math.round(190 - p * 70)}, ${Math.round(224 - p * 28)}, ${Math.round(220 - p * 10)})`; }
-    if (tp < 0.35) { const p = (tp - 0.15) / 0.2; return `rgb(${Math.round(120 - p * 42)}, ${Math.round(196 - p * 46)}, ${Math.round(210)})`; }
-    if (tp < 0.6)  { const p = (tp - 0.35) / 0.25; return `rgb(${Math.round(78 + p * 32)}, ${Math.round(150 - p * 60)}, ${Math.round(210 + p * 4)})`; }
-    if (tp < 0.8)  { const p = (tp - 0.6) / 0.2; return `rgb(${Math.round(110 + p * 40)}, ${Math.round(90 - p * 38)}, ${Math.round(214 - p * 14)})`; }
-    const p = (tp - 0.8) / 0.2; return `rgb(${Math.round(150 + p * 50)}, ${Math.round(52 - p * 24)}, ${Math.round(200 - p * 66)})`;
-  }
-  if (value === 0) return dark ? "#1e1e26" : "#ede6da";
+// Paraboleum — neutral rock when empty, phosphorescent green where the substance
+// is present (richer = brighter green in dark, deeper green in light).
+function getOilColor(value, maxValue, dark) {
   const t = Math.min(value / maxValue, 1);
   if (dark) {
-    if (t < 0.15) {
-      const p = t / 0.15;
-      return `rgb(${Math.round(45 + p * 30)}, ${Math.round(48 + p * 25)}, ${Math.round(38 + p * 15)})`;
-    }
-    if (t < 0.35) {
-      const p = (t - 0.15) / 0.2;
-      return `rgb(${Math.round(75 + p * 50)}, ${Math.round(73 + p * 30)}, ${Math.round(53 + p * 15)})`;
-    }
-    if (t < 0.6) {
-      const p = (t - 0.35) / 0.25;
-      return `rgb(${Math.round(125 + p * 40)}, ${Math.round(103 + p * 25)}, ${Math.round(68 + p * 15)})`;
-    }
-    if (t < 0.8) {
-      const p = (t - 0.6) / 0.2;
-      return `rgb(${Math.round(165 + p * 30)}, ${Math.round(128 + p * 20)}, ${Math.round(83 + p * 10)})`;
-    }
-    const p = (t - 0.8) / 0.2;
-    return `rgb(${Math.round(195 + p * 25)}, ${Math.round(148 + p * 20)}, ${Math.round(93 + p * 12)})`;
+    if (value === 0) return "#18221c";
+    if (t < 0.15) { const p = t / 0.15; return `rgb(${Math.round(40 + p * 12)}, ${Math.round(58 + p * 30)}, ${Math.round(46 + p * 16)})`; }
+    if (t < 0.35) { const p = (t - 0.15) / 0.2; return `rgb(${Math.round(52 - p * 5)}, ${Math.round(88 + p * 55)}, ${Math.round(62 + p * 16)})`; }
+    if (t < 0.6)  { const p = (t - 0.35) / 0.25; return `rgb(${Math.round(47)}, ${Math.round(143 + p * 71)}, ${Math.round(78 - p * 4)})`; }
+    if (t < 0.8)  { const p = (t - 0.6) / 0.2; return `rgb(${Math.round(47 + p * 43)}, ${Math.round(214 + p * 26)}, ${Math.round(74 + p * 36)})`; }
+    const p = (t - 0.8) / 0.2; return `rgb(${Math.round(90 + p * 26)}, ${Math.round(240 + p * 15)}, ${Math.round(110 + p * 40)})`;
   }
-  if (t < 0.15) {
-    const p = t / 0.15;
-    return `rgb(${Math.round(220 - p * 20)}, ${Math.round(210 - p * 25)}, ${Math.round(190 - p * 30)})`;
-  }
-  if (t < 0.35) {
-    const p = (t - 0.15) / 0.2;
-    return `rgb(${Math.round(200 - p * 50)}, ${Math.round(185 - p * 60)}, ${Math.round(160 - p * 70)})`;
-  }
-  if (t < 0.6) {
-    const p = (t - 0.35) / 0.25;
-    return `rgb(${Math.round(150 - p * 30)}, ${Math.round(125 - p * 40)}, ${Math.round(90 - p * 30)})`;
-  }
-  if (t < 0.8) {
-    const p = (t - 0.6) / 0.2;
-    return `rgb(${Math.round(120 - p * 30)}, ${Math.round(85 - p * 25)}, ${Math.round(60 - p * 20)})`;
-  }
-  const p = (t - 0.8) / 0.2;
-  return `rgb(${Math.round(90 - p * 30)}, ${Math.round(60 - p * 20)}, ${Math.round(40 - p * 15)})`;
+  if (value === 0) return "#e2e8e2";
+  if (t < 0.15) { const p = t / 0.15; return `rgb(${Math.round(212 - p * 46)}, ${Math.round(221 - p * 27)}, ${Math.round(214 - p * 42)})`; }
+  if (t < 0.35) { const p = (t - 0.15) / 0.2; return `rgb(${Math.round(166 - p * 74)}, ${Math.round(194 - p * 20)}, ${Math.round(172 - p * 64)})`; }
+  if (t < 0.6)  { const p = (t - 0.35) / 0.25; return `rgb(${Math.round(92 - p * 56)}, ${Math.round(174 - p * 16)}, ${Math.round(108 - p * 32)})`; }
+  if (t < 0.8)  { const p = (t - 0.6) / 0.2; return `rgb(${Math.round(36 - p * 12)}, ${Math.round(158 - p * 38)}, ${Math.round(76 - p * 24)})`; }
+  const p = (t - 0.8) / 0.2; return `rgb(${Math.round(24 - p * 10)}, ${Math.round(120 - p * 30)}, ${Math.round(52 - p * 14)})`;
 }
 
 export default function OilCrossSection({

@@ -5,27 +5,28 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const REVEAL_TIME = 10000;
 const PRELIM_DELAY = 2500;
 
+// Paraboleum density readout — dim grey-green at barren, phosphorescent green at rich.
 const DENSITY_LABELS = [
-  { label: "BARREN", color: "#6e6050" },
-  { label: "TRACE", color: "#8a7d6b" },
-  { label: "OIL SAND", color: "#a08040" },
-  { label: "CRUDE", color: "#d4a854" },
-  { label: "RICH VEIN", color: "#e87a2b" },
+  { label: "BARREN", color: "#7a8a72" },
+  { label: "TRACE", color: "#5cae6c" },
+  { label: "GLIMMER", color: "#2f9f4e" },
+  { label: "LUMEN", color: "#2dd64a" },
+  { label: "RADIANCE", color: "#74ff96" },
 ];
 
 const PRELIM_LEVELS = [
-  { label: "NOMINAL", color: "#6e6050", threshold: 0 },
-  { label: "TRACE ACTIVITY", color: "#8a7d6b", threshold: 0.05 },
-  { label: "ELEVATED READINGS", color: "#a08040", threshold: 0.15 },
-  { label: "ANOMALOUS SIGNAL", color: "#e87a2b", threshold: 0.35 },
+  { label: "NOMINAL", color: "#7a8a72", threshold: 0 },
+  { label: "TRACE ACTIVITY", color: "#5cae6c", threshold: 0.05 },
+  { label: "ELEVATED READINGS", color: "#2dd64a", threshold: 0.15 },
+  { label: "ANOMALOUS SIGNAL", color: "#74ff96", threshold: 0.35 },
 ];
 
-// Parabolum status-readout colors (index-aligned with the arrays above).
-const DENSITY_COLORS_PARA_DARK = ["#6a5a86", "#8a72b8", "#a45cff", "#c79bff", "#e0b8ff"];
-// Iridescent slick (light): teal → cyan-blue → violet → magenta
-const DENSITY_COLORS_PARA_LIGHT = ["#3f8a90", "#2f8fc0", "#4e5fd0", "#8a3dd6", "#c81f8a"];
-const PRELIM_COLORS_PARA_DARK = ["#6a5a86", "#8a72b8", "#a45cff", "#d89bff"];
-const PRELIM_COLORS_PARA_LIGHT = ["#3f8a90", "#2f8fc0", "#7a3dd6", "#c81f8a"];
+// Status-readout colors (index-aligned). Green everywhere now — dark variant is
+// bright for dark/console bg, light variant is deeper for the light console.
+const DENSITY_COLORS_PARA_DARK = ["#7a8a72", "#5cae6c", "#2f9f4e", "#2dd64a", "#74ff96"];
+const DENSITY_COLORS_PARA_LIGHT = ["#6a7a62", "#3f9a52", "#1f8a3e", "#0e7a32", "#0a5e26"];
+const PRELIM_COLORS_PARA_DARK = ["#7a8a72", "#5cae6c", "#2dd64a", "#74ff96"];
+const PRELIM_COLORS_PARA_LIGHT = ["#6a7a62", "#2f9a4e", "#0e7a32", "#0a5e26"];
 
 function classifyTier(value, maxOil) {
   if (value === 0) return 0;

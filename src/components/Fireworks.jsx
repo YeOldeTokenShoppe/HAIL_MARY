@@ -20,6 +20,10 @@ export default function FireworksSky({
   shellSize: shellSizeProp = 2,
   enabled = true,
   radius = 75,
+  heading = Math.PI / 2, // rotate sky sphere so the burst band faces -Z (the sky-view camera)
+  finale = false, // rapid-fire finale: bursts of fast shells with brief pauses
+  sound = true, // play launch/burst/crackle sound effects
+  soundVolume = 0.4, // master volume multiplier for the sound effects
 }) {
   const meshRef = useRef();
   const engineRef = useRef(null);
@@ -59,6 +63,7 @@ export default function FireworksSky({
     let isLowQuality = quality === 1;
     let isHighQuality = quality === 3;
     let shellSizeConfig = shellSizeProp;
+    let finaleMode = finale;
     let running = enabled;
     let destroyed = false;
 
@@ -86,6 +91,61 @@ export default function FireworksSky({
       pointDist: (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1),
       pointAngle: (x1, y1, x2, y2) => Math.atan2(y2 - y1, x2 - x1),
     };
+
+    // ─── Sound (Web Audio) ───────────────────────────────────────────
+    // Samples ported from the original simulator, served from /public.
+    let soundEnabled = sound;
+    let masterVolume = soundVolume;
+    const soundManager = {
+      baseURL: "/audio/fireworks/",
+      ctx: null,
+      sources: {
+        lift: { volume: 1, rateMin: 0.85, rateMax: 0.95, files: ["lift1.mp3", "lift2.mp3", "lift3.mp3"] },
+        burst: { volume: 1, rateMin: 0.8, rateMax: 0.9, files: ["burst1.mp3", "burst2.mp3"] },
+        burstSmall: { volume: 0.25, rateMin: 0.8, rateMax: 1, files: ["burst-sm-1.mp3", "burst-sm-2.mp3"] },
+        crackle: { volume: 0.2, rateMin: 1, rateMax: 1, files: ["crackle1.mp3"] },
+        crackleSmall: { volume: 0.3, rateMin: 1, rateMax: 1, files: ["crackle-sm-1.mp3"] },
+      },
+      _lastSmallBurst: 0,
+      init() {
+        if (this.ctx || typeof window === "undefined") return;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        this.ctx = new AC();
+        Object.values(this.sources).forEach((src) => {
+          Promise.all(
+            src.files.map((f) =>
+              fetch(this.baseURL + f)
+                .then((r) => r.arrayBuffer())
+                .then((buf) => new Promise((res, rej) => this.ctx.decodeAudioData(buf, res, rej)))
+            )
+          )
+            .then((buffers) => { src.buffers = buffers; })
+            .catch(() => { src.buffers = null; });
+        });
+      },
+      resume() { this.ctx?.resume?.(); },
+      play(type, scale = 1) {
+        if (!soundEnabled || !this.ctx || simSpeed < 0.95) return;
+        if (type === "burstSmall") {
+          const now = currentFrame; // throttle via frame counter
+          if (now - this._lastSmallBurst < 2) return;
+          this._lastSmallBurst = now;
+        }
+        const src = this.sources[type];
+        if (!src || !src.buffers || !src.buffers.length) return;
+        scale = MyMath.clamp(scale, 0, 1);
+        const gain = this.ctx.createGain();
+        gain.gain.value = src.volume * scale * masterVolume;
+        const node = this.ctx.createBufferSource();
+        node.buffer = src.buffers[(Math.random() * src.buffers.length) | 0];
+        node.playbackRate.value = MyMath.random(src.rateMin, src.rateMax) * (2 - scale);
+        node.connect(gain);
+        gain.connect(this.ctx.destination);
+        node.start(0);
+      },
+    };
+    if (soundEnabled) soundManager.init();
 
     const trailsCtx = trailsCanvas.getContext("2d");
     const mainCtx = mainCanvas.getContext("2d");
@@ -317,14 +377,17 @@ export default function FireworksSky({
         }
       }
       launch(position, launchHeight) {
+        soundManager.play("lift");
         const width = stageW;
         const height = stageH;
-        const hpad = 60, vpad = 50;
-        // Bursts happen in top ~70% of texture, launch from bottom
-        const minHeight = height * 0.35;
+        const hpad = 60;
+        // Burst band kept lower in the sky so the sky-view camera frames it.
+        // Smaller y = higher in the sky; this range maps to ~52°..~12° elevation.
+        const highBurstY = height * 0.21; // highest bursts
+        const lowBurstY = height * 0.44;  // lowest bursts
         const launchX = position * (width - hpad * 2) + hpad;
         const launchY = height;
-        const burstY = vpad + (1 - launchHeight) * (minHeight - vpad);
+        const burstY = highBurstY + (1 - launchHeight) * (lowBurstY - highBurstY);
         const launchDistance = launchY - burstY;
         const launchVelocity = Math.pow(launchDistance * 0.04, 0.64);
         const comet = (this.comet = Star.add(
@@ -405,6 +468,16 @@ export default function FireworksSky({
         if (this.pistil) new Shell({ spreadSize: this.spreadSize * 0.5, starLife: this.starLife * 0.6, starLifeVariation: this.starLifeVariation, starDensity: 1.4, color: this.pistilColor, glitter: "light", glitterColor: this.pistilColor === COLOR.Gold ? COLOR.Gold : COLOR.White }).burst(x, y);
         if (this.streamers) new Shell({ spreadSize: this.spreadSize * 0.9, starLife: this.starLife * 0.8, starLifeVariation: this.starLifeVariation, starCount: Math.floor(Math.max(6, this.spreadSize / 45)), color: COLOR.White, glitter: "streamer" }).burst(x, y);
         BurstFlash.add(x, y, this.spreadSize / 4);
+        // Sound — only the originally launched shell (which has a comet) makes
+        // the main report; pistil/streamer sub-shells stay quiet to avoid spam.
+        if (this.comet) {
+          const sizeDiff = shellSizeConfig - (this.shellSize ?? shellSizeConfig);
+          const scale = MyMath.clamp((1 - sizeDiff / 4) * 0.3 + 0.7, 0.7, 1);
+          soundManager.play("burst", scale);
+          if (this.crackle) soundManager.play((this.shellSize ?? 0) > 2 ? "crackle" : "crackleSmall");
+        } else if (this.floral || this.fallingLeaves) {
+          soundManager.play("burstSmall");
+        }
       }
     }
 
@@ -443,12 +516,100 @@ export default function FireworksSky({
       return 4000;
     }
 
+    // Pyramid barrage — a fan of small shells building to one big center shell
+    function seqPyramid() {
+      const barrageCountHalf = isLowQuality ? 4 : 7;
+      const largeSize = shellSizeConfig;
+      const smallSize = Math.max(0, largeSize - 3);
+      const randomMainShell = Math.random() < 0.78 ? crysanthemumShell : ringShell;
+      function launchShell(x, useSpecial) {
+        const shellType = useSpecial ? randomShell : randomMainShell;
+        const shell = new Shell(shellType(useSpecial ? largeSize : smallSize));
+        const height = x <= 0.5 ? x / 0.5 : (1 - x) / 0.5;
+        shell.launch(x, useSpecial ? 0.75 : height * 0.42);
+      }
+      let count = 0;
+      let delay = 0;
+      while (count <= barrageCountHalf) {
+        if (count === barrageCountHalf) {
+          setTimeout(() => { if (!destroyed) launchShell(0.5, true); }, delay);
+        } else {
+          const offset = (count / barrageCountHalf) * 0.5;
+          const delayOffset = Math.random() * 30 + 30;
+          setTimeout(() => { if (!destroyed) launchShell(offset, false); }, delay);
+          setTimeout(() => { if (!destroyed) launchShell(1 - offset, false); }, delay + delayOffset);
+        }
+        count++;
+        delay += 200;
+      }
+      return 3400 + barrageCountHalf * 250;
+    }
+
+    // Small barrage — a rapid wave of small shells across the sky
+    function seqSmallBarrage() {
+      seqSmallBarrage.lastCalled = Date.now();
+      const barrageCount = isLowQuality ? 5 : 11;
+      const specialIndex = isLowQuality ? 1 : 3;
+      const shellSize = Math.max(0, shellSizeConfig - 2);
+      const randomMainShell = Math.random() < 0.78 ? crysanthemumShell : ringShell;
+      const randomSpecialShell = randomFastShell();
+      function launchShell(x, useSpecial) {
+        const shellType = useSpecial ? randomSpecialShell : randomMainShell;
+        const shell = new Shell(shellType(shellSize));
+        const height = (Math.cos(x * 5 * Math.PI + PI_HALF) + 1) / 2;
+        shell.launch(x, height * 0.75);
+      }
+      let count = 0;
+      let delay = 0;
+      while (count < barrageCount) {
+        if (count === 0) {
+          launchShell(0.5, false);
+          count += 1;
+        } else {
+          const offset = (count + 1) / barrageCount / 2;
+          const delayOffset = Math.random() * 30 + 30;
+          const useSpecial = count === specialIndex;
+          setTimeout(() => { if (!destroyed) launchShell(0.5 + offset, useSpecial); }, delay);
+          setTimeout(() => { if (!destroyed) launchShell(0.5 - offset, useSpecial); }, delay + delayOffset);
+          count += 2;
+        }
+        delay += 200;
+      }
+      return 3400 + barrageCount * 120;
+    }
+    seqSmallBarrage.cooldown = 12000;
+    seqSmallBarrage.lastCalled = 0;
+
+    // A single fast shell — the finale building block
+    function seqRandomFastShell() {
+      const shellType = randomFastShell();
+      const s = getRandomShellSize();
+      const shell = new Shell(shellType(s.size));
+      shell.launch(s.x, s.height);
+      return 900 + Math.random() * 600 + shell.starLife;
+    }
+
     let isFirstSeq = true;
+    let currentFinaleCount = 0;
     function startSequence() {
       if (isFirstSeq) { isFirstSeq = false; new Shell(crysanthemumShell(shellSizeConfig)).launch(0.5, 0.5); return 2400; }
+
+      // Finale: pump out a long run of fast shells, then a short breather, repeat
+      if (finaleMode) {
+        seqRandomFastShell();
+        const finaleCount = isLowQuality ? 18 : 32;
+        const interval = isLowQuality ? 260 : 170;
+        if (currentFinaleCount < finaleCount) { currentFinaleCount++; return interval; }
+        currentFinaleCount = 0;
+        return isLowQuality ? 3000 : 1800; // short breather, then another wave
+      }
+
       const r = Math.random();
-      if (r < 0.6) return seqRandomShell();
-      if (r < 0.8) return seqTwoRandom();
+      // Barrages add the bulk of the "quantity" — fire them often
+      if (r < 0.12 && Date.now() - seqSmallBarrage.lastCalled > seqSmallBarrage.cooldown) return seqSmallBarrage();
+      if (r < 0.2) return seqPyramid();
+      if (r < 0.5) return seqRandomShell();
+      if (r < 0.75) return seqTwoRandom();
       return seqTriple();
     }
 
@@ -465,7 +626,7 @@ export default function FireworksSky({
 
       currentFrame++;
       autoLaunchTime -= timeStep;
-      if (autoLaunchTime <= 0) autoLaunchTime = startSequence() * 1.25;
+      if (autoLaunchTime <= 0) autoLaunchTime = startSequence();
 
       const starDrag = 1 - (1 - Star.airDrag) * speed;
       const starDragHeavy = 1 - (1 - Star.airDragHeavy) * speed;
@@ -580,10 +741,13 @@ export default function FireworksSky({
 
     engineRef.current = {
       step,
-      setRunning(v) { running = v; },
+      setRunning(v) { running = v; if (v) soundManager.resume(); },
       setQuality(q) { quality = q; isLowQuality = q === 1; isHighQuality = q === 3; Spark.drawWidth = q === 3 ? 0.75 : 1; },
       setShellSize(s) { shellSizeConfig = s; },
-      destroy() { destroyed = true; },
+      setFinale(v) { finaleMode = v; currentFinaleCount = 0; },
+      setSound(v) { soundEnabled = v; if (v) { soundManager.init(); soundManager.resume(); } },
+      setVolume(v) { masterVolume = v; },
+      destroy() { destroyed = true; soundManager.ctx?.close?.(); },
     };
 
     return () => { engineRef.current?.destroy(); engineRef.current = null; };
@@ -593,6 +757,9 @@ export default function FireworksSky({
   useEffect(() => { engineRef.current?.setRunning(enabled); }, [enabled]);
   useEffect(() => { engineRef.current?.setQuality(qualityProp); }, [qualityProp]);
   useEffect(() => { engineRef.current?.setShellSize(shellSizeProp); }, [shellSizeProp]);
+  useEffect(() => { engineRef.current?.setFinale(finale); }, [finale]);
+  useEffect(() => { engineRef.current?.setSound(sound); }, [sound]);
+  useEffect(() => { engineRef.current?.setVolume(soundVolume); }, [soundVolume]);
 
   // Drive simulation from R3F render loop
   useFrame((state) => {
@@ -602,7 +769,7 @@ export default function FireworksSky({
   });
 
   return (
-    <mesh ref={meshRef} renderOrder={-1}>
+    <mesh ref={meshRef} rotation={[0, heading, 0]} renderOrder={-1}>
       <sphereGeometry args={[radius, 32, 16]} />
       <meshBasicMaterial
         map={texture}

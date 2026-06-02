@@ -13,6 +13,11 @@ const PolaroidSnapshot = ({
 }) => {
   const instanceId = React.useRef(Math.random().toString(36).substring(7));
   React.useEffect(() => {
+    // Warm the watermark fonts so they're cached before a snapshot is captured.
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.load("bold 32px 'Manufacturing Consent'").catch(() => {});
+      document.fonts.load("bold 14px 'Orbitron'").catch(() => {});
+    }
   }, []);
   React.useEffect(() => {
   }, [backgroundImage]);
@@ -32,6 +37,51 @@ const PolaroidSnapshot = ({
       captureSnapshot();
     }
   }, [trigger]);
+
+  // Draw the "Hail Mary Prospecting Co." logo watermark (two lines, stacked in corner).
+  // Custom fonts must be loaded before canvas fillText, or it silently falls back to plain sans-serif.
+  const drawWatermark = async (ctx) => {
+    // Make sure the custom fonts are loaded before drawing, but NEVER let a slow
+    // or missing font block the snapshot. Orbitron's bold weight comes from the
+    // Google Fonts link and its local face is font-display:block, so an un-raced
+    // await here can hang forever and the watermark never gets drawn at all.
+    try {
+      const fontsReady = Promise.allSettled([
+        document.fonts.load("bold 32px 'Manufacturing Consent'"),
+        document.fonts.load("bold 14px 'Orbitron'"),
+      ]);
+      const timeout = new Promise((resolve) => setTimeout(resolve, 800));
+      await Promise.race([fontsReady, timeout]);
+    } catch (e) {
+      // If font loading fails, fall through and draw with whatever is available
+    }
+
+    // Anchor to the centered square the polaroid actually shows. The photo frame
+    // is 1:1 with object-fit:cover, so it center-crops the canvas — fixed corner
+    // coordinates get cropped off (left/right on a wide canvas, top/bottom on a
+    // tall one), which is why the watermark vanished. Position + scale relative to
+    // the visible square so it survives any aspect ratio.
+    const w = ctx.canvas.width;
+    const h = ctx.canvas.height;
+    const square = Math.min(w, h);
+    const offX = (w - square) / 2;
+    const offY = (h - square) / 2;
+    const big = Math.max(18, Math.round(square * 0.075));
+    const small = Math.max(9, Math.round(square * 0.032));
+    const pad = Math.round(square * 0.05);
+    const cx = offX + square / 2;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(202, 156, 4, 0.85)';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 6;
+    ctx.font = `bold ${big}px 'Manufacturing Consent', -apple-system, sans-serif`;
+    ctx.fillText('Hail Mary', cx, offY + pad + big);
+    ctx.font = `bold ${small}px 'Orbitron', -apple-system, sans-serif`;
+    ctx.fillText('Prospecting Co.', cx, offY + pad + big + small + Math.round(square * 0.012));
+    ctx.restore();
+  };
 
   const captureSnapshot = () => {
     // Double requestAnimationFrame to ensure render is complete
@@ -81,12 +131,12 @@ const PolaroidSnapshot = ({
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = canvas.width;
       tempCanvas.height = canvas.height;
-      const tempCtx = tempCanvas.getContext('2d', { 
+      const tempCtx = tempCanvas.getContext('2d', {
         preserveDrawingBuffer: true,
         willReadFrequently: true,
         alpha: true
       });
-      
+
       // Don't try to get WebGL context - it will conflict with React Three Fiber's existing context
       // Just note that we're working with a WebGL canvas
       
@@ -94,7 +144,7 @@ const PolaroidSnapshot = ({
       if (backgroundImage) {
         const bgImg = new Image();
         bgImg.crossOrigin = 'anonymous'; // Allow CORS for image loading
-        bgImg.onload = () => {
+        bgImg.onload = async () => {
           
           // First, capture the character from the canvas
           const characterCanvas = document.createElement('canvas');
@@ -137,13 +187,7 @@ const PolaroidSnapshot = ({
           tempCtx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
           tempCtx.drawImage(characterCanvas, 0, 0);
           
-          // Draw RL80.com text watermark
-          tempCtx.font = 'bold 48px system-ui, -apple-system, sans-serif';
-          tempCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-          tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-          tempCtx.shadowBlur = 6;
-          tempCtx.fillText('RL80.com', 60, 65);
-          tempCtx.shadowBlur = 0;
+          await drawWatermark(tempCtx);
 
           const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
           if (dataUrl) {
@@ -171,24 +215,20 @@ const PolaroidSnapshot = ({
       } else {
         // No background image, just draw the canvas
         tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
-        
-        // Draw RL80.com text watermark
-        tempCtx.font = 'bold 48px system-ui, -apple-system, sans-serif';
-        tempCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-        tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        tempCtx.shadowBlur = 6;
-        tempCtx.fillText('RL80.com', 30, 65);
-        tempCtx.shadowBlur = 0;
 
-        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-        if (dataUrl) {
-          setImageUrl(dataUrl);
-          setIsVisible(true);
-          setTimeout(() => { setIsBlurred(false); }, 300);
-        } else {
-          console.warn('Canvas capture was empty, trying alternate method');
-          captureWithDelay();
-        }
+        (async () => {
+          await drawWatermark(tempCtx);
+
+          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+          if (dataUrl) {
+            setImageUrl(dataUrl);
+            setIsVisible(true);
+            setTimeout(() => { setIsBlurred(false); }, 300);
+          } else {
+            console.warn('Canvas capture was empty, trying alternate method');
+            captureWithDelay();
+          }
+        })();
       }
     } catch (error) {
       console.error('Canvas capture failed:', error);
@@ -491,9 +531,9 @@ const PolaroidSnapshot = ({
   const handleShare = async (platform) => {
     const refSuffix = referralOverlay?.code ? `?ref=${referralOverlay.code}` : '';
     const shareText = referralOverlay?.code
-      ? `Check out my oil rig! Join me on the grid 🤑`
-      : `Check out my oil rig! 🤑`;
-    const shareUrl = `https://rl80.xyz/oil${refSuffix}`;
+      ? `Check out my rig! Join me on the grid 🤑`
+      : `Check out my rig! 🤑`;
+    const shareUrl = `https://rl80.com/oil${refSuffix}`;
     
     switch(platform) {
       case 'twitter':

@@ -619,6 +619,11 @@ function CameraFlyTo({ target, controlsRef }) {
   const progressRef = useRef(0);
   const lastId = useRef(null);
   const savedMinDist = useRef(null);
+  // Camera pose captured right before the fireworks sky-view fly, so toggling
+  // fireworks off can return to where the user was looking.
+  const preFirePos = useRef(new THREE.Vector3());
+  const preFireTarget = useRef(new THREE.Vector3());
+  const hasPreFire = useRef(false);
 
   useFrame((_, delta) => {
     if (target && target.id !== lastId.current) {
@@ -632,18 +637,44 @@ function CameraFlyTo({ target, controlsRef }) {
         startPos.current.copy(camera.position);
         startTarget.current.copy(controls.target);
 
-        if (target.overview) {
+        if (target.skyView) {
+          // Remember where the user was looking so we can return on toggle-off
+          preFirePos.current.copy(camera.position);
+          preFireTarget.current.copy(controls.target);
+          hasPreFire.current = true;
+          // Pull back and tilt the camera up to frame fireworks in the sky
+          if (target.mobile) {
+            endTarget.current.set(0, 7, 0);
+            endPos.current.set(0, 8, 9.5);
+          } else {
+            endTarget.current.set(0, 7, 0);
+            endPos.current.set(0, 8.5, 12);
+          }
+        } else if (target.restoreView) {
+          // Return to the pre-fireworks pose, or a sensible default overview
+          if (hasPreFire.current) {
+            endTarget.current.copy(preFireTarget.current);
+            endPos.current.copy(preFirePos.current);
+            hasPreFire.current = false;
+          } else {
+            endTarget.current.set(0, target.mobile ? 2 : 5, 0);
+            endPos.current.set(0, target.mobile ? 3.5 : 8, target.mobile ? 4 : 8);
+          }
+        } else if (target.overview) {
           // Zoom out to overview
           endTarget.current.set(0, target.mobile ? 2 : 5, 0);
           endPos.current.set(target.x, target.y, target.z);
         } else if (target.mobile) {
-          // Mobile: close ground-level view of the rig
-          endTarget.current.set(target.x, target.y - 0.1, target.z);
-          endPos.current.set(target.x + 0.35, target.y - 0.05, target.z + 0.35);
+          // Mobile: close view of the rig, lifted to look DOWN at it (~30°).
+          // A level pose (camera y == target y) grazes the ground plane and
+          // washes the rig in a warm haze (and blows out the metal's env
+          // reflection); the downward tilt breaks that grazing angle.
+          endTarget.current.set(target.x, target.y - 0.15, target.z + 0.1);
+          endPos.current.set(target.x + 0.8, target.y + 0.45, target.z + 0.6);
         } else {
-          // Desktop: elevated close-up
-          endTarget.current.set(target.x, target.y - 0.05, target.z);
-          endPos.current.set(target.x + 0.5, target.y + 0.0, target.z + 0.5);
+          // Desktop: elevated close-up (pulled back slightly for more headroom)
+          endTarget.current.set(target.x + 0.1, target.y - 0.05, target.z + 0.1);
+          endPos.current.set(target.x + 0.95, target.y + 0.05, target.z + 0.7);
         }
 
         progressRef.current = 0;
@@ -665,7 +696,7 @@ function CameraFlyTo({ target, controlsRef }) {
     if (progressRef.current >= 1) {
       flyingRef.current = false;
       // Restore minDistance after zoom-out
-      if (target?.overview && savedMinDist.current !== null) {
+      if ((target?.overview || target?.skyView || target?.restoreView) && savedMinDist.current !== null) {
         controls.minDistance = savedMinDist.current;
         savedMinDist.current = null;
       }
@@ -854,6 +885,20 @@ function toolbarBtn(active, size = 28, variant = "gold") {
     boxShadow: active && V.glow ? `0 0 8px ${V.glow}` : "none",
     textShadow: active && V.glow ? `0 0 6px ${V.color}` : "none",
   };
+}
+
+// Hail Mary Prospecting Co. logo mark — a survey contour chip: irregular
+// topographic rings (gold rock) closing in on a glowing green Paraboleum core.
+// Sourced from /public/hail-mary-icon.svg (generated from the contour art).
+function HailMaryMark() {
+  // Fills the logo box edge-to-edge (the gold box is the only frame).
+  return (
+    <img
+      src="/hail-mary-icon.svg"
+      alt="Hail Mary Prospecting Co."
+      style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
+    />
+  );
 }
 
 export default function OilPage() {
@@ -1326,6 +1371,7 @@ export default function OilPage() {
   // Snapshot trigger for PolaroidSnapshot
   const [snapshotTrigger, setSnapshotTrigger] = useState(false);
   const [fireworksOn, setFireworksOn] = useState(false);
+  const [fireworksSound, setFireworksSound] = useState(true);
   // Remember the env preset active before fireworks switched the scene to night,
   // so toggling fireworks off restores the user's original lighting.
   const fireworksPrevPresetRef = useRef(null);
@@ -1335,16 +1381,22 @@ export default function OilPage() {
         // Turning on: remember current preset, then switch to night if needed
         fireworksPrevPresetRef.current = envPreset;
         if (envPreset !== "night") setEnvPreset("night");
+        // Pull the camera back and tilt up for a better view of the sky
+        flyIdRef.current++;
+        setFlyTarget({ id: flyIdRef.current, mobile: isMobile, skyView: true });
       } else {
         // Turning off: restore the preset we had before launching fireworks
         if (fireworksPrevPresetRef.current && fireworksPrevPresetRef.current !== "night") {
           setEnvPreset(fireworksPrevPresetRef.current);
         }
         fireworksPrevPresetRef.current = null;
+        // Fly the camera back to the pre-fireworks view
+        flyIdRef.current++;
+        setFlyTarget({ id: flyIdRef.current, mobile: isMobile, restoreView: true });
       }
       return !on;
     });
-  }, [envPreset]);
+  }, [envPreset, isMobile]);
 
   // Reset snapshot trigger after timeout (fallback if user dismisses without onComplete)
   useEffect(() => {
@@ -1360,6 +1412,9 @@ export default function OilPage() {
   // Demo drill day
   const [demoDay, setDemoDay] = useState(0);
   const [demoPlaying, setDemoPlaying] = useState(false);
+  // Admin: manual gusher test — increments to fire the full 3D oil-release effect
+  // on the selected rig on demand (independent of drill depth / oil data).
+  const [gusherTest, setGusherTest] = useState(0);
 
   // ── Daily Drill (player mode) ──
   const [userDrill, setUserDrill] = useState(null); // { col, row, drillDay, lastDrillDate }
@@ -2110,6 +2165,23 @@ export default function OilPage() {
     setDrillDepth(0);
   }, [isMobile]);
 
+  // On mobile, open the page focused on the player's own rig (if they hold a
+  // claimed plot) instead of the aerial intro orbit. Fires once, only before
+  // the player has interacted — later navigation / zoom-out is left untouched.
+  // Sources the plot the same way the auto-select does (userDrill.col is often
+  // stale/null; oilPlots ownership via myPlot is the reliable fallback).
+  const didMobileRigFocus = useRef(false);
+  useEffect(() => {
+    if (didMobileRigFocus.current) return;
+    if (!isMobile || introComplete) return;
+    const col = userDrill?.col ?? myPlot?.col;
+    const row = userDrill?.row ?? myPlot?.row;
+    if (col == null) return;
+    didMobileRigFocus.current = true;
+    handleFlyTo(col, row ?? 0);
+    setIntroComplete(true);
+  }, [isMobile, introComplete, userDrill, myPlot, handleFlyTo]);
+
   // Auto-select and fly to the target cell when a rogue event appears
   useEffect(() => {
     if (rogueEvents.length === 0) return;
@@ -2756,6 +2828,22 @@ export default function OilPage() {
           RESET
         </button>
       </div>
+      <button
+        onClick={() => setGusherTest((g) => g + 1)}
+        disabled={selectedX === null}
+        style={{
+          ...styles.paramBtn,
+          ...styles.paramBtnActive,
+          width: "100%",
+          padding: "6px 8px",
+          fontSize: 11,
+          marginBottom: 8,
+          opacity: selectedX === null ? 0.4 : 1,
+          cursor: selectedX === null ? "not-allowed" : "pointer",
+        }}
+      >
+        💥 TEST GUSHER {selectedX === null ? "(select a rig)" : `(${selectedX},${sliceY})`}
+      </button>
       <input
         type="range"
         min={0}
@@ -3285,7 +3373,7 @@ export default function OilPage() {
                     if (navigator.share) {
                       navigator.share({
                         title: `Security Cam ${selectedX},${sliceY}`,
-                        text: "Caught on camera! Oil Prospector security footage",
+                        text: "Caught on camera! Prospector security footage",
                         url: playbackUrl,
                       }).catch(() => {});
                     } else {
@@ -3345,7 +3433,7 @@ export default function OilPage() {
                       e.stopPropagation();
                       if (navigator.share) {
                         navigator.share({
-                          title: "Oil Prospector Security Cam",
+                          title: "Prospector Security Cam",
                           text: "Caught on camera!",
                           url: r.downloadUrl,
                         }).catch(() => {});
@@ -3426,7 +3514,7 @@ export default function OilPage() {
           width: "90%",
           textAlign: "center",
         }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>OIL PROSPECTOR</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>PARABOLEUM PROSPECTOR</div>
           <h2 style={{
             fontFamily: "'Orbitron', monospace",
             fontSize: 16,
@@ -4350,19 +4438,14 @@ export default function OilPage() {
         <header style={m.header}>
           <div style={styles.headerLeft}>
             <div style={styles.logoMark}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b8922e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999"/>
-                <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024"/>
-                <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069"/>
-                <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z"/>
-              </svg>
+              <HailMaryMark />
             </div>
             <div>
               <h1 style={{ ...styles.title, fontSize: 12, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 <span>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
-              <p style={styles.subtitle}>OIL PROSPECTOR</p>
+              <p style={styles.subtitle}>PARABOLEUM PROSPECTOR</p>
             </div>
           </div>
           <div style={styles.headerRight}>
@@ -4435,7 +4518,7 @@ export default function OilPage() {
                 {parabolum && <ParabolumMoon />}
                 {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
                 {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
-                {fireworksOn && <Fireworks quality={1} shellSize={1} />}
+                {fireworksOn && <Fireworks quality={1} shellSize={1} finale sound={fireworksSound} />}
                 {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
                 <ambientLight intensity={env.ambient} />
                 {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
@@ -4463,6 +4546,8 @@ export default function OilPage() {
                     pumpConfig={pumpConfig}
                     allPumpConfigs={allPumpConfigs}
                     oilStrike={combinedStrike}
+                    forceStrikeGusher={isAdmin || isReport || isTest}
+                    gusherTrigger={gusherTest}
                     drillEvent={drillEvent}
                     drillProximity={drillProximity}
                     tankFill={tankFill}
@@ -4521,6 +4606,21 @@ export default function OilPage() {
               <div style={styles.gridLabel}>
                 {gridSize}&times;{gridSize}&times;{DEPTH_Z} VOXEL
               </div>
+              {selectedX !== null && (() => {
+                const mineCol = userDrill?.col ?? myPlot?.col;
+                const mineRow = userDrill?.row ?? myPlot?.row;
+                const isMine = mineCol === selectedX && mineRow === (sliceY ?? 0);
+                return (
+                  <div style={styles.cellCoordBadge}>
+                    <span style={{ color: isMine ? theme.gold : theme.muted }}>
+                      {isMine ? "YOUR CLAIM" : "RIG"}
+                    </span>
+                    <span style={{ color: theme.accent }}>
+                      ({selectedX + 1}, {(sliceY ?? 0) + 1})
+                    </span>
+                  </div>
+                );
+              })()}
               <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, display: "flex", gap: 4 }}>
                 <button
                   onClick={toggleFireworks}
@@ -4541,6 +4641,27 @@ export default function OilPage() {
                     <circle cx="12" cy="16" r="3" fill={fireworksOn ? "currentColor" : "none"} opacity={fireworksOn ? 0.3 : 1} />
                   </svg>
                 </button>
+                {fireworksOn && (
+                  <button
+                    onClick={() => setFireworksSound((s) => !s)}
+                    title={fireworksSound ? "Mute fireworks sound" : "Unmute fireworks sound"}
+                    style={{
+                      width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                      background: fireworksSound ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
+                      border: `1px solid ${fireworksSound ? theme.goldBorder : theme.cornerBorder}`,
+                      borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 5 6 9H2v6h4l5 4z" />
+                      {fireworksSound ? (
+                        <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
+                      ) : (
+                        <><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>
+                      )}
+                    </svg>
+                  </button>
+                )}
                 <button
                   title="Snapshot"
               onClick={() => setSnapshotTrigger(true)}
@@ -4578,7 +4699,7 @@ export default function OilPage() {
                   style={toolbarBtn(darkMode, 26)}
                 >{darkMode ? "●" : "◐"}</button>
                 <button
-                  title="Parabolum theme"
+                  title="Paraboleum theme"
                   onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
                   style={toolbarBtn(parabolum, 26, "violet")}
                 >◈</button>
@@ -4727,6 +4848,9 @@ export default function OilPage() {
           isMobile
           show80sButton={false}
           darkMode={uiDark}
+          accountModalInitialTab="referrals"
+          accountModalTheme="industrial"
+          accountModalUnlockedItems={unlockedItems}
           extraLeft={[{
             key: "home",
             label: "HOME",
@@ -4811,18 +4935,13 @@ export default function OilPage() {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logoMark}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b8922e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999"/>
-              <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024"/>
-              <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069"/>
-              <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z"/>
-            </svg>
+            <HailMaryMark />
           </div>
           <div>
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
             </h1>
-            <p style={styles.subtitle}>OIL PROSPECTOR</p>
+            <p style={styles.subtitle}>PARABOLEUM PROSPECTOR</p>
           </div>
         </div>
         <div style={styles.headerRight}>
@@ -4864,6 +4983,9 @@ export default function OilPage() {
             userImage={user?.imageUrl}
             show80sButton={false}
             hideMusicOnMobile
+            accountModalInitialTab="referrals"
+            accountModalTheme="industrial"
+            accountModalUnlockedItems={unlockedItems}
           />
         </div>
       </header>
@@ -4902,7 +5024,7 @@ export default function OilPage() {
             {parabolum && <ParabolumMoon />}
             {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
             {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
-            {fireworksOn && <Fireworks quality={2} shellSize={2} />}
+            {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} />}
             {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
             <ambientLight intensity={env.ambient} />
             {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
@@ -4930,6 +5052,8 @@ export default function OilPage() {
                 pumpConfig={pumpConfig}
                 allPumpConfigs={allPumpConfigs}
                 oilStrike={combinedStrike}
+                forceStrikeGusher={isAdmin || isReport || isTest}
+                gusherTrigger={gusherTest}
                 drillEvent={drillEvent}
                 drillProximity={drillProximity}
                 tankFill={tankFill}
@@ -5005,6 +5129,27 @@ export default function OilPage() {
                 <circle cx="12" cy="16" r="3" fill={fireworksOn ? "currentColor" : "none"} opacity={fireworksOn ? 0.3 : 1} />
               </svg>
             </button>
+            {fireworksOn && (
+              <button
+                onClick={() => setFireworksSound((s) => !s)}
+                title={fireworksSound ? "Mute fireworks sound" : "Unmute fireworks sound"}
+                style={{
+                  width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: fireworksSound ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
+                  border: `1px solid ${fireworksSound ? theme.goldBorder : theme.cornerBorder}`,
+                  borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
+                }}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5 6 9H2v6h4l5 4z" />
+                  {fireworksSound ? (
+                    <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
+                  ) : (
+                    <><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>
+                  )}
+                </svg>
+              </button>
+            )}
             <button
               title="Snapshot"
               onClick={() => setSnapshotTrigger(true)}
@@ -5534,6 +5679,7 @@ function getStyles(t) { return {
     justifyContent: "center",
     border: `1px solid ${t.goldBorder}`,
     borderRadius: 4,
+    overflow: "hidden",
   },
 
   title: {
@@ -5650,6 +5796,27 @@ function getStyles(t) { return {
     color: t.muted,
     letterSpacing: "0.15em",
     zIndex: 5,
+  },
+
+  // Focused-cell coordinate readout — top-left of the mobile 3D canvas. Shows
+  // the currently selected rig/cell so the player always knows what they're
+  // looking at (their own claim, or another rig they've tapped into).
+  cellCoordBadge: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 10,
+    letterSpacing: "0.12em",
+    padding: "3px 8px",
+    background: "rgba(0,0,0,0.4)",
+    border: `1px solid ${t.cornerBorder || t.border}`,
+    borderRadius: 3,
+    zIndex: 6,
+    pointerEvents: "none",
   },
 
   // Middle column

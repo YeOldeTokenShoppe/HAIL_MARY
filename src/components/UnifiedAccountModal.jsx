@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useEvmAccounts } from '@coinbase/cdp-hooks';
 import { useWalletAuth } from './WalletAuthProvider';
+import { db, doc, onSnapshot } from '@/lib/firebaseClient';
 
 // Client-only — @coinbase/cdp-react reads localStorage at module init,
 // which throws during SSR. Mirrors the pattern in BuyModal/Providers.
@@ -256,6 +257,186 @@ function AssetsTabContent({ unlockedItems, ind }) {
   );
 }
 
+// Referrals tab — self-fetches the player's oilDrills doc (live) so it works
+// from any modal instance. Shows a share hero + the referral link + reward
+// stats once the player has registered (referralCode is created at plot-pick),
+// and a "pick a plot first" prompt before then.
+function ReferralsTabContent({ ind, userId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!userId) { setLoading(false); return; }
+    setLoading(true);
+    const unsub = onSnapshot(
+      doc(db, "oilDrills", userId),
+      (snap) => { setData(snap.exists() ? snap.data() : null); setLoading(false); },
+      () => setLoading(false),
+    );
+    return () => unsub();
+  }, [userId]);
+
+  const accent = ind ? "#d4a854" : "#00f5d4";
+  const muted = ind ? "#8a8070" : "rgba(255,255,255,0.5)";
+  const textColor = ind ? "#c8c0b4" : "#fff";
+  const cardBg = ind ? "rgba(212,168,84,0.06)" : "rgba(0,245,212,0.06)";
+  const cardBorder = ind ? "rgba(212,168,84,0.2)" : "rgba(0,245,212,0.2)";
+  const font = ind ? "'Share Tech Mono', monospace" : "'Orbitron', monospace";
+
+  const code = data?.referralCode || null;
+  const link = code ? `https://rl80.xyz/oil?ref=${code}` : null;
+  const confirmed = data?.confirmedReferrals || 0;
+  const bonus = data?.bonusDrills || 0;
+
+  const flashCopied = () => { setCopied(true); setTimeout(() => setCopied(false), 1500); };
+
+  const handleShare = async () => {
+    if (!link) return;
+    const shareData = {
+      title: "Oil Prospector",
+      text: "Stake a claim in the oil field and drill for USDC. Join with my link:",
+      url: link,
+    };
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try { await navigator.share(shareData); return; }
+      catch (e) { if (e?.name === "AbortError") return; /* unsupported → fall through to copy */ }
+    }
+    try { await navigator.clipboard.writeText(link); flashCopied(); } catch {}
+  };
+
+  const handleCopy = async () => {
+    if (!link) return;
+    try { await navigator.clipboard.writeText(link); flashCopied(); } catch {}
+  };
+
+  const peopleIcon = (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", padding: "2rem 1rem", color: muted, fontFamily: font, fontSize: 11, letterSpacing: ind ? "0.1em" : "normal" }}>
+        Loading…
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Hero */}
+      <div style={{ textAlign: "center", paddingTop: 4 }}>
+        <div style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 56, height: 56, borderRadius: ind ? 8 : 16,
+          background: cardBg, border: `1px solid ${cardBorder}`, color: accent, marginBottom: 12,
+        }}>
+          {peopleIcon}
+        </div>
+        <h3 style={{
+          margin: 0, fontFamily: font, fontSize: ind ? 16 : 18, fontWeight: 600,
+          letterSpacing: ind ? "0.08em" : "0.02em", color: textColor,
+          textTransform: ind ? "uppercase" : "none",
+        }}>
+          Refer for rewards
+        </h3>
+        <p style={{
+          margin: "8px auto 0", maxWidth: 280, color: muted, fontFamily: font,
+          fontSize: ind ? 11 : 12, lineHeight: 1.6, letterSpacing: ind ? "0.06em" : "normal",
+        }}>
+          Invite friends to stake a claim. When they join and qualify, you earn bonus drills.
+        </p>
+      </div>
+
+      {code ? (
+        <>
+          {/* Primary share CTA */}
+          <button
+            onClick={handleShare}
+            style={{
+              width: "100%", padding: "12px", borderRadius: ind ? 3 : 10, cursor: "pointer",
+              fontFamily: font, fontSize: ind ? 12 : 13, fontWeight: 700,
+              letterSpacing: ind ? "0.16em" : "0.05em", textTransform: "uppercase",
+              color: ind ? "#1a1408" : "#04201c",
+              background: accent, border: `1px solid ${accent}`,
+            }}
+          >
+            {copied ? "Copied ✓" : "Share Link"}
+          </button>
+
+          {/* Copyable link */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+            background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: ind ? 3 : 8,
+          }}>
+            <span style={{
+              flex: 1, fontSize: ind ? 10 : 11, color: muted, fontFamily: font,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              rl80.xyz/oil?ref={code}
+            </span>
+            <button
+              onClick={handleCopy}
+              style={{
+                padding: "3px 10px", borderRadius: ind ? 2 : 6, cursor: "pointer",
+                background: "transparent", border: `1px solid ${cardBorder}`,
+                color: accent, fontFamily: font, fontSize: ind ? 9 : 10,
+                letterSpacing: "0.1em", textTransform: "uppercase",
+              }}
+            >
+              {copied ? "✓" : "Copy"}
+            </button>
+          </div>
+
+          {/* Reward stats */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {[
+              { value: confirmed, label: "Confirmed" },
+              { value: `+${bonus}`, label: "Bonus Drills" },
+            ].map((s) => (
+              <div key={s.label} style={{
+                flex: 1, textAlign: "center", padding: "12px 8px",
+                background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: ind ? 3 : 8,
+              }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: accent, fontFamily: font, lineHeight: 1 }}>
+                  {s.value}
+                </div>
+                <div style={{
+                  marginTop: 6, fontSize: ind ? 9 : 10, color: muted, fontFamily: font,
+                  letterSpacing: ind ? "0.12em" : "0.05em", textTransform: "uppercase",
+                }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{
+            fontSize: ind ? 9 : 10, color: muted, fontFamily: font, textAlign: "center",
+            letterSpacing: ind ? "0.08em" : "normal", lineHeight: 1.5, margin: 0,
+          }}>
+            Each confirmed referral grants extra drill depth that lifts your score.
+          </p>
+        </>
+      ) : (
+        <div style={{
+          textAlign: "center", padding: "1rem", color: muted, fontFamily: font,
+          fontSize: ind ? 11 : 12, lineHeight: 1.6, letterSpacing: ind ? "0.08em" : "normal",
+          background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: ind ? 3 : 8,
+        }}>
+          Pick a plot in the oil field to unlock your referral link.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', theme = 'cyber', unlockedItems }) {
   const { user } = useUser();
   const { signOut, openSignIn } = useClerk();
@@ -496,6 +677,12 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
               Wallet
             </button>
             <button
+              className={`modal-tab ${activeTab === 'referrals' ? 'active' : ''}`}
+              onClick={() => setActiveTab('referrals')}
+            >
+              Referrals
+            </button>
+            <button
               className={`modal-tab ${activeTab === 'assets' ? 'active' : ''}`}
               onClick={() => setActiveTab('assets')}
             >
@@ -670,6 +857,10 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
                     theme={theme}
                   />
                 )}
+              </div>
+            ) : activeTab === 'referrals' ? (
+              <div className="referrals-content">
+                <ReferralsTabContent ind={ind} userId={user?.id} />
               </div>
             ) : activeTab === 'assets' ? (
               <div className="assets-content">

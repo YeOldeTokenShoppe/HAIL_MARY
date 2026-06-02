@@ -25,7 +25,13 @@ export default function NavControlsHome({
   showHelpActive = false,
   hideMusicOnMobile = false,
   hideUserOnMobile = false,
-  hideMenu = false
+  hideMenu = false,
+  // Pass-through config for the internal UnifiedAccountModal (opened by the
+  // avatar button). Defaults preserve the original behavior; callers can
+  // deep-link a tab (e.g. /oil opens straight to "referrals") and theme it.
+  accountModalInitialTab = 'account',
+  accountModalTheme = 'cyber',
+  accountModalUnlockedItems = undefined,
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -887,9 +893,12 @@ export default function NavControlsHome({
       </div>
 
       {/* Unified Account Modal */}
-      <UnifiedAccountModal 
-        isOpen={showUnifiedModal} 
-        onClose={() => setShowUnifiedModal(false)} 
+      <UnifiedAccountModal
+        isOpen={showUnifiedModal}
+        onClose={() => setShowUnifiedModal(false)}
+        initialTab={accountModalInitialTab}
+        theme={accountModalTheme}
+        unlockedItems={accountModalUnlockedItems}
       />
     </>
   );

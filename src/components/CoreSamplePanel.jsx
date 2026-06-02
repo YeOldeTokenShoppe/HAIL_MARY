@@ -14,41 +14,27 @@ function classifyDensity(value, maxAvg) {
   return 4;
 }
 
+// Paraboleum is the substance — rock tiers (shale/sandstone) stay neutral slate,
+// the oil-bearing tiers (oil sand → crude → rich vein) glow phosphorescent green.
 const DENSITY_COLORS_DARK = [
-  { fill: "#2a2520", opacity: 0.5, label: "SHALE" },
-  { fill: "#6e5e48", opacity: 0.6, label: "SANDSTONE" },
-  { fill: "#a08040", opacity: 0.7, label: "OIL SAND" },
-  { fill: "#d4a854", opacity: 0.85, label: "CRUDE" },
-  { fill: "#e87a2b", opacity: 0.95, label: "RICH VEIN" },
+  { fill: "#2a322c", opacity: 0.5, label: "SHALE" },
+  { fill: "#46584c", opacity: 0.6, label: "SANDSTONE" },
+  { fill: "#2f8f4e", opacity: 0.75, label: "GLIMMER" },
+  { fill: "#2dd64a", opacity: 0.88, label: "LUMEN" },
+  { fill: "#74ff96", opacity: 0.95, label: "RADIANCE" },
 ];
 
 const DENSITY_COLORS_LIGHT = [
-  { fill: "#d8d0c4", opacity: 0.5, label: "SHALE" },
-  { fill: "#b8a888", opacity: 0.6, label: "SANDSTONE" },
-  { fill: "#a08040", opacity: 0.75, label: "OIL SAND" },
-  { fill: "#8a6a20", opacity: 0.85, label: "CRUDE" },
-  { fill: "#c05a10", opacity: 0.95, label: "RICH VEIN" },
+  { fill: "#d4ddd6", opacity: 0.5, label: "SHALE" },
+  { fill: "#a6c2ac", opacity: 0.62, label: "SANDSTONE" },
+  { fill: "#5cae6c", opacity: 0.75, label: "GLIMMER" },
+  { fill: "#249e4c", opacity: 0.86, label: "LUMEN" },
+  { fill: "#0e7a32", opacity: 0.95, label: "RADIANCE" },
 ];
 
-// Parabolum (dark) — arcane violet strata glowing on indigo-black.
-const DENSITY_COLORS_PARABOLUM_DARK = [
-  { fill: "#1f1530", opacity: 0.5, label: "SHALE" },
-  { fill: "#4a2d7a", opacity: 0.6, label: "SANDSTONE" },
-  { fill: "#7b3dd6", opacity: 0.72, label: "OIL SAND" },
-  { fill: "#a45cff", opacity: 0.85, label: "CRUDE" },
-  { fill: "#d89bff", opacity: 0.95, label: "RICH VEIN" },
-];
-
-// Parabolum (light) — iridescent slick: teal → cyan-blue → violet → magenta.
-const DENSITY_COLORS_PARABOLUM_LIGHT = [
-  { fill: "#bee0db", opacity: 0.5, label: "SHALE" },
-  { fill: "#5ab4c8", opacity: 0.64, label: "SANDSTONE" },
-  { fill: "#4e7fd0", opacity: 0.76, label: "OIL SAND" },
-  { fill: "#8a3dd6", opacity: 0.86, label: "CRUDE" },
-  { fill: "#c81f8a", opacity: 0.95, label: "RICH VEIN" },
-];
-
-const PARABOLUM_COLORS = (dark) => (dark ? DENSITY_COLORS_PARABOLUM_DARK : DENSITY_COLORS_PARABOLUM_LIGHT);
+// Paraboleum is now the universal substance, so the toggle keeps the same green
+// strata (the ◈ theme only restyles the console chrome, not the material).
+const PARABOLUM_COLORS = (dark) => (dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT);
 
 function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio, parabolum = false }) {
   const tubeX = 42;

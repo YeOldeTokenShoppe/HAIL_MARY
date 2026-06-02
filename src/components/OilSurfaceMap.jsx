@@ -1,31 +1,19 @@
 "use client";
 
-function getSurfaceColor(value, maxValue, dark, parabolum) {
-  if (parabolum) {
-    if (value === 0) return dark ? "#1a1030" : "#dfeae8";
-    const tp = Math.min(value / maxValue, 1);
-    if (dark) {
-      // Parabolum (dark): deep indigo → arcane violet → glowing lilac
-      if (tp < 0.3) return `rgb(${Math.round(44 + tp * 100)}, ${Math.round(24 + tp * 50)}, ${Math.round(70 + tp * 150)})`;
-      if (tp < 0.6) return `rgb(${Math.round(90 + tp * 110)}, ${Math.round(48 + tp * 70)}, ${Math.round(160 + tp * 110)})`;
-      return `rgb(${Math.round(168 + tp * 70)}, ${Math.round(108 + tp * 90)}, ${Math.round(210 + tp * 40)})`;
-    }
-    // Parabolum (light): iridescent slick — teal → cyan-blue → violet → magenta
-    if (tp < 0.3) { const p = tp / 0.3; return `rgb(${Math.round(176 - p * 80)}, ${Math.round(216 - p * 66)}, ${Math.round(214 - p * 8)})`; }
-    if (tp < 0.6) { const p = (tp - 0.3) / 0.3; return `rgb(${Math.round(96 + p * 44)}, ${Math.round(150 - p * 92)}, ${Math.round(206 + p * 6)})`; }
-    { const p = (tp - 0.6) / 0.4; return `rgb(${Math.round(140 + p * 60)}, ${Math.round(58 - p * 30)}, ${Math.round(212 - p * 74)})`; }
-  }
-  if (value === 0) return dark ? "#2a2a34" : "#e8e0d4";
+// Paraboleum — neutral when empty, phosphorescent green as density climbs.
+function getSurfaceColor(value, maxValue, dark) {
+  if (value === 0) return dark ? "#1a241e" : "#e2e8e2";
   const t = Math.min(value / maxValue, 1);
   if (dark) {
-    // Dark mode: dark teal → amber → bright gold
-    if (t < 0.3) return `rgb(${Math.round(40 + t * 80)}, ${Math.round(50 + t * 60)}, ${Math.round(50 + t * 30)})`;
-    if (t < 0.6) return `rgb(${Math.round(64 + t * 100)}, ${Math.round(68 + t * 60)}, ${Math.round(44 + t * 20)})`;
-    return `rgb(${Math.round(120 + t * 60)}, ${Math.round(98 + t * 30)}, ${Math.round(40 + t * 10)})`;
+    // dark slate-green → green → neon green
+    if (t < 0.3) return `rgb(${Math.round(40 + t * 30)}, ${Math.round(70 + t * 120)}, ${Math.round(52 + t * 40)})`;
+    if (t < 0.6) return `rgb(${Math.round(46 + t * 40)}, ${Math.round(150 + t * 90)}, ${Math.round(70 + t * 50)})`;
+    return `rgb(${Math.round(70 + t * 60)}, ${Math.round(215 + t * 40)}, ${Math.round(110 + t * 50)})`;
   }
-  if (t < 0.3) return `rgb(${Math.round(210 - t * 80)}, ${Math.round(195 - t * 80)}, ${Math.round(170 - t * 80)})`;
-  if (t < 0.6) return `rgb(${Math.round(186 - t * 60)}, ${Math.round(145 - t * 60)}, ${Math.round(100 - t * 40)})`;
-  return `rgb(${Math.round(160 - t * 40)}, ${Math.round(105 - t * 30)}, ${Math.round(50 - t * 10)})`;
+  // light: pale green-grey → deep green
+  if (t < 0.3) return `rgb(${Math.round(200 - t * 120)}, ${Math.round(216 - t * 40)}, ${Math.round(202 - t * 100)})`;
+  if (t < 0.6) return `rgb(${Math.round(110 - t * 60)}, ${Math.round(180 - t * 30)}, ${Math.round(120 - t * 60)})`;
+  return `rgb(${Math.round(40 - t * 20)}, ${Math.round(150 - t * 60)}, ${Math.round(70 - t * 30)})`;
 }
 
 export default function OilSurfaceMap({

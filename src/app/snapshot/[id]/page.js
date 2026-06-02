@@ -17,19 +17,19 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: 'RL80 Oil Rig Snapshot',
-    description: 'Check out my oil rig on RL80!',
+    title: 'Hail Mary Rig Snapshot',
+    description: 'Check out my rig!',
     openGraph: {
-      title: 'RL80 Oil Rig Snapshot',
-      description: 'Check out my oil rig on RL80!',
+      title: 'Hail Mary Rig Snapshot',
+      description: 'Check out my rig!',
       ...(imageUrl && {
-        images: [{ url: imageUrl, width: 1200, height: 630, alt: 'RL80 Oil Rig Snapshot' }],
+        images: [{ url: imageUrl, width: 1200, height: 630, alt: 'Hail Mary Rig Snapshot' }],
       }),
     },
     twitter: {
       card: 'summary_large_image',
-      title: 'RL80 Oil Rig Snapshot',
-      description: 'Check out my oil rig on RL80!',
+      title: 'Hail Mary Rig Snapshot',
+      description: 'Check out my rig! 🤑',
       ...(imageUrl && { images: [imageUrl] }),
     },
   };
