@@ -429,9 +429,107 @@ void main() {
 }
 `;
 
+// ── Oil spill / splatter decal ───────────────────────────────────────────────
+// A flat ground quad that pools a central puddle plus scattered satellite splats
+// around the wellhead while the gusher erupts. uGrow (0..1) spreads the spill as it
+// builds; uOpacity fades it in/out with the gusher. Dark oil, parabolum→neon green.
+const _spillVertexShader = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const _spillFragmentShader = `
+precision highp float;
+varying vec2 vUv;
+uniform float uOpacity;
+uniform float uGrow;
+uniform float uNightMode;
+uniform float uParabolum;
+
+vec2 hash(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(dot(hash(i), f),
+                 dot(hash(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
+             mix(dot(hash(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)),
+                 dot(hash(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
+  return v;
+}
+
+// Coverage of an irregular oil blob centered at c, base radius r, with a noisy edge.
+float splat(vec2 p, vec2 c, float r, float seed) {
+  vec2 d = p - c;
+  float ang = atan(d.y, d.x);
+  float edge = r * (1.0 + 0.4 * fbm(vec2(cos(ang), sin(ang)) * 2.5 + seed));
+  return smoothstep(edge, edge * 0.55, length(d));
+}
+
+void main() {
+  vec2 p = (vUv - 0.5) * 2.0; // -1..1
+  float g = mix(0.45, 1.0, clamp(uGrow, 0.0, 1.0)); // spread factor as the spill builds
+
+  // Central puddle + scattered satellite splats around the wellhead.
+  float cov = splat(p, vec2(0.0, 0.0), 0.5 * g, 0.0);
+  cov = max(cov, splat(p, vec2(0.55, 0.20), 0.16 * g, 11.0));
+  cov = max(cov, splat(p, vec2(-0.50, 0.35), 0.13 * g, 23.0));
+  cov = max(cov, splat(p, vec2(0.30, -0.60), 0.18 * g, 37.0));
+  cov = max(cov, splat(p, vec2(-0.45, -0.50), 0.12 * g, 51.0));
+  cov = max(cov, splat(p, vec2(0.72, -0.28), 0.09 * g, 67.0));
+  cov = max(cov, splat(p, vec2(-0.78, -0.06), 0.08 * g, 83.0));
+
+  // Fine droplet specks in an outer ring (only once the spill has spread).
+  float dist = length(p);
+  float ring = smoothstep(0.5, 0.58, dist) * (1.0 - smoothstep(0.9, 1.0, dist));
+  float speck = smoothstep(0.74, 0.82, noise(p * 11.0 + 5.0)) * ring * smoothstep(0.5, 0.9, uGrow);
+  cov = max(cov, speck);
+
+  if (cov < 0.02) discard;
+
+  // Dark oil, tinted neon-green for parabolum.
+  vec3 oil = mix(vec3(0.02, 0.015, 0.008), vec3(0.015, 0.05, 0.02), uParabolum);
+  float sheen = pow(cov, 3.0);
+  vec3 hi = mix(vec3(0.18, 0.14, 0.08), vec3(0.16, 0.60, 0.24), uParabolum);
+  vec3 col = mix(oil, hi, sheen * 0.5);
+
+  // Emissive glow so the slick still reads at night / under parabolum.
+  float emis = max(uNightMode, uParabolum) * 0.4 * cov;
+  col += mix(vec3(0.04, 0.08, 0.5), vec3(0.12, 0.7, 0.28), uParabolum) * emis;
+
+  gl_FragColor = vec4(col, cov * uOpacity * 0.92);
+}
+`;
+
 // ── Tank liquid fill (animated, flat-topped) ────────────────────────────────
 
 const PUMPJACK_SCALE = 0.1;
+
+// Gusher "blowback": while the geyser erupts, pitch the body/Samson post (Body_Pump)
+// back on its local X axis so the rig looks shoved back by the blast. Head_Pump lives
+// in a SEPARATE armature, so for the gusher we reparent it under Body_Pump (see the
+// .attach() in the start handler) — that way the horsehead rides the same rotation as
+// one rigid unit instead of swinging on its own (different local frame) and detaching.
+// Eases in with the gusher and settles as it fades.
+// Flip the sign if the rig tilts the wrong way; bump the magnitude for more drama.
+const GUSHER_BLOWBACK_BODY = -0.30; // radians of X tilt on Body_Pump (negative = pitch back)
+const GUSHER_BLOWBACK_SPEED = 15;   // lerp rate toward the target tilt
+// Extra back-pitch on the horsehead alone, on TOP of riding the body. Applied about
+// the body's X axis (the head's parent frame during the gusher), not the head's own
+// tilted local axis. ~60°; flip the sign if the head pitches forward instead of back.
+const GUSHER_HEAD_EXTRA = Math.PI / 1.1;
+const _GUSHER_X_AXIS = /* @__PURE__ */ new THREE.Vector3(1, 0, 0);
+const _gusherHeadQuat = /* @__PURE__ */ new THREE.Quaternion();
 
 /**
  * Build an ExtrudeGeometry representing liquid in a horizontal cylinder.
@@ -1188,6 +1286,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (child.name === "Head_Pump") {
         headPumpRef.current = child;
       }
+      // Body_Pump mesh — tilts back during gusher blowback
+      if (child.name === "Body_Pump") {
+        bodyPumpRef.current = child;
+      }
       if (child.name.startsWith("Cylinder_Pump")) {
         if (!cylPumpRefs.current.includes(child)) {
           cylPumpRefs.current.push(child);
@@ -1300,6 +1402,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         mat.needsUpdate = true;
         if (prevFront && prevFront !== signOrigMat.current) prevFront.dispose();
         sign.material = mat;
+        signTexMatRef.current = mat;
 
         // Apply to back sign
         const back = signBackRef.current;
@@ -1307,9 +1410,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           if (prevBack && prevBack !== signBackOrigMat.current) prevBack.dispose();
           back.material = mat.clone();
           back.material.needsUpdate = true;
+          signTexMatBackRef.current = back.material;
         }
       });
     } else if (signOrigMat.current) {
+      // No custom image — stop the watchdog from forcing a texture back on.
+      signTexMatRef.current = null;
+      signTexMatBackRef.current = null;
       if (prevFront && prevFront !== signOrigMat.current) prevFront.dispose();
       sign.material = signOrigMat.current.clone();
       sign.material.needsUpdate = true;
@@ -1476,6 +1583,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const signBackRef = useRef();
   const signOrigMat = useRef(null);
   const signBackOrigMat = useRef(null);
+  // Cached textured materials (front/back) once the custom image loads. The per-frame
+  // watchdog reapplies these if some other material swap knocks them off the Sign mesh.
+  const signTexMatRef = useRef(null);
+  const signTexMatBackRef = useRef(null);
   const signFramePartsRef = useRef([]);
   const fencePartsRef = useRef([]);
 
@@ -1639,9 +1750,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const pumpActionsRef = useRef([]);  // animation actions for the pump armatures
   const pumpPausedRef = useRef(false);
   const headPumpRef = useRef(null);       // Head_Pump mesh
-  const headPumpBaseRotX = useRef(null);
+  const headOrigParentRef = useRef(null); // Head_Pump's real armature parent (restored after gusher)
+  const headRestQuatRef = useRef(null);   // head's local quaternion right after attach (extra pitch builds from here)
   const headPumpOrigMat = useRef(null);  // original material before oil stain
   const cylPumpRefs = useRef([]);        // Cylinder_Pump meshes
+  const bodyPumpRef = useRef(null);       // Body_Pump mesh (Samson post / body)
+  const bodyPumpBaseRotX = useRef(null);
+  const blowbackRef = useRef(0);          // 0..1 eased gusher blowback amount
   const oilStainedParts = useRef([]);    // all parts to stain/restore
 
   // Oil geyser shader — only active on highlighted rig
@@ -1659,6 +1774,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     uResolution: { value: new THREE.Vector2(256, 512) },
   });
 
+  // Oil spill / splatter decal on the ground around the wellhead
+  const spillMeshRef = useRef();
+  const spillMatRef = useRef();
+  const spillUniforms = useRef({
+    uOpacity: { value: 0.0 },
+    uGrow: { value: 0.0 },
+    uNightMode: { value: 0.0 },
+    uParabolum: { value: 0.0 },
+  });
+
   const initGusher = useCallback(() => {
     gusherActiveRef.current = true;
     gusherTimerRef.current = 0;
@@ -1668,6 +1793,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
     if (geyserMeshRef.current) {
       geyserMeshRef.current.visible = true;
+    }
+    if (spillMeshRef.current) {
+      spillMeshRef.current.visible = true;
+    }
+    if (spillMatRef.current) {
+      spillMatRef.current.uniforms.uOpacity.value = 0.0;
+      spillMatRef.current.uniforms.uGrow.value = 0.0;
     }
     // Pause pump animation and tilt horsehead up out of the gusher blast
     if (!pumpPausedRef.current) {
@@ -1679,13 +1811,22 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       });
       // Force one mixer update to apply the seek position
       mixer.update(0);
-      // Flip Head_Pump upward and save original colors for all stained parts
-      if (headPumpRef.current) {
-        headPumpBaseRotX.current = headPumpRef.current.rotation.x;
-        headPumpRef.current.rotation.x -= Math.PI;
+      // Capture Body_Pump rest rotation; the per-frame blowback drives it from here.
+      if (bodyPumpRef.current && bodyPumpBaseRotX.current === null) {
+        bodyPumpBaseRotX.current = bodyPumpRef.current.rotation.x;
       }
-      // Save original colors for restore
-      oilStainedParts.current = [headPumpRef.current, strawRef.current, ...cylPumpRefs.current].filter(Boolean);
+      // Head_Pump is in a separate armature, so it won't follow the body on its own.
+      // Reparent it under Body_Pump (.attach preserves world transform) for the gusher
+      // so the horsehead rides the blowback as one rigid unit; reparented back on end.
+      if (headPumpRef.current && bodyPumpRef.current && !headOrigParentRef.current) {
+        headOrigParentRef.current = headPumpRef.current.parent;
+        bodyPumpRef.current.attach(headPumpRef.current);
+        // Local pose under the body at rest — the per-frame extra pitch builds from here.
+        headRestQuatRef.current = headPumpRef.current.quaternion.clone();
+      }
+      blowbackRef.current = 0;
+      // Save original colors for restore (head is intentionally excluded — it stays clean)
+      oilStainedParts.current = [strawRef.current, ...cylPumpRefs.current].filter(Boolean);
       oilStainedParts.current.forEach((m) => {
         if (m.material && !m.userData._origColor) {
           m.userData._origColor = m.material.color.clone();
@@ -1833,6 +1974,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   hasMessagesRef.current = hasMessages;
   const frameSkip = useRef(Math.floor(Math.random() * 3)); // stagger so not all idle rigs spike on same frame
   useFrame(({ clock }, delta) => {
+    // Sign-image self-heal: if a custom image is loaded but some other material swap
+    // (paint config, env/theme change, gusher staining, remount) has knocked it off the
+    // Sign mesh, put the cached textured material back. Cheap ref compares; no-op normally.
+    if (signTexMatRef.current && signRef.current && signRef.current.material !== signTexMatRef.current) {
+      signRef.current.material = signTexMatRef.current;
+      if (signBackRef.current && signTexMatBackRef.current && signBackRef.current.material !== signTexMatBackRef.current) {
+        signBackRef.current.material = signTexMatBackRef.current;
+      }
+    }
+
     // Non-highlighted pumpjacks: throttle animation to every 3rd frame, skip all interactive logic
     if (!highlightedRef.current) {
       frameSkip.current = (frameSkip.current + 1) % 3;
@@ -2233,7 +2384,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
       // Keep pump head parts oil-stained while gusher is active
       const stainColor = 0x0d2a14;
-      if (headPumpRef.current?.material) headPumpRef.current.material.color.set(stainColor);
       if (strawRef.current?.material) strawRef.current.material.color.set(stainColor);
       cylPumpRefs.current.forEach((m) => { if (m.material) m.material.color.set(stainColor); });
       gusherTimerRef.current += delta;
@@ -2242,26 +2392,64 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       const effectiveFill = (drainingRef.current || drainedRef.current) ? drainFillRef.current : tankFillRef.current;
       const overflowing = effectiveFill >= 1.0 && highlighted;
 
+      // Fade out near end of one-shot gusher (also drives the blowback below)
+      const fade = overflowing ? 1.0
+        : gusherTimerRef.current > GUSHER_DURATION - 1.0
+          ? Math.max(0, GUSHER_DURATION - gusherTimerRef.current)
+          : 1.0;
+
       if (geyserMatRef.current) {
         geyserMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
         geyserMatRef.current.uniforms.uParabolum.value = 1.0;
         geyserMatRef.current.uniforms.uTime.value += delta;
-        // Fade out near end of one-shot gusher
-        const fade = overflowing ? 1.0
-          : gusherTimerRef.current > GUSHER_DURATION - 1.0
-            ? Math.max(0, GUSHER_DURATION - gusherTimerRef.current)
-            : 1.0;
         geyserMatRef.current.uniforms.uOpacity.value = fade;
+      }
+
+      // Oil spill decal — spreads as the gusher builds (uGrow rides the eased blowback)
+      // and fades with the gusher (uOpacity = fade). Self-resets, no lingering state.
+      if (spillMatRef.current) {
+        spillMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
+        spillMatRef.current.uniforms.uParabolum.value = 1.0;
+        spillMatRef.current.uniforms.uGrow.value = blowbackRef.current;
+        spillMatRef.current.uniforms.uOpacity.value = fade;
+      }
+
+      // Blowback: ease the body back from the blast, riding the gusher's intensity
+      // (fade) so the rig shoves back as it erupts and settles as it dies. Head_Pump
+      // is parented under Body_Pump for the gusher, so it follows along automatically.
+      blowbackRef.current += (fade - blowbackRef.current) * Math.min(delta * GUSHER_BLOWBACK_SPEED, 1);
+      const blow = blowbackRef.current;
+      if (bodyPumpRef.current && bodyPumpBaseRotX.current !== null) {
+        bodyPumpRef.current.rotation.x = bodyPumpBaseRotX.current + blow * GUSHER_BLOWBACK_BODY;
+      }
+      // Extra horsehead pitch, eased with the gusher, about the body's X axis. Premultiply
+      // so it rotates in the parent (body) frame on top of the captured rest pose.
+      if (headPumpRef.current && headRestQuatRef.current) {
+        _gusherHeadQuat.setFromAxisAngle(_GUSHER_X_AXIS, blow * GUSHER_HEAD_EXTRA);
+        headPumpRef.current.quaternion.copy(headRestQuatRef.current).premultiply(_gusherHeadQuat);
       }
 
       if (gusherTimerRef.current > GUSHER_DURATION && !overflowing) {
         gusherActiveRef.current = false;
         if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
+        if (spillMeshRef.current) spillMeshRef.current.visible = false;
+        if (spillMatRef.current) { spillMatRef.current.uniforms.uOpacity.value = 0; spillMatRef.current.uniforms.uGrow.value = 0; }
         // Resume pump animation, restore Head_Pump rotation and all stained colors
         if (pumpPausedRef.current) {
-          if (headPumpRef.current && headPumpBaseRotX.current !== null) {
-            headPumpRef.current.rotation.x = headPumpBaseRotX.current;
+          if (bodyPumpRef.current && bodyPumpBaseRotX.current !== null) {
+            bodyPumpRef.current.rotation.x = bodyPumpBaseRotX.current;
           }
+          // Clear the extra pitch, then (body already at rest) the head's world transform
+          // matches its original — reparent it back under its own armature bone.
+          if (headPumpRef.current && headRestQuatRef.current) {
+            headPumpRef.current.quaternion.copy(headRestQuatRef.current);
+          }
+          if (headPumpRef.current && headOrigParentRef.current) {
+            headOrigParentRef.current.attach(headPumpRef.current);
+            headOrigParentRef.current = null;
+            headRestQuatRef.current = null;
+          }
+          blowbackRef.current = 0;
           oilStainedParts.current.forEach((m) => {
             if (m.material && m.userData._origColor) {
               m.material.color.copy(m.userData._origColor);
@@ -2379,11 +2567,24 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         strikeFlashRef.current = false;
         if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
         if (geyserMatRef.current) geyserMatRef.current.uniforms.uOpacity.value = 0;
+        if (spillMeshRef.current) spillMeshRef.current.visible = false;
+        if (spillMatRef.current) { spillMatRef.current.uniforms.uOpacity.value = 0; spillMatRef.current.uniforms.uGrow.value = 0; }
         // Resume pump animation, restore Head_Pump rotation and all stained colors
         if (pumpPausedRef.current) {
-          if (headPumpRef.current && headPumpBaseRotX.current !== null) {
-            headPumpRef.current.rotation.x = headPumpBaseRotX.current;
+          if (bodyPumpRef.current && bodyPumpBaseRotX.current !== null) {
+            bodyPumpRef.current.rotation.x = bodyPumpBaseRotX.current;
           }
+          // Clear the extra pitch, then (body already at rest) the head's world transform
+          // matches its original — reparent it back under its own armature bone.
+          if (headPumpRef.current && headRestQuatRef.current) {
+            headPumpRef.current.quaternion.copy(headRestQuatRef.current);
+          }
+          if (headPumpRef.current && headOrigParentRef.current) {
+            headOrigParentRef.current.attach(headPumpRef.current);
+            headOrigParentRef.current = null;
+            headRestQuatRef.current = null;
+          }
+          blowbackRef.current = 0;
           oilStainedParts.current.forEach((m) => {
             if (m.material && m.userData._origColor) {
               m.material.color.copy(m.userData._origColor);
@@ -2464,6 +2665,25 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               depthWrite={false}
               side={THREE.DoubleSide}
               uniforms={geyserUniforms.current}
+            />
+          </mesh>
+          {/* Oil spill / splatter decal — flat on the ground around the wellhead */}
+          <mesh
+            ref={spillMeshRef}
+            visible={false}
+            renderOrder={9}
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[gusherOriginRef.current.x, 0.012, gusherOriginRef.current.z]}
+          >
+            <planeGeometry args={[1.8, 1.8]} />
+            <shaderMaterial
+              ref={spillMatRef}
+              vertexShader={_spillVertexShader}
+              fragmentShader={_spillFragmentShader}
+              transparent
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              uniforms={spillUniforms.current}
             />
           </mesh>
           {/* Steam vent particles */}
@@ -3310,6 +3530,12 @@ useGLTF.preload("/models/oilJack_fancy_allProps.glb");
 
 const REMOTE_PARTICLE_COUNT = 2000;
 
+// Offset from a cell's center to the rig's wellhead, in world XZ. Matches the
+// Pumpjack's own geyser anchor (gusherOriginRef = [0, 0.05, 0.2]). The rig group
+// has no Y-rotation, so this is a plain additive shift. Without it, remote/test
+// gushers erupt from the cell center (behind the wellhead) instead of the well.
+const GUSHER_WELLHEAD_OFFSET = [0, 0.2]; // [dx, dz]
+
 function RemoteGusher({ position }) {
   const posArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT * 3));
   const velArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT * 3));
@@ -3385,7 +3611,7 @@ function RemoteGusher({ position }) {
   });
 
   return (
-    <group position={position}>
+    <group position={[position[0] + GUSHER_WELLHEAD_OFFSET[0], position[1], position[2] + GUSHER_WELLHEAD_OFFSET[1]]}>
       <pointLight
         ref={lightRef}
         position={[0, 0.5, 0]}
@@ -3532,7 +3758,7 @@ function ShaderGusher({ position, envPreset, parabolum = false }) {
   });
 
   return (
-    <group position={position}>
+    <group position={[position[0] + GUSHER_WELLHEAD_OFFSET[0], position[1], position[2] + GUSHER_WELLHEAD_OFFSET[1]]}>
       <pointLight
         ref={lightRef}
         position={[0, 0.5, 0]}
