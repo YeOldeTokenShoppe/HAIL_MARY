@@ -275,6 +275,12 @@ const CASE_TEMPLATE = {
 
   maxScans: 3,             // total questions the player can spend across all 4 stations
   correctVerdict: "doubt", // "believe" | "doubt" — ground truth for scoring
+  // DESIGN RULE: keep the evidence MIXED, not overdetermined. Most entries
+  // should read green/amber; concentrate the case-cracking flags in one or two
+  // lenses so WHICH 3 questions the player asks actually matters. List those
+  // station keys here — the post-game coaching note compares them against the
+  // stations the player actually scanned. (e.g. ["marisol"] or ["monk","eugene"])
+  decisiveLenses: ["marisol"],
 
   // Played after the player commits their verdict and the case unmasks.
   reveal: {

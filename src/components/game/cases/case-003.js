@@ -795,6 +795,9 @@ const CASE_003 = {
 
   maxScans: 3,
   correctVerdict: "doubt",
+  // The case-cracking evidence lives only in the ONCHAIN lens — every other
+  // station reads clean. Drives the post-game lens-coaching note.
+  decisiveLenses: ["marisol"],
 
   reveal: {
     summary:

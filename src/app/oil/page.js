@@ -12,7 +12,9 @@ import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import HowToPlayPanel from "@/components/HowToPlayPanel";
-import { useUser } from "@clerk/nextjs";
+import OilWelcomeModal from "@/components/OilWelcomeModal";
+import OilOverlayModal from "@/components/OilOverlayModal";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
 import NavControlsHome from "@/components/NavControlsHome";
@@ -946,20 +948,6 @@ function toolbarBtn(active, size = 28, variant = "gold") {
   };
 }
 
-// Hail Mary Prospecting Co. logo mark — a survey contour chip: irregular
-// topographic rings (gold rock) closing in on a glowing green Paraboleum core.
-// Sourced from /public/hail-mary-icon.svg (generated from the contour art).
-function HailMaryMark() {
-  // Fills the logo box edge-to-edge (the gold box is the only frame).
-  return (
-    <img
-      src="/hail-mary-icon.svg"
-      alt="Hail Mary Prospecting Co."
-      style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
-    />
-  );
-}
-
 export default function OilPage() {
   const isMobile = useIsMobile();
 
@@ -1051,12 +1039,28 @@ export default function OilPage() {
   const isTest = mode === "test";
   const [testDay, setTestDay] = useState(0);
   const { user } = useUser();
+  const clerk = useClerk();
   const { walletAddress, tokenBalance, isWalletConnected } = useWalletAuth();
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardSectionOpen, setLeaderboardSectionOpen] = useState(true);
+
+  // First-visit onboarding: auto-open the welcome/rules modal once per device.
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("oilWelcomeSeen")) setShowWelcome(true);
+    } catch {}
+  }, []);
+
+  const closeWelcome = useCallback(() => {
+    setShowWelcome(false);
+    try { localStorage.setItem("oilWelcomeSeen", "1"); } catch {}
+  }, []);
 
   // Premium purchases
   const [unlockedItems, setUnlockedItems] = useState(new Set());
@@ -3014,9 +3018,8 @@ export default function OilPage() {
 
   const truncId = (id) => id.length > 10 ? `${id.slice(0, 5)}...${id.slice(-3)}` : id;
 
-  const leaderboardPanel = (
-    <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>LEADERBOARD</h3>
+  const leaderboardBody = (
+    <>
       {/* Summary stats row */}
       <div style={{
         display: "flex", justifyContent: "space-between", padding: "8px 0", marginBottom: 8,
@@ -3133,6 +3136,28 @@ export default function OilPage() {
           No drillers yet — be the first!
         </div>
       )}
+    </>
+  );
+
+  // Full panel (with title) — used inside the header trophy overlay.
+  const leaderboardPanel = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>LEADERBOARD</h3>
+      {leaderboardBody}
+    </div>
+  );
+
+  // Collapsible inline section — lives at the bottom of the side panel.
+  const leaderboardSection = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3
+        style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+        onClick={() => setLeaderboardSectionOpen((o) => !o)}
+      >
+        LEADERBOARD
+        <span style={{ fontSize: 10, color: theme.muted }}>{leaderboardSectionOpen ? "▴" : "▾"}</span>
+      </h3>
+      {leaderboardSectionOpen && leaderboardBody}
     </div>
   );
 
@@ -4043,7 +4068,7 @@ export default function OilPage() {
       )}
       {drillStatus === "sign-in" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={drillBtnStyles.disabled}>SIGN IN TO PLAY</button>
+          <button onClick={() => clerk.openSignIn()} style={drillBtnStyles.active}>SIGN IN TO PLAY</button>
         </div>
       )}
       {drillStatus === "stunned" && (
@@ -4530,9 +4555,13 @@ export default function OilPage() {
         {/* Header */}
         <header style={m.header}>
           <div style={styles.headerLeft}>
-            <div style={styles.logoMark}>
-              <HailMaryMark />
-            </div>
+            <Link
+              href="/"
+              title="Return to shrine"
+              style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
+            >
+              <img src="/brand-mark-mono.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
+            </Link>
             <div>
               <h1 style={{ ...styles.title, fontSize: 12, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 <span>HAIL MARY</span>
@@ -4542,6 +4571,34 @@ export default function OilPage() {
             </div>
           </div>
           <div style={styles.headerRight}>
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              title="Leaderboard"
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 40, height: 40, borderRadius: 10,
+                background: "rgba(212, 175, 55, 0.05)",
+                border: "1.5px solid rgba(212, 175, 55, 0.2)",
+                color: theme.accent, cursor: "pointer", padding: 0,
+                flexShrink: 0, fontFamily: "inherit",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+            </button>
+            <button
+              onClick={() => setShowWelcome(true)}
+              title="How to play"
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 40, height: 40, borderRadius: 10,
+                background: "rgba(212, 175, 55, 0.05)",
+                border: "1.5px solid rgba(212, 175, 55, 0.2)",
+                color: theme.accent, cursor: "pointer", padding: 0,
+                flexShrink: 0, fontSize: 18, fontWeight: "bold", fontFamily: "inherit",
+              }}
+            >
+              ?
+            </button>
             <button
               onClick={() => { contextIsPlaying ? pause() : play(); }}
               title={contextIsPlaying ? "Pause music" : "Play music"}
@@ -4888,15 +4945,15 @@ export default function OilPage() {
             drillDepth={effectiveDrillDay}
             hellPockets={stats.hellPockets}
           />
-          {leaderboardPanel}
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
-          <HowToPlayPanel isMobile darkMode={uiDark} />
+          <HowToPlayPanel isMobile darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
           <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+          {leaderboardSection}
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -4959,6 +5016,12 @@ export default function OilPage() {
           isOpen={showBuyModal}
           onClose={() => setShowBuyModal(false)}
         />
+
+        <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+
+        <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark}>
+          {leaderboardPanel}
+        </OilOverlayModal>
 
         {purchaseModalItem && (
           <PumpPurchaseModal
@@ -5028,9 +5091,13 @@ export default function OilPage() {
 
       <header style={styles.header}>
         <div style={styles.headerLeft}>
-          <div style={styles.logoMark}>
-            <HailMaryMark />
-          </div>
+          <Link
+            href="/"
+            title="Return to shrine"
+            style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
+          >
+            <img src="/brand-mark-mono.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
+          </Link>
           <div>
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
@@ -5052,25 +5119,26 @@ export default function OilPage() {
           <span style={styles.statusText}>
             {gameEnded ? "GAME ENDED" : "SURVEY ACTIVE"}
           </span>
-          <Link
-            href="/"
-            title="Return to shrine"
+          <button
+            onClick={() => setShowLeaderboard(true)}
+            title="Leaderboard"
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               width: 40, height: 40, borderRadius: 10,
               background: "rgba(212, 175, 55, 0.05)",
               border: "1.5px solid rgba(212, 175, 55, 0.2)",
-              color: theme.accent, textDecoration: "none",
+              color: theme.accent, cursor: "pointer", padding: 0,
               flexShrink: 0,
             }}
           >
-            <img src="/brand-mark-mono.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
-          </Link>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          </button>
           <NavControlsHome
             isPlaying={contextIsPlaying}
             onPlayMusic={() => play()}
             onStopMusic={() => pause()}
             onSkipTrack={() => nextTrack()}
+            onHelpClick={() => setShowWelcome(true)}
             hideMenu
             onUserClick={() => {}}
             isUserSignedIn={!!user}
@@ -5379,16 +5447,16 @@ export default function OilPage() {
               drillDepth={effectiveDrillDay}
               hellPockets={stats.hellPockets}
             />
-            {leaderboardPanel}
             <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
-            <HowToPlayPanel darkMode={uiDark} />
+            <HowToPlayPanel darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
             <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
             <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+            {leaderboardSection}
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}
@@ -5483,6 +5551,12 @@ export default function OilPage() {
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />
+
+      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+
+      <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark}>
+        {leaderboardPanel}
+      </OilOverlayModal>
 
       <UnifiedAccountModal
         isOpen={showAccountModal}

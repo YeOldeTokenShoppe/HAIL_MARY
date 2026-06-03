@@ -575,8 +575,8 @@ const GUSHER_BLOWBACK_BODY = -0.30; // radians of X tilt on Body_Pump (negative 
 const GUSHER_BLOWBACK_SPEED = 15;   // lerp rate toward the target tilt
 // Extra back-pitch on the horsehead alone, on TOP of riding the body. Applied about
 // the body's X axis (the head's parent frame during the gusher), not the head's own
-// tilted local axis. ~60°; flip the sign if the head pitches forward instead of back.
-const GUSHER_HEAD_EXTRA = Math.PI / 1.1;
+// tilted local axis. ~164°; negative pitches the head back out of the blast.
+const GUSHER_HEAD_EXTRA = -Math.PI / 1.1;
 const _GUSHER_X_AXIS = /* @__PURE__ */ new THREE.Vector3(1, 0, 0);
 const _gusherHeadQuat = /* @__PURE__ */ new THREE.Quaternion();
 // One-shot gusher length (seconds). A sustained gusher (tank overflow, or the demon
@@ -1259,7 +1259,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, hasMessages = false, onEnvelopeClick, hellActive = false }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, hasMessages = false, onEnvelopeClick, hellActive = false }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -1982,6 +1982,27 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     prevHellActive.current = hellActive;
   }, [hellActive, initGusher]);
 
+  // Broadcast gusher — an active gusherEvents doc for THIS rig's cell (a real
+  // strike, another player's, or a test gusher). Drives the same coupled geyser
+  // as the owner's own strike (pump pause + blowback) so every viewer sees a live
+  // erupting rig, not a detached column. Sustained until the event clears (the
+  // owner drains their tank); released into the final 1s fade like the hell path.
+  const gusherActivePropRef = useRef(false);
+  // Starts false (not `gusherActive`) so a rig that mounts with a gusher already
+  // live — it only mounts because its cell is gushing — erupts on first render.
+  const prevGusherActive = useRef(false);
+  useEffect(() => {
+    gusherActivePropRef.current = gusherActive;
+    if (gusherActive && !prevGusherActive.current) {
+      if (!gusherActiveRef.current) initGusher();
+    } else if (!gusherActive && prevGusherActive.current) {
+      if (gusherActiveRef.current && !gusherHellRef.current) {
+        gusherTimerRef.current = GUSHER_DURATION - 1.0;
+      }
+    }
+    prevGusherActive.current = gusherActive;
+  }, [gusherActive, initGusher]);
+
   // Trigger drill effects on every drill event (highlighted rig only)
   const initDust = useCallback(() => {
     const pos = dustPosRef.current;
@@ -2502,7 +2523,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       // Sustain the gusher (and the blowback that rides it) at full intensity while
       // the tank overflows OR while the demon is loose (hell). Both hold the rig
       // pitched back indefinitely; the final 1s settle only runs once this is false.
-      const overflowing = (effectiveFill >= 1.0 && highlighted) || (gusherHellRef.current && hellActiveRef.current);
+      const overflowing = (effectiveFill >= 1.0 && highlighted) || (gusherHellRef.current && hellActiveRef.current) || gusherActivePropRef.current;
 
       // Fade out near end of one-shot gusher (also drives the blowback below)
       const fade = overflowing ? 1.0
@@ -2743,9 +2764,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
       {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
-      {/* Red alert point light + gusher VFX — on the selected rig, or on the rig
-          the demon erupts from (hellActive) so every viewer sees the blowback. */}
-      {(highlighted || hellActive) && (
+      {/* Red alert point light + gusher VFX — on the selected rig, the rig the demon
+          erupts from (hellActive), or any rig with a live gusher event (gusherActive)
+          so every viewer sees the erupting column + blowback, not just the owner. */}
+      {(highlighted || hellActive || gusherActive) && (
         <>
           <pointLight
             ref={strikeLightRef}
@@ -3419,7 +3441,7 @@ function InstancedSign({ geometry, url, positions }) {
 }
 
 // Gather all idle-plot static decorations and render them as instanced batches.
-function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, base, frameMat }) {
+function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, fullRigCells, base, frameMat }) {
   const groups = useMemo(() => {
     const addonGroups = {};   // model -> [{pos, slot, rotY}]
     const fenceGroups = {};   // model -> { scale, list:[{pos}] }
@@ -3428,6 +3450,9 @@ function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, base
     const signGroups = {};     // imageUrl -> [pos]
     items.forEach((it) => {
       if (it.col === selectedCol && it.row === selectedRow) return;
+      // Skip cells served by a full animated rig (selected or live gusher) — that
+      // rig draws its own signs/frames/cameras/add-ons.
+      if (fullRigCells?.has(`${it.col}_${it.row}`)) return;
       const cfg = allPumpConfigs[`${it.col}_${it.row}`]?.config;
       if (!cfg) return;
       Object.entries(cfg.addons || {}).forEach(([slotKey, val]) => {
@@ -3450,7 +3475,7 @@ function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, base
       }
     });
     return { addonGroups, fenceGroups, framePositions, camPositions, signGroups };
-  }, [items, allPumpConfigs, selectedCol, selectedRow]);
+  }, [items, allPumpConfigs, selectedCol, selectedRow, fullRigCells]);
 
   return (
     <>
@@ -3473,7 +3498,7 @@ function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, base
   );
 }
 
-function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut }) {
+function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut }) {
   const base = useMemo(() => buildBaseRig(scene), [scene]);
   // Per-vertex metalness/roughness (from aMetalness/aRoughness attributes) so
   // textured metal parts catch studio-env reflections while painted parts stay
@@ -3529,6 +3554,9 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
     <>
       {rigs.map((r) => {
         const isSelected = r.col === selectedCol && r.row === selectedRow;
+        // Hidden when a full animated rig stands in for this cell — the selected
+        // plot OR a cell with a live gusher (which renders its own erupting rig).
+        const isFull = isSelected || !!fullRigCells?.has(`${r.col}_${r.row}`);
         const cfg = allPumpConfigs[`${r.col}_${r.row}`]?.config || null;
         return (
           <group key={r.key}>
@@ -3537,11 +3565,11 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
               material={mat}
               position={r.position}
               scale={PUMPJACK_SCALE}
-              visible={!isSelected}
+              visible={!isFull}
               onClick={(e) => { e.stopPropagation(); onSelectCell?.(r.col, r.row); onFlyTo?.(r.col, r.row); }}
               onDoubleClick={(e) => { e.stopPropagation(); if (isSelected) onZoomOut?.(); else onFlyTo?.(r.col, r.row); }}
             />
-            {!isSelected && cfg?.addons && (
+            {!isFull && cfg?.addons && (
               <IdleDecorations position={r.position} config={cfg} threshold={decoThreshold} />
             )}
           </group>
@@ -3554,6 +3582,7 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
         allPumpConfigs={allPumpConfigs}
         selectedCol={selectedCol}
         selectedRow={selectedRow}
+        fullRigCells={fullRigCells}
         base={base}
         frameMat={frameMat}
       />
@@ -3561,7 +3590,17 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
   );
 }
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
+  // Cells with a live gusher event. Each renders a full animated rig (instead of
+  // merged static geometry) so the pump pauses + the rig pitches back as it erupts
+  // — visible to every player, not just the gusher's owner.
+  const gusherCellSet = useMemo(() => {
+    const s = new Set();
+    gusherEvents.forEach((ev) => {
+      if (ev.col != null && ev.row != null) s.add(`${ev.col}_${ev.row}`);
+    });
+    return s;
+  }, [gusherEvents]);
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -3612,6 +3651,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
           cellSize={cellSize}
           selectedCol={selectedCol}
           selectedRow={selectedRow}
+          fullRigCells={gusherCellSet}
           onSelectCell={onSelectCell}
           onFlyTo={onFlyTo}
           onZoomOut={onZoomOut}
@@ -3621,9 +3661,11 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
         // Drill all if no selection, otherwise only the selected cell
         const active = selectedCol === null || (col === selectedCol && row === selectedRow);
         const isSelected = selectedCol !== null && col === selectedCol && row === selectedRow;
-        // In merge mode only the selected plot renders a full rig; the rest come
-        // from MergedRigField (1 draw call each).
-        if (MERGE_RIGS && !isSelected) return null;
+        const hasGusher = gusherCellSet.has(`${col}_${row}`);
+        // In merge mode only the selected plot — and any cell with a live gusher —
+        // renders a full animated rig; the rest come from MergedRigField (1 draw
+        // call each). Gusher cells need the real rig so the pump can pause + tilt.
+        if (MERGE_RIGS && !isSelected && !hasGusher) return null;
         const cellEntry = allPumpConfigs[`${col}_${row}`];
         const cellConfig = isSelected ? pumpConfig : cellEntry?.config || null;
         return (
@@ -3647,6 +3689,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             parabolum={parabolum}
             forceStrikeGusher={forceStrikeGusher}
             gusherTrigger={isSelected ? gusherTrigger : 0}
+            gusherActive={hasGusher}
             hasMessages={!!plotsWithMessages[`${col}_${row}`]}
             onEnvelopeClick={() => onEnvelopeClick?.(col, row)}
             hellActive={hellActive && col === hellCol && row === hellRow}
@@ -4685,6 +4728,7 @@ export default function OilVoxelGrid({
             parabolum={parabolum}
             forceStrikeGusher={forceStrikeGusher}
             gusherTrigger={gusherTrigger}
+            gusherEvents={gusherEvents}
             plotsWithMessages={plotsWithMessages}
             onEnvelopeClick={onEnvelopeClick}
             hellActive={hellActive}
@@ -4738,20 +4782,8 @@ export default function OilVoxelGrid({
               onMiss={onDemonMiss}
             />
           )}
-          {gusherEvents
-            .filter((ev) => ev.userId !== currentUserId)
-            .map((ev) => (
-              <ShaderGusher
-                key={ev.id}
-                position={[
-                  -worldW / 2 + ev.col * cellSize + cellSize / 2,
-                  0,
-                  worldD / 2 - ev.row * cellSize - cellSize / 2,
-                ]}
-                envPreset={envPreset}
-                parabolum={parabolum}
-              />
-            ))}
+          {/* Gusher events now render as full animated rigs inside PumpjackInstances
+              (pump pause + blowback), so no separate ShaderGusher column is drawn. */}
           {Array.from({ length: gridX + 1 }, (_, i) => {
             const x = -worldW / 2 + i * cellSize;
             const points = [

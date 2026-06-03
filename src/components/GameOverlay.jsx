@@ -6,14 +6,101 @@ import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } f
 // VERDICT MATH
 // ────────────────────────────────────────────────────────────────────────
 
+// Legacy discrete-verdict probabilities. Retained for back-compat with any
+// caller that still submits a bucket string instead of a slider probability.
 export const VERDICT_PROBS = { believe: 0.15, abstain: 0.5, doubt: 0.85 };
 
-export function computeBrier(verdict, correctVerdict) {
-  // correctVerdict is "believe" (project legitimate) or "doubt" (project is scam)
-  // We score against the binary outcome: was it a scam? (1 = yes, 0 = no)
+// Confidence-slider → bucket thresholds. A raw P(scam) value collapses to one
+// of three buckets ONLY to choose which character reaction / vindication line /
+// reveal glyph to show. The Brier score is always computed on the raw
+// probability, never the bucket — that's the whole point of the slider.
+export const VERDICT_THRESHOLDS = { believe: 0.34, doubt: 0.66 };
+
+export function probabilityToVerdict(p) {
+  if (typeof p !== "number" || Number.isNaN(p)) return "abstain";
+  if (p <= VERDICT_THRESHOLDS.believe) return "believe";
+  if (p >= VERDICT_THRESHOLDS.doubt) return "doubt";
+  return "abstain";
+}
+
+export function computeBrier(verdictOrProb, correctVerdict) {
+  // correctVerdict is "believe" (project legitimate) or "doubt" (project is scam).
+  // We score against the binary outcome: was it a scam? (1 = yes, 0 = no).
+  // Accepts either a numeric P(scam) in [0,1] (confidence slider) or a legacy
+  // discrete verdict string (believe/abstain/doubt).
+  if (correctVerdict == null) return null; // reviews have no ground truth
   const actual = correctVerdict === "doubt" ? 1 : 0;
-  const predicted = VERDICT_PROBS[verdict];
+  const predicted = typeof verdictOrProb === "number"
+    ? verdictOrProb
+    : VERDICT_PROBS[verdictOrProb];
+  if (typeof predicted !== "number" || Number.isNaN(predicted)) return null;
   return Math.pow(predicted - actual, 2);
+}
+
+// Short, player-facing lens label for a station, derived from its `role`
+// (e.g. "LOGOS · ONCHAIN" → "ONCHAIN"). Used by the post-game coaching note.
+export function lensLabel(station) {
+  if (!station?.role) return "";
+  const parts = String(station.role).split("·");
+  return (parts[parts.length - 1] || station.role).trim();
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// SESSION SCORE — a running scorecard persisted in localStorage so the
+// player can watch their calibration improve across cases. Graded (forensic)
+// cases only; reviews have no ground truth and never call recordCaseResult.
+// ────────────────────────────────────────────────────────────────────────
+
+const SESSION_KEY = "rl80_terminal_session_v1";
+
+function emptyScore() {
+  return { count: 0, brierSum: 0, hits: 0, calls: 0, streak: 0, bestStreak: 0 };
+}
+
+export function readSessionScore() {
+  if (typeof window === "undefined") return emptyScore();
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return emptyScore();
+    return { ...emptyScore(), ...JSON.parse(raw) };
+  } catch (e) {
+    return emptyScore();
+  }
+}
+
+// Records one graded result and returns the updated scorecard.
+//   brier   — the Brier score for this case (lower is better)
+//   correct — did the player's leaning match ground truth? true / false, or
+//             null when the player abstained (mid-band commit).
+export function recordCaseResult({ brier, correct }) {
+  const s = readSessionScore();
+  s.count += 1;
+  if (typeof brier === "number") s.brierSum += brier;
+  // Accuracy is measured over decisive calls only. Abstaining neither helps
+  // nor hurts the hit rate; it just resets the streak (a miss does too).
+  if (correct === true) {
+    s.calls += 1;
+    s.hits += 1;
+    s.streak += 1;
+    if (s.streak > s.bestStreak) s.bestStreak = s.streak;
+  } else if (correct === false) {
+    s.calls += 1;
+    s.streak = 0;
+  } else {
+    s.streak = 0; // abstained
+  }
+  if (typeof window !== "undefined") {
+    try { window.localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  return s;
+}
+
+export function sessionAvgBrier(s) {
+  return s && s.count > 0 ? s.brierSum / s.count : null;
+}
+
+export function sessionAccuracy(s) {
+  return s && s.calls > 0 ? s.hits / s.calls : null;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -341,9 +428,9 @@ function IntroOverlay({ caseData, onStart, suppressIntro, setSuppressIntro }) {
           <div className="lt-intro-rule">
             <div className="lt-intro-rule-num">02</div>
             <div className="lt-intro-rule-body">
-              <div className="lt-intro-rule-head">RENDER A VERDICT</div>
+              <div className="lt-intro-rule-head">SET YOUR CONFIDENCE</div>
               <div className="lt-intro-rule-text">
-                <span className="lt-tone-believe">Believe</span> the project, <span className="lt-tone-abstain">Abstain</span> if uncertain, or <span className="lt-tone-doubt">Doubt</span> it. You can rule before exhausting your scans.
+                Render judgment on a dial: slide toward <span className="lt-tone-believe">Trust</span> (legit) or <span className="lt-tone-doubt">Doubt</span> (scam), or leave it centered to <span className="lt-tone-abstain">Abstain</span>. You can rule before exhausting your scans.
               </div>
             </div>
           </div>

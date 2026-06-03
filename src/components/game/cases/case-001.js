@@ -1,3 +1,13 @@
+// Case 001 — first lens-trap case. Three lenses (Pathos, Logos, Mythos) read
+// plausible-to-clean; one lens (Ethos / Monk) catches a serial-deployer rug.
+// PROPHET TOKEN is still a rug, but the ONLY tell is the deployer's identity
+// and history. A player who spends all three questions on sentiment, onchain,
+// or narrative will see a deceptively healthy surface and wrongly lean Trust.
+//
+// Teaching beat: current chain state can look fine while the people behind the
+// launch are the rug vector. Credibility — who built this and what they've
+// already done — is the lens that cracks the case. decisiveLenses: ["monk"].
+
 const CASE_001 = {
   id: "case-001",
   difficulty: "beginner",
@@ -15,9 +25,9 @@ const CASE_001 = {
   },
   // GR80 delivers this one-time rules speech as the *first* line on case 001 only,
   // before his intro. Suppressed on subsequent cases (or when player has played before).
-  // Covers: (1) the question budget, (2) the verdict trio, (3) both scoring
-  // directions — Brier (lower-better, counterintuitive) vs accuracy (higher-better),
-  // and (4) the calibration intuition (bold-right wins, bold-wrong loses, abstain spared).
+  // Covers: (1) the question budget, (2) the confidence dial, and (3) the
+  // calibration intuition (bold-right wins most, bold-wrong cuts deepest,
+  // centered abstain is spared).
 // Separate recording from monk's intro so first-visit players who've
 // heard the rules before in a prior session don't get them again. The
 // runtime plays this audio FIRST on first visit, then chains to
@@ -26,11 +36,11 @@ const CASE_001 = {
 rulesIntro: {
   text:
     "Welcome, friend. The rite is simple. You may spend three questions across " +
-    "the four of us. Then you render judgment: Trust, Abstain, or Doubt. " +
-    "Trust when the evidence holds. Doubt when the pattern breaks faith. " +
-    "Abstain when the signal is incomplete. A clear call is rewarded; a false " +
-    "one leaves a mark. Choose with care.",
-  audio: "case001_monk_rules",
+    "the four of us. Then you set your confidence on the dial: slide toward Trust " +
+    "if the evidence holds, toward Doubt if the pattern breaks faith, or leave it " +
+    "centered to Abstain. A bold, correct call is rewarded most. A bold, wrong one " +
+    "leaves the deepest mark. Choose where to place your weight with care.",
+  audio: null, // re-record: case001_monk_rules
 },
 
   stations: {
@@ -105,7 +115,7 @@ rulesIntro: {
           reveals: "FUNDING SOURCE",
         },
         {
-          q: "Has this contract appeared before?",
+          q: "Is the contract code original?",
           a: {
             text:
 "Eighty-five percent matches a prior rug template, including the same owner escape hatch. " +
@@ -173,13 +183,8 @@ rulesIntro: {
       // recordings (when present) bypass this entirely.
       voice: "2",
       intro: {
-        text: "Prophet Token did not find an audience. It rented one. Cheaply. Loudly. Badly.",
-        audio: "case001_demon_intro",
-        // Voice actor leans on dramatic pauses ("Cheaply. Loudly. Badly.")
-        // that the char-pacing fallback can't predict — ProgressiveText /
-        // LiveCaption use this duration to spread chunks across the
-        // recording instead of racing through it.
-        audioDurationMs: 11000,
+        text: "Prophet Token's crowd? Annoyingly normal. I came to roast a paid-shill circus and found people just... talking. Hate it. Look closer.",
+        audio: null, // re-record: case001_demon_intro
       },
       // Character-wide return pool — same files play across all cases on
       // revisits to Barron. Each picked at random by pickReturnLine().
@@ -190,24 +195,22 @@ rulesIntro: {
       ],
       questions: [
         {
-          q: "Are the followers real?",
+          q: "Are the followers bots?",
           a: {
             text:
-              "Five thousand followers, and eighty-one percent were born in the last two weeks. " +
-              "That is not a crowd. That is inventory.",
-            audio: "case001_demon_q1",
-            audioDurationMs: 10000,
+              "Five thousand followers, and most of them have been around for a year or more. " +
+              "Real histories, real reply chains, even a few boring accounts. This crowd wasn't bought last week.",
+            audio: null, // re-record: case001_demon_q1
           },
           reveals: "TWITTER FOLLOWERS",
         },
         {
-          q: "Is the community organic?",
+          q: "What's the Telegram actually like?",
           a: {
             text:
-              "Yeah, ok. Eighty-eight percent of Telegram posts repeat the same three phrases. " +
-              "No questions, no jokes, no typos. Real rooms are messy. This one is shrink-wrapped.",
-            audio: "case001_demon_q2",
-            audioDurationMs: 14000,
+              "The Telegram's a normal mess. People arguing about entries, posting memes, complaining the bot is laggy. " +
+              "Typos everywhere. Botted rooms are shrink-wrapped. This one's lived-in.",
+            audio: null, // re-record: case001_demon_q2
           },
           reveals: "TELEGRAM ACTIVITY",
         },
@@ -215,65 +218,63 @@ rulesIntro: {
           q: "Who's promoting it?",
           a: {
             text:
-              "Three paid promoters pushed it in the same hour. Two previously fronted dead tokens. " +
-              "New ticker, same invoice.",
-            audio: "case001_demon_q3",
-            audioDurationMs: 10000,
+              "A couple mid-tier callers mentioned it, spread across different days, no synchronized blast. " +
+              "Neutral takes, not hype scripts. If they paid for this, they paid for the world's laziest promo.",
+            audio: null, // re-record: case001_demon_q3
           },
           reveals: "KOL PROMOTERS",
         },
         {
-          q: "How does the team handle hard questions?",
+          q: "Does anyone push back on it?",
           a: {
             text:
-              "Critical replies disappear in under four minutes. A real team answers doubts. " +
-              "A trap deletes them.",
-            audio: "case001_demon_q4",
-            audioDurationMs: 9000,
+              "There's a pinned skeptic thread poking at the AI claims. Still up. Team argued back, didn't win, didn't delete. " +
+              "That's healthier than ninety percent of the rooms I read.",
+            audio: null, // re-record: case001_demon_q4
           },
           reveals: "FUD SUPPRESSION",
         },
 
       ],
       entries: [
-        { label: "TWITTER FOLLOWERS", value: "5,200 — 81% under 14 days old", threat: "red" },
-        { label: "TELEGRAM ACTIVITY", value: "88% repetitive shill phrases", threat: "red" },
-        { label: "KOL PROMOTERS", value: "3 paid KOLs, 2 with rug histories", threat: "red" },
-        { label: "FUD SUPPRESSION", value: "Negative comments deleted within ~4 min", threat: "red" },
-        { label: "POST CADENCE", value: "Coordinated pumps every 90s across 12 accounts", threat: "red" },
+        { label: "TWITTER FOLLOWERS", value: "5,200 — 64% older than 1 year", threat: "green" },
+        { label: "TELEGRAM ACTIVITY", value: "Organic chatter; typos, memes, real arguments", threat: "green" },
+        { label: "KOL PROMOTERS", value: "2 mid-tier callers, neutral framing, no swarm", threat: "green" },
+        { label: "FUD SUPPRESSION", value: "Skeptic thread pinned; team responds, no deletions", threat: "green" },
+        { label: "POST CADENCE", value: "Irregular human cadence; no coordinated bot bursts", threat: "amber" },
       ],
-      summary: "Followers are young, posts are cloned, critics vanish. Sentiment was manufactured.",
+      summary: "Crowd's aged, the room's messy, the critics are alive. Sentiment reads honest — which only tells you the audience is real, not the team.",
       // SitePal 25-char audio-name cap forces truncation on react_believe /
       // react_abstain / vind_aligned / vind_abstained — "demon" eats one
       // more char than "monk", so different slots truncate compared to
       // monk's set. Names below match what SitePal actually stored.
       verdictReaction: {
         believe: {
-          text: "You're trusting the applause. That's how the exit liquidity gets a soundtrack.",
-          audio: "case001_demon_react_belie",
+          text: "Crowd's real, sure. Just remember a real audience can still be standing on a trap door.",
+          audio: null, // re-record: case001_demon_react_belie
         },
         abstain: {
-          text: "Fine. You stepped out of the crowd before it started running.",
-          audio: "case001_demon_react_absta",
+          text: "Caution on a clean room. Bold. Slightly cowardly. I respect it.",
+          audio: null, // re-record: case001_demon_react_absta
         },
         doubt: {
-          text: "There it is. When the crowd sounds purchased, don't buy the ticket.",
-          audio: "case001_demon_react_doubt",
+          text: "Doubt on a crowd this normal? Then you're not reading the crowd. You're reading something I missed.",
+          audio: null, // re-record: case001_demon_react_doubt
         },
       },
 
       vindication: {
         aligned: {
-          text: "The rented crowd vanished right on schedule. Funny how that happens.",
-          audio: "case001_demon_vind_aligne",
+          text: "Good crowd, bad token. Honest room, dirty hands. New shape. Remember it.",
+          audio: null, // re-record: case001_demon_vind_aligne
         },
         missed: {
-          text: "You trusted the volume. Next time, ask who is making the noise.",
-          audio: "case001_demon_vind_missed",
+          text: "The room was real. The deployer wasn't. Audience never tells you who's holding the keys.",
+          audio: null, // re-record: case001_demon_vind_missed
         },
         abstained: {
-          text: "Cautious. Boring. Alive to trade another file.",
-          audio: "case001_demon_vind_abstai",
+          text: "You sat out an honest crowd and dodged a dirty team. Lucky read. I'll take it.",
+          audio: null, // re-record: case001_demon_vind_abstai
         },
       },
     },
@@ -289,8 +290,8 @@ rulesIntro: {
       sigil: "✧",
       tagline: "The chain doesn't lie. Read the receipts.",
       intro: {
-        text: "Pull up a chair. The wallets tell the whole story, if you know how to read them.",
-        audio: "case001_trinity_intro",
+        text: "Pull up a chair. The wallets on this one are quieter than I expected. Sometimes quiet means clean. Sometimes it just means careful.",
+        audio: null, // re-record: case001_trinity_intro
       },
       // Character-wide return pool — 2 lines for now (trinity_return_1, _2).
       // Add a third later if you record one.
@@ -303,45 +304,45 @@ rulesIntro: {
           q: "Who can move the market?",
           a: {
             text:
-              "Top ten wallets hold seventy-one percent. One coordinated sell from that group turns the chart into a cliff.",
-            audio: "case001_trinity_q1",
+              "Top ten wallets hold about twenty-eight percent between them. Concentrated enough to watch, not enough to call a cliff. Pretty normal for a four-day-old launch.",
+            audio: null, // re-record: case001_trinity_q1
           },
           reveals: "TOP 10 HOLDERS",
         },
         {
           q: "Is the deployer hiding supply?",
           a: {
-            text: "Twenty-two percent sits across fourteen connected wallets. Same funding path, same timing, different labels. That is concealment, not distribution.",
-            audio: "case001_trinity_q2",
+            text: "I traced the deployer's allocation. Six percent, sitting in one labeled wallet, not fanned out across shell addresses. If they're concealing supply, they're doing it badly.",
+            audio: null, // re-record: case001_trinity_q2
           },
-          reveals: "DEPLOYER CLUSTER",
+          reveals: "DEPLOYER HOLDINGS",
         },
         {
           q: "Is the volume real demand?",
           a: {
             text:
-              "Sixty-three percent of volume bounces among eight wallets. They are trading with themselves until the chart learns to lie.",
-            audio: "case001_trinity_q3",
+              "Volume's mostly clean. A little circular churn near the open, the kind every new pair has, but the bulk is distinct wallets trading once and leaving. Not a wash farm.",
+            audio: null, // re-record: case001_trinity_q3
           },
-          reveals: "WASH TRADING",
+          reveals: "VOLUME QUALITY",
         },
         {
           q: "Can liquidity disappear?",
           a: {
-            text: "Liquidity is unlocked, and there is no team vesting. The emergency exit is not hidden. It is glowing.",
-            audio: "case001_trinity_q4",
+            text: "Liquidity's locked thirty days through a third-party locker, and the contract has no mint and no hidden pause. On paper, the front door is bolted. On paper.",
+            audio: null, // re-record: case001_trinity_q4
           },
           reveals: "LP / VESTING",
         },
       ],
       entries: [
-        { label: "TOP 10 HOLDERS", value: "Hold 71% of supply", threat: "red" },
-        { label: "DEPLOYER CLUSTER", value: "22% spread across 14 connected wallets", threat: "red" },
-        { label: "WASH TRADING", value: "63% of volume bouncing among 8 wallets", threat: "red" },
-        { label: "LP / VESTING", value: "LP unlocked. Zero team vesting.", threat: "red" },
-        { label: "EXIT-WINDOW PATTERN", value: "Matches 3–7 day rug fingerprint", threat: "red" },
+        { label: "TOP 10 HOLDERS", value: "Hold ~28% of supply", threat: "amber" },
+        { label: "DEPLOYER HOLDINGS", value: "6% in one labeled wallet, not split", threat: "green" },
+        { label: "VOLUME QUALITY", value: "Mostly distinct wallets; minor open-day churn", threat: "green" },
+        { label: "LP / VESTING", value: "LP locked 30d (third-party locker)", threat: "green" },
+        { label: "CONTRACT FLAGS", value: "No mint, no hidden pause function", threat: "green" },
       ],
-      summary: "Supply is clustered, volume is circular, liquidity can leave. The exit is already built.",
+      summary: "Supply's spread, volume's mostly real, LP's locked. The chain looks fine today — because the rug here isn't in the wiring. It's in whose hands built it.",
       // SitePal 25-char cap on audio names — "trinity" (7 chars) drops one
       // more letter from each multi-syllable slot than "monk" (4 chars) or
       // "demon" (5 chars), so react_doubt / vind_missed / vind_aligned all
@@ -349,26 +350,26 @@ rulesIntro: {
       // SitePal actually stored.
       verdictReaction: {
         believe: {
-          text: "Hope you're right, kid. But the wallets are already reaching for the door.",
-          audio: "case001_trinity_react_bel",
+          text: "The chain backs you up today, kid. Just remember a locker has an expiry date and a deployer has a memory.",
+          audio: null, // re-record: case001_trinity_react_bel
         },
         abstain: {
-          text: "Smart play. The case isn't always closed when you walk away.",
-          audio: "case001_trinity_react_abs",
+          text: "Smart play. Clean wallets aren't a verdict. They're just one page of the file.",
+          audio: null, // re-record: case001_trinity_react_abs
         },
         doubt: {
-          text: "You see it. Most don't, 'til it's gone.",
-          audio: "case001_trinity_react_dou",
+          text: "Doubting numbers this tidy? Then you read something off the chain that I don't price in. Good.",
+          audio: null, // re-record: case001_trinity_react_dou
         },
       },
       vindication: {
         aligned: {
-          text: "Good read. The chain gave you the ending before the chart did.",
-          audio: "case001_trinity_vind_alig",
+          text: "Clean chain, dirty hands. The wallets were honest. The man behind them wasn't.",
+          audio: null, // re-record: case001_trinity_vind_alig
         },
         missed: {
-          text: "Walk it off. Wallet patterns are not intuitive until you have watched a hundred.",
-          audio: "case001_trinity_vind_miss",
+          text: "The onchain state was fine. It always is, until the deployer decides it isn't. Read who, not just what.",
+          audio: null, // re-record: case001_trinity_vind_miss
         },
         abstained: {
           text: "Lived to investigate another day.",
@@ -384,7 +385,7 @@ rulesIntro: {
       // Eugene is text-only — these lines render as HTML chat bubbles near her head,
       // not TTS. Soft typing chime + bubble drop-in per line. (No SitePal scene for her.)
       textOnly: true,
-      intro: "Okay, Prophet Token wants to be mystical and technical at the same time. Let's see if either half has wiring.",
+      intro: "Okay, Prophet Token actually has a pitch deck and it's... kinda coherent? Mystical branding, but there's real wiring underneath. Let's poke it.",
       returnLines: [
         "Back! ✨ Whatcha need?",
         "Hiii again 💫",
@@ -393,54 +394,60 @@ rulesIntro: {
       questions: [
         {
           q: "What are they actually promising?",
-          a: "The pitch says an AI prophecy engine will forecast token moves. Every example is a screenshot. None is a working model.",
+          a: "A signal tool that scores tokens — not literal fortune-telling. The 'prophecy' thing is just branding. The actual claim is modest enough to be real. 🤔",
           reveals: "WHITEPAPER",
         },
         {
-          q: "Can anyone inspect the AI?",
-          a: "No GitHub, no model card, no demo endpoint. The AI is less a product and more a fog machine.",
+          q: "Is there a working product?",
+          a: "There's a public GitHub with a working backtest notebook and a live demo endpoint that actually returns scores. It's thin, but it's not vaporware. ✨",
           reveals: "AI CLAIMS",
         },
         {
-          q: "Have we seen this script before?",
-          a:
-            "Same prophecy-engine language appeared in four prior rugs. They changed the logo, not the spell.",
+          q: "Is any of this copied from other projects?",
+          a: "I searched for copy-paste pitch language and... nope. The deck reads like someone actually wrote it. No recycled rug-boilerplate that I can find.",
           reveals: "PITCH PATTERN",
         },
         {
-          q: "Does the roadmap survive contact?",
-          a: "Mainnet, predictive AI, revenue share, and AGI alignment in twelve weeks. That is not a roadmap. That is a wish list with dates.",
+          q: "Is the roadmap realistic?",
+          a: "It's grounded! Beta, then more data sources, then a paid tier. No AGI, no 'cure DeFi.' Boring in a good way. The story behaves itself. 💫",
           reveals: "ROADMAP REALISM",
         },
       ],
       entries: [
-        { label: "WHITEPAPER", value: "6 pages — tokenomics only, no architecture", threat: "amber" },
-        { label: "AI CLAIMS", value: "No GitHub repos, no model card, no demo", threat: "red" },
-        { label: "PITCH PATTERN", value: "Identical 'AI prophecy engine' framing to 4 prior rugs", threat: "red" },
-        { label: "ROADMAP REALISM", value: "Mainnet → 'AGI alignment' in 12 weeks", threat: "red" },
-        { label: "ORIGIN STORY", value: "Founder bio claims MIT lab; lab denies record", threat: "red" },
+        { label: "WHITEPAPER", value: "9 pages — modest claims, real mechanics", threat: "green" },
+        { label: "AI CLAIMS", value: "Public GitHub + working demo endpoint", threat: "green" },
+        { label: "PITCH PATTERN", value: "No match to known rug boilerplate", threat: "green" },
+        { label: "ROADMAP REALISM", value: "Grounded: beta → data → paid tier", threat: "green" },
+        { label: "ORIGIN STORY", value: "Founder bio vague; no named affiliations", threat: "amber" },
       ],
-      summary: "The narrative promises technical magic while avoiding technical proof.",
+      summary: "The narrative is coherent and the product artifacts are real. The only soft spot is a founder bio that says almost nothing about who they are.",
       verdictReaction: {
-        believe: "Oh sweetie. The fog machine got you. We can grow from this.",
-        abstain: "Smart. Sometimes the vibe is no thanks, and that's a complete sentence.",
-        doubt:   "Yes. You saw the costume before it finished the song.",
+        believe: "Honestly the story holds up! Just... the story can't tell you who's holding the keys. 💭",
+        abstain: "Fair. A clean pitch with a faceless founder is a maybe, not a yes.",
+        doubt:   "Bold. The narrative's good, so if you're doubting, you're trusting something outside the brochure. I respect a girl with sources.",
       },
       vindication: {
-        aligned:   "Good instincts. You heard the story, then checked the stage props.",
-        missed:    "You trusted the story over the proof. It happens. Now you know the shape.",
-        abstained: "You read the room. Half the skill is knowing when not to play.",
+        aligned:   "The story was real and you doubted anyway — because a real story with an anonymous author is still a question mark. Nice. 🌟",
+        missed:    "The pitch was genuine. The person behind it wasn't. A good story can't vouch for a bad founder. Now you know the shape.",
+        abstained: "You felt the faceless-founder gap without naming it. Half the lesson.",
       },
     },
   },
   maxScans: 3,
+  decisiveLenses: ["monk"],
   correctVerdict: "doubt",
   reveal: {
-    summary: "PROPHET TOKEN was a serial-deployer rug. Pulled day 6. ~$340K extracted.",
+    summary:
+      "PROPHET TOKEN was a serial-deployer rug. Pulled day 6, ~$340K extracted. " +
+      "The community was real, the onchain state looked clean, and the product story checked out — " +
+      "the only tell was the deployer: a fresh wallet with a mixer-funded, cloned-contract, prior-rug history.",
     voices: {
-      believe: "You trusted the surface. The +342% chart was the bait; the chain was the trap.",
-      abstain: "Caution preserves capital. But the patterns here were legible. Be more decisive.",
-      doubt: "Correct. Three prior rugs, unlocked LP, mixer funding, sybil holders. The signal was loud.",
+      believe:
+        "You trusted the surface. The crowd was genuine, the chain was tidy, the pitch was coherent — and none of that vouches for the hand on the keys. The tell was the deployer's record.",
+      abstain:
+        "Caution preserved capital. But this case wasn't ambiguous — it was lopsided. One lens carried the whole verdict. Find it next time and call it.",
+      doubt:
+        "Correct. Sentiment, onchain, and narrative all read fine. Credibility didn't: serial deployer, prior rugs, mixer funding, cloned contract. One lens broke the case.",
     },
   },
 };

@@ -22,22 +22,24 @@ const CASE_002 = {
       voice: { voice: "9", lang: 1, engine: 1 },
       intro: {
         text:
-          "HarborLight arrives without fireworks. No prophecy. No promised riches. " +
-          "Only a small tool, a smaller market, and a team asking to be trusted. " +
-          "Quiet can still hide a storm, but quiet is not itself a sin.",
+          "HarborLight wears no faces. The founders speak through handles, not names. " +
+          "An early coin came to them through a path that flinches under the light. " +
+          "Anonymity is not yet a sin, but it is a question that demands an answer.",
+        audio: null, // re-record: case002_monk_intro
       },
       returnLines: [
-        "The harbor remains still. Continue.",
-        "A modest claim deserves a careful reading.",
-        "Not every candle is a confession. Let us keep looking.",
+        "The masks remain. Continue, and judge what is behind them.",
+        "A hidden face is not yet a guilty one. Keep looking.",
+        "Suspicion has knocked. Let us see if anyone answers.",
       ],
       questions: [
         {
           q: "Who is responsible for the project?",
           a: {
             text:
-              "The founders are public, almost inconveniently so. Old talks, old repos, " +
-              "and two failed products they did not scrub from the record. That is not sainthood. It is continuity.",
+              "No legal names. Only handles: harbor-dev, keel, and two more. " +
+              "Pseudonymous, yes. But the same handles carry three years of public commits and old forum scars. The mask is old, and it has a memory.",
+            audio: null, // re-record: case002_monk_q1
           },
           reveals: "TEAM HISTORY",
         },
@@ -54,8 +56,9 @@ const CASE_002 = {
           q: "Where did launch funding come from?",
           a: {
             text:
-              "Seed liquidity came from two known creator DAOs into a multisig, then into the pool. " +
-              "No mixer trail. No sudden ghost money. The path has names.",
+              "Here the file darkens. The earliest deployer coin arrived through a privacy hop before it reached a known creator DAO. " +
+              "One murky step, then daylight. A suspicious first breath, not a poisoned bloodline.",
+            audio: null, // re-record: case002_monk_q3
           },
           reveals: "FUNDING SOURCE",
         },
@@ -72,22 +75,22 @@ const CASE_002 = {
       entries: [
         {
           label: "TEAM HISTORY",
-          value: "Public founders; prior DAO tooling work; no rug links",
-          threat: "green",
+          value: "Pseudonymous founders; long-lived handles; no rug links",
+          threat: "amber",
           visual: {
             component: "SignalStack",
             props: {
               title: "IDENTITY CHECK",
               items: [
-                { tone: "green", label: "Founder identities", value: "PUBLIC", sublabel: "Linked talks, old repos, and DAO forum history", meter: 92 },
+                { tone: "amber", label: "Founder identities", value: "PSEUDONYMOUS", sublabel: "Handles only, no legal names disclosed", meter: 40 },
+                { tone: "green", label: "Handle age", value: "3 YEARS", sublabel: "Same handles across old repos and forums", meter: 80 },
                 { tone: "green", label: "Prior work", value: "2 TOOLS", sublabel: "Multisig exporter and contributor payout module", meter: 78 },
-                { tone: "amber", label: "Failed products", value: "2", sublabel: "Still visible; postmortems were not deleted", meter: 44 },
                 { tone: "green", label: "Known rug links", value: "0", sublabel: "No shared deployer, promoter, or wallet cluster found", meter: 96 },
               ],
             },
             caption:
-              "The founders are not anonymous, and their older failures are still inspectable. That does not guarantee success, but it argues against a disposable identity.",
-            metric: { label: "IDENTITY", value: "VISIBLE" },
+              "The team hides its legal names, which looks bad at a glance. But the handles are old and consistent, with no link to any prior rug. Anonymity here reads as caution, not as a disposable identity.",
+            metric: { label: "IDENTITY", value: "MASKED" },
           },
         },
         {
@@ -115,28 +118,28 @@ const CASE_002 = {
         },
         {
           label: "FUNDING SOURCE",
-          value: "Seeded by 2 known creator DAOs; no mixer path",
-          threat: "green",
+          value: "Deployer coin took a privacy hop before a known DAO seed",
+          threat: "red",
           visual: {
             component: "FlowGraph",
             props: {
               layout: "linear",
               radius: 180,
               nodes: [
-                { id: "dao1", label: "DAO A", sublabel: "24 ETH", externalLabel: "SEED" },
-                { id: "dao2", label: "DAO B", sublabel: "18 ETH", externalLabel: "SEED" },
-                { id: "multi", label: "3/5", sublabel: "multisig", externalLabel: "TREASURY", highlight: true },
+                { id: "mixer", label: "privacy hop", sublabel: "1 step", externalLabel: "ORIGIN" },
+                { id: "deployer", label: "deployer", sublabel: "first coin", externalLabel: "WALLET", highlight: true },
+                { id: "dao", label: "creator DAO", sublabel: "24 ETH", externalLabel: "SEED" },
                 { id: "lp", label: "$HBR", sublabel: "LP", externalLabel: "LAUNCH" },
               ],
               edges: [
-                { from: "dao1", to: "multi" },
-                { from: "dao2", to: "multi" },
-                { from: "multi", to: "lp" },
+                { from: "mixer", to: "deployer" },
+                { from: "dao", to: "lp" },
+                { from: "deployer", to: "lp" },
               ],
             },
             caption:
-              "Launch funds came from named DAO treasuries into a multisig, then into the LP. There is no mixer hop or fresh-wallet laundering path.",
-            metric: { label: "MIXER HOPS", value: "0" },
+              "The deployer's earliest coin passed through one privacy hop, which is exactly the silhouette of a launderer. But the bulk of launch funding came from a named DAO in daylight, and the murky step never recurs. One suspicious breath, not a hidden bloodline.",
+            metric: { label: "MIXER HOPS", value: "1" },
           },
         },
         {
@@ -151,11 +154,11 @@ const CASE_002 = {
                 { status: "ok", label: "Admin holder", value: "3/5", sublabel: "multisig, not single EOA" },
                 { status: "ok", label: "Execution delay", value: "48H", sublabel: "changes visible before execution" },
                 { status: "warn", label: "Upgrade rights", value: "YES", sublabel: "power remains; monitor governance" },
-                { status: "ok", label: "Signer labels", value: "5/5", sublabel: "public DAO / founder identities" },
+                { status: "ok", label: "Signer labels", value: "5/5", sublabel: "pseudonymous but consistent handles" },
               ],
             },
             caption:
-              "This is not trustless. It is constrained: named signers, a multisig threshold, and a timelock make a quick admin rug much harder.",
+              "This is not trustless. It is constrained: multiple signers, a threshold, and a timelock make a quick admin rug much harder, even with masked names.",
             metric: { label: "DELAY", value: "48H" },
           },
         },
@@ -169,27 +172,27 @@ const CASE_002 = {
               title: "DISCLOSURE REVIEW",
               items: [
                 { tone: "green", label: "Admin risk", value: "NAMED", sublabel: "Upgrade rights called out in launch post", meter: 88 },
-                { tone: "green", label: "Adoption risk", value: "NAMED", sublabel: "Niche creator workflow; no mass-market claim", meter: 82 },
+                { tone: "green", label: "Anon risk", value: "NAMED", sublabel: "Team admits it is pseudonymous and explains why", meter: 80 },
                 { tone: "amber", label: "Market risk", value: "THIN", sublabel: "Small LP means price can move sharply", meter: 45 },
                 { tone: "green", label: "Revenue claims", value: "MODEST", sublabel: "No promised yield or guaranteed buybacks", meter: 76 },
               ],
             },
             caption:
-              "Healthy files often name their own weak spots. HarborLight admits control, liquidity, and adoption risk instead of hiding them behind hype.",
+              "Healthy files often name their own weak spots. HarborLight admits its anonymity, its control surface, and its thin liquidity instead of hiding them behind hype.",
             metric: { label: "RISKS NAMED", value: "4" },
           },
         },
       ],
-      summary: "The team is visible, the build predates the token, and control is constrained. Credibility holds.",
+      summary: "The team is masked and one funding hop looks ugly, but the handles are old, the links are clean, and the scary signals all have answers.",
       verdictReaction: {
-        believe: { text: "Trust, then, but not worship. Evidence supports them. Time must still test them." },
-        abstain: { text: "Caution is permitted. So is courage. The line between them is where judgment lives." },
-        doubt: { text: "Suspicion is a tool. Do not let it become a cage." },
+        believe: { text: "A mask is not a confession. The evidence behind it favors them. Time must still test them." },
+        abstain: { text: "Caution before hidden faces is permitted. So is courage. Judgment lives on that line." },
+        doubt: { text: "Suspicion is a tool. Do not let a single dark hop become the whole verdict." },
       },
       vindication: {
-        aligned: { text: "You distinguished modesty from deceit. Well done." },
-        missed: { text: "A quiet file can be legitimate. Learn the difference between absence of hype and absence of truth." },
-        abstained: { text: "You preserved capital, though the signal favored trust." },
+        aligned: { text: "You looked past the mask and the murky hop, and saw they had answers. Well done." },
+        missed: { text: "Anonymity and one privacy hop frightened you off a clean file. Learn the difference between a scary surface and a rotten core." },
+        abstained: { text: "You preserved capital, though the evidence behind the mask favored trust." },
       },
     },
     demon: {
@@ -200,21 +203,23 @@ const CASE_002 = {
       voice: "2",
       intro: {
         text:
-          "No rockets. No cult chants. No cartoon army screaming one hundred x. " +
-          "It's weirdly refreshing. Suspiciously adult. I hate how much I don't hate it.",
+          "Oh, this room is LOUD. Rocket emojis, hundred-x screenshots, a Telegram doing cartwheels at three in the morning. " +
+          "Smells like exit liquidity in a party hat. Let's see if the noise is real money or just confetti.",
+        audio: null, // re-record: case002_demon_intro
       },
       returnLines: [
-        { text: "Back for the crowd read. Good." },
+        { text: "Back for the crowd read. Brace yourself, it's a circus." },
         { text: "Sentiment, my favorite legal hallucination." },
-        { text: "Let's see if the room is real or just expensive wallpaper." },
+        { text: "Let's see if this room is a market or a moshpit." },
       ],
       questions: [
         {
           q: "Is the audience bought?",
           a: {
             text:
-              "Follower growth is slow and annoyingly human. Old accounts, uneven posting, people disagreeing in public. " +
-              "Terrible for hype. Excellent for reality.",
+              "Follower count tripled in a week. Looks like a botted bloom at first squint. " +
+              "But three quarters of those accounts are over a year old and argue with each other. Loud, yes. Rented, no.",
+            audio: null, // re-record: case002_demon_q1
           },
           reveals: "FOLLOWER QUALITY",
         },
@@ -222,8 +227,9 @@ const CASE_002 = {
           q: "What is the community saying?",
           a: {
             text:
-              "The room is asking product questions: export limits, multisig support, fees. " +
-              "Not moon chants. Actual users are very rude to narratives.",
+              "Half the channel is screaming moon and posting green candles. " +
+              "The other half, underneath the noise, is asking about export limits and fees. The hype is real volume. So is the product talk hiding under it.",
+            audio: null, // re-record: case002_demon_q2
           },
           reveals: "COMMUNITY TOPICS",
         },
@@ -231,8 +237,9 @@ const CASE_002 = {
           q: "Who's promoting it?",
           a: {
             text:
-              "Two small analysts got free allocations and said so. That's still incentive, sweetheart. " +
-              "But it is not a paid megaphone swarm pretending to be destiny.",
+              "Two loud caller channels grabbed it and went nuclear, hundred-x targets, the whole pump liturgy. " +
+              "Ugly optics. But they latched on after launch on their own, got no allocation, and the team never amplified them.",
+            audio: null, // re-record: case002_demon_q3
           },
           reveals: "PROMOTION PATTERN",
         },
@@ -249,8 +256,8 @@ const CASE_002 = {
       entries: [
         {
           label: "FOLLOWER QUALITY",
-          value: "74% accounts older than 1 year; organic growth curve",
-          threat: "green",
+          value: "Explosive growth, but 74% accounts older than 1 year",
+          threat: "amber",
           visual: {
             component: "Pie",
             props: {
@@ -265,49 +272,49 @@ const CASE_002 = {
               ],
             },
             caption:
-              "Most followers predate launch by a wide margin. A small young-account tail is normal; an audience made entirely yesterday is not.",
+              "The growth spike looks botted at a glance, which is the scary read. But most followers predate launch by a wide margin and behave like real people. The froth is loud, not fake.",
             metric: { label: "OLD ACCTS", value: "74%" },
           },
         },
         {
           label: "COMMUNITY TOPICS",
-          value: "Product questions dominate Telegram",
-          threat: "green",
+          value: "Moon chatter on top, product questions underneath",
+          threat: "amber",
           visual: {
             component: "Checklist",
             props: {
               title: "MESSAGE SAMPLE",
               items: [
+                { status: "warn", label: "Moon / 100x phrases", value: "x41", sublabel: "loud hype layer on top of the channel" },
                 { status: "ok", label: "Can we export CSV from a Safe?", value: "x14", sublabel: "implementation question" },
                 { status: "ok", label: "How are signer roles mapped?", value: "x9", sublabel: "workflow question" },
                 { status: "ok", label: "Fee table clarification", value: "x6", sublabel: "pricing discussion" },
-                { status: "warn", label: "When listings?", value: "x3", sublabel: "market chatter, low volume" },
-                { status: "missing", label: "Moon / 100x phrases", value: "x0", sublabel: "no coordinated chant detected" },
+                { status: "warn", label: "When listings?", value: "x18", sublabel: "market chatter, high volume" },
               ],
             },
             caption:
-              "The community is talking about product limits, signer roles, and fees. That is less exciting than hype, but much harder to fake at scale.",
-            metric: { label: "PRODUCT Qs", value: "78%" },
+              "The surface layer is pure hype, the exact noise a pump makes. Dig under it and there is a steady seam of product questions a fake room would not bother to fake.",
+            metric: { label: "HYPE Qs", value: "58%" },
           },
         },
         {
           label: "PROMOTION PATTERN",
-          value: "2 disclosed allocations; no paid swarm detected",
-          threat: "amber",
+          value: "2 caller channels pumping; no allocation, no team amplification",
+          threat: "red",
           visual: {
             component: "SignalStack",
             props: {
               title: "PROMOTION REVIEW",
               items: [
-                { tone: "amber", label: "Analyst allocations", value: "2", sublabel: "free token grants disclosed in posts", meter: 38 },
-                { tone: "green", label: "Same-hour shill wave", value: "0", sublabel: "no synchronized influencer blast", meter: 92 },
-                { tone: "green", label: "Prior rug promoters", value: "0", sublabel: "no overlap with known paid-rug accounts", meter: 88 },
-                { tone: "amber", label: "Incentive clarity", value: "MIXED", sublabel: "allocations are disclosed, but still incentives", meter: 48 },
+                { tone: "red", label: "Caller-channel pumps", value: "2", sublabel: "100x targets, classic pump liturgy", meter: 22 },
+                { tone: "green", label: "Caller allocations", value: "0", sublabel: "callers latched on post-launch, got no tokens", meter: 84 },
+                { tone: "green", label: "Team amplification", value: "0", sublabel: "team never retweeted or paid the callers", meter: 88 },
+                { tone: "green", label: "Prior rug promoters", value: "0", sublabel: "no overlap with known paid-rug accounts", meter: 86 },
               ],
             },
             caption:
-              "Promotion is not perfectly clean: allocations create incentives. The important distinction is disclosure plus no paid megaphone swarm.",
-            metric: { label: "DISCLOSED", value: "2" },
+              "Two pump-caller channels screaming 100x is the single ugliest thing on the file. But they attached themselves uninvited, took no allocation, and the team never fed them. Parasites on a real project, not the engine of a scam.",
+            metric: { label: "PAID SHILLS", value: "0" },
           },
         },
         {
@@ -334,8 +341,8 @@ const CASE_002 = {
         },
         {
           label: "POST CADENCE",
-          value: "Irregular human cadence, no bot burst",
-          threat: "green",
+          value: "Frothy bursts around price, but team posts track product",
+          threat: "amber",
           visual: {
             component: "Timeline",
             props: {
@@ -343,28 +350,28 @@ const CASE_002 = {
               endLabel: "d+22",
               events: [
                 { position: 0.05, label: "Launch post", sublabel: "d+0", tone: "green" },
-                { position: 0.22, label: "Quiet gap", sublabel: "d+4", tone: "green" },
+                { position: 0.20, label: "Pump spike", sublabel: "d+3", tone: "amber" },
                 { position: 0.41, label: "Bugfix thread", sublabel: "d+9", tone: "green" },
-                { position: 0.63, label: "DAO pilot", sublabel: "d+14", tone: "green" },
+                { position: 0.60, label: "Caller blast", sublabel: "d+13", tone: "amber" },
                 { position: 0.86, label: "Fee update", sublabel: "d+20", tone: "green", highlight: true },
               ],
             },
             caption:
-              "Posts arrive around product events with uneven gaps. Bot campaigns tend to pulse on a schedule; this looks like a small team communicating when something changes.",
-            metric: { label: "BOT BURSTS", value: "0" },
+              "The community's bursts pulse around price spikes, which looks pumpy. But the team's own posts track product events, not the candles. Two different rhythms sharing one channel.",
+            metric: { label: "PUMP SPIKES", value: "2" },
           },
         },
       ],
-      summary: "The room looks small, real, and product-focused. Sentiment is restrained, which helps.",
+      summary: "The room is loud and pumpy, with caller channels screaming 100x, which looks like exit liquidity. But the hype is parasitic noise on a real, product-talking crowd.",
       verdictReaction: {
-        believe: { text: "Look at you, backing the boring horse. Honestly? I respect it." },
-        abstain: { text: "Fine. Caution has good branding these days." },
-        doubt: { text: "You may be fighting the last war. This crowd is quiet, not fake." },
+        believe: { text: "Backing a coin with a circus in the comments. Risky look. But the circus isn't the company. Respect." },
+        abstain: { text: "Fine. A room this loud has earned a little fear. Caution has good branding these days." },
+        doubt: { text: "You heard the pump chants and bailed. Understandable. But noise is not the same as fraud, sweetheart." },
       },
       vindication: {
-        aligned: { text: "The little room was real. Strange feeling, right?" },
-        missed: { text: "Not every quiet chart is a corpse. Sometimes it is just a room without fireworks." },
-        abstained: { text: "You did not lose. You also did not learn to trust clean signals yet." },
+        aligned: { text: "You heard the pump and looked past it to the real room. Strange feeling, right?" },
+        missed: { text: "The callers screamed and you flinched. Not every loud room is a trap. Sometimes it's a real thing with bad neighbors." },
+        abstained: { text: "You did not lose. You also did not learn to hear a real crowd under the noise yet." },
       },
     },
     marisol: {
@@ -374,13 +381,13 @@ const CASE_002 = {
       tagline: "The chain doesn't lie. Read the receipts.",
       intro: {
         text:
-          "HarborLight is a cleaner file than Prophet. Cleaner does not mean cleared. " +
-          "We still check the wallets, the locks, and the doors nobody mentions.",
+          "Everyone's yelling about the chart and the callers. I don't care about the noise. " +
+          "I care about the wallets, the locks, and the doors nobody mentions. The chain doesn't get excited.",
       },
       returnLines: [
         { text: "Thought you might want the receipts." },
-        { text: "Let's stay with the wallets." },
-        { text: "Clean files still leave fingerprints." },
+        { text: "Let's stay with the wallets. They don't scream." },
+        { text: "Loud files still leave quiet fingerprints." },
       ],
       questions: [
         {
@@ -405,8 +412,8 @@ const CASE_002 = {
           q: "Is the volume wash traded?",
           a: {
             text:
-              "Volume is thin, but counterparties are broad. No tight loop, no mirrored timing, no circular pump engine. " +
-              "Thin is a liquidity problem. Circular is a fraud problem.",
+              "Volume spiked with the hype, but counterparties are broad. No tight loop, no mirrored timing, no circular pump engine. " +
+              "Loud is a sentiment problem. Circular is a fraud problem. This is not circular.",
           },
           reveals: "VOLUME QUALITY",
         },
@@ -465,13 +472,13 @@ const CASE_002 = {
               ],
             },
             caption:
-              "The notable insider movement goes into vesting, not out to the market. That is a restraint signal.",
+              "The notable insider movement goes into vesting, not out to the market. Even through the hype spike, no team wallet sold. That is a restraint signal.",
             metric: { label: "TEAM SELLS", value: "0" },
           },
         },
         {
           label: "VOLUME QUALITY",
-          value: "Thin but non-circular; no wash loop detected",
+          value: "Hype-driven but non-circular; no wash loop detected",
           threat: "green",
           visual: {
             component: "FlowGraph",
@@ -497,7 +504,7 @@ const CASE_002 = {
               ],
             },
             caption:
-              "Trades converge on the pool from many counterparties instead of cycling through the same closed wallet loop.",
+              "The volume spike came from many independent counterparties hitting the pool, not from the same closed wallet loop cycling tokens. A real crowd buying, not a wash-trade engine faking it.",
             metric: { label: "CLOSED LOOPS", value: "0" },
           },
         },
@@ -519,7 +526,7 @@ const CASE_002 = {
               ],
             },
             caption:
-              "A one-year LP lock does not remove all risk, but it blocks the fast pull that defines most beginner rug files.",
+              "A verifiable one-year LP lock, signed in the same block the pool was created. It does not remove all risk, but it blocks the fast pull that defines most rug files.",
             metric: { label: "LOCK", value: "365D" },
           },
         },
@@ -545,16 +552,16 @@ const CASE_002 = {
           },
         },
       ],
-      summary: "Onchain risk exists, but the obvious rug mechanics are absent.",
+      summary: "Onchain, the obvious rug mechanics are absent: locked liquidity, real vesting, distributed holders, and organic volume under the noise.",
       verdictReaction: {
-        believe: { text: "That's where the receipts point. Keep your eyes open, but yes." },
-        abstain: { text: "Reasonable. Thin markets punish impatience." },
-        doubt: { text: "Maybe. But show me the mechanism. Suspicion still needs a body." },
+        believe: { text: "That's where the receipts point. The chain ignored the hype, and so should you. Yes." },
+        abstain: { text: "Reasonable. Thin markets punish impatience, hype or not." },
+        doubt: { text: "Maybe. But show me the mechanism. The noise isn't a body. Suspicion still needs one." },
       },
       vindication: {
-        aligned: { text: "Good read. You trusted the evidence without falling in love with it." },
-        missed: { text: "You saw risk and called fraud. Those are not the same thing." },
-        abstained: { text: "Acceptable, but the clean signals were there." },
+        aligned: { text: "Good read. You trusted the receipts over the screaming." },
+        missed: { text: "You let a loud room and a masked team talk over the chain. The receipts were clean." },
+        abstained: { text: "Acceptable, but the onchain signals were clean and loud." },
       },
     },
     eugene: {
@@ -564,34 +571,34 @@ const CASE_002 = {
       tagline: "Every rug wears a story. Find the seams.",
       textOnly: true,
       intro:
-        "This one is giving municipal software, but in a good way. Less prophecy, more spreadsheets. " +
-        "The question is whether boring means honest, or just better disguised.",
+        "Okay so the Telegram is doing the MOST right now, but the actual product? Giving municipal software, in a good way. " +
+        "Less prophecy, more spreadsheets. The question is whether the boring core matches the loud packaging.",
       returnLines: [
-        "Back to the brochure.",
-        "Let's read the story with our glasses on.",
-        "The vibes are wearing a cardigan. Suspicious, but cozy.",
+        "Back to the brochure 📄",
+        "Let's read the story with our glasses on ✨",
+        "Tuning out the moon chants, reading the actual docs 💫",
       ],
       questions: [
         {
           q: "What is the product story?",
           a:
             "Creator collectives need shared treasury controls. That is narrow, boring, and believable. " +
-            "Honestly, I love a project that knows it is not saving civilization.",
+            "Honestly, I love a project that knows it is not saving civilization, even when the comments think it is. 😅",
           reveals: "POSITIONING",
         },
         {
           q: "Does the whitepaper overpromise?",
           a:
             "It mostly explains fees, roles, and limits. There is no AGI, no revolution, no cosmic yield fountain. " +
-            "Just constraints. Beautiful little constraints.",
+            "Just constraints. Beautiful little constraints. The hype is in the chat, NOT in the docs.",
           reveals: "WHITEPAPER",
         },
         {
-          q: "Is there real user proof?",
+          q: "Is there real working product?",
           a:
-            "Three small collectives are named with public treasury addresses. You can verify the claim without trusting the paragraph. " +
-            "That is the good kind of boring.",
-          reveals: "USER PROOF",
+            "There's a live dashboard, a public GitHub with real commits, and a completed audit you can actually read. " +
+            "Three small collectives are named with public treasury addresses. You can verify all of it without trusting a single vibe. ✨",
+          reveals: "PRODUCT PROOF",
         },
         {
           q: "What is the weak spot?",
@@ -618,7 +625,7 @@ const CASE_002 = {
               ],
             },
             caption:
-              "The pitch is narrow enough to test. It names a specific workflow instead of promising to remake finance.",
+              "The pitch is narrow enough to test. It names a specific workflow instead of promising to remake finance, no matter what the moon-posters say.",
             metric: { label: "SCOPE", value: "NARROW" },
           },
         },
@@ -640,13 +647,13 @@ const CASE_002 = {
               ],
             },
             caption:
-              "The document spends its space on boring product constraints. That is a good sign in a market full of miracle language.",
+              "The document spends its space on boring product constraints. The hype lives in the chat, not in the docs. That gap is reassuring, not alarming.",
             metric: { label: "MIRACLES", value: "0" },
           },
         },
         {
-          label: "USER PROOF",
-          value: "3 named pilot collectives with public addresses",
+          label: "PRODUCT PROOF",
+          value: "Live product, public GitHub, completed audit, 3 named pilots",
           threat: "green",
           visual: {
             component: "Comparison",
@@ -686,7 +693,7 @@ const CASE_002 = {
               ],
             },
             caption:
-              "The pilot users are named and tied to public treasury addresses. The claim can be checked without trusting a testimonial.",
+              "The product is live, the GitHub is public with real commit history, the audit is completed and readable, and the pilot users are tied to public treasury addresses. The whole story can be checked without trusting a single testimonial.",
             metric: { label: "PILOTS", value: "3" },
           },
         },
@@ -706,7 +713,7 @@ const CASE_002 = {
               ],
             },
             caption:
-              "This is the key lesson: a project can be legitimate and still be a bad trade. Adoption risk is not the same thing as fraud.",
+              "This is the key lesson: a project can be legitimate and still be a bad trade. Adoption risk is not the same thing as fraud, and neither is a noisy fanbase.",
             metric: { label: "FIT", value: "UNPROVEN" },
           },
         },
@@ -721,8 +728,8 @@ const CASE_002 = {
               items: [
                 { status: "ok", label: "Pilot addresses", value: "PUBLIC" },
                 { status: "ok", label: "Repo history", value: "PUBLIC" },
+                { status: "ok", label: "Completed audit", value: "PUBLIC" },
                 { status: "ok", label: "LP lock transaction", value: "PUBLIC" },
-                { status: "ok", label: "Multisig signers", value: "PUBLIC" },
                 { status: "warn", label: "Future adoption", value: "UNKNOWN", sublabel: "cannot be proven at launch" },
               ],
             },
@@ -732,27 +739,28 @@ const CASE_002 = {
           },
         },
       ],
-      summary: "The story is narrow enough to be true. The main risk is adoption, not deception.",
+      summary: "Loud chat, quiet product. The story is narrow enough to be true, with a live product and a real audit behind it. The main risk is adoption, not deception.",
       verdictReaction: {
-        believe: "Yes. We love a boring little use case with receipts.",
+        believe: "Yes. We love a boring little use case with receipts, even when the comments are unhinged.",
         abstain: "Fair. The market could still ignore it completely.",
-        doubt: "Hmm. That feels like trauma from the last file talking.",
+        doubt: "Hmm. That feels like the moon-posters spooked you. The product itself is the calmest thing here.",
       },
       vindication: {
-        aligned: "You found the difference between low hype and low integrity.",
-        missed: "You mistook modesty for fraud. It happens.",
-        abstained: "Not wrong, but there was enough here to lean in.",
+        aligned: "You ignored the confetti and read the receipts. That's the upgrade.",
+        missed: "You let a loud chat drown out a real product. The audit and the GitHub were right there.",
+        abstained: "Not wrong, but there was a real product here to lean on.",
       },
     },
   },
   maxScans: 3,
   correctVerdict: "believe",
+  decisiveLenses: ["marisol", "eugene"],
   reveal: {
-    summary: "HARBORLIGHT remained active. No rug event. Product shipped v1.1 after 41 days.",
+    summary: "HARBORLIGHT remained active. No rug event. The pump callers moved on; the product shipped v1.1 after 41 days.",
     voices: {
-      believe: "Correct. HarborLight had adoption risk, but not fraud structure. Trust the receipts, not the noise.",
-      abstain: "Capital preserved, but the evidence supported a cautious trust. Learn to separate risk from scam.",
-      doubt: "You overcorrected. Clean controls, public team, locked liquidity, and real users pointed away from fraud.",
+      believe: "Correct. The loud crowd and the masked team looked like a pump, but the chain and the working product told the truth. Trust the receipts, not the noise.",
+      abstain: "Capital preserved, but the evidence supported a cautious trust. The hype was froth, not fraud. Learn to read the chain under the chatter.",
+      doubt: "You overcorrected. Locked liquidity, real vesting, distributed holders, a live product, and a public audit all pointed away from fraud. The pump callers were parasites, not proof.",
     },
   },
 };

@@ -504,11 +504,16 @@ const CyborgTempleScene = ({
   // Where a character is missing a dedicated abstain clip we fall back to
   // their idle — laconic stillness reads fine for Trinity, and a calm idle
   // for Eugene (RL80) lets her bubble carry the moment.
+  // Outcome → reaction clip. Curtain-call clips are full-body standing
+  // animations (cheering / clapping / shrug / disappointed / defeat / pray);
+  // the seated idle/typing clips are gameplay-only. For "abstained" we use a
+  // measured standing gesture rather than a seated idle so the whole lineup
+  // is on its feet during the reveal.
   const REACTION_PATTERNS = {
     Monk:      { aligned: /monk_cheering/i,    missed: /monk_standPray/i,     abstained: /monk_standPray/i },
     Demon:     { aligned: /demon_clapping/i,    missed: /demon_disappointed/i, abstained: /demon_shrug/i },
-    Detective: { aligned: /detective_clap/i,   missed: /detective_defeat/i, abstained: /detective_idle/i },
-    RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i,   abstained: /unicorn_idle/i },
+    Detective: { aligned: /detective_clap/i,   missed: /detective_defeat/i,   abstained: /detective_greeting/i },
+    RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i, abstained: /UnicornWaving/i },
   };
 
   const applyCharacterReaction = (agentId, outcome) => {
@@ -556,6 +561,21 @@ const CyborgTempleScene = ({
         unicornWaveStateRef.current.timeoutId = null;
       }
       unicornWaveStateRef.current.armed = false;
+    }
+    // Demon's focus sequence (idle → pointing → typing) schedules setTimeouts
+    // and a mixer 'finished' listener that settle it back into demon_typing.
+    // If the verdict was committed while Demon was focused, those fire during
+    // the reveal and clobber the reaction. Cancel them so the reaction sticks.
+    if (agentId === 'Demon' && demonAnimStateRef.current) {
+      const ds = demonAnimStateRef.current;
+      if (Array.isArray(ds.focusSequenceTimers)) {
+        ds.focusSequenceTimers.forEach((t) => clearTimeout(t));
+        ds.focusSequenceTimers = [];
+      }
+      if (ds.focusSequenceListener && mixersRef.current['Demon']) {
+        mixersRef.current['Demon'].removeEventListener('finished', ds.focusSequenceListener);
+        ds.focusSequenceListener = null;
+      }
     }
 
     const targetAction = actions[targetKey];

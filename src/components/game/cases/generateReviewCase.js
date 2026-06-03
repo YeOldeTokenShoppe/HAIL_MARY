@@ -378,6 +378,8 @@ export default function generateReviewCase({
     // outcome as `abstained` (no aligned/missed split). The reveal copy
     // softens accordingly.
     correctVerdict: null,
+    // No ground truth → no decisive-lens coaching for reviews.
+    decisiveLenses: [],
     reveal: {
       summary: `Review compiled for ${tickerLabel} on ${chainLabel}. This is your team's read — not financial advice.`,
       voices: {

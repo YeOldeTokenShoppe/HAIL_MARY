@@ -38,7 +38,8 @@ import { useBuyModal } from '@/lib/useBuyModal';
 import ReviewFunnel from '@/components/ReviewFunnel';
 import ConsensusRibbon from '@/components/ConsensusRibbon';
 import TradeServiceRail from '@/components/TradeServiceRail';
-import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine } from '@/components/GameOverlay';
+import ConfidenceVerdict from '@/components/ConfidenceVerdict';
+import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine, lensLabel, recordCaseResult, readSessionScore, sessionAvgBrier, sessionAccuracy } from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
 import SitePalCropPanel from '@/components/SitePalCropPanel';
 import { useRouter } from 'next/navigation';
@@ -1275,6 +1276,16 @@ export default function CyborgTemple() {
   }, [currentSpeech, pendingSpeech]);
   const [verdict, setVerdict] = useState(null);
   const [brier, setBrier] = useState(null);
+  // The player's committed P(scam) from the confidence slider (0..1), or null
+  // for review mode / team verdicts. Drives the Brier score and the reveal HUD.
+  const [confidence, setConfidence] = useState(null);
+  // Running session scorecard (avg Brier, accuracy, streak) persisted in
+  // localStorage. Snapshotted on each graded commit so the reveal ribbon can
+  // show the updated totals; refreshed from storage when the game (re)starts.
+  const [sessionScore, setSessionScore] = useState(null);
+  // Load the persisted scorecard on the client only (avoids an SSR/hydration
+  // mismatch — readSessionScore returns an empty card on the server).
+  useEffect(() => { setSessionScore(readSessionScore()); }, []);
   // Staged reveal for the verdict modal so the reaction audio and the
   // vindication audio land on visually distinct beats:
   //   null       — modal hidden
@@ -1375,6 +1386,7 @@ export default function CyborgTemple() {
     rulesSpokenRef.current = false;
     setVerdict(null);
     setBrier(null);
+    setConfidence(null);
     setRevealPhase(null);
   };
   // Token Review entry — same reset shape as enterGameMode, but the case
@@ -1394,6 +1406,7 @@ export default function CyborgTemple() {
     rulesSpokenRef.current = true; // skip rules on reviews — players got them in forensics
     setVerdict(null);
     setBrier(null);
+    setConfidence(null);
     setRevealPhase(null);
   };
   const returnToServiceRail = () => {
@@ -1406,6 +1419,7 @@ export default function CyborgTemple() {
     // schedule the wrong line ~1.8s later).
     setVerdict(null);
     setBrier(null);
+    setConfidence(null);
     setRevealPhase(null);
     setActiveAnswer(null);
     setActiveReaction(null);
@@ -1520,6 +1534,7 @@ export default function CyborgTemple() {
     setVisitedStations(new Set());
     setVerdict(null);
     setBrier(null);
+    setConfidence(null);
     setRevealPhase(null);
     setActiveAnswer(null);
     setActiveReaction(null);
@@ -1909,15 +1924,29 @@ export default function CyborgTemple() {
       : 'abstain';
     setVerdict(v);
     setBrier(null);
+    setConfidence(null);
     setRevealPhase('vindicate');
   };
 
-  const submitVerdict = (v) => {
+  const submitVerdict = (v, prob = null) => {
     if (verdict) return;
     setVerdict(v);
+    setConfidence(prob);
     // No Brier score for reviews (no ground truth) — leave it null so the
-    // verdict ribbon's grade chip can suppress itself.
-    setBrier(caseData.correctVerdict == null ? null : computeBrier(v, caseData.correctVerdict));
+    // verdict ribbon's grade chip can suppress itself. When a slider
+    // probability is supplied we score on the raw probability; otherwise we
+    // fall back to the legacy discrete-verdict mapping.
+    const score = caseData.correctVerdict == null
+      ? null
+      : computeBrier(prob != null ? prob : v, caseData.correctVerdict);
+    setBrier(score);
+    // Fold this result into the running session scorecard (graded cases only).
+    // `correct` is null for an abstain (mid-band) commit so it breaks the
+    // streak without counting as a wrong call.
+    if (caseData.correctVerdict != null) {
+      const correct = v === 'abstain' ? null : (v === caseData.correctVerdict);
+      try { setSessionScore(recordCaseResult({ brier: score, correct })); } catch (e) {}
+    }
     setRevealPhase('weighing');
     // Play the focused character's immediate verdict reaction. The reveal
     // phase driver below transitions weighing → reveal (when reaction ends)
@@ -2326,6 +2355,277 @@ export default function CyborgTemple() {
   if (!mounted) {
     return <CoinLoader loading={true} />;
   }
+
+  // Consultant railway — shared between the mobile bottom sheet (rendered
+  // inline inside the console) and the desktop centered-bottom strip
+  // (rendered as a separate sibling). Extracted so it isn't duplicated.
+  // State per portrait: current (phosphor ring), visited (small tick dot),
+  // all-asked (amber dim, grayscale), unvisited (neutral).
+  const consultantRailway = (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: isMobileView ? 4 : 6,
+                    ...(isMobileView ? {} : { pointerEvents: 'auto' }),
+                  }}>
+                    {/* Call-to-action — sits directly above the portraits, right
+                        where the player needs to act. Shown only until they've
+                        consulted their first character, then it's gone. */}
+                    {visitedStations.size === 0 && (
+                      <div style={{
+                        fontSize: isMobileView ? 10 : 12,
+                        letterSpacing: '0.16em',
+                        textTransform: 'uppercase',
+                        fontWeight: 700,
+                        color: '#8effc4',
+                        textShadow: '0 0 12px rgba(77,255,170,0.65)',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        ▸ Tap a consultant to begin
+                      </div>
+                    )}
+                    <div style={{
+                    display: 'flex',
+                    gap: isMobileView ? 5 : 8,
+                    padding: isMobileView ? '2px 6px 3px' : '2px 4px',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    // On desktop the surrounding strip box supplies the
+                    // background, so the row stays transparent (no box-in-box).
+                    background: isMobileView ? 'rgba(2,5,8,0.4)' : 'transparent',
+                  }}>
+                    {/* Inline scan counter — sits as the first tile in the
+                        consultant railway so the player can't miss it. Same
+                        height as the portrait tiles; narrower since it's
+                        just a number. Color follows the same red/amber/green
+                        threshold the desktop header uses. Hidden in Token
+                        Review mode — no scan budget there. */}
+                    {!isReviewMode && (() => {
+                      const r = scansRemaining;
+                      const accent = r <= 0 ? '#ff3ea0' : r === 1 ? '#ffb84d' : '#8effc4';
+                      const soft = r <= 0 ? 'rgba(255,62,160,0.55)'
+                        : r === 1 ? 'rgba(255,184,77,0.55)'
+                        : 'rgba(142,255,196,0.55)';
+                      return (
+                        <div
+                          aria-label={`${r} of ${caseData.maxScans} scans remaining`}
+                          style={{
+                            width: isMobileView ? 66 : 78,
+                            height: isMobileView ? 72 : 110,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: isMobileView ? 2 : 3,
+                            marginRight: isMobileView ? 0 : 2,
+                            borderRight: isMobileView ? 'none' : '1px solid rgba(77,255,170,0.18)',
+                            paddingRight: isMobileView ? 0 : 6,
+                            color: accent,
+                            textShadow: `0 0 10px ${soft}`,
+                            lineHeight: 1,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          <div
+                            key={r}
+                            style={{
+                              fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+                              fontSize: isMobileView ? 26 : 44,
+                              fontWeight: 900,
+                              letterSpacing: '0.02em',
+                              transformOrigin: 'center',
+                              willChange: 'transform, filter',
+                              animation: scanPunchArmed
+                                ? 'scanPunch 0.8s cubic-bezier(0.2, 1.5, 0.4, 1) both, scanBreath 2.6s ease-in-out 0.9s infinite'
+                                : 'none',
+                            }}
+                          >
+                            {r}
+                          </div>
+                          <div style={{
+                            fontSize: isMobileView ? 7 : 8,
+                            letterSpacing: '0.18em',
+                            fontWeight: 800,
+                            opacity: 0.9,
+                          }}>
+                            {r === 1 ? 'SCAN' : 'SCANS'}
+                          </div>
+                          <div style={{
+                            fontSize: isMobileView ? 7 : 8,
+                            letterSpacing: '0.10em',
+                            fontWeight: 700,
+                            opacity: 0.75,
+                          }}>
+                            REMAINING
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {[
+                      { agentId: 'Monk',      stationKey: 'monk',    portrait: '/thumbnail_gr80.png',        label: 'ETHOS' },
+                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_johnBarron.png',  label: 'PATHOS' },
+                      { agentId: 'Detective', stationKey: 'marisol', portrait: '/thumbnail_marisol.png',     label: 'LOGOS' },
+                      { agentId: 'RL80',      stationKey: 'eugene',  portrait: '/thumbnail_eugene.png',      label: 'MYTHOS' },
+                    ].map(({ agentId, stationKey, portrait, label }) => {
+                      const station = caseData.stations[stationKey];
+                      if (!station) return null;
+                      const isCurrent = focusedAgent === agentId;
+                      const isVisited = visitedStations.has(stationKey);
+                      const askedCount = asked[stationKey]?.size || 0;
+                      const totalQuestions = station.questions?.length || 0;
+                      const remaining = Math.max(0, totalQuestions - askedCount);
+                      const allAsked = remaining === 0;
+                      const shortName = label;
+                      const buttonW = isMobileView ? 58 : 92;
+                      const buttonH = isMobileView ? 72 : 110;
+
+                      const outOfScans = scansRemaining <= 0;
+                      const lockedToMonk = mustStartWithMonk && agentId !== 'Monk';
+                      const disabled = isCurrent || outOfScans || lockedToMonk;
+                      return (
+                        <button
+                          key={agentId}
+                          onClick={() => { if (!disabled) setFocusedAgent(agentId); }}
+                          disabled={disabled}
+                          title={lockedToMonk
+                            ? 'Tap ETHOS first — he sets the rules'
+                            : outOfScans && !isCurrent
+                              ? 'No scans left — render your verdict'
+                              : `${station.character} — ${station.role}`}
+                          style={{
+                            position: 'relative',
+                            width: buttonW,
+                            height: buttonH,
+                            padding: 0,
+                            overflow: 'hidden',
+                            background: 'rgba(10,58,38,0.18)',
+                            border: isCurrent
+                              ? '2px solid #4dffaa'
+                              : allAsked && isVisited
+                                ? '2px solid rgba(255,184,77,0.55)'
+                                : '2px solid rgba(255,62,160,0.55)',
+                            borderRadius: 9,
+                            color: isCurrent ? '#8effc4' : allAsked && isVisited ? '#ffb84d' : '#c8ffe0',
+                            cursor: disabled ? (isCurrent ? 'default' : 'not-allowed') : 'pointer',
+                            fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                            boxShadow: isCurrent
+                              ? '0 0 14px rgba(77,255,170,0.55)'
+                              : '0 0 8px rgba(255,62,160,0.28)',
+                            transition: 'all 0.18s ease',
+                            opacity: isCurrent
+                              ? 1
+                              : lockedToMonk
+                                ? 0.32
+                                : outOfScans
+                                  ? 0.4
+                                  : allAsked && isVisited
+                                    ? 0.78
+                                    : 0.94,
+                            filter: lockedToMonk
+                              ? 'grayscale(0.7)'
+                              : outOfScans && !isCurrent
+                                ? 'grayscale(0.5)'
+                                : 'none',
+                          }}
+                        >
+                          <img
+                            src={portrait}
+                            alt={station.character}
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              filter: allAsked && isVisited ? 'grayscale(0.35)' : 'none',
+                              transition: 'all 0.2s ease',
+                            }}
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            padding: isMobileView ? '10px 3px 3px' : '14px 4px 5px',
+                            background: 'linear-gradient(180deg, rgba(2,5,8,0) 0%, rgba(2,5,8,0.78) 55%, rgba(2,5,8,0.92) 100%)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 1,
+                          }}>
+                            <div style={{
+                              fontSize: isMobileView ? 9 : 11,
+                              letterSpacing: '0.12em',
+                              color: 'inherit',
+                              textTransform: 'uppercase',
+                              fontWeight: 700,
+                              textShadow: '0 1px 4px rgba(0,0,0,0.85)',
+                            }}>
+                              {shortName}
+                            </div>
+                            {/* Lens/specialty — surfaced at the decision point so
+                                the player knows who covers what before spending a
+                                question. */}
+                            <div style={{
+                              fontSize: isMobileView ? 6.5 : 8,
+                              letterSpacing: '0.04em',
+                              color: allAsked && isVisited
+                                ? 'rgba(255,184,77,0.75)'
+                                : isCurrent
+                                  ? 'rgba(142,255,196,0.7)'
+                                  : 'rgba(200,255,224,0.55)',
+                              textTransform: 'uppercase',
+                              textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '100%',
+                            }}>
+                              {lensLabel(station)}
+                            </div>
+                            <div style={{
+                              fontSize: 7,
+                              letterSpacing: '0.18em',
+                              color: allAsked && isVisited
+                                ? 'rgba(255,184,77,0.9)'
+                                : isCurrent
+                                  ? 'rgba(142,255,196,0.85)'
+                                  : isVisited
+                                    ? '#8fd4b6'
+                                    : 'rgba(200,255,224,0.7)',
+                              textTransform: 'uppercase',
+                              textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+                            }}>
+                              {outOfScans && !isCurrent
+                                ? '—'
+                                : allAsked && isVisited
+                                  ? 'ASKED'
+                                  : isVisited
+                                    ? (isReviewMode
+                                        ? `${remaining} LEFT`
+                                        : `${Math.min(remaining, scansRemaining)} LEFT`)
+                                    : 'TAP'}
+                            </div>
+                          </div>
+                          {isVisited && !isCurrent && !allAsked && (
+                            <div style={{
+                              position: 'absolute',
+                              top: 5,
+                              right: 5,
+                              width: 7,
+                              height: 7,
+                              borderRadius: '50%',
+                              background: '#4dffaa',
+                              boxShadow: '0 0 8px #4dffaa',
+                            }} />
+                          )}
+                        </button>
+                      );
+                    })}
+                    </div>
+                  </div>
+  );
 
   return (
     <>
@@ -3497,26 +3797,51 @@ export default function CyborgTemple() {
                 <EvidenceScreens activeAnswer={activeAnswer} caseData={caseData} />
               )}
 
-              {/* Unified game console — single bottom widget combining the
-                  question card (top section) and the consultant railway
-                  (bottom section). Replaces the old right-side scan panel +
-                  centered bottom railway with one decision surface: questions
-                  for the current consultant above, switch-consultant portraits
-                  below. Same layout on desktop and mobile. */}
+              {/* Game console. MOBILE: one bottom sheet stacking the scan
+                  counter, the question/transcript card, and the consultant
+                  railway. WIDE SCREENS: splits into two pieces so the centered
+                  3D character isn't covered — the transcript card docks
+                  top-left, and the consultant railway renders as a separate
+                  centered strip along the bottom (sibling below). */}
               {tradeMode === 'game' && !verdict && (
+                <>
+                {/* Transcript panel. On desktop it's only shown once a
+                    consultant is focused — before that the "tap a consultant"
+                    CTA lives on the railway, so there's no empty box floating.
+                    On mobile it always renders (it also hosts the railway). */}
+                {(isMobileView || (focusedAgent && CHARACTER_TO_STATION[focusedAgent] && gameStation)) && (
                 <div
                   style={{
                     position: 'fixed',
-                    left: '50%',
-                    bottom: isMobileView
-                      ? 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)'
-                      : '5.5rem',
-                    transform: 'translateX(-50%)',
                     zIndex: 1055,
-                    width: isMobileView
-                      ? 'calc(100vw - 12px)'
-                      : 'min(540px, calc(100vw - 24px))',
-                    maxHeight: isMobileView ? '58vh' : '70vh',
+                    // Mobile: full-width sheet centered along the bottom —
+                    // [A hidden][B][C] stacked, exactly as before.
+                    // Wide screens: this console becomes the TRANSCRIPT panel
+                    // ([A]+[B] only), docked TOP-LEFT. The consultant railway
+                    // [C] is rendered separately as a centered-bottom strip
+                    // (sibling below) so it isn't trapped by this panel's
+                    // backdrop-filter.
+                    ...(isMobileView
+                      ? {
+                          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 'calc(100vw - 12px)',
+                          maxHeight: '58vh',
+                        }
+                      : {
+                          // Centered on the left at roughly the character's eye
+                          // level (reads as "consulting them"). Center is pulled
+                          // slightly above the midline and maxHeight kept modest
+                          // so the panel's bottom clears the centered railway
+                          // strip even in the taller answer view.
+                          top: '44%',
+                          bottom: 'auto',
+                          left: '1.5rem',
+                          transform: 'translateY(-50%)',
+                          width: 'min(410px, 38vw)',
+                          maxHeight: '54vh',
+                        }),
                     display: 'flex',
                     flexDirection: 'column',
                     background: 'linear-gradient(180deg, rgba(4,12,8,0.92), rgba(2,5,8,0.82))',
@@ -3531,68 +3856,10 @@ export default function CyborgTemple() {
                     pointerEvents: 'auto',
                   }}
                 >
-                  {/* Prominent scan counter — centered header bar at the top of
-                      the console so the player can't miss how many questions
-                      remain. Color shifts as the budget burns down. On mobile
-                      this is replaced by the compact pill in the top HUD.
-                      Hidden in Token Review mode — there's no scan budget to
-                      surface there. */}
-                  {!isMobileView && !isReviewMode && (() => {
-                    const remaining = scansRemaining;
-                    const accent =
-                      remaining <= 0 ? '#ff3ea0'
-                      : remaining === 1 ? '#ffb84d'
-                      : '#8effc4';
-                    const accentSoft =
-                      remaining <= 0 ? 'rgba(255,62,160,0.45)'
-                      : remaining === 1 ? 'rgba(255,184,77,0.45)'
-                      : 'rgba(142,255,196,0.4)';
-                    return (
-                      <div
-                        aria-label={`${remaining} of ${caseData.maxScans} scans remaining`}
-                        style={{
-                          display: 'flex',
-                          flexDirection: isMobileView ? 'row' : 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: isMobileView ? 8 : 0,
-                          padding: isMobileView ? '4px 10px 5px' : '6px 14px 8px',
-                          borderBottom: `1px solid ${accentSoft}`,
-                          background: `linear-gradient(180deg, ${accentSoft.replace(/0\.\d+\)/, '0.10)')}, rgba(2,5,8,0.0))`,
-                          lineHeight: 1,
-                          color: accent,
-                          textShadow: `0 0 14px ${accentSoft}`,
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        <div
-                          key={remaining}
-                          style={{
-                            fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                            fontSize: isMobileView ? 26 : 60,
-                            fontWeight: 900,
-                            letterSpacing: '0.02em',
-                            transformOrigin: 'center',
-                            willChange: 'transform, filter',
-                            animation: scanPunchArmed
-                              ? 'scanPunch 1.2s cubic-bezier(0.2, 1.5, 0.4, 1) both, scanBreath 2.6s ease-in-out 0.9s infinite'
-                              : 'none',
-                          }}
-                        >
-                          {remaining}
-                        </div>
-                        <div style={{
-                          marginTop: isMobileView ? 0 : 4,
-                          fontSize: isMobileView ? 9 : 11,
-                          letterSpacing: isMobileView ? '0.20em' : '0.26em',
-                          fontWeight: 800,
-                          opacity: 0.9,
-                        }}>
-                          {remaining === 1 ? 'QUESTION LEFT' : 'QUESTIONS LEFT'}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* The scan counter now lives inline as the first tile of the
+                      consultant railway (see `consultantRailway`), on both mobile
+                      and desktop — so it's no longer duplicated here as a panel
+                      header. */}
 
                   {/* Top section: question content state machine, or a
                       "tap a consultant" hint when no character is focused. */}
@@ -3884,7 +4151,7 @@ export default function CyborgTemple() {
                               ALL QUESTIONS SPENT
                             </div>
                             <div style={{ fontSize: 12, color: '#c8ffe0', fontStyle: 'italic', lineHeight: 1.5, maxWidth: 280 }}>
-                              Render your verdict below — Trust, Abstain, or Doubt.
+                              Set your confidence below and lock in your verdict.
                             </div>
                             <div style={{
                               display: 'flex',
@@ -3898,9 +4165,9 @@ export default function CyborgTemple() {
                               fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
                               letterSpacing: '0.02em',
                             }}>
-                              <div><span style={{ color: '#8effc4', fontWeight: 700 }}>TRUST</span> — evidence supports legitimacy</div>
-                              <div><span style={{ color: '#dcdce4', fontWeight: 700 }}>ABSTAIN</span> — signal is incomplete or mixed</div>
-                              <div><span style={{ color: '#ff8a8a', fontWeight: 700 }}>DOUBT</span> — evidence supports deception or severe risk</div>
+                              <div>Slide toward <span style={{ color: '#8effc4', fontWeight: 700 }}>TRUST</span> (legit) or <span style={{ color: '#ff8a8a', fontWeight: 700 }}>DOUBT</span> (scam).</div>
+                              <div>Leave it in the middle to <span style={{ color: '#dcdce4', fontWeight: 700 }}>ABSTAIN</span>.</div>
+                              <div>Confident-and-right scores best; confident-and-wrong is worst.</div>
                             </div>
                           </div>
                         );
@@ -3988,239 +4255,45 @@ export default function CyborgTemple() {
                       );
                     })()}
                   </div>
-                  ) : (
-                    <div style={{
-                      padding: '10px 14px',
-                      textAlign: 'center',
-                      fontSize: 11,
-                      color: '#8effc4',
-                      letterSpacing: '0.10em',
-                      borderBottom: '1px solid rgba(77,255,170,0.18)',
-                    }}>
-                      Tap an agent to begin
-                    </div>
-                  )}
+                  ) : null}
 
-                  {/* Bottom section: consultant railway. Always visible in
-                      game mode. State per portrait: current (phosphor ring),
-                      visited (small tick dot), all-asked (amber dim, grayscale),
-                      unvisited (neutral). Click → setFocusedAgent → scene
-                      rotates the platform / flies camera / loads SitePal scene. */}
-                  <div style={{
-                    display: 'flex',
-                    gap: isMobileView ? 5 : 8,
-                    padding: isMobileView ? '2px 6px 3px' : '6px 8px',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    background: 'rgba(2,5,8,0.4)',
-                  }}>
-                    {/* Inline scan counter — sits as the first tile in the
-                        consultant railway so the player can't miss it. Same
-                        height as the portrait tiles; narrower since it's
-                        just a number. Color follows the same red/amber/green
-                        threshold the desktop header uses. Hidden in Token
-                        Review mode — no scan budget there. */}
-                    {isMobileView && !isReviewMode && (() => {
-                      const r = scansRemaining;
-                      const accent = r <= 0 ? '#ff3ea0' : r === 1 ? '#ffb84d' : '#8effc4';
-                      const soft = r <= 0 ? 'rgba(255,62,160,0.55)'
-                        : r === 1 ? 'rgba(255,184,77,0.55)'
-                        : 'rgba(142,255,196,0.55)';
-                      return (
-                        <div
-                          aria-label={`${r} of ${caseData.maxScans} scans remaining`}
-                          style={{
-                            width: 66,
-                            height: 72,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 2,
-                            color: accent,
-                            textShadow: `0 0 10px ${soft}`,
-                            lineHeight: 1,
-                            pointerEvents: 'none',
-                          }}
-                        >
-                          <div
-                            key={r}
-                            style={{
-                              fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-                              fontSize: 26,
-                              fontWeight: 900,
-                              letterSpacing: '0.02em',
-                              transformOrigin: 'center',
-                              willChange: 'transform, filter',
-                              animation: scanPunchArmed
-                                ? 'scanPunch 0.8s cubic-bezier(0.2, 1.5, 0.4, 1) both, scanBreath 2.6s ease-in-out 0.9s infinite'
-                                : 'none',
-                            }}
-                          >
-                            {r}
-                          </div>
-                          <div style={{
-                            fontSize: 7,
-                            letterSpacing: '0.18em',
-                            fontWeight: 800,
-                            opacity: 0.9,
-                          }}>
-                            {r === 1 ? 'SCAN' : 'SCANS'}
-                          </div>
-                          <div style={{
-                            fontSize: 7,
-                            letterSpacing: '0.10em',
-                            fontWeight: 700,
-                            opacity: 0.75,
-                          }}>
-                            REMAINING
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    {[
-                      { agentId: 'Monk',      stationKey: 'monk',    portrait: '/thumbnail_gr80.png',        label: 'ETHOS' },
-                      { agentId: 'Demon',     stationKey: 'demon',   portrait: '/thumbnail_johnBarron.png',  label: 'PATHOS' },
-                      { agentId: 'Detective', stationKey: 'marisol', portrait: '/thumbnail_marisol.png',     label: 'LOGOS' },
-                      { agentId: 'RL80',      stationKey: 'eugene',  portrait: '/thumbnail_eugene.png',      label: 'MYTHOS' },
-                    ].map(({ agentId, stationKey, portrait, label }) => {
-                      const station = caseData.stations[stationKey];
-                      if (!station) return null;
-                      const isCurrent = focusedAgent === agentId;
-                      const isVisited = visitedStations.has(stationKey);
-                      const askedCount = asked[stationKey]?.size || 0;
-                      const totalQuestions = station.questions?.length || 0;
-                      const remaining = Math.max(0, totalQuestions - askedCount);
-                      const allAsked = remaining === 0;
-                      const shortName = label;
-                      const buttonW = isMobileView ? 58 : 92;
-                      const buttonH = isMobileView ? 72 : 110;
-
-                      const outOfScans = scansRemaining <= 0;
-                      const lockedToMonk = mustStartWithMonk && agentId !== 'Monk';
-                      const disabled = isCurrent || outOfScans || lockedToMonk;
-                      return (
-                        <button
-                          key={agentId}
-                          onClick={() => { if (!disabled) setFocusedAgent(agentId); }}
-                          disabled={disabled}
-                          title={lockedToMonk
-                            ? 'Tap ETHOS first — he sets the rules'
-                            : outOfScans && !isCurrent
-                              ? 'No scans left — render your verdict'
-                              : `${station.character} — ${station.role}`}
-                          style={{
-                            position: 'relative',
-                            width: buttonW,
-                            height: buttonH,
-                            padding: 0,
-                            overflow: 'hidden',
-                            background: 'rgba(10,58,38,0.18)',
-                            border: isCurrent
-                              ? '2px solid #4dffaa'
-                              : allAsked && isVisited
-                                ? '2px solid rgba(255,184,77,0.55)'
-                                : '2px solid rgba(255,62,160,0.55)',
-                            borderRadius: 9,
-                            color: isCurrent ? '#8effc4' : allAsked && isVisited ? '#ffb84d' : '#c8ffe0',
-                            cursor: disabled ? (isCurrent ? 'default' : 'not-allowed') : 'pointer',
-                            fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                            boxShadow: isCurrent
-                              ? '0 0 14px rgba(77,255,170,0.55)'
-                              : '0 0 8px rgba(255,62,160,0.28)',
-                            transition: 'all 0.18s ease',
-                            opacity: isCurrent
-                              ? 1
-                              : lockedToMonk
-                                ? 0.32
-                                : outOfScans
-                                  ? 0.4
-                                  : allAsked && isVisited
-                                    ? 0.78
-                                    : 0.94,
-                            filter: lockedToMonk
-                              ? 'grayscale(0.7)'
-                              : outOfScans && !isCurrent
-                                ? 'grayscale(0.5)'
-                                : 'none',
-                          }}
-                        >
-                          <img
-                            src={portrait}
-                            alt={station.character}
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              filter: allAsked && isVisited ? 'grayscale(0.35)' : 'none',
-                              transition: 'all 0.2s ease',
-                            }}
-                          />
-                          <div style={{
-                            position: 'absolute',
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            padding: isMobileView ? '10px 3px 3px' : '14px 4px 5px',
-                            background: 'linear-gradient(180deg, rgba(2,5,8,0) 0%, rgba(2,5,8,0.78) 55%, rgba(2,5,8,0.92) 100%)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: 1,
-                          }}>
-                            <div style={{
-                              fontSize: isMobileView ? 9 : 11,
-                              letterSpacing: '0.12em',
-                              color: 'inherit',
-                              textTransform: 'uppercase',
-                              fontWeight: 700,
-                              textShadow: '0 1px 4px rgba(0,0,0,0.85)',
-                            }}>
-                              {shortName}
-                            </div>
-                            <div style={{
-                              fontSize: 7,
-                              letterSpacing: '0.18em',
-                              color: allAsked && isVisited
-                                ? 'rgba(255,184,77,0.9)'
-                                : isCurrent
-                                  ? 'rgba(142,255,196,0.85)'
-                                  : isVisited
-                                    ? '#8fd4b6'
-                                    : 'rgba(200,255,224,0.7)',
-                              textTransform: 'uppercase',
-                              textShadow: '0 1px 3px rgba(0,0,0,0.85)',
-                            }}>
-                              {outOfScans && !isCurrent
-                                ? '—'
-                                : allAsked && isVisited
-                                  ? 'ASKED'
-                                  : isVisited
-                                    ? (isReviewMode
-                                        ? `${remaining} LEFT`
-                                        : `${Math.min(remaining, scansRemaining)} LEFT`)
-                                    : 'TAP'}
-                            </div>
-                          </div>
-                          {isVisited && !isCurrent && !allAsked && (
-                            <div style={{
-                              position: 'absolute',
-                              top: 5,
-                              right: 5,
-                              width: 7,
-                              height: 7,
-                              borderRadius: '50%',
-                              background: '#4dffaa',
-                              boxShadow: '0 0 8px #4dffaa',
-                            }} />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {/* Bottom section: consultant railway. On mobile it lives
+                      inline inside this console sheet (below the transcript).
+                      On desktop the railway is rendered separately as a
+                      centered-bottom strip (sibling below this panel). */}
+                  {isMobileView && consultantRailway}
                 </div>
+                )}
+                {/* Desktop only: consultant railway as a centered strip along
+                    the bottom of the viewport. Kept as a SEPARATE sibling (not
+                    a child of the transcript panel) because the panel uses
+                    backdrop-filter, which would trap a fixed descendant. */}
+                {!isMobileView && (
+                  <div style={{
+                    position: 'fixed',
+                    left: 0,
+                    right: 0,
+                    bottom: '5.5rem',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    zIndex: 1055,
+                    pointerEvents: 'none',
+                  }}>
+                    <div style={{
+                      pointerEvents: 'auto',
+                      padding: '8px 12px 7px',
+                      background: 'linear-gradient(180deg, rgba(4,12,8,0.92), rgba(2,5,8,0.82))',
+                      border: '1px solid rgba(77,255,170,0.45)',
+                      borderRadius: 10,
+                      boxShadow: '0 0 28px rgba(77,255,170,0.18)',
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)',
+                    }}>
+                      {consultantRailway}
+                    </div>
+                  </div>
+                )}
+                </>
               )}
 
               {/* Floating subtitle — mobile only. Mirrors the spoken line
@@ -4286,10 +4359,11 @@ export default function CyborgTemple() {
                   to her head bone so it tracks her in world space and stays
                   out of her head/horn footprint. */}
 
-              {/* Reveal ribbon — bottom-anchored strip so the curtain-call
-                  lineup gets the full upper frame. Same state machine as
-                  before (weighing → reveal → vindicate); only the layout
-                  changed from a right-side card to a horizontal ribbon.
+              {/* Reveal ribbon — anchored to the edge that leaves the
+                  curtain-call lineup visible: BOTTOM on mobile (lineup keeps
+                  the upper frame), TOP on desktop (lineup keeps lower-center).
+                  Same state machine as before (weighing → reveal → vindicate);
+                  only the layout changed from a right-side card to a ribbon.
                   Dismissed only via the explicit NEXT CASE / BACK TO SERVICES
                   buttons (the result is too important to dismiss by accident). */}
               {verdict && tradeMode === 'game' && typeof document !== 'undefined' &&
@@ -4299,28 +4373,40 @@ export default function CyborgTemple() {
                       position: 'fixed',
                       left: 0,
                       right: 0,
-                      // Mobile: anchor to top so the curtain-call characters
-                      // keep the lower frame (which is where the camera puts
-                      // them at their authored y-positions). Desktop: stays
-                      // at the bottom, where there's enough room either way.
+                      // Mobile: anchor to the BOTTOM (overlapping the nav is
+                      // fine) so the curtain-call lineup keeps the upper frame.
+                      // Desktop: anchor to the TOP so the lineup keeps the
+                      // lower-center frame where the camera frames them.
                       ...(isMobileView
                         ? {
-                            top: 0,
-                            justifyContent: 'flex-start',
-                            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
-                          }
-                        : {
                             bottom: 0,
                             justifyContent: 'flex-end',
-                            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
+                            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5rem)',
+                            paddingLeft: 12,
+                            paddingRight: 12,
+                          }
+                        : {
+                            // Desktop: dock the whole score panel to the RIGHT
+                            // edge, centered in the space ABOVE the bottom nav
+                            // (paddingBottom) so it never overlaps it, and tucked
+                            // tight to the edge (small paddingRight).
+                            top: 0,
+                            bottom: 0,
+                            right: 0,
+                            left: 'auto',
+                            justifyContent: 'center',
+                            paddingRight: '0.85rem',
+                            paddingLeft: 0,
+                            paddingTop: '1.5rem',
+                            paddingBottom: '6rem',
                           }),
                       zIndex: 10500,
                       display: 'flex',
                       flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 10,
-                      paddingLeft: 12,
-                      paddingRight: 12,
+                      // Desktop: stretch the panel children to fill the
+                      // right-side column. Mobile: centered.
+                      alignItems: isMobileView ? 'center' : 'stretch',
+                      gap: isMobileView ? 6 : 10,
                       // No backdrop / blur during reveal — let the 3D curtain
                       // call breathe. The ribbon itself reads against the scene
                       // thanks to its own border + glow.
@@ -4364,8 +4450,41 @@ export default function CyborgTemple() {
                     ) : (() => {
                       const isCorrect = verdict === caseData.correctVerdict;
                       const isAbstain = verdict === 'abstain';
-                      const grade = brier <= 0.05 ? 'EXCELLENT' : brier <= 0.15 ? 'STRONG' : brier <= 0.30 ? 'FAIR' : 'POOR';
-                      const gradeColor = brier <= 0.15 ? '#8effc4' : brier <= 0.30 ? '#ffb84d' : '#ff4d6d';
+                      const hasBrier = typeof brier === 'number';
+                      const grade = !hasBrier ? '—' : brier <= 0.05 ? 'EXCELLENT' : brier <= 0.15 ? 'STRONG' : brier <= 0.30 ? 'FAIR' : 'POOR';
+                      const gradeColor = !hasBrier ? '#6db59a' : brier <= 0.15 ? '#8effc4' : brier <= 0.30 ? '#ffb84d' : '#ff4d6d';
+                      // Committed P(scam) from the confidence slider, for the HUD.
+                      const confPct = confidence != null ? Math.round(confidence * 100) : null;
+                      // Lens coaching — where the case-cracking evidence lived
+                      // (decisiveLenses = station keys) vs. where the player
+                      // actually spent scans (investigated = Set of station keys).
+                      const decisive = Array.isArray(caseData.decisiveLenses) ? caseData.decisiveLenses : [];
+                      const lensName = (k) => lensLabel(caseData.stations[k]) || k;
+                      const charName = (k) => caseData.stations[k]?.character || lensName(k);
+                      // Always pair the character with their lens — "Saint GR80
+                      // (CREDIBILITY)" — so the note teaches the mapping rather than
+                      // assuming the player already knows who owns which lens.
+                      const tag = (k) => `${charName(k)} (${lensName(k)})`;
+                      const joinAnd = (arr) =>
+                        arr.length <= 1 ? (arr[0] || '')
+                        : arr.length === 2 ? `${arr[0]} and ${arr[1]}`
+                        : `${arr.slice(0, -1).join(', ')}, and ${arr[arr.length - 1]}`;
+                      const missedDecisive = decisive.filter((k) => !investigated.has(k));
+                      const caughtDecisive = decisive.filter((k) => investigated.has(k));
+                      let lensNote = null;
+                      if (decisive.length > 0) {
+                        const where = `The tell was in ${joinAnd(decisive.map(tag))}.`;
+                        if (missedDecisive.length === 0) {
+                          lensNote = `${where} You looked there — good instincts.`;
+                        } else if (caughtDecisive.length === 0) {
+                          lensNote = `${where} And you never looked there.`;
+                        } else {
+                          lensNote = `${where} You consulted ${joinAnd(caughtDecisive.map(charName))} but never ${joinAnd(missedDecisive.map(charName))}.`;
+                        }
+                      }
+                      // Running session totals (snapshotted at commit time).
+                      const avgB = sessionAvgBrier(sessionScore);
+                      const acc = sessionAccuracy(sessionScore);
                       const revealed = revealPhase === 'reveal' || revealPhase === 'vindicate';
                       const vindicated = revealPhase === 'vindicate';
                       const verdictColor = revealed
@@ -4380,10 +4499,11 @@ export default function CyborgTemple() {
                         transition: 'opacity 0.55s ease, transform 0.55s ease',
                         pointerEvents: visible ? 'auto' : 'none',
                       });
-                      const statBlock = (label, value, color) => (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
-                          <div style={{ fontSize: 8, letterSpacing: '0.24em', color: '#3a6b54' }}>{label}</div>
-                          <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: 20, color: color || '#c8ffe0', marginTop: 3, lineHeight: 1 }}>{value}</div>
+                      const statBlock = (label, value, color, caption) => (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: isMobileView ? 64 : 86 }}>
+                          <div style={{ fontSize: isMobileView ? 8 : 9, letterSpacing: '0.24em', color: '#3a6b54' }}>{label}</div>
+                          <div style={{ fontFamily: "'Cinzel Decorative','Cinzel',serif", fontSize: isMobileView ? 20 : 30, color: color || '#c8ffe0', marginTop: isMobileView ? 3 : 5, lineHeight: 1 }}>{value}</div>
+                          {caption && <div style={{ fontSize: isMobileView ? 7 : 8.5, letterSpacing: '0.08em', color: '#3a6b54', marginTop: 3 }}>{caption}</div>}
                         </div>
                       );
                       return (
@@ -4394,29 +4514,54 @@ export default function CyborgTemple() {
                           {vindicated && (
                             <div
                               style={{
-                                width: 'min(720px, calc(100vw - 24px))',
-                                padding: '8px 14px 9px',
-                                borderLeft: '2px solid #ff3ea0',
-                                background: 'linear-gradient(90deg, rgba(255,62,160,0.18), rgba(255,62,160,0.04) 60%, rgba(2,5,8,0.0))',
-                                color: '#ffe2f1',
+                                width: isMobileView ? 'min(720px, calc(100vw - 24px))' : 'min(620px, 64vw)',
+                                padding: '10px 16px 11px',
+                                border: '1px solid rgba(255,62,160,0.45)',
+                                // Accent on the left in the mobile sheet, on top
+                                // when it's the centered desktop banner.
+                                borderLeft: isMobileView ? '3px solid #ff3ea0' : '1px solid rgba(255,62,160,0.45)',
+                                borderTop: isMobileView ? '1px solid rgba(255,62,160,0.45)' : '3px solid #ff3ea0',
+                                borderRadius: 8,
+                                // Desktop: float the debrief as a centered banner
+                                // at the top of the scene (the score panel docks
+                                // right). Mobile: in-flow in the bottom sheet.
+                                ...(isMobileView ? {} : {
+                                  position: 'fixed',
+                                  top: '1.5rem',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  zIndex: 10600,
+                                  textAlign: 'center',
+                                }),
+                                // Solid, blurred backing so the debrief stays
+                                // legible over the bright curtain-call scene
+                                // (was a gradient that faded to transparent).
+                                background: 'linear-gradient(180deg, rgba(22,6,17,0.94), rgba(6,2,10,0.9))',
+                                backdropFilter: 'blur(10px)',
+                                WebkitBackdropFilter: 'blur(10px)',
+                                boxShadow: '0 0 22px rgba(255,62,160,0.22)',
+                                color: '#ffeaf5',
                                 fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
                                 fontStyle: 'italic',
                                 fontSize: 13,
-                                lineHeight: 1.35,
+                                lineHeight: 1.4,
                                 pointerEvents: 'auto',
                                 ...fadeIn(true),
+                                // Re-assert the centering transform AFTER fadeIn,
+                                // which would otherwise overwrite it with
+                                // translateY(0) and leave the quote off-center.
+                                ...(isMobileView ? {} : { transform: 'translateX(-50%)' }),
                               }}
                             >
-                              <span style={{
-                                display: 'inline-block',
-                                marginRight: 10,
+                              <div style={{
                                 fontStyle: 'normal',
                                 fontSize: 9,
                                 letterSpacing: '0.24em',
-                                color: 'rgba(255,142,196,0.85)',
+                                color: 'rgba(255,160,205,0.95)',
+                                marginBottom: 4,
                               }}>
-                                // {vindicationDelivery ? vindicationDelivery.character.toUpperCase() : 'THE TERMINAL'}
-                              </span>
+                                // {vindicationDelivery ? vindicationDelivery.character.toUpperCase() : 'THE TERMINAL'} · DEBRIEF
+                              </div>
                               "{vindicationDelivery ? vindicationDelivery.text : caseData.reveal.voices[verdict]}"
                             </div>
                           )}
@@ -4425,8 +4570,9 @@ export default function CyborgTemple() {
                             className="reveal-ribbon"
                             onClick={(e) => e.stopPropagation()}
                             style={{
-                              width: 'min(960px, calc(100vw - 24px))',
+                              width: isMobileView ? 'min(960px, calc(100vw - 24px))' : 'min(360px, 34vw)',
                               display: 'flex',
+                              flexDirection: isMobileView ? 'row' : 'column',
                               alignItems: 'stretch',
                               gap: 0,
                               padding: '10px 14px',
@@ -4448,7 +4594,9 @@ export default function CyborgTemple() {
                               alignItems: 'center',
                               gap: 12,
                               paddingRight: 14,
-                              borderRight: '1px solid rgba(77,255,170,0.18)',
+                              ...(isMobileView
+                                ? { borderRight: '1px solid rgba(77,255,170,0.18)' }
+                                : { borderBottom: '1px solid rgba(77,255,170,0.18)', paddingBottom: 10 }),
                               minWidth: 168,
                             }}>
                               <div style={{
@@ -4480,22 +4628,59 @@ export default function CyborgTemple() {
                             <div style={{
                               flex: '1 1 220px',
                               minWidth: 220,
-                              padding: '2px 14px',
-                              borderRight: '1px solid rgba(77,255,170,0.18)',
+                              padding: isMobileView ? '2px 14px' : '10px 0',
+                              ...(isMobileView
+                                ? { borderRight: '1px solid rgba(77,255,170,0.18)' }
+                                : { borderBottom: '1px solid rgba(77,255,170,0.18)' }),
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'center',
                             }}>
-                              {!revealed ? (
-                                <div style={{
-                                  fontSize: 11,
-                                  letterSpacing: '0.26em',
-                                  color: '#6db59a',
-                                  animation: 'verdictWeighPulse 1.6s ease-in-out infinite',
-                                }}>
-                                  // WEIGHING EVIDENCE<span className="reveal-dots" />
-                                </div>
-                              ) : (
+                              {!revealed ? (() => {
+                                // During the weighing beat the focused character
+                                // speaks their immediate verdict reaction — show
+                                // that line as text (the transcript panel is gone
+                                // once a verdict is committed, so it has nowhere
+                                // else to surface).
+                                const reactionResolved = resolveLine(activeReaction?.text);
+                                const reactionText = reactionResolved?.text;
+                                const reactionChar = activeReaction?.stationKey
+                                  ? caseData.stations[activeReaction.stationKey]?.character
+                                  : null;
+                                const weighing = (
+                                  <div style={{
+                                    fontSize: 9,
+                                    letterSpacing: '0.24em',
+                                    color: '#6db59a',
+                                    animation: 'verdictWeighPulse 1.6s ease-in-out infinite',
+                                  }}>
+                                    // WEIGHING EVIDENCE<span className="reveal-dots" />
+                                  </div>
+                                );
+                                if (!reactionText) {
+                                  return (
+                                    <div style={{ fontSize: 11, letterSpacing: '0.26em' }}>{weighing}</div>
+                                  );
+                                }
+                                return (
+                                  <div style={fadeIn(true)}>
+                                    <div style={{ fontSize: 8, letterSpacing: '0.26em', color: '#3a6b54', marginBottom: 3 }}>
+                                      // {(reactionChar || 'THE TERMINAL').toUpperCase()}
+                                    </div>
+                                    <div style={{
+                                      fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
+                                      fontStyle: 'italic',
+                                      fontSize: 12.5,
+                                      color: '#c8ffe0',
+                                      lineHeight: 1.4,
+                                      marginBottom: 5,
+                                    }}>
+                                      "{reactionText}"
+                                    </div>
+                                    {weighing}
+                                  </div>
+                                );
+                              })() : (
                                 <div style={fadeIn(true)}>
                                   <div style={{ fontSize: 8, letterSpacing: '0.26em', color: '#3a6b54', marginBottom: 3 }}>// GROUND TRUTH</div>
                                   <div style={{
@@ -4506,75 +4691,75 @@ export default function CyborgTemple() {
                                   }}>
                                     {caseData.reveal.summary}
                                   </div>
+                                  {lensNote && (
+                                    <div style={{
+                                      marginTop: 6,
+                                      fontSize: 9.5,
+                                      lineHeight: 1.4,
+                                      letterSpacing: '0.02em',
+                                      color: missedDecisive.length === 0 ? '#7fe6b3' : '#f0c98a',
+                                    }}>
+                                      <span style={{ letterSpacing: '0.22em', color: '#3a6b54' }}>// LENS · </span>
+                                      {lensNote}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
 
-                            {/* Cell C — stats (BRIER · GRADE · SCANS) */}
+                            {/* Cell C — stats. Inline on mobile (row sheet) and
+                                in-flow on desktop (vertical panel): a centered
+                                wrapping row of stat blocks. */}
                             {revealed && (
                               <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
+                                flexWrap: 'wrap',
+                                justifyContent: 'center',
                                 gap: 14,
-                                padding: '2px 14px',
-                                borderRight: '1px solid rgba(77,255,170,0.18)',
+                                ...(isMobileView
+                                  ? { padding: '2px 14px', borderRight: '1px solid rgba(77,255,170,0.18)' }
+                                  : { width: '100%', padding: '10px 0 0', borderTop: '1px solid rgba(77,255,170,0.18)' }),
                                 ...fadeIn(true),
                               }}>
-                                {statBlock('BRIER', brier.toFixed(3), gradeColor)}
+                                {confPct != null && statBlock('YOUR CALL', `${confPct}%`, isAbstain ? '#dcdce4' : (isCorrect ? '#8effc4' : '#ff8a8a'), 'P(scam)')}
+                                {statBlock('BRIER', hasBrier ? brier.toFixed(3) : '—', gradeColor, '0 = perfect')}
                                 {statBlock('GRADE', grade, gradeColor)}
                                 {statBlock('SCANS', `${investigated.size}/${caseData.maxScans}`)}
+                                {sessionScore && sessionScore.count > 0 && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 92, paddingLeft: 14, borderLeft: '1px solid rgba(77,255,170,0.18)' }}>
+                                    <div style={{ fontSize: 8, letterSpacing: '0.20em', color: '#3a6b54' }}>SESSION ·{sessionScore.count}</div>
+                                    <div style={{ fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace", fontSize: 11, color: '#c8ffe0', marginTop: 4, lineHeight: 1.5, textAlign: 'center' }}>
+                                      <div>avg <span style={{ color: '#8effc4' }}>{avgB != null ? avgB.toFixed(3) : '—'}</span>{acc != null ? ` · ${Math.round(acc * 100)}%` : ''}</div>
+                                      <div style={{ color: '#6db59a' }}>streak {sessionScore.streak}{sessionScore.bestStreak > 0 ? ` (best ${sessionScore.bestStreak})` : ''}</div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
 
-                            {/* Cell D — actions */}
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              padding: '2px 0 2px 14px',
-                              ...fadeIn(vindicated),
-                            }}>
-                              <button
-                                onClick={advanceToNextCase}
-                                disabled={!nextCaseAvailable}
-                                title={nextCaseAvailable ? undefined : 'More cases coming soon'}
-                                style={{
-                                  background: nextCaseAvailable
-                                    ? 'linear-gradient(135deg, rgba(77,255,170,0.18), rgba(13,80,50,0.32))'
-                                    : 'transparent',
-                                  border: `1px solid ${nextCaseAvailable ? 'rgba(77,255,170,0.85)' : 'rgba(77,255,170,0.25)'}`,
-                                  color: nextCaseAvailable ? '#8effc4' : 'rgba(142,255,196,0.35)',
-                                  padding: '8px 14px',
-                                  fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  letterSpacing: '0.26em',
-                                  cursor: nextCaseAvailable ? 'pointer' : 'not-allowed',
-                                  boxShadow: nextCaseAvailable
-                                    ? '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
-                                    : 'none',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {nextCaseAvailable ? '▸ NEXT CASE' : '▸ NEXT — SOON'}
-                              </button>
-                              <button
-                                onClick={returnToServiceRail}
-                                style={{
-                                  background: 'transparent',
-                                  border: '1px solid rgba(110,181,154,0.55)',
-                                  color: '#8fd4b6',
-                                  padding: '8px 14px',
-                                  fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                                  fontSize: 10,
-                                  letterSpacing: '0.26em',
-                                  cursor: 'pointer',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                ▸ BACK
-                              </button>
-                            </div>
+                            {/* Actions (NEXT CASE / BACK) live in the bottom-nav
+                                center slot during the reveal, not in this panel. */}
+
+                            {/* Plain-language explainer — most players won't know
+                                what a Brier score is. Wraps to its own line along
+                                the bottom of the ribbon. */}
+                            {revealed && hasBrier && (
+                              <div style={{
+                                width: '100%',
+                                marginTop: 8,
+                                paddingTop: 8,
+                                borderTop: '1px solid rgba(77,255,170,0.12)',
+                                fontSize: 9.5,
+                                lineHeight: 1.5,
+                                color: '#6db59a',
+                                letterSpacing: '0.02em',
+                                ...fadeIn(vindicated),
+                              }}>
+                                <span style={{ letterSpacing: '0.22em', color: '#3a6b54', marginRight: 8 }}>// SCORING</span>
+                                Brier measures how well your confidence matched reality — <strong style={{ color: '#8effc4', fontWeight: 700 }}>0 is a perfect call</strong>, and lower is always better. Confident-and-right scores lowest, confident-and-wrong worst; sitting near 50% (Abstain) lands in the middle.
+                              </div>
+                            )}
                           </div>
                         </>
                       );
@@ -4591,7 +4776,62 @@ export default function CyborgTemple() {
                    placeholders for now. */
                 onBuyClick={() => {}}
                 centerSlot={
-                  tradeMode === 'game' && isReviewMode ? (
+                  // Once a verdict is committed the verdict control is dropped
+                  // and, in the final reveal beat, replaced with the NEXT CASE /
+                  // BACK actions (moved here out of the score panel).
+                  tradeMode === 'game' && verdict ? (
+                    revealPhase === 'vindicate' ? (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                        <button
+                          onClick={advanceToNextCase}
+                          disabled={!nextCaseAvailable}
+                          title={nextCaseAvailable ? undefined : 'More cases coming soon'}
+                          style={{
+                            height: 60,
+                            padding: '0 18px',
+                            borderRadius: 10,
+                            background: nextCaseAvailable
+                              ? 'linear-gradient(135deg, rgba(77,255,170,0.22), rgba(13,80,50,0.34))'
+                              : 'rgba(20,30,40,0.45)',
+                            border: `1px solid ${nextCaseAvailable ? 'rgba(120,255,180,0.95)' : 'rgba(77,255,170,0.25)'}`,
+                            color: nextCaseAvailable ? '#d6ffe5' : 'rgba(142,255,196,0.35)',
+                            fontFamily: "'Orbitron', monospace",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            letterSpacing: '0.14em',
+                            cursor: nextCaseAvailable ? 'pointer' : 'not-allowed',
+                            textShadow: nextCaseAvailable ? '0 0 10px rgba(77,255,170,0.5)' : 'none',
+                            boxShadow: nextCaseAvailable
+                              ? '0 0 14px rgba(77,255,170,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
+                              : 'none',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {nextCaseAvailable ? '▸ NEXT CASE' : '▸ NEXT — SOON'}
+                        </button>
+                        <button
+                          onClick={returnToServiceRail}
+                          style={{
+                            height: 60,
+                            padding: '0 16px',
+                            borderRadius: 10,
+                            background: 'rgba(20,30,40,0.45)',
+                            border: '1px solid rgba(110,181,154,0.6)',
+                            color: '#9ed6bb',
+                            fontFamily: "'Orbitron', monospace",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            letterSpacing: '0.14em',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          ▸ BACK
+                        </button>
+                      </div>
+                    ) : null
+                  )
+                  : tradeMode === 'game' && isReviewMode ? (
                     // Review mode — the team renders the verdict, not
                     // the player. Single READ TEAM VERDICT button stays
                     // disabled until they've asked at least one question
@@ -4634,51 +4874,15 @@ export default function CyborgTemple() {
                       );
                     })()
                   ) : tradeMode === 'game' ? (
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 6,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {[
-                        { label: 'Trust', verdict: 'trust', bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)', desc: 'Trust — evidence supports legitimacy' },
-                        { label: 'Abstain', verdict: 'abstain', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)', desc: 'Abstain — signal is incomplete or mixed' },
-                        { label: 'Doubt',   verdict: 'doubt',   bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)', desc: 'Doubt — evidence supports deception or severe risk' },
-                      ].map(({ label, verdict: v, bg, border, desc }) => {
-                        const enabled = investigated.size > 0 && !verdict;
-                        const onClick = () => { if (enabled) submitVerdict(v); };
-                        return (
-                        <button
-                          key={label}
-                          onClick={onClick}
-                          disabled={!enabled}
-                          aria-label={desc}
-                          title={!enabled && investigated.size === 0 ? 'Investigate at least one station first' : desc}
-                          style={{
-                            minWidth: 70,
-                            height: 60,
-                            padding: '10px 10px',
-                            borderRadius: 10,
-                            background: bg,
-                            border: `1px solid ${border}`,
-                            color: '#fff',
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: 11,
-                            fontWeight: 800,
-                            letterSpacing: '0.12em',
-                            cursor: enabled ? 'pointer' : 'not-allowed',
-                            opacity: enabled ? 1 : 0.4,
-                            textShadow: '0 1px 0 rgba(0,0,0,0.4)',
-                            boxShadow: `0 0 8px ${border}, inset 0 1px 0 rgba(255,255,255,0.15)`,
-                          }}
-                        >
-                          {label}
-                        </button>
-                        );
-                      })}
-                    </div>
+                    // Forensic (graded) case — calibrated confidence slider.
+                    // The player sets P(scam); the committed probability buckets
+                    // to believe/abstain/doubt only for the character reaction.
+                    <ConfidenceVerdict
+                      enabled={investigated.size > 0 && !verdict}
+                      isMobileView={isMobileView}
+                      disabledHint="Investigate at least one station first"
+                      onCommit={(p, bucket) => submitVerdict(bucket, p)}
+                    />
                   ) : (
                     (() => {
                       const isReview = selectedService === 'analysis';
