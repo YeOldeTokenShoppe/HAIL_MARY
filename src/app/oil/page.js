@@ -181,7 +181,7 @@ const skyGradientShader = {
 // Colored glow hovering just beneath the floating oil-field cube. The cube's
 // bottom face sits at local y = -worldH (≈ -10 for the default 20-level grid),
 // so this sits a touch below it. Placeholder color for now — placement first.
-function FieldUnderglow({ y = -6, color = "#e88409", size = 40, drop = 3 }) {
+function FieldUnderglow({ y = -8, color = "#e88409", size = 40, drop = 3, haloSize = 30, haloDrop = 5, haloOpacity = 0.6 }) {
   // Soft radial-gradient sprite (camera-facing) so the glow has feathered edges
   // instead of a hard sphere silhouette. Keeps default depthTest so the cube
   // occludes the upper half and the glow spills out from beneath the field.
@@ -203,22 +203,77 @@ function FieldUnderglow({ y = -6, color = "#e88409", size = 40, drop = 3 }) {
     ctx.fillRect(0, 0, s, s);
     return new THREE.CanvasTexture(c);
   }, []);
+  // Bottom-weighted variant for the camera-facing halo: the same radial glow,
+  // but its UPPER half is faded to transparent so the halo can be large/bright
+  // enough to hold the horizon glow at any orbit angle without its top reaching
+  // up to light the grid surface. Decouples horizon brightness from grid reach,
+  // which size/drop alone can't. (Canvas top = sprite top.)
+  const haloTexture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const s = 128;
+    const c = document.createElement("canvas");
+    c.width = c.height = s;
+    const ctx = c.getContext("2d");
+    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.5)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    // Cut the top: keep the lower half, ramp the upper half down to nothing.
+    ctx.globalCompositeOperation = "destination-in";
+    const v = ctx.createLinearGradient(0, 0, 0, s);
+    v.addColorStop(0, "rgba(0,0,0,0)");      // top edge — fully removed
+    v.addColorStop(0.5, "rgba(0,0,0,0.12)"); // around the core — mostly removed
+    v.addColorStop(1, "rgba(0,0,0,1)");      // bottom — kept
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, s, s);
+    return new THREE.CanvasTexture(c);
+  }, []);
   return (
     <group position={[0, y, 0]}>
-      <sprite position={[0, -drop, 0]} scale={[size, size, 1]}>
-        <spriteMaterial
+      {/* Horizontal ground-glow disc (lies flat in the XZ plane) rather than a
+          camera-facing vertical sprite. A vertical quad's plane cuts up through
+          the cube, and depthTest clips it into a hard occlusion seam that slides
+          across the cube as you orbit (the "shadow"). A flat disc sits just
+          under the cube: the cube cleanly occludes the part directly beneath it
+          and the rim spills out around the base as the horizon glow — no seam.
+          Stays depthTest'd, so it also avoids the iOS additive-CanvasTexture
+          blocky-rectangle artifact. */}
+      <mesh position={[0, -drop, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[size / 2, 48]} />
+        <meshBasicMaterial
           map={texture}
           color={color}
           transparent
           opacity={0.85}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Camera-facing halo: keeps the horizon glow alive at low orbit angles,
+          where the flat disc projects edge-on and nearly vanishes. Kept small
+          and dropped LOW so its top edge tucks under the cube's bottom — it
+          spills out and down into the sky as the horizon rim but never rises in
+          front of the grid surface, so it doesn't re-introduce the extra-light
+          bleed onto the grid that the vertical sprite alone caused. Tune:
+          smaller haloSize / larger haloDrop = less grid reach; larger haloSize /
+          haloOpacity = more horizon glow. */}
+      <sprite position={[0, -haloDrop, 0]} scale={[haloSize, haloSize, 1]}>
+        <spriteMaterial
+          map={texture}
+          color={color}
+          transparent
+          opacity={haloOpacity}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </sprite>
       {/* No pointLight: an omni light here under-lit the tall water tower and
           threw an uneven hotspot on the grid ground at certain angles. The
-          additive sprite is screen-space and carries the glow without shading
-          any geometry. */}
+          additive disc + halo are unlit and carry the glow without shading any
+          geometry. */}
     </group>
   );
 }
@@ -627,9 +682,13 @@ function CameraFlyTo({ target, controlsRef }) {
 
   useFrame((_, delta) => {
     if (target && target.id !== lastId.current) {
-      lastId.current = target.id;
       const controls = controlsRef?.current;
+      // Only consume this target once controls are actually mounted — otherwise a
+      // fly requested on the same render this component mounts (e.g. first surface
+      // click ending the intro) would be marked seen and silently dropped. Retry
+      // next frame until the ref is populated.
       if (controls) {
+        lastId.current = target.id;
         // Save and temporarily lower minDistance
         if (savedMinDist.current === null) savedMinDist.current = controls.minDistance;
         controls.minDistance = 0.3;
@@ -670,11 +729,11 @@ function CameraFlyTo({ target, controlsRef }) {
           // washes the rig in a warm haze (and blows out the metal's env
           // reflection); the downward tilt breaks that grazing angle.
           endTarget.current.set(target.x, target.y - 0.15, target.z + 0.1);
-          endPos.current.set(target.x + 0.8, target.y + 0.45, target.z + 0.6);
+          endPos.current.set(target.x + 0.5, target.y + 0.22, target.z + 0.41);
         } else {
           // Desktop: elevated close-up (pulled back slightly for more headroom)
           endTarget.current.set(target.x + 0.1, target.y - 0.05, target.z + 0.1);
-          endPos.current.set(target.x + 0.95, target.y + 0.05, target.z + 0.7);
+          endPos.current.set(target.x + 0.63, target.y + 0.01, target.z + 0.47);
         }
 
         progressRef.current = 0;
@@ -2062,6 +2121,35 @@ export default function OilPage() {
     return maxNeighbor;
   }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D, gridSize]);
 
+  // Hell proximity — is a hell pocket lurking in the 3x3x3 neighborhood? Returns a
+  // 0..1 "heat" intensity that feeds the area-scan thermal/sulfurous hint. Closer
+  // (face-adjacent) reads hotter than a corner, but it intentionally does NOT encode
+  // WHICH direction the pocket is — so the scan warns "something's near" without
+  // handing the player the exact cell.
+  const hellProximity = useMemo(() => {
+    if (selectedX === null || sliceY === null || effectiveDrillDay === 0) return 0;
+    const depthIndex = effectiveDrillDay - 1;
+    if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
+    const hm = stats.hellMap;
+    let intensity = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          const nx = selectedX + dx;
+          const ny = sliceY + dy;
+          const nz = depthIndex + dz;
+          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize || nz < 0 || nz >= DEPTH_Z) continue;
+          if (!hm[`${nx}_${ny}_${nz}`]) continue;
+          const steps = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+          const w = steps === 1 ? 0.85 : steps === 2 ? 0.6 : 0.45;
+          if (w > intensity) intensity = w;
+        }
+      }
+    }
+    return intensity;
+  }, [selectedX, sliceY, effectiveDrillDay, stats.hellMap, gridSize]);
+
   // Camera shake — ref-driven, no state re-renders
   const shakeRef = useRef(0);
 
@@ -2152,6 +2240,11 @@ export default function OilPage() {
     const x = -worldW / 2 + col * CELL_SIZE + CELL_SIZE / 2;
     const z = worldD / 2 - row * CELL_SIZE - CELL_SIZE / 2;
     flyIdRef.current++;
+    // Any explicit fly target is a navigation intent — end the intro orbit so the
+    // OrbitControls + CameraFlyTo rig mounts and actually moves the camera. Without
+    // this, a surface-map / claim click before the user has touched the 3D canvas
+    // sets flyTarget but nothing is mounted to act on it.
+    setIntroComplete(true);
     setFlyTarget({ x, y: isMobile ? 1.3 : 5.3, z, id: flyIdRef.current, mobile: isMobile });
     setSelectedX(col);
     setSliceY(row);
@@ -4763,6 +4856,7 @@ export default function OilPage() {
             oilValue={drilledOilValue}
             maxOil={stats.maxOil}
             drillProximity={drillProximity}
+            hellProximity={hellProximity}
             darkMode={uiDark}
             parabolum={parabolum}
             Geode={GeodeMode}
@@ -5261,6 +5355,7 @@ export default function OilPage() {
               oilValue={drilledOilValue}
               maxOil={stats.maxOil}
               drillProximity={drillProximity}
+              hellProximity={hellProximity}
               darkMode={uiDark}
               parabolum={parabolum}
               Geode={GeodeMode}

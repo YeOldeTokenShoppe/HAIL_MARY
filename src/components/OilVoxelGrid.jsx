@@ -301,6 +301,7 @@ uniform float uTime;
 uniform float uOpacity;
 uniform float uNightMode;
 uniform float uParabolum;
+uniform float uHell;
 uniform vec2 uResolution;
 
 // Hash and noise
@@ -339,15 +340,21 @@ void main() {
   float T = uTime;
 
   // ── Fast scrolling noise layers that rush UPWARD ──
-  // Key: subtract time from y so the pattern moves up
-  float scroll1 = fbm(vec2(x * 8.0, y * 5.0 - T * 4.0));
-  float scroll2 = fbm(vec2(x * 10.0 + 3.7, y * 6.0 - T * 5.0 + 1.3));
-  float scroll3 = fbm(vec2(x * 14.0 - 1.1, y * 8.0 - T * 6.0 + 5.7));
+  // Key: subtract time from y so the pattern moves up. Hell roars ~1.7x faster so
+  // it reads as superheated gas/flame rather than flowing liquid.
+  float tScale = mix(1.0, 1.7, uHell);
+  float scroll1 = fbm(vec2(x * 8.0, y * 5.0 - T * 4.0 * tScale));
+  float scroll2 = fbm(vec2(x * 10.0 + 3.7, y * 6.0 - T * 5.0 * tScale + 1.3));
+  float scroll3 = fbm(vec2(x * 14.0 - 1.1, y * 8.0 - T * 6.0 * tScale + 5.7));
 
   // Combine into turbulent displacement
   float turb = scroll1 * 0.55 + scroll2 * 0.3 + scroll3 * 0.15;
 
-  // ── Column shape: narrow jet at base, cresting cap that curls back down ──
+  // Extra-fast flicker layer for hell — drives flame-tongue sway and brightness
+  // flicker. Roughly -0.5..0.5; we offset to taste below.
+  float flameFlick = fbm(vec2(x * 9.0 + 1.7, y * 11.0 - T * 12.0));
+
+  // ── Column shape (oil): narrow jet at base, cresting cap that curls back down ──
   float baseWidth = 0.06;
   float spread = 0.35 * y * y; // quadratic spread up the jet
   float wobble = scroll1 * 0.1 * y;
@@ -358,27 +365,48 @@ void main() {
   // Lobes push outward from center
   float capLobe = capZone * sign(x + 0.001) * (fbm(vec2(abs(x) * 6.0 - T * 1.5, y * 4.0 + T * 2.0)) * 0.12);
 
-  float columnWidth = baseWidth + spread + capBulge + abs(capLobe);
-  float xOff = x + wobble + capLobe;
+  float oilWidth = baseWidth + spread + capBulge + abs(capLobe);
+  float oilXOff = x + wobble + capLobe;
   // Soft inner edge: in the cap, the boundary becomes a wide gentle gradient
-  float innerEdge = mix(columnWidth * 0.3, columnWidth * 0.0, capZone);
+  float oilInner = mix(oilWidth * 0.3, oilWidth * 0.0, capZone);
+
+  // ── Furnace-blast shape (hell): a torch-flame teardrop — narrow nozzle at the
+  //    wellmouth, billowing belly, tapering to flickering tongues. No liquid cap. ──
+  float fl = flameFlick - 0.5; // ~ -1..0; magnitude drives raggedness
+  float belly = 0.26 * smoothstep(0.02, 0.30, y) * (1.0 - smoothstep(0.32, 0.96, y));
+  float ragged = abs(fl) * 0.10 * (0.4 + y);                  // turbulent flickering edge
+  float tongues = smoothstep(0.55, 1.0, y) * abs(fl) * 0.16;  // flame tips lick upward
+  float hellWidth = baseWidth + belly + ragged + tongues;
+  float hellXOff = x + wobble * 1.4 + fl * 0.16 * y;          // flames sway, not a tidy column
+  float hellInner = hellWidth * 0.05;                         // soft, gaseous — no hard liquid wall
+
+  float columnWidth = mix(oilWidth, hellWidth, uHell);
+  float xOff = mix(oilXOff, hellXOff, uHell);
+  float innerEdge = mix(oilInner, hellInner, uHell);
   float shape = smoothstep(columnWidth, innerEdge, abs(xOff));
 
   // ── Vertical profile ──
   float coreDensity = smoothstep(0.0, 0.08, y);
 
-  // Stay solid throughout — no smoke dissipation
-  float wispiness = mix(0.85, 0.4, y); // less wispy overall, stays denser
+  // Oil stays solid (no smoke dissipation); hell stays fairly dense in the belly
+  // but breaks up into flickering flame toward the tips.
+  float wispiness = mix(mix(0.85, 0.4, y), mix(0.92, 0.78, y), uHell);
   float density = mix(turb * 0.5 + 0.5, 1.0, wispiness) * coreDensity;
 
   // Chaotic blobs rushing upward
-  float blobs = noise(vec2(x * 10.0, y * 8.0 - T * 5.0));
+  float blobs = noise(vec2(x * 10.0, y * 8.0 - T * 5.0 * tScale));
   blobs = smoothstep(0.1, 0.5, blobs) * (1.0 - y * 0.3);
   density = max(density, blobs * 0.8);
 
-  // Dense cap fill — stays opaque, not smoky
+  // Oil: dense mushroom cap fill. Hell skips the cap entirely (no liquid crest).
   float capDensity = capZone * (fbm(vec2(sign(x + 0.001) * abs(x) * 2.0 - sign(x + 0.001) * T * 2.0, y * 5.0 - T * 0.8)) * 0.4 + 0.6);
-  density = mix(density, max(density, capDensity), capZone);
+  density = mix(mix(density, max(density, capDensity), capZone), density, uHell);
+
+  // Hell: flicker the brightness and taper density toward the tips so the flame
+  // licks and dies out up top instead of standing as a solid wall.
+  float flameDensity = (0.62 + 0.55 * flameFlick) * (1.0 - smoothstep(0.35, 1.0, y) * 0.72);
+  density *= mix(1.0, flameDensity, uHell);
+  density = max(density, 0.0);
 
   // ── Color: very dark oil with occasional slick highlights ──
   vec3 darkOil = vec3(0.03, 0.015, 0.008);
@@ -398,13 +426,25 @@ void main() {
   midOil = mix(midOil, vec3(0.05, 0.28, 0.09), uParabolum);
   highlight = mix(highlight, vec3(0.22, 0.70, 0.28), uParabolum);
 
+  // Hell: a fiery eruption — charred-red base, molten-orange body, red-orange crests
+  darkOil = mix(darkOil, vec3(0.26, 0.02, 0.0), uHell);
+  midOil = mix(midOil, vec3(0.95, 0.16, 0.01), uHell);
+  highlight = mix(highlight, vec3(1.8, 0.55, 0.06), uHell);
+
   float colorNoise = scroll2 * 0.5 + 0.5;
   vec3 col = mix(darkOil, midOil, colorNoise);
   col = mix(col, highlight, pow(max(density, 0.0), 4.0) * 0.6);
 
-  // Night/Paraboleum emissive glow — blue at night, neon-green for Paraboleum
-  float emissive = max(uNightMode, uParabolum) * (0.3 + 0.4 * pow(max(density, 0.0), 2.0));
-  col += mix(vec3(0.05, 0.1, 1.35), vec3(0.22, 1.5, 0.42), uParabolum) * emissive;
+  // Hell: white-hot furnace mouth at the base, cooling to red-orange up the flame.
+  // Confined to the bottom ~45% so the body stays red-orange, not yellow.
+  float heat = (1.0 - smoothstep(0.0, 0.45, y)) * uHell * coreDensity;
+  col = mix(col, vec3(2.1, 1.05, 0.4), heat * 0.5);
+
+  // Emissive glow — blue at night, neon-green for Paraboleum, molten-orange for hell
+  float emissive = max(max(uNightMode, uParabolum), uHell) * (0.3 + 0.45 * pow(max(density, 0.0), 2.0));
+  vec3 glowCol = mix(vec3(0.05, 0.1, 1.35), vec3(0.22, 1.5, 0.42), uParabolum);
+  glowCol = mix(glowCol, vec3(2.4, 0.5, 0.04), uHell);
+  col += glowCol * emissive;
 
   // ── Alpha compositing ──
   float alpha = shape * density * uOpacity;
@@ -412,17 +452,21 @@ void main() {
   float coreBoost = smoothstep(columnWidth * 0.5, 0.0, abs(xOff)) * coreDensity * 0.5;
   alpha = min(alpha + coreBoost * uOpacity, 1.0);
 
-  // Dome fade: radial distance from a point at top-center of the gusher
-  // This naturally rounds the top into a dome shape
+  // Top fade. Oil rounds into a dome; hell tapers into ragged, flickering flame
+  // tips that dissipate higher up the plane.
   float domeCenter = 0.65; // y-center of the dome
   float dx = x * 1.8; // stretch x so dome is taller than wide
   float dy = max(y - domeCenter, 0.0); // only fade above dome center
   float domeDist = sqrt(dx * dx + dy * dy);
   float domeFade = smoothstep(0.4, 0.05, domeDist);
+  // Flame-tip fade: 1 through the body, falling to 0 at a flickering, noise-jittered
+  // top edge so the tongues lick and break up instead of ending in a clean dome.
+  float hellTop = smoothstep(1.0, 0.74 + flameFlick * 0.16, y);
+  float topFade = mix(domeFade, hellTop, uHell);
 
   // Edge fade — sides and bottom
   float edgeFade = smoothstep(0.0, 0.03, vUv.x) * smoothstep(1.0, 0.97, vUv.x)
-                 * smoothstep(0.0, 0.02, y) * domeFade;
+                 * smoothstep(0.0, 0.02, y) * topFade;
   alpha *= edgeFade;
 
   gl_FragColor = vec4(col, alpha);
@@ -448,6 +492,7 @@ uniform float uOpacity;
 uniform float uGrow;
 uniform float uNightMode;
 uniform float uParabolum;
+uniform float uHell;
 
 vec2 hash(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -497,15 +542,19 @@ void main() {
 
   if (cov < 0.02) discard;
 
-  // Dark oil, tinted neon-green for parabolum.
+  // Dark oil, tinted neon-green for parabolum, molten-red for hell.
   vec3 oil = mix(vec3(0.02, 0.015, 0.008), vec3(0.015, 0.05, 0.02), uParabolum);
+  oil = mix(oil, vec3(0.14, 0.02, 0.0), uHell);
   float sheen = pow(cov, 3.0);
   vec3 hi = mix(vec3(0.18, 0.14, 0.08), vec3(0.16, 0.60, 0.24), uParabolum);
+  hi = mix(hi, vec3(1.5, 0.55, 0.06), uHell);
   vec3 col = mix(oil, hi, sheen * 0.5);
 
-  // Emissive glow so the slick still reads at night / under parabolum.
-  float emis = max(uNightMode, uParabolum) * 0.4 * cov;
-  col += mix(vec3(0.04, 0.08, 0.5), vec3(0.12, 0.7, 0.28), uParabolum) * emis;
+  // Emissive glow so the slick still reads at night / under parabolum / in hell.
+  float emis = max(max(uNightMode, uParabolum), uHell) * 0.4 * cov;
+  vec3 emisCol = mix(vec3(0.04, 0.08, 0.5), vec3(0.12, 0.7, 0.28), uParabolum);
+  emisCol = mix(emisCol, vec3(1.6, 0.38, 0.02), uHell);
+  col += emisCol * emis;
 
   gl_FragColor = vec4(col, cov * uOpacity * 0.92);
 }
@@ -530,6 +579,9 @@ const GUSHER_BLOWBACK_SPEED = 15;   // lerp rate toward the target tilt
 const GUSHER_HEAD_EXTRA = Math.PI / 1.1;
 const _GUSHER_X_AXIS = /* @__PURE__ */ new THREE.Vector3(1, 0, 0);
 const _gusherHeadQuat = /* @__PURE__ */ new THREE.Quaternion();
+// One-shot gusher length (seconds). A sustained gusher (tank overflow, or the demon
+// being loose) holds at full intensity and only runs this final 1s as a settle.
+const GUSHER_DURATION = 3.0;
 
 /**
  * Build an ExtrudeGeometry representing liquid in a horizontal cylinder.
@@ -1771,6 +1823,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     uOpacity: { value: 1.0 },
     uNightMode: { value: 0.0 },
     uParabolum: { value: 0.0 },
+    uHell: { value: 0.0 },
     uResolution: { value: new THREE.Vector2(256, 512) },
   });
 
@@ -1782,11 +1835,22 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     uGrow: { value: 0.0 },
     uNightMode: { value: 0.0 },
     uParabolum: { value: 0.0 },
+    uHell: { value: 0.0 },
   });
 
-  const initGusher = useCallback(() => {
+  // True while the active gusher is a hell eruption (demon unleash) rather than a
+  // normal oil/parabolum overflow — drives the fiery shader tint + fireball burst.
+  const gusherHellRef = useRef(false);
+  const hellBurstRef = useRef();
+  const hellBurstMatRef = useRef();
+  const hellBurstLightRef = useRef();
+  const hellBurstTimerRef = useRef(0);
+
+  const initGusher = useCallback((hell = false) => {
     gusherActiveRef.current = true;
     gusherTimerRef.current = 0;
+    gusherHellRef.current = hell;
+    hellBurstTimerRef.current = 0;
     if (geyserMatRef.current) {
       geyserMatRef.current.uniforms.uTime.value = 0;
       geyserMatRef.current.uniforms.uOpacity.value = 1.0;
@@ -1898,6 +1962,26 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, [tankFill, highlighted, initGusher]);
 
+  // Hell unleash — when the demon erupts from this rig's well, blow the rig parts
+  // back and fire a fiery gusher + fireball burst. Edge-triggered on hellActive
+  // false→true. Initialized to the current value so a mid-event remount (or a
+  // returning player loading with the demon already loose) doesn't replay it.
+  const prevHellActive = useRef(hellActive);
+  useEffect(() => {
+    if (hellActive && !prevHellActive.current) {
+      initGusher(true);            // fiery tint + blowback + fireball
+      strikingRef.current = true;  // continuous red alert-light strobe
+      strikeTimerRef.current = 0;
+    } else if (!hellActive && prevHellActive.current) {
+      // Demon banished — release the held gusher into its final 1s fade so the rig
+      // settles back smoothly instead of snapping (the timer was pinned while held).
+      if (gusherActiveRef.current && gusherHellRef.current) {
+        gusherTimerRef.current = GUSHER_DURATION - 1.0;
+      }
+    }
+    prevHellActive.current = hellActive;
+  }, [hellActive, initGusher]);
+
   // Trigger drill effects on every drill event (highlighted rig only)
   const initDust = useCallback(() => {
     const pos = dustPosRef.current;
@@ -1984,8 +2068,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
 
-    // Non-highlighted pumpjacks: throttle animation to every 3rd frame, skip all interactive logic
-    if (!highlightedRef.current) {
+    // Non-highlighted pumpjacks: throttle animation to every 3rd frame, skip all
+    // interactive logic. EXCEPTION: the rig the demon erupts from (hellActive) runs
+    // the full path so its blowback + fiery gusher play for every viewer, not just
+    // whoever happens to have it selected. Also keep running while ANY gusher is
+    // still active so the settle/restore completes after hellActive flips off (else
+    // a non-highlighted rig would freeze mid-blowback and never restore the pump).
+    if (!highlightedRef.current && !hellActiveRef.current && !gusherActiveRef.current) {
       frameSkip.current = (frameSkip.current + 1) % 3;
       if (!NO_ANIM && frameSkip.current === 0) mixer.update(delta * 3);
       return;
@@ -2382,15 +2471,38 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (geyserMeshRef.current && !geyserMeshRef.current.visible) {
         geyserMeshRef.current.visible = true;
       }
-      // Keep pump head parts oil-stained while gusher is active
-      const stainColor = 0x0d2a14;
+      // Keep pump parts stained while gusher is active — green oil normally, a
+      // charred scorch for the hell eruption.
+      const hell = gusherHellRef.current;
+      const stainColor = hell ? 0x2a0a05 : 0x0d2a14;
       if (strawRef.current?.material) strawRef.current.material.color.set(stainColor);
       cylPumpRefs.current.forEach((m) => { if (m.material) m.material.color.set(stainColor); });
       gusherTimerRef.current += delta;
-      const GUSHER_DURATION = 3.0;
+
+      // Fireball burst — a fast expanding flash at the wellhead the instant the
+      // demon is unleashed (first ~0.8s of the hell gusher), then it fades out.
+      if (hell && hellBurstRef.current) {
+        hellBurstTimerRef.current += delta;
+        const bt = hellBurstTimerRef.current;
+        const BURST_DUR = 0.85;
+        if (bt < BURST_DUR) {
+          const bf = bt / BURST_DUR;
+          hellBurstRef.current.visible = true;
+          hellBurstRef.current.scale.setScalar(0.3 + bf * 2.8);
+          hellBurstRef.current.rotation.y += delta * 1.5;
+          if (hellBurstMatRef.current) hellBurstMatRef.current.opacity = (1 - bf) * 0.95;
+          if (hellBurstLightRef.current) hellBurstLightRef.current.intensity = (1 - bf) * 12;
+        } else if (hellBurstRef.current.visible) {
+          hellBurstRef.current.visible = false;
+          if (hellBurstLightRef.current) hellBurstLightRef.current.intensity = 0;
+        }
+      }
 
       const effectiveFill = (drainingRef.current || drainedRef.current) ? drainFillRef.current : tankFillRef.current;
-      const overflowing = effectiveFill >= 1.0 && highlighted;
+      // Sustain the gusher (and the blowback that rides it) at full intensity while
+      // the tank overflows OR while the demon is loose (hell). Both hold the rig
+      // pitched back indefinitely; the final 1s settle only runs once this is false.
+      const overflowing = (effectiveFill >= 1.0 && highlighted) || (gusherHellRef.current && hellActiveRef.current);
 
       // Fade out near end of one-shot gusher (also drives the blowback below)
       const fade = overflowing ? 1.0
@@ -2400,7 +2512,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
       if (geyserMatRef.current) {
         geyserMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
-        geyserMatRef.current.uniforms.uParabolum.value = 1.0;
+        geyserMatRef.current.uniforms.uParabolum.value = hell ? 0.0 : 1.0;
+        geyserMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
         geyserMatRef.current.uniforms.uTime.value += delta;
         geyserMatRef.current.uniforms.uOpacity.value = fade;
       }
@@ -2409,7 +2522,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       // and fades with the gusher (uOpacity = fade). Self-resets, no lingering state.
       if (spillMatRef.current) {
         spillMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
-        spillMatRef.current.uniforms.uParabolum.value = 1.0;
+        spillMatRef.current.uniforms.uParabolum.value = hell ? 0.0 : 1.0;
+        spillMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
         spillMatRef.current.uniforms.uGrow.value = blowbackRef.current;
         spillMatRef.current.uniforms.uOpacity.value = fade;
       }
@@ -2431,6 +2545,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
       if (gusherTimerRef.current > GUSHER_DURATION && !overflowing) {
         gusherActiveRef.current = false;
+        gusherHellRef.current = false;
+        if (hellBurstRef.current) hellBurstRef.current.visible = false;
+        if (hellBurstLightRef.current) hellBurstLightRef.current.intensity = 0;
         if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
         if (spillMeshRef.current) spillMeshRef.current.visible = false;
         if (spillMatRef.current) { spillMatRef.current.uniforms.uOpacity.value = 0; spillMatRef.current.uniforms.uGrow.value = 0; }
@@ -2626,8 +2743,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
       {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
-      {/* Red alert point light — only on selected rig, intensity driven by useFrame */}
-      {highlighted && (
+      {/* Red alert point light + gusher VFX — on the selected rig, or on the rig
+          the demon erupts from (hellActive) so every viewer sees the blowback. */}
+      {(highlighted || hellActive) && (
         <>
           <pointLight
             ref={strikeLightRef}
@@ -2637,6 +2755,23 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
             distance={5}
             decay={1.5}
           />
+          {/* Hell fireball burst — additive flash at the wellhead on demon unleash */}
+          <group
+            position={[gusherOriginRef.current.x, gusherOriginRef.current.y + 0.35, gusherOriginRef.current.z]}
+          >
+            <mesh ref={hellBurstRef} visible={false} renderOrder={11}>
+              <icosahedronGeometry args={[0.35, 2]} />
+              <meshBasicMaterial
+                ref={hellBurstMatRef}
+                color="#ff3c0a"
+                transparent
+                opacity={0}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
+            </mesh>
+            <pointLight ref={hellBurstLightRef} color="#ff3a00" intensity={0} distance={6} decay={2} />
+          </group>
           {/* Oil geyser shader plane */}
           <mesh
             ref={geyserMeshRef}

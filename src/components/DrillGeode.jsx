@@ -21,6 +21,21 @@ const PRELIM_LEVELS = [
   { label: "ANOMALOUS SIGNAL", color: "#74ff96", threshold: 0.35 },
 ];
 
+// Hell-pocket proximity readings — amber→orange thermal/chemical cues that warn a
+// hell pocket is near WITHOUT naming the demon or its direction. Deliberately
+// ambiguous (could read as a thermal vent over a rich vein), and visually distinct
+// from the green oil scan so it doesn't blend into a normal "good" signal.
+const HELL_PRELIM_LEVELS = [
+  { label: "THERMAL FLUX", color: "#d6a23c" },
+  { label: "SULFUROUS TRACE", color: "#e8742a" },
+  { label: "EXOTHERMIC ANOMALY", color: "#ff5a1e" },
+];
+function getHellPrelimLevel(intensity) {
+  if (intensity >= 0.8) return 2;
+  if (intensity >= 0.55) return 1;
+  return 0;
+}
+
 // Status-readout colors (index-aligned). Green everywhere now — dark variant is
 // bright for dark/console bg, light variant is deeper for the light console.
 const DENSITY_COLORS_PARA_DARK = ["#7a8a72", "#5cae6c", "#2f9f4e", "#2dd64a", "#74ff96"];
@@ -118,6 +133,7 @@ export default function DrillHUD({
   oilValue = 0,
   maxOil = 1,
   drillProximity = 0,
+  hellProximity = 0,
   darkMode = true,
   parabolum = false,
   hud = false,
@@ -145,6 +161,7 @@ export default function DrillHUD({
   const pendingOilValue = useRef(0);
   const pendingMaxOil = useRef(1);
   const pendingProximity = useRef(0);
+  const pendingHellProximity = useRef(0);
   const prelimTimerRef = useRef(null);
 
   const animate = useCallback(() => {
@@ -188,6 +205,21 @@ export default function DrillHUD({
       prelimTimerRef.current = setTimeout(() => {
         const prox = pendingProximity.current;
         const mx = pendingMaxOil.current;
+        const hellProx = pendingHellProximity.current;
+        // A nearby hell pocket overrides the oil scan with an ambiguous thermal
+        // cue — it's the more important (and more dangerous) thing under the bit.
+        if (hellProx > 0) {
+          const hi = getHellPrelimLevel(hellProx);
+          const hl = HELL_PRELIM_LEVELS[hi];
+          const hp = 55 + hellProx * 40; // elevated pressure — reads as "energetic"
+          setPrelimPressure(hp);
+          setPressure(hp);
+          setDensity(0);
+          setStatus(`AREA SCAN: ${hl.label}`);
+          setStatusColor(hl.color);
+          setPhase("preliminary");
+          return;
+        }
         const prelim = getPrelimLevel(prox, mx);
         const prelimIdx = PRELIM_LEVELS.indexOf(prelim);
         const proxRatio = mx > 0 ? prox / mx : 0;
@@ -211,6 +243,7 @@ export default function DrillHUD({
       pendingOilValue.current = oilValue;
       pendingMaxOil.current = maxOil;
       pendingProximity.current = drillProximity;
+      pendingHellProximity.current = hellProximity;
       if (prelimTimerRef.current) clearTimeout(prelimTimerRef.current);
       setPhase("drilling");
       setStatus("DRILLING...");
@@ -222,7 +255,7 @@ export default function DrillHUD({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (prelimTimerRef.current) clearTimeout(prelimTimerRef.current);
     };
-  }, [drillEvent, animate, oilValue, maxOil, drillProximity]);
+  }, [drillEvent, animate, oilValue, maxOil, drillProximity, hellProximity]);
 
   const dark = darkMode;
   const hellColor = "#ff2200";
