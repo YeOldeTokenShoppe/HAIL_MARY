@@ -40,7 +40,7 @@ rulesIntro: {
     "if the evidence holds, toward Doubt if the pattern breaks faith, or leave it " +
     "centered to Abstain. A bold, correct call is rewarded most. A bold, wrong one " +
     "leaves the deepest mark. Choose where to place your weight with care.",
-  audio: null, // re-record: case001_monk_rules
+  audio: "case001_monk_rules",
 },
 
   stations: {
@@ -54,7 +54,7 @@ rulesIntro: {
       //   voice 9 / lang 1 / engine 1  (Acapela; lang 1 covers English voices
       //   here regardless of US/UK accent — the accent is part of the voice).
       // Audio recordings bypass this entirely once wired into the case data.
-      voice: { voice: "9", lang: 1, engine: 7 },
+      voice: { voice: "9", lang: 1, engine: 7, effect: "T", effLevel: 3 },
       // Pre-recorded — the audio file contains the full rules preamble + intro
       // combined (per the locked convention). The runtime favors `audio` when
       // SitePal `sayAudio` is available; `text` stays as the TTS fallback and
@@ -181,10 +181,10 @@ rulesIntro: {
       // SitePal Neural2 US-English male slot; adjust to whichever voice ID
       // matches the male voice in your SitePal account 9308752. Audio
       // recordings (when present) bypass this entirely.
-      voice: "2",
+      voice: { voice: "2", effect: "T", effLevel: 3 },
       intro: {
         text: "Prophet Token's crowd? Annoyingly normal. I came to roast a paid-shill circus and found people just... talking. Hate it. Look closer.",
-        audio: null, // re-record: case001_demon_intro
+        audio: "case001_demon_intro",
       },
       // Character-wide return pool — same files play across all cases on
       // revisits to Barron. Each picked at random by pickReturnLine().
@@ -200,7 +200,7 @@ rulesIntro: {
             text:
               "Five thousand followers, and most of them have been around for a year or more. " +
               "Real histories, real reply chains, even a few boring accounts. This crowd wasn't bought last week.",
-            audio: null, // re-record: case001_demon_q1
+            audio: "case001_demon_q1",
           },
           reveals: "TWITTER FOLLOWERS",
         },
@@ -210,7 +210,7 @@ rulesIntro: {
             text:
               "The Telegram's a normal mess. People arguing about entries, posting memes, complaining the bot is laggy. " +
               "Typos everywhere. Botted rooms are shrink-wrapped. This one's lived-in.",
-            audio: null, // re-record: case001_demon_q2
+            audio: "case001_demon_q2",
           },
           reveals: "TELEGRAM ACTIVITY",
         },
@@ -220,7 +220,7 @@ rulesIntro: {
             text:
               "A couple mid-tier callers mentioned it, spread across different days, no synchronized blast. " +
               "Neutral takes, not hype scripts. If they paid for this, they paid for the world's laziest promo.",
-            audio: null, // re-record: case001_demon_q3
+            audio: "case001_demon_q3",
           },
           reveals: "KOL PROMOTERS",
         },
@@ -230,7 +230,7 @@ rulesIntro: {
             text:
               "There's a pinned skeptic thread poking at the AI claims. Still up. Team argued back, didn't win, didn't delete. " +
               "That's healthier than ninety percent of the rooms I read.",
-            audio: null, // re-record: case001_demon_q4
+            audio: "case001_demon_q4",
           },
           reveals: "FUD SUPPRESSION",
         },
@@ -251,30 +251,30 @@ rulesIntro: {
       verdictReaction: {
         believe: {
           text: "Crowd's real, sure. Just remember a real audience can still be standing on a trap door.",
-          audio: null, // re-record: case001_demon_react_belie
+          audio: "case001_demon_react_belie",
         },
         abstain: {
           text: "Caution on a clean room. Bold. Slightly cowardly. I respect it.",
-          audio: null, // re-record: case001_demon_react_absta
+          audio: "case001_demon_react_absta",
         },
         doubt: {
           text: "Doubt on a crowd this normal? Then you're not reading the crowd. You're reading something I missed.",
-          audio: null, // re-record: case001_demon_react_doubt
+          audio: "case001_demon_react_doubt",
         },
       },
 
       vindication: {
         aligned: {
           text: "Good crowd, bad token. Honest room, dirty hands. New shape. Remember it.",
-          audio: null, // re-record: case001_demon_vind_aligne
+          audio: "case001_demon_vind_aligne",
         },
         missed: {
           text: "The room was real. The deployer wasn't. Audience never tells you who's holding the keys.",
-          audio: null, // re-record: case001_demon_vind_missed
+          audio: "case001_demon_vind_missed",
         },
         abstained: {
           text: "You sat out an honest crowd and dodged a dirty team. Lucky read. I'll take it.",
-          audio: null, // re-record: case001_demon_vind_abstai
+          audio: "case001_demon_vind_abstai",
         },
       },
     },
@@ -289,9 +289,13 @@ rulesIntro: {
       role: "LOGOS · ONCHAIN",
       sigil: "✧",
       tagline: "The chain doesn't lie. Read the receipts.",
+      // "Kate" — SitePal TTS fallback (recorded lines use ElevenLabs).
+      // Reverb = effect "T" (SitePal "Time" family), level 3 per the docs
+      // (Echo=1, Reverb=3, Flanger=2, Phase=4). Affects the TTS fallback only.
+      voice: { voice: "3", lang: 1, engine: 3, effect: "T", effLevel: 3 },
       intro: {
         text: "Pull up a chair. The wallets on this one are quieter than I expected. Sometimes quiet means clean. Sometimes it just means careful.",
-        audio: null, // re-record: case001_trinity_intro
+        audio: "case001_trinity_intro",
       },
       // Character-wide return pool — 2 lines for now (trinity_return_1, _2).
       // Add a third later if you record one.
@@ -305,7 +309,7 @@ rulesIntro: {
           a: {
             text:
               "Top ten wallets hold about twenty-eight percent between them. Concentrated enough to watch, not enough to call a cliff. Pretty normal for a four-day-old launch.",
-            audio: null, // re-record: case001_trinity_q1
+            audio: "case001_trinity_q1",
           },
           reveals: "TOP 10 HOLDERS",
         },
@@ -313,7 +317,7 @@ rulesIntro: {
           q: "Is the deployer hiding supply?",
           a: {
             text: "I traced the deployer's allocation. Six percent, sitting in one labeled wallet, not fanned out across shell addresses. If they're concealing supply, they're doing it badly.",
-            audio: null, // re-record: case001_trinity_q2
+            audio: "case001_trinity_q2",
           },
           reveals: "DEPLOYER HOLDINGS",
         },
@@ -322,7 +326,7 @@ rulesIntro: {
           a: {
             text:
               "Volume's mostly clean. A little circular churn near the open, the kind every new pair has, but the bulk is distinct wallets trading once and leaving. Not a wash farm.",
-            audio: null, // re-record: case001_trinity_q3
+            audio: "case001_trinity_q3",
           },
           reveals: "VOLUME QUALITY",
         },
@@ -330,7 +334,7 @@ rulesIntro: {
           q: "Can liquidity disappear?",
           a: {
             text: "Liquidity's locked thirty days through a third-party locker, and the contract has no mint and no hidden pause. On paper, the front door is bolted. On paper.",
-            audio: null, // re-record: case001_trinity_q4
+            audio: "case001_trinity_q4",
           },
           reveals: "LP / VESTING",
         },
@@ -351,25 +355,25 @@ rulesIntro: {
       verdictReaction: {
         believe: {
           text: "The chain backs you up today, kid. Just remember a locker has an expiry date and a deployer has a memory.",
-          audio: null, // re-record: case001_trinity_react_bel
+          audio: "case001_trinity_react_bel",
         },
         abstain: {
           text: "Smart play. Clean wallets aren't a verdict. They're just one page of the file.",
-          audio: null, // re-record: case001_trinity_react_abs
+          audio: "case001_trinity_react_abs",
         },
         doubt: {
           text: "Doubting numbers this tidy? Then you read something off the chain that I don't price in. Good.",
-          audio: null, // re-record: case001_trinity_react_dou
+          audio: "case001_trinity_react_dou",
         },
       },
       vindication: {
         aligned: {
           text: "Clean chain, dirty hands. The wallets were honest. The man behind them wasn't.",
-          audio: null, // re-record: case001_trinity_vind_alig
+          audio: "case001_trinity_vind_alig",
         },
         missed: {
           text: "The onchain state was fine. It always is, until the deployer decides it isn't. Read who, not just what.",
-          audio: null, // re-record: case001_trinity_vind_miss
+          audio: "case001_trinity_vind_miss",
         },
         abstained: {
           text: "Lived to investigate another day.",

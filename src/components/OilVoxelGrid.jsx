@@ -582,6 +582,10 @@ const _gusherHeadQuat = /* @__PURE__ */ new THREE.Quaternion();
 // One-shot gusher length (seconds). A sustained gusher (tank overflow, or the demon
 // being loose) holds at full intensity and only runs this final 1s as a settle.
 const GUSHER_DURATION = 3.0;
+// After a broadcast gusher event clears, keep its rig mounted this long so the
+// geyser plays its final 1s fade + the pump settles before handing the cell back
+// to the merged static field (covers the ~1s fade with a little margin).
+const GUSHER_FADE_LINGER_MS = 1200;
 
 /**
  * Build an ExtrudeGeometry representing liquid in a horizontal cylinder.
@@ -1259,7 +1263,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, hasMessages = false, onEnvelopeClick, hellActive = false }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, hasMessages = false, onEnvelopeClick, hellActive = false }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -2765,9 +2769,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
       {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
       {/* Red alert point light + gusher VFX — on the selected rig, the rig the demon
-          erupts from (hellActive), or any rig with a live gusher event (gusherActive)
-          so every viewer sees the erupting column + blowback, not just the owner. */}
-      {(highlighted || hellActive || gusherActive) && (
+          erupts from (hellActive), or any rig with a live gusher event (gusherActive).
+          gusherLingering keeps it mounted through the 1s fade after the event clears
+          so the column eases out instead of vanishing. */}
+      {(highlighted || hellActive || gusherActive || gusherLingering) && (
         <>
           <pointLight
             ref={strikeLightRef}
@@ -3601,6 +3606,45 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
     });
     return s;
   }, [gusherEvents]);
+
+  // Linger set — cells whose gusher event JUST cleared. They keep a full rig (with
+  // gusherActive=false, which kicks off the fade) for a short window so the geyser
+  // eases out + the pump settles before the cell reverts to the merged static field.
+  const [lingerSet, setLingerSet] = useState(() => new Set());
+  const prevGusherCells = useRef(new Set());
+  const lingerTimers = useRef(new Map());
+  useEffect(() => {
+    const curr = gusherCellSet;
+    // Cells that just ended → start (or restart) a linger timer.
+    prevGusherCells.current.forEach((key) => {
+      if (!curr.has(key)) {
+        setLingerSet((s) => (s.has(key) ? s : new Set(s).add(key)));
+        const existing = lingerTimers.current.get(key);
+        if (existing) clearTimeout(existing);
+        const id = setTimeout(() => {
+          lingerTimers.current.delete(key);
+          setLingerSet((s) => { if (!s.has(key)) return s; const n = new Set(s); n.delete(key); return n; });
+        }, GUSHER_FADE_LINGER_MS);
+        lingerTimers.current.set(key, id);
+      }
+    });
+    // Cells that (re)activated → cancel any pending linger so they don't unmount.
+    curr.forEach((key) => {
+      const existing = lingerTimers.current.get(key);
+      if (existing) { clearTimeout(existing); lingerTimers.current.delete(key); }
+      setLingerSet((s) => { if (!s.has(key)) return s; const n = new Set(s); n.delete(key); return n; });
+    });
+    prevGusherCells.current = new Set(curr);
+  }, [gusherCellSet]);
+  useEffect(() => () => { lingerTimers.current.forEach((id) => clearTimeout(id)); }, []);
+
+  // Cells that render a full animated rig on account of a gusher — actively erupting
+  // or fading out. (The selected cell is handled separately via isSelected.)
+  const fullRigCells = useMemo(
+    () => new Set([...gusherCellSet, ...lingerSet]),
+    [gusherCellSet, lingerSet]
+  );
+
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -3651,7 +3695,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
           cellSize={cellSize}
           selectedCol={selectedCol}
           selectedRow={selectedRow}
-          fullRigCells={gusherCellSet}
+          fullRigCells={fullRigCells}
           onSelectCell={onSelectCell}
           onFlyTo={onFlyTo}
           onZoomOut={onZoomOut}
@@ -3661,11 +3705,13 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
         // Drill all if no selection, otherwise only the selected cell
         const active = selectedCol === null || (col === selectedCol && row === selectedRow);
         const isSelected = selectedCol !== null && col === selectedCol && row === selectedRow;
-        const hasGusher = gusherCellSet.has(`${col}_${row}`);
-        // In merge mode only the selected plot — and any cell with a live gusher —
-        // renders a full animated rig; the rest come from MergedRigField (1 draw
-        // call each). Gusher cells need the real rig so the pump can pause + tilt.
-        if (MERGE_RIGS && !isSelected && !hasGusher) return null;
+        const cellKey = `${col}_${row}`;
+        const hasGusher = gusherCellSet.has(cellKey);   // actively erupting
+        const isLingering = lingerSet.has(cellKey);     // fading out post-event
+        // In merge mode only the selected plot — and any cell with a live or fading
+        // gusher — renders a full animated rig; the rest come from MergedRigField (1
+        // draw call each). Gusher cells need the real rig so the pump can pause + tilt.
+        if (MERGE_RIGS && !isSelected && !hasGusher && !isLingering) return null;
         const cellEntry = allPumpConfigs[`${col}_${row}`];
         const cellConfig = isSelected ? pumpConfig : cellEntry?.config || null;
         return (
@@ -3690,6 +3736,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             forceStrikeGusher={forceStrikeGusher}
             gusherTrigger={isSelected ? gusherTrigger : 0}
             gusherActive={hasGusher}
+            gusherLingering={isLingering}
             hasMessages={!!plotsWithMessages[`${col}_${row}`]}
             onEnvelopeClick={() => onEnvelopeClick?.(col, row)}
             hellActive={hellActive && col === hellCol && row === hellRow}
@@ -3703,287 +3750,6 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
 }
 
 useGLTF.preload("/models/oilJack_fancy_allProps.glb");
-
-// ── Remote Gusher (broadcast oil strikes) ────────────────────────────────────
-
-const REMOTE_PARTICLE_COUNT = 2000;
-
-// Offset from a cell's center to the rig's wellhead, in world XZ. Matches the
-// Pumpjack's own geyser anchor (gusherOriginRef = [0, 0.05, 0.2]). The rig group
-// has no Y-rotation, so this is a plain additive shift. Without it, remote/test
-// gushers erupt from the cell center (behind the wellhead) instead of the well.
-const GUSHER_WELLHEAD_OFFSET = [0, 0.2]; // [dx, dz]
-
-function RemoteGusher({ position }) {
-  const posArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT * 3));
-  const velArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT * 3));
-  const lifeArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT));
-  const geoRef = useRef();
-  const matRef = useRef();
-  const lightRef = useRef();
-  const elapsed = useRef(0);
-
-  // Initialize particles — stagger across full lifetime for continuous flow
-  useEffect(() => {
-    const pos = posArr.current;
-    const vel = velArr.current;
-    const life = lifeArr.current;
-    for (let i = 0; i < REMOTE_PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
-      // Stagger across full life so particles are evenly distributed at all times
-      const t = (i / REMOTE_PARTICLE_COUNT) * 1.2;
-      const angle = Math.random() * Math.PI * 2;
-      const spread = 0.05 + Math.random() * 0.12;
-      const vy = 3.0 + Math.random() * 2.5;
-      const vx = Math.cos(angle) * spread;
-      const vz = Math.sin(angle) * spread;
-      // Pre-simulate to starting position
-      pos[i3] = vx * t;
-      pos[i3 + 1] = 0.3 + vy * t - 3.0 * t * t; // half-gravity pre-sim
-      pos[i3 + 2] = vz * t;
-      vel[i3] = vx;
-      vel[i3 + 1] = vy - 6.0 * t;
-      vel[i3 + 2] = vz;
-      life[i] = t;
-    }
-  }, []);
-
-  useFrame((_, delta) => {
-    elapsed.current += delta;
-    const pos = posArr.current;
-    const vel = velArr.current;
-    const life = lifeArr.current;
-
-    for (let i = 0; i < REMOTE_PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
-      life[i] += delta;
-      if (life[i] > 1.2) {
-        // respawn with tight spread for columnar stream
-        pos[i3] = 0;
-        pos[i3 + 1] = 0.3;
-        pos[i3 + 2] = 0;
-        const angle = Math.random() * Math.PI * 2;
-        const spread = 0.05 + Math.random() * 0.12;
-        vel[i3] = Math.cos(angle) * spread;
-        vel[i3 + 1] = 3.0 + Math.random() * 2.5;
-        vel[i3 + 2] = Math.sin(angle) * spread;
-        life[i] = 0;
-      }
-      vel[i3 + 1] -= 6.0 * delta; // gravity
-      pos[i3] += vel[i3] * delta;
-      pos[i3 + 1] += vel[i3 + 1] * delta;
-      pos[i3 + 2] += vel[i3 + 2] * delta;
-    }
-
-    if (geoRef.current) {
-      geoRef.current.attributes.position.needsUpdate = true;
-    }
-    if (matRef.current) {
-      matRef.current.opacity = 0.5;
-    }
-    // Flash point light on initial burst, then steady glow
-    if (lightRef.current) {
-      const flash = Math.max(0, 1 - elapsed.current * 2) * 3;
-      lightRef.current.intensity = flash + 0.5;
-    }
-  });
-
-  return (
-    <group position={[position[0] + GUSHER_WELLHEAD_OFFSET[0], position[1], position[2] + GUSHER_WELLHEAD_OFFSET[1]]}>
-      <pointLight
-        ref={lightRef}
-        position={[0, 0.5, 0]}
-        color={0xff2200}
-        intensity={0}
-        distance={4}
-        decay={2}
-      />
-      <points renderOrder={10}>
-        <bufferGeometry ref={geoRef}>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[posArr.current, 3]}
-            count={REMOTE_PARTICLE_COUNT}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          ref={matRef}
-          color={0x4cff7a}
-          size={0.02}
-          map={_neutralDropletTex}
-          transparent
-          opacity={0.5}
-          depthWrite={false}
-          depthTest={false}
-          sizeAttenuation
-        />
-      </points>
-    </group>
-  );
-}
-
-// ── Neutral soft-circle texture (white RGB, alpha-only falloff) ──────────────
-const _neutralDropletTex = (() => {
-  if (typeof document === "undefined") return null;
-  const size = 32;
-  const c = document.createElement("canvas");
-  c.width = size; c.height = size;
-  const ctx = c.getContext("2d");
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  g.addColorStop(0, "rgba(255,255,255,1)");
-  g.addColorStop(0.5, "rgba(255,255,255,0.8)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
-  return new THREE.CanvasTexture(c);
-})();
-
-// ── Shader Gusher (test gushers use the GPU geyser shader) ──────────────────
-
-const SHADER_GUSHER_PARTICLES = 300;
-
-function ShaderGusher({ position, envPreset, parabolum = false }) {
-  const meshRef = useRef();
-  const shaderMatRef = useRef();
-  const camPosRef = useRef(new THREE.Vector3());
-  const meshPosRef = useRef(new THREE.Vector3());
-  const uniformsRef = useRef({
-    uTime: { value: 0 },
-    uOpacity: { value: 1.0 },
-    uNightMode: { value: 0.0 },
-    uParabolum: { value: 0.0 },
-    uResolution: { value: new THREE.Vector2(256, 512) },
-  });
-
-  const posArr = useRef(new Float32Array(SHADER_GUSHER_PARTICLES * 3));
-  const velArr = useRef(new Float32Array(SHADER_GUSHER_PARTICLES * 3));
-  const lifeArr = useRef(new Float32Array(SHADER_GUSHER_PARTICLES));
-  const geoRef = useRef();
-  const ptMatRef = useRef();
-  const lightRef = useRef();
-  const elapsed = useRef(0);
-
-  const { camera } = useThree();
-
-  useEffect(() => {
-    const pos = posArr.current;
-    const vel = velArr.current;
-    const life = lifeArr.current;
-    for (let i = 0; i < SHADER_GUSHER_PARTICLES; i++) {
-      const i3 = i * 3;
-      const t = (i / SHADER_GUSHER_PARTICLES) * 1.2;
-      const angle = Math.random() * Math.PI * 2;
-      const spread = 0.05 + Math.random() * 0.12;
-      const vy = 3.0 + Math.random() * 2.5;
-      const vx = Math.cos(angle) * spread;
-      const vz = Math.sin(angle) * spread;
-      pos[i3] = vx * t;
-      pos[i3 + 1] = 0.3 + vy * t - 3.0 * t * t;
-      pos[i3 + 2] = vz * t;
-      vel[i3] = vx;
-      vel[i3 + 1] = vy - 6.0 * t;
-      vel[i3 + 2] = vz;
-      life[i] = t;
-    }
-  }, []);
-
-  useFrame((_, delta) => {
-    if (shaderMatRef.current) {
-      shaderMatRef.current.uniforms.uTime.value += delta;
-      shaderMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
-      shaderMatRef.current.uniforms.uParabolum.value = 1.0;
-    }
-    const mesh = meshRef.current;
-    if (mesh) {
-      const camPos = camera.getWorldPosition(camPosRef.current);
-      const meshPos = mesh.getWorldPosition(meshPosRef.current);
-      mesh.lookAt(camPos.x, meshPos.y, camPos.z);
-    }
-
-    elapsed.current += delta;
-    const pos = posArr.current;
-    const vel = velArr.current;
-    const life = lifeArr.current;
-    for (let i = 0; i < SHADER_GUSHER_PARTICLES; i++) {
-      const i3 = i * 3;
-      life[i] += delta;
-      if (life[i] > 1.2) {
-        pos[i3] = 0;
-        pos[i3 + 1] = 0.3;
-        pos[i3 + 2] = 0;
-        const angle = Math.random() * Math.PI * 2;
-        const spread = 0.05 + Math.random() * 0.12;
-        vel[i3] = Math.cos(angle) * spread;
-        vel[i3 + 1] = 3.0 + Math.random() * 2.5;
-        vel[i3 + 2] = Math.sin(angle) * spread;
-        life[i] = 0;
-      }
-      vel[i3 + 1] -= 6.0 * delta;
-      pos[i3] += vel[i3] * delta;
-      pos[i3 + 1] += vel[i3 + 1] * delta;
-      pos[i3 + 2] += vel[i3 + 2] * delta;
-    }
-    if (geoRef.current) geoRef.current.attributes.position.needsUpdate = true;
-    if (ptMatRef.current) {
-      ptMatRef.current.opacity = 0.5;
-      // Paraboleum is the default substance — gusher droplets are always green
-      ptMatRef.current.color.setRGB(0.20, 0.85, 0.32);
-    }
-    if (lightRef.current) {
-      const flash = Math.max(0, 1 - elapsed.current * 2) * 3;
-      lightRef.current.intensity = flash + 0.5;
-    }
-  });
-
-  return (
-    <group position={[position[0] + GUSHER_WELLHEAD_OFFSET[0], position[1], position[2] + GUSHER_WELLHEAD_OFFSET[1]]}>
-      <pointLight
-        ref={lightRef}
-        position={[0, 0.5, 0]}
-        color={0x4cff7a}
-        intensity={1.5}
-        distance={4}
-        decay={2}
-      />
-      <mesh
-        ref={meshRef}
-        renderOrder={10}
-        position={[0, 1.0, 0]}
-      >
-        <planeGeometry args={[0.9, 3.0]} />
-        <shaderMaterial
-          ref={shaderMatRef}
-          vertexShader={_geyserVertexShader}
-          fragmentShader={_geyserFragmentShader}
-          transparent
-          depthWrite={false}
-          side={THREE.DoubleSide}
-          uniforms={uniformsRef.current}
-        />
-      </mesh>
-      <points renderOrder={11}>
-        <bufferGeometry ref={geoRef}>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[posArr.current, 3]}
-            count={SHADER_GUSHER_PARTICLES}
-          />
-        </bufferGeometry>
-        <pointsMaterial
-          ref={ptMatRef}
-          color={0x4cff7a}
-          size={0.02}
-          map={_neutralDropletTex}
-          transparent
-          opacity={0.5}
-          depthWrite={false}
-          depthTest
-          sizeAttenuation
-        />
-      </points>
-    </group>
-  );
-}
 
 // ── Hell Demon — spawns from below, flies to a victim plot, roams the field
 //    making mischief, and must be caught during a vulnerable pause window ─────
@@ -4505,7 +4271,6 @@ export default function OilVoxelGrid({
   communityOil = 0,
   rogueEvents = [],
   gusherEvents = [],
-  currentUserId,
   onRogueArrive,
   onRogueConsequence,
   envPreset,
@@ -4782,8 +4547,8 @@ export default function OilVoxelGrid({
               onMiss={onDemonMiss}
             />
           )}
-          {/* Gusher events now render as full animated rigs inside PumpjackInstances
-              (pump pause + blowback), so no separate ShaderGusher column is drawn. */}
+          {/* Gusher events render as full animated rigs inside PumpjackInstances
+              (pump pause + blowback + wellhead geyser), one per gushing cell. */}
           {Array.from({ length: gridX + 1 }, (_, i) => {
             const x = -worldW / 2 + i * cellSize;
             const points = [

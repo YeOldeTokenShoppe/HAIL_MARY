@@ -2013,6 +2013,34 @@ export default function OilPage() {
     return oilInTank / TANK_CAPACITY;
   }, [selectedX, effectiveDrillDay, oilInTank]);
 
+  // Is the owner's own rig currently erupting? A live gusher event keeps the rig
+  // gushing + the alert light strobing until shut off. The gusherEvents listener
+  // already filters to status === "active", so a userId match is enough. Drives an
+  // always-reachable shut-off so the gusher can be cleared even when the tank is
+  // empty (the drain banks oil; clearing the gusher must not depend on having any).
+  const myGusherActive = useMemo(
+    () => !!user?.id && gusherEvents.some((ev) => ev.userId === user.id),
+    [gusherEvents, user?.id]
+  );
+
+  // Active gusher event(s) on the currently selected cell, regardless of owner.
+  // Backs an admin/test/report shut-off so a stuck gusher can be cleared in-app
+  // (the normal player path is gated behind their own claim's tank panel).
+  const selectedCellGushers = useMemo(
+    () => gusherEvents.filter((ev) => ev.col === selectedX && ev.row === sliceY),
+    [gusherEvents, selectedX, sliceY]
+  );
+  const handleShutOffGusher = useCallback(async () => {
+    if (!db || selectedCellGushers.length === 0) return;
+    try {
+      await Promise.all(selectedCellGushers.map((ev) =>
+        updateDoc(doc(db, "gusherEvents", ev.id), { status: "done" })
+      ));
+    } catch (e) {
+      console.error("Failed to shut off gusher:", e);
+    }
+  }, [selectedCellGushers]);
+
   const selectedDepthData = useMemo(() => {
     if (selectedX === null || sliceY == null || !stats.grid3D[selectedX]?.[sliceY]) return null;
     const col = [];
@@ -2576,14 +2604,19 @@ export default function OilPage() {
     if (previewModeRef.current) return;
     // Bank whatever is currently in the tank (tankOil when present, else legacy).
     const delta = oilInTank;
-    if (delta <= 0) return;
-    setTankDrained(true);
-    setLastDrainSnapshot(playerExtracted); // keep legacy marker aligned
-    setCommunityOil(prev => prev + delta);
-    if (userDrill) {
-      const newTotal = (userDrill.totalCollected || 0) + delta;
-      const newDrains = (userDrill.tankDrains || 0) + 1;
-      setUserDrill(prev => prev ? { ...prev, totalCollected: newTotal, tankDrains: newDrains, tankOil: 0, lastDrainExtracted: playerExtracted } : prev);
+    // Nothing to bank AND no gusher to shut off → no-op. Otherwise proceed: the API
+    // banks any oil AND marks the user's gusher events done (which turns off the
+    // gusher + alert light), so an empty tank can still shut a stuck gusher off.
+    if (delta <= 0 && !myGusherActive) return;
+    if (delta > 0) {
+      setTankDrained(true);
+      setLastDrainSnapshot(playerExtracted); // keep legacy marker aligned
+      setCommunityOil(prev => prev + delta);
+      if (userDrill) {
+        const newTotal = (userDrill.totalCollected || 0) + delta;
+        const newDrains = (userDrill.tankDrains || 0) + 1;
+        setUserDrill(prev => prev ? { ...prev, totalCollected: newTotal, tankDrains: newDrains, tankOil: 0, lastDrainExtracted: playerExtracted } : prev);
+      }
     }
     if (user?.id) {
       try {
@@ -2604,7 +2637,7 @@ export default function OilPage() {
         console.error("Failed to save tank drain:", err);
       }
     }
-  }, [user?.id, userDrill, oilInTank, playerExtracted, username]);
+  }, [user?.id, userDrill, oilInTank, playerExtracted, username, myGusherActive]);
 
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
@@ -4271,6 +4304,26 @@ export default function OilPage() {
     </div>
   );
 
+  // ── Admin/test/report gusher shut-off — an in-app escape hatch to clear a stuck
+  //    gusher on the selected cell when the normal player tank panel is hidden. ──
+  const gusherShutoffPanel = (isAdmin || isReport || isTest) && selectedCellGushers.length > 0 && (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <button
+        onClick={handleShutOffGusher}
+        style={{
+          width: "100%", padding: "8px 12px",
+          border: `1px solid ${theme.red}`, borderRadius: 3, cursor: "pointer",
+          background: `${theme.red}22`, color: theme.red,
+          fontFamily: "'Share Tech Mono', monospace",
+          fontSize: 11, letterSpacing: "0.12em", fontWeight: 700,
+          animation: "tankPulse 1.2s ease-in-out infinite",
+        }}
+      >
+        SHUT OFF GUSHER ({selectedX + 1}, {sliceY + 1})
+      </button>
+    </div>
+  );
+
   // ── Player Drill Panel (depth profile for active players) ──
   const playerDrillPanel = !isAdmin && !isReport && activeUserDrill && (
     <div style={isMobile ? m.section : styles.panelSection}>
@@ -4461,7 +4514,7 @@ export default function OilPage() {
             transition: "width 0.4s ease",
           }} />
         </div>
-        {oilInTank > 0 && !tankDrained && (
+        {((oilInTank > 0 && !tankDrained) || myGusherActive) && (
           <button
             onClick={handleTankDrain}
             style={{
@@ -4475,7 +4528,9 @@ export default function OilPage() {
               animation: tankFill >= 1.0 ? "tankPulse 1.2s ease-in-out infinite" : "none",
             }}
           >
-            {tankFill >= 1.0 ? "TANK HEAVY — BANK SOON" : "BANK OIL TO STORAGE"}
+            {oilInTank <= 0 && myGusherActive
+              ? "SHUT OFF GUSHER"
+              : tankFill >= 1.0 ? "TANK HEAVY — BANK SOON" : "BANK OIL TO STORAGE"}
           </button>
         )}
         {tankDrained && (
@@ -4705,7 +4760,6 @@ export default function OilPage() {
                     communityOil={communityOil}
                     rogueEvents={rogueEvents}
                     gusherEvents={gusherEvents}
-                    currentUserId={user?.id}
                     onRogueArrive={handleRogueArrive}
                     onRogueConsequence={handleRogueConsequence}
                     envPreset={envPreset}
@@ -4920,6 +4974,7 @@ export default function OilPage() {
             hellActive={hellActive}
             demonBlockade={demonBlockade}
           />
+          {gusherShutoffPanel}
           {playerDrillPanel}
           {isAdmin && parametersPanel}
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
@@ -5223,7 +5278,6 @@ export default function OilPage() {
                 communityOil={communityOil}
                 rogueEvents={rogueEvents}
                 gusherEvents={gusherEvents}
-                currentUserId={user?.id}
                 onRogueArrive={handleRogueArrive}
                 onRogueConsequence={handleRogueConsequence}
                 envPreset={envPreset}
@@ -5429,6 +5483,7 @@ export default function OilPage() {
               Geode={GeodeMode}
               hellActive={hellActive}
             />
+            {gusherShutoffPanel}
             {playerDrillPanel}
             {isAdmin && parametersPanel}
             {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}

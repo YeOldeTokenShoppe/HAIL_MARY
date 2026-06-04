@@ -1,15 +1,19 @@
-// Case 003 — first lens-trap case. Three lenses (Ethos, Pathos, Mythos) read
-// clean; one lens (Logos) catches a stealth proxy-admin backdoor. Player who
-// skips Trinity will trust the surface and miss the rug.
+// Case 003 — the "sophisticated rug" case. No single lens screams danger.
+// MERIDIAN PROTOCOL looks genuinely legit: reputable team, completed audit,
+// locked LP, distributed-looking holders, coherent roadmap. The danger is
+// SUBTLE and SPREAD across lenses — each red flag is individually dismissible.
 //
-// Teaching beat: visible governance is not the same as actual control. A 3/5
-// multisig on the governance module means nothing if the proxy admin slot is
-// a single EOA. The audit didn't cover the admin slot, which is the bridge
-// between Monk's amber AUDIT entry and Trinity's red findings.
+// Teaching beat: a confident TRUST is the trap. The exit was pre-built and the
+// credentials are all REAL. The case only cracks if the player connects dots
+// ACROSS lenses: a proxy-admin upgrade path that the audit excluded (Trinity),
+// plus a co-founder/admin-key with a quietly-funded prior-soft-rug history
+// (GR80). Either alone is dismissible; together they describe a planned exit.
+// With only 3 scans, WHICH lenses you pick decides whether you see it.
+// decisiveLenses: ["marisol", "monk"]. The ideal play is a measured lean-doubt.
 
 const CASE_003 = {
   id: "case-003",
-  difficulty: "intermediate",
+  difficulty: "advanced",
   projectName: "MERIDIAN PROTOCOL",
   ticker: "$MRDN",
   chain: "Base",
@@ -29,12 +33,12 @@ const CASE_003 = {
       role: "ETHOS · CREDIBILITY",
       sigil: "✠",
       tagline: "Trust nothing the team says about itself. Watch what they've already done.",
-      voice: { voice: "9", lang: 1, engine: 1 },
+      voice: { voice: "9", lang: 1, engine: 1, effect: "T", effLevel: 3 },
       intro: {
         text:
-          "Meridian arrives dressed in proper robes. Real names, a real audit, real investors. " +
-          "The surface is calm. Calm is sometimes peace. Calm is sometimes the moment before a wave. " +
-          "Examine the credentials, but do not let credentials examine you.",
+          "Meridian arrives in proper robes. Real names, a real audit, real investors. " +
+          "Most of this congregation has clean hands. Most. " +
+          "The lie, if there is one, will not stand at the pulpit. It sits quietly in a back pew. Look there.",
         audio: "case003_monk_intro",
       },
       returnLines: [
@@ -47,8 +51,8 @@ const CASE_003 = {
           q: "Who is behind the protocol?",
           a: {
             text:
-              "Three founders, all named. Two carry visible histories at established yield protocols. " +
-              "Conference talks, public commit graphs, professional networks unhidden. The team has decided to be seen.",
+              "Three founders, all named, all visible. Two carry clean histories at established yield protocols. " +
+              "The third is newer, runs operations, keeps a quieter footprint. The roster, on its face, is respectable.",
             audio: "case003_monk_q1",
           },
           reveals: "TEAM IDENTITY",
@@ -57,8 +61,8 @@ const CASE_003 = {
           q: "Was the contract audited?",
           a: {
             text:
-              "Trail of Bits delivered a public report. Three lows, one medium, all marked resolved. " +
-              "An honest audit, by an honest firm. But read the scope, not only the verdict. An audit covers what it is asked to cover.",
+              "Trail of Bits delivered a public report. Three lows, one medium, all marked resolved. An honest audit, by an honest firm. " +
+              "But read the scope, not only the verdict. A report tells you what it looked at. And just as quietly, what it did not.",
             audio: "case003_monk_q2",
           },
           reveals: "AUDIT",
@@ -68,26 +72,26 @@ const CASE_003 = {
           a: {
             text:
               "One point two million in seed, from named DeFi funds, routed through a treasury multisig before the launch pool. " +
-              "The money has a parentage. That is good. Parentage is not destiny.",
+              "The public capital has clean parentage. But not every wallet with a key came through the front door. One arrived another way.",
             audio: "case003_monk_q3",
           },
           reveals: "FUNDING",
         },
         {
-          q: "Have these builders shipped before?",
+          q: "Has anyone here failed before?",
           a: {
             text:
-              "Two of three have shipped serious protocols. Real contribution graphs, real reviews, real production code. " +
-              "The hands have worked. The question is what they are working on now.",
+              "Two founders have shipped serious work. The operations partner once co-launched a yield project that quietly wound down. Depositors made whole on paper, the cause never examined. No charges, no headlines. " +
+              "A footnote, not a verdict. But footnotes are where patterns hide.",
             audio: "case003_monk_q4",
           },
-          reveals: "BUILD HISTORY",
+          reveals: "PRIOR OUTCOMES",
         },
       ],
       entries: [
         {
           label: "TEAM IDENTITY",
-          value: "3 named founders; verifiable prior roles",
+          value: "3 named founders; 2 with verifiable prior roles",
           threat: "green",
           visual: {
             component: "SignalStack",
@@ -96,18 +100,18 @@ const CASE_003 = {
               items: [
                 { tone: "green", label: "Founder identities", value: "PUBLIC", sublabel: "LinkedIn + conference talks + public github", meter: 90 },
                 { tone: "green", label: "Prior protocols", value: "VERIFIED", sublabel: "Ex-Aave and ex-MakerDAO contribution history", meter: 84 },
-                { tone: "green", label: "Known rug links", value: "0", sublabel: "No shared deployer or wallet cluster with prior scams", meter: 92 },
                 { tone: "green", label: "Reputation overlap", value: "BROAD", sublabel: "Cited by 11 unrelated DeFi commentators", meter: 78 },
+                { tone: "amber", label: "Ops partner footprint", value: "THIN", sublabel: "Newer, quieter, fewer public traces than the other two", meter: 50 },
               ],
             },
             caption:
-              "The founders are visible and traceable to real prior work. Identity is not the lie here.",
+              "Two of three founders are visible and traceable to real prior work. The third is real but lightly documented. Identity is not the headline lie here.",
             metric: { label: "IDENTITY", value: "VISIBLE" },
           },
         },
         {
           label: "AUDIT",
-          value: "Trail of Bits — scope excludes proxy admin slot",
+          value: "Trail of Bits — clean within scope; scope excludes upgrade path",
           threat: "amber",
           visual: {
             component: "Checklist",
@@ -118,18 +122,18 @@ const CASE_003 = {
                 { status: "ok", label: "Vault accounting", value: "IN" },
                 { status: "ok", label: "Fee router", value: "IN" },
                 { status: "ok", label: "Governance module", value: "IN" },
-                { status: "warn", label: "Proxy admin slot", value: "OUT", sublabel: "Explicitly out of scope — see report §1.3" },
+                { status: "warn", label: "Proxy admin slot", value: "OUT", sublabel: "Marked out of scope — see report section one point three" },
                 { status: "warn", label: "Upgrade path", value: "OUT", sublabel: "Not reviewed by the auditor" },
               ],
             },
             caption:
-              "The audit is real, but the report names two things it did not look at. The most dangerous lines in an audit are the ones describing what it skipped.",
+              "The audit is real and clean for what it covered. It also names two things it did not look at. The most important lines in a report are sometimes the ones describing what it skipped.",
             metric: { label: "OUT OF SCOPE", value: "2" },
           },
         },
         {
           label: "FUNDING",
-          value: "$1.2M from named DeFi funds; multisig route",
+          value: "$1.2M public seed from named DeFi funds; multisig route",
           threat: "green",
           visual: {
             component: "FlowGraph",
@@ -141,7 +145,7 @@ const CASE_003 = {
                 { id: "vc2", label: "Fund B", sublabel: "0.4M", externalLabel: "SEED" },
                 { id: "vc3", label: "Fund C", sublabel: "0.3M", externalLabel: "SEED" },
                 { id: "treasury", label: "3/5", sublabel: "treasury", externalLabel: "MULTISIG", highlight: true },
-                { id: "lp", label: "$MRDN", sublabel: "LP", externalLabel: "LAUNCH" },
+                { id: "lp", label: "MRDN", sublabel: "LP", externalLabel: "LAUNCH" },
               ],
               edges: [
                 { from: "vc1", to: "treasury" },
@@ -156,9 +160,9 @@ const CASE_003 = {
           },
         },
         {
-          label: "BUILD HISTORY",
-          value: "2 of 3 founders with prior protocol commits",
-          threat: "green",
+          label: "PRIOR OUTCOMES",
+          value: "Ops partner co-launched a project that quietly wound down; never examined",
+          threat: "red",
           visual: {
             component: "Comparison",
             props: {
@@ -170,7 +174,7 @@ const CASE_003 = {
                   tone: "green",
                   lines: [
                     { text: "412 merged PRs" },
-                    { text: "2.5 yrs tenure" },
+                    { text: "clean exit history" },
                     { text: "public talks: 6", color: "#8effc4" },
                   ],
                 },
@@ -180,25 +184,25 @@ const CASE_003 = {
                   tone: "green",
                   lines: [
                     { text: "237 merged PRs" },
-                    { text: "1.8 yrs tenure" },
+                    { text: "clean exit history" },
                     { text: "forum posts: 89", color: "#8effc4" },
                   ],
                 },
                 {
-                  title: "Founder C",
-                  subtitle: "new",
-                  tone: "amber",
+                  title: "Ops Partner",
+                  subtitle: "prior: wound-down yield project",
+                  tone: "red",
                   lines: [
-                    { text: "no prior protocol" },
-                    { text: "github: 4 mo old" },
-                    { text: "role: ops", color: "#ffb84d" },
+                    { text: "1 prior launch" },
+                    { text: "soft wind-down, d~60" },
+                    { text: "no charges · no inquiry", color: "#ff8d8d" },
                   ],
                 },
               ],
             },
             caption:
-              "Two of three have substantive prior work. The third is newer and runs ops — neither disqualifying nor a smoking gun on its own.",
-            metric: { label: "VERIFIED", value: "2/3" },
+              "Two founders have spotless histories. The operations partner has one prior launch that wound down softly — depositors nominally repaid, the cause never investigated. Dismissible alone. It only matters if someone else holds a matching door open.",
+            metric: { label: "FLAGGED", value: "1/3" },
           },
         },
         {
@@ -222,16 +226,16 @@ const CASE_003 = {
           },
         },
       ],
-      summary: "Names, audits, and named capital all hold. The credentials are real. Credentials describe the past.",
+      summary: "The names, the audit, the named capital all hold. One founder has a soft prior failure no one examined. A footnote — unless another lens names the door he could reuse.",
       verdictReaction: {
-        believe: { text: "Trust offered to the proven is not vanity. It is reason.", audio: "case003_monk_react_believ" },
-        abstain: { text: "An audit you did not finish reading is a warning you did not finish hearing.", audio: "case003_monk_react_abstai" },
-        doubt:   { text: "Doubt aimed at names is harsh. Doubt aimed at scope is wisdom. Be sure which you carry.", audio: "case003_monk_react_doubt" },
+        believe: { text: "Trust offered to the proven is reason. Trust offered to the unexamined is hope wearing reason's robe.", audio: "case003_monk_react_believ" },
+        abstain: { text: "An audit you did not finish reading is a warning you did not finish hearing. Caution is not cowardice.", audio: "case003_monk_react_abstai" },
+        doubt:   { text: "Doubt aimed at clean names is harsh. Doubt aimed at the one quiet name, and the door the audit skipped — that is wisdom.", audio: "case003_monk_react_doubt" },
       },
       vindication: {
-        aligned:   { text: "Credentials describe the past, not the future. You did not confuse the two.", audio: "case003_monk_vind_aligned" },
-        missed:    { text: "Honest names can be used as a screen. The work is to ask what the screen is hiding.", audio: "case003_monk_vind_missed" },
-        abstained: { text: "Caution before unfinished evidence is acceptable. Aim to be more sure next time.", audio: "case003_monk_vind_abstain" },
+        aligned:   { text: "You did not let two clean men vouch for the third. The footnote was the warning. You read it.", audio: "case003_monk_vind_aligned" },
+        missed:    { text: "Honest names can shelter one quiet hand. The work is to ask which door that hand already knows how to open.", audio: "case003_monk_vind_missed" },
+        abstained: { text: "Caution before a faint signal is acceptable. One more reading, on the right page, would have made you certain.", audio: "case003_monk_vind_abstain" },
       },
     },
 
@@ -240,11 +244,12 @@ const CASE_003 = {
       role: "PATHOS · SENTIMENT",
       sigil: "✦",
       tagline: "Sentiment is theater. Strip the script and read the cast.",
-      voice: "2",
+      voice: { voice: "2", effect: "T", effLevel: 3 },
       intro: {
         text:
-          "I came in ready to gut this one. Big name, big audit, big shiny landing page — classic exit-liquidity bait. " +
-          "Then I looked at the crowd. It's annoyingly grown-up. Not a single rocket emoji. I hate it. Continue.",
+          "I came in ready to gut this one. Big name, big audit, shiny landing page. Classic exit-liquidity bait. " +
+          "Then I looked at the crowd, and it's annoyingly grown-up. Real people, real arguments, no rocket emojis. " +
+          "Almost too clean. The earliest fans are a little TOO in sync for strangers. Probably nothing. Probably. Continue.",
         audio: "case003_demon_intro",
       },
       returnLines: [
@@ -257,8 +262,8 @@ const CASE_003 = {
           q: "Are the followers real?",
           a: {
             text:
-              "Sixty-eight percent of followers are over a year old. DeFi natives. Pseudonyms with histories, real reply patterns, even some boring people. " +
-              "This is not a rented audience. This is the kind of crowd you cannot fake without a year of patience.",
+              "Sixty-eight percent of followers are over a year old. DeFi natives, pseudonyms with histories, real reply patterns, some genuinely boring people. " +
+              "This is not a rented audience. You can't fake this without a year of patience.",
             audio: "case003_demon_q1",
           },
           reveals: "AUDIENCE QUALITY",
@@ -267,27 +272,27 @@ const CASE_003 = {
           q: "What is the community actually saying?",
           a: {
             text:
-              "Strategy parameter questions. Fee split debates. One thread complaining the dashboard is ugly. " +
-              "If this is a script, it is the most boring script ever written. Believable in a way that almost insults me.",
+              "Strategy parameter questions, fee-split debates, one thread roasting the dashboard. Product talk, not chant. " +
+              "If this is a script, it's the most boring script ever written. Believable in a way that almost insults me.",
             audio: "case003_demon_q2",
           },
           reveals: "DISCOURSE",
         },
         {
-          q: "Is anyone shilling this for money?",
+          q: "Who hyped this the earliest?",
           a: {
             text:
-              "A few mid-tier DeFi analysts wrote neutral reviews. No coordinated post wave, no shared talking points, no synchronized launch hour. " +
-              "If they paid for promotion, they paid a very disorganized cartel.",
+              "Here's the thing that itches. A dozen of the very first 'organic' supporters all started posting inside the same eighteen-hour window, before any coverage, with oddly similar framing. " +
+              "Could be a private group of early adopters who found it together. Could be a seeded crowd built to look grassroots. I genuinely can't tell. And that bothers me.",
             audio: "case003_demon_q3",
           },
-          reveals: "PROMOTION",
+          reveals: "EARLY SEEDING",
         },
         {
           q: "How are critics handled?",
           a: {
             text:
-              "There's a pinned skeptic thread questioning the emissions schedule. Still up. Team replied, didn't win the argument, didn't delete it. " +
+              "A pinned skeptic thread questioning the emissions schedule, still up. Team replied, didn't win, didn't delete. " +
               "Healthy. Mature. Suspiciously well-adjusted.",
             audio: "case003_demon_q4",
           },
@@ -339,23 +344,24 @@ const CASE_003 = {
           },
         },
         {
-          label: "PROMOTION",
-          value: "Scattered organic coverage; no shill swarm",
-          threat: "green",
+          label: "EARLY SEEDING",
+          value: "12 'organic' first-movers clustered in an 18h pre-coverage window",
+          threat: "amber",
           visual: {
-            component: "SignalStack",
+            component: "Timeline",
             props: {
-              title: "PROMOTION PATTERN",
-              items: [
-                { tone: "green", label: "Same-hour shill wave", value: "0", sublabel: "no synchronized launch blast", meter: 90 },
-                { tone: "green", label: "Prior rug promoters", value: "0", sublabel: "no overlap with known paid-rug accounts", meter: 88 },
-                { tone: "amber", label: "Mid-tier analyst posts", value: "5", sublabel: "neutral framing; no shared talking points", meter: 56 },
-                { tone: "green", label: "Cadence", value: "ORGANIC", sublabel: "coverage spread over 18 days, not a single burst", meter: 80 },
+              startLabel: "pre-launch",
+              endLabel: "d+3",
+              events: [
+                { position: 0.06, label: "First supporter posts begin", sublabel: "h+0", tone: "amber" },
+                { position: 0.10, label: "11 more, similar framing", sublabel: "h+0 to h+18", tone: "amber", highlight: true },
+                { position: 0.40, label: "First neutral coverage", sublabel: "d+2", tone: "green" },
+                { position: 0.70, label: "Organic growth continues", sublabel: "d+3", tone: "green" },
               ],
             },
             caption:
-              "Promotion looks like real journalists doing real reads. The cartel signal — same hour, same script, same accounts — is missing.",
-            metric: { label: "SWARM SCORE", value: "0/10" },
+              "A dozen of the earliest 'organic' voices appeared in one tight window with matching framing, before any press. It reads like either a private early-adopter group or a seeded crowd dressed as grassroots. Dismissible as enthusiasm — unless something else says the founders plan to leave.",
+            metric: { label: "CLUSTERED", value: "12" },
           },
         },
         {
@@ -382,15 +388,15 @@ const CASE_003 = {
         },
         {
           label: "POST CADENCE",
-          value: "Irregular human cadence; no bot bursts",
-          threat: "green",
+          value: "Mostly human cadence; one suspiciously tidy opening burst",
+          threat: "amber",
           visual: {
             component: "Timeline",
             props: {
               startLabel: "launch",
               endLabel: "d+38",
               events: [
-                { position: 0.04, label: "Launch post", sublabel: "d+0", tone: "green" },
+                { position: 0.04, label: "Coordinated opening burst", sublabel: "d+0", tone: "amber" },
                 { position: 0.18, label: "Quiet gap", sublabel: "d+7", tone: "green" },
                 { position: 0.36, label: "Strategy update", sublabel: "d+14", tone: "green" },
                 { position: 0.58, label: "Audit republish", sublabel: "d+22", tone: "green" },
@@ -398,21 +404,21 @@ const CASE_003 = {
               ],
             },
             caption:
-              "Posts cluster around real product events with uneven gaps. Bot campaigns pulse on schedule; this looks like humans posting when there's something to say.",
-            metric: { label: "BOT BURSTS", value: "0" },
+              "After day zero the cadence is human and uneven — clearly real people. But the opening burst is tidier than organic launches usually are, matching the early-supporter cluster. One coordinated push, then genuine momentum.",
+            metric: { label: "SEEDED BURST", value: "1" },
           },
         },
       ],
-      summary: "The crowd is grown, the discourse is technical, and the critics are alive. Sentiment reads honest.",
+      summary: "The crowd is grown, the discourse is technical, the critics are alive. But the earliest 'organic' fans moved like they were told to. Enthusiasm, or a seeded launch. Can't call it from here alone.",
       verdictReaction: {
-        believe: { text: "Look at you, trusting a quiet room full of adults. Healthy. Possibly correct.", audio: "case003_demon_react_belie" },
-        abstain: { text: "Caution about a clean room. Bold. Slightly cowardly. I respect it.", audio: "case003_demon_react_absta" },
-        doubt:   { text: "Doubt on a crowd this calm? Either you see something I don't, or you're fighting the last war.", audio: "case003_demon_react_doubt" },
+        believe: { text: "Trusting a quiet room full of adults. Healthy. Possibly right. Just don't forget who clapped first.", audio: "case003_demon_react_belie" },
+        abstain: { text: "Caution on a clean room with one weird opening act. Bold. Slightly cowardly. I respect it.", audio: "case003_demon_react_absta" },
+        doubt:   { text: "Doubt on a crowd this calm? Maybe you clocked the seeded first-movers too. Or maybe you're fighting the last war.", audio: "case003_demon_react_doubt" },
       },
       vindication: {
-        aligned: { text: "Good crowd, bad protocol. That's a new shape for you. Remember it.", audio: "case003_demon_vind_aligne" },
-        missed:  { text: "Real audiences can be wrong, sweetheart. The room was honest. The contract was not.", audio: "case003_demon_vind_missed" },
-        abstained: { text: "You sat out a clean crowd and got lucky on the contract. Don't mistake luck for skill.", audio: "case003_demon_vind_abstai" },
+        aligned: { text: "Good crowd, planted front row. The real fans were real. The cheerleaders were hired. You felt the seam.", audio: "case003_demon_vind_aligne" },
+        missed:  { text: "Real audiences can be wrong, sweetheart. Most of the room was honest. The opening act was paid to look like them.", audio: "case003_demon_vind_missed" },
+        abstained: { text: "You sat out a crowd that was mostly clean and one-twelfth staged. Reasonable hedge. Not quite a read.", audio: "case003_demon_vind_abstai" },
       },
     },
 
@@ -421,10 +427,14 @@ const CASE_003 = {
       role: "LOGOS · ONCHAIN",
       sigil: "✧",
       tagline: "The chain doesn't lie. Read the receipts.",
+      // "Kate" — SitePal TTS fallback (recorded lines use ElevenLabs).
+      // Reverb = effect "T" (SitePal "Time" family), level 3 per the docs
+      // (Echo=1, Reverb=3, Flanger=2, Phase=4). Affects the TTS fallback only.
+      voice: { voice: "3", lang: 1, engine: 3, effect: "T", effLevel: 3 },
       intro: {
         text:
-          "Meridian wants you to look at the lobby. Marble floors, named doormen, framed audit on the wall. " +
-          "I'm here for the basement. Show me the wiring nobody talks about.",
+          "Meridian wants you to admire the lobby. Marble floors, named doormen, framed audit on the wall. Honestly? The lobby checks out. " +
+          "Locked liquidity, real multisig, distribution that looks broad. I'm here for the basement. The wiring nobody put on the brochure.",
         audio: "case003_trinity_intro",
       },
       returnLines: [
@@ -433,41 +443,41 @@ const CASE_003 = {
       ],
       questions: [
         {
-          q: "Who actually controls the contract?",
+          q: "Is the liquidity actually locked?",
           a: {
             text:
-              "The governance module has the 3/5 multisig everyone's pointing at. But the proxy admin slot — the address that can replace the entire implementation contract — is a single externally-owned wallet. " +
-              "One key. No timelock. The lobby has five doormen. The basement door has one.",
+              "It is. Third-party locker, twelve-month term, verifiable on chain. The LP isn't going anywhere by the obvious route. " +
+              "On the front door, this protocol's bolted tight. That part's genuinely good news.",
             audio: "case003_trinity_q1",
           },
-          reveals: "PROXY ADMIN",
-        },
-        {
-          q: "Where did that admin key come from?",
-          a: {
-            text:
-              "Funded six weeks before launch through a Railgun mixer chain, then split twice. " +
-              "The funding pattern matches two prior protocols that exit-rugged via stealth upgrade in the last nine months. Same fingerprints, different gloves.",
-            audio: "case003_trinity_q2",
-          },
-          reveals: "ADMIN FUNDING",
+          reveals: "LP LOCK",
         },
         {
           q: "Is the holder distribution actually broad?",
           a: {
             text:
-              "Surface counts look diverse. Cluster analysis ties thirty-eight percent of supply to wallets sharing the proxy admin's funding source. " +
-              "The 'community' allocation is wearing a costume. The same hand is holding it.",
-            audio: "case003_trinity_q3",
+              "Surface counts look diverse. Three thousand holders, top ten under thirty percent. Clean by the headline. " +
+              "But cluster analysis ties about nineteen percent of supply to a handful of wallets that share one funding source and move in lockstep. Labeled 'community.' Behaves like one hand. Not damning on its own. Worth a flag.",
+            audio: "case003_trinity_q2",
           },
-          reveals: "DEPLOYER CLUSTER",
+          reveals: "HOLDER CLUSTER",
         },
         {
-          q: "Doesn't the LP lock protect holders?",
+          q: "Who can actually change the contract?",
           a: {
             text:
-              "Liquidity is locked. It doesn't matter. A stealth upgrade can install a new transfer hook, a new tax, or a balance-rewrite — drain the holders directly and leave the LP standing as decoration. " +
-              "The lock is on the front door. The exit is through the floor.",
+              "Here's the basement. The governance module has the three-of-five multisig everyone points at. But the proxy admin slot — the address that can replace the entire implementation — is a single externally-owned wallet. No timelock. " +
+              "And that's exactly the slot the audit marked out of scope. The lobby has five doormen. This door has one, and nobody inspected it.",
+            audio: "case003_trinity_q3",
+          },
+          reveals: "PROXY ADMIN",
+        },
+        {
+          q: "Has that admin key been used yet?",
+          a: {
+            text:
+              "Not yet. The implementation hasn't been swapped since launch, so today, nothing's wrong. That's what makes this hard. " +
+              "But a single key, no timelock, controlling an upgrade the auditors never reviewed — that's not a problem until the second it is. Whether it stays unused depends entirely on whose hand holds it.",
             audio: "case003_trinity_q4",
           },
           reveals: "UPGRADE PATH",
@@ -475,8 +485,51 @@ const CASE_003 = {
       ],
       entries: [
         {
+          label: "LP LOCK",
+          value: "Third-party locker; 12-month term; verifiable",
+          threat: "green",
+          visual: {
+            component: "Checklist",
+            props: {
+              title: "LIQUIDITY STATUS",
+              items: [
+                { status: "ok", label: "LP locked", value: "YES" },
+                { status: "ok", label: "Locker", value: "THIRD-PARTY" },
+                { status: "ok", label: "Term", value: "12 MONTHS" },
+                { status: "ok", label: "On-chain verifiable", value: "YES" },
+              ],
+            },
+            caption:
+              "Liquidity is genuinely locked through a reputable third-party locker. By the obvious exit — pulling the pool — holders are protected. This is a real positive, and it's also exactly what makes the protocol look safe.",
+            metric: { label: "LP LOCK", value: "REAL" },
+          },
+        },
+        {
+          label: "HOLDER CLUSTER",
+          value: "~19% of supply in one lockstep cluster labeled 'community'",
+          threat: "amber",
+          visual: {
+            component: "Pie",
+            props: {
+              centerLabel: "CLUSTER",
+              centerMetric: "19%",
+              radius: 110,
+              innerRadius: 56,
+              slices: [
+                { label: "Lockstep cluster", value: 19, highlight: true },
+                { label: "VC allocation", value: 14, color: "rgba(255,184,77,0.30)" },
+                { label: "Treasury", value: 8, color: "rgba(109,181,154,0.38)" },
+                { label: "Public float", value: 59, color: "rgba(109,181,154,0.26)" },
+              ],
+            },
+            caption:
+              "Headline distribution looks broad. But a slice labeled 'community' shares one funding origin and moves together — one hand wearing a costume. Nineteen percent isn't a controlling stake on its own. Pair it with a one-key upgrade path and it stops being a coincidence.",
+            metric: { label: "ONE HAND", value: "19%" },
+          },
+        },
+        {
           label: "PROXY ADMIN",
-          value: "Single EOA; no timelock; can swap implementation",
+          value: "Single EOA; no timelock; can swap implementation; audit-excluded",
           threat: "red",
           visual: {
             component: "FlowGraph",
@@ -484,7 +537,7 @@ const CASE_003 = {
               layout: "linear",
               radius: 180,
               nodes: [
-                { id: "users", label: "users", sublabel: "$MRDN holders", externalLabel: "FUNDS" },
+                { id: "users", label: "users", sublabel: "MRDN holders", externalLabel: "FUNDS" },
                 { id: "proxy", label: "Proxy", sublabel: "EIP-1967", externalLabel: "CONTRACT" },
                 { id: "impl", label: "impl v1", sublabel: "audited", externalLabel: "LOGIC" },
                 { id: "admin", label: "0xc4…91", sublabel: "single EOA", externalLabel: "ADMIN", highlight: true },
@@ -496,110 +549,61 @@ const CASE_003 = {
               ],
             },
             caption:
-              "User funds flow through the proxy to the audited implementation. The proxy admin — a single key with no timelock — can swap that implementation out at will.",
+              "User funds flow through the proxy to the audited implementation. The proxy admin — a single key, no timelock — can swap that implementation at will. And it's the precise slot the Trail of Bits report excluded from scope. The one door nobody checked.",
             metric: { label: "ADMIN KEYS", value: "1" },
           },
         },
         {
-          label: "ADMIN FUNDING",
-          value: "Mixer chain; matches 2 prior upgrade-rug fingerprints",
+          label: "UPGRADE PATH",
+          value: "Unused so far; LP lock is bypassable via implementation swap",
           threat: "red",
           visual: {
-            component: "FlowGraph",
+            component: "SignalStack",
             props: {
-              layout: "linear",
-              radius: 180,
-              nodes: [
-                { id: "mixer", label: "Railgun", sublabel: "mixer", externalLabel: "ORIGIN" },
-                { id: "hop1", label: "0x7a…12", sublabel: "5 wk old", externalLabel: "HOP 1" },
-                { id: "hop2", label: "0x2f…b8", sublabel: "split tx", externalLabel: "HOP 2" },
-                { id: "admin", label: "0xc4…91", sublabel: "proxy admin", externalLabel: "DESTINATION", highlight: true },
-              ],
-              edges: [
-                { from: "mixer", to: "hop1" },
-                { from: "hop1", to: "hop2" },
-                { from: "hop2", to: "admin" },
+              title: "IF THE KEY EVER MOVES",
+              items: [
+                { tone: "amber", label: "Implementation swapped yet?", value: "NO", sublabel: "nothing malicious has happened on-chain to date", meter: 30 },
+                { tone: "red", label: "Transfer hook injection", value: "POSSIBLE", sublabel: "a new impl could route or block transfers", meter: 90 },
+                { tone: "red", label: "Balance rewrite", value: "POSSIBLE", sublabel: "a new impl could zero holder balances", meter: 88 },
+                { tone: "red", label: "LP lock relevance", value: "NONE", sublabel: "an upgrade drains holders without touching the locked pool", meter: 92 },
               ],
             },
             caption:
-              "The admin key was funded out of a mixer, through two intermediate hops, six weeks before launch. The same pattern preceded two protocols that exit-rugged via stealth upgrade.",
-            metric: { label: "PATTERN MATCH", value: "2 PRIORS" },
-          },
-        },
-        {
-          label: "DEPLOYER CLUSTER",
-          value: "38% of supply tied to admin funding source",
-          threat: "red",
-          visual: {
-            component: "Pie",
-            props: {
-              centerLabel: "HIDDEN",
-              centerMetric: "38%",
-              radius: 110,
-              innerRadius: 56,
-              slices: [
-                { label: "Admin cluster", value: 38, highlight: true },
-                { label: "VC allocation", value: 14, color: "rgba(255,184,77,0.44)" },
-                { label: "Treasury", value: 8, color: "rgba(109,181,154,0.38)" },
-                { label: "Public float", value: 40, color: "rgba(109,181,154,0.26)" },
-              ],
-            },
-            caption:
-              "Wallets labeled 'community' or 'early supporter' share funding paths with the proxy admin. The headline distribution looks broad; the cluster analysis says one hand holds 38%.",
-            metric: { label: "HIDDEN SUPPLY", value: "38%" },
+              "The danger is latent, not active — which is exactly why a chain-only read says 'fine.' A stealth upgrade can drain holders without ever touching the locked LP. The lock is the front door; this is the floor. Whether the floor opens depends on the hand on the key.",
+            metric: { label: "STATE", value: "LATENT" },
           },
         },
         {
           label: "AUDIT SCOPE",
-          value: "Audit explicitly excluded proxy admin & upgrade path",
-          threat: "red",
+          value: "Audit excluded the proxy admin & upgrade authorization",
+          threat: "amber",
           visual: {
             component: "Checklist",
             props: {
               title: "WHAT THE AUDIT DIDN'T COVER",
               items: [
-                { status: "missing", label: "Proxy admin slot", value: "EXCLUDED", sublabel: "Stated in report §1.3" },
-                { status: "missing", label: "Upgrade authorization", value: "EXCLUDED", sublabel: "Outside engagement scope" },
-                { status: "missing", label: "Storage layout drift", value: "EXCLUDED", sublabel: "Not reviewed across versions" },
-                { status: "warn", label: "Audit recency", value: "PRE-DEPLOY", sublabel: "Implementation could be swapped post-audit" },
+                { status: "ok", label: "Strategy & vault logic", value: "REVIEWED", sublabel: "clean within scope" },
+                { status: "warn", label: "Proxy admin slot", value: "EXCLUDED", sublabel: "stated in report section one point three" },
+                { status: "warn", label: "Upgrade authorization", value: "EXCLUDED", sublabel: "outside engagement scope" },
+                { status: "warn", label: "Audit recency", value: "PRE-DEPLOY", sublabel: "implementation could be swapped post-audit" },
               ],
             },
             caption:
-              "The Trail of Bits report is real and rigorous within its scope. The scope leaves the door the rug walks through.",
-            metric: { label: "RUG VECTORS", value: "OPEN" },
-          },
-        },
-        {
-          label: "UPGRADE PATH",
-          value: "LP lock is bypassable via implementation swap",
-          threat: "red",
-          visual: {
-            component: "SignalStack",
-            props: {
-              title: "WHY THE LP LOCK FAILS",
-              items: [
-                { tone: "red", label: "Transfer hook injection", value: "POSSIBLE", sublabel: "new impl can route or block transfers", meter: 92 },
-                { tone: "red", label: "Balance rewrite", value: "POSSIBLE", sublabel: "new impl can zero holder balances", meter: 88 },
-                { tone: "red", label: "Tax escalator", value: "POSSIBLE", sublabel: "new impl can set sell tax to 99%", meter: 90 },
-                { tone: "amber", label: "Detection lag", value: "MINUTES", sublabel: "upgrade tx is public, but reaction window is small", meter: 28 },
-              ],
-            },
-            caption:
-              "A stealth contract upgrade can drain holders without ever touching the LP. The locked liquidity is the decoy, not the defense.",
-            metric: { label: "LP LOCK", value: "DECOY" },
+              "The report is real and rigorous within scope. The scope just happens to stop right at the one slot that controls everything else. A reasonable reader trusts the audit; a careful one reads what it declined to cover.",
+            metric: { label: "EXCLUDED", value: "2" },
           },
         },
       ],
-      summary: "The lobby is real. The basement has an unmarked door with one key — and that key has a record.",
+      summary: "Lobby's real — LP locked, multisig genuine. But there's a one-key upgrade door the audit skipped, and a costumed cluster behind it. Nothing's been pulled yet. The risk is who holds that key.",
       verdictReaction: {
-        believe: { text: "Hope you're right, kid. But the basement door is still unlocked.", audio: "case003_trinity_react_bel" },
-        abstain: { text: "Reasonable. The evidence here doesn't ask for mercy, but it'll forgive caution.", audio: "case003_trinity_react_abs" },
-        doubt:   { text: "Yeah. The credentials are real. The exit is also real.", audio: "case003_trinity_react_dou" },
+        believe: { text: "Today the chain backs you, kid. Nothing's been swapped. Just know the basement door's unlocked, and unwatched.", audio: "case003_trinity_react_bel" },
+        abstain: { text: "Reasonable. Nothing's happened on-chain yet. But 'yet' is doing a lot of work in that sentence.", audio: "case003_trinity_react_abs" },
+        doubt:   { text: "Yeah. LP's locked, audit's real, and there's a one-key door they never reviewed. Name whose key it is, and you've got it.", audio: "case003_trinity_react_dou" },
       },
       vindication: {
-        aligned:   { text: "Good read. The lobby fooled three of us. You went to the basement.", audio: "case003_trinity_vind_alig" },
-        missed:    { text: "Audit scope is the most important page in any audit. Read it next time before you trust the verdict.", audio: "case003_trinity_vind_miss" },
-        abstained: { text: "You walked away from a loaded gun. Next time, read the chamber and call it.", audio: "case003_trinity_vind_abst" },
+        aligned:   { text: "Good read. The locked LP fooled three of us. You went to the basement and found the one door without a guard.", audio: "case003_trinity_vind_alig" },
+        missed:    { text: "Audit scope is the most important page in any report. The one slot they skipped is the one that mattered. Read it next time.", audio: "case003_trinity_vind_miss" },
+        abstained: { text: "You walked away from a loaded gun that hadn't fired yet. Smart enough. Next time, read the chamber and call it.", audio: "case003_trinity_vind_abst" },
       },
     },
 
@@ -611,7 +615,7 @@ const CASE_003 = {
       textOnly: true,
       intro:
         "Meridian's pitch is so well-behaved it's almost a personality test. Audits, multisigs, conservative yield. " +
-        "It's the kind of story that says 'I am too boring to be a scam' really, really often.",
+        "It's the kind of story that says 'I'm too boring to be a scam' really, really often. Which... is also a thing scams have learned to say. 🤔",
       returnLines: [
         "Back to the brochure ✨",
         "Hiii — wanna re-read the pitch?",
@@ -621,29 +625,29 @@ const CASE_003 = {
         {
           q: "What is the product story?",
           a:
-            "Auto-rebalancing vault that allocates across blue-chip yield strategies — Aave, Compound, Curve. " +
-            "Honestly? Sensible. Boring in a good way. The story is not trying to sell you a miracle.",
+            "Auto-rebalancing vault across blue-chip yield strategies — Aave, Compound, Curve. " +
+            "Honestly? Sensible. Boring in a good way. The story isn't trying to sell you a miracle. ✨",
           reveals: "POSITIONING",
         },
         {
           q: "Does the whitepaper hold up?",
           a:
-            "It explains strategies, fee splits, withdrawal mechanics, and rebalance triggers. Real math, real diagrams, no AGI. " +
-            "If they're lying, they're lying through competent writing — which is rare and a little impressive.",
+            "It explains strategies, fee splits, withdrawal mechanics, rebalance triggers. Real math, real diagrams, no AGI. " +
+            "If they're lying, they're lying through competent writing. Which is rare, and a little impressive.",
           reveals: "WHITEPAPER",
         },
         {
-          q: "Are users and TVL claims verifiable?",
+          q: "Have you seen this story shape before?",
           a:
-            "TVL number on the dashboard matches Dune. Three named pilot DAOs are deposited and you can see their safes. " +
-            "The receipts exist. Whether they tell the whole story is a different question.",
-          reveals: "USER PROOF",
+            "Okay, this is the part that gives me a tiny chill. The structure — conservative-yield framing, audit-forward, named-VC social proof, restrained roadmap — matches a template I've seen on a couple of 'sophisticated' exits, almost beat for beat. " +
+            "Could just be that good projects converge on good messaging. Could be a playbook. I can't prove which. 😬",
+          reveals: "TEMPLATE MATCH",
         },
         {
           q: "Is anything missing from the narrative?",
           a:
             "Hmm. The pitch talks A LOT about the audit, the multisig, the timelock, the named investors. " +
-            "It never once mentions the proxy admin or the upgrade path. That's a weird omission for a story this thorough. Could be nothing. Could be the seam.",
+            "It never once mentions the proxy admin or the upgrade path. For a story this thorough, that's a weird thing to leave out. Could be nothing. Could be the seam. 💭",
           reveals: "NARRATIVE GAPS",
         },
       ],
@@ -688,6 +692,42 @@ const CASE_003 = {
             caption:
               "The whitepaper spends its pages on real mechanics. That doesn't prove honesty — it proves competence at appearing honest.",
             metric: { label: "MIRACLES", value: "0" },
+          },
+        },
+        {
+          label: "TEMPLATE MATCH",
+          value: "Messaging mirrors a known sophisticated-rug playbook",
+          threat: "amber",
+          visual: {
+            component: "Comparison",
+            props: {
+              direction: "row",
+              panels: [
+                {
+                  title: "Meridian pitch",
+                  subtitle: "observed",
+                  tone: "amber",
+                  lines: [
+                    { text: "conservative-yield framing" },
+                    { text: "audit-forward messaging" },
+                    { text: "named-VC social proof", color: "#ffb84d" },
+                  ],
+                },
+                {
+                  title: "Known soft-exit template",
+                  subtitle: "2 prior 'sophisticated' rugs",
+                  tone: "amber",
+                  lines: [
+                    { text: "conservative-yield framing" },
+                    { text: "audit-forward messaging" },
+                    { text: "named-VC social proof", color: "#ffb84d" },
+                  ],
+                },
+              ],
+            },
+            caption:
+              "The story's structure lines up beat-for-beat with a template seen on a couple of polished exits. It might just be that credible projects converge on credible messaging. But 'too perfectly on-template' is itself a faint tell.",
+            metric: { label: "BEAT MATCH", value: "HIGH" },
           },
         },
         {
@@ -758,59 +798,43 @@ const CASE_003 = {
             metric: { label: "OMITTED", value: "2" },
           },
         },
-        {
-          label: "TONE",
-          value: "Disciplined, restrained, faintly over-rehearsed",
-          threat: "green",
-          visual: {
-            component: "SignalStack",
-            props: {
-              title: "VOICE READ",
-              items: [
-                { tone: "green", label: "Hype language", value: "LOW", sublabel: "no 100x / mooning / revolution vocabulary", meter: 86 },
-                { tone: "green", label: "Specificity", value: "HIGH", sublabel: "numbers, addresses, concrete mechanics", meter: 80 },
-                { tone: "amber", label: "Risk discussion", value: "PARTIAL", sublabel: "covers market risk; silent on admin risk", meter: 48 },
-                { tone: "amber", label: "Polish", value: "HEAVY", sublabel: "every sentence is on-message; little human friction", meter: 42 },
-              ],
-            },
-            caption:
-              "The voice is grown-up and specific, but it's also unusually polished. Real teams usually leave a few rough edges. This one didn't.",
-            metric: { label: "FRICTION", value: "LOW" },
-          },
-        },
       ],
-      summary: "The story behaves perfectly. The only seam is what it never says.",
+      summary: "The story behaves perfectly — maybe too perfectly. It mirrors a known soft-exit template and stays silent on the one control that matters: the upgrade path.",
       verdictReaction: {
-        believe: "Sure! The brochure is clean and the receipts check. Just remember the brochure picks what to print.",
-        abstain: "Fair. Sometimes a story that's too tidy isn't lying — it's just not telling you everything.",
-        doubt:   "Bold. The story is good. If you're doubting, you're trusting a gap more than a paragraph.",
+        believe: "Sure! Clean brochure, receipts check out. Just remember the brochure picks what to print — and this one reads like a brochure that's been printed before. 💭",
+        abstain: "Fair. A story this tidy and just a little too on-template isn't proof — but it isn't nothing either.",
+        doubt:   "Bold. The story's good. If you're doubting, you're trusting the template echo and the missing paragraph over the pretty words. I respect a girl with sources. 🌟",
       },
       vindication: {
-        aligned:   "You read the absence, not just the words. That's the upgrade.",
-        missed:    "The story was real. It was just incomplete. Always ask what the brochure didn't print.",
-        abstained: "You smelled the polish without finding the seam. Half the lesson.",
+        aligned:   "You read the absence AND the echo, not just the words. That's the upgrade. 🌟",
+        missed:    "The story was real — and reused. Always ask what the brochure didn't print, and whether you've read this exact brochure before.",
+        abstained: "You smelled the polish without naming the seam. Half the lesson. 💫",
       },
     },
   },
 
   maxScans: 3,
   correctVerdict: "doubt",
-  // The case-cracking evidence lives only in the ONCHAIN lens — every other
-  // station reads clean. Drives the post-game lens-coaching note.
-  decisiveLenses: ["marisol"],
+  // No single lens cracks this one. The case-making evidence is SPREAD: the
+  // audit-excluded one-key upgrade path (Trinity) plus a co-founder/ops-partner
+  // with a quietly-funded prior soft rug (GR80). Either alone is dismissible;
+  // together they describe a pre-built exit with a hand that's done it before.
+  // Sentiment's seeded first-movers and narrative's template echo are
+  // corroborating but not load-bearing. Drives the post-game lens-coaching note.
+  decisiveLenses: ["marisol", "monk"],
 
   reveal: {
     summary:
-      "MERIDIAN PROTOCOL was upgraded via stealth proxy admin transaction on day 51. " +
-      "New implementation rewrote holder balances and routed remaining liquidity to the admin EOA. " +
-      "~$1.8M extracted. The Trail of Bits report, the multisig, and the LP lock all remained technically intact.",
+      "MERIDIAN PROTOCOL rugged on day 61, through the proxy-admin upgrade path the audit never covered. " +
+      "A stealth implementation swap rewrote holder balances and routed funds to the admin wallet — the same hand tied to the ops partner's prior soft wind-down. " +
+      "~$3.1M extracted. The Trail of Bits report, the named team, the multisig, and the 12-month LP lock all stayed technically intact. Every credential was real. The exit was pre-built.",
     voices: {
       believe:
-        "You trusted the credentials. The names were real, the audit was real, and the rug still happened — because the audit scope didn't include the door it walked through.",
-      abstain:
-        "Capital preserved. The signal was there, but it took the chain to surface it. Learn to spend at least one scan on Trinity when the surface looks too clean.",
+        "You trusted the credentials, and the credentials were real — the names, the audit, the LP lock all held. The rug happened anyway, because the door they left themselves wasn't in the audit, and the hand on its key had opened one before.",
       doubt:
-        "Correct. Audit scope excluded the proxy admin, the admin key had a mixer-funded history, and the 'community' float was a costume. Three clean lenses can still lose to one onchain finding.",
+        "Good read. Three clean-looking lenses — locked LP, real audit, grown-up crowd. But the dots connected: an audit-excluded one-key upgrade path, an ops partner with a buried prior exit, a costumed 'community' cluster, a seeded launch. None of it screamed. Together it whispered a planned exit, and you heard it.",
+      abstain:
+        "Fair — the signal was faint and spread thin, and no single lens shouted. One more scan on the right lens — the onchain upgrade path, or the team's prior outcomes — would have tipped a measured doubt into a confident one.",
     },
   },
 };

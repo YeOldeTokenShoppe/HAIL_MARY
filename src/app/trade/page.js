@@ -526,7 +526,12 @@ function SitePalHostEmbed({ config }) {
         // Runs in capture phase before any onClick handler, so a
         // legitimate Demon click still queues + plays the greeting
         // afterwards via activateSitePalProjection.
-        if (typeof window.stopSpeech === "function") {
+        //
+        // Guard: skip this when a line is intentionally playing — otherwise
+        // ANY tap (e.g. VIEW EVIDENCE) cuts the character off mid-sentence.
+        // The stray auto-greeting plays before our speechActive is set, so
+        // it's still silenced; only deliberate speech is spared.
+        if (!speechActiveRef.current && typeof window.stopSpeech === "function") {
           try { window.stopSpeech(); } catch (e) {}
         }
         if (typeof window.saySilent === "function") window.saySilent(0);
@@ -1025,6 +1030,13 @@ export default function CyborgTemple() {
   // ProgressiveText's reveal pace, ~70ms/char) — close enough to audio
   // duration for the visual handoff to feel right.
   const [speechActive, setSpeechActive] = useState(false);
+  // Live mirror of speechActive for the document-level audio-unlock handler
+  // (resumeAudio), which runs in a stable `[]` effect and can't read state
+  // directly. Lets it skip the stray-greeting stopSpeech while a line is
+  // intentionally playing, so a tap mid-line (e.g. VIEW EVIDENCE) doesn't cut
+  // the character off.
+  const speechActiveRef = useRef(false);
+  useEffect(() => { speechActiveRef.current = speechActive; }, [speechActive]);
   const speechEndTimerRef = useRef(null);
   // Mobile-only: gates the inline CONTINUE button so it doesn't appear
   // until the player has actually heard the line (audio started AND
@@ -1660,6 +1672,11 @@ export default function CyborgTemple() {
         const voice = typeof voiceCfg === 'string' ? voiceCfg : voiceCfg?.voice;
         const lang = typeof voiceCfg === 'object' ? voiceCfg?.lang : undefined;
         const engine = typeof voiceCfg === 'object' ? voiceCfg?.engine : undefined;
+        // Optional SitePal sayText voice FX (e.g. reverb) carried on the voice
+        // config as { effect, effLevel }. Only affects the TTS fallback —
+        // uploaded recordings (sayAudio, incl. ElevenLabs) are unaffected.
+        const effect = typeof voiceCfg === 'object' ? voiceCfg?.effect : undefined;
+        const effLevel = typeof voiceCfg === 'object' ? voiceCfg?.effLevel : undefined;
 
         if (voice) {
           const speech = {
@@ -1668,6 +1685,8 @@ export default function CyborgTemple() {
             voice,
             lang,
             engine,
+            effect,
+            effLevel,
           };
           window.__sitePalPendingSpeech = {
             characterId,
