@@ -3001,11 +3001,12 @@ export default function OilPage() {
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>GEOLOGICAL SURVEY</h3>
       <div style={isMobile ? m.statGrid : styles.statGrid}>
-        <StatBlock s={styles} accentColor={theme.accent} label="TOTAL OIL" value={<AnimNum value={stats.totalOil} />} unit="USDC" accent />
+        <StatBlock s={styles} accentColor={theme.accent} label="TOTAL VALUE" value={<AnimNum value={stats.totalOil} />} unit="USDC" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={stats.deposits.length} />
         <StatBlock s={styles} accentColor={theme.accent} label="AVAILABLE CLAIMS" value={`${(gridSize * gridSize) - Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length}/${gridSize * gridSize}`} />
         <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={stats.totalOil > 0 ? `${(playerExtracted / stats.totalOil * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
         <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
+        <StatBlock s={styles} accentColor={theme.accent} label="MAX DEPTH" value={DEPTH_Z} unit="LVL" />
         {!isAdmin && !isReport && effectiveDrillDay > 0 && (
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
@@ -4203,7 +4204,7 @@ export default function OilPage() {
             <div style={drillBtnStyles.hint}>Your rig drills on its own — no clicking needed.</div>
           )}
           <div style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.06em", fontStyle: "italic", textAlign: "center", maxWidth: 220 }}>
-            It strikes once a day — at an hour you can&apos;t predict. Keep an eye on it.
+            It can strike at any moment — there&apos;s no telling when. Keep an eye on it.
           </div>
         </div>
       )}
@@ -5194,6 +5195,8 @@ export default function OilPage() {
             onStopMusic={() => pause()}
             onSkipTrack={() => nextTrack()}
             onHelpClick={() => setShowWelcome(true)}
+            accentColor={theme.accent}
+            framedAvatar
             hideMenu
             onUserClick={() => {}}
             isUserSignedIn={!!user}

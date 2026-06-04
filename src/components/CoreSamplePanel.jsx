@@ -551,7 +551,7 @@ export default function CoreSamplePanel({
   hellPockets = [],
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [coreTab, setCoreTab] = useState("personal");
+  const [coreTab, setCoreTab] = useState("field");
   const [analysisState, setAnalysisState] = useState("idle");
   const [revealRatio, setRevealRatio] = useState(0);
   const rafRef = useRef(null);
@@ -705,11 +705,11 @@ export default function CoreSamplePanel({
             borderBottom: `1px solid ${dark ? "#2a2e36" : "#d4c8b4"}`,
             paddingBottom: 6,
           }}>
-            <button style={tabStyle(coreTab === "personal")} onClick={() => setCoreTab("personal")}>
-              YOUR CLAIM
-            </button>
             <button style={tabStyle(coreTab === "field")} onClick={() => setCoreTab("field")}>
               FIELD SURVEY
+            </button>
+            <button style={tabStyle(coreTab === "personal")} onClick={() => setCoreTab("personal")}>
+              YOUR CLAIM
             </button>
           </div>
 

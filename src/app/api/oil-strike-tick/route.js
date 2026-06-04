@@ -7,9 +7,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // ── Continuous-pump strike loop ───────────────────────────────────────────────
-// Runs hourly (triggered by the Firebase `oilStrikeTick` scheduled function, or
-// any cron that hits this route with the CRON_SECRET). Each armed rig strikes
-// exactly ONCE per UTC day, at a per-rig random hour the player can't predict.
+// Runs on a short cadence (every 5 min via the Firebase `oilStrikeTick`
+// scheduled function, or any cron that hits this route with the CRON_SECRET).
+// Each armed rig strikes exactly ONCE per UTC day, at a per-rig random
+// minute-of-day the player can't predict — so a strike can land at any time of
+// day, not just on the hour (it fires on the first tick at/after that minute).
 //
 // The strike is never random in OUTCOME — the oil at each layer is fixed by the
 // deterministic block-hash distribution. Only the reveal TIME is randomized.
@@ -22,16 +24,17 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_DEPTH_Z = 20;
 
-// Deterministic, unpredictable strike hour [0,23] per (rig, day). Stable across
-// ticks with no extra Firestore writes, so a missed/retried tick is safe.
-function strikeHourFor(userId, dateStr) {
+// Deterministic, unpredictable strike minute-of-day [0,1439] per (rig, day).
+// Stable across ticks with no extra Firestore writes, so a missed/retried tick
+// is safe. Minute granularity (not hour) lets a strike land at any time of day.
+function strikeMinuteFor(userId, dateStr) {
   const s = `${userId}:${dateStr}`;
   let h = 0;
   for (let i = 0; i < s.length; i++) {
     h = ((h << 5) - h) + s.charCodeAt(i);
     h |= 0;
   }
-  return Math.abs(h) % 24;
+  return Math.abs(h) % 1440;
 }
 
 // UTC "YYYY-MM-DD" — match the date basis the rest of the game uses.
@@ -89,6 +92,7 @@ async function runTick({ force = false, deep = 1 } = {}) {
   const now = new Date();
   const today = utcDateStr(now);
   const hour = now.getUTCHours();
+  const nowMinutes = hour * 60 + now.getUTCMinutes();
 
   const drillsSnap = await db.collection("oilDrills").get();
 
@@ -111,7 +115,7 @@ async function runTick({ force = false, deep = 1 } = {}) {
     if (col == null || row == null) { summary.skipped++; continue; }
     if (drill.armed === false || drill.rigDepleted) { summary.skipped++; continue; }
     if (!ignoreDayGuard && drill.lastStrikeDate === today) { summary.skipped++; continue; }
-    if (!force && hour < strikeHourFor(userId, today)) { summary.skipped++; continue; }
+    if (!force && nowMinutes < strikeMinuteFor(userId, today)) { summary.skipped++; continue; }
 
     const cellKey = `${col}_${row}`;
     const plotRef = db.collection("oilPlots").doc(cellKey);

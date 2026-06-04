@@ -1029,7 +1029,12 @@ exports.refreshRl80MarketManual = onRequest({
 // Each armed rig strikes once/day at its own unpredictable hour; the route's
 // per-day idempotency guard makes running every hour safe.
 exports.oilStrikeTick = onSchedule({
-  schedule: "0 * * * *",
+  // Every 5 minutes: a rig's strike can land at any time of day (not just on the
+  // hour) without the cost of an every-minute full rig scan. The route gates on a
+  // per-rig minute-of-day target, so the strike fires on the first 5-min tick
+  // at/after that minute. The `lastStrikeDate` guard still enforces ONE strike
+  // per UTC day per rig — this cadence only sharpens *when* within the day.
+  schedule: "every 5 minutes",
   timeZone: "UTC",
   memory: "256MiB",
   timeoutSeconds: 120,

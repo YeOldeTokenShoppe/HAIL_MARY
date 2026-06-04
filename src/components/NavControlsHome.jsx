@@ -32,6 +32,14 @@ export default function NavControlsHome({
   accountModalInitialTab = 'account',
   accountModalTheme = 'cyber',
   accountModalUnlockedItems = undefined,
+  // Optional override for the help/music icon glyph color so these buttons can
+  // match a host page's theme accent (e.g. /oil Solstice/Dark/Paraboleum).
+  // Null preserves the original hardcoded gold.
+  accentColor = null,
+  // When true, the avatar image sits inside the button border (no 8px bleed)
+  // so it reads the same size as the adjacent icon tiles. Defaults to the
+  // original full-bleed crop used on the home page.
+  framedAvatar = false,
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -768,6 +776,7 @@ export default function NavControlsHome({
             className="help-btn-nav"
             onClick={onHelpClick}
             title="Show help annotations"
+            style={accentColor ? { color: accentColor } : undefined}
           >
             ?
           </button>
@@ -811,6 +820,7 @@ export default function NavControlsHome({
                   className="music-btn-mobile active"
                   onClick={handleStopClick}
                   title="Stop"
+                  style={accentColor ? { color: accentColor } : undefined}
                 >
                   ⏹
                 </button>
@@ -818,6 +828,7 @@ export default function NavControlsHome({
                   className="music-btn-mobile"
                   onClick={handleSkipClick}
                   title="Skip"
+                  style={accentColor ? { color: accentColor } : undefined}
                 >
                   ⏭
                 </button>
@@ -827,6 +838,7 @@ export default function NavControlsHome({
                 className="music-btn-mobile single"
                 onClick={handlePlayClick}
                 title="Play"
+                style={accentColor ? { color: accentColor } : undefined}
               >
                 ♫
               </button>
@@ -849,9 +861,9 @@ export default function NavControlsHome({
                   alt="Avatar"
                   style={{
                     position: 'absolute',
-                    inset: '-8px',
-                    width: 'calc(100% + 16px)',
-                    height: 'calc(100% + 16px)',
+                    inset: framedAvatar ? '0' : '-8px',
+                    width: framedAvatar ? '100%' : 'calc(100% + 16px)',
+                    height: framedAvatar ? '100%' : 'calc(100% + 16px)',
                     objectFit: 'cover',
                     display: 'block'
                   }}

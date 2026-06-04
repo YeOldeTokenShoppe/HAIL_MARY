@@ -87,13 +87,13 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 ### Decided & implementation status
 
 **Decided (2026-05-30):**
-- **Strike timing:** one guaranteed strike per UTC day at a per-rig **deterministic-but-unpredictable hour** (`hash(userId + date) % 24`) — stable across ticks, no extra writes, idempotent.
+- **Strike timing:** one guaranteed strike per UTC day at a per-rig **deterministic-but-unpredictable minute-of-day** (`hash(userId + date) % 1440`) — can land at any time, not just on the hour; stable across ticks, no extra writes, idempotent.
 - **Cadence:** **auto-advance, depth = cap.** The rig drills one layer deeper per day automatically (no action budget); the old "20 drill actions" becomes the 20-layer depth floor. Agency lives in plot choice + banking timing.
 - **Tank:** **uncapped.** `tankOil` grows freely; dino risk scales with hoarding instead of a cap.
 
 **Implemented (server core — Slice 1):**
-- `src/app/api/oil-strike-tick/route.js` — the strike loop. Hourly-safe, idempotent per day, reuses `generateOilDistribution3D` + `getAdminDb` (single source of truth). Manual test: `GET /api/oil-strike-tick?password=<ADMIN_PASSWORD>&force=1` (add `&deep=N`, 1–20, to drill N layers in one call for testing — bypasses the once-per-day guard; affects all claimed rigs; Telegram suppressed during deep drills). `&scout=1` returns the richest cells (no writes) so a tester can aim a rig — gives 0-based `col`/`row`, the on-screen `label` (col+1,row+1), and `bestLayer`.
-- `functions/index.js` → `oilStrikeTick` — hourly Firebase scheduled function that pings the route (needs `CRON_SECRET`; `APP_URL` optional). Deploy with `firebase deploy --only functions`.
+- `src/app/api/oil-strike-tick/route.js` — the strike loop. Tick-cadence-agnostic, idempotent per day (gates on a per-rig minute-of-day target so a strike fires on the first tick at/after that minute), reuses `generateOilDistribution3D` + `getAdminDb` (single source of truth). Manual test: `GET /api/oil-strike-tick?password=<ADMIN_PASSWORD>&force=1` (add `&deep=N`, 1–20, to drill N layers in one call for testing — bypasses the once-per-day guard; affects all claimed rigs; Telegram suppressed during deep drills). `&scout=1` returns the richest cells (no writes) so a tester can aim a rig — gives 0-based `col`/`row`, the on-screen `label` (col+1,row+1), and `bestLayer`.
+- `functions/index.js` → `oilStrikeTick` — every-5-minutes Firebase scheduled function that pings the route (needs `CRON_SECRET`; `APP_URL` optional). Deploy with `firebase deploy --only functions`.
 - New `oilDrills` fields written by the striker: `tankOil`, `lastStrikeDate`, `lastStrikeAt`, `lastStrikeOil`, `lastStrikeDepth`, `lastStrikeHell`, `armed`, `rigDepleted`.
 
 **Implemented (client wiring — Slice 2):**
