@@ -175,6 +175,63 @@ const IRID_PRESETS = {
   },
 };
 const ACTIVE_IRID = IRID_PRESETS.opal;
+
+// ── Default rig identity (Lyquid80) ──────────────────────────────────────────
+// Brand-tints the DEFAULT (un-customized) rig toward the opal/petrol palette so
+// the resting plot already reads "Lyquid80" instead of stock yellow/blue. Keyed
+// by PUMP_ZONES id → hex; a zone absent here keeps the model's baked atlas color.
+// Only the moving/hero parts are tinted (beam, horse head, counterweights, crank)
+// so the pad/tank/pipes/valve keep their grounding detail. A player's saved color
+// always overrides these — this is just the new "stock" look. Tune freely.
+const DEFAULT_RIG_TINT = {
+  beam:          "#26343d", // walking beam — dark petrol steel (the part players track)
+  horseHead:     "#3a7d76", // horse head — teal accent so the bob reads
+  counterweight: "#19222a", // counterweights — darkest petrol
+  crankWheel:    "#2b8f88", // crank — muted cyan accent
+};
+
+// Wellhead position in a rig's local (cell) space — where the drill pipe meets
+// the ground and the gusher erupts. Used to anchor the idle WellGlow. This is a
+// fallback; buildBaseRig derives the TRUE position from the Straw mesh and writes
+// it into _rigWellhead (and base.wellhead) so the glow sits in the actual hole.
+const WELLHEAD_OFFSET = [0, 0.006, 0.2];
+let _rigWellhead = [...WELLHEAD_OFFSET];
+// Opal-cyan glow color for the wellhead (the substance's signature bloom).
+const WELLHEAD_GLOW = ACTIVE_IRID.hex.emis; // 0x18d0c0
+// Glow is sunk just below the pad (DROP) so the pad masks any overhang to the hole
+// opening (depth-test); SIZE can exceed the hole since the rim trims it. No point
+// light — light spills onto the pad and can't be clipped by geometry.
+const WELLHEAD_GLOW_DROP = -0.018;
+const WELLHEAD_GLOW_SIZE = 0.12;
+
+// ── Control-box live readout (MachinePanel) ──────────────────────────────────
+// The MachinePanel box has baked, static digits. On the close-up (selected) rig
+// we overlay a live LED readout (depth, last find, MAX) anchored to the panel's
+// real world transform. These tunables dial the LED onto the screen face — like
+// the wellhead, expect to nudge them against the model. ROT corrects facing if
+// the text comes out sideways; the backing plane masks the baked digits.
+// Offset is in world-aligned axes (the rig group isn't rotated): +Y lifts onto the
+// screen, +X/−Z push out of the box face. ROT is a world Euler — the panel's own
+// local frame is twisted (local +Z points straight down), so we orient cleanly in
+// world space instead. Default faces world +X (the box's outward side).
+// Anchored at the control-box housing (PressurePanel). Offset is world-aligned:
+// +X = proud of the face, −Y = down from the LOW screen, +Z = toward the open
+// side (away from the red button on −Z). W spans Z (horizontal), H spans Y.
+const PANEL_READOUT_OFFSET = [0.012, -0.02, 0.02];
+const PANEL_READOUT_ROT = [0, Math.PI / 2, 0]; // stand vertical, face world +X
+const PANEL_READOUT_SIZE = 0.038;          // LED glyph height (world units)
+const PANEL_SCREEN_W = 0.075;              // backing width  (along Z)
+const PANEL_SCREEN_H = 0.05;               // backing height (along Y)
+// Mesh-driven path (PressurePanel2 is the screen): orientation + size come from the
+// quad. The exported quad is horizontal (face points down), so MESH_ROT stands the
+// digits up and faces them out (+X). If you re-orient the quad vertical/facing-out
+// in Blender, set MESH_ROT back to [0,0,0] so the digits stay coplanar with it.
+// LIFT pushes the digits off the quad face (flip sign if they render behind it);
+// GLYPH_FRAC = digit height as a fraction of the quad's shorter side.
+const PANEL_TEXT_LIFT = 0.003;
+const PANEL_MESH_ROT = [-Math.PI / 2, 0, 0];
+const PANEL_GLYPH_FRAC = 0.6;
+
 // GLSL palette fn shared by the procedural shaders. `t` in [0,1) → sheen color.
 const IRID_GLSL = `
 vec3 iridPalette(float t) {
@@ -917,6 +974,15 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
         m.envMapIntensity = 1.0;
         m.needsUpdate = true;
       }
+      // Lyquid80 brand default: flat-tint the hero zones even when "stock" so the
+      // close-up rig matches the merged field. This branch only runs when there's
+      // no custom color, so overriding here never stomps a player's choice.
+      const brandTint = DEFAULT_RIG_TINT[zoneId];
+      if (brandTint) {
+        child.material.color.set(brandTint);
+        child.material.map = null;
+        child.material.needsUpdate = true;
+      }
       return;
     }
 
@@ -944,9 +1010,12 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
 
     const mat = child.material;
 
-    // Apply color — detach texture map so flat color shows through
-    if (zoneConf.color) {
-      mat.color.set(zoneConf.color);
+    // Apply color — detach texture map so flat color shows through. Falls back to
+    // the Lyquid80 brand default for the zone, then the model's original color, so
+    // the selected/close-up rig matches the merged field (see DEFAULT_RIG_TINT).
+    const paintColor = zoneConf.color || DEFAULT_RIG_TINT[zoneId];
+    if (paintColor) {
+      mat.color.set(paintColor);
       if (mat.map) mat.map = null;
     } else {
       mat.color.copy(orig.color);
@@ -1415,6 +1484,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   // Gusher spawn position — model origin (center of rig)
   const gusherOriginRef = useRef(new THREE.Vector3(0, 0.05, 0.2));
 
+  // LED readout anchor. Prefer the dedicated PressurePanel2 screen mesh; fall back
+  // to PressurePanel (the housing) if the model hasn't been re-exported yet.
+  const controlBoxRef = useRef(null); // PressurePanel — now the pressure LED screen
+  const panel2Ref = useRef(null);     // PressurePanel2 — the depth LED screen
+  const [panelXform, setPanelXform] = useState(null);       // depth screen transform
+  const [pressureXform, setPressureXform] = useState(null); // pressure screen transform
+  const [pressure, setPressure] = useState({ label: "LOW", hex: "#33dd66" });
+  const pressureLevelRef = useRef("LOW"); // debounces the level setState in useFrame
+
   // Find the Straw mesh, GaugeNeedle, and pressure text meshes
   useEffect(() => {
     clonedScene.traverse((child) => {
@@ -1450,9 +1528,27 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         gaugeNeedleRef.current = child;
         gaugeBaseRotX.current = child.rotation.x;
       }
+      // Dedicated LED screen mesh (preferred anchor for the live readout)
+      if (child.name === "PressurePanel2") {
+        panel2Ref.current = child;
+        // Darken the screen so the amber LED reads. Clone first — the base material
+        // is shared across the rig atlas, so editing it in place would tint the
+        // whole pumpjack. applyPumpConfig skips this mesh (no zone), so it persists.
+        if (child.material && !child.userData._screenDarkened) {
+          const dm = child.material.clone();
+          dm.map = null;
+          dm.color.set("#06080c");
+          dm.roughness = 1.0;
+          dm.metalness = 0.0;
+          if (dm.emissive) { dm.emissive.set("#06080c"); dm.emissiveIntensity = 0.15; }
+          child.material = dm;
+          child.userData._screenDarkened = true;
+        }
+      }
       // Pressure panel text meshes — find children of PressurePanel
       // Log names in dev to identify the correct mapping
       if (child.name === "PressurePanel") {
+        controlBoxRef.current = child; // housing anchor for the live LED readout
         child.traverse((sub) => {
           if (sub === child) return;
           if (process.env.NODE_ENV === "development") {
@@ -1468,6 +1564,65 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         });
       }
     });
+    const group = shakeGroupRef.current;
+
+    // Resolve a flat screen quad's transform into the rig group's local space:
+    // position + orientation + size, so a drei <Text> lies exactly on it.
+    const screenXform = (mesh) => {
+      if (!mesh || !group) return null;
+      group.updateWorldMatrix(true, false);
+      mesh.updateWorldMatrix(true, false);
+      const pos = new THREE.Vector3();
+      mesh.getWorldPosition(pos);
+      group.worldToLocal(pos); // group is unscaled → local units match the overlay
+      const wq = new THREE.Quaternion();
+      mesh.getWorldQuaternion(wq);
+      const gq = new THREE.Quaternion();
+      group.getWorldQuaternion(gq);
+      wq.premultiply(gq.invert()); // → group-local rotation
+      mesh.geometry.computeBoundingBox();
+      const bb = mesh.geometry.boundingBox;
+      const ws = new THREE.Vector3();
+      mesh.getWorldScale(ws);
+      const dims = [
+        (bb.max.x - bb.min.x) * ws.x,
+        (bb.max.y - bb.min.y) * ws.y,
+        (bb.max.z - bb.min.z) * ws.z,
+      ].sort((a, b) => b - a); // [width, height, ~0]
+      return {
+        pos: [pos.x, pos.y, pos.z],
+        quat: [wq.x, wq.y, wq.z, wq.w],
+        w: dims[0], h: dims[1], fromMesh: true,
+      };
+    };
+
+    // Depth screen: PressurePanel2 if exported, else the world-docked fallback.
+    if (panel2Ref.current) {
+      setPanelXform(screenXform(panel2Ref.current));
+    } else if (controlBoxRef.current && group) {
+      const pos = new THREE.Vector3();
+      controlBoxRef.current.getWorldPosition(pos);
+      group.worldToLocal(pos);
+      setPanelXform({ pos: [pos.x, pos.y, pos.z], fromMesh: false });
+    }
+    // Pressure screen: the PressurePanel quad (now a code-rendered LED).
+    if (controlBoxRef.current) setPressureXform(screenXform(controlBoxRef.current));
+
+    // Darken both screens to the LED look (clone first — the base material is shared
+    // across the rig atlas, so an in-place edit would tint the whole pumpjack).
+    const darkenScreen = (mesh) => {
+      if (!mesh?.material || mesh.userData._screenDark) return;
+      const m = mesh.material.clone();
+      m.map = null;
+      m.color.set("#06080c");
+      if (m.emissive) { m.emissive.set("#06080c"); m.emissiveIntensity = 0.15; }
+      m.roughness = 1; m.metalness = 0;
+      mesh.material = m;
+      mesh.userData._screenDark = true;
+    };
+    darkenScreen(controlBoxRef.current); // PressurePanel screen
+    // The baked LOW/MED/HIGH letter meshes are replaced by drei text — hide them.
+    [textLowRef, textMedRef, textHighRef].forEach((r) => { if (r.current) r.current.visible = false; });
   }, [clonedScene]);
 
   useEffect(() => {
@@ -2259,27 +2414,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       const lerpSpeed = hellOverride ? 8 : 3;
       needle.rotation.x += (targetAngle - needle.rotation.x) * Math.min(delta * lerpSpeed, 1);
 
-      // Pressure label visibility — based on needle's actual lerped position, not raw fill
+      // Pressure level — based on the needle's lerped position (not raw fill). Drives
+      // the code-rendered LED label; setState only when the level actually changes.
       const displayAngleDeg = Math.abs(needle.rotation.x - gaugeBaseRotX.current) * (180 / Math.PI);
-      if (textLowRef.current) textLowRef.current.visible = !hellOverride && displayAngleDeg < 85;
-      if (textMedRef.current) textMedRef.current.visible = !hellOverride && displayAngleDeg >= 85 && displayAngleDeg < 210;
-      if (textHighRef.current) {
-        if (hellOverride) {
-          // Rapid red flash during hell event
-          textHighRef.current.visible = Math.sin(performance.now() * 0.02) > 0;
-          if (textHighRef.current.material) {
-            textHighRef.current.material.color.set(0xff2200);
-            textHighRef.current.material.emissive.set(0xff2200);
-            textHighRef.current.material.emissiveIntensity = 2;
-          }
-        } else {
-          const highOn = displayAngleDeg >= 210;
-          const flashing = displayAngleDeg >= 202.5;
-          textHighRef.current.visible = highOn && (!flashing || Math.sin(performance.now() * 0.012) > 0);
-          if (textHighRef.current.material) {
-            textHighRef.current.material.emissiveIntensity = 0;
-          }
-        }
+      const level = hellOverride || displayAngleDeg >= 210 ? "HIGH"
+        : displayAngleDeg >= 85 ? "MED" : "LOW";
+      if (level !== pressureLevelRef.current) {
+        pressureLevelRef.current = level;
+        const hex = level === "HIGH" ? "#ff3a2a" : level === "MED" ? "#ffae00" : "#33dd66";
+        setPressure({ label: level, hex });
       }
     }
 
@@ -2352,6 +2495,27 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
       }
     }
+
+    // Hell: wash the control-box screens red so the whole panel reads as alarm —
+    // the readout text strobes (PanelReadout), the screens glow a steadier red
+    // beneath it. Restores to the dark LED look when the event clears.
+    const hellNow = hellActiveRef.current;
+    [controlBoxRef.current, panel2Ref.current].forEach((scr) => {
+      const m = scr?.material;
+      if (!m?.emissive || !scr.userData._screenDark) return;
+      if (hellNow) {
+        const g = 0.45 + 0.35 * Math.sin(performance.now() * 0.012); // slow red pulse
+        m.emissive.setRGB(g, 0.03, 0.0);
+        m.emissiveIntensity = 1.0;
+        m.color.set("#1a0402");
+        scr.userData._screenHell = true;
+      } else if (scr.userData._screenHell) {
+        m.emissive.set("#06080c");
+        m.emissiveIntensity = 0.15;
+        m.color.set("#06080c");
+        scr.userData._screenHell = false;
+      }
+    });
 
     // Ground shake on oil strike — offset the outer group
     const shakeGroup = shakeGroupRef.current;
@@ -2876,6 +3040,34 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
       {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} parabolum={parabolum} />}
+      {/* Lyquid80 wellhead glow — idle bloom, flares on a strike, red during hell */}
+      <WellGlow strike={oilStrike} hell={hellActive} />
+      {/* Live control-box LEDs (close-up rig only): depth readout + pressure gauge */}
+      {highlighted && panelXform && (
+        <PanelReadout
+          pos={panelXform.pos}
+          quat={panelXform.quat}
+          w={panelXform.w}
+          h={panelXform.h}
+          fromMesh={panelXform.fromMesh}
+          token={hellActive ? "!!" : (drillDay >= maxDrillDay ? "MAX" : String(drillDay).padStart(2, "0"))}
+          idleHex={drillDay >= maxDrillDay ? "#ff3a2a" : "#ffae00"}
+          flareKey={oilStrike}
+          alarm={hellActive}
+        />
+      )}
+      {highlighted && pressureXform && (
+        <PanelReadout
+          pos={pressureXform.pos}
+          quat={pressureXform.quat}
+          w={pressureXform.w}
+          h={pressureXform.h}
+          fromMesh={pressureXform.fromMesh}
+          token={pressure.label}
+          idleHex={pressure.hex}
+          alarm={hellActive}
+        />
+      )}
       {/* Red alert point light + gusher VFX — on the selected rig, the rig the demon
           erupts from (hellActive), or any rig with a live gusher event (gusherActive).
           gusherLingering keeps it mounted through the 1s fade after the event clears
@@ -3261,9 +3453,15 @@ function buildBaseRig(scene) {
   let signGeo = null;
   const frameGeoms = [];
   const camGeoms = [];
+  let strawXZ = null; // Straw (drill pipe) world XZ → the true wellhead center
   scene.traverse((child) => {
     if (!child.isMesh || !child.geometry) return;
     if (child.name === "Envelope") return; // removed from scene
+    if (child.name === "Straw") {
+      const wp = new THREE.Vector3();
+      child.getWorldPosition(wp);
+      strawXZ = [wp.x, wp.z]; // scene space; scaled to cell-local on return
+    }
     // Security camera — only on plots with showCamera (rendered by IdleSign)
     if (child.name.startsWith("Security_Camera")) {
       let cg = child.geometry.clone();
@@ -3386,7 +3584,13 @@ function buildBaseRig(scene) {
     signCamGeo.computeBoundingSphere();
     camGeoms.forEach((g) => g.dispose());
   }
-  return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo };
+  // Wellhead in cell-local space: Straw world XZ × render scale, just above the
+  // pad. Cache module-level so the close-up WellGlow uses the same point.
+  const wellhead = strawXZ
+    ? [strawXZ[0] * PUMPJACK_SCALE, WELLHEAD_OFFSET[1], strawXZ[1] * PUMPJACK_SCALE]
+    : [...WELLHEAD_OFFSET];
+  _rigWellhead = wellhead;
+  return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo, wellhead };
 }
 
 function rigColorAttribute(base, config) {
@@ -3395,9 +3599,11 @@ function rigColorAttribute(base, config) {
   const tmp = new THREE.Color();
   for (let i = 0; i < total; i++) {
     const zid = vZone[i];
-    const custom = zid && config?.[zid]?.color;
-    if (custom) {
-      tmp.set(custom);
+    // Per-player color wins; otherwise the Lyquid80 brand default for the zone;
+    // otherwise the model's baked atlas color (vBase).
+    const paint = (zid && config?.[zid]?.color) || (zid && DEFAULT_RIG_TINT[zid]);
+    if (paint) {
+      tmp.set(paint);
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     } else {
       colors[i * 3] = vBase[i * 3]; colors[i * 3 + 1] = vBase[i * 3 + 1]; colors[i * 3 + 2] = vBase[i * 3 + 2];
@@ -3512,6 +3718,170 @@ function InstancedGeo({ geometry, material, positions, scale }) {
   }, [geometry, positions, scale]);
   if (!geometry || !positions.length) return null;
   return <instancedMesh ref={ref} args={[geometry, material, positions.length]} />;
+}
+
+// ── Wellhead glow (Lyquid80 signature bloom) ─────────────────────────────────
+// Close-up version for the full Pumpjack: a pulsing additive disc + faint point
+// light at the wellhead, brightening briefly on a strike. Self-contained so it
+// can't desync the rig's own animation state.
+function WellGlow({ position, strike = 0, hell = false }) {
+  const matRef = useRef();
+  const t = useRef(0);
+  // `strike` is a persistent value (the struck amount), not a flag — so flare on
+  // a *change* of it, then decay, instead of glowing constantly while it's > 0.
+  const prevStrike = useRef(strike);
+  const boost = useRef(0);
+  const _cyan = useMemo(() => new THREE.Color(WELLHEAD_GLOW), []);
+  const _hellRed = useMemo(() => new THREE.Color("#ff2a10"), []);
+  useFrame((_, delta) => {
+    t.current += delta;
+    if (strike !== prevStrike.current) {
+      if (strike > 0) boost.current = 1;
+      prevStrike.current = strike;
+    }
+    boost.current = Math.max(0, boost.current - delta * 0.7); // ~1.4s flare decay
+    if (!matRef.current) return;
+    if (hell) {
+      // The well the demon erupts from glows a hot, fast-pulsing red.
+      matRef.current.color.copy(_hellRed);
+      matRef.current.opacity = 0.55 + 0.4 * Math.abs(Math.sin(t.current * 6));
+    } else {
+      matRef.current.color.copy(_cyan);
+      matRef.current.opacity = 0.34 + 0.12 * Math.sin(t.current * 2.2) + boost.current * 0.7;
+    }
+  });
+  return (
+    <group position={position || _rigWellhead}>
+      {/* Sunk into the hole; depthTest (default on) lets the pad rim mask the
+          overhang, so the bloom stays inside the hole instead of washing the pad. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, WELLHEAD_GLOW_DROP, 0]} renderOrder={8}>
+        <planeGeometry args={[WELLHEAD_GLOW_SIZE, WELLHEAD_GLOW_SIZE]} />
+        <meshBasicMaterial
+          ref={matRef}
+          color={WELLHEAD_GLOW}
+          transparent
+          opacity={0.34}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+// Field version: ONE instanced additive disc across every plot's wellhead, plus a
+// single shared throttled pulse — so the idle field glow costs ~1 draw call and
+// 1 useFrame, preserving the merged field's perf win.
+function WellGlowField({ positions }) {
+  const ref = useRef();
+  const geo = useMemo(() => {
+    const g = new THREE.PlaneGeometry(0.09, 0.09); // square — matches the well hole
+    g.rotateX(-Math.PI / 2); // lie flat on the ground (InstancedGeo can't rotate)
+    return g;
+  }, []);
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: WELLHEAD_GLOW, transparent: true, opacity: 0.2,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }), []);
+  useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
+  useEffect(() => {
+    const inst = ref.current;
+    if (!inst) return;
+    const dummy = new THREE.Object3D();
+    positions.forEach((p, i) => {
+      dummy.position.set(p[0], p[1], p[2]);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    inst.computeBoundingSphere?.();
+  }, [positions]);
+  const t = useRef(0);
+  const skip = useRef(0);
+  useFrame((_, delta) => {
+    skip.current = (skip.current + 1) % 3; // throttle — it's a distant idle glow
+    if (skip.current) return;
+    t.current += delta * 3;
+    mat.opacity = 0.18 + 0.07 * Math.sin(t.current);
+  });
+  if (!positions.length) return null;
+  return <instancedMesh ref={ref} args={[geo, mat, positions.length]} />;
+}
+
+// Presentational LED readout for a screen (close-up rig only). Renders `token` in
+// `idleHex` with a gentle "alive" pulse; flares toward white whenever `flareKey`
+// changes to a positive value (depth uses oilStrike; pressure passes 0). When `alarm`
+// (a hell event) it overrides to a hard red strobe matching the alert beacon (~4 Hz).
+// Anchored to a screen's transform { pos, quat, w, h } when fromMesh, else docked.
+function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", idleHex = "#ffae00", flareKey = 0, alarm = false }) {
+  const matRef = useRef();
+  const t = useRef(0);
+  const prevFlare = useRef(flareKey);
+  const boost = useRef(0);
+  const _base = useMemo(() => new THREE.Color(), []);
+  const _white = useMemo(() => new THREE.Color("#fff2c8"), []);
+  const _red = useMemo(() => new THREE.Color("#ff2a14"), []);
+  useFrame((_, dt) => {
+    t.current += dt;
+    if (flareKey !== prevFlare.current) {
+      if (flareKey > 0) boost.current = 1;
+      prevFlare.current = flareKey;
+    }
+    boost.current = Math.max(0, boost.current - dt * 0.6); // ~1.6s flare
+    if (!matRef.current) return;
+    if (alarm) {
+      // Hell strobe — same 4 Hz square as the alert beacon (Math.sin(t*25) > 0)
+      const on = Math.sin(t.current * 25) > 0;
+      _base.copy(_red).multiplyScalar(on ? 1 : 0.25);
+      matRef.current.color.copy(_base);
+      matRef.current.opacity = on ? 1 : 0.12;
+    } else {
+      const pulse = 0.72 + 0.18 * Math.sin(t.current * 3); // gentle "alive" flicker
+      _base.set(idleHex).multiplyScalar(pulse);
+      _base.lerp(_white, Math.min(boost.current, 1) * 0.85);
+      matRef.current.color.copy(_base);
+      matRef.current.opacity = 1;
+    }
+  });
+  const digits = (
+    <Text
+      fontSize={fromMesh ? (h || 0.05) * PANEL_GLYPH_FRAC : PANEL_READOUT_SIZE}
+      maxWidth={fromMesh ? (w || 0.1) * 0.94 : undefined}
+      anchorX="center"
+      anchorY="middle"
+      letterSpacing={0.05}
+      color={idleHex}
+      font={undefined}
+      renderOrder={999}
+    >
+      {token}
+      <meshBasicMaterial ref={matRef} attach="material" color={idleHex} toneMapped={false} transparent depthWrite={false} side={THREE.DoubleSide} />
+    </Text>
+  );
+  // Mesh-driven: the digits lie directly on the PressurePanel2 quad (the mesh is the
+  // screen, so no generated backing). Orientation comes from the quad's quaternion.
+  if (fromMesh) {
+    return (
+      <group position={pos} quaternion={quat}>
+        <group rotation={PANEL_MESH_ROT}>
+          {/* lift inside the rotated frame so it pushes along the face normal */}
+          <group position={[0, 0, PANEL_TEXT_LIFT]}>{digits}</group>
+        </group>
+      </group>
+    );
+  }
+  // Fallback (pre-export): world-oriented docked LED with its own dark backing.
+  return (
+    <group position={pos}>
+      <group rotation={PANEL_READOUT_ROT} position={PANEL_READOUT_OFFSET}>
+        <mesh position={[0, 0, -0.002]} renderOrder={998}>
+          <planeGeometry args={[PANEL_SCREEN_W, PANEL_SCREEN_H]} />
+          <meshBasicMaterial color="#070a08" transparent opacity={0.92} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+        {digits}
+      </group>
+    </group>
+  );
 }
 
 // Sign image quads sharing one texture → one instanced draw call per image URL.
@@ -3650,6 +4020,17 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
     return { key: it.key, position: it.position, col: it.col, row: it.row, geo };
   }), [base, items, allPumpConfigs]);
 
+  // Wellhead world positions for the instanced idle glow (stable — not keyed on
+  // selection, so focusing a plot doesn't rebuild the instance buffer).
+  const wellPositions = useMemo(() => {
+    const wh = base.wellhead || WELLHEAD_OFFSET;
+    return rigs.map((r) => [
+      r.position[0] + wh[0],
+      r.position[1] + wh[1],
+      r.position[2] + wh[2],
+    ]);
+  }, [rigs, base]);
+
   useEffect(() => () => rigs.forEach((r) => r.geo.dispose()), [rigs]);
   useEffect(() => () => {
     base.geometry.dispose();
@@ -3693,6 +4074,8 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
           </group>
         );
       })}
+      {/* Lyquid80 wellhead glow across every plot — one instanced draw call. */}
+      <WellGlowField positions={wellPositions} />
       {/* Static decorations (signs, frames, cameras, fences, non-animated add-ons)
           instanced by type — one draw call each across the whole field. */}
       <StaticDecoField
@@ -3758,7 +4141,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
     [gusherCellSet, lingerSet]
   );
 
-  const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
+  const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps2.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
   // OilTower position — centered on the 4 middle cells
@@ -3864,7 +4247,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
   );
 }
 
-useGLTF.preload("/models/oilJack_fancy_allProps.glb");
+useGLTF.preload("/models/oilJack_fancy_allProps2.glb");
 
 // ── Hell Demon — spawns from below, flies to a victim plot, roams the field
 //    making mischief, and must be caught during a vulnerable pause window ─────
