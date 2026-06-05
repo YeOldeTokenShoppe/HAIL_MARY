@@ -3,10 +3,9 @@ import { createHash } from "crypto";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 
 // Whitelist of fields the admin UI is allowed to set on oilGame/settings.
-// ticketCount / currentPickOrder / pickDeadline are excluded — those are
-// owned by /api/oil-ticket and /api/oil-draft-skip and must not be writable
-// from this endpoint to prevent admin-side tampering with the draft order
-// or ticket count.
+// ticketCount / currentPickOrder / pickDeadline are legacy draft fields (the
+// ticket/draft system was removed) — not in the whitelist, so they stay
+// unwritable from here.
 //
 // NOTE: `blockHash` (the distribution seed) is deliberately NOT public-writable.
 // It is the secret that decides where the oil is; publishing it would let any

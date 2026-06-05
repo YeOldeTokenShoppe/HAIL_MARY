@@ -3,6 +3,16 @@ import { db, doc, setDoc, serverTimestamp } from "@/lib/firebaseServer";
 
 export async function POST(req) {
   try {
+    // Authenticate the caller as Telegram. Telegram echoes the `secret_token`
+    // set at setWebhook time in this header on every delivery. Without this,
+    // anyone could POST `/start <victimClerkId>` and bind a victim's account to
+    // their own chat. Fails closed: if the secret isn't configured, reject.
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    const provided = req.headers.get("x-telegram-bot-api-secret-token");
+    if (!secret || provided !== secret) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const update = await req.json();
     const message = update.message;
     if (!message?.text || !message?.chat?.id) {

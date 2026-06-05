@@ -130,3 +130,5 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: OIL_PURCHASE_TREASURY
+    secret: OIL_PURCHASE_TREASURY

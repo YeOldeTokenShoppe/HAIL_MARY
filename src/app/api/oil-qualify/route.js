@@ -48,8 +48,10 @@ export async function POST(req) {
   try {
     const { adminPassword } = await req.json();
 
-    // Admin auth — same pattern as other oil admin routes
-    const correctPassword = process.env.ADMIN_PASSWORD || process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+    // Admin auth — server-only secret. NEVER fall back to NEXT_PUBLIC_* (that
+    // var is inlined into the client bundle, so accepting it would let any
+    // visitor authorize this snapshot, which writes `qualified` for all players).
+    const correctPassword = process.env.ADMIN_PASSWORD;
     if (!correctPassword || adminPassword !== correctPassword) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

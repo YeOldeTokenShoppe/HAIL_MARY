@@ -1,6 +1,8 @@
 // Server-side utility: reads RL80/USD price from Uniswap V2 pool on Base
 // Pool: 0x40d827aCDBEfd8Ef46953e2b1AC87b8697b82203 (RL80/WETH)
 
+import { getBaseRpcUrl } from "./baseRpcUrl";
+
 const UNISWAP_PAIR = "0x40d827aCDBEfd8Ef46953e2b1AC87b8697b82203";
 
 // ABI fragments (function selectors)
@@ -8,8 +10,8 @@ const GET_RESERVES_SIG = "0x0902f1ac"; // getReserves()
 const TOKEN0_SIG = "0x0dfe1681";       // token0()
 
 async function baseRpc(method, params) {
-  const url = process.env.NEXT_PUBLIC_BASE_RPC_URL || process.env.BASE_RPC_URL;
-  if (!url) throw new Error("BASE_RPC_URL not configured");
+  const url = getBaseRpcUrl();
+  if (!url) throw new Error("Base RPC not configured (set BASE_RPC_URL or NEXT_PUBLIC_CDP_CLIENT_API_KEY)");
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -132,6 +132,18 @@ export async function POST(req) {
     if (!userId || !itemIds?.length) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+    // userId is an x402-supplied value used directly as a Firestore doc-path
+    // segment (oilPurchases/{userId}). Constrain it to safe ID chars so a "/"
+    // (or junk) can't traverse paths or spawn garbage docs. This endpoint is
+    // intentionally pay-for-anyone (x402 bazaar), so we validate rather than
+    // session-bind — the payer funds the unlock; items are cosmetic.
+    if (typeof userId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(userId)) {
+      return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
+    }
+    if (!Array.isArray(itemIds) || itemIds.length > 20 ||
+        !itemIds.every((id) => typeof id === "string")) {
+      return NextResponse.json({ error: "Invalid itemIds" }, { status: 400 });
+    }
 
     let totalUsdc;
     try {

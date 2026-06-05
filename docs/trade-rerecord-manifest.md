@@ -5,7 +5,44 @@ changed and need recordings (slots not listed are unchanged). Eugene's lines
 are included for her new vocal — she was previously text-only, so her audio
 playback wiring is still a separate step.
 
-## case-001 — PROPHET TOKEN ($PRPHT) · DOUBT · 14 slots
+## case-001 — PROPHET TOKEN ($PRPHT) · DOUBT · 36 slots
+
+### Saint GR80  *(station: monk, voice: {"voice":"9","lang":1,"engine":7,"effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case001_monk_rules` | Welcome, friend. The rite is simple. You may spend three questions across the four of us. Then you set your confidence on the dial: slide toward Trust if the evidence holds, toward Doubt if the pattern breaks faith, or leave it centered to Abstain. A bold, correct call is rewarded most. A bold, wrong one leaves the deepest mark. Choose where to place your weight with care. |
+
+### John Barron  *(station: demon, voice: {"voice":"2","effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case001_demon_intro` | Prophet Token's crowd? Annoyingly normal. I came to roast a paid-shill circus and found people just... talking. Hate it. Look closer. |
+| `case001_demon_q1` | Five thousand followers, and most of them have been around for a year or more. Real histories, real reply chains, even a few boring accounts. This crowd wasn't bought last week. |
+| `case001_demon_q2` | The Telegram's a normal mess. People arguing about entries, posting memes, complaining the bot is laggy. Typos everywhere. Botted rooms are shrink-wrapped. This one's lived-in. |
+| `case001_demon_q3` | A couple mid-tier callers mentioned it, spread across different days, no synchronized blast. Neutral takes, not hype scripts. If they paid for this, they paid for the world's laziest promo. |
+| `case001_demon_q4` | There's a pinned skeptic thread poking at the AI claims. Still up. Team argued back, didn't win, didn't delete. That's healthier than ninety percent of the rooms I read. |
+| `case001_demon_react_belie` | Crowd's real, sure. Just remember a real audience can still be standing on a trap door. |
+| `case001_demon_react_absta` | Caution on a clean room. Bold. Slightly cowardly. I respect it. |
+| `case001_demon_react_doubt` | Doubt on a crowd this normal? Then you're not reading the crowd. You're reading something I missed. |
+| `case001_demon_vind_aligne` | Good crowd, bad token. Honest room, dirty hands. New shape. Remember it. |
+| `case001_demon_vind_missed` | The room was real. The deployer wasn't. Audience never tells you who's holding the keys. |
+| `case001_demon_vind_abstai` | You sat out an honest crowd and dodged a dirty team. Lucky read. I'll take it. |
+
+### Detective Trinity  *(station: marisol, voice: {"voice":"3","lang":1,"engine":3,"effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case001_trinity_intro` | Pull up a chair. The wallets on this one are quieter than I expected. Sometimes quiet means clean. Sometimes it just means careful. |
+| `case001_trinity_q1` | Top ten wallets hold about twenty-eight percent between them. Concentrated enough to watch, not enough to call a cliff. Pretty normal for a four-day-old launch. |
+| `case001_trinity_q2` | I traced the deployer's allocation. Six percent, sitting in one labeled wallet, not fanned out across shell addresses. If they're concealing supply, they're doing it badly. |
+| `case001_trinity_q3` | Volume's mostly clean. A little circular churn near the open, the kind every new pair has, but the bulk is distinct wallets trading once and leaving. Not a wash farm. |
+| `case001_trinity_q4` | Liquidity's locked thirty days through a third-party locker, and the contract has no mint and no hidden pause. On paper, the front door is bolted. On paper. |
+| `case001_trinity_react_bel` | The chain backs you up today, kid. Just remember a locker has an expiry date and a deployer has a memory. |
+| `case001_trinity_react_abs` | Smart play. Clean wallets aren't a verdict. They're just one page of the file. |
+| `case001_trinity_react_dou` | Doubting numbers this tidy? Then you read something off the chain that I don't price in. Good. |
+| `case001_trinity_vind_alig` | Clean chain, dirty hands. The wallets were honest. The man behind them wasn't. |
+| `case001_trinity_vind_miss` | The onchain state was fine. It always is, until the deployer decides it isn't. Read who, not just what. |
 
 ### Eugene  *(station: eugene, voice: null)*
 
@@ -26,7 +63,64 @@ playback wiring is still a separate step.
 | `case001_eugene_vind_misse` | The pitch was genuine. The person behind it wasn't. A good story can't vouch for a bad founder. Now you know the shape. |
 | `case001_eugene_vind_absta` | You felt the faceless-founder gap without naming it. Half the lesson. |
 
-## case-002 — HARBORLIGHT ($HBR) · BELIEVE · 14 slots
+## case-002 — HARBORLIGHT ($HBR) · BELIEVE · 56 slots
+
+### Saint GR80  *(station: monk, voice: {"voice":"9","lang":1,"engine":1,"effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case002_monk_intro` | HarborLight wears no faces. Its builders speak through handles, never names. And the first coin that funded them came by a road that flinches under the lamp. Anonymity is not yet sin. But it is a question, and questions deserve to be followed all the way down. |
+| `case002_monk_return_1` | The masks remain. Judge what stands behind them. |
+| `case002_monk_return_2` | A hidden face is not yet a guilty one. Keep looking. |
+| `case002_monk_return_3` | Suspicion has knocked. Let us see who answers. |
+| `case002_monk_q1` | No legal names. Only handles: harbor-dev, keel, two others. Pseudonymous, plainly. Yet those same handles carry three years of public commits, and old forum scars from a prior project that never harmed a soul. The mask is old. And an old mask has a memory. |
+| `case002_monk_q2` | Before the coin, a working treasury dashboard. Before that, a separate tool that still runs under the same keys. Three months of commits came before the launch, not after it. This is not a cathedral. It is a foundation. And foundations are not laid by those who plan to flee. |
+| `case002_monk_q3` | Here the file darkens. The deployer's earliest coin passed through one privacy-shaped hop before it reached a known creator DAO. But follow that hop, and it ends not in shadow, but at an exchange withdrawal. A coin bought and pulled from a regulated desk. A suspicious first breath. Not a poisoned bloodline. |
+| `case002_monk_q4` | Power remains. The admin keys are not surrendered. But they sit behind a three-of-five multisig and a forty-eight-hour timelock. The sword is real, but sheathed in delay and daylight. Watch it. Do not yet fear it. |
+| `case002_monk_react_believe` | A mask is not a confession. The evidence behind it leans their way. Still, let time test them. |
+| `case002_monk_react_abstain` | Caution before hidden faces is permitted. So is courage. Judgment lives on that line. |
+| `case002_monk_react_doubt` | Suspicion is a tool, not a verdict. Do not let one dark hop become the whole sentence before you have followed it down. |
+| `case002_monk_vind_aligned` | You looked past the mask and the murky hop, and found their answers. Well done. |
+| `case002_monk_vind_missed` | A masked team and one privacy hop scared you off a clean file. Learn the difference between a frightening surface and a rotten core. |
+| `case002_monk_vind_abstained` | You kept your capital. Though the evidence behind the mask favored a measure of trust. |
+
+### John Barron  *(station: demon, voice: {"voice":"2","effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case002_demon_intro` | Oh, this room is LOUD. Rocket emojis, hundred-x screenshots, a Telegram doing cartwheels at three in the morning. Smells like exit liquidity in a party hat. Two caller channels foaming at the mouth. Let's see if that noise is real money, or just confetti somebody paid for. |
+| `case002_demon_return_1` | Back for the crowd read. Brace yourself. It's a circus. |
+| `case002_demon_return_2` | Sentiment. My favorite legal hallucination. |
+| `case002_demon_return_3` | Let's see if this room's a market or a moshpit. |
+| `case002_demon_q1` | Follower count tripled in a week. First squint, looks like a botted bloom. The classic rented crowd. But three quarters of these accounts are over a year old, and they argue with each other. Bots never bother. Loud, yes. Rented, no. |
+| `case002_demon_q2` | Half the channel's screaming moon and throwing green candles around like it's a wedding. The other half, down under the noise, is asking about export limits, signer roles, fees. The hype is real volume. So is the boring product talk hiding under it. |
+| `case002_demon_q3` | Two loud caller channels grabbed it and went nuclear. Hundred-x targets, the whole pump liturgy. Genuinely ugly optics. But trace it. They latched on after launch, on their own, took zero allocation, and the team never amplified them once. Parasites, not payroll. |
+| `case002_demon_q4` | Negative posts, still standing. One fee complaint got a public correction from the team, in-thread, no deletion. Annoyingly healthy. Deeply inconvenient for my brand. |
+| `case002_demon_react_believe` | Backing a coin with a circus in the comments. Risky look. But the circus isn't the company, sweetheart. Respect. |
+| `case002_demon_react_abstain` | Fine. A room this loud has earned a little fear. Caution's got good branding these days. |
+| `case002_demon_react_doubt` | You heard the pump chants and bailed. Understandable. But noise isn't fraud, and you never checked who was actually getting paid. |
+| `case002_demon_vind_aligned` | You heard the pump and looked straight past it to the real room underneath. Strange feeling, right? |
+| `case002_demon_vind_missed` | The callers screamed and you flinched. Not every loud room's a trap. Sometimes it's a real thing with bad neighbors. |
+| `case002_demon_vind_abstained` | You didn't lose. You also didn't learn to hear a real crowd under the noise. Not yet. |
+
+### Detective Trinity  *(station: marisol, voice: {"voice":"3","lang":1,"engine":3,"effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case002_trinity_intro` | Everyone's yelling about the chart and the callers. I don't care about noise. What stops me cold is the holder list. Nearly forty percent of supply in a handful of wallets. That's the shape of a rug. So I'll do the boring thing and find out whose wallets those actually are. |
+| `case002_trinity_return_1` | Figured you'd want the receipts. |
+| `case002_trinity_return_2` | Let's stay with the wallets. They don't scream. |
+| `case002_trinity_return_3` | Loud files still leave quiet fingerprints. |
+| `case002_trinity_q1` | Top ten wallets hold thirty-eight percent. On the surface, cliff-edge concentration. The kind that ends careers. But pull the labels. The biggest is a time-locked treasury contract. The second, a known exchange cold wallet, holding for listed users. Concentrated, yes. Anonymous and dumpable, no. |
+| `case002_trinity_q2` | Team wallets haven't sold a single token through the hype spike. One advisor moved an allocation. I traced it straight into a vesting contract, not out to the market. That's a paper trail, not a dump. |
+| `case002_trinity_q3` | Volume spiked with the hype, and a chunk of it looks suspiciously rhythmic. The kind of pattern that screams wash trading. But trace the counterparty. One labeled market-maker desk running quotes, not a closed loop cycling the same coins. Loud is a sentiment problem. Circular is a fraud problem. This is neither. |
+| `case002_trinity_q4` | Liquidity's locked a full year, signed in the same block the pool was created. Not forever. Not magic. But long enough to make the quick-rug math very ugly for anyone planning one. |
+| `case002_trinity_react_believe` | That's where the receipts point. The chain ignored the hype. Trace the wallets, and so should you. Yes. |
+| `case002_trinity_react_abstain` | Reasonable. Thin markets punish impatience, hype or not. But the locks are real. |
+| `case002_trinity_react_doubt` | You saw thirty-eight percent and walked. I get it. But you never traced the wallets, and tracing was the whole job. |
+| `case002_trinity_vind_aligned` | Good read. You traced the concentration instead of fleeing it, and the receipts held. |
+| `case002_trinity_vind_missed` | You let a scary holder chart talk over the labels. Treasury locked, LP locked, nobody sold. The receipts were clean. |
+| `case002_trinity_vind_abstained` | Acceptable. But trace the wallets, and the onchain signals were clean and loud. |
 
 ### Eugene  *(station: eugene, voice: null)*
 
@@ -47,7 +141,55 @@ playback wiring is still a separate step.
 | `case002_eugene_vind_misse` | You let a loud chat and an over-ambitious roadmap drown out a real, audited product. The GitHub and the pilots were right there. |
 | `case002_eugene_vind_absta` | Not wrong! But there was a real, verifiable product here to lean on under all that noise. |
 
-## case-003 — MERIDIAN PROTOCOL ($MRDN) · DOUBT · 14 slots
+## case-003 — MERIDIAN PROTOCOL ($MRDN) · DOUBT · 47 slots
+
+### Saint GR80  *(station: monk, voice: {"voice":"9","lang":1,"engine":1,"effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case003_monk_intro` | Meridian arrives in proper robes. Real names, a real audit, real investors. Most of this congregation has clean hands. Most. The lie, if there is one, will not stand at the pulpit. It sits quietly in a back pew. Look there. |
+| `case003_monk_q1` | Three founders, all named, all visible. Two carry clean histories at established yield protocols. The third is newer, runs operations, keeps a quieter footprint. The roster, on its face, is respectable. |
+| `case003_monk_q2` | Trail of Bits delivered a public report. Three lows, one medium, all marked resolved. An honest audit, by an honest firm. But read the scope, not only the verdict. A report tells you what it looked at. And just as quietly, what it did not. |
+| `case003_monk_q3` | One point two million in seed, from named DeFi funds, routed through a treasury multisig before the launch pool. The public capital has clean parentage. But not every wallet with a key came through the front door. One arrived another way. |
+| `case003_monk_q4` | Two founders have shipped serious work. The operations partner once co-launched a yield project that quietly wound down. Depositors made whole on paper, the cause never examined. No charges, no headlines. A footnote, not a verdict. But footnotes are where patterns hide. |
+| `case003_monk_react_believ` | Trust offered to the proven is reason. Trust offered to the unexamined is hope wearing reason's robe. |
+| `case003_monk_react_abstai` | An audit you did not finish reading is a warning you did not finish hearing. Caution is not cowardice. |
+| `case003_monk_react_doubt` | Doubt aimed at clean names is harsh. Doubt aimed at the one quiet name, and the door the audit skipped — that is wisdom. |
+| `case003_monk_vind_aligned` | You did not let two clean men vouch for the third. The footnote was the warning. You read it. |
+| `case003_monk_vind_missed` | Honest names can shelter one quiet hand. The work is to ask which door that hand already knows how to open. |
+| `case003_monk_vind_abstain` | Caution before a faint signal is acceptable. One more reading, on the right page, would have made you certain. |
+
+### John Barron  *(station: demon, voice: {"voice":"2","effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case003_demon_intro` | I came in ready to gut this one. Big name, big audit, shiny landing page. Classic exit-liquidity bait. Then I looked at the crowd, and it's annoyingly grown-up. Real people, real arguments, no rocket emojis. Almost too clean. The earliest fans are a little TOO in sync for strangers. Probably nothing. Probably. Continue. |
+| `case003_demon_q1` | Sixty-eight percent of followers are over a year old. DeFi natives, pseudonyms with histories, real reply patterns, some genuinely boring people. This is not a rented audience. You can't fake this without a year of patience. |
+| `case003_demon_q2` | Strategy parameter questions, fee-split debates, one thread roasting the dashboard. Product talk, not chant. If this is a script, it's the most boring script ever written. Believable in a way that almost insults me. |
+| `case003_demon_q3` | Here's the thing that itches. A dozen of the very first 'organic' supporters all started posting inside the same eighteen-hour window, before any coverage, with oddly similar framing. Could be a private group of early adopters who found it together. Could be a seeded crowd built to look grassroots. I genuinely can't tell. And that bothers me. |
+| `case003_demon_q4` | A pinned skeptic thread questioning the emissions schedule, still up. Team replied, didn't win, didn't delete. Healthy. Mature. Suspiciously well-adjusted. |
+| `case003_demon_react_belie` | Trusting a quiet room full of adults. Healthy. Possibly right. Just don't forget who clapped first. |
+| `case003_demon_react_absta` | Caution on a clean room with one weird opening act. Bold. Slightly cowardly. I respect it. |
+| `case003_demon_react_doubt` | Doubt on a crowd this calm? Maybe you clocked the seeded first-movers too. Or maybe you're fighting the last war. |
+| `case003_demon_vind_aligne` | Good crowd, planted front row. The real fans were real. The cheerleaders were hired. You felt the seam. |
+| `case003_demon_vind_missed` | Real audiences can be wrong, sweetheart. Most of the room was honest. The opening act was paid to look like them. |
+| `case003_demon_vind_abstai` | You sat out a crowd that was mostly clean and one-twelfth staged. Reasonable hedge. Not quite a read. |
+
+### Detective Trinity  *(station: marisol, voice: {"voice":"3","lang":1,"engine":3,"effect":"T","effLevel":3})*
+
+| Slot | Line |
+|---|---|
+| `case003_trinity_intro` | Meridian wants you to admire the lobby. Marble floors, named doormen, framed audit on the wall. Honestly? The lobby checks out. Locked liquidity, real multisig, distribution that looks broad. I'm here for the basement. The wiring nobody put on the brochure. |
+| `case003_trinity_q1` | It is. Third-party locker, twelve-month term, verifiable on chain. The LP isn't going anywhere by the obvious route. On the front door, this protocol's bolted tight. That part's genuinely good news. |
+| `case003_trinity_q2` | Surface counts look diverse. Three thousand holders, top ten under thirty percent. Clean by the headline. But cluster analysis ties about nineteen percent of supply to a handful of wallets that share one funding source and move in lockstep. Labeled 'community.' Behaves like one hand. Not damning on its own. Worth a flag. |
+| `case003_trinity_q3` | Here's the basement. The governance module has the three-of-five multisig everyone points at. But the proxy admin slot — the address that can replace the entire implementation — is a single externally-owned wallet. No timelock. And that's exactly the slot the audit marked out of scope. The lobby has five doormen. This door has one, and nobody inspected it. |
+| `case003_trinity_q4` | Not yet. The implementation hasn't been swapped since launch, so today, nothing's wrong. That's what makes this hard. But a single key, no timelock, controlling an upgrade the auditors never reviewed — that's not a problem until the second it is. Whether it stays unused depends entirely on whose hand holds it. |
+| `case003_trinity_react_bel` | Today the chain backs you, kid. Nothing's been swapped. Just know the basement door's unlocked, and unwatched. |
+| `case003_trinity_react_abs` | Reasonable. Nothing's happened on-chain yet. But 'yet' is doing a lot of work in that sentence. |
+| `case003_trinity_react_dou` | Yeah. LP's locked, audit's real, and there's a one-key door they never reviewed. Name whose key it is, and you've got it. |
+| `case003_trinity_vind_alig` | Good read. The locked LP fooled three of us. You went to the basement and found the one door without a guard. |
+| `case003_trinity_vind_miss` | Audit scope is the most important page in any report. The one slot they skipped is the one that mattered. Read it next time. |
+| `case003_trinity_vind_abst` | You walked away from a loaded gun that hadn't fired yet. Smart enough. Next time, read the chamber and call it. |
 
 ### Eugene  *(station: eugene, voice: null)*
 
@@ -69,4 +211,4 @@ playback wiring is still a separate step.
 | `case003_eugene_vind_absta` | You smelled the polish without naming the seam. Half the lesson. 💫 |
 
 ---
-Total slots to re-record: **42**
+Total slots to re-record: **139**

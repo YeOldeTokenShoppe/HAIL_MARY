@@ -1175,10 +1175,11 @@ export default function OilPage() {
         // commitment, plus the post-game reveal (which is safe to compute from).
         if (d.seedCommitment) setSeedCommitment(d.seedCommitment);
         if (d.seedReveal) setBlockHash(d.seedReveal);
-        // Legacy/pre-migration games may still carry a public blockHash. Only
-        // seed-visible modes (admin/report/test) may adopt it — normal players
-        // must never receive a usable seed.
-        else if (d.blockHash && (isAdmin || isReport || isTest)) setBlockHash(d.blockHash);
+        // Legacy/pre-migration games may still carry a public blockHash. Gate
+        // adoption on the PASSWORD-VERIFIED admin flag (not the URL `mode`,
+        // which any visitor can set to admin/report/test) so a stray legacy
+        // seed can never be computed client-side by a non-admin.
+        else if (d.blockHash && adminAuthed) setBlockHash(d.blockHash);
         if (d.numberOfDeposits) setNumberOfDeposits(d.numberOfDeposits);
         if (d.totalOilBudget) setTotalOilBudget(d.totalOilBudget);
         if (typeof d.gameEnded === "boolean") setGameEnded(d.gameEnded);
@@ -3806,7 +3807,10 @@ export default function OilPage() {
             color: gamePhase === p ? theme.gold : theme.muted,
           }}
         >
-          {p.toUpperCase().replace("_", " ")}
+          {/* `ticket_sale` is the legacy stored value for the pre-game
+              registration/qualification lobby (OilQualify) — relabel for
+              display only; the stored phase value is unchanged. */}
+          {({ ticket_sale: "REGISTRATION", active: "ACTIVE", ended: "ENDED" }[p] || p.toUpperCase())}
         </button>
       ))}
     </div>
