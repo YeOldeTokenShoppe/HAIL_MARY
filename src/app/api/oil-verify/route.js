@@ -59,11 +59,16 @@ export async function GET() {
     }
 
     // 3. Final seed + field — recompute the distribution and compare against
-    //    every cell that was actually revealed during play.
-    if (revealedSecret && publishedAnchorHash) {
-      const finalSeed = computeFinalSeed(revealedSecret, publishedAnchorHash);
+    //    every cell that was actually revealed during play. Future-block scheme
+    //    derives finalSeed = SHA256(secret : blockHash); the legacy admin-typed
+    //    scheme used the revealed value directly as the distribution seed.
+    if (revealedSecret) {
+      const finalSeed = publishedAnchorHash
+        ? computeFinalSeed(revealedSecret, publishedAnchorHash)
+        : revealedSecret;
       checks.finalSeed = {
         value: finalSeed,
+        scheme: publishedAnchorHash ? "future-block" : "legacy-direct",
         matchesPublished: s.finalSeedReveal ? s.finalSeedReveal === finalSeed : null,
       };
 

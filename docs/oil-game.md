@@ -297,9 +297,21 @@ player could copy the seed and run `generateOilDistribution3D` to print the enti
 
 - **Seed is secret (commit-reveal).** The raw seed lives in the server-only `oilSecret/seed`
   doc (`firestore.rules`: `read/write: if false`). `oilGame/settings` publishes only the
-  SHA-256 **commitment** (`seedCommitment`); the raw seed (`seedReveal`) is published at game
+  SHA-256 **commitment** (`seedCommitment`); the secret (`seedReveal`) is published at game
   end for verification. `/api/oil-settings` POST stores the seed + commitment and purges any
   legacy public `blockHash`; an admin-only GET returns the seed for the live inspector.
+- **Future-block anchor (provable fairness — 2026-06-04).** Commit-reveal alone stops the
+  house changing the seed *after* commit, but not from *grinding* one before. The seed is
+  now anchored to a **future Base block hash** the operator can't predict: `finalSeed =
+  SHA256(serverSecret : anchorBlockHash)`. Flow (`/api/oil-fairness`, admin):
+  `commit` (random `serverSecret`, publish `seedCommitment` + a future `anchorBlock`) →
+  `anchor` (once mined, fetch the block hash, derive + store `finalSeed`; strike-tick reads
+  it) → `reveal` (publish `serverSecret` at game end; also auto-fires on `gameEnded:true`).
+  `lib/oilFairness.js` holds the pure helpers (`computeCommitment` / `computeFinalSeed` /
+  `verifyRevealedField`). **`/api/oil-verify`** is public/no-auth: it re-fetches the anchor
+  block from Base, recomputes the commitment + finalSeed + entire field, and checks every
+  drilled `oilPlots.revealed` cell — returning `{phase, verdict, checks}`. It handles both
+  the future-block scheme and the legacy direct-seed scheme.
 - **Server writes the reveal per cell.** On each strike, `oil-strike-tick` writes the
   discovered oil into `oilPlots/{col_row}.revealed[layer]` (+ `hellLayers`). `/api/oil-backfill-revealed`
   (admin-gated) backfills already-drilled cells.
@@ -332,10 +344,14 @@ pool read from `oilGame/settings.totalOilBudget`); `depthBias` is the single
 `OIL_DEPTH_BIAS` constant in `oilDistribution.js` — every live caller uses the
 default (the dead `OilHeatmap2D` still has a literal but isn't imported).
 
-**Deferred (pre-launch):** lock `oilPlots`/`oilDrills` to server-only writes (needs
-`/api/oil-claim-jump` + `/api/oil-drill` endpoints first), and reconcile `OilVerifyPanel`/
-`OilVerifyExplainer` to the commit-reveal model (verify `SHA256(seedReveal) == seedCommitment`
-post-game instead of recomputing from a block hash).
+**Done (2026-06-04):** `oilPlots`/`oilDrills`/`oilQualified` are locked to server-only writes
+(all writers go through admin-SDK endpoints). The verify UI is reconciled to the new model:
+- **`OilVerifyExplainer`** ("VERIFY THE MAP", player-facing) explains commit → future-block
+  anchor → reveal, and its "RUN VERIFICATION" button calls `/api/oil-verify`, shows the
+  phase/verdict + per-check results, and (post-reveal) regenerates the field in-browser from
+  the revealed `finalSeed` and re-confirms the anchor hash from Base directly.
+- **`OilVerifyPanel`** (admin) is now the fairness console: COMMIT / ANCHOR / REVEAL buttons
+  driving `/api/oil-fairness`, with live status from `/api/oil-verify`.
 
 ## Telegram Integration
 
