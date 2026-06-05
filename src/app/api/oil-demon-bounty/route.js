@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
+import { authedUserId } from "@/lib/oilAuth";
 import {
   createDemonBounty,
   MAX_BONUS_DRILLS,
@@ -7,21 +8,35 @@ import {
   BOUNTY_TTL_MS,
 } from "@/lib/oilDemon";
 
-// POST — Create a demon bounty event (called when a player drills a hell pocket).
-// The creation logic is shared with the server-side strike loop via createDemonBounty.
+// POST — Create a demon bounty for the authenticated user. The real summon path
+// is now the server strike-tick (createDemonBounty directly); this endpoint is
+// kept session-gated and fully server-derived (plot + un-banked tank read from
+// the user's own drill doc) so the bounty amount can never be inflated from the
+// client.
 export async function POST(req) {
   try {
-    const { userId, username, col, row, unbankedOil } = await req.json();
-
-    if (!userId || typeof userId !== "string") {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
-    }
-    if (col == null || row == null) {
-      return NextResponse.json({ error: "Missing col/row" }, { status: 400 });
+    const userId = await authedUserId(req);
+    if (!userId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const db = getAdminDb();
-    const result = await createDemonBounty(db, { userId, username, col, row, unbankedOil });
+    const drillSnap = await db.collection("oilDrills").doc(userId).get();
+    if (!drillSnap.exists) {
+      return NextResponse.json({ error: "No drill record" }, { status: 400 });
+    }
+    const drill = drillSnap.data();
+    if (drill.col == null || drill.row == null) {
+      return NextResponse.json({ error: "No claimed plot" }, { status: 400 });
+    }
+
+    const result = await createDemonBounty(db, {
+      userId,
+      username: drill.username || null,
+      col: drill.col,
+      row: drill.row,
+      unbankedOil: Math.max(0, drill.tankOil || 0), // server-derived, never client
+    });
 
     if (!result.ok) {
       return NextResponse.json({ error: "A demon is already loose" }, { status: 409 });
@@ -36,10 +51,15 @@ export async function POST(req) {
 // PATCH — Claim the bounty (player clicks the demon)
 export async function PATCH(req) {
   try {
-    const { bountyId, hunterId, hunterUsername } = await req.json();
-
-    if (!bountyId || !hunterId) {
-      return NextResponse.json({ error: "Missing bountyId or hunterId" }, { status: 400 });
+    // Hunter identity is the verified session — never trusted from the body, so
+    // nobody can claim a bounty as someone else.
+    const hunterId = await authedUserId(req);
+    if (!hunterId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const { bountyId, hunterUsername } = await req.json().catch(() => ({}));
+    if (!bountyId) {
+      return NextResponse.json({ error: "Missing bountyId" }, { status: 400 });
     }
 
     const db = getAdminDb();

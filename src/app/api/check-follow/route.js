@@ -129,7 +129,7 @@ export async function GET(request) {
   } catch (error) {
     console.error("check-follow error:", error);
     // Fall back to cached list on any error
-    return fallbackToCache(username);
+    return fallbackToCache(username, error.message);
   }
 }
 
@@ -144,11 +144,22 @@ async function checkCache(username) {
   return false;
 }
 
-async function fallbackToCache(username) {
+async function fallbackToCache(username, debugError) {
   const found = await checkCache(username);
-  return NextResponse.json({
+  const payload = {
     follows: found,
     source: "cache",
     note: found ? undefined : "Could not verify live. Try again shortly.",
-  });
+  };
+  // Dev-only diagnostics — never leak internal error strings in production.
+  if (process.env.NODE_ENV === "development") {
+    let cacheSize = null;
+    try {
+      const snap = await getDoc(doc(db, "followers", "latest"));
+      cacheSize = snap.exists() ? (snap.data().usernames || []).length : 0;
+    } catch {}
+    payload.debugError = debugError || null;
+    payload.cacheSize = cacheSize;
+  }
+  return NextResponse.json(payload);
 }

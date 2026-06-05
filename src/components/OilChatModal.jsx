@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useOilApiFetch } from "@/lib/oilApiClient";
 import {
   db, collection, query, where, orderBy, limit, addDoc, deleteDoc, serverTimestamp,
   onSnapshot, doc, updateDoc,
@@ -126,21 +127,23 @@ export default function OilChatModal({
   }, [text, currentUserId, plotKey, username, cooldown, isOwner]);
 
   // Save links
+  const oilApiFetch = useOilApiFetch();
   const handleSaveLinks = useCallback(async () => {
-    if (!currentUserId || !db) return;
+    if (!currentUserId) return;
     setSavingLinks(true);
     try {
-      await updateDoc(doc(db, "oilDrills", currentUserId), {
-        telegramHandle: linkDraft.telegramHandle.replace(/^@/, "").trim().slice(0, 40),
-        xHandle: linkDraft.xHandle.replace(/^@/, "").trim().slice(0, 40),
+      const res = await oilApiFetch("/api/oil-profile", {
+        method: "POST",
+        body: JSON.stringify({ telegramHandle: linkDraft.telegramHandle, xHandle: linkDraft.xHandle }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setEditingLinks(false);
     } catch (e) {
       console.error("Failed to save social links:", e);
     } finally {
       setSavingLinks(false);
     }
-  }, [currentUserId, linkDraft]);
+  }, [currentUserId, linkDraft, oilApiFetch]);
 
   // Delete message
   const handleDelete = useCallback(async (msgId) => {

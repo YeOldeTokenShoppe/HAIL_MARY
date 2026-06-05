@@ -4,7 +4,7 @@ import { useRef, useMemo, useEffect, useCallback, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, Html, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
-import { generateOilDistribution3D } from "@/lib/oilDistribution";
+import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
@@ -137,6 +137,51 @@ export function CctvRenderer({ canvasRef }) {
 
 // ── Vertex shader (unchanged) ───────────────────────────────────────────────
 
+// ── Paraboleum iridescence ──────────────────────────────────────────────────
+// One palette drives EVERY Paraboleum surface (gusher, oil-spill, underground
+// voxel deposits, and the per-rig tank + tower liquids). The procedural shaders
+// share an Inigo-Quilez cosine palette  a + b*cos(2π(c·t + d))  for the moving
+// oil-slick sheen; the two physical-material liquids use real thin-film
+// iridescence (hex tints below). Swap ACTIVE_IRID to retune the whole substance
+// at once — opal / aurora / mercury / nebula.
+const _v3 = (c) => `vec3(${c[0].toFixed(4)}, ${c[1].toFixed(4)}, ${c[2].toFixed(4)})`;
+const IRID_PRESETS = {
+  // True oil-slick opal: NEUTRAL near-black base so the full petrol rainbow reads
+  // (magenta→cyan→gold→green). Strong sheen, cyan bloom — distinct from aurora.
+  opal: {
+    a: [0.50, 0.50, 0.50], b: [0.50, 0.50, 0.50], c: [1.0, 1.0, 1.0], d: [0.00, 0.18, 0.42],
+    base: [0.010, 0.018, 0.028], baseHi: [0.10, 0.13, 0.17], glow: [0.25, 0.95, 0.90],
+    sheen: 1.9, hex: { base: 0x06070b, emis: 0x18d0c0 },
+  },
+  // The current alien-glow green, elevated: green-DOMINANT with a soft teal→
+  // chartreuse→cyan shimmer. Subtle sheen so it stays unmistakably green.
+  aurora: {
+    a: [0.20, 0.55, 0.35], b: [0.20, 0.40, 0.30], c: [1.0, 1.0, 1.0], d: [0.30, 0.05, 0.55],
+    base: [0.02, 0.10, 0.05], baseHi: [0.10, 0.55, 0.22], glow: [0.20, 1.40, 0.55],
+    sheen: 0.7, hex: { base: 0x0d3a16, emis: 0x2dd64a },
+  },
+  // Silvery living metal with a faint rainbow thin-film skin.
+  mercury: {
+    a: [0.60, 0.60, 0.62], b: [0.32, 0.32, 0.34], c: [1.0, 1.0, 1.0], d: [0.00, 0.10, 0.22],
+    base: [0.10, 0.11, 0.13], baseHi: [0.58, 0.61, 0.66], glow: [0.50, 0.55, 0.66],
+    sheen: 0.9, hex: { base: 0x1a1d22, emis: 0x9aabbd },
+  },
+  // Liquid galaxy — green suppressed, strong blue floor → swings indigo→violet→
+  // magenta (purple, not pink). Violet base, blue-biased bloom.
+  nebula: {
+    a: [0.40, 0.14, 0.62], b: [0.34, 0.14, 0.38], c: [1.0, 1.0, 1.0], d: [0.52, 0.20, 0.02],
+    base: [0.05, 0.015, 0.13], baseHi: [0.30, 0.10, 0.60], glow: [0.55, 0.22, 1.25],
+    sheen: 1.2, hex: { base: 0x160830, emis: 0x6a2cd8 },
+  },
+};
+const ACTIVE_IRID = IRID_PRESETS.opal;
+// GLSL palette fn shared by the procedural shaders. `t` in [0,1) → sheen color.
+const IRID_GLSL = `
+vec3 iridPalette(float t) {
+  return ${_v3(ACTIVE_IRID.a)} + ${_v3(ACTIVE_IRID.b)} * cos(6.28318530718 * (${_v3(ACTIVE_IRID.c)} * t + ${_v3(ACTIVE_IRID.d)}));
+}
+`;
+
 const volumeVert = /* glsl */ `
   varying vec3 vOrigin;
   varying vec3 vDirection;
@@ -182,7 +227,7 @@ function buildFragShader({ deposits, gridX, gridY, depthZ, cellSize, depthCellSi
 
   varying vec3 vOrigin;
   varying vec3 vDirection;
-
+${IRID_GLSL}
   const vec3 BOUNDS_MIN = vec3(${(-halfW).toFixed(4)}, ${(-halfH).toFixed(4)}, ${(-halfD).toFixed(4)});
   const vec3 BOUNDS_MAX = vec3(${halfW.toFixed(4)}, ${halfH.toFixed(4)}, ${halfD.toFixed(4)});
   const float DEPTH_SCALE = ${depthScale};
@@ -253,6 +298,12 @@ ${depositLines}
 
         float glow = 1.0 + intensity * (2.0 + uParabolum * 2.4);
         oilColor *= glow;
+
+        // Iridescent opal veins: hue slides with depth + position so the buried
+        // Paraboleum reads as a shimmering mineral rather than flat green. Static
+        // (no time uniform here) but the color shift still moves as you orbit.
+        float irT = fract(worldPos.y * 0.16 + worldPos.x * 0.06 + worldPos.z * 0.04 + intensity);
+        oilColor += iridPalette(irT) * uParabolum * intensity * intensity * 0.5 * ${ACTIVE_IRID.sheen.toFixed(3)};
 
         float sampleAlpha = clamp(d * 0.35, 0.0, 1.0);
         color += (1.0 - alpha) * sampleAlpha * oilColor;
@@ -330,7 +381,7 @@ float fbm(vec2 p) {
   }
   return v;
 }
-
+${IRID_GLSL}
 void main() {
   float x = vUv.x - 0.5;
   // When viewing the back face, flip x so the flow pattern stays consistent
@@ -421,10 +472,11 @@ void main() {
   midOil = mix(midOil, midOilNight, uNightMode);
   highlight = mix(highlight, highlightNight, uNightMode);
 
-  // Paraboleum: neon-green phosphorescent gusher (overrides night when active)
-  darkOil = mix(darkOil, vec3(0.02, 0.10, 0.03), uParabolum);
-  midOil = mix(midOil, vec3(0.05, 0.28, 0.09), uParabolum);
-  highlight = mix(highlight, vec3(0.22, 0.70, 0.28), uParabolum);
+  // Paraboleum: iridescent opal gusher (overrides night when active). Dark teal
+  // base; the rainbow sheen is layered on after compositing below.
+  darkOil = mix(darkOil, ${_v3(ACTIVE_IRID.base)}, uParabolum);
+  midOil = mix(midOil, ${_v3(ACTIVE_IRID.baseHi)} * 0.6, uParabolum);
+  highlight = mix(highlight, ${_v3(ACTIVE_IRID.baseHi)}, uParabolum);
 
   // Hell: a fiery eruption — charred-red base, molten-orange body, red-orange crests
   darkOil = mix(darkOil, vec3(0.26, 0.02, 0.0), uHell);
@@ -435,6 +487,18 @@ void main() {
   vec3 col = mix(darkOil, midOil, colorNoise);
   col = mix(col, highlight, pow(max(density, 0.0), 4.0) * 0.6);
 
+  // Iridescent oil-slick sheen: bands of petrol-rainbow that flow up the column
+  // and drift over time. abs(x) fakes a grazing/fresnel term so the sheen
+  // intensifies toward the rounded edges of the gusher, like light off a film.
+  float irFres = pow(clamp(abs(x) * 2.0, 0.0, 1.0), 1.3);
+  // Higher vertical frequency = more rainbow bands stacked up the column; the 0.5
+  // floor spreads the sheen across the full width (not just the edges) so the
+  // whole gusher cycles through the spectrum instead of glowing a single hue.
+  float irPhase = fract(y * 1.7 - T * 0.14 + fbm(vec2(x * 3.5, y * 2.2 - T * 0.1)) * 0.4 + abs(x) * 0.6);
+  vec3 irSheen = iridPalette(irPhase);
+  float irAmt = uParabolum * (0.22 + 0.6 * irFres) * smoothstep(0.04, 0.35, density) * ${ACTIVE_IRID.sheen.toFixed(3)};
+  col = mix(col, irSheen, irAmt * 0.55) + irSheen * irAmt * 0.35;
+
   // Hell: white-hot furnace mouth at the base, cooling to red-orange up the flame.
   // Confined to the bottom ~45% so the body stays red-orange, not yellow.
   float heat = (1.0 - smoothstep(0.0, 0.45, y)) * uHell * coreDensity;
@@ -442,7 +506,7 @@ void main() {
 
   // Emissive glow — blue at night, neon-green for Paraboleum, molten-orange for hell
   float emissive = max(max(uNightMode, uParabolum), uHell) * (0.3 + 0.45 * pow(max(density, 0.0), 2.0));
-  vec3 glowCol = mix(vec3(0.05, 0.1, 1.35), vec3(0.22, 1.5, 0.42), uParabolum);
+  vec3 glowCol = mix(vec3(0.05, 0.1, 1.35), ${_v3(ACTIVE_IRID.glow)}, uParabolum);
   glowCol = mix(glowCol, vec3(2.4, 0.5, 0.04), uHell);
   col += glowCol * emissive;
 
@@ -493,6 +557,9 @@ uniform float uGrow;
 uniform float uNightMode;
 uniform float uParabolum;
 uniform float uHell;
+uniform vec2 uClipCenter;
+uniform vec2 uFieldHalf;
+uniform float uPlaneHalf;
 
 vec2 hash(vec2 p) {
   p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -520,7 +587,7 @@ float splat(vec2 p, vec2 c, float r, float seed) {
   float edge = r * (1.0 + 0.4 * fbm(vec2(cos(ang), sin(ang)) * 2.5 + seed));
   return smoothstep(edge, edge * 0.55, length(d));
 }
-
+${IRID_GLSL}
 void main() {
   vec2 p = (vUv - 0.5) * 2.0; // -1..1
   float g = mix(0.45, 1.0, clamp(uGrow, 0.0, 1.0)); // spread factor as the spill builds
@@ -540,19 +607,35 @@ void main() {
   float speck = smoothstep(0.74, 0.82, noise(p * 11.0 + 5.0)) * ring * smoothstep(0.5, 0.9, uGrow);
   cov = max(cov, speck);
 
+  // Clip to the playfield top so perimeter-rig puddles pool to the mesa edge
+  // and stop, instead of flinging splats off into the air. Map plane-local p
+  // (-1..1) to grid XZ (rotation [-π/2,0,0] sends local +Y to world -Z), then
+  // fade out just past the field boundary.
+  vec2 gridXZ = uClipCenter + vec2(p.x, -p.y) * uPlaneHalf;
+  vec2 edgeDist = uFieldHalf - abs(gridXZ); // >0 inside, <0 past the edge
+  float fieldMask = smoothstep(0.0, 0.05, min(edgeDist.x, edgeDist.y));
+  cov *= fieldMask;
+
   if (cov < 0.02) discard;
 
   // Dark oil, tinted neon-green for parabolum, molten-red for hell.
   vec3 oil = mix(vec3(0.02, 0.015, 0.008), vec3(0.015, 0.05, 0.02), uParabolum);
   oil = mix(oil, vec3(0.14, 0.02, 0.0), uHell);
   float sheen = pow(cov, 3.0);
-  vec3 hi = mix(vec3(0.18, 0.14, 0.08), vec3(0.16, 0.60, 0.24), uParabolum);
+  vec3 hi = mix(vec3(0.18, 0.14, 0.08), ${_v3(ACTIVE_IRID.baseHi)}, uParabolum);
   hi = mix(hi, vec3(1.5, 0.55, 0.06), uHell);
   vec3 col = mix(oil, hi, sheen * 0.5);
 
+  // Oil-slick rainbow on the puddle — exactly what spilled oil does in real life.
+  // Concentric-ish bands keyed off distance + a little noise, strongest where the
+  // film is thin (the spreading edges).
+  float irT = fract(dist * 1.4 + fbm(p * 4.0) * 0.5 + uGrow * 0.2);
+  float irEdge = smoothstep(0.15, 0.6, dist) * (1.0 - smoothstep(0.85, 1.05, dist));
+  col = mix(col, col + iridPalette(irT), uParabolum * cov * (0.30 + 0.5 * irEdge) * ${ACTIVE_IRID.sheen.toFixed(3)});
+
   // Emissive glow so the slick still reads at night / under parabolum / in hell.
   float emis = max(max(uNightMode, uParabolum), uHell) * 0.4 * cov;
-  vec3 emisCol = mix(vec3(0.04, 0.08, 0.5), vec3(0.12, 0.7, 0.28), uParabolum);
+  vec3 emisCol = mix(vec3(0.04, 0.08, 0.5), ${_v3(ACTIVE_IRID.glow)} * 0.6, uParabolum);
   emisCol = mix(emisCol, vec3(1.6, 0.38, 0.02), uHell);
   col += emisCol * emis;
 
@@ -660,15 +743,22 @@ function TankLiquid({ tankBounds, tankFill, envPreset, parabolum = false }) {
   const isNight = envPreset === "night";
   const isSolstice = envPreset === "solstice";
 
-  const oilMat = useMemo(() => new THREE.MeshStandardMaterial({
-    // Paraboleum overrides time-of-day: a phosphorescent neon-green fluid in the tank
-    color: 0x0d3a16,
-    roughness: 0.2,
-    metalness: 0.1,
+  const oilMat = useMemo(() => new THREE.MeshPhysicalMaterial({
+    // Paraboleum overrides time-of-day: an iridescent phosphorescent fluid. Real
+    // thin-film iridescence makes the surface shift hue as the camera orbits;
+    // clearcoat adds the wet glossy skin, emissive keeps it glowing in the dark.
+    color: ACTIVE_IRID.hex.base,
+    roughness: 0.12,
+    metalness: 0.0,
     transparent: true,
-    opacity: 0.97,
-    emissive: 0x2dd64a,
-    emissiveIntensity: 0.7,
+    opacity: 0.96,
+    emissive: ACTIVE_IRID.hex.emis,
+    emissiveIntensity: 0.6,
+    iridescence: 1.0,
+    iridescenceIOR: 1.6,
+    iridescenceThicknessRange: [120, 560],
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.18,
   }), [isNight, isSolstice, parabolum]);
 
   // Tank geometry params — the tank is a horizontal cylinder
@@ -1263,7 +1353,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, hasMessages = false, onEnvelopeClick, hellActive = false }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10 }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -1498,8 +1588,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     });
     if (!tankMesh) return;
 
-    // Render both sides so the tank stays visible at all camera angles
+    // Render both sides so the tank stays visible at all camera angles, and make
+    // the shell a translucent glass so the oil level inside is clearly visible
+    // (it was near-opaque, washing out the fill — you could only tell oil was in
+    // there as it drained).
     tankMesh.material.side = THREE.DoubleSide;
+    tankMesh.material.transparent = true;
+    tankMesh.material.opacity = 0.78;
+    tankMesh.material.depthWrite = true;
+    tankMesh.material.needsUpdate = true;
 
     // Compute bounding box in the clonedScene's local coordinate system
     // (accounts for all intermediate parent transforms in the GLB hierarchy)
@@ -1840,6 +1937,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     uNightMode: { value: 0.0 },
     uParabolum: { value: 0.0 },
     uHell: { value: 0.0 },
+    // Playfield clip so perimeter-rig puddles don't spill off the mesa edge.
+    uClipCenter: { value: new THREE.Vector2(0, 0) }, // plane center in grid space (x,z)
+    uFieldHalf: { value: new THREE.Vector2(5, 5) },  // playfield half-extents (x,z)
+    uPlaneHalf: { value: 0.9 },                      // half the spill plane size (1.8/2)
   });
 
   // True while the active gusher is a hell eruption (demon unleash) rather than a
@@ -2551,6 +2652,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         spillMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
         spillMatRef.current.uniforms.uGrow.value = blowbackRef.current;
         spillMatRef.current.uniforms.uOpacity.value = fade;
+        // Clip the puddle to the playfield: plane center (grid space) = cell pos +
+        // wellhead offset; field is centered at origin with these half-extents.
+        spillMatRef.current.uniforms.uClipCenter.value.set(
+          position[0] + gusherOriginRef.current.x,
+          position[2] + gusherOriginRef.current.z
+        );
+        spillMatRef.current.uniforms.uFieldHalf.value.set(worldW / 2, worldD / 2);
       }
 
       // Blowback: ease the body back from the blast, riding the gusher's intensity
@@ -2909,15 +3017,20 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
   targetFill.current = fill;
   const lastQ = useRef(-1);
 
-  // Paraboleum — phosphorescent green (matches the per-rig TankLiquid)
-  const oilMat = useMemo(() => new THREE.MeshStandardMaterial({
-    color: 0x0d3a16,
-    roughness: 0.2,
-    metalness: 0.1,
+  // Paraboleum — iridescent thin-film fluid (matches the per-rig TankLiquid)
+  const oilMat = useMemo(() => new THREE.MeshPhysicalMaterial({
+    color: ACTIVE_IRID.hex.base,
+    roughness: 0.12,
+    metalness: 0.0,
     transparent: true,
     opacity: 0.92,
-    emissive: 0x2dd64a,
-    emissiveIntensity: 0.7,
+    emissive: ACTIVE_IRID.hex.emis,
+    emissiveIntensity: 0.6,
+    iridescence: 1.0,
+    iridescenceIOR: 1.6,
+    iridescenceThicknessRange: [120, 560],
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.18,
   }), []);
 
   useFrame((_, delta) => {
@@ -3740,6 +3853,8 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             hasMessages={!!plotsWithMessages[`${col}_${row}`]}
             onEnvelopeClick={() => onEnvelopeClick?.(col, row)}
             hellActive={hellActive && col === hellCol && row === hellRow}
+            worldW={worldW}
+            worldD={worldD}
             onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
             onDoubleClick={() => isSelected ? onZoomOut?.() : onFlyTo?.(col, row)}
           />
@@ -4364,7 +4479,7 @@ export default function OilVoxelGrid({
 
   const { deposits, hellPockets: generatedHellPockets } = useMemo(() => {
     const result = generateOilDistribution3D({
-      blockHash, gridX, gridY, depthZ, totalOilBudget, numberOfDeposits, depthBias: 0.35,
+      blockHash, gridX, gridY, depthZ, totalOilBudget: OIL_FIELD_UNITS, numberOfDeposits,
     });
     return { deposits: result.deposits, hellPockets: result.hellPockets };
   }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, totalOilBudget]);

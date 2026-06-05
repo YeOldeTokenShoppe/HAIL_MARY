@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
-import { generateOilDistribution3D } from "@/lib/oilDistribution";
+import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { createDemonBounty } from "@/lib/oilDemon";
 
 export const runtime = "nodejs";
@@ -67,8 +67,12 @@ async function runTick({ force = false, deep = 1 } = {}) {
   if (settings.gamePhase !== "active") {
     return { ok: true, skipped: "phase_not_active", phase: settings.gamePhase || null };
   }
-  if (!settings.blockHash) {
-    return { ok: true, skipped: "no_block_hash" };
+  // Seed lives in the server-only secret doc; fall back to the legacy public
+  // `blockHash` for pre-migration games.
+  const secretSnap = await db.collection("oilSecret").doc("seed").get();
+  const seed = (secretSnap.exists && secretSnap.data().seed) || settings.blockHash;
+  if (!seed) {
+    return { ok: true, skipped: "no_seed" };
   }
 
   // Respect the global single-demon blockade — drilling halts while a demon is loose.
@@ -80,11 +84,11 @@ async function runTick({ force = false, deep = 1 } = {}) {
   const gridSize = settings.gridSize || 10;
   const depthZ = settings.depthZ || DEFAULT_DEPTH_Z;
   const { grid, hellPockets } = generateOilDistribution3D({
-    blockHash: settings.blockHash,
+    blockHash: seed,
     gridX: gridSize,
     gridY: gridSize,
     depthZ,
-    totalOilBudget: settings.totalOilBudget || 500000,
+    totalOilBudget: OIL_FIELD_UNITS, // field resolution, not the $ prize
     numberOfDeposits: settings.numberOfDeposits || 5,
   });
   const hellSet = new Set((hellPockets || []).map((p) => `${p.x}_${p.y}_${p.z}`));
@@ -101,9 +105,11 @@ async function runTick({ force = false, deep = 1 } = {}) {
   // Once a hell pocket summons a demon, the blockade halts drilling — stop
   // striking the remaining rigs this tick so we don't drill through the halt.
   let summonedThisTick = false;
-  // Admin deep-drill (deep > 1) bypasses the once-per-day guard so a single call
-  // can drill multiple layers (test convenience). Normal hourly ticks keep deep = 1.
-  const ignoreDayGuard = deep > 1;
+  // Admin overrides bypass the once-per-day guard: deep-drill (deep > 1) so a
+  // single call can drill multiple layers, and any explicit `force` so an admin
+  // can repeatedly force-strike for testing even if the rig already struck today.
+  // Normal cron ticks (force=false, deep=1) keep the once-per-day guard.
+  const ignoreDayGuard = deep > 1 || force;
 
   for (const docSnap of drillsSnap.docs) {
     const drill = docSnap.data();
@@ -147,6 +153,12 @@ async function runTick({ force = false, deep = 1 } = {}) {
             col, row,
             drillDay: newDepth,
             lastStrikeAt: FieldValue.serverTimestamp(),
+            // Server-authoritative reveal: persist the discovered oil for this
+            // layer so the client renders the field from Firestore, never by
+            // recomputing the secret seed. merge:true deep-merges the map, so
+            // previously revealed layers are preserved.
+            revealed: { [layerIndex]: oilAtLayer },
+            ...(isHell ? { hellLayers: { [layerIndex]: true } } : {}),
           }, { merge: true });
 
           t.set(drillRef, {
@@ -232,16 +244,18 @@ async function scoutOil() {
   const db = getAdminDb();
   const settingsSnap = await db.collection("oilGame").doc("settings").get();
   const settings = settingsSnap.exists ? settingsSnap.data() : {};
-  if (!settings.blockHash) return { ok: false, error: "no_block_hash" };
+  const secretSnap = await db.collection("oilSecret").doc("seed").get();
+  const seed = (secretSnap.exists && secretSnap.data().seed) || settings.blockHash;
+  if (!seed) return { ok: false, error: "no_seed" };
 
   const gridSize = settings.gridSize || 10;
   const depthZ = settings.depthZ || DEFAULT_DEPTH_Z;
   const { grid } = generateOilDistribution3D({
-    blockHash: settings.blockHash,
+    blockHash: seed,
     gridX: gridSize,
     gridY: gridSize,
     depthZ,
-    totalOilBudget: settings.totalOilBudget || 500000,
+    totalOilBudget: OIL_FIELD_UNITS, // field resolution, not the $ prize
     numberOfDeposits: settings.numberOfDeposits || 5,
   });
 

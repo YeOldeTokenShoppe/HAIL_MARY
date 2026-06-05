@@ -8,9 +8,8 @@ import {
   where,
   onSnapshot,
   doc,
-  updateDoc,
-  serverTimestamp,
 } from "@/lib/firebaseClient";
+import { useOilApiFetch } from "@/lib/oilApiClient";
 
 export default function OilPlotDraft({
   theme,
@@ -25,6 +24,7 @@ export default function OilPlotDraft({
   const [settings, setSettings] = useState({});
   const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState(null);
+  const oilApiFetch = useOilApiFetch();
 
   // Subscribe to qualified players
   useEffect(() => {
@@ -87,20 +87,21 @@ export default function OilPlotDraft({
       setClaiming(true);
       setError(null);
       try {
-        // Update qualified player doc with plot selection
-        const playerRef = doc(db, "oilQualified", user.id);
-        await updateDoc(playerRef, {
-          plotCol: col,
-          plotRow: row,
-          pickedAt: serverTimestamp(),
+        // Server-authoritative pick: writes plotCol/plotRow to oilQualified +
+        // arms the rig + checks qualification. oilQualified is write:false.
+        const res = await oilApiFetch("/api/oil-claim", {
+          method: "POST",
+          body: JSON.stringify({ col, row }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) setError(data.error || "Claim failed.");
       } catch (err) {
         setError(err.message);
       } finally {
         setClaiming(false);
       }
     },
-    [user, myPlayer]
+    [user, myPlayer, oilApiFetch]
   );
 
   // Admin: start game

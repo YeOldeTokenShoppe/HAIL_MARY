@@ -778,7 +778,7 @@ const PolaroidSnapshot = ({
                   JOIN ME ON THE GRID
                 </div>
                 <div style={{ fontSize: 10, color: '#333', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  {referralOverlay.link || `rl80.xyz/oil?ref=${referralOverlay.code}`}
+                  {referralOverlay.link || `rl80.com/oil?ref=${referralOverlay.code}`}
                 </div>
               </div>
             )}

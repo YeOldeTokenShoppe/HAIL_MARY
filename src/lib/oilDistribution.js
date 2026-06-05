@@ -3,6 +3,20 @@
  * Deterministic RNG from a block hash seed, producing blob-like 3D oil deposits.
  */
 
+// Fixed internal resolution of the field, in abstract oil units. The grid is
+// ALWAYS generated at this scale (not the $ prize) so the deposit blobs are
+// faithful — at a low total, rounding wipes out the blob edges and collapses the
+// distribution to its cores. The prize pool ($) is a SEPARATE value distributed
+// by score share at payout. Every generateOilDistribution3D caller must pass
+// this (not the prize) so client and server agree.
+export const OIL_FIELD_UNITS = 1000000;
+
+// Depth distribution bias (0 = uniform, →1 = deeper). The single source of truth
+// — every caller relies on this default so client and server never drift. (A
+// mismatch here once had the server revealing oil at different depths than the
+// client rendered.)
+export const OIL_DEPTH_BIAS = 0.35;
+
 /**
  * Deterministic RNG (mulberry32-ish) from a string seed (block hash).
  */
@@ -33,13 +47,13 @@ export function generateOilDistribution3D({
   gridX = 10,
   gridY = 10,
   depthZ = 20,
-  totalOilBudget = 500000,
+  totalOilBudget = OIL_FIELD_UNITS,
   numberOfDeposits = 5,
   radiusMin = 0.8,
   radiusMax = 3.0,
   richnessMin = 0.6,
   richnessMax = 2.0,
-  depthBias = 0.55,
+  depthBias = OIL_DEPTH_BIAS,
   hitThreshold = 0.005,
 }) {
   const rand = createRNG(blockHash);

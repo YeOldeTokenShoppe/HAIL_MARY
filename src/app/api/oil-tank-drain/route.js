@@ -1,29 +1,26 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
+import { authedUserId } from "@/lib/oilAuth";
 
-// Player tank drain. Server is the only writer to oilGame/communityStorage —
-// it computes the delta from the user's stored lastDrainExtracted to prevent
-// double-counting on duplicate requests (rapid double-click, retries).
+// Player tank drain (banking). The acting user is taken from the verified Clerk
+// session — never the request body — so nobody can bank on another's behalf. The
+// banked amount is ALWAYS the server-stored `tankOil` (written by the strike
+// loop); the client supplies no amounts, so the score can't be inflated.
 export async function POST(req) {
   try {
-    const { userId, playerExtracted, username } = await req.json();
-
-    if (!userId || typeof userId !== "string") {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    const userId = await authedUserId(req);
+    if (!userId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    // playerExtracted is only needed for the legacy fallback path; default it.
-    const pe = typeof playerExtracted === "number" ? playerExtracted : 0;
-    if (pe < 0 || !Number.isFinite(pe)) {
-      return NextResponse.json({ error: "Invalid playerExtracted" }, { status: 400 });
-    }
+    const body = await req.json().catch(() => ({}));
+    const username = typeof body.username === "string" ? body.username.trim() : null;
 
     const db = getAdminDb();
     const drillRef = db.collection("oilDrills").doc(userId);
     const communityRef = db.collection("oilGame").doc("communityStorage");
 
     // Transaction ensures concurrent drain calls from the same user can't
-    // double-count: the second one reads the already-zeroed tankOil (or the
-    // already-advanced lastDrainExtracted on the legacy path).
+    // double-count: the second one reads the already-zeroed tankOil.
     const result = await db.runTransaction(async (t) => {
       const drillSnap = await t.get(drillRef);
       if (!drillSnap.exists) {
@@ -31,29 +28,20 @@ export async function POST(req) {
       }
       const drill = drillSnap.data();
 
-      let delta;
-      const drillUpdate = { updatedAt: FieldValue.serverTimestamp() };
-
-      if (typeof drill.tankOil === "number" && drill.tankOil > 0) {
-        // Preferred: explicit tankOil accumulator written by the strike loop.
-        delta = drill.tankOil;
-        drillUpdate.tankOil = 0;
-        drillUpdate.lastDrainExtracted = pe; // keep legacy marker aligned
-      } else {
-        // Legacy delta model (data predating the strike loop).
-        const lastDrain = drill.lastDrainExtracted || 0;
-        delta = pe - lastDrain;
-        if (delta <= 0) {
-          return { delta: 0, newTotal: drill.totalCollected || 0 };
-        }
-        drillUpdate.lastDrainExtracted = pe;
+      // Authoritative un-banked balance written by the strike loop. Server-
+      // derived only — never trusted from the client.
+      const delta = (typeof drill.tankOil === "number" && drill.tankOil > 0) ? drill.tankOil : 0;
+      if (delta <= 0) {
+        return { delta: 0, newTotal: drill.totalCollected || 0, newDrains: drill.tankDrains || 0 };
       }
 
-      drillUpdate.totalCollected = (drill.totalCollected || 0) + delta;
-      drillUpdate.tankDrains = (drill.tankDrains || 0) + 1;
-      if (typeof username === "string" && username.trim()) {
-        drillUpdate.username = username.trim();
-      }
+      const drillUpdate = {
+        updatedAt: FieldValue.serverTimestamp(),
+        tankOil: 0,
+        totalCollected: (drill.totalCollected || 0) + delta,
+        tankDrains: (drill.tankDrains || 0) + 1,
+      };
+      if (username) drillUpdate.username = username;
 
       t.set(communityRef, {
         totalOil: FieldValue.increment(delta),

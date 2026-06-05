@@ -116,14 +116,20 @@ export async function POST(req) {
     const maxDepth = 20;
     const seeded = [];
 
-    // All unclaimed cells, in order — assigned deterministically so a large
-    // count fills the whole grid (vs. random picking which leaves gaps).
+    // All unclaimed cells, then shuffled so a partial count scatters across the
+    // field (realistic emergent map) instead of clustering in the first rows; a
+    // full count still fills every cell since we take distinct entries.
     const freeCells = [];
     for (let row = 0; row < gridSize; row++) {
       for (let col = 0; col < gridSize; col++) {
         const key = `${col}_${row}`;
         if (!claimed.has(key)) freeCells.push({ col, row, key });
       }
+    }
+    // Fisher–Yates shuffle.
+    for (let i = freeCells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [freeCells[i], freeCells[j]] = [freeCells[j], freeCells[i]];
     }
     const total = Math.min(count, freeCells.length);
 

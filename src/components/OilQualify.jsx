@@ -10,7 +10,8 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import CyberNav from "@/components/CyberNav";
 import { useMusic } from "@/components/MusicContext";
-import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, serverTimestamp, arrayUnion, increment } from "@/lib/firebaseClient";
+import { db, collection, query, orderBy, onSnapshot, doc } from "@/lib/firebaseClient";
+import { useOilApiFetch } from "@/lib/oilApiClient";
 
 const QUALIFICATION_THRESHOLD = 20; // $20 USD worth of RL80
 const GRID_SIZE = 10; // Fixed 10x10 grid
@@ -121,6 +122,9 @@ export default function OilQualify({
     return () => unsub();
   }, []);
 
+  // Attaches the Clerk session token to server-authoritative oil endpoints.
+  const oilApiFetch = useOilApiFetch();
+
   // Check X follow via live API — triggered by button click
   const handleCheckFollow = useCallback(() => {
     const clean = xUsername.trim().replace(/^@/, "").toLowerCase();
@@ -210,36 +214,33 @@ export default function OilQualify({
     setError(null);
     setSuccess(null);
     try {
-      // Check if this X username is already claimed by another player
-      const clean = xUsername.trim().replace(/^@/, "").toLowerCase();
-      const taken = players.find((p) => p.xUsername === clean && p.id !== user.id);
-      if (taken) {
-        setError("This X username is already registered by another player.");
-        setRegistering(false);
+      // Server re-checks the on-chain balance and decides `qualified` — the
+      // client can no longer self-qualify (oilQualified is write:false).
+      const res = await oilApiFetch("/api/oil-register", {
+        method: "POST",
+        body: JSON.stringify({
+          walletAddress,
+          xUsername,
+          clerkName: user.fullName || user.firstName || "Anonymous",
+          clerkAvatar: user.imageUrl || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Registration failed.");
         return;
       }
-      await setDoc(doc(db, "oilQualified", user.id), {
-        userId: user.id,
-        clerkName: user.fullName || user.firstName || "Anonymous",
-        clerkAvatar: user.imageUrl || null,
-        walletAddress,
-        xUsername: xUsername.trim().replace(/^@/, "").toLowerCase(),
-        registeredAt: serverTimestamp(),
-        qualified: liveCheck?.qualified || false,
-        lastSnapshotBalance: liveCheck?.balance || "0",
-        lastSnapshotUsdValue: liveCheck?.usdValue || 0,
-        lastSnapshotAt: serverTimestamp(),
-        plotCol: null,
-        plotRow: null,
-        pickedAt: null,
-      });
-      setSuccess("Registration confirmed!");
+      setSuccess(
+        data.qualified
+          ? "Registration confirmed!"
+          : `Registered, but your wallet holds $${data.usdValue ?? 0} of RL80 (need $${data.threshold}). Top up to qualify.`
+      );
     } catch (err) {
       setError(err.message);
     } finally {
       setRegistering(false);
     }
-  }, [user, walletAddress, liveCheck, xFollowVerified, xUsername]);
+  }, [user, walletAddress, xFollowVerified, xUsername, oilApiFetch]);
 
   // Admin: run snapshot
   const handleRunSnapshot = useCallback(async () => {
@@ -264,123 +265,52 @@ export default function OilQualify({
 
   // Claim a plot on the inline 10x10 grid (merged into registration flow)
   const handleClaimPlot = useCallback(async (col, row) => {
-    if (!user || !db || claiming) return;
+    if (!user || claiming) return;
     const key = `${col}_${row}`;
-    const existing = allPlots[key];
-    if (existing?.currentOwnerId) return; // already claimed
+    if (allPlots[key]?.currentOwnerId) return; // already claimed (server re-checks)
     setClaiming(true);
     setError(null);
     try {
-      // Generate default referral code (first 8 chars of wallet address)
-      const defaultRefCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user.id.slice(0, 8);
-
-      // 1. Write oilPlots/{col_row}
-      await setDoc(doc(db, "oilPlots", key), {
-        col,
-        row,
-        drillDay: existing?.drillDay ?? 0,
-        currentOwnerId: user.id,
-        ownerHistory: arrayUnion({ userId: user.id, claimedAt: new Date().toISOString() }),
-        disqualified: false,
-      }, { merge: true });
-      // 2. Write oilDrills/{userId}
-      await setDoc(doc(db, "oilDrills", user.id), {
-        userId: user.id,
-        col,
-        row,
-        drillDay: 0,
-        lastDrillDate: null,
-        claimJumpsUsed: 0,
-        totalCollected: 0,
-        tankDrains: 0,
-        lastDrainExtracted: 0,
-        bonusDrills: 0,
-        confirmedReferrals: 0,
-        referralCode: defaultRefCode,
-        username: user.fullName || user.firstName || "",
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      // 3. Create oilReferrals/{code} for this player's referral code
-      await setDoc(doc(db, "oilReferrals", defaultRefCode), {
-        userId: user.id,
-        code: defaultRefCode,
-        createdAt: serverTimestamp(),
-      });
-      // 4. Update oilQualified/{userId} with referredBy
+      // Server does the whole claim: plot + fresh drill doc + referral code +
+      // referral credit (capped, no self-referral). It derives our own ref code
+      // from the stored wallet; we just pass who referred US.
       const refCode = storedRef || (typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null);
-      await setDoc(doc(db, "oilQualified", user.id), {
-        plotCol: col,
-        plotRow: row,
-        pickedAt: serverTimestamp(),
-        referredBy: refCode || null,
-      }, { merge: true });
-      // 5. Credit the referrer if valid
-      if (refCode) {
-        try {
-          const refDocSnap = await getDoc(doc(db, "oilReferrals", refCode));
-          if (refDocSnap.exists()) {
-            const referrerId = refDocSnap.data().userId;
-            // Validate: not self-referral
-            if (referrerId && referrerId !== user.id) {
-              const referrerDrillSnap = await getDoc(doc(db, "oilDrills", referrerId));
-              if (referrerDrillSnap.exists()) {
-                const referrerData = referrerDrillSnap.data();
-                const currentBonus = referrerData.bonusDrills || 0;
-                const bonusToAdd = Math.min(REFERRAL_BONUS, MAX_BONUS_DRILLS - currentBonus);
-                if (bonusToAdd > 0) {
-                  await updateDoc(doc(db, "oilDrills", referrerId), {
-                    bonusDrills: increment(bonusToAdd),
-                    confirmedReferrals: increment(1),
-                    updatedAt: serverTimestamp(),
-                  });
-                }
-              }
-            }
-          }
-          // Clear localStorage after crediting
-          if (typeof window !== "undefined") localStorage.removeItem("oil_ref");
-        } catch (refErr) {
-          console.error("Failed to credit referrer:", refErr);
-        }
-      }
+      const res = await oilApiFetch("/api/oil-claim", {
+        method: "POST",
+        body: JSON.stringify({
+          col, row,
+          username: user.fullName || user.firstName || "",
+          referredByCode: refCode || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (typeof window !== "undefined") localStorage.removeItem("oil_ref");
     } catch (err) {
       setError(err.message);
     } finally {
       setClaiming(false);
     }
-  }, [user, allPlots, claiming, walletAddress, storedRef]);
+  }, [user, allPlots, claiming, storedRef, oilApiFetch]);
 
   // Release current plot so user can pick a different one
   const [releasing, setReleasing] = useState(false);
   const handleReleasePlot = useCallback(async () => {
-    if (!user || !db || !userPlotEntry) return;
+    if (!user || !userPlotEntry) return;
     setReleasing(true);
     setError(null);
     try {
-      const plotKey = `${userPlotEntry.col}_${userPlotEntry.row}`;
-      // Release the plot
-      await setDoc(doc(db, "oilPlots", plotKey), {
-        currentOwnerId: null,
-        ownerHistory: arrayUnion({ userId: user.id, releasedAt: new Date().toISOString(), reason: "voluntary" }),
-      }, { merge: true });
-      // Clear col/row in oilDrills
-      await setDoc(doc(db, "oilDrills", user.id), {
-        col: null,
-        row: null,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      // Clear in oilQualified
-      await setDoc(doc(db, "oilQualified", user.id), {
-        plotCol: null,
-        plotRow: null,
-        pickedAt: null,
-      }, { merge: true });
+      const res = await oilApiFetch("/api/oil-release", { method: "POST" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setReleasing(false);
     }
-  }, [user, userPlotEntry]);
+  }, [user, userPlotEntry, oilApiFetch]);
 
   const mono = "'Share Tech Mono', monospace";
 
@@ -653,7 +583,7 @@ export default function OilQualify({
                   }
 
                   const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
-                  const text = `I just staked my claim at Hail Mary Prospecting Co.\n\nrl80.xyz/oil?ref=${refCode}`;
+                  const text = `I just staked my claim at Hail Mary Prospecting Co.\n\nrl80.com/oil?ref=${refCode}`;
                   window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "width=550,height=420");
                   setTimeout(() => setShareNote(null), 5000);
                 } catch (err) { console.error("Share failed:", err); }
@@ -746,7 +676,7 @@ export default function OilQualify({
                     const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
                     await navigator.share({
                       title: "Hail Mary Prospecting Co.",
-                      text: `I just staked my claim! Join me: rl80.xyz/oil?ref=${refCode}`,
+                      text: `I just staked my claim! Join me: rl80.com/oil?ref=${refCode}`,
                       files: [file],
                     });
                   } catch (err) {
@@ -1656,12 +1586,12 @@ export default function OilQualify({
                 padding: "6px 10px", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 3,
               }}>
                 <span style={{ fontSize: 11, color: theme.textStrong, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  rl80.xyz/oil?ref={walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8)}
+                  rl80.com/oil?ref={walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8)}
                 </span>
                 <button
                   onClick={() => {
                     const code = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
-                    navigator.clipboard.writeText(`https://rl80.xyz/oil?ref=${code}`);
+                    navigator.clipboard.writeText(`https://rl80.com/oil?ref=${code}`);
                   }}
                   style={{
                     padding: "4px 12px", border: `1px solid ${theme.gold}`, borderRadius: 3,

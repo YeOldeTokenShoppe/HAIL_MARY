@@ -1,8 +1,9 @@
 /**
  * Oil Game Batch USDC Payout Script
  *
- * Reads the oilDrills + oilQualified collections from Firestore,
- * builds a payout manifest, and sends USDC transfers on Base.
+ * Reads oilDrills + oilQualified + oilGame/settings from Firestore, splits the
+ * prize pool (settings.totalOilBudget) in proportion to each player's score
+ * (banked + un-banked oil units), and sends USDC transfers on Base.
  *
  * Usage:
  *   node scripts/oil-payout.js --dry-run   # preview only
@@ -21,7 +22,7 @@ import { createPublicClient, createWalletClient, http, parseUnits, encodeFunctio
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 // ── Constants ──────────────────────────────────────────────────────────
 const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
@@ -71,15 +72,23 @@ function createClients() {
 
 // ── Firestore data fetch ───────────────────────────────────────────────
 async function fetchPayoutData() {
+  // Oil is a SCORE in field units (decoupled from the prize). The prize pool is
+  // oilGame/settings.totalOilBudget, split in proportion to each player's score.
+  console.log('Fetching oilGame/settings (prize pool)...');
+  const settingsSnap = await getDoc(doc(db, 'oilGame', 'settings'));
+  const prizePool = settingsSnap.exists() ? (settingsSnap.data().totalOilBudget || 0) : 0;
+  console.log(`  → prize pool: ${prizePool} USDC`);
+
   console.log('Fetching oilDrills...');
   const drillsSnap = await getDocs(collection(db, 'oilDrills'));
   const drills = new Map();
-  drillsSnap.forEach((doc) => {
-    const d = doc.data();
-    drills.set(doc.id, {
-      userId: d.userId || doc.id,
+  drillsSnap.forEach((snap) => {
+    const d = snap.data();
+    drills.set(snap.id, {
+      userId: d.userId || snap.id,
       username: d.username || null,
-      totalCollected: d.totalCollected || 0,
+      // Score = banked oil + any un-banked tank (auto-banked at season end).
+      score: (d.totalCollected || 0) + (d.tankOil || 0),
     });
   });
   console.log(`  → ${drills.size} drill records`);
@@ -87,25 +96,29 @@ async function fetchPayoutData() {
   console.log('Fetching oilQualified...');
   const qualSnap = await getDocs(collection(db, 'oilQualified'));
   const qualified = new Map();
-  qualSnap.forEach((doc) => {
-    const d = doc.data();
-    qualified.set(doc.id, {
-      userId: d.userId || doc.id,
+  qualSnap.forEach((snap) => {
+    const d = snap.data();
+    qualified.set(snap.id, {
+      userId: d.userId || snap.id,
       walletAddress: d.walletAddress || null,
       clerkName: d.clerkName || null,
     });
   });
   console.log(`  → ${qualified.size} qualified records`);
 
-  return { drills, qualified };
+  return { drills, qualified, prizePool };
 }
 
 // ── Build payout list ──────────────────────────────────────────────────
-function buildPayoutList(drills, qualified) {
-  const payouts = [];
+function buildPayoutList(drills, qualified, prizePool) {
+  // Scoreboard denominator: total score across ALL players (incl. those without
+  // a wallet, so a missing wallet doesn't inflate everyone else's share).
+  let totalScore = 0;
+  for (const [, drill] of drills) totalScore += drill.score;
 
+  const payouts = [];
   for (const [userId, drill] of drills) {
-    if (drill.totalCollected <= 0) continue;
+    if (drill.score <= 0) continue;
 
     const qual = qualified.get(userId);
     if (!qual?.walletAddress || !isAddress(qual.walletAddress)) {
@@ -113,11 +126,14 @@ function buildPayoutList(drills, qualified) {
       continue;
     }
 
+    // Proportional payout: your share of the scoreboard × the prize pool.
+    const amount = totalScore > 0 ? (drill.score / totalScore) * prizePool : 0;
     payouts.push({
       userId,
       wallet: qual.walletAddress,
       username: drill.username || qual.clerkName || userId.slice(0, 8),
-      amount: drill.totalCollected, // USDC units (e.g. 12.5 = $12.50)
+      score: drill.score,
+      amount, // USDC ($) — proportional share
     });
   }
 
@@ -301,8 +317,12 @@ async function executePayouts(payouts, alreadyPaid) {
 async function main() {
   console.log(isDryRun ? '🔍 DRY RUN MODE\n' : '💸 LIVE PAYOUT MODE\n');
 
-  const { drills, qualified } = await fetchPayoutData();
-  const payouts = buildPayoutList(drills, qualified);
+  const { drills, qualified, prizePool } = await fetchPayoutData();
+  if (!prizePool || prizePool <= 0) {
+    console.error('✗ No prize pool set (oilGame/settings.totalOilBudget). Aborting.');
+    process.exit(1);
+  }
+  const payouts = buildPayoutList(drills, qualified, prizePool);
 
   if (payouts.length === 0) {
     console.log('No payouts to process.');

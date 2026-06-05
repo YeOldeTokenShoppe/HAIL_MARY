@@ -263,18 +263,28 @@ function AssetsTabContent({ unlockedItems, ind }) {
 // and a "pick a plot first" prompt before then.
 function ReferralsTabContent({ ind, userId }) {
   const [data, setData] = useState(null);
+  const [qual, setQual] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
     setLoading(true);
-    const unsub = onSnapshot(
+    // oilDrills holds the live referral stats (set at plot-claim); oilQualified
+    // holds the wallet + code (set at registration) so the code shows as soon
+    // as the player registers, before they've picked a plot.
+    const unsubDrill = onSnapshot(
       doc(db, "oilDrills", userId),
       (snap) => { setData(snap.exists() ? snap.data() : null); setLoading(false); },
       () => setLoading(false),
     );
-    return () => unsub();
+    const unsubQual = onSnapshot(
+      doc(db, "oilQualified", userId),
+      (snap) => setQual(snap.exists() ? snap.data() : null),
+      () => {},
+    );
+    return () => { unsubDrill(); unsubQual(); };
   }, [userId]);
 
   const accent = ind ? "#d4a854" : "#00f5d4";
@@ -284,8 +294,13 @@ function ReferralsTabContent({ ind, userId }) {
   const cardBorder = ind ? "rgba(212,168,84,0.2)" : "rgba(0,245,212,0.2)";
   const font = ind ? "'Share Tech Mono', monospace" : "'Orbitron', monospace";
 
-  const code = data?.referralCode || null;
-  const link = code ? `https://rl80.xyz/oil?ref=${code}` : null;
+  // Code is deterministic from the wallet (first 8 hex chars), matching
+  // /api/oil-register, /api/oil-claim and the OilQualify page. Prefer a stored
+  // value, fall back to deriving it so already-registered players still see it.
+  const wallet = qual?.walletAddress || "";
+  const derived = wallet ? wallet.replace(/^0x/i, "").slice(0, 8).toLowerCase() : null;
+  const code = data?.referralCode || qual?.referralCode || derived || null;
+  const link = code ? `https://rl80.com/oil?ref=${code}` : null;
   const confirmed = data?.confirmedReferrals || 0;
   const bonus = data?.bonusDrills || 0;
 
@@ -308,6 +323,15 @@ function ReferralsTabContent({ ind, userId }) {
   const handleCopy = async () => {
     if (!link) return;
     try { await navigator.clipboard.writeText(link); flashCopied(); } catch {}
+  };
+
+  const handleCopyCode = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 1500);
+    } catch {}
   };
 
   const peopleIcon = (
@@ -356,6 +380,37 @@ function ReferralsTabContent({ ind, userId }) {
 
       {code ? (
         <>
+          {/* The player's referral code — large, standalone, copyable. Friends
+              can enter this directly, or use the share link below. */}
+          <div style={{
+            textAlign: "center", padding: "14px 12px",
+            background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: ind ? 3 : 10,
+          }}>
+            <div style={{
+              fontSize: ind ? 9 : 10, color: muted, fontFamily: font,
+              letterSpacing: ind ? "0.14em" : "0.06em", textTransform: "uppercase", marginBottom: 8,
+            }}>
+              Your referral code
+            </div>
+            <div style={{
+              fontSize: ind ? 24 : 26, fontWeight: 700, color: accent, fontFamily: font,
+              letterSpacing: "0.18em", lineHeight: 1, marginBottom: 10, userSelect: "all",
+            }}>
+              {code}
+            </div>
+            <button
+              onClick={handleCopyCode}
+              style={{
+                padding: "5px 16px", borderRadius: ind ? 2 : 6, cursor: "pointer",
+                background: "transparent", border: `1px solid ${cardBorder}`,
+                color: accent, fontFamily: font, fontSize: ind ? 10 : 11,
+                letterSpacing: "0.1em", textTransform: "uppercase",
+              }}
+            >
+              {codeCopied ? "Copied ✓" : "Copy Code"}
+            </button>
+          </div>
+
           {/* Primary share CTA */}
           <button
             onClick={handleShare}
@@ -379,7 +434,7 @@ function ReferralsTabContent({ ind, userId }) {
               flex: 1, fontSize: ind ? 10 : 11, color: muted, fontFamily: font,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
-              rl80.xyz/oil?ref={code}
+              rl80.com/oil?ref={code}
             </span>
             <button
               onClick={handleCopy}
@@ -430,7 +485,7 @@ function ReferralsTabContent({ ind, userId }) {
           fontSize: ind ? 11 : 12, lineHeight: 1.6, letterSpacing: ind ? "0.08em" : "normal",
           background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: ind ? 3 : 8,
         }}>
-          Pick a plot in the oil field to unlock your referral link.
+          Register in the oil field to unlock your referral link.
         </div>
       )}
     </div>

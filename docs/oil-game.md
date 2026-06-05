@@ -83,6 +83,7 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 - **Three layers:** engine (resource-agnostic, operates on abstract `units`) / resource theme (name, color, VFX, verb, tank visual — a config in `oilGame/settings`) / extraction physics (fluid only for now).
 - **Keep internal "oil" naming** (`oilPlots`, `oilDrills`, `oilGame`, `/oil`) — it's the engine's substrate label; renaming the data model buys nothing. Separate internal naming (stays "oil") from the **player-facing substance** (read from a `resourceTheme` config). New strike/tank code should pull substance labels from that config rather than hardcoding "oil."
 - Default substance is an open creative call (oil = legible/built; goo = fits the hell/demon theme, brand-safe, more shareable). A hybrid is on the table: oil baseline + otherworldly goo as the rare jackpot strike tied to hell pockets.
+- **Player-facing substance name: Lyquid80** (locked 2026-06-04). Reads as "liquidity" when spoken, ties to the **RL80** token and element 80; visually an **iridescent opal** fluid (cyan gusher beam, petrol-rainbow spill puddles, real thin-film iridescence on tank liquids). Display strings only (headers, theme tooltip); internal identifiers stay `parabolum`/`uParabolum` per the layer split above. See the iridescence system in `src/components/OilVoxelGrid.jsx` (`IRID_PRESETS` / `ACTIVE_IRID = opal`).
 
 ### Decided & implementation status
 
@@ -288,14 +289,53 @@ Oil strike visual effects are **delayed 10 seconds** (`STRIKE_REVEAL_DELAY`) to 
 - Gauge needle behavior differs subtly for oil vs dry (builds agitation before oil reveals)
 - Camera shake delayed to coincide with the strike reveal
 
-## Community Drill Data
+## Server-Authoritative Reveal (anti-cheat — 2026-06-04)
 
-Surface view and cross-section grids show **all players' drilled data**, not just the current player's column. Each cell reveals oil values up to that plot's `drillDay` from Firestore `oilPlots`.
+The distribution used to be computed **client-side** from a public `blockHash`, so any
+player could copy the seed and run `generateOilDistribution3D` to print the entire field
+(or just read `stats.grid3D` from memory). The reveal is now server-authoritative:
 
-- Computed in `communityGrid3D` / `communityClaimTotals` memos
-- Data is live via `allPlotsMap` Firestore listener — updates in real-time as players drill
-- Creates an evolving intelligence map that gets richer each day
-- Strategic implication: waiting to drill lets you observe others' results, but you lose days
+- **Seed is secret (commit-reveal).** The raw seed lives in the server-only `oilSecret/seed`
+  doc (`firestore.rules`: `read/write: if false`). `oilGame/settings` publishes only the
+  SHA-256 **commitment** (`seedCommitment`); the raw seed (`seedReveal`) is published at game
+  end for verification. `/api/oil-settings` POST stores the seed + commitment and purges any
+  legacy public `blockHash`; an admin-only GET returns the seed for the live inspector.
+- **Server writes the reveal per cell.** On each strike, `oil-strike-tick` writes the
+  discovered oil into `oilPlots/{col_row}.revealed[layer]` (+ `hellLayers`). `/api/oil-backfill-revealed`
+  (admin-gated) backfills already-drilled cells.
+- **Client renders from reveals, never the seed.** `useClaimStats` only computes when
+  `seedVisible` (admin/report/test); normal players run it disabled. `displayGrid3D` /
+  `displayHellMap` assemble the field from `oilPlots.revealed` (memos `revealedGrid3D` /
+  `revealedHellMap` / `claimOrder`, all seed-free). Surface view, cross-section, core sample,
+  proximity/area-scan, and hit-rate all read revealed data only.
+- **Hell is server-authoritative.** The strike-tick summons the demon on a hell strike;
+  the client only mirrors visuals via the `demonBounty` listener (admin/test keep a local preview).
+- **Still a live intelligence map** via the `allPlotsMap` listener — it just reflects what's
+  actually been drilled, by anyone, and leaks nothing about the undrilled field.
+
+### Resolution decoupled from prize (2026-06-04)
+
+The field is generated at a fixed internal resolution — `OIL_FIELD_UNITS` (500,000)
+in `oilDistribution.js` — **not** the dollar prize. At a low total, scaling+rounding
+wiped out each deposit blob's edges and collapsed the distribution to its cores
+(one composite band, "0.0k" cells). Every `generateOilDistribution3D` caller now
+passes `OIL_FIELD_UNITS` (client `useClaimStats`/`OilVoxelGrid`, server strike-tick/
+backfill, verify) **and** `depthBias: 0.35` so client and server produce the *same*
+field. Oil is now a **score in field units**; the **prize pool** (`settings.totalOilBudget`,
+shown as "PRIZE POOL") is separate and pays out by share. Player oil readouts (cells,
+tank, EXTRACTED, leaderboard) read in OIL units; `TANK_CAPACITY` rescaled to units.
+
+**Economy pass (done 2026-06-04):** all player + inspector oil readouts now read
+in OIL units (only PRIZE POOL + demon bounties stay USDC); `scripts/oil-payout.js`
+splits the pool by score share (`payout = (banked+tank) / totalScore × prizePool`,
+pool read from `oilGame/settings.totalOilBudget`); `depthBias` is the single
+`OIL_DEPTH_BIAS` constant in `oilDistribution.js` — every live caller uses the
+default (the dead `OilHeatmap2D` still has a literal but isn't imported).
+
+**Deferred (pre-launch):** lock `oilPlots`/`oilDrills` to server-only writes (needs
+`/api/oil-claim-jump` + `/api/oil-drill` endpoints first), and reconcile `OilVerifyPanel`/
+`OilVerifyExplainer` to the commit-reveal model (verify `SHA256(seedReveal) == seedCommitment`
+post-game instead of recomputing from a block hash).
 
 ## Telegram Integration
 

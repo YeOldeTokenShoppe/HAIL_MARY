@@ -1,19 +1,20 @@
 "use client";
 
-// Paraboleum — neutral when empty, phosphorescent green as density climbs.
+// Paraboleum — neutral when empty, iridescent opal cyan as density climbs
+// (matches the cyan gusher beam + tank liquid).
 function getSurfaceColor(value, maxValue, dark) {
-  if (value === 0) return dark ? "#1a241e" : "#e2e8e2";
+  if (value === 0) return dark ? "#101e22" : "#dfe9ea";
   const t = Math.min(value / maxValue, 1);
   if (dark) {
-    // dark slate-green → green → neon green
-    if (t < 0.3) return `rgb(${Math.round(40 + t * 30)}, ${Math.round(70 + t * 120)}, ${Math.round(52 + t * 40)})`;
-    if (t < 0.6) return `rgb(${Math.round(46 + t * 40)}, ${Math.round(150 + t * 90)}, ${Math.round(70 + t * 50)})`;
-    return `rgb(${Math.round(70 + t * 60)}, ${Math.round(215 + t * 40)}, ${Math.round(110 + t * 50)})`;
+    // dark slate-teal → teal → bright cyan
+    if (t < 0.3) return `rgb(${Math.round(30 + t * 25)}, ${Math.round(78 + t * 120)}, ${Math.round(88 + t * 125)})`;
+    if (t < 0.6) return `rgb(${Math.round(38 + t * 30)}, ${Math.round(158 + t * 88)}, ${Math.round(170 + t * 82)})`;
+    return `rgb(${Math.round(60 + t * 56)}, ${Math.round(220 + t * 38)}, ${Math.round(222 + t * 33)})`;
   }
-  // light: pale green-grey → deep green
-  if (t < 0.3) return `rgb(${Math.round(200 - t * 120)}, ${Math.round(216 - t * 40)}, ${Math.round(202 - t * 100)})`;
-  if (t < 0.6) return `rgb(${Math.round(110 - t * 60)}, ${Math.round(180 - t * 30)}, ${Math.round(120 - t * 60)})`;
-  return `rgb(${Math.round(40 - t * 20)}, ${Math.round(150 - t * 60)}, ${Math.round(70 - t * 30)})`;
+  // light: pale cyan-grey → deep teal
+  if (t < 0.3) return `rgb(${Math.round(196 - t * 120)}, ${Math.round(220 - t * 28)}, ${Math.round(224 - t * 30)})`;
+  if (t < 0.6) return `rgb(${Math.round(96 - t * 54)}, ${Math.round(184 - t * 30)}, ${Math.round(192 - t * 34)})`;
+  return `rgb(${Math.round(34 - t * 14)}, ${Math.round(150 - t * 55)}, ${Math.round(168 - t * 60)})`;
 }
 
 export default function OilSurfaceMap({
@@ -32,7 +33,7 @@ export default function OilSurfaceMap({
 }) {
   // Dark-theme bgs: dark (#12161c), parabolumDark (#0c0717), hud (#0f141c).
   const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717" || theme?.bg === "#0f141c";
-  const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#5a8a3a", accent: "#7a5a1a" };
+  const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#2dd6c8", accent: "#7a5a1a" };
 
   return (
     <div style={{ fontFamily: "'Share Tech Mono', 'Courier New', monospace", color: t.muted, position: "relative" }}>
@@ -48,7 +49,7 @@ export default function OilSurfaceMap({
         fontSize: 9, color: t.inspectorKey || t.muted, marginBottom: 8,
         textAlign: "center", letterSpacing: "0.08em",
       }}>
-        {claimJumpMode ? "CLAIM JUMP \u2014 Click an unclaimed cell" : "SURFACE VIEW \u2014 Total oil per claim"}
+        {claimJumpMode ? "CLAIM JUMP \u2014 Click an unclaimed cell" : "SURVEY MAP \u2014 oil \u00b7 dry \u00b7 unexplored"}
       </div>
       {/* X axis labels along top */}
       <div style={{
@@ -89,29 +90,28 @@ export default function OilSurfaceMap({
             const plotData = allPlotsMap[plotKey];
             const isOwned = plotData?.currentOwnerId != null;
             const isMine = !!currentUserId && plotData?.currentOwnerId === currentUserId;
-            const isDQ = plotData?.disqualified && !isOwned;
             const isUnclaimed = !isOwned;
             const hasDrillHistory = plotData?.drillDay > 0;
 
             // In claim jump mode, unclaimed cells are clickable targets
             const isJumpTarget = claimJumpMode && isUnclaimed;
 
-            // Determine cell background
+            // Cell fill encodes SURVEY STATE (the intelligence layer) — ownership
+            // moves to the border below. Priority: selection > jump-target >
+            // discovered oil (heatmap) > surveyed-dry > unexplored. A drilled-but-
+            // dry cell reads distinctly from an unexplored one, so "we checked
+            // here, nothing" is legible at a glance.
             let bg;
             if (claim.index === selectedClaimIndex) {
               bg = t.selectFill || (dark ? "rgba(122,170,90,0.7)" : "rgba(90, 138, 58, 0.7)");
-            } else if (isMine) {
-              bg = dark ? "rgba(90,138,58,0.3)" : "rgba(90,138,58,0.2)";
-            } else if (isOwned) {
-              bg = dark ? "rgba(100,100,120,0.3)" : "rgba(130,130,140,0.2)";
-            } else if (isDQ && hasDrillHistory) {
-              bg = dark ? "rgba(180,140,60,0.2)" : "rgba(180,140,60,0.15)";
             } else if (isJumpTarget) {
               bg = dark ? "rgba(212,168,84,0.15)" : "rgba(212,168,84,0.12)";
-            } else if (claim.total === 0 && t.mapEmpty) {
-              bg = t.mapEmpty;
-            } else {
+            } else if (claim.total > 0) {
               bg = getSurfaceColor(claim.total, maxClaimTotal, dark, parabolum);
+            } else if (hasDrillHistory) {
+              bg = dark ? "rgba(74,88,104,0.5)" : "rgba(150,162,178,0.34)";
+            } else {
+              bg = t.mapEmpty || (dark ? "rgba(255,255,255,0.03)" : "rgba(120,108,90,0.06)");
             }
 
             return (
@@ -151,20 +151,20 @@ export default function OilSurfaceMap({
                   <div style={{ fontSize: 8, fontWeight: 700, color: t.green }}>YOU</div>
                 ) : isOwned ? (
                   <div style={{ fontSize: 7, color: dark ? "#888" : "#999" }}>&#9632;</div>
-                ) : (
-                  <div style={{ fontWeight: "bold" }}>{claim.index + 1}</div>
-                )}
-                {isJumpTarget && (
+                ) : null}
+                {/* The number drawn on a cell is its OIL amount (field units —
+                    decoupled from the $ prize pool). A dry-but-drilled cell shows
+                    the depth drilled as "D{n}" on a slate fill, and unexplored
+                    cells are blank. */}
+                {isJumpTarget ? (
                   <div style={{ fontSize: "6px", color: t.gold || t.accent, marginTop: "1px" }}>JUMP</div>
-                )}
-                {!isJumpTarget && claim.total > 0 && !isOwned && (
-                  <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.7)", marginTop: "1px" }}>
-                    {(claim.total / 1000).toFixed(1)}k
+                ) : claim.total > 0 ? (
+                  <div style={{ fontSize: "8px", fontWeight: 700, color: dark ? "rgba(255,255,255,0.9)" : "rgba(30,22,10,0.82)" }}>
+                    {claim.total >= 1e6 ? `${(claim.total / 1e6).toFixed(1)}M` : claim.total >= 1000 ? `${(claim.total / 1000).toFixed(1)}k` : Math.round(claim.total)}
                   </div>
-                )}
-                {isDQ && hasDrillHistory && (
-                  <div style={{ fontSize: "6px", color: t.warn || "#cc7755" }}>D{plotData.drillDay}</div>
-                )}
+                ) : hasDrillHistory ? (
+                  <div style={{ fontSize: "6px", color: t.muted, marginTop: "1px" }}>D{plotData.drillDay}</div>
+                ) : null}
               </div>
             );
           })}

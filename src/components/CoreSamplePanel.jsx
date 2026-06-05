@@ -14,22 +14,36 @@ function classifyDensity(value, maxAvg) {
   return 4;
 }
 
+// Composite (field-average) classifier. The average is dominated by the single
+// richest deposit, so a linear peak-relative scale buries every smaller deposit
+// below the green threshold — making a multi-level field read as one band. A
+// sqrt (perceptual) scale lifts the low end so each depth that holds oil glows
+// proportionally, while the peak still tops out at RADIANCE.
+function classifyComposite(value, maxAvg) {
+  if (value === 0) return 0;
+  const t = maxAvg > 0 ? Math.sqrt(value / maxAvg) : 0;
+  if (t < 0.18) return 1;
+  if (t < 0.45) return 2;
+  if (t < 0.72) return 3;
+  return 4;
+}
+
 // Paraboleum is the substance — rock tiers (shale/sandstone) stay neutral slate,
 // the oil-bearing tiers (oil sand → crude → rich vein) glow phosphorescent green.
 const DENSITY_COLORS_DARK = [
-  { fill: "#2a322c", opacity: 0.5, label: "SHALE" },
-  { fill: "#46584c", opacity: 0.6, label: "SANDSTONE" },
-  { fill: "#2f8f4e", opacity: 0.75, label: "GLIMMER" },
-  { fill: "#2dd64a", opacity: 0.88, label: "LUMEN" },
-  { fill: "#74ff96", opacity: 0.95, label: "RADIANCE" },
+  { fill: "#2a322f", opacity: 0.5, label: "SHALE" },
+  { fill: "#46585a", opacity: 0.6, label: "SANDSTONE" },
+  { fill: "#2f8f8f", opacity: 0.75, label: "GLIMMER" },
+  { fill: "#2dd6c8", opacity: 0.88, label: "LUMEN" },
+  { fill: "#7afff2", opacity: 0.95, label: "RADIANCE" },
 ];
 
 const DENSITY_COLORS_LIGHT = [
-  { fill: "#d4ddd6", opacity: 0.5, label: "SHALE" },
-  { fill: "#a6c2ac", opacity: 0.62, label: "SANDSTONE" },
-  { fill: "#5cae6c", opacity: 0.75, label: "GLIMMER" },
-  { fill: "#249e4c", opacity: 0.86, label: "LUMEN" },
-  { fill: "#0e7a32", opacity: 0.95, label: "RADIANCE" },
+  { fill: "#d4ddda", opacity: 0.5, label: "SHALE" },
+  { fill: "#a6c2c0", opacity: 0.62, label: "SANDSTONE" },
+  { fill: "#5caeb0", opacity: 0.75, label: "GLIMMER" },
+  { fill: "#249e9e", opacity: 0.86, label: "LUMEN" },
+  { fill: "#0e7a78", opacity: 0.95, label: "RADIANCE" },
 ];
 
 // Paraboleum is now the universal substance, so the toggle keeps the same green
@@ -83,7 +97,7 @@ function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio, pa
       <g clipPath="url(#core-clip)">
         <g clipPath="url(#core-reveal)">
           {avgColumn.map((value, z) => {
-            const tier = classifyDensity(value, maxAvg);
+            const tier = classifyComposite(value, maxAvg);
             const c = colors[tier];
             return (
               <rect
@@ -171,7 +185,7 @@ function CompositeCoreTube({ avgColumn, maxAvg, peakDepth, dark, revealRatio, pa
           let runStart = 0;
 
           for (let z = 0; z <= DEPTH_Z; z++) {
-            const tier = z < DEPTH_Z ? classifyDensity(avgColumn[z], maxAvg) : -2;
+            const tier = z < DEPTH_Z ? classifyComposite(avgColumn[z], maxAvg) : -2;
             if (tier !== lastTier && lastTier >= 0) {
               const span = z - runStart;
               if (lastTier >= 3 && span >= 2) {
@@ -588,24 +602,29 @@ export default function CoreSamplePanel({
     btnBgHover: "rgba(139,105,20,0.12)",
   };
 
+  // Depth profile = PEAK density per depth (richest cell at each level), NOT the
+  // field average. Deposits are sparse — a few cells each — so averaging across
+  // all 100 plots dilutes every deposit but the single richest into nothing,
+  // collapsing the survey to one band. Peak-per-depth registers each deposit's
+  // core, so the profile shows oil at every level it actually exists (matching
+  // the 3D). (Name kept `avgColumn` so downstream rendering is unchanged.)
   const { avgColumn, maxAvg, peakDepth } = useMemo(() => {
     if (!grid3D) return { avgColumn: [], maxAvg: 0, peakDepth: -1 };
-    const totalCells = gridX * gridY;
-    const avg = new Array(DEPTH_Z).fill(0);
+    const col = new Array(DEPTH_Z).fill(0);
     for (let x = 0; x < gridX; x++) {
       for (let y = 0; y < gridY; y++) {
         for (let z = 0; z < DEPTH_Z; z++) {
-          avg[z] += grid3D[x]?.[y]?.[z] ?? 0;
+          const v = grid3D[x]?.[y]?.[z] ?? 0;
+          if (v > col[z]) col[z] = v;
         }
       }
     }
     let mx = 0;
     let peak = -1;
     for (let z = 0; z < DEPTH_Z; z++) {
-      avg[z] = avg[z] / totalCells;
-      if (avg[z] > mx) { mx = avg[z]; peak = z; }
+      if (col[z] > mx) { mx = col[z]; peak = z; }
     }
-    return { avgColumn: avg, maxAvg: mx, peakDepth: peak };
+    return { avgColumn: col, maxAvg: mx, peakDepth: peak };
   }, [grid3D, gridX, gridY]);
 
   const runAnalysis = useCallback(() => {

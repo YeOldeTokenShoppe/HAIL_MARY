@@ -254,16 +254,15 @@
         allow write: if true;
       }
 
-      // Oil Drill progress — one doc per user tracking daily drill state
+      // Oil Drill progress — one doc per user tracking daily drill state.
+      // Public read; ALL writes go through server endpoints (oil-claim,
+      // oil-claim-jump, oil-release, oil-transfer, oil-profile, oil-tank-drain,
+      // oil-strike-tick, oil-demon-bounty) via the Admin SDK, which bypasses
+      // these rules. Prize money rides on tankOil/totalCollected — no client
+      // write path is permitted.
       match /oilDrills/{docId} {
         allow read: if true;
-        allow create: if true
-          && request.resource.data.keys().hasAll(['userId', 'col', 'row', 'drillDay', 'lastDrillDate', 'updatedAt'])
-          && request.resource.data.userId is string
-          && request.resource.data.userId.size() > 0;
-        allow update: if true
-          && request.resource.data.userId == resource.data.userId;
-        allow delete: if false;
+        allow write: if false;
       }
 
       // Oil Game settings — public read, server-only write via Admin SDK.
@@ -273,6 +272,15 @@
       // on the line — no client SDK write path is permitted.
       match /oilGame/{docId} {
         allow read: if true;
+        allow write: if false;
+      }
+
+      // Distribution seed (commit-reveal). The raw seed decides where the oil
+      // is — exposing it would let any player compute the whole field. It is
+      // server-only: written/read exclusively via the admin SDK. The public
+      // commitment + post-game reveal live on oilGame/settings instead.
+      match /oilSecret/{docId} {
+        allow read: if false;
         allow write: if false;
       }
 
@@ -298,11 +306,13 @@
         allow delete: if false;
       }
 
-      // Oil Qualified players — registration for the oil game
+      // Oil Qualified players — registration + qualification for the oil game.
+      // Public read; writes are server-only. `qualified` is decided by an
+      // on-chain RL80 balance re-check in /api/oil-register and the admin
+      // snapshot — the client must never be able to self-qualify.
       match /oilQualified/{docId} {
         allow read: if true;
-        allow create, update: if true;
-        allow delete: if false;
+        allow write: if false;
       }
 
       // Oil Plot Bulletin Board — public chat per plot
@@ -317,11 +327,13 @@
         allow delete: if true;
       }
 
-      // Oil Plots — claimed plots on the grid
+      // Oil Plots — claimed plots on the grid, and the server-written reveal
+      // (drilled depth, revealed oil per layer, hell layers). Public read so
+      // clients can render the field; writes are server-only. Letting a client
+      // write here would let it forge ownership or fabricate oil — locked.
       match /oilPlots/{docId} {
         allow read: if true;
-        allow create, update: if true;
-        allow delete: if false;
+        allow write: if false;
       }
 
       // Telegram linking — server writes via webhook, read by API route

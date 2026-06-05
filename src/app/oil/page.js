@@ -9,7 +9,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import CleanCanvas from "@/components/canvas/CleanCanvas";
 import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
-import { generateOilDistribution3D } from "@/lib/oilDistribution";
+import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import HowToPlayPanel from "@/components/HowToPlayPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
@@ -603,7 +603,9 @@ const DEFAULT_BLOCK_HASH =
 
 const DEPTH_Z = 20;
 const CELL_SIZE = 1;
-const TANK_CAPACITY = 5;
+// "Bank soon" meter threshold, in field oil units (~1% of OIL_FIELD_UNITS) — the
+// tank holds oil (the score), not dollars; the prize pays out by share.
+const TANK_CAPACITY = 5000;
 const PASSIVE_DRILLS = 10;
 const MAX_BONUS_DRILLS = 10;
 const MAX_DEPTH = 20;
@@ -807,16 +809,25 @@ function CameraShake({ shakeRef }) {
   return null;
 }
 
-function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY) {
+const EMPTY_CLAIM_STATS = {
+  grid3D: [], claimTotals: [], sorted: [], deposits: [],
+  maxOil: 0, totalOil: 0, dryClaims: 0, maxClaimTotal: 0,
+  hellPockets: [], hellMap: {},
+};
+
+// `enabled` gates the seed computation. Normal players run with enabled=false so
+// the client NEVER computes the field from the seed (the exploit fix); they
+// render from server-revealed data instead. Only admin / report / test compute.
+function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY, enabled = true) {
   return useMemo(() => {
+    if (!enabled) return EMPTY_CLAIM_STATS;
     const { grid, deposits, maxOil, hellPockets } = generateOilDistribution3D({
       blockHash,
       gridX,
       gridY,
       depthZ: DEPTH_Z,
-      totalOilBudget,
+      totalOilBudget: OIL_FIELD_UNITS, // field resolution, decoupled from the $ prize
       numberOfDeposits,
-      depthBias: 0.35,
     });
 
     const claimTotals = [];
@@ -844,7 +855,7 @@ function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY
     }
 
     return { grid3D: grid, claimTotals, sorted, deposits, maxOil, totalOil, dryClaims, maxClaimTotal, hellPockets, hellMap };
-  }, [blockHash, numberOfDeposits, totalOilBudget, gridX, gridY]);
+  }, [blockHash, numberOfDeposits, totalOilBudget, gridX, gridY, enabled]);
 }
 
 // Animated number counter
@@ -1040,6 +1051,21 @@ export default function OilPage() {
   const [testDay, setTestDay] = useState(0);
   const { user } = useUser();
   const clerk = useClerk();
+
+  // Authenticated fetch for oil mutation endpoints — attaches the Clerk session
+  // token so the server verifies identity from the session, never a body userId.
+  const oilApiFetch = useCallback(async (url, opts = {}) => {
+    let token = null;
+    try { token = await clerk.session?.getToken(); } catch {}
+    return fetch(url, {
+      ...opts,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opts.headers || {}),
+      },
+    });
+  }, [clerk]);
   const { walletAddress, tokenBalance, isWalletConnected } = useWalletAuth();
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
   const router = useRouter();
@@ -1123,6 +1149,12 @@ export default function OilPage() {
   const [revealProgress, setRevealProgress] = useState(0);
   const [animateReveal, setAnimateReveal] = useState(false);
   const [blockHash, setBlockHash] = useState(DEFAULT_BLOCK_HASH);
+  // Public commitment to the seed (SHA-256). Shown during play; the raw seed is
+  // only published (and used) at game end. Players never receive the raw seed.
+  const [seedCommitment, setSeedCommitment] = useState(null);
+  // Admin testing: when on, render the reveal-only PLAYER view (hide seed data)
+  // even in admin/report/test, so you can watch reveal-on-drill without a 2nd tab.
+  const [previewAsPlayer, setPreviewAsPlayer] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
@@ -1139,7 +1171,14 @@ export default function OilPage() {
     const unsub = onSnapshot(doc(db, "oilGame", "settings"), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        if (d.blockHash) setBlockHash(d.blockHash);
+        // The raw seed is never in the public doc during play — only its
+        // commitment, plus the post-game reveal (which is safe to compute from).
+        if (d.seedCommitment) setSeedCommitment(d.seedCommitment);
+        if (d.seedReveal) setBlockHash(d.seedReveal);
+        // Legacy/pre-migration games may still carry a public blockHash. Only
+        // seed-visible modes (admin/report/test) may adopt it — normal players
+        // must never receive a usable seed.
+        else if (d.blockHash && (isAdmin || isReport || isTest)) setBlockHash(d.blockHash);
         if (d.numberOfDeposits) setNumberOfDeposits(d.numberOfDeposits);
         if (d.totalOilBudget) setTotalOilBudget(d.totalOilBudget);
         if (typeof d.gameEnded === "boolean") setGameEnded(d.gameEnded);
@@ -1152,6 +1191,19 @@ export default function OilPage() {
     });
     return () => unsub();
   }, []);
+
+  // Admin: pull the raw seed from the server (password-gated) so the inspector
+  // can compute the full field during a live game. Players have no such path —
+  // for them the seed stays server-side until the post-game reveal.
+  useEffect(() => {
+    if (!isAdmin || !adminAuthed || !adminPassword) return;
+    let cancelled = false;
+    fetch(`/api/oil-settings?adminPassword=${encodeURIComponent(adminPassword)}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d?.seed) setBlockHash(d.seed); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isAdmin, adminAuthed, adminPassword]);
 
   // Community oil storage — tracks total oil sent by all players
   const [communityOil, setCommunityOil] = useState(0);
@@ -1552,17 +1604,21 @@ export default function OilPage() {
 
   const handleSaveUsername = useCallback(async () => {
     if (previewModeRef.current) return;
-    if (!user?.id || !db || !username.trim() || !userDrill) return;
+    if (!user?.id || !username.trim() || !userDrill) return;
     setUsernameSaving(true);
     try {
-      await setDoc(doc(db, "oilDrills", user.id), { username: username.trim(), updatedAt: serverTimestamp() }, { merge: true });
+      const res = await oilApiFetch("/api/oil-profile", {
+        method: "POST",
+        body: JSON.stringify({ username: username.trim() }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setUsernameSaved(true);
     } catch (err) {
       console.error("Failed to save username:", err);
     } finally {
       setUsernameSaving(false);
     }
-  }, [user?.id, username, userDrill]);
+  }, [user?.id, username, userDrill, oilApiFetch]);
 
   // Reset the "SAVED" confirmation once the name is edited again.
   useEffect(() => { setUsernameSaved(false); }, [username]);
@@ -1606,9 +1662,14 @@ export default function OilPage() {
     if (isSummonerStunned) return "stunned";
     if (isBlockadeActive) return "blockade";
     if (gamePhase === "ticket_sale") return "pre-game";
+    // A real player with no plot (e.g. just released) has no rig — prompt a claim
+    // instead of treating the null col as plot (0,0) and rendering a phantom rig.
+    if (!isAdmin && !isTest && !isReport && userDrill?.col == null) return "no-claim";
     if (selectedX === null && userDrill?.col != null) return "wrong-claim";
     if (selectedX === null) return "no-claim";
-    if (userDrill && (userDrill.col !== selectedX || userDrill.row !== sliceY)) return "wrong-claim";
+    // Only "wrong-claim" if the rig is actually on a DIFFERENT plot — a null col
+    // (no plot) must not read as plot (0,0).
+    if (userDrill?.col != null && (userDrill.col !== selectedX || userDrill.row !== sliceY)) return "wrong-claim";
     const currentDepth = userPlotState?.drillDay ?? userDrill?.drillDay ?? 0;
     if (currentDepth >= MAX_DEPTH) return "max-depth";
     // Continuous-pump model: real players don't click to drill — the rig strikes
@@ -1806,68 +1867,139 @@ export default function OilPage() {
   const controlsRef = useRef();
   const controlsRefMobile = useRef();
 
-  const stats = useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridSize, gridSize);
+  // Only admin / report / test may compute the field from the seed. Normal
+  // players run disabled and render purely from server-revealed data, so the
+  // seed never has to reach (or be computed on) their client.
+  const seedVisible = (isAdmin || isReport || isTest) && !previewAsPlayer;
+  const stats = useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridSize, gridSize, seedVisible);
 
-  // In active game mode, hide oil data from 2D views
-  const showOilData = isAdmin || isReport;
+  // In active game mode, hide oil data from 2D views. `previewAsPlayer` lets an
+  // admin force the reveal-only player view to test reveal-on-drill in place.
+  const showOilData = (isAdmin || isReport) && !previewAsPlayer;
 
   // Community-visible grid: reveals oil data at every plot up to its drilled depth
-  const communityGrid3D = useMemo(() => {
-    if (showOilData) return stats.grid3D;
-    const g = [];
-    for (let x = 0; x < gridSize; x++) {
-      g[x] = [];
-      for (let y = 0; y < gridSize; y++) {
-        const plotKey = `${x}_${y}`;
-        const plotDepth = allPlotsMap[plotKey]?.drillDay ?? 0;
-        const row = new Array(DEPTH_Z).fill(0);
-        for (let z = 0; z < Math.min(plotDepth, DEPTH_Z); z++) {
-          row[z] = stats.grid3D[x]?.[y]?.[z] ?? 0;
-        }
-        g[x][y] = row;
+  // ── Server-authoritative reveal (Slice 2) ─────────────────────────────────
+  // For normal players the field is assembled from what the SERVER has revealed
+  // into oilPlots (`revealed`/`hellLayers`), never recomputed from the seed.
+  // Admin/report (showOilData) still see the full seed-computed truth.
+
+  // Seed-free cell skeleton in the exact (y desc, x asc) order the surface map
+  // renders by array position — structure only, no oil values. Mirrors the
+  // ordering useClaimStats uses so the grid never scrambles when stats is gone.
+  const claimOrder = useMemo(() => {
+    const list = [];
+    for (let y = gridSize - 1; y >= 0; y--)
+      for (let x = 0; x < gridSize; x++)
+        list.push({ x, y, index: y * gridSize + x, claim: y * gridSize + x + 1 });
+    return list;
+  }, [gridSize]);
+
+  // 3D oil grid assembled from the server's per-cell reveals (seed-free).
+  const revealedGrid3D = useMemo(() => {
+    const g = Array.from({ length: gridSize }, () =>
+      Array.from({ length: gridSize }, () => new Array(DEPTH_Z).fill(0)));
+    for (const key in allPlotsMap) {
+      const rev = allPlotsMap[key]?.revealed;
+      if (!rev) continue;
+      const us = key.indexOf("_");
+      const cx = Number(key.slice(0, us)), cy = Number(key.slice(us + 1));
+      if (!g[cx]?.[cy]) continue;
+      for (const zStr in rev) {
+        const z = Number(zStr);
+        if (z >= 0 && z < DEPTH_Z) g[cx][cy][z] = rev[zStr] ?? 0;
       }
     }
     return g;
-  }, [showOilData, stats.grid3D, allPlotsMap, gridSize]);
+  }, [allPlotsMap, gridSize]);
+
+  // Hell layers revealed by the server: "x_y_z" → true (seed-free).
+  const revealedHellMap = useMemo(() => {
+    const m = {};
+    for (const key in allPlotsMap) {
+      const hl = allPlotsMap[key]?.hellLayers;
+      if (!hl) continue;
+      const us = key.indexOf("_");
+      const cx = Number(key.slice(0, us)), cy = Number(key.slice(us + 1));
+      for (const zStr in hl) if (hl[zStr]) m[`${cx}_${cy}_${Number(zStr)}`] = true;
+    }
+    return m;
+  }, [allPlotsMap]);
+
+  // Single source switch for every player-facing oil read: seed-visible modes
+  // (admin / report / test sandbox) see the full seed-computed field; real
+  // players see only what the server has revealed into oilPlots.
+  const displayGrid3D = seedVisible ? stats.grid3D : revealedGrid3D;
+  const displayHellMap = seedVisible ? stats.hellMap : revealedHellMap;
+
+  const communityGrid3D = displayGrid3D;
 
   const communityClaimTotals = useMemo(() => {
-    if (showOilData) return stats.claimTotals;
-    return stats.claimTotals.map((c) => {
-      const plotKey = `${c.x}_${c.y}`;
-      const plotDepth = allPlotsMap[plotKey]?.drillDay ?? 0;
+    if (seedVisible) return stats.claimTotals;
+    return claimOrder.map((c) => {
       let sum = 0;
-      for (let z = 0; z < Math.min(plotDepth, DEPTH_Z); z++) {
-        sum += stats.grid3D[c.x]?.[c.y]?.[z] ?? 0;
-      }
+      for (let z = 0; z < DEPTH_Z; z++) sum += revealedGrid3D[c.x]?.[c.y]?.[z] ?? 0;
       return { ...c, oil: sum, total: sum };
     });
-  }, [showOilData, stats.claimTotals, stats.grid3D, allPlotsMap]);
+  }, [seedVisible, stats.claimTotals, claimOrder, revealedGrid3D]);
+
+  // Max claim total for surface-map heatmap normalization. Equals
+  // stats.maxClaimTotal in seed-visible modes; for players it's the richest
+  // revealed claim so the discovered heatmap still scales correctly.
+  const communityMaxClaimTotal = useMemo(
+    () => communityClaimTotals.reduce((m, c) => (c.total > m ? c.total : m), 0),
+    [communityClaimTotals],
+  );
 
   const communityMaxOil = useMemo(() => {
     let max = 0;
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        for (let z = 0; z < DEPTH_Z; z++) {
+    for (let x = 0; x < gridSize; x++)
+      for (let y = 0; y < gridSize; y++)
+        for (let z = 0; z < DEPTH_Z; z++)
           if (communityGrid3D[x]?.[y]?.[z] > max) max = communityGrid3D[x][y][z];
-        }
-      }
-    }
     return max;
   }, [communityGrid3D, gridSize]);
+
+  // Max cell value + hell pockets for the player-facing display (revealed) vs
+  // admin/report (full seed truth).
+  const displayMaxOil = seedVisible ? stats.maxOil : communityMaxOil;
+  const displayHellPockets = useMemo(() => {
+    if (seedVisible) return stats.hellPockets;
+    const arr = [];
+    for (const k in revealedHellMap) {
+      const p = k.split("_");
+      arr.push({ x: Number(p[0]), y: Number(p[1]), z: Number(p[2]) });
+    }
+    return arr;
+  }, [seedVisible, stats.hellPockets, revealedHellMap]);
 
   // Player extracted oil total
   const playerExtracted = useMemo(() => {
     if (!activeUserDrill || effectiveDrillDay === 0) return 0;
     let total = 0;
     for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
-      total += stats.grid3D[activeUserDrill.col]?.[activeUserDrill.row]?.[z] ?? 0;
+      total += displayGrid3D[activeUserDrill.col]?.[activeUserDrill.row]?.[z] ?? 0;
     }
     return total;
-  }, [activeUserDrill, effectiveDrillDay, stats.grid3D]);
+  }, [activeUserDrill, effectiveDrillDay, displayGrid3D]);
 
-  const hitRate = stats.claimTotals.length > 0
-    ? Math.round(((gridSize * gridSize - stats.dryClaims) / (gridSize * gridSize)) * 100)
-    : 0;
+  // Community hit rate: of the cells drilled so far, the % that struck oil.
+  // Computed from revealed data (not the seed) so it leaks nothing about the
+  // undrilled field. Admin/report keep the whole-field figure.
+  const hitRate = useMemo(() => {
+    if (seedVisible) {
+      return stats.claimTotals.length > 0
+        ? Math.round(((gridSize * gridSize - stats.dryClaims) / (gridSize * gridSize)) * 100)
+        : 0;
+    }
+    let drilled = 0, hit = 0;
+    for (const key in allPlotsMap) {
+      if ((allPlotsMap[key]?.drillDay ?? 0) <= 0) continue;
+      drilled++;
+      const rev = allPlotsMap[key].revealed || {};
+      if (Object.values(rev).some((v) => v > 0)) hit++;
+    }
+    return drilled > 0 ? Math.round((hit / drilled) * 100) : 0;
+  }, [seedVisible, stats.claimTotals, stats.dryClaims, allPlotsMap, gridSize]);
 
   const selectedClaimIndex = selectedX !== null ? sliceY * gridSize + selectedX : null;
   // Cross-section highlight column: the active selection, or fall back to the
@@ -1905,9 +2037,10 @@ export default function OilPage() {
     }
   }, [demonBounty]);
 
-  // Reactive hell pocket detection — fires the API for real players, or local-only for admin/test
+  // Reactive hell pocket detection — admin/test get an immediate local preview;
+  // for real players the server strike-tick is authoritative (the demon is
+  // summoned server-side and visuals come from the demonBounty listener).
   const lastHellCheckRef = useRef(null);
-  const hellApiCalledRef = useRef(false);
   useEffect(() => {
     // Which cell + depth represents the player drilling into a hell pocket?
     // Real players: their OWN plot at their OWN drill depth — so merely
@@ -1927,35 +2060,12 @@ export default function OilPage() {
     {
       const z = depth - 1;
       const hellKey = `${col}_${row}_${z}`;
-      if (stats.hellMap[hellKey] && !hellActive) {
-        if (user?.id && !isAdmin && !isTest && !hellApiCalledRef.current) {
-          // Real player — call the API to create a demon bounty event
-          hellApiCalledRef.current = true;
-          const unbankedOil = userDrill?.tankOil != null
-            ? Math.max(0, userDrill.tankOil)
-            : Math.max(0, playerExtracted - (lastDrainSnapshot || 0));
-          fetch("/api/oil-demon-bounty", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: user.id,
-              username: username?.trim() || user?.firstName || "Anonymous",
-              col,
-              row,
-              unbankedOil,
-            }),
-          }).then(r => r.json()).then(data => {
-            if (data.ok) {
-              // Visuals will be driven by the Firestore listener
-              console.log("[HELL] Demon bounty created:", data.bountyId);
-            }
-            hellApiCalledRef.current = false;
-          }).catch(err => {
-            console.error("[HELL] API call failed:", err);
-            hellApiCalledRef.current = false;
-          });
-        } else {
-          // Admin/test mode — local-only visual effects
+      if (displayHellMap[hellKey] && !hellActive) {
+        // Real players: the SERVER strike-tick summons the demon when a rig
+        // strikes a hell layer (server-authoritative), and the demonBounty
+        // listener above drives the visuals — no client call. Only admin/test
+        // get an immediate local-only preview here.
+        if (isAdmin || isTest) {
           prevEnvPresetRef.current = envPreset;
           setEnvPreset("hell");
           setHellActive(true);
@@ -1974,7 +2084,7 @@ export default function OilPage() {
         }
       }
     }
-  }, [selectedX, sliceY, effectiveDrillDay, userDrill, stats.hellMap, hellActive, envPreset, user?.id, isAdmin, isTest, playerExtracted, lastDrainSnapshot, username]);
+  }, [selectedX, sliceY, effectiveDrillDay, userDrill, displayHellMap, hellActive, envPreset, isAdmin, isTest]);
 
   // Reset drained state when cell or drill depth changes
   useEffect(() => {
@@ -1997,21 +2107,20 @@ export default function OilPage() {
   // (only the layers THIS rig struck — correct across claim-jumps to pre-drilled
   // cells). Fall back to the legacy derived model for data predating the loop.
   const oilInTank = useMemo(() => {
-    // Real players use the strike loop's authoritative tankOil. Admin/test/report
-    // run on demoDay/testDay-driven extraction (no live loop), so derive there.
-    if (!isAdmin && !isTest && !isReport && userDrill?.tankOil != null) {
+    // The strike loop's authoritative tankOil wins whenever it exists — for real
+    // players AND for an admin/test rig that's actually been struck (so the tank
+    // reflects FORCE STRIKE). Fall back to the legacy demo-derived value only
+    // when there's no server tank (pure demoDay/testDay simulation).
+    if (userDrill?.tankOil != null) {
       return Math.max(0, userDrill.tankOil);
     }
     if (playerExtracted === 0) return 0;
     return Math.max(0, playerExtracted - lastDrainSnapshot);
-  }, [isAdmin, isTest, isReport, userDrill?.tankOil, playerExtracted, lastDrainSnapshot]);
+  }, [userDrill?.tankOil, playerExtracted, lastDrainSnapshot]);
 
   // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
-  const tankFill = useMemo(() => {
-    if (selectedX === null || effectiveDrillDay === 0) return 0;
-    return oilInTank / TANK_CAPACITY;
-  }, [selectedX, effectiveDrillDay, oilInTank]);
+  const tankFill = useMemo(() => oilInTank / TANK_CAPACITY, [oilInTank]);
 
   // Is the owner's own rig currently erupting? A live gusher event keeps the rig
   // gushing + the alert light strobing until shut off. The gusherEvents listener
@@ -2042,11 +2151,11 @@ export default function OilPage() {
   }, [selectedCellGushers]);
 
   const selectedDepthData = useMemo(() => {
-    if (selectedX === null || sliceY == null || !stats.grid3D[selectedX]?.[sliceY]) return null;
+    if (selectedX === null || sliceY == null || !displayGrid3D[selectedX]?.[sliceY]) return null;
     const col = [];
-    for (let z = 0; z < DEPTH_Z; z++) col.push(stats.grid3D[selectedX][sliceY][z]);
+    for (let z = 0; z < DEPTH_Z; z++) col.push(displayGrid3D[selectedX][sliceY][z]);
     return col;
-  }, [stats.grid3D, selectedX, sliceY]);
+  }, [displayGrid3D, selectedX, sliceY]);
 
   const selectedData = useMemo(() => {
     if (selectedDepthData === null) return null;
@@ -2079,20 +2188,20 @@ export default function OilPage() {
       oilStrikeDay.current = effectiveDrillDay;
       return 0;
     }
-    const oilAtDepth = stats.grid3D[selectedX]?.[sliceY]?.[depthIndex] ?? 0;
+    const oilAtDepth = displayGrid3D[selectedX]?.[sliceY]?.[depthIndex] ?? 0;
     if (oilAtDepth > 0 && effectiveDrillDay !== oilStrikeDay.current) {
       oilStrikeDay.current = effectiveDrillDay;
       return effectiveDrillDay; // unique trigger value per strike
     }
     return 0;
-  }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D]);
+  }, [selectedX, sliceY, effectiveDrillDay, displayGrid3D]);
 
   const drilledOilValue = useMemo(() => {
     if (selectedX === null || effectiveDrillDay === 0) return 0;
     const depthIndex = effectiveDrillDay - 1;
     if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
-    return stats.grid3D[selectedX]?.[sliceY]?.[depthIndex] ?? 0;
-  }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D]);
+    return displayGrid3D[selectedX]?.[sliceY]?.[depthIndex] ?? 0;
+  }, [selectedX, sliceY, effectiveDrillDay, displayGrid3D]);
 
   // Tank overflow gusher — fires once when tankFill first crosses 1.0
   const tankOverflowed = useRef(false);
@@ -2135,7 +2244,7 @@ export default function OilPage() {
     if (selectedX === null || sliceY === null || effectiveDrillDay === 0) return 0;
     const depthIndex = effectiveDrillDay - 1;
     if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
-    const grid = stats.grid3D;
+    const grid = displayGrid3D;
     let maxNeighbor = 0;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
@@ -2151,7 +2260,7 @@ export default function OilPage() {
       }
     }
     return maxNeighbor;
-  }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D, gridSize]);
+  }, [selectedX, sliceY, effectiveDrillDay, displayGrid3D, gridSize]);
 
   // Hell proximity — is a hell pocket lurking in the 3x3x3 neighborhood? Returns a
   // 0..1 "heat" intensity that feeds the area-scan thermal/sulfurous hint. Closer
@@ -2162,7 +2271,7 @@ export default function OilPage() {
     if (selectedX === null || sliceY === null || effectiveDrillDay === 0) return 0;
     const depthIndex = effectiveDrillDay - 1;
     if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
-    const hm = stats.hellMap;
+    const hm = displayHellMap;
     let intensity = 0;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
@@ -2180,7 +2289,7 @@ export default function OilPage() {
       }
     }
     return intensity;
-  }, [selectedX, sliceY, effectiveDrillDay, stats.hellMap, gridSize]);
+  }, [selectedX, sliceY, effectiveDrillDay, displayHellMap, gridSize]);
 
   // Camera shake — ref-driven, no state re-renders
   const shakeRef = useRef(0);
@@ -2230,16 +2339,6 @@ export default function OilPage() {
     setDrillDepth(0);
   }, []);
 
-  const handleApplyHash = useCallback((hash) => {
-    setBlockHash(hash);
-    setAnimateReveal(false);
-    setRevealProgress(0);
-    setIsRevealed(false);
-    setSelectedX(null);
-    setDrillDepth(0);
-    saveGameSettings({ blockHash: hash });
-  }, [saveGameSettings]);
-
   const handleRandomize = useCallback(() => {
     const hex = "0123456789abcdef";
     let hash = "0x";
@@ -2254,6 +2353,24 @@ export default function OilPage() {
     setDrillDepth(0);
     saveGameSettings({ blockHash: hash });
   }, [saveGameSettings]);
+
+  // ── Admin test tools — button equivalents of the seed / backfill / strike /
+  // scout dev endpoints, so testing the reveal pipeline doesn't need curl/URLs.
+  const [toolStatus, setToolStatus] = useState("");
+  const [toolBusy, setToolBusy] = useState(false);
+  const [toolDeep, setToolDeep] = useState(3);
+  const runTool = useCallback(async (label, fn) => {
+    if (!adminPassword) { setToolStatus("✗ no admin password"); return; }
+    setToolBusy(true);
+    setToolStatus(`${label}…`);
+    try {
+      setToolStatus(await fn());
+    } catch (e) {
+      setToolStatus(`✗ ${e?.message || "failed"}`);
+    } finally {
+      setToolBusy(false);
+    }
+  }, [adminPassword]);
 
   const handleSelectX = useCallback((x) => {
     setSelectedX(x);
@@ -2336,25 +2453,15 @@ export default function OilPage() {
     const nextCellDepth = currentCellDepth + 1;
     // Optimistic local update. Mirror the strike loop: a drill accumulates the
     // drilled layer's oil into tankOil (the authoritative un-banked balance).
-    const oilAtDepth = stats.grid3D[col]?.[row]?.[nextCellDepth - 1] ?? 0;
+    const layerIndex = nextCellDepth - 1;
+    const oilAtDepth = stats.grid3D[col]?.[row]?.[layerIndex] ?? 0;
+    const isHellLayer = !!stats.hellMap?.[`${col}_${row}_${layerIndex}`];
     setUserDrill((prev) => prev ? { ...prev, drillDay: nextCellDepth, tankOil: (prev.tankOil || 0) + oilAtDepth, lastStrikeOil: oilAtDepth, lastStrikeDepth: nextCellDepth } : prev);
     try {
-      // Update oilPlots (cell depth)
-      await setDoc(doc(db, "oilPlots", plotKey), {
-        drillDay: nextCellDepth,
-      }, { merge: true });
-      // Update oilDrills
-      await setDoc(doc(db, "oilDrills", user.id), {
-        userId: user.id,
-        col,
-        row,
-        ...(username.trim() ? { username: username.trim() } : {}),
-        tankOil: increment(oilAtDepth),
-        lastStrikeOil: oilAtDepth,
-        lastStrikeDepth: nextCellDepth,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      // Broadcast gusher event if oil exists at this depth
+      // Admin/test manual DRILL is a LOCAL preview only — it no longer persists
+      // to oilPlots/oilDrills (those are server-authoritative; use FORCE STRIKE in
+      // TEST TOOLS for a real, persisted strike). The gusher event still fires so
+      // the visual is exercised.
       if (oilAtDepth > 0) {
         try {
           await addDoc(collection(db, "gusherEvents"), {
@@ -2379,87 +2486,18 @@ export default function OilPage() {
   // ── Claim Jump handler ──
   const handleClaimJump = useCallback(async (newCol, newRow) => {
     if (previewModeRef.current) return;
-    if (!user?.id || !db || !userDrill) return;
-    const targetKey = `${newCol}_${newRow}`;
-    const targetPlot = allPlotsMap[targetKey];
-    // Target must be unclaimed
-    if (targetPlot?.currentOwnerId != null) return;
-    const jumpsUsed = userDrill.claimJumpsUsed ?? 0;
-    const currentBonusDrills = userDrill.bonusDrills ?? 0;
-    const isFree = jumpsUsed < FREE_CLAIM_JUMPS;
-    // If not free, must have bonus drills available
-    if (!isFree && currentBonusDrills <= 0) return;
-    const oldCol = userDrill.col;
-    const oldRow = userDrill.row;
-    const oldKey = `${oldCol}_${oldRow}`;
+    if (!user?.id || !userDrill) return;
+    // Quick client guard (the server re-checks authoritatively inside the txn).
+    if (allPlotsMap[`${newCol}_${newRow}`]?.currentOwnerId != null) return;
     try {
-      await runTransaction(db, async (transaction) => {
-        // Re-check target is still unclaimed
-        const targetRef = doc(db, "oilPlots", targetKey);
-        const targetSnap = await transaction.get(targetRef);
-        if (targetSnap.exists() && targetSnap.data().currentOwnerId != null) {
-          throw new Error("Plot already claimed");
-        }
-        // Release old plot
-        const oldRef = doc(db, "oilPlots", oldKey);
-        transaction.update(oldRef, {
-          currentOwnerId: null,
-          ownerHistory: arrayUnion({ userId: user.id, releasedAt: new Date().toISOString(), reason: "claim_jump" }),
-        });
-        // Claim new plot
-        transaction.set(targetRef, {
-          col: newCol,
-          row: newRow,
-          drillDay: targetSnap.exists() ? (targetSnap.data().drillDay ?? 0) : 0,
-          currentOwnerId: user.id,
-          ownerHistory: arrayUnion({ userId: user.id, claimedAt: new Date().toISOString() }),
-          disqualified: false,
-          lastDrillDate: targetSnap.exists() ? (targetSnap.data().lastDrillDate ?? null) : null,
-        }, { merge: true });
-        // Update oilDrills
-        const newJumps = jumpsUsed + 1;
-        const newBonus = isFree ? currentBonusDrills : Math.max(0, currentBonusDrills - 1);
-        const drillRef = doc(db, "oilDrills", user.id);
-        transaction.update(drillRef, {
-          col: newCol,
-          row: newRow,
-          claimJumpsUsed: newJumps,
-          bonusDrills: newBonus,
-          // Re-arm the rig at the fresh cell — otherwise a rig that bottomed out
-          // at its old plot would stay depleted and the strike loop would skip it.
-          armed: true,
-          rigDepleted: false,
-          updatedAt: serverTimestamp(),
-        });
-        // Update oilQualified
-        const qualRef = doc(db, "oilQualified", user.id);
-        transaction.update(qualRef, {
-          plotCol: newCol,
-          plotRow: newRow,
-        });
+      const res = await oilApiFetch("/api/oil-claim-jump", {
+        method: "POST",
+        body: JSON.stringify({ newCol, newRow }),
       });
-      // Carry the player's pump customization to the new cell. Configs are stored
-      // per-cell (pumpConfigs/{userId}_{col}_{row}) while unlocks are account-level —
-      // so without this a jump lands on a default pump even though you own everything.
-      try {
-        const oldCfgRef = doc(db, "pumpConfigs", `${user.id}_${oldCol}_${oldRow}`);
-        const oldCfgSnap = await getDoc(oldCfgRef);
-        if (oldCfgSnap.exists() && oldCfgSnap.data().config) {
-          await setDoc(doc(db, "pumpConfigs", `${user.id}_${newCol}_${newRow}`), {
-            userId: user.id,
-            col: newCol,
-            row: newRow,
-            config: oldCfgSnap.data().config,
-            updatedAt: serverTimestamp(),
-          });
-          // Strip the released plot back to a default pump so leftover add-ons
-          // don't make it look owned/unavailable to other players.
-          await deleteDoc(oldCfgRef);
-        }
-      } catch (e) {
-        console.error("Failed to carry pump config on claim jump:", e);
-      }
-      // Explicit confirmation that the jump landed (coords shown as the on-screen label).
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { console.error("Claim jump failed:", data.error); return; }
+      // Server moved the plot, charged the jump, inherited depth, re-armed, and
+      // carried the pump config. Just confirm + fly there.
       setClaimToast({ col: newCol, row: newRow });
       if (claimToastTimer.current) clearTimeout(claimToastTimer.current);
       claimToastTimer.current = setTimeout(() => setClaimToast(null), 5000);
@@ -2468,135 +2506,50 @@ export default function OilPage() {
     } catch (err) {
       console.error("Claim jump failed:", err);
     }
-  }, [user?.id, userDrill, allPlotsMap, handleFlyTo]);
+  }, [user?.id, userDrill, allPlotsMap, handleFlyTo, oilApiFetch]);
+
+  // Mid-season join: a qualified, plot-less player claims an unclaimed cell in
+  // active phase (registration-window claiming happens via OilQualify instead).
+  // Score/counters are preserved server-side for returning players.
+  const handleClaimActivePlot = useCallback(async () => {
+    if (!user?.id || selectedX === null) return;
+    if (allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId != null) return;
+    try {
+      const res = await oilApiFetch("/api/oil-claim", {
+        method: "POST",
+        body: JSON.stringify({ col: selectedX, row: sliceY, username: username?.trim() || user?.firstName || "" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { console.error("Claim failed:", data.error); return; }
+      handleFlyTo(selectedX, sliceY);
+    } catch (err) {
+      console.error("Claim failed:", err);
+    }
+  }, [user?.id, selectedX, sliceY, allPlotsMap, username, oilApiFetch, handleFlyTo]);
 
   // ── Transfer Plot handler ──
   const handleTransferPlot = useCallback(async (recipientUsername, transferUpgrades) => {
     if (previewModeRef.current) return { error: "Preview mode — sign up to play" };
-    if (!user?.id || !db || !userDrill || userDrill.col == null) {
+    if (!user?.id || !userDrill || userDrill.col == null) {
       return { error: "You don't own a plot to transfer" };
     }
     const trimmed = recipientUsername?.trim();
     if (!trimmed) return { error: "Enter a username" };
-
-    // Find recipient by username in oilDrills
-    const drillsQ = query(collection(db, "oilDrills"), where("username", "==", trimmed));
-    const drillsSnap = await getDocs(drillsQ);
-    if (drillsSnap.empty) return { error: "User not found" };
-
-    const recipientDrillDoc = drillsSnap.docs[0];
-    const recipientId = recipientDrillDoc.data().userId || recipientDrillDoc.id;
-
-    if (recipientId === user.id) return { error: "Cannot transfer to yourself" };
-
-    // Check qualification
-    const qualSnap = await getDoc(doc(db, "oilQualified", recipientId));
-    if (!qualSnap.exists() || !qualSnap.data().qualified) {
-      return { error: "User not qualified" };
-    }
-
-    const senderCol = userDrill.col;
-    const senderRow = userDrill.row;
-    const senderKey = `${senderCol}_${senderRow}`;
-
     try {
-      await runTransaction(db, async (transaction) => {
-        // Re-verify qualification inside transaction
-        const qualRef = doc(db, "oilQualified", recipientId);
-        const qualCheck = await transaction.get(qualRef);
-        if (!qualCheck.exists() || !qualCheck.data().qualified) {
-          throw new Error("User not qualified");
-        }
-
-        // Check if recipient already has a plot
-        const recipientDrillRef = doc(db, "oilDrills", recipientId);
-        const recipientDrill = await transaction.get(recipientDrillRef);
-        const recipientData = recipientDrill.exists() ? recipientDrill.data() : null;
-
-        // If recipient owns a different plot, release it
-        if (recipientData?.col != null && recipientData?.row != null) {
-          const recipientOldKey = `${recipientData.col}_${recipientData.row}`;
-          if (recipientOldKey !== senderKey) {
-            const recipientOldPlotRef = doc(db, "oilPlots", recipientOldKey);
-            transaction.update(recipientOldPlotRef, {
-              currentOwnerId: null,
-              ownerHistory: arrayUnion({ userId: recipientId, releasedAt: new Date().toISOString(), reason: "transfer_received_new" }),
-            });
-          }
-        }
-
-        // Release sender's plot ownership
-        const senderPlotRef = doc(db, "oilPlots", senderKey);
-        transaction.update(senderPlotRef, {
-          currentOwnerId: null,
-          ownerHistory: arrayUnion({ userId: user.id, releasedAt: new Date().toISOString(), reason: "transfer_out" }),
-        });
-
-        // Assign plot to recipient
-        transaction.set(senderPlotRef, {
-          col: senderCol,
-          row: senderRow,
-          currentOwnerId: recipientId,
-          ownerHistory: arrayUnion({ userId: recipientId, claimedAt: new Date().toISOString(), reason: "transfer_in" }),
-          disqualified: false,
-        }, { merge: true });
-
-        // Update recipient's oilDrills
-        transaction.update(recipientDrillRef, {
-          col: senderCol,
-          row: senderRow,
-          updatedAt: serverTimestamp(),
-        });
-
-        // Update recipient's oilQualified
-        transaction.update(qualRef, {
-          plotCol: senderCol,
-          plotRow: senderRow,
-        });
-
-        // Transfer premium upgrades if opted in
-        if (transferUpgrades) {
-          const senderPurchRef = doc(db, "oilPurchases", user.id);
-          const recipientPurchRef = doc(db, "oilPurchases", recipientId);
-          const senderPurchSnap = await transaction.get(senderPurchRef);
-          const recipientPurchSnap = await transaction.get(recipientPurchRef);
-
-          const senderUnlocked = senderPurchSnap.exists() ? (senderPurchSnap.data().unlocked || {}) : {};
-          const recipientUnlocked = recipientPurchSnap.exists() ? (recipientPurchSnap.data().unlocked || {}) : {};
-
-          if (Object.keys(senderUnlocked).length > 0) {
-            const mergedUnlocked = { ...recipientUnlocked, ...senderUnlocked };
-            transaction.set(recipientPurchRef, { unlocked: mergedUnlocked }, { merge: true });
-            // Clear all unlocked keys from sender
-            const clearedUnlocked = {};
-            const { deleteField } = await import("firebase/firestore");
-            for (const key of Object.keys(senderUnlocked)) clearedUnlocked[`unlocked.${key}`] = deleteField();
-            transaction.update(senderPurchRef, clearedUnlocked);
-          }
-        }
-
-        // Clear sender's oilDrills
-        const senderDrillRef = doc(db, "oilDrills", user.id);
-        transaction.update(senderDrillRef, {
-          col: null,
-          row: null,
-          updatedAt: serverTimestamp(),
-        });
-
-        // Clear sender's oilQualified
-        const senderQualRef = doc(db, "oilQualified", user.id);
-        transaction.update(senderQualRef, {
-          plotCol: null,
-          plotRow: null,
-        });
+      // Server validates ownership + recipient qualification and does the atomic
+      // move (incl. optional premium-upgrade transfer).
+      const res = await oilApiFetch("/api/oil-transfer", {
+        method: "POST",
+        body: JSON.stringify({ recipientUsername: trimmed, transferUpgrades: !!transferUpgrades }),
       });
-
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: data.error || "Transfer failed" };
       return { success: true };
     } catch (err) {
       console.error("Transfer failed:", err);
       return { error: err.message || "Transfer failed" };
     }
-  }, [user?.id, userDrill]);
+  }, [user?.id, userDrill, oilApiFetch]);
 
   // Tank drain handler — updates UI optimistically, persists via /api/oil-tank-drain.
   // Server is the only writer to oilGame/communityStorage (rules locked).
@@ -2620,14 +2573,9 @@ export default function OilPage() {
     }
     if (user?.id) {
       try {
-        const res = await fetch("/api/oil-tank-drain", {
+        const res = await oilApiFetch("/api/oil-tank-drain", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: user.id,
-            playerExtracted,
-            username: username?.trim() || undefined,
-          }),
+          body: JSON.stringify({ username: username?.trim() || undefined }),
         });
         if (!res.ok) {
           const { error } = await res.json().catch(() => ({}));
@@ -2637,7 +2585,7 @@ export default function OilPage() {
         console.error("Failed to save tank drain:", err);
       }
     }
-  }, [user?.id, userDrill, oilInTank, playerExtracted, username, myGusherActive]);
+  }, [user?.id, userDrill, oilInTank, playerExtracted, username, myGusherActive, oilApiFetch]);
 
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
@@ -2693,12 +2641,10 @@ export default function OilPage() {
     }
     if (!user?.id) return;
     try {
-      const res = await fetch("/api/oil-demon-bounty", {
+      const res = await oilApiFetch("/api/oil-demon-bounty", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bountyId: demonBounty.id,
-          hunterId: user.id,
           hunterUsername: username?.trim() || user?.firstName || "Anonymous",
         }),
       });
@@ -2721,7 +2667,7 @@ export default function OilPage() {
     } catch (err) {
       console.error("[HELL] Bounty claim error:", err);
     }
-  }, [demonBounty?.id, user?.id, username]);
+  }, [demonBounty?.id, user?.id, username, oilApiFetch]);
 
   // Deterministic victim plot for the local/test demon (the multiplayer path
   // gets its target from the Firestore bounty instead).
@@ -2785,7 +2731,7 @@ export default function OilPage() {
         </div>
       </div>
       <div style={styles.paramRow}>
-        <span style={styles.paramLabel}>OIL BUDGET</span>
+        <span style={styles.paramLabel}>PRIZE POOL</span>
         <div style={styles.paramButtons}>
           {[100, 250, 500, 1000].map((n) => (
             <button
@@ -2837,14 +2783,14 @@ export default function OilPage() {
           fontWeight: 700,
           color: theme.accent,
         }}>
-          {stats.maxClaimTotal} USDC
+          {stats.maxClaimTotal} OIL
         </span>
       </div>
       <div style={{ marginTop: 4, fontSize: 9, color: theme.muted, lineHeight: 1.6 }}>
         {stats.sorted.slice(0, 5).map((c, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
             <span>#{i + 1} ({c.x},{c.y})</span>
-            <span style={{ color: c.oil > 0 ? theme.textStrong : theme.muted }}>{c.oil} USDC</span>
+            <span style={{ color: c.oil > 0 ? theme.textStrong : theme.muted }}>{c.oil} OIL</span>
           </div>
         ))}
       </div>
@@ -2923,6 +2869,92 @@ export default function OilPage() {
     </div>
   );
 
+  const testToolsPanel = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>TEST TOOLS</h3>
+      <button
+        onClick={() => setPreviewAsPlayer((v) => !v)}
+        style={{ ...styles.btn, marginBottom: 8, ...(previewAsPlayer ? { background: theme.accent, color: theme.bg } : {}) }}
+        title="Toggle the reveal-only player view (hides seed data) so you can watch reveal-on-drill"
+      >
+        {previewAsPlayer ? "VIEW AS PLAYER: ON" : "VIEW AS PLAYER: OFF"}
+      </button>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Seeding + revealing", async () => {
+          const pw = encodeURIComponent(adminPassword);
+          const r1 = await fetch("/api/oil-seed-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, count: 30 }) }).then(r => r.json());
+          if (!r1?.ok) throw new Error(r1?.error || "seed failed");
+          const r2 = await fetch(`/api/oil-backfill-revealed?password=${pw}`).then(r => r.json());
+          if (!r2?.ok) throw new Error(r2?.error || "backfill failed");
+          return `✓ seeded ${r1.seeded} rigs · revealed ${r2.layers} layers / ${r2.backfilled} cells`;
+        })}>SEED + REVEAL FIELD</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Backfilling", async () => {
+          const r = await fetch(`/api/oil-backfill-revealed?password=${encodeURIComponent(adminPassword)}`).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return `✓ revealed ${r.layers} layers / ${r.backfilled} cells`;
+        })}>BACKFILL REVEALS</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Scouting", async () => {
+          const r = await fetch(`/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&scout=1`).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return `richest: ${(r.richest || []).slice(0, 5).map(c => `${c.label}=${c.total}@L${c.bestLayer}`).join("  ") || "none"}`;
+        })}>SCOUT RICHEST</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Clearing seeded", async () => {
+          // clear:"only" wipes fake_* docs WITHOUT re-seeding (a truthy non-"only"
+          // value clears then falls through and re-seeds).
+          const r = await fetch("/api/oil-seed-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, clear: "only" }) }).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return `✓ cleared ${r.cleared} docs`;
+        })}>CLEAR SEEDED</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Clearing demon", async () => {
+          const bId = demonBlockade?.bountyId || demonBounty?.id;
+          if (!bId) return "no active demon";
+          const res = await fetch("/api/oil-demon-bounty", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bountyId: bId, password: adminPassword }) });
+          const r = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
+          return "✓ demon cleared + blockade lifted";
+        })}>CLEAR DEMON</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Releasing my claims", async () => {
+          if (!user?.id) throw new Error("sign in first");
+          const res = await oilApiFetch("/api/oil-release", { method: "POST" });
+          const r = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
+          return `✓ released ${r.released ?? 0} plot(s)`;
+        })}>RELEASE MY CLAIMS</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Clearing ALL plots", async () => {
+          const res = await fetch(`/api/oil-admin-reset?password=${encodeURIComponent(adminPassword)}`);
+          const r = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
+          return `✓ released ${r.plotsCleared} plot(s) · cleared ${r.rigsCleared} rig(s)`;
+        })}>CLEAR ALL PLOTS</button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+        <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Claiming cell", async () => {
+          if (selectedX === null) throw new Error("select a cell on the survey map first");
+          if (!user?.id) throw new Error("sign in first");
+          // Claim for YOUR account so a FORCE STRIKE fills the tank your meter
+          // reads (your own un-banked oil) — needed to test the tank/alarm.
+          const r = await fetch("/api/oil-admin-claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, userId: user.id, username: username?.trim() || user?.firstName || "ADMIN", col: selectedX, row: sliceY }) }).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return `✓ claimed (${selectedX + 1}, ${sliceY + 1}) for you — now FORCE STRIKE to drill it`;
+        })}>CLAIM SELECTED</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Forcing strike", async () => {
+          const r = await fetch(`/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&force=1&deep=${toolDeep}`).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return `✓ struck ${r.struck} · skipped ${r.skipped}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}`;
+        })}>FORCE STRIKE</button>
+        <span style={{ fontSize: 10, color: theme.muted }}>depth</span>
+        {[1, 3, 20].map((n) => (
+          <button key={n} onClick={() => setToolDeep(n)} style={{ ...styles.paramBtn, ...(toolDeep === n ? styles.paramBtnActive : {}) }}>{n}</button>
+        ))}
+      </div>
+      {toolStatus && (
+        <div style={{ marginTop: 8, fontSize: 10, fontFamily: "'Share Tech Mono', monospace", color: theme.accent, wordBreak: "break-word", lineHeight: 1.4 }}>
+          {toolStatus}
+        </div>
+      )}
+    </div>
+  );
+
   const demoDrillPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>DRILL DEMO</h3>
@@ -2997,30 +3029,35 @@ export default function OilPage() {
     </div>
   );
 
+  // Players see the commitment (the seed itself is secret until the post-game
+  // reveal); admin/report see the real seed.
+  const seedReadout = (showOilData || isReport) ? blockHash : seedCommitment;
+  const seedReadoutLabel = (showOilData || isReport) ? "SEED HASH" : "SEED COMMITMENT";
   const statsPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>GEOLOGICAL SURVEY</h3>
       <div style={isMobile ? m.statGrid : styles.statGrid}>
-        <StatBlock s={styles} accentColor={theme.accent} label="TOTAL VALUE" value={<AnimNum value={stats.totalOil} />} unit="USDC" accent />
-        <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={stats.deposits.length} />
+        <StatBlock s={styles} accentColor={theme.accent} label="PRIZE POOL" value={<AnimNum value={totalOilBudget} />} unit="USDC" accent />
+        <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={numberOfDeposits} />
         <StatBlock s={styles} accentColor={theme.accent} label="AVAILABLE CLAIMS" value={`${(gridSize * gridSize) - Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length}/${gridSize * gridSize}`} />
-        <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={stats.totalOil > 0 ? `${(playerExtracted / stats.totalOil * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
+        <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={OIL_FIELD_UNITS > 0 ? `${(playerExtracted / OIL_FIELD_UNITS * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
         <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
         <StatBlock s={styles} accentColor={theme.accent} label="MAX DEPTH" value={DEPTH_Z} unit="LVL" />
         {!isAdmin && !isReport && effectiveDrillDay > 0 && (
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
-            <StatBlock s={styles} accentColor={theme.accent} label="EXTRACTED" value={<AnimNum value={playerExtracted} />} unit="USDC" accent />
+            <StatBlock s={styles} accentColor={theme.accent} label="EXTRACTED" value={<AnimNum value={playerExtracted} />} unit="OIL" accent />
           </>
         )}
         {(isAdmin || isReport) && (
           <>
-            <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="USDC" />
+            <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="OIL" />
             <StatBlock s={styles} accentColor={theme.accent} label="DRY CLAIMS" value={stats.dryClaims} />
+            <StatBlock s={styles} accentColor={theme.accent} label="FIELD OIL" value={OIL_FIELD_UNITS.toLocaleString()} unit="OIL" />
           </>
         )}
       </div>
-      {blockHash && (
+      {seedReadout && (
         <div style={{
           marginTop: 6, padding: "5px 8px",
           background: uiDark ? "rgba(180,160,130,0.06)" : "rgba(180,160,130,0.08)",
@@ -3031,19 +3068,19 @@ export default function OilPage() {
             fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
             color: uiDark ? "#8a8070" : "#8b7d6b", letterSpacing: "0.12em",
           }}>
-            SEED HASH
+            {seedReadoutLabel}
           </span>
           <span
-            title={blockHash}
+            title={seedReadout}
             style={{
               fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
               color: uiDark ? "#8a8070" : "#8b7d6b",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               maxWidth: "65%", textAlign: "right", cursor: "pointer",
             }}
-            onClick={() => navigator.clipboard?.writeText(blockHash)}
+            onClick={() => navigator.clipboard?.writeText(seedReadout)}
           >
-            {blockHash.slice(0, 10)}...{blockHash.slice(-8)}
+            {seedReadout.slice(0, 10)}...{seedReadout.slice(-8)}
           </span>
         </div>
       )}
@@ -3123,7 +3160,7 @@ export default function OilPage() {
                 fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
                 whiteSpace: "nowrap", marginLeft: 8,
               }}>
-                {(d.totalCollected || 0).toLocaleString()} USDC
+                {(d.totalCollected || 0).toLocaleString()} OIL
               </span>
             </div>
           ))}
@@ -3158,7 +3195,7 @@ export default function OilPage() {
                 fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
                 whiteSpace: "nowrap", marginLeft: 8,
               }}>
-                {(d.totalCollected || 0).toLocaleString()} USDC
+                {(d.totalCollected || 0).toLocaleString()} OIL
               </span>
             </div>
           ))}
@@ -3221,7 +3258,7 @@ export default function OilPage() {
             </div>
             <div style={styles.inspectorRow}>
               <span style={styles.inspectorKey}>Total Oil:</span>
-              <span style={styles.inspectorVal}>{selectedData.total.toLocaleString()} USDC</span>
+              <span style={styles.inspectorVal}>{selectedData.total.toLocaleString()} OIL</span>
             </div>
             <div style={styles.inspectorRow}>
               <span style={styles.inspectorKey}>Richest Depth:</span>
@@ -3255,14 +3292,14 @@ export default function OilPage() {
               <div style={styles.inspectorRow}>
                 <span style={{ ...styles.inspectorKey, color: theme.green }}>Extracted:</span>
                 <span style={{ ...styles.inspectorVal, color: theme.green }}>
-                  {selectedData.extracted.toLocaleString()} USDC
+                  {selectedData.extracted.toLocaleString()} OIL
                 </span>
               </div>
               {drillDepth < DEPTH_Z && selectedData.missed > 0 && (
                 <div style={styles.inspectorRow}>
                   <span style={{ ...styles.inspectorKey, color: theme.warn }}>Underground:</span>
                   <span style={{ ...styles.inspectorVal, color: theme.warn }}>
-                    {selectedData.missed.toLocaleString()} USDC
+                    {selectedData.missed.toLocaleString()} OIL
                   </span>
                 </div>
               )}
@@ -3412,6 +3449,7 @@ export default function OilPage() {
       <button
         onClick={handleReveal}
         disabled={isRevealed}
+        title="Show where the oil is buried for the current field (visualization only — does not change anything)"
         style={{
           ...styles.btn,
           ...styles.btnPrimary,
@@ -3425,10 +3463,18 @@ export default function OilPage() {
         </svg>
         {isMobile ? "REVEAL" : "REVEAL DEPOSITS"}
       </button>
-      <button onClick={handleReset} style={{ ...styles.btn, ...(isMobile ? { padding: "8px 14px", fontSize: 10 } : {}) }}>
-        RESET
+      <button
+        onClick={handleReset}
+        title="Hide the reveal and rewind the depth preview. Keeps the same field — nothing is re-rolled."
+        style={{ ...styles.btn, ...(isMobile ? { padding: "8px 14px", fontSize: 10 } : {}) }}
+      >
+        CLEAR VIEW
       </button>
-      <button onClick={handleRandomize} style={{ ...styles.btn, ...(isMobile ? { padding: "8px 14px", fontSize: 10 } : {}) }}>
+      <button
+        onClick={handleRandomize}
+        title="Roll a brand-new field — every deposit moves. Destructive: regenerates the whole map. Use between seasons, not mid-game."
+        style={{ ...styles.btn, ...(isMobile ? { padding: "8px 14px", fontSize: 10 } : {}) }}
+      >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ marginRight: 6 }}>
           <path d="M2 5h8l-2-2M12 9H4l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         </svg>
@@ -3666,7 +3712,7 @@ export default function OilPage() {
           width: "90%",
           textAlign: "center",
         }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>PARABOLEUM PROSPECTOR</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>LYQUID80 PROSPECTOR</div>
           <h2 style={{
             fontFamily: "'Orbitron', monospace",
             fontSize: 16,
@@ -4134,8 +4180,12 @@ export default function OilPage() {
             >
               GO TO YOUR CLAIM ({Math.min(userDrill.col, gridSize - 1) + 1}, {Math.min(userDrill.row, gridSize - 1) + 1})
             </button>
+          ) : (selectedX !== null && allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId == null && gamePhase === "active") ? (
+            <button onClick={handleClaimActivePlot} style={drillBtnStyles.active}>
+              CLAIM THIS PLOT ({selectedX + 1}, {sliceY + 1})
+            </button>
           ) : (
-            <button disabled style={drillBtnStyles.disabled}>SELECT A CLAIM</button>
+            <button disabled style={drillBtnStyles.disabled}>SELECT AN UNCLAIMED PLOT</button>
           )}
         </div>
       )}
@@ -4186,14 +4236,23 @@ export default function OilPage() {
           <button disabled style={{ ...drillBtnStyles.active, cursor: "default" }}>
             ⛏ RIG PUMPING
           </button>
-          <div style={drillBtnStyles.depth}>DEPTH {cellDepth}/{MAX_DEPTH}</div>
-          {/* Depth progress bar — fills as the rig auto-strikes deeper */}
+          <div style={drillBtnStyles.depth}>DEPTH {Math.min(cellDepth + 1, MAX_DEPTH)}/{MAX_DEPTH}</div>
+          {/* Depth progress bar — solid for layers already struck, plus a
+              pulsing segment for the layer the rig is actively drilling, so
+              a fresh rig reads as "drilling layer 1" rather than empty. */}
           <div style={{ width: "100%", maxWidth: 220, height: 10, background: theme.barBg, borderRadius: 4, overflow: "hidden", border: `1px solid ${theme.border}`, position: "relative" }}>
             <div style={{
               width: `${(cellDepth / MAX_DEPTH) * 100}%`,
               height: "100%",
               background: `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
               position: "absolute", left: 0, top: 0,
+            }} />
+            <div style={{
+              width: `${(1 / MAX_DEPTH) * 100}%`,
+              height: "100%",
+              background: "#7ab44a",
+              position: "absolute", left: `${(cellDepth / MAX_DEPTH) * 100}%`, top: 0,
+              animation: "pulse 1.2s ease-in-out infinite",
             }} />
           </div>
           {userDrill?.lastStrikeDepth != null ? (
@@ -4326,7 +4385,7 @@ export default function OilPage() {
   );
 
   // ── Player Drill Panel (depth profile for active players) ──
-  const playerDrillPanel = !isAdmin && !isReport && activeUserDrill && (
+  const playerDrillPanel = !isAdmin && !isReport && activeUserDrill?.col != null && (
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
         YOUR CLAIM ({activeUserDrill.col + 1}, {activeUserDrill.row + 1})
@@ -4375,7 +4434,7 @@ export default function OilPage() {
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.green }}>
-          EXTRACTED: {playerExtracted.toLocaleString()} USDC
+          EXTRACTED: {playerExtracted.toLocaleString()} OIL
         </span>
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
           DEPTH {effectiveDrillDay}/{DEPTH_Z}
@@ -4407,11 +4466,11 @@ export default function OilPage() {
           padding: "4px 8px", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 2,
         }}>
           <span style={{ fontSize: 10, color: theme.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            rl80.xyz/oil?ref={userDrill.referralCode}
+            rl80.com/oil?ref={userDrill.referralCode}
           </span>
           <button
             onClick={() => {
-              navigator.clipboard.writeText(`https://rl80.xyz/oil?ref=${userDrill.referralCode}`);
+              navigator.clipboard.writeText(`https://rl80.com/oil?ref=${userDrill.referralCode}`);
             }}
             style={{
               padding: "2px 8px", border: `1px solid ${theme.border}`, borderRadius: 2,
@@ -4497,7 +4556,7 @@ export default function OilPage() {
         }}>
           <span style={{ fontSize: 11, letterSpacing: "0.12em", color: theme.accent }}>TANK · UNBANKED</span>
           <span style={{ fontSize: 11, letterSpacing: "0.08em", color: tankFill >= 1.0 && !tankDrained ? theme.red : theme.muted }}>
-            {tankDrained ? 0 : oilInTank.toLocaleString()} USDC
+            {tankDrained ? 0 : oilInTank.toLocaleString()} OIL
           </span>
         </div>
         <div style={{
@@ -4550,7 +4609,7 @@ export default function OilPage() {
             SENT TO STORAGE
           </span>
           <span style={{ fontSize: 11, letterSpacing: "0.08em", color: theme.green, fontWeight: 700 }}>
-            {(activeUserDrill.totalCollected || 0).toLocaleString()} USDC
+            {(activeUserDrill.totalCollected || 0).toLocaleString()} OIL
           </span>
         </div>
       )}
@@ -4558,7 +4617,7 @@ export default function OilPage() {
       <div style={styles.depthChart}>
         {Array.from({ length: DEPTH_Z }, (_, d) => {
           const drilled = d < effectiveDrillDay;
-          const oil = drilled ? (stats.grid3D[activeUserDrill.col]?.[activeUserDrill.row]?.[d] ?? 0) : 0;
+          const oil = drilled ? (displayGrid3D[activeUserDrill.col]?.[activeUserDrill.row]?.[d] ?? 0) : 0;
           const barWidth = drilled && communityMaxOil > 0 ? (oil / communityMaxOil) * 100 : 0;
           return (
             <div key={d} style={styles.depthRow}>
@@ -4623,7 +4682,7 @@ export default function OilPage() {
                 <span>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
-              <p style={styles.subtitle}>PARABOLEUM PROSPECTOR</p>
+              <p style={styles.subtitle}>LYQUID80 PROSPECTOR</p>
             </div>
           </div>
           <div style={styles.headerRight}>
@@ -4904,7 +4963,7 @@ export default function OilPage() {
                   style={toolbarBtn(darkMode, 26)}
                 >{darkMode ? "●" : "◐"}</button>
                 <button
-                  title="Paraboleum theme"
+                  title="Lyquid80 theme"
                   onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
                   style={toolbarBtn(parabolum, 26, "violet")}
                 >◈</button>
@@ -4923,7 +4982,7 @@ export default function OilPage() {
             <div style={m.section}>
               <OilSurfaceMap
                 claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
-                maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
+                maxClaimTotal={communityMaxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 theme={theme}
@@ -4966,7 +5025,7 @@ export default function OilPage() {
             maxDepth={DEPTH_Z}
             oilStrike={oilStrike}
             oilValue={drilledOilValue}
-            maxOil={stats.maxOil}
+            maxOil={displayMaxOil}
             drillProximity={drillProximity}
             hellProximity={hellProximity}
             darkMode={uiDark}
@@ -4978,6 +5037,7 @@ export default function OilPage() {
           {gusherShutoffPanel}
           {playerDrillPanel}
           {isAdmin && parametersPanel}
+          {isAdmin && testToolsPanel}
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
           {testGusherButton && (
             <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
@@ -4988,8 +5048,8 @@ export default function OilPage() {
           {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
           <CoreSamplePanel
-            grid3D={stats.grid3D}
-            maxOil={stats.maxOil}
+            grid3D={displayGrid3D}
+            maxOil={displayMaxOil}
             darkMode={uiDark}
             parabolum={parabolum}
             Geode={GeodeMode}
@@ -4999,7 +5059,7 @@ export default function OilPage() {
             selectedX={selectedX}
             selectedY={sliceY}
             drillDepth={effectiveDrillDay}
-            hellPockets={stats.hellPockets}
+            hellPockets={displayHellPockets}
           />
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
           {(isAdmin || isReport) && topClaimsPanel}
@@ -5007,15 +5067,11 @@ export default function OilPage() {
           {(isAdmin || isReport) && depositsPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
           <HowToPlayPanel isMobile darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
-          <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
+          <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {leaderboardSection}
           {(isAdmin || isReport) && (
-            <OilVerifyPanel
-              numberOfDeposits={numberOfDeposits}
-              totalOilBudget={totalOilBudget}
-              onApplyHash={handleApplyHash}
-            />
+            <OilVerifyPanel adminPassword={adminPassword} />
           )}
           {claimPlotButton && (
             <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
@@ -5158,7 +5214,7 @@ export default function OilPage() {
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
             </h1>
-            <p style={styles.subtitle}>PARABOLEUM PROSPECTOR</p>
+            <p style={styles.subtitle}>LYQUID80 PROSPECTOR</p>
           </div>
         </div>
         <div style={styles.headerRight}>
@@ -5406,7 +5462,7 @@ export default function OilPage() {
               style={toolbarBtn(darkMode, 28)}
             >{darkMode ? "●" : "◐"}</button>
             <button
-              title="Parabolum theme"
+              title="Lyquid80 theme"
               onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
               style={toolbarBtn(parabolum, 28, "violet")}
             >◈</button>
@@ -5432,7 +5488,7 @@ export default function OilPage() {
             <div style={styles.midPanel}>
               <OilSurfaceMap
                 claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
-                maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
+                maxClaimTotal={communityMaxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 theme={theme}
@@ -5445,7 +5501,7 @@ export default function OilPage() {
                 currentUserId={user?.id}
               />
             </div>
-            <div style={{ ...styles.midPanel, flex: 1, minHeight: 0 }}>
+            <div style={{ ...styles.midPanel, flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
               <OilCrossSection
                 grid3D={showOilData ? stats.grid3D : communityGrid3D}
                 maxCellValue={showOilData ? stats.maxOil : communityMaxOil}
@@ -5458,6 +5514,7 @@ export default function OilPage() {
                 parabolum={parabolum}
                 gridX={gridSize}
                 gridY={gridSize}
+                fillHeight
               />
             </div>
           </div>
@@ -5478,7 +5535,7 @@ export default function OilPage() {
               maxDepth={DEPTH_Z}
               oilStrike={oilStrike}
               oilValue={drilledOilValue}
-              maxOil={stats.maxOil}
+              maxOil={displayMaxOil}
               drillProximity={drillProximity}
               hellProximity={hellProximity}
               darkMode={uiDark}
@@ -5489,12 +5546,13 @@ export default function OilPage() {
             {gusherShutoffPanel}
             {playerDrillPanel}
             {isAdmin && parametersPanel}
+          {isAdmin && testToolsPanel}
             {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
             <CoreSamplePanel
-              grid3D={stats.grid3D}
-              maxOil={stats.maxOil}
+              grid3D={displayGrid3D}
+              maxOil={displayMaxOil}
               darkMode={uiDark}
               parabolum={parabolum}
               Geode={GeodeMode}
@@ -5503,7 +5561,7 @@ export default function OilPage() {
               selectedX={selectedX}
               selectedY={sliceY}
               drillDepth={effectiveDrillDay}
-              hellPockets={stats.hellPockets}
+              hellPockets={displayHellPockets}
             />
             <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
             {(isAdmin || isReport) && inspectorPanel}
@@ -5512,17 +5570,11 @@ export default function OilPage() {
             {(isAdmin || isReport) && depositsPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
             <HowToPlayPanel darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
-            <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
+            <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
             <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
             {leaderboardSection}
             {(isAdmin || isReport) && (
-              <OilVerifyPanel
-                numberOfDeposits={numberOfDeposits}
-                totalOilBudget={totalOilBudget}
-                onApplyHash={handleApplyHash}
-                gridX={gridSize}
-                gridY={gridSize}
-              />
+              <OilVerifyPanel adminPassword={adminPassword} />
             )}
             {testGusherButton && (
               <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
