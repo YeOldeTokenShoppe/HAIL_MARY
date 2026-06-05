@@ -54,8 +54,8 @@ const priceChipStyle = {
 // ── Zone definitions ─────────────────────────────────────────────────────────
 export const PUMP_ZONES = [
   { id: "pad",           label: "PAD",            meshes: ["ground", "ground001"] },
-  { id: "foundation",    label: "FOUNDATION",     meshes: ["Under_Pump", "Bottom_Box"] },
-  { id: "motorBox",      label: "MOTOR BOX",      meshes: ["Cube", "Wheel_Box"] },
+  { id: "foundation",    label: "BASE PLATE",     meshes: ["Bottom_Box"] },
+  { id: "motorBox",      label: "MOTOR BOX",      meshes: ["Cube", "Wheel_Box", "Under_Pump"] },
   { id: "crankWheel",    label: "CRANK WHEEL",    meshes: ["Wheel_Back"] },
   { id: "beam",          label: "WALKING BEAM",   meshes: ["Body_Pump"] },
   { id: "counterweight", label: "COUNTERWEIGHTS", meshes: ["Cylinder_Pump", "Cylinder_Pump001"] },
@@ -123,6 +123,13 @@ export const FENCE_CATALOG = [
   { id: "stone",        label: "STONE",         model: "/models/addons/Fence_Stone.glb",        scale: 0.1 },
 ];
 
+// Sign styles — each its own GLB (separate from the rig). Internal mesh names per
+// model: `Sign` (front image), `Sign2` (back), `SignFrame`. `cameraModel` is an
+// optional matching camera GLB pre-positioned on that sign (shown when showCamera).
+export const SIGN_CATALOG = [
+  { id: "sign1", label: "BILLBOARD", model: "/models/addons/Sign1.glb", cameraModel: "/models/addons/SecurityCamera_Sign1.glb" },
+];
+
 const BASE_MAX_ADDONS = 3;
 
 // Default config: all zones use stock (original model materials)
@@ -132,6 +139,7 @@ export function getDefaultPumpConfig() {
     config[z.id] = { color: null, preset: "stock" };
   });
   config.signImageUrl = null;
+  config.signStyle = "sign1"; // which SIGN_CATALOG entry to render
   config.showCamera = false;
   config.showSign = false;
   config.fenceType = null;

@@ -130,9 +130,15 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 
 The game progresses through three phases, controlled by `gamePhase` in Firestore:
 
-1. **`ticket_sale`** (Registration + Plot Pick) — Players register by connecting a wallet that holds ≥$20 USD worth of RL80 tokens. After registration, they immediately pick a plot on the fixed 10x10 grid (first come, first served). Players who already picked a plot fall through to the 3D canvas.
-2. **`active`** — Game starts. Daily drilling flow. Players can claim jump to different plots.
-3. **`ended`** — Game over. Report mode unlocked.
+1. **`ticket_sale`** (Registration + Plot Pick — labeled **"REGISTRATION"** in admin; the
+   `ticket_sale` value is a legacy name, the ticket/draft system is gone). Renders `OilQualify`:
+   players connect a wallet holding ≥ $20 of RL80 **and** verify they follow **@rl80token** on X,
+   then pick a plot on the grid (first come, first served). `oil-register` re-checks the balance
+   server-side and is the sole writer of `qualified`. Already-picked players fall through to the 3D canvas.
+2. **`active`** — Game running. Continuous auto-pump drilling (one strike/day per rig at a random
+   minute). Players can claim-jump. A qualified, plot-less player can **join mid-season** by
+   selecting an unclaimed cell → **CLAIM THIS PLOT** (`handleClaimActivePlot` → `oil-claim`).
+3. **`ended`** — Game over. Report mode unlocked. Seed revealed; `/api/oil-verify` returns VERIFIED.
 
 Default is `"active"` for backward compatibility.
 
@@ -327,7 +333,7 @@ player could copy the seed and run `generateOilDistribution3D` to print the enti
 
 ### Resolution decoupled from prize (2026-06-04)
 
-The field is generated at a fixed internal resolution — `OIL_FIELD_UNITS` (500,000)
+The field is generated at a fixed internal resolution — `OIL_FIELD_UNITS` (1,000,000)
 in `oilDistribution.js` — **not** the dollar prize. At a low total, scaling+rounding
 wiped out each deposit blob's edges and collapsed the distribution to its cores
 (one composite band, "0.0k" cells). Every `generateOilDistribution3D` caller now
@@ -352,6 +358,48 @@ default (the dead `OilHeatmap2D` still has a literal but isn't imported).
   the revealed `finalSeed` and re-confirms the anchor hash from Base directly.
 - **`OilVerifyPanel`** (admin) is now the fairness console: COMMIT / ANCHOR / REVEAL buttons
   driving `/api/oil-fairness`, with live status from `/api/oil-verify`.
+
+## Security Model & Firestore Rules (integrity hardening — 2026-06-05)
+
+Prize money is on the line, so every money-or-ownership-critical write is server-only and
+every secret is private. Three layers:
+
+### 1. Auth on every mutation
+- **Player mutations** (`oil-claim`, `oil-claim-jump`, `oil-release`, `oil-transfer`,
+  `oil-profile`, `oil-register`, `oil-tank-drain`, `oil-demon-bounty`, `oil-ticket`) derive the
+  acting user from the **verified Clerk session token** via `authedUserId(req)`
+  (`lib/oilAuth.js`): `Authorization: Bearer <token>` → `verifyToken({secretKey:
+  CLERK_SECRET_KEY})` → `payload.sub`. **A userId is NEVER trusted from the request body.** The
+  client attaches the token via `useOilApiFetch()` (`lib/oilApiClient.js`).
+- **Admin actions** (`oil-settings`, `oil-fairness`, `oil-admin-reset`, `oil-admin-claim`,
+  `oil-strike-tick` force/scout, `oil-seed-test`, `oil-rogue`, `oil-backfill-revealed`,
+  `oil-qualify` POST) are gated on `process.env.ADMIN_PASSWORD` **only** — never a
+  `NEXT_PUBLIC_*` fallback (that var is inlined into the client bundle). Cron routes
+  (`oil-strike-tick`, `cron/update-followers`) accept `Bearer ${CRON_SECRET}`.
+- **Qualification is server-verified:** `qualified` is written ONLY by `/api/oil-register`
+  (re-reads the on-chain RL80 balance, requires ≥ $20) and the admin snapshot. `oil-claim`
+  refuses unless `oilQualified.qualified === true`. The client cannot self-qualify.
+
+### 2. Firestore rules are deny-by-default
+**Firestore evaluates rules additively (OR) — there is no deny-override.** A permissive
+`match /{document=**} { allow read: if true }` therefore silently OVERRODE every
+`read: if false`, leaking `config/x_oauth` (X OAuth refresh + access tokens), `oilSecret/seed`
+(the distribution seed), `chatReports`, and `testimonialRateLimits`. Fixed:
+- Catch-all is now `read: if false; write: if false`.
+- Public-read collections are granted `read: if true` **explicitly**, per collection.
+- Money-critical collections (`oilPlots`, `oilDrills`, `oilQualified`, `oilGame`,
+  `oilReferrals`) are `write: if false` — server-only.
+- Secrets (`oilSecret` seed, `config` OAuth tokens) are `read: if false; write: if false`.
+- **Lesson:** never rely on a specific `read:false` to "beat" a broad catch-all; deny by
+  default and grant reads explicitly. (A REST `GET .../documents/<path>` is the quickest way
+  to verify a lockdown actually took effect after `firebase deploy --only firestore:rules`.)
+
+### 3. Server routes use the Admin SDK
+Routes touching private collections use `getAdminDb()` (firebase-admin, **bypasses rules**),
+not the client SDK. The X-OAuth routes (`check-follow`, `cron/update-followers`,
+`auth/x/callback`) were converted to the Admin SDK so `config/x_oauth` can stay private.
+Note: `lib/firebaseServer.js` is the **client** SDK (subject to rules) — don't use it for
+privileged reads in API routes.
 
 ## Telegram Integration
 
@@ -545,12 +593,25 @@ node scripts/oil-payout.js
 
 ## Environment Variables
 
+All server-only secrets must be in Firebase **App Hosting** (Secret Manager + `apphosting.yaml`),
+not just `.env.local`. NEVER give a server secret a `NEXT_PUBLIC_*` twin (it would ship in the
+client bundle).
+
 | Variable | Description |
 |----------|-------------|
-| `OIL_TICKET_WALLET` | Recipient wallet address for ticket payments (server-side) |
-| `NEXT_PUBLIC_OIL_TICKET_WALLET` | Same wallet address exposed to client |
-| `BASE_RPC_URL` | Base chain RPC endpoint |
-| `PAYOUT_PRIVATE_KEY` | Private key of wallet holding USDC (for post-game payouts) |
-| `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather |
-| `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | Telegram bot username for deeplinks |
+| `CLERK_SECRET_KEY` | Verifies player session tokens (`authedUserId`). Server-only. |
+| `ADMIN_PASSWORD` | Gates all admin endpoints. Server-only; never `NEXT_PUBLIC_*`. |
+| `CRON_SECRET` | Bearer secret for cron routes (`oil-strike-tick`, `update-followers`). |
+| `NEXT_PUBLIC_CDP_CLIENT_API_KEY` | Coinbase CDP key — Base RPC lane (`viemClient`, and `BASE_RPC_URL` fallback). |
+| `BASE_RPC_URL` | Optional Base RPC override. If unset, built from the CDP key (`lib/baseRpcUrl.js`). |
+| `OIL_PURCHASE_TREASURY` | `0x` Base address receiving x402 premium-item payments. |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather. |
+| `TELEGRAM_WEBHOOK_SECRET` | Validates Telegram's `X-Telegram-Bot-Api-Secret-Token` on the webhook (fail-closed). |
+| `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | Telegram bot username for deeplinks. |
+| `X_CLIENT_ID` / `X_CLIENT_SECRET` | X (Twitter) OAuth app for the follow-check token (`config/x_oauth`). |
+| `PAYOUT_PRIVATE_KEY` | Private key of wallet holding USDC (post-game payout script). |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path/JSON for the firebase-admin service account (Admin SDK). |
+
+**Removed:** `OIL_TICKET_WALLET` / `NEXT_PUBLIC_OIL_TICKET_WALLET` — the ticket/draft system was
+deleted (registration + plot-pick is now `OilQualify`; mid-season join is "CLAIM THIS PLOT").
 *

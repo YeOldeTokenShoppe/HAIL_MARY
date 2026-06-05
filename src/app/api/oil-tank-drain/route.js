@@ -55,13 +55,17 @@ export async function POST(req) {
     // Mark this user's active gusher events as done. Best-effort, outside
     // the transaction — failures here shouldn't roll back the drain.
     try {
+      // Filter status in code — a `!=` filter combined with the userId equality
+      // needs a composite index and throws without one.
       const gusherSnap = await db.collection("gusherEvents")
         .where("userId", "==", userId)
-        .where("status", "!=", "done")
         .get();
       const batch = db.batch();
-      gusherSnap.forEach((d) => batch.update(d.ref, { status: "done" }));
-      if (!gusherSnap.empty) await batch.commit();
+      let n = 0;
+      gusherSnap.forEach((d) => {
+        if (d.data().status !== "done") { batch.update(d.ref, { status: "done" }); n++; }
+      });
+      if (n > 0) await batch.commit();
     } catch (err) {
       console.error("[oil-tank-drain] gusher cleanup failed:", err.message);
     }

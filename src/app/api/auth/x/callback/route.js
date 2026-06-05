@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/firebaseServer'
-import { doc, setDoc } from 'firebase/firestore'
+import { getAdminDb } from '@/lib/firebaseAdmin'
+
+export const runtime = 'nodejs'
 
 export async function GET(request) {
   try {
@@ -57,8 +58,8 @@ export async function GET(request) {
     const tokens = await tokenResponse.json()
     console.log('OAuth tokens received successfully')
 
-    // Store tokens in Firestore
-    await setDoc(doc(db, 'config', 'x_oauth'), {
+    // Store tokens in Firestore via Admin SDK (config is private + write-locked).
+    await getAdminDb().collection('config').doc('x_oauth').set({
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresIn: tokens.expires_in,

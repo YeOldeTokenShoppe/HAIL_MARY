@@ -21,11 +21,17 @@ export async function POST(req) {
 
     const key = `${col}_${row}`;
 
-    // Claim the plot for this user (overwrites any current owner, incl. test users)
+    // Claim the plot for this user (overwrites any current owner, incl. test
+    // users). Reset the cell to a clean slate (depth 0, no prior reveal) so an
+    // admin test-claim can drill it fresh — otherwise a previously bottomed-out
+    // cell starts depleted.
     await db.collection("oilPlots").doc(key).set({
       col,
       row,
       currentOwnerId: userId,
+      drillDay: 0,
+      revealed: FieldValue.delete(),
+      hellLayers: FieldValue.delete(),
       ownerHistory: FieldValue.arrayUnion({
         userId,
         claimedAt: new Date().toISOString(),
@@ -34,10 +40,15 @@ export async function POST(req) {
       disqualified: false,
     }, { merge: true });
 
+    // Arm the rig — without armed:true / rigDepleted:false a previously
+    // depleted rig is skipped by strike-tick forever (the symptom that made
+    // FORCE STRIKE never fire after an admin claim).
     await db.collection("oilDrills").doc(userId).set({
       userId,
       col,
       row,
+      armed: true,
+      rigDepleted: false,
       username: username || "admin",
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true });

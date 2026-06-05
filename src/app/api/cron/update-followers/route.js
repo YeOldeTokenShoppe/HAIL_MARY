@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/firebaseServer'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { getAdminDb } from '@/lib/firebaseAdmin'
 
-// Refresh the OAuth access token using stored refresh token
+export const runtime = 'nodejs'
+
+// Refresh the OAuth access token using stored refresh token. Admin SDK —
+// config/x_oauth is private (read:false), so the client SDK can't read it.
 async function getAccessToken() {
-  const oauthDoc = await getDoc(doc(db, 'config', 'x_oauth'))
-  if (!oauthDoc.exists()) {
+  const db = getAdminDb()
+  const oauthDoc = await db.collection('config').doc('x_oauth').get()
+  if (!oauthDoc.exists) {
     throw new Error('No X OAuth tokens found. Visit /api/auth/x to authorize first.')
   }
 
@@ -40,7 +43,7 @@ async function getAccessToken() {
   const tokens = await response.json()
 
   // Store updated tokens
-  await setDoc(doc(db, 'config', 'x_oauth'), {
+  await db.collection('config').doc('x_oauth').set({
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     expiresIn: tokens.expires_in,
@@ -62,6 +65,8 @@ export async function GET(request) {
     }
 
     console.log('Cron job: Starting followers update process...')
+
+    const db = getAdminDb()
 
     // Get OAuth access token from Firestore
     const accessToken = await getAccessToken()
@@ -145,7 +150,7 @@ export async function GET(request) {
     console.log(`Total followers collected: ${allDisplayNames.length}`)
 
     // Store in Firestore
-    await setDoc(doc(db, 'followers', 'latest'), {
+    await db.collection('followers').doc('latest').set({
       displayNames: allDisplayNames,
       usernames: allUsernames,
       totalCount: allDisplayNames.length,
@@ -167,7 +172,7 @@ export async function GET(request) {
 
     // Store error info in Firestore for debugging
     try {
-      await setDoc(doc(db, 'followers', 'latest'), {
+      await getAdminDb().collection('followers').doc('latest').set({
         error: error.message,
         updatedAt: new Date().toISOString(),
         success: false

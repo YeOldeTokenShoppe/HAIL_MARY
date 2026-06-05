@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebaseServer";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 
-// Reuse the same OAuth token refresh logic from the cron job
+export const runtime = "nodejs";
+
+// Reuse the same OAuth token refresh logic from the cron job. Uses the Admin
+// SDK — `config/x_oauth` is private (read:false), so the client SDK can't read
+// it; the Admin SDK bypasses rules.
 async function getAccessToken() {
-  const oauthDoc = await getDoc(doc(db, "config", "x_oauth"));
-  if (!oauthDoc.exists()) {
+  const db = getAdminDb();
+  const oauthDoc = await db.collection("config").doc("x_oauth").get();
+  if (!oauthDoc.exists) {
     throw new Error("No X OAuth tokens found.");
   }
 
@@ -35,7 +39,7 @@ async function getAccessToken() {
   }
 
   const tokens = await response.json();
-  await setDoc(doc(db, "config", "x_oauth"), {
+  await db.collection("config").doc("x_oauth").set({
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     expiresIn: tokens.expires_in,
@@ -135,8 +139,8 @@ export async function GET(request) {
 
 async function checkCache(username) {
   try {
-    const snap = await getDoc(doc(db, "followers", "latest"));
-    if (snap.exists()) {
+    const snap = await getAdminDb().collection("followers").doc("latest").get();
+    if (snap.exists) {
       const usernames = snap.data().usernames || [];
       return usernames.includes(username.toLowerCase());
     }
@@ -155,8 +159,8 @@ async function fallbackToCache(username, debugError) {
   if (process.env.NODE_ENV === "development") {
     let cacheSize = null;
     try {
-      const snap = await getDoc(doc(db, "followers", "latest"));
-      cacheSize = snap.exists() ? (snap.data().usernames || []).length : 0;
+      const snap = await getAdminDb().collection("followers").doc("latest").get();
+      cacheSize = snap.exists ? (snap.data().usernames || []).length : 0;
     } catch {}
     payload.debugError = debugError || null;
     payload.cacheSize = cacheSize;

@@ -236,10 +236,12 @@
         allow read, create: if true;
       }
 
-      // X OAuth tokens - server writes, no client access
+      // X OAuth tokens — server-only (Admin SDK). No client read OR write:
+      // write:true previously let anyone overwrite config/x_oauth and hijack the
+      // account's tokens. All writers (auth/x/callback, cron) use the Admin SDK.
       match /config/{document} {
         allow read: if false;
-        allow write: if true;
+        allow write: if false;
       }
 
       // Followers data - public read, server write
@@ -407,9 +409,49 @@
         allow read, write: if false;
       }
 
-      // Default rules - SECURE by default
+      // =========================================================================
+      // PUBLIC-READ COLLECTIONS (no other writers — written by admin/server SDK,
+      // which bypasses rules). These previously relied on the permissive
+      // catch-all for read. They are listed explicitly because the catch-all is
+      // now deny-by-default (see below) — Firestore rules are ADDITIVE (OR), so
+      // a broad `read: if true` catch-all silently overrode every `read: if
+      // false` (it was leaking config/x_oauth OAuth tokens, oilSecret seed,
+      // chatReports, testimonialRateLimits). Reads here are unchanged; the only
+      // behavioral change is that the deny-by-default now actually enforces the
+      // read:false collections.
+      // =========================================================================
+      match /demonBounty/{d}      { allow read: if true; allow write: if false; }
+      match /oilPurchases/{d}     { allow read: if true; allow write: if false; }
+      match /polaroids/{d}        { allow read: if true; allow write: if false; }
+      match /fountain_donations/{d} { allow read: if true; allow write: if false; }
+      match /trades/{d}           { allow read: if true; allow write: if false; }
+      match /decisions/{d}        { allow read: if true; allow write: if false; }
+      match /summaries/{d}        { allow read: if true; allow write: if false; }
+      match /market/{d}           { allow read: if true; allow write: if false; }
+      match /macroData/{d}        { allow read: if true; allow write: if false; }
+      match /newsData/{d}         { allow read: if true; allow write: if false; }
+      match /technicalData/{d}    { allow read: if true; allow write: if false; }
+      match /sentimentData/{d}    { allow read: if true; allow write: if false; }
+      match /sentiment_analysis/{d}         { allow read: if true; allow write: if false; }
+      match /sentiment_analysis_history/{d} { allow read: if true; allow write: if false; }
+      match /lighterData/{d}      { allow read: if true; allow write: if false; }
+      match /simulatedAccount/{d}      { allow read: if true; allow write: if false; }
+      match /simulatedPositions/{d}    { allow read: if true; allow write: if false; }
+      match /simulatedTradeHistory/{d} { allow read: if true; allow write: if false; }
+      match /agentChat/{d}        { allow read: if true; allow write: if false; }
+      match /agentContext/{d}     { allow read: if true; allow write: if false; }
+      match /agentDecisions/{d}   { allow read: if true; allow write: if false; }
+      match /agentScores/{d}      { allow read: if true; allow write: if false; }
+      match /systemConfig/{d}     { allow read: if true; allow write: if false; }
+      match /weeklyAnalysis/{d}   { allow read: if true; allow write: if false; }
+      match /xPost/{d}            { allow read: if true; allow write: if false; }
+      match /test/{d}             { allow read: if true; allow write: if false; }
+
+      // Default rules — DENY by default. Firestore ORs all matching rules, so a
+      // permissive catch-all here would override every explicit `read: if false`
+      // above. Anything not explicitly granted read access is private.
       match /{document=**} {
-        allow read: if true;
+        allow read: if false;
         allow write: if false;
       }
     }

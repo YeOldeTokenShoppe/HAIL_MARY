@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, Html, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
-import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG } from "@/components/PimpMyPumpPanel";
+import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
@@ -75,6 +75,7 @@ export function CctvRenderer({ canvasRef }) {
   const CCTV_OFFSET_Y = 0.00;
   const CCTV_OFFSET_Z = -0.03;
   const CCTV_TILT = 3.0;
+  const CCTV_FORWARD_CLEAR = 0.06; // push render origin ahead of the housing so the camera body never pans into frame
   const CCTV_FOV = 90;
 
   useFrame(() => {
@@ -92,17 +93,18 @@ export function CctvRenderer({ canvasRef }) {
     cctvCam.fov = CCTV_FOV;
     cctvCam.updateProjectionMatrix();
 
-    // Position camera at the security camera + offsets
-    cctvCam.position.set(
-      _cctvState.worldPos.x + CCTV_OFFSET_X,
-      _cctvState.worldPos.y + CCTV_OFFSET_Y,
-      _cctvState.worldPos.z + CCTV_OFFSET_Z,
-    );
-
     // Forward direction in the security camera's local space (reuse refs)
     const localFwd = _localFwd.current.set(1, 0, 0);
     const normalMatrix = _normalMat.current.getNormalMatrix(_cctvState.worldMatrix);
     localFwd.applyMatrix3(normalMatrix).normalize();
+
+    // Position at the camera + fixed offset + a forward clearance along the lens, so
+    // the housing stays behind the render origin and never enters frame at sweep ends.
+    cctvCam.position.set(
+      _cctvState.worldPos.x + CCTV_OFFSET_X + localFwd.x * CCTV_FORWARD_CLEAR,
+      _cctvState.worldPos.y + CCTV_OFFSET_Y + localFwd.y * CCTV_FORWARD_CLEAR,
+      _cctvState.worldPos.z + CCTV_OFFSET_Z + localFwd.z * CCTV_FORWARD_CLEAR,
+    );
 
     const target = _target.current.copy(cctvCam.position).add(localFwd.multiplyScalar(5));
     target.y -= CCTV_TILT;
@@ -188,6 +190,9 @@ const DEFAULT_RIG_TINT = {
   horseHead:     "#3a7d76", // horse head — teal accent so the bob reads
   counterweight: "#19222a", // counterweights — darkest petrol
   crankWheel:    "#2b8f88", // crank — muted cyan accent
+  foundation:    "#2c4a6e", // base plate (Bottom_Box) — refined deep blue accent
+  // NB: Under_Pump moved to the motorBox zone (untinted) so it keeps its baked dark
+  // and matches Wheel_Box (both share material Palet.004 / #1b1b1b).
 };
 
 // Wellhead position in a rig's local (cell) space — where the drill pipe meets
@@ -198,6 +203,10 @@ const WELLHEAD_OFFSET = [0, 0.006, 0.2];
 let _rigWellhead = [...WELLHEAD_OFFSET];
 // Opal-cyan glow color for the wellhead (the substance's signature bloom).
 const WELLHEAD_GLOW = ACTIVE_IRID.hex.emis; // 0x18d0c0
+
+// Backlit sign — emissive strength of the player's image so it reads as a lit
+// display, not a matte poster. Shared by the close-up + instanced field signs.
+const SIGN_EMISSIVE_INTENSITY = 1.4;
 // Glow is sunk just below the pad (DROP) so the pad masks any overhang to the hole
 // opening (depth-test); SIZE can exceed the hole since the rim trims it. No point
 // light — light spills onto the pad and can't be clipped by geometry.
@@ -1648,17 +1657,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, [clonedScene, pumpConfig, envMap]);
 
-  // Security camera visibility — requires sign to be visible
+  // Embedded sign + camera retired — signs render from the SIGN_CATALOG (PlotSignField),
+  // so force the rig's baked Sign/SignFrame/Security_Camera meshes hidden. (Harmless
+  // no-op once the sign-less rig GLB is in place, where these meshes don't exist.)
   useEffect(() => {
-    const show = !!pumpConfig?.showCamera && !!pumpConfig?.showSign;
-    secCamPartsRef.current.forEach((part) => { part.visible = show; });
+    secCamPartsRef.current.forEach((part) => { part.visible = false; });
+    signFramePartsRef.current.forEach((part) => { part.visible = false; });
+    if (signRef.current) signRef.current.visible = false;
+    if (signBackRef.current) signBackRef.current.visible = false;
   }, [pumpConfig?.showCamera, pumpConfig?.showSign]);
-
-  // Sign frame visibility
-  useEffect(() => {
-    const show = !!pumpConfig?.showSign;
-    signFramePartsRef.current.forEach((part) => { part.visible = show; });
-  }, [pumpConfig?.showSign]);
 
   // Fence visibility — hide the old embedded fence parts (now separate models)
   useEffect(() => {
@@ -1697,7 +1704,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         mat.color = new THREE.Color(0xffffff);
         mat.emissive = new THREE.Color(0xffffff);
         mat.emissiveMap = tex;
-        mat.emissiveIntensity = 0.8;
+        mat.emissiveIntensity = SIGN_EMISSIVE_INTENSITY;
         mat.transparent = false;
         mat.alphaTest = 0.5;
         mat.needsUpdate = true;
@@ -1921,10 +1928,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (!secCamPartsRef.current.includes(child)) {
           secCamPartsRef.current.push(child);
         }
-        child.visible = !!pumpConfigRef.current?.showCamera && !!pumpConfigRef.current?.showSign;
+        child.visible = false; // embedded camera retired — catalog renders it
       }
       // Sign — custom image texture (front + back)
       if (child.name === "Sign" && child.isMesh) {
+        child.visible = false; // embedded sign retired — catalog renders it
         signRef.current = child;
         if (!signOrigMat.current) {
           signOrigMat.current = child.material.clone();
@@ -1935,6 +1943,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
       }
       if (child.name === "Sign_Back" && child.isMesh) {
+        child.visible = false; // embedded sign retired — catalog renders it
         signBackRef.current = child;
         if (!signBackOrigMat.current) {
           signBackOrigMat.current = child.material.clone();
@@ -1953,7 +1962,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           child.material = child.material.clone();
           child.material.side = THREE.DoubleSide;
         }
-        child.visible = !!pumpConfigRef.current?.showSign;
+        child.visible = false; // embedded sign frame retired — catalog renders it
       }
       // Fence_Package and all children — hidden by default
       if (child.name.startsWith("Fence_Package")) {
@@ -3319,7 +3328,9 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
         <TowerLiquid
           towerBounds={towerBounds}
           position={position}
-          fill={totalOilBudget > 0 ? communityOil / totalOilBudget : 0}
+          /* Community tank fills relative to the whole field (OIL_FIELD_UNITS),
+             not the $ prize pool — communityOil is in field units. */
+          fill={Math.min(communityOil / OIL_FIELD_UNITS, 1)}
           scale={0.1}
         />
       )}
@@ -3908,7 +3919,7 @@ function InstancedSign({ geometry, url, positions }) {
   useEffect(() => {
     if (!tex) return;
     mat.map = tex; mat.emissive = new THREE.Color(0xffffff);
-    mat.emissiveMap = tex; mat.emissiveIntensity = 0.8; mat.needsUpdate = true;
+    mat.emissiveMap = tex; mat.emissiveIntensity = SIGN_EMISSIVE_INTENSITY; mat.needsUpdate = true;
   }, [tex, mat]);
   useEffect(() => () => mat.dispose(), [mat]);
   useEffect(() => {
@@ -3927,6 +3938,132 @@ function InstancedSign({ geometry, url, positions }) {
   if (!geometry || !positions.length || !tex) return null;
   return <instancedMesh ref={ref} args={[geometry, mat, positions.length]} />;
 }
+
+// ── Catalog signs (separate GLBs, per-plot image) ────────────────────────────
+// A sign is its own model now (not baked into the rig). For each plot with showSign
+// we load the chosen SIGN_CATALOG entry, paint the player's image (emissive backlit)
+// onto its Sign/Sign2 faces, and mount the matching camera GLB when showCamera.
+// Rendered per-plot (signs are opt-in, so counts are low); group by image URL later
+// if they get common. All meshes ride one group at the plot origin — the model bakes
+// the offset-to-the-side and the camera GLB is pre-registered to the same space.
+function SignModel({ model, signImageUrl }) {
+  const { scene } = useGLTF(model);
+  const cloned = useMemo(() => {
+    const c = scene.clone(true);
+    // Clone the image-face materials so a per-plot texture can't leak to other signs.
+    c.traverse((ch) => {
+      if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) ch.material = ch.material.clone();
+    });
+    return c;
+  }, [scene]);
+  useEffect(() => () => {
+    cloned.traverse((ch) => {
+      if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) {
+        ch.material.map?.dispose();
+        ch.material.emissiveMap?.dispose();
+        ch.material.dispose();
+      }
+    });
+  }, [cloned]);
+  useEffect(() => {
+    if (!signImageUrl) return;
+    let alive = true;
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = "anonymous";
+    loader.load(signImageUrl, (tex) => {
+      if (!alive) { tex.dispose(); return; }
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.repeat.x = -1; tex.offset.x = 1;
+      cloned.traverse((ch) => {
+        if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) {
+          const m = ch.material;
+          m.map = tex;
+          m.color = new THREE.Color(0xffffff);
+          m.emissive = new THREE.Color(0xffffff);
+          m.emissiveMap = tex;
+          m.emissiveIntensity = SIGN_EMISSIVE_INTENSITY;
+          m.needsUpdate = true;
+        }
+      });
+    });
+    return () => { alive = false; };
+  }, [cloned, signImageUrl]);
+  return <primitive object={cloned} />;
+}
+
+// Catalog camera. When `active` (this plot is focused + showCamera), it sweeps its
+// Security_Camera mesh and feeds the world transform to the shared CCTV renderer —
+// the same protocol the embedded camera used, just sourced from the sign model.
+function SignCameraModel({ model, active }) {
+  const { scene } = useGLTF(model);
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+  const camRef = useRef(null);
+  const baseRotY = useRef(null);
+  useEffect(() => {
+    cloned.traverse((c) => { if (c.name === "Security_Camera") camRef.current = c; });
+    if (camRef.current && baseRotY.current === null) baseRotY.current = camRef.current.rotation.y;
+  }, [cloned]);
+  useEffect(() => () => {
+    if (camRef.current && _cctvState.ownerId === camRef.current.uuid) {
+      _cctvState.active = false; _cctvState.ownerId = null;
+    }
+  }, []);
+  useFrame(() => {
+    const cam = camRef.current;
+    if (!cam || baseRotY.current === null) return;
+    if (active) {
+      if (!_cctvState.pauseSweep) {
+        const sweep = 90 * (Math.PI / 180);
+        const baseOffset = 45 * (Math.PI / 180);
+        const period = 12; // seconds for a full back-and-forth
+        const t = (Math.sin(performance.now() * 0.001 * (2 * Math.PI / period)) + 1) / 2;
+        cam.rotation.y = baseRotY.current + baseOffset + t * sweep;
+      }
+      cam.updateWorldMatrix(true, false);
+      cam.getWorldPosition(_cctvState.worldPos);
+      cam.getWorldQuaternion(_cctvState.worldQuat);
+      _cctvState.worldMatrix.copy(cam.matrixWorld);
+      _cctvState.active = true;
+      _cctvState.ownerId = cam.uuid;
+    } else if (_cctvState.active && _cctvState.ownerId === cam.uuid) {
+      _cctvState.active = false; _cctvState.ownerId = null;
+    }
+  });
+  return <primitive object={cloned} />;
+}
+
+function PlotSign({ position, signImageUrl, signStyle, showCamera, isSelected }) {
+  const entry = SIGN_CATALOG.find((s) => s.id === signStyle) || SIGN_CATALOG[0];
+  if (!entry) return null;
+  return (
+    <group position={position} scale={PUMPJACK_SCALE}>
+      <SignModel model={entry.model} signImageUrl={signImageUrl} />
+      {showCamera && entry.cameraModel && <SignCameraModel model={entry.cameraModel} active={!!isSelected} />}
+    </group>
+  );
+}
+
+// One sign per plot with showSign (the image is optional — a blank panel shows until
+// one is set). The selected plot uses the LIVE pumpConfig so toggles show instantly;
+// other plots read the saved allPumpConfigs map.
+function PlotSignField({ items, allPumpConfigs, pumpConfig, selectedCol, selectedRow }) {
+  const signs = useMemo(() => {
+    const out = [];
+    items.forEach((it) => {
+      const isSel = it.col === selectedCol && it.row === selectedRow;
+      const cfg = (isSel && pumpConfig) ? pumpConfig : allPumpConfigs[`${it.col}_${it.row}`]?.config;
+      if (cfg?.showSign) {
+        out.push({ key: it.key, position: it.position, signImageUrl: cfg.signImageUrl || null, signStyle: cfg.signStyle, showCamera: cfg.showCamera, isSelected: isSel });
+      }
+    });
+    return out;
+  }, [items, allPumpConfigs, pumpConfig, selectedCol, selectedRow]);
+  return signs.map((s) => (
+    <PlotSign key={s.key} position={s.position} signImageUrl={s.signImageUrl} signStyle={s.signStyle} showCamera={s.showCamera} isSelected={s.isSelected} />
+  ));
+}
+SIGN_CATALOG.forEach((s) => { useGLTF.preload(s.model); if (s.cameraModel) useGLTF.preload(s.cameraModel); });
 
 // Gather all idle-plot static decorations and render them as instanced batches.
 function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, fullRigCells, base, frameMat }) {
@@ -3973,20 +4110,13 @@ function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, full
       {Object.entries(groups.fenceGroups).map(([model, { scale, list }]) => (
         <InstancedGLB key={`f-${model}`} model={model} placements={list} scale={scale} />
       ))}
-      {base.signFrameGeo && (
-        <InstancedGeo geometry={base.signFrameGeo} material={frameMat} positions={groups.framePositions} scale={PUMPJACK_SCALE} />
-      )}
-      {base.signCamGeo && (
-        <InstancedGeo geometry={base.signCamGeo} material={frameMat} positions={groups.camPositions} scale={PUMPJACK_SCALE} />
-      )}
-      {Object.entries(groups.signGroups).map(([url, positions]) => (
-        <InstancedSign key={`s-${url}`} geometry={base.signGeo} url={url} positions={positions} />
-      ))}
+      {/* Signs/frames/cameras are no longer baked into the rig — they render from the
+          SIGN_CATALOG via PlotSignField (see MergedRigField). */}
     </>
   );
 }
 
-function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut }) {
+function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut }) {
   const base = useMemo(() => buildBaseRig(scene), [scene]);
   // Per-vertex metalness/roughness (from aMetalness/aRoughness attributes) so
   // textured metal parts catch studio-env reflections while painted parts stay
@@ -4087,6 +4217,9 @@ function MergedRigField({ scene, items, allPumpConfigs, envMap, cellSize, select
         base={base}
         frameMat={frameMat}
       />
+      {/* Catalog signs (+ cameras) — one per plot with showSign, all plots incl. the
+          selected one, since signs are no longer part of the rig. */}
+      <PlotSignField items={items} allPumpConfigs={allPumpConfigs} pumpConfig={pumpConfig} selectedCol={selectedCol} selectedRow={selectedRow} />
     </>
   );
 }
@@ -4187,6 +4320,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
           scene={scene}
           items={items}
           allPumpConfigs={allPumpConfigs}
+          pumpConfig={pumpConfig}
           envMap={envMap}
           cellSize={cellSize}
           selectedCol={selectedCol}

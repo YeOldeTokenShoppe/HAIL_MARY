@@ -56,8 +56,17 @@ async function handle(req) {
     }
   }
 
+  // Clear active gusher broadcast effects — otherwise the 3D field keeps
+  // erupting after a reset (these are ephemeral; safe to delete).
+  let gushersCleared = 0;
+  const gushersSnap = await db.collection("gusherEvents").get();
+  for (const d of gushersSnap.docs) {
+    batch.delete(d.ref);
+    gushersCleared++; n++; await flush(false);
+  }
+
   await flush(true);
-  return NextResponse.json({ ok: true, plotsCleared, rigsCleared });
+  return NextResponse.json({ ok: true, plotsCleared, rigsCleared, gushersCleared });
 }
 
 export async function POST(req) { return handle(req); }

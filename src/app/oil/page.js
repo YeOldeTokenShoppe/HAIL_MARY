@@ -2087,6 +2087,35 @@ export default function OilPage() {
     }
   }, [selectedX, sliceY, effectiveDrillDay, userDrill, displayHellMap, hellActive, envPreset, isAdmin, isTest]);
 
+  // Admin/test: fire (or clear) the hell-portal effect at the selected cell on
+  // demand — a local preview, no claim/strike/demon required. Mirrors the
+  // reactive local-preview block above; sets hellTimeoutRef so the demonBounty
+  // sync effect doesn't immediately clear it.
+  const handleTestHell = useCallback(() => {
+    if (hellActive) {
+      if (hellTimeoutRef.current) { clearTimeout(hellTimeoutRef.current); hellTimeoutRef.current = null; }
+      setHellActive(false);
+      setHellCol(null);
+      setHellRow(null);
+      setEnvPreset(prevEnvPresetRef.current || "day");
+      return;
+    }
+    if (selectedX === null) return;
+    prevEnvPresetRef.current = envPreset;
+    setEnvPreset("hell");
+    setHellActive(true);
+    setHellCol(selectedX);
+    setHellRow(sliceY);
+    if (hellTimeoutRef.current) clearTimeout(hellTimeoutRef.current);
+    hellTimeoutRef.current = setTimeout(() => {
+      setHellActive(false);
+      setHellCol(null);
+      setHellRow(null);
+      setEnvPreset(prevEnvPresetRef.current || "day");
+      hellTimeoutRef.current = null;
+    }, 90000);
+  }, [hellActive, selectedX, sliceY, envPreset]);
+
   // Reset drained state when cell or drill depth changes
   useEffect(() => {
     setTankDrained(false);
@@ -2359,6 +2388,7 @@ export default function OilPage() {
   // scout dev endpoints, so testing the reveal pipeline doesn't need curl/URLs.
   const [toolStatus, setToolStatus] = useState("");
   const [toolBusy, setToolBusy] = useState(false);
+  const [intelTab, setIntelTab] = useState("claims"); // FIELD INTEL panel tab
   const [toolDeep, setToolDeep] = useState(3);
   const runTool = useCallback(async (label, fn) => {
     if (!adminPassword) { setToolStatus("✗ no admin password"); return; }
@@ -2515,16 +2545,20 @@ export default function OilPage() {
   const handleClaimActivePlot = useCallback(async () => {
     if (!user?.id || selectedX === null) return;
     if (allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId != null) return;
+    // Carry the referral code so a mid-season joiner arriving via a ?ref= link
+    // still credits the referrer (same as the registration claim path).
+    const refCode = typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null;
     try {
       const res = await oilApiFetch("/api/oil-claim", {
         method: "POST",
-        body: JSON.stringify({ col: selectedX, row: sliceY, username: username?.trim() || user?.firstName || "" }),
+        body: JSON.stringify({ col: selectedX, row: sliceY, username: username?.trim() || user?.firstName || "", referredByCode: refCode || null }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { console.error("Claim failed:", data.error); return; }
+      if (!res.ok) { alert(data.error || "Claim failed"); return; }
+      if (refCode && typeof window !== "undefined") localStorage.removeItem("oil_ref");
       handleFlyTo(selectedX, sliceY);
     } catch (err) {
-      console.error("Claim failed:", err);
+      alert(err.message || "Claim failed");
     }
   }, [user?.id, selectedX, sliceY, allPlotsMap, username, oilApiFetch, handleFlyTo]);
 
@@ -2777,44 +2811,6 @@ export default function OilPage() {
         </span>
       </div>
       <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
-        <span style={styles.paramLabel}>MAX CLAIM</span>
-        <span style={{
-          fontFamily: "'Orbitron', monospace",
-          fontSize: 13,
-          fontWeight: 700,
-          color: theme.accent,
-        }}>
-          {stats.maxClaimTotal} OIL
-        </span>
-      </div>
-      <div style={{ marginTop: 4, fontSize: 9, color: theme.muted, lineHeight: 1.6 }}>
-        {stats.sorted.slice(0, 5).map((c, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>#{i + 1} ({c.x},{c.y})</span>
-            <span style={{ color: c.oil > 0 ? theme.textStrong : theme.muted }}>{c.oil} OIL</span>
-          </div>
-        ))}
-      </div>
-      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
-        <span style={{ ...styles.paramLabel, color: "#cc3333" }}>HELL POCKETS</span>
-        <span style={{
-          fontFamily: "'Orbitron', monospace",
-          fontSize: 13,
-          fontWeight: 700,
-          color: "#cc3333",
-        }}>
-          {stats.hellPockets.length}
-        </span>
-      </div>
-      <div style={{ marginTop: 2, fontSize: 9, color: "#cc3333", lineHeight: 1.6 }}>
-        {stats.hellPockets.map((hp, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>#{i + 1} plot ({hp.x + 1},{hp.y + 1})</span>
-            <span>depth {hp.z + 1}</span>
-          </div>
-        ))}
-      </div>
-      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
         <span style={styles.paramLabel}>START DATE</span>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <input
@@ -2889,23 +2885,13 @@ export default function OilPage() {
           if (!r2?.ok) throw new Error(r2?.error || "backfill failed");
           return `✓ seeded ${r1.seeded} rigs · revealed ${r2.layers} layers / ${r2.backfilled} cells`;
         })}>SEED + REVEAL FIELD</button>
-        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Backfilling", async () => {
-          const r = await fetch(`/api/oil-backfill-revealed?password=${encodeURIComponent(adminPassword)}`).then(r => r.json());
-          if (!r?.ok) throw new Error(r?.error || "failed");
-          return `✓ revealed ${r.layers} layers / ${r.backfilled} cells`;
-        })}>BACKFILL REVEALS</button>
-        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Scouting", async () => {
-          const r = await fetch(`/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&scout=1`).then(r => r.json());
-          if (!r?.ok) throw new Error(r?.error || "failed");
-          return `richest: ${(r.richest || []).slice(0, 5).map(c => `${c.label}=${c.total}@L${c.bestLayer}`).join("  ") || "none"}`;
-        })}>SCOUT RICHEST</button>
         <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Clearing seeded", async () => {
           // clear:"only" wipes fake_* docs WITHOUT re-seeding (a truthy non-"only"
           // value clears then falls through and re-seeds).
           const r = await fetch("/api/oil-seed-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, clear: "only" }) }).then(r => r.json());
           if (!r?.ok) throw new Error(r?.error || "failed");
-          return `✓ cleared ${r.cleared} docs`;
-        })}>CLEAR SEEDED</button>
+          return `✓ removed ${r.cleared} test bots`;
+        })}>REMOVE TEST BOTS</button>
         <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Clearing demon", async () => {
           const bId = demonBlockade?.bountyId || demonBounty?.id;
           if (!bId) return "no active demon";
@@ -2914,19 +2900,12 @@ export default function OilPage() {
           if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
           return "✓ demon cleared + blockade lifted";
         })}>CLEAR DEMON</button>
-        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Releasing my claims", async () => {
-          if (!user?.id) throw new Error("sign in first");
-          const res = await oilApiFetch("/api/oil-release", { method: "POST" });
-          const r = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
-          return `✓ released ${r.released ?? 0} plot(s)`;
-        })}>RELEASE MY CLAIMS</button>
-        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Clearing ALL plots", async () => {
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Resetting board", async () => {
           const res = await fetch(`/api/oil-admin-reset?password=${encodeURIComponent(adminPassword)}`);
           const r = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
           return `✓ released ${r.plotsCleared} plot(s) · cleared ${r.rigsCleared} rig(s)`;
-        })}>CLEAR ALL PLOTS</button>
+        })}>RESET BOARD</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Claiming cell", async () => {
@@ -2944,7 +2923,7 @@ export default function OilPage() {
           return `✓ struck ${r.struck} · skipped ${r.skipped}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}`;
         })}>FORCE STRIKE</button>
         <span style={{ fontSize: 10, color: theme.muted }}>depth</span>
-        {[1, 3, 20].map((n) => (
+        {[1, 3, 5, 10, 11, 20].map((n) => (
           <button key={n} onClick={() => setToolDeep(n)} style={{ ...styles.paramBtn, ...(toolDeep === n ? styles.paramBtnActive : {}) }}>{n}</button>
         ))}
       </div>
@@ -3005,7 +2984,23 @@ export default function OilPage() {
           cursor: selectedX === null ? "not-allowed" : "pointer",
         }}
       >
-        💥 TEST GUSHER {selectedX === null ? "(select a rig)" : `(${selectedX},${sliceY})`}
+        💥 TEST GUSHER {selectedX === null ? "(select a rig)" : `(${selectedX + 1},${sliceY + 1})`}
+      </button>
+      <button
+        onClick={handleTestHell}
+        disabled={selectedX === null && !hellActive}
+        style={{
+          ...styles.paramBtn,
+          ...styles.paramBtnActive,
+          width: "100%",
+          padding: "6px 8px",
+          fontSize: 11,
+          marginBottom: 8,
+          opacity: (selectedX === null && !hellActive) ? 0.4 : 1,
+          cursor: (selectedX === null && !hellActive) ? "not-allowed" : "pointer",
+        }}
+      >
+        🔥 {hellActive ? "CLEAR HELL" : `TEST HELL ${selectedX === null ? "(select a rig)" : `(${selectedX + 1},${sliceY + 1})`}`}
       </button>
       <input
         type="range"
@@ -3350,43 +3345,6 @@ export default function OilPage() {
     </div>
   );
 
-  const topClaimsPanel = isRevealed ? (
-    <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
-        <span style={styles.rankIcon}>&#9650;</span> TOP CLAIMS
-      </h3>
-      <div style={styles.rankList}>
-        {stats.sorted.slice(0, 5).map((c, i) => (
-          <div
-            key={c.claim}
-            onClick={() => handleSelectClaim(c)}
-            style={{
-              ...styles.rankRow,
-              cursor: "pointer",
-              background: c.index === selectedClaimIndex ? "rgba(212,168,84,0.15)" : "transparent",
-            }}
-          >
-            <span style={{
-              ...styles.rankNumber,
-              color: i === 0 ? theme.accent : i === 1 ? theme.inspectorKey : i === 2 ? theme.accent : theme.muted,
-            }}>
-              #{i + 1}
-            </span>
-            <span style={styles.rankClaim}>CLAIM {c.claim}</span>
-            <span style={styles.rankOil}>{c.oil.toLocaleString()}</span>
-            <div style={styles.rankBarWrap}>
-              <div
-                style={{
-                  ...styles.rankBarFill,
-                  width: `${(c.oil / stats.sorted[0].oil) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  ) : null;
 
   const dryZonesPanel = isRevealed ? (
     <div style={isMobile ? m.section : styles.panelSection}>
@@ -3408,21 +3366,68 @@ export default function OilPage() {
     </div>
   ) : null;
 
-  const depositsPanel = (
+  // Combined "field intel" section — MAX CLAIM (peak + top-5 richest cells) and
+  // DEPOSIT LOCATIONS (blob centers) as two tabs in one panel, to declutter.
+  const fieldIntelPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>DEPOSIT LOCATIONS</h3>
-      <div style={isMobile ? m.depositGrid : styles.depositList}>
-        {stats.deposits.map((d, i) => (
-          <div key={i} style={styles.depositRow}>
-            <span style={styles.depositIndex}>{String(i + 1).padStart(2, "0")}</span>
-            <span style={styles.depositCoord}>
-              ({d.cx.toFixed(1)}, {d.cy.toFixed(1)}, {d.cz.toFixed(1)})
-            </span>
-            <span style={styles.depositRadius}>r{d.radius.toFixed(1)}</span>
-            {!isRevealed && <span style={styles.depositHidden}>HIDDEN</span>}
-          </div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+        {[["claims", "MAX CLAIM"], ["deposits", "DEPOSIT LOCATIONS"]].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setIntelTab(key)}
+            style={{
+              flex: 1, padding: "5px 6px", borderRadius: 3, cursor: "pointer",
+              fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              border: `1px solid ${intelTab === key ? theme.accent : theme.border}`,
+              background: intelTab === key ? `${theme.accent}22` : "transparent",
+              color: intelTab === key ? theme.accent : theme.muted,
+            }}
+          >
+            {label}
+          </button>
         ))}
       </div>
+      {intelTab === "claims" ? (
+        <>
+          <div style={styles.paramRow}>
+            <span style={styles.paramLabel}>MAX CLAIM</span>
+            <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 700, color: theme.accent }}>
+              {stats.maxClaimTotal} OIL
+            </span>
+          </div>
+          <div style={{ marginTop: 4, fontSize: 9, color: theme.muted, lineHeight: 1.6 }}>
+            {stats.sorted.slice(0, 5).map((c, i) => (
+              <div
+                key={c.claim ?? i}
+                onClick={() => handleSelectClaim(c)}
+                title="Fly to this claim"
+                style={{
+                  display: "flex", justifyContent: "space-between", cursor: "pointer",
+                  padding: "1px 3px", borderRadius: 2,
+                  background: c.index === selectedClaimIndex ? "rgba(212,168,84,0.15)" : "transparent",
+                }}
+              >
+                <span>#{i + 1} ({c.x + 1},{c.y + 1})</span>
+                <span style={{ color: c.oil > 0 ? theme.textStrong : theme.muted }}>{c.oil} OIL</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div style={isMobile ? m.depositGrid : styles.depositList}>
+          {stats.deposits.map((d, i) => (
+            <div key={i} style={styles.depositRow}>
+              <span style={styles.depositIndex}>{String(i + 1).padStart(2, "0")}</span>
+              <span style={styles.depositCoord}>
+                ({d.cx.toFixed(1)}, {d.cy.toFixed(1)}, {d.cz.toFixed(1)})
+              </span>
+              <span style={styles.depositRadius}>r{d.radius.toFixed(1)}</span>
+              {!isRevealed && <span style={styles.depositHidden}>HIDDEN</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -3652,44 +3657,6 @@ export default function OilPage() {
     </div>
   );
 
-  // Test gusher toggle — spawns 1-3 fake gusher events, stays until stopped
-  const testGushersActive = gusherEvents.some((e) => e.userId?.startsWith("test-gusher-"));
-  const handleToggleTestGushers = useCallback(async () => {
-    if (!db) return;
-    if (testGushersActive) {
-      // Stop: mark all test gushers as done
-      try {
-        const { getDocs: gd } = await import("firebase/firestore");
-        const snap = await gd(query(collection(db, "gusherEvents"), where("status", "==", "active")));
-        await Promise.all(snap.docs.filter((d) => d.data().userId?.startsWith("test-gusher-")).map((d) =>
-          updateDoc(doc(db, "gusherEvents", d.id), { status: "done" })
-        ));
-      } catch (e) {
-        console.error("Failed to stop test gushers:", e);
-      }
-    } else {
-      // Start: spawn 1-3 test gushers
-      const count = Math.min(3, Math.floor(Math.random() * 3) + 1);
-      for (let i = 0; i < count; i++) {
-        const col = Math.floor(Math.random() * gridSize);
-        const row = Math.floor(Math.random() * gridSize);
-        try {
-          await addDoc(collection(db, "gusherEvents"), {
-            col,
-            row,
-            userId: `test-gusher-${Date.now()}-${i}`,
-            username: "ADMIN TEST",
-            oilAmount: 999,
-            createdAt: serverTimestamp(),
-            status: "active",
-          });
-        } catch (e) {
-          console.error("Failed to write test gusher:", e);
-        }
-      }
-    }
-  }, [gridSize, testGushersActive]);
-
   // ═══════════════════════════════════════════════════════════
   // ADMIN PASSWORD GATE
   // ═══════════════════════════════════════════════════════════
@@ -3856,7 +3823,7 @@ export default function OilPage() {
         cursor: "pointer",
       }}
     >
-      CLAIM PLOT AS ME ({selectedX},{sliceY})
+      CLAIM PLOT AS ME ({selectedX + 1},{sliceY + 1})
     </button>
   );
 
@@ -3911,28 +3878,6 @@ export default function OilPage() {
     }}>
       GAME ENDED — <a href="/oil?mode=report" style={{ color: theme.accent, textDecoration: "underline" }}>VIEW REPORT</a>
     </div>
-  );
-
-  const testGusherButton = isAdmin && adminAuthed && (
-    <button
-      onClick={handleToggleTestGushers}
-      style={{
-        padding: "10px 20px",
-        background: testGushersActive ? "linear-gradient(180deg, #5a2010, #8a3020)" : "linear-gradient(180deg, #1a0e05, #3a2010)",
-        border: `1px solid ${testGushersActive ? "#b04030" : "#5a4020"}`,
-        borderRadius: 3,
-        color: testGushersActive ? "#ff9966" : "#d4a854",
-        fontFamily: "'Share Tech Mono', monospace",
-        fontSize: 11,
-        letterSpacing: "0.12em",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
-      {testGushersActive ? "STOP GUSHERS" : "TEST GUSHERS (1-3)"}
-    </button>
   );
 
   // Mode badge for header
@@ -5043,11 +4988,6 @@ export default function OilPage() {
           {isAdmin && parametersPanel}
           {isAdmin && testToolsPanel}
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
-          {testGusherButton && (
-            <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
-              {testGusherButton}
-            </div>
-          )}
           {(isAdmin || isReport) && demoDrillPanel}
           {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
@@ -5066,9 +5006,8 @@ export default function OilPage() {
             hellPockets={displayHellPockets}
           />
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
-          {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
-          {(isAdmin || isReport) && depositsPanel}
+          {(isAdmin || isReport) && fieldIntelPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
           <HowToPlayPanel isMobile darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
           <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
@@ -5569,9 +5508,8 @@ export default function OilPage() {
             />
             <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
             {(isAdmin || isReport) && inspectorPanel}
-            {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
-            {(isAdmin || isReport) && depositsPanel}
+            {(isAdmin || isReport) && fieldIntelPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
             <HowToPlayPanel darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
             <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
@@ -5579,11 +5517,6 @@ export default function OilPage() {
             {leaderboardSection}
             {(isAdmin || isReport) && (
               <OilVerifyPanel adminPassword={adminPassword} />
-            )}
-            {testGusherButton && (
-              <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
-                {testGusherButton}
-              </div>
             )}
             {claimPlotButton && (
               <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>

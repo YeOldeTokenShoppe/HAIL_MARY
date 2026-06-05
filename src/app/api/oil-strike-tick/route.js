@@ -250,7 +250,7 @@ async function scoutOil() {
 
   const gridSize = settings.gridSize || 10;
   const depthZ = settings.depthZ || DEFAULT_DEPTH_Z;
-  const { grid } = generateOilDistribution3D({
+  const { grid, hellPockets } = generateOilDistribution3D({
     blockHash: seed,
     gridX: gridSize,
     gridY: gridSize,
@@ -280,7 +280,17 @@ async function scoutOil() {
     }
   }
   cells.sort((a, b) => b.total - a.total);
-  return { ok: true, gridSize, depthZ, richest: cells.slice(0, 10) };
+
+  // Hell-pocket locations (admin only) so a tester can park a rig on one and
+  // force-strike down to its layer to trigger the hell/demon effect. Each
+  // pocket needs the rig at (col,row) and a strike that reaches depth z+1.
+  const hell = (hellPockets || []).map((p) => ({
+    col: p.x, row: p.y,
+    label: `(${p.x + 1}, ${p.y + 1})`,
+    layer: p.z + 1, // 1-based; force-strike to this DEPTH to breach it
+  }));
+
+  return { ok: true, gridSize, depthZ, richest: cells.slice(0, 10), hell };
 }
 
 // Admin test helper: reset a single user's claim-jump counter (and re-arm the rig)
