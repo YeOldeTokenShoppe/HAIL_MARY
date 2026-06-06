@@ -41,6 +41,33 @@ const LEGACY_RIGS = typeof window !== "undefined"
   && new URLSearchParams(window.location.search).get("legacy") === "1";
 const MERGE_RIGS = !LEGACY_RIGS;
 
+// Atmospheric distance fog — hazes the far rows of the field for depth and softens
+// the horizon seam. OFF by default (it can read as dirty air over the clean field);
+// opt in with ?fog=1 to revisit/A-B. Linear so the foreground stays crisp.
+const FIELD_FOG = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("fog") === "1";
+const FOG_NEAR = 6;   // within this distance: no haze (keeps the selected plot clear)
+const FOG_FAR = 24;   // full haze by here (back of the grid recedes)
+// Horizon-haze color per environment — distant rigs fade toward this, so it should
+// read like that preset's sky/atmosphere. Tune freely.
+function fogColorFor(envPreset, parabolum) {
+  if (parabolum) return "#3a2c58";          // iridescent violet murk
+  if (envPreset === "solstice") return "#c9a86a"; // golden dust
+  if (envPreset === "night") return "#444c6e";    // cool blue dark
+  if (envPreset === "hell") return "#3a160c";      // low red smog
+  return "#bcb091";                          // warm dusty haze (day)
+}
+function FieldFog({ envPreset, parabolum, enabled }) {
+  const { scene } = useThree();
+  useEffect(() => {
+    if (!enabled) { scene.fog = null; return; }
+    const prev = scene.fog;
+    scene.fog = new THREE.Fog(fogColorFor(envPreset, parabolum), FOG_NEAR, FOG_FAR);
+    return () => { scene.fog = prev; };
+  }, [scene, envPreset, parabolum, enabled]);
+  return null;
+}
+
 // ── Shared CCTV state (module-level, Pumpjack writes → CctvRenderer reads) ──
 const _cctvState = {
   active: false,
@@ -204,9 +231,9 @@ let _rigWellhead = [...WELLHEAD_OFFSET];
 // Opal-cyan glow color for the wellhead (the substance's signature bloom).
 const WELLHEAD_GLOW = ACTIVE_IRID.hex.emis; // 0x18d0c0
 
-// Backlit sign — emissive strength of the player's image so it reads as a lit
-// display, not a matte poster. Shared by the close-up + instanced field signs.
-const SIGN_EMISSIVE_INTENSITY = 1.4;
+// Backlit sign — emissive strength of the player's image. Moderate so it glows
+// without blowing out / desaturating the image under tone-mapping.
+const SIGN_EMISSIVE_INTENSITY = 0.7;
 // Glow is sunk just below the pad (DROP) so the pad masks any overhang to the hole
 // opening (depth-test); SIZE can exceed the hole since the rim trims it. No point
 // light — light spills onto the pad and can't be clipped by geometry.
@@ -713,6 +740,20 @@ void main() {
 
 const PUMPJACK_SCALE = 0.1;
 
+// Yaw correction (degrees about world-up) applied to the auto-derived MachinePanel
+// front direction. The front is inferred from the gauge children, then this rotates
+// it to square up. If the camera frames a SIDE, set 90 or -90; if it frames the BACK,
+// set 180; if it's already perfect, set 0.
+const PANEL_FRONT_YAW_OFFSET_DEG = 0;
+const _PANEL_UP = /* @__PURE__ */ new THREE.Vector3(0, 1, 0);
+
+// Pressure-gauge needle: sweeps about its LOCAL X axis (matching Blender), 0 at empty
+// tank → 120° at full (Blender quaternion W=0.5, X=0.866). Flip the sign if it sweeps
+// toward LOW instead of HIGH.
+const NEEDLE_FULL_SWEEP = /* @__PURE__ */ (120 * Math.PI / 180);
+const _NEEDLE_AXIS = /* @__PURE__ */ new THREE.Vector3(1, 0, 0);
+const _needleQuat = /* @__PURE__ */ new THREE.Quaternion();
+
 // Gusher "blowback": while the geyser erupts, pitch the body/Samson post (Body_Pump)
 // back on its local X axis so the rig looks shoved back by the blast. Head_Pump lives
 // in a SEPARATE armature, so for the gusher we reparent it under Body_Pump (see the
@@ -724,8 +765,9 @@ const GUSHER_BLOWBACK_BODY = -0.30; // radians of X tilt on Body_Pump (negative 
 const GUSHER_BLOWBACK_SPEED = 15;   // lerp rate toward the target tilt
 // Extra back-pitch on the horsehead alone, on TOP of riding the body. Applied about
 // the body's X axis (the head's parent frame during the gusher), not the head's own
-// tilted local axis. ~164°; negative pitches the head back out of the blast.
-const GUSHER_HEAD_EXTRA = -Math.PI / 1.1;
+// tilted local axis. ~164°; positive pitches the head back away from the body — the
+// negative direction curled it under and clipped through Body_Pump.
+const GUSHER_HEAD_EXTRA = Math.PI / 1.1;
 const _GUSHER_X_AXIS = /* @__PURE__ */ new THREE.Vector3(1, 0, 0);
 const _gusherHeadQuat = /* @__PURE__ */ new THREE.Quaternion();
 // One-shot gusher length (seconds). A sustained gusher (tank overflow, or the demon
@@ -1431,7 +1473,9 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10 }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject }) {
+  const panelZoomedRef = useRef(false); // true once the panel has been zoomed in on
+  const machinePanelRef = useRef();     // MachinePanel container node (for click-to-zoom)
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -1447,7 +1491,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   // Gauge needle + pressure labels
   const gaugeNeedleRef = useRef();
-  const gaugeBaseRotX = useRef(0);
+  const needleRestQuat = useRef(null); // needle's rest local quaternion (rotate from here)
+  const needleAngle = useRef(0);       // current lerped sweep angle (radians, about local X)
   const textHighRef = useRef();
   const textMedRef = useRef();
   const textLowRef = useRef();
@@ -1532,10 +1577,20 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (child.name === "Wheel") {
         wheelRef.current = child;
       }
-      // Gauge needle
+      // Pressure-gauge needle. GaugeNeedle is the needle physically mounted on the
+      // visible BoostGauge_01 face (they're co-located); BoostGauge_Needle is a stray
+      // off to the side, so it's NOT the one to drive.
       if (child.name === "GaugeNeedle") {
         gaugeNeedleRef.current = child;
-        gaugeBaseRotX.current = child.rotation.x;
+        needleRestQuat.current = child.quaternion.clone();
+        // Red emissive glow. Clone the material first — the base is shared across the
+        // rig atlas, so editing it in place would tint the whole pumpjack.
+        if (child.material && !child.userData._needleGlow) {
+          child.material = child.material.clone();
+          child.material.emissive = new THREE.Color("#ff2a1a");
+          child.material.emissiveIntensity = 0.5;
+          child.userData._needleGlow = true;
+        }
       }
       // Dedicated LED screen mesh (preferred anchor for the live readout)
       if (child.name === "PressurePanel2") {
@@ -1917,6 +1972,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (child.name === "RedButton" && child.isMesh) {
         redButtonRef.current = child;
       }
+      // MachinePanel container (pre-order traverse visits the parent before its
+      // children, so the first match is the top-level box, not a child gauge).
+      if (!machinePanelRef.current && typeof child.name === "string" && child.name.startsWith("MachinePanel")) {
+        machinePanelRef.current = child;
+      }
       // Security camera — sweeping pivot + all camera parts
       if (child.name === "Security_Camera") {
         secCamRef.current = child;
@@ -2127,8 +2187,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     if (geyserMeshRef.current) {
       geyserMeshRef.current.visible = true;
     }
+    // Hell eruption (demon unleash) is pure fire — no oil puddle on the ground.
     if (spillMeshRef.current) {
-      spillMeshRef.current.visible = true;
+      spillMeshRef.current.visible = !hell;
     }
     if (spillMatRef.current) {
       spillMatRef.current.uniforms.uOpacity.value = 0.0;
@@ -2416,18 +2477,31 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         straw.scale.z = baseScale;
       }
     }
-    if (needle) {
+    if (needle && needleRestQuat.current) {
       const hellOverride = hellActiveRef.current;
       const fill = hellOverride ? 1.0 : Math.max(0, Math.min(currentFill, 1.0) - gaugePressureOffset.current);
-      const targetAngle = gaugeBaseRotX.current - fill * 225 * (Math.PI / 180);
+      // Sweep the needle about its LOCAL X axis from its rest pose, exactly like the
+      // Blender setup (full tank → 120° about local X). Applied as a quaternion in the
+      // needle's local frame — the rest pose isn't identity in three.js (it counteracts
+      // the rotated MachinePanel parent), so a plain Euler set would skew/foreshorten.
+      const targetAngle = fill * NEEDLE_FULL_SWEEP;
       const lerpSpeed = hellOverride ? 8 : 3;
-      needle.rotation.x += (targetAngle - needle.rotation.x) * Math.min(delta * lerpSpeed, 1);
+      needleAngle.current += (targetAngle - needleAngle.current) * Math.min(delta * lerpSpeed, 1);
+      // Shudder: a fast jitter that grows with pressure (still at empty, trembling at
+      // full). A smooth high-freq wobble plus a touch of per-frame randomness. Added
+      // only to the displayed angle, not needleAngle, so the HIGH/MED/LOW label is stable.
+      const pressure = Math.max(0, needleAngle.current / NEEDLE_FULL_SWEEP);
+      const shudder = pressure * (0.05 * Math.sin(performance.now() * 0.05) + 0.3 * (Math.random() - 0.5));
+      _needleQuat.setFromAxisAngle(_NEEDLE_AXIS, needleAngle.current + shudder);
+      needle.quaternion.copy(needleRestQuat.current).multiply(_needleQuat);
+      // Red glow brightens with pressure (caps at 1.4).
+      if (needle.material) needle.material.emissiveIntensity = 0.4 + pressure * 1.0;
 
-      // Pressure level — based on the needle's lerped position (not raw fill). Drives
-      // the code-rendered LED label; setState only when the level actually changes.
-      const displayAngleDeg = Math.abs(needle.rotation.x - gaugeBaseRotX.current) * (180 / Math.PI);
-      const level = hellOverride || displayAngleDeg >= 210 ? "HIGH"
-        : displayAngleDeg >= 85 ? "MED" : "LOW";
+      // Pressure level — based on the needle's lerped angle (not raw fill). Drives the
+      // code-rendered LED label; setState only when the level actually changes.
+      const displayAngleDeg = Math.abs(needleAngle.current) * (180 / Math.PI);
+      const level = hellOverride || displayAngleDeg >= 110 ? "HIGH"
+        : displayAngleDeg >= 45 ? "MED" : "LOW";
       if (level !== pressureLevelRef.current) {
         pressureLevelRef.current = level;
         const hex = level === "HIGH" ? "#ff3a2a" : level === "MED" ? "#ffae00" : "#33dd66";
@@ -2739,7 +2813,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
     // Security camera sweep — slow loop from 0° to 155° CCW and back
     const secCam = secCamRef.current;
-    const camVisible = highlighted && !!pumpConfig?.showCamera;
+    // Live feed only for the owner (or admin/test/report). Non-owners still see the
+    // camera housing sweep, but it never feeds the CCTV renderer.
+    const camVisible = highlighted && !!pumpConfig?.showCamera && cameraViewable;
     if (secCam && secCamBaseRotY.current !== null) {
       if (camVisible && !(highlighted && _cctvState.pauseSweep)) {
         const sweep = 90 * (Math.PI / 180);
@@ -2819,7 +2895,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
       // Oil spill decal — spreads as the gusher builds (uGrow rides the eased blowback)
       // and fades with the gusher (uOpacity = fade). Self-resets, no lingering state.
-      if (spillMatRef.current) {
+      // Skip the ground puddle entirely for the hell eruption — fire only.
+      if (spillMeshRef.current && spillMeshRef.current.visible === hell) {
+        spillMeshRef.current.visible = !hell;
+      }
+      if (spillMatRef.current && !hell) {
         spillMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
         spillMatRef.current.uniforms.uParabolum.value = hell ? 0.0 : 1.0;
         spillMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
@@ -2936,6 +3016,36 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   });
 
+  // Zoom the camera to a canonical head-on view of the MachinePanel's front face.
+  // Used by a direct panel/gauge click and by the first RedButton click.
+  const focusMachinePanel = useCallback((panelNode) => {
+    if (!panelNode || !onFocusObject) return;
+    panelNode.updateWorldMatrix(true, false);
+    const bbox = new THREE.Box3().setFromObject(panelNode);
+    const center = bbox.getCenter(new THREE.Vector3());
+    const size = bbox.getSize(new THREE.Vector3());
+    // Snap the front/back heading to the panel's thinner horizontal axis (its depth);
+    // the gauge face spans the wider axis. Gauge children pick which way is the front.
+    const axis = size.x < size.z ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+    const avg = new THREE.Vector3();
+    let n = 0;
+    panelNode.traverse((c) => {
+      if (c !== panelNode && c.isMesh) { avg.add(c.getWorldPosition(new THREE.Vector3())); n++; }
+    });
+    let sign = 1;
+    if (n > 0) {
+      avg.divideScalar(n).sub(center);
+      const d = avg.dot(axis);
+      if (Math.abs(d) > 1e-5) sign = Math.sign(d);
+    }
+    const front = axis.multiplyScalar(sign);
+    front.applyAxisAngle(_PANEL_UP, PANEL_FRONT_YAW_OFFSET_DEG * Math.PI / 180);
+    front.y = 0;
+    front.normalize();
+    onFocusObject(center, front);
+    panelZoomedRef.current = true; // now a RedButton click drains instead of zooming
+  }, [onFocusObject]);
+
   const handleClick = useCallback((e) => {
     e.stopPropagation();
 
@@ -2972,14 +3082,23 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       return;
     }
 
-    // RedButton click — drain tank, stop gusher, reset gauge. Walk up parents and
-    // tolerate GLTF "_N" suffixes so a click on a child mesh of the button still counts.
-    let isRedButton = false;
-    for (let rb = e.object; rb; rb = rb.parent) {
-      if (rb.name === "RedButton" || (typeof rb.name === "string" && rb.name.startsWith("RedButton"))) { isRedButton = true; break; }
+    // Panel buttons. AlarmButton_01 and RedButton both bring the user close-up (zoom).
+    // Once zoomed in, RedButton (only) drains the tank. Walk up parents and tolerate
+    // GLTF "_N" suffixes so a click on a child mesh of a button still counts.
+    let clickedButton = null; // "red" | "alarm" | null
+    for (let b = e.object; b; b = b.parent) {
+      if (typeof b.name !== "string") continue;
+      if (b.name.startsWith("RedButton")) { clickedButton = "red"; break; }
+      if (b.name.startsWith("AlarmButton")) { clickedButton = "alarm"; break; }
     }
-    if (isRedButton && highlighted) {
-      if (!drainingRef.current && tankFillRef.current > 0) {
+    if (clickedButton && highlighted) {
+      // First click on either button zooms in so the user can see/aim at the button.
+      if (!panelZoomedRef.current) {
+        if (onFocusObject && machinePanelRef.current) focusMachinePanel(machinePanelRef.current);
+        return;
+      }
+      // Already zoomed in: only RedButton drains the tank.
+      if (clickedButton === "red" && !drainingRef.current && tankFillRef.current > 0) {
         drainingRef.current = true;
         drainFillRef.current = Math.min(tankFillRef.current, 1.0);
         setTankDraining(true);
@@ -3021,6 +3140,18 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       return;
     }
 
+    // MachinePanel click — zoom to a canonical head-on view of the panel's FRONT,
+    // no matter which face of the box (or which child gauge/button) was clicked. The
+    // parent walk catches child meshes (gauges) since they live under the panel node.
+    let panelNode = null;
+    for (let p = e.object; p; p = p.parent) {
+      if (typeof p.name === "string" && p.name.startsWith("MachinePanel")) { panelNode = p; break; }
+    }
+    if (panelNode && highlighted && onFocusObject) {
+      focusMachinePanel(panelNode);
+      return;
+    }
+
     // Messaging is handled entirely in the UI panel (OilPlotChat), not via a
     // 3D click. The Envelope mesh is intentionally NOT intercepted here — a
     // click on it falls through to the normal rig select/fly below. (The mesh
@@ -3035,7 +3166,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       onClick?.();
     }
     lastClickTime.current = now;
-  }, [onClick, onDoubleClick, highlighted, initSteam, onEnvelopeClick]);
+  }, [onClick, onDoubleClick, highlighted, initSteam, onEnvelopeClick, onFocusObject, focusMachinePanel]);
+
+  // Reset the panel-zoom flag when this rig is deselected, so re-selecting it starts
+  // the zoom-then-drain sequence fresh.
+  useEffect(() => {
+    if (!highlighted) panelZoomedRef.current = false;
+  }, [highlighted]);
 
   return (
     <group ref={shakeGroupRef} position={position}>
@@ -3290,10 +3427,44 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
   );
 }
 
-function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
+// OilTower click-to-zoom: the GasTowerWindow sits on the tower's -X side and faces
+// outward (world -X), so the camera approaches from there. The window is large, so it
+// needs more dolly distance than the close-up MachinePanel.
+const TOWER_WINDOW_FRONT = /* @__PURE__ */ new THREE.Vector3(-1, 0, 0);
+const TOWER_FOCUS_DIST = 1.3;
+
+function OilTower({ position, communityOil = 0, totalOilBudget = 500, onFocusObject, onZoomOut }) {
   const { scene } = useGLTF("/models/OilTower.glb");
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
   useEffect(() => () => disposeScene(clonedScene), [clonedScene]);
+
+  // Capture the GasTowerWindow on the big GasTower for click-to-zoom.
+  const windowRef = useRef(null);
+  const towerZoomedRef = useRef(false);
+  useEffect(() => {
+    clonedScene.traverse((c) => { if (c.name === "GasTowerWindow") windowRef.current = c; });
+  }, [clonedScene]);
+
+  // Clicking any GasTower* mesh zooms to a head-on view of the window; clicking again
+  // pulls back out to the overview.
+  const handleTowerClick = useCallback((e) => {
+    let isTower = false;
+    for (let o = e.object; o; o = o.parent) {
+      if (typeof o.name === "string" && o.name.startsWith("GasTower")) { isTower = true; break; }
+    }
+    if (!isTower) return;
+    e.stopPropagation();
+    if (towerZoomedRef.current) {
+      towerZoomedRef.current = false;
+      onZoomOut?.();
+      return;
+    }
+    if (!onFocusObject || !windowRef.current) return;
+    windowRef.current.updateWorldMatrix(true, false);
+    const center = new THREE.Box3().setFromObject(windowRef.current).getCenter(new THREE.Vector3());
+    onFocusObject(center, TOWER_WINDOW_FRONT.clone(), TOWER_FOCUS_DIST);
+    towerZoomedRef.current = true;
+  }, [onFocusObject, onZoomOut]);
 
   // Find the tower tank mesh and compute bounds
   const towerBounds = useMemo(() => {
@@ -3323,7 +3494,14 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
 
   return (
     <group>
-      <primitive object={clonedScene} position={position} scale={0.1} />
+      <primitive
+        object={clonedScene}
+        position={position}
+        scale={0.1}
+        onClick={handleTowerClick}
+        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = "auto"; }}
+      />
       {towerBounds && (
         <TowerLiquid
           towerBounds={towerBounds}
@@ -3948,6 +4126,7 @@ function InstancedSign({ geometry, url, positions }) {
 // the offset-to-the-side and the camera GLB is pre-registered to the same space.
 function SignModel({ model, signImageUrl }) {
   const { scene } = useGLTF(model);
+  const { gl } = useThree();
   const cloned = useMemo(() => {
     const c = scene.clone(true);
     // Clone the image-face materials so a per-plot texture can't leak to other signs.
@@ -3973,13 +4152,21 @@ function SignModel({ model, signImageUrl }) {
     loader.load(signImageUrl, (tex) => {
       if (!alive) { tex.dispose(); return; }
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.repeat.x = -1; tex.offset.x = 1;
+      tex.flipY = false;   // match the model's glTF UVs (TextureLoader defaults to true → upside down)
+      tex.anisotropy = gl.capabilities.getMaxAnisotropy(); // sharpest at grazing angles (billboards are usually angled)
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.needsUpdate = true;
       cloned.traverse((ch) => {
         if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) {
           const m = ch.material;
           m.map = tex;
           m.color = new THREE.Color(0xffffff);
+          m.metalness = 0;
+          m.roughness = 0.6;
+          // Clear any inherited maps that would muddy/desaturate the image.
+          m.normalMap = null; m.roughnessMap = null; m.metalnessMap = null; m.aoMap = null;
           m.emissive = new THREE.Color(0xffffff);
           m.emissiveMap = tex;
           m.emissiveIntensity = SIGN_EMISSIVE_INTENSITY;
@@ -4033,13 +4220,14 @@ function SignCameraModel({ model, active }) {
   return <primitive object={cloned} />;
 }
 
-function PlotSign({ position, signImageUrl, signStyle, showCamera, isSelected }) {
+function PlotSign({ position, signImageUrl, signStyle, showCamera, isSelected, cameraViewable = true }) {
   const entry = SIGN_CATALOG.find((s) => s.id === signStyle) || SIGN_CATALOG[0];
   if (!entry) return null;
   return (
     <group position={position} scale={PUMPJACK_SCALE}>
       <SignModel model={entry.model} signImageUrl={signImageUrl} />
-      {showCamera && entry.cameraModel && <SignCameraModel model={entry.cameraModel} active={!!isSelected} />}
+      {/* Camera model still renders for everyone; the live feed (active) only for the owner. */}
+      {showCamera && entry.cameraModel && <SignCameraModel model={entry.cameraModel} active={!!isSelected && cameraViewable} />}
     </group>
   );
 }
@@ -4047,7 +4235,7 @@ function PlotSign({ position, signImageUrl, signStyle, showCamera, isSelected })
 // One sign per plot with showSign (the image is optional — a blank panel shows until
 // one is set). The selected plot uses the LIVE pumpConfig so toggles show instantly;
 // other plots read the saved allPumpConfigs map.
-function PlotSignField({ items, allPumpConfigs, pumpConfig, selectedCol, selectedRow }) {
+function PlotSignField({ items, allPumpConfigs, pumpConfig, selectedCol, selectedRow, cameraViewable = true }) {
   const signs = useMemo(() => {
     const out = [];
     items.forEach((it) => {
@@ -4060,7 +4248,7 @@ function PlotSignField({ items, allPumpConfigs, pumpConfig, selectedCol, selecte
     return out;
   }, [items, allPumpConfigs, pumpConfig, selectedCol, selectedRow]);
   return signs.map((s) => (
-    <PlotSign key={s.key} position={s.position} signImageUrl={s.signImageUrl} signStyle={s.signStyle} showCamera={s.showCamera} isSelected={s.isSelected} />
+    <PlotSign key={s.key} position={s.position} signImageUrl={s.signImageUrl} signStyle={s.signStyle} showCamera={s.showCamera} isSelected={s.isSelected} cameraViewable={cameraViewable} />
   ));
 }
 SIGN_CATALOG.forEach((s) => { useGLTF.preload(s.model); if (s.cameraModel) useGLTF.preload(s.cameraModel); });
@@ -4116,7 +4304,7 @@ function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, full
   );
 }
 
-function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut }) {
+function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut, cameraViewable = true }) {
   const base = useMemo(() => buildBaseRig(scene), [scene]);
   // Per-vertex metalness/roughness (from aMetalness/aRoughness attributes) so
   // textured metal parts catch studio-env reflections while painted parts stay
@@ -4219,12 +4407,12 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
       />
       {/* Catalog signs (+ cameras) — one per plot with showSign, all plots incl. the
           selected one, since signs are no longer part of the rig. */}
-      <PlotSignField items={items} allPumpConfigs={allPumpConfigs} pumpConfig={pumpConfig} selectedCol={selectedCol} selectedRow={selectedRow} />
+      <PlotSignField items={items} allPumpConfigs={allPumpConfigs} pumpConfig={pumpConfig} selectedCol={selectedCol} selectedRow={selectedRow} cameraViewable={cameraViewable} />
     </>
   );
 }
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
   // Cells with a live gusher event. Each renders a full animated rig (instead of
   // merged static geometry) so the pump pauses + the rig pitches back as it erupts
   // — visible to every player, not just the gusher's owner.
@@ -4310,7 +4498,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
   return (
     <>
       {/* Oil Tower in the center 4 cells */}
-      <OilTower position={towerPos} communityOil={communityOil} totalOilBudget={totalOilBudget} />
+      <OilTower position={towerPos} communityOil={communityOil} totalOilBudget={totalOilBudget} onFocusObject={onFocusObject} onZoomOut={onZoomOut} />
       {/* Animated border outline on the selected grid square */}
       {selectedPos && (
         <PlotBorderHighlight position={selectedPos} cellSize={cellSize} />
@@ -4329,6 +4517,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
           onSelectCell={onSelectCell}
           onFlyTo={onFlyTo}
           onZoomOut={onZoomOut}
+          cameraViewable={cameraViewable}
         />
       )}
       {items.map(({ key, position, col, row }) => {
@@ -4372,6 +4561,8 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             hellActive={hellActive && col === hellCol && row === hellRow}
             worldW={worldW}
             worldD={worldD}
+            cameraViewable={cameraViewable}
+            onFocusObject={onFocusObject}
             onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
             onDoubleClick={() => isSelected ? onZoomOut?.() : onFlyTo?.(col, row)}
           />
@@ -4921,6 +5112,12 @@ export default function OilVoxelGrid({
   demonCapturable = true,
   onClaimBounty,
   onDemonMiss,
+  // Gate the live CCTV feed: only the plot owner (or admin/test/report) sees it.
+  // Visitors clicking a camera-enabled plot get the rig + camera model, no feed.
+  cameraViewable = true,
+  // Click-to-zoom on scene objects (e.g. MachinePanel): called with the THREE
+  // world intersection point so the page can dolly the camera in.
+  onFocusObject,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -5044,6 +5241,8 @@ export default function OilVoxelGrid({
 
   return (
     <group>
+      {/* Atmospheric distance fog (per-environment) — depth + softer horizon */}
+      <FieldFog envPreset={envPreset} parabolum={parabolum} enabled={FIELD_FOG} />
       {/* Volumetric oil deposits — only rendered after reveal */}
       {(animateReveal || revealProgress > 0) && (
         <mesh position={[0, -worldH / 2, 0]} renderOrder={0}>
@@ -5131,6 +5330,8 @@ export default function OilVoxelGrid({
             hellActive={hellActive}
             hellCol={hellCol}
             hellRow={hellRow}
+            cameraViewable={cameraViewable}
+            onFocusObject={onFocusObject}
           />
           {rogueEvents.map((ev) => (
             <RogueCharacter

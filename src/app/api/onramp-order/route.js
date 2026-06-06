@@ -84,9 +84,13 @@ export async function POST(request) {
         { status: 400, headers: corsHeaders }
       );
     }
-    if (!email || typeof email !== 'string') {
+    // Email is sourced from the CDP-verified identity client-side; the server
+    // can't re-verify it, but it must at least be a well-formed address (the
+    // raw value flows into the CDP order). Reject malformed/garbage.
+    if (!email || typeof email !== 'string' || email.length > 254 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
-        { error: 'Verified email is required' },
+        { error: 'A valid email is required' },
         { status: 400, headers: corsHeaders }
       );
     }

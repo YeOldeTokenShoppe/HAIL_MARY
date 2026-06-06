@@ -34,14 +34,19 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
         background: "rgba(0,0,0,0.78)",
         backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 16,
+        // Keep the centered modal clear of the notch / home indicator so its
+        // close button and CTA stay reachable.
+        padding: "calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px))",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
-          width: "100%", maxWidth: 460, maxHeight: "90vh",
+          // dvh (not vh) so the modal fits the *visible* viewport on iOS Safari
+          // even while the URL bar is showing — otherwise the centered modal
+          // overflows past the top and the close button hides under the URL bar.
+          width: "100%", maxWidth: 460, maxHeight: "90dvh",
           overflowY: "auto",
           background: c.panelBg,
           border: `1px solid ${c.border}`,
@@ -55,10 +60,10 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
           onClick={onClose}
           aria-label="Close"
           style={{
-            position: "absolute", top: 8, right: 8, zIndex: 2,
-            width: 30, height: 30, borderRadius: 6,
-            background: "rgba(0,0,0,0.45)", border: `1px solid ${c.border}`,
-            color: "#fff", cursor: "pointer", fontSize: 16, lineHeight: 1,
+            position: "absolute", top: 10, right: 10, zIndex: 2,
+            width: 38, height: 38, borderRadius: 8,
+            background: "rgba(0,0,0,0.6)", border: `1px solid ${c.border}`,
+            color: "#fff", cursor: "pointer", fontSize: 20, lineHeight: 1,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >

@@ -667,6 +667,10 @@ function CameraFlyIn({ onComplete, mobile = false }) {
   return null;
 }
 
+// Head-on focus (MachinePanel click) downward tilt. 0 = dead-level/straight-on,
+// higher = camera sits more above the panel and looks down. ~0.15 is a gentle tilt.
+const FOCUS_TILT = 0.15;
+
 // Smoothly animate camera to a target position
 function CameraFlyTo({ target, controlsRef }) {
   const { camera } = useThree();
@@ -727,13 +731,34 @@ function CameraFlyTo({ target, controlsRef }) {
           // Zoom out to overview
           endTarget.current.set(0, target.mobile ? 2 : 5, 0);
           endPos.current.set(target.x, target.y, target.z);
+        } else if (target.focus) {
+          // Zoom in on the clicked point. If a face normal was supplied, swing the
+          // camera around to view the face head-on; otherwise just dolly in along
+          // the current view direction.
+          endTarget.current.set(target.x, target.y, target.z);
+          let dir;
+          if (target.nx !== undefined && target.nx !== null) {
+            // Approach along the panel's fixed front axis = canonical head-on view.
+            // No flip-toward-camera: we want it to swing around to the front even if
+            // the user is currently looking at the back/side.
+            dir = new THREE.Vector3(target.nx, target.ny, target.nz);
+            dir.y += FOCUS_TILT; // small lift so it looks slightly down, not dead-flat
+          } else {
+            dir = startPos.current.clone().sub(endTarget.current);
+            if (dir.lengthSq() < 1e-6) dir.set(0.6, 0.3, 0.6); // degenerate fallback
+          }
+          dir.normalize();
+          // Per-target distance (big objects like the tower window need more room);
+          // falls back to the close panel distance.
+          const focusDist = target.focusDist ?? (target.mobile ? 0.2 : 0.25);
+          endPos.current.copy(endTarget.current).addScaledVector(dir, focusDist);
         } else if (target.mobile) {
-          // Mobile: close view of the rig, lifted to look DOWN at it (~30°).
-          // A level pose (camera y == target y) grazes the ground plane and
-          // washes the rig in a warm haze (and blows out the metal's env
-          // reflection); the downward tilt breaks that grazing angle.
-          endTarget.current.set(target.x, target.y - 0.15, target.z + 0.1);
-          endPos.current.set(target.x + 0.5, target.y + 0.22, target.z + 0.41);
+          // Mobile: close, fairly head-on view of the rig with a gentle downward tilt.
+          // (A level pose — camera y == target y — grazes the ground plane and washes
+          // the rig in haze, so keep the camera a touch above the look-at.) The smaller
+          // +x offset keeps the rig centered rather than thrown to one side.
+          endTarget.current.set(target.x, target.y - 0.08, target.z + 0.05);
+          endPos.current.set(target.x + 0.34, target.y + 0.0, target.z + 0.41);
         } else {
           // Desktop: elevated close-up (pulled back slightly for more headroom)
           endTarget.current.set(target.x + 0.1, target.y - 0.05, target.z + 0.1);
@@ -1695,6 +1720,13 @@ export default function OilPage() {
   const cellOwnerId = selectedX !== null ? (allPumpConfigs[`${selectedX}_${sliceY}`]?.userId || user?.id) : user?.id;
   const { isRecording, recordings, playbackUrl, setPlaybackUrl, startRecording, stopRecording } = useCctvRecorder(cctvCanvasRef, selectedX, sliceY, cellOwnerId);
 
+  // CCTV privacy: only the plot's owner sees the live camera feed. Admin/test/report
+  // retain access for moderation + record-on-behalf. Visitors still see the camera
+  // model on the rig, just no feed.
+  const cameraViewable = isAdmin || isTest || isReport ||
+    (selectedX !== null && !!user?.id &&
+      allPumpConfigs[`${selectedX}_${sliceY}`]?.userId === user.id);
+
   // CCTV auto-record: triggered by rogue arrival callback + gusher effect
   const recordedEventsRef = useRef(new Set());
 
@@ -2436,6 +2468,19 @@ export default function OilPage() {
     setFlyTarget({ x: 0, y: isMobile ? 3.5 : 8, z: isMobile ? 4 : 8, id: flyIdRef.current, mobile: isMobile, overview: true });
     setSelectedX(null);
     setDrillDepth(0);
+  }, [isMobile]);
+
+  // Click-to-zoom on a scene object (e.g. MachinePanel). worldPoint is the THREE
+  // intersection point; CameraFlyTo's `focus` branch dollies the camera in toward it.
+  const handleFocusObject = useCallback((worldPoint, normal, dist) => {
+    if (!worldPoint) return;
+    flyIdRef.current++;
+    setFlyTarget({
+      x: worldPoint.x, y: worldPoint.y, z: worldPoint.z,
+      nx: normal?.x, ny: normal?.y, nz: normal?.z,
+      focusDist: dist,
+      id: flyIdRef.current, mobile: isMobile, focus: true,
+    });
   }, [isMobile]);
 
   // On mobile, open the page focused on the player's own rig (if they hold a
@@ -3527,7 +3572,7 @@ export default function OilPage() {
   const unwatchedCount = recordings.filter((r) => !viewedRecIds.has(r.id)).length;
 
   // CCTV overlay — collapsible widget, top-left of canvas
-  const cctvOverlay = selectedX !== null && flyTarget && pumpConfig.showCamera && (
+  const cctvOverlay = selectedX !== null && flyTarget && pumpConfig.showCamera && cameraViewable && (
     <div style={cctvStyles.wrap}>
       <div
         style={cctvStyles.header}
@@ -4716,7 +4761,7 @@ export default function OilPage() {
         </div>
 
         {/* Scrollable: active view + panels below */}
-        <div style={m.scroll}>
+        <div id="oil-scroll" style={m.scroll}>
           {/* 3D Voxel */}
           {mobileTab === "3d" && (
             <div id="oil-canvas" style={m.canvasWrap}>
@@ -4783,6 +4828,8 @@ export default function OilPage() {
                     demonCapturable={demonCapturable}
                     onClaimBounty={handleClaimBounty}
                     onDemonMiss={handleDemonMiss}
+                    cameraViewable={cameraViewable}
+                    onFocusObject={handleFocusObject}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -4924,6 +4971,26 @@ export default function OilPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Scroll handle — only on the 3D tab, where the canvas captures touch.
+              Gives a non-canvas grab area so the page can be scrolled, and taps
+              nudge the panels below the scene into view. */}
+          {mobileTab === "3d" && (
+            <button
+              type="button"
+              style={m.scrollHandle}
+              aria-label="Scroll down to your claim"
+              onClick={() => {
+                document.getElementById("oil-scroll")?.scrollBy({
+                  top: Math.round(window.innerHeight * 0.5),
+                  behavior: "smooth",
+                });
+              }}
+            >
+              <span style={m.scrollHandleGrip} />
+              <span>Scroll for your claim ↓</span>
+            </button>
           )}
 
           {/* Surface Map */}
@@ -5294,6 +5361,8 @@ export default function OilPage() {
                 demonCapturable={demonCapturable}
                 onClaimBounty={handleClaimBounty}
                 onDemonMiss={handleDemonMiss}
+                cameraViewable={cameraViewable}
+                onFocusObject={handleFocusObject}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -6430,10 +6499,45 @@ function getMobileStyles(t) { return {
 
   canvasWrap: {
     position: "relative",
-    height: "75vh",
-    minHeight: 280,
-    maxHeight: 500,
+    // Shrunk from 75vh so a non-canvas strip (scroll handle + panel peek) stays
+    // visible below the scene on small phones. The 3D canvas captures all touch
+    // (OrbitControls), so without a touchable band below it the page can't be
+    // scrolled on an iPhone 13. See scrollHandle below.
+    height: "56vh",
+    minHeight: 240,
+    maxHeight: 420,
     borderBottom: `1px solid ${t.border}`,
+  },
+
+  scrollHandle: {
+    flexShrink: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    height: 44,
+    width: "100%",
+    padding: "6px 0",
+    border: "none",
+    cursor: "pointer",
+    background: t.panelWash ? `${t.panelLine}, ${t.tintBg}` : t.tintBg,
+    borderBottom: `1px solid ${t.border}`,
+    color: t.muted,
+    fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 9,
+    letterSpacing: "0.18em",
+    textTransform: "uppercase",
+    // The canvas eats touch; this strip does not — it's the grab area for scrolling.
+    touchAction: "auto",
+  },
+
+  scrollHandleGrip: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    background: t.accent || t.muted,
+    opacity: 0.5,
   },
 
   section: {

@@ -7,7 +7,7 @@ import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId, PREMIUM
 // as WebP before it's stored. /oil is a shared scene — every player loads each
 // other's sign as a GPU texture, so bounding it here keeps the field cheap for all.
 // (A Storage rule also caps file size server-side as a guardrail.)
-async function resizeSignImage(file, maxDim = 512, quality = 0.85) {
+async function resizeSignImage(file, maxDim = 1024, quality = 0.92) {
   let img;
   let bmp = null;
   try {
@@ -32,10 +32,16 @@ async function resizeSignImage(file, maxDim = 512, quality = 0.85) {
   canvas.height = ch;
   canvas.getContext("2d").drawImage(img, 0, 0, cw, ch);
   if (bmp?.close) bmp.close();
-  // WebP first (smallest); fall back to PNG where WebP encode isn't supported
-  // (older Safari). Both stay well under the 1MB Storage cap at <=512px.
-  let blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-  if (!blob) blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  // Lossless PNG first — razor-sharp on hard-edged logos/text, matching a baked
+  // texture (a 2-color logo encodes tiny). Only fall back to lossy WebP when the PNG
+  // would blow the ~1MB Storage cap — i.e. for photographic uploads, where lossy
+  // artifacts are invisible anyway.
+  const STORAGE_CAP = 1_000_000;
+  let blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob || blob.size > STORAGE_CAP) {
+    const webp = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+    if (webp) blob = webp;
+  }
   return blob;
 }
 
@@ -979,7 +985,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                       if (!file) return;
                       let blob = null;
                       try {
-                        blob = await resizeSignImage(file, 512, 0.85);
+                        blob = await resizeSignImage(file, 2048, 0.92);
                       } catch {
                         blob = null; // fall back to original on any decode/encode error
                       }
