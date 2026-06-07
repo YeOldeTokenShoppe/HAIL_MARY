@@ -41,6 +41,33 @@ const LEGACY_RIGS = typeof window !== "undefined"
   && new URLSearchParams(window.location.search).get("legacy") === "1";
 const MERGE_RIGS = !LEGACY_RIGS;
 
+// Animated field: EVERY merged idle rig runs its full pumpjack linkage in the vertex
+// shader (no skeletal animation, no extra draw calls). Moving parts are tagged per
+// vertex (aPart) during the merge; the crank is the single driver and the beam angle
+// is solved from the four-bar linkage. Per-rig phase derived from the rig's world
+// position desyncs the field. The whole field reads as "alive" on wide aerial views
+// where full Pumpjacks would blow the draw-call budget. ON by default — `?animfield=0`
+// falls back to the static merged field (A/B + escape hatch).
+const ANIM_FIELD = typeof window === "undefined"
+  || new URLSearchParams(window.location.search).get("animfield") !== "0";
+// Tunables. The crank (Wheel_Back) is the single driver: it spins at FIELD_PUMP_SPEED
+// and the beam angle is SOLVED from the four-bar linkage (crank → pitman → beam), so
+// the beam amplitude is physical and the pitman length is conserved (no deform).
+const FIELD_PUMP_SPEED = 1.7;       // crank angular speed (rad/s)
+const FIELD_CRANK_DIR = -1;          // crank spin direction (+1 / -1) — flip if backwards
+const FIELD_PUMP_PIVOT_FRAC = 0.1; // saddle height = center→top fraction of beam bbox
+// LEGACY fine-tune for Cube's crank attach, about the axle: SCALE (radial) + ANGLE
+// (tangential). Normally untouched — the attach is taken from the CrankPin_Mesh geometry
+// centroid, so it seats automatically. Left here only as an escape hatch if a future
+// model lacks the pin geometry. NOTE: changing SCALE also changes the throw (beam rock).
+const FIELD_CRANK_PIN_SCALE = 1.0;
+const FIELD_CRANK_PIN_ANGLE = 0.0;
+// Debug: ?pinmark=1 renders a small sphere at each linkage joint the shader uses —
+// red = crank pin (pitmanA), green = axle (crankPivot), blue = beam end (pitmanB) — so
+// the seating can be checked against the actual rig geometry. Drawn on every rig.
+const PIN_MARK = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("pinmark") === "1";
+
 // Atmospheric distance fog — hazes the far rows of the field for depth and softens
 // the horizon seam. OFF by default (it can read as dirty air over the clean field);
 // opt in with ?fog=1 to revisit/A-B. Linear so the foreground stays crisp.
@@ -3635,7 +3662,14 @@ function buildBaseRig(scene) {
   const colorChunks = []; // Float32Array(count*3) per mesh, in merge order
   const metalChunks = []; // Float32Array(count) per mesh
   const roughChunks = []; // Float32Array(count) per mesh
+  const rockChunks = [];  // Float32Array(count) per mesh — 1 = beam/horsehead (bobs)
   const zoneChunks = [];   // { zoneId, count } per mesh
+  let bodyBox = null;      // Body_Pump (walking beam) bbox → saddle pivot estimate
+  let wheelBox = null;     // Wheel_Back (crank) bbox → spin axle center
+  let strawBox = null;     // Straw (polished rod) bbox → fallback travel reference
+  let headBox = null;      // Head_Pump bbox → beam-tip attach the head+rod ride
+  let pitBox = null;       // Cube (pitman / connecting rod) bbox → coupler endpoints
+  let crankPinCentroid = null; // CrankPin_Mesh geometry centroid → exact pin attach
   const tmp = new THREE.Color();
   // Sign + frame are pulled OUT of the merge so they only appear on plots with
   // showSign (rendered per-plot by IdleSign). signGeo keeps UV for the image.
@@ -3643,8 +3677,32 @@ function buildBaseRig(scene) {
   const frameGeoms = [];
   const camGeoms = [];
   let strawXZ = null; // Straw (drill pipe) world XZ → the true wellhead center
+  // Optional Blender markers (Empty or mesh) naming the EXACT pitman pivots — when
+  // present they override the bbox estimates for a precise linkage. Read once here;
+  // mesh-typed markers are also skipped in the traverse so they never render.
+  const markerPos = (name) => {
+    const o = scene.getObjectByName(name);
+    if (!o) return null;
+    const wp = new THREE.Vector3(); o.getWorldPosition(wp);
+    return [wp.x, wp.y, wp.z];
+  };
+  // A single `<base>` marker (Empty), or the average of `<base>_Left` + `<base>_Right`
+  // (handy when it's easier to snap one to each of Cube's two bars; they project to the
+  // same in-plane point, so one centered marker is equivalent). Exact names only — a
+  // geometry mesh like "CrankPin_Mesh" is NOT treated as a marker and renders normally.
+  const markerAvg = (base) => {
+    const single = markerPos(base);
+    if (single) return single;
+    const l = markerPos(`${base}_Left`), r = markerPos(`${base}_Right`);
+    if (l && r) return [(l[0] + r[0]) / 2, (l[1] + r[1]) / 2, (l[2] + r[2]) / 2];
+    return l || r || null;
+  };
+  const crankPinMarker = markerAvg("CrankPin");   // crank throw point on Wheel_Back
+  const beamPinMarker = markerAvg("BeamPin");      // equalizer attach point on the beam
+  const crankAxleMarker = markerAvg("CrankAxle");  // crank rotation center (optional)
   scene.traverse((child) => {
     if (!child.isMesh || !child.geometry) return;
+    if (/^(CrankPin|BeamPin|CrankAxle)(_Left|_Right)?$/.test(child.name)) return; // hide only mesh markers, not "_Mesh" geometry
     if (child.name === "Envelope") return; // removed from scene
     if (child.name === "Straw") {
       const wp = new THREE.Vector3();
@@ -3701,6 +3759,60 @@ function buildBaseRig(scene) {
     const n = g.attributes.position.count;
     const uv = g.attributes.uv;
 
+    // Exact crank-pin attach: centroid of the VISIBLE pin geometry (world space). Cube's
+    // bottom pins here so it rides the real pin, not a marker that may sit ahead of it.
+    if (child.name === "CrankPin_Mesh") {
+      const pp = g.attributes.position; let sx = 0, sy = 0, sz = 0;
+      for (let i = 0; i < n; i++) { sx += pp.getX(i); sy += pp.getY(i); sz += pp.getZ(i); }
+      crankPinCentroid = [sx / n, sy / n, sz / n];
+    }
+
+    // Moving parts, tagged per-vertex (aPart) for the shared merged material's
+    // shader (see ANIM_FIELD injection):
+    //   1 = walking beam (Body_Pump) + the equalizer bar (Cylinder), rocking about the
+    //       saddle.
+    //   2 = crank — Wheel_Back (crankshaft + wheels) + CrankPin_Mesh (the pin geometry),
+    //       continuous spin about the axle (the pin orbits to stay under Cube's bottom).
+    //   3 = head assembly — horsehead (Head_Pump) + polished rod (Straw) + the bridle/
+    //       carrier pieces (Cylinder_Pump, Cylinder_Pump.001), all on the SAME bone
+    //       (Armature.001). Ride the beam tip via pure translation, keeping their rest
+    //       (upright) orientation so the head stays vertical and the rod stays plumb.
+    //   4 = pitman / connecting rod (Cube) — bottom pinned to the crank throw (orbits),
+    //       top pinned to the equalizer; rigid coupler solved by the four-bar so it
+    //       stays welded at both ends without deforming.
+    const ROCK_MESHES = ["Body_Pump", "Cylinder"];
+    const SPIN_MESHES = ["Wheel_Back", "CrankPin_Mesh"];
+    const STROKE_MESHES = ["Straw", "Head_Pump", "Cylinder_Pump", "Cylinder_Pump.001"];
+    const isRock = ROCK_MESHES.includes(child.name);
+    const isSpin = SPIN_MESHES.includes(child.name);
+    const isStroke = STROKE_MESHES.includes(child.name);
+    const isPitman = child.name === "Cube";
+    if (child.name === "Body_Pump") {
+      g.computeBoundingBox();
+      bodyBox = g.boundingBox.clone(); // merged-space; saddle sits at its top-center
+    }
+    if (child.name === "Wheel_Back") {
+      g.computeBoundingBox();
+      wheelBox = g.boundingBox.clone(); // crank axle ≈ wheel bbox center
+    }
+    if (child.name === "Straw") {
+      g.computeBoundingBox();
+      strawBox = g.boundingBox.clone(); // rod bbox (fallback travel reference)
+    }
+    if (child.name === "Head_Pump") {
+      g.computeBoundingBox();
+      headBox = g.boundingBox.clone(); // head top ≈ beam tip → the attach point it rides
+    }
+    if (isPitman) {
+      g.computeBoundingBox();
+      pitBox = g.boundingBox.clone(); // bottom = crank-pin end, top = beam end
+    }
+    const rockArr = new Float32Array(n);
+    if (isRock) rockArr.fill(1);
+    else if (isSpin) rockArr.fill(2);
+    else if (isStroke) rockArr.fill(3);
+    else if (isPitman) rockArr.fill(4);
+
     let zoneId = MESH_TO_ZONE[child.name];
     if (!zoneId && child.name?.startsWith("SignFrame")) zoneId = "signFrame";
 
@@ -3734,6 +3846,7 @@ function buildBaseRig(scene) {
     colorChunks.push(cols);
     metalChunks.push(mArr);
     roughChunks.push(rArr);
+    rockChunks.push(rockArr);
     zoneChunks.push({ zoneId: zoneId || null, count: n });
   });
   const geometry = mergeGeometries(geoms, false);
@@ -3748,6 +3861,7 @@ function buildBaseRig(scene) {
   const vBase = new Float32Array(total * 3);
   const aMetal = new Float32Array(total);
   const aRough = new Float32Array(total);
+  const aPart = new Float32Array(total);
   let o = 0, co = 0;
   for (let k = 0; k < colorChunks.length; k++) {
     const cols = colorChunks[k];
@@ -3755,11 +3869,78 @@ function buildBaseRig(scene) {
     vBase.set(cols, co); co += cols.length;
     aMetal.set(metalChunks[k], o);
     aRough.set(roughChunks[k], o);
+    aPart.set(rockChunks[k], o);
     for (let i = 0; i < z.count; i++) vZone[o + i] = z.zoneId;
     o += z.count;
   }
   geometry.setAttribute("aMetalness", new THREE.BufferAttribute(aMetal, 1));
   geometry.setAttribute("aRoughness", new THREE.BufferAttribute(aRough, 1));
+  geometry.setAttribute("aPart", new THREE.BufferAttribute(aPart, 1));
+
+  // Pivots/axis for the shader-driven motion (ANIM_FIELD). The beam rocks about
+  // the saddle (top-center of Body_Pump) around the horizontal axis perpendicular
+  // to its long span; the crank spins about its own axle (Wheel_Back center), same
+  // axis orientation (it turns in the beam's vertical plane).
+  let rock = null;
+  if (bodyBox) {
+    const c = new THREE.Vector3(); bodyBox.getCenter(c);
+    const size = new THREE.Vector3(); bodyBox.getSize(size);
+    const pivotY = c.y + (bodyBox.max.y - c.y) * FIELD_PUMP_PIVOT_FRAC;
+    // Longer horizontal extent = beam length → rock about the perpendicular axis.
+    const axis = size.x >= size.z ? [0, 0, 1] : [1, 0, 0];
+    let crankPivot = [c.x, c.y, c.z];
+    if (wheelBox) { const wc = new THREE.Vector3(); wheelBox.getCenter(wc); crankPivot = [wc.x, wc.y, wc.z]; }
+    if (crankAxleMarker) crankPivot = crankAxleMarker; // exact rotation center (optional)
+    // Travel reference for the head+rod group: the head's attach to the beam (its top ≈
+    // the beam tip). Rotating THIS point about the saddle gives the beam-tip arc, applied
+    // as pure translation — so the head rides the tip (stays attached) and stays upright,
+    // and the rod rides with it. (Straw top is a fallback if the head isn't present.)
+    let strawRef = [c.x, c.y, c.z];
+    if (headBox) { const hc = new THREE.Vector3(); headBox.getCenter(hc); strawRef = [hc.x, headBox.max.y, hc.z]; }
+    else if (strawBox) { const sc = new THREE.Vector3(); strawBox.getCenter(sc); strawRef = [sc.x, strawBox.max.y, sc.z]; }
+    // Pitman endpoints. Cube is TWO parallel bars, so its bbox is widest along the
+    // axle (the gap between them) — useless for finding the rod's ends. Collapse the
+    // axle direction and work in the rocking plane (u = in-plane horizontal, v = Y):
+    // the rod's two ends are diagonal bbox corners. Crank end = corner nearest the
+    // wheel center (sits on the throw); beam end = the diagonally-opposite corner.
+    let pitmanA = crankPivot, pitmanB = [c.x, c.y, c.z];
+    if (pitBox) {
+      const pc = new THREE.Vector3(); pitBox.getCenter(pc);
+      const axleIsZ = axis[2] === 1;
+      const axleC = axleIsZ ? pc.z : pc.x;                 // centre the bars on the axle
+      const uLo = axleIsZ ? pitBox.min.x : pitBox.min.z;
+      const uHi = axleIsZ ? pitBox.max.x : pitBox.max.z;
+      const yLo = pitBox.min.y, yHi = pitBox.max.y;
+      const mk = (u, y) => (axleIsZ ? [u, y, axleC] : [axleC, y, u]);
+      const corners = [mk(uLo, yLo), mk(uLo, yHi), mk(uHi, yLo), mk(uHi, yHi)];
+      const oppo    = [mk(uHi, yHi), mk(uHi, yLo), mk(uLo, yHi), mk(uLo, yLo)]; // diagonal
+      const d2 = (p, q) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
+      let bi = 0;
+      for (let i = 1; i < 4; i++) if (d2(corners[i], crankPivot) < d2(corners[bi], crankPivot)) bi = i;
+      pitmanA = corners[bi]; pitmanB = oppo[bi];
+    }
+    // Exact Blender markers win over the bbox estimates.
+    if (crankPinMarker) pitmanA = crankPinMarker;
+    if (beamPinMarker) pitmanB = beamPinMarker;
+    // The VISIBLE pin geometry centroid wins over the marker — it's the ground truth for
+    // "where Cube touches the wheel," so they can't disagree.
+    if (crankPinCentroid) pitmanA = crankPinCentroid;
+    // Seat Cube's crank attach onto the visible pin: rotate it around the axle by
+    // FIELD_CRANK_PIN_ANGLE (tangential), then scale its radius by FIELD_CRANK_PIN_SCALE
+    // (radial). Applies to marker OR estimate, so it's dial-able either way.
+    if (FIELD_CRANK_PIN_ANGLE !== 0 || FIELD_CRANK_PIN_SCALE !== 1) {
+      const vx = pitmanA[0] - crankPivot[0], vy = pitmanA[1] - crankPivot[1], vz = pitmanA[2] - crankPivot[2];
+      const a = FIELD_CRANK_PIN_ANGLE, c = Math.cos(a), s = Math.sin(a), k = FIELD_CRANK_PIN_SCALE;
+      const dot = axis[0] * vx + axis[1] * vy + axis[2] * vz;
+      const crx = axis[1] * vz - axis[2] * vy, cry = axis[2] * vx - axis[0] * vz, crz = axis[0] * vy - axis[1] * vx;
+      pitmanA = [
+        crankPivot[0] + (vx * c + crx * s + axis[0] * dot * (1 - c)) * k,
+        crankPivot[1] + (vy * c + cry * s + axis[1] * dot * (1 - c)) * k,
+        crankPivot[2] + (vz * c + crz * s + axis[2] * dot * (1 - c)) * k,
+      ];
+    }
+    rock = { pivot: [c.x, pivotY, c.z], axis, crankPivot, strawRef, pitmanA, pitmanB };
+  }
 
   let signFrameGeo = null;
   if (frameGeoms.length) {
@@ -3779,7 +3960,7 @@ function buildBaseRig(scene) {
     ? [strawXZ[0] * PUMPJACK_SCALE, WELLHEAD_OFFSET[1], strawXZ[1] * PUMPJACK_SCALE]
     : [...WELLHEAD_OFFSET];
   _rigWellhead = wellhead;
-  return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo, wellhead };
+  return { geometry, vZone, vBase, total, signGeo, signFrameGeo, signCamGeo, wellhead, rock };
 }
 
 function rigColorAttribute(base, config) {
@@ -4304,8 +4485,49 @@ function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, full
   );
 }
 
+// ── Debug joint spheres (?pinmark=1) ─────────────────────────────────────────
+// One instanced sphere per rig at a given rig-local linkage point, so it's cheap
+// (1 draw call per joint) and visible on the whole field. depthTest off so the dot
+// is always locatable; eyeball its position against the wheel/equalizer geometry.
+function PinInstanced({ rigs, point, color }) {
+  const ref = useRef();
+  const geo = useMemo(() => new THREE.SphereGeometry(0.02, 10, 10), []);
+  const mat = useMemo(() => new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false }), [color]);
+  useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
+  useEffect(() => {
+    const inst = ref.current; if (!inst || !point) return;
+    const d = new THREE.Object3D();
+    rigs.forEach((r, i) => {
+      d.position.set(
+        r.position[0] + point[0] * PUMPJACK_SCALE,
+        r.position[1] + point[1] * PUMPJACK_SCALE,
+        r.position[2] + point[2] * PUMPJACK_SCALE,
+      );
+      d.updateMatrix();
+      inst.setMatrixAt(i, d.matrix);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    inst.computeBoundingSphere();
+  }, [rigs, point, geo]);
+  if (!point || !rigs.length) return null;
+  return <instancedMesh ref={ref} args={[geo, mat, rigs.length]} renderOrder={9999} frustumCulled={false} />;
+}
+function PinMarkers({ rigs, rock }) {
+  if (!rock) return null;
+  return (
+    <>
+      <PinInstanced rigs={rigs} point={rock.pitmanA} color={0xff3030} />{/* crank pin */}
+      <PinInstanced rigs={rigs} point={rock.crankPivot} color={0x30ff30} />{/* axle */}
+      <PinInstanced rigs={rigs} point={rock.pitmanB} color={0x3060ff} />{/* beam end */}
+    </>
+  );
+}
+
 function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cellSize, selectedCol, selectedRow, fullRigCells, onSelectCell, onFlyTo, onZoomOut, cameraViewable = true }) {
   const base = useMemo(() => buildBaseRig(scene), [scene]);
+  // Captured uniforms of the shared merged material's compiled shader — so the
+  // per-frame loop can advance the beam-bob clock (ANIM_FIELD only).
+  const fieldUniforms = useRef(null);
   // Per-vertex metalness/roughness (from aMetalness/aRoughness attributes) so
   // textured metal parts catch studio-env reflections while painted parts stay
   // matte — recovering the close-up rig's metallic sheen at ~1 draw call.
@@ -4318,17 +4540,121 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
       vertexColors: true, roughness: 1.0, metalness: 1.0,
       envMap: envMap || null, envMapIntensity: 0.9,
     });
+    // Shader-driven rig motion across the whole field (no skeletal anim, no extra draw
+    // calls). The crank (Wheel_Back) is the single driver; the beam angle is SOLVED
+    // from the four-bar linkage so the pitman stays rigid. aPart: 1 = walking beam
+    // rocks about the saddle, 2 = crank spins about its axle, 3 = rod strokes with the
+    // horsehead tip, 4 = pitman (rigid, spans crank pin → beam). Per-rig phase from the
+    // model-matrix translation desyncs neighbours so the field doesn't pump in unison.
+    const rock = ANIM_FIELD && base.rock;
+    const fnum = (x) => Number(x).toFixed(6);
+    const v3 = (a) => `vec3(${fnum(a[0])}, ${fnum(a[1])}, ${fnum(a[2])})`;
+    // Four-bar constants reduced to the 2D rocking plane (v = world Y, u = the in-plane
+    // horizontal). Ground = saddle S ↔ crank center C; crank throw rC, rocker radius rB
+    // (beam), coupler length Lp (pitman); a0/b0 = rest angles.
+    let link = null;
+    if (rock) {
+      const ax = rock.axis;
+      const uIdx = ax[2] === 1 ? 0 : 2;
+      const uSwiz = ax[2] === 1 ? "x" : "z";
+      const planeSign = ax[2] === 1 ? 1 : -1;     // (u,v) CCW angle → Rodrigues about axis
+      const U = (p) => p[uIdx];
+      const S2 = [U(rock.pivot), rock.pivot[1]];
+      const C2 = [U(rock.crankPivot), rock.crankPivot[1]];
+      const A2 = [U(rock.pitmanA), rock.pitmanA[1]];   // crank-pin rest
+      const B2 = [U(rock.pitmanB), rock.pitmanB[1]];   // beam-attach rest
+      const D = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+      link = {
+        uSwiz, planeSign, S2, C2,
+        rC: D(A2, C2), a0: Math.atan2(A2[1] - C2[1], A2[0] - C2[0]),
+        rB: D(B2, S2), b0: Math.atan2(B2[1] - S2[1], B2[0] - S2[0]),
+        Lp: D(B2, A2),
+      };
+    }
+    const rockCommon = rock ? `
+      attribute float aPart;
+      uniform float uTime;
+      vec3 _axis = ${v3(rock.axis)};
+      vec3 _saddle = ${v3(rock.pivot)};
+      vec3 _crank = ${v3(rock.crankPivot)};
+      vec3 _strawRef = ${v3(rock.strawRef)};
+      vec3 _pitA = ${v3(rock.pitmanA)};
+      vec3 _pitB = ${v3(rock.pitmanB)};
+      const float _S2u = ${fnum(link.S2[0])}, _S2v = ${fnum(link.S2[1])};
+      const float _C2u = ${fnum(link.C2[0])}, _C2v = ${fnum(link.C2[1])};
+      const float _rC = ${fnum(link.rC)}, _a0 = ${fnum(link.a0)};
+      const float _rB = ${fnum(link.rB)}, _b0 = ${fnum(link.b0)};
+      const float _Lp = ${fnum(link.Lp)};
+      const float _planeSign = ${fnum(link.planeSign)};
+      float _phase() { ${PIN_MARK ? "return 0.0;" : "vec3 rw = modelMatrix[3].xyz; return rw.x * 1.7 + rw.z * 2.3;"} }
+      float _wrap(float x) { return atan(sin(x), cos(x)); }            // → [-PI, PI]
+      float _planeAng(vec3 w) { return atan(w.y, w.${link.uSwiz}); }
+      float _thetaUV() { return (uTime * ${fnum(FIELD_PUMP_SPEED)} * ${fnum(FIELD_CRANK_DIR)}) + _phase(); }
+      float _crankAngle() { return _thetaUV() * _planeSign; }          // Rodrigues about axis
+      // Four-bar solve: spin the crank, intersect circle(S,rB) with circle(pin,Lp),
+      // pick the branch nearest rest → the beam angle that conserves the pitman length.
+      float _beamAngle() {
+        vec2 S2 = vec2(_S2u, _S2v);
+        float al = _a0 + _thetaUV();
+        vec2 P = vec2(_C2u, _C2v) + _rC * vec2(cos(al), sin(al));      // live crank pin
+        float d = max(distance(P, S2), 1e-4);
+        float ca = (d * d + _rB * _rB - _Lp * _Lp) / (2.0 * d);
+        float h = sqrt(max(_rB * _rB - ca * ca, 0.0));
+        vec2 dir = (P - S2) / d, prp = vec2(-dir.y, dir.x);
+        vec2 M = S2 + ca * dir;
+        vec2 Q1 = M + h * prp, Q2 = M - h * prp;
+        float b1 = atan(Q1.y - _S2v, Q1.x - _S2u);
+        float b2 = atan(Q2.y - _S2v, Q2.x - _S2u);
+        float beta = abs(_wrap(b1 - _b0)) < abs(_wrap(b2 - _b0)) ? b1 : b2;
+        return _wrap(beta - _b0) * _planeSign;                         // Rodrigues about axis
+      }
+      vec3 _rotDir(vec3 v, float a) {
+        float c = cos(a), s = sin(a);
+        return v * c + cross(_axis, v) * s + _axis * dot(_axis, v) * (1.0 - c);
+      }
+      vec3 _rotAbout(vec3 v, vec3 piv, float a) { return _rotDir(v - piv, a) + piv; }
+      vec3 _rodMove() { return _rotAbout(_strawRef, _saddle, _beamAngle()) - _strawRef; }
+      // Pitman: the four-bar conserves Lp, so the rod is RIGID — rotate it to point
+      // from the live crank pin (A') to the live beam attach (B').
+      float _pitmanRot() {
+        vec3 Ap = _rotAbout(_pitA, _crank, _crankAngle());
+        vec3 Bp = _rotAbout(_pitB, _saddle, _beamAngle());
+        return _wrap(_planeAng(Bp - Ap) - _planeAng(_pitB - _pitA)) * _planeSign;
+      }
+      vec3 _pitmanXform(vec3 p) {
+        return _rotAbout(_pitA, _crank, _crankAngle()) + _rotDir(p - _pitA, _pitmanRot());
+      }` : "";
+    const beginNormalRock = rock ? `
+      if (aPart > 3.5) objectNormal = _rotDir(objectNormal, _pitmanRot());
+      else if (aPart > 2.5) {}                                         // rod: translation only
+      else if (aPart > 1.5) objectNormal = _rotDir(objectNormal, _crankAngle());
+      else if (aPart > 0.5) objectNormal = _rotDir(objectNormal, _beamAngle());` : "";
+    const beginVertexRock = rock ? `
+      if (aPart > 3.5) transformed = _pitmanXform(transformed);
+      else if (aPart > 2.5) transformed += _rodMove();
+      else if (aPart > 1.5) transformed = _rotAbout(transformed, _crank, _crankAngle());
+      else if (aPart > 0.5) transformed = _rotAbout(transformed, _saddle, _beamAngle());` : "";
     m.onBeforeCompile = (shader) => {
+      if (rock) shader.uniforms.uTime = { value: 0 };
       shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nattribute float aMetalness;\nattribute float aRoughness;\nvarying float vMetalnessV;\nvarying float vRoughnessV;")
-        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvMetalnessV = aMetalness;\nvRoughnessV = aRoughness;");
+        .replace("#include <common>", "#include <common>\nattribute float aMetalness;\nattribute float aRoughness;\nvarying float vMetalnessV;\nvarying float vRoughnessV;" + rockCommon)
+        .replace("#include <beginnormal_vertex>", "#include <beginnormal_vertex>" + beginNormalRock)
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvMetalnessV = aMetalness;\nvRoughnessV = aRoughness;" + beginVertexRock);
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", "#include <common>\nvarying float vMetalnessV;\nvarying float vRoughnessV;")
         .replace("#include <roughnessmap_fragment>", "float roughnessFactor = vRoughnessV;")
         .replace("#include <metalnessmap_fragment>", "float metalnessFactor = vMetalnessV;");
+      fieldUniforms.current = shader.uniforms;
     };
     return m;
-  }, [envMap]);
+  }, [envMap, base]);
+
+  // Advance the crank clock. Cheap no-op unless ANIM_FIELD compiled uTime in.
+  useFrame((_, delta) => {
+    if (!ANIM_FIELD || NO_ANIM || PIN_MARK) return; // PIN_MARK freezes at rest for seating checks
+    const u = fieldUniforms.current;
+    if (u && u.uTime) u.uTime.value += delta;
+  });
   // Build all rigs once (not keyed on selection) — selection only toggles
   // visibility, so clicking a plot doesn't rebuild 100 geometries.
   const rigs = useMemo(() => items.map((it) => {
@@ -4394,6 +4720,7 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
       })}
       {/* Lyquid80 wellhead glow across every plot — one instanced draw call. */}
       <WellGlowField positions={wellPositions} />
+      {PIN_MARK && <PinMarkers rigs={rigs} rock={base.rock} />}
       {/* Static decorations (signs, frames, cameras, fences, non-animated add-ons)
           instanced by type — one draw call each across the whole field. */}
       <StaticDecoField
