@@ -2674,10 +2674,10 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
     </>
   );
 
-  /* Proceed → route to /oil for goo mode; statue mode is pure flavor.
+  /* Proceed → route to /hailmary for goo mode; statue mode is pure flavor.
      Always close the overlay so the user lands cleanly. */
   const handleProceed = () => {
-    if (!statueMode) router.push("/oil");
+    if (!statueMode) router.push("/hailmary");
     onClose?.();
   };
 
@@ -3192,7 +3192,7 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
               className="cyber-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                if (!statueMode) router.push("/oil");
+                if (!statueMode) router.push("/hailmary");
                 // statue mode: no navigation — button is flavor
               }}
               aria-label={OVERLAY_COPY.buttonText[modeIndex]}

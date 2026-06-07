@@ -3042,7 +3042,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             key: 'lode',
             label: 'Hail Mary PC',
             title: 'Hail Mary Prospecting Co — coming soon',
-              onClick: () => { window.location.href = '/oil'; },
+              onClick: () => { window.location.href = '/hailmary'; },
             comingSoon: false,
             icon: (
               <svg

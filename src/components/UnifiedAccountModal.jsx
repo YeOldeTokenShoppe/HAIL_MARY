@@ -300,7 +300,7 @@ function ReferralsTabContent({ ind, userId }) {
   const wallet = qual?.walletAddress || "";
   const derived = wallet ? wallet.replace(/^0x/i, "").slice(0, 8).toLowerCase() : null;
   const code = data?.referralCode || qual?.referralCode || derived || null;
-  const link = code ? `https://rl80.com/oil?ref=${code}` : null;
+  const link = code ? `https://rl80.com/hailmary?ref=${code}` : null;
   const confirmed = data?.confirmedReferrals || 0;
   const bonus = data?.bonusDrills || 0;
 
@@ -434,7 +434,7 @@ function ReferralsTabContent({ ind, userId }) {
               flex: 1, fontSize: ind ? 10 : 11, color: muted, fontFamily: font,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
-              rl80.com/oil?ref={code}
+              rl80.com/hailmary?ref={code}
             </span>
             <button
               onClick={handleCopy}

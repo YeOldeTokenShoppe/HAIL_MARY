@@ -81,7 +81,7 @@ Keep the **extra-depth referral reward** unchanged — under proportional split 
 The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc. — but restricted to **fluids** so the pump/tank/drain/overflow/gusher loop above applies unchanged. Solid-mining (gold, diamonds, buried treasure) is a **future build**: a sibling game mode with its own extraction verb (mine, not pump) and machine, sharing only the grid/claim/season/economy engine — explicitly out of scope now.
 
 - **Three layers:** engine (resource-agnostic, operates on abstract `units`) / resource theme (name, color, VFX, verb, tank visual — a config in `oilGame/settings`) / extraction physics (fluid only for now).
-- **Keep internal "oil" naming** (`oilPlots`, `oilDrills`, `oilGame`, `/oil`) — it's the engine's substrate label; renaming the data model buys nothing. Separate internal naming (stays "oil") from the **player-facing substance** (read from a `resourceTheme` config). New strike/tank code should pull substance labels from that config rather than hardcoding "oil."
+- **Keep internal "oil" naming** (`oilPlots`, `oilDrills`, `oilGame`, `/api/oil-*`, `oil_*` localStorage) — it's the engine's substrate label; renaming the data model buys nothing. Separate internal naming (stays "oil") from the **player-facing substance** (read from a `resourceTheme` config). New strike/tank code should pull substance labels from that config rather than hardcoding "oil." NOTE: the player-facing **route** moved `/oil` → `/hailmary` (2026-06-07; `/oil` 308-redirects, query preserved). Only the URL + the page file (`src/app/hailmary/page.js`) changed — the data model/API/storage keep the "oil" label.
 - Default substance is an open creative call (oil = legible/built; goo = fits the hell/demon theme, brand-safe, more shareable). A hybrid is on the table: oil baseline + otherworldly goo as the rare jackpot strike tied to hell pockets.
 - **Player-facing substance name: Lyquid80** (locked 2026-06-04). Reads as "liquidity" when spoken, ties to the **RL80** token and element 80; visually an **iridescent opal** fluid (cyan gusher beam, petrol-rainbow spill puddles, real thin-film iridescence on tank liquids). Display strings only (headers, theme tooltip); internal identifiers stay `parabolum`/`uParabolum` per the layer split above. See the iridescence system in `src/components/OilVoxelGrid.jsx` (`IRID_PRESETS` / `ACTIVE_IRID = opal`).
 
@@ -215,18 +215,20 @@ No schema change. Stores pump visual config per cell.
 
 ## Routes
 
-### `/oil` — Active Game (Player View)
+> The game lives at `/hailmary` (renamed from `/oil`, 2026-06-07). `/oil` 308-redirects there with query strings preserved, so old links keep working.
+
+### `/hailmary` — Active Game (Player View)
 The default player-facing view during an active game. During `ticket_sale` phase, shows OilQualify if the user hasn't picked a plot yet; falls through to the 3D canvas if they have.
 
 **Visible:** 3D canvas with pumpjacks and CCTV, surface map (2D grid with ownership coloring), cross-section, geological survey, Pimp My Pump customization, claim jump toggle.
 
-### `/oil?mode=admin` — Admin Controls
+### `/hailmary?mode=admin` — Admin Controls
 Password-gated. Everything from Active Game plus parameters, drill demo, inspector, top claims, dry zones, deposits, verify panel, end game button, phase overrides.
 
-### `/oil?mode=test` — Test Mode
+### `/hailmary?mode=test` — Test Mode
 No sign-in required. Simulate the player drill experience for any cell.
 
-### `/oil?mode=report` — Post-Game Report
+### `/hailmary?mode=report` — Post-Game Report
 Available after admin ends the game. Full reveal of all data.
 
 ## API Routes
@@ -437,7 +439,7 @@ Purchases are permanent account-level unlocks via x402 on-chain payment. Free it
 
 | File | Purpose |
 |------|---------|
-| `src/app/oil/page.js` | Main game page — drill handler, community grid, drill HUD, core sample, Telegram shake delay |
+| `src/app/hailmary/page.js` | Main game page — drill handler, community grid, drill HUD, core sample, Telegram shake delay |
 | `src/components/CoreSamplePanel.jsx` | Core sample panel — personal drill log + field survey with animation |
 | `src/components/DrillHUD.jsx` | Instrument gauges — phased drill animation, area scan |
 | `src/components/OilVoxelGrid.jsx` | 3D scene — pumpjacks, staged drill effects, delayed strike reveal |
@@ -462,7 +464,7 @@ Animated characters that roam the grid and cause mischief. Deployed by admin or 
 
 ### How It Works (Current)
 
-1. Admin opens Rogue Deploy panel in `/oil?mode=admin`
+1. Admin opens Rogue Deploy panel in `/hailmary?mode=admin`
 2. Picks a character type, target cell (col/row), hits DEPLOY
 3. `POST /api/oil-rogue` writes a `rogueEvents` doc, executes the consequence, and sends a Telegram alert
 4. All clients receive the event via `onSnapshot` → a `RogueCharacter` renders the animated GLB on the 3D grid
@@ -505,7 +507,7 @@ the `demonBounty` Firestore collection + `oilGame/demonBlockade` doc.
 
 ### Trigger & Lifecycle
 
-1. A player drills a cell whose column contains a hell pocket → `/oil` POSTs to
+1. A player drills a cell whose column contains a hell pocket → `/hailmary` POSTs to
    `/api/oil-demon-bounty` (real players; admin/test mode runs a local-only preview instead).
 2. The API creates a `demonBounty` doc (`status: "active"`) and sets the global `demonBlockade`:
    - Picks a random **victim plot** (another player's occupied cell) as the demon's target.

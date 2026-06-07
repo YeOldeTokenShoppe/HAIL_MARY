@@ -79,7 +79,7 @@ export default async function SnapshotPage({ params }) {
         <p style={{ color: 'rgba(255,255,255,0.6)' }}>Snapshot not found</p>
       )}
       <Link
-        href="/oil"
+        href="/hailmary"
         style={{
           color: '#00bbf9',
           textDecoration: 'none',

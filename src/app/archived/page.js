@@ -195,7 +195,7 @@ export default function HomePage() {
           <p key="deploy">Our Lady willing, this one hits. Deploy?</p>,
         ]}
         onProceed={() => {
-          window.location.href = "/oil";
+          window.location.href = "/hailmary";
         }}
       />
 

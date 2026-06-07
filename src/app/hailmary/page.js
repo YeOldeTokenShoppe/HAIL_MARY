@@ -31,6 +31,32 @@ import useCctvRecorder from "@/hooks/useCctvRecorder";
 import PumpPurchaseModal from "@/components/PumpPurchaseModal";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 
+// ── Milestone caption pools ──────────────────────────────────────────────────
+// Randomized per capture so the feed doesn't read the same with only 2 event
+// types. The chosen caption is set once into the polaroid meta and flows through
+// to the saved/published feed entry. (Admins can still hand-edit before publish.)
+const GUSHER_CAPTIONS = [
+  "STRUCK LYQUID80! 💸",
+  "PAYDIRT! 💸",
+  "THAR SHE BLOWS! 🛢️",
+  "GUSHER! 💦",
+  "RICH STRIKE — DRINKS ON ME! 🥂",
+  "FROM ZERO TO OIL BARON 📈",
+  "DIVERSIFYING THE PORTFOLIO 💸",
+];
+const HELL_CAPTIONS = [
+  "JUST TRYING TO MAKE A BUCK — DIDN'T MEAN TO UNLEASH HELL 🔥👹",
+  "WHO SUMMONED THIS THING 👹",
+  "MY RIG WENT STRAIGHT TO HELL 🔥",
+  "BREACHED A HELL POCKET 😈",
+  "OOPS. THAT'S A DEMON. 🔥👹",
+  "DRILLED TOO GREEDY, TOO DEEP 👹",
+];
+const pickCaption = (eventType) => {
+  const pool = eventType === "hell" ? HELL_CAPTIONS : GUSHER_CAPTIONS;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
   day:   { sky: "#7da4c9", skyBottom: null, ambient: 0.6, dirA: 4.0, dirB: 3.0, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
@@ -1170,7 +1196,7 @@ export default function OilPage() {
   // Redirect report mode to active if game hasn't ended
   useEffect(() => {
     if (isReport && !gameEnded) {
-      window.location.replace("/oil");
+      window.location.replace("/hailmary");
     }
   }, [isReport, gameEnded]);
 
@@ -2215,6 +2241,94 @@ export default function OilPage() {
     }
   }, [selectedCellGushers]);
 
+  // ── Field Dispatch feed (admin-approved published polaroids) ────────────────
+  // Read via /api/oil-feed (admin SDK) so it works regardless of whether the
+  // firestore rules have been deployed, and refreshes after an admin publishes.
+  const [feedItems, setFeedItems] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedDispatchOpen, setFeedDispatchOpen] = useState(true);
+  const [lightboxItem, setLightboxItem] = useState(null); // feed item shown enlarged
+  useEffect(() => {
+    if (!lightboxItem) return;
+    const onKey = (e) => { if (e.key === "Escape") setLightboxItem(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxItem]);
+  const loadFeed = useCallback(async () => {
+    setFeedLoading(true);
+    try {
+      const res = await fetch("/api/oil-feed");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.items)) setFeedItems(data.items);
+    } catch (e) {
+      console.error("[oil] feed load failed:", e);
+    } finally {
+      setFeedLoading(false);
+    }
+  }, []);
+  useEffect(() => { loadFeed(); }, [loadFeed]);
+
+  // Admin moderation: the pending (approved:false) dispatch backlog. Loaded on
+  // demand (password-gated) when the admin opens the panel.
+  const [pendingItems, setPendingItems] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [moderatingId, setModeratingId] = useState(null);
+  const loadPending = useCallback(async () => {
+    if (!adminPassword) return;
+    setPendingLoading(true);
+    try {
+      const res = await fetch("/api/oil-feed-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, action: "list" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.items)) setPendingItems(data.items);
+    } catch (e) {
+      console.error("[oil] pending feed load failed:", e);
+    } finally {
+      setPendingLoading(false);
+    }
+  }, [adminPassword]);
+  useEffect(() => { if (pendingOpen && adminPassword) loadPending(); }, [pendingOpen, adminPassword, loadPending]);
+  const moderateDispatch = useCallback(async (id, action) => {
+    if (!adminPassword || !id) return;
+    setModeratingId(id);
+    try {
+      const res = await fetch("/api/oil-feed-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, action, id }),
+      });
+      if (res.ok) {
+        setPendingItems((prev) => prev.filter((it) => it.id !== id));
+        if (action === "approve") loadFeed(); // surface it in the public feed
+      }
+    } catch (e) {
+      console.error("[oil] moderate failed:", e);
+    } finally {
+      setModeratingId(null);
+    }
+  }, [adminPassword, loadFeed]);
+  const approveAllPending = useCallback(async () => {
+    if (!adminPassword || pendingItems.length === 0) return;
+    if (typeof window !== "undefined" && !window.confirm(`Approve all ${pendingItems.length} pending dispatch(es)? They'll go live in Field Dispatch.`)) return;
+    setModeratingId("__all__");
+    try {
+      const res = await fetch("/api/oil-feed-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword, action: "approve_all" }),
+      });
+      if (res.ok) { setPendingItems([]); loadFeed(); }
+    } catch (e) {
+      console.error("[oil] approve-all failed:", e);
+    } finally {
+      setModeratingId(null);
+    }
+  }, [adminPassword, pendingItems.length, loadFeed]);
+
   // ── Auto Polaroid captures on milestone events ──────────────────────────────
   // When a player's own rig strikes a gusher or unleashes Hell, automatically
   // pop the shareable Polaroid AND persist it to the public feed — so the moment
@@ -2262,8 +2376,8 @@ export default function OilPage() {
     if (selectedX === null) return;
     const col = selectedX, row = sliceY;
     const meta = eventType === "hell"
-      ? { eventType: "hell", label: "JUST TRYING TO MAKE A BUCK - DIDN'T MEAN TO UNLEASH HELL 🔥👹", col, row, persist: false }
-      : { eventType: "gusher", label: "STRUCK LYQUID80! 💸", col, row, persist: false };
+      ? { eventType: "hell", label: pickCaption("hell"), col, row, persist: false }
+      : { eventType: "gusher", label: pickCaption("gusher"), col, row, persist: false };
     // Let the eruption / hell portal reach a photogenic frame before grabbing it.
     const t = setTimeout(() => fireEventCapture(meta), eventType === "hell" ? 1500 : 1200);
     return () => clearTimeout(t);
@@ -2324,7 +2438,9 @@ export default function OilPage() {
           password: adminPassword,
           metadata: {
             approved: true,
-            eventType: meta?.eventType ?? null,
+            // Manual Snapshot captures have no event meta → tag them "showcase"
+            // so composition-variety shots read intentionally in the feed.
+            eventType: meta?.eventType ?? "showcase",
             userId: user?.id ?? null,
             username: username?.trim() || user?.firstName || "A Prospector",
             col: meta?.col ?? selectedX ?? null,
@@ -2336,11 +2452,12 @@ export default function OilPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: data.error || `HTTP ${res.status}` };
+      loadFeed(); // surface the new entry in the Field Dispatch panel
       return { ok: true, url: data.storageUrl };
     } catch (e) {
       return { ok: false, error: e.message };
     }
-  }, [adminPassword, user?.id, username, userDrill?.referralCode, selectedX, sliceY]);
+  }, [adminPassword, user?.id, username, userDrill?.referralCode, selectedX, sliceY, loadFeed]);
 
   // Rising edge: the player's own rig erupts → celebratory gusher Polaroid.
   // Skipped in preview/test/admin so the feed isn't polluted with rehearsals.
@@ -2361,7 +2478,7 @@ export default function OilPage() {
     const t = setTimeout(() => {
       fireEventCapture({
         eventType: "gusher",
-        label: "STRUCK LYQUID80! 💸",
+        label: pickCaption("gusher"),
         oilAmount: newest.oilAmount ?? null,
         col: newest.col, row: newest.row,
         persist: true,
@@ -2384,7 +2501,7 @@ export default function OilPage() {
     const t = setTimeout(() => {
       fireEventCapture({
         eventType: "hell",
-        label: "DIDN'T MEAN TO UNLEASHE HELL 🔥👹",
+        label: pickCaption("hell"),
         col: demonBounty.summonerCol ?? null,
         row: demonBounty.summonerRow ?? null,
         persist: true,
@@ -3468,6 +3585,205 @@ export default function OilPage() {
     </div>
   );
 
+  // Dispatch category tag (label + color), shared by the grid + lightbox.
+  const dispatchTag = (eventType) => {
+    if (eventType === "hell") return { label: "🔥 HELL", color: theme.red };
+    if (eventType === "gusher") return { label: "💥 GUSHER", color: theme.accent };
+    if (eventType === "showcase") return { label: "📸 SHOWCASE", color: theme.muted };
+    return null;
+  };
+
+  // Field Dispatch — gallery of admin-published milestone polaroids (public).
+  const fieldDispatchBody = (
+    <>
+      {feedLoading && feedItems.length === 0 ? (
+        <div style={{ fontSize: 11, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", textAlign: "center", padding: "10px 0" }}>
+          Loading…
+        </div>
+      ) : feedItems.length === 0 ? (
+        <div style={{ fontSize: 11, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", textAlign: "center", padding: "10px 0" }}>
+          No dispatches yet.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxHeight: 360, overflowY: "auto", overflowX: "hidden", padding: "6px 6px 2px" }}>
+          {feedItems.map((it) => {
+            // Each saved polaroid has a baked-in -5deg tilt. Counter it (+5deg) then
+            // add a STABLE pseudo-random lean + vertical nudge (hashed from the id, so
+            // it's varied but doesn't reshuffle on every render) for a scattered look.
+            let h = 0;
+            for (let i = 0; i < it.id.length; i++) h = (h * 31 + it.id.charCodeAt(i)) | 0;
+            const imgRotate = 5 + (((h % 1000) / 1000) * 12 - 6); // net ±6deg
+            const imgDy = ((Math.abs(h >> 3) % 100) / 100) * 6 - 3; // ±3px
+            return (
+              <div
+                key={it.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setLightboxItem(it)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLightboxItem(it); } }}
+                title={it.caption || it.eventType || "dispatch"}
+                style={{ width: 138, cursor: "zoom-in", display: "flex", flexDirection: "column", alignItems: "center" }}
+              >
+                <img
+                  src={it.storageUrl}
+                  alt={it.caption || "dispatch"}
+                  loading="lazy"
+                  style={{
+                    width: "100%", height: "auto", display: "block",
+                    transform: `translateY(${imgDy}px) rotate(${imgRotate}deg)`,
+                    filter: "drop-shadow(0 4px 9px rgba(0,0,0,0.4))",
+                  }}
+                />
+                <div style={{ padding: "5px 4px 0", textAlign: "center", maxWidth: "100%" }}>
+                  {dispatchTag(it.eventType) && (
+                    <div style={{ fontSize: 8, letterSpacing: "0.1em", color: dispatchTag(it.eventType).color, textTransform: "uppercase", fontFamily: "'Share Tech Mono', monospace", marginBottom: 1 }}>
+                      {dispatchTag(it.eventType).label}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 9, color: theme.text, fontFamily: "'Share Tech Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>
+                    {it.username || "A Prospector"}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  const fieldDispatchSection = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3
+        style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+        onClick={() => setFeedDispatchOpen((o) => !o)}
+      >
+        <span>FIELD DISPATCH{feedItems.length > 0 ? ` · ${feedItems.length}` : ""}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); loadFeed(); }}
+            title="Refresh"
+            style={{ fontSize: 12, color: theme.muted, cursor: "pointer", lineHeight: 1 }}
+          >⟳</span>
+          <span style={{ fontSize: 10, color: theme.muted }}>{feedDispatchOpen ? "▴" : "▾"}</span>
+        </span>
+      </h3>
+      {feedDispatchOpen && fieldDispatchBody}
+    </div>
+  );
+
+  // Admin-only: moderate the pending (approved:false) backlog → Approve publishes
+  // it to Field Dispatch; Reject deletes the doc + its storage blob.
+  const pendingFeedPanel = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3
+        style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+        onClick={() => setPendingOpen((o) => !o)}
+      >
+        <span>PENDING DISPATCHES{pendingItems.length > 0 ? ` · ${pendingItems.length}` : ""}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); loadPending(); }}
+            title="Refresh"
+            style={{ fontSize: 12, color: theme.muted, cursor: "pointer", lineHeight: 1 }}
+          >⟳</span>
+          <span style={{ fontSize: 10, color: theme.muted }}>{pendingOpen ? "▴" : "▾"}</span>
+        </span>
+      </h3>
+      {pendingOpen && (
+        pendingLoading && pendingItems.length === 0 ? (
+          <div style={{ fontSize: 11, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", textAlign: "center", padding: "10px 0" }}>Loading…</div>
+        ) : pendingItems.length === 0 ? (
+          <div style={{ fontSize: 11, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", textAlign: "center", padding: "10px 0" }}>Nothing waiting — auto-captures from live play land here.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto", overflowX: "hidden", padding: "4px 2px" }}>
+            <button
+              disabled={moderatingId === "__all__"}
+              onClick={approveAllPending}
+              style={{ ...styles.btn, padding: "5px 10px", fontSize: 10, color: theme.green, borderColor: theme.green, justifyContent: "center", opacity: moderatingId === "__all__" ? 0.5 : 1 }}
+            >
+              {moderatingId === "__all__" ? "APPROVING…" : `✓ APPROVE ALL (${pendingItems.length})`}
+            </button>
+            {pendingItems.map((it) => {
+              const tag = dispatchTag(it.eventType);
+              const busy = moderatingId === it.id;
+              return (
+                <div key={it.id} style={{ display: "flex", gap: 10, alignItems: "center", opacity: busy ? 0.5 : 1, borderBottom: `1px solid ${theme.barBg}`, paddingBottom: 8 }}>
+                  <img
+                    src={it.storageUrl}
+                    alt={it.caption || "pending"}
+                    loading="lazy"
+                    onClick={() => setLightboxItem(it)}
+                    title="Click to enlarge"
+                    style={{ width: 72, height: "auto", display: "block", cursor: "zoom-in", flexShrink: 0, filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.4))" }}
+                  />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    {tag && <div style={{ fontSize: 8, letterSpacing: "0.1em", color: tag.color, fontFamily: "'Share Tech Mono', monospace", marginBottom: 2 }}>{tag.label}</div>}
+                    <div style={{ fontSize: 10, color: theme.text, fontFamily: "'Share Tech Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.username || "A Prospector"}</div>
+                    {it.caption && <div style={{ fontSize: 9, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.caption}</div>}
+                    <div style={{ display: "flex", gap: 6, marginTop: 5 }}>
+                      <button disabled={busy} onClick={() => moderateDispatch(it.id, "approve")} style={{ ...styles.btn, padding: "3px 10px", fontSize: 10, color: theme.green, borderColor: theme.green }}>APPROVE</button>
+                      <button disabled={busy} onClick={() => moderateDispatch(it.id, "reject")} style={{ ...styles.btn, padding: "3px 10px", fontSize: 10, color: theme.red, borderColor: theme.red }}>REJECT</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+    </div>
+  );
+
+  // Lightbox — the clicked dispatch enlarged over a blurred, dimmed page.
+  // The polaroid webp is transparent, so it floats over the blur instead of
+  // sitting on the browser's default white.
+  const feedLightbox = lightboxItem && (
+    <div
+      onClick={() => setLightboxItem(null)}
+      style={{
+        position: "fixed", inset: 0, zIndex: 100000,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 14, padding: 24,
+        background: "rgba(0,0,0,0.55)",
+        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        cursor: "zoom-out",
+      }}
+    >
+      <button
+        onClick={(e) => { e.stopPropagation(); setLightboxItem(null); }}
+        aria-label="Close"
+        title="Close"
+        style={{
+          position: "absolute", top: 18, right: 18,
+          width: 40, height: 40, borderRadius: "50%",
+          background: "rgba(0,0,0,0.5)", color: "#fff",
+          border: "1px solid rgba(255,255,255,0.3)", cursor: "pointer",
+          fontSize: 20, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >✕</button>
+      <img
+        src={lightboxItem.storageUrl}
+        alt={lightboxItem.caption || "dispatch"}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "min(92vw, 560px)", maxHeight: "82vh", objectFit: "contain",
+          cursor: "default", filter: "drop-shadow(0 24px 70px rgba(0,0,0,0.65))",
+        }}
+      />
+      {(lightboxItem.username || lightboxItem.eventType) && (
+        <div style={{ textAlign: "center", fontFamily: "'Share Tech Mono', monospace", color: "rgba(255,255,255,0.85)" }}>
+          {lightboxItem.eventType && (
+            <span style={{ fontSize: 11, letterSpacing: "0.12em", color: lightboxItem.eventType === "hell" ? "#ff7a5c" : lightboxItem.eventType === "showcase" ? "rgba(255,255,255,0.7)" : "#ffd479", marginRight: 8, textTransform: "uppercase" }}>
+              {lightboxItem.eventType === "hell" ? "🔥 HELL" : lightboxItem.eventType === "showcase" ? "📸 SHOWCASE" : "💥 GUSHER"}
+            </span>
+          )}
+          <span style={{ fontSize: 12 }}>{lightboxItem.username || "A Prospector"}</span>
+        </div>
+      )}
+    </div>
+  );
+
   const inspectorPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3
@@ -4093,7 +4409,7 @@ export default function OilPage() {
       <span style={{ fontWeight: 700 }}>PREVIEW MODE</span>
       <span style={{ opacity: 0.8 }}>Sign up to actually play and claim a plot</span>
       <a
-        href="/oil"
+        href="/hailmary"
         style={{
           padding: "3px 10px",
           background: "#1a1408",
@@ -4120,7 +4436,7 @@ export default function OilPage() {
       fontSize: 11,
       letterSpacing: "0.1em",
     }}>
-      GAME ENDED — <a href="/oil?mode=report" style={{ color: theme.accent, textDecoration: "underline" }}>VIEW REPORT</a>
+      GAME ENDED — <a href="/hailmary?mode=report" style={{ color: theme.accent, textDecoration: "underline" }}>VIEW REPORT</a>
     </div>
   );
 
@@ -4659,11 +4975,11 @@ export default function OilPage() {
           padding: "4px 8px", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 2,
         }}>
           <span style={{ fontSize: 10, color: theme.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            rl80.com/oil?ref={userDrill.referralCode}
+            rl80.com/hailmary?ref={userDrill.referralCode}
           </span>
           <button
             onClick={() => {
-              navigator.clipboard.writeText(`https://rl80.com/oil?ref=${userDrill.referralCode}`);
+              navigator.clipboard.writeText(`https://rl80.com/hailmary?ref=${userDrill.referralCode}`);
             }}
             style={{
               padding: "2px 8px", border: `1px solid ${theme.border}`, borderRadius: 2,
@@ -5279,6 +5595,8 @@ export default function OilPage() {
           <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {leaderboardSection}
+          {fieldDispatchSection}
+          {isAdmin && pendingFeedPanel}
           {(isAdmin || isReport) && (
             <OilVerifyPanel adminPassword={adminPassword} />
           )}
@@ -5381,10 +5699,11 @@ export default function OilPage() {
           trigger={snapshotTrigger}
           captureElementId="oil-canvas"
           label={snapshotLabel}
-          referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : null}
+          referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : { link: "rl80.com/hailmary" }}
           onComplete={handleSnapshotComplete}
           onPublish={isAdmin ? publishPolaroidToFeed : null}
         />
+        {feedLightbox}
 
         {chatModalPlotKey && (
           <OilChatModal
@@ -5782,6 +6101,8 @@ export default function OilPage() {
             <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
             <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
             {leaderboardSection}
+            {fieldDispatchSection}
+            {isAdmin && pendingFeedPanel}
             {(isAdmin || isReport) && (
               <OilVerifyPanel adminPassword={adminPassword} />
             )}
@@ -5833,10 +6154,11 @@ export default function OilPage() {
         trigger={snapshotTrigger}
         captureElementId="oil-canvas"
         label={snapshotLabel}
-        referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : null}
+        referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : { link: "rl80.com/hailmary" }}
         onComplete={handleSnapshotComplete}
         onPublish={isAdmin ? publishPolaroidToFeed : null}
       />
+      {feedLightbox}
 
       {chatModalPlotKey && (
         <OilChatModal

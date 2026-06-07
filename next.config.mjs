@@ -73,6 +73,14 @@ const nextConfig = {
         destination: '/',
         permanent: true, // 308 permanent redirect
       },
+      {
+        // The game moved /oil -> /hailmary (substance is no longer "oil").
+        // Query strings (?ref=, ?mode=report, ?preview=1) are preserved, so old
+        // shared polaroids, referral links, and bookmarks keep working.
+        source: '/oil',
+        destination: '/hailmary',
+        permanent: true, // 308 permanent redirect
+      },
     ];
   },
   async headers() {

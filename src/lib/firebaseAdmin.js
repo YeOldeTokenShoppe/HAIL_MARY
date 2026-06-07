@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 let db = null;
 
@@ -33,6 +34,18 @@ function initAdmin() {
 
 export function getAdminDb() {
   return initAdmin();
+}
+
+// Storage bucket via the admin SDK (bypasses storage rules) — used to delete a
+// polaroid blob when a pending dispatch is rejected. Bucket name is passed
+// explicitly since the admin app isn't initialized with a default bucket.
+export function getAdminBucket() {
+  initAdmin();
+  const name =
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!name) return null;
+  return getStorage().bucket(name);
 }
 
 export { FieldValue, Timestamp };

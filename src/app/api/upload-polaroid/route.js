@@ -94,7 +94,7 @@ export async function POST(request) {
     const meta = metadata && typeof metadata === 'object' ? metadata : {};
     const clampStr = (v, n) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
     const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-    const eventType = meta.eventType === 'gusher' || meta.eventType === 'hell' ? meta.eventType : null;
+    const eventType = ['gusher', 'hell', 'showcase'].includes(meta.eventType) ? meta.eventType : null;
 
     // `approved: true` is the ONLY way an entry becomes publicly visible, and it
     // was already password-validated above. Auto-captures never send `approved`,

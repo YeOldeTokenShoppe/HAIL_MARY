@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId, PREMIUM_PRICES } from "@/lib/oilPremium";
 
 // Normalize an uploaded sign image to <=maxDim px (preserving aspect) and re-encode
-// as WebP before it's stored. /oil is a shared scene — every player loads each
+// as WebP before it's stored. /hailmary is a shared scene — every player loads each
 // other's sign as a GPU texture, so bounding it here keeps the field cheap for all.
 // (A Storage rule also caps file size server-side as a guardrail.)
 async function resizeSignImage(file, maxDim = 1024, quality = 0.92) {

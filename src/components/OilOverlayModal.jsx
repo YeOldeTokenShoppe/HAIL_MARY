@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-// Generic centered overlay for /oil — wraps any panel content (e.g. the
+// Generic centered overlay for /hailmary — wraps any panel content (e.g. the
 // leaderboard) in a dismissible, scrollable card. Closes on backdrop click,
 // the × button, or Escape.
 export default function OilOverlayModal({ isOpen, onClose, darkMode = false, maxWidth = 420, children }) {

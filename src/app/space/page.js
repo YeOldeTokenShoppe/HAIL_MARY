@@ -74,7 +74,7 @@ export default function SpacePage() {
           </>
         }
         onProceed={() => {
-          window.location.href = "/oil";
+          window.location.href = "/hailmary";
         }}
       />
 

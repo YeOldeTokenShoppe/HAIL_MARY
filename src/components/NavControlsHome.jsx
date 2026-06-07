@@ -28,12 +28,12 @@ export default function NavControlsHome({
   hideMenu = false,
   // Pass-through config for the internal UnifiedAccountModal (opened by the
   // avatar button). Defaults preserve the original behavior; callers can
-  // deep-link a tab (e.g. /oil opens straight to "referrals") and theme it.
+  // deep-link a tab (e.g. /hailmary opens straight to "referrals") and theme it.
   accountModalInitialTab = 'account',
   accountModalTheme = 'cyber',
   accountModalUnlockedItems = undefined,
   // Optional override for the help/music icon glyph color so these buttons can
-  // match a host page's theme accent (e.g. /oil Solstice/Dark/Paraboleum).
+  // match a host page's theme accent (e.g. /hailmary Solstice/Dark/Paraboleum).
   // Null preserves the original hardcoded gold.
   accentColor = null,
   // When true, the avatar image sits inside the button border (no 8px bleed)

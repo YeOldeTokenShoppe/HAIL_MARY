@@ -80,7 +80,7 @@ export default function MobileBottomNav({
   hideMenu = false,
   // Pass-through config for the internal UnifiedAccountModal (opened by the
   // Account / Wallet slots). Defaults preserve the original behavior; callers
-  // can deep-link a tab (e.g. /oil opens straight to "referrals") and theme it.
+  // can deep-link a tab (e.g. /hailmary opens straight to "referrals") and theme it.
   accountModalInitialTab = 'account',
   accountModalTheme = 'cyber',
   accountModalUnlockedItems = undefined,

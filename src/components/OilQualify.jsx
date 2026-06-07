@@ -583,7 +583,7 @@ export default function OilQualify({
                   }
 
                   const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
-                  const text = `I just staked my claim at Hail Mary Prospecting Co.\n\nrl80.com/oil?ref=${refCode}`;
+                  const text = `I just staked my claim at Hail Mary Prospecting Co.\n\nrl80.com/hailmary?ref=${refCode}`;
                   window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "width=550,height=420");
                   setTimeout(() => setShareNote(null), 5000);
                 } catch (err) { console.error("Share failed:", err); }
@@ -676,7 +676,7 @@ export default function OilQualify({
                     const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
                     await navigator.share({
                       title: "Hail Mary Prospecting Co.",
-                      text: `I just staked my claim! Join me: rl80.com/oil?ref=${refCode}`,
+                      text: `I just staked my claim! Join me: rl80.com/hailmary?ref=${refCode}`,
                       files: [file],
                     });
                   } catch (err) {
@@ -709,7 +709,7 @@ export default function OilQualify({
         {/* Sign-in / user badge */}
         <div style={{ marginTop: 20 }}>
           {!user ? (
-            <SignInButton mode="modal" forceRedirectUrl="/oil">
+            <SignInButton mode="modal" forceRedirectUrl="/hailmary">
               <button style={{
                 padding: "10px 28px",
                 background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
@@ -938,7 +938,7 @@ export default function OilQualify({
               mounted on client-side routes to itself and its one-shot effect
               wouldn't re-read ?preview=1. */}
           <a
-            href="/oil?preview=1"
+            href="/hailmary?preview=1"
             style={{
               display: "block",
               textAlign: "center",
@@ -971,7 +971,7 @@ export default function OilQualify({
               <div style={{ fontSize: 12, color: theme.muted, marginBottom: 14 }}>
                 Sign in to check your qualification
               </div>
-              <SignInButton mode="modal" forceRedirectUrl="/oil">
+              <SignInButton mode="modal" forceRedirectUrl="/hailmary">
                 <button style={{
                   padding: "10px 28px",
                   background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
@@ -1586,12 +1586,12 @@ export default function OilQualify({
                 padding: "6px 10px", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 3,
               }}>
                 <span style={{ fontSize: 11, color: theme.textStrong, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  rl80.com/oil?ref={walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8)}
+                  rl80.com/hailmary?ref={walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8)}
                 </span>
                 <button
                   onClick={() => {
                     const code = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
-                    navigator.clipboard.writeText(`https://rl80.com/oil?ref=${code}`);
+                    navigator.clipboard.writeText(`https://rl80.com/hailmary?ref=${code}`);
                   }}
                   style={{
                     padding: "4px 12px", border: `1px solid ${theme.gold}`, borderRadius: 3,
@@ -2004,7 +2004,7 @@ export default function OilQualify({
         </div>
       </div>
 
-      {/* Bottom Mobile Nav — same layout as /oil game page:
+      {/* Bottom Mobile Nav — same layout as /hailmary game page:
           hide music/wallet/menu, add HOME via extraLeft. */}
       {isMobile && <MobileBottomNav
         isPlaying={contextIsPlaying}

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { HOW_TO_PLAY_STEPS } from "./HowToPlayPanel";
 
-// First-visit onboarding overlay for /oil. Shows a character greeting video
+// First-visit onboarding overlay for /hailmary. Shows a character greeting video
 // up top with the How-to-Play steps below. Re-openable via the "?" help button.
 export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
   // Close on Escape for keyboard users.

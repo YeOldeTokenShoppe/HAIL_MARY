@@ -100,7 +100,7 @@ export default function ArcadePage() {
 
   const handleEnterScreen = useCallback((screenName) => {
     setScreenTransition(true);
-    const destination = screenName === "Screen2" ? "/race" : "/oil";
+    const destination = screenName === "Screen2" ? "/race" : "/hailmary";
     // Navigate after the white flash fills the screen
     setTimeout(() => {
       router.push(destination);
@@ -469,7 +469,7 @@ export default function ArcadePage() {
                 fontFamily: "monospace",
               }}
             >
-              You will be redirected to {activeScreen === "Screen2" ? "/race" : "/oil"}
+              You will be redirected to {activeScreen === "Screen2" ? "/race" : "/hailmary"}
             </p>
             <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
               <button

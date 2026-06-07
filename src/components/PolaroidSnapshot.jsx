@@ -45,19 +45,33 @@ const PolaroidSnapshot = ({
   // Draw the "Hail Mary Prospecting Co." logo watermark (two lines, stacked in corner).
   // Custom fonts must be loaded before canvas fillText, or it silently falls back to plain sans-serif.
   const drawWatermark = async (ctx) => {
-    // Make sure the custom fonts are loaded before drawing, but NEVER let a slow
-    // or missing font block the snapshot. Orbitron's bold weight comes from the
-    // Google Fonts link and its local face is font-display:block, so an un-raced
-    // await here can hang forever and the watermark never gets drawn at all.
-    try {
-      const fontsReady = Promise.allSettled([
-        document.fonts.load("bold 32px 'Manufacturing Consent'"),
-        document.fonts.load("bold 14px 'Orbitron'"),
-      ]);
-      const timeout = new Promise((resolve) => setTimeout(resolve, 800));
-      await Promise.race([fontsReady, timeout]);
-    } catch (e) {
-      // If font loading fails, fall through and draw with whatever is available
+    // Load the BUNDLED TTFs directly (FontFace API) before drawing. Relying on the
+    // @font-face/Google timing + an 800ms race loses on mobile (slower fetch), so
+    // canvas fillText falls back to plain sans-serif and bakes that into the photo.
+    // Loading the local files guarantees the family is present at draw time. Still
+    // raced against a timeout so a stuck fetch never blocks the snapshot.
+    if (typeof document !== 'undefined' && document.fonts) {
+      const ensureFont = async (family, url, sample) => {
+        try {
+          if (document.fonts.check && document.fonts.check(sample)) return; // already available
+          const ff = new FontFace(family, `url(${url})`);
+          await ff.load();
+          document.fonts.add(ff);
+        } catch (e) {
+          // Fall through — draw with whatever's available.
+        }
+      };
+      try {
+        await Promise.race([
+          Promise.all([
+            ensureFont("Manufacturing Consent", "/fonts/ManufacturingConsent.ttf", "32px 'Manufacturing Consent'"),
+            ensureFont("Orbitron", "/fonts/Orbitron.ttf", "14px 'Orbitron'"),
+          ]),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+      } catch (e) {
+        // If font loading fails, fall through and draw with whatever is available.
+      }
     }
 
     // Anchor to the centered square the polaroid actually shows. The photo frame
@@ -559,7 +573,7 @@ const PolaroidSnapshot = ({
     const shareText = referralOverlay?.code
       ? `Check out my rig! Join me on the grid 🤑`
       : `Check out my rig! 🤑`;
-    const shareUrl = `https://rl80.com/oil${refSuffix}`;
+    const shareUrl = `https://rl80.com/hailmary${refSuffix}`;
     
     switch(platform) {
       case 'twitter':
@@ -804,7 +818,7 @@ const PolaroidSnapshot = ({
                   JOIN ME ON THE GRID
                 </div>
                 <div style={{ fontSize: 10, color: '#333', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  {referralOverlay.link || `rl80.com/oil?ref=${referralOverlay.code}`}
+                  {referralOverlay.link || `rl80.com/hailmary?ref=${referralOverlay.code}`}
                 </div>
               </div>
             )}
