@@ -547,7 +547,9 @@ void main() {
   float belly = 0.26 * smoothstep(0.02, 0.30, y) * (1.0 - smoothstep(0.32, 0.96, y));
   float ragged = abs(fl) * 0.10 * (0.4 + y);                  // turbulent flickering edge
   float tongues = smoothstep(0.55, 1.0, y) * abs(fl) * 0.16;  // flame tips lick upward
-  float hellWidth = baseWidth + belly + ragged + tongues;
+  // Scaled in a touch so the flame base stays within the pad instead of
+  // spilling its shader edge onto the ground past the wellhead.
+  float hellWidth = (baseWidth + belly + ragged + tongues) * 0.78;
   float hellXOff = x + wobble * 1.4 + fl * 0.16 * y;          // flames sway, not a tidy column
   float hellInner = hellWidth * 0.05;                         // soft, gaseous — no hard liquid wall
 
@@ -4903,7 +4905,7 @@ useGLTF.preload("/models/oilJack_fancy_allProps2.glb");
 
 // ── Hell Demon — spawns from below, flies to a victim plot, roams the field
 //    making mischief, and must be caught during a vulnerable pause window ─────
-useGLTF.preload("/models/diablo.glb");
+useGLTF.preload("/models/imp_devil.glb");
 
 // Deterministic PRNG so every client animates the same wander path from a
 // shared seed (the bountyId). Frame timing still drifts between clients, but
@@ -4939,6 +4941,16 @@ const DEMON_BANISH_DUR = 1.0;
 const DEMON_WANDER_RADIUS = 2; // cells around the victim plot
 const DEMON_YAW_OFFSET = 0;    // tweak if the model faces the wrong way
 const DEMON_SPAWN_OFFSET_Z = 0.2; // nudge the spawn toward the wellhead (world +z)
+const DEMON_APPEAR_DELAY = 2.0;   // seconds the hell effects play before the demon erupts
+// Flying intro sequence (after the Spawn-To-Fly-Idle emergence): hover, cast a
+// spell, then fly to the victim plot and land into the ground wander loop.
+const DEMON_FLY_Y = 0.2;       // hover height (world units) during the fly intro
+const DEMON_SPAWN_PEAK_Y = 0.2; // burst-out apex during spawn; settles to hover after
+const DEMON_FLY_SPEED = 0.5;    // flying travel speed (units/sec)
+const FLY_IDLE2_DUR = 2.0;      // Fly Idle after the cast, before flying off
+const FLY_IDLE3_DUR = 2.0;      // Fly Idle at the destination, before landing
+const FLY_TURN_DUR = 0.5;       // Fly Turn to face the destination
+const FLY_LAND_DUR = 0.6;       // descend from fly height to the ground
 
 function HellDemon({
   summonerCol = 0,
@@ -4955,12 +4967,12 @@ function HellDemon({
   onBanish,
   onMiss,
 }) {
-  const { scene, animations } = useGLTF("/models/diablo.glb");
+  const { scene, animations } = useGLTF("/models/imp_devil.glb");
   const cloned = useMemo(() => SkeletonUtils.clone(scene), [scene]);
   useEffect(() => () => disposeScene(cloned), [cloned]);
 
   // Drive a manual AnimationMixer (mixer.update is called in our useFrame).
-  // NOTE: every clip in diablo.glb animates per-bone *translation* (not just
+  // NOTE: every clip in imp_devil.glb animates per-bone *translation* (not just
   // rotation) — the limb motion lives in the .position tracks, so we use the
   // raw clips unmodified. The locomotion clips ("Walk Forward In Place",
   // "Turn Left/Right") have no root forward motion, so the group translate
@@ -4989,6 +5001,19 @@ function HellDemon({
   const [vulnerable, setVulnerable] = useState(false);
   const [done, setDone] = useState(false);
 
+  // Hold the demon hidden underground for a beat after the hell effects begin
+  // (this component mounts exactly when they do), then run the spawn. `appeared`
+  // drives the group's visible prop; appearedRef gates the useFrame machine.
+  const [appeared, setAppeared] = useState(false);
+  const appearedRef = useRef(false);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      appearedRef.current = true;
+      setAppeared(true);
+    }, DEMON_APPEAR_DELAY * 1000);
+    return () => clearTimeout(id);
+  }, []);
+
   // Cell-center → world position (cell centers are where the rigs sit)
   const cellToWorld = useCallback(
     (c, r) =>
@@ -5016,7 +5041,7 @@ function HellDemon({
   // Seeded RNG — stable per demon
   const rng = useMemo(() => demonMulberry32(demonHashSeed(String(seed))), [seed]);
 
-  // Animation crossfade helper (fuzzy match against the diablo clip names).
+  // Animation crossfade helper (fuzzy match against the imp_devil clip names).
   // Pass a single matcher, or an ARRAY of matchers to blend several clips at
   // once (e.g. [/walk/, /look.?around/] = walk while glancing around — both at
   // full weight, the same way the glTF viewer plays them together).
@@ -5058,6 +5083,7 @@ function HellDemon({
   const fromRef = useRef(new THREE.Vector3());
   const toRef = useRef(new THREE.Vector3());
   const segDurRef = useRef(1);
+  const flyRiseFromRef = useRef(DEMON_FLY_Y); // spawn-apex height the hover settles down from
   const headingRef = useRef(0);
   const turnFromRef = useRef(0);
   const turnDeltaRef = useRef(0);
@@ -5162,6 +5188,36 @@ function HellDemon({
     });
   };
 
+  // Flying intro (replaces the ground trek): hover → cast → fly to the victim
+  // plot → land, then hand off to the normal ground wander loop. Not catchable
+  // until it lands (roamingRef stays false through the intro).
+  const startFlyIntro = (g) => {
+    homeNodeRef.current = { i: targetCol, j: targetRow };
+    roamingRef.current = false;
+    headingRef.current = g.rotation.y - DEMON_YAW_OFFSET; // keep heading continuous
+    flyRiseFromRef.current = g.position.y; // settle the hover down from the spawn apex
+    setPhase("fly_idle_2"); // the cast is blended into the spawn; hover, then fly off
+  };
+  // Turn to face the victim plot's home node (the same street point the wander
+  // loop uses, so the post-landing hand-off lines up), then fly there.
+  const startFlyTurn = (g) => {
+    const toW = nodeToWorld(homeNodeRef.current.i, homeNodeRef.current.j);
+    fromRef.current.set(g.position.x, DEMON_FLY_Y, g.position.z);
+    toRef.current.set(toW.x, DEMON_FLY_Y, toW.z);
+    const dir = toRef.current.clone().sub(fromRef.current);
+    const targetHeading =
+      dir.lengthSq() > 1e-4 ? Math.atan2(dir.x, dir.z) : headingRef.current;
+    turnFromRef.current = headingRef.current;
+    let dh = targetHeading - headingRef.current;
+    while (dh > Math.PI) dh -= Math.PI * 2;
+    while (dh < -Math.PI) dh += Math.PI * 2;
+    turnDeltaRef.current = dh;
+    const d = fromRef.current.distanceTo(toRef.current);
+    segDurRef.current = Math.max(0.6, d / DEMON_FLY_SPEED);
+    playAnim(dh >= 0 ? /fly turn left/ : /fly turn right/);
+    setPhase("fly_turn");
+  };
+
   // Face a nearby cell (the rig!) and play an attack — stays in place.
   const startMischief = (g) => {
     const home = homeNodeRef.current;
@@ -5216,15 +5272,35 @@ function HellDemon({
     }
   };
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (mixerRef.current) mixerRef.current.update(delta);
     const g = groupRef.current;
     if (!g || done) return;
+    if (!appearedRef.current) {
+      // Park at the underground spawn point (hidden via visible={appeared}) so the
+      // first visible frame is already the borehole emergence, not a flash at origin.
+      const s = cellToWorld(summonerCol, summonerRow);
+      g.position.set(s.x, DEMON_GROUND_Y - 0.5, s.z + DEMON_SPAWN_OFFSET_Z);
+      return;
+    }
     tRef.current += delta;
     const t = tRef.current;
     const phase = phaseRef.current;
     const init = !phaseInitRef.current;
     if (init) phaseInitRef.current = true;
+
+    // Turn the demon to face the camera (yaw only) and keep headingRef in sync so
+    // the following fly-turn starts from this heading with no pop. Used through
+    // the spawn + hover intro so the demon always presents its front to the
+    // viewer regardless of how they've orbited.
+    const faceCamera = () => {
+      const yaw = Math.atan2(
+        state.camera.position.x - g.position.x,
+        state.camera.position.z - g.position.z,
+      );
+      headingRef.current = yaw;
+      g.rotation.y = yaw + DEMON_YAW_OFFSET;
+    };
 
     // Spawn point = the summoner's drill well (cell CENTER, under the rig), so
     // the demon erupts from the borehole rather than off at a plot corner.
@@ -5244,13 +5320,68 @@ function HellDemon({
         if (init) {
           g.position.set(sWorld.x, DEMON_GROUND_Y - 0.5, sWorld.z);
           g.scale.setScalar(1);
-          playAnim(/spawn/, false);
+          // Blend the emergence and the spell together so the demon bursts out
+          // of the ground already casting — both play once and clamp.
+          playAnim([/spawn to fly idle/, /fly cast spell/], false);
         }
         const f = demonClamp(t / DEMON_SPAWN_DUR, 0, 1);
         const ease = 1 - Math.pow(1 - f, 3);
-        g.position.y = DEMON_GROUND_Y - 0.5 + ease * 0.5;
-        g.rotation.y += delta * 1.2;
-        if (f >= 1) startTransit(g);
+        // Burst up out of the ground past the hover height for a launch feel; the
+        // clip adds its own lift on top, and fly_idle_1 settles back to hover.
+        g.position.y = DEMON_GROUND_Y - 0.5 + ease * (DEMON_SPAWN_PEAK_Y + 0.5);
+        faceCamera();
+        if (f >= 1) startFlyIntro(g);
+        break;
+      }
+      case "fly_idle_2": {
+        if (init) playAnim(/fly idle/);
+        // Settle from the spawn apex down to hover height as the cast finishes.
+        const settle = demonClamp(t / 0.4, 0, 1);
+        const se = 1 - Math.pow(1 - settle, 2);
+        const from = flyRiseFromRef.current;
+        g.position.y = from + (DEMON_FLY_Y - from) * se + Math.sin(t * 1.6) * 0.04 * se;
+        faceCamera();
+        if (t >= FLY_IDLE2_DUR) startFlyTurn(g);
+        break;
+      }
+      case "fly_turn": {
+        const f = demonClamp(t / FLY_TURN_DUR, 0, 1);
+        const ease = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+        g.rotation.y = turnFromRef.current + turnDeltaRef.current * ease + DEMON_YAW_OFFSET;
+        g.position.y = DEMON_FLY_Y;
+        if (f >= 1) {
+          headingRef.current = turnFromRef.current + turnDeltaRef.current;
+          setPhase("fly_move");
+        }
+        break;
+      }
+      case "fly_move": {
+        if (init) playAnim(/fly forward in place/);
+        const f = demonClamp(t / segDurRef.current, 0, 1);
+        g.position.lerpVectors(fromRef.current, toRef.current, f);
+        g.position.y = DEMON_FLY_Y;
+        g.rotation.y = headingRef.current + DEMON_YAW_OFFSET;
+        if (f >= 1) setPhase("fly_idle_3");
+        break;
+      }
+      case "fly_idle_3": {
+        if (init) playAnim(/fly idle/);
+        g.position.y = DEMON_FLY_Y + Math.sin(t * 1.6) * 0.04;
+        if (t >= FLY_IDLE3_DUR) setPhase("fly_land");
+        break;
+      }
+      case "fly_land": {
+        if (init) playAnim(/walk forward in place/);
+        const f = demonClamp(t / FLY_LAND_DUR, 0, 1);
+        const ease = 1 - Math.pow(1 - f, 3);
+        g.position.y = DEMON_FLY_Y + (DEMON_GROUND_Y - DEMON_FLY_Y) * ease;
+        g.rotation.y = headingRef.current + DEMON_YAW_OFFSET;
+        if (f >= 1) {
+          g.position.y = DEMON_GROUND_Y;
+          wanderNodeRef.current = homeNodeRef.current;
+          roamingRef.current = true; // now catchable — resume grid wandering
+          setPhase("wander_pause");
+        }
         break;
       }
       case "walk_turn": {
@@ -5264,7 +5395,7 @@ function HellDemon({
         break;
       }
       case "walk_move": {
-        if (init) playAnim([/walk/, /look.?around/]);
+        if (init) playAnim(/walk/);
         const f = demonClamp(t / segDurRef.current, 0, 1);
         g.position.lerpVectors(fromRef.current, toRef.current, f);
         g.position.y = DEMON_GROUND_Y;
@@ -5274,7 +5405,7 @@ function HellDemon({
       }
       case "wander_pause": {
         if (init) {
-          playAnim(rng() < 0.5 ? /look.?around/ : /idle/);
+          playAnim(/idle/);
           setVuln(true);
         }
         if (t >= DEMON_PAUSE_DUR) {
@@ -5338,8 +5469,11 @@ function HellDemon({
   if (done) return null;
 
   return (
-    <group ref={groupRef} onPointerDown={handleClick}>
-      <primitive object={cloned} scale={0.12} />
+    <group ref={groupRef} visible={appeared} onPointerDown={handleClick}>
+      {/* imp_devil.glb is authored upside-down vs three.js Y-up — flip it
+          upright here on the inner primitive so the group keeps owning heading
+          yaw (rotation.y) and ground height. */}
+      <primitive object={cloned} scale={0.07} rotation={[Math.PI, 0, 0]} />
       <pointLight ref={lightRef} color="#ff2200" intensity={6} distance={3} decay={2} position={[0, 0.3, 0]} />
       {/* Mischief / banish spark — additive, untextured (safe on iOS) */}
       <mesh ref={sparkRef} position={[0, 0.25, 0.18]} visible={false}>

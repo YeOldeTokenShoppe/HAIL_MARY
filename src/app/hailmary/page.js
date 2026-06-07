@@ -47,7 +47,7 @@ const GUSHER_CAPTIONS = [
 const HELL_CAPTIONS = [
   "JUST TRYING TO MAKE A BUCK — DIDN'T MEAN TO UNLEASH HELL 🔥👹",
   "WHO SUMMONED THIS THING 👹",
-  "MY RIG WENT STRAIGHT TO HELL 🔥",
+  "MY INVESTMENT WENT STRAIGHT TO HELL 🔥",
   "BREACHED A HELL POCKET 😈",
   "OOPS. THAT'S A DEMON. 🔥👹",
   "DRILLED TOO GREEDY, TOO DEEP 👹",
@@ -2379,7 +2379,9 @@ export default function OilPage() {
       ? { eventType: "hell", label: pickCaption("hell"), col, row, persist: false }
       : { eventType: "gusher", label: pickCaption("gusher"), col, row, persist: false };
     // Let the eruption / hell portal reach a photogenic frame before grabbing it.
-    const t = setTimeout(() => fireEventCapture(meta), eventType === "hell" ? 1500 : 1200);
+    // Hell waits an extra 2s on top: the demon emerges 2s after the effects begin
+    // (DEMON_APPEAR_DELAY in OilVoxelGrid), so capture once it's out of the ground.
+    const t = setTimeout(() => fireEventCapture(meta), eventType === "hell" ? 3500 : 1200);
     return () => clearTimeout(t);
   }, [selectedX, sliceY, fireEventCapture]);
 
