@@ -1368,7 +1368,7 @@ function HeroAltarObject({
     let buffer = null;
     (async () => {
       try {
-        const res = await fetch("/audio/sparkle.mp3");
+        const res = await fetch("/audio/choir.mp3");
         const arrayBuf = await res.arrayBuffer();
         buffer = await ctx.decodeAudioData(arrayBuf);
         if (cancelled) return;

@@ -74,17 +74,18 @@
 }
 
 .polaroidBottom {
-  padding: 15px 10px 20px;
+  padding: 10px 10px 1px;
   background: white;
   text-align: center;
   min-height: 60px; /* Increased space for 2 lines */
   display: flex;
+  flex-direction: column; /* caption on top, "Join me on the grid" stacked below */
   align-items: center;
   justify-content: center;
 }
 
 .polaroidText {
-  font-family: "Homemade Apple", cursive;
+  font-family: "Permanent Marker", cursive;
   font-size: 14px; /* Slightly smaller */
   color: #333;
   margin: 0;

@@ -758,7 +758,7 @@ function CameraFlyTo({ target, controlsRef }) {
           // the rig in haze, so keep the camera a touch above the look-at.) The smaller
           // +x offset keeps the rig centered rather than thrown to one side.
           endTarget.current.set(target.x, target.y - 0.08, target.z + 0.05);
-          endPos.current.set(target.x + 0.34, target.y + 0.0, target.z + 0.41);
+          endPos.current.set(target.x + 0.34, target.y + 0.07, target.z + 0.41);
         } else {
           // Desktop: elevated close-up (pulled back slightly for more headroom)
           endTarget.current.set(target.x + 0.1, target.y - 0.05, target.z + 0.1);
@@ -1038,7 +1038,10 @@ export default function OilPage() {
   // chosen scene. Mutually exclusive with parabolum (the toggles clear each other).
   const [GeodeMode, setGeodeMode] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("oil_GeodeMode") === "true";
+      // Geode is the default theme (shows the opal sheen best). New visitors
+      // (no stored pref) get it; anyone who explicitly toggled it off is honored.
+      const stored = localStorage.getItem("oil_GeodeMode");
+      return stored === null ? true : stored === "true";
     }
     return false;
   });
@@ -2212,6 +2215,184 @@ export default function OilPage() {
     }
   }, [selectedCellGushers]);
 
+  // ── Auto Polaroid captures on milestone events ──────────────────────────────
+  // When a player's own rig strikes a gusher or unleashes Hell, automatically
+  // pop the shareable Polaroid AND persist it to the public feed — so the moment
+  // is saved even for players who never tap Share (and attributed to the rig's
+  // display name when there's no logged-in account). The overlay is the same one
+  // the manual Snapshot button uses; `captureMeta` carries the event-specific
+  // caption + the metadata we POST to /api/upload-polaroid.
+  const [captureMeta, setCaptureMeta] = useState(null);
+  const captureMetaRef = useRef(null);
+  const capturedGusherRef = useRef(null); // last gusher event id auto-captured
+  const capturedHellRef = useRef(null);   // last demon bounty id auto-captured
+  // Admin toggle: also pop the Polaroid when the Test Gusher / Test Hell buttons
+  // fire their local-only visual (those don't create real gusher/demon docs, so
+  // the live auto-capture effects below never see them).
+  const [captureOnTest, setCaptureOnTest] = useState(false);
+  // Don't auto-capture events that were already live at page load (e.g. a refresh
+  // mid-gusher) — only ones that fire after this short settle window.
+  const autoCaptureReadyRef = useRef(false);
+  useEffect(() => {
+    const id = setTimeout(() => { autoCaptureReadyRef.current = true; }, 2500);
+    return () => clearTimeout(id);
+  }, []);
+
+  const snapshotLabel = captureMeta?.label ?? "Diversifying my investment portfolio!";
+
+  // Manual Snapshot button: a plain capture, never persisted to the feed.
+  const handleManualSnapshot = useCallback(() => {
+    captureMetaRef.current = null;
+    setCaptureMeta(null);
+    setSnapshotTrigger(true);
+  }, []);
+
+  // Fire an event capture: show the Polaroid with an event caption and flag it
+  // for feed persistence (read back in onComplete via the ref).
+  const fireEventCapture = useCallback((meta) => {
+    captureMetaRef.current = meta;
+    setCaptureMeta(meta);
+    setSnapshotTrigger(true);
+  }, []);
+
+  // Admin "Capture on Test": preview the themed Polaroid for the test visual.
+  // persist:false → it pops the shareable overlay (Download/Share work) but does
+  // NOT write to the public feed, so test presses don't pollute it.
+  const fireTestCapture = useCallback((eventType) => {
+    if (selectedX === null) return;
+    const col = selectedX, row = sliceY;
+    const meta = eventType === "hell"
+      ? { eventType: "hell", label: "JUST TRYING TO MAKE A BUCK - DIDN'T MEAN TO UNLEASH HELL 🔥👹", col, row, persist: false }
+      : { eventType: "gusher", label: "STRUCK LYQUID80! 💸", col, row, persist: false };
+    // Let the eruption / hell portal reach a photogenic frame before grabbing it.
+    const t = setTimeout(() => fireEventCapture(meta), eventType === "hell" ? 1500 : 1200);
+    return () => clearTimeout(t);
+  }, [selectedX, sliceY, fireEventCapture]);
+
+  // Push a finished Polaroid (the composited webp data URL) to the public feed.
+  // Best-effort + fire-and-forget — a failed upload must never disrupt play.
+  const persistFeedSnapshot = useCallback(async (dataUrl, meta) => {
+    if (!meta?.persist || typeof dataUrl !== "string") return;
+    try {
+      await fetch("/api/upload-polaroid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageData: dataUrl,
+          metadata: {
+            eventType: meta.eventType,
+            userId: user?.id ?? null,
+            username: username?.trim() || user?.firstName || "A Prospector",
+            col: meta.col ?? null,
+            row: meta.row ?? null,
+            oilAmount: meta.oilAmount ?? null,
+            caption: meta.label ?? null,
+            referralCode: userDrill?.referralCode ?? null,
+          },
+        }),
+      });
+    } catch (e) {
+      console.error("[oil] feed snapshot upload failed:", e);
+    }
+  }, [user?.id, username, userDrill?.referralCode]);
+
+  // Shared onComplete for both layouts' Polaroid instances.
+  const handleSnapshotComplete = useCallback((dataUrl) => {
+    const meta = captureMetaRef.current;
+    if (meta?.persist) persistFeedSnapshot(dataUrl, meta);
+    setTimeout(() => {
+      setSnapshotTrigger(false);
+      setCaptureMeta(null);
+      // Keep captureMetaRef holding this capture's context (eventType/col/row) so a
+      // later admin "Publish to Feed" can attribute it — it's overwritten on the
+      // next capture and cleared by handleManualSnapshot.
+    }, 100);
+  }, [persistFeedSnapshot]);
+
+  // Admin "Publish to Feed": write the on-screen polaroid to oilFeed as an
+  // approved (publicly visible) entry. Password-gated server-side, so this is the
+  // only path that makes a capture public — a deliberate verify-then-publish step.
+  const publishPolaroidToFeed = useCallback(async ({ dataUrl, caption } = {}) => {
+    if (!dataUrl) return { ok: false, error: "no image" };
+    const meta = captureMetaRef.current;
+    try {
+      const res = await fetch("/api/upload-polaroid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageData: dataUrl,
+          password: adminPassword,
+          metadata: {
+            approved: true,
+            eventType: meta?.eventType ?? null,
+            userId: user?.id ?? null,
+            username: username?.trim() || user?.firstName || "A Prospector",
+            col: meta?.col ?? selectedX ?? null,
+            row: meta?.row ?? sliceY ?? null,
+            caption: caption ?? meta?.label ?? null,
+            referralCode: userDrill?.referralCode ?? null,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data.error || `HTTP ${res.status}` };
+      return { ok: true, url: data.storageUrl };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  }, [adminPassword, user?.id, username, userDrill?.referralCode, selectedX, sliceY]);
+
+  // Rising edge: the player's own rig erupts → celebratory gusher Polaroid.
+  // Skipped in preview/test/admin so the feed isn't polluted with rehearsals.
+  useEffect(() => {
+    if (previewModeRef.current || isTest || isAdmin || !user?.id) return;
+    const mine = gusherEvents.filter((ev) => ev.userId === user.id);
+    const newest = mine.length
+      ? mine.reduce((a, b) => ((b.createdAt?.seconds ?? 0) > (a.createdAt?.seconds ?? 0) ? b : a))
+      : null;
+    if (!autoCaptureReadyRef.current) {
+      // Absorb whatever was already gushing at mount without firing a capture.
+      if (newest) capturedGusherRef.current = newest.id;
+      return;
+    }
+    if (!newest || capturedGusherRef.current === newest.id) return;
+    capturedGusherRef.current = newest.id;
+    // Let the 3D eruption climb to a photogenic frame before grabbing it.
+    const t = setTimeout(() => {
+      fireEventCapture({
+        eventType: "gusher",
+        label: "STRUCK LYQUID80! 💸",
+        oilAmount: newest.oilAmount ?? null,
+        col: newest.col, row: newest.row,
+        persist: true,
+      });
+    }, 1400);
+    return () => clearTimeout(t);
+  }, [gusherEvents, user?.id, isTest, isAdmin, fireEventCapture]);
+
+  // Rising edge: the player breaches a Hell pocket and summons the demon.
+  useEffect(() => {
+    if (previewModeRef.current || isTest || isAdmin || !user?.id) return;
+    if (!demonBounty || demonBounty.summonerId !== user.id) return;
+    if (!autoCaptureReadyRef.current) {
+      capturedHellRef.current = demonBounty.id; // already loose at mount — skip
+      return;
+    }
+    if (capturedHellRef.current === demonBounty.id) return;
+    capturedHellRef.current = demonBounty.id;
+    // The scene swaps to the hell preset + portal — give it a beat to ignite.
+    const t = setTimeout(() => {
+      fireEventCapture({
+        eventType: "hell",
+        label: "DIDN'T MEAN TO UNLEASHE HELL 🔥👹",
+        col: demonBounty.summonerCol ?? null,
+        row: demonBounty.summonerRow ?? null,
+        persist: true,
+      });
+    }, 1700);
+    return () => clearTimeout(t);
+  }, [demonBounty, user?.id, isTest, isAdmin, fireEventCapture]);
+
   const selectedDepthData = useMemo(() => {
     if (selectedX === null || sliceY == null || !displayGrid3D[selectedX]?.[sliceY]) return null;
     const col = [];
@@ -3016,7 +3197,21 @@ export default function OilPage() {
         </button>
       </div>
       <button
-        onClick={() => setGusherTest((g) => g + 1)}
+        onClick={() => setCaptureOnTest((v) => !v)}
+        title="When on, Test Gusher / Test Hell also pop the shareable Polaroid (preview only — not saved to the feed)"
+        style={{
+          ...styles.paramBtn,
+          ...(captureOnTest ? styles.paramBtnActive : {}),
+          width: "100%",
+          padding: "6px 8px",
+          fontSize: 11,
+          marginBottom: 8,
+        }}
+      >
+        📸 CAPTURE ON TEST: {captureOnTest ? "ON" : "OFF"}
+      </button>
+      <button
+        onClick={() => { setGusherTest((g) => g + 1); if (captureOnTest) fireTestCapture("gusher"); }}
         disabled={selectedX === null}
         style={{
           ...styles.paramBtn,
@@ -3032,7 +3227,7 @@ export default function OilPage() {
         💥 TEST GUSHER {selectedX === null ? "(select a rig)" : `(${selectedX + 1},${sliceY + 1})`}
       </button>
       <button
-        onClick={handleTestHell}
+        onClick={() => { const wasActive = hellActive; handleTestHell(); if (captureOnTest && !wasActive) fireTestCapture("hell"); }}
         disabled={selectedX === null && !hellActive}
         style={{
           ...styles.paramBtn,
@@ -3563,6 +3758,10 @@ export default function OilPage() {
       @keyframes demonBannerPulse {
         0%, 100% { box-shadow: 0 4px 30px rgba(255,34,0,0.3); }
         50% { box-shadow: 0 4px 50px rgba(255,34,0,0.6); }
+      }
+      @keyframes opalSheen {
+        0% { background-position: 0% center; }
+        100% { background-position: 200% center; }
       }
     `}</style>
   );
@@ -4676,7 +4875,7 @@ export default function OilPage() {
                 <span>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
-              <p style={styles.subtitle}>LYQUID80 QUEST</p>
+              <p style={{ ...styles.subtitle, fontSize: 11 }}>LYQUID80 QUEST</p>
             </div>
           </div>
           <div style={styles.headerRight}>
@@ -4924,7 +5123,7 @@ export default function OilPage() {
                 )}
                 <button
                   title="Snapshot"
-              onClick={() => setSnapshotTrigger(true)}
+              onClick={handleManualSnapshot}
                   style={{
                     width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
                     background: "rgba(212,168,84,0.15)", border: `1px solid ${theme.cornerBorder}`,
@@ -5181,11 +5380,10 @@ export default function OilPage() {
         <PolaroidSnapshot
           trigger={snapshotTrigger}
           captureElementId="oil-canvas"
-          label="Diversifying my investment portfolio!"
+          label={snapshotLabel}
           referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : null}
-          onComplete={() => {
-            setTimeout(() => setSnapshotTrigger(false), 100);
-          }}
+          onComplete={handleSnapshotComplete}
+          onPublish={isAdmin ? publishPolaroidToFeed : null}
         />
 
         {chatModalPlotKey && (
@@ -5224,7 +5422,7 @@ export default function OilPage() {
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
               <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
             </h1>
-            <p style={styles.subtitle}>LYQUID80 QUEST</p>
+            <p style={{ ...styles.subtitle, fontSize: 18 }}>LYQUID80 QUEST</p>
           </div>
         </div>
         <div style={styles.headerRight}>
@@ -5439,7 +5637,7 @@ export default function OilPage() {
             )}
             <button
               title="Snapshot"
-              onClick={() => setSnapshotTrigger(true)}
+              onClick={handleManualSnapshot}
               style={{
                 width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
                 background: "rgba(212,168,84,0.15)", border: `1px solid ${theme.cornerBorder}`,
@@ -5634,11 +5832,10 @@ export default function OilPage() {
       <PolaroidSnapshot
         trigger={snapshotTrigger}
         captureElementId="oil-canvas"
-        label="Diversifying my investment portfolio!"
+        label={snapshotLabel}
         referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : null}
-        onComplete={() => {
-          setTimeout(() => setSnapshotTrigger(false), 100);
-        }}
+        onComplete={handleSnapshotComplete}
+        onPublish={isAdmin ? publishPolaroidToFeed : null}
       />
 
       {chatModalPlotKey && (
@@ -5981,9 +6178,19 @@ function getStyles(t) { return {
     margin: 0,
     fontSize: 11,
     fontWeight: 400,
-    color: t.muted,
     letterSpacing: "0.35em",
     textTransform: "uppercase",
+    // Opal gusher sheen: petrol-slick rainbow (cyan→violet→magenta→gold→green)
+    // that slowly drifts, with a cyan bloom matching the substance emis (#18d0c0).
+    backgroundImage:
+      "linear-gradient(100deg, #18d0c0 0%, #7b9cff 18%, #c77bff 34%, #ff5ea8 50%, #ffcf6b 66%, #5effc4 82%, #18d0c0 100%)",
+    backgroundSize: "200% auto",
+    WebkitBackgroundClip: "text",
+    backgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    color: "transparent",
+    animation: "opalSheen 8s linear infinite",
+    filter: "drop-shadow(0 0 6px rgba(24,208,192,0.35))",
   },
 
   headerRight: {

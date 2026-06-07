@@ -10,6 +10,7 @@ const PolaroidSnapshot = ({
   label = 'Victory!',
   backgroundImage = null,
   referralOverlay = null, // { code, link } — overlaid on polaroid bottom
+  onPublish = null, // admin-only: async ({ dataUrl, caption }) => { ok, error } — shows a "Publish to Feed" button
 }) => {
   const instanceId = React.useRef(Math.random().toString(36).substring(7));
   React.useEffect(() => {
@@ -17,6 +18,8 @@ const PolaroidSnapshot = ({
     if (typeof document !== 'undefined' && document.fonts) {
       document.fonts.load("bold 32px 'Manufacturing Consent'").catch(() => {});
       document.fonts.load("bold 14px 'Orbitron'").catch(() => {});
+      // Caption font — warmed so the html2canvas download/share capture renders it.
+      document.fonts.load("14px 'Permanent Marker'").catch(() => {});
     }
   }, []);
   React.useEffect(() => {
@@ -28,6 +31,7 @@ const PolaroidSnapshot = ({
   const [polaroidImageUrl, setPolaroidImageUrl] = useState(null); // Cached polaroid capture
   const [polaroidBlob, setPolaroidBlob] = useState(null); // Cached polaroid blob
   const [caption, setCaption] = useState(label);
+  const [isPublishing, setIsPublishing] = useState(false);
   const captionRef = useRef(null);
   const polaroidRef = useRef(null);
 
@@ -528,6 +532,28 @@ const PolaroidSnapshot = ({
     }
   };
 
+  const handlePublish = async () => {
+    if (isPublishing || !onPublish) return;
+    setIsPublishing(true);
+    try {
+      // Publish exactly what's on screen: the captured polaroid + the admin's
+      // final (possibly edited) caption.
+      const url = polaroidImageUrl || await capturePolaroid();
+      const finalCaption = captionRef.current?.textContent?.trim() || caption;
+      const result = await onPublish({ dataUrl: url, caption: finalCaption });
+      if (result?.ok) {
+        showNotification('Published to feed ✓');
+      } else {
+        showNotification(`Publish failed: ${result?.error || 'unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Publish failed:', err);
+      showNotification('Publish failed');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const handleShare = async (platform) => {
     const refSuffix = referralOverlay?.code ? `?ref=${referralOverlay.code}` : '';
     const shareText = referralOverlay?.code
@@ -837,6 +863,23 @@ const PolaroidSnapshot = ({
                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
               </svg>
             </button>
+
+            {onPublish && (
+              <button
+                className={`${styles.actionButton} action-button`}
+                onClick={handlePublish}
+                disabled={isPublishing}
+                title="Publish to site feed (admin)"
+                aria-label="Publish to feed"
+                style={{ opacity: isPublishing ? 0.5 : 1 }}
+              >
+                {/* megaphone / broadcast — publish to the public feed */}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 11l18-5v12L3 14v-3z"/>
+                  <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         {/* <div className={styles.polaroidShadow} /> */}

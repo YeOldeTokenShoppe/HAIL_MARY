@@ -423,6 +423,10 @@
       match /demonBounty/{d}      { allow read: if true; allow write: if false; }
       match /oilPurchases/{d}     { allow read: if true; allow write: if false; }
       match /polaroids/{d}        { allow read: if true; allow write: if false; }
+      // Auto-capture news/social feed (gusher + hell milestones). Public read is
+      // gated on `approved` so unmoderated rig art (custom sign images) stays
+      // hidden until reviewed. Written only by the admin SDK (/api/upload-polaroid).
+      match /oilFeed/{d}          { allow read: if resource.data.approved == true; allow write: if false; }
       match /fountain_donations/{d} { allow read: if true; allow write: if false; }
       match /trades/{d}           { allow read: if true; allow write: if false; }
       match /decisions/{d}        { allow read: if true; allow write: if false; }

@@ -2,7 +2,10 @@
 // Simple Node.js runtime version using Firebase REST APIs
 
 import { NextResponse } from 'next/server';
-import { db, doc, setDoc } from '@/lib/firebaseServer';
+// Firestore writes use the ADMIN SDK (bypasses security rules). The client SDK
+// can't write here: `polaroids` is `write: if false` and the catch-all denies by
+// default, so a client-SDK write would be silently rejected.
+import { getAdminDb } from '@/lib/firebaseAdmin';
 
 // Remove edge runtime to use Node.js runtime
 // export const runtime = 'edge';
@@ -10,13 +13,20 @@ import { db, doc, setDoc } from '@/lib/firebaseServer';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { imageData, metadata } = body;
+    const { imageData, metadata, password } = body;
     
     console.log('[Upload API] Received request with metadata:', metadata);
     
     if (!imageData) {
       console.error('[Upload API] No image data provided');
       return NextResponse.json({ error: 'No image data provided' }, { status: 400 });
+    }
+
+    // Admin "Publish to Feed" (approved=true) is password-gated. Validate up front,
+    // BEFORE the storage upload, so an unauthorized request can't orphan an image.
+    const wantApprove = metadata && typeof metadata === 'object' && metadata.approved === true;
+    if (wantApprove && (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
     }
 
     // Get Firebase config from environment variables
@@ -78,16 +88,64 @@ export async function POST(request) {
     // Generate public URL
     const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(filename)}?alt=media`;
     
-    // Save metadata to Firestore for Twitter Card OG tags
+    // Normalize the optional event metadata sent by auto-captures (gusher/hell).
+    // Everything is sanitized + length-capped: the client is untrusted, and these
+    // fields can end up rendered in a public feed.
+    const meta = metadata && typeof metadata === 'object' ? metadata : {};
+    const clampStr = (v, n) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
+    const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    const eventType = meta.eventType === 'gusher' || meta.eventType === 'hell' ? meta.eventType : null;
+
+    // `approved: true` is the ONLY way an entry becomes publicly visible, and it
+    // was already password-validated above. Auto-captures never send `approved`,
+    // so they stay `false` (a private backlog).
+    const approved = wantApprove;
+
+    const feedMeta = {
+      eventType,
+      userId: clampStr(meta.userId, 128),
+      username: clampStr(meta.username, 40) || 'A Prospector',
+      col: num(meta.col),
+      row: num(meta.row),
+      oilAmount: num(meta.oilAmount),
+      caption: clampStr(meta.caption, 140),
+      referralCode: clampStr(meta.referralCode, 32),
+    };
+
+    // Save metadata to Firestore (admin SDK) for Twitter Card OG tags
     let snapshotId = randomId;
     try {
-      if (db) {
-        await setDoc(doc(db, 'polaroids', randomId), {
+      const adb = getAdminDb();
+      if (adb) {
+        await adb.collection('polaroids').doc(randomId).set({
           storageUrl: publicUrl,
           storagePath: filename,
           createdAt: new Date().toISOString(),
+          ...feedMeta,
         });
         console.log('[Upload API] Saved polaroid doc:', randomId);
+
+        // Feed entries: milestone auto-captures (gusher/hell) land as an
+        // unapproved private backlog (`approved: false`); admin "Publish to Feed"
+        // writes an approved, publicly-visible entry. A rig render can contain a
+        // player's custom sign art, so only password-gated approval makes it live.
+        if (eventType || approved) {
+          try {
+            await adb.collection('oilFeed').add({
+              ...feedMeta,
+              snapshotId: randomId,
+              storageUrl: publicUrl,
+              storagePath: filename,
+              approved,
+              createdAt: new Date().toISOString(),
+              createdAtMs: Date.now(),
+            });
+            console.log('[Upload API] Saved oilFeed entry:', eventType || 'custom', 'approved=' + approved, randomId);
+          } catch (feedErr) {
+            console.error('[Upload API] Failed to write oilFeed doc:', feedErr.message);
+            // Non-fatal — the image + polaroid doc are already saved.
+          }
+        }
       } else {
         console.warn('[Upload API] Firestore not available, skipping doc creation');
       }
