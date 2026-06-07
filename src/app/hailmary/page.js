@@ -629,16 +629,18 @@ const DEFAULT_BLOCK_HASH =
 
 const DEPTH_Z = 20;
 const CELL_SIZE = 1;
-// "Bank soon" meter threshold, in field oil units (~1% of OIL_FIELD_UNITS) — the
-// tank holds oil (the score), not dollars; the prize pays out by share.
-const TANK_CAPACITY = 5000;
+// "Bank soon" meter threshold, in field oil units (~0.5% of OIL_FIELD_UNITS) — the
+// tank holds oil (the score), paid out at a fixed rate. Scales with OIL_FIELD_UNITS:
+// every cell's oil is proportional to the field total, so this must track it
+// (500K field → 2.5K) to keep the gusher-fill cadence constant.
+const TANK_CAPACITY = 2500;
 const PASSIVE_DRILLS = 10;
 const MAX_BONUS_DRILLS = 10;
 const MAX_DEPTH = 20;
 const FREE_CLAIM_JUMPS = 2;
-// A loose demon is transient — bounties older than this are stale/orphaned and
-// get auto-expired client-side (must match BOUNTY_TTL_MS in the API route).
-const DEMON_BOUNTY_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// A loose demon stays active until dispatched; this is only the orphan-cleanup
+// backstop for a bugged/abandoned bounty (must match BOUNTY_TTL_MS in the API).
+const DEMON_BOUNTY_TTL_MS = 24 * 60 * 60 * 1000; // 24h orphan backstop
 
 // Continuous orbit exactly like the Three.js horse example. Stops when user interacts.
 function CameraFlyIn({ onComplete, mobile = false }) {
@@ -753,6 +755,32 @@ function CameraFlyTo({ target, controlsRef }) {
             endTarget.current.set(0, target.mobile ? 2 : 5, 0);
             endPos.current.set(0, target.mobile ? 3.5 : 8, target.mobile ? 4 : 8);
           }
+        } else if (target.hellView) {
+          // Two-phase camera pull-back while the demon is loose (mobile). Phase
+          // "near": capture the pre-hell pose and dolly straight back a little
+          // along the current view so the demon's elaborate entrance fits in
+          // frame without a jarring jump. Phase "far": pull all the way out to
+          // the field overview once it starts roaming, so the roaming/tappable
+          // demon stays visible. restoreView returns to the captured pose on banish.
+          if (target.phase === "near") {
+            preFirePos.current.copy(camera.position);
+            preFireTarget.current.copy(controls.target);
+            hasPreFire.current = true;
+            // Frame the summoner's rig (where the demon erupts), pulled well back
+            // and aimed a little low so the whole show fits: the demon bursting
+            // up out of the ground AND the higher flying-idle hover. The look-at
+            // sits near the ground/wellhead; the camera is far enough back (~1.5
+            // world units) to keep the risen demon in frame at fov 50.
+            endTarget.current.set(target.x, target.y - 0.10, target.z + 0.05);
+            endPos.current.set(target.x + 0.65, target.y + 0.12, target.z + 0.75);
+          } else {
+            // Phase 2: rise to an elevated, oblique helicopter vantage that frames
+            // the field. The slow flySpeed makes this a cinematic pull-back; once
+            // it settles, OrbitControls autoRotate (driven by the hellOrbit prop)
+            // circles the camera around this look-at for the helicopter sweep.
+            endTarget.current.set(0, target.mobile ? 1.4 : 5, 0);
+            endPos.current.set(0, target.mobile ? 6 : 9, target.mobile ? 7 : 11);
+          }
         } else if (target.overview) {
           // Zoom out to overview
           endTarget.current.set(0, target.mobile ? 2 : 5, 0);
@@ -783,8 +811,8 @@ function CameraFlyTo({ target, controlsRef }) {
           // (A level pose — camera y == target y — grazes the ground plane and washes
           // the rig in haze, so keep the camera a touch above the look-at.) The smaller
           // +x offset keeps the rig centered rather than thrown to one side.
-          endTarget.current.set(target.x, target.y - 0.08, target.z + 0.05);
-          endPos.current.set(target.x + 0.34, target.y + 0.07, target.z + 0.41);
+          endTarget.current.set(target.x, target.y - 0.13, target.z + 0.05);
+          endPos.current.set(target.x + 0.44, target.y + 0.06, target.z + 0.51);
         } else {
           // Desktop: elevated close-up (pulled back slightly for more headroom)
           endTarget.current.set(target.x + 0.1, target.y - 0.05, target.z + 0.1);
@@ -800,7 +828,7 @@ function CameraFlyTo({ target, controlsRef }) {
     const controls = controlsRef?.current;
     if (!controls) return;
 
-    progressRef.current = Math.min(1, progressRef.current + delta * 1.2);
+    progressRef.current = Math.min(1, progressRef.current + delta * (target?.flySpeed ?? 1.2));
     const t = 1 - Math.pow(1 - progressRef.current, 3);
 
     camera.position.lerpVectors(startPos.current, endPos.current, t);
@@ -810,7 +838,7 @@ function CameraFlyTo({ target, controlsRef }) {
     if (progressRef.current >= 1) {
       flyingRef.current = false;
       // Restore minDistance after zoom-out
-      if ((target?.overview || target?.skyView || target?.restoreView) && savedMinDist.current !== null) {
+      if ((target?.overview || target?.skyView || target?.restoreView || (target?.hellView && target?.phase !== "near")) && savedMinDist.current !== null) {
         controls.minDistance = savedMinDist.current;
         savedMinDist.current = null;
       }
@@ -1926,6 +1954,9 @@ export default function OilPage() {
 
   // Camera fly-to
   const [flyTarget, setFlyTarget] = useState(null);
+  // Phase-2 helicopter auto-orbit while the demon is loose (mobile). Driven as a
+  // React prop on OrbitControls so frequent re-renders can't silently reset it.
+  const [hellOrbit, setHellOrbit] = useState(false);
   const controlsRef = useRef();
   const controlsRefMobile = useRef();
 
@@ -2177,6 +2208,54 @@ export default function OilPage() {
     }, 90000);
   }, [hellActive, selectedX, sliceY, envPreset]);
 
+  // Mobile: two-phase camera pull-back while the demon is loose. The close
+  // focused-rig view leaves the erupting demon too high in frame and loses it as
+  // it roams, so phase 1 dollies back a little for the demon's elaborate entrance
+  // (~5s), then phase 2 pulls all the way out to the field overview once it starts
+  // roaming. The prior view is captured and restored when the demon is banished.
+  const hellPhase2Timer = useRef(null);
+  const hellOrbitTimer = useRef(null);
+  const prevHellForCamRef = useRef(false);
+  useEffect(() => {
+    if (!isMobile) {
+      prevHellForCamRef.current = hellActive;
+      return;
+    }
+    if (hellActive && !prevHellForCamRef.current) {
+      // Phase 1 — frame the summoner's rig (where the demon erupts) using the
+      // same grid→world math as handleFlyTo.
+      const col = hellCol ?? userDrill?.col ?? myPlot?.col ?? 0;
+      const row = hellRow ?? userDrill?.row ?? myPlot?.row ?? 0;
+      const worldW = gridSize * CELL_SIZE;
+      const worldD = gridSize * CELL_SIZE;
+      const x = -worldW / 2 + col * CELL_SIZE + CELL_SIZE / 2;
+      const z = worldD / 2 - row * CELL_SIZE - CELL_SIZE / 2;
+      flyIdRef.current++;
+      setFlyTarget({ x, y: 1.3, z, id: flyIdRef.current, mobile: true, hellView: true, phase: "near" });
+      if (hellPhase2Timer.current) clearTimeout(hellPhase2Timer.current);
+      if (hellOrbitTimer.current) clearTimeout(hellOrbitTimer.current);
+      hellPhase2Timer.current = setTimeout(() => {
+        // Phase 2 — slow, cinematic pull-back to the helicopter vantage...
+        flyIdRef.current++;
+        setFlyTarget({ id: flyIdRef.current, mobile: true, hellView: true, phase: "far", flySpeed: 0.2 });
+        hellPhase2Timer.current = null;
+        // ...then, once the pull-back has settled, start the auto-orbit (driven
+        // via the OrbitControls autoRotate prop so React re-renders don't reset it).
+        hellOrbitTimer.current = setTimeout(() => {
+          setHellOrbit(true);
+          hellOrbitTimer.current = null;
+        }, 3200);
+      }, 7000);
+    } else if (!hellActive && prevHellForCamRef.current) {
+      if (hellPhase2Timer.current) { clearTimeout(hellPhase2Timer.current); hellPhase2Timer.current = null; }
+      if (hellOrbitTimer.current) { clearTimeout(hellOrbitTimer.current); hellOrbitTimer.current = null; }
+      setHellOrbit(false);
+      flyIdRef.current++;
+      setFlyTarget({ id: flyIdRef.current, mobile: true, restoreView: true });
+    }
+    prevHellForCamRef.current = hellActive;
+  }, [hellActive, isMobile, hellCol, hellRow, gridSize, userDrill, myPlot]);
+
   // Reset drained state when cell or drill depth changes
   useEffect(() => {
     setTankDrained(false);
@@ -2208,6 +2287,23 @@ export default function OilPage() {
     if (playerExtracted === 0) return 0;
     return Math.max(0, playerExtracted - lastDrainSnapshot);
   }, [userDrill?.tankOil, playerExtracted, lastDrainSnapshot]);
+
+  // Oil you've found = banked (totalCollected) + un-banked tank. This is what you
+  // get paid for at the fixed rate below.
+  const playerScore = useMemo(
+    () => (activeUserDrill?.totalCollected || 0) + oilInTank,
+    [activeUserDrill?.totalCollected, oilInTank],
+  );
+  // Fixed conversion: every oil unit is worth pot ÷ field (e.g. $500 ÷ 500K =
+  // $0.001/unit → 1,000 oil = $1). The field is finite and deterministic, so total
+  // liability is capped at the pot (only reached at 100% extraction); unfound oil is
+  // never paid out (operator keeps it). Value depends ONLY on your own oil — no share
+  // dilution, so referrals never shrink your take (docs/oil-game.md).
+  const oilUsdRate = useMemo(
+    () => (OIL_FIELD_UNITS > 0 ? totalOilBudget / OIL_FIELD_UNITS : 0),
+    [totalOilBudget],
+  );
+  const oilValue = useMemo(() => playerScore * oilUsdRate, [playerScore, oilUsdRate]);
 
   // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
@@ -3064,13 +3160,49 @@ export default function OilPage() {
   // anyway — blocking client-side avoids a banish that Firestore then refuses).
   const demonCapturable = !isSummonerStunned;
 
-  // Mistimed click on the roaming demon → it dodges away; flash a taunt.
-  const [demonTaunt, setDemonTaunt] = useState(false);
-  const demonTauntTimer = useRef(null);
-  const handleDemonMiss = useCallback(() => {
-    setDemonTaunt(true);
-    if (demonTauntTimer.current) clearTimeout(demonTauntTimer.current);
-    demonTauntTimer.current = setTimeout(() => setDemonTaunt(false), 1500);
+  // Two-phase demon difficulty. For the first stretch of its life the demon must
+  // be fought down (get close + land DEMON_HARD_HITS timed hits while dodging);
+  // after that an easy one-click banish appears so the global blockade always has
+  // a clean exit. Anchored to the bounty's createdAt so all clients flip together
+  // (late joiners who load past the cutoff get the easy phase immediately). Admin/
+  // test uses a short hard phase so both phases are quick to exercise.
+  const DEMON_HARD_HITS = 3;
+  const demonHardPhaseMs = (isAdmin || isTest) ? 25_000 : 5 * 60 * 1000;
+  const [demonEasyPhase, setDemonEasyPhase] = useState(false);
+  const demonStartMsRef = useRef(null);
+  useEffect(() => {
+    if (!hellActive) { setDemonEasyPhase(false); demonStartMsRef.current = null; return; }
+    const startMs = demonBounty?.createdAt?.toMillis?.() ?? demonStartMsRef.current ?? Date.now();
+    demonStartMsRef.current = startMs;
+    const remaining = demonHardPhaseMs - (Date.now() - startMs);
+    if (remaining <= 0) { setDemonEasyPhase(true); return; }
+    setDemonEasyPhase(false);
+    const id = setTimeout(() => setDemonEasyPhase(true), remaining);
+    return () => clearTimeout(id);
+  }, [hellActive, demonBounty?.id, demonHardPhaseMs]);
+  const demonRequiredHits = demonEasyPhase ? 1 : DEMON_HARD_HITS;
+
+  // Mistimed click on the roaming demon → it counterattacks and locks this
+  // player out for a few seconds. demonStunRemaining drives the HUD countdown.
+  const [demonStunRemaining, setDemonStunRemaining] = useState(0);
+  const demonStunTimer = useRef(null);
+  const handleDemonMiss = useCallback((cooldownSecs = 3.5) => {
+    if (demonStunTimer.current) clearInterval(demonStunTimer.current);
+    const endAt = Date.now() + cooldownSecs * 1000;
+    setDemonStunRemaining(Math.ceil(cooldownSecs));
+    demonStunTimer.current = setInterval(() => {
+      const rem = Math.max(0, endAt - Date.now());
+      setDemonStunRemaining(Math.ceil(rem / 1000));
+      if (rem <= 0) { clearInterval(demonStunTimer.current); demonStunTimer.current = null; }
+    }, 200);
+  }, []);
+  useEffect(() => () => { if (demonStunTimer.current) clearInterval(demonStunTimer.current); }, []);
+
+  // The demon's retaliation lands (after its Take Damage flinch). Impact feedback
+  // = camera shake. The lockout itself is the penalty (handled per-client in
+  // HellDemon); no economic damage by design, to keep the bounty race fair.
+  const handleDemonAttack = useCallback(() => {
+    shakeRef.current = 1;
   }, []);
 
   // Legacy demo drill (admin inspector)
@@ -3395,13 +3527,14 @@ export default function OilPage() {
         <StatBlock s={styles} accentColor={theme.accent} label="PRIZE POOL" value={<AnimNum value={totalOilBudget} />} unit="USDC" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={numberOfDeposits} />
         <StatBlock s={styles} accentColor={theme.accent} label="AVAILABLE CLAIMS" value={`${(gridSize * gridSize) - Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length}/${gridSize * gridSize}`} />
-        <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={OIL_FIELD_UNITS > 0 ? `${(playerExtracted / OIL_FIELD_UNITS * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
         <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
         <StatBlock s={styles} accentColor={theme.accent} label="MAX DEPTH" value={DEPTH_Z} unit="LVL" />
         {!isAdmin && !isReport && effectiveDrillDay > 0 && (
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
             <StatBlock s={styles} accentColor={theme.accent} label="EXTRACTED" value={<AnimNum value={playerExtracted} />} unit="OIL" accent />
+            {/* Fixed-rate value of oil found — no share dilution, depends only on your own haul. */}
+            <StatBlock s={styles} accentColor={theme.gold} label="VALUE" value={`≈ ${oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} unit="USDC" accent />
           </>
         )}
         {(isAdmin || isReport) && (
@@ -3409,6 +3542,7 @@ export default function OilPage() {
             <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="OIL" />
             <StatBlock s={styles} accentColor={theme.accent} label="DRY CLAIMS" value={stats.dryClaims} />
             <StatBlock s={styles} accentColor={theme.accent} label="FIELD OIL" value={OIL_FIELD_UNITS.toLocaleString()} unit="OIL" />
+            <StatBlock s={styles} accentColor={theme.accent} label="FIELD TAPPED" value={OIL_FIELD_UNITS > 0 ? `${(communityOil / OIL_FIELD_UNITS * 100).toFixed(2)}%` : "0%"} accent={communityOil > 0} />
           </>
         )}
       </div>
@@ -4531,7 +4665,7 @@ export default function OilPage() {
   // Banishing now happens by catching the roaming demon during its vulnerable
   // pause window (the 3D BANISH ring / demon body), not via an always-on button.
   // This element is the "it dodged!" taunt shown after a mistimed click.
-  const claimBountyButton = demonTaunt && (
+  const claimBountyButton = demonStunRemaining > 0 && (
     <div
       style={{
         position: "fixed",
@@ -4539,6 +4673,9 @@ export default function OilPage() {
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 9998,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
         padding: isMobile ? "12px 24px" : "14px 30px",
         background: "linear-gradient(180deg, rgba(90,5,0,0.95), rgba(50,3,0,0.92))",
         border: "2px solid rgba(255,68,34,0.7)",
@@ -4551,9 +4688,10 @@ export default function OilPage() {
         boxShadow: "0 0 30px rgba(255,34,0,0.45)",
         textTransform: "uppercase",
         pointerEvents: "none",
+        animation: "demonBannerPulse 0.9s ease-in-out infinite",
       }}
     >
-      THE DEMON DODGES — WAIT FOR IT TO STOP
+      <span>⚡ STUNNED — {demonStunRemaining}s</span>
     </div>
   );
 
@@ -4952,6 +5090,14 @@ export default function OilPage() {
         </span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+        <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.gold }}>
+          VALUE: ≈ {oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC
+        </span>
+        <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.muted }}>
+          BANK TO LOCK IN
+        </span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
         <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}>
           {passiveDepth} PASSIVE + {bonusDrills} BONUS
         </span>
@@ -5242,25 +5388,10 @@ export default function OilPage() {
           </div>
         </header>
 
-        {/* Seed bar — admin/report only */}
-        {(isAdmin || isReport) && (
-          <div style={m.seedBar}>
-            <span style={styles.seedLabel}>SEED</span>
-            <span style={styles.seedValue}>{blockHash}</span>
-          </div>
-        )}
-
-        {/* Controls — admin only */}
-        {isAdmin && (
-          <div style={m.inlineControls}>
-            {controlButtons}
-          </div>
-        )}
-
         {/* Tab bar */}
         <div style={m.tabBar}>
           {[
-            { key: "3d", label: "3D VOXEL" },
+            { key: "3d", label: "3D" },
             { key: "surface", label: "SURFACE" },
             { key: "xsec", label: "X-SECTION" },
           ].map((tab) => (
@@ -5343,8 +5474,10 @@ export default function OilPage() {
                     demonTargetCol={localDemonTarget?.col}
                     demonTargetRow={localDemonTarget?.row}
                     demonCapturable={demonCapturable}
+                    demonRequiredHits={demonRequiredHits}
                     onClaimBounty={handleClaimBounty}
                     onDemonMiss={handleDemonMiss}
+                    onDemonAttack={handleDemonAttack}
                     cameraViewable={cameraViewable}
                     onFocusObject={handleFocusObject}
                   />
@@ -5362,6 +5495,9 @@ export default function OilPage() {
                       maxPolarAngle={Math.PI}
                       minPolarAngle={0}
                       zoomToCursor
+                      autoRotate={hellOrbit}
+                      autoRotateSpeed={0.6}
+                      onStart={() => { if (hellOrbit) setHellOrbit(false); }}
                       target={[0, 1, 0]}
                     />
                     <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
@@ -5389,10 +5525,10 @@ export default function OilPage() {
                 const isMine = mineCol === selectedX && mineRow === (sliceY ?? 0);
                 return (
                   <div style={styles.cellCoordBadge}>
-                    <span style={{ color: isMine ? theme.gold : theme.muted }}>
+                    <span style={{ color: isMine ? theme.gold : "#aebccb" }}>
                       {isMine ? "YOUR CLAIM" : "RIG"}
                     </span>
-                    <span style={{ color: theme.accent }}>
+                    <span style={{ color: "#ffe0a0" }}>
                       ({selectedX + 1}, {(sliceY ?? 0) + 1})
                     </span>
                   </div>
@@ -5510,6 +5646,13 @@ export default function OilPage() {
             </button>
           )}
 
+          {/* Controls — admin only (moved below the scroll handle) */}
+          {isAdmin && (
+            <div style={m.inlineControls}>
+              {controlButtons}
+            </div>
+          )}
+
           {/* Surface Map */}
           {mobileTab === "surface" && (
             <div style={m.section}>
@@ -5594,6 +5737,13 @@ export default function OilPage() {
           {(isAdmin || isReport) && fieldIntelPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
           <HowToPlayPanel isMobile darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
+          {/* Seed bar — admin/report only (moved here, just above Verify The Map) */}
+          {(isAdmin || isReport) && (
+            <div style={m.seedBar}>
+              <span style={styles.seedLabel}>SEED</span>
+              <span style={styles.seedValue}>{blockHash}</span>
+            </div>
+          )}
           <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {leaderboardSection}
@@ -5878,8 +6028,10 @@ export default function OilPage() {
                 demonTargetCol={localDemonTarget?.col}
                 demonTargetRow={localDemonTarget?.row}
                 demonCapturable={demonCapturable}
+                demonRequiredHits={demonRequiredHits}
                 onClaimBounty={handleClaimBounty}
                 onDemonMiss={handleDemonMiss}
+                onDemonAttack={handleDemonAttack}
                 cameraViewable={cameraViewable}
                 onFocusObject={handleFocusObject}
               />
@@ -6625,12 +6777,19 @@ function getStyles(t) { return {
     alignItems: "center",
     gap: 6,
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: 700,
     letterSpacing: "0.12em",
-    padding: "3px 8px",
-    background: "rgba(0,0,0,0.4)",
-    border: `1px solid ${t.cornerBorder || t.border}`,
-    borderRadius: 3,
+    padding: "4px 9px",
+    // Solid dark chip + blur so the readout stays legible over the bright 3D
+    // scene. Text colors below are fixed light tones (not theme-derived) so they
+    // never go dark-on-dark in the light themes.
+    background: "rgba(10,13,18,0.82)",
+    backdropFilter: "blur(6px)",
+    WebkitBackdropFilter: "blur(6px)",
+    border: "1px solid rgba(255,255,255,0.18)",
+    borderRadius: 4,
+    textShadow: "0 1px 2px rgba(0,0,0,0.6)",
     zIndex: 6,
     pointerEvents: "none",
   },

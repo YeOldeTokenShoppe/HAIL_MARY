@@ -9,7 +9,7 @@
 // distribution to its cores. The prize pool ($) is a SEPARATE value distributed
 // by score share at payout. Every generateOilDistribution3D caller must pass
 // this (not the prize) so client and server agree.
-export const OIL_FIELD_UNITS = 1000000;
+export const OIL_FIELD_UNITS = 500000;
 
 // Depth distribution bias (0 = uniform, →1 = deeper). The single source of truth
 // — every caller relies on this default so client and server never drift. (A

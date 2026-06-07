@@ -1,9 +1,16 @@
 /**
  * Oil Game Batch USDC Payout Script
  *
- * Reads oilDrills + oilQualified + oilGame/settings from Firestore, splits the
- * prize pool (settings.totalOilBudget) in proportion to each player's score
- * (banked + un-banked oil units), and sends USDC transfers on Base.
+ * Reads oilDrills + oilQualified + oilGame/settings from Firestore and pays each
+ * player a FIXED-RATE value for the oil they found (banked + un-banked tank):
+ *
+ *   rate   = prizePool / OIL_FIELD_UNITS      (e.g. $500 / 500,000 = $0.001/unit)
+ *   payout = (totalCollected + tankOil) * rate
+ *
+ * Your value depends only on your own haul — no share dilution. The field is finite,
+ * so total payout is bounded by the pot (only reached at 100% extraction); unfound
+ * oil is never paid out (operator keeps the remainder). See docs/oil-game.md
+ * "Prize pool — oil has a fixed value".
  *
  * Usage:
  *   node scripts/oil-payout.js --dry-run   # preview only
@@ -16,13 +23,15 @@
  */
 
 import 'dotenv/config';
-import { createReadStream, existsSync, readFileSync, writeFileSync } from 'fs';
+import { createReadStream, existsSync, readFileSync, writeFileSync, realpathSync } from 'fs';
+import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import { createPublicClient, createWalletClient, http, parseUnits, encodeFunctionData, erc20Abi, isAddress } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { OIL_FIELD_UNITS } from '../src/lib/oilDistribution.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
 const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
@@ -71,9 +80,9 @@ function createClients() {
 }
 
 // ── Firestore data fetch ───────────────────────────────────────────────
-async function fetchPayoutData() {
-  // Oil is a SCORE in field units (decoupled from the prize). The prize pool is
-  // oilGame/settings.totalOilBudget, split in proportion to each player's score.
+export async function fetchPayoutData() {
+  // Oil is measured in field units; each unit is worth prizePool / OIL_FIELD_UNITS.
+  // The prize pool is oilGame/settings.totalOilBudget.
   console.log('Fetching oilGame/settings (prize pool)...');
   const settingsSnap = await getDoc(doc(db, 'oilGame', 'settings'));
   const prizePool = settingsSnap.exists() ? (settingsSnap.data().totalOilBudget || 0) : 0;
@@ -110,11 +119,27 @@ async function fetchPayoutData() {
 }
 
 // ── Build payout list ──────────────────────────────────────────────────
-function buildPayoutList(drills, qualified, prizePool) {
-  // Scoreboard denominator: total score across ALL players (incl. those without
-  // a wallet, so a missing wallet doesn't inflate everyone else's share).
+export function buildPayoutList(drills, qualified, prizePool) {
+  // Fixed rate: every oil unit is worth prizePool / OIL_FIELD_UNITS.
+  const rate = OIL_FIELD_UNITS > 0 ? prizePool / OIL_FIELD_UNITS : 0;
+  console.log(`  → rate: ${rate} USDC/oil  (pot ${prizePool} ÷ field ${OIL_FIELD_UNITS.toLocaleString()})`);
+
+  // Cross-scale safety: in a valid single-scale season nobody can extract more oil
+  // than the field holds, so total score ≤ OIL_FIELD_UNITS and total payout ≤ pot.
+  // If scores exceed the field, the data was accumulated at a DIFFERENT
+  // OIL_FIELD_UNITS scale (e.g. the field was resized mid/between seasons without a
+  // reset) — paying out would over-spend the pot. Refuse and make the operator fix it.
   let totalScore = 0;
   for (const [, drill] of drills) totalScore += drill.score;
+  if (totalScore > OIL_FIELD_UNITS) {
+    console.error(
+      `\n✗ ABORT: total oil found (${totalScore.toLocaleString()}) exceeds the field ` +
+      `(${OIL_FIELD_UNITS.toLocaleString()}). The oilDrills data was almost certainly ` +
+      `accumulated at a different OIL_FIELD_UNITS scale. Reset the game collections ` +
+      `(scripts/oil-reset.js) and re-run a clean season before paying out.`
+    );
+    process.exit(1);
+  }
 
   const payouts = [];
   for (const [userId, drill] of drills) {
@@ -126,14 +151,14 @@ function buildPayoutList(drills, qualified, prizePool) {
       continue;
     }
 
-    // Proportional payout: your share of the scoreboard × the prize pool.
-    const amount = totalScore > 0 ? (drill.score / totalScore) * prizePool : 0;
+    // Fixed-rate payout: the value of the oil this player actually found.
+    const amount = drill.score * rate;
     payouts.push({
       userId,
       wallet: qual.walletAddress,
       username: drill.username || qual.clerkName || userId.slice(0, 8),
       score: drill.score,
-      amount, // USDC ($) — proportional share
+      amount, // USDC ($) — score × fixed rate
     });
   }
 
@@ -351,7 +376,12 @@ async function main() {
   await executePayouts(payouts, alreadyPaid);
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Only run payouts when invoked directly (`node scripts/oil-payout.js`), NOT when
+// imported (e.g. by scripts/oil-build-merkle.js, which reuses the functions above).
+const isEntrypoint = process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isEntrypoint) {
+  main().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}

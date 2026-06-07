@@ -8,9 +8,12 @@ export const MAX_BONUS_DRILLS = 10;
 export const BOUNTY_BONUS_DRILLS = 3;
 export const BOUNTY_USDC = 5; // deducted from the community pool
 export const STUN_DURATION_MS = 2 * 60 * 1000; // 2 minutes
-// A loose demon is transient — after this it's considered stale and any client
-// may auto-expire it (so an orphaned bounty can't keep relighting hell forever).
-export const BOUNTY_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// A loose demon now stays active INDEFINITELY until a hunter dispatches it (the
+// blockade halts drilling until then). This long TTL is only an orphan-cleanup
+// backstop so a bugged/abandoned bounty can't freeze the field literally forever
+// — it is not the normal end of the event (banish is). Admin tests use the local
+// preview demon (90s safety timeout), so this doesn't slow testing.
+export const BOUNTY_TTL_MS = 24 * 60 * 60 * 1000; // 24h orphan backstop
 
 /**
  * Create a demon bounty (the hell-pocket event). `db` is an admin Firestore

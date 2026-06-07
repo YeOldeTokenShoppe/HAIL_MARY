@@ -4937,6 +4937,16 @@ const DEMON_TURN_DUR = 0.4;
 const DEMON_PAUSE_DUR = 2.6;   // the vulnerable / catchable window
 const DEMON_MISCHIEF_DUR = 1.6;
 const DEMON_FLEE_DUR = 0.7;
+const DEMON_TAKE_DAMAGE_DUR = 0.73;  // "Take Damage" clip length (flinch on a mistimed hit)
+const DEMON_COUNTER_ATTACK_DUR = 0.9; // "Slash/Projectile Attack" clip length (retaliation)
+// Per-player lockout after a mistimed click: this client can't click the demon
+// (or banish during a vulnerable window) until it elapses. Client-side only, so
+// it never blocks OTHER hunters — it just costs the impatient player the race.
+const DEMON_HIT_COOLDOWN = 3.5;
+// Hard-phase combat: you must get the camera within this range (world units) of
+// the demon for a click to land as a hit, and land this many hits to banish it.
+const DEMON_HIT_RANGE = 4.0;
+const DEMON_HARD_HITS = 3;
 const DEMON_BANISH_DUR = 1.0;
 const DEMON_WANDER_RADIUS = 2; // cells around the victim plot
 const DEMON_YAW_OFFSET = 0;    // tweak if the model faces the wrong way
@@ -4966,6 +4976,10 @@ function HellDemon({
   clickable = false,
   onBanish,
   onMiss,
+  onAttack,
+  onHit,
+  requiredHits = 1,   // 1 = easy one-click banish; >1 = hard combat phase
+  hitRange = DEMON_HIT_RANGE,
 }) {
   const { scene, animations } = useGLTF("/models/imp_devil.glb");
   const cloned = useMemo(() => SkeletonUtils.clone(scene), [scene]);
@@ -5000,6 +5014,19 @@ function HellDemon({
   const sparkRef = useRef();
   const [vulnerable, setVulnerable] = useState(false);
   const [done, setDone] = useState(false);
+  // Local post-mistimed-click lockout (this player only).
+  const [onCooldown, setOnCooldown] = useState(false);
+  const cooldownRef = useRef(0);
+  // Hard-phase combat: accumulated hits, in-range telegraph, and prop mirrors so
+  // the useFrame/click closures always read the latest values.
+  const hitsRef = useRef(0);
+  const [hits, setHits] = useState(0); // for the progress pips
+  const [inRange, setInRange] = useState(false);
+  const inRangeRef = useRef(false);
+  const requiredHitsRef = useRef(requiredHits);
+  requiredHitsRef.current = requiredHits;
+  const hitRangeRef = useRef(hitRange);
+  hitRangeRef.current = hitRange;
 
   // Hold the demon hidden underground for a beat after the hell effects begin
   // (this component mounts exactly when they do), then run the spawn. `appeared`
@@ -5097,6 +5124,7 @@ function HellDemon({
   const walkSpeedRef = useRef(DEMON_WALK_SPEED);
   const vulnerableRef = useRef(false);
   const roamingRef = useRef(false); // false during the spawn→victim intro trek
+  const counterStepRef = useRef(0); // 0 = flinch (Take Damage), 1 = retaliate (attack)
 
   const setPhase = (p) => {
     phaseRef.current = p;
@@ -5256,26 +5284,88 @@ function HellDemon({
     playAnim(/slash/, false);
   };
 
+  // Mistimed click (outside the catchable window) → the demon flinches with a
+  // Take Damage reaction, then retaliates with a Slash/Projectile attack before
+  // resuming its wander. Anchored regexes (^) pick the grounded clips, not the
+  // "Fly ..." variants. The retaliation fires onAttack as it lands.
+  const beginCounter = () => {
+    const g = groupRef.current;
+    if (!g) return;
+    setVuln(false);
+    counterStepRef.current = 0;
+    cooldownRef.current = DEMON_HIT_COOLDOWN; // lock this player out of the race
+    setOnCooldown(true);
+    setPhase("counter");
+    playAnim(/^take damage/, false);
+  };
+
+  // A clean, in-range hit during the catchable window: the demon flinches (Take
+  // Damage) with NO retaliation/lockout — the reward for good timing. One hit per
+  // window; it resumes wandering after, until the required hits land (then banish).
+  const beginHit = () => {
+    setVuln(false);
+    setPhase("hitstun");
+    playAnim(/^take damage/, false);
+  };
+
+  // Register one clean hit; banish on the final one.
+  const landHit = () => {
+    const required = requiredHitsRef.current;
+    hitsRef.current += 1;
+    setHits(hitsRef.current);
+    onHit?.(hitsRef.current, required);
+    if (hitsRef.current >= required) beginBanish();
+    else beginHit();
+  };
+
   const WANDER_PHASES = ["walk_turn", "walk_move", "wander_mischief", "wander_pause"];
   const handleClick = (e) => {
     if (e?.stopPropagation) e.stopPropagation();
     if (!clickable || done) return;
     const ph = phaseRef.current;
-    if (ph === "banish") return;
+    if (ph === "banish" || ph === "counter" || ph === "hitstun") return;
+    if (cooldownRef.current > 0) return; // locked out after a mistimed hit
     if (!roamingRef.current) return; // can't be caught during the intro trek
-    if (vulnerableRef.current && ph === "wander_pause") {
-      beginBanish();
+
+    const inWindow = vulnerableRef.current && ph === "wander_pause";
+    const required = requiredHitsRef.current;
+
+    // Easy phase (required <= 1): a timed click banishes outright, no proximity.
+    if (required <= 1) {
+      if (inWindow) beginBanish();
+      else if (WANDER_PHASES.includes(ph)) { beginCounter(); onMiss?.(DEMON_HIT_COOLDOWN); }
+      return;
+    }
+
+    // Hard phase: a clean hit needs the catchable window AND proximity. A
+    // mistimed click (outside the window) is punished with the retaliation +
+    // lockout; an in-window-but-too-far tap is just a no-op (the GET CLOSER
+    // telegraph guides them in), so distance alone never costs you the race.
+    if (inWindow) {
+      if (inRangeRef.current) landHit();
     } else if (WANDER_PHASES.includes(ph)) {
-      // It's roaming but not in the catchable window — it dodges away.
-      beginFlee();
-      onMiss?.();
+      beginCounter();
+      onMiss?.(DEMON_HIT_COOLDOWN);
     }
   };
 
   useFrame((state, delta) => {
     if (mixerRef.current) mixerRef.current.update(delta);
+    if (cooldownRef.current > 0) {
+      cooldownRef.current = Math.max(0, cooldownRef.current - delta);
+      if (cooldownRef.current === 0) setOnCooldown(false);
+    }
     const g = groupRef.current;
     if (!g || done) return;
+    // Proximity telegraph for the hard combat phase: is the camera close enough
+    // for a click to count as a hit? (Only meaningful when requiredHits > 1.)
+    {
+      const near = state.camera.position.distanceTo(g.position) <= hitRangeRef.current;
+      if (near !== inRangeRef.current) {
+        inRangeRef.current = near;
+        setInRange(near);
+      }
+    }
     if (!appearedRef.current) {
       // Park at the underground spawn point (hidden via visible={appeared}) so the
       // first visible frame is already the borehole emergence, not a flash at origin.
@@ -5444,6 +5534,44 @@ function HellDemon({
         }
         break;
       }
+      case "hitstun": {
+        // Clean hit: flinch facing the player, then resume wandering (the click
+        // handler already banished if this was the final hit).
+        faceCamera();
+        g.position.y = DEMON_GROUND_Y;
+        if (t >= DEMON_TAKE_DAMAGE_DUR) startWalk(g);
+        break;
+      }
+      case "counter": {
+        // Stand ground, facing the player, through the two-beat reaction:
+        // flinch (Take Damage) → retaliate (Slash/Projectile) → resume wander.
+        faceCamera();
+        g.position.y = DEMON_GROUND_Y;
+        if (counterStepRef.current === 0) {
+          if (t >= DEMON_TAKE_DAMAGE_DUR) {
+            counterStepRef.current = 1;
+            tRef.current = 0; // restart the per-phase clock for the attack beat
+            playAnim(rng() < 0.5 ? /^slash attack/ : /^projectile attack/, false);
+            onAttack?.(DEMON_HIT_COOLDOWN); // damage hook — the retaliation lands here
+          }
+        } else {
+          // Attack-flash spark for impact, reusing the mischief spark mesh.
+          if (sparkRef.current) {
+            const sf = Math.sin(demonClamp(t / DEMON_COUNTER_ATTACK_DUR, 0, 1) * Math.PI);
+            sparkRef.current.visible = true;
+            sparkRef.current.material.opacity = sf * 0.9;
+            sparkRef.current.scale.setScalar(0.6 + sf * 0.9);
+          }
+          if (t >= DEMON_COUNTER_ATTACK_DUR) {
+            if (sparkRef.current) {
+              sparkRef.current.visible = false;
+              sparkRef.current.material.opacity = 0;
+            }
+            startWalk(g);
+          }
+        }
+        break;
+      }
       case "banish": {
         const f = demonClamp(t / DEMON_BANISH_DUR, 0, 1);
         g.scale.setScalar(1 - f);
@@ -5486,45 +5614,83 @@ function HellDemon({
           depthWrite={false}
         />
       </mesh>
-      {/* BANISH ring — only appears during the catchable pause window */}
-      {clickable && vulnerable && (
+      {/* Catchable-window UI — hidden while this player is on their
+          post-mistimed-click lockout. Easy phase = one-click BANISH; hard phase
+          = a HIT button (in range) with progress pips, or a GET CLOSER prompt. */}
+      {clickable && vulnerable && !onCooldown && (
         <Html
           center
           position={[0, 0.6, 0]}
           zIndexRange={[9999, 9999]}
           style={{ pointerEvents: "none" }}
         >
-          <button
-            onClick={(e) => { e.stopPropagation(); beginBanish(); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{
-              pointerEvents: "auto",
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              background: "rgba(255,34,0,0.2)",
-              border: "3px solid rgba(255,68,34,0.85)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 10,
-              color: "#ff6644",
-              letterSpacing: "0.12em",
-              fontWeight: 700,
-              boxShadow: "0 0 24px rgba(255,34,0,0.6), 0 0 48px rgba(255,34,0,0.3)",
-              textShadow: "0 0 8px rgba(255,34,0,0.7)",
-              animation: "demonBannerPulse 0.9s ease-in-out infinite",
-            }}
-          >
-            BANISH
-          </button>
+          {requiredHits <= 1 ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); beginBanish(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={ringBtnStyle("BANISH")}
+            >
+              BANISH
+            </button>
+          ) : inRange ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); landHit(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={ringBtnStyle("HIT")}
+            >
+              <span style={{ fontSize: 11 }}>HIT</span>
+              <span style={{ fontSize: 13, letterSpacing: "0.18em", marginTop: 2 }}>
+                {"◆".repeat(hits)}{"◇".repeat(Math.max(0, requiredHits - hits))}
+              </span>
+            </button>
+          ) : (
+            <div style={getCloserStyle}>GET CLOSER</div>
+          )}
         </Html>
       )}
     </group>
   );
 }
+
+// Shared circular button style for the demon catch UI.
+function ringBtnStyle() {
+  return {
+    pointerEvents: "auto",
+    width: 80,
+    height: 80,
+    borderRadius: "50%",
+    background: "rgba(255,34,0,0.2)",
+    border: "3px solid rgba(255,68,34,0.85)",
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 10,
+    color: "#ff6644",
+    letterSpacing: "0.12em",
+    fontWeight: 700,
+    boxShadow: "0 0 24px rgba(255,34,0,0.6), 0 0 48px rgba(255,34,0,0.3)",
+    textShadow: "0 0 8px rgba(255,34,0,0.7)",
+    animation: "demonBannerPulse 0.9s ease-in-out infinite",
+  };
+}
+
+const getCloserStyle = {
+  pointerEvents: "none",
+  padding: "7px 14px",
+  borderRadius: 6,
+  background: "rgba(20,2,0,0.8)",
+  border: "1px solid rgba(255,68,34,0.5)",
+  fontFamily: "'Share Tech Mono', monospace",
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.18em",
+  color: "#ffb499",
+  textShadow: "0 0 8px rgba(255,34,0,0.6)",
+  whiteSpace: "nowrap",
+};
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -5571,8 +5737,10 @@ export default function OilVoxelGrid({
   demonTargetRow = null,
   demonSeed = null,
   demonCapturable = true,
+  demonRequiredHits = 1,
   onClaimBounty,
   onDemonMiss,
+  onDemonAttack,
   // Gate the live CCTV feed: only the plot owner (or admin/test/report) sees it.
   // Visitors clicking a camera-enabled plot get the rig + camera model, no feed.
   cameraViewable = true,
@@ -5820,8 +5988,10 @@ export default function OilVoxelGrid({
               gridY={gridY}
               seed={demonSeed || `local_${hellCol}_${hellRow}`}
               clickable={demonCapturable}
+              requiredHits={demonRequiredHits}
               onBanish={onClaimBounty}
               onMiss={onDemonMiss}
+              onAttack={onDemonAttack}
             />
           )}
           {demonBounty && ["active", "flying", "waiting"].includes(demonBounty.status) && (
@@ -5837,8 +6007,10 @@ export default function OilVoxelGrid({
               gridY={gridY}
               seed={demonBounty.id}
               clickable={demonCapturable}
+              requiredHits={demonRequiredHits}
               onBanish={onClaimBounty}
               onMiss={onDemonMiss}
+              onAttack={onDemonAttack}
             />
           )}
           {/* Gusher events render as full animated rigs inside PumpjackInstances

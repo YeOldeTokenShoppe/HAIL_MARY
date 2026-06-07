@@ -44,24 +44,26 @@ Because oil is real money, **earned/banked oil must never be stealable.** Loss a
 - Any loss must be **preventable and self-determined** — only un-banked oil, only after a fair defense window (the camera/defense path already exists). Timing luck must never cost money.
 - The **demon is already fine** (self-inflicted summon cost, defense window, redistributive bounty). The thing to rework is the **dino stealing 20–30% of a random victim's tank offline** → convert to a contested-capture event (dino *en route* to a gusher; bank/defend in time).
 
-### Prize pool — oil as a scoreboard
+### Prize pool — oil has a fixed value (2026-06-07, supersedes the share model)
 
-The buried oil is a **scoreboard**, not the literal payout. At season end the full pot splits **in proportion to each player's score**:
+**Every oil unit is worth a fixed rate: `rate = pot ÷ OIL_FIELD_UNITS`** (e.g. `$500 ÷ 500,000 = $0.001/unit` → 1,000 oil = $1). A player's payout is simply:
 
-> payout = (your oil found ÷ total oil found) × pot
+> payout = (your banked + tank oil) × rate
 
-This guarantees the **entire pot always pays out** regardless of turnout — the "money left in the ground" problem disappears with no dynamic grid resizing. Competition is preserved (rich-vein finders earn a bigger slice). Players keep the *feeling* of extracting money while the accounting redistributes the remainder at payout.
+Your value depends **only on your own haul** — never on what anyone else finds. Properties:
 
-Grid size becomes a **feel/contention** dial, not an economic one: fixed 10×10 is fine (runs sparse at low turnout, EV stays high), or size **once at registration close** for a packed board. Because the distribution is deterministic from a block hash, **resize only once at the `ticket_sale → active` transition — never mid-game** (it would move oil out from under active rigs).
+- **Liability is bounded by construction.** The field is finite and deterministic (`OIL_FIELD_UNITS` total), so the most that can ever be owed is `OIL_FIELD_UNITS × rate = the pot`, reached only at 100% extraction. Escrow the pot and you're always solvent — no separate cap mechanism needed.
+- **You pay only for oil actually found.** Unfound oil is never paid out; the operator keeps the remainder. (This deliberately *reverses* the old "entire pot always pays out" goal.)
+- **Referrals are positive-sum with no pot-scaling tricks.** A new player digging their own claim can't shrink your value, because there are no slices — there's a fixed price per unit. This removes the whole zero-sum/dilution problem the share model had to engineer around.
+- **Anti-sybil matters more.** Fixed-rate rewards total oil found, so one entity farming many wallets to grab deposit cells captures more of the bounded pot directly. Defend with the entry gate (hold tokens) + per-wallet claim limits.
 
-### Scaling & referrals
+Payout concentration follows oil concentration: with the field's value massed in a few deposit blobs, hitting a deposit pays big and missing pays cents — authentic prospector variance. Flatten it (if desired) by spreading the **distribution** (more deposits, less peaky), *not* by changing the formula.
 
-A **fixed** pot that always fully pays is **zero-sum** — every referred player dilutes everyone's slice, which kills the referral flywheel (and makes the existing extra-depth referral reward just claw back self-inflicted dilution). Two independent decisions:
+Grid size becomes a **feel/contention** dial, not an economic one: fixed 10×10 is fine. Because the distribution is deterministic from a block hash, **resize only once at the `ticket_sale → active` transition — never mid-game** (it would move oil out from under active rigs).
 
-- **Pot *size*:** must **scale with participation** (not fixed) so referrals are positive-sum.
-- **Pot *distribution*:** proportional score (above) — this was never the problem; it's what guarantees full payout.
+Keep the **extra-depth referral reward** unchanged — under fixed-rate it's a clean personal kicker (more depth → more oil found → bigger check) that costs no other player anything.
 
-Keep the **extra-depth referral reward** unchanged — under proportional split it's a personal *kicker* (more depth → higher score → bigger slice) on top of a pot that now grows when you recruit.
+> **Superseded share model (pre-2026-06-07):** the pot used to split *pari-mutuel* — `payout = (your oil ÷ total oil found) × pot` — so the entire pot always paid out regardless of turnout. Abandoned because it (a) paid the full pot even to a handful of players who barely dug, and (b) was zero-sum, so every referral diluted everyone's slice (which forced a "pot must scale with participation" workaround and sponsor-additive funding just to keep referrals positive-sum). The fixed-rate model fixes both directly.
 
 ### Funding — sponsorship + dev revenue (separate buckets)
 
@@ -335,20 +337,20 @@ player could copy the seed and run `generateOilDistribution3D` to print the enti
 
 ### Resolution decoupled from prize (2026-06-04)
 
-The field is generated at a fixed internal resolution — `OIL_FIELD_UNITS` (1,000,000)
-in `oilDistribution.js` — **not** the dollar prize. At a low total, scaling+rounding
-wiped out each deposit blob's edges and collapsed the distribution to its cores
-(one composite band, "0.0k" cells). Every `generateOilDistribution3D` caller now
-passes `OIL_FIELD_UNITS` (client `useClaimStats`/`OilVoxelGrid`, server strike-tick/
-backfill, verify) **and** `depthBias: 0.35` so client and server produce the *same*
-field. Oil is now a **score in field units**; the **prize pool** (`settings.totalOilBudget`,
-shown as "PRIZE POOL") is separate and pays out by share. Player oil readouts (cells,
-tank, EXTRACTED, leaderboard) read in OIL units; `TANK_CAPACITY` rescaled to units.
+The field is generated at a fixed internal resolution — `OIL_FIELD_UNITS` (500,000
+as of 2026-06-07; was 1,000,000) in `oilDistribution.js` — **not** the dollar prize.
+At a low total, scaling+rounding wiped out each deposit blob's edges and collapsed the
+distribution to its cores (one composite band, "0.0k" cells) — that collapse happened
+at the **~$500 prize scale**, so 500K still has ample resolution. Every
+`generateOilDistribution3D` caller now passes `OIL_FIELD_UNITS` (client
+`useClaimStats`/`OilVoxelGrid`, server strike-tick/backfill, verify) **and**
+`depthBias: 0.35` so client and server produce the *same* field. Oil is a **score in
+field units** converted to dollars at the fixed rate `pot ÷ OIL_FIELD_UNITS` (see
+*Prize pool — oil has a fixed value*). Player oil readouts (cells, tank, EXTRACTED,
+leaderboard) read in OIL units; `TANK_CAPACITY` is rescaled with the field (500K → 2,500).
 
 **Economy pass (done 2026-06-04):** all player + inspector oil readouts now read
-in OIL units (only PRIZE POOL + demon bounties stay USDC); `scripts/oil-payout.js`
-splits the pool by score share (`payout = (banked+tank) / totalScore × prizePool`,
-pool read from `oilGame/settings.totalOilBudget`); `depthBias` is the single
+in OIL units (only PRIZE POOL + demon bounties stay USDC); `depthBias` is the single
 `OIL_DEPTH_BIAS` constant in `oilDistribution.js` — every live caller uses the
 default (the dead `OilHeatmap2D` still has a literal but isn't imported).
 
@@ -570,28 +572,68 @@ Phase durations (`DEMON_*_DUR`), `DEMON_PAUSE_DUR` (size of the catchable window
 
 ## Post-Game Payout
 
-After the game ends (`gamePhase = "ended"`), players are paid out in USDC on Base using the batch payout script.
+After the game ends (`gamePhase = "ended"`), players are paid out in USDC on Base.
+Both rails below pay the **same fixed-rate amount** the UI shows —
+`payout = (banked + tank) × pot ÷ OIL_FIELD_UNITS` (the cross-scale guard in
+`buildPayoutList` aborts if total oil > field, i.e. data left over from a different
+scale; reset first via `scripts/oil-reset.js`).
 
-### Script: `scripts/oil-payout.js`
+### Which rail to use — staged by scale
 
-Reads `oilDrills` (for `totalCollected`) and `oilQualified` (for `walletAddress`), joins on userId, and sends USDC transfers sequentially.
+A payout contract makes **settlement** verifiable, not **scoring** (scores live
+off-chain in Firestore regardless), so it's not needed day one. Stage it:
+
+| Stage | Rail | Why |
+|-------|------|-----|
+| **Launch (handful of players, bootstrapped)** | **Off-chain push** — `scripts/oil-payout.js` | Done, simplest. The "operator could just not pay" trust gap is identical to a push-from-contract, so a contract adds little. |
+| **Cheap interim trust** | Hold the pot in a public address / multisig | Most of the escrow-trust benefit, zero contract code. |
+| **Scale (dozens+ players, or want non-custodial credibility)** | **Merkle distributor** — `OilPayoutDistributor.sol` + `scripts/oil-build-merkle.js` | Visible escrow, players self-claim (they pay gas), no hot-wallet key risk during distribution, on-chain record. |
+
+Do **not** put scoring on-chain — gas-per-drill on a 24/7 game is a huge
+re-architecture that doesn't remove the real (server) trust dependency. Provable
+fairness (commit-reveal seed) already covers field verifiability.
+
+### Rail A — off-chain push: `scripts/oil-payout.js`
+
+Reads `oilDrills` (score = `totalCollected + tankOil`, in **OIL units**) + `oilQualified`
+(`walletAddress`) + `oilGame/settings` (pot), computes `score × pot/OIL_FIELD_UNITS`,
+and sends USDC transfers sequentially.
 
 ```bash
-# Preview payout manifest (no transfers sent)
-node scripts/oil-payout.js --dry-run
-
-# Execute payouts
-node scripts/oil-payout.js
+node scripts/oil-payout.js --dry-run   # preview manifest, no transfers
+node scripts/oil-payout.js             # execute (prompts to confirm)
 ```
 
-**Features:**
-- Displays a full manifest table (wallet, username, amount) before prompting for confirmation
-- Checks payout wallet USDC balance before starting
-- Resume support: writes results to `scripts/payout-results.json` after each tx — re-running skips already-paid wallets
-- USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (6 decimals)
-- `totalCollected` is in USDC units (e.g. 12.5 = $12.50)
+- Manifest table + USDC balance check before sending; total is bounded by the pot.
+- Resume support: writes `scripts/payout-results.json` after each tx — re-running skips paid wallets.
+- USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (6 decimals).
+- **Env:** `BASE_RPC_URL`, `PAYOUT_PRIVATE_KEY`.
 
-**Required env vars:** `BASE_RPC_URL`, `PAYOUT_PRIVATE_KEY`
+### Rail B — on-chain Merkle distributor (scaffold)
+
+`contracts/OilPayoutDistributor.sol` — pull-payment USDC distributor. Operator
+publishes a Merkle root + funds the contract; players `claim(amount, proof)`;
+operator `sweep()`s the unclaimed remainder after `claimDeadline` (the on-chain form
+of "operator keeps unfound/unclaimed oil"). Leaf =
+`keccak256(keccak256(abi.encode(account, amount)))`, sorted-pair nodes (OZ
+StandardMerkleTree compatible).
+
+```bash
+node scripts/oil-build-merkle.js   # reuses oil-payout's math → scripts/oil-merkle.json
+```
+
+Deploy flow:
+1. `node scripts/oil-build-merkle.js` → `oil-merkle.json` (prints `merkleRoot`, `totalUsdc`).
+2. Deploy `OilPayoutDistributor(USDC, merkleRoot, claimDeadline, owner)`.
+3. Transfer `totalAmount` USDC into the deployed contract (escrow).
+4. Publish `oil-merkle.json`; players look up their `{ amount, proof }` and call `claim()`.
+
+> ⚠️ The `.sol` is an **unaudited scaffold** with inlined minimal `IERC20`/`Ownable`/proof
+> (the repo has no Solidity toolchain). Before escrowing real money: compile + test in
+> Foundry/Remix, swap to OpenZeppelin `SafeERC20`/`MerkleProof`/`Ownable`, and get a
+> security review. Builder↔contract leaf/proof agreement is unit-tested in JS, but the
+> contract itself has not been compiled in-repo. Regulatory note: auto-distributing
+> escrow can shift optics toward "lottery payout" — worth a lawyer's pass.
 
 ## Environment Variables
 
