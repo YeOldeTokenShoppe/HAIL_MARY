@@ -4,13 +4,12 @@ import { authedUserId } from "@/lib/oilAuth";
 
 export const runtime = "nodejs";
 
-const MAX_BONUS_DRILLS = 10;
-const REFERRAL_BONUS = 3;
 const GRID_MAX = 50;
 
 // Initial plot claim during registration. Authenticated; the plot must be
 // unclaimed (re-checked in the txn); sets up the user's drill doc with clean
-// counters; credits the referrer (capped at MAX_BONUS_DRILLS, no self-referral).
+// counters; records a pending referral (credited later, at the next
+// qualification snapshot — anti-sybil; see oil-qualify).
 export async function POST(req) {
   try {
     const userId = await authedUserId(req);
@@ -43,6 +42,17 @@ export async function POST(req) {
     // Derive this user's own referral code (wallet-based if we have it, else id).
     const wallet = qualSnap.data().walletAddress || "";
     const refCode = wallet ? wallet.replace(/^0x/i, "").slice(0, 8).toLowerCase() : userId.slice(0, 8);
+
+    // Resolve the referrer up front (real code, not self). The credit is NOT
+    // applied here — it's deferred to the next qualification snapshot, so the
+    // referred wallet must still hold ≥ $20 then. This kills the buy-$20 →
+    // refer → sell → recycle farm that an instant credit would reward.
+    let referrerId = null;
+    if (referredByCode) {
+      const refSnap = await db.collection("oilReferrals").doc(referredByCode).get();
+      const rid = refSnap.exists ? refSnap.data().userId : null;
+      if (rid && rid !== userId) referrerId = rid;
+    }
 
     const isNew = await db.runTransaction(async (t) => {
       const plotSnap = await t.get(plotRef);
@@ -87,36 +97,16 @@ export async function POST(req) {
 
       t.set(qualRef, {
         plotCol: col, plotRow: row, pickedAt: FieldValue.serverTimestamp(),
-        ...(fresh ? { referredBy: referredByCode || null } : {}),
+        // Record the pending referral on fresh players; the snapshot credits the
+        // referrer once this wallet is confirmed still-qualified.
+        ...(fresh ? {
+          referredBy: referredByCode || null,
+          ...(referrerId ? { referredByUserId: referrerId, referralCredited: false } : {}),
+        } : {}),
       }, { merge: true });
 
       return fresh;
     });
-
-    // Referral credit — only for genuinely new players. Best-effort, capped, no self-referral.
-    if (isNew && referredByCode) {
-      try {
-        const refSnap = await db.collection("oilReferrals").doc(referredByCode).get();
-        const referrerId = refSnap.exists ? refSnap.data().userId : null;
-        if (referrerId && referrerId !== userId) {
-          const rRef = db.collection("oilDrills").doc(referrerId);
-          const rSnap = await rRef.get();
-          if (rSnap.exists) {
-            const cur = rSnap.data().bonusDrills || 0;
-            const add = Math.min(REFERRAL_BONUS, MAX_BONUS_DRILLS - cur);
-            if (add > 0) {
-              await rRef.set({
-                bonusDrills: FieldValue.increment(add),
-                confirmedReferrals: FieldValue.increment(1),
-                updatedAt: FieldValue.serverTimestamp(),
-              }, { merge: true });
-            }
-          }
-        }
-      } catch (e) {
-        console.error("[oil-claim] referral credit failed:", e.message);
-      }
-    }
 
     return NextResponse.json({ ok: true, col, row, refCode });
   } catch (err) {

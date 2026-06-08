@@ -4,7 +4,7 @@ A 3D oil exploration game where players claim land on a fixed 10x10 grid and dri
 
 ## Economy & Timing Model (Proposed)
 
-> **Status: design proposal, not yet implemented.** This section captures the intended direction for game pacing, the local tank, theft, and prize economics. Where it conflicts with the *current* implementation described below (daily-drill cadence in **Core Mechanics**, dino tank-theft in **Rogue Characters → Consequences v2**, literal `totalCollected` payout in **Post-Game Payout**), this section is the target model and supersedes those.
+> **Status: BUILT (2026-06-07).** The pacing/depth model, the uncapped local tank, the depth levers, and the fixed-rate prize economics in this section are implemented and tested — see *TIMING FRAMEWORK* and *Depth levers* below for specifics and file pointers. Older descriptive sections (Core Mechanics, Game Phase Flow, Data Model) have been reconciled to match. **Still proposal-only:** the *contested-capture* theft rework in **Rogue Characters → Consequences v2** — the dino still takes un-banked tank oil today.
 
 ### Design through-line
 
@@ -22,7 +22,7 @@ Timing is three separate knobs, mixed-and-matched:
 
 **Lump-sum blocks (Family A), not flow-rate.** A block's oil is already fixed by the deterministic block-hash distribution — whether it's dry, holds crude, or is a hell pocket is decided up front. The **only** thing randomized is *when* the rig finishes a block and reveals it. The strike is never random in outcome, only in reveal time — which keeps it fair and un-cheatable.
 
-**The strike mechanic.** The rig is "armed." Once per day it resolves the next block at a **random hour the player can't predict** (variants: one guaranteed strike at a random hour; per-hour dice roll; or a jittered drill-time so it "breaks through overnight"). A server cron rolls each armed rig forward, schedules strikes, writes to Firestore, and fires the existing Telegram alert. The player's only ongoing decision is **whether to keep drilling deeper** — deeper = richer, but more dry-block risk. That single milk-vs-gamble choice preserves agency in an otherwise idle loop.
+**The strike mechanic.** The rig is "armed." It resolves the next block at a **random time the player can't predict**, paced by the depth-scaled interval (see *TIMING FRAMEWORK* — avg interval = season ÷ depthCap, with the strike placed at a random moment inside each window). A server cron rolls each armed rig forward, schedules strikes, writes to Firestore, and fires the existing Telegram alert. The player's only ongoing decision is **whether to keep drilling deeper** — deeper = richer, but more dry-block risk. That single milk-vs-gamble choice preserves agency in an otherwise idle loop.
 
 > Offline strikes require server-authoritative scheduling (a Firebase scheduled function / cron route — the same pattern already planned for rogue auto-deploy).
 
@@ -89,13 +89,51 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 
 ### Decided & implementation status
 
-**Decided (2026-05-30):**
-- **Strike timing:** one guaranteed strike per UTC day at a per-rig **deterministic-but-unpredictable minute-of-day** (`hash(userId + date) % 1440`) — can land at any time, not just on the hour; stable across ticks, no extra writes, idempotent.
-- **Cadence:** **auto-advance, depth = cap.** The rig drills one layer deeper per day automatically (no action budget); the old "20 drill actions" becomes the 20-layer depth floor. Agency lives in plot choice + banking timing.
-- **Tank:** **uncapped.** `tankOil` grows freely; dino risk scales with hoarding instead of a cap.
+**Decided (2026-06-07) — TIMING FRAMEWORK (supersedes the 2026-05-30 "1 layer/day" cadence below):**
+
+Three independent clocks, deliberately **decoupled** so depth never doubles as a countdown timer (the bug in flat-1/day + referral-gated depth: low-referral rigs deplete early and idle the back half of the season):
+
+| Clock | Decision | Controls |
+|-------|----------|----------|
+| **Season** (macro) | **Fixed 10-day rounds**, wall-clock end for everyone | Payout/ranking clock. Everyone ends together → **no staggered finishes**. Fast iteration for the bootstrapped 1–2 season test. |
+| **Depth** (earned) | Base 10 + earned bonus, capped at 20 | *How deep & rich* you extract — a resource reward, never *how long* you play. |
+| **Cadence** (strike) | **Fill-the-season pace + random reveal time:** avg interval = `seasonMs ÷ depthCap`, but each strike fires at an **unpredictable moment within its interval window** | TWO knobs: the interval is the *metronome* (depth-10 ≈ 1/day, depth-20 ≈ 2/day — fills the whole season, nobody idles); the *random placement inside each window* is the **engagement engine** — continuous drilling yields strikes at times you can't predict, driving the "did my rig hit?" compulsion to keep checking. Don't lose the randomness — it's the whole point of the strike mechanic. |
+
+- **What a "strike" actually is — grind vs. paydirt:** the drill **continuously grinds** through each unit (the always-on baseline). **Most units are just shale (dry)** — passed through as low-key, ambient non-events. A **"strike" is specifically hitting something of interest** (a deposit), and *that* event surfaces at a **random, unpredictable time of day**. The unit's content is predetermined (block-hash deterministic, un-cheatable); only the *reveal moment* is random. So the loop is **variable-ratio** (does this unit hold anything?) × **variable-interval** (when does it pop?) — mostly-dry grinding punctuated by rare, randomly-timed payoffs = the slot-machine reinforcement that drives compulsive checking. (Code already distinguishes the two: `lastStrikeOil` / `lastStrikeDepth` vs the "dry layer" readout in the Slice-3 pump UI.)
+- **`depthCap = PASSIVE_DRILLS(10) + bonusDrills`** (capped at `MAX_DEPTH = 20`). `bonusDrills` now does **double duty** — deeper layers *and* a shorter strike interval → referrals/effort buy **intensity + richness**, not an earlier finish. Base-10 (depth-10) maps exactly onto the already-shipped ~1/day tick; bonuses densify it up to ~2/day.
+- **Mid-season bonus drills recompute the interval** from the current `depthCap` each tick — earn referrals on day 5 and the remaining strikes densify (a small catch-up burst). Rewards referring early.
+- **Random reveal time is the engagement engine (preserved from the original "random-hour strike" design):** the interval sets *average* pace, but the strike fires at an unpredictable moment **within** each window — `strikeTarget = windowStart + (hash(userId + windowIndex) mod intervalMs)` (hash-derived → stable/idempotent across ticks, unguessable; cron fires on the first tick at/after the target). This is what makes players check back; the interval change only altered the *average* spacing (was a flat daily gate), never the unpredictability.
+- **Fixed-rate kills the "wait-and-see" worry:** payout = `your oil × pot/OIL_FIELD_UNITS`, depends only on your own haul. Watching the live map only helps you *aim* a claim-jump, never your rate — no payout incentive to hoard/stall. Auto-pump removes the "when to drill" lever; the residual info-leak (jumping onto a revealed-rich column) is dampened because only drilled layers are public and the rich deep layers stay secret.
+- **Full payout is NOT the target.** Unfound oil stays in treasury (operator keeps the remainder); the depth cap is a throttle on how much of the pot is won. A partially-extracted field is the intended, solvent outcome.
+
+**Implementation — BUILT 2026-06-07** (evolves the existing idempotent strike-tick — not a rewrite; `next build` clean):
+- **`oil-strike-tick`** (`src/app/api/oil-strike-tick/route.js`): per-rig `depthCap = min(PASSIVE_DRILLS(10) + bonusDrills, MAX_DEPTH(20), depthZ)`. Strike target `= windowStart + strikeFraction(userId, currentDepth)·interval`, where `windowStart = lastStrikeAt ?? seasonStart` and `interval = (seasonEnd − windowStart) ÷ (depthCap − currentDepth)` — **remaining-time ÷ remaining-layers**, recomputed each strike so mid-season bonus drills and late joins re-pace automatically (last strike always lands ~buzzer). `strikeFraction` is the hash-derived random placement (engagement engine). Fires when `now ≥ target`; txn re-checks `lastStrikeAt` vs the gated window for idempotency under concurrent ticks. The cell-depth cap moved from the absolute `depthZ` to the per-rig `depthCap`. **Legacy fallback:** no `seasonLengthDays` ⇒ the original once-per-day `hash(userId+date)%1440` cadence (so in-flight test games don't break).
+- **Season clock:** `seasonClock(settings)` reads `gameStartDate` + new `seasonLengthDays` (whitelisted in `oil-settings`); `seasonEnd = start + lengthDays·86400000`.
+- **Buzzer:** `endSeason()` — at `now ≥ seasonEnd` the tick txn-flips `gamePhase→ended` + `gameEnded:true` (once), sweeps every rig's `tankOil → totalCollected` (auto-bank, idempotent), and publishes the fairness reveal (mirrors `oil-settings` `gameEnded:true`). Revives: a capped rig sets `rigDepleted:true` (not disarmed) so a later bonus raises `depthCap` and it strikes again.
+- **Client** (`page.js`): `seasonLengthDays` state from the settings listener; `passiveDepth` re-paced to `round(seasonProgress · PASSIVE_DRILLS)` over the real season length (was flat `floor(days since start)`); admin **SEASON LENGTH** input + live ENDS-date / strike-cadence readout next to START DATE.
+- **Depth levers BUILT 2026-06-07** (separate from the clock): social-share (`oil-feed-admin` approve → `+1`/post, sub-cap 3, idempotent) + diamond-hands (`oil-qualify` snapshot → 30/60/90-day milestones, +1 each). Pure math in `lib/oilBonusMath.js` (19 unit tests), credit helper in `lib/oilBonus.js`. See *Depth levers* above.
+
+**Depth levers feeding `bonusDrills` (base 10 → cap 20) — decided 2026-06-07:**
+
+Governing principle: **effort / network / loyalty earns depth (real prize money); token *holdings size* earns status (cosmetics), NEVER depth** — tying payout capacity to stake size breaks the promotional-sweepstakes framing and hands the prize to whales.
+
+All levers feed the shared `bonusDrills` field; `depthCap = min(10 + bonusDrills, 20)`. Pure math + sub-caps live in `src/lib/oilBonusMath.js`; the Firestore credit helper is `creditBonusDrills` in `src/lib/oilBonus.js`.
+
+- **Live (pre-existing):** referrals (`+3`/referral, `oil-claim`) + demon-hunting (`BOUNTY_BONUS_DRILLS`, `oil-demon-bounty`).
+- **BUILT 2026-06-07 — social shares:** when an admin **approves** a player's Field Dispatch (Polaroid) post, the poster is credited `+1` (sub-cap `+3`). The approval gate **is** the anti-sybil check (a vetted, shareable moment). Idempotent via a `depthCredited` flag on the `oilFeed` doc. Hook: `oil-feed-admin` `approve` / `approve_all`. *Live-tested end-to-end.*
+- **BUILT 2026-06-07 — diamond-hands (LONG-TERM holding):** held continuously qualified for **30 / 60 / 90 days** → `+1` each (sub-cap `+3`). **Absolute days, deliberately longer than a season**, because the per-season qualification floor *already* disqualifies anyone who sells below $20 mid-round — so a within-season holding bonus would be redundant (it'd hand +3 to everyone still playing). The 30-day horizon rewards holding **across** seasons (a fresh $20 buyer clears the floor but isn't a diamond hand). Measured from `qualifiedSince` (set on first qualification, persists across seasons, **reset if the wallet drops below $20**); credited in the `oil-qualify` snapshot via a top-up toward the milestones reached. **Dormant at launch** (nobody has 30 days yet) — kicks in as the project matures. ⚠️ stake-*adjacent* (keys on duration, not bag size) — lawyer it before money scales. Knobs: `HOLDING_MILESTONE_DAYS` in `oilBonusMath.js`.
+- **Holdings *size* → cosmetics/status only:** bigger bag earns a fancier rig / exclusive themes / leaderboard flair / extra pump slots / whale badge — buy pressure without selling payout access. (Not depth.)
+- **Caps:** every lever is sub-capped (`share` +3, `holding` +3) so no single lever fills the pool and referrals stay primary; the global `MAX_BONUS_DRILLS = 10` clamps the total (10 base + 10 bonus = 20). Tracked per-lever (`bonusFromShares`, `bonusFromHolding`); referrals via `confirmedReferrals`.
+- **Anti-sybil:** shares gate on admin approval; diamond-hands gates on a 30-day continuous hold (resets on any sub-$20 dip). **Referral hardening BUILT 2026-06-07:** `oil-claim` no longer credits the referrer at claim time — it records `referredByUserId` + `referralCredited:false` on the referred player's `oilQualified` doc, and the `oil-qualify` snapshot pays the referrer (`+REFERRAL_BONUS`, capped, `confirmedReferrals++`) only once that wallet is confirmed **still qualified**. Kills the buy-$20 → refer → sell → recycle farm. (Pre-existing referrals carry only the legacy `referredBy` *code*, not `referredByUserId`, so they're never re-credited.) **Operational note:** referrals now pay out *on snapshot*, so run the qualification snapshot regularly.
+- **Client breakdown (BUILT 2026-06-07):** the bonus panel shows a per-source split — `+N referrals/hunts · +N shares · +N holding` (shares/holding tracked precisely via `bonusFromShares`/`bonusFromHolding`; referrals + demon hunts share one counter, so they're lumped).
+
+**Decided (2026-05-30) — SUPERSEDED by the 2026-06-07 framework above (kept for history):**
+- **Strike timing:** the **deterministic-but-unpredictable random reveal time** (`hash(userId + ...)`-derived, lands at any moment, not on the hour) is **KEPT** — it's the engagement engine. Only the *window size* changed: from a fixed once-per-UTC-day gate to a depth-scaled interval (`seasonMs ÷ depthCap`), so the strike still fires at an unguessable time, just inside a window whose width is set by depth.
+- ~~**Cadence:** auto-advance, depth = cap. One layer deeper per day automatically.~~ Replaced by fill-the-season pacing so depth ≠ duration.
+- **Tank:** **uncapped.** `tankOil` grows freely; dino risk scales with hoarding instead of a cap. *(still current)*
 
 **Implemented (server core — Slice 1):**
-- `src/app/api/oil-strike-tick/route.js` — the strike loop. Tick-cadence-agnostic, idempotent per day (gates on a per-rig minute-of-day target so a strike fires on the first tick at/after that minute), reuses `generateOilDistribution3D` + `getAdminDb` (single source of truth). Manual test: `GET /api/oil-strike-tick?password=<ADMIN_PASSWORD>&force=1` (add `&deep=N`, 1–20, to drill N layers in one call for testing — bypasses the once-per-day guard; affects all claimed rigs; Telegram suppressed during deep drills). `&scout=1` returns the richest cells (no writes) so a tester can aim a rig — gives 0-based `col`/`row`, the on-screen `label` (col+1,row+1), and `bestLayer`.
+- `src/app/api/oil-strike-tick/route.js` — the strike loop. Tick-cadence-agnostic, idempotent (gates on the per-rig **interval target + `lastStrikeAt`**; legacy once-per-day minute-of-day fallback when no `seasonLengthDays` is set), reuses `generateOilDistribution3D` + `getAdminDb` (single source of truth). Pure timing math is extracted to `src/lib/oilStrikeClock.js` (24 unit tests). Manual test: `GET /api/oil-strike-tick?password=<ADMIN_PASSWORD>&force=1` (add `&deep=N`, 1–20, to drill N layers in one call — bypasses the time gate **and** the per-rig depthCap; affects all claimed rigs; Telegram suppressed during deep drills). `&scout=1` returns the richest cells (no writes) so a tester can aim a rig — 0-based `col`/`row`, on-screen `label` (col+1,row+1), and `bestLayer`.
 - `functions/index.js` → `oilStrikeTick` — every-5-minutes Firebase scheduled function that pings the route (needs `CRON_SECRET`; `APP_URL` optional). Deploy with `firebase deploy --only functions`.
 - New `oilDrills` fields written by the striker: `tankOil`, `lastStrikeDate`, `lastStrikeAt`, `lastStrikeOil`, `lastStrikeDepth`, `lastStrikeHell`, `armed`, `rigDepleted`.
 
@@ -112,7 +150,7 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 - **Bug fixed in the extraction:** the old `POST` called `communitySnap.exists()` (a method) on an **admin** snapshot where `exists` is a property → it threw, so the real-player hell→demon path was 500-ing (masked because admin/test mode uses a local preview, not the API). The shared lib uses the property form. Also: the old "drain summoner's tank" block was a no-op (only re-wrote `lastDrainExtracted`); it now correctly zeroes `tankOil`.
 
 **Implemented (auto-pump UI — Slice 3):**
-- New `drillStatus === "auto-pumping"` for real players: replaces the manual DRILL button with a non-clickable "⛏ RIG PUMPING" indicator + depth bar, the last-strike result (`depth N — struck X` / `dry layer`), and a "strikes once a day at an hour you can't predict" hint. `rigDepleted` falls through to "max-depth".
+- New `drillStatus === "auto-pumping"` for real players: replaces the manual DRILL button with a non-clickable "⛏ RIG PUMPING" indicator + depth bar, the last-strike result (`depth N — struck X` / `dry layer`), and a "can strike at any moment — no telling when" hint (the cadence is the depth-scaled interval; the *timing* is unpredictable). `rigDepleted` falls through to "max-depth".
 - Manual drilling is cleanly disabled for real players (drillStatus never "ready" for them, and `handleDailyDrill` already guards on `"ready"`); **admin/test keep the manual DRILL path** for verification.
 - **Mobile overlap fix (pre-existing bug):** the mobile 3D tab rendered `DrillHUD` twice — once inside the canvas wrap and once in the control block below — so the gauges crowded/overlapped the drill button. Removed the in-canvas copy; now one `DrillHUD` per layout (mobile control block / desktop side panel), matching desktop.
 
@@ -120,7 +158,7 @@ The extracted substance is **themeable** — oil, otherworldly goo, plasma, etc.
 - A "while you were away" summary toast (uses `lastStrikeAt`/`lastStrikeOil`/`lastStrikeDepth`) — the result is currently surfaced inline in the pump indicator + via the existing 3D strike visual, so this is purely a flourish.
 
 **Decided (2026-05-31):**
-- **End-of-season un-banked oil → credited to the player, never lost.** Un-banked `tankOil` belongs to the player; banking *during* the season is optional theft-protection (the dino can take a % of un-banked oil), not a scoring gate. Payout = `totalCollected` + any remaining `tankOil`. No "bank before the buzzer" pressure. **Implementation TODO:** `scripts/oil-payout.js` reads only `totalCollected` today — either sweep all `tankOil → totalCollected` at season end, or sum both in the payout.
+- **End-of-season un-banked oil → credited to the player, never lost.** Un-banked `tankOil` belongs to the player; banking *during* the season is optional theft-protection (the dino can take a % of un-banked oil), not a scoring gate. Payout = `totalCollected` + any remaining `tankOil`. No "bank before the buzzer" pressure. **DONE (2026-06-07):** un-banked oil is paid out two ways over — the season buzzer (`endSeason` in `oil-strike-tick`) auto-sweeps every rig's `tankOil → totalCollected` when the phase flips to `ended`, *and* `scripts/oil-payout.js` independently scores `totalCollected + tankOil` (see *Rail A*). So nothing is lost whether the season ends on the buzzer or early via the admin button (which doesn't run the sweep — the payout's summing covers that case).
 - **EV-per-player: flat floor, trending up — never declining.** Pot scales at least linearly with participation (per-qualified-wallet sponsor bounty) so EV stays flat as the game grows; as traction attracts bigger sponsorships the pot grows faster than headcount and EV *rises*. Growth always rewards existing players → referrals stay strongly positive-sum.
 
 **Tank meter copy (done 2026-05-31):** relabeled to reflect the uncapped tank — header "TANK · UNBANKED", readout shows raw `{tankOil} USDC` (no `/cap`), and the over-threshold prompt is "TANK HEAVY — BANK SOON" (button) instead of "TANK FULL". `TANK_CAPACITY = 5` now only drives the meter's red "bank soon" threshold, not a storage limit.
@@ -137,24 +175,37 @@ The game progresses through three phases, controlled by `gamePhase` in Firestore
    players connect a wallet holding ≥ $20 of RL80 **and** verify they follow **@rl80token** on X,
    then pick a plot on the grid (first come, first served). `oil-register` re-checks the balance
    server-side and is the sole writer of `qualified`. Already-picked players fall through to the 3D canvas.
-2. **`active`** — Game running. Continuous auto-pump drilling (one strike/day per rig at a random
-   minute). Players can claim-jump. A qualified, plot-less player can **join mid-season** by
-   selecting an unclaimed cell → **CLAIM THIS PLOT** (`handleClaimActivePlot` → `oil-claim`).
-3. **`ended`** — Game over. Report mode unlocked. Seed revealed; `/api/oil-verify` returns VERIFIED.
+2. **`active`** — Game running. Continuous auto-pump drilling: each armed rig grinds on its own and
+   **strikes at random, unpredictable times**, paced by the fill-the-season clock (avg interval =
+   season ÷ depthCap; see *TIMING FRAMEWORK*). Players can claim-jump. A qualified, plot-less player
+   can **join mid-season** by selecting an unclaimed cell → **CLAIM THIS PLOT**
+   (`handleClaimActivePlot` → `oil-claim`).
+3. **`ended`** — Game over (auto-flipped by the strike tick at the season buzzer, or by the admin
+   END GAME button). Report mode unlocked. Seed revealed; `/api/oil-verify` returns VERIFIED.
 
 Default is `"active"` for backward compatibility.
 
 ## Core Mechanics
 
-### Drilling
-- Each player gets **20 total drill actions** across all plots
-- Each day, a player can drill one layer deeper on their current plot
-- Cell depth persists across owners (if you claim jump to a pre-drilled cell, you continue from that depth)
+> The drilling model below is the **fill-the-season auto-pump** (current). The full timing/depth/
+> economy design lives in *Economy & Timing Model* near the top; this is the short version.
 
-### Claim Jumping
+### Drilling (auto-pump)
+- Rigs drill **automatically** — there is **no manual drill action or per-day budget**. Each armed
+  rig grinds continuously and **strikes** (reveals the next layer) at a random, unpredictable time.
+- Reachable depth is **`depthCap = min(10 + bonusDrills, 20)`** — base 10 plus earned bonus
+  (referrals, demon hunts, social shares, diamond-hands); hard cap 20.
+- Strikes are **paced to fill the fixed season** (avg interval = season ÷ depthCap), so more bonus =
+  deeper *and* more frequent strikes, and every rig finishes near the buzzer (no idle).
+- Most layers are dry **shale**; a "strike" proper is hitting a **deposit**, lump-summed into the tank.
+- Cell depth persists across owners (claim-jump to a pre-drilled cell → continue from that depth).
+- Admin/test mode keeps a manual DRILL path; real players see the auto-pump indicator.
+
+### Claim Jumping (`oil-claim-jump`)
 - Players can move to a different unclaimed plot
-- **First 2 jumps are free** (no drill action cost)
-- **3rd jump onwards** costs 1 drill action per jump
+- **First 2 jumps are free**
+- **3rd jump onwards costs 1 bonus drill** (`bonusDrills − 1`) — it eats into your earned depth cap,
+  so frequent jumping trades depth for mobility (and you need a bonus drill available to jump at all)
 - Old plot is released (becomes unclaimed, but retains its drill depth)
 
 ### Disqualification
@@ -177,20 +228,28 @@ Per-cell state that persists across owners.
 | `ownerHistory` | array | `[{ userId, claimedAt, releasedAt?, reason? }]` |
 | `disqualified` | boolean | True if released due to disqualification |
 | `lastDrillDate` | string\|null | "YYYY-MM-DD" |
+| `revealed` | map | Server-authoritative per-layer oil reveal `{ [layer]: oil }` (client renders from this, never the seed) |
+| `hellLayers` | map | `{ [layer]: true }` for hell-pocket layers |
+| `lastStrikeAt` | timestamp | Last strike on this cell |
 
 ### `oilDrills/{userId}` — Player Stats
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `userId` | string | Clerk user.id |
-| `col` | number\|null | Current plot column |
-| `row` | number\|null | Current plot row |
-| `totalDrillActions` | number | Max 20 (player's action counter) |
-| `claimJumpsUsed` | number | Tracks jumps (first 2 free) |
-| `totalCollected` | number | Oil sent to main tank |
-| `tankDrains` | number | Number of tank drains |
-| `lastDrainExtracted` | number | Extracted at last drain |
-| `lastDrillDate` | string\|null | "YYYY-MM-DD" |
+| `col` / `row` | number\|null | Current plot |
+| `claimJumpsUsed` | number | Jumps used (first 2 free, then 1 bonus drill each) |
+| `totalCollected` | number | **Banked** oil — sacrosanct, scored (OIL units) |
+| `tankOil` | number | **Un-banked** oil in the tank (auto-banked at the buzzer) |
+| `tankDrains` / `lastDrainExtracted` | number | Banking stats |
+| `bonusDrills` | number | Earned depth bonus (global cap `MAX_BONUS_DRILLS = 10`) → `depthCap = min(10 + bonusDrills, 20)` |
+| `confirmedReferrals` | number | Referrals credited (at a qualification snapshot) |
+| `bonusFromShares` | number | Bonus from approved feed posts (sub-cap 3) |
+| `bonusFromHolding` | number | Bonus from diamond-hands milestones (sub-cap 3) |
+| `referralCode` | string | This player's shareable referral code |
+| `armed` / `rigDepleted` | boolean | Strike-loop state (armed pumps; depleted = reached `depthCap`) |
+| `lastStrikeAt` | timestamp | Last strike time — opens the next interval window |
+| `lastStrikeOil` / `lastStrikeDepth` / `lastStrikeHell` | number/number/bool | Last strike result |
 | `username` | string | Display name |
 | `updatedAt` | timestamp | Last modification |
 
@@ -211,6 +270,20 @@ Per-cell state that persists across owners.
 | `plotCol` | number\|null | Grid column (backward compat) |
 | `plotRow` | number\|null | Grid row (backward compat) |
 | `pickedAt` | Timestamp\|null | When plot was picked |
+| `qualifiedSince` | number\|null | ms of first continuous qualification (diamond-hands clock; reset on a sub-$20 dip) |
+| `referredBy` | string\|null | Referral *code* used at registration (admin display) |
+| `referredByUserId` | string\|null | Resolved referrer userId — pending referral credit |
+| `referralCredited` | boolean | True once the referrer has been paid (at a snapshot); blocks double-credit |
+
+### `oilGame/settings` — Game Config (selected fields)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `gamePhase` | string | `ticket_sale` / `active` / `ended` |
+| `gameStartDate` | string | Season start "YYYY-MM-DD" (with `seasonLengthDays` → the season clock) |
+| `seasonLengthDays` | number | Fixed season length (default 10); enables the fill-the-season strike pacing |
+| `seasonEndedAt` | timestamp | Set when the buzzer auto-ends the season |
+| `seedCommitment` / `seedReveal` | string | Provable-fairness commit / post-game reveal |
 
 ### `pumpConfigs/{userId_col_row}` — Pump Customization
 No schema change. Stores pump visual config per cell.

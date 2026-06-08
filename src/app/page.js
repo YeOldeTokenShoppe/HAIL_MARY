@@ -3045,7 +3045,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         extraRight={[
           {
             key: 'lode',
-            label: 'Hail Mary PC',
+            label: 'Hail Mary',
             title: 'Hail Mary Prospecting Co — coming soon',
               onClick: () => { router.push('/hailmary'); },
             comingSoon: false,

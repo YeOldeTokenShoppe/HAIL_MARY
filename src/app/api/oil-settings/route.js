@@ -20,6 +20,7 @@ const ALLOWED_FIELDS = new Set([
   "gameEnded",
   "gameDay",
   "gameStartDate",
+  "seasonLengthDays",
 ]);
 
 const sha256Hex = (s) => createHash("sha256").update(String(s)).digest("hex");

@@ -1,9 +1,29 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, getAdminBucket } from "@/lib/firebaseAdmin";
+import { creditBonusDrills } from "@/lib/oilBonus";
+
+// Award the social-share depth bonus to a feed post's owner, once. The admin
+// approval IS the anti-sybil gate (a vetted, shareable moment). Idempotent via a
+// `depthCredited` flag on the doc; only marks once a real rig was credited (so a
+// post made before the player claimed can still pay out on a later approval).
+async function creditShareBonus(db, ref, data) {
+  if (!data.userId || data.depthCredited) return 0;
+  try {
+    const res = await creditBonusDrills(db, data.userId, "share");
+    if (res.credited > 0 || res.reason === "capped") {
+      await ref.set({ depthCredited: true }, { merge: true });
+    }
+    return res.credited;
+  } catch (e) {
+    console.warn("[oil-feed-admin] share bonus failed:", e.message);
+    return 0;
+  }
+}
 
 // Admin moderation for the Field Dispatch feed. Password-gated (ADMIN_PASSWORD).
 //   action: "list"    → pending (approved:false) polaroids, newest-first
 //   action: "approve" → flip a doc to approved:true (becomes publicly visible)
+//                       + award the poster the social-share depth bonus (once)
 //   action: "reject"  → delete the doc + best-effort delete its storage blob
 export async function POST(req) {
   try {
@@ -46,17 +66,25 @@ export async function POST(req) {
 
     if (action === "approve") {
       if (!id) return NextResponse.json({ error: "no_id" }, { status: 400 });
-      await db.collection("oilFeed").doc(id).set({ approved: true }, { merge: true });
-      return NextResponse.json({ ok: true });
+      const ref = db.collection("oilFeed").doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return NextResponse.json({ error: "not_found" }, { status: 404 });
+      await ref.set({ approved: true }, { merge: true });
+      const depthCredited = await creditShareBonus(db, ref, snap.data());
+      return NextResponse.json({ ok: true, depthCredited });
     }
 
     if (action === "approve_all") {
       const snap = await db.collection("oilFeed").where("approved", "==", false).limit(500).get();
       if (snap.empty) return NextResponse.json({ ok: true, count: 0 });
-      const batch = db.batch();
-      snap.docs.forEach((d) => batch.set(d.ref, { approved: true }, { merge: true }));
-      await batch.commit();
-      return NextResponse.json({ ok: true, count: snap.size });
+      // Per-doc (not a single batch) so each post's owner can be credited the
+      // share bonus in its own transaction.
+      let depthCredited = 0;
+      for (const d of snap.docs) {
+        await d.ref.set({ approved: true }, { merge: true });
+        depthCredited += await creditShareBonus(db, d.ref, d.data());
+      }
+      return NextResponse.json({ ok: true, count: snap.size, depthCredited });
     }
 
     if (action === "reject") {

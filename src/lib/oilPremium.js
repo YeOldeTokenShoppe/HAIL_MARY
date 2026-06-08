@@ -39,7 +39,7 @@ export const FREE_FENCE_IDS = new Set([
 
 export const FREE_ADDON_IDS = new Set([
   "flamingo",
-  "bearTrap",
+  "bearRug",
   "gravestone",
   "sunflowers",
   "gnome",
@@ -47,6 +47,8 @@ export const FREE_ADDON_IDS = new Set([
   "palmTree",
   "pumpkinPatch",
   "skeleton",
+  "scarecrow",
+  "forSaleSign",
 ]);
 
 // Accessories: sign toggle + image upload are free; security camera is premium

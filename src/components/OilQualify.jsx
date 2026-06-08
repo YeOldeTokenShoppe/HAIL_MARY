@@ -1760,7 +1760,7 @@ export default function OilQualify({
           gap: 12,
         }}>
           {[
-            { src: "/moneyShot.png", caption: "A gusher!" },
+            { src: "/images/moneyShot.webp", caption: "A gorgeous gusher!" },
             { src: "/images/hell.webp", caption: "A demon is accidentally released from a hell pocket in the shale" },
           ].map(({ src, caption }) => (
             <div key={src}>

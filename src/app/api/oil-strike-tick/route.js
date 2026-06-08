@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { createDemonBounty } from "@/lib/oilDemon";
+import {
+  PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
+} from "@/lib/oilStrikeClock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,20 +12,87 @@ export const dynamic = "force-dynamic";
 // ── Continuous-pump strike loop ───────────────────────────────────────────────
 // Runs on a short cadence (every 5 min via the Firebase `oilStrikeTick`
 // scheduled function, or any cron that hits this route with the CRON_SECRET).
-// Each armed rig strikes exactly ONCE per UTC day, at a per-rig random
-// minute-of-day the player can't predict — so a strike can land at any time of
-// day, not just on the hour (it fires on the first tick at/after that minute).
+//
+// Fill-the-season pacing (docs/oil-game.md → "TIMING FRAMEWORK"). When a season
+// clock is configured (gameStartDate + seasonLengthDays), each armed rig spreads
+// its strikes across the WHOLE season: avg interval = season ÷ depthCap, so a
+// depth-10 rig strikes ~1/day and a depth-20 rig ~2/day, and every rig finishes
+// near the buzzer (no idle, no staggered finishes). Within each interval window
+// the strike fires at a random, unguessable moment — the "did my rig hit?"
+// engagement engine. Without a season clock it falls back to the legacy
+// once-per-UTC-day, random-minute-of-day cadence.
 //
 // The strike is never random in OUTCOME — the oil at each layer is fixed by the
 // deterministic block-hash distribution. Only the reveal TIME is randomized.
 //
-// Model (see docs/oil-game.md → "Economy & Timing Model"):
-//   • Auto-advance: a strike drills the cell one layer deeper (cap at depthZ).
+// Model:
+//   • depthCap = min(PASSIVE_DRILLS + bonusDrills, MAX_DEPTH) — bonus buys both
+//     deeper layers AND a shorter interval (more frequent strikes).
+//   • A strike drills the cell one layer deeper (cap at the per-rig depthCap).
 //   • Lump-sum: the newly drilled layer's oil is added to the rig's `tankOil`.
 //   • Uncapped tank: `tankOil` grows freely; banking is a separate action.
-//   • Idempotent: `lastStrikeDate` guards against double-striking within a day.
+//   • Idempotent: the interval target + `lastStrikeAt` guard against double-
+//     striking within a window (legacy mode: `lastStrikeDate`).
+//   • Buzzer: at season end the tick flips gamePhase→ended, auto-banks every
+//     tank, and publishes the fairness reveal.
 
 const DEFAULT_DEPTH_Z = 20;
+
+// Firestore Timestamp → ms (the strike clock works in plain ms; see oilStrikeClock).
+const tsMillis = (ts) => (ts && typeof ts.toMillis === "function" ? ts.toMillis() : null);
+
+// End-of-season buzzer: flip the phase once (txn-guarded so concurrent ticks
+// don't double-run), auto-bank every rig's un-banked tank so nobody loses oil to
+// timing, then publish the fairness reveal (mirrors oil-settings' gameEnded path).
+async function endSeason(db) {
+  const settingsRef = db.collection("oilGame").doc("settings");
+  const won = await db.runTransaction(async (t) => {
+    const s = (await t.get(settingsRef)).data() || {};
+    if (s.gamePhase !== "active") return false;
+    t.set(settingsRef, {
+      gamePhase: "ended",
+      gameEnded: true,
+      seasonEndedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return true;
+  });
+  if (!won) return { ok: true, skipped: "already_ended" };
+
+  // Sweep tankOil → totalCollected (only un-banked oil; idempotent — a re-run sees 0).
+  let swept = 0, sweptOil = 0;
+  const drillsSnap = await db.collection("oilDrills").get();
+  for (const d of drillsSnap.docs) {
+    const tank = d.data().tankOil || 0;
+    if (tank > 0) {
+      await d.ref.set({
+        totalCollected: FieldValue.increment(tank),
+        tankOil: 0,
+        armed: false,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      swept++; sweptOil += tank;
+    }
+  }
+
+  // Provable-fairness reveal (same as oil-settings on gameEnded:true).
+  try {
+    const sd = (await db.collection("oilSecret").doc("seed").get()).data() || {};
+    if (sd.serverSecret) {
+      await settingsRef.set({
+        seedReveal: sd.serverSecret,
+        finalSeedReveal: sd.seed || null,
+        revealedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } else if (sd.seed) {
+      await settingsRef.set({ seedReveal: sd.seed, revealedAt: FieldValue.serverTimestamp() }, { merge: true });
+    }
+  } catch (err) {
+    console.error("[oil-strike-tick] season-end reveal failed:", err.message);
+  }
+
+  return { ok: true, ended: true, swept, sweptOil };
+}
 
 // Deterministic, unpredictable strike minute-of-day [0,1439] per (rig, day).
 // Stable across ticks with no extra Firestore writes, so a missed/retried tick
@@ -67,6 +137,14 @@ async function runTick({ force = false, deep = 1 } = {}) {
   if (settings.gamePhase !== "active") {
     return { ok: true, skipped: "phase_not_active", phase: settings.gamePhase || null };
   }
+
+  // End-of-season buzzer — only when a season clock is configured. Flips the
+  // phase, auto-banks every tank, and reveals the seed. Runs before any drilling.
+  const season = seasonClock(settings);
+  if (season && Date.now() >= season.endMs) {
+    return await endSeason(db);
+  }
+
   // Seed lives in the server-only secret doc; fall back to the legacy public
   // `blockHash` for pre-migration games.
   const secretSnap = await db.collection("oilSecret").doc("seed").get();
@@ -117,15 +195,40 @@ async function runTick({ force = false, deep = 1 } = {}) {
     const { col, row } = drill;
 
     if (summonedThisTick) { summary.skipped++; continue; }
-    // Must hold a claimed plot, be armed, not already struck today, not bottomed out.
+    // Must hold a claimed plot and be armed (admin hard-disable via armed:false).
     if (col == null || row == null) { summary.skipped++; continue; }
-    if (drill.armed === false || drill.rigDepleted) { summary.skipped++; continue; }
-    if (!ignoreDayGuard && drill.lastStrikeDate === today) { summary.skipped++; continue; }
-    if (!force && nowMinutes < strikeMinuteFor(userId, today)) { summary.skipped++; continue; }
+    if (drill.armed === false) { summary.skipped++; continue; }
 
     const cellKey = `${col}_${row}`;
     const plotRef = db.collection("oilPlots").doc(cellKey);
     const drillRef = db.collection("oilDrills").doc(userId);
+
+    // Per-rig depth ceiling (base + earned bonus). Read the cell's current depth
+    // up front — it drives both the depletion check and the interval pacing.
+    // Admin force/deep drilling bypasses the cap (drill the full field for testing).
+    const depthCap = depthCapFor(drill, depthZ);
+    const effectiveCap = ignoreDayGuard ? depthZ : depthCap;
+    const gateDepth = ((await plotRef.get()).data()?.drillDay) || 0;
+    if (gateDepth >= effectiveCap) {
+      // Capped for THIS player (cells persist across owners; earning bonus later
+      // raises the cap and the rig revives). Cache rigDepleted for the UI; don't
+      // disarm, so a bonus grant doesn't need to re-arm it.
+      if (!drill.rigDepleted) {
+        await drillRef.set({ rigDepleted: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      }
+      summary.depleted++; continue;
+    }
+
+    // Time gate — interval-windowed when a season is configured, else legacy daily.
+    let gateWindowMs = null;
+    if (season) {
+      const { windowStartMs, targetMs } = strikeTargetMs(season, tsMillis(drill.lastStrikeAt), gateDepth, depthCap, userId);
+      gateWindowMs = windowStartMs;
+      if (!force && Date.now() < targetMs) { summary.skipped++; continue; }
+    } else {
+      if (!ignoreDayGuard && drill.lastStrikeDate === today) { summary.skipped++; continue; }
+      if (!force && nowMinutes < strikeMinuteFor(userId, today)) { summary.skipped++; continue; }
+    }
 
     try {
       // deep > 1 (admin) drills several layers in one call; deep = 1 is the normal tick.
@@ -134,13 +237,23 @@ async function runTick({ force = false, deep = 1 } = {}) {
           const plotSnap = await t.get(plotRef);
           const drillNow = (await t.get(drillRef)).data() || drill;
 
-          // Re-check the day guard inside the txn (idempotent under concurrent ticks).
-          if (!ignoreDayGuard && drillNow.lastStrikeDate === today) return { status: "already_struck" };
+          // Re-check the gate inside the txn (idempotent under concurrent ticks).
+          // Season mode: bail if another tick already advanced lastStrikeAt past
+          // the window we gated on. Legacy: the once-per-day guard.
+          if (!ignoreDayGuard) {
+            if (season) {
+              const nowLastMs = tsMillis(drillNow.lastStrikeAt) ?? season.startMs;
+              if (nowLastMs !== gateWindowMs) return { status: "already_struck" };
+            } else if (drillNow.lastStrikeDate === today) {
+              return { status: "already_struck" };
+            }
+          }
 
           const currentDepth = (plotSnap.exists ? plotSnap.data().drillDay : 0) || 0;
-          if (currentDepth >= depthZ) {
-            // Rig has reached the floor — disarm it; nothing left to strike.
-            t.set(drillRef, { armed: false, rigDepleted: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+          if (currentDepth >= effectiveCap) {
+            // Capped for this player — mark depleted. Don't disarm: a later bonus
+            // raises depthCap and the rig revives on the next tick.
+            t.set(drillRef, { rigDepleted: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             return { status: "depleted" };
           }
 
@@ -169,6 +282,7 @@ async function runTick({ force = false, deep = 1 } = {}) {
             lastStrikeOil: oilAtLayer,
             lastStrikeDepth: newDepth,
             lastStrikeHell: isHell,
+            rigDepleted: false, // a successful strike clears any stale depleted cache
             updatedAt: FieldValue.serverTimestamp(),
           }, { merge: true });
 

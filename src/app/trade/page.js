@@ -23,7 +23,6 @@ import CyborgTempleScene, {
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
-import ScreenBSlotMachine from "@/components/ScreenBSlotMachine";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import MusicButton from '@/components/MusicButton';
@@ -168,14 +167,14 @@ function SitePalHostEmbed({ config }) {
           window.__sitePalPreloadQueue.length === 0) {
         window.__sitePalPreloading = false;
         window.__sitePalPreloadQueue = null;
-        console.log('[SitePal] preload complete');
+        // console.log('[SitePal] preload complete');
         return;
       }
       const next = window.__sitePalPreloadQueue.shift();
       window.__sitePalSceneLoaded = false;
       try {
         if (typeof window.loadSceneByID === "function") {
-          console.log('[SitePal] preloading sceneID=', next);
+          // console.log('[SitePal] preloading sceneID=', next);
           window.loadSceneByID(next);
         }
       } catch (e) {
@@ -255,20 +254,20 @@ function SitePalHostEmbed({ config }) {
           if (request.attempts === 1 && typeof window.loadAudio === "function") {
             try { window.loadAudio(request.audioName); } catch (e) {}
           }
-          console.log('[SitePal] sayAudio(', request.audioName, ') attempt=', request.attempts);
+          // console.log('[SitePal] sayAudio(', request.audioName, ') attempt=', request.attempts);
           result = window.sayAudio(request.audioName);
         } else if (request.type === "text" && request.text && typeof window.sayText === "function") {
           const voice = request.voice || "3";
           const lang = request.lang || 1;
           const engine = request.engine || 3;
-          console.log('[SitePal] sayText(', request.text, ') attempt=', request.attempts);
+          // console.log('[SitePal] sayText(', request.text, ') attempt=', request.attempts);
           if (request.effect !== undefined && request.effLevel !== undefined) {
             result = window.sayText(request.text, voice, lang, engine, request.effect, request.effLevel, request.xData1, request.xData2);
           } else {
             result = window.sayText(request.text, voice, lang, engine);
           }
         } else if (request.type === "scene" && typeof window.replay === "function") {
-          console.log('[SitePal] replay scene audio attempt=', request.attempts);
+          // console.log('[SitePal] replay scene audio attempt=', request.attempts);
           result = window.replay();
         }
 
@@ -393,8 +392,8 @@ function SitePalHostEmbed({ config }) {
             currentAudioName = attrs.audioName;
             window.__sitePalCurrentAudioName = attrs.audioName;
           }
-          console.log('[SitePal vh_sceneLoaded] sceneID=',
-            attrs && attrs.sceneID, 'audio=', attrs && attrs.audioName);
+          // console.log('[SitePal vh_sceneLoaded] sceneID=',
+          //   attrs && attrs.sceneID, 'audio=', attrs && attrs.audioName);
         }
       } catch (e) {}
       window.__sitePalSceneLoaded = true;
@@ -428,7 +427,7 @@ function SitePalHostEmbed({ config }) {
         window.__sitePalInitialLoaded = true;
         window.__sitePalPreloading = true;
         window.__sitePalPreloadQueue = PRELOAD_QUEUE.slice();
-        console.log('[SitePal] starting preload', window.__sitePalPreloadQueue);
+        // console.log('[SitePal] starting preload', window.__sitePalPreloadQueue);
         preloadAudioForScene(window.__sitePalCurrentSceneId);
         // Mute AND stopSpeech — the published scene has a bound audio
         // (`11devil1`) that SitePal auto-plays on embed load. setPlayerVolume(0)
@@ -615,13 +614,13 @@ function GpuMemoryProbe() {
     const heapMB = typeof performance !== 'undefined' && performance.memory
       ? (performance.memory.totalJSHeapSize / 1048576).toFixed(1)
       : 'n/a';
-    console.log('[GPU]', {
-      textures: state.gl.info.memory.textures,
-      geometries: state.gl.info.memory.geometries,
-      calls: state.gl.info.render.calls,
-      triangles: state.gl.info.render.triangles,
-      jsHeapMB: heapMB,
-    });
+    // console.log('[GPU]', {
+    //   textures: state.gl.info.memory.textures,
+    //   geometries: state.gl.info.memory.geometries,
+    //   calls: state.gl.info.render.calls,
+    //   triangles: state.gl.info.render.triangles,
+    //   jsHeapMB: heapMB,
+    // });
   });
   return null;
 }
@@ -786,6 +785,127 @@ function CameraControlsRig({
 
   return <CameraControls ref={ref} makeDefault />;
 }
+
+// Styling for the lobby "START …" action button. Mirrors the service-rail
+// card language (dark translucent fill, accent border, glowing left strip,
+// hover sheen sweep) so it reads as the "armed" sibling of the cards above
+// it. The accent color is injected per-render via the `--sa` CSS variable.
+const TSR_START_CSS = `
+.tsr-start {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 248px;
+  height: 56px;
+  padding: 0 24px 0 26px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sa) 52%, rgba(140, 150, 170, 0.22));
+  border-top-color: color-mix(in srgb, var(--sa) 82%, transparent);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--sa) 18%, rgba(8, 10, 16, 0.6)),
+      color-mix(in srgb, var(--sa) 5%, rgba(2, 3, 6, 0.55)));
+  color: color-mix(in srgb, var(--sa) 26%, #ffffff);
+  font-family: 'Orbitron', monospace;
+  cursor: pointer;
+  text-align: left;
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--sa) 30%, transparent),
+    0 0 30px rgba(217, 45, 176, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 120ms ease;
+}
+
+/* Glowing left accent strip — same motif as .tsr-card::after. */
+.tsr-start::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 5px;
+  border-radius: 0 3px 3px 0;
+  background: var(--sa);
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--sa) 75%, transparent),
+    0 0 24px color-mix(in srgb, var(--sa) 35%, transparent);
+}
+
+/* Diagonal sheen that sweeps across on hover/focus. */
+.tsr-start::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(120deg, transparent, color-mix(in srgb, var(--sa) 20%, transparent), transparent);
+  transform: translateX(-70%);
+  transition: opacity 200ms ease, transform 600ms ease;
+}
+
+.tsr-start:hover,
+.tsr-start:focus-visible {
+  border-color: color-mix(in srgb, var(--sa) 85%, white 6%);
+  box-shadow:
+    0 0 26px color-mix(in srgb, var(--sa) 42%, transparent),
+    0 0 34px rgba(217, 45, 176, 0.2),
+    inset 0 0 0 1px color-mix(in srgb, var(--sa) 42%, transparent);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.tsr-start:hover::before,
+.tsr-start:focus-visible::before {
+  opacity: 1;
+  transform: translateX(70%);
+}
+
+.tsr-start:active {
+  transform: translateY(0);
+}
+
+.tsr-start__eyebrow,
+.tsr-start__label,
+.tsr-start__chev {
+  position: relative;
+  z-index: 1;
+}
+
+.tsr-start__eyebrow {
+  color: var(--sa);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--sa) 55%, transparent);
+}
+
+.tsr-start__label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--sa) 45%, transparent);
+}
+
+.tsr-start__chev {
+  margin-left: auto;
+  font-size: 15px;
+  color: var(--sa);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--sa) 60%, transparent);
+  transition: transform 180ms ease;
+}
+
+.tsr-start:hover .tsr-start__chev,
+.tsr-start:focus-visible .tsr-start__chev {
+  transform: translateX(3px);
+}
+`;
 
 // Mobile CRT overlay stubs — placeholder copy per Screen1-4. Replace later
 // with real content once the per-screen mobile views are designed.
@@ -1526,13 +1646,13 @@ export default function CyborgTemple() {
         }
       });
     } catch (e) {}
-    console.log('[stopSitePalAudio]', {
-      initTimerCleared,
-      retryTimerCleared,
-      domAudiosPaused,
-      sitepalAudiosFound: typeof document !== 'undefined' ? document.querySelectorAll('audio').length : 0,
-      iframesFound: typeof document !== 'undefined' ? document.querySelectorAll('iframe').length : 0,
-    });
+    // console.log('[stopSitePalAudio]', {
+    //   initTimerCleared,
+    //   retryTimerCleared,
+    //   domAudiosPaused,
+    //   sitepalAudiosFound: typeof document !== 'undefined' ? document.querySelectorAll('audio').length : 0,
+    //   iframesFound: typeof document !== 'undefined' ? document.querySelectorAll('iframe').length : 0,
+    // });
   }, []);
 
   // Hook for the post-verdict "NEXT CASE" button. These first files are the
@@ -2312,13 +2432,13 @@ export default function CyborgTemple() {
     const fallbackTimer = setTimeout(() => {
       if (isSceneLoading && !modelLoaded) {
         // Only force ready if model still hasn't loaded after extended timeout
-        console.log('[Temple] Fallback timeout reached, model still not loaded');
-        console.log('[Temple] Consider checking network or model file size');
+          // console.log('[Temple] Fallback timeout reached, model still not loaded');
+          // console.log('[Temple] Consider checking network or model file size');
         // Don't reveal the scene - keep showing loader
         // Just log the issue for debugging
       } else if (isSceneLoading && modelLoaded) {
         // If model is loaded but scene is still loading, it's safe to reveal
-        console.log('[Temple] Fallback timeout reached but model is loaded, revealing scene');
+        // console.log('[Temple] Fallback timeout reached but model is loaded, revealing scene');
         setSceneReady(true);
         setIsSceneLoading(false);
       }
@@ -2958,13 +3078,13 @@ export default function CyborgTemple() {
         <div 
           onClick={() => {
             if (!userHasInteracted) {
-              console.log('Panel clicked, collapsing');
+              // console.log('Panel clicked, collapsing');
               setUserHasInteracted(true);
             }
           }}
           onTouchStart={() => {
             if (!userHasInteracted) {
-              console.log('Panel touched, collapsing');
+              // console.log('Panel touched, collapsing');
               setUserHasInteracted(true);
             }
           }}
@@ -3241,7 +3361,7 @@ export default function CyborgTemple() {
               }
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
-                console.log(`CoinFace ${coinIndex} tapped`)
+                // console.log(`CoinFace ${coinIndex} tapped`)
               }}
               onAgentClick={(agentId) => {
                 if (agentId) {
@@ -3320,11 +3440,8 @@ export default function CyborgTemple() {
             {/* Liminal Terminal preview — screens render cryptic teasers */}
             <VideoScreens is80sMode={context80sMode} previewMode={true} />
 
-            {/* Council group chat painted onto ScreenA/C/D */}
+            {/* Council group chat painted onto ScreenA-D */}
             <CouncilChatScreens />
-
-            {/* ScreenB → looping slot machine */}
-            <ScreenBSlotMachine />
 
               {/* <NeuralNetworkR3F 
               theme={2}
@@ -4919,55 +5036,32 @@ export default function CyborgTemple() {
                   ) : (
                     (() => {
                       const isReview = selectedService === 'analysis';
-                      // Two-stop gradient + a magenta-echo outer halo so the
-                      // button doesn't read as a flat green/cyan tile against
-                      // the magenta-edged nav bar. The echo color matches the
-                      // MobileBottomNav's m80 border/box-shadow palette.
-                      const accent = isReview
-                        ? {
-                            border: 'rgba(142,233,255,0.95)',
-                            text: '#d6faff',
-                            shadow: 'rgba(142,233,255,0.7)',
-                            glow: 'rgba(142,233,255,0.5)',
-                            tint: 'rgba(13,50,80,0.4)',
-                            soft: 'rgba(142,233,255,0.32)',
-                            peak: 'rgba(142,233,255,0.55)',
-                          }
-                        : {
-                            border: 'rgba(120,255,180,0.95)',
-                            text: '#d6ffe5',
-                            shadow: 'rgba(77,255,170,0.7)',
-                            glow: 'rgba(77,255,170,0.5)',
-                            tint: 'rgba(13,80,50,0.4)',
-                            soft: 'rgba(77,255,170,0.32)',
-                            peak: 'rgba(120,255,180,0.55)',
-                          };
+                      // Accent color drives the whole button via the --sa CSS
+                      // var; the rest of the styling (dark translucent fill,
+                      // glowing left strip, sheen sweep) lives in TSR_START_CSS
+                      // so the button reads as an "armed" sibling of the
+                      // service-rail cards rather than a flat gradient pill.
+                      const accent = isReview ? '#8ee9ff' : '#78ffb4';
                       const handleStart = isReview
                         ? () => setShowReviewFunnel(true)
                         : enterGameMode;
                       return (
-                        <button
-                          onClick={handleStart}
-                          aria-label={isReview ? 'Start Token Review' : 'Start Token Task Force'}
-                          style={{
-                            minWidth: 220,
-                            height: 60,
-                            padding: '10px 22px',
-                            borderRadius: 10,
-                            background: `linear-gradient(135deg, ${accent.peak} 0%, ${accent.soft} 38%, ${accent.tint} 100%)`,
-                            border: `1px solid ${accent.border}`,
-                            color: accent.text,
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: 12,
-                            fontWeight: 800,
-                            letterSpacing: '0.2em',
-                            cursor: 'pointer',
-                            textShadow: `0 0 12px ${accent.shadow}`,
-                            boxShadow: `0 0 18px ${accent.glow}, 0 0 32px rgba(217,45,176,0.22), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.25)`,
-                          }}
-                        >
-                          {isReview ? '✦ START TOKEN REVIEW' : '✦ START TOKEN FORENSICS'}
-                        </button>
+                        <>
+                          <style>{TSR_START_CSS}</style>
+                          <button
+                            type="button"
+                            onClick={handleStart}
+                            aria-label={isReview ? 'Start Token Review' : 'Start Token Task Force'}
+                            className="tsr-start"
+                            style={{ '--sa': accent }}
+                          >
+                            <span className="tsr-start__eyebrow">START</span>
+                            <span className="tsr-start__label">
+                              {isReview ? 'TOKEN REVIEW' : 'TOKEN FORENSICS'}
+                            </span>
+                            <span className="tsr-start__chev" aria-hidden>▸</span>
+                          </button>
+                        </>
                       );
                     })()
                   )

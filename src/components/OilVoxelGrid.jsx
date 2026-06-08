@@ -4433,42 +4433,129 @@ function InstancedSign({ geometry, url, positions }) {
 // Rendered per-plot (signs are opt-in, so counts are low); group by image URL later
 // if they get common. All meshes ride one group at the plot origin — the model bakes
 // the offset-to-the-side and the camera GLB is pre-registered to the same space.
-function SignModel({ model, signImageUrl }) {
+// Measure a sign face's display aspect (width / height) from its geometry. Signs stand
+// upright, so the vertical extent is height (Y) and the larger horizontal extent is the
+// width; the smallest extent is the panel thickness. The parent group only applies
+// uniform scale + translation, which don't change the ratio, so local bounds suffice.
+function signFaceAspect(geometry) {
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  const sx = bb.max.x - bb.min.x;
+  const sy = bb.max.y - bb.min.y;
+  const sz = bb.max.z - bb.min.z;
+  const width = Math.max(sx, sz);
+  const height = sy;
+  return (width > 1e-6 && height > 1e-6) ? width / height : 1;
+}
+
+function tuneSignTexture(tex, gl) {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false; // match the model's glTF UVs (loaders default to true → upside down)
+  tex.anisotropy = gl.capabilities.getMaxAnisotropy(); // sharpest at grazing angles
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Map an uploaded image onto a sign face under one of three fit modes:
+//   fill    — cover the face, crop overflow, no distortion (default)
+//   fit     — show the whole image, letterboxed with black bars
+//   stretch — fill the face edge-to-edge (legacy; may distort)
+function buildSignTexture(image, faceAspect, mode, gl) {
+  const imgAspect = (image.width || 1) / (image.height || 1);
+  if (mode === "fit") {
+    // Letterbox onto a face-aspect canvas with black bars. Black reads as "unlit" on the
+    // emissive panel, so the bars look intentional rather than smearing the edge pixels.
+    const longEdge = Math.min(2048, Math.max(image.width, image.height) || 1024);
+    let cw, ch;
+    if (faceAspect >= 1) { cw = longEdge; ch = Math.max(1, Math.round(longEdge / faceAspect)); }
+    else { ch = longEdge; cw = Math.max(1, Math.round(longEdge * faceAspect)); }
+    const canvas = document.createElement("canvas");
+    canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, cw, ch);
+    let dw, dh;
+    if (imgAspect > faceAspect) { dw = cw; dh = cw / imgAspect; }
+    else { dh = ch; dw = ch * imgAspect; }
+    ctx.drawImage(image, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+    return tuneSignTexture(new THREE.CanvasTexture(canvas), gl);
+  }
+  const tex = tuneSignTexture(new THREE.Texture(image), gl);
+  if (mode === "fill") {
+    // Cover: sample the largest centered sub-rect whose aspect matches the face.
+    const ratio = faceAspect / imgAspect;
+    let rx = 1, ry = 1;
+    if (ratio < 1) rx = ratio;   // image wider than face → crop the sides
+    else ry = 1 / ratio;         // image taller than face → crop top/bottom
+    tex.repeat.set(rx, ry);
+    tex.offset.set((1 - rx) / 2, (1 - ry) / 2);
+  }
+  // mode === "stretch": leave repeat (1,1) / offset (0,0) — fills exactly, may distort.
+  return tex;
+}
+
+function SignModel({ model, signImageUrl, signFit = "fill" }) {
   const { scene } = useGLTF(model);
   const { gl } = useThree();
   const cloned = useMemo(() => {
     const c = scene.clone(true);
     // Clone the image-face materials so a per-plot texture can't leak to other signs.
+    // Stash the pristine (no-image) material state so Clear can restore the blank panel.
     c.traverse((ch) => {
-      if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) ch.material = ch.material.clone();
+      if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) {
+        ch.material = ch.material.clone();
+        const m = ch.material;
+        ch.userData._origMat = {
+          map: m.map, emissiveMap: m.emissiveMap,
+          emissive: m.emissive.clone(), emissiveIntensity: m.emissiveIntensity,
+          color: m.color.clone(), roughness: m.roughness, metalness: m.metalness,
+          normalMap: m.normalMap, roughnessMap: m.roughnessMap,
+          metalnessMap: m.metalnessMap, aoMap: m.aoMap,
+        };
+      }
     });
     return c;
   }, [scene]);
   useEffect(() => () => {
+    // Only dispose the cloned materials — the maps are either shared with the cached GLTF
+    // (must not dispose) or our per-face textures (disposed by the texture effect below).
     cloned.traverse((ch) => {
-      if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) {
-        ch.material.map?.dispose();
-        ch.material.emissiveMap?.dispose();
-        ch.material.dispose();
-      }
+      if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) ch.material.dispose();
     });
   }, [cloned]);
   useEffect(() => {
-    if (!signImageUrl) return;
     let alive = true;
+    const created = []; // per-mesh textures we build this run, disposed on change/unmount
+    // No image → restore each face to its pristine blank state (this is what makes Clear work).
+    if (!signImageUrl) {
+      cloned.traverse((ch) => {
+        const o = ch.userData?._origMat;
+        if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2") && o) {
+          const m = ch.material;
+          m.map = o.map; m.emissiveMap = o.emissiveMap;
+          m.emissive.copy(o.emissive); m.emissiveIntensity = o.emissiveIntensity;
+          m.color.copy(o.color); m.roughness = o.roughness; m.metalness = o.metalness;
+          m.normalMap = o.normalMap; m.roughnessMap = o.roughnessMap;
+          m.metalnessMap = o.metalnessMap; m.aoMap = o.aoMap;
+          m.needsUpdate = true;
+        }
+      });
+      return () => { alive = false; };
+    }
     const loader = new THREE.TextureLoader();
     loader.crossOrigin = "anonymous";
-    loader.load(signImageUrl, (tex) => {
-      if (!alive) { tex.dispose(); return; }
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.flipY = false;   // match the model's glTF UVs (TextureLoader defaults to true → upside down)
-      tex.anisotropy = gl.capabilities.getMaxAnisotropy(); // sharpest at grazing angles (billboards are usually angled)
-      tex.generateMipmaps = true;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.needsUpdate = true;
+    loader.load(signImageUrl, (loaded) => {
+      if (!alive) { loaded.dispose(); return; }
+      const image = loaded.image;
       cloned.traverse((ch) => {
         if (ch.isMesh && (ch.name === "Sign" || ch.name === "Sign2")) {
+          // Build a texture per face so fill-crop (repeat/offset) and letterbox sizing
+          // can follow each face's own aspect ratio (front/back can differ).
+          const tex = buildSignTexture(image, signFaceAspect(ch.geometry), signFit, gl);
+          created.push(tex);
           const m = ch.material;
           m.map = tex;
           m.color = new THREE.Color(0xffffff);
@@ -4482,9 +4569,10 @@ function SignModel({ model, signImageUrl }) {
           m.needsUpdate = true;
         }
       });
+      loaded.dispose(); // per-mesh textures hold their own copy of the image
     });
-    return () => { alive = false; };
-  }, [cloned, signImageUrl]);
+    return () => { alive = false; created.forEach((t) => t.dispose()); };
+  }, [cloned, signImageUrl, signFit, gl]);
   return <primitive object={cloned} />;
 }
 
@@ -4529,12 +4617,12 @@ function SignCameraModel({ model, active }) {
   return <primitive object={cloned} />;
 }
 
-function PlotSign({ position, signImageUrl, signStyle, showCamera, isSelected, cameraViewable = true }) {
+function PlotSign({ position, signImageUrl, signStyle, signFit = "fill", showCamera, isSelected, cameraViewable = true }) {
   const entry = SIGN_CATALOG.find((s) => s.id === signStyle) || SIGN_CATALOG[0];
   if (!entry) return null;
   return (
     <group position={position} scale={PUMPJACK_SCALE}>
-      <SignModel model={entry.model} signImageUrl={signImageUrl} />
+      <SignModel model={entry.model} signImageUrl={signImageUrl} signFit={signFit} />
       {/* Camera model still renders for everyone; the live feed (active) only for the owner. */}
       {showCamera && entry.cameraModel && <SignCameraModel model={entry.cameraModel} active={!!isSelected && cameraViewable} />}
     </group>
@@ -4551,13 +4639,13 @@ function PlotSignField({ items, allPumpConfigs, pumpConfig, selectedCol, selecte
       const isSel = it.col === selectedCol && it.row === selectedRow;
       const cfg = (isSel && pumpConfig) ? pumpConfig : allPumpConfigs[`${it.col}_${it.row}`]?.config;
       if (cfg?.showSign) {
-        out.push({ key: it.key, position: it.position, signImageUrl: cfg.signImageUrl || null, signStyle: cfg.signStyle, showCamera: cfg.showCamera, isSelected: isSel });
+        out.push({ key: it.key, position: it.position, signImageUrl: cfg.signImageUrl || null, signStyle: cfg.signStyle, signFit: cfg.signFit || "fill", showCamera: cfg.showCamera, isSelected: isSel });
       }
     });
     return out;
   }, [items, allPumpConfigs, pumpConfig, selectedCol, selectedRow]);
   return signs.map((s) => (
-    <PlotSign key={s.key} position={s.position} signImageUrl={s.signImageUrl} signStyle={s.signStyle} showCamera={s.showCamera} isSelected={s.isSelected} cameraViewable={cameraViewable} />
+    <PlotSign key={s.key} position={s.position} signImageUrl={s.signImageUrl} signStyle={s.signStyle} signFit={s.signFit} showCamera={s.showCamera} isSelected={s.isSelected} cameraViewable={cameraViewable} />
   ));
 }
 SIGN_CATALOG.forEach((s) => { useGLTF.preload(s.model); if (s.cameraModel) useGLTF.preload(s.cameraModel); });

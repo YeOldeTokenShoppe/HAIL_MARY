@@ -14,6 +14,8 @@ const SERVICES = [
     title: "Token Review",
     desc: "Request a team analysis of any token.",
     accent: "cyan",
+    disabled: true,
+    cta: "COMING SOON",
   },
   {
     id: "terminal-traders",

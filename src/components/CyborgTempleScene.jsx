@@ -517,12 +517,12 @@ const CyborgTempleScene = ({
   };
 
   const applyCharacterReaction = (agentId, outcome) => {
-    console.log('[reaction-debug] entered', { agentId, outcome });
+    // console.log('[reaction-debug] entered', { agentId, outcome });
     const pattern = REACTION_PATTERNS[agentId]?.[outcome];
-    if (!pattern) {
-      console.log('[reaction-debug] no pattern for', agentId, outcome);
-      return;
-    }
+    // if (!pattern) {
+    //   console.log('[reaction-debug] no pattern for', agentId, outcome);
+    //   return;
+    // }
     const actions = actionsRef.current[agentId];
     const state = (
       agentId === 'Monk'      ? monkAnimStateRef.current      :
@@ -531,7 +531,7 @@ const CyborgTempleScene = ({
       agentId === 'RL80'      ? rl80AnimStateRef.current      : null
     );
     if (!actions || !state) {
-      console.log('[reaction-debug] missing actions or state', { agentId, hasActions: !!actions, hasState: !!state });
+      // console.log('[reaction-debug] missing actions or state', { agentId, hasActions: !!actions, hasState: !!state });
       return;
     }
     const targetKey = Object.keys(actions).find((a) => pattern.test(a));
@@ -539,12 +539,12 @@ const CyborgTempleScene = ({
       console.log('[reaction-debug] pattern not matched for', agentId, outcome, 'available:', Object.keys(actions));
       return;
     }
-    console.log('[reaction-debug] resolved', {
-      agentId, outcome, targetKey,
-      prevKey: state.currentAnimation,
-      availableKeys: Object.keys(actions),
-      runningBefore: Object.entries(actions).filter(([, a]) => a.isRunning && a.isRunning()).map(([k]) => k),
-    });
+    // console.log('[reaction-debug] resolved', {
+    //   agentId, outcome, targetKey,
+    //   prevKey: state.currentAnimation,
+    //   availableKeys: Object.keys(actions),
+    //   runningBefore: Object.entries(actions).filter(([, a]) => a.isRunning && a.isRunning()).map(([k]) => k),
+    // });
 
     // Shut down any character-specific attention-getting cycle so the reaction
     // isn't immediately overwritten. In particular the Monk's hail/beckon/idle
@@ -609,7 +609,7 @@ const CyborgTempleScene = ({
         .filter(([, a]) => a.isRunning && a.isRunning())
         .map(([k, a]) => `${k}=w${a.getEffectiveWeight().toFixed(2)}@t${a.time.toFixed(2)}`)
         .join(' | ');
-      console.log(`[reaction-debug] ${label} ${agentId}/${targetKey} →`, running);
+      // console.log(`[reaction-debug] ${label} ${agentId}/${targetKey} →`, running);
     }, delay);
     dumpRunning('250ms', 250);
     dumpRunning('1500ms', 1500);
@@ -1404,19 +1404,19 @@ const CyborgTempleScene = ({
       };
       const targetSceneId = config.sceneId;
       const sameScene = window.__sitePalCurrentSceneId === targetSceneId;
-      console.log(`[${characterId} click] sceneLoaded=`, window.__sitePalSceneLoaded,
-        'currentSceneId=', window.__sitePalCurrentSceneId,
-        'targetSceneId=', targetSceneId, 'sameScene=', sameScene);
+      // console.log(`[${characterId} click] sceneLoaded=`, window.__sitePalSceneLoaded,
+      //   'currentSceneId=', window.__sitePalCurrentSceneId,
+      //   'targetSceneId=', targetSceneId, 'sameScene=', sameScene);
       if (sameScene && window.__sitePalSceneLoaded === true) {
         try { if (typeof window.setPlayerVolume === 'function') window.setPlayerVolume(7); } catch (e) { console.warn(`[${characterId}] setPlayerVolume err`, e); }
         try { if (typeof window.__sitePalSpeakPending === 'function') window.__sitePalSpeakPending(window.__sitePalCurrentAudioName || null); } catch (e) { console.warn(`[${characterId}] speak err`, e); }
       } else if (window.__sitePalSceneLoaded === true && typeof window.loadSceneByID === 'function') {
         window.__sitePalSceneLoaded = false;
-        console.log(`[${characterId} click] loadSceneByID`, targetSceneId);
+        // console.log(`[${characterId} click] loadSceneByID`, targetSceneId);
         window.loadSceneByID(targetSceneId);
       }
     } catch (e) {
-      console.warn(`[${characterId} click err]`, e);
+      // console.warn(`[${characterId} click err]`, e);
     }
   };
 
@@ -1669,9 +1669,9 @@ const CyborgTempleScene = ({
       // ── TEMP smoke test for v43 import (reveal flow) ──
       // Remove once StageProps + reaction clips are verified.
       const _stageProps = templeScene.getObjectByName('StageProps');
-      console.log('[reveal-smoke] StageProps node:', _stageProps);
-      console.log('[reveal-smoke] StageProps child count:', _stageProps ? _stageProps.children.length : 'NOT FOUND');
-      console.log('[reveal-smoke] animation clips:', gltf.animations.map(a => a.name));
+      // console.log('[reveal-smoke] StageProps node:', _stageProps);
+      // console.log('[reveal-smoke] StageProps child count:', _stageProps ? _stageProps.children.length : 'NOT FOUND');
+      // console.log('[reveal-smoke] animation clips:', gltf.animations.map(a => a.name));
 
       
       const _expected = [
@@ -1683,11 +1683,11 @@ const CyborgTempleScene = ({
 
       const _cheer = gltf.animations.find(a => a.name === 'monk_cheering');
 const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
-console.log('[reveal-smoke] monk_cheering tracks:', _cheer?.tracks.length, _cheer?.tracks.map(t => t.name));
-console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _stand?.tracks.map(t => t.name));
+// console.log('[reveal-smoke] monk_cheering tracks:', _cheer?.tracks.length, _cheer?.tracks.map(t => t.name));
+// console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _stand?.tracks.map(t => t.name));
       const _present = new Set(gltf.animations.map(a => a.name.toLowerCase()));
       const _missing = _expected.filter(n => ![..._present].some(p => p.includes(n.toLowerCase())));
-      console.log('[reveal-smoke] missing reaction clips:', _missing.length ? _missing : 'none — all present');
+      // console.log('[reveal-smoke] missing reaction clips:', _missing.length ? _missing : 'none — all present');
       if (typeof window !== 'undefined') {
         window.__templeScene = templeScene;
         window.__gltf = gltf;
@@ -1901,7 +1901,7 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
               meshInventory.push(`${o.name} (G)`);
             }
           });
-          console.log('[Demon meshes]', meshInventory.join(', '));
+          // console.log('[Demon meshes]', meshInventory.join(', '));
         }
         else if (child.name === 'Monk_empty') {
           animatedCharacters['Monk'] = child;
@@ -3348,12 +3348,12 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
       // Idempotent on the touchstart + touchend pair: the first call sets
       // focusTarget.agentId to null (Reset transition), so the second
       // call's outer gate fails and it no-ops.
-      console.log('[touch] event', {
-        type: event.type,
-        focusTargetAgent: focusTarget?.agentId,
-        touchedSomething,
-        intersectsCount: intersects.length,
-      });
+      // console.log('[touch] event', {
+      //   type: event.type,
+      //   focusTargetAgent: focusTarget?.agentId,
+      //   touchedSomething,
+      //   intersectsCount: intersects.length,
+      // });
 
       const CHARACTER_AGENT_IDS = new Set([
         'Monk',
@@ -3394,7 +3394,7 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
           if (!object.userData.clickable) continue;
           const aid = object.userData.agentId;
           if (CHARACTER_AGENT_IDS.has(aid)) {
-            console.log('[touch] focus', { aid });
+            // console.log('[touch] focus', { aid });
             if (event.cancelable) event.preventDefault();
             if (onAgentClick) onAgentClick(aid);
             // Suppress the synthesized click that fires shortly after this
@@ -3425,13 +3425,13 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
               walker = walker.parent;
             }
           }
-          console.log('[touch] intersect', i, {
-            hitName,
-            hitAgentBefore,
-            hitClickableBefore,
-            resolvedAgent: object.userData.agentId,
-            resolvedClickable: object.userData.clickable,
-          });
+          // console.log('[touch] intersect', i, {
+          //   hitName,
+          //   hitAgentBefore,
+          //   hitClickableBefore,
+          //   resolvedAgent: object.userData.agentId,
+          //   resolvedClickable: object.userData.clickable,
+          // });
           if (!object.userData.clickable) continue;
           const aid = object.userData.agentId;
           if (
@@ -3445,7 +3445,7 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
           // should block the unfocus.
           break;
         }
-        console.log('[touch] unfocus decision', { hitDifferentCharacter });
+        // console.log('[touch] unfocus decision', { hitDifferentCharacter });
         if (!hitDifferentCharacter) {
           if (event.cancelable) {
             event.preventDefault();
@@ -5533,24 +5533,33 @@ console.log('[reveal-smoke] monk_standPray tracks:', _stand?.tracks.length, _sta
       }
       const dummy = demonHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
-      // Full lookAt with no flip — matches the Monk's working tracker at
-      // line 5034. The demon's bone forward axis is local -Z (same as
-      // Monk), so lookAt aligns it with the camera direction without any
-      // correction rotation. The maxHeadAngle clamp below caps the turn
-      // so the head doesn't wrap into uncanny territory.
+      // Aim a dummy at the camera (bone forward is local -Z, so a plain
+      // lookAt orients toward the camera with no correction flip).
       dummy.lookAt(camera.position);
 
-      // ~85° max turn — wider than the 70° default but conservative enough
-      // not to wrap the neck. 1.92 (Monk) lets the head spin past the
-      // natural range here.
-      const maxHeadAngle = 1.75;
-      const angleBetween = demonHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
-      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 1.25) : 0;
-      const blendedWorldQuat = demonHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
-
+      // The earlier approach — slerp the head's world quaternion toward this
+      // look-at and cap the total angle — couldn't separate roll from
+      // yaw/pitch, so a roll component leaked in and cocked the head ("ear
+      // on shoulder"). Instead, express the look-at as a delta FROM the rest
+      // pose in the bone's own frame, decompose it into yaw(Y)/pitch(X)/
+      // roll(Z), clamp yaw and pitch to anatomical limits, and force roll to
+      // zero. Recompose and that's the target — no roll can ever leak in.
       const parentWorldQuat = new THREE.Quaternion();
       head.parent.getWorldQuaternion(parentWorldQuat);
-      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+      const desiredLocal = parentWorldQuat.clone().invert().multiply(dummy.quaternion);
+
+      const baseLocal = demonHeadBoneRef._baseQuat;
+      const delta = baseLocal.clone().invert().multiply(desiredLocal);
+
+      const euler = new THREE.Euler().setFromQuaternion(delta, 'YXZ');
+      const MAX_YAW = 1.15;   // ~66° left/right
+      const MAX_PITCH = 0.5;  // ~29° up/down
+      euler.y = THREE.MathUtils.clamp(euler.y, -MAX_YAW, MAX_YAW);
+      euler.x = THREE.MathUtils.clamp(euler.x, -MAX_PITCH, MAX_PITCH);
+      euler.z = 0; // hard-zero roll — kills the ear-to-shoulder tilt
+      const clampedDelta = new THREE.Quaternion().setFromEuler(euler);
+
+      const targetQuat = baseLocal.clone().multiply(clampedDelta);
 
       if (!demonHeadBoneRef._smoothedQuat) {
         demonHeadBoneRef._smoothedQuat = head.quaternion.clone();

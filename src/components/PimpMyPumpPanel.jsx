@@ -50,9 +50,9 @@ const priceChipStyle = {
   marginLeft: 5,
   padding: "0 5px",
   borderRadius: 2,
-  background: "rgba(22, 163, 74, 0.22)",
-  border: "1px solid rgba(22, 101, 52, 0.7)",
-  color: "#166534",
+  background: "rgba(212, 168, 84, 0.18)",
+  border: "1px solid #d4a854",
+  color: "#e0b84e",
   fontWeight: 700,
   whiteSpace: "nowrap",
 };
@@ -90,7 +90,7 @@ export const ADDON_CATALOG = [
   { id: "gravestone",      label: "GRAVESTONE",       color: "#555555", shape: "cross",    model: "/models/addons/gravestone.glb" },
   { id: "skeleton",      label: "HOME DEPOT SKELETON",       color: "#e8dcc8", shape: "cylinder", model: "/models/addons/HDSkeleton.glb" },
   { id: "flamingo",      label: "PINK FLAMINGO",  color: "#ff69b4", shape: "cone",     model: "/models/addons/pinkFlamingo.glb" },
-  { id: "bearTrap",      label: "BEAR TRAP",      color: "#888888", shape: "box",      model: "/models/addons/bearTrap.glb" },
+  { id: "bearRug",       label: "BEAR RUG",       color: "#8B5A2B", shape: "box",      model: "/models/addons/Bear_Rug.glb" },
   { id: "dinosaur",      label: "T-REX",       color: "#6b8e23", shape: "cone",     model: "/models/addons/t-rex.glb", animated: true, premium: true, allowedSlots: [3, 4], allowedRotations: [0, 2] },
   { id: "goldRocks",     label: "GOLD ROCKS",     color: "#ffd700", shape: "sphere",   model: "/models/addons/goldRocks.glb" },
   { id: "palmTree",      label: "PALM TREE",      color: "#2d8a4e", shape: "cylinder", model: "/models/addons/palmTree.glb" },
@@ -100,6 +100,8 @@ export const ADDON_CATALOG = [
 
   { id: "sunflowers",      label: "SUNFLOWERS",      color: "#ffd700", shape: "cone",   model: "/models/addons/Sunflowers.glb" },
   { id: "gnome",      label: "GARDEN GNOME",      color: "#33c2ccff", shape: "cone",   model: "/models/addons/gnome.glb" },
+  { id: "scarecrow",   label: "SCARECROW",      color: "#c9a227", shape: "cone",   model: "/models/addons/scarecrow.glb" },
+  { id: "forSaleSign", label: "FOR SALE SIGN",  color: "#d4202a", shape: "box",    model: "/models/addons/ForSaleSign.glb" },
   // { id: "neonSign",      label: "NEON SIGN",      color: "#ff00ff", shape: "box",      emissive: true },
   // { id: "gnome",         label: "GARDEN GNOME",   color: "#33a1ccff", shape: "cone" },
   // { id: "cactus",        label: "COOL CACTUS",    color: "#2d8a4e", shape: "cylinder" },
@@ -122,18 +124,22 @@ export const ADDON_SLOTS = [
   { x:  0.25, y: 0, z: -0.25 }, // 7 back-right
 ];
 
+// Center column slots are unavailable (reserved — the sign/pipework runs through
+// the front- and back-center of the plot). Grayed out and non-interactive.
+export const BLOCKED_ADDON_SLOTS = new Set(["1", "6"]);
+
 export const FENCE_CATALOG = [
   { id: "chainlink",    label: "CHAIN LINK",    model: "/models/addons/Fence_Chainlink.glb",    scale: 0.1 },
   { id: "iron",         label: "IRON",          model: "/models/addons/Fence_Iron.glb",         scale: 0.1 },
   { id: "whitePicket",  label: "WHITE PICKET",  model: "/models/addons/Fence_WhitePicket.glb",  scale: 0.1 },
-  { id: "stone",        label: "STONE",         model: "/models/addons/Fence_Stone.glb",        scale: 0.1 },
 ];
 
 // Sign styles — each its own GLB (separate from the rig). Internal mesh names per
 // model: `Sign` (front image), `Sign2` (back), `SignFrame`. `cameraModel` is an
 // optional matching camera GLB pre-positioned on that sign (shown when showCamera).
 export const SIGN_CATALOG = [
-  { id: "sign1", label: "BILLBOARD", model: "/models/addons/Sign1.glb", cameraModel: "/models/addons/SecurityCamera_Sign1.glb" },
+  { id: "sign1", label: "TALL SIGN", model: "/models/addons/Sign1.glb", cameraModel: "/models/addons/SecurityCamera_Sign1.glb" },
+  { id: "sign2", label: "BILLBOARD", model: "/models/addons/Sign2.glb", cameraModel: "/models/addons/SecurityCamera_Sign2.glb" },
 ];
 
 const BASE_MAX_ADDONS = 3;
@@ -146,6 +152,7 @@ export function getDefaultPumpConfig() {
   });
   config.signImageUrl = null;
   config.signStyle = "sign1"; // which SIGN_CATALOG entry to render
+  config.signFit = "fill";    // how the uploaded image maps onto the sign face: fill | fit | stretch
   config.showCamera = false;
   config.showSign = false;
   config.fenceType = null;
@@ -933,7 +940,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
 
           <div style={{ ...styles.divider, background: c.border }} />
 
-          {/* Accessories 2×2 grid: Sign Visibility + Sign Image | Security Cam + Fence */}
+          {/* ── SIGN group: Visibility + Style | Image + Security Cam ── */}
+          <div style={{ ...styles.presetLabel, fontSize: mFs, color: c.accent, marginBottom: 6, letterSpacing: "0.16em" }}>SIGN</div>
           <div style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
@@ -944,7 +952,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
           }}>
             {/* Sign visibility toggle */}
             <div>
-              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SIGN VISIBILITY</span>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>VISIBILITY</span>
               <button
                 onClick={() => {
                   const newShowSign = !config.showSign;
@@ -969,9 +977,40 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
               </button>
             </div>
 
+            {/* Sign style picker — only when more than one style exists; requires sign visible */}
+            {SIGN_CATALOG.length > 1 && (
+              <div style={{ opacity: config.showSign ? 1 : 0.35, pointerEvents: config.showSign ? "auto" : "none" }}>
+                <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>STYLE</span>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {SIGN_CATALOG.map((s) => {
+                    const isActive = (config.signStyle || "sign1") === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => onChange({ ...config, signStyle: s.id })}
+                        style={{
+                          padding: isMobile ? "5px 8px" : "3px 8px",
+                          background: isActive ? c.activeBg : c.btnBg,
+                          border: `1px solid ${isActive ? c.activeBorder : c.btnBorder}`,
+                          borderRadius: 2,
+                          color: isActive ? c.activeText : c.btnText,
+                          fontFamily: "'Share Tech Mono', monospace",
+                          fontSize: mFs - 1,
+                          letterSpacing: "0.1em",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Sign image upload — only enabled when sign is visible */}
             <div style={{ opacity: config.showSign ? 1 : 0.35, pointerEvents: config.showSign ? "auto" : "none" }}>
-              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SIGN IMAGE</span>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>IMAGE</span>
               <div style={styles.signInputWrap}>
                 <label style={{ ...styles.signUploadBtn, fontSize: mFs, padding: isMobile ? "5px 10px" : "3px 7px", color: c.btnText, borderColor: c.btnBorder, background: c.btnBg }}>
                   {config.signImageUrl ? "CHANGE" : "UPLOAD"}
@@ -1008,6 +1047,34 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                   </button>
                 )}
               </div>
+              {/* Fit mode — how the uploaded image maps onto the sign face */}
+              {config.signImageUrl && (
+                <div style={{ display: "flex", gap: 3, marginTop: 4, flexWrap: "wrap" }}>
+                  {[["fill", "FILL"], ["fit", "FIT"], ["stretch", "STRETCH"]].map(([key, lbl]) => {
+                    const isActive = (config.signFit || "fill") === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => onChange({ ...config, signFit: key })}
+                        style={{
+                          padding: isMobile ? "4px 7px" : "2px 6px",
+                          background: isActive ? c.activeBg : c.btnBg,
+                          border: `1px solid ${isActive ? c.activeBorder : c.btnBorder}`,
+                          borderRadius: 2,
+                          color: isActive ? c.activeText : c.btnText,
+                          fontFamily: "'Share Tech Mono', monospace",
+                          fontSize: mFs - 1,
+                          letterSpacing: "0.08em",
+                          cursor: "pointer",
+                        }}
+                        title={key === "fill" ? "Cover the sign, crop overflow (no distortion)" : key === "fit" ? "Fit the whole image, with letterbox bars" : "Stretch edge-to-edge (may distort)"}
+                      >
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Security camera toggle — requires sign to be visible */}
@@ -1051,57 +1118,59 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                 </button>
               )}
             </div>
+          </div>
 
-            {/* Fence selector */}
-            <div>
-              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>FENCE</span>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                <button
-                  onClick={() => onChange({ ...config, fenceType: null })}
-                  style={{
-                    padding: isMobile ? "5px 8px" : "3px 8px",
-                    background: !config.fenceType ? c.activeBg : c.btnBg,
-                    border: `1px solid ${!config.fenceType ? c.activeBorder : c.btnBorder}`,
-                    borderRadius: 2,
-                    color: !config.fenceType ? c.activeText : c.btnText,
-                    fontFamily: "'Share Tech Mono', monospace",
-                    fontSize: mFs - 1,
-                    letterSpacing: "0.1em",
-                    cursor: "pointer",
-                  }}
-                >
-                  NONE
-                </button>
-                {FENCE_CATALOG.map((f) => {
-                  const fenceLocked = isPremiumFence(f.id) && !unlockedItems.has(makePurchaseId("fence", f.id));
-                  const isActive = config.fenceType === f.id;
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => onChange({ ...config, fenceType: f.id })}
-                      style={{
-                        padding: isMobile ? "5px 8px" : "3px 8px",
-                        background: isActive ? c.activeBg : c.btnBg,
-                        border: `1px solid ${isActive ? c.activeBorder : c.btnBorder}`,
-                        borderRadius: 2,
-                        color: isActive ? c.activeText : c.btnText,
-                        fontFamily: "'Share Tech Mono', monospace",
-                        fontSize: mFs - 1,
-                        letterSpacing: "0.1em",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {f.label}
-                      {fenceLocked && <span style={{ ...priceChipStyle, fontSize: mFs - 2 }}>{PREMIUM_PRICES.fence.usdc} USDC</span>}
-                    </button>
-                  );
-                })}
-              </div>
+          <div style={{ ...styles.divider, background: c.border }} />
+
+          {/* Fence selector */}
+          <div style={{ opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none", marginBottom: 8 }}>
+            <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>FENCE</span>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              <button
+                onClick={() => onChange({ ...config, fenceType: null })}
+                style={{
+                  padding: isMobile ? "5px 8px" : "3px 8px",
+                  background: !config.fenceType ? c.activeBg : c.btnBg,
+                  border: `1px solid ${!config.fenceType ? c.activeBorder : c.btnBorder}`,
+                  borderRadius: 2,
+                  color: !config.fenceType ? c.activeText : c.btnText,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: mFs - 1,
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                }}
+              >
+                NONE
+              </button>
+              {FENCE_CATALOG.map((f) => {
+                const fenceLocked = isPremiumFence(f.id) && !unlockedItems.has(makePurchaseId("fence", f.id));
+                const isActive = config.fenceType === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => onChange({ ...config, fenceType: f.id })}
+                    style={{
+                      padding: isMobile ? "5px 8px" : "3px 8px",
+                      background: isActive ? c.activeBg : c.btnBg,
+                      border: `1px solid ${isActive ? c.activeBorder : c.btnBorder}`,
+                      borderRadius: 2,
+                      color: isActive ? c.activeText : c.btnText,
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: mFs - 1,
+                      letterSpacing: "0.1em",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {f.label}
+                    {fenceLocked && <span style={{ ...priceChipStyle, fontSize: mFs - 2 }}>{PREMIUM_PRICES.fence.usdc} USDC</span>}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Poop cleanup */}
             {config.poop && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
                 <span style={{ fontSize: mFs, color: "#a05030", fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.1em" }}>POOP DETECTED</span>
                 <button
                   onClick={() => onChange({ ...config, poop: false })}
@@ -1156,6 +1225,25 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                       );
                     }
                     const slotKey = String(cell);
+                    if (BLOCKED_ADDON_SLOTS.has(slotKey)) {
+                      return (
+                        <div
+                          key={cell}
+                          style={{
+                            ...addonStyles.slotCell,
+                            width: isMobile ? 48 : 44,
+                            height: isMobile ? 36 : 32,
+                            background: c.slotBg,
+                            borderColor: c.slotBorder,
+                            opacity: 0.3,
+                            cursor: "not-allowed",
+                          }}
+                          title="Unavailable"
+                        >
+                          <span style={{ fontSize: isMobile ? 12 : 10, color: c.muted, lineHeight: 1 }}>&#10005;</span>
+                        </div>
+                      );
+                    }
                     const addonEntry = addons[slotKey];
                     const item = addonEntry ? ADDON_CATALOG.find((c) => c.id === addonEntry.id) : null;
                     const isEmpty = !item;
@@ -1216,15 +1304,23 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                               }}
                               style={{
                                 position: "absolute",
-                                bottom: 0,
-                                right: 0,
-                                fontSize: 8,
-                                color: c.muted,
+                                top: -5,
+                                right: -5,
+                                fontSize: 12,
+                                color: c.activeText,
+                                background: c.activeBg,
+                                border: `1px solid ${c.activeBorder}`,
+                                borderRadius: "50%",
+                                width: 16,
+                                height: 16,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
                                 cursor: "pointer",
-                                padding: "0 2px",
                                 lineHeight: 1,
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
                               }}
-                              title={`Rotate (${rot * 90}°)`}
+                              title="Rotate 90°"
                             >
                               &#8635;
                             </div>

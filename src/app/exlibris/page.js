@@ -246,7 +246,7 @@ export default function ModelViewerPage() {
         extraRight={[
           {
             key: 'lode',
-            label: 'Hail Mary PC',
+            label: 'Hail Mary',
             title: 'Hail Mary Prospecting Co — coming soon',
             onClick: () => { router.push('/hailmary'); },
             comingSoon: false,

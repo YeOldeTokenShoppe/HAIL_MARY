@@ -1246,6 +1246,7 @@ export default function OilPage() {
   const [gameEnded, setGameEnded] = useState(false);
   const [gameDay, setGameDay] = useState(1);
   const [gameStartDate, setGameStartDate] = useState(null);
+  const [seasonLengthDays, setSeasonLengthDays] = useState(10);
 
   // Admin password gate
   const [adminAuthed, setAdminAuthed] = useState(false);
@@ -1327,6 +1328,7 @@ export default function OilPage() {
         if (typeof d.gridSize === "number") setGridSize(d.gridSize);
         if (d.gamePhase) setGamePhase(d.gamePhase);
         if (d.gameStartDate) setGameStartDate(d.gameStartDate);
+        if (typeof d.seasonLengthDays === "number" && d.seasonLengthDays > 0) setSeasonLengthDays(d.seasonLengthDays);
       }
       setSettingsLoaded(true);
     });
@@ -1682,7 +1684,7 @@ export default function OilPage() {
     const unsub = onSnapshot(doc(db, "oilDrills", user.id), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0 });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -1770,13 +1772,17 @@ export default function OilPage() {
   const todayUTC = new Date().toISOString().slice(0, 10);
 
   // ── Passive depth computation (time-based, no clicking) ──
+  // Base-depth ceiling reached so far, paced by the season clock (not a flat
+  // 1/day). The rig fills its full depthCap = PASSIVE_DRILLS + bonus across the
+  // whole season; actual depth is server-driven (oilPlots.drillDay) — this is the
+  // display/ceiling estimate. See docs/oil-game.md → "TIMING FRAMEWORK".
   const passiveDepth = useMemo(() => {
     if (!gameStartDate) return 0;
-    const start = new Date(gameStartDate + "T00:00:00Z");
-    const now = new Date();
-    const days = Math.floor((now - start) / 86400000);
-    return Math.min(Math.max(days, 0), PASSIVE_DRILLS);
-  }, [gameStartDate, todayUTC]);
+    const start = new Date(gameStartDate + "T00:00:00Z").getTime();
+    const lenMs = (seasonLengthDays > 0 ? seasonLengthDays : 10) * 86400000;
+    const progress = Math.min(Math.max((Date.now() - start) / lenMs, 0), 1);
+    return Math.min(Math.round(progress * PASSIVE_DRILLS), PASSIVE_DRILLS);
+  }, [gameStartDate, seasonLengthDays, todayUTC]);
 
   const bonusDrills = userDrill?.bonusDrills ?? 0;
   const playerDepth = Math.min(passiveDepth + bonusDrills, MAX_DEPTH);
@@ -3437,6 +3443,36 @@ export default function OilPage() {
       {gameStartDate && (
         <div style={{ ...styles.paramRow, marginTop: 2, fontSize: 10, color: theme.muted }}>
           <span>PASSIVE DEPTH NOW: {passiveDepth}/{PASSIVE_DRILLS}</span>
+        </div>
+      )}
+      <div style={{ ...styles.paramRow, marginTop: 6 }}>
+        <span style={styles.paramLabel}>SEASON LENGTH</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="number"
+            min={1}
+            max={120}
+            value={seasonLengthDays}
+            onChange={(e) => {
+              const n = Math.max(1, Math.min(120, parseInt(e.target.value, 10) || 1));
+              setSeasonLengthDays(n);
+              saveGameSettings({ seasonLengthDays: n });
+            }}
+            style={{
+              padding: "2px 6px", width: 56, background: theme.inputBg, border: `1px solid ${theme.border}`,
+              borderRadius: 2, color: theme.textStrong, fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10, outline: "none",
+            }}
+          />
+          <span style={{ fontSize: 9, color: theme.muted }}>days</span>
+        </div>
+      </div>
+      {gameStartDate && (
+        <div style={{ ...styles.paramRow, marginTop: 2, fontSize: 10, color: theme.muted }}>
+          <span>
+            ENDS {new Date(new Date(gameStartDate + "T00:00:00Z").getTime() + seasonLengthDays * 86400000).toISOString().slice(0, 10)}
+            {" · "}STRIKE ~{(seasonLengthDays / PASSIVE_DRILLS).toFixed(1)}d (base) → {(seasonLengthDays / MAX_DEPTH).toFixed(1)}d (max depth)
+          </span>
         </div>
       )}
       <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
@@ -5240,6 +5276,22 @@ export default function OilPage() {
           <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.gold }}>
             +{bonusDrills} bonus drills
           </span>
+        </div>
+      )}
+      {/* Bonus-source breakdown. shares/holding are tracked precisely; the
+          remainder (referrals + demon hunts) shares one counter, so it's lumped. */}
+      {userDrill?.referralCode && bonusDrills > 0 && (
+        <div style={{ fontSize: 9, color: theme.muted, marginBottom: 6, letterSpacing: "0.05em" }}>
+          {(() => {
+            const shares = userDrill.bonusFromShares || 0;
+            const holding = userDrill.bonusFromHolding || 0;
+            const refs = Math.max(0, bonusDrills - shares - holding);
+            const parts = [];
+            if (refs > 0) parts.push(`+${refs} referrals/hunts`);
+            if (shares > 0) parts.push(`+${shares} shares`);
+            if (holding > 0) parts.push(`+${holding} holding`);
+            return parts.join("  ·  ");
+          })()}
         </div>
       )}
       {/* Copyable referral link */}

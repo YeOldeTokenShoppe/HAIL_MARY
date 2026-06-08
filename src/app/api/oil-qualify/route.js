@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { getRL80Price, getRL80Balance } from "@/lib/oilPrice";
+import { creditBonusDrills, holdingMilestonesPassed, MAX_BONUS_DRILLS, REFERRAL_BONUS } from "@/lib/oilBonus";
 
 const QUALIFICATION_THRESHOLD_USD = 20;
 
@@ -89,6 +90,58 @@ export async function POST(req) {
           lastSnapshotUsdValue: Math.round(usdValue * 100) / 100,
           lastSnapshotAt: FieldValue.serverTimestamp(),
         }, { merge: true });
+
+        // Diamond-hands (long-term holding) depth lever. The streak starts on
+        // first qualification (stored as ms) and credits the 30/60/90-day
+        // milestones reached so far to the player's rig — distinct from the
+        // per-season floor (rewards holding ACROSS seasons; see lib/oilBonus).
+        if (qualified) {
+          let sinceMs = player.qualifiedSince;
+          if (sinceMs == null) {
+            sinceMs = Date.now();
+            await db.collection("oilQualified").doc(player.id).set({ qualifiedSince: sinceMs }, { merge: true });
+          } else if (typeof sinceMs?.toMillis === "function") {
+            sinceMs = sinceMs.toMillis();
+          }
+          const milestones = holdingMilestonesPassed(Date.now() - sinceMs);
+          if (milestones > 0) {
+            try {
+              await creditBonusDrills(db, player.id, "holding", { targetTotal: milestones });
+            } catch (e) {
+              console.error(`[oil-qualify] holding bonus failed for ${player.id}:`, e.message);
+            }
+          }
+
+          // Deferred referral credit (anti-sybil): pay the referrer only now that
+          // the referred wallet is confirmed STILL qualified — a recycled $20
+          // can't farm instant referral rewards. One credit per referral.
+          if (player.referredByUserId && !player.referralCredited) {
+            try {
+              const rRef = db.collection("oilDrills").doc(player.referredByUserId);
+              await db.runTransaction(async (t) => {
+                const rSnap = await t.get(rRef);
+                if (!rSnap.exists) return;
+                const cur = rSnap.data().bonusDrills || 0;
+                const add = Math.min(REFERRAL_BONUS, MAX_BONUS_DRILLS - cur);
+                t.set(rRef, {
+                  // Always count the confirmed referral; add depth only if under the cap.
+                  confirmedReferrals: FieldValue.increment(1),
+                  ...(add > 0 ? { bonusDrills: FieldValue.increment(add), rigDepleted: false, armed: true } : {}),
+                  updatedAt: FieldValue.serverTimestamp(),
+                }, { merge: true });
+              });
+              await db.collection("oilQualified").doc(player.id).set({ referralCredited: true }, { merge: true });
+            } catch (e) {
+              console.error(`[oil-qualify] deferred referral credit failed for ${player.id}:`, e.message);
+            }
+          }
+        } else if (player.qualifiedSince != null) {
+          // Dropped below the $20 floor → reset the holding streak (they keep any
+          // bonus already earned; they must re-hold to climb again).
+          await db.collection("oilQualified").doc(player.id).set(
+            { qualifiedSince: FieldValue.delete() }, { merge: true },
+          );
+        }
 
         // If player just became disqualified, release their plot
         if (!qualified && wasQualified) {

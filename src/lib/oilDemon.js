@@ -4,7 +4,7 @@ import { FieldValue, Timestamp } from "@/lib/firebaseAdmin";
 // POST /api/oil-demon-bounty and the server-side strike loop (oil-strike-tick),
 // so a hell-pocket hit summons the demon identically however it was triggered.
 
-export const MAX_BONUS_DRILLS = 10;
+export { MAX_BONUS_DRILLS } from "@/lib/oilBonusMath"; // single source (lib/oilBonusMath)
 export const BOUNTY_BONUS_DRILLS = 3;
 export const BOUNTY_USDC = 5; // deducted from the community pool
 export const STUN_DURATION_MS = 2 * 60 * 1000; // 2 minutes

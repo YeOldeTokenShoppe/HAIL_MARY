@@ -18,7 +18,7 @@ import { useFrame, useThree } from "@react-three/fiber";
  *   bottom (background, speaker tags, message bodies, separators), and a
  *   per-message layout table is kept around so any one message can be
  *   re-painted in place later.
- * - Each of ScreenA/C/D gets its own `THREE.CanvasTexture` pointing at the
+ * - Each of ScreenA-D gets its own `THREE.CanvasTexture` pointing at the
  *   same canvas, with `wrapT = RepeatWrapping` so we can scroll past the
  *   bottom and wrap back to the top seamlessly.
  * - The scroll is punctuated rather than linear: each lurch represents
@@ -32,7 +32,7 @@ import { useFrame, useThree } from "@react-three/fiber";
  *   on the message arriving at ScreenA's bottom edge — so the motion and
  *   the scramble are coincident, which means the user's eye is already on
  *   the lurch when the decode fires. (ScreenA is the canonical anchor;
- *   ScreenC/D show the same scramble at their phase-shifted positions.)
+ *   ScreenB/C/D show the same scramble at their phase-shifted positions.)
  *   Redraws are throttled to ~15fps and only happen during an active
  *   scramble, so the texture-upload bandwidth is negligible at rest.
  */
@@ -117,9 +117,9 @@ const MESSAGE_GAP = 14;
 
 // Starting scroll offset (0..1) for each of the secondary screens. Picked so
 // the windows show clearly different parts of the thread at any one moment.
-// ScreenB is intentionally omitted — it's owned by ScreenBSlotMachine.
 const SCREEN_START_OFFSETS = {
   ScreenA: 0.0,
+  ScreenB: 0.2,
   ScreenC: 0.4,
   ScreenD: 0.75,
 };
@@ -370,8 +370,8 @@ export default function CouncilChatScreens() {
       // Helps us spot mesh-name mismatches (e.g. "Screen_A" vs "ScreenA").
       if (seenScreenLikeNames.length > 0 && !window.__councilChatLogged) {
         window.__councilChatLogged = true;
-        console.log("[CouncilChat] screen-like meshes in scene:", seenScreenLikeNames);
-        console.log("[CouncilChat] looking for:", screenNames);
+        // console.log("[CouncilChat] screen-like meshes in scene:", seenScreenLikeNames);
+        // console.log("[CouncilChat] looking for:", screenNames);
       }
 
       if (found.length > 0) {
