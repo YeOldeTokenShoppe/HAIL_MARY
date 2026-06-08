@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useOilApiFetch } from "@/lib/oilApiClient";
 import {
-  db, collection, query, where, orderBy, limit, addDoc, deleteDoc, serverTimestamp,
-  onSnapshot, doc, updateDoc,
+  db, collection, query, where, orderBy, limit, onSnapshot, doc,
 } from "@/lib/firebaseClient";
 
 export default function OilPlotChat({
@@ -20,14 +19,14 @@ export default function OilPlotChat({
   onRead,
   onTransferPlot,
   unlockedItems,
+  claimJumpOption,
+  isPlayer = false,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
   const [hasUnread, setHasUnread] = useState(false);
-  const cooldownRef = useRef(null);
   const listRef = useRef(null);
   const initialLoadRef = useRef(true);
 
@@ -47,6 +46,7 @@ export default function OilPlotChat({
   const [transferUpgrades, setTransferUpgrades] = useState(false);
 
   const isOwner = !!currentUserId && currentUserId === plotOwnerId;
+  const oilApiFetch = useOilApiFetch();
 
   const c = darkMode
     ? {
@@ -125,46 +125,35 @@ export default function OilPlotChat({
     }
   }, [messages]);
 
-  // ── Cooldown timer ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    cooldownRef.current = setInterval(() => {
-      setCooldown((prev) => {
-        if (prev <= 1) { clearInterval(cooldownRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(cooldownRef.current);
-  }, [cooldown]);
-
   // ── Post message ──────────────────────────────────────────────────────────
+  // Server-authoritative: the route derives the sender from the Clerk session
+  // and enforces the thread, so the client only sends the plot, target thread,
+  // and text. (oilPlotMessages is locked to server-only writes.)
   const handlePost = useCallback(async (replyToThreadUser) => {
-    if (!text.trim() || !currentUserId || !plotKey || !db || cooldown > 0) return;
+    if (!text.trim() || !currentUserId || !plotKey || sending) return;
     setSending(true);
     try {
-      // threadUserId is always the non-owner participant
+      // For owner replies, name the thread; visitors always post to their own.
       const threadUserId = isOwner ? replyToThreadUser : currentUserId;
       if (!threadUserId) return;
 
-      await addDoc(collection(db, "oilPlotMessages"), {
-        plotKey,
-        fromUserId: currentUserId,
-        fromUsername: username || "anon",
-        threadUserId,
-        text: text.trim().slice(0, 200),
-        timestamp: serverTimestamp(),
+      const res = await oilApiFetch("/api/oil-message", {
+        method: "POST",
+        body: JSON.stringify({ plotKey, threadUserId, text: text.trim().slice(0, 200) }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
       setText("");
-      setCooldown(30);
     } catch (e) {
       console.error("Failed to post message:", e);
     } finally {
       setSending(false);
     }
-  }, [text, currentUserId, plotKey, username, cooldown, isOwner]);
+  }, [text, currentUserId, plotKey, sending, isOwner, oilApiFetch]);
 
   // ── Save social links ─────────────────────────────────────────────────────
-  const oilApiFetch = useOilApiFetch();
   const handleSaveLinks = useCallback(async () => {
     if (!currentUserId) return;
     setSavingLinks(true);
@@ -184,11 +173,15 @@ export default function OilPlotChat({
   }, [currentUserId, linkDraft, oilApiFetch]);
 
   // ── Delete message ──────────────────────────────────────────────────────
+  // Server gates deletes to the message author or the plot owner.
   const handleDelete = useCallback(async (msgId) => {
-    if (!db) return;
-    try { await deleteDoc(doc(db, "oilPlotMessages", msgId)); }
-    catch (e) { console.error("Failed to delete message:", e); }
-  }, []);
+    try {
+      await oilApiFetch("/api/oil-message", {
+        method: "DELETE",
+        body: JSON.stringify({ msgId }),
+      });
+    } catch (e) { console.error("Failed to delete message:", e); }
+  }, [oilApiFetch]);
 
   // ── Transfer plot ──────────────────────────────────────────────────────────
   const handleTransfer = useCallback(async () => {
@@ -439,8 +432,44 @@ export default function OilPlotChat({
             </p>
           )}
 
+          {/* ── Unclaimed plot — nobody to message; offer claim jump ─── */}
+          {currentUserId && !plotOwnerId && (
+            <div>
+              <p style={{ fontFamily: mono, fontSize: 10, color: c.muted, margin: 0 }}>
+                This plot is unclaimed — no owner to message yet.
+              </p>
+              {claimJumpOption && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    onClick={() => { if (!claimJumpOption.disabled) claimJumpOption.onClaim(); }}
+                    disabled={claimJumpOption.disabled}
+                    style={{
+                      ...btnStyle(c.activeBg),
+                      opacity: claimJumpOption.disabled ? 0.5 : 1,
+                      cursor: claimJumpOption.disabled ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {claimJumpOption.label}
+                  </button>
+                  {claimJumpOption.note && (
+                    <p style={{ fontFamily: mono, fontSize: 9, color: c.muted, margin: "5px 0 0" }}>
+                      {claimJumpOption.note}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Signed in but not a player — messaging is players-only ── */}
+          {currentUserId && !isOwner && plotOwnerId && !isPlayer && (
+            <p style={{ fontFamily: mono, fontSize: 10, color: c.muted, margin: 0 }}>
+              Only players can message plot owners.
+            </p>
+          )}
+
           {/* ── Visitor view: single thread with plot owner ────────── */}
-          {currentUserId && !isOwner && (
+          {currentUserId && !isOwner && plotOwnerId && isPlayer && (
             <>
               <div
                 ref={listRef}
@@ -496,18 +525,18 @@ export default function OilPlotChat({
                   onChange={(e) => setText(e.target.value.slice(0, 200))}
                   maxLength={200}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePost(); } }}
-                  disabled={sending || cooldown > 0}
+                  disabled={sending}
                 />
                 <button
                   onClick={() => handlePost()}
-                  disabled={sending || cooldown > 0 || !text.trim()}
+                  disabled={sending || !text.trim()}
                   style={{
-                    ...btnStyle(cooldown > 0 ? c.muted : c.activeBg),
-                    opacity: (sending || cooldown > 0 || !text.trim()) ? 0.5 : 1,
+                    ...btnStyle(c.activeBg),
+                    opacity: (sending || !text.trim()) ? 0.5 : 1,
                     minWidth: 50,
                   }}
                 >
-                  {cooldown > 0 ? `${cooldown}s` : "SEND"}
+                  SEND
                 </button>
               </div>
             </>
@@ -589,18 +618,18 @@ export default function OilPlotChat({
                     onChange={(e) => setText(e.target.value.slice(0, 200))}
                     maxLength={200}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePost(replyTarget); } }}
-                    disabled={sending || cooldown > 0}
+                    disabled={sending}
                   />
                   <button
                     onClick={() => handlePost(replyTarget)}
-                    disabled={sending || cooldown > 0 || !text.trim()}
+                    disabled={sending || !text.trim()}
                     style={{
-                      ...btnStyle(cooldown > 0 ? c.muted : c.activeBg),
-                      opacity: (sending || cooldown > 0 || !text.trim()) ? 0.5 : 1,
+                      ...btnStyle(c.activeBg),
+                      opacity: (sending || !text.trim()) ? 0.5 : 1,
                       minWidth: 50,
                     }}
                   >
-                    {cooldown > 0 ? `${cooldown}s` : "SEND"}
+                    SEND
                   </button>
                 </div>
               )}

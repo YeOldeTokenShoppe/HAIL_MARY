@@ -11,7 +11,7 @@
  *   3. Transfer `totalAmount` USDC into the deployed contract (escrow)
  *   4. Publish oil-merkle.json so players can look up their { amount, proof } and claim()
  *
- * Leaf format matches contracts/OilPayoutDistributor.sol (OZ StandardMerkleTree style):
+ * Leaf format matches contracts/src/OilPayoutDistributor.sol (OZ StandardMerkleTree style):
  *   leaf  = keccak256( keccak256( abi.encode(address account, uint256 amount) ) )
  *   node  = keccak256( sorted(a, b) )   // commutative — proof order doesn't matter
  *

@@ -13,6 +13,7 @@ import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import ChartWidget from "@/components/ChartWidget";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import MusicButton from "@/components/MusicButton";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import ReliquaryRail from "@/components/ReliquaryRail";
@@ -2518,6 +2519,10 @@ export default function HomePage() {
         showSignInNudge || showCandlePicker ? " has-overlay" : ""
       }`}
     >
+      <MusicButton
+        accent="#d4a854"
+        style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
+      />
       <div className="scene-background">
         <StarfieldStatueScene
           style={{
@@ -3012,7 +3017,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             key: 'terminal',
             label: 'Terminal',
             title: 'The Liminal Terminal',
-            onClick: () => { window.location.href = '/trade'; },
+            onClick: () => { router.push('/trade'); },
             icon: (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -3042,7 +3047,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             key: 'lode',
             label: 'Hail Mary PC',
             title: 'Hail Mary Prospecting Co — coming soon',
-              onClick: () => { window.location.href = '/hailmary'; },
+              onClick: () => { router.push('/hailmary'); },
             comingSoon: false,
             icon: (
               <svg

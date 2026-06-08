@@ -54,6 +54,7 @@ export const MusicProvider = ({ children }) => {
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.2);
+  const [isDucked, setIsDucked] = useState(false); // music dips while a character speaks
   const [trackProgress, setTrackProgress] = useState(0);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [is80sMode, setIs80sMode] = useState(false);
@@ -698,15 +699,37 @@ export const MusicProvider = ({ children }) => {
     }
   }, [is80sMode, isShuffled, loadTrack]);
   
-  // Update volume when it changes
+  // Update volume when it changes, with a smooth "duck" ramp while a character
+  // is speaking (isDucked) so dialogue stays intelligible over the music.
   useEffect(() => {
-    if (globalAudioManager) {
-      const audio = globalAudioManager.getAudio();
-      if (audio) {
-        audio.volume = volume;
-      }
+    if (!globalAudioManager) return;
+    const audio = globalAudioManager.getAudio();
+    if (!audio) return;
+
+    const DUCK_FACTOR = 0.18; // music drops to 18% of chosen volume while speaking
+    const target = Math.max(0, Math.min(1, volume * (isDucked ? DUCK_FACTOR : 1)));
+    const start = audio.volume;
+    const delta = target - start;
+
+    // Snap if the change is negligible; otherwise ease over ~280ms.
+    if (Math.abs(delta) < 0.005) {
+      audio.volume = target;
+      return;
     }
-  }, [volume]);
+
+    const duration = 280;
+    let raf = null;
+    let startTs = null;
+    const step = (ts) => {
+      if (startTs === null) startTs = ts;
+      const t = Math.min(1, (ts - startTs) / duration);
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // easeInOutQuad
+      audio.volume = Math.max(0, Math.min(1, start + delta * eased));
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [volume, isDucked]);
   
   // Removed restoration logic - now handled by MusicManager component
   
@@ -720,6 +743,8 @@ export const MusicProvider = ({ children }) => {
     setIsPlaying,
     volume,
     setVolume,
+    isDucked,
+    setMusicDucked: setIsDucked,
     trackProgress,
     setTrackProgress,
     currentTrackIndex,

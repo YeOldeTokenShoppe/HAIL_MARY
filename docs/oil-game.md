@@ -370,7 +370,7 @@ every secret is private. Three layers:
 
 ### 1. Auth on every mutation
 - **Player mutations** (`oil-claim`, `oil-claim-jump`, `oil-release`, `oil-transfer`,
-  `oil-profile`, `oil-register`, `oil-tank-drain`, `oil-demon-bounty`, `oil-ticket`) derive the
+  `oil-profile`, `oil-register`, `oil-tank-drain`, `oil-demon-bounty`, `oil-ticket`, `oil-message`) derive the
   acting user from the **verified Clerk session token** via `authedUserId(req)`
   (`lib/oilAuth.js`): `Authorization: Bearer <token>` → `verifyToken({secretKey:
   CLERK_SECRET_KEY})` → `payload.sub`. **A userId is NEVER trusted from the request body.** The
@@ -421,6 +421,51 @@ privileged reads in API routes.
 | `oilTelegram/{userId}` | `chatId`, `username`, `linkedAt` |
 | `cctvRecordings/{docId}` | `downloadUrl`, `storagePath`, `eventType`, `col`, `row`, `durationMs` |
 
+## Plot Messaging
+
+Per-plot chat so players can negotiate trades / plot buys (or just say "Sick rig!").
+Rendered by `OilPlotChat` (sidebar accordion) and `OilChatModal` (popup); both share the
+same model and back end. The plot owner can also publish **social links** (`telegramHandle`
+/ `xHandle` on their `oilDrills` doc, edited via `/api/oil-profile`) which surface as
+clickable TG/X links in the panel, plus a **Transfer Plot** action (`/api/oil-transfer`).
+
+### Threading
+A conversation is keyed by `plotKey` + `threadUserId`, where `threadUserId` is always the
+**non-owner participant**:
+- A **visitor** sees only their own thread with the owner and writes into it
+  (`threadUserId == their id`).
+- The **owner** sees *all* threads on their plot, grouped by sender, and replies per-thread.
+
+### Server-authoritative writes (security)
+Money + identity are on the line, so this follows the same model as every other mutation:
+the collection is **read-public but server-only for writes**, and all mutations go through
+`POST` / `DELETE /api/oil-message` (Clerk-authed via `authedUserId`). Specifically:
+- **No identity spoofing.** `fromUserId` is taken from the verified Clerk session, never the
+  body; `fromUsername` is resolved server-side (`oilDrills.username` → `oilQualified.clerkName`
+  → `"anon"`). The thread is enforced — a visitor can only write into their own thread; an
+  owner can only reply into a real participant's thread.
+- **Players only.** The sender must have `oilQualified.qualified === true` (the same flag
+  `oil-claim` gates on) — a signed-in non-player, or someone disqualified, gets `403`. The
+  client mirrors this with an `isPlayer={!!userDrill}` prop (shows "Only players can message"
+  instead of an input); the prop is a proxy, the route is the real gate.
+- **Moderated deletes.** Only the message **author** or the **plot owner** can delete a message.
+- There is **no send cooldown** — the token/qualification gate is the spam throttle (a fixed
+  per-message timer added friction for real conversation while being trivially bypassable
+  client-side, so it was removed).
+
+When the selected plot is **unclaimed**, the panel shows "no owner to message yet" and, for an
+eligible player, a **CLAIM JUMP HERE** button (wired to `handleClaimJump` via the page's
+`buildClaimJumpOption` helper, mirroring the CLAIM JUMP toggle's gating + cost note).
+
+### Firestore
+| Collection | Purpose |
+|------------|---------|
+| `oilPlotMessages/{msgId}` | `plotKey`, `fromUserId`, `fromUsername`, `threadUserId`, `text` (≤200), `timestamp`. Read-public; `create/update/delete: if false` (server-only). |
+
+Three composite indexes back the listeners (in `firestore.indexes.json`):
+`plotKey+timestamp` (owner thread view), `plotKey+threadUserId+timestamp` (visitor thread),
+and `threadUserId+timestamp` (the page's cross-plot unread-message dots).
+
 ## Assets Tab (UnifiedAccountModal)
 
 New "Assets" tab in the account modal showing all premium items the player owns, grouped by category (Themes, Fences, Add-ons, Accessories, Slot Unlocks). Items persist across all game rounds — stored in `oilPurchases/{userId}.unlocked`. Supports both `cyber` and `industrial` themes.
@@ -449,6 +494,8 @@ Purchases are permanent account-level unlocks via x402 on-chain payment. Free it
 | `src/components/OilQualify.jsx` | Registration + plot picking |
 | `src/components/UnifiedAccountModal.jsx` | Account/Wallet/Assets tabs |
 | `src/components/PimpMyPumpPanel.jsx` | Pump customization + premium item shop |
+| `src/components/OilPlotChat.jsx` | Plot messaging — sidebar accordion (threads, social links, transfer, claim-jump offer) |
+| `src/components/OilChatModal.jsx` | Plot messaging — popup variant of the same chat |
 | `src/hooks/useCctvRecorder.js` | CCTV recording + Firebase upload + Telegram delivery |
 | `src/lib/oilDistribution.js` | Deterministic 3D oil distribution from block hash |
 | `src/lib/oilPremium.js` | Premium item registry, pricing, free/premium classification |
@@ -459,6 +506,7 @@ Purchases are permanent account-level unlocks via x402 on-chain payment. Free it
 | `src/app/api/oil-purchase/route.js` | x402 premium purchase handler |
 | `src/app/api/oil-seed-test/route.js` | Admin: seed fake players for testing |
 | `src/app/api/oil-qualify/route.js` | Qualification check + admin snapshot |
+| `src/app/api/oil-message/route.js` | Plot messaging — server-authoritative create/delete (players-only, thread-enforced) |
 
 ## Rogue Characters System
 
@@ -611,7 +659,7 @@ node scripts/oil-payout.js             # execute (prompts to confirm)
 
 ### Rail B — on-chain Merkle distributor (scaffold)
 
-`contracts/OilPayoutDistributor.sol` — pull-payment USDC distributor. Operator
+`contracts/src/OilPayoutDistributor.sol` — pull-payment USDC distributor. Operator
 publishes a Merkle root + funds the contract; players `claim(amount, proof)`;
 operator `sweep()`s the unclaimed remainder after `claimDeadline` (the on-chain form
 of "operator keeps unfound/unclaimed oil"). Leaf =
@@ -628,12 +676,44 @@ Deploy flow:
 3. Transfer `totalAmount` USDC into the deployed contract (escrow).
 4. Publish `oil-merkle.json`; players look up their `{ amount, proof }` and call `claim()`.
 
-> ⚠️ The `.sol` is an **unaudited scaffold** with inlined minimal `IERC20`/`Ownable`/proof
-> (the repo has no Solidity toolchain). Before escrowing real money: compile + test in
-> Foundry/Remix, swap to OpenZeppelin `SafeERC20`/`MerkleProof`/`Ownable`, and get a
-> security review. Builder↔contract leaf/proof agreement is unit-tested in JS, but the
-> contract itself has not been compiled in-repo. Regulatory note: auto-distributing
-> escrow can shift optics toward "lottery payout" — worth a lawyer's pass.
+Built on **OpenZeppelin 5.6.1** — `SafeERC20`, `MerkleProof.verifyCalldata`, `Ownable`,
+`ReentrancyGuard` (no more inlined primitives). OZ is vendored into `contracts/lib`
+(gitignored); reinstall with the `git clone` in `foundry.toml` if missing.
+
+**Build & test (Foundry):** `foundry.toml` is scoped (`src = contracts/src`, sibling to
+`contracts/lib`) so it never collides with the Next.js `src/`. The test itself stays
+dependency-free (inline cheatcode interface + mock USDC — no forge-std needed).
+
+```bash
+forge test --match-path 'contracts/test/*' -vv
+```
+
+`contracts/test/OilPayoutDistributor.t.sol` covers: happy-path claim, double-claim
+revert, bad-proof / wrong-amount / wrong-claimant reverts, sweep-before-deadline and
+non-owner reverts, and post-deadline sweep of the remainder. `test_RootMatchesJsBuilder`
+pins the Solidity-built Merkle root to the JS builder's root for identical input, so
+`oil-build-merkle.js` and the contract provably agree on leaf/proof encoding (9 tests,
+all passing).
+
+**Static analysis:** Slither (101 detectors, OZ lib + tests filtered out) reports a
+single low-severity informational — `block.timestamp` used in the `sweep` deadline
+check. Benign: the deadline is days/weeks long and `sweep` is owner-only, so a few
+seconds of miner timestamp drift grants nothing. No reentrancy / arbitrary-send /
+unchecked-transfer / access-control findings.
+
+```bash
+slither . --filter-paths "contracts/lib|contracts/test"
+```
+
+> **Audit is stake-gated, not a launch blocker.** A formal audit isn't cost-justified
+> for a small (~$500) escrow — the contract is small, standard (OZ primitives), passes
+> the suite above, and is Slither-clean bar the benign timestamp note. A bug can only
+> ever lose what you funded (max loss ≈ escrow), so a $10k+ audit to protect $500 is
+> upside-down. Mitigate cheaply: short claim window + low escrow, fresh deploy address,
+> dry-run on Base Sepolia first. Commission a real audit only once per-season escrow is
+> large enough that an exploit would hurt — the same threshold at which you'd reach for
+> this on-chain rail at all (below it, use Rail A). At that point also revisit the
+> "lottery optics" legal question with a lawyer.
 
 ## Environment Variables
 

@@ -317,16 +317,15 @@
         allow write: if false;
       }
 
-      // Oil Plot Bulletin Board — public chat per plot
+      // Oil Plot messaging — per-plot chat between players. Public read so any
+      // client can render a thread, but ALL writes are server-only via
+      // /api/oil-message: the route derives the sender from the verified Clerk
+      // session (no identity spoofing), enforces the conversation thread, and
+      // limits deletes to the message author or the plot owner. A client SDK
+      // create/delete here would let anyone post as anyone or wipe the board.
       match /oilPlotMessages/{msgId} {
         allow read: if true;
-        allow create: if true
-          && request.resource.data.keys().hasAll(['plotKey', 'fromUserId', 'fromUsername', 'threadUserId', 'text', 'timestamp'])
-          && request.resource.data.text is string
-          && request.resource.data.text.size() >= 1
-          && request.resource.data.text.size() <= 200;
-        allow update: if false;
-        allow delete: if true;
+        allow create, update, delete: if false;
       }
 
       // Oil Plots — claimed plots on the grid, and the server-written reveal

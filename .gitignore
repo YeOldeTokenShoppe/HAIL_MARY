@@ -57,3 +57,8 @@ firebase-adminsdk*.json
 
 
 cache/*
+
+# Foundry (oil payout contract)
+contracts/out/
+contracts/cache/
+contracts/lib/

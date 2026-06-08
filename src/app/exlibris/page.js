@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useMusic } from '@/components/MusicContext';
+import MusicButton from '@/components/MusicButton';
 import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import CompactCandleModal from '@/components/CompactCandleModal';
@@ -67,6 +68,11 @@ export default function ModelViewerPage() {
         is80sMode={is80sMode}
         onBookClick={() => setShowLittleBook(true)}
         onBookHoverChange={setIsBookHovered}
+      />
+
+      <MusicButton
+        accent="#d4a854"
+        style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 9999 }}
       />
 
       {isBookHovered && !showLittleBook && (
@@ -214,7 +220,7 @@ export default function ModelViewerPage() {
             key: 'terminal',
             label: 'TERMINAL',
             title: 'The Liminal Terminal',
-            onClick: () => { window.location.href = '/trade'; },
+            onClick: () => { router.push('/trade'); },
             icon: (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -242,7 +248,7 @@ export default function ModelViewerPage() {
             key: 'lode',
             label: 'Hail Mary PC',
             title: 'Hail Mary Prospecting Co — coming soon',
-            onClick: () => { window.location.href = '/hailmary'; },
+            onClick: () => { router.push('/hailmary'); },
             comingSoon: false,
             icon: (
               <svg

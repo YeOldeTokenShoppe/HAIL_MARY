@@ -617,9 +617,33 @@ void main() {
   // floor spreads the sheen across the full width (not just the edges) so the
   // whole gusher cycles through the spectrum instead of glowing a single hue.
   float irPhase = fract(y * 1.7 - T * 0.14 + fbm(vec2(x * 3.5, y * 2.2 - T * 0.1)) * 0.4 + abs(x) * 0.6);
-  vec3 irSheen = iridPalette(irPhase);
-  float irAmt = uParabolum * (0.22 + 0.6 * irFres) * smoothstep(0.04, 0.35, density) * ${ACTIVE_IRID.sheen.toFixed(3)};
-  col = mix(col, irSheen, irAmt * 0.55) + irSheen * irAmt * 0.35;
+  // Chromatic dispersion: per-channel phase split. A base split applies across the
+  // whole width so the rainbow reads everywhere, and fans out further at the grazing
+  // silhouette (irFres) for a strong prismatic edge fringe — light splitting through
+  // an oil film.
+  float disp = 0.05 + 0.12 * irFres;
+  vec3 irSheen = vec3(
+    iridPalette(irPhase + disp).r,
+    iridPalette(irPhase).g,
+    iridPalette(irPhase - disp).b
+  );
+  // Sheen carried up the FULL column (looser density gate) and stronger overall.
+  float irAmt = uParabolum * (0.38 + 0.5 * irFres) * smoothstep(0.02, 0.2, density) * ${ACTIVE_IRID.sheen.toFixed(3)};
+  col = mix(col, irSheen, irAmt * 0.7) + irSheen * irAmt * 0.5;
+
+  // ── Glitter motes: bright iridescent flecks streaming up the FULL height of the
+  //    column, twinkling as they rise (sparser/dimmer toward the top, like rising
+  //    embers). Two noise octaves give a mix of fine + coarse sparkles. They boost
+  //    BOTH color and alpha (see compositing below) so they twinkle against the sky
+  //    rather than vanishing where the jet thins out. Parabolum-only. ──
+  float moteN  = noise(vec2(x * 50.0, y * 36.0 - T * 9.0)) * 0.5 + 0.5;
+  float moteN2 = noise(vec2(x * 84.0 + 19.0, y * 60.0 - T * 14.0)) * 0.5 + 0.5;
+  float moteTwinkle = 0.55 + 0.45 * sin(T * 16.0 + x * 47.0 + y * 31.0);
+  float moteHeight = mix(1.0, 0.5, y); // thin out gently up top
+  float motes = (smoothstep(0.66, 0.9, moteN) + smoothstep(0.78, 0.95, moteN2))
+              * moteTwinkle * moteHeight * uParabolum * shape;
+  vec3 moteCol = mix(vec3(0.9, 1.0, 0.98), iridPalette(fract(irPhase + 0.5)), 0.5);
+  col += moteCol * motes * 2.2;
 
   // Hell: white-hot furnace mouth at the base, cooling to red-orange up the flame.
   // Confined to the bottom ~45% so the body stays red-orange, not yellow.
@@ -637,6 +661,10 @@ void main() {
   // Solid core boost
   float coreBoost = smoothstep(columnWidth * 0.5, 0.0, abs(xOff)) * coreDensity * 0.5;
   alpha = min(alpha + coreBoost * uOpacity, 1.0);
+  // Glitter motes carry their OWN alpha so they sparkle against the sky up the whole
+  // column, even where the jet has thinned to near-transparent. Clamped via the
+  // dome/edge fade below so they still respect the silhouette.
+  alpha = max(alpha, clamp(motes, 0.0, 1.0) * uOpacity * 0.9);
 
   // Top fade. Oil rounds into a dome; hell tapers into ragged, flickering flame
   // tips that dissipate higher up the plane.
@@ -2204,9 +2232,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const hellBurstLightRef = useRef();
   const hellBurstTimerRef = useRef(0);
 
-  const initGusher = useCallback((hell = false) => {
+  // Per-run gusher length. Defaults to GUSHER_DURATION; the admin Test Gusher passes
+  // a longer value so it stays on screen long enough to grab a screenshot.
+  const gusherDurationRef = useRef(GUSHER_DURATION);
+
+  const initGusher = useCallback((hell = false, duration = GUSHER_DURATION) => {
     gusherActiveRef.current = true;
     gusherTimerRef.current = 0;
+    gusherDurationRef.current = duration;
     gusherHellRef.current = hell;
     hellBurstTimerRef.current = 0;
     if (geyserMatRef.current) {
@@ -2303,7 +2336,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   useEffect(() => {
     if (gusherTrigger > 0 && gusherTrigger !== prevGusherTrigger.current && highlighted) {
       revealStrike();
-      initGusher();
+      // Admin Test Gusher: run 3s longer than a normal strike so it's easy to screenshot.
+      initGusher(false, GUSHER_DURATION + 3);
     }
     prevGusherTrigger.current = gusherTrigger;
   }, [gusherTrigger, highlighted, revealStrike, initGusher]);
@@ -2909,9 +2943,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       const overflowing = (effectiveFill >= 1.0 && highlighted) || (gusherHellRef.current && hellActiveRef.current) || gusherActivePropRef.current;
 
       // Fade out near end of one-shot gusher (also drives the blowback below)
+      const gusherDur = gusherDurationRef.current;
       const fade = overflowing ? 1.0
-        : gusherTimerRef.current > GUSHER_DURATION - 1.0
-          ? Math.max(0, GUSHER_DURATION - gusherTimerRef.current)
+        : gusherTimerRef.current > gusherDur - 1.0
+          ? Math.max(0, gusherDur - gusherTimerRef.current)
           : 1.0;
 
       if (geyserMatRef.current) {
@@ -2958,7 +2993,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         headPumpRef.current.quaternion.copy(headRestQuatRef.current).premultiply(_gusherHeadQuat);
       }
 
-      if (gusherTimerRef.current > GUSHER_DURATION && !overflowing) {
+      if (gusherTimerRef.current > gusherDur && !overflowing) {
         gusherActiveRef.current = false;
         gusherHellRef.current = false;
         if (hellBurstRef.current) hellBurstRef.current.visible = false;
@@ -3384,23 +3419,109 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
   targetFill.current = fill;
   const lastQ = useRef(-1);
 
-  // Paraboleum — iridescent thin-film fluid (matches the per-rig TankLiquid)
-  const oilMat = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: ACTIVE_IRID.hex.base,
-    roughness: 0.12,
-    metalness: 0.0,
+  // Paraboleum — animated procedural fluid. The per-rig tanks use a physical
+  // thin-film material, but the big community tank is viewed dead-on through a
+  // frosted window, where physical iridescence collapses to a flat slab. This
+  // custom shader reuses the shared opal palette (iridPalette) so it reads as the
+  // SAME substance as the gushers, but with motion + depth: deep→luminous vertical
+  // gradient, drifting caustics, rising shimmer streaks, a pulsing surface
+  // meniscus, and a fresnel rim glow.
+  const oilMat = useMemo(() => new THREE.ShaderMaterial({
     transparent: true,
-    opacity: 0.92,
-    emissive: ACTIVE_IRID.hex.emis,
-    emissiveIntensity: 0.6,
-    iridescence: 1.0,
-    iridescenceIOR: 1.6,
-    iridescenceThicknessRange: [120, 560],
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.18,
+    depthWrite: false,
+    side: THREE.FrontSide,
+    uniforms: {
+      uTime: { value: 0 },
+      uOpacity: { value: 0.97 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vNormalW;
+      varying vec3 vWorldPos;
+      void main() {
+        vUv = uv;
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        vNormalW = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: IRID_GLSL + `
+      precision highp float;
+      varying vec2 vUv;
+      varying vec3 vNormalW;
+      varying vec3 vWorldPos;
+      uniform float uTime;
+      uniform float uOpacity;
+
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vnoise(vec2 p){
+        vec2 i = floor(p), f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1,0)), u.x),
+                   mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
+      }
+      float fbm(vec2 p){
+        float v = 0.0, a = 0.5;
+        for (int i = 0; i < 4; i++) { v += a * vnoise(p); p *= 2.0; a *= 0.5; }
+        return v;
+      }
+
+      void main() {
+        float h = clamp(vUv.y, 0.0, 1.0);   // 0 = bottom, 1 = surface
+        float ang = vUv.x;                    // 0..1 around the tank
+
+        vec3 V = normalize(cameraPosition - vWorldPos);
+        float fres = pow(1.0 - abs(dot(normalize(vNormalW), V)), 2.5);
+
+        // deep murk at the bottom -> luminous near the surface
+        vec3 base = mix(${_v3(ACTIVE_IRID.base)}, ${_v3(ACTIVE_IRID.baseHi)}, smoothstep(0.0, 1.0, h));
+
+        // slow swirling caustics drifting through the body
+        float s1 = fbm(vec2(ang * 6.0 + uTime * 0.05, h * 4.0 - uTime * 0.12));
+        float s2 = fbm(vec2(ang * 10.0 - uTime * 0.08, h * 7.0 + uTime * 0.06));
+        float caustic = smoothstep(0.45, 0.95, s1 * 0.6 + s2 * 0.5);
+
+        // drifting thin-film iridescence (angle + depth + flow + time)
+        float irT = fract(fres * 1.2 + h * 0.7 + s1 * 0.5 + uTime * 0.04);
+        vec3 irid = iridPalette(irT);
+        float iridAmt = (0.25 + 0.75 * fres) * (0.5 + 0.5 * caustic) * ${ACTIVE_IRID.sheen.toFixed(3)};
+
+        // luminosity floor so the body glows as a filled column instead of
+        // collapsing to a see-through near-black navy
+        vec3 col = base + ${_v3(ACTIVE_IRID.glow)} * 0.22;
+        col += irid * iridAmt;
+        col += ${_v3(ACTIVE_IRID.glow)} * caustic * 0.42;
+
+        // rising shimmer streaks
+        float streak = smoothstep(0.6, 1.0, fbm(vec2(ang * 22.0, h * 3.0 - uTime * 0.5)));
+        col += ${_v3(ACTIVE_IRID.glow)} * streak * 0.15;
+
+        // glowing surface meniscus with a gentle pulse traveling around the rim
+        float surf = smoothstep(0.93, 1.0, h);
+        float surfPulse = 0.7 + 0.3 * sin(uTime * 1.5 + ang * 12.566);
+        col += ${_v3(ACTIVE_IRID.glow)} * surf * surfPulse * 1.25;
+
+        // fresnel rim glow + slow overall breathing (brightening, not dimming)
+        col += ${_v3(ACTIVE_IRID.glow)} * fres * 0.45;
+        col *= 1.0 + 0.1 * sin(uTime * 0.6);
+
+        // lift saturation so the broadband opal sheen doesn't read dingy/gray
+        float luma = dot(col, vec3(0.299, 0.587, 0.114));
+        col = mix(vec3(luma), col, 1.4);
+
+        // mostly opaque body so you can't see through to the tank floor; rim +
+        // surface push to fully solid
+        float alpha = uOpacity * (0.88 + 0.12 * fres) + surf * 0.15;
+        gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
+      }
+    `,
   }), []);
+  useEffect(() => () => oilMat.dispose(), [oilMat]);
 
   useFrame((_, delta) => {
+    oilMat.uniforms.uTime.value += delta;
+
     const target = Math.min(targetFill.current, 1);
     const prev = displayFill.current;
     if (Math.abs(target - prev) < 0.0001) {
@@ -3779,6 +3900,11 @@ function buildBaseRig(scene) {
     //       carrier pieces (Cylinder_Pump, Cylinder_Pump.001), all on the SAME bone
     //       (Armature.001). Ride the beam tip via pure translation, keeping their rest
     //       (upright) orientation so the head stays vertical and the rod stays plumb.
+    //       NB: the head intentionally does NOT rock with the beam. Rocking it seals the
+    //       beam/head joint but then the tilting head separates from the plumb rod — a
+    //       worse artifact, since the rod is locked to a fixed wellhead and can't follow.
+    //       A perfect fit needs a modeled flexible bridle (cable rolling over the head
+    //       curve), which this rigid-part shader can't express. Keep the head upright.
     //   4 = pitman / connecting rod (Cube) — bottom pinned to the crank throw (orbits),
     //       top pinned to the equalizer; rigid coupler solved by the four-bar so it
     //       stays welded at both ends without deforming.
@@ -4741,7 +4867,7 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
   );
 }
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
   // Cells with a live gusher event. Each renders a full animated rig (instead of
   // merged static geometry) so the pump pauses + the rig pitches back as it erupts
   // — visible to every player, not just the gusher's owner.
@@ -4792,7 +4918,13 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
   );
 
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps2.glb");
-  const envMap = useEnvironment({ preset: "studio" });
+  // Reflections-only env map (not the scene background), chosen per theme by the
+  // page: warm "sunset" for the bright day/dusk scenes, "warehouse" (cooler,
+  // contrasty) for night/dark + the Lyquid80 substance themes. Both read as shaped
+  // metal without raising envMapIntensity (which would blow out the white plastic
+  // against the dark ground). Drei caches each HDR, so switching themes is instant
+  // after first load.
+  const envMap = useEnvironment({ preset: envMapPreset });
 
   // OilTower position — centered on the 4 middle cells
   const towerPos = useMemo(() => {
@@ -5724,6 +5856,7 @@ export default function OilVoxelGrid({
   onRogueArrive,
   onRogueConsequence,
   envPreset,
+  envMapPreset = "warehouse",
   parabolum = false,
   forceStrikeGusher = false,
   gusherTrigger = 0,
@@ -5950,6 +6083,7 @@ export default function OilVoxelGrid({
             communityOil={communityOil}
             totalOilBudget={totalOilBudget}
             envPreset={envPreset}
+            envMapPreset={envMapPreset}
             parabolum={parabolum}
             forceStrikeGusher={forceStrikeGusher}
             gusherTrigger={gusherTrigger}

@@ -1,0 +1,14 @@
+# Foundry config — scoped to contracts/ so it never collides with the Next.js src/ dir.
+# Build/test the payout contract:  forge test --match-path 'contracts/test/*'
+[profile.default]
+src = "contracts/src"
+test = "contracts/test"
+out = "contracts/out"
+cache_path = "contracts/cache"
+libs = ["contracts/lib"]
+remappings = ["@openzeppelin/contracts/=contracts/lib/openzeppelin-contracts/contracts/"]
+optimizer = true
+optimizer_runs = 200
+# OZ (openzeppelin-contracts 5.6.1) is vendored into contracts/lib (gitignored).
+# Reinstall if missing:
+#   git clone --depth 1 https://github.com/OpenZeppelin/openzeppelin-contracts contracts/lib/openzeppelin-contracts

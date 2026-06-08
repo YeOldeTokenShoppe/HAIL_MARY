@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useOilApiFetch } from "@/lib/oilApiClient";
 import {
-  db, collection, query, where, orderBy, limit, addDoc, deleteDoc, serverTimestamp,
-  onSnapshot, doc, updateDoc,
+  db, collection, query, where, orderBy, limit, onSnapshot, doc,
 } from "@/lib/firebaseClient";
 
 export default function OilChatModal({
@@ -13,12 +12,12 @@ export default function OilChatModal({
   currentUserId,
   username,
   onClose,
+  claimJumpOption,
+  isPlayer = false,
 }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-  const cooldownRef = useRef(null);
   const listRef = useRef(null);
 
   // Social links
@@ -29,6 +28,7 @@ export default function OilChatModal({
   const [replyTarget, setReplyTarget] = useState(null);
 
   const isOwner = !!currentUserId && currentUserId === plotOwnerId;
+  const oilApiFetch = useOilApiFetch();
 
   const mono = "'Share Tech Mono', monospace";
   const c = {
@@ -90,44 +90,30 @@ export default function OilChatModal({
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
-  // Cooldown
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    cooldownRef.current = setInterval(() => {
-      setCooldown((prev) => {
-        if (prev <= 1) { clearInterval(cooldownRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(cooldownRef.current);
-  }, [cooldown]);
-
-  // Post message
+  // Post message — server-authoritative (sender + thread enforced server-side).
   const handlePost = useCallback(async (replyToThreadUser) => {
-    if (!text.trim() || !currentUserId || !plotKey || !db || cooldown > 0) return;
+    if (!text.trim() || !currentUserId || !plotKey || sending) return;
     setSending(true);
     try {
       const threadUserId = isOwner ? replyToThreadUser : currentUserId;
       if (!threadUserId) return;
-      await addDoc(collection(db, "oilPlotMessages"), {
-        plotKey,
-        fromUserId: currentUserId,
-        fromUsername: username || "anon",
-        threadUserId,
-        text: text.trim().slice(0, 200),
-        timestamp: serverTimestamp(),
+      const res = await oilApiFetch("/api/oil-message", {
+        method: "POST",
+        body: JSON.stringify({ plotKey, threadUserId, text: text.trim().slice(0, 200) }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
       setText("");
-      setCooldown(30);
     } catch (e) {
       console.error("Failed to post message:", e);
     } finally {
       setSending(false);
     }
-  }, [text, currentUserId, plotKey, username, cooldown, isOwner]);
+  }, [text, currentUserId, plotKey, sending, isOwner, oilApiFetch]);
 
   // Save links
-  const oilApiFetch = useOilApiFetch();
   const handleSaveLinks = useCallback(async () => {
     if (!currentUserId) return;
     setSavingLinks(true);
@@ -145,12 +131,15 @@ export default function OilChatModal({
     }
   }, [currentUserId, linkDraft, oilApiFetch]);
 
-  // Delete message
+  // Delete message — server gates to author or plot owner.
   const handleDelete = useCallback(async (msgId) => {
-    if (!db) return;
-    try { await deleteDoc(doc(db, "oilPlotMessages", msgId)); }
-    catch (e) { console.error("Failed to delete message:", e); }
-  }, []);
+    try {
+      await oilApiFetch("/api/oil-message", {
+        method: "DELETE",
+        body: JSON.stringify({ msgId }),
+      });
+    } catch (e) { console.error("Failed to delete message:", e); }
+  }, [oilApiFetch]);
 
   // Thread grouping for owner
   const threads = isOwner
@@ -283,8 +272,44 @@ export default function OilChatModal({
             </p>
           )}
 
+          {/* Unclaimed plot — nobody to message; offer a claim jump */}
+          {currentUserId && !plotOwnerId && (
+            <div style={{ margin: "20px 0", textAlign: "center" }}>
+              <p style={{ fontFamily: mono, fontSize: 11, color: c.muted, margin: 0 }}>
+                This plot is unclaimed — no owner to message yet.
+              </p>
+              {claimJumpOption && (
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    onClick={() => { if (!claimJumpOption.disabled) { claimJumpOption.onClaim(); onClose?.(); } }}
+                    disabled={claimJumpOption.disabled}
+                    style={{
+                      ...btnStyle(c.activeBg),
+                      opacity: claimJumpOption.disabled ? 0.5 : 1,
+                      cursor: claimJumpOption.disabled ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {claimJumpOption.label}
+                  </button>
+                  {claimJumpOption.note && (
+                    <p style={{ fontFamily: mono, fontSize: 10, color: c.muted, margin: "6px 0 0" }}>
+                      {claimJumpOption.note}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Signed in but not a player — messaging is players-only */}
+          {currentUserId && !isOwner && plotOwnerId && !isPlayer && (
+            <p style={{ fontFamily: mono, fontSize: 11, color: c.muted, margin: "20px 0", textAlign: "center" }}>
+              Only players can message plot owners.
+            </p>
+          )}
+
           {/* Visitor view */}
-          {currentUserId && !isOwner && (
+          {currentUserId && !isOwner && plotOwnerId && isPlayer && (
             <div ref={listRef} style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
               {messages.length === 0 && (
                 <p style={{ fontFamily: mono, fontSize: 11, color: c.muted, margin: "20px 0", textAlign: "center" }}>
@@ -378,8 +403,8 @@ export default function OilChatModal({
           )}
         </div>
 
-        {/* Footer — input */}
-        {currentUserId && (
+        {/* Footer — input (owners can always reply; visitors must be players) */}
+        {currentUserId && plotOwnerId && (isOwner || isPlayer) && (
           <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${c.border}` }}>
             {isOwner && !replyTarget && threadList && threadList.length > 0 ? (
               <p style={{ fontFamily: mono, fontSize: 10, color: c.muted, margin: 0, textAlign: "center" }}>
@@ -399,18 +424,18 @@ export default function OilChatModal({
                       handlePost(isOwner ? replyTarget : undefined);
                     }
                   }}
-                  disabled={sending || cooldown > 0}
+                  disabled={sending}
                   autoFocus
                 />
                 <button
                   onClick={() => handlePost(isOwner ? replyTarget : undefined)}
-                  disabled={sending || cooldown > 0 || !text.trim()}
+                  disabled={sending || !text.trim()}
                   style={{
-                    ...btnStyle(cooldown > 0 ? c.muted : c.activeBg),
-                    opacity: (sending || cooldown > 0 || !text.trim()) ? 0.5 : 1,
+                    ...btnStyle(c.activeBg),
+                    opacity: (sending || !text.trim()) ? 0.5 : 1,
                     minWidth: 56,
                   }}>
-                  {cooldown > 0 ? `${cooldown}s` : "SEND"}
+                  SEND
                 </button>
               </div>
             )}

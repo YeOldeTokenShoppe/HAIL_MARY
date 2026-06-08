@@ -8,6 +8,31 @@
         { "fieldPath": "col", "order": "ASCENDING" },
         { "fieldPath": "row", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "oilPlotMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "plotKey", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "oilPlotMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "plotKey", "order": "ASCENDING" },
+        { "fieldPath": "threadUserId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "oilPlotMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "threadUserId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

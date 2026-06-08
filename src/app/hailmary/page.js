@@ -17,6 +17,7 @@ import OilOverlayModal from "@/components/OilOverlayModal";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
+import MusicButton from "@/components/MusicButton";
 import NavControlsHome from "@/components/NavControlsHome";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
@@ -671,24 +672,61 @@ function CameraFlyIn({ onComplete, mobile = false }) {
     elapsed.current += delta;
     const time = elapsed.current;
 
+    // Corkscrew-in: the orbit RADIUS (and base height) eases inward over `dur`
+    // seconds, opening on a wide shot that frames the whole field + the oil tower
+    // then spiralling in to the resting radius. The key to making it read as a
+    // DECREASING ORBIT (not a straight dolly-in) is to drive the orbit ANGLE off
+    // the same eased descent progress, so the camera completes a fixed number of
+    // full revolutions WHILE the radius shrinks — independent of frame rate. A
+    // small constant term keeps a gentle orbit going after it settles.
+    const easeInOutCubic = (p) =>
+      p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+    const TWO_PI = Math.PI * 2;
+
     if (mobile) {
-      // Mobile: closer orbit among the rigs, like the Three.js horse example
-      const r = 4;
+      // Mobile: wide field-and-tower shot → close orbit among the rigs
+      const dur = 7;
+      const k = easeInOutCubic(Math.min(time / dur, 1)); // eased radius/height settle
+      const r = 9 + (2 - 9) * k;
+      const baseY = 5 + (2 - 5) * k;
+      // Drift the orbit pivot + look-at off the central tower and into the rig
+      // field as it descends, so the wide establishing shot still centers the
+      // tower but the close orbit makes the rigs (not the tower) the subject.
+      const cx = 1.5 * k;
+      const cz = 1.5 * k;
+      // One constant spin rate the whole time: half a revolution over the descent,
+      // then keeps orbiting at that same speed (no part-two slowdown).
+      const angle = (TWO_PI * 0.3 / dur) * time;
       camera.position.set(
-        Math.sin(time / 10) * r,
-        3 + 0.8 * Math.cos(time / 5),
-        Math.cos(time / 10) * r,
+        cx + Math.sin(angle) * r,
+        baseY + 0.8 * Math.cos(time / 5),
+        cz + Math.cos(angle) * r,
       );
-      camera.lookAt(0, 2, 0);
+      camera.lookAt(cx, 1.5, cz);
     } else {
-      // Desktop: wider establishing shot
-      const r = 8;
+      // Desktop: wide field-and-tower shot → resting orbit near the rigs
+      const dur = 9;
+      const k = easeInOutCubic(Math.min(time / dur, 1)); // eased radius/height settle
+      const r = 18 + (5 - 18) * k;
+      // The desktop rig surface sits at world y≈5 (grid group offset). Keep the
+      // settled height + bob ABOVE that so the orbit never dips into the
+      // substance volume (baseY 7.5 − 1.5 bob = 6 min), and look at the surface
+      // (y=5), not below it.
+      const baseY = 10 + (7.5 - 10) * k;
+      // Drift the orbit pivot + look-at off the central tower and into the rig
+      // field as it descends, so the wide establishing shot still centers the
+      // tower but the close orbit makes the rigs (not the tower) the subject.
+      const cx = 3 * k;
+      const cz = 3 * k;
+      // One constant spin rate the whole time: half a revolution over the descent,
+      // then keeps orbiting at that same speed (no part-two slowdown).
+      const angle = (TWO_PI * 0.5 / dur) * time;
       camera.position.set(
-        Math.sin(time / 10) * r,
-        7 + 1.5 * Math.cos(time / 5),
-        Math.cos(time / 10) * r,
+        cx + Math.sin(angle) * r,
+        baseY + 1.5 * Math.cos(time / 5),
+        cz + Math.cos(angle) * r,
       );
-      camera.lookAt(0, 5, 0);
+      camera.lookAt(cx, 5, cz);
     }
   });
 
@@ -806,6 +844,16 @@ function CameraFlyTo({ target, controlsRef }) {
           // falls back to the close panel distance.
           const focusDist = target.focusDist ?? (target.mobile ? 0.2 : 0.25);
           endPos.current.copy(endTarget.current).addScaledVector(dir, focusDist);
+        } else if (target.rigIntro) {
+          // Desktop page-open focus on the player's own rig: an elevated, pulled-
+          // back 3/4 view. The camera sits well above the surface and looks down
+          // ~30°, so the open never dives to near-ground level into the grid.
+          // Override the look-at START too: OrbitControls' resting target sits
+          // below the (high) desktop surface, so without this the opening frame
+          // would aim into the underground voxels before lerping up to the rig.
+          startTarget.current.set(0, target.y, 0); // field-surface center, above ground
+          endTarget.current.set(target.x, target.y - 0.1, target.z);
+          endPos.current.set(target.x + 2.4, target.y + 2.6, target.z + 2.4);
         } else if (target.mobile) {
           // Mobile: close, fairly head-on view of the rig with a gentle downward tilt.
           // (A level pose — camera y == target y — grazes the ground plane and washes
@@ -1103,6 +1151,16 @@ export default function OilPage() {
   // own violet-lit scene (both are self-contained themed looks, independent of
   // the day/dusk/night presets); otherwise the user's selected time-of-day.
   const env = ENV_PRESETS[GeodeMode ? "GeodeDusk" : parabolum ? "parabolumEnv" : envPreset];
+  // Reflections-only env map for the rigs' metal (NOT the sky). Warm "sunset"
+  // reflections flatter the warm brass/copper on the bright day/dusk scenes;
+  // "warehouse" (cooler, contrasty) suits the night/dark scenes and the Lyquid80
+  // substance themes (Parabolum + Geode). Drei caches each HDR, so toggling is
+  // instant after first load.
+  const envMapPreset = useMemo(() => {
+    if (parabolum || GeodeMode) return "warehouse";              // Lyquid80 themes
+    if (envPreset === "night" || envPreset === "hell") return "warehouse";
+    return "sunset";                                             // day, solstice, dusk
+  }, [parabolum, GeodeMode, envPreset]);
   // Don't persist the transient "hell" preset — otherwise a reload during a
   // demon event restores hell forever. Keep the last real preset saved instead.
   useEffect(() => {
@@ -2103,6 +2161,10 @@ export default function OilPage() {
   // Session-local drain tracking (declared early — used by hell pocket detection)
   const [tankDrained, setTankDrained] = useState(false);
   const [lastDrainSnapshot, setLastDrainSnapshot] = useState(0);
+  // Admin Test Gusher: force the local tank to full so the full-tank UI + overflow
+  // gusher can be previewed/screenshotted. Set when the Test Gusher fires and
+  // self-clears a few seconds later (see the gusherTest effect below).
+  const [testTankFull, setTestTankFull] = useState(false);
 
   // ── Hell pocket state ──
   // Local visual state is driven by either:
@@ -2277,6 +2339,9 @@ export default function OilPage() {
   // (only the layers THIS rig struck — correct across claim-jumps to pre-drilled
   // cells). Fall back to the legacy derived model for data predating the loop.
   const oilInTank = useMemo(() => {
+    // Admin Test Gusher override — show a full tank for the preview/screenshot.
+    // Display-only: the drain API is server-authoritative, so this never persists.
+    if (testTankFull) return TANK_CAPACITY;
     // The strike loop's authoritative tankOil wins whenever it exists — for real
     // players AND for an admin/test rig that's actually been struck (so the tank
     // reflects FORCE STRIKE). Fall back to the legacy demo-derived value only
@@ -2286,7 +2351,7 @@ export default function OilPage() {
     }
     if (playerExtracted === 0) return 0;
     return Math.max(0, playerExtracted - lastDrainSnapshot);
-  }, [userDrill?.tankOil, playerExtracted, lastDrainSnapshot]);
+  }, [userDrill?.tankOil, playerExtracted, lastDrainSnapshot, testTankFull]);
 
   // Oil you've found = banked (totalCollected) + un-banked tank. This is what you
   // get paid for at the fixed rate below.
@@ -2675,6 +2740,18 @@ export default function OilPage() {
     }
   }, [tankFill]);
 
+  // Admin Test Gusher: each press fills the local tank to full (overflow UI +
+  // sustained gusher) then self-clears ~7s later so the preview cleans itself up.
+  // Keyed on the gusherTest counter so every press restarts the window; guards 0 so
+  // it never fires on mount.
+  useEffect(() => {
+    if (gusherTest === 0) return;
+    setTankDrained(false); // un-mask the bar if a prior drain zeroed it
+    setTestTankFull(true);
+    const id = setTimeout(() => setTestTankFull(false), 7000);
+    return () => clearTimeout(id);
+  }, [gusherTest]);
+
   // Combine oilStrike and tankGusher into a single trigger for gusher effects
   const combinedStrike = oilStrike || tankGusher;
 
@@ -2879,22 +2956,43 @@ export default function OilPage() {
     });
   }, [isMobile]);
 
-  // On mobile, open the page focused on the player's own rig (if they hold a
-  // claimed plot) instead of the aerial intro orbit. Fires once, only before
-  // the player has interacted — later navigation / zoom-out is left untouched.
-  // Sources the plot the same way the auto-select does (userDrill.col is often
+  // The player's own rig cell, if they hold a claimed plot. When set, the page
+  // SKIPS the aerial intro orbit and opens focused on that rig instead (both
+  // desktop and mobile). null = logged-out / no plot → the cinematic orbit plays.
+  // Sources the plot the same way auto-select does (userDrill.col is often
   // stale/null; oilPlots ownership via myPlot is the reliable fallback).
-  const didMobileRigFocus = useRef(false);
-  useEffect(() => {
-    if (didMobileRigFocus.current) return;
-    if (!isMobile || introComplete) return;
+  const introRig = useMemo(() => {
     const col = userDrill?.col ?? myPlot?.col;
     const row = userDrill?.row ?? myPlot?.row;
-    if (col == null) return;
-    didMobileRigFocus.current = true;
-    handleFlyTo(col, row ?? 0);
+    if (col == null) return null;
+    return { col, row: row ?? 0 };
+  }, [userDrill?.col, userDrill?.row, myPlot?.col, myPlot?.row]);
+
+  // Plot owners open straight on their rig: fly from the default camera pose to
+  // the rig instead of running the aerial orbit. Fires once, only before the
+  // player has interacted. Mobile reuses handleFlyTo (its close pose looks down
+  // enough to stay clear of the ground). Desktop's surface sits high (grid group
+  // at y=5) and handleFlyTo's near-level close-up grazes into the grid, so the
+  // desktop open uses a dedicated elevated, pulled-back rig focus (rigIntro).
+  const didRigFocus = useRef(false);
+  useEffect(() => {
+    if (didRigFocus.current || introComplete || !introRig) return;
+    didRigFocus.current = true;
+    if (isMobile) {
+      handleFlyTo(introRig.col, introRig.row);
+      return;
+    }
+    const worldW = gridSize * CELL_SIZE;
+    const worldD = gridSize * CELL_SIZE;
+    const x = -worldW / 2 + introRig.col * CELL_SIZE + CELL_SIZE / 2;
+    const z = worldD / 2 - introRig.row * CELL_SIZE - CELL_SIZE / 2;
+    flyIdRef.current++;
+    setFlyTarget({ x, y: 5.3, z, id: flyIdRef.current, mobile: false, rigIntro: true });
+    setSelectedX(introRig.col);
+    setSliceY(introRig.row);
+    setDrillDepth(0);
     setIntroComplete(true);
-  }, [isMobile, introComplete, userDrill, myPlot, handleFlyTo]);
+  }, [introRig, introComplete, isMobile, handleFlyTo, gridSize]);
 
   // Auto-select and fly to the target cell when a rogue event appears
   useEffect(() => {
@@ -2979,6 +3077,34 @@ export default function OilPage() {
       console.error("Claim jump failed:", err);
     }
   }, [user?.id, userDrill, allPlotsMap, handleFlyTo, oilApiFetch]);
+
+  // Offer shown in the plot-message panel when the selected plot is unclaimed:
+  // a one-tap claim jump onto it. Mirrors the CLAIM JUMP toggle gating (active
+  // phase, not test, player already holds a plot) so we never surface a dead
+  // button. Returns null when no jump is possible; the chat panel then just
+  // shows the "unclaimed — no owner to message" line.
+  const buildClaimJumpOption = useCallback((plotKey) => {
+    if (!plotKey || gamePhase !== "active" || isTest) return null;
+    if (!user?.id || !userDrill || userDrill.col == null) return null;
+    if (allPlotsMap[plotKey]?.currentOwnerId != null) return null; // already claimed
+    const [col, row] = plotKey.split("_").map(Number);
+    if (col === userDrill.col && row === userDrill.row) return null; // already standing here
+    const used = userDrill.claimJumpsUsed ?? 0;
+    const costsBonus = used >= FREE_CLAIM_JUMPS;
+    const bonus = userDrill.bonusDrills ?? 0;
+    const blocked = costsBonus && bonus <= 0;
+    const free = Math.max(0, FREE_CLAIM_JUMPS - used);
+    return {
+      label: "CLAIM JUMP HERE",
+      note: blocked
+        ? "No free jumps left — need a bonus drill"
+        : costsBonus
+          ? "Costs 1 bonus drill"
+          : `${free} free jump${free === 1 ? "" : "s"} left`,
+      disabled: blocked,
+      onClaim: () => handleClaimJump(col, row),
+    };
+  }, [gamePhase, isTest, user?.id, userDrill, allPlotsMap, handleClaimJump]);
 
   // Mid-season join: a qualified, plot-less player claims an unclaimed cell in
   // active phase (registration-window claiming happens via OilQualify instead).
@@ -5371,20 +5497,7 @@ export default function OilPage() {
             >
               ?
             </button>
-            <button
-              onClick={() => { contextIsPlaying ? pause() : play(); }}
-              title={contextIsPlaying ? "Pause music" : "Play music"}
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 40, height: 40, borderRadius: 10,
-                background: "rgba(212, 175, 55, 0.05)",
-                border: "1.5px solid rgba(212, 175, 55, 0.2)",
-                color: theme.accent, cursor: "pointer", padding: 0,
-                flexShrink: 0, fontSize: 20, fontFamily: "inherit",
-              }}
-            >
-              {contextIsPlaying ? "⏸" : "♫"}
-            </button>
+            <MusicButton accent={theme.accent} />
           </div>
         </header>
 
@@ -5465,6 +5578,7 @@ export default function OilPage() {
                     onRogueArrive={handleRogueArrive}
                     onRogueConsequence={handleRogueConsequence}
                     envPreset={envPreset}
+                    envMapPreset={envMapPreset}
                     parabolum={parabolum}
                     plotsWithMessages={plotsWithMessages}
                     hellActive={hellActive}
@@ -5498,11 +5612,11 @@ export default function OilPage() {
                       autoRotate={hellOrbit}
                       autoRotateSpeed={0.6}
                       onStart={() => { if (hellOrbit) setHellOrbit(false); }}
-                      target={[0, 1, 0]}
+                      target={[1.5, 1.5, 1.5]}
                     />
                     <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
                   </>
-                ) : (
+                ) : introRig ? null : (
                   <CameraFlyIn onComplete={() => setIntroComplete(true)} mobile />
                 )}
                 <CameraShake shakeRef={shakeRef} />
@@ -5732,7 +5846,7 @@ export default function OilPage() {
             drillDepth={effectiveDrillDay}
             hellPockets={displayHellPockets}
           />
-          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
+          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && fieldIntelPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
@@ -5864,6 +5978,8 @@ export default function OilPage() {
             currentUserId={user?.id}
             username={user?.username || user?.firstName || "anon"}
             onClose={() => { dismissedPlotsRef.current[chatModalPlotKey] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[chatModalPlotKey]; return next; }); setChatModalPlotKey(null); }}
+            claimJumpOption={buildClaimJumpOption(chatModalPlotKey)}
+            isPlayer={!!userDrill}
           />
         )}
       </div>
@@ -6019,6 +6135,7 @@ export default function OilPage() {
                 onRogueArrive={handleRogueArrive}
                 onRogueConsequence={handleRogueConsequence}
                 envPreset={envPreset}
+                envMapPreset={envMapPreset}
                 parabolum={parabolum}
                 plotsWithMessages={plotsWithMessages}
                 hellActive={hellActive}
@@ -6049,13 +6166,13 @@ export default function OilPage() {
                   maxDistance={45}
                   maxPolarAngle={Math.PI}
                   minPolarAngle={0}
-                  target={[0, 3, 0]}
+                  target={[3, 5, 3]}
                   zoomToCursor
                 />
                 <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />
               </>
-            ) : (
-              <CameraFlyIn onComplete={() => setIntroComplete(true)} duration={5} />
+            ) : introRig ? null : (
+              <CameraFlyIn onComplete={() => setIntroComplete(true)} />
             )}
             <CameraShake shakeRef={shakeRef} />
           </CleanCanvas>
@@ -6246,7 +6363,7 @@ export default function OilPage() {
               drillDepth={effectiveDrillDay}
               hellPockets={displayHellPockets}
             />
-            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
+            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && fieldIntelPanel}
@@ -6321,6 +6438,8 @@ export default function OilPage() {
           currentUserId={user?.id}
           username={user?.username || user?.firstName || "anon"}
           onClose={() => { dismissedPlotsRef.current[chatModalPlotKey] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[chatModalPlotKey]; return next; }); setChatModalPlotKey(null); }}
+          claimJumpOption={buildClaimJumpOption(chatModalPlotKey)}
+          isPlayer={!!userDrill}
         />
       )}
 

@@ -26,6 +26,7 @@ import CouncilChatScreens from "@/components/CouncilChatScreens";
 import ScreenBSlotMachine from "@/components/ScreenBSlotMachine";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
+import MusicButton from '@/components/MusicButton';
 import { useUser, useClerk } from "@clerk/nextjs";
 import CyberNav from '@/components/CyberNav';
 import NavControls from '@/components/NavControls';
@@ -2087,9 +2088,18 @@ export default function CyborgTemple() {
     isPlaying: contextIsPlaying, 
     nextTrack,
     currentTrack,
-    is80sMode: context80sMode, 
-    setIs80sMode: setContext80sMode
+    is80sMode: context80sMode,
+    setIs80sMode: setContext80sMode,
+    setMusicDucked,
   } = useMusic();
+
+  // Duck the background music while a character is speaking; restore it when
+  // they finish (and force-restore on unmount so navigating away mid-sentence
+  // never leaves the music stuck quiet).
+  useEffect(() => {
+    setMusicDucked(speechActive);
+  }, [speechActive, setMusicDucked]);
+  useEffect(() => () => setMusicDucked(false), [setMusicDucked]);
     
 
     // Check if mobile view and device
@@ -3548,6 +3558,10 @@ export default function CyborgTemple() {
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (
           <>
+            <MusicButton
+              accent="#8effc4"
+              style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 1002 }}
+            />
             {/* Nav Controls - Desktop only */}
             {!isMobileView && (
               <div
