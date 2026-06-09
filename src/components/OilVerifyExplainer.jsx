@@ -6,11 +6,36 @@ import { generateOilDistribution3D, OIL_FIELD_UNITS, OIL_DEPTH_BIAS } from "@/li
 
 const DEPTH_Z = 20;
 
-const STEPS = [
+// Plain-English explanation (default, for everyone). The crypto-accurate version
+// lives in TECH_STEPS, tucked behind a "technical details" toggle for the curious.
+const PLAIN_STEPS = [
+  {
+    num: "1",
+    title: "Locked in before anyone plays",
+    desc: "Before the game opens, we seal the hidden map and publish a tamper-proof fingerprint of it. We can't quietly swap the map later — the fingerprint would stop matching.",
+  },
+  {
+    num: "2",
+    title: "Tied to something nobody can predict",
+    desc: "The map is locked to a future moment on the Base blockchain that hasn't happened yet. So nobody — not even us — can hand-pick a map that favors anyone.",
+  },
+  {
+    num: "3",
+    title: "Revealed when the game ends",
+    desc: "When the game finishes, we publish the secret. Anyone can rebuild the exact same map and confirm it matches the fingerprint from step 1.",
+  },
+  {
+    num: "4",
+    title: "Check it yourself",
+    desc: "The button below re-runs every check live in your browser. You don't have to trust us — you can prove it.",
+  },
+];
+
+const TECH_STEPS = [
   {
     num: "1",
     title: "COMMIT",
-    desc: "Before the game, the house generates a secret and publishes only its SHA-256 fingerprint (the \"commitment\") plus a FUTURE Base block number. The secret is sealed; the commitment proves it can't be swapped later.",
+    desc: "The house generates a secret and publishes only its SHA-256 fingerprint (the \"commitment\") plus a FUTURE Base block number. The secret is sealed; the commitment proves it can't be swapped later.",
   },
   {
     num: "2",
@@ -27,11 +52,6 @@ const STEPS = [
     title: "REVEAL",
     desc: "When the game ends, the secret is published. Anyone can confirm SHA-256(secret) matches the original commitment, re-derive the seed, and regenerate the entire field.",
   },
-  {
-    num: "5",
-    title: "VERIFY IT YOURSELF",
-    desc: "The button below re-runs the whole chain — commitment, on-chain block hash, seed, and every drilled cell — right here in your browser.",
-  },
 ];
 
 export default function OilVerifyExplainer({
@@ -42,6 +62,8 @@ export default function OilVerifyExplainer({
   gridY = 10,
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showTech, setShowTech] = useState(false);      // technical "how it works"
+  const [showChecks, setShowChecks] = useState(false);  // technical result breakdown
   const [status, setStatus] = useState("idle"); // idle | loading | done | error
   const [error, setError] = useState(null);
   const [report, setReport] = useState(null); // { phase, verdict, checks, published, claimTotals? }
@@ -82,7 +104,7 @@ export default function OilVerifyExplainer({
     return report.claimTotals.find((ct) => ct.x === selectedCell.x && ct.y === selectedCell.y) || null;
   }, [report, selectedCell]);
 
-  // Re-run the entire fairness chain in the browser.
+  // Re-run the entire fairness chain in the browser. (Logic unchanged.)
   const handleVerify = useCallback(async () => {
     try {
       setStatus("loading");
@@ -145,9 +167,40 @@ export default function OilVerifyExplainer({
     }
   }, [gridX, gridY, numberOfDeposits]);
 
-  const verdictColor =
-    report?.verdict === "VERIFIED" || report?.verdict === "ANCHOR_OK" ? c.ok
-      : report?.verdict === "FAILED" ? c.bad : c.pending;
+  // Plain-English headline for the result — replaces the cryptic VERIFIED /
+  // PENDING / FAILED verdicts. Before reveal, reassure (it's not "broken");
+  // after reveal, say clearly whether it checks out.
+  const plainResult = useMemo(() => {
+    if (!report) return null;
+    if (report.phase === "revealed") {
+      if (report.verdict === "VERIFIED") {
+        return {
+          tone: c.ok, icon: "✓", title: "Provably fair",
+          body: "The revealed map exactly matches the fingerprint locked in before the game started, and the seed was tied to a Base block nobody could predict. Nothing was rigged.",
+        };
+      }
+      return {
+        tone: c.bad, icon: "⚠", title: "Couldn't fully verify",
+        body: "The core proof checks out — the locked-in fingerprint is valid and the seed was tied to an unpredictable block — but some drilled cells didn't match the rebuilt map. In a live game this shouldn't happen; reach out if you see it.",
+      };
+    }
+    if (report.phase === "anchored") {
+      return {
+        tone: c.pending, icon: "🔒", title: "Locked in — sealed until the end",
+        body: "The map is sealed and tied to a Base block nobody could predict, so it can't be changed. The full proof unlocks when the game ends and the secret is revealed.",
+      };
+    }
+    if (report.phase === "committed") {
+      return {
+        tone: c.pending, icon: "🔒", title: "Locked in",
+        body: "The map's fingerprint is published and can't be swapped. The full proof unlocks once the game ends.",
+      };
+    }
+    return {
+      tone: c.pending, icon: "•", title: "No game locked in yet",
+      body: "No game has been sealed yet — check back once a round is set up.",
+    };
+  }, [report, c]);
 
   const Check = ({ label, state, detail }) => (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 9, marginBottom: 4, fontFamily: mono }}>
@@ -157,6 +210,12 @@ export default function OilVerifyExplainer({
       </span>
     </div>
   );
+
+  const linkBtn = {
+    background: "none", border: "none", padding: 0, cursor: "pointer",
+    color: c.muted, fontFamily: mono, fontSize: 8, letterSpacing: "0.1em",
+    textDecoration: "underline", textTransform: "uppercase",
+  };
 
   return (
     <div style={{ padding: isMobile ? "12px 12px" : "12px 14px", borderBottom: `1px solid ${c.sectionBorder}` }}>
@@ -170,24 +229,25 @@ export default function OilVerifyExplainer({
           display: "flex", alignItems: "center", gap: 6, fontFamily: mono,
         }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c.activeBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
-          VERIFY THE MAP
+          IS THIS GAME FAIR?
         </h3>
         <span style={{ fontSize: 10, color: c.muted }}>{expanded ? "▴" : "▾"}</span>
       </div>
 
       {expanded && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 8, fontFamily: mono, color: c.muted, letterSpacing: "0.15em", marginBottom: 8, fontWeight: 600 }}>
-            PROVABLY FAIR — HOW IT WORKS
+          <div style={{ fontFamily: mono, fontSize: 10, color: c.text, lineHeight: 1.5, letterSpacing: "0.02em", marginBottom: 12 }}>
+            The map of where the oil is hidden is locked in <b>before anyone plays</b>, and tied to something
+            nobody can predict — so it can't be rigged. Here's how, and you can prove it yourself.
           </div>
 
-          {STEPS.map((s) => (
+          {PLAIN_STEPS.map((s) => (
             <div key={s.num} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
               <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: c.stepNum, minWidth: 16, textAlign: "center", lineHeight: "16px" }}>
                 {s.num}
               </span>
               <div>
-                <div style={{ fontFamily: mono, fontSize: 10, fontWeight: 600, color: c.text, letterSpacing: "0.12em", marginBottom: 2 }}>
+                <div style={{ fontFamily: mono, fontSize: 10, fontWeight: 600, color: c.text, letterSpacing: "0.06em", marginBottom: 2 }}>
                   {s.title}
                 </div>
                 <div style={{ fontFamily: mono, fontSize: 10, color: c.muted, lineHeight: "1.4", letterSpacing: "0.02em" }}>
@@ -197,100 +257,112 @@ export default function OilVerifyExplainer({
             </div>
           ))}
 
-          <div style={{ fontSize: 8, fontFamily: mono, color: c.muted, letterSpacing: "0.15em", marginBottom: 8, marginTop: 14, fontWeight: 600 }}>
-            VERIFY THIS GAME
-          </div>
+          {/* Technical "how it works" — the crypto-accurate version for the curious. */}
+          <button onClick={() => setShowTech((t) => !t)} style={{ ...linkBtn, marginTop: 4, marginBottom: showTech ? 8 : 0 }}>
+            {showTech ? "− hide technical details" : "+ technical details"}
+          </button>
+          {showTech && (
+            <div style={{ background: c.infoBg, border: `1px solid ${c.infoBorder}`, padding: 8, marginBottom: 8 }}>
+              {TECH_STEPS.map((s) => (
+                <div key={s.num} style={{ display: "flex", gap: 8, marginBottom: 6, alignItems: "flex-start" }}>
+                  <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, color: c.stepNum, minWidth: 14, textAlign: "center" }}>{s.num}</span>
+                  <div>
+                    <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: c.text, letterSpacing: "0.12em", marginBottom: 2 }}>{s.title}</div>
+                    <div style={{ fontFamily: mono, fontSize: 9, color: c.muted, lineHeight: 1.4 }}>{s.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <button
             onClick={handleVerify}
             disabled={status === "loading"}
             style={{
-              width: "100%", padding: "7px 8px", background: "#d4a854", border: "1px solid #b8922e",
-              borderRadius: 2, color: "#fff", fontFamily: mono, fontSize: 9,
-              letterSpacing: "0.12em", cursor: "pointer", marginBottom: 8, textTransform: "uppercase",
+              width: "100%", padding: "8px 8px", background: c.activeBg, border: `1px solid ${darkMode ? "#b8922e" : "#9a6f10"}`,
+              borderRadius: 2, color: "#fff", fontFamily: mono, fontSize: 10,
+              letterSpacing: "0.12em", cursor: status === "loading" ? "wait" : "pointer",
+              marginTop: 12, marginBottom: 8, textTransform: "uppercase", fontWeight: 700,
             }}
           >
-            {status === "loading" ? "VERIFYING…" : "RUN VERIFICATION"}
+            {status === "loading" ? "CHECKING…" : "CHECK THIS GAME"}
           </button>
 
           {error && (
             <div style={{ fontSize: 9, color: c.bad, marginBottom: 8, letterSpacing: "0.05em", fontFamily: mono }}>
-              {error}
+              Couldn't run the check ({error}). Try again in a moment.
             </div>
           )}
 
-          {status === "done" && report && (
+          {status === "done" && report && plainResult && (
             <>
-              {/* Verdict + phase */}
-              <div style={{ background: c.infoBg, border: `1px solid ${verdictColor}`, padding: 8, marginBottom: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ color: c.infoKey, letterSpacing: "0.12em", fontFamily: mono, fontSize: 9 }}>
-                    PHASE: {String(report.phase || "—").toUpperCase()}
-                  </span>
-                  <span style={{ color: verdictColor, fontWeight: 700, fontFamily: orbitron, fontSize: 11, letterSpacing: "0.08em" }}>
-                    {report.verdict}
+              {/* Plain-English headline */}
+              <div style={{ background: c.infoBg, border: `1px solid ${plainResult.tone}`, padding: 10, marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>{plainResult.icon}</span>
+                  <span style={{ color: plainResult.tone, fontWeight: 700, fontFamily: orbitron, fontSize: 12, letterSpacing: "0.04em" }}>
+                    {plainResult.title}
                   </span>
                 </div>
-
-                {/* Anchor — on-chain hash matches what was published */}
-                {report.checks.anchor && (
-                  <Check
-                    label={`ANCHOR · BLOCK ${report.checks.anchor.block?.toLocaleString?.() ?? report.checks.anchor.block}`}
-                    state={report.checks.anchor.matches ?? null}
-                    detail={report.checks.anchor.matches ? "on-chain match" : report.checks.anchor.error ? "fetch error" : "mismatch"}
-                  />
-                )}
-                {/* Browser re-check of the anchor */}
-                {report.browser?.anchorMatches != null && (
-                  <Check label="ANCHOR · IN-BROWSER" state={report.browser.anchorMatches} detail={report.browser.anchorMatches ? "match" : "mismatch"} />
-                )}
-                {/* Commitment — SHA256(secret) === published */}
-                {report.checks.commitment && (
-                  <Check label="COMMITMENT" state={report.checks.commitment.matches ?? null} detail={report.checks.commitment.matches ? "secret valid" : "invalid"} />
-                )}
-                {/* Field — every drilled cell matches the recomputed field */}
-                {report.checks.field && (
-                  <Check
-                    label={`FIELD · ${report.checks.field.checked} CELLS`}
-                    state={report.checks.field.ok ?? null}
-                    detail={report.checks.field.ok ? "all match" : `${report.checks.field.mismatches?.length || "?"} off`}
-                  />
-                )}
-                {report.phase !== "revealed" && (
-                  <div style={{ fontSize: 8, color: c.noteText, fontFamily: mono, fontStyle: "italic", marginTop: 4, lineHeight: 1.4 }}>
-                    {report.phase === "anchored"
-                      ? "Anchor is locked. The secret is revealed when the game ends — then the full field can be regenerated."
-                      : report.phase === "committed"
-                        ? "Commitment recorded. Awaiting the anchor block."
-                        : "No game committed yet."}
-                  </div>
-                )}
+                <div style={{ fontFamily: mono, fontSize: 9, color: c.text, lineHeight: 1.5, letterSpacing: "0.02em" }}>
+                  {plainResult.body}
+                </div>
               </div>
 
-              {/* Published values */}
-              {(report.commitment || report.anchorBlockHash) && (
-                <div style={{ background: c.infoBg, border: `1px solid ${c.infoBorder}`, padding: 8, marginBottom: 8 }}>
-                  {[
-                    report.commitment && { key: "COMMITMENT", val: report.commitment },
-                    report.anchorBlock != null && { key: "ANCHOR BLOCK", val: String(report.anchorBlock) },
-                    report.anchorBlockHash && { key: "BLOCK HASH", val: report.anchorBlockHash },
-                    report.finalSeed && { key: "FINAL SEED", val: report.finalSeed },
-                  ].filter(Boolean).map((row) => (
-                    <div key={row.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 9, marginBottom: 3 }}>
-                      <span style={{ color: c.infoKey, letterSpacing: "0.1em", flexShrink: 0, fontFamily: mono }}>{row.key}</span>
-                      <span style={{ color: c.hashVal, fontFamily: mono, fontSize: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "62%", textAlign: "right" }}>
-                        {row.val}
-                      </span>
+              {/* Technical breakdown — the original per-check rows + published values. */}
+              <button onClick={() => setShowChecks((s) => !s)} style={{ ...linkBtn, marginBottom: showChecks ? 8 : 0 }}>
+                {showChecks ? "− hide the proof" : "+ show the proof"}
+              </button>
+              {showChecks && (
+                <>
+                  <div style={{ background: c.infoBg, border: `1px solid ${c.infoBorder}`, padding: 8, marginBottom: 8 }}>
+                    {report.checks.anchor && (
+                      <Check
+                        label={`ANCHOR · BLOCK ${report.checks.anchor.block?.toLocaleString?.() ?? report.checks.anchor.block}`}
+                        state={report.checks.anchor.matches ?? null}
+                        detail={report.checks.anchor.matches ? "on-chain match" : report.checks.anchor.error ? "fetch error" : "mismatch"}
+                      />
+                    )}
+                    {report.browser?.anchorMatches != null && (
+                      <Check label="ANCHOR · IN-BROWSER" state={report.browser.anchorMatches} detail={report.browser.anchorMatches ? "match" : "mismatch"} />
+                    )}
+                    {report.checks.commitment && (
+                      <Check label="COMMITMENT" state={report.checks.commitment.matches ?? null} detail={report.checks.commitment.matches ? "secret valid" : "invalid"} />
+                    )}
+                    {report.checks.field && (
+                      <Check
+                        label={`FIELD · ${report.checks.field.checked} CELLS`}
+                        state={report.checks.field.ok ?? null}
+                        detail={report.checks.field.ok ? "all match" : `${report.checks.field.mismatches?.length || "?"} off`}
+                      />
+                    )}
+                  </div>
+
+                  {(report.commitment || report.anchorBlockHash) && (
+                    <div style={{ background: c.infoBg, border: `1px solid ${c.infoBorder}`, padding: 8, marginBottom: 8 }}>
+                      {[
+                        report.commitment && { key: "COMMITMENT", val: report.commitment },
+                        report.anchorBlock != null && { key: "ANCHOR BLOCK", val: String(report.anchorBlock) },
+                        report.anchorBlockHash && { key: "BLOCK HASH", val: report.anchorBlockHash },
+                        report.finalSeed && { key: "FINAL SEED", val: report.finalSeed },
+                      ].filter(Boolean).map((row) => (
+                        <div key={row.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 9, marginBottom: 3 }}>
+                          <span style={{ color: c.infoKey, letterSpacing: "0.1em", flexShrink: 0, fontFamily: mono }}>{row.key}</span>
+                          <span style={{ color: c.hashVal, fontFamily: mono, fontSize: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "62%", textAlign: "right" }}>
+                            {row.val}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
 
-              {/* Recomputed map (post-reveal only) */}
+              {/* Recomputed map (post-reveal only) — concrete "here's the real map". */}
               {report.claimTotals && (
                 <>
-                  <div style={{ fontSize: 7, color: c.noteText, letterSpacing: "0.15em", marginBottom: 6, fontFamily: mono }}>
-                    SELECT CLAIM TO INSPECT
+                  <div style={{ fontSize: 8, color: c.text, letterSpacing: "0.04em", marginBottom: 6, fontFamily: mono }}>
+                    THE REAL MAP — tap a claim to see how much oil it held
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
                     {Array.from({ length: gridY }, (_, rowIdx) => (
@@ -329,7 +401,7 @@ export default function OilVerifyExplainer({
               )}
 
               <div style={{ fontSize: 8, color: c.noteText, fontFamily: mono, lineHeight: "1.4", letterSpacing: "0.02em", fontStyle: "italic" }}>
-                The block hash and field regeneration run in your browser — verify the source yourself.
+                This check runs entirely in your browser — nothing to take on trust.
               </div>
             </>
           )}

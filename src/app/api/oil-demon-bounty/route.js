@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { authedUserId } from "@/lib/oilAuth";
+import { logTimeline } from "@/lib/oilTimeline";
 import {
   createDemonBounty,
   MAX_BONUS_DRILLS,
@@ -131,6 +132,14 @@ export async function PATCH(req) {
         bonusDrills: isSummoner ? 0 : BOUNTY_BONUS_DRILLS,
         dismissed: isSummoner,
       };
+    });
+
+    // FIELD ACTIVITY feed — demon contained (drilling resumes for everyone).
+    await logTimeline(db, {
+      type: "contain",
+      username: typeof hunterUsername === "string" ? hunterUsername.slice(0, 60) : null,
+      userId: hunterId,
+      detail: result.dismissed ? "banished their own demon" : "drilling resumed",
     });
 
     return NextResponse.json({ ok: true, ...result });

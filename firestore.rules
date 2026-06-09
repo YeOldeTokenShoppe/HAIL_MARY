@@ -308,6 +308,21 @@
         allow delete: if false;
       }
 
+      // Claim/jump audit log — public read so anyone can audit plot placement
+      // against the revealed map post-game (insider-tipping accountability).
+      // Server-only writes (via /api/oil-claim + /api/oil-claim-jump).
+      match /oilClaimLog/{docId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      // FIELD ACTIVITY timeline — public who/what/when feed (no amounts/coords).
+      // Server-only writes via the strike-tick / claim / demon routes.
+      match /oilTimeline/{docId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
       // Oil Qualified players — registration + qualification for the oil game.
       // Public read; writes are server-only. `qualified` is decided by an
       // on-chain RL80 balance re-check in /api/oil-register and the admin

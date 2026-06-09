@@ -9,6 +9,15 @@ const QUALIFICATION_THRESHOLD_USD = 20;
 // Live check: reads balance + price, returns qualification status
 export async function GET(req) {
   try {
+    // Daily cron path: Vercel cron fires a GET with `Authorization: Bearer
+    // $CRON_SECRET`. That runs the ONGOING snapshot (gated to active games inside
+    // runSnapshot). The wallet live-check below is the initial/entry check and
+    // stays open during registration.
+    const auth = req.headers.get("authorization") || "";
+    if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json(await runSnapshot());
+    }
+
     const { searchParams } = new URL(req.url);
     const wallet = searchParams.get("wallet");
     if (!wallet || !wallet.startsWith("0x")) {
@@ -47,7 +56,7 @@ export async function GET(req) {
 // When a player becomes disqualified, their oilPlots cell is released
 export async function POST(req) {
   try {
-    const { adminPassword } = await req.json();
+    const { adminPassword } = await req.json().catch(() => ({}));
 
     // Admin auth — server-only secret. NEVER fall back to NEXT_PUBLIC_* (that
     // var is inlined into the client bundle, so accepting it would let any
@@ -56,8 +65,29 @@ export async function POST(req) {
     if (!correctPassword || adminPassword !== correctPassword) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    return NextResponse.json(await runSnapshot());
+  } catch (err) {
+    console.error("[oil-qualify POST]", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
 
+// Shared snapshot runner — reads every registered player, recomputes count-based
+// qualification, credits diamond-hands + deferred referrals, and releases plots
+// for anyone who sold below their floor. Called by the admin POST and the daily
+// cron (GET + CRON_SECRET bearer).
+async function runSnapshot() {
     const db = getAdminDb();
+
+    // Only run during an ACTIVE game. The INITIAL qualification check lives
+    // elsewhere (oil-register + the oil-qualify GET live check) and runs during
+    // registration — this snapshot is the ONGOING re-check (disqualify sellers,
+    // credit diamond-hands + deferred referrals), which only matters once play
+    // is live. No active game ⇒ no-op.
+    const settings = (await db.collection("oilGame").doc("settings").get()).data() || {};
+    if (settings.gamePhase !== "active") {
+      return { ok: true, skipped: "not_active", phase: settings.gamePhase || null };
+    }
 
     // Get current RL80 price
     const price = await getRL80Price();
@@ -78,7 +108,17 @@ export async function POST(req) {
         const balance = await getRL80Balance(player.walletAddress);
         const balanceNum = Number(balance) / 1e18;
         const usdValue = balanceNum * price.rl80PriceUsd;
-        const qualified = usdValue >= QUALIFICATION_THRESHOLD_USD;
+
+        // Count-based qualification (price-independent): hold ≥ your entry count
+        // floor. Disqualifies only on SELLING below entry, never on a price move.
+        // Legacy/backfill: a player with no stored floor (registered before the
+        // count rule) gets one derived once from the current price, fixed onward.
+        let floor = player.qualifyTokenFloor;
+        const backfillFloor = floor == null;
+        if (backfillFloor) {
+          floor = price.rl80PriceUsd > 0 ? QUALIFICATION_THRESHOLD_USD / price.rl80PriceUsd : Infinity;
+        }
+        const qualified = balanceNum >= floor;
         const wasQualified = player.qualified !== false; // treat undefined as qualified
 
         if (qualified) qualifiedCount++;
@@ -89,6 +129,8 @@ export async function POST(req) {
           lastSnapshotBalance: balanceNum.toString(),
           lastSnapshotUsdValue: Math.round(usdValue * 100) / 100,
           lastSnapshotAt: FieldValue.serverTimestamp(),
+          // Persist a backfilled floor once so it's fixed from here on.
+          ...(backfillFloor && Number.isFinite(floor) ? { qualifyTokenFloor: floor } : {}),
         }, { merge: true });
 
         // Diamond-hands (long-term holding) depth lever. The streak starts on
@@ -204,15 +246,11 @@ export async function POST(req) {
       results,
     });
 
-    return NextResponse.json({
+    return {
       ok: true,
       price: price.rl80PriceUsd,
       qualifiedCount,
       totalChecked: players.length,
       timestamp: Date.now(),
-    });
-  } catch (err) {
-    console.error("[oil-qualify POST]", err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+    };
 }

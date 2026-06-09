@@ -139,6 +139,7 @@ export default function DrillHUD({
   hud = false,
   hellActive = false,
   demonBlockade = null,
+  drillingActive = false,
 }) {
   const [phase, setPhase] = useState("standby");
   // Mirrors for the zero-dep animate() callback to read current theme state.
@@ -155,6 +156,8 @@ export default function DrillHUD({
   const [status, setStatus] = useState("STANDBY");
   const [statusColor, setStatusColor] = useState(null);
   const [prelimPressure, setPrelimPressure] = useState(0);
+  const prelimPressureRef = useRef(0);
+  prelimPressureRef.current = prelimPressure;
   const rafRef = useRef(null);
   const startRef = useRef(0);
   const prevDrillEvent = useRef(0);
@@ -257,6 +260,43 @@ export default function DrillHUD({
     };
   }, [drillEvent, animate, oilValue, maxOil, drillProximity, hellProximity]);
 
+  // Idle "DRILLING" loop — when the rig is actively drilling but NOT mid-reveal
+  // (standby on a fresh rig, or settled on the AREA SCAN between strikes), gently
+  // jitter the gauges so they read as working instead of parked. Keeps the AREA
+  // SCAN label/level when present (jitters around it); just adds life. Throttled.
+  const idleRafRef = useRef(null);
+  const idleTickRef = useRef(0);
+  useEffect(() => {
+    const idleOk = drillingActive && !hellActive && !demonBlockade?.active
+      && (phase === "standby" || phase === "preliminary");
+    if (!idleOk) {
+      if (idleRafRef.current) cancelAnimationFrame(idleRafRef.current);
+      idleRafRef.current = null;
+      return;
+    }
+    if (phase === "standby") {
+      setStatus("DRILLING");
+      setStatusColor(null);
+    }
+    const loop = () => {
+      const ms = performance.now();
+      if (ms - idleTickRef.current >= 55) {  // ~18fps — enough for a subtle breathe
+        idleTickRef.current = ms;
+        const base = phase === "preliminary" ? prelimPressureRef.current : 24;
+        const noise = Math.sin(ms * 0.0017) * 6 + Math.sin(ms * 0.0033) * 4 + Math.sin(ms * 0.0008) * 3;
+        setPressure(Math.max(2, Math.min(85, base + noise)));
+        const d = 5 + Math.sin(ms * 0.0022) * 4 + Math.max(0, Math.sin(ms * 0.011)) * 4;
+        setDensity(Math.max(0, d));
+      }
+      idleRafRef.current = requestAnimationFrame(loop);
+    };
+    idleRafRef.current = requestAnimationFrame(loop);
+    return () => {
+      if (idleRafRef.current) cancelAnimationFrame(idleRafRef.current);
+      idleRafRef.current = null;
+    };
+  }, [drillingActive, phase, hellActive, demonBlockade]);
+
   const dark = darkMode;
   const hellColor = "#ff2200";
   const isHellOrBlockade = hellActive || demonBlockade?.active;
@@ -294,7 +334,7 @@ export default function DrillHUD({
         {/* Status line */}
         <div style={{
           fontSize: 10, fontWeight: 600, letterSpacing: "0.18em",
-          color: displayStatusColor || (isDrilling ? accentColor : mutedColor),
+          color: displayStatusColor || ((isDrilling || (drillingActive && phase === "standby")) ? accentColor : mutedColor),
           fontFamily: "'Share Tech Mono', monospace",
           textAlign: "center",
           textShadow: displayStatusColor && displayStatusColor !== "#6e6050" ? `0 0 6px ${displayStatusColor}` : "none",

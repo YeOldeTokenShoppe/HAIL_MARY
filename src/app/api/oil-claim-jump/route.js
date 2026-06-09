@@ -23,6 +23,16 @@ export async function POST(req) {
     }
 
     const db = getAdminDb();
+
+    // Claim-jump stays enabled during active play (engagement). It carries an
+    // insider-tipping risk (operator could steer a jump onto a known-rich cell
+    // post-anchor), so every jump is written to the PUBLIC oilClaimLog with the
+    // phase + whether the map was already knowable (`anchored`). Post-game, with
+    // the revealed map, anyone can audit jumps onto deposits. The tipping surface
+    // is also bounded by a right-sized (small) grid. See docs/oil-game.md →
+    // "Insider-tipping defense".
+    const settings = (await db.collection("oilGame").doc("settings").get()).data() || {};
+
     const drillRef = db.collection("oilDrills").doc(userId);
     const targetKey = `${newCol}_${newRow}`;
     const targetRef = db.collection("oilPlots").doc(targetKey);
@@ -79,8 +89,24 @@ export async function POST(req) {
         plotCol: newCol, plotRow: newRow,
       }, { merge: true });
 
-      return { oldKey, newCol, newRow, claimJumpsUsed: jumpsUsed + 1, bonusDrills: newBonus };
+      return { oldKey, newCol, newRow, claimJumpsUsed: jumpsUsed + 1, bonusDrills: newBonus, username: drill.username || null };
     });
+
+    // Public audit log (best-effort, server-only write). `anchored` flags jumps
+    // made while the map was already knowable — the auditable, potentially-suspect
+    // kind. Failure here must not roll back the jump.
+    try {
+      const [fromCol, fromRow] = result.oldKey.split("_").map(Number);
+      await db.collection("oilClaimLog").add({
+        type: "jump", userId, username: result.username,
+        fromCol, fromRow, col: newCol, row: newRow,
+        phase: settings.gamePhase || null,
+        anchored: !!settings.anchorBlockHash,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      console.error("[oil-claim-jump] audit log failed:", e.message);
+    }
 
     // Carry pump customization to the new cell (best-effort, outside the txn).
     try {

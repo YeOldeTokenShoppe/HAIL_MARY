@@ -65,8 +65,44 @@ async function handle(req) {
     gushersCleared++; n++; await flush(false);
   }
 
+  // Clear the FIELD ACTIVITY timeline — it's season-scoped (resets with the board).
+  const timelineSnap = await db.collection("oilTimeline").get();
+  for (const d of timelineSnap.docs) {
+    batch.delete(d.ref);
+    n++; await flush(false);
+  }
+
   await flush(true);
-  return NextResponse.json({ ok: true, plotsCleared, rigsCleared, gushersCleared });
+
+  // Zero the community holding tank — it's incremented by banking/demon flows and
+  // is otherwise never reset, so without this it stays "full" across board resets
+  // (the big oil tower fills as communityOil / OIL_FIELD_UNITS and clamps at 100%).
+  const communityRef = db.collection("oilGame").doc("communityStorage");
+  const communitySnap = await communityRef.get();
+  const communityOilBefore = communitySnap.exists ? (communitySnap.data().totalOil || 0) : 0;
+  if (communityOilBefore !== 0) {
+    await communityRef.set(
+      { totalOil: 0, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  }
+
+  // A wiped board is never "ended" — drop the game back to a clean, playable
+  // phase so gamePhase/gameEnded can't be left contradicting the fresh board
+  // (e.g. ACTIVE highlighted while the GAME ENDED banner lingers). Also clear any
+  // leftover reveal fields: a stale seedReveal on an active board would make the
+  // verifier (and the client) expose the live map — a fairness leak.
+  await db.collection("oilGame").doc("settings").set(
+    {
+      gamePhase: "active", gameEnded: false,
+      seedReveal: FieldValue.delete(),
+      finalSeedReveal: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return NextResponse.json({ ok: true, plotsCleared, rigsCleared, gushersCleared, communityOilCleared: communityOilBefore, phaseReset: "active" });
 }
 
 export async function POST(req) { return handle(req); }

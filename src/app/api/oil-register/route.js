@@ -48,6 +48,14 @@ export async function POST(req) {
     const usdValue = balanceNum * price.rl80PriceUsd;
     const qualified = usdValue >= QUALIFICATION_THRESHOLD_USD;
 
+    // Count floor = the $20-equivalent token COUNT at registration price. Entry is
+    // value-gated (real $20 commitment), but ongoing snapshots check this fixed
+    // COUNT — so a holder is never disqualified by a price drop, only by selling
+    // below their entry position. Captured once, here, at the registration price.
+    const qualifyTokenFloor = price.rl80PriceUsd > 0
+      ? QUALIFICATION_THRESHOLD_USD / price.rl80PriceUsd
+      : null;
+
     // Deterministic referral code = first 8 hex chars of the wallet. Same
     // derivation as /api/oil-claim and the OilQualify page. Stored on the
     // player doc so the referral link is shareable from registration onward.
@@ -67,6 +75,8 @@ export async function POST(req) {
       lastSnapshotBalance: balanceNum.toString(),
       lastSnapshotUsdValue: Math.round(usdValue * 100) / 100,
       lastSnapshotAt: FieldValue.serverTimestamp(),
+      // Lock the count floor at entry (only when they actually qualified).
+      ...(qualified && qualifyTokenFloor != null ? { qualifyTokenFloor } : {}),
     }, { merge: true });
 
     // Create the code→userId mapping so referrals credit even if the referrer

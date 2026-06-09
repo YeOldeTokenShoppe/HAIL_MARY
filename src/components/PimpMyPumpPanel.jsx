@@ -46,13 +46,16 @@ async function resizeSignImage(file, maxDim = 1024, quality = 0.92) {
 }
 
 // Small price tag rendered on locked items in place of the old lock icon.
+// Dark pill (not the old faint-gold) so the price stays legible once the item is
+// selected — selected buttons switch to the gold activeBg (#d4a854), which used to
+// swallow the gold-on-gold chip whole.
 const priceChipStyle = {
   marginLeft: 5,
   padding: "0 5px",
   borderRadius: 2,
-  background: "rgba(212, 168, 84, 0.18)",
+  background: "rgba(20, 16, 8, 0.78)",
   border: "1px solid #d4a854",
-  color: "#e0b84e",
+  color: "#f0c862",
   fontWeight: 700,
   whiteSpace: "nowrap",
 };

@@ -65,6 +65,38 @@ Keep the **extra-depth referral reward** unchanged — under fixed-rate it's a c
 
 > **Superseded share model (pre-2026-06-07):** the pot used to split *pari-mutuel* — `payout = (your oil ÷ total oil found) × pot` — so the entire pot always paid out regardless of turnout. Abandoned because it (a) paid the full pot even to a handful of players who barely dug, and (b) was zero-sum, so every referral diluted everyone's slice (which forced a "pot must scale with participation" workaround and sponsor-additive funding just to keep referrals positive-sum). The fixed-rate model fixes both directly.
 
+### Provable fairness & insider-tipping defense (BUILT 2026-06-08)
+
+Provable fairness uses a **future-block commit-reveal** (`lib/oilFairness.js`, `/api/oil-fairness` commit/anchor/reveal, public `/api/oil-verify`): commit `SHA-256(secret)` + a *future* Base block number, derive `finalSeed = SHA-256(secret : blockHash)` once that block mines, reveal the secret at game end. This defends against **seed-grinding** — the operator can't search for a self-favoring map, because the map is undetermined (even to the operator) until the unpredictable block is mined.
+
+**It does NOT, by itself, stop insider-tipping.** Once the anchor block is mined the seed is fixed and the operator *holds the secret*, so they can compute the entire map. If players could still pick or move plots after that, the operator could tip insiders toward the rich cells. Hiding the admin distribution view is theater — whoever holds the secret can always derive the map post-anchor.
+
+**Decision (2026-06-08) — split by action: first-plot claims locked pre-anchor; claim-jumps stay live + audited.** The only real defense against tipping is *timing* (lock choices before the map is knowable), but a blanket lock kills engagement (claim-jump is a core live-game loop). So the two actions are treated differently:
+
+```
+registration (ticket_sale)  → first-plot claims open; only the commitment is
+                              public; anchor block still in the future → the map
+                              is unknown to EVERYONE, operator included
+   ↓ anchor block mines (at the registration → active transition) → seed fixed
+active                      → drilling reveals the pre-set map; NO new first-plot
+                              claims, but CLAIM-JUMPS stay enabled (logged/audited)
+   ↓ game ends → reveal → anyone verifies via /api/oil-verify + audits oilClaimLog
+```
+
+**Enforcement (server-authoritative):**
+- **First-plot claims (`oil-claim`)** — real-player requests rejected unless `gamePhase === "ticket_sale" && !anchorBlockHash` (registration *and* pre-anchor). Gating on `!anchorBlockHash` (not just phase) is the precise crypto boundary — even an early/mistaken anchor during registration closes claims. **Operational rule:** run the `oil-fairness` **anchor** step only at the registration→active transition, so `active ⟺ map determined`.
+- **Claim-jumps (`oil-claim-jump`)** — **stay enabled during active play** (engagement, 2026-06-08 reversal of the original blanket Option A). This is *not* provably tip-proof — the operator could steer a jump onto a known-rich cell post-anchor — so it's an **operator-trust + auditable** posture, not a cryptographic guarantee. Two things bound the risk: (1) every claim/jump is written to the **public `oilClaimLog`** with `phase` + `anchored`, so post-game (with the revealed map) anyone can spot suspicious jumps onto deposits; (2) a **right-sized small grid** keeps the unclaimed-rich-cell tipping surface small (see *Grid sizing* below). Don't market claims as fully provably-fair — provably-fair covers the **map**; claim placement is trust-plus-audit.
+
+- **Tester exemption:** `isTester` accounts may still claim while `testingEnabled === true` (including the active phase) so the live loop can be exercised. Testing must be **off** for any live game (safe-by-default `testingEnabled`), so this never weakens real-game fairness. See the tester access-code flow (`/api/oil-tester-code`, `/api/oil-redeem-code`).
+
+**Grid sizing (2026-06-08):** size the grid to roughly **2–4× expected signups**, starting small (e.g. 6×6 for a first season) and growing as the base does. Small grids early are better on all the axes that matter then: players actually hit oil (good first-impression UX), and the claim-jump tipping surface shrinks because cells fill up (few unclaimed rich targets). A large sparse grid (10×10 for a handful of players) is both a ghost town *and* a tipping playground. The "higher hit-rate pays out more of the pot" downside of a small grid is controllable via deposit count / depth cap / rate, and early payouts are cheap traction.
+
+**Grid is a PRE-PICK capacity dial — freeze it on the first claim.** Size the grid upfront (from a demand estimate / early interest count) *before plot-picking opens*. Growing is only truly transparent while the board is **empty**: a plot is a `(col,row)` coordinate, so growing adds cells without changing coordinates or (blind, pre-anchor) expected value — BUT it shifts every existing pick's **relative position** (a deliberately-chosen corner becomes an interior cell; the new corner opens up behind them) and resamples the whole distribution under their pick. Players form attachments to position, so that reads as a bait-and-switch. Therefore: **once ≥1 plot is claimed, the grid is frozen** (no grow, no shrink); never shrink below a claimed coordinate; and never resize after the `ticket_sale → active` anchor (it would move oil out from under active rigs). Overflow beyond the frozen capacity → waitlist → next season (opened on a bigger grid, chosen upfront again).
+
+**Overflow → waitlist → next rolling season (BUILT 2026-06-08).** Grid-growing covers demand up to your max grid during registration. Beyond that — or demand arriving *after* anchor (mid-season), when first-plot claims are closed — players join a **next-season waitlist** (`/api/oil-waitlist`: sets `waitlisted:true` + `waitlistedAt` on their `oilQualified` doc; returns position + total). A qualified-but-unplaced player sees a "JOIN NEXT-SEASON WAITLIST → you're #N of M" affordance in the no-claim panel; the admin status banner shows the waitlist count (a sponsor demand metric). **Prefer this over a second parallel pot:** under fixed-rate, adding players is positive-sum (no dilution, liability still capped at the escrowed pot), so the right scaling move is a *bigger pot (sponsors)* + staggered registration for the next rolling season — not splitting the crowd/pot/ops across two simultaneous games. True parallel pots are a sponsor-funded scale feature, not a bootstrap one.
+- **Reveal is gated on game-end (2026-06-08):** `/api/oil-verify` and the client only treat the seed as revealed when `gameEnded === true || gamePhase === "ended"` — a stale `seedReveal` on an active board can no longer leak the live map. `oil-admin-reset` also clears `seedReveal`/`finalSeedReveal`.
+- **Residual trust note:** the operator still custodies the secret. To remove even that, derive the secret from an external/multi-party source (future work). For bootstrap seasons, pre-anchor claim-locking + on-end reveal is the accepted bar.
+
 ### Funding — sponsorship + dev revenue (separate buckets)
 
 | Bucket | Source | Notes |
@@ -202,17 +234,19 @@ Default is `"active"` for backward compatibility.
 - Admin/test mode keeps a manual DRILL path; real players see the auto-pump indicator.
 
 ### Claim Jumping (`oil-claim-jump`)
+- **Enabled during active play (2026-06-08)** — kept live for engagement, unlike first-plot claims which are registration-locked. Carries an insider-tipping risk that's mitigated by the public `oilClaimLog` (every jump records `phase` + `anchored` for post-game audit) and a right-sized small grid. See *Provable fairness & insider-tipping defense*.
 - Players can move to a different unclaimed plot
 - **First 2 jumps are free**
 - **3rd jump onwards costs 1 bonus drill** (`bonusDrills − 1`) — it eats into your earned depth cap,
   so frequent jumping trades depth for mobility (and you need a bonus drill available to jump at all)
 - Old plot is released (becomes unclaimed, but retains its drill depth)
 
-### Disqualification
-- Admin runs snapshots to verify RL80 token balances on-chain
-- Players who drop below $20 USD threshold are disqualified
-- Disqualified players' plots are released but marked as disqualified (drill depth preserved)
-- Released plots are available for others to claim jump to
+### Disqualification (count-based, 2026-06-08)
+- Admin runs snapshots to verify RL80 token balances on-chain.
+- **Qualification is count-based, not value-based.** *Entry* is value-gated (`oil-register` requires ≥ $20 worth) and locks a **count floor** `qualifyTokenFloor = $20 ÷ price_at_registration` on the player's `oilQualified` doc. *Ongoing* snapshots (`oil-qualify` POST) then check `balance ≥ qualifyTokenFloor` — **price-independent**. So a holder is disqualified only by **selling below their entry position**, never by a price drop they didn't cause. (Legacy docs with no stored floor get one backfilled once at the current price, fixed thereafter. The pre-registration live check `oil-qualify` GET stays value-based — it's the entry gate.)
+- **Why:** removes volatility false-disqualifications, and makes the diamond-hands streak (which keys off continuous qualification) reset only on a real sell, not a price dip — fixing both fairness issues in one rule.
+- Disqualified players' plots are released but marked as disqualified (drill depth preserved).
+- Released plots are available for others to claim jump to.
 
 ## Data Model
 
@@ -331,11 +365,16 @@ Collapsible panel in the right sidebar (`src/components/CoreSamplePanel.jsx`) wi
 - Best find marked with pulsing orange dot
 - Updates each time the player drills — even dry layers fill in a new band
 
-### FIELD SURVEY (Composite Core)
-- Single core tube averaging oil density across all 100 plots at each depth level
-- "RUN CORE ANALYSIS" button triggers a 2.8-second top-to-bottom reveal animation
-- Shows the depth bias visually (deeper = richer) without revealing location-specific data
-- Callout labels auto-generated for significant zones, pulsing PEAK DENSITY marker
+### FIELD PROFILE strip (Core Sample) — redesigned 2026-06-09
+- The Core Sample is now a **horizontal drill band** (surface-left → deep-right) with the
+  live auger; beneath it a thin **field-profile strip** shows the richest revealed strata
+  per depth across the whole field, on the *same axis* ("your drill is here ▸ … the field's
+  rich zone is there ▸"), with a caret on the richest depth.
+- Reads from **revealed data only** (`revealedGrid3D` for players), so it's an *emerging*
+  clue that fills in as the field gets drilled — not a seed leak. Admin/report see the full
+  field. **No reveal gate** (the old vertical composite + "RUN CORE ANALYSIS" reveal was
+  removed). With the depth-cap mechanic it surfaces "the vein is deeper than your reach —
+  earn more depth" without exposing *which* plots hold oil.
 
 ## Drill HUD (Instrument Gauges)
 
@@ -416,16 +455,47 @@ At a low total, scaling+rounding wiped out each deposit blob's edges and collaps
 distribution to its cores (one composite band, "0.0k" cells) — that collapse happened
 at the **~$500 prize scale**, so 500K still has ample resolution. Every
 `generateOilDistribution3D` caller now passes `OIL_FIELD_UNITS` (client
-`useClaimStats`/`OilVoxelGrid`, server strike-tick/backfill, verify) **and**
-`depthBias: 0.35` so client and server produce the *same* field. Oil is a **score in
+`useClaimStats`/`OilVoxelGrid`, server strike-tick/backfill, verify) so client and
+server produce the *same* field. (Callers still pass `depthBias: 0.35`, but it's
+**vestigial** now — depth comes from stratification; see *Depth distribution* below.) Oil is a **score in
 field units** converted to dollars at the fixed rate `pot ÷ OIL_FIELD_UNITS` (see
 *Prize pool — oil has a fixed value*). Player oil readouts (cells, tank, EXTRACTED,
 leaderboard) read in OIL units; `TANK_CAPACITY` is rescaled with the field (500K → 2,500).
 
 **Economy pass (done 2026-06-04):** all player + inspector oil readouts now read
-in OIL units (only PRIZE POOL + demon bounties stay USDC); `depthBias` is the single
-`OIL_DEPTH_BIAS` constant in `oilDistribution.js` — every live caller uses the
-default (the dead `OilHeatmap2D` still has a literal but isn't imported).
+in OIL units (only PRIZE POOL + demon bounties stay USDC). `depthBias` / `OIL_DEPTH_BIAS`
+is now **vestigial** (see *Depth distribution* below) — still exported and accepted for
+signature/verifier compat, but no longer governs placement.
+
+### Depth distribution — stratified ramp, not a depth-bias wall (2026-06-09)
+
+The old model rolled every deposit's depth through a single `OIL_DEPTH_BIAS = 0.35`
+power curve, which clustered all `numberOfDeposits` blobs **deep** (median ~12). With the
+base cap `PASSIVE_DRILLS = 10`, a seed could leave *every* deposit below base reach →
+low-depth rigs had a **structural zero** chance (bait-and-switch). The live field-profile
+strip in the Core Sample made this visible.
+
+Now deposits are **stratified across the column**: the usable depth range (~1 → ~`depthZ`−1.5)
+is split into `numberOfDeposits` equal bands, with one deposit placed at a random depth
+*within* each band. So every season is **guaranteed** reachable shallow oil (≤ the base
+cap) **and** deep oil — a ramp, not a wall.
+
+**Richness rises with depth in EXPECTATION, not as a cap.** A uniform roll is raised to a
+depth-driven exponent (`richExp = 2.4 − depthFrac·2.0`, i.e. ~2.4 shallow → ~0.4 deep), so:
+- a **shallow** deposit usually reads modest but **can still spike rich** (~1-in-7 odds of
+  landing in the top richness band);
+- a **deep** deposit is usually rich (~60%) but can occasionally be modest.
+
+So "deeper = richer" stays true on average while a low-depth rig keeps a real (if rarer)
+shot at a rich pocket.
+
+**Fairness is unchanged.** The band structure + richness curve are **public parameters**
+(exactly as `depthBias` was); the secret, unpredictable part is still *which (cx,cy) cells*
+hold oil. Hell pockets use a separate RNG stream (`blockHash + "_hell"`) and are untouched.
+The **total oil budget is unchanged** — this only *redistributes where* oil sits (and makes
+it reachable), it does not change the pot. Lock it before the first committed seed:
+`generateOilDistribution3D` is shared by the strike-tick, the public verifier, and the
+preview, so any change here remaps every seed.
 
 **Done (2026-06-04):** `oilPlots`/`oilDrills`/`oilQualified` are locked to server-only writes
 (all writers go through admin-SDK endpoints). The verify UI is reconciled to the new model:

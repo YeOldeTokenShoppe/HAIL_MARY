@@ -109,8 +109,9 @@ function formatPrice(p) {
   if (p >= 1) return p.toFixed(3);
   if (p >= 0.001) return p.toFixed(4);
   if (p <= 0) return p.toFixed(3);
-  // round to 3 significant digits — Math.round handles carry (e.g. 0.0₇999 → 0.0₆100)
-  const SIG = 3;
+  // round to 4 significant digits — enough resolution that sub-percent ETH
+  // moves flip a visible digit. Math.round handles carry (e.g. 0.0₇9999 → 0.0₆1000)
+  const SIG = 4;
   const exp = Math.floor(Math.log10(p));
   const factor = Math.pow(10, SIG - 1 - exp);
   const rounded = Math.round(p * factor) / factor;
@@ -124,9 +125,11 @@ function formatPrice(p) {
 function formatMoney(n) {
   if (n == null || !Number.isFinite(n)) return "—";
   const a = Math.abs(n);
-  if (a >= 1e9) return `$${(a / 1e9).toFixed(2)}B`;
-  if (a >= 1e6) return `$${(a / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `$${(a / 1e3).toFixed(1)}K`;
+  // Extra decimals so a 1–2% ETH move (which revalues FDV via the RL80/ETH
+  // ratio) actually shifts a displayed digit instead of rounding away.
+  if (a >= 1e9) return `$${(a / 1e9).toFixed(3)}B`;
+  if (a >= 1e6) return `$${(a / 1e6).toFixed(3)}M`;
+  if (a >= 1e3) return `$${(a / 1e3).toFixed(2)}K`;
   return `$${a.toFixed(0)}`;
 }
 
@@ -949,24 +952,34 @@ export default function ChartWidget({
 
       ctx.textAlign = "left";
       const { glyphs, totalWidth } = measurePriceGlyphs(ctx, mainStr);
-      const mainX = (W - totalWidth) / 2;
       const mainY = H * 0.58;
 
-      // price text with lead outline
+      // Shrink-to-fit: long values (e.g. the 4-sig-fig price 0.0₇3856) would
+      // crowd the glass, so scale down when wider than the target. Short views
+      // (market cap) stay at full size. Drawn around a centered origin so the
+      // scale keeps the text optically centered.
+      const PRICE_MAX_W = IW * 0.82;
+      const fit = totalWidth > PRICE_MAX_W ? PRICE_MAX_W / totalWidth : 1;
+
+      ctx.save();
+      ctx.translate(W * 0.5, mainY);
+      ctx.scale(fit, fit);
+
+      // price text with lead outline — fill all glyphs, then stroke on top
       ctx.fillStyle = AMBER;
       for (const g of glyphs) {
         ctx.font = g.style.font;
-        ctx.fillText(g.ch, mainX + g.offset, mainY);
+        ctx.fillText(g.ch, -totalWidth / 2 + g.offset, 0);
       }
-      ctx.textAlign = "left";
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.strokeStyle = LEAD;
       for (const g of glyphs) {
         ctx.font = g.style.font;
         ctx.lineWidth = g.style.strokeW;
-        ctx.strokeText(g.ch, mainX + g.offset, mainY);
+        ctx.strokeText(g.ch, -totalWidth / 2 + g.offset, 0);
       }
+      ctx.restore();
 
       // eyebrow — centered, sits just below the apex where the arch is wide enough
       ctx.textAlign = "center";

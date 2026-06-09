@@ -945,7 +945,7 @@ const EMPTY_CLAIM_STATS = {
 // `enabled` gates the seed computation. Normal players run with enabled=false so
 // the client NEVER computes the field from the seed (the exploit fix); they
 // render from server-revealed data instead. Only admin / report / test compute.
-function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY, enabled = true) {
+function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY, enabled = true, numberOfHellPockets = null) {
   return useMemo(() => {
     if (!enabled) return EMPTY_CLAIM_STATS;
     const { grid, deposits, maxOil, hellPockets } = generateOilDistribution3D({
@@ -955,6 +955,7 @@ function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY
       depthZ: DEPTH_Z,
       totalOilBudget: OIL_FIELD_UNITS, // field resolution, decoupled from the $ prize
       numberOfDeposits,
+      numberOfHellPockets,
     });
 
     const claimTotals = [];
@@ -982,7 +983,7 @@ function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY
     }
 
     return { grid3D: grid, claimTotals, sorted, deposits, maxOil, totalOil, dryClaims, maxClaimTotal, hellPockets, hellMap };
-  }, [blockHash, numberOfDeposits, totalOilBudget, gridX, gridY, enabled]);
+  }, [blockHash, numberOfDeposits, totalOilBudget, gridX, gridY, enabled, numberOfHellPockets]);
 }
 
 // Animated number counter
@@ -1244,7 +1245,9 @@ export default function OilPage() {
   // Game state
   const [gamePhase, setGamePhase] = useState("ticket_sale");
   const [gameEnded, setGameEnded] = useState(false);
-  const [gameDay, setGameDay] = useState(1);
+  const [testingEnabled, setTestingEnabled] = useState(false);
+  // gameDay is derived from the season clock (see the useMemo below), not stored
+  // or admin-set — it's a truthful "DAY N" display, can't desync.
   const [gameStartDate, setGameStartDate] = useState(null);
   const [seasonLengthDays, setSeasonLengthDays] = useState(10);
 
@@ -1280,13 +1283,6 @@ export default function OilPage() {
     }
   }, [adminPassword]);
 
-  // Redirect report mode to active if game hasn't ended
-  useEffect(() => {
-    if (isReport && !gameEnded) {
-      window.location.replace("/hailmary");
-    }
-  }, [isReport, gameEnded]);
-
   const [revealProgress, setRevealProgress] = useState(0);
   const [animateReveal, setAnimateReveal] = useState(false);
   const [blockHash, setBlockHash] = useState(DEFAULT_BLOCK_HASH);
@@ -1300,10 +1296,18 @@ export default function OilPage() {
   const [mounted, setMounted] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
   const [numberOfDeposits, setNumberOfDeposits] = useState(5);
+  const [numberOfHellPockets, setNumberOfHellPockets] = useState(null); // null ⇒ auto (~3% of grid)
   const [totalOilBudget, setTotalOilBudget] = useState(500);
   const [gridSize, setGridSize] = useState(10);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [showMainTankInfo, setShowMainTankInfo] = useState(false);
+  // Tester access code: redeem box (players) + admin set-code input.
+  const [testerCode, setTesterCode] = useState("");
+  const [testerMsg, setTesterMsg] = useState(null);
+  const [adminTesterCode, setAdminTesterCode] = useState("");
+  // Next-season waitlist (overflow demand: grid full / registration closed).
+  const [waitlistInfo, setWaitlistInfo] = useState(null); // { waitlisted, position, total }
+  const [waitlistCount, setWaitlistCount] = useState(0);   // admin sponsor metric
 
   // ── Firestore game settings sync ──
   // Subscribe to oilGame/settings — all modes get live updates
@@ -1315,25 +1319,41 @@ export default function OilPage() {
         // The raw seed is never in the public doc during play — only its
         // commitment, plus the post-game reveal (which is safe to compute from).
         if (d.seedCommitment) setSeedCommitment(d.seedCommitment);
-        if (d.seedReveal) setBlockHash(d.seedReveal);
+        // The revealed seed is only safe to expose to clients AFTER the game has
+        // actually ended — otherwise a stale/leftover seedReveal (e.g. from a
+        // prior test cycle) would hand every player the live map. Gate on
+        // gameEnded/phase, not merely the field's presence.
+        const endedNow = d.gameEnded === true || d.gamePhase === "ended";
+        if (endedNow && d.seedReveal) setBlockHash(d.seedReveal);
         // Legacy/pre-migration games may still carry a public blockHash. Gate
         // adoption on the PASSWORD-VERIFIED admin flag (not the URL `mode`,
         // which any visitor can set to admin/report/test) so a stray legacy
         // seed can never be computed client-side by a non-admin.
         else if (d.blockHash && adminAuthed) setBlockHash(d.blockHash);
         if (d.numberOfDeposits) setNumberOfDeposits(d.numberOfDeposits);
+        if (typeof d.numberOfHellPockets === "number") setNumberOfHellPockets(d.numberOfHellPockets);
         if (d.totalOilBudget) setTotalOilBudget(d.totalOilBudget);
         if (typeof d.gameEnded === "boolean") setGameEnded(d.gameEnded);
-        if (typeof d.gameDay === "number") setGameDay(d.gameDay);
         if (typeof d.gridSize === "number") setGridSize(d.gridSize);
         if (d.gamePhase) setGamePhase(d.gamePhase);
         if (d.gameStartDate) setGameStartDate(d.gameStartDate);
         if (typeof d.seasonLengthDays === "number" && d.seasonLengthDays > 0) setSeasonLengthDays(d.seasonLengthDays);
+        if (typeof d.testingEnabled === "boolean") setTestingEnabled(d.testingEnabled);
       }
       setSettingsLoaded(true);
     });
     return () => unsub();
   }, []);
+
+  // Redirect report mode to active if game hasn't ended. Wait for settings to
+  // load first — gameEnded defaults to false on mount, so without the
+  // settingsLoaded gate this fires before Firestore arrives and bounces every
+  // report view back to /hailmary (looked like the link just refreshing).
+  useEffect(() => {
+    if (isReport && settingsLoaded && !gameEnded) {
+      window.location.replace("/hailmary");
+    }
+  }, [isReport, settingsLoaded, gameEnded]);
 
   // Admin: pull the raw seed from the server (password-gated) so the inspector
   // can compute the full field during a live game. Players have no such path —
@@ -1393,6 +1413,36 @@ export default function OilPage() {
         }
         return next;
       });
+    });
+    return () => unsub();
+  }, []);
+
+  // Set of tester userIds (code-qualified, no wallet) — used to badge them on
+  // the leaderboard and to hide them while testers are disabled.
+  const [testerIds, setTesterIds] = useState(() => new Set());
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(collection(db, "oilQualified"), (snap) => {
+      const ids = new Set();
+      let waiting = 0;
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data.isTester === true) ids.add(d.id);
+        if (data.waitlisted === true) waiting++;
+      });
+      setTesterIds(ids);
+      setWaitlistCount(waiting);
+    });
+    return () => unsub();
+  }, []);
+
+  // FIELD ACTIVITY feed — live who/what/when timeline (latest 30, newest first).
+  const [timelineEvents, setTimelineEvents] = useState([]);
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, "oilTimeline"), orderBy("createdAt", "desc"), limit(30));
+    const unsub = onSnapshot(q, (snap) => {
+      setTimelineEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   }, []);
@@ -1595,8 +1645,8 @@ export default function OilPage() {
   // Direct client writes to oilGame/* are blocked by Firestore rules — prize
   // money is on the line, so settings can only be mutated server-side.
   // Uses a ref for current values so the callback identity is stable.
-  const gameSettingsRef = useRef({ blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay, gameStartDate });
-  gameSettingsRef.current = { blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay, gameStartDate };
+  const gameSettingsRef = useRef({ blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameStartDate });
+  gameSettingsRef.current = { blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameStartDate };
   const saveGameSettings = useCallback(async (overrides = {}) => {
     if (!isAdmin || !adminAuthed || !adminPassword) return;
     try {
@@ -1784,6 +1834,16 @@ export default function OilPage() {
     return Math.min(Math.round(progress * PASSIVE_DRILLS), PASSIVE_DRILLS);
   }, [gameStartDate, seasonLengthDays, todayUTC]);
 
+  // Current season day, derived from the clock — "DAY N" of seasonLengthDays.
+  // Clamped to [1, seasonLengthDays] so it never reads e.g. "Day 15 / 10".
+  const gameDay = useMemo(() => {
+    if (!gameStartDate) return 1;
+    const start = new Date(gameStartDate + "T00:00:00Z").getTime();
+    const len = seasonLengthDays > 0 ? seasonLengthDays : 10;
+    const day = Math.floor((Date.now() - start) / 86400000) + 1;
+    return Math.min(Math.max(day, 1), len);
+  }, [gameStartDate, seasonLengthDays, todayUTC]);
+
   const bonusDrills = userDrill?.bonusDrills ?? 0;
   const playerDepth = Math.min(passiveDepth + bonusDrills, MAX_DEPTH);
 
@@ -1868,6 +1928,9 @@ export default function OilPage() {
     for (const ev of gusherEvents) {
       if (recordedEventsRef.current.has(ev.id)) continue;
       if (ev.col === selectedX && ev.row === sliceY) {
+        // Step 2 — a small "strike" (seep) isn't worth a CCTV clip; mark it seen
+        // so we don't reconsider it, and reserve recordings for gusher+.
+        if (ev.tier === "strike") { recordedEventsRef.current.add(ev.id); continue; }
         recordedEventsRef.current.add(ev.id);
         startRecording({ eventId: ev.id, eventType: "gusher", col: ev.col, row: ev.row });
         break;
@@ -2028,7 +2091,7 @@ export default function OilPage() {
   // players run disabled and render purely from server-revealed data, so the
   // seed never has to reach (or be computed on) their client.
   const seedVisible = (isAdmin || isReport || isTest) && !previewAsPlayer;
-  const stats = useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridSize, gridSize, seedVisible);
+  const stats = useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridSize, gridSize, seedVisible, numberOfHellPockets);
 
   // In active game mode, hide oil data from 2D views. `previewAsPlayer` lets an
   // admin force the reveal-only player view to test reveal-on-drill in place.
@@ -2380,6 +2443,7 @@ export default function OilPage() {
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
   const tankFill = useMemo(() => oilInTank / TANK_CAPACITY, [oilInTank]);
 
+
   // Is the owner's own rig currently erupting? A live gusher event keeps the rig
   // gushing + the alert light strobing until shut off. The gusherEvents listener
   // already filters to status === "active", so a userId match is enough. Drives an
@@ -2643,6 +2707,10 @@ export default function OilPage() {
     }
     if (!newest || capturedGusherRef.current === newest.id) return;
     capturedGusherRef.current = newest.id;
+    // Step 2 — reserve the celebratory auto-Polaroid for the dramatic tiers. A
+    // small "strike" (low seep) gets only the in-world seep + tank tick, no
+    // capture; gusher and motherlode are photo-worthy.
+    if (newest.tier === "strike") return;
     // Let the 3D eruption climb to a photogenic frame before grabbing it.
     const t = setTimeout(() => {
       fireEventCapture({
@@ -3135,6 +3203,39 @@ export default function OilPage() {
     }
   }, [user?.id, selectedX, sliceY, allPlotsMap, username, oilApiFetch, handleFlyTo]);
 
+  // Redeem a tester access code → server flips this user's oilQualified to
+  // qualified:true (no wallet / no $20 gate), so they can claim a rig like a
+  // normal player. The code is validated server-side against the locked oilSecret.
+  const handleRedeemCode = useCallback(async () => {
+    const code = testerCode.trim();
+    if (!code) return;
+    setTesterMsg("…");
+    try {
+      const res = await oilApiFetch("/api/oil-redeem-code", {
+        method: "POST",
+        body: JSON.stringify({ code, clerkName: username?.trim() || user?.firstName || "Tester" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setTesterMsg(data.error || "Invalid code"); return; }
+      setTesterMsg("✓ Qualified! Select an unclaimed plot, then CLAIM THIS PLOT.");
+      setTesterCode("");
+    } catch (err) {
+      setTesterMsg(err.message || "failed");
+    }
+  }, [testerCode, oilApiFetch, username, user?.firstName]);
+
+  // Join the next-season waitlist (overflow: grid full / registration closed).
+  const handleJoinWaitlist = useCallback(async () => {
+    try {
+      const res = await oilApiFetch("/api/oil-waitlist", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setWaitlistInfo({ error: data.error || "failed" }); return; }
+      setWaitlistInfo({ waitlisted: true, position: data.position, total: data.total });
+    } catch (err) {
+      setWaitlistInfo({ error: err.message || "failed" });
+    }
+  }, [oilApiFetch]);
+
   // ── Transfer Plot handler ──
   const handleTransferPlot = useCallback(async (recipientUsername, transferUpgrades) => {
     if (previewModeRef.current) return { error: "Preview mode — sign up to play" };
@@ -3360,7 +3461,7 @@ export default function OilPage() {
       <div style={styles.paramRow}>
         <span style={styles.paramLabel}>DEPOSITS</span>
         <div style={styles.paramButtons}>
-          {[1, 2, 3, 5, 8, 12, 16].map((n) => (
+          {[1, 2, 3, 4, 5, 8, 12, 16].map((n) => (
             <button
               key={n}
               onClick={() => { setNumberOfDeposits(n); handleReset(); saveGameSettings({ numberOfDeposits: n }); }}
@@ -3375,20 +3476,46 @@ export default function OilPage() {
         </div>
       </div>
       <div style={styles.paramRow}>
-        <span style={styles.paramLabel}>PRIZE POOL</span>
+        <span style={styles.paramLabel}>HELL POCKETS</span>
         <div style={styles.paramButtons}>
-          {[100, 250, 500, 1000].map((n) => (
+          {/* AUTO = derive ~3% of grid (just 1 on a 6×6); pick a number to override. */}
+          {[{ label: "AUTO", val: null }, { label: "1", val: 1 }, { label: "2", val: 2 }, { label: "3", val: 3 }, { label: "4", val: 4 }, { label: "5", val: 5 }, { label: "8", val: 8 }].map(({ label, val }) => (
             <button
-              key={n}
-              onClick={() => { setTotalOilBudget(n); handleReset(); saveGameSettings({ totalOilBudget: n }); }}
+              key={label}
+              onClick={() => { setNumberOfHellPockets(val); handleReset(); saveGameSettings({ numberOfHellPockets: val }); }}
               style={{
                 ...styles.paramBtn,
-                ...(totalOilBudget === n ? styles.paramBtnActive : {}),
+                ...(numberOfHellPockets === val ? styles.paramBtnActive : {}),
               }}
             >
-              {`${n / 1_000_000}M`}
+              {label}
             </button>
           ))}
+        </div>
+      </div>
+      <div style={styles.paramRow}>
+        <span style={styles.paramLabel}>PRIZE POOL</span>
+        {/* Open field — the prize pool is just the $ value of the field; it only
+            scales the fixed per-unit rate (pot / OIL_FIELD_UNITS), not the oil
+            distribution, so no board reset is needed when it changes. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="number"
+            min={0}
+            step={50}
+            value={totalOilBudget}
+            onChange={(e) => {
+              const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+              setTotalOilBudget(n);
+              saveGameSettings({ totalOilBudget: n });
+            }}
+            style={{
+              padding: "2px 6px", width: 80, background: theme.inputBg, border: `1px solid ${theme.border}`,
+              borderRadius: 2, color: theme.textStrong, fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10, outline: "none",
+            }}
+          />
+          <span style={{ fontSize: 9, color: theme.muted }}>USDC</span>
         </div>
       </div>
       <div style={styles.paramRow}>
@@ -3477,30 +3604,14 @@ export default function OilPage() {
       )}
       <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
         <span style={styles.paramLabel}>GAME DAY</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button
-            onClick={() => { const d = Math.max(1, gameDay - 1); setGameDay(d); saveGameSettings({ gameDay: d }); }}
-            style={{ ...styles.paramBtn, padding: "2px 8px" }}
-          >
-            &minus;
-          </button>
-          <span style={{
-            fontFamily: "'Orbitron', monospace",
-            fontSize: 13,
-            fontWeight: 700,
-            color: theme.accent,
-            minWidth: 30,
-            textAlign: "center",
-          }}>
-            {gameDay}
-          </span>
-          <button
-            onClick={() => { const d = gameDay + 1; setGameDay(d); saveGameSettings({ gameDay: d }); }}
-            style={{ ...styles.paramBtn, padding: "2px 8px" }}
-          >
-            +
-          </button>
-        </div>
+        {/* Read-only — derived from the season clock (gameStartDate + seasonLengthDays).
+            Adjust pacing via START DATE / SEASON LENGTH above, not here. */}
+        <span style={{
+          fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 700,
+          color: gameStartDate ? theme.accent : theme.muted, minWidth: 30, textAlign: "right",
+        }}>
+          {gameStartDate ? `${gameDay} / ${seasonLengthDays}` : "—"}
+        </span>
       </div>
     </div>
   );
@@ -3549,22 +3660,87 @@ export default function OilPage() {
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Claiming cell", async () => {
           if (selectedX === null) throw new Error("select a cell on the survey map first");
-          if (!user?.id) throw new Error("sign in first");
-          // Claim for YOUR account so a FORCE STRIKE fills the tank your meter
-          // reads (your own un-banked oil) — needed to test the tank/alarm.
-          const r = await fetch("/api/oil-admin-claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, userId: user.id, username: username?.trim() || user?.firstName || "ADMIN", col: selectedX, row: sliceY }) }).then(r => r.json());
+          // Claim for YOUR account when signed in (so a FORCE STRIKE fills the tank
+          // your meter reads); otherwise fall back to a synthetic "admin_test" rig so
+          // admin can test gushers/effects without signing in. Reset clears it like
+          // any other rig. The field-wide 3D gusher fires regardless of owner.
+          const claimUserId = user?.id || "admin_test";
+          const claimUsername = username?.trim() || user?.firstName || "ADMIN";
+          const r = await fetch("/api/oil-admin-claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, userId: claimUserId, username: claimUsername, col: selectedX, row: sliceY }) }).then(r => r.json());
           if (!r?.ok) throw new Error(r?.error || "failed");
-          return `✓ claimed (${selectedX + 1}, ${sliceY + 1}) for you — now FORCE STRIKE to drill it`;
+          return `✓ claimed (${selectedX + 1}, ${sliceY + 1}) ${user?.id ? "for you" : "as admin_test"} — now FORCE STRIKE to drill it`;
         })}>CLAIM SELECTED</button>
         <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Forcing strike", async () => {
-          const r = await fetch(`/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&force=1&deep=${toolDeep}`).then(r => r.json());
+          let url = `/api/oil-strike-tick?password=${encodeURIComponent(adminPassword)}&force=1&deep=${toolDeep}`;
+          let scope = " (all rigs)";
+          // If a cell is selected, drill JUST that rig (matches the intuitive
+          // "selected rig → strike it" model). Auto-claim it first if unowned;
+          // if already owned, leave it so repeat strikes drill deeper (claiming
+          // would reset depth to 0). No selection → global tick (all rigs).
+          if (selectedX !== null) {
+            const owned = allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId != null;
+            if (!owned) {
+              const claimUserId = user?.id || "admin_test";
+              const claimUsername = username?.trim() || user?.firstName || "ADMIN";
+              const c = await fetch("/api/oil-admin-claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, userId: claimUserId, username: claimUsername, col: selectedX, row: sliceY }) }).then(r => r.json());
+              if (!c?.ok) throw new Error(c?.error || "auto-claim failed");
+            }
+            url += `&col=${selectedX}&row=${sliceY}`;
+            scope = ` @(${selectedX + 1}, ${sliceY + 1})`;
+          }
+          const r = await fetch(url).then(r => r.json());
           if (!r?.ok) throw new Error(r?.error || "failed");
-          return `✓ struck ${r.struck} · skipped ${r.skipped}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}`;
+          // Break skipped down by reason (no_plot is the usual one right after a
+          // board reset). Targeted strikes auto-claim, so you shouldn't see it.
+          const reasons = r.skipReasons && Object.keys(r.skipReasons).length
+            ? ` (${Object.entries(r.skipReasons).map(([k, v]) => `${k}:${v}`).join(", ")})`
+            : "";
+          return `✓ struck ${r.struck}${scope} · skipped ${r.skipped}${reasons}${r.depleted ? ` · depleted ${r.depleted}` : ""}${r.demonsSummoned ? ` · demons ${r.demonsSummoned}` : ""}`;
         })}>FORCE STRIKE</button>
+        <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Banking tank", async () => {
+          // Bank the selected rig's un-banked tankOil into the community tank
+          // (mirrors the player BANK OIL flow; password-gated, targeted by cell).
+          if (selectedX === null) throw new Error("select the rig's cell first");
+          const r = await fetch("/api/oil-admin-bank", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, col: selectedX, row: sliceY }) }).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return r.delta > 0
+            ? `✓ banked ${r.delta.toLocaleString()} → community · rig total ${r.newTotal.toLocaleString()}`
+            : `nothing to bank (tank empty) @(${selectedX + 1}, ${sliceY + 1})`;
+        })}>BANK TANK</button>
         <span style={{ fontSize: 10, color: theme.muted }}>depth</span>
         {[1, 3, 5, 10, 11, 20].map((n) => (
           <button key={n} onClick={() => setToolDeep(n)} style={{ ...styles.paramBtn, ...(toolDeep === n ? styles.paramBtnActive : {}) }}>{n}</button>
         ))}
+      </div>
+      {/* Tester access code — set/clear the code testers redeem to qualify
+          without a wallet. Stored server-side in locked oilSecret. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+        <input
+          value={adminTesterCode}
+          onChange={(e) => setAdminTesterCode(e.target.value)}
+          placeholder="tester access code"
+          style={{ flex: "1 1 140px", minWidth: 0, padding: "6px 8px", fontSize: 12, fontFamily: "'Share Tech Mono', monospace", background: theme.panelBg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 3 }}
+        />
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Setting tester code", async () => {
+          const r = await fetch("/api/oil-tester-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, code: adminTesterCode.trim() }) }).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          return r.hasCode ? `✓ tester code set: "${r.code}" — share it with testers` : "✓ tester code cleared";
+        })}>SET CODE</button>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Loading tester code", async () => {
+          const r = await fetch(`/api/oil-tester-code?password=${encodeURIComponent(adminPassword)}`).then(r => r.json());
+          if (!r?.ok) throw new Error(r?.error || "failed");
+          setAdminTesterCode(r.code || "");
+          return r.hasCode ? `current code: "${r.code}"` : "no tester code set";
+        })}>SHOW</button>
+        <button disabled={toolBusy} style={{ ...styles.btn, ...(testingEnabled ? { borderColor: theme.gold, color: theme.gold } : {}) }} onClick={() => runTool("Toggling testing", async () => {
+          // Safe-by-default kill-switch for the tester code. While OFF (live play)
+          // the code is inert — nobody can redeem it and no tester can claim, even
+          // if the code leaks. Turn ON only while actively testing. Real $20-RL80
+          // players are never affected either way.
+          const next = !testingEnabled;
+          await saveGameSettings({ testingEnabled: next });
+          return next ? "✓ TESTING ON — tester code active" : "✓ TESTING OFF — code locked for live play";
+        })}>{testingEnabled ? "TESTING: ON" : "TESTING: OFF"}</button>
       </div>
       {toolStatus && (
         <div style={{ marginTop: 8, fontSize: 10, fontFamily: "'Share Tech Mono', monospace", color: theme.accent, wordBreak: "break-word", lineHeight: 1.4 }}>
@@ -3708,7 +3884,36 @@ export default function OilPage() {
           </>
         )}
       </div>
-      {seedReadout && (
+      {(isAdmin || isReport) && (() => {
+        // Single-line game status: claim-board occupancy and community-tank fill are
+        // independent stores (oilPlots ownership vs oilGame/communityStorage.totalOil),
+        // so surface both together — a full tank on a fresh board means the community
+        // tank wasn't zeroed (reset now clears it; legacy data may still read >100%).
+        const totalCells = gridSize * gridSize;
+        const claimed = Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length;
+        const tappedPct = OIL_FIELD_UNITS > 0 ? (communityOil / OIL_FIELD_UNITS) * 100 : 0;
+        const tankOverfull = tappedPct >= 100;
+        return (
+          <div style={{
+            marginTop: 6, padding: "5px 8px",
+            background: uiDark ? "rgba(180,160,130,0.06)" : "rgba(180,160,130,0.08)",
+            border: `1px solid ${tankOverfull ? theme.red : (uiDark ? "#444" : "#d4c8b4")}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+            fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.06em",
+            color: uiDark ? "#8a8070" : "#8b7d6b",
+          }}>
+            <span>PHASE <b style={{ color: theme.accent }}>{gameEnded ? "ended" : gamePhase}</b></span>
+            <span>CLAIMED <b style={{ color: theme.accent }}>{claimed}/{totalCells}</b></span>
+            {waitlistCount > 0 && <span>WAITLIST <b style={{ color: theme.gold }}>{waitlistCount}</b></span>}
+            <span>TANK <b style={{ color: tankOverfull ? theme.red : theme.green }}>{communityOil.toLocaleString()}/{OIL_FIELD_UNITS.toLocaleString()}</b> ({tappedPct.toFixed(1)}%){tankOverfull ? <span style={{ color: theme.red }}> ⚠ over capacity — run admin reset to clear</span> : ""}</span>
+          </div>
+        );
+      })()}
+      {/* Only the PLAYER commitment is shown here — for admin/report the raw
+          SEED HASH already lives in the top-left BLOCK HASH SEED bar, so showing
+          it again here would be redundant. Players have no top bar, so this is
+          their only provable-fairness commitment readout. */}
+      {seedReadout && !(showOilData || isReport) && (
         <div style={{
           marginTop: 6, padding: "5px 8px",
           background: uiDark ? "rgba(180,160,130,0.06)" : "rgba(180,160,130,0.08)",
@@ -3739,6 +3944,35 @@ export default function OilPage() {
   );
 
   const truncId = (id) => id.length > 10 ? `${id.slice(0, 5)}...${id.slice(-3)}` : id;
+
+  // Relative timestamp for the activity feed ("2m ago", "3h ago", "just now").
+  const relTime = (ts) => {
+    const ms = ts?.toMillis ? ts.toMillis() : (ts?.seconds ? ts.seconds * 1000 : null);
+    if (!ms) return "";
+    const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    if (s < 45) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+
+  // Event-type → icon, color, and phrasing for the FIELD ACTIVITY feed.
+  const TIMELINE_META = {
+    strike:  { icon: "⛏", color: theme.muted, fill: false, verb: "struck oil" },
+    gusher:  { icon: "💎", color: theme.gold, fill: false, verb: "hit a gusher!" },
+    motherlode: { icon: "🌋", color: theme.gold, fill: true, verb: "hit the MOTHERLODE!" },
+    hell:    { icon: "☠", color: theme.red, fill: false, verb: "breached a hell pocket" },
+    contain: { icon: "🛡", color: "#6bc7d1", fill: false, verb: "contained the demon" },
+    rogue:   { icon: "⚠", color: theme.warn, fill: false, verb: "spotted a rogue prospector" },
+    claim:   { icon: "⚑", color: theme.muted, fill: false, verb: "claimed a plot" },
+    system:  { icon: "◆", color: theme.accent, fill: true,  verb: "" },
+  };
+
+  const testerBadgeStyle = {
+    fontSize: 8, letterSpacing: "0.1em", fontFamily: "'Share Tech Mono', monospace",
+    color: theme.gold, border: `1px solid ${theme.gold}55`, borderRadius: 2,
+    padding: "0 3px", lineHeight: "12px", flexShrink: 0,
+  };
 
   const leaderboardBody = (
     <>
@@ -3806,6 +4040,7 @@ export default function OilPage() {
                 }}>
                   {d.username || truncId(d.id)}
                 </span>
+                {testerIds.has(d.id) && <span style={testerBadgeStyle}>TESTER</span>}
               </div>
               <span style={{
                 fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
@@ -3841,6 +4076,7 @@ export default function OilPage() {
                 }}>
                   {d.username || truncId(d.id)}
                 </span>
+                {testerIds.has(d.id) && <span style={testerBadgeStyle}>TESTER</span>}
               </div>
               <span style={{
                 fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
@@ -3948,6 +4184,57 @@ export default function OilPage() {
         </div>
       )}
     </>
+  );
+
+  // FIELD ACTIVITY — single-rail live timeline feed (who / what / when only).
+  const timelineSection = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3 style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>FIELD ACTIVITY</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 8, letterSpacing: "0.14em", color: theme.green }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: theme.green, boxShadow: `0 0 6px ${theme.green}`, animation: "tankPulse 1.6s ease-in-out infinite" }} />
+          LIVE
+        </span>
+      </h3>
+      {timelineEvents.length === 0 ? (
+        <div style={{ fontSize: 10, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", padding: "4px 0" }}>
+          No activity yet — the field is quiet.
+        </div>
+      ) : (
+        <div style={{ position: "relative", paddingLeft: 2, maxHeight: 280, overflowY: "auto" }}>
+          {/* vertical spine */}
+          <div style={{ position: "absolute", left: 7, top: 4, bottom: 4, width: 2, background: theme.border }} />
+          {timelineEvents.map((ev) => {
+            const meta = TIMELINE_META[ev.type] || TIMELINE_META.strike;
+            const who = ev.username || (ev.userId ? truncId(ev.userId) : null);
+            return (
+              <div key={ev.id} style={{ position: "relative", paddingLeft: 26, paddingBottom: 12 }}>
+                <span style={{
+                  position: "absolute", left: 1, top: 1, width: 15, height: 15, borderRadius: "50%",
+                  background: meta.fill ? meta.color : theme.panelBg,
+                  border: `2px solid ${meta.color}`,
+                  boxShadow: (ev.type === "hell" || ev.type === "gusher" || ev.type === "motherlode") ? `0 0 8px ${meta.color}99` : "none",
+                }} />
+                <div style={{ fontSize: 11, lineHeight: 1.4, color: theme.text, fontFamily: "'Share Tech Mono', monospace" }}>
+                  <span style={{ marginRight: 5, color: meta.color }}>{meta.icon}</span>
+                  {ev.type === "system" ? (
+                    <span style={{ color: theme.muted, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: 10 }}>{ev.detail || "season event"}</span>
+                  ) : (
+                    <>
+                      {who && <span style={{ color: theme.textStrong, fontWeight: 700 }}>{who}</span>} {meta.verb}
+                    </>
+                  )}
+                </div>
+                <div style={{ marginTop: 2, fontSize: 9, color: theme.muted, letterSpacing: "0.06em" }}>
+                  {relTime(ev.createdAt)}
+                  {ev.detail && ev.type !== "system" ? <span style={{ fontStyle: "italic" }}> — {ev.detail}</span> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 
   const fieldDispatchSection = (
@@ -4270,16 +4557,29 @@ export default function OilPage() {
         </>
       ) : (
         <div style={isMobile ? m.depositGrid : styles.depositList}>
-          {stats.deposits.map((d, i) => (
-            <div key={i} style={styles.depositRow}>
-              <span style={styles.depositIndex}>{String(i + 1).padStart(2, "0")}</span>
-              <span style={styles.depositCoord}>
-                ({d.cx.toFixed(1)}, {d.cy.toFixed(1)}, {d.cz.toFixed(1)})
-              </span>
-              <span style={styles.depositRadius}>r{d.radius.toFixed(1)}</span>
-              {!isRevealed && <span style={styles.depositHidden}>HIDDEN</span>}
-            </div>
-          ))}
+          {/* Blob centers are continuous (cx/cy in grid units, cz = depth layer).
+              Map each to its discrete CELL + depth so it lines up with the grid and
+              you can click to fly/select, then FORCE STRIKE it (drill to ~z to hit). */}
+          {stats.deposits.map((d, i) => {
+            const col = Math.max(0, Math.min(Math.round(d.cx), gridSize - 1));
+            const row = Math.max(0, Math.min(Math.round(d.cy), gridSize - 1));
+            const depth = Math.round(d.cz);
+            return (
+              <div
+                key={i}
+                onClick={() => handleSelectClaim({ x: col, y: row })}
+                title={`blob center (${d.cx.toFixed(1)}, ${d.cy.toFixed(1)}, ${d.cz.toFixed(1)}) · r${d.radius.toFixed(1)} — click to fly + select`}
+                style={{ ...styles.depositRow, cursor: "pointer" }}
+              >
+                <span style={styles.depositIndex}>{String(i + 1).padStart(2, "0")}</span>
+                <span style={styles.depositCoord}>
+                  cell ({col + 1},{row + 1}) · z{depth}
+                </span>
+                <span style={styles.depositRadius}>r{d.radius.toFixed(1)}</span>
+                {!isRevealed && <span style={styles.depositHidden}>HIDDEN</span>}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -4620,7 +4920,10 @@ export default function OilPage() {
       {["ticket_sale", "active", "ended"].map((p) => (
         <button
           key={p}
-          onClick={() => saveGameSettings({ gamePhase: p })}
+          // Phase selector is authoritative over gameEnded — keep the two settings
+          // fields in lockstep so you can't land on ACTIVE while the GAME ENDED
+          // banner lingers (only "ended" implies the game is over).
+          onClick={() => { const ended = p === "ended"; setGameEnded(ended); saveGameSettings({ gamePhase: p, gameEnded: ended }); }}
           style={{
             padding: "3px 8px",
             border: `1px solid ${gamePhase === p ? theme.gold : theme.border}`,
@@ -4644,7 +4947,7 @@ export default function OilPage() {
   // End Game button (admin only)
   const endGameButton = isAdmin && !gameEnded && (
     <button
-      onClick={() => { setGameEnded(true); saveGameSettings({ gameEnded: true }); }}
+      onClick={() => { setGameEnded(true); setGamePhase("ended"); saveGameSettings({ gameEnded: true, gamePhase: "ended" }); }}
       style={{
         padding: "10px 20px",
         background: `linear-gradient(180deg, ${theme.red}, #a03030)`,
@@ -4734,7 +5037,10 @@ export default function OilPage() {
       fontSize: 11,
       letterSpacing: "0.1em",
     }}>
-      GAME ENDED — <a href="/hailmary?mode=report" style={{ color: theme.accent, textDecoration: "underline" }}>VIEW REPORT</a>
+      GAME ENDED
+      {/* No VIEW REPORT link: this banner is admin-only, and for an admin
+          report mode shows strictly less than admin mode. Report mode itself
+          still works via /hailmary?mode=report for public/player sharing. */}
     </div>
   );
 
@@ -4998,6 +5304,62 @@ export default function OilPage() {
           ) : (
             <button disabled style={drillBtnStyles.disabled}>SELECT AN UNCLAIMED PLOT</button>
           )}
+          {/* Tester access code — non-crypto testers redeem a code to qualify
+              without the wallet/$20 gate, then claim a plot above. Harmless for
+              already-qualified players (they just claim and ignore this). */}
+          <div style={{ marginTop: 10, width: "100%", maxWidth: 260 }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.muted, marginBottom: 4 }}>HAVE A TESTER CODE?</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                value={testerCode}
+                onChange={(e) => setTesterCode(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleRedeemCode(); }}
+                placeholder="access code"
+                style={{
+                  flex: 1, minWidth: 0, padding: "6px 8px", fontSize: 12,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  background: theme.panelBg, color: theme.text,
+                  border: `1px solid ${theme.border}`, borderRadius: 3,
+                }}
+              />
+              <button onClick={handleRedeemCode} disabled={!testerCode.trim()} style={{
+                padding: "6px 12px", fontSize: 11, letterSpacing: "0.08em", cursor: testerCode.trim() ? "pointer" : "default",
+                fontFamily: "'Share Tech Mono', monospace",
+                background: testerCode.trim() ? `${theme.gold}22` : "transparent",
+                color: testerCode.trim() ? theme.gold : theme.muted,
+                border: `1px solid ${testerCode.trim() ? theme.gold : theme.border}`, borderRadius: 3,
+              }}>REDEEM</button>
+            </div>
+            {testerMsg && <div style={{ fontSize: 10, color: testerMsg.startsWith("✓") ? theme.green : theme.muted, marginTop: 4 }}>{testerMsg}</div>}
+          </div>
+          {/* Next-season waitlist — for overflow demand once claims are closed
+              (grid full / registration over). Qualified-but-unplaced users
+              reserve a spot for the next rolling season. */}
+          {user && gamePhase !== "ticket_sale" && (
+            <div style={{ marginTop: 10, width: "100%", maxWidth: 260, borderTop: `1px solid ${theme.border}`, paddingTop: 10 }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.muted, marginBottom: 6 }}>
+                CLAIMS ARE CLOSED FOR THIS SEASON
+              </div>
+              {waitlistInfo?.waitlisted ? (
+                <div style={{ fontSize: 10, color: theme.green, lineHeight: 1.5 }}>
+                  ✓ You&apos;re #{waitlistInfo.position} of {waitlistInfo.total} on the waitlist — you&apos;ll get first dibs next season.
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={handleJoinWaitlist}
+                    style={{
+                      width: "100%", padding: "7px 10px", fontSize: 11, letterSpacing: "0.08em", cursor: "pointer",
+                      fontFamily: "'Share Tech Mono', monospace", fontWeight: 700,
+                      background: `${theme.gold}22`, color: theme.gold,
+                      border: `1px solid ${theme.gold}`, borderRadius: 3,
+                    }}
+                  >JOIN NEXT-SEASON WAITLIST</button>
+                  {waitlistInfo?.error && <div style={{ fontSize: 10, color: theme.muted, marginTop: 4 }}>{waitlistInfo.error}</div>}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
       {drillStatus === "wrong-claim" && (
@@ -5048,24 +5410,8 @@ export default function OilPage() {
             ⛏ RIG PUMPING
           </button>
           <div style={drillBtnStyles.depth}>DEPTH {Math.min(cellDepth + 1, MAX_DEPTH)}/{MAX_DEPTH}</div>
-          {/* Depth progress bar — solid for layers already struck, plus a
-              pulsing segment for the layer the rig is actively drilling, so
-              a fresh rig reads as "drilling layer 1" rather than empty. */}
-          <div style={{ width: "100%", maxWidth: 220, height: 10, background: theme.barBg, borderRadius: 4, overflow: "hidden", border: `1px solid ${theme.border}`, position: "relative" }}>
-            <div style={{
-              width: `${(cellDepth / MAX_DEPTH) * 100}%`,
-              height: "100%",
-              background: `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
-              position: "absolute", left: 0, top: 0,
-            }} />
-            <div style={{
-              width: `${(1 / MAX_DEPTH) * 100}%`,
-              height: "100%",
-              background: "#7ab44a",
-              position: "absolute", left: `${(cellDepth / MAX_DEPTH) * 100}%`, top: 0,
-              animation: "pulse 1.2s ease-in-out infinite",
-            }} />
-          </div>
+          {/* Depth progress bar removed — the horizontal drill core (Core Sample)
+              now serves as the live depth/progress meter. */}
           {userDrill?.lastStrikeDepth != null ? (
             <div style={drillBtnStyles.hint}>
               Last strike: depth {userDrill.lastStrikeDepth}{userDrill.lastStrikeOil > 0 ? ` — struck ${userDrill.lastStrikeOil.toLocaleString()}` : " — dry layer"}
@@ -5602,6 +5948,7 @@ export default function OilPage() {
                   <OilVoxelGrid
                     blockHash={blockHash}
                     numberOfDeposits={numberOfDeposits}
+                    numberOfHellPockets={numberOfHellPockets}
                     totalOilBudget={totalOilBudget}
                     gridX={gridSize}
                     gridY={gridSize}
@@ -5875,15 +6222,9 @@ export default function OilPage() {
             Geode={GeodeMode}
             hellActive={hellActive}
             demonBlockade={demonBlockade}
+            drillingActive={drillStatus === "auto-pumping" || ((isAdmin || isReport || isTest) && effectiveDrillDay > 0 && effectiveDrillDay < DEPTH_Z)}
           />
-          {gusherShutoffPanel}
-          {playerDrillPanel}
-          {isAdmin && parametersPanel}
-          {isAdmin && testToolsPanel}
-          {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
-          {(isAdmin || isReport) && demoDrillPanel}
-          {(isAdmin || isReport) && inspectorPanel}
-          {statsPanel}
+          {/* Live drill core — moved up beside the gauges as the top "drill dashboard". */}
           <CoreSamplePanel
             grid3D={displayGrid3D}
             maxOil={displayMaxOil}
@@ -5898,6 +6239,14 @@ export default function OilPage() {
             drillDepth={effectiveDrillDay}
             hellPockets={displayHellPockets}
           />
+          {gusherShutoffPanel}
+          {playerDrillPanel}
+          {isAdmin && parametersPanel}
+          {isAdmin && testToolsPanel}
+          {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
+          {(isAdmin || isReport) && demoDrillPanel}
+          {(isAdmin || isReport) && inspectorPanel}
+          {statsPanel}
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && fieldIntelPanel}
@@ -5913,6 +6262,7 @@ export default function OilPage() {
           <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {leaderboardSection}
+          {timelineSection}
           {fieldDispatchSection}
           {isAdmin && pendingFeedPanel}
           {(isAdmin || isReport) && (
@@ -6159,6 +6509,7 @@ export default function OilPage() {
               <OilVoxelGrid
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
+                numberOfHellPockets={numberOfHellPockets}
                 totalOilBudget={totalOilBudget}
                 gridX={gridSize}
                 gridY={gridSize}
@@ -6394,14 +6745,9 @@ export default function OilPage() {
               parabolum={parabolum}
               Geode={GeodeMode}
               hellActive={hellActive}
+              drillingActive={drillStatus === "auto-pumping" || ((isAdmin || isReport || isTest) && effectiveDrillDay > 0 && effectiveDrillDay < DEPTH_Z)}
             />
-            {gusherShutoffPanel}
-            {playerDrillPanel}
-            {isAdmin && parametersPanel}
-          {isAdmin && testToolsPanel}
-            {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
-            {(isAdmin || isReport) && demoDrillPanel}
-            {statsPanel}
+            {/* Live drill core — moved up beside the gauges as the top "drill dashboard". */}
             <CoreSamplePanel
               grid3D={displayGrid3D}
               maxOil={displayMaxOil}
@@ -6415,6 +6761,13 @@ export default function OilPage() {
               drillDepth={effectiveDrillDay}
               hellPockets={displayHellPockets}
             />
+            {gusherShutoffPanel}
+            {playerDrillPanel}
+            {isAdmin && parametersPanel}
+          {isAdmin && testToolsPanel}
+            {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
+            {(isAdmin || isReport) && demoDrillPanel}
+            {statsPanel}
             <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && dryZonesPanel}
@@ -6424,6 +6777,7 @@ export default function OilPage() {
             <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
             <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
             {leaderboardSection}
+            {timelineSection}
             {fieldDispatchSection}
             {isAdmin && pendingFeedPanel}
             {(isAdmin || isReport) && (

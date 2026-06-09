@@ -26,7 +26,11 @@ export async function GET() {
     const commitment = s.seedCommitment || null;
     const anchorBlock = s.anchorBlock ?? null;
     const publishedAnchorHash = s.anchorBlockHash || null;
-    const revealedSecret = s.seedReveal || null;
+    // The secret is only "revealed" once the game has actually ended. A leftover
+    // seedReveal on an active game (e.g. a prior test cycle that wasn't cleared)
+    // must NOT expose the field — that would leak the live map to players.
+    const gameOver = s.gameEnded === true || s.gamePhase === "ended";
+    const revealedSecret = (gameOver && s.seedReveal) ? s.seedReveal : null;
 
     const phase = revealedSecret ? "revealed" : publishedAnchorHash ? "anchored" : commitment ? "committed" : "uninitialized";
 

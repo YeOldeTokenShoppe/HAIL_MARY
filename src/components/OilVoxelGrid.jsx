@@ -68,6 +68,16 @@ const FIELD_CRANK_PIN_ANGLE = 0.0;
 const PIN_MARK = typeof window !== "undefined"
   && new URLSearchParams(window.location.search).get("pinmark") === "1";
 
+// Strike-tier visual: the dedicated ballistic-droplet "fountain" shader (a weak
+// well spitting droplets), vs. the fallback of scaling the geyser column down
+// into a sputtering bubble. Fountain ON by default — `?sputtershader=0` falls
+// back to the scaled column for an A/B compare. SPUTTER_PARTICLES is the per-pixel
+// droplet budget — kept conservative for the mobile GPU ceiling (tune upward only
+// after checking phone FPS with several strikes live).
+const STRIKE_FOUNTAIN = typeof window === "undefined"
+  || new URLSearchParams(window.location.search).get("sputtershader") !== "0";
+const SPUTTER_PARTICLES = 28;
+
 // Atmospheric distance fog — hazes the far rows of the field for depth and softens
 // the horizon seam. OFF by default (it can read as dirty air over the clean field);
 // opt in with ?fog=1 to revisit/A-B. Linear so the foreground stays crisp.
@@ -302,6 +312,36 @@ vec3 iridPalette(float t) {
 }
 `;
 
+// ── EXPERIMENT: "Abyss Teal" palette for the eruption ────────────────────────
+// Recolors the erupting gusher (geyser shader) AND its ground spill/splatter to a
+// teal/green/blue variant of the opal substance: full thin-film iridescence +
+// bloom + glitter (the "wow"), but the spectrum is held green/blue-dominant (red
+// kept low) so pink is structurally impossible. Scoped to the eruption: the 5
+// voxel surfaces, side panels, rig tint, and wellhead idle glow stay on stock
+// opal. To revert, delete GUSHER_IRID + gusherPalette and swap the geyser+spill
+// shaders' gusherPalette/GUSHER_IRID refs back to iridPalette/ACTIVE_IRID.
+const GUSHER_IRID = {
+  // ABYSS TEAL: cycles emerald GREEN → TEAL → deep BLUE → CYAN. Red is held LOW
+  // across the whole cycle (a.r=0.10) so green/blue always dominate — pink is
+  // structurally impossible (it needs high red). Green & blue swing out of phase
+  // to roll through the teal→blue→cyan band. Dark ocean-teal base; bright cyan
+  // bloom + high sheen keep the opal wow.
+  // Green & blue held ANTI-PHASE (dG=0, dB=0.5) so the column swings the full
+  // distance spring-GREEN → TEAL → deep BLUE → TEAL for visible banding, not one
+  // flat cyan. A little red rides the green end for a warm spring-green (blue stays
+  // low there → no pink).
+  a: [0.12, 0.55, 0.58], b: [0.12, 0.42, 0.42], c: [1.0, 1.0, 1.0], d: [0.00, 0.00, 0.50],
+  base:   [0.02, 0.07, 0.13],  // dark ocean-teal (the dark body reads deep teal)
+  baseHi: [0.08, 0.30, 0.34],  // teal mid
+  glow:   [0.14, 0.68, 0.90],  // electric cyan bloom, eased so the banding shows
+  sheen: 1.9,
+};
+const GUSHER_GLSL = `
+vec3 gusherPalette(float t) {
+  return ${_v3(GUSHER_IRID.a)} + ${_v3(GUSHER_IRID.b)} * cos(6.28318530718 * (${_v3(GUSHER_IRID.c)} * t + ${_v3(GUSHER_IRID.d)}));
+}
+`;
+
 const volumeVert = /* glsl */ `
   varying vec3 vOrigin;
   varying vec3 vDirection;
@@ -473,6 +513,7 @@ uniform float uOpacity;
 uniform float uNightMode;
 uniform float uParabolum;
 uniform float uHell;
+uniform float uTint;     // motherlode: push the column toward molten gold (0 otherwise)
 uniform vec2 uResolution;
 
 // Hash and noise
@@ -501,7 +542,7 @@ float fbm(vec2 p) {
   }
   return v;
 }
-${IRID_GLSL}
+${GUSHER_GLSL}
 void main() {
   float x = vUv.x - 0.5;
   // When viewing the back face, flip x so the flow pattern stays consistent
@@ -596,9 +637,9 @@ void main() {
 
   // Paraboleum: iridescent opal gusher (overrides night when active). Dark teal
   // base; the rainbow sheen is layered on after compositing below.
-  darkOil = mix(darkOil, ${_v3(ACTIVE_IRID.base)}, uParabolum);
-  midOil = mix(midOil, ${_v3(ACTIVE_IRID.baseHi)} * 0.6, uParabolum);
-  highlight = mix(highlight, ${_v3(ACTIVE_IRID.baseHi)}, uParabolum);
+  darkOil = mix(darkOil, ${_v3(GUSHER_IRID.base)}, uParabolum);
+  midOil = mix(midOil, ${_v3(GUSHER_IRID.baseHi)} * 0.6, uParabolum);
+  highlight = mix(highlight, ${_v3(GUSHER_IRID.baseHi)}, uParabolum);
 
   // Hell: a fiery eruption — charred-red base, molten-orange body, red-orange crests
   darkOil = mix(darkOil, vec3(0.26, 0.02, 0.0), uHell);
@@ -623,12 +664,12 @@ void main() {
   // an oil film.
   float disp = 0.05 + 0.12 * irFres;
   vec3 irSheen = vec3(
-    iridPalette(irPhase + disp).r,
-    iridPalette(irPhase).g,
-    iridPalette(irPhase - disp).b
+    gusherPalette(irPhase + disp).r,
+    gusherPalette(irPhase).g,
+    gusherPalette(irPhase - disp).b
   );
   // Sheen carried up the FULL column (looser density gate) and stronger overall.
-  float irAmt = uParabolum * (0.38 + 0.5 * irFres) * smoothstep(0.02, 0.2, density) * ${ACTIVE_IRID.sheen.toFixed(3)};
+  float irAmt = uParabolum * (0.38 + 0.5 * irFres) * smoothstep(0.02, 0.2, density) * ${GUSHER_IRID.sheen.toFixed(3)};
   col = mix(col, irSheen, irAmt * 0.7) + irSheen * irAmt * 0.5;
 
   // ── Glitter motes: bright iridescent flecks streaming up the FULL height of the
@@ -642,8 +683,10 @@ void main() {
   float moteHeight = mix(1.0, 0.5, y); // thin out gently up top
   float motes = (smoothstep(0.66, 0.9, moteN) + smoothstep(0.78, 0.95, moteN2))
               * moteTwinkle * moteHeight * uParabolum * shape;
-  vec3 moteCol = mix(vec3(0.9, 1.0, 0.98), iridPalette(fract(irPhase + 0.5)), 0.5);
-  col += moteCol * motes * 2.2;
+  // Cool cyan-white glitter biased toward the palette — sparkle for the opal wow
+  // without washing the column white. Tinted by the teal spectrum, dimmed a touch.
+  vec3 moteCol = mix(vec3(0.70, 0.92, 0.95), gusherPalette(fract(irPhase + 0.5)), 0.55);
+  col += moteCol * motes * 1.6;
 
   // Hell: white-hot furnace mouth at the base, cooling to red-orange up the flame.
   // Confined to the bottom ~45% so the body stays red-orange, not yellow.
@@ -652,9 +695,18 @@ void main() {
 
   // Emissive glow — blue at night, neon-green for Paraboleum, molten-orange for hell
   float emissive = max(max(uNightMode, uParabolum), uHell) * (0.3 + 0.45 * pow(max(density, 0.0), 2.0));
-  vec3 glowCol = mix(vec3(0.05, 0.1, 1.35), ${_v3(ACTIVE_IRID.glow)}, uParabolum);
+  // Extra bloom for the cosmic-opal gusher (parabolum only — night/hell unchanged).
+  emissive *= mix(1.0, 1.2, uParabolum);
+  vec3 glowCol = mix(vec3(0.05, 0.1, 1.35), ${_v3(GUSHER_IRID.glow)}, uParabolum);
   glowCol = mix(glowCol, vec3(2.4, 0.5, 0.04), uHell);
   col += glowCol * emissive;
+
+  // White guard: the dense core stacks body + sheen + bloom + motes additively and
+  // clips to white. Where luminance runs hot, pull it back toward a cyan-teal hue
+  // (scaled by that luminance so it stays bright, just cyan instead of white).
+  // Parabolum-only so night/hell keep their own hot cores.
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(col, vec3(0.18, 0.82, 0.92) * lum, smoothstep(0.9, 1.5, lum) * uParabolum * 0.5);
 
   // ── Alpha compositing ──
   float alpha = shape * density * uOpacity;
@@ -683,6 +735,138 @@ void main() {
                  * smoothstep(0.0, 0.02, y) * topFade;
   alpha *= edgeFade;
 
+  // Motherlode tint — nudge the iridescent column toward a hot molten gold so the
+  // richest strikes read as richer, not merely taller. Disabled for the hell fire
+  // path (it owns its own fiery palette) and 0 for strike/gusher tiers.
+  col = mix(col, col * vec3(1.5, 1.18, 0.55) + vec3(0.14, 0.07, 0.0), uTint * (1.0 - uHell));
+
+  gl_FragColor = vec4(col, alpha);
+}
+`;
+
+// ── Strike "sputter" fountain ────────────────────────────────────────────────
+// A weak well doesn't sustain a jet — it spits discrete droplets that arc up and
+// fall back. This is a separate primitive from the geyser column (which is a
+// continuous turbulent beam): individual ballistic particles, evaluated per pixel.
+// Adapted from a classic Shadertoy particle fountain, ported to our conventions —
+// transparent output (alpha = droplet coverage, no opaque background), Lyquid80
+// cyan instead of the original fire palette, and the particle budget cut hard
+// (single loop, SPUTTER_PARTICLES droplets) for the mobile GPU ceiling. Runs
+// continuously while the strike event is live, so it reads as an ongoing weak
+// well rather than a one-shot you have to be watching for. vUv: (0.5, 0) = the
+// wellhead nozzle; droplets launch from there.
+const _sputterVertexShader = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const _sputterFragmentShader = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform float uOpacity;
+uniform float uNightMode;
+
+float hashf(float v) { return fract(sin(v * 27179.18917)); }
+
+// Ballistic arc: launch up with velocity yv under unit gravity; recycle each
+// particle over one full arc (CYCLE seconds). x drifts linearly from the nozzle.
+const float CYCLE = 1.94152;
+float py(float t, float yv) { return -0.01 + yv * t - 0.5 * t * t; }
+float px(float t, float xv) { return 0.5 + xv * t; }
+vec2 particle(float t, float xv, float yv) {
+  t = mod(t, CYCLE);
+  return vec2(px(t, xv) - 0.2 * xv, py(t, yv));
+}
+
+void main() {
+  vec2 uv = vUv;
+  float v = 0.0;
+  for (float i = 0.0; i < ${SPUTTER_PARTICLES}.0; i++) {
+    // Desync each droplet in time + give it a slightly different launch.
+    float tt = uTime + i + hashf(i) * 0.7;
+    float xv = sin(i) * 0.22;                 // horizontal drift (±)
+    float yv = 0.92 + 0.05 * cos(i * 5.1);    // launch speed → arc height
+    vec2 p = particle(tt, xv, yv);
+    // Varied droplet size — a few fat blobs among a finer spray (0.4..1.5×).
+    float sz = 0.1 + 0.4 * hashf(i * 1.7 + 2.3);
+    float ri = 0.011 * sz;                    // droplet radius (small)
+    // Dims over its arc life ("evaporates" near the top); smaller drops read
+    // fainter, like mist, so the spray has depth instead of uniform blobs.
+    float life = 1.0 - mod(tt, CYCLE) / CYCLE;
+    float bright = (0.4 + 0.6 * life) * (0.5 + 0.5 * sz / 1.5);
+    v += (1.0 - smoothstep(ri, ri + ri * 0.7, length(p - uv))) * bright;
+  }
+  v = clamp(v, 0.0, 1.0);
+  // Lyquid80 cyan: deep teal body to a hot near-white core where droplets stack.
+  // (Rock/debris is handled by the real dust particle system, not faked here —
+  // soft shader discs read as mud.)
+  vec3 col = mix(vec3(0.10, 0.42, 0.60), vec3(0.55, 0.95, 1.0), v);
+  // Night mode pulls the core a touch cooler/brighter so it still pops on dark.
+  col = mix(col, col * vec3(0.9, 1.05, 1.1), uNightMode * 0.5);
+  gl_FragColor = vec4(col, v * uOpacity);
+}
+`;
+
+// ── Underground feeder jet ───────────────────────────────────────────────────
+// A narrow iridescent column running from the struck deposit cell UP to the
+// wellhead, so the gusher visibly originates from the cell that holds the oil
+// instead of from just below the surface. The above-ground geyser plane is left
+// untouched (its crest stays at a fixed height); this segment only fills the
+// underground span, and its length grows with drill depth. Because players can see
+// a little way below ground, the beam now reads as one continuous eruption rising
+// out of the deposit. vUv.y: 0 = deposit (bottom) → 1 = surface (top).
+const _feederVertexShader = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const _feederFragmentShader = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform float uOpacity;
+uniform float uHell;
+
+vec2 hash(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return -1.0 + 2.0 * fract(sin(p) * 43758.5453123); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(dot(hash(i), f), dot(hash(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
+             mix(dot(hash(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)), dot(hash(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x), u.y);
+}
+${GUSHER_GLSL}
+void main() {
+  float x = vUv.x - 0.5;
+  if (!gl_FrontFacing) x = -x;
+  float y = vUv.y;                          // 0 deposit → 1 surface
+  float T = uTime;
+  // Narrow column, widening a touch toward the surface so it meets the base of the
+  // above-ground jet.
+  float width = 0.12 + 0.07 * y;
+  float shape = smoothstep(width, width * 0.12, abs(x));
+  // Vertically-streaked turbulence rushing UPWARD (low vertical frequency → long
+  // streaks that read as fast laminar flow at any column length).
+  float n = noise(vec2(x * 8.0, y * 4.0 - T * 5.0));
+  float density = (0.55 + 0.45 * n) * shape;
+  // Emerge from the deposit at the bottom; stay solid up to the surface.
+  density *= smoothstep(0.0, 0.14, y);
+  density = max(density, 0.0);
+  // Iridescent opal (normal) / molten (hell) palette scrolling up the column.
+  float irPhase = fract(y * 1.6 - T * 0.5 + n * 0.3);
+  vec3 opal = gusherPalette(irPhase);
+  vec3 fire = mix(vec3(0.5, 0.05, 0.0), vec3(2.0, 0.6, 0.1), 0.5 + 0.5 * n);
+  vec3 col = mix(opal, fire, uHell);
+  // Self-emissive so it glows in the dark underground.
+  col += col * (0.4 + 0.6 * pow(density, 2.0));
+  float alpha = density * uOpacity;
+  // Side edge fade.
+  alpha *= smoothstep(0.0, 0.04, vUv.x) * smoothstep(1.0, 0.96, vUv.x);
   gl_FragColor = vec4(col, alpha);
 }
 `;
@@ -737,7 +921,7 @@ float splat(vec2 p, vec2 c, float r, float seed) {
   float edge = r * (1.0 + 0.4 * fbm(vec2(cos(ang), sin(ang)) * 2.5 + seed));
   return smoothstep(edge, edge * 0.55, length(d));
 }
-${IRID_GLSL}
+${GUSHER_GLSL}
 void main() {
   vec2 p = (vUv - 0.5) * 2.0; // -1..1
   float g = mix(0.45, 1.0, clamp(uGrow, 0.0, 1.0)); // spread factor as the spill builds
@@ -768,26 +952,41 @@ void main() {
 
   if (cov < 0.02) discard;
 
-  // Dark oil, tinted neon-green for parabolum, molten-red for hell.
-  vec3 oil = mix(vec3(0.02, 0.015, 0.008), vec3(0.015, 0.05, 0.02), uParabolum);
+  // Dark oil, tinted earthy plum for parabolum, molten-red for hell.
+  vec3 oil = mix(vec3(0.02, 0.015, 0.008), ${_v3(GUSHER_IRID.base)}, uParabolum);
   oil = mix(oil, vec3(0.14, 0.02, 0.0), uHell);
   float sheen = pow(cov, 3.0);
-  vec3 hi = mix(vec3(0.18, 0.14, 0.08), ${_v3(ACTIVE_IRID.baseHi)}, uParabolum);
+  vec3 hi = mix(vec3(0.18, 0.14, 0.08), ${_v3(GUSHER_IRID.baseHi)}, uParabolum);
   hi = mix(hi, vec3(1.5, 0.55, 0.06), uHell);
   vec3 col = mix(oil, hi, sheen * 0.5);
 
-  // Oil-slick rainbow on the puddle — exactly what spilled oil does in real life.
-  // Concentric-ish bands keyed off distance + a little noise, strongest where the
-  // film is thin (the spreading edges).
+  // Teal oil-slick sheen on the puddle — oscillates deep TEAL ↔ electric CYAN
+  // (both green/blue-dominant) so it matches the column and stays in the teal
+  // family. Strongest at the thin edge.
   float irT = fract(dist * 1.4 + fbm(p * 4.0) * 0.5 + uGrow * 0.2);
+  vec3 slick = mix(vec3(0.05, 0.28, 0.34), vec3(0.10, 0.85, 0.95), 0.5 + 0.5 * cos(6.28318530718 * irT));
   float irEdge = smoothstep(0.15, 0.6, dist) * (1.0 - smoothstep(0.85, 1.05, dist));
-  col = mix(col, col + iridPalette(irT), uParabolum * cov * (0.30 + 0.5 * irEdge) * ${ACTIVE_IRID.sheen.toFixed(3)});
+  col = mix(col, col + slick, uParabolum * cov * (0.28 + 0.5 * irEdge) * ${(GUSHER_IRID.sheen * 0.6).toFixed(3)});
 
   // Emissive glow so the slick still reads at night / under parabolum / in hell.
   float emis = max(max(uNightMode, uParabolum), uHell) * 0.4 * cov;
-  vec3 emisCol = mix(vec3(0.04, 0.08, 0.5), ${_v3(ACTIVE_IRID.glow)} * 0.6, uParabolum);
+  vec3 emisCol = mix(vec3(0.04, 0.08, 0.5), ${_v3(GUSHER_IRID.glow)} * 0.6, uParabolum);
   emisCol = mix(emisCol, vec3(1.6, 0.38, 0.02), uHell);
   col += emisCol * emis;
+
+  // White guard (matches the gusher): pull the brighter sheen pixels back toward
+  // a cyan-teal hue so the splash reads as the same substance as the column and
+  // never clips to white. Parabolum-only.
+  float teal_lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(col, vec3(0.18, 0.82, 0.92) * teal_lum, smoothstep(0.42, 1.0, teal_lum) * uParabolum * 0.7);
+
+  // Violet iridescence on the splash — applied AFTER the teal guard (which would
+  // otherwise pull it back to cyan). Driven across the WHOLE puddle by the slick
+  // phase (no irEdge gate — that only fires at the rim where coverage is already
+  // dropping, which made this invisible). vBand is a broad cosine so the purple
+  // rolls in as iridescent bands. Blue-dominant violet (R<B) so it stays purple.
+  float vBand = 0.5 + 0.5 * cos(6.28318530718 * irT + 2.1);
+  col = mix(col, vec3(0.40, 0.16, 0.66), uParabolum * cov * vBand * 0.9);
 
   gl_FragColor = vec4(col, cov * uOpacity * 0.92);
 }
@@ -834,6 +1033,37 @@ const GUSHER_DURATION = 3.0;
 // geyser plays its final 1s fade + the pump settles before handing the cell back
 // to the merged static field (covers the ~1s fade with a little margin).
 const GUSHER_FADE_LINGER_MS = 1200;
+// Underground feeder jet — the column from the struck deposit cell up to the
+// wellhead (see _feederFragmentShader). Its length = drill depth in world units
+// (drillDay · depthCellSize), clamped to a minimum so a shallow strike still shows
+// a stub. The above-ground crest height is unaffected.
+const GUSHER_FEEDER_WIDTH = 0.42;     // world width of the feeder plane
+const GUSHER_FEEDER_MIN_DEPTH = 0.5;  // shortest feeder (world units), for shallow strikes
+const GUSHER_FEEDER_DEPTH_SCALE = 1.0; // multiplier on drill depth → tune how deep the origin sits
+
+// Step 2 — tiered strike feedback. The 3D oil response scales with the strike
+// tier written on each gusherEvent (oil-strike-tick `tierFor`): a small "strike"
+// reads as a low seep bubble, "gusher" is the baseline beam, "motherlode" is
+// taller + wider + a hotter tint and the only tier that shoves the rig hard. The
+// rock/dust kick-up is the constant across all three (scaled, not gated). Tune
+// the feel here; thresholds that pick the tier live in oil-strike-tick `runTick`.
+const GUSHER_TIER_VIS = {
+  //            geyser column         duration            ground   rig       dust    color    behaviour
+  //            height  width         (seconds)           spill    blowback  kick    tint     sputter (one-shot coughs)
+  strike:     { height: 0.7,  width: 0.55, duration: 2.6,                   spill: 0.4,  blowback: 0.3, dust: 0.8, tint: 0.0, sputter: true },
+  gusher:     { height: 1.0,  width: 1.0,  duration: GUSHER_DURATION,        spill: 1.0,  blowback: 1.0,  dust: 1.5, tint: 0.0, sputter: false },
+  motherlode: { height: 1.45, width: 1.18, duration: GUSHER_DURATION + 1.5,  spill: 1.4,  blowback: 1.2,  dust: 2.1, tint: 1.0, sputter: false },
+};
+const tierVis = (t) => GUSHER_TIER_VIS[t] || GUSHER_TIER_VIS.gusher;
+// Sputter envelope (strike tier) — a weak well doesn't sustain a jet; it coughs a
+// short burst of decaying spurts, idles, then coughs again, repeating for as long
+// as the strike's event is live (until banked). Recurring so the player catches it
+// whenever they glance over, not just in the first couple seconds. A faint floor
+// keeps a small dribble between coughs so the cell reads as "struck" at a glance.
+const STRIKE_SPUTTER_HZ = 1.6;      // spurts/sec within a cough burst
+const STRIKE_SPUTTER_FLOOR = 0.1;   // residual dribble between coughs (0..1 of tier height)
+const STRIKE_SPUTTER_CYCLE = 6.0;   // seconds between cough bursts
+const STRIKE_SPUTTER_WINDOW = 2.0;  // length of each cough burst within the cycle
 
 /**
  * Build an ExtrudeGeometry representing liquid in a horizontal cylinder.
@@ -1530,7 +1760,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, depositLayer = -1, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherActive = false, gusherLingering = false, gusherTier = "gusher", hasMessages = false, onEnvelopeClick, hellActive = false, worldW = 10, worldD = 10, cameraViewable = true, onFocusObject }) {
   const panelZoomedRef = useRef(false); // true once the panel has been zoomed in on
   const machinePanelRef = useRef();     // MachinePanel container node (for click-to-zoom)
   const lastClickTime = useRef(0);
@@ -1760,13 +1990,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     return () => mixer.stopAllAction();
   }, [mixer, animations]);
 
-  // Apply pump customization (paint colors) — show for any cell with a config
+  // Apply pump customization (paint colors). Runs for EVERY full rig, including
+  // those that mount on-demand with no config (gusher/lingering cells never
+  // selected): applyPumpConfig caches each part's original material on first
+  // encounter, so it's safe to call with an empty originalMats — it captures, then
+  // lays the Lyquid80 brand tint over the GLB's baked colors. The old guard skipped
+  // this when originalMats was empty, leaving such rigs showing the import (yellow/
+  // blue) materials. No re-call guard needed — _pmpCloned/_swappedStandard make it
+  // idempotent.
   useEffect(() => {
-    if (pumpConfig) {
-      applyPumpConfig(clonedScene, pumpConfig, originalMatsRef.current, envMap);
-    } else if (originalMatsRef.current && Object.keys(originalMatsRef.current).length > 0) {
-      applyPumpConfig(clonedScene, null, originalMatsRef.current, envMap);
-    }
+    applyPumpConfig(clonedScene, pumpConfig || null, originalMatsRef.current, envMap);
   }, [clonedScene, pumpConfig, envMap]);
 
   // Embedded sign + camera retired — signs render from the SIGN_CATALOG (PlotSignField),
@@ -1995,6 +2228,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const drainedRef = useRef(false);   // finished draining, stay at 0
   const drainFillRef = useRef(0);
   const redButtonRef = useRef();
+  const redButtonOrigColor = useRef(null); // original material, restored when the alarm clears
   const [tankDraining, setTankDraining] = useState(false);
   const onTankDrainRef = useRef(onTankDrain);
   onTankDrainRef.current = onTankDrain;
@@ -2025,9 +2259,21 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   useEffect(() => {
     clonedScene.traverse((child) => {
-      // RedButton — click to drain the tank
+      // RedButton — click to drain the tank; also pulses red when an alarm fires.
       if (child.name === "RedButton" && child.isMesh) {
         redButtonRef.current = child;
+        if (!redButtonOrigColor.current && child.material) {
+          redButtonOrigColor.current = {
+            color: child.material.color.clone(),
+            emissive: child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0),
+            emissiveIntensity: child.material.emissiveIntensity || 0,
+          };
+        }
+        // Clone so the alarm strobe doesn't leak across the merged-rig instances.
+        if (child.material && !child.userData._redButtonCloned) {
+          child.material = child.material.clone();
+          child.userData._redButtonCloned = true;
+        }
       }
       // MachinePanel container (pre-order traverse visits the parent before its
       // children, so the first match is the top-level box, not a child gauge).
@@ -2196,6 +2442,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   // Oil geyser shader — only active on highlighted rig
   const gusherActiveRef = useRef(false);
   const gusherTimerRef = useRef(0);
+  // Step 2 — the visual tier (strike|gusher|motherlode) of the current eruption.
+  // Captured at initGusher time so the per-frame geyser/spill/blowback scaling
+  // reads a stable value for the whole run. Mirror the prop for the broadcast path.
+  const gusherTierPropRef = useRef(gusherTier);
+  gusherTierPropRef.current = gusherTier;
+  const gusherTierRef = useRef("gusher");
   const geyserMeshRef = useRef();
   const geyserMatRef = useRef();
   const _camPos = useRef(new THREE.Vector3());
@@ -2206,7 +2458,34 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     uNightMode: { value: 0.0 },
     uParabolum: { value: 0.0 },
     uHell: { value: 0.0 },
+    uTint: { value: 0.0 },
     uResolution: { value: new THREE.Vector2(256, 512) },
+  });
+
+  // Strike "sputter" fountain — the ballistic-droplet primitive used for the
+  // strike tier instead of the geyser column (see _sputterFragmentShader). A
+  // separate billboard plane; only one of {geyser column, sputter fountain} is
+  // visible per eruption, chosen by tier.
+  const sputterMeshRef = useRef();
+  const sputterMatRef = useRef();
+  const sputterUniforms = useRef({
+    uTime: { value: 0 },
+    uOpacity: { value: 1.0 },
+    uNightMode: { value: 0.0 },
+  });
+  // The fountain runs continuously, so re-kick the real dust/rock particles on a
+  // cycle (they fire once otherwise) — keeps the weak well spitting actual rock
+  // chips at the base alongside the liquid spray. Counts down in the gusher loop.
+  const sputterDustTimerRef = useRef(0);
+
+  // Underground feeder jet — narrow column from the struck deposit up to the
+  // wellhead, so the gusher originates from the cell that holds the oil.
+  const feederMeshRef = useRef();
+  const feederMatRef = useRef();
+  const feederUniforms = useRef({
+    uTime: { value: 0 },
+    uOpacity: { value: 1.0 },
+    uHell: { value: 0.0 },
   });
 
   // Oil spill / splatter decal on the ground around the wellhead
@@ -2236,19 +2515,60 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   // a longer value so it stays on screen long enough to grab a screenshot.
   const gusherDurationRef = useRef(GUSHER_DURATION);
 
-  const initGusher = useCallback((hell = false, duration = GUSHER_DURATION) => {
+  const initGusher = useCallback((hell = false, tier = null, durationOverride = null) => {
+    // Resolve the visual tier: explicit arg wins (hell/admin), else the broadcast
+    // prop (gusherEvents.tier for this cell), else baseline. Hell eruptions read as
+    // a big fire column, so they ride the motherlode size.
+    const t = hell ? "motherlode" : (tier || gusherTierPropRef.current || "gusher");
+    gusherTierRef.current = t;
+    const vis = tierVis(t);
+    // Strike tier renders as the droplet fountain (separate mesh) unless the A/B
+    // toggle forces the scaled-column fallback. Only one primitive shows.
+    const fountain = vis.sputter && STRIKE_FOUNTAIN;
     gusherActiveRef.current = true;
     gusherTimerRef.current = 0;
-    gusherDurationRef.current = duration;
+    gusherDurationRef.current = durationOverride ?? vis.duration;
     gusherHellRef.current = hell;
     hellBurstTimerRef.current = 0;
+    // Rock/dust kick-up fires on EVERY eruption (not just the highlighted rig's
+    // drill), scaled by tier — this is what makes admin FORCE-STRIKE and remote
+    // gushers show the ground kick too. initDust is defined below; the closure
+    // reads its stable ref at call time.
+    initDust(vis.dust);
+    // Fountain re-kicks dust on a ~5.5s cycle. Stagger the first interval per rig
+    // (hashed from world position) so simultaneous strikes don't throw rock in
+    // lockstep — the period is shared, so a one-time offset keeps them desynced.
+    const dph = Math.sin(position[0] * 45.233 + position[2] * 91.187) * 24634.6345;
+    sputterDustTimerRef.current = 3.0 + (dph - Math.floor(dph)) * 2.5; // 3.0..5.5s
+    // Seed the geyser column + spill scale immediately so the first frame already
+    // reflects the tier (the per-frame loop keeps them in sync afterward).
+    if (geyserMeshRef.current) {
+      geyserMeshRef.current.scale.set(vis.width, vis.height, 1);
+      geyserMeshRef.current.position.y = gusherOriginRef.current.y - 0.5 + 1.5 * vis.height;
+    }
+    if (spillMeshRef.current) spillMeshRef.current.scale.set(vis.spill, vis.spill, 1);
     if (geyserMatRef.current) {
       geyserMatRef.current.uniforms.uTime.value = 0;
       geyserMatRef.current.uniforms.uOpacity.value = 1.0;
     }
-    if (geyserMeshRef.current) {
-      geyserMeshRef.current.visible = true;
+    // The geyser column + underground feeder drive sustained gushers (and the
+    // column-fallback sputter); the droplet fountain drives the strike tier.
+    if (geyserMeshRef.current) geyserMeshRef.current.visible = !fountain;
+    if (feederMatRef.current) {
+      feederMatRef.current.uniforms.uTime.value = 0;
+      feederMatRef.current.uniforms.uOpacity.value = 1.0;
     }
+    if (feederMeshRef.current) feederMeshRef.current.visible = !fountain;
+    if (sputterMatRef.current) {
+      // Per-rig phase offset so simultaneous strikes don't sputter in lockstep:
+      // seed the fountain's time so each well starts at a different point in its
+      // droplet cycle (CYCLE = 1.94152 in _sputterFragmentShader). Stable per rig
+      // (hashed from world position), so it's the same offset every eruption.
+      const ph = Math.sin(position[0] * 12.9898 + position[2] * 78.233) * 43758.5453;
+      sputterMatRef.current.uniforms.uTime.value = (ph - Math.floor(ph)) * 1.94152;
+      sputterMatRef.current.uniforms.uOpacity.value = 1.0;
+    }
+    if (sputterMeshRef.current) sputterMeshRef.current.visible = fountain;
     // Hell eruption (demon unleash) is pure fire — no oil puddle on the ground.
     if (spillMeshRef.current) {
       spillMeshRef.current.visible = !hell;
@@ -2257,8 +2577,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       spillMatRef.current.uniforms.uOpacity.value = 0.0;
       spillMatRef.current.uniforms.uGrow.value = 0.0;
     }
-    // Pause pump animation and tilt horsehead up out of the gusher blast
-    if (!pumpPausedRef.current) {
+    // Pause pump animation and tilt horsehead up out of the gusher blast — but
+    // ONLY for sustained gushers. A small strike (sputter) keeps the pump working
+    // normally; its weak spurts play over the running rig, no dramatic tilt/stain.
+    if (!vis.sputter && !pumpPausedRef.current) {
       // Seek all actions to frame 103/110 (pump head at highest) and pause
       pumpActionsRef.current.forEach((action) => {
         const clip = action.getClip();
@@ -2287,6 +2609,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (m.material && !m.userData._origColor) {
           m.userData._origColor = m.material.color.clone();
         }
+        // Hide Straw + Cylinder_Pump for the duration of the eruption — the gusher
+        // column occupies the wellhead, so the pump straw/cylinders read as clutter.
+        m.visible = false;
       });
       pumpPausedRef.current = true;
     }
@@ -2337,7 +2662,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     if (gusherTrigger > 0 && gusherTrigger !== prevGusherTrigger.current && highlighted) {
       revealStrike();
       // Admin Test Gusher: run 3s longer than a normal strike so it's easy to screenshot.
-      initGusher(false, GUSHER_DURATION + 3);
+      initGusher(false, "gusher", GUSHER_DURATION + 3);
     }
     prevGusherTrigger.current = gusherTrigger;
   }, [gusherTrigger, highlighted, revealStrike, initGusher]);
@@ -2368,8 +2693,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     } else if (!hellActive && prevHellActive.current) {
       // Demon banished — release the held gusher into its final 1s fade so the rig
       // settles back smoothly instead of snapping (the timer was pinned while held).
+      // Relative to the run's own duration (hell rides the longer motherlode length).
       if (gusherActiveRef.current && gusherHellRef.current) {
-        gusherTimerRef.current = GUSHER_DURATION - 1.0;
+        gusherTimerRef.current = gusherDurationRef.current - 1.0;
       }
     }
     prevHellActive.current = hellActive;
@@ -2389,15 +2715,18 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     if (gusherActive && !prevGusherActive.current) {
       if (!gusherActiveRef.current) initGusher();
     } else if (!gusherActive && prevGusherActive.current) {
+      // Event cleared (banked / shut off) → release into the final 1s fade.
+      // Relative to this run's duration; a sputtering strike loops past its
+      // duration while live, so reset the timer into the taper window to end it.
       if (gusherActiveRef.current && !gusherHellRef.current) {
-        gusherTimerRef.current = GUSHER_DURATION - 1.0;
+        gusherTimerRef.current = gusherDurationRef.current - 1.0;
       }
     }
     prevGusherActive.current = gusherActive;
   }, [gusherActive, initGusher]);
 
   // Trigger drill effects on every drill event (highlighted rig only)
-  const initDust = useCallback(() => {
+  const initDust = useCallback((intensity = 1) => {
     const pos = dustPosRef.current;
     const vel = dustVelRef.current;
     const life = dustLifeRef.current;
@@ -2407,11 +2736,13 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       pos[i3]     = (Math.random() - 0.5) * 0.1;
       pos[i3 + 1] = 0.02;
       pos[i3 + 2] = (Math.random() - 0.5) * 0.1;
-      // Burst outward + upward with random velocity
+      // Burst outward + upward with random velocity. Tier intensity scales the
+      // kick so a seep barely puffs while a motherlode throws rock harder; the
+      // particle count (buffer size) stays fixed for a stable mobile GPU budget.
       const angle = Math.random() * Math.PI * 2;
-      const speed = 0.3 + Math.random() * 0.7;
+      const speed = (0.22 + Math.random() * 0.5) * intensity;
       vel[i3]     = Math.cos(angle) * speed;
-      vel[i3 + 1] = 0.5 + Math.random() * 1.0;
+      vel[i3 + 1] = (0.4 + Math.random() * 0.8) * intensity;
       vel[i3 + 2] = Math.sin(angle) * speed;
       life[i] = -(i / DUST_COUNT) * 0.15; // stagger spawns
     }
@@ -2460,6 +2791,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   drillDayRef.current = drillDay;
   const depthCellRef = useRef(depthCellSize);
   depthCellRef.current = depthCellSize;
+  const depositLayerRef = useRef(depositLayer);
+  depositLayerRef.current = depositLayer;
   const tankFillRef = useRef(tankFill);
   tankFillRef.current = tankFill;
   const pumpConfigRef = useRef(pumpConfig);
@@ -2620,6 +2953,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           pl.material.emissiveIntensity = intensity * 5.0;
           pl.material.color.set(intensity > 0.1 ? 0xff2200 : 0x331111);
         }
+        // RedButton — pulse emissive red in time with the alarm beacon.
+        const rb = redButtonRef.current;
+        if (rb?.material?.emissive) {
+          rb.material.emissive.set(0xff0000);
+          rb.material.emissiveIntensity = intensity * 4.0;
+        }
       } else {
         // Both modes done — restore original
         const orig = alertLightOrigColor.current;
@@ -2638,6 +2977,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           pl.material.color.copy(plOrig.color);
           pl.material.emissive.copy(plOrig.emissive);
           pl.material.emissiveIntensity = plOrig.emissiveIntensity;
+        }
+        // RedButton — restore original
+        const rb = redButtonRef.current;
+        const rbOrig = redButtonOrigColor.current;
+        if (rb?.material?.emissive && rbOrig) {
+          rb.material.color.copy(rbOrig.color);
+          rb.material.emissive.copy(rbOrig.emissive);
+          rb.material.emissiveIntensity = rbOrig.emissiveIntensity;
         }
       }
     }
@@ -2746,6 +3093,18 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       const vel = dustVelRef.current;
       const life = dustLifeRef.current;
       const DUST_GRAVITY = -2.0;
+      // Keep debris on the playfield: clamp world XZ to the field half-extents so
+      // perimeter rigs don't throw rock into the void beyond the mesa (mirrors the
+      // spill puddle's uFieldHalf clip). Dust is in the rig's local frame, so the
+      // local bound is the field edge minus the rig's own offset from center.
+      // Inset a touch so rock settles fully on the mesa rather than straddling the rim.
+      const DUST_EDGE_INSET = 0.05;
+      const dustHalfW = worldW / 2 - DUST_EDGE_INSET;
+      const dustHalfD = worldD / 2 - DUST_EDGE_INSET;
+      const dustMinX = -dustHalfW - position[0];
+      const dustMaxX =  dustHalfW - position[0];
+      const dustMinZ = -dustHalfD - position[2];
+      const dustMaxZ =  dustHalfD - position[2];
       let allDone = true;
 
       for (let i = 0; i < DUST_COUNT; i++) {
@@ -2760,6 +3119,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         pos[i3 + 2] += vel[i3 + 2] * delta;
         // Clamp to ground
         if (pos[i3 + 1] < 0) { pos[i3 + 1] = 0; vel[i3 + 1] = 0; vel[i3] *= 0.9; vel[i3 + 2] *= 0.9; }
+        // Clamp to playfield edge — rock that would fly off stops at the mesa rim
+        if (pos[i3] < dustMinX)      { pos[i3] = dustMinX;     vel[i3] = 0; }
+        else if (pos[i3] > dustMaxX) { pos[i3] = dustMaxX;     vel[i3] = 0; }
+        if (pos[i3 + 2] < dustMinZ)      { pos[i3 + 2] = dustMinZ; vel[i3 + 2] = 0; }
+        else if (pos[i3 + 2] > dustMaxZ) { pos[i3 + 2] = dustMaxZ; vel[i3 + 2] = 0; }
       }
 
       if (dustGeoRef.current) {
@@ -2905,16 +3269,23 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
     // Oil geyser shader update
     if (gusherActiveRef.current) {
-      // Ensure mesh is visible (ref may not have been ready when initGusher fired)
-      if (geyserMeshRef.current && !geyserMeshRef.current.visible) {
-        geyserMeshRef.current.visible = true;
-      }
-      // Keep pump parts stained while gusher is active — green oil normally, a
-      // charred scorch for the hell eruption.
+      const vis = tierVis(gusherTierRef.current);
+      // Strike tier draws the droplet fountain; everything else draws the geyser
+      // column. Keep exactly one of the two primitives visible (refs may not have
+      // been ready when initGusher fired, so reconcile here every frame).
+      const fountain = vis.sputter && STRIKE_FOUNTAIN;
+      if (sputterMeshRef.current) sputterMeshRef.current.visible = fountain;
+      if (geyserMeshRef.current) geyserMeshRef.current.visible = !fountain;
+      if (spillMeshRef.current) spillMeshRef.current.scale.set(vis.spill, vis.spill, 1);
+      // Keep pump parts stained while a sustained gusher is active — green oil
+      // normally, a charred scorch for hell. Skipped for a strike (sputter): the
+      // pump never pauses and a weak well doesn't drench the rig.
       const hell = gusherHellRef.current;
-      const stainColor = hell ? 0x2a0a05 : 0x0d2a14;
-      if (strawRef.current?.material) strawRef.current.material.color.set(stainColor);
-      cylPumpRefs.current.forEach((m) => { if (m.material) m.material.color.set(stainColor); });
+      if (!vis.sputter) {
+        const stainColor = hell ? 0x2a0a05 : 0x0d2a14;
+        if (strawRef.current?.material) strawRef.current.material.color.set(stainColor);
+        cylPumpRefs.current.forEach((m) => { if (m.material) m.material.color.set(stainColor); });
+      }
       gusherTimerRef.current += delta;
 
       // Fireball burst — a fast expanding flash at the wellhead the instant the
@@ -2940,25 +3311,105 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       // Sustain the gusher (and the blowback that rides it) at full intensity while
       // the tank overflows OR while the demon is loose (hell). Both hold the rig
       // pitched back indefinitely; the final 1s settle only runs once this is false.
-      const overflowing = (effectiveFill >= 1.0 && highlighted) || (gusherHellRef.current && hellActiveRef.current) || gusherActivePropRef.current;
+      // A strike (sputter) stays "live" while its broadcast event is active so it
+      // keeps coughing on a cycle — it just modulates intensity instead of holding
+      // a steady jet. A sustained gusher is held by overflow / hell / a live doc.
+      const gusherDur = gusherDurationRef.current;
+      const overflowing = vis.sputter
+        ? gusherActivePropRef.current
+        : ((effectiveFill >= 1.0 && highlighted) || (gusherHellRef.current && hellActiveRef.current) || gusherActivePropRef.current);
 
       // Fade out near end of one-shot gusher (also drives the blowback below)
-      const gusherDur = gusherDurationRef.current;
       const fade = overflowing ? 1.0
         : gusherTimerRef.current > gusherDur - 1.0
           ? Math.max(0, gusherDur - gusherTimerRef.current)
           : 1.0;
 
-      if (geyserMatRef.current) {
-        geyserMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
-        geyserMatRef.current.uniforms.uParabolum.value = hell ? 0.0 : 1.0;
-        geyserMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
-        geyserMatRef.current.uniforms.uTime.value += delta;
-        geyserMatRef.current.uniforms.uOpacity.value = fade;
+      // Column-fallback cough envelope — ONLY when the strike tier is drawn as a
+      // scaled geyser column (fountain disabled via ?sputtershader=0). Each
+      // STRIKE_SPUTTER_CYCLE a short burst of decaying coughs, then an idle gap at
+      // the floor. 1.0 (no-op) for sustained tiers and for the droplet fountain
+      // (the fountain shader owns its own discrete-droplet motion).
+      let sputterEnv = 1.0;
+      if (vis.sputter && !fountain) {
+        const tc = gusherTimerRef.current % STRIKE_SPUTTER_CYCLE;
+        let spurt = 0;
+        if (tc < STRIKE_SPUTTER_WINDOW) {
+          const pulse = Math.max(0, Math.sin(tc * STRIKE_SPUTTER_HZ * Math.PI * 2));
+          spurt = pulse * (1 - tc / STRIKE_SPUTTER_WINDOW); // coughs weaken across the burst
+        }
+        sputterEnv = STRIKE_SPUTTER_FLOOR + (1 - STRIKE_SPUTTER_FLOOR) * spurt;
+      }
+
+      if (fountain) {
+        // Strike droplet fountain — runs continuously while the strike is live so
+        // the weak well keeps spitting. The shader owns the per-droplet ballistics;
+        // we only advance time and ride the overall fade in/out.
+        if (sputterMatRef.current) {
+          sputterMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
+          sputterMatRef.current.uniforms.uTime.value += delta;
+          sputterMatRef.current.uniforms.uOpacity.value = fade;
+        }
+        // Re-kick the real dust/rock particles every ~5.5s (they're a one-shot
+        // burst otherwise) so the well throws an occasional batch of actual chips
+        // at the base while it sputters. Reuses the 80-point buffer — no new geometry.
+        sputterDustTimerRef.current -= delta;
+        if (sputterDustTimerRef.current <= 0) {
+          // Per-rig period (≈4.6–6.4s, hashed from position) so strikes never drift
+          // back into a synchronized re-kick over a long session.
+          const rk = Math.sin(position[0] * 73.91 + position[2] * 18.27) * 11251.73;
+          sputterDustTimerRef.current = 4.6 + (rk - Math.floor(rk)) * 1.8;
+          initDust(0.8);
+        }
+      } else {
+        // Geyser column — sustained gushers + the (rare) sputter column-fallback.
+        // Apply the tier height (× cough envelope), anchoring the base at the
+        // wellhead so it grows upward. Width is steady per tier.
+        if (geyserMeshRef.current) {
+          const colH = vis.height * sputterEnv;
+          geyserMeshRef.current.scale.set(vis.width, colH, 1);
+          geyserMeshRef.current.position.y = gusherOriginRef.current.y - 0.5 + 1.5 * colH;
+        }
+        if (geyserMatRef.current) {
+          geyserMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
+          geyserMatRef.current.uniforms.uParabolum.value = hell ? 0.0 : 1.0;
+          geyserMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
+          geyserMatRef.current.uniforms.uTint.value = vis.tint;
+          geyserMatRef.current.uniforms.uTime.value += delta;
+          geyserMatRef.current.uniforms.uOpacity.value = fade * sputterEnv;
+        }
+        // Underground feeder jet — anchor its bottom at the cell's deposit depth and
+        // its top at the wellhead, so the gusher rises out of the cell that holds the
+        // oil. Depth = the deposit layer (richest layer) in world units, falling back
+        // to the drill head for a dry cell.
+        if (feederMeshRef.current) {
+          const sourceLayer = depositLayerRef.current >= 0
+            ? depositLayerRef.current
+            : drillDayRef.current;
+          const depth = Math.max(
+            GUSHER_FEEDER_MIN_DEPTH,
+            sourceLayer * depthCellRef.current * GUSHER_FEEDER_DEPTH_SCALE
+          );
+          if (!feederMeshRef.current.visible) feederMeshRef.current.visible = true;
+          feederMeshRef.current.scale.y = depth;
+          feederMeshRef.current.position.set(
+            gusherOriginRef.current.x,
+            gusherOriginRef.current.y - depth / 2,
+            gusherOriginRef.current.z
+          );
+          if (feederMatRef.current) {
+            feederMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
+            feederMatRef.current.uniforms.uTime.value += delta;
+            feederMatRef.current.uniforms.uOpacity.value = fade * sputterEnv;
+          }
+        }
       }
 
       // Oil spill decal — spreads as the gusher builds (uGrow rides the eased blowback)
       // and fades with the gusher (uOpacity = fade). Self-resets, no lingering state.
+      // For a strike the rig never blows back, so the small puddle rides the sputter
+      // envelope instead — a modest patch that pulses with the coughs and persists
+      // (at the floor) as the at-a-glance "struck here" marker until banked.
       // Skip the ground puddle entirely for the hell eruption — fire only.
       if (spillMeshRef.current && spillMeshRef.current.visible === hell) {
         spillMeshRef.current.visible = !hell;
@@ -2967,7 +3418,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         spillMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
         spillMatRef.current.uniforms.uParabolum.value = hell ? 0.0 : 1.0;
         spillMatRef.current.uniforms.uHell.value = hell ? 1.0 : 0.0;
-        spillMatRef.current.uniforms.uGrow.value = blowbackRef.current;
+        spillMatRef.current.uniforms.uGrow.value = vis.sputter ? (fountain ? 0.6 : sputterEnv) : blowbackRef.current;
         spillMatRef.current.uniforms.uOpacity.value = fade;
         // Clip the puddle to the playfield: plane center (grid space) = cell pos +
         // wellhead offset; field is centered at origin with these half-extents.
@@ -2982,8 +3433,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       // (fade) so the rig shoves back as it erupts and settles as it dies. Head_Pump
       // is parented under Body_Pump for the gusher, so it follows along automatically.
       blowbackRef.current += (fade - blowbackRef.current) * Math.min(delta * GUSHER_BLOWBACK_SPEED, 1);
-      const blow = blowbackRef.current;
-      if (bodyPumpRef.current && bodyPumpBaseRotX.current !== null) {
+      // Tier scales how hard the rig is shoved — a seep barely nudges it, a
+      // motherlode throws it back. A strike (sputter) never blows back: its pump
+      // keeps running, so force the rig tilt to zero regardless of any stale base.
+      const blow = vis.sputter ? 0 : blowbackRef.current * vis.blowback;
+      if (!vis.sputter && bodyPumpRef.current && bodyPumpBaseRotX.current !== null) {
         bodyPumpRef.current.rotation.x = bodyPumpBaseRotX.current + blow * GUSHER_BLOWBACK_BODY;
       }
       // Extra horsehead pitch, eased with the gusher, about the body's X axis. Premultiply
@@ -2999,6 +3453,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (hellBurstRef.current) hellBurstRef.current.visible = false;
         if (hellBurstLightRef.current) hellBurstLightRef.current.intensity = 0;
         if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
+        if (sputterMeshRef.current) sputterMeshRef.current.visible = false;
+        if (feederMeshRef.current) feederMeshRef.current.visible = false;
         if (spillMeshRef.current) spillMeshRef.current.visible = false;
         if (spillMatRef.current) { spillMatRef.current.uniforms.uOpacity.value = 0; spillMatRef.current.uniforms.uGrow.value = 0; }
         // Resume pump animation, restore Head_Pump rotation and all stained colors
@@ -3022,6 +3478,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               m.material.color.copy(m.userData._origColor);
               delete m.userData._origColor;
             }
+            m.visible = true; // restore Straw + Cylinder_Pump after the gusher
           });
           pumpActionsRef.current.forEach((action) => { action.paused = false; });
           pumpPausedRef.current = false;
@@ -3172,6 +3629,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         strikingRef.current = false;
         strikeFlashRef.current = false;
         if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
+        if (feederMeshRef.current) feederMeshRef.current.visible = false;
         if (geyserMatRef.current) geyserMatRef.current.uniforms.uOpacity.value = 0;
         if (spillMeshRef.current) spillMeshRef.current.visible = false;
         if (spillMatRef.current) { spillMatRef.current.uniforms.uOpacity.value = 0; spillMatRef.current.uniforms.uGrow.value = 0; }
@@ -3196,6 +3654,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               m.material.color.copy(m.userData._origColor);
               delete m.userData._origColor;
             }
+            m.visible = true; // restore Straw + Cylinder_Pump after the gusher
           });
           pumpActionsRef.current.forEach((action) => { action.paused = false; });
           pumpPausedRef.current = false;
@@ -3260,6 +3719,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           w={panelXform.w}
           h={panelXform.h}
           fromMesh={panelXform.fromMesh}
+          label="DEPTH"
           token={hellActive ? "!!" : (drillDay >= maxDrillDay ? "MAX" : String(drillDay).padStart(2, "0"))}
           idleHex={drillDay >= maxDrillDay ? "#ff3a2a" : "#ffae00"}
           flareKey={oilStrike}
@@ -3309,6 +3769,33 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
             </mesh>
             <pointLight ref={hellBurstLightRef} color="#ff3a00" intensity={0} distance={6} decay={2} />
           </group>
+          {/* Underground feeder jet — origin of the gusher in the deposit cell. A
+              unit-height plane scaled per-frame to the drill depth; position/scale
+              are driven in the gusher update loop. Billboards like the geyser. */}
+          <mesh
+            ref={feederMeshRef}
+            visible={false}
+            renderOrder={8}
+            position={[gusherOriginRef.current.x, gusherOriginRef.current.y - 1.0, gusherOriginRef.current.z]}
+            onBeforeRender={(renderer, scene, camera) => {
+              const mesh = feederMeshRef.current;
+              if (!mesh) return;
+              const camPos = camera.getWorldPosition(_camPos.current);
+              const meshPos = mesh.getWorldPosition(_meshPos.current);
+              mesh.lookAt(camPos.x, meshPos.y, camPos.z);
+            }}
+          >
+            <planeGeometry args={[GUSHER_FEEDER_WIDTH, 1]} />
+            <shaderMaterial
+              ref={feederMatRef}
+              vertexShader={_feederVertexShader}
+              fragmentShader={_feederFragmentShader}
+              transparent
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              uniforms={feederUniforms.current}
+            />
+          </mesh>
           {/* Oil geyser shader plane */}
           <mesh
             ref={geyserMeshRef}
@@ -3337,6 +3824,37 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               depthWrite={false}
               side={THREE.DoubleSide}
               uniforms={geyserUniforms.current}
+            />
+          </mesh>
+          {/* Strike "sputter" fountain plane — droplets launch from the nozzle at
+              uv (0.5, 0). Shorter/squarer than the geyser column: a low weak spit,
+              not a tower. Mutually exclusive with the geyser plane (one per tier). */}
+          <mesh
+            ref={sputterMeshRef}
+            visible={false}
+            renderOrder={10}
+            position={[
+              gusherOriginRef.current.x,
+              gusherOriginRef.current.y + 0.6,
+              gusherOriginRef.current.z
+            ]}
+            onBeforeRender={(renderer, scene, camera) => {
+              const mesh = sputterMeshRef.current;
+              if (!mesh) return;
+              const camPos = camera.getWorldPosition(_camPos.current);
+              const meshPos = mesh.getWorldPosition(_meshPos.current);
+              mesh.lookAt(camPos.x, meshPos.y, camPos.z);
+            }}
+          >
+            <planeGeometry args={[0.9, 1.2]} />
+            <shaderMaterial
+              ref={sputterMatRef}
+              vertexShader={_sputterVertexShader}
+              fragmentShader={_sputterFragmentShader}
+              transparent
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              uniforms={sputterUniforms.current}
             />
           </mesh>
           {/* Oil spill / splatter decal — flat on the ground around the wellhead */}
@@ -3422,8 +3940,8 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
   // Paraboleum — animated procedural fluid. The per-rig tanks use a physical
   // thin-film material, but the big community tank is viewed dead-on through a
   // frosted window, where physical iridescence collapses to a flat slab. This
-  // custom shader reuses the shared opal palette (iridPalette) so it reads as the
-  // SAME substance as the gushers, but with motion + depth: deep→luminous vertical
+  // custom shader reuses the gusher palette (gusherPalette/GUSHER_IRID) so it reads
+  // as the SAME substance as the gushers, but with motion + depth: deep→luminous vertical
   // gradient, drifting caustics, rising shimmer streaks, a pulsing surface
   // meniscus, and a fresnel rim glow.
   const oilMat = useMemo(() => new THREE.ShaderMaterial({
@@ -3446,7 +3964,7 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
         gl_Position = projectionMatrix * viewMatrix * wp;
       }
     `,
-    fragmentShader: IRID_GLSL + `
+    fragmentShader: GUSHER_GLSL + `
       precision highp float;
       varying vec2 vUv;
       varying vec3 vNormalW;
@@ -3475,7 +3993,7 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
         float fres = pow(1.0 - abs(dot(normalize(vNormalW), V)), 2.5);
 
         // deep murk at the bottom -> luminous near the surface
-        vec3 base = mix(${_v3(ACTIVE_IRID.base)}, ${_v3(ACTIVE_IRID.baseHi)}, smoothstep(0.0, 1.0, h));
+        vec3 base = mix(${_v3(GUSHER_IRID.base)}, ${_v3(GUSHER_IRID.baseHi)}, smoothstep(0.0, 1.0, h));
 
         // slow swirling caustics drifting through the body
         float s1 = fbm(vec2(ang * 6.0 + uTime * 0.05, h * 4.0 - uTime * 0.12));
@@ -3484,26 +4002,32 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
 
         // drifting thin-film iridescence (angle + depth + flow + time)
         float irT = fract(fres * 1.2 + h * 0.7 + s1 * 0.5 + uTime * 0.04);
-        vec3 irid = iridPalette(irT);
-        float iridAmt = (0.25 + 0.75 * fres) * (0.5 + 0.5 * caustic) * ${ACTIVE_IRID.sheen.toFixed(3)};
+        vec3 irid = gusherPalette(irT);
+        float iridAmt = (0.25 + 0.75 * fres) * (0.5 + 0.5 * caustic) * ${GUSHER_IRID.sheen.toFixed(3)};
 
         // luminosity floor so the body glows as a filled column instead of
         // collapsing to a see-through near-black navy
-        vec3 col = base + ${_v3(ACTIVE_IRID.glow)} * 0.22;
+        vec3 col = base + ${_v3(GUSHER_IRID.glow)} * 0.22;
         col += irid * iridAmt;
-        col += ${_v3(ACTIVE_IRID.glow)} * caustic * 0.42;
+        col += ${_v3(GUSHER_IRID.glow)} * caustic * 0.42;
 
         // rising shimmer streaks
         float streak = smoothstep(0.6, 1.0, fbm(vec2(ang * 22.0, h * 3.0 - uTime * 0.5)));
-        col += ${_v3(ACTIVE_IRID.glow)} * streak * 0.15;
+        col += ${_v3(GUSHER_IRID.glow)} * streak * 0.15;
 
         // glowing surface meniscus with a gentle pulse traveling around the rim
         float surf = smoothstep(0.93, 1.0, h);
         float surfPulse = 0.7 + 0.3 * sin(uTime * 1.5 + ang * 12.566);
-        col += ${_v3(ACTIVE_IRID.glow)} * surf * surfPulse * 1.25;
+        col += ${_v3(GUSHER_IRID.glow)} * surf * surfPulse * 1.25;
+
+        // Violet shimmer — echoes the gusher splashes. ADDITIVE (a low-percentage
+        // mix just gets swamped by the bright teal body), banded by the iridescence
+        // phase so flecks drift through. Blue-dominant (R<B) so it stays violet.
+        float vBand = smoothstep(0.45, 0.85, 0.5 + 0.5 * cos(6.28318530718 * irT + 2.1));
+        col += vec3(0.45, 0.10, 0.78) * vBand * 0.6;
 
         // fresnel rim glow + slow overall breathing (brightening, not dimming)
-        col += ${_v3(ACTIVE_IRID.glow)} * fres * 0.45;
+        col += ${_v3(GUSHER_IRID.glow)} * fres * 0.45;
         col *= 1.0 + 0.1 * sin(uTime * 0.6);
 
         // lift saturation so the broadband opal sheen doesn't read dingy/gray
@@ -3542,8 +4066,8 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
 
     const tb = towerBounds;
     const S = scale;
-    // Radius slightly smaller than tank to avoid clipping through walls
-    const r = tb.radius * 0.78;
+    // Fluid radius as a fraction of the tank's inner radius (knob above).
+    const r = tb.radius * TOWER_FLUID_RADIUS_FRAC;
     // Gauge range: the markings don't start at the very bottom of the mesh.
     // gaugeBottom = fraction of total height where the "0" mark sits
     // gaugeTop   = fraction of total height where the "500" mark sits
@@ -3582,6 +4106,14 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
 // needs more dolly distance than the close-up MachinePanel.
 const TOWER_WINDOW_FRONT = /* @__PURE__ */ new THREE.Vector3(-1, 0, 0);
 const TOWER_FOCUS_DIST = 1.3;
+
+// ── Community tank sizing ────────────────────────────────────────────────────
+// TOWER_SCALE is the overall tower size. TOWER_FLUID_RADIUS_FRAC is how much of
+// the tank's inner radius the FLUID fills (the tank model is unchanged): 1.0 = the
+// fluid touches the walls, lower leaves a gap. Bump toward ~0.95 to fit the tank
+// better; back off if the column clips through the glass.
+const TOWER_SCALE = 0.1;
+const TOWER_FLUID_RADIUS_FRAC = 0.89;
 
 function OilTower({ position, communityOil = 0, totalOilBudget = 500, onFocusObject, onZoomOut }) {
   const { scene } = useGLTF("/models/OilTower.glb");
@@ -3647,7 +4179,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500, onFocusObj
       <primitive
         object={clonedScene}
         position={position}
-        scale={0.1}
+        scale={TOWER_SCALE}
         onClick={handleTowerClick}
         onPointerOver={() => { document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { document.body.style.cursor = "auto"; }}
@@ -3659,7 +4191,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500, onFocusObj
           /* Community tank fills relative to the whole field (OIL_FIELD_UNITS),
              not the $ prize pool — communityOil is in field units. */
           fill={Math.min(communityOil / OIL_FIELD_UNITS, 1)}
-          scale={0.1}
+          scale={TOWER_SCALE}
         />
       )}
     </group>
@@ -4311,7 +4843,7 @@ function WellGlowField({ positions }) {
 // changes to a positive value (depth uses oilStrike; pressure passes 0). When `alarm`
 // (a hell event) it overrides to a hard red strobe matching the alert beacon (~4 Hz).
 // Anchored to a screen's transform { pos, quat, w, h } when fromMesh, else docked.
-function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", idleHex = "#ffae00", flareKey = 0, alarm = false }) {
+function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", label = "", idleHex = "#ffae00", flareKey = 0, alarm = false }) {
   const matRef = useRef();
   const t = useRef(0);
   const prevFlare = useRef(flareKey);
@@ -4356,14 +4888,36 @@ function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", idleHex =
       <meshBasicMaterial ref={matRef} attach="material" color={idleHex} toneMapped={false} transparent depthWrite={false} side={THREE.DoubleSide} />
     </Text>
   );
+  // Small dim caption above the digits (e.g. "DEPTH"). sh = screen height so it
+  // scales with the readout. Sits near the top; digits nudge down to make room.
+  const caption = (sh) => label ? (
+    <Text
+      position={[0, sh * 0.34, 0]}
+      fontSize={sh * 0.19}
+      anchorX="center"
+      anchorY="middle"
+      letterSpacing={0.12}
+      color={idleHex}
+      font={undefined}
+      renderOrder={999}
+    >
+      {label}
+      <meshBasicMaterial attach="material" color={idleHex} toneMapped={false} transparent opacity={0.95} depthWrite={false} side={THREE.DoubleSide} />
+    </Text>
+  ) : null;
+
   // Mesh-driven: the digits lie directly on the PressurePanel2 quad (the mesh is the
   // screen, so no generated backing). Orientation comes from the quad's quaternion.
   if (fromMesh) {
+    const sh = h || 0.05;
     return (
       <group position={pos} quaternion={quat}>
         <group rotation={PANEL_MESH_ROT}>
           {/* lift inside the rotated frame so it pushes along the face normal */}
-          <group position={[0, 0, PANEL_TEXT_LIFT]}>{digits}</group>
+          <group position={[0, 0, PANEL_TEXT_LIFT]}>
+            {caption(sh)}
+            <group position={[0, label ? -sh * 0.1 : 0, 0]}>{digits}</group>
+          </group>
         </group>
       </group>
     );
@@ -4376,7 +4930,8 @@ function PanelReadout({ pos, quat, w, h, fromMesh = false, token = "", idleHex =
           <planeGeometry args={[PANEL_SCREEN_W, PANEL_SCREEN_H]} />
           <meshBasicMaterial color="#070a08" transparent opacity={0.92} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
-        {digits}
+        {caption(PANEL_SCREEN_H)}
+        <group position={[0, label ? -PANEL_SCREEN_H * 0.1 : 0, 0]}>{digits}</group>
       </group>
     </group>
   );
@@ -4955,7 +5510,7 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
   );
 }
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
   // Cells with a live gusher event. Each renders a full animated rig (instead of
   // merged static geometry) so the pump pauses + the rig pitches back as it erupts
   // — visible to every player, not just the gusher's owner.
@@ -4965,6 +5520,17 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
       if (ev.col != null && ev.row != null) s.add(`${ev.col}_${ev.row}`);
     });
     return s;
+  }, [gusherEvents]);
+
+  // Step 2 — cell → strike tier (strike|gusher|motherlode) so each erupting rig
+  // scales its 3D response. If two events share a cell, the last one wins (newest
+  // write); a missing entry defaults to "gusher" downstream.
+  const gusherTierByCell = useMemo(() => {
+    const m = new Map();
+    gusherEvents.forEach((ev) => {
+      if (ev.col != null && ev.row != null) m.set(`${ev.col}_${ev.row}`, ev.tier || "gusher");
+    });
+    return m;
   }, [gusherEvents]);
 
   // Linger set — cells whose gusher event JUST cleared. They keep a full rig (with
@@ -5091,6 +5657,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             drillDay={active ? drillDay : 0}
             maxDrillDay={maxDrillDay}
             depthCellSize={depthCellSize}
+            depositLayer={peakDepthMap[cellKey] ?? -1}
             highlighted={isSelected}
             pumpConfig={cellConfig}
             envMap={envMap}
@@ -5105,6 +5672,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             gusherTrigger={isSelected ? gusherTrigger : 0}
             gusherActive={hasGusher}
             gusherLingering={isLingering}
+            gusherTier={gusherTierByCell.get(cellKey) || "gusher"}
             hasMessages={!!plotsWithMessages[`${col}_${row}`]}
             onEnvelopeClick={() => onEnvelopeClick?.(col, row)}
             hellActive={hellActive && col === hellCol && row === hellRow}
@@ -5921,6 +6489,7 @@ export default function OilVoxelGrid({
   depthZ = 20,
   cellSize = 1,
   numberOfDeposits = 5,
+  numberOfHellPockets = null,
   totalOilBudget = 500,
   revealProgress = 0,
   animateReveal = false,
@@ -6041,12 +6610,28 @@ export default function OilVoxelGrid({
   const worldH = depthZ * depthCellSize;
   const worldD = gridY * cellSize;
 
-  const { deposits, hellPockets: generatedHellPockets } = useMemo(() => {
+  const { deposits, hellPockets: generatedHellPockets, peakDepthMap } = useMemo(() => {
     const result = generateOilDistribution3D({
       blockHash, gridX, gridY, depthZ, totalOilBudget: OIL_FIELD_UNITS, numberOfDeposits,
+      numberOfHellPockets, // match the server/admin count — else the 3D derives a different one
     });
-    return { deposits: result.deposits, hellPockets: result.hellPockets };
-  }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, totalOilBudget]);
+    // Per-column deposit depth: the layer (z) holding the most oil in that column.
+    // The gusher feeder emanates from here so the beam rises out of the deposit the
+    // cell actually holds, not from the current (often shallow) drill head.
+    const peak = {};
+    const g = result.grid;
+    for (let x = 0; x < gridX; x++) {
+      for (let y = 0; y < gridY; y++) {
+        let bestZ = -1, bestV = 0;
+        for (let z = 0; z < depthZ; z++) {
+          const v = g[x][y][z];
+          if (v > bestV) { bestV = v; bestZ = z; }
+        }
+        if (bestZ >= 0) peak[`${x}_${y}`] = bestZ;
+      }
+    }
+    return { deposits: result.deposits, hellPockets: result.hellPockets, peakDepthMap: peak };
+  }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, numberOfHellPockets, totalOilBudget]);
 
   // Build fragment shader with deposit data baked in as constants
   const fragmentShader = useMemo(() => {
@@ -6156,6 +6741,7 @@ export default function OilVoxelGrid({
             drillDay={drillDay}
             maxDrillDay={depthZ}
             depthCellSize={depthCellSize}
+            peakDepthMap={peakDepthMap}
             selectedCol={selectedCol}
             selectedRow={selectedRow}
             onSelectCell={onSelectCell}

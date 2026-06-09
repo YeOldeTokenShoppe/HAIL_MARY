@@ -49,8 +49,20 @@ export function generateOilDistribution3D({
   depthZ = 20,
   totalOilBudget = OIL_FIELD_UNITS,
   numberOfDeposits = 5,
-  radiusMin = 0.8,
-  radiusMax = 3.0,
+  // Hell-pocket count. null ⇒ derive from grid size (~3%). Decoupled from oil
+  // (separate RNG stream below), so changing it never moves the oil map and
+  // never affects provable-fairness verification.
+  numberOfHellPockets = null,
+  // Deposit blob radius range. Kept deliberately NARROW: a wide range (the old
+  // 0.8–3.0) made each seed re-roll deposit *sizes* across ~4×, so on a small
+  // grid the hit rate swung wildly seed-to-seed (e.g. 47%–86% at 4 deposits).
+  // Tightening the band stabilizes the hit rate near a target WITHOUT weakening
+  // fairness — placement (cx/cy) stays seed-random/unpredictable; only blob size
+  // is made consistent. NOTE: shared by strike-tick + the verifier + the preview,
+  // so this default changes all three together — lock it before the first real
+  // committed game (changing it remaps every seed).
+  radiusMin = 1.5,
+  radiusMax = 2.2,
   richnessMin = 0.6,
   richnessMax = 2.0,
   depthBias = OIL_DEPTH_BIAS,
@@ -62,19 +74,36 @@ export function generateOilDistribution3D({
     Array.from({ length: gridY }, () => new Array(depthZ).fill(0))
   );
 
-  function biasedDepth() {
-    const u = rand();
-    const biased = Math.pow(u, 1 - depthBias);
-    return biased * (depthZ - 1);
-  }
-
-  const deposits = Array.from({ length: numberOfDeposits }, () => ({
-    cx: rand() * (gridX - 1),
-    cy: rand() * (gridY - 1),
-    cz: biasedDepth(),
-    radius: radiusMin + rand() * (radiusMax - radiusMin),
-    richness: richnessMin + rand() * (richnessMax - richnessMin),
-  }));
+  // Deposits are STRATIFIED across the depth column so every season has reachable
+  // oil shallow (within the base PASSIVE depth cap) AND richer oil deeper — a ramp,
+  // not a wall. Without this, a depth-biased roll could put every deposit below the
+  // base cap, leaving low-depth rigs with a structural zero chance (bait-and-switch).
+  //
+  // Each deposit's depth is random WITHIN its stratum, and its (cx,cy) is fully
+  // seed-random — so WHICH cells hold oil stays unpredictable; only the public band
+  // structure is fixed. Provable fairness is unaffected (same as the old depthBias
+  // being a known parameter). Richness scales with depth: shallow = a modest taste,
+  // deep = the jackpot the bonus-depth grind earns. (depthBias is now unused; the
+  // stratification replaces it.)
+  const zMin = 1.0;
+  const zMax = depthZ - 1.5;
+  const N = Math.max(1, numberOfDeposits);
+  const deposits = Array.from({ length: N }, (_, i) => {
+    const cx = rand() * (gridX - 1);
+    const cy = rand() * (gridY - 1);
+    const bandLo = zMin + (i / N) * (zMax - zMin);
+    const bandHi = zMin + ((i + 1) / N) * (zMax - zMin);
+    const cz = bandLo + rand() * (bandHi - bandLo);
+    const radius = radiusMin + rand() * (radiusMax - radiusMin);
+    // Richness rises with depth in EXPECTATION, but the full range stays reachable
+    // at ANY depth — a shallow rig CAN still hit a rich pocket, just less often.
+    // Bias a uniform roll by depth: shallow skews modest (high exponent ⇒ mostly
+    // low, but a high roll still spikes), deep skews rich (low exponent).
+    const depthFrac = zMax > zMin ? (cz - zMin) / (zMax - zMin) : 0; // 0 shallow → 1 deep
+    const richExp = 2.4 - depthFrac * 2.0;     // ~2.4 shallow → ~0.4 deep
+    const richness = richnessMin + Math.pow(rand(), richExp) * (richnessMax - richnessMin);
+    return { cx, cy, cz, radius, richness };
+  });
 
   let rawTotal = 0;
   for (let x = 0; x < gridX; x++) {
@@ -154,10 +183,12 @@ export function generateOilDistribution3D({
   // Use a separate RNG stream so adding/removing hell pockets doesn't shift
   // oil deposit positions (the main rand has already been consumed above).
   const hellRng = createRNG(blockHash + "_hell");
-  const numberOfHellPockets = Math.max(1, Math.floor(gridX * gridY * 0.03)); // ~3% of grid
+  const hellCount = (numberOfHellPockets != null && numberOfHellPockets >= 0)
+    ? Math.floor(numberOfHellPockets)
+    : Math.max(1, Math.floor(gridX * gridY * 0.03)); // default ~3% of grid
   const hellPockets = [];
   const usedCells = new Set();
-  for (let i = 0; i < numberOfHellPockets * 3 && hellPockets.length < numberOfHellPockets; i++) {
+  for (let i = 0; i < hellCount * 20 && hellPockets.length < hellCount; i++) {
     const hx = Math.floor(hellRng() * gridX);
     const hy = Math.floor(hellRng() * gridY);
     const hz = Math.floor(hellRng() * (depthZ - 2)) + 2; // never at surface (z>=2)

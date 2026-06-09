@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Drill Animation Preview</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f6f7f9;
+        font-family: Arial, sans-serif;
+      }
+
+      #animation {
+        margin: 200px 0 0 200px;
+        position: relative;
+      }
+
+      #animation * {
+        position: absolute;
+      }
+
+      #drill {
+        animation: drillmove linear 1.5s infinite;
+        z-index: 3;
+      }
+
+      #drillingmiddle {
+        width: 15px;
+        height: 210px;
+        background: #192a3c;
+        margin: -10px 0 0 147px;
+      }
+
+      #drilling {
+        width: 30px;
+        height: 210px;
+        margin: -10px 0 0 140px;
+        background-image: repeating-linear-gradient(
+          -55deg,
+          transparent,
+          transparent 12px,
+          #192a3c 12px,
+          #192a3c 19px
+        );
+        animation: drilling linear 2.5s infinite;
+      }
+
+      #drilling::before {
+        content: none;
+      }
+
+      #drilling::after {
+        content: none;
+      }
+
+      #arrowhead {
+        width: 5px;
+        height: 0;
+        border-top: 10px solid #192a3c;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        margin: 200px 0 0 147px;
+      }
+
+      #drillhead {
+        width: 30px;
+        height: 10px;
+        background: #192a3c;
+        margin: -20px 0 0 140px;
+      }
+
+      @keyframes drilling {
+        0% {
+          background-position-y: 0px;
+        }
+
+        100% {
+          background-position-y: 700px;
+        }
+      }
+
+      @keyframes drillmove {
+        0% {
+          top: -20px;
+        }
+
+        50% {
+          top: -4px;
+        }
+
+        100% {
+          top: -20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="animation">
+      <div id="drill">
+        <div id="drillhead"></div>
+        <div id="drillingmiddle"></div>
+        <div id="drilling"></div>
+        <div id="arrowhead"></div>
+      </div>
+    </div>
+  </body>
+</html>

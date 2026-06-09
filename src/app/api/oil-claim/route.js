@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { authedUserId } from "@/lib/oilAuth";
+import { logTimeline } from "@/lib/oilTimeline";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,8 @@ export async function POST(req) {
     const drillRef = db.collection("oilDrills").doc(userId);
     const qualRef = db.collection("oilQualified").doc(userId);
 
+    const settings = (await db.collection("oilGame").doc("settings").get()).data() || {};
+
     // Qualification gate — server-authoritative. `qualified` is written only by
     // /api/oil-register (on-chain balance re-check) and the admin snapshot;
     // oilQualified is write:false, so the client cannot forge it. No plot
@@ -37,6 +40,30 @@ export async function POST(req) {
         { error: "Not qualified — register with a wallet holding at least $20 of RL80 first." },
         { status: 403 }
       );
+    }
+
+    const isTester = qualSnap.data().isTester === true;
+    if (isTester) {
+      // Testers are a TESTING construct — they may claim any time testing is on
+      // (including the active phase, so you can exercise the live loop). Testing
+      // must be OFF for any live game, so this never weakens real-game fairness.
+      if (settings.testingEnabled !== true) {
+        return NextResponse.json({ error: "Testing is currently disabled." }, { status: 403 });
+      }
+    } else {
+      // Fairness gate for real players — plots can ONLY be claimed before the map
+      // is knowable: during registration and before the future-block seed is
+      // anchored. Once anchored (or the game is active/ended), the operator could
+      // compute the map and tip insiders toward rich plots, so claiming closes.
+      // This is the timing defense that commit-reveal alone doesn't provide.
+      // See docs/oil-game.md → "Insider-tipping defense".
+      const claimsOpen = settings.gamePhase === "ticket_sale" && !settings.anchorBlockHash;
+      if (!claimsOpen) {
+        return NextResponse.json(
+          { error: "Claims are closed — plots are chosen during registration, before the map is locked in." },
+          { status: 403 }
+        );
+      }
     }
 
     // Derive this user's own referral code (wallet-based if we have it, else id).
@@ -107,6 +134,28 @@ export async function POST(req) {
 
       return fresh;
     });
+
+    // Public audit log (best-effort, server-only). For first-plot claims `anchored`
+    // is normally false (claims are registration/pre-anchor for real players), but
+    // we log it regardless so the record is complete. See oilClaimLog / docs.
+    try {
+      await db.collection("oilClaimLog").add({
+        type: "claim", userId, username: typeof username === "string" ? username.trim().slice(0, 60) : null,
+        col, row,
+        phase: settings.gamePhase || null,
+        anchored: !!settings.anchorBlockHash,
+        isTester,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      console.error("[oil-claim] audit log failed:", e.message);
+    }
+
+    // FIELD ACTIVITY feed — only announce brand-new players claiming (not silent
+    // re-claims), keeps the feed meaningful. No coords.
+    if (isNew) {
+      await logTimeline(db, { type: "claim", username: typeof username === "string" ? username.trim().slice(0, 60) || null : null, userId });
+    }
 
     return NextResponse.json({ ok: true, col, row, refCode });
   } catch (err) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { createDemonBounty } from "@/lib/oilDemon";
+import { logTimeline } from "@/lib/oilTimeline";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
@@ -91,6 +92,8 @@ async function endSeason(db) {
     console.error("[oil-strike-tick] season-end reveal failed:", err.message);
   }
 
+  await logTimeline(db, { type: "system", detail: "The season has ended" });
+
   return { ok: true, ended: true, swept, sweptOil };
 }
 
@@ -129,8 +132,11 @@ async function notifyTelegram(db, userId, text) {
   }
 }
 
-async function runTick({ force = false, deep = 1 } = {}) {
+async function runTick({ force = false, deep = 1, targetCol = null, targetRow = null } = {}) {
   const db = getAdminDb();
+  // Targeted admin strike: drill only the rig sitting on this cell (the survey-map
+  // selection). Other rigs are passed over silently — not counted as skips.
+  const targeted = targetCol != null && targetRow != null;
 
   const settingsSnap = await db.collection("oilGame").doc("settings").get();
   const settings = settingsSnap.exists ? settingsSnap.data() : {};
@@ -161,15 +167,25 @@ async function runTick({ force = false, deep = 1 } = {}) {
 
   const gridSize = settings.gridSize || 10;
   const depthZ = settings.depthZ || DEFAULT_DEPTH_Z;
-  const { grid, hellPockets } = generateOilDistribution3D({
+  const { grid, hellPockets, maxOil } = generateOilDistribution3D({
     blockHash: seed,
     gridX: gridSize,
     gridY: gridSize,
     depthZ,
     totalOilBudget: OIL_FIELD_UNITS, // field resolution, not the $ prize
     numberOfDeposits: settings.numberOfDeposits || 5,
+    numberOfHellPockets: settings.numberOfHellPockets ?? null, // null ⇒ derive from grid
   });
   const hellSet = new Set((hellPockets || []).map((p) => `${p.x}_${p.y}_${p.z}`));
+  // Strike tiers, relative to the field's single richest cell (self-calibrating
+  // per season). gusher ≥ 50%, motherlode ≥ 85%. Drives the feed label AND the
+  // scaled 3D response (gusherEvents.tier) in step 2.
+  const gusherThreshold = (maxOil || 0) * 0.5;
+  const motherlodeThreshold = (maxOil || 0) * 0.85;
+  const tierFor = (oil) => oil <= 0 ? "strike"
+    : (motherlodeThreshold > 0 && oil >= motherlodeThreshold) ? "motherlode"
+    : (gusherThreshold > 0 && oil >= gusherThreshold) ? "gusher"
+    : "strike";
 
   const now = new Date();
   const today = utcDateStr(now);
@@ -178,7 +194,10 @@ async function runTick({ force = false, deep = 1 } = {}) {
 
   const drillsSnap = await db.collection("oilDrills").get();
 
-  const summary = { struck: 0, skipped: 0, depleted: 0, errors: 0, demonsSummoned: 0 };
+  const summary = { struck: 0, skipped: 0, depleted: 0, errors: 0, demonsSummoned: 0, skipReasons: {} };
+  // Tally a skip with a human-readable reason so the admin FORCE STRIKE toast can
+  // say *why* nothing struck (e.g. every rig lost its plot to a board reset).
+  const skip = (reason) => { summary.skipped++; summary.skipReasons[reason] = (summary.skipReasons[reason] || 0) + 1; };
   const strikes = [];
   // Once a hell pocket summons a demon, the blockade halts drilling — stop
   // striking the remaining rigs this tick so we don't drill through the halt.
@@ -194,10 +213,13 @@ async function runTick({ force = false, deep = 1 } = {}) {
     const userId = docSnap.id;
     const { col, row } = drill;
 
-    if (summonedThisTick) { summary.skipped++; continue; }
+    // Targeted mode: ignore every rig except the one on the selected cell.
+    if (targeted && (col !== targetCol || row !== targetRow)) continue;
+
+    if (summonedThisTick) { skip("demon_blockade"); continue; }
     // Must hold a claimed plot and be armed (admin hard-disable via armed:false).
-    if (col == null || row == null) { summary.skipped++; continue; }
-    if (drill.armed === false) { summary.skipped++; continue; }
+    if (col == null || row == null) { skip("no_plot"); continue; }
+    if (drill.armed === false) { skip("disarmed"); continue; }
 
     const cellKey = `${col}_${row}`;
     const plotRef = db.collection("oilPlots").doc(cellKey);
@@ -224,10 +246,10 @@ async function runTick({ force = false, deep = 1 } = {}) {
     if (season) {
       const { windowStartMs, targetMs } = strikeTargetMs(season, tsMillis(drill.lastStrikeAt), gateDepth, depthCap, userId);
       gateWindowMs = windowStartMs;
-      if (!force && Date.now() < targetMs) { summary.skipped++; continue; }
+      if (!force && Date.now() < targetMs) { skip("not_yet"); continue; }
     } else {
-      if (!ignoreDayGuard && drill.lastStrikeDate === today) { summary.skipped++; continue; }
-      if (!force && nowMinutes < strikeMinuteFor(userId, today)) { summary.skipped++; continue; }
+      if (!ignoreDayGuard && drill.lastStrikeDate === today) { skip("struck_today"); continue; }
+      if (!force && nowMinutes < strikeMinuteFor(userId, today)) { skip("not_yet"); continue; }
     }
 
     try {
@@ -307,6 +329,7 @@ async function runTick({ force = false, deep = 1 } = {}) {
               if (demon.ok) {
                 summonedThisTick = true;
                 summary.demonsSummoned++;
+                await logTimeline(db, { type: "hell", username: outcome.username, userId, detail: "the field froze" });
                 await notifyTelegram(db, userId,
                   `🔥 <b>YOUR RIG BREACHED A HELL POCKET!</b>\nA demon is loose on the field — your unbanked tank fueled the bounty. Drilling is halted until it's banished.`);
               }
@@ -318,14 +341,18 @@ async function runTick({ force = false, deep = 1 } = {}) {
 
           // Normal strike: reuse gusherEvents so the existing 3D strike visual fires.
           if (outcome.oil > 0) {
+            const strikeTier = tierFor(outcome.oil); // strike | gusher | motherlode
             await db.collection("gusherEvents").add({
               col, row, userId,
               username: outcome.username,
               oilAmount: outcome.oil,
               depth: outcome.depth,
+              tier: strikeTier, // drives the size-scaled 3D response (step 2)
               createdAt: FieldValue.serverTimestamp(),
               status: "active",
             });
+            // FIELD ACTIVITY feed (who/what/when only — no amount, no coords).
+            await logTimeline(db, { type: strikeTier, username: outcome.username, userId });
           }
           // Best-effort retention hook — skipped during deep admin drills to avoid spam.
           if (deep === 1) {
@@ -338,7 +365,7 @@ async function runTick({ force = false, deep = 1 } = {}) {
           summary.depleted++;
           break;
         } else {
-          summary.skipped++;
+          skip("already_struck");
           break;
         }
       }
@@ -371,6 +398,7 @@ async function scoutOil() {
     depthZ,
     totalOilBudget: OIL_FIELD_UNITS, // field resolution, not the $ prize
     numberOfDeposits: settings.numberOfDeposits || 5,
+    numberOfHellPockets: settings.numberOfHellPockets ?? null, // null ⇒ derive from grid
   });
 
   const cells = [];
@@ -431,7 +459,9 @@ function authorized(req) {
   const pw = url.searchParams.get("password");
   if (process.env.ADMIN_PASSWORD && pw === process.env.ADMIN_PASSWORD) {
     const deep = Math.max(1, Math.min(parseInt(url.searchParams.get("deep") || "1", 10) || 1, 20));
-    return { ok: true, cron: false, force: url.searchParams.get("force") === "1", deep, scout: url.searchParams.get("scout") === "1", grant: url.searchParams.get("grant") };
+    const targetCol = url.searchParams.has("col") ? parseInt(url.searchParams.get("col"), 10) : null;
+    const targetRow = url.searchParams.has("row") ? parseInt(url.searchParams.get("row"), 10) : null;
+    return { ok: true, cron: false, force: url.searchParams.get("force") === "1", deep, scout: url.searchParams.get("scout") === "1", grant: url.searchParams.get("grant"), targetCol, targetRow };
   }
   return { ok: false };
 }
@@ -442,7 +472,7 @@ async function handle(req) {
   try {
     const result = a.grant ? await grantJumps(a.grant)
       : a.scout ? await scoutOil()
-      : await runTick({ force: a.force, deep: a.deep });
+      : await runTick({ force: a.force, deep: a.deep, targetCol: a.targetCol, targetRow: a.targetRow });
     return NextResponse.json(result);
   } catch (err) {
     console.error("[oil-strike-tick] Error:", err.message);

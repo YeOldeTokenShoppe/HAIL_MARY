@@ -177,6 +177,38 @@ exports.analyzePrayersManual = onRequest({
 // DISABLED 2026-01-24: Paused to save costs while setting up paper trading
 // To re-enable: uncomment the exports below and deploy with `firebase deploy --only functions`
 //
+// Daily oil-game qualification snapshot. Pings the App Hosting route with the
+// CRON_SECRET bearer; the route's GET cron path runs runSnapshot(), which only
+// acts during an ACTIVE game (no-op otherwise). The initial/entry qualification
+// check runs separately during registration — this is the ongoing re-check:
+// disqualify sellers (count-based), credit diamond-hands + deferred referrals.
+exports.oilQualifySnapshotDaily = onSchedule({
+  schedule: "0 7 * * *",  // 07:00 UTC daily
+  timeZone: "UTC",
+  memory: "256MiB",
+  timeoutSeconds: 300,
+  secrets: ["CRON_SECRET"],
+}, async () => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    logger.error("[oil-qualify cron] CRON_SECRET not configured");
+    return;
+  }
+  const appUrl = process.env.APP_URL || "https://pumpkin--hailmary-3ff6c.us-central1.hosted.app";
+  const endpoint = `${appUrl}/api/oil-qualify`;
+  try {
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${cronSecret}` },
+      signal: AbortSignal.timeout(120000),
+    });
+    const result = await res.json().catch(() => ({}));
+    logger.info("[oil-qualify cron] snapshot result:", result);
+  } catch (error) {
+    logger.error("[oil-qualify cron] failed:", error);
+  }
+});
+
 // exports.runScoringWorkflow = onSchedule({
 //   schedule: "0 * * * *",  // Every hour at minute 0
 //   timeZone: "UTC",
@@ -829,11 +861,15 @@ async function fetchRl80Timeframe(days, ratio, cgKey) {
   async function fetchCgOhlc() {
     const attempts = [];
     if (cgKey) {
-      attempts.push({
-        url: `${RL80_PRO_CG_ETH_OHLC}?vs_currency=usd&days=${days}`,
-        headers: {Accept: "application/json", "x-cg-pro-api-key": cgKey},
-        label: "pro",
-      });
+      // Only hit the Pro endpoint when explicitly opted in — a Demo key on
+      // pro-api.coingecko.com 400s (error 10011). Default to the Demo path.
+      if (process.env.COINGECKO_PRO === "true") {
+        attempts.push({
+          url: `${RL80_PRO_CG_ETH_OHLC}?vs_currency=usd&days=${days}`,
+          headers: {Accept: "application/json", "x-cg-pro-api-key": cgKey},
+          label: "pro",
+        });
+      }
       attempts.push({
         url: `${RL80_CG_ETH_OHLC}?vs_currency=usd&days=${days}`,
         headers: {Accept: "application/json", "x-cg-demo-api-key": cgKey},
@@ -927,23 +963,103 @@ async function fetchRl80Timeframe(days, ratio, cgKey) {
   };
 }
 
+// GeckoTerminal's free tier throttles bursts, so retry the pool fetch a few
+// times with linear backoff before giving up. On ultimate failure the caller
+// skips the write entirely, leaving the last-good marketData/rl80 doc intact.
+async function fetchPool() {
+  const retries = 3;
+  let lastStatus = 0;
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(RL80_GECKO_POOL, {
+      headers: {Accept: "application/json"},
+    });
+    if (res.ok) return res;
+    lastStatus = res.status;
+    if (i < retries - 1) {
+      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+  throw new Error(`pool fetch failed: ${lastStatus}`);
+}
+
+// Live ETH/USD. GeckoTerminal freezes its quote-token (ETH) USD price on
+// zero-volume pools, so its base_token_price_usd / fdv_usd are stale by
+// whatever ETH has moved since the pool last traded. We fetch a live ETH
+// price and re-derive RL80's USD from the (fresh) on-pool RL80/ETH ratio.
+// Tries CoinGecko (Demo key, then public), then Coinbase spot.
+async function fetchLiveEthUsd(cgKey) {
+  const cgUrl =
+    "https://api.coingecko.com/api/v3/simple/price" +
+    "?ids=ethereum&vs_currencies=usd";
+  const attempts = [];
+  if (cgKey) {
+    attempts.push({
+      url: cgUrl,
+      headers: {Accept: "application/json", "x-cg-demo-api-key": cgKey},
+      parse: (j) => j?.ethereum?.usd,
+      label: "coingecko-demo",
+    });
+  }
+  attempts.push({
+    url: cgUrl,
+    headers: {Accept: "application/json"},
+    parse: (j) => j?.ethereum?.usd,
+    label: "coingecko-public",
+  });
+  attempts.push({
+    url: "https://api.coinbase.com/v2/prices/ETH-USD/spot",
+    headers: {Accept: "application/json"},
+    parse: (j) => parseFloat(j?.data?.amount),
+    label: "coinbase",
+  });
+  for (const a of attempts) {
+    try {
+      const r = await fetch(a.url, {headers: a.headers});
+      if (!r.ok) {
+        logger.warn(`[rl80 market] ETH price ${a.label} status=${r.status}`);
+        continue;
+      }
+      const j = await r.json().catch(() => null);
+      const v = a.parse(j);
+      if (Number.isFinite(v) && v > 0) return {usd: v, source: a.label};
+    } catch (err) {
+      logger.warn(`[rl80 market] ETH price ${a.label} err: ${err.message}`);
+    }
+  }
+  return null;
+}
+
 async function refreshRl80MarketData() {
   const cgKey = process.env.COINGECKO_API_KEY || null;
 
-  const poolRes = await fetch(RL80_GECKO_POOL, {
-    headers: {Accept: "application/json"},
-  });
-  if (!poolRes.ok) {
-    throw new Error(`pool fetch failed: ${poolRes.status}`);
-  }
+  const poolRes = await fetchPool();
   const poolJson = await poolRes.json().catch(() => ({}));
   const pool = poolJson?.data?.attributes || {};
-  const priceUsd = parseFloat(pool.base_token_price_usd) || null;
   const poolPriceChange24h =
     parseFloat(pool.price_change_percentage?.h24) || 0;
   const ratio = parseFloat(pool.base_token_price_native_currency) || null;
-  const fdv = parseFloat(pool.fdv_usd) || null;
   const liquidity = parseFloat(pool.reserve_in_usd) || null;
+
+  // GeckoTerminal's USD figures (stale ETH on dormant pools) — kept as a
+  // fallback only.
+  const gtPriceUsd = parseFloat(pool.base_token_price_usd) || null;
+  const gtEthUsd = parseFloat(pool.quote_token_price_usd) || null;
+  const gtFdv = parseFloat(pool.fdv_usd) || null;
+
+  // Re-derive USD from the fresh RL80/ETH ratio × live ETH. Fall back to
+  // GeckoTerminal's values if the live ETH fetch fails so we never write null.
+  const ethLive = await fetchLiveEthUsd(cgKey);
+  let priceUsd = gtPriceUsd;
+  let fdv = gtFdv;
+  let ethPriceUsd = gtEthUsd;
+  let priceSource = "geckoterminal";
+  if (ethLive && ratio) {
+    ethPriceUsd = ethLive.usd;
+    priceUsd = ratio * ethLive.usd;
+    // Re-scale FDV off the corrected ETH (cancels GT's stale ETH/USD).
+    if (gtFdv && gtEthUsd) fdv = gtFdv * (ethLive.usd / gtEthUsd);
+    priceSource = `ratio×eth:${ethLive.source}`;
+  }
 
   const results = await Promise.all(
       RL80_ALLOWED_DAYS.map((d) =>
@@ -979,6 +1095,8 @@ async function refreshRl80MarketData() {
     fdv,
     liquidity,
     ratio,
+    ethPriceUsd,
+    priceSource,
     timeframes,
     updatedAt: FieldValue.serverTimestamp(),
     updatedAtIso: new Date().toISOString(),
@@ -989,7 +1107,7 @@ async function refreshRl80MarketData() {
 }
 
 exports.refreshRl80Market = onSchedule({
-  schedule: "every 1 minutes",
+  schedule: "every 5 minutes",
   timeZone: "UTC",
   memory: "256MiB",
   timeoutSeconds: 60,

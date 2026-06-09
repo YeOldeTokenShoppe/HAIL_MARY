@@ -20,7 +20,7 @@ export default function MusicButton({
   style = {},
   title,
 }) {
-  const { play, pause, isPlaying, isLoadingTrack } = useMusic();
+  const { play, pause, isPlaying, isLoadingTrack, nextTrack } = useMusic();
 
   const label = isLoadingTrack
     ? "Loading music…"
@@ -28,44 +28,61 @@ export default function MusicButton({
     ? "Pause music"
     : "Play music";
 
+  const btnStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: size,
+    height: size,
+    borderRadius: 10,
+    background,
+    border: `1.5px solid ${borderColor}`,
+    color: accent,
+    cursor: isLoadingTrack ? "wait" : "pointer",
+    padding: 0,
+    flexShrink: 0,
+    fontSize: 20,
+    fontFamily: "inherit",
+  };
+
   return (
-    <button
-      onClick={() => {
-        if (isLoadingTrack) return;
-        isPlaying ? pause() : play();
-      }}
-      title={title || label}
-      aria-label={label}
-      aria-busy={isLoadingTrack || undefined}
-      disabled={isLoadingTrack}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: size,
-        height: size,
-        borderRadius: 10,
-        background,
-        border: `1.5px solid ${borderColor}`,
-        color: accent,
-        cursor: isLoadingTrack ? "wait" : "pointer",
-        padding: 0,
-        flexShrink: 0,
-        fontSize: 20,
-        fontFamily: "inherit",
-        ...style,
-      }}
-    >
-      <span
-        style={
-          isLoadingTrack
-            ? { display: "inline-block", animation: "mbSpin 0.9s linear infinite" }
-            : undefined
-        }
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, ...style }}>
+      <button
+        onClick={() => {
+          if (isLoadingTrack) return;
+          isPlaying ? pause() : play();
+        }}
+        title={title || label}
+        aria-label={label}
+        aria-busy={isLoadingTrack || undefined}
+        disabled={isLoadingTrack}
+        style={btnStyle}
       >
-        {isLoadingTrack ? "◌" : isPlaying ? "⏸" : "♫"}
-      </span>
+        <span
+          style={
+            isLoadingTrack
+              ? { display: "inline-block", animation: "mbSpin 0.9s linear infinite" }
+              : undefined
+          }
+        >
+          {isLoadingTrack ? "◌" : isPlaying ? "⏸" : "♫"}
+        </span>
+      </button>
+      {isPlaying && typeof nextTrack === "function" && (
+        <button
+          onClick={() => {
+            if (isLoadingTrack) return;
+            nextTrack();
+          }}
+          title="Skip track"
+          aria-label="Skip to next track"
+          disabled={isLoadingTrack}
+          style={{ ...btnStyle, fontSize: 16 }}
+        >
+          ⏭
+        </button>
+      )}
       <style>{"@keyframes mbSpin{to{transform:rotate(360deg)}}"}</style>
-    </button>
+    </div>
   );
 }

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Field Activity — Timeline Feed Mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #12161c; --text: #b0bcc8; --textStrong: #d4dce4; --accent: #d4a854;
+    --muted: #6a7888; --border: #242c38; --panelBg: rgba(18,22,28,0.95);
+    --barBg: #1e2630; --green: #6aaa6a; --warn: #cc7755; --red: #e06060;
+    --gold: #d4a854; --cyan: #6bc7d1;
+    --mono: 'Share Tech Mono', monospace; --orb: 'Orbitron', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background:
+      radial-gradient(1200px 600px at 70% -10%, #1a2230 0%, #0c0f14 60%) , #0c0f14;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px; font-family: var(--mono); color: var(--text);
+  }
+
+  /* ── Panel (matches the side-panel chrome) ───────────────────────────── */
+  .panel {
+    width: 340px; background: var(--panelBg);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 14px 14px 8px; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+  .panel__head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .panel__title {
+    margin: 0; font-family: var(--mono); font-size: 11px; font-weight: 600;
+    color: var(--accent); letter-spacing: 0.2em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .panel__title svg { stroke: var(--gold); }
+  .live {
+    display: flex; align-items: center; gap: 5px; font-size: 8px;
+    letter-spacing: 0.14em; color: var(--green);
+  }
+  .live .pip {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 6px var(--green); animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* ── Feed: single vertical spine with node dots ──────────────────────── */
+  .feed { position: relative; padding: 2px 0; }
+  .feed::before {
+    content: ""; position: absolute; left: 7px; top: 4px; bottom: 4px;
+    width: 2px; background: linear-gradient(180deg, var(--border), rgba(36,44,56,0.15));
+  }
+  .item {
+    position: relative; padding: 0 0 14px 26px; cursor: default;
+  }
+  .item:last-child { padding-bottom: 4px; }
+  .dot {
+    position: absolute; left: 1px; top: 1px; width: 15px; height: 15px;
+    border-radius: 50%; background: var(--bg);
+    border: 2px solid var(--muted); display: grid; place-items: center;
+  }
+  .item__line {
+    font-size: 11px; line-height: 1.45; color: var(--text);
+  }
+  .item__who { color: var(--textStrong); font-weight: 700; }
+  .item__icon { margin-right: 5px; }
+  .item__meta {
+    margin-top: 2px; font-size: 9px; color: var(--muted); letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .item__sub { color: var(--muted); font-style: italic; }
+
+  /* event-type accents (dot ring + icon color) */
+  .strike .dot { border-color: var(--gold); box-shadow: 0 0 7px rgba(212,168,84,0.4); }
+  .strike .item__icon { color: var(--gold); }
+  .gusher .dot { border-color: var(--gold); background: var(--gold); }
+  .gusher .item__icon { color: var(--gold); }
+  .gusher .item__line { }
+  .hell .dot { border-color: var(--red); box-shadow: 0 0 9px rgba(224,96,96,0.5); }
+  .hell .item__icon { color: var(--red); }
+  .hell .item__who { color: #f0a098; }
+  .contain .dot { border-color: var(--cyan); box-shadow: 0 0 7px rgba(107,199,209,0.4); }
+  .contain .item__icon { color: var(--cyan); }
+  .rogue .dot { border-color: var(--warn); }
+  .rogue .item__icon { color: var(--warn); }
+  .claim .dot { border-color: var(--muted); }
+  .claim .item__icon { color: var(--muted); }
+  .system .dot { border-color: var(--accent); background: var(--accent); }
+  .system .item__line { color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
+
+  .foot {
+    text-align: center; font-size: 8px; color: var(--muted); letter-spacing: 0.1em;
+    padding: 8px 0 4px; border-top: 1px solid var(--border); margin-top: 4px;
+  }
+  .note { width: 340px; margin: 14px auto 0; font-size: 9px; color: #55606e; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="panel">
+      <div class="panel__head">
+        <h3 class="panel__title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          FIELD ACTIVITY
+        </h3>
+        <span class="live"><span class="pip"></span>LIVE</span>
+      </div>
+
+      <div class="feed">
+        <div class="item strike">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">⛏</span><span class="item__who">ProspectorJane</span> struck oil</div>
+          <div class="item__meta">2m ago</div>
+        </div>
+
+        <div class="item gusher">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">💎</span><span class="item__who">vault_lord</span> hit a gusher!</div>
+          <div class="item__meta">9m ago</div>
+        </div>
+
+        <div class="item hell">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">☠</span><span class="item__who">unlucky_pete</span> breached a hell pocket</div>
+          <div class="item__meta">14m ago<span class="item__sub">— the field froze</span></div>
+        </div>
+
+        <div class="item contain">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">🛡</span><span class="item__who">MoonMike</span> contained the demon</div>
+          <div class="item__meta">18m ago<span class="item__sub">— drilling resumed</span></div>
+        </div>
+
+        <div class="item claim">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">⚑</span><span class="item__who">satoshi_jr</span> claimed a plot</div>
+          <div class="item__meta">41m ago</div>
+        </div>
+
+        <div class="item rogue">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">⚠</span> a rogue prospector appeared near <span class="item__who">GridGoblin</span></div>
+          <div class="item__meta">1h ago</div>
+        </div>
+
+        <div class="item strike">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">⛏</span><span class="item__who">diamond_deb</span> struck oil</div>
+          <div class="item__meta">2h ago</div>
+        </div>
+
+        <div class="item strike">
+          <span class="dot"></span>
+          <div class="item__line"><span class="item__icon">⛏</span><span class="item__who">rig_rat_88</span> struck oil</div>
+          <div class="item__meta">3h ago</div>
+        </div>
+
+        <div class="item system">
+          <span class="dot"></span>
+          <div class="item__line">Season 1 began</div>
+          <div class="item__meta">4h ago</div>
+        </div>
+      </div>
+
+      <div class="foot">SHOWING LAST 24H · WHO + WHAT + WHEN</div>
+    </div>
+
+    <p class="note">
+      Mock — single-rail timeline feed in the dark/industrial theme. Newest first, live-prepending,
+      scrollable. No amounts, no coordinates (kept off until the post-game reveal). Dot color + icon carry
+      the event type: ⛏ strike (gold) · 💎 gusher (filled gold) · ☠ hell breach (red) · 🛡 contained (cyan) ·
+      ⚠ rogue (amber) · ⚑ claim (muted) · system milestone (filled gold).
+    </p>
+  </div>
+</body>
+</html>

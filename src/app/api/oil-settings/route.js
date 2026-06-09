@@ -14,13 +14,14 @@ import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 // is published. The seed is revealed (published) at game end for verification.
 const ALLOWED_FIELDS = new Set([
   "numberOfDeposits",
+  "numberOfHellPockets",
   "totalOilBudget",
   "gridSize",
   "gamePhase",
   "gameEnded",
-  "gameDay",
   "gameStartDate",
   "seasonLengthDays",
+  "testingEnabled",
 ]);
 
 const sha256Hex = (s) => createHash("sha256").update(String(s)).digest("hex");
