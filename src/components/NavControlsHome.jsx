@@ -228,7 +228,7 @@ export default function NavControlsHome({
           height: 40px;
           width: 40px;
           border-radius: 10px;
-          font-size: 1.5rem;
+          font-size: 1.2rem;
           color: rgba(212, 175, 55, 0.8);
         }
         

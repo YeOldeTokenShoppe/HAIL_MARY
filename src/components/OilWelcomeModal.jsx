@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { HOW_TO_PLAY_STEPS } from "./HowToPlayPanel";
+import HowToPlayDialogue from "./HowToPlayDialogue";
 
 // First-visit onboarding overlay for /hailmary. Shows a character greeting video
 // up top with the How-to-Play steps below. Re-openable via the "?" help button.
@@ -70,23 +71,8 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
           ×
         </button>
 
-        {/* Character greeting video */}
-        <div style={{
-          position: "relative", width: "100%",
-          background: "#000",
-          borderTopLeftRadius: 10, borderTopRightRadius: 10,
-          overflow: "hidden",
-        }}>
-          <video
-            src="/videos/gr80_greetings.mp4"
-            poster="/gr80_thumbnail.png"
-            autoPlay
-            muted
-            loop
-            playsInline
-            style={{ display: "block", width: "100%", height: "auto" }}
-          />
-        </div>
+        {/* Character greeting — St. GR80 & John Barron SitePal dialogue */}
+        <HowToPlayDialogue darkMode={darkMode} />
 
         {/* Heading */}
         <div style={{ padding: "16px 18px 4px" }}>

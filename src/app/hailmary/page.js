@@ -644,7 +644,7 @@ const FREE_CLAIM_JUMPS = 2;
 const DEMON_BOUNTY_TTL_MS = 24 * 60 * 60 * 1000; // 24h orphan backstop
 
 // Continuous orbit exactly like the Three.js horse example. Stops when user interacts.
-function CameraFlyIn({ onComplete, mobile = false }) {
+function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
   const { camera, gl } = useThree();
   const elapsed = useRef(0);
   const done = useRef(false);
@@ -683,50 +683,62 @@ function CameraFlyIn({ onComplete, mobile = false }) {
       p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
     const TWO_PI = Math.PI * 2;
 
+    // The orbit was tuned for a 10×10 field; the grid renders at a world footprint
+    // of gridSize×CELL_SIZE, so a smaller grid (e.g. 6×6) is physically smaller and
+    // the fixed-radius orbit ends up circling way out past empty ground. Scale the
+    // orbit radius, horizontal drift, height-ABOVE-surface, and bob by gridSize/10
+    // so smaller fields get the same framing (camera flies more directly over the
+    // field) while the look-at stays pinned to the surface center. f=1 at gridSize 10
+    // reproduces the original tuning exactly.
+    const f = grid / 10;
+
     if (mobile) {
       // Mobile: wide field-and-tower shot → close orbit among the rigs
-      const dur = 7;
+      const dur = 10;
       const k = easeInOutCubic(Math.min(time / dur, 1)); // eased radius/height settle
-      const r = 9 + (2 - 9) * k;
-      const baseY = 5 + (2 - 5) * k;
+      const SURFACE = 1.5; // mobile rig surface / look-at height
+      const r = (9 + (2 - 9) * k) * f;
+      const baseY = SURFACE + (3.5 + (0.5 - 3.5) * k) * f;
       // Drift the orbit pivot + look-at off the central tower and into the rig
       // field as it descends, so the wide establishing shot still centers the
       // tower but the close orbit makes the rigs (not the tower) the subject.
-      const cx = 1.5 * k;
-      const cz = 1.5 * k;
+      const cx = 1.5 * k * f;
+      const cz = 1.5 * k * f;
       // One constant spin rate the whole time: half a revolution over the descent,
       // then keeps orbiting at that same speed (no part-two slowdown).
       const angle = (TWO_PI * 0.3 / dur) * time;
       camera.position.set(
         cx + Math.sin(angle) * r,
-        baseY + 0.8 * Math.cos(time / 5),
+        baseY + 0.8 * f * Math.cos(time / 5),
         cz + Math.cos(angle) * r,
       );
-      camera.lookAt(cx, 1.5, cz);
+      camera.lookAt(cx, SURFACE, cz);
     } else {
       // Desktop: wide field-and-tower shot → resting orbit near the rigs
-      const dur = 9;
+      const dur = 13;
       const k = easeInOutCubic(Math.min(time / dur, 1)); // eased radius/height settle
-      const r = 18 + (5 - 18) * k;
       // The desktop rig surface sits at world y≈5 (grid group offset). Keep the
       // settled height + bob ABOVE that so the orbit never dips into the
-      // substance volume (baseY 7.5 − 1.5 bob = 6 min), and look at the surface
-      // (y=5), not below it.
-      const baseY = 10 + (7.5 - 10) * k;
+      // substance volume, and look at the surface (y=5), not below it. Heights are
+      // expressed as an offset above SURFACE so scaling by f never sinks the camera
+      // into the ground for small grids.
+      const SURFACE = 5;
+      const r = (18 + (5 - 18) * k) * f;
+      const baseY = SURFACE + (5 + (2.5 - 5) * k) * f;
       // Drift the orbit pivot + look-at off the central tower and into the rig
       // field as it descends, so the wide establishing shot still centers the
       // tower but the close orbit makes the rigs (not the tower) the subject.
-      const cx = 3 * k;
-      const cz = 3 * k;
+      const cx = 3 * k * f;
+      const cz = 3 * k * f;
       // One constant spin rate the whole time: half a revolution over the descent,
       // then keeps orbiting at that same speed (no part-two slowdown).
       const angle = (TWO_PI * 0.5 / dur) * time;
       camera.position.set(
         cx + Math.sin(angle) * r,
-        baseY + 1.5 * Math.cos(time / 5),
+        baseY + 1.5 * f * Math.cos(time / 5),
         cz + Math.cos(angle) * r,
       );
-      camera.lookAt(cx, 5, cz);
+      camera.lookAt(cx, SURFACE, cz);
     }
   });
 
@@ -1085,6 +1097,96 @@ function toolbarBtn(active, size = 28, variant = "gold") {
     boxShadow: active && V.glow ? `0 0 8px ${V.glow}` : "none",
     textShadow: active && V.glow ? `0 0 6px ${V.color}` : "none",
   };
+}
+
+// Time-of-day glyphs, shared between the tray buttons and the collapsed trigger.
+const ICON_DAY = (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+);
+const ICON_DUSK = (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>
+);
+const ICON_NIGHT = (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+);
+const TIME_OF_DAY = [["day", ICON_DAY], ["dusk", ICON_DUSK], ["night", ICON_NIGHT]];
+
+// Collapsible scene/theme toolbar (top-right over the 3D canvas). Defaults to a
+// single trigger button that mirrors the ACTIVE theme's glyph so current state
+// stays readable at a glance; clicking expands the full tray. Click-away or Esc
+// collapses it again. Themes are a set-once preference, so they don't earn
+// permanent screen space over the hero shot of the field.
+function SceneThemeToolbar({
+  envPreset, setEnvPreset, darkMode, setDarkMode,
+  parabolum, setParabolum, GeodeMode, setGeodeMode,
+  setFireworksOn, size = 28,
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Glyph + tint shown on the collapsed trigger, reflecting the active theme.
+  let triggerGlyph, triggerVariant = "gold";
+  if (GeodeMode) { triggerGlyph = "⊞"; triggerVariant = "cyan"; }
+  else if (parabolum) { triggerGlyph = "◈"; triggerVariant = "violet"; }
+  else if (envPreset === "solstice") triggerGlyph = "✺";
+  else if (darkMode || envPreset === "night") triggerGlyph = ICON_NIGHT;
+  else if (envPreset === "dusk") triggerGlyph = ICON_DUSK;
+  else triggerGlyph = ICON_DAY;
+
+  return (
+    <div ref={ref} style={TOOLBAR_TRAY}>
+      {open && (
+        <>
+          {TIME_OF_DAY.map(([key, icon]) => (
+            <button
+              key={key}
+              title={key[0].toUpperCase() + key.slice(1)}
+              onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
+              style={toolbarBtn(envPreset === key, size)}
+            >{icon}</button>
+          ))}
+          <div style={TOOLBAR_DIVIDER} />
+          <button
+            title="Solstice theme"
+            onClick={() => { setEnvPreset("solstice"); setParabolum(false); setGeodeMode(false); setDarkMode(false); setFireworksOn(false); }}
+            style={toolbarBtn(envPreset === "solstice" && !parabolum && !GeodeMode, size)}
+          >✺</button>
+          <button
+            title={darkMode ? "Dark theme (active)" : "Dark theme"}
+            onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
+            style={toolbarBtn(darkMode, size)}
+          >{darkMode ? "●" : "◐"}</button>
+          <button
+            title="Lyquid80 theme"
+            onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
+            style={toolbarBtn(parabolum, size, "violet")}
+          >◈</button>
+          <button
+            title="Geode theme"
+            onClick={() => { setGeodeMode((h) => !h); setParabolum(false); }}
+            style={toolbarBtn(GeodeMode, size, "cyan")}
+          >⊞</button>
+          <div style={TOOLBAR_DIVIDER} />
+        </>
+      )}
+      <button
+        title={open ? "Hide scene & theme controls" : "Scene & theme"}
+        onClick={() => setOpen((o) => !o)}
+        style={toolbarBtn(!open, size, triggerVariant)}
+      >{open ? "✕" : triggerGlyph}</button>
+    </div>
+  );
 }
 
 export default function OilPage() {
@@ -6016,7 +6118,7 @@ export default function OilPage() {
                     <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
                   </>
                 ) : introRig ? null : (
-                  <CameraFlyIn onComplete={() => setIntroComplete(true)} mobile />
+                  <CameraFlyIn onComplete={() => setIntroComplete(true)} mobile grid={gridSize} />
                 )}
                 <CameraShake shakeRef={shakeRef} />
               </CleanCanvas>
@@ -6047,18 +6149,13 @@ export default function OilPage() {
                   </div>
                 );
               })()}
-              <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, display: "flex", gap: 4 }}>
+              <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, ...TOOLBAR_TRAY }}>
                 <button
                   onClick={toggleFireworks}
                   title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
-                  style={{
-                    width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-                    background: fireworksOn ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
-                    border: `1px solid ${fireworksOn ? theme.goldBorder : theme.cornerBorder}`,
-                    borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
-                  }}
+                  style={toolbarBtn(fireworksOn, 26)}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 2 L14 8 L12 6 L10 8 Z" />
                     <path d="M12 6 L12 12" />
                     <path d="M8 14 L5 11" /><path d="M16 14 L19 11" />
@@ -6071,14 +6168,9 @@ export default function OilPage() {
                   <button
                     onClick={() => setFireworksSound((s) => !s)}
                     title={fireworksSound ? "Mute fireworks sound" : "Unmute fireworks sound"}
-                    style={{
-                      width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-                      background: fireworksSound ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
-                      border: `1px solid ${fireworksSound ? theme.goldBorder : theme.cornerBorder}`,
-                      borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
-                    }}
+                    style={toolbarBtn(fireworksSound, 26)}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 5 6 9H2v6h4l5 4z" />
                       {fireworksSound ? (
                         <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
@@ -6090,51 +6182,24 @@ export default function OilPage() {
                 )}
                 <button
                   title="Snapshot"
-              onClick={handleManualSnapshot}
-                  style={{
-                    width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "rgba(212,168,84,0.15)", border: `1px solid ${theme.cornerBorder}`,
-                    borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
-                  }}
+                  onClick={handleManualSnapshot}
+                  style={toolbarBtn(false, 26)}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                     <circle cx="12" cy="13" r="4"/>
                   </svg>
                 </button>
               </div>
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10 }}>
-                <div style={TOOLBAR_TRAY}>
-                {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
-                  <button
-                    key={key}
-                    title={key[0].toUpperCase() + key.slice(1)}
-                    onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
-                    style={toolbarBtn(envPreset === key, 26)}
-                  >{icon}</button>
-                ))}
-                <div style={TOOLBAR_DIVIDER} />
-                <button
-                  title="Solstice theme"
-                  onClick={() => { setEnvPreset("solstice"); setParabolum(false); setGeodeMode(false); setDarkMode(false); setFireworksOn(false); }}
-                  style={toolbarBtn(envPreset === "solstice" && !parabolum && !GeodeMode, 26)}
-                >✺</button>
-                <button
-                  title={darkMode ? "Dark theme (active)" : "Dark theme"}
-                  onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
-                  style={toolbarBtn(darkMode, 26)}
-                >{darkMode ? "●" : "◐"}</button>
-                <button
-                  title="Lyquid80 theme"
-                  onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
-                  style={toolbarBtn(parabolum, 26, "violet")}
-                >◈</button>
-                <button
-                  title="Geode theme"
-                  onClick={() => { setGeodeMode((h) => !h); setParabolum(false); }}
-                  style={toolbarBtn(GeodeMode, 26, "cyan")}
-                >⊞</button>
-                </div>
+                <SceneThemeToolbar
+                  size={26}
+                  envPreset={envPreset} setEnvPreset={setEnvPreset}
+                  darkMode={darkMode} setDarkMode={setDarkMode}
+                  parabolum={parabolum} setParabolum={setParabolum}
+                  GeodeMode={GeodeMode} setGeodeMode={setGeodeMode}
+                  setFireworksOn={setFireworksOn}
+                />
               </div>
             </div>
           )}
@@ -6575,7 +6640,7 @@ export default function OilPage() {
                 <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />
               </>
             ) : introRig ? null : (
-              <CameraFlyIn onComplete={() => setIntroComplete(true)} />
+              <CameraFlyIn onComplete={() => setIntroComplete(true)} grid={gridSize} />
             )}
             <CameraShake shakeRef={shakeRef} />
           </CleanCanvas>
@@ -6587,18 +6652,13 @@ export default function OilPage() {
           <div style={styles.gridLabel}>
             {gridSize}&times;{gridSize}&times;{DEPTH_Z} VOXEL GRID
           </div>
-          <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, display: "flex", gap: 4 }}>
+          <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, ...TOOLBAR_TRAY }}>
             <button
               onClick={toggleFireworks}
               title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
-              style={{
-                width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                background: fireworksOn ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
-                border: `1px solid ${fireworksOn ? theme.goldBorder : theme.cornerBorder}`,
-                borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
-              }}
+              style={toolbarBtn(fireworksOn, 28)}
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2 L14 8 L12 6 L10 8 Z" />
                 <path d="M12 6 L12 12" />
                 <path d="M8 14 L5 11" /><path d="M16 14 L19 11" />
@@ -6611,14 +6671,9 @@ export default function OilPage() {
               <button
                 onClick={() => setFireworksSound((s) => !s)}
                 title={fireworksSound ? "Mute fireworks sound" : "Unmute fireworks sound"}
-                style={{
-                  width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                  background: fireworksSound ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
-                  border: `1px solid ${fireworksSound ? theme.goldBorder : theme.cornerBorder}`,
-                  borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
-                }}
+                style={toolbarBtn(fireworksSound, 28)}
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 5 6 9H2v6h4l5 4z" />
                   {fireworksSound ? (
                     <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
@@ -6631,50 +6686,23 @@ export default function OilPage() {
             <button
               title="Snapshot"
               onClick={handleManualSnapshot}
-              style={{
-                width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(212,168,84,0.15)", border: `1px solid ${theme.cornerBorder}`,
-                borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
-              }}
+              style={toolbarBtn(false, 28)}
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
               </svg>
             </button>
           </div>
           <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={TOOLBAR_TRAY}>
-            {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
-              <button
-                key={key}
-                title={key[0].toUpperCase() + key.slice(1)}
-                onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
-                style={toolbarBtn(envPreset === key, 28)}
-              >{icon}</button>
-            ))}
-            <div style={TOOLBAR_DIVIDER} />
-            <button
-              title="Solstice theme"
-              onClick={() => { setEnvPreset("solstice"); setParabolum(false); setGeodeMode(false); setDarkMode(false); setFireworksOn(false); }}
-              style={toolbarBtn(envPreset === "solstice" && !parabolum && !GeodeMode, 28)}
-            >✺</button>
-            <button
-              title={darkMode ? "Dark theme (active)" : "Dark theme"}
-              onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
-              style={toolbarBtn(darkMode, 28)}
-            >{darkMode ? "●" : "◐"}</button>
-            <button
-              title="Lyquid80 theme"
-              onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
-              style={toolbarBtn(parabolum, 28, "violet")}
-            >◈</button>
-            <button
-              title="Geode theme"
-              onClick={() => { setGeodeMode((h) => !h); setParabolum(false); }}
-              style={toolbarBtn(GeodeMode, 28, "cyan")}
-            >⊞</button>
-            </div>
+            <SceneThemeToolbar
+              size={28}
+              envPreset={envPreset} setEnvPreset={setEnvPreset}
+              darkMode={darkMode} setDarkMode={setDarkMode}
+              parabolum={parabolum} setParabolum={setParabolum}
+              GeodeMode={GeodeMode} setGeodeMode={setGeodeMode}
+              setFireworksOn={setFireworksOn}
+            />
             <button
               title={panelsCollapsed ? "Show side panel" : "Hide side panel"}
               onClick={() => setPanelsCollapsed((p) => !p)}
