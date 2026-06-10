@@ -24,8 +24,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 const ACCOUNT = "9308752";
 
 // SitePal scene identity (from CyborgTempleScene's SITEPAL_PROJECTION_CONFIG).
-const MONK = { key: "monk", label: "St. GR80", sceneId: 2774449, hash: "SfJwD81CkTeyemxPllatiMuMQDBGhBgZ" };
-const JOHN = { key: "john", label: "John Barron", sceneId: 2774900, hash: "YnR4tCeRwrDH29TfMAxvtPb4anz6oa6n" };
+// Intro-only GR80 scene (a dedicated build for the How-to-Play dialogue) —
+// distinct from /trade's monk scene (2774449), which is unchanged.
+const MONK = { key: "monk", label: "St. GR80", sceneId: 2775053, hash: "I0s05E8rXxvHYHdJIPmcIU5msqkW6t0A" };
+// Intro-only John scene (a dedicated, better build for the How-to-Play
+// dialogue) — distinct from /trade's Demon scene (2774900), which is unchanged.
+const JOHN = { key: "john", label: "John Barron", sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb" };
 
 // St. GR80's SitePal TTS voice — "Gilbert" (UK English male), with the reverb
 // effect the character uses on /trade.

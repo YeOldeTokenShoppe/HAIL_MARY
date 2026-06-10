@@ -697,22 +697,31 @@ function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
       const dur = 10;
       const k = easeInOutCubic(Math.min(time / dur, 1)); // eased radius/height settle
       const SURFACE = 1.5; // mobile rig surface / look-at height
-      const r = (9 + (2 - 9) * k) * f;
-      const baseY = SURFACE + (3.5 + (0.5 - 3.5) * k) * f;
-      // Drift the orbit pivot + look-at off the central tower and into the rig
-      // field as it descends, so the wide establishing shot still centers the
-      // tower but the close orbit makes the rigs (not the tower) the subject.
-      const cx = 1.5 * k * f;
-      const cz = 1.5 * k * f;
-      // One constant spin rate the whole time: half a revolution over the descent,
-      // then keeps orbiting at that same speed (no part-two slowdown).
+      // Orbit pivots on the field center (no drift toward a corner). The bob and
+      // look-at are COUPLED into a slow "breathing" reveal: at the crest the camera
+      // rises, the orbit eases outward, and the look-at lifts toward the tower top
+      // (~y4.5 world, base y1 + ~3.5 tall) — tilting the camera UP so the oil
+      // tower's top swings into frame; at the trough it returns to the centered,
+      // rig-level framing. up = 0 at trough, 1 at crest.
+      // Vertical motion is a cosine SHAPED to dwell low: raw is a symmetric 0..1
+      // cosine; squaring it biases toward 0, so the camera spends most of each
+      // cycle down among the rigs and only briefly springs up to peek at the
+      // tower. Everything (height, radius, look-at) is driven off this shaped up.
+      const raw = (Math.cos(time / 8) + 1) * 0.5;  // 0..1, symmetric (slow period)
+      const up = raw * raw;                        // biased toward 0 → ground dwell
+      const r = (9 + (1.6 - 9) * k) * f * (1 + 0.12 * up);
+      // baseY is the low, close rig-orbit height (settle ~1.7); the crest climb is
+      // ADDED on top via up, so the floor never dips below it.
+      const baseY = SURFACE + (3.5 + (0.2 - 3.5) * k) * f;
       const angle = (TWO_PI * 0.3 / dur) * time;
       camera.position.set(
-        cx + Math.sin(angle) * r,
-        baseY + 0.8 * f * Math.cos(time / 5),
-        cz + Math.cos(angle) * r,
+        Math.sin(angle) * r,
+        baseY + 1.4 * f * up,
+        Math.cos(angle) * r,
       );
-      camera.lookAt(cx, SURFACE, cz);
+      // Tower top is a fixed world height (NOT field-scaled), so the look-at lift
+      // is an absolute amount, independent of grid size.
+      camera.lookAt(0, SURFACE + 2.0 * up, 0);
     } else {
       // Desktop: wide field-and-tower shot → resting orbit near the rigs
       const dur = 13;
@@ -723,22 +732,32 @@ function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
       // expressed as an offset above SURFACE so scaling by f never sinks the camera
       // into the ground for small grids.
       const SURFACE = 5;
-      const r = (18 + (5 - 18) * k) * f;
-      const baseY = SURFACE + (5 + (2.5 - 5) * k) * f;
-      // Drift the orbit pivot + look-at off the central tower and into the rig
-      // field as it descends, so the wide establishing shot still centers the
-      // tower but the close orbit makes the rigs (not the tower) the subject.
-      const cx = 3 * k * f;
-      const cz = 3 * k * f;
-      // One constant spin rate the whole time: half a revolution over the descent,
-      // then keeps orbiting at that same speed (no part-two slowdown).
+      // Orbit pivots on the field center (no drift toward a corner). The bob and
+      // look-at are COUPLED into a slow "breathing" reveal: at the crest the camera
+      // rises, the orbit eases outward, and the look-at lifts toward the tower top
+      // (~y8.5 world, surface y5 + ~3.5 tall) — tilting the camera UP so the oil
+      // tower's top swings into frame; at the trough it returns to the centered,
+      // rig-level framing. up = 0 at trough, 1 at crest.
+      // Vertical motion is a cosine SHAPED to dwell low: raw is a symmetric 0..1
+      // cosine; squaring it biases toward 0, so the camera spends most of each
+      // cycle down among the rigs and only briefly springs up to peek at the
+      // tower. Everything (height, radius, look-at) is driven off this shaped up.
+      const raw = (Math.cos(time / 8) + 1) * 0.5;  // 0..1, symmetric (slow period)
+      const up = raw * raw;                        // biased toward 0 → ground dwell
+      // Close, centered rig orbit; eases out ~12% only at the brief crest for tower headroom.
+      const r = (18 + (4 - 18) * k) * f * (1 + 0.12 * up);
+      // baseY is the low, close rig-orbit height (settle 6.5); the crest climb is
+      // ADDED on top via up, so the floor never dips below it.
+      const baseY = SURFACE + (5 + (1.5 - 5) * k) * f;
       const angle = (TWO_PI * 0.5 / dur) * time;
       camera.position.set(
-        cx + Math.sin(angle) * r,
-        baseY + 1.5 * f * Math.cos(time / 5),
-        cz + Math.cos(angle) * r,
+        Math.sin(angle) * r,
+        baseY + 2.2 * f * up,
+        Math.cos(angle) * r,
       );
-      camera.lookAt(cx, SURFACE, cz);
+      // Tower top is a fixed world height (NOT field-scaled), so the look-at lift
+      // is an absolute amount, independent of grid size.
+      camera.lookAt(0, SURFACE + 2.5 * up, 0);
     }
   });
 

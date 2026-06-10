@@ -84,20 +84,32 @@ const PolaroidSnapshot = ({
     const square = Math.min(w, h);
     const offX = (w - square) / 2;
     const offY = (h - square) / 2;
-    const big = Math.max(18, Math.round(square * 0.075));
-    const small = Math.max(9, Math.round(square * 0.032));
-    const pad = Math.round(square * 0.05);
-    const cx = offX + square / 2;
+    // Subtle corner signature: smaller, low-opacity, tucked into the top-left.
+    // The top tends to be open sky while the bottom fills with rig structure, so
+    // top-left reads most consistently. Still anchored to the visible square so it
+    // survives a crop to the photo.
+    const big = Math.max(14, Math.round(square * 0.06));
+    const small = Math.max(8, Math.round(square * 0.024));
+    const leftX = offX + Math.round(square * 0.04);   // 4% in from the left of the visible square
+    const topY = offY + Math.round(square * 0.05);    // 5% down from the top of the visible square
+    const gap = Math.round(square * 0.01);
 
     ctx.save();
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(202, 156, 4, 0.85)';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 6;
+    ctx.textAlign = 'left';
+    // Anchor by the TOP of the text (not the baseline) so vertical placement is
+    // identical across devices. With the default 'alphabetic' baseline the apparent
+    // top shifts with each font's ascent — the real display font (laptop) vs the
+    // sans-serif fallback (mobile) sat at different heights. 'top' removes that.
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(202, 156, 4, 0.6)';
+    // Stronger shadow keeps it legible over light/busy backgrounds.
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+    ctx.shadowBlur = 4;
+    // "Hail Mary" (larger) sits above "Prospecting Co." (smaller), both left-aligned.
     ctx.font = `bold ${big}px 'Manufacturing Consent', -apple-system, sans-serif`;
-    ctx.fillText('Hail Mary', cx, offY + pad + big);
+    ctx.fillText('Hail Mary', leftX, topY);
     ctx.font = `bold ${small}px 'Orbitron', -apple-system, sans-serif`;
-    ctx.fillText('Prospecting Co.', cx, offY + pad + big + small + Math.round(square * 0.012));
+    ctx.fillText('Prospecting Co.', leftX, topY + big + gap);
     ctx.restore();
   };
 
@@ -231,13 +243,24 @@ const PolaroidSnapshot = ({
         };
         bgImg.src = backgroundImage;
       } else {
-        // No background image, just draw the canvas
-        tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+        // No background image. Output a SQUARE, center-cropped image that matches
+        // exactly what the 1:1 photo frame shows on screen. Baking the crop in (rather
+        // than leaning on the <img> object-fit:cover) keeps the downloaded polaroid
+        // identical to the on-screen one — html2canvas mishandles object-fit, which is
+        // what pushed the watermark low in the download. Square in → square frame, so
+        // there's nothing left for object-fit to get wrong, and drawWatermark's 5%
+        // anchor (offX/offY = 0 here) lands in the same spot everywhere.
+        const s = Math.min(canvas.width, canvas.height);
+        const sqCanvas = document.createElement('canvas');
+        sqCanvas.width = s;
+        sqCanvas.height = s;
+        const sqCtx = sqCanvas.getContext('2d', { willReadFrequently: true, alpha: true });
+        sqCtx.drawImage(canvas, (canvas.width - s) / 2, (canvas.height - s) / 2, s, s, 0, 0, s, s);
 
         (async () => {
-          await drawWatermark(tempCtx);
+          await drawWatermark(sqCtx);
 
-          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+          const dataUrl = sqCanvas.toDataURL('image/jpeg', 0.6);
           if (dataUrl) {
             setImageUrl(dataUrl);
             setIsVisible(true);
@@ -386,21 +409,16 @@ const PolaroidSnapshot = ({
   // Capture the polaroid once when it becomes visible
   const capturePolaroid = async () => {
     if (!polaroidRef.current || polaroidImageUrl) return polaroidImageUrl; // Return existing if already captured
-    
+
+    // Declared outside the try so the finally block can always clean it up,
+    // even if html2canvas throws (common on mobile).
+    let tempContainer = null;
+
     try {
       const { default: html2canvas } = await import('html2canvas');
-      
-      // Hide buttons and shadow temporarily
-      const closeBtn = polaroidRef.current.querySelector('button[aria-label="Close polaroid"]');
-      const actionBtns = polaroidRef.current.querySelector(`.${styles.actionButtons}`);
-      const shadow = polaroidRef.current.querySelector(`.${styles.polaroidShadow}`);
-      
-      if (closeBtn) closeBtn.style.visibility = 'hidden';
-      if (actionBtns) actionBtns.style.visibility = 'hidden';
-      if (shadow) shadow.style.visibility = 'hidden';
-      
+
       // Create a temporary container with transparent background
-      const tempContainer = document.createElement('div');
+      tempContainer = document.createElement('div');
       tempContainer.style.cssText = `
         position: fixed;
         top: 0;
@@ -417,7 +435,18 @@ const PolaroidSnapshot = ({
       const clonedPolaroid = polaroidRef.current.cloneNode(true);
       clonedPolaroid.style.position = 'relative';
       clonedPolaroid.style.margin = '100px';
-      
+
+      // Hide the buttons/shadow IN THE CLONE only — never on the live polaroid.
+      // html2canvas captures the clone, so touching the live DOM is unnecessary
+      // and was making the on-screen action buttons blink out for the whole
+      // (multi-second, on mobile) capture, looking like they'd disappeared.
+      const clonedActionBtns = clonedPolaroid.querySelector(`.${styles.actionButtons}`);
+      const clonedCloseBtn = clonedPolaroid.querySelector('button[aria-label="Close polaroid"]');
+      const clonedShadow = clonedPolaroid.querySelector(`.${styles.polaroidShadow}`);
+      if (clonedActionBtns) clonedActionBtns.style.visibility = 'hidden';
+      if (clonedCloseBtn) clonedCloseBtn.style.visibility = 'hidden';
+      if (clonedShadow) clonedShadow.style.visibility = 'hidden';
+
       // Make sure the cloned image has the current composited imageUrl
       const clonedImg = clonedPolaroid.querySelector('img');
       if (clonedImg) {
@@ -455,26 +484,25 @@ const PolaroidSnapshot = ({
         y: -75
       });
       
-      // Remove temporary container
-      document.body.removeChild(tempContainer);
-      
-      // Restore buttons and shadow
-      if (closeBtn) closeBtn.style.visibility = '';
-      if (actionBtns) actionBtns.style.visibility = '';
-      if (shadow) shadow.style.visibility = '';
-      
       // Store both data URL and blob for reuse - using WebP for transparency and better compression
       const dataUrl = canvas.toDataURL('image/webp', 0.9);
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.9));
-      
+
       setPolaroidImageUrl(dataUrl);
       setPolaroidBlob(blob);
-      
+
       // Return the data URL so it can be used immediately
       return dataUrl;
     } catch (error) {
       console.error('Failed to capture polaroid:', error);
       return null;
+    } finally {
+      // Always remove the temp capture container, even if html2canvas threw.
+      // The live polaroid's buttons are never touched anymore (we hide them in
+      // the clone), so there's nothing on-screen to restore here.
+      if (tempContainer && tempContainer.parentNode) {
+        tempContainer.parentNode.removeChild(tempContainer);
+      }
     }
   };
   
@@ -571,7 +599,7 @@ const PolaroidSnapshot = ({
   const handleShare = async (platform) => {
     const refSuffix = referralOverlay?.code ? `?ref=${referralOverlay.code}` : '';
     const shareText = referralOverlay?.code
-      ? `Check out my rig! Join me on the grid 🤑`
+      ? `Now it's our turn to rig the system 🤑`
       : `Check out my rig! 🤑`;
     const shareUrl = `https://rl80.com/hailmary${refSuffix}`;
     
@@ -814,8 +842,8 @@ const PolaroidSnapshot = ({
                 textAlign: 'center',
                 fontFamily: "'Share Tech Mono', monospace",
               }}>
-                <div style={{ fontSize: 8, letterSpacing: '0.2em', color: '#666', marginBottom: 2 }}>
-                  JOIN ME ON THE GRID
+                <div style={{ fontSize: 8, letterSpacing: '0.12em', color: '#666', marginBottom: 2 }}>
+                  IT'S YOUR TURN TO RIG THE SYSTEM
                 </div>
                 <div style={{ fontSize: 10, color: '#333', fontWeight: 700, letterSpacing: '0.05em' }}>
                   {referralOverlay.link || `rl80.com/hailmary?ref=${referralOverlay.code}`}

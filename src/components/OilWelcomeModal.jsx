@@ -2,7 +2,25 @@
 
 import { useEffect } from "react";
 import { HOW_TO_PLAY_STEPS } from "./HowToPlayPanel";
-import HowToPlayDialogue from "./HowToPlayDialogue";
+
+// Transcript of the intro video's spoken dialogue. Rendered as on-page text so
+// browsers' built-in page translation picks it up (a <video> <track> subtitle
+// file would NOT be auto-translated). Keep in sync with the recorded dialogue.
+const INTRO_TRANSCRIPT = [
+  { who: "St. GR80", text: "Welcome, prospector. The field is sealed before anyone plays — its riches hidden even from us. Provably fair." },
+  { who: "John Barron", text: "Which means nobody knows where the big strike hides… not even you. Delicious, isn't it?" },
+  { who: "St. GR80", text: "Hold a little RL80 — that is your key. No spending. Sell whenever you wish." },
+  { who: "John Barron", text: "But why would you leave? Claim your plot, and the hunt begins." },
+  { who: "St. GR80", text: "Your rig drills on its own, day and night. It strikes when the earth decides. Patience." },
+  { who: "John Barron", text: "Random. Unpredictable. You'll check back again… and again… and again." },
+  { who: "St. GR80", text: "The deeper you go, the richer the ground. Bank what you find, and it is yours — safe, and counted." },
+  { who: "John Barron", text: "Or push deeper for the motherlode… and pray you don't crack a hell pocket. I do love when they crack a hell pocket." },
+  { who: "St. GR80", text: "Should one breach, the whole field freezes — and hunters race for the bounty. Keep your cameras watching. Bank often." },
+  { who: "John Barron", text: "Or don't. Greedy hands make the best stories." },
+  { who: "St. GR80", text: "Drill wisely, prospector." },
+  { who: "John Barron", text: "Push your luck." },
+  { who: "St. GR80", text: "Welcome to Hail Mary." },
+];
 
 // First-visit onboarding overlay for /hailmary. Shows a character greeting video
 // up top with the How-to-Play steps below. Re-openable via the "?" help button.
@@ -71,8 +89,41 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
           ×
         </button>
 
-        {/* Character greeting — St. GR80 & John Barron SitePal dialogue */}
-        <HowToPlayDialogue darkMode={darkMode} />
+        {/* Character greeting — St. GR80 & John Barron intro video (recorded
+            from the SitePal dialogue; mobile-safe, no live SitePal at runtime). */}
+        <div style={{
+          position: "relative", width: "100%",
+          background: "#000",
+          borderTopLeftRadius: 10, borderTopRightRadius: 10,
+          overflow: "hidden",
+        }}>
+          <video
+            src="/HMPC_Intro.web.mp4"
+            poster="/HMPC_Intro_poster.jpg"
+            controls
+            playsInline
+            preload="metadata"
+            style={{ display: "block", width: "100%", height: "auto" }}
+          />
+        </div>
+
+        {/* Collapsible transcript — on-page text so browser translation covers it. */}
+        <details style={{ padding: "10px 18px 0" }}>
+          <summary style={{
+            cursor: "pointer", listStyle: "revert",
+            fontSize: 12, fontWeight: 700, color: c.accent,
+            letterSpacing: "0.16em", textTransform: "uppercase", userSelect: "none",
+          }}>
+            Transcript
+          </summary>
+          <div style={{ marginTop: 8 }}>
+            {INTRO_TRANSCRIPT.map((l, i) => (
+              <p key={i} style={{ margin: "0 0 9px", fontSize: 13, lineHeight: 1.5, color: c.muted }}>
+                <strong style={{ color: c.text }}>{l.who}:</strong> {l.text}
+              </p>
+            ))}
+          </div>
+        </details>
 
         {/* Heading */}
         <div style={{ padding: "16px 18px 4px" }}>
@@ -95,20 +146,20 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
           {HOW_TO_PLAY_STEPS.map((s) => (
             <div key={s.num} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "flex-start" }}>
               <span style={{
-                fontSize: 12, fontWeight: 700, color: c.stepNum,
-                minWidth: 18, textAlign: "center", lineHeight: "18px",
+                fontSize: 14, fontWeight: 700, color: c.stepNum,
+                minWidth: 18, textAlign: "center", lineHeight: "20px",
               }}>
                 {s.num}
               </span>
               <div>
                 <div style={{
-                  fontSize: 11, fontWeight: 600, color: c.text,
+                  fontSize: 13, fontWeight: 600, color: c.text,
                   letterSpacing: "0.12em", marginBottom: 3,
                 }}>
                   {s.title}
                 </div>
                 <div style={{
-                  fontSize: 11, color: c.muted, lineHeight: 1.5,
+                  fontSize: 13, color: c.muted, lineHeight: 1.5,
                   letterSpacing: "0.02em",
                 }}>
                   {s.desc}

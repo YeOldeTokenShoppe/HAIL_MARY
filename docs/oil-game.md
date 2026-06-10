@@ -858,6 +858,23 @@ slither . --filter-paths "contracts/lib|contracts/test"
 > this on-chain rail at all (below it, use Rail A). At that point also revisit the
 > "lottery optics" legal question with a lawyer.
 
+### 🔖 Pick up later — payout open items (as of 2026-06-07)
+
+The fixed-rate economy, both payout rails, the contract, its tests, and Slither are
+all done and green. Outstanding before a real season:
+
+1. **Reset stale-scale Firestore data (do this first).** Existing `oilDrills` /
+   `oilPlots.revealed` / `oilGame/communityStorage` were accumulated at the old
+   1M-unit scale, so EXTRACTED / VALUE read wrong against the current 500K field (the
+   "one player's banked oil > whole field" symptom). Run `node scripts/oil-reset.js
+   --dry-run` to preview, then without the flag to clear, then re-seed/re-drill.
+   (Cross-scale data also makes `oil-payout.js` abort by design.)
+2. **Rail choice is scale-gated.** Launch on **Rail A** (`oil-payout.js`, off-chain
+   push). Only move to **Rail B** (the Merkle distributor) — and only then pay for an
+   audit — once per-season escrow is large enough to matter.
+3. **Before Rail B ever holds real money:** dry-run on Base Sepolia, then the
+   stake-gated audit + the lottery-optics legal pass noted above.
+
 ## Environment Variables
 
 All server-only secrets must be in Firebase **App Hosting** (Secret Manager + `apphosting.yaml`),
@@ -881,4 +898,120 @@ client bundle).
 
 **Removed:** `OIL_TICKET_WALLET` / `NEXT_PUBLIC_OIL_TICKET_WALLET` — the ticket/draft system was
 deleted (registration + plot-pick is now `OilQualify`; mid-season join is "CLAIM THIS PLOT").
+
+## How-to-Play Intro Video
+
+The first-visit "How to Play" modal (`OilWelcomeModal.jsx`) opens with a short intro: a
+two-character dialogue between **St. GR80** (the monk) and **John Barron** explaining the game.
+What actually ships is a **pre-recorded MP4**, not a live avatar — see "Why a video" below.
+
+### What's mounted
+
+`OilWelcomeModal.jsx` plays a plain `<video controls playsInline preload="metadata">`:
+
+- Video: `public/HMPC_Intro.web.mp4` (served at `/HMPC_Intro.web.mp4`)
+- Poster: `public/HMPC_Intro_poster.jpg`
+
+Tap-to-play with sound. No SitePal / WebGL at runtime, so it's bulletproof on mobile.
+
+### Why a video (not live SitePal)
+
+The characters are SitePal avatars. Driving them live in the modal was attempted and abandoned:
+
+- **Two side-by-side live portals don't work** in this React/Next env. A single shared
+  embed-functions load collapses both scenes onto portal `0`; loading the script per-portal
+  yields distinct ids but the second load clobbers the first portal's registration, so
+  `selectPortal()` silently no-ops. (Same limitation `/trade` hit — it uses one portal +
+  `loadSceneByID` scene-swapping.)
+- A **single-portal scene-swap spotlight** worked on desktop (both lip-sync, one shown at a
+  time), but John's scene is **3D** (`SitePal3DJS_R.js`) and on the heavy oil-field page it
+  **OOM-crashed iOS Safari/Chrome** when loaded.
+
+A recorded video sidesteps all of it. The live components are kept in the repo for re-recording
+(see below) but are not mounted in the modal.
+
+### Re-recording the intro (full runbook)
+
+Because two live portals can't render together, each character is recorded **separately on
+desktop** (where the 3D scene is fine) and composited side-by-side in iMovie. The recording
+studio enforces a shared timeline so the two clips alternate correctly.
+
+**Studio route:** `src/app/hailmary/studio/page.js` → `/hailmary/studio`
+
+1. **Calibrate once** (only needed if GR80's lines/voice change): open
+   `/hailmary/studio?c=monk&cal=1`, click **Run Calibration**. It speaks GR80's lines, measures
+   each duration, and saves them to `localStorage["hm_gr80_durations"]`. Do everything afterward
+   in the **same browser** so the saved timeline is used. (John's durations are hard-coded from
+   `afinfo` on the MP3s; estimates are used for GR80 if uncalibrated.)
+2. **Record GR80:** open `/hailmary/studio?c=monk`. Start your screen recorder, click
+   **Start Take**. A white **sync flash** plays at t=0, then GR80 speaks on his turns and idles
+   during John's. Stop recording at "Take complete."
+3. **Record John:** open `/hailmary/studio?c=john`, same steps. (Keep the browser window the
+   same size/position between takes so the avatars match.)
+4. **Composite in iMovie:** import both clips, drop John as an overlay on GR80, set the overlay
+   to **Side by Side**, then slide it so both **white flashes** land on the same frame (that's
+   the sync). Trim the ends, export.
+
+**Screen recording on macOS:** use **OBS Studio**, run it from `/Applications` (not the mounted
+`.dmg`), and grant **System Settings → Privacy & Security → Screen Recording** then relaunch.
+macOS's built-in recorders don't capture system audio. OBS saves to `~/Movies` (format is
+"Hybrid MOV" `.mov`, which iMovie imports fine).
+
+**Compress before shipping** (iMovie 1080p exports are ~120 MB — too big for `public/`):
+
+```sh
+# from the exported master (keep the master OUT of public/)
+ffmpeg -y -i HMPC_Intro.mp4 -vf "scale=-2:720" -c:v libx264 -crf 24 -preset medium \
+  -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart public/HMPC_Intro.web.mp4
+# poster frame (avoid t=0 in case of the flash/black)
+ffmpeg -y -ss 3 -i HMPC_Intro.mp4 -frames:v 1 -vf "scale=-2:720" -q:v 3 public/HMPC_Intro_poster.jpg
+```
+
+That took the last cut from **124 MB → ~5 MB** at 720p with no meaningful loss at modal size.
+**Only the ~5 MB web mp4 + poster belong in `public/`** — large source MP4s bloat every deploy
+(and some hosts reject them).
+
+### Head-turn (look at each other) — `setGaze`
+
+For a livelier take, the listener can turn toward the speaker. SitePal exposes
+`setGaze(degrees, duration, amplitude)` (this is exactly what SitePal's own conversation example
+uses — `setGaze(90, 5, 100)` / `setGaze(270, 5, 100)` to turn left/right). `degrees` is the gaze
+direction (clock-like; ~90 ≈ one side, ~270 ≈ the other — tune per scene), `duration` seconds,
+`amplitude` 0–100 how far the head turns. Since the takes are recorded separately, give each
+character a gaze toward where the **other** sits in the final side-by-side (GR80 is on the left →
+gaze right toward John; John on the right → gaze left toward GR80), e.g. turn toward the other
+while listening and back toward camera while speaking.
+
+**Implemented in `studio/page.js`** (2026-06-09): the take recenters the gaze (face camera) on the
+recorded character's own slots and turns toward the other on the other's slots. Tune the
+`GAZE` constants at the top of that file: `monk.lookDeg` / `john.lookDeg` are the turn directions
+(clock-like — if someone turns the wrong way, swap their value, try `90` ↔ `270`), `amp` is how
+far (0–100), `durationSec` how long the turn holds. Eyeball it in `/hailmary/studio?c=monk` and
+adjust before recording.
+
+### Intro SitePal scenes (account 9308752)
+
+The intro uses **dedicated** scenes, distinct from `/trade` (so retuning the intro never touches
+the game). Update these only in `HowToPlayDialogue.jsx` and `src/app/hailmary/studio/page.js`:
+
+| Character | Intro scene | Hash | `/trade` scene (do not touch) |
+|-----------|-------------|------|-------------------------------|
+| St. GR80  | `2775053` | `I0s05E8rXxvHYHdJIPmcIU5msqkW6t0A` | `2774449` |
+| John Barron | `2775052` | `IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb` | `2774900` (Demon) |
+
+- **GR80** speaks via SitePal TTS: `sayText(text, "9", 1, 7, "T", 3)` (voice 9 "Gilbert", engine 7
+  Acapela, reverb).
+- **John** speaks uploaded audio tracks `john_01`..`john_06` (in the account's Audio Manager) via
+  `sayAudio(name)`. The same clips also exist at `public/audio/john_0X.mp3`. SitePal can only
+  speak audio it hosts — a `/public` URL or `sayMP3audio(url)` did **not** work; tracks must be
+  uploaded by name.
+
+### Key files
+
+- `src/components/OilWelcomeModal.jsx` — the modal; mounts the `<video>`.
+- `src/app/hailmary/studio/page.js` — recording studio (one character per take, shared timeline,
+  sync flash, GR80 calibration).
+- `src/components/HowToPlayDialogue.jsx` — the (now-unmounted) live single-portal scene-swap
+  dialogue, kept for reference / future use.
+- `public/HMPC_Intro.web.mp4`, `public/HMPC_Intro_poster.jpg` — shipped assets.
 *
