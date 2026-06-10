@@ -131,15 +131,34 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
   // swap to him during the conversation is fast. 'init' → 'warming' → 'done'.
   const preloadRef = useRef("init");
 
+  // Audio-start tracking for the iOS retry path.
+  const audioStartedRef = useRef(false);
+  const speakRetryRef = useRef(null);
+  const SPEAK_RETRY_MS = 2600;
+
   const clearWatchdog = useCallback(() => {
     if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
   }, []);
+  const clearSpeakRetry = useCallback(() => {
+    if (speakRetryRef.current) { clearTimeout(speakRetryRef.current); speakRetryRef.current = null; }
+  }, []);
 
-  // Actually speak line n on the (now-loaded) correct scene.
-  const doSpeak = useCallback((n, token) => {
+  // Actually speak line n on the (now-loaded) correct scene. On mobile the
+  // first sayText/sayAudio after a gesture sometimes silently no-ops; if
+  // vh_audioStarted hasn't fired by SPEAK_RETRY_MS we re-prime with saySilent
+  // and try again (up to 3 attempts) — the same robustness /trade relies on.
+  const doSpeak = useCallback((n, token, attempt = 1) => {
     if (token !== runTokenRef.current) return;
     const L = SCRIPT[n];
+    audioStartedRef.current = false;
+    clearSpeakRetry();
+    try {
+      // Re-prime the audio pipeline on every attempt — cheap, and it's what
+      // actually unsticks iOS Safari/Chrome.
+      if (typeof window.saySilent === "function") window.saySilent(0);
+    } catch (e) {}
     try { if (typeof window.setPlayerVolume === "function") window.setPlayerVolume(7); } catch (e) {}
+    if (attempt > 1) { try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {} }
     try {
       if (L.who === "monk") {
         if (typeof window.sayText === "function") {
@@ -152,7 +171,14 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
     } catch (e) {
       console.warn("[HowToPlayDialogue] speak error", e);
     }
-  }, []);
+    speakRetryRef.current = setTimeout(() => {
+      if (token !== runTokenRef.current || audioStartedRef.current) return;
+      if (attempt < 3) {
+        console.warn("[HowToPlayDialogue] speech did not start; retrying", { n, attempt });
+        doSpeak(n, token, attempt + 1);
+      }
+    }, SPEAK_RETRY_MS);
+  }, [clearSpeakRetry]);
 
   const speakLine = useCallback((n, token) => {
     if (token !== runTokenRef.current) return;
@@ -162,6 +188,7 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
       awaitingRef.current = -1;
       pendingRef.current = null;
       clearWatchdog();
+      clearSpeakRetry();
       setCaption("");
       return;
     }
@@ -185,7 +212,7 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
       try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
       try { if (typeof window.loadSceneByID === "function") window.loadSceneByID(target); } catch (e) {}
     }
-  }, [clearWatchdog, doSpeak]);
+  }, [clearWatchdog, clearSpeakRetry, doSpeak]);
 
   // Advance from line n to n+1 exactly once (guarded by awaitingRef).
   const advance = useCallback((n, token) => {
@@ -198,9 +225,41 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
     setTimeout(() => speakLine(next, token), TURN_GAP_MS);
   }, [clearWatchdog, speakLine]);
 
+  // iOS/Safari audio unlock — MUST run inside a real user gesture. saySilent(0)
+  // primes SitePal (its own example does this on mobile), and resuming a
+  // WebAudio context + SitePal's internal _vhssAudioCtx releases the suspended
+  // audio pipeline. Without this, speech is silent on mobile and the watchdog
+  // churns through the script with no sound.
+  const unlockAudio = useCallback(() => {
+    try { if (typeof window.saySilent === "function") window.saySilent(0); } catch (e) {}
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) {
+        const ctx = window.__rl80UnlockCtx || new Ctx();
+        window.__rl80UnlockCtx = ctx;
+        if (ctx.state === "suspended" && ctx.resume) ctx.resume().catch(() => {});
+        try {
+          const s = ctx.createBufferSource();
+          s.buffer = ctx.createBuffer(1, 1, 22050);
+          s.connect(ctx.destination);
+          s.start(0);
+        } catch (e) {}
+      }
+    } catch (e) {}
+    try { if (window._vhssAudioCtx && window._vhssAudioCtx.resume) window._vhssAudioCtx.resume(); } catch (e) {}
+    // Resume the AudioContext(s) SitePal itself created (collected via the
+    // constructor patch in the embed effect) — this is the one that actually
+    // plays speech and stays suspended on iOS until a gesture resumes it.
+    try {
+      (window.__hmAudioInstances || []).forEach((ctx) => {
+        try { if (ctx && ctx.state === "suspended" && ctx.resume) ctx.resume(); } catch (e) {}
+      });
+    } catch (e) {}
+  }, []);
+
   const start = useCallback(() => {
     if (!ready) return;
-    try { if (typeof window.saySilent === "function") window.saySilent(0); } catch (e) {}
+    unlockAudio(); // runs inside the click/tap gesture
     try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
     runTokenRef.current += 1;
     const token = runTokenRef.current;
@@ -211,11 +270,30 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
     setPlaying(true);
     playingRef.current = true;
     speakLine(0, token);
-  }, [ready, speakLine]);
+  }, [ready, speakLine, unlockAudio]);
 
   // Embed the single portal + wire shared SitePal callbacks.
   useEffect(() => {
     let cancelled = false;
+
+    // Patch AudioContext BEFORE SitePal loads so we can collect (and later
+    // resume) the audio context IT creates — that context is suspended on iOS
+    // until a gesture resumes it, and it's the one that plays speech.
+    try {
+      const key = window.AudioContext ? "AudioContext" : (window.webkitAudioContext ? "webkitAudioContext" : null);
+      if (key && !window.__hmCtxPatched) {
+        window.__hmCtxPatched = true;
+        window.__hmAudioInstances = window.__hmAudioInstances || [];
+        const Orig = window[key];
+        const Patched = function (...args) {
+          const inst = new Orig(...args);
+          try { window.__hmAudioInstances.push(inst); } catch (e) {}
+          return inst;
+        };
+        Patched.prototype = Orig.prototype;
+        window[key] = Patched;
+      }
+    } catch (e) {}
 
     const prev = {
       vh_sceneLoaded: window.vh_sceneLoaded,
@@ -272,7 +350,10 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
       advance(awaitingRef.current, runTokenRef.current);
     };
 
-    window.vh_audioStarted = () => {};
+    window.vh_audioStarted = () => {
+      audioStartedRef.current = true;
+      clearSpeakRetry();
+    };
     window.vh_audioError = (audID, portal, errCode, errMsg) => {
       console.warn("[HowToPlayDialogue] vh_audioError", { audID, errCode, errMsg });
     };
@@ -308,6 +389,7 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
       runTokenRef.current += 1;
       clearTimeout(readyFallback);
       if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
+      if (speakRetryRef.current) { clearTimeout(speakRetryRef.current); speakRetryRef.current = null; }
       try { if (typeof window.stopSpeech === "function") window.stopSpeech(); } catch (e) {}
       window.vh_sceneLoaded = prev.vh_sceneLoaded;
       window.vh_talkEnded = prev.vh_talkEnded;
@@ -315,16 +397,31 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
       window.vh_audioError = prev.vh_audioError;
       if (containerRef.current) containerRef.current.innerHTML = "";
     };
-  }, [advance, doSpeak]);
+  }, [advance, doSpeak, clearSpeakRetry]);
 
-  // Best-effort autoplay once the portal is ready (works when the modal was
-  // opened by a tap, e.g. the "?" button; the Start/Replay button covers the rest).
+  // Autoplay once ready — but NOT on touch devices: iOS/Android block audio
+  // without a gesture, so autoplaying there just churns the script silently.
+  // On touch, the user taps Start (which unlocks audio in the gesture).
   useEffect(() => {
-    if (autoPlay && ready && !autoTriedRef.current && !playingRef.current) {
-      autoTriedRef.current = true;
-      start();
-    }
+    if (!autoPlay || !ready || autoTriedRef.current || playingRef.current) return;
+    const isTouch = typeof window !== "undefined" && window.matchMedia
+      && window.matchMedia("(pointer: coarse)").matches;
+    if (isTouch) return;
+    autoTriedRef.current = true;
+    start();
   }, [autoPlay, ready, start]);
+
+  // Insurance: unlock audio on the first tap/click anywhere (some browsers need
+  // the gesture before SitePal's context exists; Start also unlocks directly).
+  useEffect(() => {
+    const onGesture = () => unlockAudio();
+    document.addEventListener("pointerdown", onGesture, { capture: true });
+    document.addEventListener("touchstart", onGesture, { capture: true });
+    return () => {
+      document.removeEventListener("pointerdown", onGesture, { capture: true });
+      document.removeEventListener("touchstart", onGesture, { capture: true });
+    };
+  }, [unlockAudio]);
 
   // Scale the fixed-size stage down to fit narrow containers.
   useEffect(() => {
