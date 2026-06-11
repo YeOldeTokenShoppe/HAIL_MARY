@@ -3,6 +3,7 @@ import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { createDemonBounty } from "@/lib/oilDemon";
 import { logTimeline } from "@/lib/oilTimeline";
+import { sendPlayerAlert } from "@/lib/oilAlerts";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
@@ -77,6 +78,7 @@ async function endSeason(db) {
   }
 
   // Provable-fairness reveal (same as oil-settings on gameEnded:true).
+  let revealed = false;
   try {
     const sd = (await db.collection("oilSecret").doc("seed").get()).data() || {};
     if (sd.serverSecret) {
@@ -85,14 +87,19 @@ async function endSeason(db) {
         finalSeedReveal: sd.seed || null,
         revealedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
+      revealed = true;
     } else if (sd.seed) {
       await settingsRef.set({ seedReveal: sd.seed, revealedAt: FieldValue.serverTimestamp() }, { merge: true });
+      revealed = true;
     }
   } catch (err) {
     console.error("[oil-strike-tick] season-end reveal failed:", err.message);
   }
 
   await logTimeline(db, { type: "system", detail: "The season has ended" });
+  if (revealed) {
+    await logTimeline(db, { type: "system", detail: "seed revealed — anyone can now verify the entire map" });
+  }
 
   return { ok: true, ended: true, swept, sweptOil };
 }
@@ -115,22 +122,7 @@ function utcDateStr(d) {
   return d.toISOString().slice(0, 10);
 }
 
-async function notifyTelegram(db, userId, text) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return;
-  try {
-    const linkSnap = await db.collection("oilTelegram").doc(userId).get();
-    const chatId = linkSnap.exists ? linkSnap.data().chatId : null;
-    if (!chatId) return;
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
-    });
-  } catch (err) {
-    console.error("[oil-strike-tick] telegram notify failed:", err.message);
-  }
-}
+// Player alerts now fan out through lib/oilAlerts (Telegram + web push).
 
 async function runTick({ force = false, deep = 1, targetCol = null, targetRow = null } = {}) {
   const db = getAdminDb();
@@ -330,8 +322,12 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
                 summonedThisTick = true;
                 summary.demonsSummoned++;
                 await logTimeline(db, { type: "hell", username: outcome.username, userId, detail: "the field froze" });
-                await notifyTelegram(db, userId,
-                  `🔥 <b>YOUR RIG BREACHED A HELL POCKET!</b>\nA demon is loose on the field — your unbanked tank fueled the bounty. Drilling is halted until it's banished.`);
+                await sendPlayerAlert(db, userId, {
+                  title: "🔥 YOUR RIG BREACHED A HELL POCKET!",
+                  body: "A demon is loose on the field — your unbanked tank fueled the bounty. Drilling is halted until it's banished.",
+                  tag: "hmpc-hell",
+                  telegramHtml: `🔥 <b>YOUR RIG BREACHED A HELL POCKET!</b>\nA demon is loose on the field — your unbanked tank fueled the bounty. Drilling is halted until it's banished.`,
+                });
               }
             } catch (err) {
               console.error(`[oil-strike-tick] demon summon failed for ${userId}:`, err.message);
@@ -356,10 +352,26 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
           }
           // Best-effort retention hook — skipped during deep admin drills to avoid spam.
           if (deep === 1) {
-            const msg = outcome.oil > 0
-              ? `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col}, ${row}) hit ${outcome.oil} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.`
-              : `🪨 Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`;
-            await notifyTelegram(db, userId, msg);
+            if (outcome.oil > 0) {
+              // Fixed-rate ≈$ tag — the dollar figure is what makes the ping land.
+              const usdVal = (outcome.oil * (settings.totalOilBudget || 500)) / OIL_FIELD_UNITS;
+              const usdTag = usdVal >= 0.005 ? ` (≈ $${usdVal.toFixed(2)})` : "";
+              await sendPlayerAlert(db, userId, {
+                title: "⛽ YOUR RIG STRUCK!",
+                body: `Plot (${col}, ${row}) hit ${outcome.oil.toLocaleString()}${usdTag} at depth ${outcome.depth}. Bank it before a dino comes sniffing.`,
+                tag: "hmpc-strike",
+                telegramHtml: `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col}, ${row}) hit ${outcome.oil}${usdTag} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.`,
+              });
+            } else {
+              // Dry layers go to Telegram only — push stays reserved for
+              // paydirt so the notification keeps its signal value.
+              await sendPlayerAlert(db, userId, {
+                title: "🪨 Dry layer",
+                body: `Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`,
+                channels: { telegram: true, push: false },
+                telegramHtml: `🪨 Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`,
+              });
+            }
           }
         } else if (outcome.status === "depleted") {
           summary.depleted++;

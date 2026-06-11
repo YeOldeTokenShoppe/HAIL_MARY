@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { fetchBlockHash, fetchLatestBlockNumber } from "@/lib/fetchBlockHash";
 import { FAIRNESS_SCHEME, computeCommitment, computeFinalSeed } from "@/lib/oilFairness";
+import { logTimeline } from "@/lib/oilTimeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,14 @@ async function commit(db, { lead }) {
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 
+  // Feed moment: the commitment is public theater — players can watch the
+  // countdown to the block that writes the map. (Block number is public by
+  // design; no location/seed info leaks.)
+  await logTimeline(db, {
+    type: "system",
+    detail: `map commitment sealed — Base block #${anchorBlock} will write the map`,
+  });
+
   return { ok: true, step: "commit", commitment, anchorBlock, committedAtBlock: latest };
 }
 
@@ -83,6 +92,12 @@ async function anchor(db) {
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
 
+  // Feed moment: the anchor IS the season-opening event.
+  await logTimeline(db, {
+    type: "system",
+    detail: `THE BLOCK HAS SPOKEN — map locked by Base block #${anchorBlock}`,
+  });
+
   return { ok: true, step: "anchor", anchorBlock, anchorBlockHash: blockHash };
 }
 
@@ -101,6 +116,11 @@ async function reveal(db) {
     revealedAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   }, { merge: true });
+
+  await logTimeline(db, {
+    type: "system",
+    detail: "seed revealed — anyone can now verify the entire map",
+  });
 
   return { ok: true, step: "reveal", revealedSecret: !!serverSecret, anchored: !!anchorBlockHash };
 }

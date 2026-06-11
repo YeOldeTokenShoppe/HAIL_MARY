@@ -94,7 +94,8 @@ active                      → drilling reveals the pre-set map; NO new first-p
 **Grid is a PRE-PICK capacity dial — freeze it on the first claim.** Size the grid upfront (from a demand estimate / early interest count) *before plot-picking opens*. Growing is only truly transparent while the board is **empty**: a plot is a `(col,row)` coordinate, so growing adds cells without changing coordinates or (blind, pre-anchor) expected value — BUT it shifts every existing pick's **relative position** (a deliberately-chosen corner becomes an interior cell; the new corner opens up behind them) and resamples the whole distribution under their pick. Players form attachments to position, so that reads as a bait-and-switch. Therefore: **once ≥1 plot is claimed, the grid is frozen** (no grow, no shrink); never shrink below a claimed coordinate; and never resize after the `ticket_sale → active` anchor (it would move oil out from under active rigs). Overflow beyond the frozen capacity → waitlist → next season (opened on a bigger grid, chosen upfront again).
 
 **Overflow → waitlist → next rolling season (BUILT 2026-06-08).** Grid-growing covers demand up to your max grid during registration. Beyond that — or demand arriving *after* anchor (mid-season), when first-plot claims are closed — players join a **next-season waitlist** (`/api/oil-waitlist`: sets `waitlisted:true` + `waitlistedAt` on their `oilQualified` doc; returns position + total). A qualified-but-unplaced player sees a "JOIN NEXT-SEASON WAITLIST → you're #N of M" affordance in the no-claim panel; the admin status banner shows the waitlist count (a sponsor demand metric). **Prefer this over a second parallel pot:** under fixed-rate, adding players is positive-sum (no dilution, liability still capped at the escrowed pot), so the right scaling move is a *bigger pot (sponsors)* + staggered registration for the next rolling season — not splitting the crowd/pot/ops across two simultaneous games. True parallel pots are a sponsor-funded scale feature, not a bootstrap one.
-- **Reveal is gated on game-end (2026-06-08):** `/api/oil-verify` and the client only treat the seed as revealed when `gameEnded === true || gamePhase === "ended"` — a stale `seedReveal` on an active board can no longer leak the live map. `oil-admin-reset` also clears `seedReveal`/`finalSeedReveal`.
+- **Reveal is gated on game-end (2026-06-08):** `/api/oil-verify` and the client only treat the seed as revealed when `gameEnded === true || gamePhase === "ended"` — a stale `seedReveal` on an active board can no longer leak the live map.
+- **`oil-admin-reset` wipes the whole fairness lifecycle (2026-06-10):** RESET BOARD deletes `seedScheme`/`seedCommitment`/`anchorBlock`/`anchorBlockHash`/`seedReveal`/`finalSeedReveal` (+ legacy `blockHash`) from `oilGame/settings` AND deletes the server-side `oilSecret/seed` doc. Rationale: a stale commit kept `OilAnchorEvent` counting down to last season's block, and a stale `anchorBlockHash` silently rejected every first-plot claim in the next registration (`oil-claim` requires `ticket_sale && !anchorBlockHash`). After a reset the lobby shows the no-commitment state and strike-tick idles (`skipped:"no_seed"`) until a fresh COMMIT + ANCHOR — so the new-season runbook is: RESET BOARD → ZERO SCORES (`/api/oil-admin-zero-scores`, zeroes every rig's banked `totalCollected` — kept out of RESET BOARD so a mid-season wipe can't destroy earned money) → phase `ticket_sale` → set START DATE → COMMIT (lead sized to the planned start) → claims open → ANCHOR at the registration→active flip.
 - **Residual trust note:** the operator still custodies the secret. To remove even that, derive the secret from an external/multi-party source (future work). For bootstrap seasons, pre-anchor claim-locking + on-end reveal is the accepted bar.
 
 ### Funding — sponsorship + dev revenue (separate buckets)
@@ -186,8 +187,28 @@ All levers feed the shared `bonusDrills` field; `depthCap = min(10 + bonusDrills
 - Manual drilling is cleanly disabled for real players (drillStatus never "ready" for them, and `handleDailyDrill` already guards on `"ready"`); **admin/test keep the manual DRILL path** for verification.
 - **Mobile overlap fix (pre-existing bug):** the mobile 3D tab rendered `DrillHUD` twice — once inside the canvas wrap and once in the control block below — so the gauges crowded/overlapped the drill button. Removed the in-canvas copy; now one `DrillHUD` per layout (mobile control block / desktop side panel), matching desktop.
 
-**Remaining UI polish (optional):**
-- A "while you were away" summary toast (uses `lastStrikeAt`/`lastStrikeOil`/`lastStrikeDepth`) — the result is currently surfaced inline in the pump indicator + via the existing 3D strike visual, so this is purely a flourish.
+**"WHILE YOU WERE AWAY" recap — BUILT 2026-06-10** (upgraded from the old "optional toast" idea —
+for a game whose engine is "check back," the moment of checking back IS the product):
+- `src/components/OilAwayRecap.jsx` — landing overlay for a returning player. **Centered card
+  on ALL viewports** (a mobile bottom sheet left ~3/4 of a tall phone viewport as dead dimmed
+  space — reworked 2026-06-10 to a centered card over a light dim, 0.55 + 3px blur, so the
+  field stays visible as framing). Hero = oil struck while away (count-up animation, ≈$ at the
+  fixed rate) or the honest dry read ("N layers of dry shale — the vein is still down there").
+  Sections: YOUR RIG (depth from→to, strike count + best, hell-pocket warning, banked-delta,
+  tank readout with ⚠ TANK HEAVY — BANK IT NOW wired to `handleTankDrain` when ≥
+  `TANK_CAPACITY`) and THE FIELD (up to 4 timeline events by other players + "and N more" +
+  unread plot-message count). CTA: BACK TO THE FIELD.
+- **Diff source is fully client-side, no new server work:** baseline `{at, col/row, depth,
+  tank, banked}` in localStorage (`oil_away_v1`); per-layer oil from the server-authoritative
+  `oilPlots.revealed` map over the layers drilled since the baseline; field events filtered
+  from the existing `oilTimeline` listener (`> baseline.at`, not self); unread from the
+  `plotsWithMessages` listener.
+- **Shows once per absence:** active phase, real players with a rig only (admin/test/report/
+  preview excluded), ≥30 min away, and at least one notable item; re-baselines on every
+  qualifying load. Claim-jumping resets the baseline (plot key mismatch).
+- **Preview hooks:** `?recap=1` forces it with real data over a synthetic 26h/3-layer window;
+  `?recap=demo` renders a fully synthetic showcase (tagged "DEMO DATA") — use this to eyeball
+  the mobile sheet on a real phone.
 
 **Decided (2026-05-31):**
 - **End-of-season un-banked oil → credited to the player, never lost.** Un-banked `tankOil` belongs to the player; banking *during* the season is optional theft-protection (the dino can take a % of un-banked oil), not a scoring gate. Payout = `totalCollected` + any remaining `tankOil`. No "bank before the buzzer" pressure. **DONE (2026-06-07):** un-banked oil is paid out two ways over — the season buzzer (`endSeason` in `oil-strike-tick`) auto-sweeps every rig's `tankOil → totalCollected` when the phase flips to `ended`, *and* `scripts/oil-payout.js` independently scores `totalCollected + tankOil` (see *Rail A*). So nothing is lost whether the season ends on the buzzer or early via the admin button (which doesn't run the sweep — the payout's summing covers that case).
@@ -203,19 +224,85 @@ All levers feed the shared `bonusDrills` field; `depthCap = min(10 + bonusDrills
 The game progresses through three phases, controlled by `gamePhase` in Firestore:
 
 1. **`ticket_sale`** (Registration + Plot Pick — labeled **"REGISTRATION"** in admin; the
-   `ticket_sale` value is a legacy name, the ticket/draft system is gone). Renders `OilQualify`:
-   players connect a wallet holding ≥ $20 of RL80 **and** verify they follow **@rl80token** on X,
-   then pick a plot on the grid (first come, first served). `oil-register` re-checks the balance
-   server-side and is the sole writer of `qualified`. Already-picked players fall through to the 3D canvas.
+   `ticket_sale` value is a legacy name, the ticket/draft system is gone). Plot-less users get
+   `OilQualify` (the registration lobby): connect a wallet holding ≥ $20 of RL80 **and** verify
+   they follow **@rl80token** on X. Once qualified, the plot pick happens **on the live 3D
+   field** ("PICK YOUR PLOT ON THE FIELD" — see *Pre-season mode* below; first come, first
+   served). `oil-register` re-checks the balance server-side and is the sole writer of
+   `qualified`. **Players who already claimed fall through to the 3D field in PRE-SEASON mode.**
 2. **`active`** — Game running. Continuous auto-pump drilling: each armed rig grinds on its own and
    **strikes at random, unpredictable times**, paced by the fill-the-season clock (avg interval =
-   season ÷ depthCap; see *TIMING FRAMEWORK*). Players can claim-jump. A qualified, plot-less player
-   can **join mid-season** by selecting an unclaimed cell → **CLAIM THIS PLOT**
-   (`handleClaimActivePlot` → `oil-claim`).
+   season ÷ depthCap; see *TIMING FRAMEWORK*). Players can claim-jump. **First-plot claims are
+   CLOSED** (registration-locked pre-anchor, per *Provable fairness & insider-tipping defense*) —
+   the client only renders CLAIM THIS PLOT while `testingEnabled === true` (the tester exemption,
+   the only case the server accepts mid-season); otherwise a qualified-but-unplaced player sees
+   "CLAIMS ARE CLOSED" with the **next-season waitlist** as the primary CTA.
 3. **`ended`** — Game over (auto-flipped by the strike tick at the season buzzer, or by the admin
    END GAME button). Report mode unlocked. Seed revealed; `/api/oil-verify` returns VERIFIED.
 
 Default is `"active"` for backward compatibility.
+
+### Pre-season mode (BUILT 2026-06-10)
+
+During `ticket_sale`, `/hailmary` is **one destination with state-driven layers** instead of a
+hard page swap:
+
+- **Plot-less users** → `OilQualify` (registration lobby / marketing scroll).
+- **ON-FIELD PLOT PICK (BUILT 2026-06-10) — the ONLY claiming path.** The lobby's inline 2D
+  quick-pick grid was removed (`handleClaimPlot` deleted); a qualified plot-less user instead
+  hits **"⛏ PICK YOUR PLOT ON THE FIELD →"** (calls `onEnterField` → `lobbyView=false`), lands
+  on the live 3D field in pick mode, clicks an open cell (3D field or surface map — the map IS
+  the 2D fallback, so no second claim UI to maintain), and stakes it via **"⛏ STAKE YOUR
+  CLAIM (c, r)"** → the existing `handleClaimActivePlot` → `/api/oil-claim` (same `?ref=`
+  handling; server enforces qualification + the registration/pre-anchor window). On success the
+  drill doc arrives, the camera flies to the rig, and the panel flips to the pre-season
+  checklist; "← BACK TO REGISTRATION" returns to the lobby (hidden in `?preview=1`, where the
+  lobby gate doesn't apply).
+- **Players with a claimed plot** → the 3D field in **pre-season mode**: header reads
+  `SEASON STARTS IN Xd Xh` (isolated `SeasonCountdown`, ticks on its own 30s timer) +
+  `PRE-SEASON` status, and the drill-button slot renders the **pre-season checklist** — the three
+  highest-leverage asks while waiting for the anchor:
+  1. **GET STRIKE ALERTS** — Telegram bot deeplink (`t.me/<bot>?start=<userId>`); shows ✓ once
+     `oilTelegram/{userId}` exists (live listener).
+  2. **RECRUIT YOUR CREW** — referral link copy (+3 layers per confirmed referral).
+  3. **PIMP YOUR RIG** — GO TO RIG selects the player's plot (camera fly) for customization.
+- **Lobby ↔ field plumbing (`lobbyView` state in `page.js`):** pinned `true` on mount for
+  plot-less users so claiming a plot does NOT yank them off the certificate mid-ceremony — they
+  stay in the lobby (share moment) until they click the new **⛏ ENTER THE FIELD** button under
+  the certificate (`onEnterField` prop). Returning: the pre-season panel's VIEW CLAIM CERTIFICATE
+  link (players) or the OPEN LOBBY button next to the admin PHASE controls (admins) set
+  `lobbyView = true`. The pin waits on a `drillLoaded` flag (drill-doc listener resolved) so a
+  plot-holder's loading-race null can't trap them in the lobby.
+- **No-claim panel reconciled with server truth:** the dead active-phase CLAIM button +
+  "claims closed" contradiction is gone (claim CTA renders only when a claim can succeed); the
+  tester-code input is collapsed behind a "HAVE A TESTER CODE?" link.
+- **Anchor-as-event (BUILT 2026-06-10):** the provable-fairness anchor is public theater.
+  `OilAnchorEvent` (`src/components/OilAnchorEvent.jsx`) renders three states from the public
+  settings fields (`seedCommitment` / `anchorBlock` / `anchorBlockHash`, now mirrored into
+  page state): pre-commit ("THE MAP DOES NOT EXIST YET — nobody knows where the Lyquid80 is.
+  Not even us."), committed (**live countdown to the anchor block** — polls Base height every
+  30s via the CDP RPC lane / `fetchLatestBlockNumber`, ticks locally at ~2s/block between
+  polls, shows the truncated commitment hash), and anchored ("THE BLOCK HAS SPOKEN" + BaseScan
+  link). Full section in the `OilQualify` lobby (after HOW IT WORKS); `compact` one-liner in
+  both pre-season panel branches (checklist + pick mode). **Feed moments:** `oil-fairness`
+  commit/anchor/reveal now write `oilTimeline` system events ("map commitment sealed — Base
+  block #N will write the map" / "THE BLOCK HAS SPOKEN — map locked by Base block #N" /
+  "seed revealed…"); the auto-reveal paths (`oil-settings` on `gameEnded:true`, strike-tick
+  `endSeason`) log the reveal line too. **Operational note:** the default commit `lead` is 30
+  blocks (~1 min) — for the countdown to be real theater, run COMMIT early in registration
+  with `?lead=` sized to the planned season start (≈ seconds-until-start ÷ 2). The crypto is
+  unchanged (the anchor block must merely not exist at commit time), and claims still close
+  only when the anchor **step** publishes the hash — but run anchor + the phase flip promptly
+  once the block mines, since the operator can compute the map from that moment. The fairness
+  console (`OilVerifyPanel`, collapsed "PROVABLE FAIRNESS (ADMIN)" accordion) is mounted in
+  **both** the field's admin sidebar and the `OilQualify` lobby ADMIN CONTROLS section
+  (2026-06-10) — commit happens during registration, when the admin is in the lobby. Its lead
+  input now shows a live blocks→wall-clock conversion (+ the landing timestamp).
+- `OilQualify` now receives `gridSize` + `prizePool` from `oilGame/settings` (was hardcoded
+  10×10 / $500), leads with the prize ("$N USDC IS BURIED IN THIS FIELD" + "holding is the
+  ticket" framing), reframes the counter as **plots remaining** (scarcity, not headcount), and
+  the HOW IT WORKS / rules copy reflects the auto-pump model with **get paid** as the climax
+  step (claim-jump demoted to the rules list).
 
 ## Core Mechanics
 
@@ -467,6 +554,15 @@ in OIL units (only PRIZE POOL + demon bounties stay USDC). `depthBias` / `OIL_DE
 is now **vestigial** (see *Depth distribution* below) — still exported and accepted for
 signature/verifier compat, but no longer governs placement.
 
+**≈$ equivalents sweep (done 2026-06-10):** every player-facing oil number now carries a
+muted `≈ $X.XX` tag at the fixed rate (`fmtOilUsd` helper in `page.js`, rate =
+`totalOilBudget ÷ OIL_FIELD_UNITS`): leaderboard rows (both lists), TANK · UNBANKED, SENT TO
+STORAGE, the last-strike line in the pump indicator, the away-recap (hero + tank + banked),
+and the strike alert itself (push + Telegram, computed server-side in `oil-strike-tick`).
+Deliberately NOT tagged: per-cell/per-layer geology readouts (cross-section, core sample,
+depth profile) — they're instruments, not wallets, and the density would hurt more than the
+conversion helps. EXTRACTED already had the adjacent VALUE stat (kept).
+
 ### Depth distribution — stratified ramp, not a depth-bias wall (2026-06-09)
 
 The old model rolled every deposit's depth through a single `OIL_DEPTH_BIAS = 0.35`
@@ -547,6 +643,70 @@ not the client SDK. The X-OAuth routes (`check-follow`, `cron/update-followers`,
 `auth/x/callback`) were converted to the Admin SDK so `config/x_oauth` can stay private.
 Note: `lib/firebaseServer.js` is the **client** SDK (subject to rules) — don't use it for
 privileged reads in API routes.
+
+## Share Pipeline (BUILT 2026-06-10)
+
+Three artifacts, one acquisition loop — every share carries the player's `?ref=` link:
+
+- **Share-this-strike (away-recap):** when the recap shows a haul, a "📸 SHARE THIS STRIKE"
+  button captures the recap card itself (html2canvas → PNG to clipboard, same pattern as the
+  claim-certificate share) and opens the X composer with the haul + ≈$ + referral link.
+- **FINAL HAUL card (season end):** `finalHaulCard` in `page.js` — when `gameEnded`, real
+  players with a score see a fixed-palette receipt card (LYQUID80 total + ≈$ USDC, "paid to
+  your wallet on Base") above the drill panel, with "📸 SHARE YOUR HAUL". The payout-receipt
+  moment is the game's best marketing asset.
+- **Public Field Dispatch gallery `/hailmary/feed`:** standalone shareable route (server
+  wrapper exports OG metadata; `FeedClient.jsx` renders) — polaroid-scatter grid of approved
+  `oilFeed` items via the existing public `/api/oil-feed` (admin SDK, no index needed), each
+  card linking to its `/snapshot/{id}` page (which already carries per-image OG/Twitter tags),
+  with STAKE A CLAIM CTAs top + bottom. ⚠ The uploaded PNG **is** the polaroid —
+  PolaroidSnapshot bakes the white frame + handwritten caption into the image, so the gallery
+  renders it BARE (drop-shadow + scatter rotation + one metadata line: tag · username · time);
+  wrapping it in another frame/caption gives polaroids-of-polaroids (fixed 2026-06-10). Linked from the in-game FIELD DISPATCH accordion
+  header ("VIEW ALL"). Pre-existing pieces this builds on: PolaroidSnapshot's clipboard+tweet
+  share w/ referral overlay, the `polaroids/{id}` OG docs, and the admin approve flow
+  (`oil-feed-admin`, +1 bonus drill to the poster).
+
+## Web Push Alerts (BUILT 2026-06-10)
+
+FCM web push — the low-friction strike-alert channel (one tap on the device in hand, no
+account linking). Telegram stays as the secondary channel (it can deliver CCTV video; push
+can't).
+
+- **Fan-out helper `src/lib/oilAlerts.js`** — `sendPlayerAlert(db, userId, {title, body, url,
+  tag, telegramHtml, channels})` reaches Telegram + all registered push tokens in one call;
+  best-effort per channel (never throws into the strike loop); prunes tokens FCM reports dead.
+  `oil-strike-tick` now routes ALL its player alerts through it (hell-breach + strike on both
+  channels; **dry layers are Telegram-only** so push keeps its signal value). TODO: migrate
+  `oil-rogue` + demon-bounty victim alerts to the same helper.
+- **Client hook `src/hooks/usePushAlerts.js`** — platform detection (`supported` /
+  `needsInstall` for iOS-Safari-not-installed), `enable()` (permission → `getToken` with
+  `NEXT_PUBLIC_FIREBASE_VAPID_KEY` → POST `/api/oil-push-subscribe`), silent token re-validation
+  on revisit, `sendTest()` → `/api/oil-push-test` (self-only pipeline check).
+- **Service worker `public/firebase-messaging-sw.js`** — data-only payloads rendered by the SW
+  (no auto-display double-fire); Firebase config arrives via the registration URL's query
+  string; notification click focuses/opens `/hailmary` (where the away-recap is waiting —
+  push and recap are two halves of one loop).
+- **PWA install** — `public/manifest.json` (`start_url: /hailmary`, standalone) + real icons
+  (`icon-192/512.png`, `apple-icon.png` — rasterized from `hail-mary-icon.svg`; this also fixed
+  the previously-dangling `/apple-icon.png` metadata reference) + `manifest`/`appleWebApp` in
+  `layout.js` metadata. **iOS only delivers web push to Home-Screen-installed sites** — the UI
+  detects that state and shows "Share → Add to Home Screen" instructions.
+- **Storage `oilPush/{userId}`** — `{ tokens: [≤10, newest-wins], updatedAt }`; server-only
+  writes via `/api/oil-push-subscribe` (Clerk-authed; DELETE unsubscribes a token); private by
+  the deny-by-default Firestore rules (no rules change needed).
+- **UI** — the pre-season "GET STRIKE ALERTS" ask is push-first (ENABLE ALERTS) with "or link
+  Telegram →" secondary, plus "send a test ping →" / "turn off this device" links once enabled;
+  the auto-pumping panel shows a 🔔 nudge for active-phase players with neither channel; admins
+  get a STRIKE ALERTS (THIS DEVICE) panel under the fairness console (enable / disable / test
+  with real FCM outcome readout).
+- **Unsubscribe** — `disable()` in the hook: DELETE the token server-side + FCM `deleteToken`
+  + clear the local flag (and suppress silent re-enroll for the session). Browser-level
+  blocking also works ungracefully: FCM reports the token dead on the next send and
+  `sendPlayerAlert` prunes it.
+- **Env:** `NEXT_PUBLIC_FIREBASE_VAPID_KEY` (the PUBLIC "Key pair" value from Firebase Console →
+  Cloud Messaging → Web Push certificates; the private key never leaves Firebase). Must also be
+  set in App Hosting for production.
 
 ## Telegram Integration
 
@@ -874,6 +1034,24 @@ all done and green. Outstanding before a real season:
    audit — once per-season escrow is large enough to matter.
 3. **Before Rail B ever holds real money:** dry-run on Base Sepolia, then the
    stake-gated audit + the lottery-optics legal pass noted above.
+
+## Development Notes (local dev server)
+
+Hard-won on 2026-06-10 — the `/hailmary` page is huge and dev mode needs care:
+
+- **Next 16 dev memory watchdog crash-loops this app on default heap.** Symptom: `/hailmary`
+  takes minutes then the terminal prints `⚠ Server is approaching the used memory threshold,
+  restarting...` — the dev worker restarts after (or during) every page load, dropping
+  in-flight requests and recompiling from scratch each visit ("page won't load", `curl` gets
+  empty replies / timeouts). Fix: the `dev` script now runs with
+  `NODE_OPTIONS='--max-old-space-size=8192'` (machine has 64 GB). With the bigger heap the
+  watchdog stays quiet and the Turbopack cache persists: `/hailmary` ≈ 1.7s cold / ~100ms warm.
+- **Never run `next build` while `next dev` is running.** They contend on the shared `.next`
+  directory; observed result was a wedged dev worker spinning at >300% CPU serving nothing.
+  If the dev server is wedged: kill it, `rm -rf .next`, restart (first `/hailmary` compile
+  after a cache wipe is the slow one — a couple of minutes).
+- A second `next dev` instance fails on `.next/dev/lock` (and falls to port 3001) — one
+  instance at a time.
 
 ## Environment Variables
 

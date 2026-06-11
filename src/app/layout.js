@@ -7,6 +7,14 @@ export const metadata = {
     icon: '/favicon.svg',
     apple: '/apple-icon.png',
   },
+  // PWA manifest — required for iOS Add-to-Home-Screen install, which is what
+  // unlocks web push on iPhone (Safari only delivers push to installed apps).
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'HMPC',
+    statusBarStyle: 'black-translucent',
+  },
   other: {
     'base:app_id': '698a7e3fe6f6a95ae49e0002',
   },

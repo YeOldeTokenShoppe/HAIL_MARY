@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import ShaderText from "@/components/ShaderText";
 import NoiseBackground from "@/components/NoiseBackground";
 import { SignInButton } from "@clerk/nextjs";
@@ -12,9 +12,18 @@ import CyberNav from "@/components/CyberNav";
 import { useMusic } from "@/components/MusicContext";
 import { db, collection, query, orderBy, onSnapshot, doc } from "@/lib/firebaseClient";
 import { useOilApiFetch } from "@/lib/oilApiClient";
+import OilAnchorEvent from "@/components/OilAnchorEvent";
+import OilClaimCertificate from "@/components/OilClaimCertificate";
+import dynamic from "next/dynamic";
+
+// Fairness console (COMMIT / ANCHOR / REVEAL) — needed HERE because the commit
+// (which starts the anchor countdown) happens during registration, when the
+// admin is standing in this lobby, not on the field.
+const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
+const OilAdminGuide = dynamic(() => import("@/components/OilAdminGuide"), { ssr: false });
 
 const QUALIFICATION_THRESHOLD = 20; // $20 USD worth of RL80
-const GRID_SIZE = 10; // Fixed 10x10 grid
+const DEFAULT_GRID_SIZE = 10; // fallback until oilGame/settings gridSize arrives
 const MAX_BONUS_DRILLS = 10;
 const REFERRAL_BONUS = 3;
 
@@ -34,12 +43,21 @@ export default function OilQualify({
   isMobile,
   user,
   isAdmin,
+  adminPassword,
   saveGameSettings,
   walletAddress,
   tokenBalance,
   isWalletConnected,
   storedRef,
+  gridSize,
+  prizePool = 500,
+  onEnterField,
+  seedCommitment,
+  anchorBlock,
+  anchorBlockHash,
 }) {
+  // Live values from oilGame/settings (passed by the page) with safe fallbacks
+  const GRID_SIZE = gridSize || DEFAULT_GRID_SIZE;
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -57,11 +75,8 @@ export default function OilQualify({
   const [xCheckingFollow, setXCheckingFollow] = useState(false);
   const [xIdentityVerified, setXIdentityVerified] = useState(false); // true when X username comes from Clerk OAuth
   const [allPlots, setAllPlots] = useState({}); // oilPlots collection: { "col_row": { ... } }
-  const [claiming, setClaiming] = useState(false);
-  const [shareNote, setShareNote] = useState(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
-  const certRef = useRef(null);
 
   useEffect(() => {
     if (!lightboxSrc) return;
@@ -263,35 +278,10 @@ export default function OilQualify({
     }
   }, []);
 
-  // Claim a plot on the inline 10x10 grid (merged into registration flow)
-  const handleClaimPlot = useCallback(async (col, row) => {
-    if (!user || claiming) return;
-    const key = `${col}_${row}`;
-    if (allPlots[key]?.currentOwnerId) return; // already claimed (server re-checks)
-    setClaiming(true);
-    setError(null);
-    try {
-      // Server does the whole claim: plot + fresh drill doc + referral code +
-      // referral credit (capped, no self-referral). It derives our own ref code
-      // from the stored wallet; we just pass who referred US.
-      const refCode = storedRef || (typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null);
-      const res = await oilApiFetch("/api/oil-claim", {
-        method: "POST",
-        body: JSON.stringify({
-          col, row,
-          username: user.fullName || user.firstName || "",
-          referredByCode: refCode || null,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      if (typeof window !== "undefined") localStorage.removeItem("oil_ref");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setClaiming(false);
-    }
-  }, [user, allPlots, claiming, storedRef, oilApiFetch]);
+  // Plot claiming moved ON-FIELD (2026-06-10): the lobby's 2D quick-pick grid
+  // was replaced by the "PICK YOUR PLOT ON THE FIELD" CTA (onEnterField) — the
+  // claim itself happens on the 3D field via the page's STAKE YOUR CLAIM
+  // button (same /api/oil-claim route, same ?ref= handling).
 
   // Release current plot so user can pick a different one
   const [releasing, setReleasing] = useState(false);
@@ -455,254 +445,83 @@ export default function OilQualify({
           color: "#e8dcc8",
         }}>
           <div style={{
-            fontSize: isMobile ? 12 : 14,
+            fontSize: isMobile ? 18 : 24,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            color: theme.gold,
+          }}>
+            ${prizePool} USDC IS BURIED IN THIS FIELD
+          </div>
+          <div style={{
+            fontSize: isMobile ? 10 : 12,
             letterSpacing: "0.35em",
             color: theme.gold,
+            marginTop: 10,
+            opacity: 0.8,
           }}>
             PLAYER QUALIFICATION
           </div>
           <div style={{
             fontSize: 10,
             color: theme.text,
-            marginTop: 8,
+            marginTop: 6,
             letterSpacing: "0.1em",
           }}>
             HOLD ${QUALIFICATION_THRESHOLD}+ USD OF RL80 & FOLLOW @RL80TOKEN
           </div>
+          <div style={{
+            fontSize: 9,
+            color: theme.muted,
+            marginTop: 4,
+            letterSpacing: "0.08em",
+          }}>
+            HOLDING IS THE TICKET — YOU NEVER SPEND IT
+          </div>
         </div>
 
-        {/* Hero image — Claim Certificate with dynamic fields */}
-        <div ref={certRef} style={{
-          margin: "20px auto 0",
-          maxWidth: 480,
-          position: "relative",
-          borderRadius: 4,
-          overflow: "hidden",
-        }}>
-          <img src="/ClaimCertificate.webp" alt="Claim Certificate" style={{ width: "100%", display: "block" }} />
-          {/* Dynamic field overlays — fill in progressively as the user advances
-              through the funnel (sign in → register → claim plot). Each field
-              renders independently so the certificate previews what a completed
-              claim will look like, as enticement. */}
-          {(() => {
-            const certFont = "'Share Tech Mono', monospace";
-            const inkColor = "#3a2a18";
-            const placeholderColor = "rgba(58, 42, 24, 0.32)";
-            const rot = "rotate(-5.5deg)";
-            const fieldStyle = {
-              position: "absolute",
-              fontFamily: certFont,
-              whiteSpace: "nowrap",
-              pointerEvents: "none",
-              transform: rot,
-            };
-            const claimId = walletAddress
-              ? walletAddress.slice(0, 10).toUpperCase()
-              : user?.id
-              ? user.id.slice(0, 10).toUpperCase()
-              : null;
-            const grantedTo = user?.fullName || user?.firstName || (user ? "Anonymous" : null);
-            const plotCol = userPlotEntry?.col ?? userPlayer?.plotCol;
-            const plotRow = userPlotEntry?.row ?? userPlayer?.plotRow;
-            const hasPlot = plotCol != null && plotRow != null;
-            const pickedRaw = userPlayer?.pickedAt;
-            const claimDate = pickedRaw?.toDate?.()
-              ? pickedRaw.toDate()
-              : pickedRaw?.seconds
-              ? new Date(pickedRaw.seconds * 1000)
-              : new Date(); // default to today as a preview before the plot is locked in
-            const dateStr = claimDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-            return (
-              <>
-                <div style={{ ...fieldStyle, top: "52%", left: "50%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700, color: claimId ? inkColor : placeholderColor }}>
-                  {claimId || "[ CLAIM ID ]"}
-                </div>
-                <div style={{ ...fieldStyle, top: "60%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700, color: hasPlot ? inkColor : placeholderColor }}>
-                  {hasPlot ? `(${plotCol}, ${plotRow})` : "( COL , ROW )"}
-                </div>
-                <div style={{ ...fieldStyle, top: "69%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700, color: grantedTo ? inkColor : placeholderColor }}>
-                  {grantedTo || "[ YOUR NAME ]"}
-                </div>
-                <div style={{ ...fieldStyle, top: "83%", left: "40%", fontSize: isMobile ? "2.4vw" : 12, fontWeight: 700, color: pickedRaw ? inkColor : placeholderColor }}>
-                  {dateStr}
-                </div>
-                {/* Authorizing signature — the certificate is issued/signed by
-                    the company granting the claim, not the player. */}
-                <div style={{
-                  position: "absolute",
-                  top: "82%",
-                  right: "20%",
-                  fontFamily: "'Homemade Apple', cursive",
-                  fontSize: isMobile ? "0.5em" : 15,
-                  color: inkColor,
-                  pointerEvents: "none",
-                  transform: rot,
-                  opacity: 0.85,
-                  whiteSpace: "nowrap",
-                }}>
-                  Mary
-                </div>
-              </>
-            );
-          })()}
-        </div>
+        {/* Hero — Claim Certificate with dynamic fields + the share pipeline.
+            Shared component (OilClaimCertificate) — the field's pre-season
+            panel renders the same certificate as a click-to-enlarge thumb.
+            Fields fill in progressively (sign in → register → claim plot) so
+            the certificate previews a completed claim, as enticement. */}
+        <OilClaimCertificate
+          variant="hero"
+          user={user}
+          walletAddress={walletAddress}
+          plotCol={userPlotEntry?.col ?? userPlayer?.plotCol}
+          plotRow={userPlotEntry?.row ?? userPlayer?.plotRow}
+          pickedAt={userPlayer?.pickedAt}
+          theme={theme}
+          isMobile={isMobile}
+          showShare={!!(userPlayer && userHasPlot)}
+        />
 
-        {/* Share buttons — only when certificate has data */}
-        {userPlayer && userHasPlot && (
-          <div style={{ margin: "12px auto 0", maxWidth: 480, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-            {/* Share on X — copies PNG to clipboard, then opens Twitter compose */}
+
+        {/* Claim staked → the lobby's job is done. Hand the player to the 3D
+            field (pre-season mode: countdown + alerts/referral/rig checklist). */}
+        {userPlayer && userHasPlot && onEnterField && (
+          <div style={{ margin: "16px auto 0", maxWidth: 480 }}>
             <button
-              onClick={async () => {
-                try {
-                  setShareNote("Capturing image...");
-                  const { default: html2canvas } = await import("html2canvas");
-                  const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
-
-                  // Re-draw onto a fresh canvas to get a clean PNG blob (same pattern as PolaroidSnapshot)
-                  const img = new Image();
-                  img.src = canvas.toDataURL("image/png");
-                  await new Promise((r) => { img.onload = r; img.onerror = r; });
-                  const c = document.createElement("canvas");
-                  c.width = img.width; c.height = img.height;
-                  c.getContext("2d").drawImage(img, 0, 0);
-                  const pngBlob = await new Promise((r) => c.toBlob(r, "image/png"));
-
-                  let clipboardOk = false;
-                  if (pngBlob && navigator.clipboard && window.ClipboardItem) {
-                    try {
-                      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
-                      clipboardOk = true;
-                    } catch (clipErr) {
-                      console.error("Clipboard copy failed:", clipErr);
-                    }
-                  }
-
-                  if (clipboardOk) {
-                    setShareNote("Image copied! Press Cmd+V (or Ctrl+V) to paste it into your tweet");
-                    await new Promise((r) => setTimeout(r, 1500));
-                  }
-
-                  const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
-                  const text = `I just staked my claim at Hail Mary Prospecting Co.\n\nrl80.com/hailmary?ref=${refCode}`;
-                  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "width=550,height=420");
-                  setTimeout(() => setShareNote(null), 5000);
-                } catch (err) { console.error("Share failed:", err); }
-              }}
+              onClick={onEnterField}
               style={{
-                padding: "8px 16px",
-                background: `${theme.gold}22`,
-                border: `1px solid ${theme.gold}`,
+                width: "100%",
+                padding: "14px 28px",
+                background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
+                border: `1px solid ${theme.goldBorder || theme.gold}`,
                 borderRadius: 3,
-                color: theme.gold,
+                color: "#fff",
                 fontFamily: mono,
-                fontSize: 10,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-              SHARE ON X
-            </button>
-            {/* Copy image as PNG */}
-            <button
-              onClick={async () => {
-                try {
-                  setShareNote("Copying...");
-                  const { default: html2canvas } = await import("html2canvas");
-                  const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
-                  const pngBlob = await new Promise((r) => canvas.toBlob(r, "image/png"));
-                  if (pngBlob && navigator.clipboard && window.ClipboardItem) {
-                    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
-                    setShareNote("Copied to clipboard!");
-                  }
-                  setTimeout(() => setShareNote(null), 3000);
-                } catch (err) { console.error("Copy failed:", err); }
-              }}
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: `1px solid ${theme.border}`,
-                borderRadius: 3,
-                color: theme.muted,
-                fontFamily: mono,
-                fontSize: 10,
-                letterSpacing: "0.1em",
+                fontSize: 14,
+                fontWeight: 700,
+                letterSpacing: "0.15em",
                 cursor: "pointer",
               }}
             >
-              COPY IMAGE
+              ⛏ ENTER THE FIELD →
             </button>
-            {/* Download */}
-            <button
-              onClick={async () => {
-                try {
-                  const { default: html2canvas } = await import("html2canvas");
-                  const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
-                  const link = document.createElement("a");
-                  link.download = "hail-mary-claim.png";
-                  link.href = canvas.toDataURL("image/png");
-                  link.click();
-                  setShareNote("Downloaded!");
-                  setTimeout(() => setShareNote(null), 3000);
-                } catch (err) { console.error("Download failed:", err); }
-              }}
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: `1px solid ${theme.border}`,
-                borderRadius: 3,
-                color: theme.muted,
-                fontFamily: mono,
-                fontSize: 10,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-              }}
-            >
-              DOWNLOAD
-            </button>
-            {/* Mobile native share */}
-            {typeof navigator !== "undefined" && navigator.share && (
-              <button
-                onClick={async () => {
-                  try {
-                    const { default: html2canvas } = await import("html2canvas");
-                    const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
-                    const pngBlob = await new Promise((r) => canvas.toBlob(r, "image/png"));
-                    if (!pngBlob) return;
-                    const file = new File([pngBlob], "hail-mary-claim.png", { type: "image/png" });
-                    const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
-                    await navigator.share({
-                      title: "Hail Mary Prospecting Co.",
-                      text: `I just staked my claim! Join me: rl80.com/hailmary?ref=${refCode}`,
-                      files: [file],
-                    });
-                  } catch (err) {
-                    if (err.name !== "AbortError") console.error("Share failed:", err);
-                  }
-                }}
-                style={{
-                  padding: "8px 16px",
-                  background: "transparent",
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: 3,
-                  color: theme.muted,
-                  fontFamily: mono,
-                  fontSize: 10,
-                  letterSpacing: "0.1em",
-                  cursor: "pointer",
-                }}
-              >
-                SHARE
-              </button>
-            )}
-            {shareNote && (
-              <div style={{ width: "100%", textAlign: "center", fontSize: 10, color: theme.green, marginTop: 4 }}>
-                {shareNote}
-              </div>
-            )}
+            <div style={{ textAlign: "center", fontSize: 9, color: theme.muted, marginTop: 6, letterSpacing: "0.08em" }}>
+              YOUR RIG IS STAKED — SEE IT ON THE GRID & GET READY FOR THE SEASON
+            </div>
           </div>
         )}
 
@@ -775,29 +594,41 @@ export default function OilQualify({
           color: "#e8dcc8",
           marginBottom: 24,
         }}>
-          <div style={{
-            fontSize: isMobile ? 52 : 72,
-            fontWeight: 700,
-            color: theme.gold,
-            lineHeight: 1,
-          }}>
-            {qualifiedPlayers.length}
-          </div>
-          <div style={{
-            fontSize: 11,
-            letterSpacing: "0.25em",
-            color: theme.muted,
-            marginTop: 8,
-          }}>
-            QUALIFIED PLAYERS
-          </div>
-          <div style={{
-            fontSize: 10,
-            color: theme.muted,
-            marginTop: 4,
-          }}>
-            {players.length} registered total
-          </div>
+          {(() => {
+            // Scarcity over headcount: "plots remaining" motivates at any
+            // player count, while a low "qualified players" number reads as a
+            // ghost town. Claimed = oilPlots docs with a current owner.
+            const totalPlots = GRID_SIZE * GRID_SIZE;
+            const claimedPlots = Object.values(allPlots).filter((p) => p?.currentOwnerId != null).length;
+            const plotsRemaining = Math.max(0, totalPlots - claimedPlots);
+            return (
+              <>
+                <div style={{
+                  fontSize: isMobile ? 52 : 72,
+                  fontWeight: 700,
+                  color: theme.gold,
+                  lineHeight: 1,
+                }}>
+                  {plotsRemaining}
+                </div>
+                <div style={{
+                  fontSize: 11,
+                  letterSpacing: "0.25em",
+                  color: theme.muted,
+                  marginTop: 8,
+                }}>
+                  {plotsRemaining === 1 ? "PLOT REMAINING" : "PLOTS REMAINING"}
+                </div>
+                <div style={{
+                  fontSize: 10,
+                  color: theme.muted,
+                  marginTop: 4,
+                }}>
+                  first come, first served &mdash; {claimedPlots} claimed &middot; {players.length} prospector{players.length === 1 ? "" : "s"} registered
+                </div>
+              </>
+            );
+          })()}
 
           <div style={{
             display: "inline-block",
@@ -811,7 +642,7 @@ export default function OilQualify({
               {GRID_SIZE}x{GRID_SIZE} GRID
             </div>
             <div style={{ fontSize: 9, color: theme.muted }}>
-              {GRID_SIZE * GRID_SIZE} PLOTS &mdash; $500 USDC PRIZE POOL
+              {GRID_SIZE * GRID_SIZE} PLOTS &mdash; ${prizePool} USDC PRIZE POOL
             </div>
           </div>
         </div>
@@ -839,10 +670,10 @@ export default function OilQualify({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
-              { step: "01", title: "HOLD RL80 & FOLLOW", desc: `Hold at least $${QUALIFICATION_THRESHOLD} USD worth of RL80 tokens and follow @rl80token on X.` },
-              { step: "02", title: "REGISTER & PICK YOUR PLOT", desc: "Connect your wallet, verify your X follow, register, then pick a plot on the 10x10 grid. First come, first served." },
-              { step: "03", title: "DRILL FOR OIL", desc: "Each day 1 new layer unlocks to drill. Click to drill each layer. Refer friends for bonus depth (up to +10 layers). Max depth: 20." },
-              { step: "04", title: "CLAIM JUMP", desc: "Move to a different unclaimed plot. First 2 jumps are free, each jump after costs 1 bonus drill." },
+              { step: "01", title: "HOLD RL80 & FOLLOW", desc: `Hold at least $${QUALIFICATION_THRESHOLD} of RL80 and follow @rl80token on X. You never spend it — holding is the ticket. Sell anytime; you only lose your seat.` },
+              { step: "02", title: "STAKE YOUR CLAIM", desc: `Connect your wallet, verify your follow, and pick a plot on the ${GRID_SIZE}x${GRID_SIZE} grid. First come, first served.` },
+              { step: "03", title: "YOUR RIG DRILLS 24/7", desc: "No clicking. Once the season starts, your rig pumps around the clock and strikes at random, unpredictable times — day or night. Refer friends to drill deeper (+3 layers each, up to depth 20)." },
+              { step: "04", title: "STRIKE LYQUID80 — GET PAID", desc: "Every unit you haul is worth real USDC at a fixed rate. When the season ends, payouts go straight to your wallet." },
             ].map((item) => (
               <div key={item.step} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <div style={{
@@ -866,6 +697,16 @@ export default function OilQualify({
             ))}
           </div>
         </div>
+
+        {/* Anchor-as-event — the provable-fairness trust beat: the map doesn't
+            exist until the anchor block mines (live countdown once committed). */}
+        <OilAnchorEvent
+          theme={theme}
+          isMobile={isMobile}
+          seedCommitment={seedCommitment}
+          anchorBlock={anchorBlock}
+          anchorBlockHash={anchorBlockHash}
+        />
 
         {/* Brochure Images */}
         <div style={{
@@ -1433,98 +1274,60 @@ export default function OilQualify({
           )}
         </div>
 
-        {/* Inline Plot Grid — shown after registration, before plot is picked */}
+        {/* Qualified, no plot yet → the pick happens ON THE FIELD (the page
+            swaps to the 3D field in pick mode via onEnterField; claiming a
+            cell there is the only claim path). */}
         {userRegistered && userPlayer?.qualified && !userHasPlot && (
           <div style={{
             marginBottom: 24,
-            padding: isMobile ? 16 : 20,
+            padding: isMobile ? 20 : 24,
             border: `1px solid ${theme.gold}44`,
             borderRadius: 4,
-            background: `${theme.gold}06`,
+            background: "rgba(20, 12, 28, 0.72)",
+            backdropFilter: "blur(24px) saturate(1.2)",
+            WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+            textAlign: "center",
           }}>
             <div style={{
-              fontSize: 12,
+              fontSize: 13,
               letterSpacing: "0.15em",
               color: theme.green,
-              marginBottom: 4,
+              marginBottom: 6,
               fontWeight: 700,
-              textAlign: "center",
             }}>
-              YOU ARE QUALIFIED — PICK YOUR PLOT
+              YOU ARE QUALIFIED — STAKE YOUR CLAIM
             </div>
             <div style={{
-              fontSize: 10,
+              fontSize: 11,
               color: theme.muted,
-              marginBottom: 14,
-              textAlign: "center",
+              marginBottom: 16,
+              lineHeight: 1.6,
+              maxWidth: 420,
+              marginLeft: "auto",
+              marginRight: "auto",
             }}>
-              Click any available cell on the {GRID_SIZE}x{GRID_SIZE} grid to claim it
+              Walk the live field and choose your ground — click any open cell
+              on the {GRID_SIZE}x{GRID_SIZE} grid and plant your rig where you
+              want to drill. First come, first served.
             </div>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
-              gap: 2,
-              width: "100%",
-              maxWidth: isMobile ? "100%" : 500,
-              margin: "0 auto",
-            }}>
-              {Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, i) => {
-                const col = i % GRID_SIZE;
-                const row = Math.floor(i / GRID_SIZE);
-                const key = `${col}_${row}`;
-                const plotData = allPlots[key];
-                const taken = plotData?.currentOwnerId != null;
-                const isDQ = plotData?.disqualified;
-                const canPick = !taken && !claiming;
-
-                return (
-                  <div
-                    key={key}
-                    onClick={() => canPick && handleClaimPlot(col, row)}
-                    style={{
-                      aspectRatio: "1",
-                      border: `1px solid ${taken ? theme.border : theme.gold}44`,
-                      borderRadius: 2,
-                      background: taken
-                        ? `${theme.muted}15`
-                        : isDQ
-                        ? `${theme.warn}15`
-                        : canPick
-                        ? `${theme.gold}12`
-                        : "transparent",
-                      cursor: canPick ? "pointer" : "default",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: isMobile ? 7 : 9,
-                      color: taken ? theme.muted : theme.borderLight,
-                      transition: "background 0.15s",
-                    }}
-                    title={taken ? "Claimed" : isDQ ? `Pre-drilled (depth ${plotData?.drillDay || 0})` : `(${col}, ${row})`}
-                  >
-                    {taken ? (
-                      <span style={{ fontSize: isMobile ? 8 : 10, color: theme.muted }}>&#9632;</span>
-                    ) : isDQ && plotData?.drillDay > 0 ? (
-                      <span style={{ fontSize: isMobile ? 6 : 8, color: theme.warn }}>D{plotData.drillDay}</span>
-                    ) : (
-                      <span>{col},{row}</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 16,
-              fontSize: 10,
-              color: theme.muted,
-              marginTop: 10,
-            }}>
-              <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: `${theme.gold}30`, marginRight: 4, verticalAlign: "middle" }} /> Available</span>
-              <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: `${theme.muted}30`, marginRight: 4, verticalAlign: "middle" }} /> Taken</span>
-              <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: `${theme.warn}30`, marginRight: 4, verticalAlign: "middle" }} /> Pre-drilled</span>
-            </div>
+            <button
+              onClick={onEnterField}
+              disabled={!onEnterField}
+              style={{
+                padding: "14px 32px",
+                background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
+                border: `1px solid ${theme.goldBorder || theme.gold}`,
+                borderRadius: 3,
+                color: "#fff",
+                fontFamily: mono,
+                fontSize: 14,
+                fontWeight: 700,
+                letterSpacing: "0.15em",
+                cursor: onEnterField ? "pointer" : "default",
+              }}
+            >
+              ⛏ PICK YOUR PLOT ON THE FIELD →
+            </button>
             {error && (
               <div style={{ color: theme.red, fontSize: 11, textAlign: "center", marginTop: 8 }}>
                 {error}
@@ -1544,7 +1347,7 @@ export default function OilQualify({
             textAlign: "center",
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: theme.green, marginBottom: 6 }}>
-              PLOT CLAIMED — ({userPlotEntry?.col}, {userPlotEntry?.row})
+              PLOT CLAIMED — ({userPlotEntry.col + 1}, {userPlotEntry.row + 1})
             </div>
             <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>
               You have picked your plot. The game will start soon — check back when the drilling phase begins!
@@ -1617,7 +1420,7 @@ export default function OilQualify({
             { label: "ENTRY", value: "HOLD " + `$${QUALIFICATION_THRESHOLD}+ RL80`, sub: "Token balance check" },
             { label: "GRID SIZE", value: `${GRID_SIZE}x${GRID_SIZE} FIXED`, sub: `${GRID_SIZE * GRID_SIZE} plots` },
             { label: "MAX DEPTH", value: "20 LAYERS", sub: "10 passive + 10 bonus" },
-            { label: "PRIZE POOL", value: "$500 USDC", sub: "Hidden underground" },
+            { label: "PRIZE POOL", value: `$${prizePool} USDC`, sub: "Hidden underground" },
           ].map((item) => (
             <div
               key={item.label}
@@ -1818,13 +1621,13 @@ export default function OilQualify({
             color: theme.text,
             lineHeight: 1.8,
           }}>
-            <li>Hold at least ${QUALIFICATION_THRESHOLD} USD worth of RL80 tokens and follow @rl80token on X to qualify.</li>
-            <li>Admin runs snapshots to verify token balances on-chain. Drop below threshold = disqualified, plot released.</li>
-            <li>Fixed {GRID_SIZE}x{GRID_SIZE} grid (100 plots). Pick your plot when you register. First come, first served.</li>
-            <li>Each day, 1 new layer unlocks to drill (10 passive over the contest). Click to drill each layer. Refer friends for up to 10 bonus layers (max depth: 20).</li>
-            <li>Claim jumping: move to an unclaimed plot. First 2 jumps free, then each jump costs 1 bonus drill.</li>
-            <li>Referrals: share your referral link. When a new player qualifies and claims a plot, you earn +3 bonus drills (capped at 10).</li>
-            <li>Oil distribution is seeded by a verifiable on-chain block hash. $500 USDC prize pool.</li>
+            <li>Hold at least ${QUALIFICATION_THRESHOLD} USD worth of RL80 tokens and follow @rl80token on X to qualify. You never spend the tokens — holding is the ticket.</li>
+            <li>Balance snapshots verify holdings on-chain. You&apos;re only disqualified by <em>selling</em> below your entry position — a price dip never disqualifies you.</li>
+            <li>Fixed {GRID_SIZE}x{GRID_SIZE} grid ({GRID_SIZE * GRID_SIZE} plots). Pick your plot when you register. First come, first served.</li>
+            <li>Your rig drills automatically, 24/7 — no clicking. It strikes at random, unpredictable times, pacing through 10 base layers over the season. Refer friends for up to 10 bonus layers (max depth: 20) — deeper usually means richer.</li>
+            <li>Claim jumping: move to an unclaimed plot mid-season. First 2 jumps free, then each jump costs 1 bonus drill.</li>
+            <li>Referrals: share your referral link. When a new player qualifies and claims a plot, you earn +{REFERRAL_BONUS} bonus drills (capped at {MAX_BONUS_DRILLS}).</li>
+            <li>The map is seeded by a future Base block hash nobody can predict — not even us — and revealed for public verification when the season ends. ${prizePool} USDC prize pool.</li>
           </ul>
         </div>
 
@@ -1888,6 +1691,14 @@ export default function OilQualify({
               borderBottom: `1px solid ${theme.border}`,
             }}>
               ADMIN CONTROLS
+            </div>
+
+            {/* Fairness console — run COMMIT (with a lead sized to the season
+                start) from right here during registration; the anchor countdown
+                section above goes live the moment it lands. */}
+            <div style={{ marginBottom: 16, background: "rgba(240, 232, 220, 0.92)", borderRadius: 4, overflow: "hidden" }}>
+              <OilAdminGuide />
+              <OilVerifyPanel adminPassword={adminPassword} />
             </div>
 
             {/* Run Snapshot */}
@@ -1969,7 +1780,7 @@ export default function OilQualify({
                 PHASE OVERRIDE
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {["ticket_sale", "active", "ended"].map((phase) => (
+                {["registration", "active", "ended"].map((phase) => (
                   <button
                     key={phase}
                     onClick={() => saveGameSettings({ gamePhase: phase })}

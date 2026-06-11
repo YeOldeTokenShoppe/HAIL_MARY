@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
+import { logTimeline } from "@/lib/oilTimeline";
 
 // Whitelist of fields the admin UI is allowed to set on oilGame/settings.
 // ticketCount / currentPickOrder / pickDeadline are legacy draft fields (the
@@ -103,6 +104,9 @@ export async function POST(req) {
           { merge: true },
         );
         written.push("seedReveal");
+      }
+      if (written.includes("seedReveal")) {
+        await logTimeline(db, { type: "system", detail: "seed revealed — anyone can now verify the entire map" });
       }
     }
 

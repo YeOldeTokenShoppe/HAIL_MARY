@@ -130,6 +130,19 @@ export default function OilVerifyPanel({ adminPassword }) {
               {busy === "commit" ? "..." : "COMMIT"}
             </button>
           </div>
+          {/* Lead → wall-clock conversion (Base ≈ 2s/block) so sizing the
+              countdown to the season start needs no math. Default lead is 30
+              blocks (~1 min) — fine for testing, blink-and-miss-it as theater. */}
+          <div style={{ ...s.note, marginTop: -4, marginBottom: 8 }}>
+            {(() => {
+              const n = parseInt(lead, 10);
+              if (!Number.isFinite(n) || n <= 0) return "lead = blocks until the map locks (~2s each). 1d ≈ 43200 · 3d ≈ 129600 · 7d ≈ 302400. Empty = 30 (~1 min).";
+              const sec = n * 2;
+              const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+              const human = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m ${sec % 60}s`;
+              return `${n.toLocaleString()} blocks ≈ ${human} — countdown lands ${new Date(Date.now() + sec * 1000).toLocaleString()}`;
+            })()}
+          </div>
 
           {/* Anchor / Reveal / Refresh */}
           <div style={s.inputRow}>

@@ -10,6 +10,10 @@ import * as THREE from "three";
 import CleanCanvas from "@/components/canvas/CleanCanvas";
 import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
+import { REFERRAL_BONUS } from "@/lib/oilBonusMath";
+import OilAnchorEvent from "@/components/OilAnchorEvent";
+import OilAwayRecap from "@/components/OilAwayRecap";
+import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import HowToPlayPanel from "@/components/HowToPlayPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
@@ -617,6 +621,8 @@ function ParabolumMoon() {
 const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr: false });
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
+const OilAdminGuide = dynamic(() => import("@/components/OilAdminGuide"), { ssr: false });
+const OilClaimCertificate = dynamic(() => import("@/components/OilClaimCertificate"), { ssr: false });
 const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
 const OilPlotChat = dynamic(() => import("@/components/OilPlotChat"), { ssr: false });
 const CoreSamplePanel = dynamic(() => import("@/components/CoreSamplePanel"), { ssr: false });
@@ -1063,6 +1069,30 @@ const DrillCountdown = memo(function DrillCountdown({ style }) {
   return <div style={style}>NEXT DRILL IN {countdown}</div>;
 });
 
+// Isolated pre-season countdown ("SEASON STARTS IN 2d 14h 03m") — its own
+// 30s timer so the tick never re-renders the page. Falls back to "SOON" when
+// no start date is set or the date has already passed (admin hasn't flipped
+// the phase yet).
+const SeasonCountdown = memo(function SeasonCountdown({ gameStartDate, style }) {
+  const [label, setLabel] = useState("SOON");
+  useEffect(() => {
+    if (!gameStartDate) { setLabel("SOON"); return; }
+    const target = new Date(gameStartDate + "T00:00:00Z").getTime();
+    const tick = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) { setLabel("SOON"); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const mn = Math.floor((diff % 3600000) / 60000);
+      setLabel(d > 0 ? `IN ${d}d ${h}h` : h > 0 ? `IN ${h}h ${String(mn).padStart(2, "0")}m` : `IN ${mn}m`);
+    };
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [gameStartDate]);
+  return <span style={style}>SEASON STARTS {label}</span>;
+});
+
 function useIsMobile(breakpoint = 900) {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -1311,7 +1341,7 @@ export default function OilPage() {
   const drillBtnStyles = useMemo(() => getDrillStyles(theme), [theme]);
   const isTest = mode === "test";
   const [testDay, setTestDay] = useState(0);
-  const { user } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const clerk = useClerk();
 
   // Authenticated fetch for oil mutation endpoints — attaches the Clerk session
@@ -1371,6 +1401,19 @@ export default function OilPage() {
   // or admin-set — it's a truthful "DAY N" display, can't desync.
   const [gameStartDate, setGameStartDate] = useState(null);
   const [seasonLengthDays, setSeasonLengthDays] = useState(10);
+  // Provable-fairness anchor (public fields from oilGame/settings) — drives
+  // the anchor-as-event countdown in the lobby + pre-season panel.
+  const [anchorBlock, setAnchorBlock] = useState(null);
+  const [anchorBlockHash, setAnchorBlockHash] = useState(null);
+  // Pre-season lobby toggle: during ticket_sale a player WITH a plot lands on
+  // the 3D field (pre-season mode) instead of OilQualify. lobbyView=true pins
+  // the registration page open — set on mount for plot-less users (so claiming
+  // a plot doesn't yank them off the certificate mid-ceremony) and by the
+  // "VIEW REGISTRATION LOBBY" link in the pre-season panel (the certificate
+  // itself is now a thumb right in the panel — OilClaimCertificate).
+  const [lobbyView, setLobbyView] = useState(null);
+  // Whether this player has linked the Telegram alert bot (oilTelegram/{userId})
+  const [telegramLinked, setTelegramLinked] = useState(false);
 
   // Admin password gate
   const [adminAuthed, setAdminAuthed] = useState(false);
@@ -1424,6 +1467,7 @@ export default function OilPage() {
   const [showMainTankInfo, setShowMainTankInfo] = useState(false);
   // Tester access code: redeem box (players) + admin set-code input.
   const [testerCode, setTesterCode] = useState("");
+  const [showTesterCode, setShowTesterCode] = useState(false); // tester-code input collapsed behind a link
   const [testerMsg, setTesterMsg] = useState(null);
   const [adminTesterCode, setAdminTesterCode] = useState("");
   // Next-season waitlist (overflow demand: grid full / registration closed).
@@ -1439,7 +1483,9 @@ export default function OilPage() {
         const d = snap.data();
         // The raw seed is never in the public doc during play — only its
         // commitment, plus the post-game reveal (which is safe to compute from).
-        if (d.seedCommitment) setSeedCommitment(d.seedCommitment);
+        // Unconditional (null on absence) so a board reset that wipes the
+        // fairness fields clears the lobby countdown in already-open tabs.
+        setSeedCommitment(d.seedCommitment || null);
         // The revealed seed is only safe to expose to clients AFTER the game has
         // actually ended — otherwise a stale/leftover seedReveal (e.g. from a
         // prior test cycle) would hand every player the live map. Gate on
@@ -1460,6 +1506,10 @@ export default function OilPage() {
         if (d.gameStartDate) setGameStartDate(d.gameStartDate);
         if (typeof d.seasonLengthDays === "number" && d.seasonLengthDays > 0) setSeasonLengthDays(d.seasonLengthDays);
         if (typeof d.testingEnabled === "boolean") setTestingEnabled(d.testingEnabled);
+        // Anchor-as-event: the public commit/anchor fields drive the "map does
+        // not exist yet" countdown (OilAnchorEvent). Both are public by design.
+        setAnchorBlock(typeof d.anchorBlock === "number" ? d.anchorBlock : null);
+        setAnchorBlockHash(d.anchorBlockHash || null);
       }
       setSettingsLoaded(true);
     });
@@ -1559,23 +1609,32 @@ export default function OilPage() {
 
   // FIELD ACTIVITY feed — live who/what/when timeline (latest 30, newest first).
   const [timelineEvents, setTimelineEvents] = useState([]);
+  const [timelineLoaded, setTimelineLoaded] = useState(false); // first snapshot arrived (away-recap gate)
   useEffect(() => {
     if (!db) return;
     const q = query(collection(db, "oilTimeline"), orderBy("createdAt", "desc"), limit(30));
     const unsub = onSnapshot(q, (snap) => {
       setTimelineEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setTimelineLoaded(true);
     });
     return () => unsub();
   }, []);
 
   const leaderboardData = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const totalDrillers = allDrillers.length;
-    const drilledTodayCount = allDrillers.filter((d) => d.lastDrillDate === today).length;
-    const topCollectors = [...allDrillers]
+    // DRILLERS counts rigs actually staked on the board (col != null) — drill
+    // docs persist across board resets (they carry referrals/bonuses), so the
+    // raw doc count would show ghost rigs from past seasons.
+    const placed = allDrillers.filter((d) => d.col != null);
+    const totalDrillers = placed.length;
+    const drilledTodayCount = placed.filter((d) => d.lastDrillDate === today).length;
+    // Zero-score rigs are noise, not collectors — but DON'T require placement:
+    // a released rig's banked score is still real money owed to that player.
+    const topCollectors = allDrillers
+      .filter((d) => (d.totalCollected || 0) > 0)
       .sort((a, b) => (b.totalCollected || 0) - (a.totalCollected || 0))
       .slice(0, 10);
-    const topToday = allDrillers
+    const topToday = placed
       .filter((d) => d.lastDrillDate === today)
       .sort((a, b) => (b.totalCollected || 0) - (a.totalCollected || 0))
       .slice(0, 10);
@@ -1847,12 +1906,17 @@ export default function OilPage() {
 
   // ── Daily Drill (player mode) ──
   const [userDrill, setUserDrill] = useState(null); // { col, row, drillDay, lastDrillDate }
+  // True once the player's drill doc (or signed-out status) has actually
+  // resolved — gates decisions that must not run on the loading-race null.
+  const [drillLoaded, setDrillLoaded] = useState(false);
   // drillCountdown state removed — now handled by isolated DrillCountdown component
 
   // Load user drill state from Firestore
   useEffect(() => {
-    if (!user?.id || !db) return;
+    if (!userLoaded || !db) return;
+    if (!user?.id) { setDrillLoaded(true); return; } // signed out — no drill doc to wait for
     const unsub = onSnapshot(doc(db, "oilDrills", user.id), (snap) => {
+      setDrillLoaded(true);
       if (snap.exists()) {
         const d = snap.data();
         setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0 });
@@ -1862,7 +1926,32 @@ export default function OilPage() {
       }
     });
     return () => unsub();
+  }, [user?.id, userLoaded]);
+
+  // Web-push alerts (FCM) — the lowest-friction strike-alert channel; pairs
+  // with the Telegram link below in the "GET STRIKE ALERTS" ask.
+  const pushAlerts = usePushAlerts({ active: !!user?.id });
+
+  // Telegram alert-bot link status (oilTelegram/{userId} is written by the
+  // bot's /start handler) — drives the "GET STRIKE ALERTS" pre-season ask.
+  useEffect(() => {
+    if (!user?.id || !db) return;
+    const unsub = onSnapshot(doc(db, "oilTelegram", user.id), (snap) => {
+      setTelegramLinked(snap.exists() && !!snap.data()?.chatId);
+    });
+    return () => unsub();
   }, [user?.id]);
+
+  // Pin the registration lobby open for plot-less users during ticket_sale so
+  // claiming a plot doesn't instantly swap them to the field — they stay on
+  // the certificate (share moment), then choose "ENTER THE FIELD" themselves.
+  // Waits for drillLoaded so a plot-holder's loading-race null doesn't pin
+  // them into the lobby; they land straight on the field (lobbyView stays null).
+  useEffect(() => {
+    if (gamePhase === "ticket_sale" && settingsLoaded && drillLoaded && userDrill?.col == null && lobbyView === null) {
+      setLobbyView(true);
+    }
+  }, [gamePhase, settingsLoaded, drillLoaded, userDrill?.col, lobbyView]);
 
   // Listen to premium purchases
   useEffect(() => {
@@ -2008,6 +2097,125 @@ export default function OilPage() {
     if (currentDepth >= playerDepth) return "depth-ceiling";
     return "ready";
   }, [user, gamePhase, selectedX, sliceY, userDrill, userPlotState, playerDepth, isSummonerStunned, isBlockadeActive, isAdmin, isTest, isReport]);
+
+  // ── WHILE YOU WERE AWAY recap ──────────────────────────────────────────────
+  // The landing payoff for a returning player: diff the current rig state
+  // against a localStorage baseline from the last visit (depth via the
+  // server-authoritative oilPlots.revealed map — exact per-layer oil, no new
+  // server work) + field events from the timeline + unread plot messages.
+  // Shows once per absence (≥30 min away, something notable), then re-baselines.
+  // Preview hooks: ?recap=1 forces it with real data over a synthetic 26h
+  // window; ?recap=demo renders a fully synthetic showcase.
+  const [awayRecap, setAwayRecap] = useState(null);
+  const awayRecapRanRef = useRef(false);
+  useEffect(() => {
+    if (awayRecapRanRef.current || typeof window === "undefined") return;
+    if (!settingsLoaded || !drillLoaded || !timelineLoaded) return;
+    const force = new URLSearchParams(window.location.search).get("recap");
+
+    if (force === "demo") {
+      awayRecapRanRef.current = true;
+      setAwayRecap({
+        demo: true,
+        awayMs: 26.5 * 3600 * 1000,
+        fromDepth: 9, toDepth: 12,
+        strikes: [{ layer: 10, oil: 1840 }, { layer: 9, oil: 320 }],
+        oilGained: 2160, hellHit: false,
+        tank: 2840, tankDelta: 2160, bankedDelta: 0,
+        fieldEvents: [
+          { type: "gusher", username: "DustyDan" },
+          { type: "contain", username: "R80Hunter" },
+          { type: "claim", username: "NewProspector" },
+        ],
+        fieldEventCount: 7, unreadCount: 2,
+      });
+      return;
+    }
+
+    if (gamePhase !== "active") { awayRecapRanRef.current = true; return; }
+    if (!force && (isAdmin || isTest || isReport || previewMode)) { awayRecapRanRef.current = true; return; }
+    if (!user?.id || userDrill?.col == null) return; // needs a real rig
+    if (!userPlotState) return;                      // wait for the plot doc
+    awayRecapRanRef.current = true;
+
+    const KEY = "oil_away_v1";
+    const now = Date.now();
+    const cur = {
+      at: now, col: userDrill.col, row: userDrill.row,
+      depth: userPlotState.drillDay || 0,
+      tank: userDrill.tankOil ?? 0,
+      banked: userDrill.totalCollected || 0,
+    };
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cur)); } catch { /* private mode */ } };
+    let prev = null;
+    try { prev = JSON.parse(localStorage.getItem(KEY) || "null"); } catch { /* corrupt baseline */ }
+    if (force === "1") {
+      prev = { at: now - 26 * 3600 * 1000, col: cur.col, row: cur.row, depth: Math.max(0, cur.depth - 3), tank: 0, banked: cur.banked };
+    }
+
+    // First visit on this rig (or claim-jumped since) — just set the baseline.
+    if (!prev || prev.col !== cur.col || prev.row !== cur.row) { save(); return; }
+    const awayMs = now - prev.at;
+    if (!force && awayMs < 30 * 60 * 1000) { save(); return; } // they just saw it
+
+    const revealed = userPlotState.revealed || {};
+    const hells = userPlotState.hellLayers || {};
+    const strikes = [];
+    let oilGained = 0, hellHit = false;
+    for (let L = prev.depth; L < cur.depth; L++) {
+      const oil = Number(revealed[L] ?? revealed[String(L)] ?? 0);
+      if (oil > 0) strikes.push({ layer: L, oil });
+      oilGained += oil;
+      if (hells[L] || hells[String(L)]) hellHit = true;
+    }
+    const fieldEvents = timelineEvents.filter((ev) => {
+      const t = ev.createdAt?.toMillis?.() ?? (ev.createdAt?.seconds ? ev.createdAt.seconds * 1000 : 0);
+      return t > prev.at && ev.userId !== user.id;
+    });
+    const unreadCount = Object.keys(plotsWithMessages).length;
+    const bankedDelta = Math.max(0, cur.banked - prev.banked);
+    const notable = strikes.length > 0 || cur.depth > prev.depth || bankedDelta > 0 || fieldEvents.length > 0 || unreadCount > 0;
+
+    if (force === "1" || notable) {
+      setAwayRecap({
+        awayMs, fromDepth: prev.depth, toDepth: cur.depth, strikes, oilGained, hellHit,
+        tank: cur.tank, tankDelta: cur.tank - prev.tank, bankedDelta,
+        fieldEvents: fieldEvents.slice(0, 4).map(({ type, username, detail }) => ({ type, username, detail })),
+        fieldEventCount: fieldEvents.length, unreadCount,
+      });
+    }
+    if (!force) save();
+  }, [settingsLoaded, drillLoaded, timelineLoaded, gamePhase, user?.id, userDrill, userPlotState, timelineEvents, plotsWithMessages, isAdmin, isTest, isReport, previewMode]);
+
+  // ── Season-end FINAL HAUL share card ────────────────────────────────────────
+  // The payout receipt moment: when the season ends, a player's result becomes
+  // a shareable artifact ("I got paid by a pumpjack") — the best acquisition
+  // creative the game produces. Card → PNG → clipboard → X compose w/ ref link.
+  const finalHaulRef = useRef(null);
+  const [haulShareNote, setHaulShareNote] = useState(null);
+  const shareFinalHaul = useCallback(async (score, usdValue, refCode) => {
+    try {
+      setHaulShareNote("Capturing…");
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(finalHaulRef.current, { scale: 2, backgroundColor: "#140b1c", useCORS: true });
+      const pngBlob = await new Promise((r) => canvas.toBlob(r, "image/png"));
+      let copied = false;
+      if (pngBlob && navigator.clipboard && window.ClipboardItem) {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+          copied = true;
+        } catch { /* clipboard blocked — text share still works */ }
+      }
+      setHaulShareNote(copied ? "Card copied! Paste it into your post (Cmd+V)" : null);
+      if (copied) await new Promise((r) => setTimeout(r, 1200));
+      const text = `Final haul: ${score.toLocaleString()} Lyquid80 (≈ $${usdValue.toFixed(2)} USDC, paid to my wallet) ⛏ Hail Mary Prospecting Co.\n\nNext season: rl80.com/hailmary${refCode ? `?ref=${refCode}` : ""}`;
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "width=550,height=420");
+      setTimeout(() => setHaulShareNote(null), 4000);
+    } catch (err) {
+      console.error("final haul share failed:", err);
+      setHaulShareNote(null);
+    }
+  }, []);
 
   // Panel collapse for full 3D view
   const [panelsCollapsed, setPanelsCollapsed] = useState(false);
@@ -2559,6 +2767,14 @@ export default function OilPage() {
     [totalOilBudget],
   );
   const oilValue = useMemo(() => playerScore * oilUsdRate, [playerScore, oilUsdRate]);
+  // "≈ $X.XX" tag for any oil readout — the fixed rate makes every oil number
+  // translatable to money, which is what makes the stakes feel real. Returns
+  // null for zero/unknown so callers can simply skip the tag.
+  const fmtOilUsd = (oil) => {
+    if (!oilUsdRate || !(oil > 0)) return null;
+    const v = oil * oilUsdRate;
+    return `≈ $${v >= 0.01 ? v.toFixed(2) : v.toFixed(4)}`;
+  };
 
   // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
@@ -3775,8 +3991,19 @@ export default function OilPage() {
           const res = await fetch(`/api/oil-admin-reset?password=${encodeURIComponent(adminPassword)}`);
           const r = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
-          return `✓ released ${r.plotsCleared} plot(s) · cleared ${r.rigsCleared} rig(s)`;
+          loadFeed(); // dispatch feed was wiped server-side — refresh the accordion
+          return `✓ released ${r.plotsCleared} plot(s) · cleared ${r.rigsCleared} rig(s) · ${r.feedCleared ?? 0} dispatch(es) · fairness wiped — run COMMIT before the next season`;
         })}>RESET BOARD</button>
+        <button disabled={toolBusy} style={{ ...styles.btn, borderColor: theme.red, color: theme.red }} onClick={() => runTool("Zeroing scores", async () => {
+          // Deliberately separate from RESET BOARD (which preserves banked
+          // score so a mid-season glitch wipe can't erase earned money) —
+          // this is the explicit "new season starts from zero" step.
+          if (!window.confirm("Zero the BANKED score (totalCollected) on EVERY rig? This permanently erases all earned/test winnings.")) return "cancelled";
+          const res = await fetch(`/api/oil-admin-zero-scores?password=${encodeURIComponent(adminPassword)}`);
+          const r = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
+          return `✓ zeroed ${r.rigsZeroed} rig(s) — ${(r.oilZeroed || 0).toLocaleString()} banked oil erased`;
+        })}>ZERO SCORES</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Claiming cell", async () => {
@@ -4163,11 +4390,15 @@ export default function OilPage() {
                 </span>
                 {testerIds.has(d.id) && <span style={testerBadgeStyle}>TESTER</span>}
               </div>
-              <span style={{
-                fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
-                whiteSpace: "nowrap", marginLeft: 8,
-              }}>
-                {(d.totalCollected || 0).toLocaleString()} OIL
+              <span style={{ whiteSpace: "nowrap", marginLeft: 8, textAlign: "right" }}>
+                <span style={{ fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
+                  {(d.totalCollected || 0).toLocaleString()} OIL
+                </span>
+                {fmtOilUsd(d.totalCollected) && (
+                  <span style={{ fontSize: 8, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
+                    {fmtOilUsd(d.totalCollected)}
+                  </span>
+                )}
               </span>
             </div>
           ))}
@@ -4199,11 +4430,15 @@ export default function OilPage() {
                 </span>
                 {testerIds.has(d.id) && <span style={testerBadgeStyle}>TESTER</span>}
               </div>
-              <span style={{
-                fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
-                whiteSpace: "nowrap", marginLeft: 8,
-              }}>
-                {(d.totalCollected || 0).toLocaleString()} OIL
+              <span style={{ whiteSpace: "nowrap", marginLeft: 8, textAlign: "right" }}>
+                <span style={{ fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
+                  {(d.totalCollected || 0).toLocaleString()} OIL
+                </span>
+                {fmtOilUsd(d.totalCollected) && (
+                  <span style={{ fontSize: 8, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
+                    {fmtOilUsd(d.totalCollected)}
+                  </span>
+                )}
               </span>
             </div>
           ))}
@@ -4366,6 +4601,14 @@ export default function OilPage() {
       >
         <span>FIELD DISPATCH{feedItems.length > 0 ? ` · ${feedItems.length}` : ""}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <a
+            href="/hailmary/feed"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Open the public gallery"
+            style={{ fontSize: 9, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline" }}
+          >VIEW ALL</a>
           <span
             onClick={(e) => { e.stopPropagation(); loadFeed(); }}
             title="Refresh"
@@ -5013,11 +5256,19 @@ export default function OilPage() {
   // ── Pre-game phase gates ──
   // Hold render until Firestore settings arrive so the default "ticket_sale"
   // state doesn't briefly render OilQualify on top of an in-progress game.
-  if (!settingsLoaded && !previewMode) {
+  if ((!settingsLoaded || (gamePhase === "ticket_sale" && !drillLoaded)) && !previewMode) {
+    // Also hold during ticket_sale until the drill doc resolves, so a
+    // plot-holder doesn't flash the registration lobby before landing on the
+    // field in pre-season mode.
     return <div style={{ width: "100vw", height: "100vh", background: theme.bg }} />;
   }
   const userHasPlot = userDrill?.col != null;
-  if (gamePhase === "ticket_sale" && !previewMode) {
+  // Pre-season split: lobbyView=true pins the registration lobby open;
+  // lobbyView=false sends the user to the 3D field — plot-holders get
+  // pre-season mode, qualified plot-less users get the ON-FIELD PLOT PICK
+  // (the only claiming path: lobby CTA → field → click a cell → stake).
+  // null (undecided) falls back on plot ownership.
+  if (gamePhase === "ticket_sale" && !previewMode && (lobbyView ?? !userHasPlot)) {
     return (
       <OilQualify
         theme={theme}
@@ -5025,11 +5276,18 @@ export default function OilPage() {
         isMobile={isMobile}
         user={user}
         isAdmin={isAdmin && adminAuthed}
+        adminPassword={adminPassword}
         saveGameSettings={saveGameSettings}
         walletAddress={walletAddress}
         tokenBalance={tokenBalance}
         isWalletConnected={isWalletConnected}
         storedRef={typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null}
+        gridSize={gridSize}
+        prizePool={totalOilBudget}
+        onEnterField={() => setLobbyView(false)}
+        seedCommitment={seedCommitment}
+        anchorBlock={anchorBlock}
+        anchorBlockHash={anchorBlockHash}
       />
     );
   }
@@ -5062,6 +5320,27 @@ export default function OilPage() {
           {({ ticket_sale: "REGISTRATION", active: "ACTIVE", ended: "ENDED" }[p] || p.toUpperCase())}
         </button>
       ))}
+      {/* During registration an admin with a claimed plot lands on the field
+          (pre-season mode) — this is their way back into the lobby, since the
+          player-facing VIEW REGISTRATION LOBBY link lives in the (non-admin)
+          pre-season panel. */}
+      {gamePhase === "ticket_sale" && (
+        <button
+          onClick={() => setLobbyView(true)}
+          style={{
+            padding: "3px 8px",
+            border: `1px solid ${theme.border}`,
+            borderRadius: 3,
+            fontFamily: "'Share Tech Mono', monospace",
+            fontSize: 9,
+            cursor: "pointer",
+            background: "transparent",
+            color: theme.muted,
+          }}
+        >
+          OPEN LOBBY
+        </button>
+      )}
     </div>
   );
 
@@ -5369,6 +5648,102 @@ export default function OilPage() {
   );
 
   // ── Passive Depth Indicator (active mode only, not test mode) ──
+  // Admin test surface for the alert channels — the player-facing enrollment
+  // UI (pre-season checklist / auto-pump nudge) lives inside drillButton,
+  // which admin/test modes never render, so without this an admin has no way
+  // to enroll a device or fire a test push.
+  const adminAlertsPanel = isAdmin && (
+    <div style={{ padding: "10px 14px", borderBottom: `1px solid ${theme.border}` }}>
+      <div style={{ fontSize: 9, letterSpacing: "0.2em", color: theme.muted, marginBottom: 6, fontFamily: "'Share Tech Mono', monospace" }}>
+        STRIKE ALERTS (THIS DEVICE)
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontFamily: "'Share Tech Mono', monospace" }}>
+        <span style={{ fontSize: 9, color: pushAlerts.enabled ? theme.green : theme.muted }}>
+          PUSH {pushAlerts.enabled ? "ON" : "OFF"}
+        </span>
+        <span style={{ fontSize: 9, color: telegramLinked ? theme.green : theme.muted }}>
+          · TELEGRAM {telegramLinked ? "LINKED" : "—"}
+        </span>
+        {!pushAlerts.enabled && pushAlerts.supported && (
+          <button
+            onClick={pushAlerts.enable}
+            disabled={pushAlerts.busy}
+            style={{ padding: "3px 10px", fontSize: 9, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", background: `${theme.gold}22`, color: theme.gold, border: `1px solid ${theme.gold}`, borderRadius: 3 }}
+          >{pushAlerts.busy ? "…" : "ENABLE PUSH"}</button>
+        )}
+        {pushAlerts.enabled && (
+          <button
+            onClick={pushAlerts.sendTest}
+            disabled={pushAlerts.testState === "sending"}
+            style={{ padding: "3px 10px", fontSize: 9, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", background: "transparent", color: pushAlerts.testState === "sent" ? theme.green : pushAlerts.testState === "failed" ? theme.red : theme.muted, border: `1px solid ${theme.border}`, borderRadius: 3 }}
+          >
+            {pushAlerts.testState === "sending" ? "…" : pushAlerts.testState === "sent" ? `SENT ✓${pushAlerts.testDetail ? ` (${pushAlerts.testDetail})` : ""}` : pushAlerts.testState === "failed" ? `FAILED${pushAlerts.testDetail ? `: ${pushAlerts.testDetail}` : ""} — RETRY` : "SEND TEST PING"}
+          </button>
+        )}
+        {pushAlerts.enabled && (
+          <button
+            onClick={pushAlerts.disable}
+            disabled={pushAlerts.busy}
+            style={{ padding: "3px 10px", fontSize: 9, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", background: "transparent", color: theme.muted, border: `1px solid ${theme.border}`, borderRadius: 3 }}
+          >{pushAlerts.busy ? "…" : "DISABLE"}</button>
+        )}
+      </div>
+      {pushAlerts.needsInstall && (
+        <div style={{ fontSize: 8, color: theme.muted, marginTop: 4, fontFamily: "'Share Tech Mono', monospace" }}>
+          iPhone: Add to Home Screen first, then enable from the installed app
+        </div>
+      )}
+      {pushAlerts.error && (
+        <div style={{ fontSize: 8, color: theme.red, marginTop: 4, fontFamily: "'Share Tech Mono', monospace" }}>{pushAlerts.error}</div>
+      )}
+    </div>
+  );
+
+  // Season-end FINAL HAUL — the player-facing result + payout receipt share.
+  // Fixed dark palette (not theme tokens) so the captured PNG always looks
+  // right regardless of the player's UI theme.
+  const finalHaulCard = gameEnded && !isAdmin && !isReport && !isTest && user && playerScore > 0 && (
+    <div style={{ padding: "10px 14px", borderBottom: `1px solid ${theme.border}`, background: theme.tintBg }}>
+      <div
+        ref={finalHaulRef}
+        style={{
+          padding: "16px 18px",
+          border: "1px solid rgba(212,168,84,0.5)",
+          borderRadius: 8,
+          background: "linear-gradient(180deg, #1c1024, #140b1c)",
+          textAlign: "center",
+          fontFamily: "'Share Tech Mono', monospace",
+        }}
+      >
+        <div style={{ fontSize: 8, letterSpacing: "0.3em", color: "#b8a890" }}>HAIL MARY PROSPECTING CO.</div>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.18em", color: "#d4a854", marginTop: 6 }}>
+          🏁 SEASON ENDED — FINAL HAUL
+        </div>
+        <div style={{ fontSize: 38, fontWeight: 700, color: "#d4a854", lineHeight: 1.1, marginTop: 10, textShadow: "0 0 16px rgba(212,168,84,0.3)" }}>
+          {playerScore.toLocaleString()}
+        </div>
+        <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#e8dcc8", marginTop: 4 }}>
+          LYQUID80 · ≈ ${oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC
+        </div>
+        <div style={{ fontSize: 8, letterSpacing: "0.08em", color: "#b8a890", marginTop: 8 }}>
+          real USDC, paid to your wallet on Base · rl80.com/hailmary
+        </div>
+      </div>
+      <button
+        onClick={() => shareFinalHaul(playerScore, oilValue, userDrill?.referralCode || null)}
+        disabled={!!haulShareNote}
+        style={{
+          width: "100%", marginTop: 8, padding: "9px 12px",
+          background: `${theme.gold}22`, border: `1px solid ${theme.gold}`,
+          borderRadius: 3, color: theme.gold, fontFamily: "'Share Tech Mono', monospace",
+          fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", cursor: "pointer",
+        }}
+      >
+        {haulShareNote || "📸 SHARE YOUR HAUL"}
+      </button>
+    </div>
+  );
+
   const drillButton = !isAdmin && !isReport && !isTest && (
     <div style={{
       padding: "10px 14px",
@@ -5381,7 +5756,162 @@ export default function OilPage() {
     }}>
       {drillStatus === "pre-game" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={drillBtnStyles.disabled}>GAME STARTS SOON</button>
+          {userHasPlot ? (() => {
+            // Pre-season checklist — the three things worth doing before the
+            // drill starts: alerts (retention), referrals (depth), rig (investment).
+            const askRow = { width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", border: `1px solid ${theme.border}`, borderRadius: 3, background: theme.panelBg };
+            const askNum = (done) => ({ fontSize: 11, fontWeight: 700, minWidth: 14, textAlign: "center", color: done ? theme.green : theme.gold });
+            const askText = { flex: 1, textAlign: "left", minWidth: 0 };
+            const askTitle = { fontSize: 10, letterSpacing: "0.08em", color: theme.text };
+            const askSub = { fontSize: 8, letterSpacing: "0.05em", color: theme.muted, marginTop: 1 };
+            const askBtn = { padding: "4px 10px", fontSize: 9, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", background: `${theme.gold}22`, color: theme.gold, border: `1px solid ${theme.gold}`, borderRadius: 3, whiteSpace: "nowrap" };
+            return (
+              <>
+                <button disabled style={{ ...drillBtnStyles.active, cursor: "default" }}>
+                  ⛏ RIG STAKED AT ({Math.min(userDrill.col, gridSize - 1) + 1}, {Math.min(userDrill.row, gridSize - 1) + 1})
+                </button>
+                <SeasonCountdown
+                  gameStartDate={gameStartDate}
+                  style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", color: theme.gold }}
+                />
+                <div style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.06em", textAlign: "center", maxWidth: 240 }}>
+                  Once it does, your rig pumps on its own — day and night. Get ready:
+                </div>
+                <div style={{ width: "100%", maxWidth: 280, display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+                  {(() => {
+                    // Alerts ask — push-first (one tap, this device), Telegram
+                    // as the secondary channel (it can deliver CCTV video).
+                    const alertsOn = telegramLinked || pushAlerts.enabled;
+                    const tgUrl = `https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || "OilRogueBot"}?start=${user.id}`;
+                    return (
+                      <div style={{ ...askRow, flexWrap: "wrap" }}>
+                        <span style={askNum(alertsOn)}>{alertsOn ? "✓" : "1"}</span>
+                        <span style={askText}>
+                          <div style={askTitle}>{alertsOn ? "STRIKE ALERTS ON" : "GET STRIKE ALERTS"}</div>
+                          <div style={askSub}>
+                            {pushAlerts.needsInstall && !alertsOn
+                              ? "iPhone: Share → Add to Home Screen, then enable here"
+                              : alertsOn
+                                ? (pushAlerts.enabled ? "push enabled on this device" : "telegram linked")
+                                : "know the moment your rig hits"}
+                          </div>
+                          {pushAlerts.error && <div style={{ ...askSub, color: theme.red }}>{pushAlerts.error}</div>}
+                        </span>
+                        {!pushAlerts.enabled && pushAlerts.supported ? (
+                          <button style={askBtn} onClick={pushAlerts.enable} disabled={pushAlerts.busy}>
+                            {pushAlerts.busy ? "…" : "ENABLE ALERTS"}
+                          </button>
+                        ) : !telegramLinked ? (
+                          <button style={askBtn} onClick={() => window.open(tgUrl, "_blank")}>LINK TELEGRAM</button>
+                        ) : null}
+                        {/* Secondary channel link */}
+                        {!telegramLinked && pushAlerts.supported && !pushAlerts.enabled && (
+                          <button
+                            onClick={() => window.open(tgUrl, "_blank")}
+                            style={{ width: "100%", padding: 0, marginTop: 2, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline", textAlign: "right" }}
+                          >or link Telegram →</button>
+                        )}
+                        {/* Pipeline self-test + opt-out once push is on */}
+                        {pushAlerts.enabled && (
+                          <div style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 8, marginTop: 2 }}>
+                            <button
+                              onClick={pushAlerts.disable}
+                              disabled={pushAlerts.busy}
+                              style={{ padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline" }}
+                            >{pushAlerts.busy ? "…" : "turn off this device"}</button>
+                            <button
+                              onClick={pushAlerts.sendTest}
+                              disabled={pushAlerts.testState === "sending"}
+                              style={{ padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: pushAlerts.testState === "sent" ? theme.green : pushAlerts.testState === "failed" ? theme.red : theme.muted, textDecoration: "underline", textAlign: "right" }}
+                            >
+                              {pushAlerts.testState === "sending" ? "sending…" : pushAlerts.testState === "sent" ? "test sent ✓" : pushAlerts.testState === "failed" ? "test failed — retry?" : "send a test ping →"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {userDrill?.referralCode && (
+                    <div style={askRow}>
+                      <span style={askNum((userDrill.confirmedReferrals || 0) > 0)}>{(userDrill.confirmedReferrals || 0) > 0 ? "✓" : "2"}</span>
+                      <span style={askText}>
+                        <div style={askTitle}>RECRUIT YOUR CREW</div>
+                        <div style={askSub}>+{REFERRAL_BONUS} layers deeper per referral, all season</div>
+                      </span>
+                      <button
+                        style={askBtn}
+                        onClick={() => navigator.clipboard.writeText(`https://rl80.com/hailmary?ref=${userDrill.referralCode}`)}
+                      >COPY LINK</button>
+                    </div>
+                  )}
+                  <div style={askRow}>
+                    <span style={askNum(false)}>3</span>
+                    <span style={askText}>
+                      <div style={askTitle}>PIMP YOUR RIG</div>
+                      <div style={askSub}>make the claim yours — themes, fences, add-ons</div>
+                    </span>
+                    <button
+                      style={askBtn}
+                      onClick={() => handleSelectClaim({ x: userDrill.col, y: userDrill.row })}
+                    >GO TO RIG</button>
+                  </div>
+                </div>
+                <OilAnchorEvent compact theme={theme} seedCommitment={seedCommitment} anchorBlock={anchorBlock} anchorBlockHash={anchorBlockHash} />
+                {/* Claim-certificate thumb — tap for the Polaroid-style
+                    lightbox with the share buttons. Claim date comes from the
+                    plot's ownerHistory (the drill doc has no claim stamp). */}
+                <OilClaimCertificate
+                  variant="thumb"
+                  user={user}
+                  walletAddress={walletAddress}
+                  plotCol={userDrill.col}
+                  plotRow={userDrill.row}
+                  pickedAt={(allPlotsMap[`${userDrill.col}_${userDrill.row}`]?.ownerHistory || []).filter((h) => h.userId === user?.id).slice(-1)[0]?.claimedAt || null}
+                  referralCode={userDrill?.referralCode || null}
+                  theme={theme}
+                  isMobile={isMobile}
+                />
+                <button
+                  onClick={() => setLobbyView(true)}
+                  style={{ marginTop: 2, padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.1em", color: theme.muted, textDecoration: "underline" }}
+                >VIEW REGISTRATION LOBBY</button>
+              </>
+            );
+          })() : (() => {
+            // ON-FIELD PLOT PICK (registration) — the only claiming path. A
+            // qualified, plot-less player arrives via the lobby's "PICK YOUR
+            // PLOT ON THE FIELD" CTA, clicks an open cell on the 3D field or
+            // surface map, and stakes it. Same oil-claim route as everywhere
+            // (carries the ?ref= code; server enforces qualification + the
+            // registration/pre-anchor window).
+            const selPlot = selectedX !== null ? allPlotsMap[`${selectedX}_${sliceY}`] : null;
+            const selUnclaimed = selectedX !== null && selPlot?.currentOwnerId == null;
+            return (
+              <>
+                {selUnclaimed ? (
+                  <button onClick={handleClaimActivePlot} style={drillBtnStyles.active}>
+                    ⛏ STAKE YOUR CLAIM ({selectedX + 1}, {sliceY + 1})
+                  </button>
+                ) : (
+                  <button disabled style={drillBtnStyles.disabled}>SELECT AN OPEN PLOT</button>
+                )}
+                <div style={drillBtnStyles.hint}>
+                  Click any open cell on the field or the surface map — that ground is yours for the season.
+                </div>
+                <SeasonCountdown
+                  gameStartDate={gameStartDate}
+                  style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}
+                />
+                <OilAnchorEvent compact theme={theme} seedCommitment={seedCommitment} anchorBlock={anchorBlock} anchorBlockHash={anchorBlockHash} />
+                {!previewMode && (
+                  <button
+                    onClick={() => setLobbyView(true)}
+                    style={{ marginTop: 4, padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.1em", color: theme.muted, textDecoration: "underline" }}
+                  >← BACK TO REGISTRATION</button>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
       {drillStatus === "sign-in" && (
@@ -5409,7 +5939,14 @@ export default function OilPage() {
           </div>
         </div>
       )}
-      {drillStatus === "no-claim" && (
+      {drillStatus === "no-claim" && (() => {
+        // Server truth (oil-claim): real players may claim ONLY during
+        // registration (pre-anchor); testers only while testingEnabled. The
+        // claim CTA therefore renders only when a claim can actually succeed —
+        // otherwise the waitlist is the primary affordance, so the panel never
+        // shows a dead CLAIM button above a "claims are closed" notice.
+        const activeClaimsOpen = gamePhase === "active" && testingEnabled;
+        return (
         <div style={drillBtnStyles.wrap}>
           {userDrill?.col != null ? (
             <button
@@ -5418,47 +5955,19 @@ export default function OilPage() {
             >
               GO TO YOUR CLAIM ({Math.min(userDrill.col, gridSize - 1) + 1}, {Math.min(userDrill.row, gridSize - 1) + 1})
             </button>
-          ) : (selectedX !== null && allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId == null && gamePhase === "active") ? (
-            <button onClick={handleClaimActivePlot} style={drillBtnStyles.active}>
-              CLAIM THIS PLOT ({selectedX + 1}, {sliceY + 1})
-            </button>
+          ) : activeClaimsOpen ? (
+            (selectedX !== null && allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId == null) ? (
+              <button onClick={handleClaimActivePlot} style={drillBtnStyles.active}>
+                CLAIM THIS PLOT ({selectedX + 1}, {sliceY + 1})
+              </button>
+            ) : (
+              <button disabled style={drillBtnStyles.disabled}>SELECT AN UNCLAIMED PLOT</button>
+            )
           ) : (
-            <button disabled style={drillBtnStyles.disabled}>SELECT AN UNCLAIMED PLOT</button>
-          )}
-          {/* Tester access code — non-crypto testers redeem a code to qualify
-              without the wallet/$20 gate, then claim a plot above. Harmless for
-              already-qualified players (they just claim and ignore this). */}
-          <div style={{ marginTop: 10, width: "100%", maxWidth: 260 }}>
-            <div style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.muted, marginBottom: 4 }}>HAVE A TESTER CODE?</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <input
-                value={testerCode}
-                onChange={(e) => setTesterCode(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleRedeemCode(); }}
-                placeholder="access code"
-                style={{
-                  flex: 1, minWidth: 0, padding: "6px 8px", fontSize: 12,
-                  fontFamily: "'Share Tech Mono', monospace",
-                  background: theme.panelBg, color: theme.text,
-                  border: `1px solid ${theme.border}`, borderRadius: 3,
-                }}
-              />
-              <button onClick={handleRedeemCode} disabled={!testerCode.trim()} style={{
-                padding: "6px 12px", fontSize: 11, letterSpacing: "0.08em", cursor: testerCode.trim() ? "pointer" : "default",
-                fontFamily: "'Share Tech Mono', monospace",
-                background: testerCode.trim() ? `${theme.gold}22` : "transparent",
-                color: testerCode.trim() ? theme.gold : theme.muted,
-                border: `1px solid ${testerCode.trim() ? theme.gold : theme.border}`, borderRadius: 3,
-              }}>REDEEM</button>
-            </div>
-            {testerMsg && <div style={{ fontSize: 10, color: testerMsg.startsWith("✓") ? theme.green : theme.muted, marginTop: 4 }}>{testerMsg}</div>}
-          </div>
-          {/* Next-season waitlist — for overflow demand once claims are closed
-              (grid full / registration over). Qualified-but-unplaced users
-              reserve a spot for the next rolling season. */}
-          {user && gamePhase !== "ticket_sale" && (
-            <div style={{ marginTop: 10, width: "100%", maxWidth: 260, borderTop: `1px solid ${theme.border}`, paddingTop: 10 }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.muted, marginBottom: 6 }}>
+            /* Claims closed (mid-season / ended) — next-season waitlist is the
+               primary CTA for qualified-but-unplaced players. */
+            <div style={{ width: "100%", maxWidth: 260 }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.muted, marginBottom: 6, textAlign: "center" }}>
                 CLAIMS ARE CLOSED FOR THIS SEASON
               </div>
               {waitlistInfo?.waitlisted ? (
@@ -5481,8 +5990,52 @@ export default function OilPage() {
               )}
             </div>
           )}
+          {/* Tester access code — non-crypto testers redeem a code to qualify
+              without the wallet/$20 gate. Collapsed behind a link so it never
+              reads as a step real players are missing. */}
+          {userDrill?.col == null && (
+            <div style={{ marginTop: 10, width: "100%", maxWidth: 260 }}>
+              {!showTesterCode ? (
+                <button
+                  onClick={() => setShowTesterCode(true)}
+                  style={{
+                    background: "none", border: "none", padding: 0, cursor: "pointer",
+                    fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.08em",
+                    color: theme.muted, textDecoration: "underline",
+                  }}
+                >HAVE A TESTER CODE?</button>
+              ) : (
+                <>
+                  <div style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.muted, marginBottom: 4 }}>TESTER CODE</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      value={testerCode}
+                      onChange={(e) => setTesterCode(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleRedeemCode(); }}
+                      placeholder="access code"
+                      style={{
+                        flex: 1, minWidth: 0, padding: "6px 8px", fontSize: 12,
+                        fontFamily: "'Share Tech Mono', monospace",
+                        background: theme.panelBg, color: theme.text,
+                        border: `1px solid ${theme.border}`, borderRadius: 3,
+                      }}
+                    />
+                    <button onClick={handleRedeemCode} disabled={!testerCode.trim()} style={{
+                      padding: "6px 12px", fontSize: 11, letterSpacing: "0.08em", cursor: testerCode.trim() ? "pointer" : "default",
+                      fontFamily: "'Share Tech Mono', monospace",
+                      background: testerCode.trim() ? `${theme.gold}22` : "transparent",
+                      color: testerCode.trim() ? theme.gold : theme.muted,
+                      border: `1px solid ${testerCode.trim() ? theme.gold : theme.border}`, borderRadius: 3,
+                    }}>REDEEM</button>
+                  </div>
+                  {testerMsg && <div style={{ fontSize: 10, color: testerMsg.startsWith("✓") ? theme.green : theme.muted, marginTop: 4 }}>{testerMsg}</div>}
+                </>
+              )}
+            </div>
+          )}
         </div>
-      )}
+        );
+      })()}
       {drillStatus === "wrong-claim" && (
         <div style={drillBtnStyles.wrap}>
           <button
@@ -5535,7 +6088,7 @@ export default function OilPage() {
               now serves as the live depth/progress meter. */}
           {userDrill?.lastStrikeDepth != null ? (
             <div style={drillBtnStyles.hint}>
-              Last strike: depth {userDrill.lastStrikeDepth}{userDrill.lastStrikeOil > 0 ? ` — struck ${userDrill.lastStrikeOil.toLocaleString()}` : " — dry layer"}
+              Last strike: depth {userDrill.lastStrikeDepth}{userDrill.lastStrikeOil > 0 ? ` — struck ${userDrill.lastStrikeOil.toLocaleString()}${fmtOilUsd(userDrill.lastStrikeOil) ? ` (${fmtOilUsd(userDrill.lastStrikeOil)})` : ""}` : " — dry layer"}
             </div>
           ) : (
             <div style={drillBtnStyles.hint}>Your rig drills on its own — no clicking needed.</div>
@@ -5543,6 +6096,32 @@ export default function OilPage() {
           <div style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.06em", fontStyle: "italic", textAlign: "center", maxWidth: 220 }}>
             It can strike at any moment — there&apos;s no telling when. Keep an eye on it.
           </div>
+          {/* Alert nudge for players who skipped the pre-season ask — the
+              strike ping is the retention engine, so keep offering it. */}
+          {!telegramLinked && !pushAlerts.enabled && (pushAlerts.supported || pushAlerts.needsInstall) && (
+            <>
+              <button
+                onClick={pushAlerts.supported ? pushAlerts.enable : () => window.open(`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || "OilRogueBot"}?start=${user?.id}`, "_blank")}
+                disabled={pushAlerts.busy}
+                style={{
+                  marginTop: 6, padding: "6px 14px", fontSize: 10, letterSpacing: "0.08em", cursor: "pointer",
+                  fontFamily: "'Share Tech Mono', monospace",
+                  background: `${theme.gold}22`, color: theme.gold,
+                  border: `1px solid ${theme.gold}`, borderRadius: 3,
+                }}
+              >
+                🔔 {pushAlerts.busy ? "…" : "GET STRIKE ALERTS"}
+              </button>
+              {pushAlerts.needsInstall && (
+                <div style={{ fontSize: 8, color: theme.muted, letterSpacing: "0.06em", textAlign: "center", maxWidth: 220 }}>
+                  iPhone: Share → Add to Home Screen, then enable — or tap to link Telegram
+                </div>
+              )}
+              {pushAlerts.error && (
+                <div style={{ fontSize: 8, color: theme.red, letterSpacing: "0.06em", textAlign: "center", maxWidth: 220 }}>{pushAlerts.error}</div>
+              )}
+            </>
+          )}
         </div>
       )}
       {drillStatus === "ready" && (
@@ -5859,6 +6438,9 @@ export default function OilPage() {
           <span style={{ fontSize: 11, letterSpacing: "0.12em", color: theme.accent }}>TANK · UNBANKED</span>
           <span style={{ fontSize: 11, letterSpacing: "0.08em", color: tankFill >= 1.0 && !tankDrained ? theme.red : theme.muted }}>
             {tankDrained ? 0 : oilInTank.toLocaleString()} OIL
+            {!tankDrained && fmtOilUsd(oilInTank) && (
+              <span style={{ fontSize: 9, color: theme.muted, marginLeft: 6, letterSpacing: "0.04em" }}>{fmtOilUsd(oilInTank)}</span>
+            )}
           </span>
         </div>
         <div style={{
@@ -5912,6 +6494,9 @@ export default function OilPage() {
           </span>
           <span style={{ fontSize: 11, letterSpacing: "0.08em", color: theme.green, fontWeight: 700 }}>
             {(activeUserDrill.totalCollected || 0).toLocaleString()} OIL
+            {fmtOilUsd(activeUserDrill.totalCollected) && (
+              <span style={{ fontSize: 9, color: theme.muted, marginLeft: 6, fontWeight: 400, letterSpacing: "0.04em" }}>{fmtOilUsd(activeUserDrill.totalCollected)}</span>
+            )}
           </span>
         </div>
       )}
@@ -6291,6 +6876,7 @@ export default function OilPage() {
 
           {/* Panels below active view */}
           {testStepper}
+          {finalHaulCard}
           {drillButton}
           <DrillGeode
             drillEvent={drillEvent}
@@ -6352,6 +6938,8 @@ export default function OilPage() {
           {(isAdmin || isReport) && (
             <OilVerifyPanel adminPassword={adminPassword} />
           )}
+          {isAdmin && <OilAdminGuide />}
+          {adminAlertsPanel}
           {claimPlotButton && (
             <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
               {claimPlotButton}
@@ -6409,6 +6997,17 @@ export default function OilPage() {
         />
 
         <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+
+        <OilAwayRecap
+          recap={awayRecap}
+          referralCode={userDrill?.referralCode || null}
+          theme={theme}
+          isMobile={isMobile}
+          usdRate={totalOilBudget / OIL_FIELD_UNITS}
+          tankHeavy={(awayRecap?.tank ?? 0) >= TANK_CAPACITY}
+          onBank={handleTankDrain}
+          onClose={() => setAwayRecap(null)}
+        />
 
         <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark}>
           {leaderboardPanel}
@@ -6506,11 +7105,13 @@ export default function OilPage() {
             color: theme.accent,
             letterSpacing: "0.1em",
           }}>
-            DAY {gameDay}
+            {gamePhase === "ticket_sale"
+              ? <SeasonCountdown gameStartDate={gameStartDate} />
+              : `DAY ${gameDay} / ${seasonLengthDays}`}
           </span>
           <div style={{ ...styles.statusDot, ...(gameEnded ? { background: theme.red, boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
           <span style={styles.statusText}>
-            {gameEnded ? "GAME ENDED" : "SURVEY ACTIVE"}
+            {gameEnded ? "GAME ENDED" : gamePhase === "ticket_sale" ? "PRE-SEASON" : "SURVEY ACTIVE"}
           </span>
           <button
             onClick={() => setShowLeaderboard(true)}
@@ -6778,6 +7379,7 @@ export default function OilPage() {
             transform: mounted ? "translateX(0)" : "translateX(20px)",
           }}>
             {testStepper}
+            {finalHaulCard}
             {drillButton}
             <DrillGeode
               drillEvent={drillEvent}
@@ -6830,6 +7432,8 @@ export default function OilPage() {
             {(isAdmin || isReport) && (
               <OilVerifyPanel adminPassword={adminPassword} />
             )}
+            {isAdmin && <OilAdminGuide />}
+            {adminAlertsPanel}
             {claimPlotButton && (
               <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
                 {claimPlotButton}
@@ -6914,6 +7518,17 @@ export default function OilPage() {
       />
 
       <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+
+      <OilAwayRecap
+        recap={awayRecap}
+        referralCode={userDrill?.referralCode || null}
+        theme={theme}
+        isMobile={isMobile}
+        usdRate={totalOilBudget / OIL_FIELD_UNITS}
+        tankHeavy={(awayRecap?.tank ?? 0) >= TANK_CAPACITY}
+        onBank={handleTankDrain}
+        onClose={() => setAwayRecap(null)}
+      />
 
       <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark}>
         {leaderboardPanel}
