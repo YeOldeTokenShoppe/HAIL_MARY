@@ -379,13 +379,31 @@
       // HOME PAGE SHRINE CANDLES — one lit candle per user (doc ID = Clerk userId)
       // =========================================================================
       match /shrineCandles/{userId} {
+        // These docs feed the landing-page VigilTicker, so every
+        // writable display field is tightly shaped: displayName must
+        // look like the app's shortened wallet address (0x1234…abcd)
+        // and intention must be one of the preset keys from
+        // src/lib/intentions.js — keep that list and this one in sync.
+        // Without this, a raw client-SDK write could scroll arbitrary
+        // text (scam links, slurs) across the homepage chyron.
+        function validTickerFields(data) {
+          return (!('displayName' in data)
+              || data.displayName == null
+              || (data.displayName is string
+                  && data.displayName.matches('0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}')))
+            && (!('intention' in data)
+              || data.intention == null
+              || data.intention in ['bags', 'bullrun', 'family', 'green', 'us-all']);
+        }
         allow read: if true;
         allow create: if true
           && request.resource.data.keys().hasAll(['userId', 'litAt'])
           && request.resource.data.userId is string
-          && request.resource.data.userId == userId;
+          && request.resource.data.userId == userId
+          && validTickerFields(request.resource.data);
         allow update: if true
-          && request.resource.data.userId == resource.data.userId;
+          && request.resource.data.userId == resource.data.userId
+          && validTickerFields(request.resource.data);
         allow delete: if true;
       }
 

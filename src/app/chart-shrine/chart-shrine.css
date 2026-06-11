@@ -222,14 +222,16 @@ body:has(.shrine-page.neon) {
   }
 }
 
-/* /home title header — sits top-left, full-width row above the chart band. */
+/* /home title header — sits top-left, full-width row above the chart band.
+   Top padding clears the VigilTicker chyron strip (~24px) pinned to the
+   viewport's top edge. */
 .shrine-page.neon .hero-header {
   width: 100%;
   max-width: 1200px;
   display: flex;
   justify-content: flex-start;
   padding-left: 1rem;
-  padding-top: 2rem;
+  padding-top: 3rem;
 }
 
 .shrine-page.neon .hero-header .our-lady-title {
@@ -317,7 +319,7 @@ body:has(.shrine-page.neon) {
    inline — this selector's specificity otherwise overrides their own
    `position: fixed`. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.vigil-ticker):not(.candle-coachmark) {
   position: relative;
   z-index: 1;
   /* Don't eat pointer events over the canvas — these are decorative
@@ -331,7 +333,7 @@ body:has(.shrine-page.neon) {
 /* Safety net: keep any interactive descendant of those wrappers
    clickable even though the parent is pointer-events:none. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail)
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.vigil-ticker):not(.candle-coachmark)
   :is(a, button, input, select, textarea, label, [role="button"], [tabindex]) {
   pointer-events: auto;
 }
@@ -1322,6 +1324,105 @@ body:has(.shrine-page.neon) {
   color: #f1d77a;
 }
 
+/* Dedication card — preset intention chips inside the flame-nudge frame.
+   Pills in the gold accent; wraps to extra rows on narrow screens. */
+.dedication-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.dedication-chip {
+  padding: 7px 14px;
+  background: rgba(241, 215, 122, 0.07);
+  border: 1px solid rgba(241, 215, 122, 0.35);
+  border-radius: 999px;
+  color: #f1d77a;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.dedication-chip:hover {
+  background: rgba(241, 215, 122, 0.16);
+  border-color: rgba(241, 215, 122, 0.7);
+  color: #fff3c4;
+}
+
+.dedication-chip.is-active {
+  background: rgba(241, 215, 122, 0.22);
+  border-color: #f1d77a;
+  color: #fff7d6;
+  box-shadow: 0 0 10px rgba(241, 215, 122, 0.25);
+}
+
+/* Quiet tertiary action under the chips — the door into the picker for
+   users who don't yet know the candle itself is tappable. */
+.dedication-customize-link {
+  margin-top: 2px;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: #a39a82;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.dedication-customize-link:hover {
+  color: #f1d77a;
+}
+
+/* One-time hint that the lit candle is the customization surface. Sits
+   near the pedestal (the hero candle is camera-anchored in the lower
+   right of the scene). Non-interactive by design — it's a label, not a
+   button — and it fades out on the page's timer. */
+.candle-coachmark {
+  position: fixed;
+  right: 10%;
+  bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+  z-index: 1001;
+  padding: 8px 14px;
+  background: rgba(20, 16, 28, 0.88);
+  border: 1px solid rgba(241, 215, 122, 0.3);
+  border-radius: 999px;
+  color: #f1d77a;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  animation:
+    candleCoachmarkIn 300ms ease,
+    candleCoachmarkPulse 2.4s ease-in-out 300ms infinite;
+}
+
+@keyframes candleCoachmarkIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes candleCoachmarkPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(241, 215, 122, 0);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(241, 215, 122, 0.35);
+  }
+}
+
 /* Picker variant — same frame, but centered in the viewport rather
    than docked at the bottom. Bottom-anchored was easy to miss since
    the user's eye is already on the candle (also near the bottom) when
@@ -1331,6 +1432,13 @@ body:has(.shrine-page.neon) {
   bottom: auto;
   transform: translate(-50%, -50%);
   animation-name: candlePickerIn;
+  /* Never taller than the viewport minus breathing room for the bottom
+     nav — the Disconnect button at the bottom must stay reachable on
+     short screens. Content scrolls inside instead. dvh where supported
+     (mobile URL-bar-aware), vh fallback above it. */
+  max-height: calc(100vh - 150px);
+  max-height: calc(100dvh - 150px);
+  overflow-y: auto;
 }
 
 @keyframes candlePickerIn {

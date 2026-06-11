@@ -26,10 +26,14 @@ import {
   readCandle,
   lightCandle,
   extinguishCandle,
+  dedicateCandle,
   readCandlePrefs,
   writeCandlePrefs,
+  subscribeLitCandles,
   PREFS_IMAGE_MAX_BYTES,
 } from "@/lib/candleRitual";
+import { INTENTION_PRESETS } from "@/lib/intentions";
+import VigilTicker from "@/components/VigilTicker";
 import {
   readLocalCandle,
   writeLocalCandle,
@@ -39,10 +43,10 @@ import { fireCandleIgnitionPulse } from "@/utils/candleIgnitionPulse";
 import CommunityCandles from "@/components/CommunityCandles";
 import "./chart-shrine/chart-shrine.css";
 
-// Preload only the anon-default pillar candle. The votive GLB is
-// lazy-loaded on first mount of a signed-in user's HeroAltarObject so
-// anonymous visitors don't pay the download for an asset they won't see.
-useGLTF.preload("/models/JustCandle.glb");
+// Preload the votive — the only candle variant the page renders since
+// the pillar was retired from the picker (its model + config remain in
+// CANDLE_VARIANTS should it ever return).
+useGLTF.preload("/models/tinyVotiveOnly2.glb");
 
 // Per-user candle customization. localStorage gives an instant paint on
 // reload (and is the only store for anonymous users); Firestore carries
@@ -50,7 +54,6 @@ useGLTF.preload("/models/JustCandle.glb");
 // hydrate local first, then reconcile with Firestore when it returns.
 // Keyed by userId so each signed-in user on a shared device gets their
 // own prefs.
-const CANDLE_VARIANT_STORAGE_PREFIX = "rl80:candleVariant:";
 const VOTIVE_IMAGE_STORAGE_PREFIX = "rl80:votiveImage:";
 const VOTIVE_TINT_STORAGE_PREFIX = "rl80:votiveTint:";
 // Preset list for the votive image picker. `src: null` means "restore the
@@ -85,24 +88,6 @@ const VOTIVE_TINT_PRESETS = [
   { key: "jade", hex: "#0ef178", label: "Jade" },
   { key: "cyan", hex: "#14f7ff", label: "Cyan" },
 ];
-function readCandleVariant(userId) {
-  if (!userId || typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(CANDLE_VARIANT_STORAGE_PREFIX + userId);
-  } catch {
-    return null;
-  }
-}
-function writeCandleVariant(userId, variant) {
-  if (!userId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      CANDLE_VARIANT_STORAGE_PREFIX + userId,
-      variant,
-    );
-  } catch {}
-}
-
 function readVotiveImage(userId) {
   if (!userId || typeof window === "undefined") return null;
   try {
@@ -141,6 +126,25 @@ function writeVotiveTint(userId, hex) {
     } else {
       window.localStorage.setItem(VOTIVE_TINT_STORAGE_PREFIX + userId, hex);
     }
+  } catch {}
+}
+
+// One-time "tap your candle to customize" coachmark. Per-device (not
+// per-user): the lesson is about the UI, not the account. Marked seen
+// either when shown or when the user finds the picker on their own.
+const CANDLE_COACHMARK_KEY = "rl80:candleCoachmarkSeen";
+function candleCoachmarkSeen() {
+  if (typeof window === "undefined") return true;
+  try {
+    return !!window.localStorage.getItem(CANDLE_COACHMARK_KEY);
+  } catch {
+    return true;
+  }
+}
+function markCandleCoachmarkSeen() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CANDLE_COACHMARK_KEY, "1");
   } catch {}
 }
 
@@ -2073,6 +2077,23 @@ export default function HomePage() {
     days: tfOpt.days,
     aggregate: tfOpt.aggregate,
   });
+  // The hero sky reflects the real market: the 24h change shifts the
+  // red/green balance of the orbital candles, saturating at ±5%, and
+  // feeds the CRT HUD readout. Falls back to 0 (the authored
+  // bullish-lean baseline) while loading or when price data is missing.
+  const skyPriceDirection = useMemo(() => {
+    const pct = data.priceChange24h;
+    if (data.loading || typeof pct !== "number" || !Number.isFinite(pct)) {
+      return 0;
+    }
+    return Math.max(-1, Math.min(1, pct / 5));
+  }, [data.loading, data.priceChange24h]);
+  // Live feed of recently lit candles (signed-in lightings only — anon
+  // candles never reach Firestore). Powers the VigilTicker chyron and
+  // the in-scene "flames" HUD count. Capped at 99 so the listener stays
+  // bounded; past that the count just reads "99".
+  const [litCandles, setLitCandles] = useState([]);
+  useEffect(() => subscribeLitCandles(setLitCandles, 99), []);
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const userId = isConnected && address ? address.toLowerCase() : null;
@@ -2099,15 +2120,11 @@ export default function HomePage() {
   // until both isConnected and address resolve — avoids a one-frame
   // flicker between wagmi state hydration and address availability.
   const meltDuration = userId ? MELT_DURATION_SIGNED_IN_MS : MELT_DURATION_ANON_MS;
-  // Candle variant — everyone starts on the pillar. Signed-in users
-  // can discover the votive (and future variants) through the picker;
-  // their choice persists in localStorage. Starting on the pillar makes
-  // the upgrade feel earned rather than auto-granted.
-  const [candleVariantChoice, setCandleVariantChoice] = useState("pillar");
   const [showCandlePicker, setShowCandlePicker] = useState(false);
   // Per-user votive customization. `null` on both = use the baked-in
-  // texture and authored wax color. Anon visitors never see the picker
-  // so these stay null for them.
+  // texture and authored wax color. Anon visitors can't open the picker;
+  // instead they're dealt a random preset saint per visit (effect below)
+  // so the default altar stays varied without granting customization.
   const [votiveImage, setVotiveImage] = useState(null);
   const [votiveTint, setVotiveTint] = useState(null);
   // Quota error surface for the upload flow — "your image is too large
@@ -2119,14 +2136,8 @@ export default function HomePage() {
     // 1) Local-first paint — reads are synchronous and keyed by userId,
     //    so a returning user sees their prior candle without waiting on
     //    the Firestore round-trip.
-    const localVariant = readCandleVariant(userId);
     const localImage = readVotiveImage(userId);
     const localTint = readVotiveTint(userId);
-    if (localVariant && CANDLE_VARIANTS[localVariant]) {
-      setCandleVariantChoice(localVariant);
-    } else {
-      setCandleVariantChoice("pillar");
-    }
     setVotiveImage(localImage);
     setVotiveTint(localTint);
 
@@ -2139,13 +2150,10 @@ export default function HomePage() {
     (async () => {
       const remote = await readCandlePrefs(userId);
       if (cancelled) return;
+      // Note: a legacy `candleVariant` field may exist on older prefs
+      // docs from when the picker offered the pillar. It's ignored —
+      // the votive is the only variant the UI renders now.
       const upstreamPatch = {};
-
-      if (remote?.candleVariant && CANDLE_VARIANTS[remote.candleVariant]) {
-        setCandleVariantChoice(remote.candleVariant);
-      } else if (localVariant && CANDLE_VARIANTS[localVariant]) {
-        upstreamPatch.candleVariant = localVariant;
-      }
 
       if (typeof remote?.votiveImage !== "undefined") {
         setVotiveImage(remote.votiveImage);
@@ -2175,7 +2183,21 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [userId]);
-  const candleVariant = userId ? candleVariantChoice : "pillar";
+  // Anonymous visitors draw a random saint from the preset deck each
+  // visit. An effect (not initial state) so the roll happens client-side
+  // only and exactly once per anon session — Math.random during render
+  // would re-roll on every re-render. Also runs on sign-out
+  // (userId → null), which is the correct reset; the signed-in
+  // hydration effect above owns the signed-in case and overwrites these.
+  useEffect(() => {
+    if (userId) return;
+    const preset =
+      VOTIVE_IMAGE_PRESETS[
+        Math.floor(Math.random() * VOTIVE_IMAGE_PRESETS.length)
+      ];
+    setVotiveImage(preset.src);
+    setVotiveTint(null);
+  }, [userId]);
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useBuyModal();
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
@@ -2184,14 +2206,68 @@ export default function HomePage() {
   // Post-ignition nudge shown only to anonymous visitors who just lit a
   // candle — frames sign-in as "save your flame" rather than a gate.
   const [showSignInNudge, setShowSignInNudge] = useState(false);
+  // Post-ignition dedication card for signed-in users — preset intention
+  // chips that attach a dedication to the burn and surface it on the
+  // VigilTicker. The signed-in sibling of the anon sign-in nudge: same
+  // timing beat, same card frame, never both at once.
+  const [showDedication, setShowDedication] = useState(false);
+  // The current burn's dedication (preset key or null). Mirrors the
+  // `intention` field on the shrineCandles doc so the picker chips can
+  // show the selected state; hydrated alongside lit state below.
+  const [intention, setIntention] = useState(null);
   const debugRef = useRef(null);
-  // Holds the pending sign-in nudge timer so we can cancel it if the
-  // user extinguishes before the delay elapses, or unmounts the page.
-  // Without this the nudge could pop on a candle that's no longer lit.
+  // Close the wallet modal (and a lingering sign-in nudge) the moment a
+  // connection lands — their job is done, and leaving them up buries the
+  // candle the user connected for. Transition-gated rather than keyed on
+  // `isConnected` alone so an already-connected user can still open the
+  // modal to manage their account.
+  const wasConnectedRef = useRef(isConnected);
+  useEffect(() => {
+    if (isConnected && !wasConnectedRef.current) {
+      setShowAccountModal(false);
+      setShowSignInNudge(false);
+    }
+    wasConnectedRef.current = isConnected;
+  }, [isConnected]);
+  // Holds the pending sign-in nudge / dedication timers so we can cancel
+  // them if the user extinguishes before the delay elapses, or unmounts
+  // the page. Without this a card could pop on a candle that's no
+  // longer lit.
   const nudgeTimerRef = useRef(null);
+  const dedicationTimerRef = useRef(null);
   useEffect(() => () => {
     if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+    if (dedicationTimerRef.current) clearTimeout(dedicationTimerRef.current);
   }, []);
+  // Auto-dismiss the dedication card — it's an offer, not a gate.
+  useEffect(() => {
+    if (!showDedication) return undefined;
+    const id = setTimeout(() => setShowDedication(false), 12000);
+    return () => clearTimeout(id);
+  }, [showDedication]);
+  // One-time coachmark: once lit, the candle itself is the only door to
+  // the customization picker, and nothing else advertises that. Shown
+  // once per device, after the dedication card's beat has fully played
+  // out (3.5s delay + 12s auto-dismiss) so the two never stack.
+  const [showCandleCoachmark, setShowCandleCoachmark] = useState(false);
+  useEffect(() => {
+    if (!candleLit || !userId) return undefined;
+    if (candleCoachmarkSeen()) return undefined;
+    const id = setTimeout(() => {
+      // Re-check: the user may have found the picker (or tapped the
+      // dedication card's customize link) while we waited.
+      if (candleCoachmarkSeen()) return;
+      markCandleCoachmarkSeen();
+      setShowCandleCoachmark(true);
+    }, 16500);
+    return () => clearTimeout(id);
+  }, [candleLit, userId]);
+  // The hint fades itself out — it's a whisper, not a gate.
+  useEffect(() => {
+    if (!showCandleCoachmark) return undefined;
+    const id = setTimeout(() => setShowCandleCoachmark(false), 7000);
+    return () => clearTimeout(id);
+  }, [showCandleCoachmark]);
   useEffect(() => {
     if (HERO_PULLQUOTES.length < 2) return undefined;
     const id = setInterval(() => {
@@ -2276,6 +2352,7 @@ export default function HomePage() {
       if (remoteLive) {
         setLitAt(remote.litAtMs);
         setCandleLit(true);
+        setIntention(remote.intention ?? null);
         if (local) clearLocalCandle();
       } else if (localLive) {
         // Promote the anonymous candle to the signed-in ledger so it
@@ -2288,12 +2365,26 @@ export default function HomePage() {
         });
         setLitAt(local.litAtMs);
         setCandleLit(true);
+        setIntention(null);
         clearLocalCandle();
+        // The just-promoted flame is the natural moment to offer a
+        // dedication — the user signed in *for this candle*. Short
+        // delay so the card doesn't land on top of the closing wallet
+        // modal. doLight covers the fresh-light case; this covers the
+        // promotion path, which never goes through doLight.
+        if (dedicationTimerRef.current) {
+          clearTimeout(dedicationTimerRef.current);
+        }
+        dedicationTimerRef.current = setTimeout(() => {
+          setShowDedication(true);
+          dedicationTimerRef.current = null;
+        }, 1200);
       } else {
         if (remote?.litAtMs) extinguishCandle(userId);
         if (local?.litAtMs) clearLocalCandle();
         setLitAt(null);
         setCandleLit(false);
+        setIntention(null);
       }
     }
     hydrate();
@@ -2308,20 +2399,39 @@ export default function HomePage() {
     setCandleLit(false);
     setLitAt(null);
     setShowSignInNudge(false);
-    // Cancel a pending nudge so it doesn't fire on a now-dark candle.
+    setShowDedication(false);
+    setShowCandleCoachmark(false);
+    setIntention(null);
+    // Cancel pending cards so they don't fire on a now-dark candle.
     if (nudgeTimerRef.current) {
       clearTimeout(nudgeTimerRef.current);
       nudgeTimerRef.current = null;
+    }
+    if (dedicationTimerRef.current) {
+      clearTimeout(dedicationTimerRef.current);
+      dedicationTimerRef.current = null;
     }
   };
 
   const doLight = () => {
     const now = Date.now();
+    // Fresh burn, fresh dedication — lightCandle's full overwrite also
+    // clears the remote `intention` field.
+    setIntention(null);
     if (userId) {
       lightCandle(userId, {
         displayName: shortAddress,
         avatarUrl: null,
       });
+      // Offer a dedication once the ignition FX have had their moment —
+      // same 3.5s beat as the anon sign-in nudge below, for the same
+      // reason: don't slide a card over the flame burst the user just
+      // triggered.
+      if (dedicationTimerRef.current) clearTimeout(dedicationTimerRef.current);
+      dedicationTimerRef.current = setTimeout(() => {
+        setShowDedication(true);
+        dedicationTimerRef.current = null;
+      }, 3500);
     } else {
       writeLocalCandle(now);
       // Fire the nudge on every anon light. The once-per-device gate
@@ -2353,6 +2463,9 @@ export default function HomePage() {
   const toggleCandle = () => {
     if (candleLit) {
       if (userId) {
+        // They found the picker — the coachmark's lesson is learned.
+        markCandleCoachmarkSeen();
+        setShowCandleCoachmark(false);
         setShowCandlePicker(true);
         return;
       }
@@ -2362,18 +2475,14 @@ export default function HomePage() {
     doLight();
   };
 
-  const handlePickVariant = (variant) => {
-    if (!CANDLE_VARIANTS[variant]) return;
-    if (!canCustomize) return;
-    writeCandleVariant(userId, variant);
-    setCandleVariantChoice(variant);
-    writeCandlePrefs(userId, { candleVariant: variant });
-    setShowCandlePicker(false);
-    // Only auto-light when the user was unlit at pick-time — tapping
-    // the picker mid-burn should swap the model without resetting the
-    // litAt timer. The model swap happens automatically when the
-    // variant prop changes on HeroAltarObject.
-    if (!candleLit) doLight();
+  // Commit a dedication chip (null clears it). Optimistic: update local
+  // state and close the card immediately, let the Firestore write land
+  // in the background — the ticker's live subscription surfaces it
+  // within moments, which is its own feedback.
+  const handleDedicate = (intentionKey) => {
+    if (userId) dedicateCandle(userId, intentionKey);
+    setIntention(intentionKey ?? null);
+    setShowDedication(false);
   };
 
   // Commit a votive image choice. `src == null` clears the preference
@@ -2495,24 +2604,6 @@ export default function HomePage() {
     if (userId && showSignInNudge) setShowSignInNudge(false);
   }, [userId, showSignInNudge]);
 
-  // Tick the melt-timer ring + countdown on the CANDLE FAB. 1Hz so the
-  // MM:SS readout in the final hour reads as a live clock; the ring's
-  // CSS transition smooths the arc between ticks.
-  const [meltProgress, setMeltProgress] = useState(0);
-  useEffect(() => {
-    if (!candleLit || !litAt) {
-      setMeltProgress(0);
-      return;
-    }
-    const compute = () => {
-      const p = Math.min((Date.now() - litAt) / meltDuration, 1);
-      setMeltProgress(p);
-    };
-    compute();
-    const id = setInterval(compute, 1000);
-    return () => clearInterval(id);
-  }, [candleLit, litAt, meltDuration]);
-
   return (
     <main
       className={`shrine-page neon${
@@ -2521,7 +2612,9 @@ export default function HomePage() {
     >
       <MusicButton
         accent="#d4a854"
-        style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
+        // top clears the VigilTicker chyron strip (~24px) pinned to the
+        // viewport's top edge.
+        style={{ position: "fixed", top: "2.5rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
       />
       <div className="scene-background">
         <StarfieldStatueScene
@@ -2534,12 +2627,15 @@ export default function HomePage() {
           statueProps={{ scale: [3, 3, 3] }}
           cameraRadius={2.2}
           scrollDepth
+          priceDirection={skyPriceDirection}
+          priceChange24h={data.loading ? null : data.priceChange24h}
+          litCandleCount={litCandles.length}
         >
           <HeroAltarObject
             candleLit={candleLit}
             litAt={litAt}
             meltDuration={meltDuration}
-            variant={candleVariant}
+            variant="votive"
             onBurnedOut={doExtinguish}
             debugRef={debugRef}
             votiveImage={votiveImage}
@@ -2665,7 +2761,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           <ul className="flame-nudge-benefits">
             <li>Burns 8 hours, not 1 minute</li>
             <li>Follows you across every device</li>
-            <li>Unlocks the votive — customize image &amp; wax color</li>
+            <li>Make it yours — custom image &amp; wax color</li>
           </ul>
           <div className="flame-nudge-actions">
             <button
@@ -2690,15 +2786,65 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         </div>
       )}
 
+      {showDedication && candleLit && (
+        <div
+          className="flame-nudge dedication-card"
+          role="dialog"
+          aria-label="Dedicate your flame"
+        >
+          <p className="flame-nudge-title">Dedicate your flame</p>
+          <p className="flame-nudge-sub">Your intention joins the ticker</p>
+          <div className="dedication-chips">
+            {INTENTION_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                className="dedication-chip"
+                onClick={() => handleDedicate(preset.key)}
+              >
+                {preset.text}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="dedication-customize-link"
+            onClick={() => {
+              setShowDedication(false);
+              // Opening the picker from here teaches the same lesson the
+              // coachmark exists for — no need to show it later.
+              markCandleCoachmarkSeen();
+              setShowCandlePicker(true);
+            }}
+          >
+            customize your candle →
+          </button>
+          <button
+            type="button"
+            className="flame-nudge-dismiss"
+            onClick={() => setShowDedication(false)}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {showCandleCoachmark && (
+        <div className="candle-coachmark" role="status">
+          tap your candle to customize
+        </div>
+      )}
+
       {showCandlePicker && (
         <div
           className={`flame-nudge candle-picker-popup${
             canCustomize ? "" : " is-locked"
           }`}
           role="dialog"
-          aria-label="Choose your candle"
+          aria-label="Your candle"
         >
-          <p className="flame-nudge-title">Choose your candle</p>
+          <p className="flame-nudge-title">Your candle</p>
           {candleLit && litAt && (
             <div className="candle-picker-timer">
               {formatRemaining(litAt, meltDuration)}
@@ -2721,40 +2867,37 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
               </button>
             </div>
           )}
-          <div className="candle-picker-tiles">
-            <button
-              type="button"
-              disabled={!canCustomize}
-              className={`candle-picker-tile${
-                candleVariantChoice === "pillar" ? " is-active" : ""
-              }`}
-              onClick={() => handlePickVariant("pillar")}
-            >
-              <span className="candle-picker-tile-label">Pillar</span>
-              <span className="candle-picker-tile-desc">
-                Plain green taper
-              </span>
-            </button>
-            <button
-              type="button"
-              disabled={!canCustomize}
-              className={`candle-picker-tile${
-                candleVariantChoice === "votive" ? " is-active" : ""
-              }`}
-              onClick={() => handlePickVariant("votive")}
-            >
-              <span className="candle-picker-tile-label">Votive</span>
-              <span className="candle-picker-tile-desc">
-                Glass votive with customizable image and wax color
-              </span>
-            </button>
-          </div>
-
-          {/* Votive-only personalization. Only reached when the user has
-              picked (or is currently on) the votive variant; otherwise the
-              pillar-only flow skips this block entirely. */}
-          {candleVariantChoice === "votive" && (
+          {/* Dedication — available to any signed-in user with a lit
+              candle, deliberately NOT gated by canCustomize: intentions
+              are free, cosmetics cost RL80. This is the mid-burn surface;
+              the post-light dedication card covers fresh lightings.
+              Tapping the active chip clears the dedication. */}
+          {candleLit && (
             <div className="votive-customize">
+              <p className="votive-customize-heading">Intention</p>
+              <div className="dedication-chips">
+                {INTENTION_PRESETS.map((preset) => {
+                  const isActive = intention === preset.key;
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      className={`dedication-chip${isActive ? " is-active" : ""}`}
+                      onClick={() => handleDedicate(isActive ? null : preset.key)}
+                    >
+                      {preset.text}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Votive personalization — the votive is the only variant the
+              picker offers now (the pillar tile was retired when the
+              votive became the site-wide default; its model + config
+              remain in CANDLE_VARIANTS if it ever returns). */}
+          <div className="votive-customize">
               <p className="votive-customize-heading">Image</p>
               <div className="votive-image-presets">
                 {VOTIVE_IMAGE_PRESETS.map((preset) => {
@@ -2897,8 +3040,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                   />
                 </label>
               </div>
-            </div>
-          )}
+          </div>
 
           {candleLit && (
             <button
@@ -2938,15 +3080,47 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         </div>
       )}
 
+      <VigilTicker
+        candles={litCandles}
+        latestPrice={data.latestPrice}
+        priceChange24h={data.loading ? null : data.priceChange24h}
+        myFlame={
+          candleLit && litAt
+            ? { litAtMs: litAt, meltDurationMs: meltDuration }
+            : null
+        }
+      />
+
       <MobileBottomNav
-        /* Reduced to 3 slots: LOGIN (account) | CANDLE (center FAB) | BUY
-           (menu slot). Music and Wallet slots are suppressed. */
+        /* Slots, left to right: BUY (book slot, fixed) | TERMINAL |
+           CANDLE (center FAB, fixed) | HAIL MARY | EX LIBRIS. Music and
+           Wallet slots are suppressed. The dedicated account/LOGIN slot
+           is intentionally absent — sign-in surfaces through the
+           post-light nudge and the picker's disconnect flow. Buttons
+           never trade places: BUY stays left and the center FAB stays
+           the candle in both lit states, so each position teaches one
+           meaning. */
         hideWallet
         accountOnLeft
-        onBuyClick={candleLit ? () => setShowBuyModal(true) : doLight}
+        /* Center FAB routing — always the candle:
+           - unlit: light it (any auth state)
+           - lit + signed-in: open the customization picker
+           - lit + anon: re-surface the save-your-flame nudge; tapping a
+             button labeled MY CANDLE must never snuff the flame (the
+             physical candle tap still extinguishes for anon). */
+        onBuyClick={
+          candleLit
+            ? userId
+              ? toggleCandle
+              : () => setShowSignInNudge(true)
+            : doLight
+        }
+        /* Center FAB is candle-themed in both states now, so mirroring
+           the 3D candle's hover onto it is always coherent. */
         centerHighlight={candleObjectHovered}
         centerLabel={
           candleLit ? (
+            /* Sliders glyph — "adjust my candle". */
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -2962,8 +3136,15 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
               }}
               aria-hidden="true"
             >
-              <line x1="12" y1="1" x2="12" y2="23" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
             </svg>
           ) : (
             <img
@@ -2973,9 +3154,8 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             />
           )
         }
-        centerSubLabel={candleLit ? "BUY RL80" : "LIGHT CANDLE"}
-        centerTitle={candleLit ? "Buy RL80" : "Light candle"}
-        centerProgress={candleLit ? meltProgress : null}
+        centerSubLabel={candleLit ? "MY CANDLE" : "LIGHT CANDLE"}
+        centerTitle={candleLit ? "Your candle" : "Light candle"}
         /* Menu slot routes to /exlibris. */
         onMenuClick={() => router.push('/exlibris')}
         menuIcon={
@@ -3001,10 +3181,9 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         show80sButton={false}
         isMobile
         is80sMode
-        /* Left slot starts as BUY (book slot) while the candle is unlit;
-           once the center FAB flips to BUY RL80, the left slot falls
-           through to the default account/login slot. */
-        onBookClick={candleLit ? undefined : () => setShowBuyModal(true)}
+        /* Left slot is BUY, permanently — it no longer vacates for the
+           account slot when the candle lights. */
+        onBookClick={() => setShowBuyModal(true)}
         bookLabel="BUY"
         bookIcon={
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>

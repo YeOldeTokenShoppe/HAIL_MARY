@@ -67,6 +67,24 @@ export async function lightCandle(
   }
 }
 
+// Attach a dedication to the user's currently-lit candle. Preset keys
+// only (see lib/intentions.js) — enforced again in firestore.rules so a
+// raw client-SDK write can't scroll arbitrary text across the landing
+// page. Merge-write: the burn (litAt) is untouched, and a re-light's
+// full setDoc naturally clears the dedication for the next burn.
+export async function dedicateCandle(userId, intentionKey) {
+  if (!db || !userId) return;
+  try {
+    await setDoc(
+      doc(db, COLLECTION, userId),
+      { intention: intentionKey ?? null },
+      { merge: true },
+    );
+  } catch (err) {
+    console.warn("[candleRitual] dedicateCandle failed:", err);
+  }
+}
+
 export async function extinguishCandle(userId) {
   if (!db || !userId) return;
   try {

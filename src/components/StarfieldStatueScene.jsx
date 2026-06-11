@@ -95,6 +95,16 @@ function StarfieldStatueScene({
   showStats = false,
   paused = false,
   scrollDepth = false,
+  // Real RL80 market direction in [-1, 1] — shifts the red/green balance
+  // of the orbital candle helix so the shrine's mood tracks the token.
+  // 0 keeps the authored bullish-lean default.
+  priceDirection = 0,
+  // Raw 24h % change for the CRT HUD readout; null hides the line
+  // (loading / no data) rather than showing a fake 0.0%.
+  priceChange24h = null,
+  // Live count of currently-burning community candles for the HUD;
+  // null/0 falls back to the static authored readout.
+  litCandleCount = null,
   children,
 }) {
   const router = useRouter()
@@ -236,14 +246,26 @@ function StarfieldStatueScene({
         <div style={{ position: 'absolute', top: '12px', right: '14px', textAlign: 'right' }}>
           <div>LIVEi rev &#9679;</div>
           <div style={{ opacity: 0.4 }}>HOLO-FEED</div>
+          {typeof priceChange24h === 'number' && Number.isFinite(priceChange24h) && (
+            <div
+              style={{
+                color: priceChange24h >= 0
+                  ? 'rgba(0, 255, 136, 0.75)'
+                  : 'rgba(255, 80, 80, 0.75)',
+              }}
+            >
+              RL80 {priceChange24h >= 0 ? '▲' : '▼'} {Math.abs(priceChange24h).toFixed(1)}%
+            </div>
+          )}
         </div>
         {/* Bottom-left */}
         <div style={{ position: 'absolute', bottom: '12px', left: '14px', opacity: 0.4 }}>
           OLPP-MK.VII
         </div>
-        {/* Bottom-right */}
+        {/* Bottom-right — live vigil count when we have one, otherwise the
+            authored set-dressing readout. */}
         <div style={{ position: 'absolute', bottom: '12px', right: '14px', textAlign: 'right', opacity: 0.4 }}>
-          VOL: 48 NODES
+          {litCandleCount > 0 ? `VIGIL: ${litCandleCount} FLAMES` : 'VOL: 48 NODES'}
         </div>
       </div>
 
@@ -342,7 +364,7 @@ function StarfieldStatueScene({
             {...statueProps}
           />
 
-          <MobileCandleOrbital />
+          <MobileCandleOrbital priceDirection={priceDirection} />
 
           {children}
 

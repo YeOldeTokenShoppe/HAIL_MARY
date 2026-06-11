@@ -137,12 +137,33 @@ const globalCandleCache = {
 };
 
 // Orbital candle component that receives a cloned VCANDLE
-function OrbitalCandle({ angle, radius, candleObject, index, onClick, transitionState, isViewerOpen, yOffset = 0 }) {
+function OrbitalCandle({ angle, radius, candleObject, index, onClick, transitionState, isViewerOpen, yOffset = 0, redChance = 0.35 }) {
   const groupRef = useRef();
   const candleRef = useRef();
   const frozenTimeRef = useRef(null);
   const frozenRotationRef = useRef(null);
   const createdMaterialsRef = useRef([]);
+  // Cloned wax materials, kept separately from createdMaterialsRef so the
+  // market-direction recolor effect below can retint them in place without
+  // re-running the whole mount/setup effect.
+  const waxMaterialsRef = useRef([]);
+
+  // Per-index hash in [0,1) — shuffled (not alternating) so the same candle
+  // keeps its draw across re-renders. Compared against `redChance`: as the
+  // real market direction moves the threshold, each candle flips color at
+  // its own hash value, so a mood swing sweeps through the helix candle by
+  // candle instead of snapping all at once.
+  const hashFrac = useMemo(() => {
+    const hash = Math.sin(index * 127.1 + 311.7) * 43758.5453;
+    return hash - Math.floor(hash);
+  }, [index]);
+  const isRed = hashFrac < redChance;
+  // Mirror into a ref so the mount effect can paint the initial color
+  // without listing `isRed` as a dependency (recoloring is the second
+  // effect's job; remounting the candle for a color change would be
+  // wasteful and visually jarring).
+  const isRedRef = useRef(isRed);
+  isRedRef.current = isRed;
 
   // Setup candle on mount
   useEffect(() => {
@@ -169,16 +190,15 @@ function OrbitalCandle({ angle, radius, candleObject, index, onClick, transition
       }
     });
 
-    // Red/green wax — shuffled (not alternating) via a per-index hash so
-    // the same candle keeps its color across re-renders.
-    const hash = Math.sin(index * 127.1 + 311.7) * 43758.5453;
-    const isRed = (hash - Math.floor(hash)) < 0.35;
-    const waxColor = isRed ? 0xcc2222 : 0x22cc22;
+    // Red/green wax — initial draw from the current market-shifted
+    // threshold; later threshold moves are handled by the recolor effect.
+    const waxColor = isRedRef.current ? 0xcc2222 : 0x22cc22;
 
     candleObject.traverse((child) => {
       if (child.isMesh && child.name?.toLowerCase() === 'wax') {
         const waxMaterial = child.material.clone();
         createdMaterialsRef.current.push(waxMaterial);
+        waxMaterialsRef.current.push(waxMaterial);
         waxMaterial.color = new THREE.Color(waxColor);
         child.material = waxMaterial;
       }
@@ -197,8 +217,22 @@ function OrbitalCandle({ angle, radius, candleObject, index, onClick, transition
         if (material && material.dispose) material.dispose();
       });
       createdMaterialsRef.current = [];
+      waxMaterialsRef.current = [];
     };
   }, [candleObject, index]);
+
+  // Retint the wax when the market direction moves this candle across the
+  // red/green threshold. The hash-scaled delay staggers the flips so a
+  // direction change reads as a wave washing over the helix.
+  useEffect(() => {
+    const mats = waxMaterialsRef.current;
+    if (mats.length === 0) return;
+    const id = setTimeout(() => {
+      const color = new THREE.Color(isRed ? 0xcc2222 : 0x22cc22);
+      mats.forEach((m) => m.color.copy(color));
+    }, hashFrac * 2500);
+    return () => clearTimeout(id);
+  }, [isRed, hashFrac]);
   
   useFrame((state) => {
     if (groupRef.current) {
@@ -350,7 +384,7 @@ function OrbitalCandle({ angle, radius, candleObject, index, onClick, transition
 }
 
 // Main orbital system to be added to existing scene
-function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChange, isViewerOpen = false }) {
+function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChange, isViewerOpen = false, priceDirection = 0 }) {
   const groupRef = useRef();
   const [vcandleObjects, setVcandleObjects] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -369,6 +403,12 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
   const HELIX_SPREAD = 23;
   const ROTATION_INTERVAL = 15000; // 15 seconds between rotations
   const TRANSITION_DURATION = 2000; // 2 second fade transition
+
+  // Map real market direction [-1, 1] onto the share of red candles.
+  // 0.35 is the authored bullish-lean baseline; a full pump leaves a few
+  // embers of red (0.05) and a full dump turns the sky mostly red (0.65)
+  // while keeping both colors present so the helix never goes monochrome.
+  const redChance = Math.max(0.05, Math.min(0.65, 0.35 - priceDirection * 0.3));
 
   // Extract and clone candle objects from the loaded model
   useEffect(() => {
@@ -599,6 +639,7 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
             onClick={onCandleClick}
             transitionState={transitionState}
             isViewerOpen={isViewerOpen}
+            redChance={redChance}
           />
         );
       })}
@@ -621,6 +662,7 @@ export default React.memo(MobileCandleOrbital, (prevProps, nextProps) => {
     prevProps.candleData === nextProps.candleData &&
     prevProps.isViewerOpen === nextProps.isViewerOpen &&
     prevProps.onCandleClick === nextProps.onCandleClick &&
-    prevProps.onPaginationChange === nextProps.onPaginationChange
+    prevProps.onPaginationChange === nextProps.onPaginationChange &&
+    prevProps.priceDirection === nextProps.priceDirection
   );
 });
