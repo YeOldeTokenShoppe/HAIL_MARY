@@ -229,7 +229,15 @@ The game progresses through three phases, controlled by `gamePhase` in Firestore
    they follow **@rl80token** on X. Once qualified, the plot pick happens **on the live 3D
    field** ("PICK YOUR PLOT ON THE FIELD" — see *Pre-season mode* below; first come, first
    served). `oil-register` re-checks the balance server-side and is the sole writer of
-   `qualified`. **Players who already claimed fall through to the 3D field in PRE-SEASON mode.**
+   `qualified`. **X follow is server-enforced too (2026-06-11):** registration runs the same
+   three-tier follow check as the VERIFY button (`lib/xFollowers.js` — cached follower list →
+   cooldown-gated on-demand refresh → live look-up; the cache also backstops via the daily
+   `updateFollowers` Firebase cron). When the Clerk user has an X account linked (OAuth), its
+   username overrides the typed one and the doc gets `xVerified:true` (ownership proven); typed
+   handles are stored `xVerified:false` — they prove only that the handle follows, not that the
+   player owns it (accepted residual risk; the real gate is the $20 hold). Handle uniqueness is
+   first-come, except an OAuth-verified owner reclaims their handle from an unverified squatter.
+   **Players who already claimed fall through to the 3D field in PRE-SEASON mode.**
 2. **`active`** — Game running. Continuous auto-pump drilling: each armed rig grinds on its own and
    **strikes at random, unpredictable times**, paced by the fill-the-season clock (avg interval =
    season ÷ depthCap; see *TIMING FRAMEWORK*). Players can claim-jump. **First-plot claims are

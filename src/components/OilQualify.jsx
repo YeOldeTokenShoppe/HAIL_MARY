@@ -73,6 +73,7 @@ export default function OilQualify({
   const [xUsername, setXUsername] = useState("");
   const [xFollowVerified, setXFollowVerified] = useState(false);
   const [xCheckingFollow, setXCheckingFollow] = useState(false);
+  const [xFollowNote, setXFollowNote] = useState(null); // server guidance after a failed check
   const [xIdentityVerified, setXIdentityVerified] = useState(false); // true when X username comes from Clerk OAuth
   const [allPlots, setAllPlots] = useState({}); // oilPlots collection: { "col_row": { ... } }
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -146,14 +147,25 @@ export default function OilQualify({
     if (!clean) return;
     setXCheckingFollow(true);
     setXFollowVerified(false);
+    setXFollowNote(null);
     fetch(`/api/check-follow?username=${encodeURIComponent(clean)}`)
       .then((r) => r.json())
       .then((data) => {
         setXFollowVerified(!!data.follows);
+        // Surface the server's guidance (e.g. "just followed? try again
+        // shortly" while the on-demand cache refresh is cooling down).
+        setXFollowNote(
+          data.follows
+            ? null
+            : data.reason === "user_not_found"
+              ? "That X account doesn't exist — check the spelling."
+              : data.note || "Not verified — make sure this account follows @rl80token.",
+        );
         setXCheckingFollow(false);
       })
       .catch(() => {
         setXFollowVerified(false);
+        setXFollowNote("Couldn't check right now — try again in a moment.");
         setXCheckingFollow(false);
       });
   }, [xUsername]);
@@ -1076,7 +1088,7 @@ export default function OilQualify({
                           type="text"
                           placeholder="your_x_username"
                           value={xUsername}
-                          onChange={(e) => setXUsername(e.target.value)}
+                          onChange={(e) => { setXUsername(e.target.value); setXFollowNote(null); }}
                           style={{
                             flex: 1,
                             color: theme.text,
@@ -1128,8 +1140,8 @@ export default function OilQualify({
                       </div>
                     )}
                     {xUsername.trim() && !xCheckingFollow && !xFollowVerified && xUsername.length > 1 && (
-                      <div style={{ fontSize: 10, marginTop: 6, color: theme.muted }}>
-                        Enter your X username and click VERIFY
+                      <div style={{ fontSize: 10, marginTop: 6, color: xFollowNote ? "#d4a854" : theme.muted }}>
+                        {xFollowNote || "Enter your X username and click VERIFY"}
                       </div>
                     )}
                     <div style={{ fontSize: 10, marginTop: 8, color: theme.muted }}>
