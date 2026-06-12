@@ -1423,6 +1423,42 @@ body:has(.shrine-page.neon) {
   }
 }
 
+/* THE VESTRY — empty scroll viewport at the page bottom; the hero
+   canvas's basement (Our Lady's chamber, MaryChamber.jsx) shows through.
+   No background on purpose. Pointer events come from the catch-all
+   direct-child rule (none), which is what lets drags reach the canvas
+   turntable underneath. */
+.vestry-viewport {
+  /* Tall on purpose: the crane camera parks 3 viewport-heights before
+     the page bottom (cameraParkScreens), so this supplies the scroll
+     runway over which the chamber's hold + reveal play on a static
+     shot. ~1 screen of arrival + ~3 screens parked. */
+  height: 380vh;
+  height: 380svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 8svh;
+  gap: 7px;
+}
+
+.vestry-label {
+  color: rgba(241, 215, 122, 0.8);
+  font-family: "Cinzel", serif;
+  font-size: 0.95rem;
+  letter-spacing: 6px;
+  text-shadow: 0 0 16px rgba(241, 215, 122, 0.25);
+}
+
+.vestry-sublabel {
+  color: rgba(163, 154, 130, 0.7);
+  font-family: 'Courier New', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+}
+
+
 /* Picker variant — same frame, but centered in the viewport rather
    than docked at the bottom. Bottom-anchored was easy to miss since
    the user's eye is already on the candle (also near the bottom) when

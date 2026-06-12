@@ -5,14 +5,21 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { getCandleIgnitionMs } from "@/utils/candleIgnitionPulse";
 
-// Candle-ignition response — when the altar lights, briefly amplify the
-// pink rim shell + halo glow so the statue acknowledges the moment. Decay
-// constant matches the candle's halo flash so both reactions feel like one
-// event. Capped at +1.0 over base so it stays clearly an "amp", not a
-// re-color.
+// Candle-ignition response, three layers so the statue visibly *receives*
+// the flame rather than just blinking:
+//   1. Rim shell + halo flash (uIntensity) — fast, matches the candle's
+//      own halo flash so both read as one event.
+//   2. Sacred-heart surge (uGlowIntensity) — slower swell-and-subside,
+//      a heartbeat rather than a blink.
+//   3. Body ripple (uPulseT) — a warm band sweeping feet-to-crown over
+//      STATUE_RIPPLE_MS, tinting the cyan hologram flame-gold as it
+//      passes. Sweep range comes from the statue's bounding box at load.
 const STATUE_PULSE_WINDOW_MS = 700;
 const STATUE_PULSE_DECAY_MS = 180;
 const STATUE_PULSE_PEAK_BOOST = 1.0;
+const STATUE_RIPPLE_MS = 1600;
+const STATUE_HEART_DECAY_MS = 450;
+const STATUE_HEART_PEAK_BOOST = 2.6;
 
 function HolographicStatue3({
   onLoad,
@@ -54,12 +61,17 @@ function HolographicStatue3({
         uniforms: {
           uTime: { value: 0.0 },
           uColor: { value: new THREE.Color(0x00ffff) },
+          // Ignition ripple progress (0→1 sweep, <0 idle). World-Y sweep
+          // range is filled in per-clone at load from the bounding box.
+          uPulseT: { value: -1.0 },
+          uRipMinY: { value: 0.0 },
+          uRipMaxY: { value: 1.0 },
         },
         vertexShader: `
       uniform float uTime;
       varying vec3 vPosition;
       varying vec3 vNormal;
-  
+
       vec2 random2D(vec2 st) {
         st = vec2(dot(st, vec2(127.1, 311.7)),
                  dot(st, vec2(269.5, 183.3)));
@@ -87,6 +99,9 @@ function HolographicStatue3({
          fragmentShader: `
       uniform vec3 uColor;
       uniform float uTime;
+      uniform float uPulseT;
+      uniform float uRipMinY;
+      uniform float uRipMaxY;
       varying vec3 vPosition;
       varying vec3 vNormal;
 
@@ -108,7 +123,22 @@ function HolographicStatue3({
         holographic += fresnel * 2.25;
         holographic *= falloff;
 
-        gl_FragColor = vec4(uColor, holographic);
+        // Candle-ignition ripple: a warm band sweeps from the feet to
+        // the crown, brightening the hologram and tinting it flame-gold
+        // as it passes — the statue feeling the flame catch below her.
+        vec3 color = uColor;
+        if (uPulseT >= 0.0) {
+          float span = max(uRipMaxY - uRipMinY, 0.001);
+          float front = mix(uRipMinY, uRipMaxY, uPulseT);
+          float d = (vPosition.y - front) / (span * 0.07);
+          float band = exp(-d * d);
+          // Dissolve rather than pop as the band exits through the crown.
+          float fade = 1.0 - smoothstep(0.75, 1.0, uPulseT);
+          holographic += band * fade * 2.5 * falloff;
+          color = mix(color, vec3(1.0, 0.85, 0.45), band * fade * 0.65);
+        }
+
+        gl_FragColor = vec4(color, holographic);
       }
     `,
         transparent: true,
@@ -447,6 +477,12 @@ function HolographicStatue3({
         uniforms: {
           uTime: { value: 0 },
           uColor: { value: new THREE.Color(0xffd700) },
+          // Shares the body fragment shader, so the ripple uniforms must
+          // exist — a missing uPulseT reads as GL-default 0.0, which
+          // would pin a permanent bright band at uRipMinY.
+          uPulseT: { value: -1.0 },
+          uRipMinY: { value: 0.0 },
+          uRipMaxY: { value: 1.0 },
         },
         vertexShader: holographicMaterial.vertexShader,
         fragmentShader: holographicMaterial.fragmentShader,
@@ -565,7 +601,10 @@ function HolographicStatue3({
             const clonedMaterial = holographicMaterial.clone();
             clonedMaterial.uniforms = {
               uTime: { value: 0 },
-              uColor: { value: new THREE.Color(0x00ffff) }
+              uColor: { value: new THREE.Color(0x00ffff) },
+              uPulseT: { value: -1.0 },
+              uRipMinY: { value: 0.0 },
+              uRipMaxY: { value: 1.0 },
             };
             child.material = clonedMaterial;
             child.renderOrder = bodyRenderOrder++;
@@ -573,6 +612,23 @@ function HolographicStatue3({
           }
         }
       });
+
+      // Ignition-ripple sweep range — world-Y extent of the centered
+      // statue (the anchor sits at position[1] and the statue is centered
+      // on it; rotation is Y-only so the vertical extent is stable).
+      // Padded so the band enters fully below the feet and dissolves
+      // above the crown, with headroom for the ±0.3 hover bob.
+      {
+        const size = box.getSize(new THREE.Vector3());
+        const ripMinY = position[1] - size.y / 2 - 0.4;
+        const ripMaxY = position[1] + size.y / 2 + 0.4;
+        for (const m of animatedMaterialsRef.current) {
+          if (m.uniforms.uRipMinY) {
+            m.uniforms.uRipMinY.value = ripMinY;
+            m.uniforms.uRipMaxY.value = ripMaxY;
+          }
+        }
+      }
 
       // Depth mask clone removed — was an extra full-statue-geometry pass
       // that gave the halo rings a "peek through the holographic gaps"
@@ -837,11 +893,16 @@ function HolographicStatue3({
         groupRef.current.rotation.rotation.y += delta * 0.3;
       }
 
-      // Compute the candle-ignition pulse boost once per frame. Decays
-      // exponentially over STATUE_PULSE_WINDOW_MS, then sits at zero for
-      // the rest of the candle's burn so this costs ~nothing when idle.
+      // Compute the candle-ignition envelopes once per frame. All decay
+      // to zero within STATUE_RIPPLE_MS, then idle for the rest of the
+      // candle's burn so this costs ~nothing when nothing just lit:
+      //   pulseBoost — fast flash for the rim shell + halo (uIntensity)
+      //   heartBoost — slower swell for the sacred hearts (uGlowIntensity)
+      //   rippleT    — 0→1 progress of the body sweep (uPulseT)
       const ignitionMs = getCandleIgnitionMs();
       let pulseBoost = 0;
+      let heartBoost = 0;
+      let rippleT = -1;
       if (ignitionMs > 0) {
         const sinceIgnition = performance.now() - ignitionMs;
         if (sinceIgnition < STATUE_PULSE_WINDOW_MS) {
@@ -849,10 +910,16 @@ function HolographicStatue3({
             STATUE_PULSE_PEAK_BOOST *
             Math.exp(-sinceIgnition / STATUE_PULSE_DECAY_MS);
         }
+        if (sinceIgnition < STATUE_RIPPLE_MS) {
+          heartBoost =
+            STATUE_HEART_PEAK_BOOST *
+            Math.exp(-sinceIgnition / STATUE_HEART_DECAY_MS);
+          rippleT = sinceIgnition / STATUE_RIPPLE_MS;
+        }
       }
 
       // Update shader uniforms using cached materials (more efficient).
-      // Caches each material's authored uIntensity on userData the first
+      // Caches each material's authored intensity on userData the first
       // time we see it so the per-frame multiplier doesn't compound (the
       // alternative — reading the live uniform — would chase its own tail).
       for (const material of animatedMaterialsRef.current) {
@@ -865,6 +932,17 @@ function HolographicStatue3({
           }
           material.uniforms.uIntensity.value =
             material.userData.baseUIntensity * (1 + pulseBoost);
+        }
+        if (material.uniforms?.uGlowIntensity) {
+          if (material.userData.baseUGlowIntensity == null) {
+            material.userData.baseUGlowIntensity =
+              material.uniforms.uGlowIntensity.value;
+          }
+          material.uniforms.uGlowIntensity.value =
+            material.userData.baseUGlowIntensity * (1 + heartBoost);
+        }
+        if (material.uniforms?.uPulseT) {
+          material.uniforms.uPulseT.value = rippleT;
         }
       }
     }

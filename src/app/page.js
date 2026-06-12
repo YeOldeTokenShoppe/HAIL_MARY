@@ -34,6 +34,7 @@ import {
 } from "@/lib/candleRitual";
 import { INTENTION_PRESETS } from "@/lib/intentions";
 import VigilTicker from "@/components/VigilTicker";
+import MaryChamber from "@/components/MaryChamber";
 import {
   readLocalCandle,
   writeLocalCandle,
@@ -2627,6 +2628,11 @@ export default function HomePage() {
           statueProps={{ scale: [3, 3, 3] }}
           cameraRadius={2.2}
           scrollDepth
+          /* Park the crane 3 screens before the bottom so the chamber's
+             hold-on-the-phone and slow reveal play on a static shot —
+             paired with the tall .vestry-viewport that supplies that
+             scroll runway (keep the two in sync: vestry ≈ park + 0.8). */
+          cameraParkScreens={3}
           priceDirection={skyPriceDirection}
           priceChange24h={data.loading ? null : data.priceChange24h}
           litCandleCount={litCandles.length}
@@ -2643,6 +2649,10 @@ export default function HomePage() {
             onHoverChange={setCandleObjectHovered}
             onTap={toggleCandle}
           />
+          {/* Our Lady's chamber at the bottom of the crane descent —
+              scroll-gated inside the component, so it costs nothing
+              until the visitor heads down. */}
+          <MaryChamber />
           {/* <Stats className="r3f-stats" /> */}
         </StarfieldStatueScene>
       </div>
@@ -2708,6 +2718,11 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           </div>
         </section>
 
+        {/* The community candles now live on Our Lady's phone in the
+            Vestry (WatchlistPhoneTexture CANDLE items) — the 2D VigilWall
+            section was retired in their favor. VigilWall.jsx remains on
+            disk, unmounted, if it's ever wanted back. */}
+
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
           <span className="section-divider-icon">&#x2020;</span>
@@ -2753,6 +2768,16 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           Coming soon
         </button>
       </div> */}
+
+      {/* THE VESTRY — one empty viewport of scroll at the very bottom so
+          the canvas basement (Our Lady's chamber) plays out unobstructed
+          as the crane camera completes its descent. Deliberately a direct
+          child of <main>: the catch-all child rule strips its pointer
+          events, so drags fall through to the canvas turntable. */}
+      <div className="vestry-viewport" aria-hidden="true">
+        <span className="vestry-label">THE VESTRY</span>
+        <span className="vestry-sublabel">she sees every intention</span>
+      </div>
 
       {showSignInNudge && (
         <div className="flame-nudge" role="status" aria-live="polite">

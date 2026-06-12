@@ -20,7 +20,10 @@ import { WatchlistPhoneTexture } from './WatchlistPhoneTexture'
 
 
 
-export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null, showLatestPolaroid = false, isHighlighting = false }) {
+export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null, showLatestPolaroid = false, isHighlighting = false,
+  // Phone aura glow overrides — defaults preserve the /illumin80 look;
+  // other mounts (e.g. the landing page chamber) tune their own.
+  phoneAuraColor = '#00ffff', phoneAuraIntensity = 0.003, phoneAuraSize = 1, phoneAuraOpacity = 0.9 }) {
 
   // Get mobile state from parent or detect it locally
   const [isMobileLocal, setIsMobileLocal] = useState(false)
@@ -877,10 +880,10 @@ return (
           phoneCaseWorldPos[2] + 3
         ]}
         phoneRotation={phoneCaseWorldRotation}
-        color='#00ffff'
-        intensity={1}
-        size={8}
-        opacity={0.5}
+        color={phoneAuraColor}
+        intensity={phoneAuraIntensity}
+        size={phoneAuraSize}
+        opacity={phoneAuraOpacity}
         isActive={hasActiveClick}
         priceDirection={priceChange / 5}
       />

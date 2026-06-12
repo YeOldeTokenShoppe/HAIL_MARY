@@ -9,14 +9,21 @@ import StarField from '@/components/StarField'
 import HolographicStatue3 from '@/components/HolographicStatue3'
 import MobileCandleOrbital, { CandleOrbitalEffects } from './MobileCandleOrbital'
 import BackgroundChart from './BackgroundChart'
+import { getChamberFocus } from '@/utils/chamberFocus'
 
 // Crane shot loop - sweeps low to high and back while gently orbiting
-function getRootScrollProgress() {
+// `parkScreens` shortens the scroll distance the descent is mapped to,
+// so the camera completes its travel that many viewport-heights BEFORE
+// the page bottom and then sits parked — a static shot over the final
+// stretch, which is what lets the chamber choreography (hold on the
+// phone, slow reveal) play out fully on stage.
+function getRootScrollProgress(parkScreens = 0) {
   if (typeof window === 'undefined') return 0
 
   const maxScroll =
     document.documentElement.scrollHeight - window.innerHeight
-  const travel = Math.max(window.innerHeight * 3.4, maxScroll, 1)
+  const park = window.innerHeight * parkScreens
+  const travel = Math.max(window.innerHeight * 3.4, maxScroll - park, 1)
   const progress = window.scrollY / travel
   return Math.min(Math.max(progress, 0), 1)
 }
@@ -32,6 +39,7 @@ function CraneShotCamera({
   craneSpeed = 0.15,
   heightRange = [-0.5, 1.8],
   scrollDepth = false,
+  parkScreens = 0,
 }) {
   const { camera } = useThree()
   const timeRef = useRef(0)
@@ -45,7 +53,9 @@ function CraneShotCamera({
     timeRef.current += delta
 
     const t = timeRef.current
-    const targetDepth = scrollDepth ? smoothProgress(getRootScrollProgress()) : 0
+    const targetDepth = scrollDepth
+      ? smoothProgress(getRootScrollProgress(parkScreens))
+      : 0
     const smoothing = 1 - Math.exp(-delta * 5)
     depthRef.current += (targetDepth - depthRef.current) * smoothing
     const depth = depthRef.current
@@ -71,6 +81,16 @@ function CraneShotCamera({
       target[1] - depth * 9.3,
       target[2]
     )
+
+    // Chamber phone focus — when the visitor clicks Our Lady's phone at
+    // the bottom of the descent, override the scroll-derived framing
+    // with the close-up. The existing lerp below turns the override
+    // into a smooth dolly in and back out.
+    const chamberFocus = getChamberFocus()
+    if (chamberFocus.active) {
+      desiredPosition.current.set(...chamberFocus.position)
+      desiredTarget.current.set(...chamberFocus.target)
+    }
     cameraPositionRef.current.copy(camera.position)
     cameraPositionRef.current.lerp(desiredPosition.current, smoothing)
     camera.position.copy(cameraPositionRef.current)
@@ -95,6 +115,10 @@ function StarfieldStatueScene({
   showStats = false,
   paused = false,
   scrollDepth = false,
+  // Viewport-heights before the page bottom at which the crane descent
+  // completes and the camera parks (static shot for the chamber's
+  // hold + reveal). 0 = original behavior, descent ends at the bottom.
+  cameraParkScreens = 0,
   // Real RL80 market direction in [-1, 1] — shifts the red/green balance
   // of the orbital candle helix so the shrine's mood tracks the token.
   // 0 keeps the authored bullish-lean default.
@@ -320,6 +344,7 @@ function StarfieldStatueScene({
             target={cameraTarget}
             radius={cameraRadius}
             scrollDepth={scrollDepth}
+            parkScreens={cameraParkScreens}
           />
 
           {/* Ambient lighting */}

@@ -1,7 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { db, collection, query, orderBy, limit, onSnapshot, getDocs } from '@/lib/firebaseClient';
+import { db, collection, query, orderBy, limit, onSnapshot, getDocs, doc, getDoc } from '@/lib/firebaseClient';
+import {
+  publishPhoneScroll,
+  isPhoneScrollExternalDrive,
+  consumePhoneScrollFlick,
+} from '@/utils/phoneScrollSync';
+import { intentionText } from '@/lib/intentions';
 
 // ===========================================
 // CONFIGURATION
@@ -38,7 +44,7 @@ const CONFIG = {
 const ACTIVITY_TYPES = {
   CANDLE: {
     icon: '🕯️',
-    verb: 'Dedicated a Green Candle',
+    verb: 'Lit a candle',
     unit: 'candle',
     pluralUnit: 'candles',
     color: '#00ff66'
@@ -210,7 +216,10 @@ export function WatchlistPhoneTexture({
   
   // Activity feed state
   const [activities, setActivities] = useState([]);
-  const [activeTab, setActiveTab] = useState('XPOSTS');
+  // 'ALL' so the vigil's candles interleave with her X mentions — the
+  // feed reads as Our Lady scrolling both her notifications AND the
+  // intentions of the faithful.
+  const [activeTab, setActiveTab] = useState('ALL');
   const [breakthroughEvent, setBreakthroughEvent] = useState(null);
 
   // Live time display state
@@ -224,6 +233,9 @@ export function WatchlistPhoneTexture({
   // User avatar cache for activity items
   const activityAvatarsRef = useRef({});
   const screenshotImagesRef = useRef({});
+  // Votive prefs (saint image) per shrine-candle holder, fetched once
+  // per userId per session.
+  const votivePrefsCacheRef = useRef({});
 
   // Illumin80 badge state
   const [illumin80UserIds, setIllumin80UserIds] = useState(new Set());
@@ -448,38 +460,66 @@ export function WatchlistPhoneTexture({
   // ===========================================
   
   useEffect(() => {
-    // Subscribe to Firebase offerings
-    const offeringsRef = collection(db, 'offerings');
-    const q = query(offeringsRef, orderBy('createdAt', 'desc'), limit(30));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newActivities = [];
-      
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        newActivities.push({
-          id: doc.id,
+    let cancelled = false;
+    // Subscribe to the LIVE shrine candles — the same data the landing
+    // page's ticker and vigil wall use. Each burning candle becomes a
+    // CANDLE feed item carrying the holder's saint image (votive prefs)
+    // and their dedication, so the phone literally shows the vigil.
+    // (Replaced the legacy `offerings` source, which has been stale
+    // since the shrine moved to shrineCandles.)
+    const candlesRef = collection(db, 'shrineCandles');
+    const q = query(candlesRef, orderBy('litAt', 'desc'), limit(20));
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const docs = [];
+      snapshot.forEach((d) => docs.push({ id: d.id, ...d.data() }));
+
+      // Resolve votive saint images. Preset paths only — custom uploads
+      // are stored as ~900KB data: URLs and a feed must not pull
+      // megabytes of them; those fall back to the default saint.
+      await Promise.all(
+        docs.map(async (c) => {
+          if (votivePrefsCacheRef.current[c.id] !== undefined) return;
+          try {
+            const snap = await getDoc(doc(db, 'shrineCandlePrefs', c.id));
+            votivePrefsCacheRef.current[c.id] = snap.exists() ? snap.data() : null;
+          } catch {
+            votivePrefsCacheRef.current[c.id] = null;
+          }
+        }),
+      );
+      if (cancelled) return;
+
+      const newActivities = docs.map((c) => {
+        const prefs = votivePrefsCacheRef.current[c.id];
+        const image =
+          prefs?.votiveImage && prefs.votiveImage.startsWith('/')
+            ? prefs.votiveImage
+            : '/images/nuestraSenora.webp';
+        const dedication = intentionText(c.intention);
+        return {
+          id: `vigil-${c.id}`,
           type: 'CANDLE',
-          username: data.name || truncateAddress(data.walletAddress),
-          userId: data.userId,
-          userImageUrl: data.userImageUrl,
-          prayerType: data.type || 'petition', // petition, confession, appreciation
-          amount: parseInt(data.tokensBurned) || 1,
-          timestamp: data.createdAt?.toMillis?.() || Date.now(),
+          username: c.displayName || 'a pilgrim',
+          userId: c.id,
+          userImageUrl: image,
+          // Shown in place of the generic verb when the holder dedicated
+          // their flame.
+          feedLine: dedication ? `Lit a candle ${dedication}` : null,
+          waxTint: prefs?.votiveTint || null,
+          amount: 1,
+          timestamp: c.litAt?.toMillis?.() || Date.now(),
           isNew: false,
-        });
+        };
       });
-      
-      if (newActivities.length > 0) {
-        setActivities(prev => {
-          // Merge with existing staking activities
-          const stakingActivities = prev.filter(a => a.type !== 'CANDLE');
-          const merged = [...newActivities, ...stakingActivities];
-          return merged.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
-        });
-      }
+
+      setActivities(prev => {
+        const others = prev.filter(a => a.type !== 'CANDLE');
+        const merged = [...newActivities, ...others];
+        return merged.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+      });
     }, (error) => {
-      console.error('Error fetching offerings:', error);
+      console.error('Error fetching shrine candles:', error);
     });
     
     // Subscribe to Firebase stakes
@@ -560,6 +600,7 @@ export function WatchlistPhoneTexture({
     });
 
     return () => {
+      cancelled = true;
       unsubscribe();
       unsubscribeStakes();
       unsubscribeXPosts();
@@ -1068,7 +1109,48 @@ export function WatchlistPhoneTexture({
       // Check if it's an actual Image object (not 'loading' or 'failed' strings)
       const isImageLoaded = userAvatar && userAvatar instanceof Image;
 
-      if (isImageLoaded) {
+      if (activity.type === 'CANDLE' && isImageLoaded) {
+        // Miniature votive card — the holder's actual candle: saint
+        // image cover-fit in a glass-shaped frame with their wax tint
+        // at the base. (The VigilWall's 2D cards, relocated to her
+        // phone.)
+        const vw = 54;
+        const vh = 72;
+        const vx = avatarX - vw / 2;
+        const vy = avatarY - vh / 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(vx, vy, vw, vh, 8);
+        ctx.clip();
+        const iw = userAvatar.naturalWidth || vw;
+        const ih = userAvatar.naturalHeight || vh;
+        const cover = Math.max(vw / iw, vh / ih);
+        const sw = vw / cover;
+        const sh = vh / cover;
+        ctx.drawImage(
+          userAvatar,
+          (iw - sw) / 2,
+          (ih - sh) / 2,
+          sw,
+          sh,
+          vx,
+          vy,
+          vw,
+          vh,
+        );
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = activity.waxTint || '#1fae5a';
+        ctx.fillRect(vx, vy + vh - 10, vw, 10);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(241, 215, 122, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(vx, vy, vw, vh, 8);
+        ctx.stroke();
+
+        usernameX = avatarX + vw / 2 + 14;
+      } else if (isImageLoaded) {
         // Draw avatar image
         ctx.save();
         ctx.beginPath();
@@ -1236,15 +1318,16 @@ export function WatchlistPhoneTexture({
         ctx.fillStyle = '#000';
         ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
 
-        ctx.fillText(activityType.verb, usernameX, itemY + 62);
+        ctx.fillText(activity.feedLine || activityType.verb, usernameX, itemY + 62);
 
         // Amount (bottom right)
         ctx.textAlign = 'right';
         ctx.fillStyle = activityType.color;
         ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
 
+        // Candles show the glyph rather than a meaningless "+1".
         const amountText = activity.type === 'CANDLE'
-          ? `+${formatAmount(activity.amount, activity.type)}`
+          ? '🕯️'
           : `${activity.type === 'UNSTAKE' ? '-' : '+'}${formatAmount(activity.amount, activity.type)} ${activityType.unit}`;
         ctx.fillText(amountText, width - 40, itemY + 62);
 
@@ -1395,6 +1478,17 @@ export function WatchlistPhoneTexture({
   const autoScrollStateRef = useRef('pausing'); // 'pausing' | 'scrolling' | 'bottom_pause'
   const autoScrollPauseStartRef = useRef(Date.now());
 
+  // Chamber-flick glide (external drive): each impulse animates the
+  // scroll with smoothstep easing — slow catch, fast middle, rolling
+  // stop — starting the same frame as the hand gesture so thumb and
+  // content accelerate together. The generic lerp below is bypassed
+  // (position and target are kept equal during the glide).
+  const FLICK_GLIDE_MS = 1600;
+  const glideFromRef = useRef(0);
+  const glideToRef = useRef(0);
+  const glideStartRef = useRef(0);
+  const glideActiveRef = useRef(false);
+
   // Reset auto-scroll when tab changes or new items arrive
   useEffect(() => {
     scrollPositionRef.current = 0;
@@ -1422,15 +1516,50 @@ export function WatchlistPhoneTexture({
           autoScrollStateRef.current = 'scrolling';
         }
       } else if (autoScrollStateRef.current === 'scrolling') {
-        // Slowly scroll down
-        scrollPositionRef.current += CONFIG.AUTO_SCROLL_SPEED;
-        targetScrollRef.current = scrollPositionRef.current;
+        if (isPhoneScrollExternalDrive()) {
+          // Chamber-driven: the content advances only when her thumb
+          // flicks (impulses from MaryChamber). Each impulse starts an
+          // eased glide; between gestures the feed sits still.
+          const impulse = consumePhoneScrollFlick();
+          if (impulse > 0) {
+            glideFromRef.current = scrollPositionRef.current;
+            glideToRef.current = Math.min(
+              scrollPositionRef.current + impulse,
+              maxScroll,
+            );
+            glideStartRef.current = now;
+            glideActiveRef.current = true;
+          }
+          if (glideActiveRef.current) {
+            const u = Math.min(
+              (now - glideStartRef.current) / FLICK_GLIDE_MS,
+              1,
+            );
+            const eased = u * u * (3 - 2 * u);
+            scrollPositionRef.current =
+              glideFromRef.current +
+              (glideToRef.current - glideFromRef.current) * eased;
+            targetScrollRef.current = scrollPositionRef.current;
+            if (u >= 1) glideActiveRef.current = false;
+          }
+          if (scrollPositionRef.current >= maxScroll - 0.5) {
+            scrollPositionRef.current = maxScroll;
+            targetScrollRef.current = maxScroll;
+            glideActiveRef.current = false;
+            autoScrollStateRef.current = 'bottom_pause';
+            autoScrollPauseStartRef.current = now;
+          }
+        } else {
+          // Slowly scroll down
+          scrollPositionRef.current += CONFIG.AUTO_SCROLL_SPEED;
+          targetScrollRef.current = scrollPositionRef.current;
 
-        if (scrollPositionRef.current >= maxScroll) {
-          scrollPositionRef.current = maxScroll;
-          targetScrollRef.current = maxScroll;
-          autoScrollStateRef.current = 'bottom_pause';
-          autoScrollPauseStartRef.current = now;
+          if (scrollPositionRef.current >= maxScroll) {
+            scrollPositionRef.current = maxScroll;
+            targetScrollRef.current = maxScroll;
+            autoScrollStateRef.current = 'bottom_pause';
+            autoScrollPauseStartRef.current = now;
+          }
         }
       } else if (autoScrollStateRef.current === 'bottom_pause') {
         // Pause at the bottom, then smoothly scroll back to top
@@ -1448,6 +1577,10 @@ export function WatchlistPhoneTexture({
         }
       }
     }
+
+    // Broadcast the scroll phase so the chamber's hand animation can
+    // flick Our Lady's thumb in sync with the content actually moving.
+    publishPhoneScroll(maxScroll > 0 ? autoScrollStateRef.current : 'pausing');
 
     // Smooth scrolling for manual/programmatic scroll
     if (Math.abs(targetScrollRef.current - scrollPositionRef.current) > 0.5) {
