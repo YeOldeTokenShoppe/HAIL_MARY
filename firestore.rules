@@ -393,7 +393,8 @@
                   && data.displayName.matches('0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}')))
             && (!('intention' in data)
               || data.intention == null
-              || data.intention in ['bags', 'bullrun', 'family', 'green', 'us-all']);
+              || data.intention in ['prosper80', 'secur80', 'notori80',
+                  'liquid80', 'celebr80', 'pi80',]);
         }
         // Burn credit (tokensBurned & friends) is written ONLY by
         // /api/burn-offering via the admin SDK after verifying a real

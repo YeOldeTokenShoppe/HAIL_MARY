@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMusic } from '@/components/MusicContext';
+import MusicButton from '@/components/MusicButton';
 import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import NavControlsHome from '@/components/NavControlsHome';
@@ -281,6 +282,45 @@ export default function FountainPage() {
           </div>
         </div>
       )}
+
+      {/* Top-right controls: brand-mark home link + shared music toggle */}
+      <div
+        style={{
+          position: "fixed",
+          top: "calc(1rem + env(safe-area-inset-top))",
+          right: "1rem",
+          zIndex: 30000,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          pointerEvents: "auto",
+        }}
+      >
+        <Link
+          href="/"
+          title="Home"
+          aria-label="Home"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            background: "rgba(0, 182, 255, 0.06)",
+            border: "1.5px solid rgba(0, 182, 255, 0.25)",
+          }}
+        >
+          <img
+            src="/brand-mark-cyan.svg"
+            alt="Home"
+            width="24"
+            height="24"
+            style={{ display: "block" }}
+          />
+        </Link>
+        <MusicButton accent="#d4a854" />
+      </div>
 
       {/* Nav Controls - Top Right (desktop only) */}
       {/* {!isMobileDevice && (

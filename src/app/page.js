@@ -2829,7 +2829,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                 className="dedication-chip"
                 onClick={() => handleDedicate(preset.key)}
               >
-                {preset.text}
+                {preset.label}
               </button>
             ))}
           </div>
@@ -2912,7 +2912,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                       className={`dedication-chip${isActive ? " is-active" : ""}`}
                       onClick={() => handleDedicate(isActive ? null : preset.key)}
                     >
-                      {preset.text}
+                      {preset.label}
                     </button>
                   );
                 })}
@@ -3423,7 +3423,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
 
         {/* Wishing Fountain — internal link, but styled identically to
             the socials above: the rail reads as one group. Lucide
-            "hand-coins" = a coin given, not just a coin. */}
+            "waves-arrow-down" = something dropping into water. */}
         <Link
           href="/fountain"
           aria-label="Wishing Fountain — toss a coin for charity"
@@ -3463,11 +3463,10 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17" />
-            <path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9" />
-            <path d="m2 16 6 6" />
-            <circle cx="16" cy="9" r="2.9" />
-            <circle cx="6" cy="5" r="3" />
+            <path d="M12 10L12 2" />
+            <path d="M16 6L12 10L8 6" />
+            <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
+            <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
           </svg>
         </Link>
       </div>

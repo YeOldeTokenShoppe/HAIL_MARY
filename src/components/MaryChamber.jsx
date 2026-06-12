@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import { HandsModel } from "./HandsGLTFScene";
 import {
   setChamberFocus,
@@ -151,15 +152,48 @@ const PHONE_AURA_INTENSITY = 0.1;
 const PHONE_AURA_SIZE = 3;
 const PHONE_AURA_OPACITY = 0.1;
 
-// THE BLUE LIGHT: hands_MOBILE.glb carries an EMBEDDED point light
-// (KHR_lights_punctual, node "Point") just in front of the screen — the
-// authored "phone glow on the fingers". Blender values: color
-// (0, 0.63, 1.0) azure, intensity ~10.9. These chamber overrides
-// re-tint/dim it; the authored values are restored on unmount because
-// useGLTF caches the scene graph and the light object is shared with
-// /illumin80's mount. Set intensity 0 to switch it off entirely.
-const SCREEN_GLOW_COLOR = "#9fc8ff";
-const SCREEN_GLOW_INTENSITY = 5;
+// SCREEN GLOW: the current hands_MOBILE.glb export carries NO embedded
+// light (KHR_lights_punctual isn't in its extensions — an older export
+// had one, which is what the "blue light" lore refers to). The glow is
+// therefore OUR SpotLight, created in the corrective traverse below
+// and parented to the PhoneScreen mesh so it rides the reveal spin,
+// then removed on unmount because useGLTF caches the scene graph and
+// /illumin80's mount must not inherit it. A SPOT, not a point: aimed
+// straight out of the glass with a wide feathered cone, so the wash
+// lands on fingers and face while the phone's backside gets nothing
+// (nothing here casts shadows, so a point light leaked a halo onto the
+// back of the case).
+// Cyan = the site's signature tint (wax preset / Lyquid80). INTENSITY
+// is physical candela and the light sits ~a finger-width from her
+// skin, so small numbers carry: 0.5 is a subtle wash, 2 is moody-club,
+// 0 switches it off. DISTANCE (world units) caps how far the cast
+// reaches. LIFT (world units) floats it off the glass along the
+// rendered face's normal — positive is out the side the feed shows,
+// negative flips everything to the far side if the export's normals
+// ever turn out inverted. SPREAD is the cone half-angle in radians
+// (max ~1.57).
+const SCREEN_GLOW_COLOR = "#14f7ff";
+const SCREEN_GLOW_INTENSITY = 0.5;
+const SCREEN_GLOW_DISTANCE = 3.5;
+const SCREEN_GLOW_LIFT = 0.0;
+const SCREEN_GLOW_SPREAD = 1.3;
+
+// Local-space normal of the screen's rendered face. The feed material
+// is FrontSide and visibly renders, so the geometry normal is ground
+// truth for which way "out of the glass" points — the export's local
+// axes don't map to it predictably (two axis guesses both missed).
+function screenFaceNormal(mesh) {
+  const n = new THREE.Vector3(0, 0, 1);
+  const attr = mesh?.geometry?.attributes?.normal;
+  if (attr) {
+    n.fromBufferAttribute(attr, 0);
+    // Draco-quantized exports can hold degenerate normals; fall back
+    // to +Z rather than normalizing a near-zero vector into NaN.
+    if (n.lengthSq() > 0.25) n.normalize();
+    else n.set(0, 0, 1);
+  }
+  return n;
+}
 
 // HER SCROLLING THUMB — the node named 'hand' (mesh Mesh_47) bobs on
 // its local Y in flick gestures, synchronized with the feed's REAL
@@ -250,7 +284,14 @@ function ChamberInner() {
   useEffect(() => () => {
     clearChamberFocus();
     const light = screenGlowLightRef.current;
-    if (light?.userData?.authoredGlowColor) {
+    if (light?.userData?.chamberScreenGlow) {
+      // Our injected glow — pull it (and its spot aim target) OUT of
+      // the cached scene graph (useGLTF shares it with /illumin80) and
+      // clear the ref so a remount injects a fresh one.
+      light.target?.removeFromParent?.();
+      light.removeFromParent();
+      screenGlowLightRef.current = null;
+    } else if (light?.userData?.authoredGlowColor) {
       light.color.copy(light.userData.authoredGlowColor);
       light.intensity = light.userData.authoredGlowIntensity;
     }
@@ -289,16 +330,62 @@ function ChamberInner() {
     if (!root) return;
     const mats = [];
     root.traverse((child) => {
-      // The GLB's embedded screen-glow light: stash the authored values
-      // once (for the unmount restore), then apply the chamber tint.
-      if (child.isPointLight) {
+      // Screen-glow light: re-apply the chamber constants on every
+      // corrective pass so tuning them takes effect live. (Covers our
+      // own injected light below — and, if a future GLB export ever
+      // ships an embedded light again, that one too: stash its authored
+      // values once so unmount can restore the shared cached scene.)
+      if (child.isPointLight || child.isSpotLight) {
         if (child.userData.authoredGlowColor == null) {
           child.userData.authoredGlowColor = child.color.clone();
           child.userData.authoredGlowIntensity = child.intensity;
         }
         child.color.set(SCREEN_GLOW_COLOR);
         child.intensity = SCREEN_GLOW_INTENSITY;
+        // Our injected spot also re-applies reach, spread, and lift
+        // here, so every SCREEN_GLOW_* knob tunes live without a
+        // remount.
+        if (child.userData.chamberScreenGlow && child.parent) {
+          child.distance = SCREEN_GLOW_DISTANCE;
+          child.angle = SCREEN_GLOW_SPREAD;
+          const ws = child.parent.getWorldScale(new THREE.Vector3());
+          const n = screenFaceNormal(child.parent);
+          const lz = SCREEN_GLOW_LIFT / (ws.z || 1);
+          const dir = SCREEN_GLOW_LIFT < 0 ? -1 : 1;
+          child.position.copy(n).multiplyScalar(lz);
+          child.target.position
+            .copy(n)
+            .multiplyScalar(lz + dir / (ws.z || 1));
+        }
         screenGlowLightRef.current = child;
+        return;
+      }
+      // The current GLB has no embedded light, so cast the screen glow
+      // ourselves: a wide soft spotlight parented to the PhoneScreen
+      // mesh (it rides the reveal spin that way), floated off the glass
+      // by LIFT world-units and aimed straight out of the screen — both
+      // converted to the screen's local units via its world scale. The
+      // aim target is parented to the screen too, so the beam tracks
+      // every rotation.
+      if (child.name === "PhoneScreen" && screenGlowLightRef.current == null) {
+        const glow = new THREE.SpotLight(
+          SCREEN_GLOW_COLOR,
+          SCREEN_GLOW_INTENSITY,
+          SCREEN_GLOW_DISTANCE,
+          SCREEN_GLOW_SPREAD,
+          1, // penumbra — fully feathered cone edge
+          2, // physical inverse-square decay
+        );
+        const ws = child.getWorldScale(new THREE.Vector3());
+        const n = screenFaceNormal(child);
+        const lz = SCREEN_GLOW_LIFT / (ws.z || 1);
+        const dir = SCREEN_GLOW_LIFT < 0 ? -1 : 1;
+        glow.position.copy(n).multiplyScalar(lz);
+        glow.target.position.copy(n).multiplyScalar(lz + dir / (ws.z || 1));
+        glow.userData.chamberScreenGlow = true;
+        child.add(glow);
+        child.add(glow.target);
+        screenGlowLightRef.current = glow;
         return;
       }
       // The scrolling hand — stash its authored rest Y once; the frame

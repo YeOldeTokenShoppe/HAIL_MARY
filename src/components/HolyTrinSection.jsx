@@ -68,7 +68,7 @@ export default function HolyTrinSection() {
       <div className="holy-trin-text">
         <DropInTitle
           lines={["The Holy", "Trin80", "of Tokens"]}
-          colors={["#2ad6ee", "#d4af37", "#d92db0"]}
+      colors={["#00ff00", "#f4e4c1", "#ffd700"]}
           fontSize={{ mobile: "3rem", desktop: "3.4rem" }}
           isMobile={typeof window !== "undefined" && window.innerWidth <= 900}
           triggerAnimation={inView}

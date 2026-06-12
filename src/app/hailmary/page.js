@@ -6562,7 +6562,7 @@ export default function OilPage() {
               title="Return to shrine"
               style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
             >
-              <img src="/brand-mark-mono.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
+              <img src="/brand-mark.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
             </Link>
             <div>
               <h1 style={{ ...styles.title, fontSize: 12, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
@@ -6986,7 +6986,7 @@ export default function OilPage() {
             label: "HOME",
             title: "Return to shrine",
             onClick: () => router.push("/"),
-            icon: <img src="/brand-mark-mono.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
+            icon: <img src="/brand-mark-cyan.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
           }]}
         />
 
@@ -7088,7 +7088,7 @@ export default function OilPage() {
             title="Return to shrine"
             style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
           >
-            <img src="/brand-mark-mono.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
+            <img src="/brand-mark-cyan.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
           </Link>
           <div>
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>

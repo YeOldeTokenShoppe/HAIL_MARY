@@ -5095,7 +5095,7 @@ export default function CyborgTemple() {
                       <rect x="14" y="14" width="7" height="7" rx="1" />
                     </svg>
                   ) : (
-                    <img src="/brand-mark.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
+                    <img src="/brand-mark-cyan.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
                   )
                 }
                 menuLabel={tradeMode === 'game' ? 'MENU' : 'HOME'}

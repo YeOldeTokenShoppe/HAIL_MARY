@@ -32,6 +32,7 @@ const CONFIG = {
   ITEM_HEIGHT: 85,
   ITEM_GAP: 12,
   XPOST_ITEM_HEIGHT: 300,
+  CANDLE_ITEM_HEIGHT: 320,       // expanded vigil rows: header + centered votive "image"
   AUTO_SCROLL_PAUSE: 3000,       // Pause at top before scrolling
   AUTO_SCROLL_SPEED: 0.4,        // Pixels per frame for auto-scroll
   AUTO_SCROLL_BOTTOM_PAUSE: 2000, // Pause at bottom before resetting
@@ -44,29 +45,12 @@ const CONFIG = {
 const ACTIVITY_TYPES = {
   CANDLE: {
     icon: '🕯️',
-    verb: 'Lit a candle',
+    verb: 'Lit a candle for Prosper80',
     unit: 'candle',
     pluralUnit: 'candles',
     color: '#00ff66'
   },
-  STAKE: {
-    icon: '💎',
-    verb: 'Staked RL80',
-    unit: 'RL80',
-    color: '#00bfff'
-  },
-  UNSTAKE: {
-    icon: '📤',
-    verb: 'Unstaked RL80',
-    unit: 'RL80',
-    color: '#ff9500'
-  },
-  CLAIM: {
-    icon: '💰',
-    verb: 'Claimed ETH',
-    unit: 'ETH',
-    color: '#ffeb3b'
-  },
+  
   XPOST: {
     icon: '𝕏',
     verb: 'posted',
@@ -105,6 +89,13 @@ function truncateAddress(address) {
   if (!address) return 'anon';
   if (address.length <= 12) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+// First *code point* of a display name, for avatar-placeholder
+// initials. charAt(0) splits surrogate pairs, so an emoji-leading name
+// ("🅱️erry") rendered as a broken-glyph box instead of the emoji.
+function nameInitial(name) {
+  return (Array.from(name || '')[0] || '?').toUpperCase();
 }
 
 function wrapText(ctx, text, maxWidth, maxLines) {
@@ -269,20 +260,25 @@ function drawVotiveCandle(ctx, cx, cy, w, h, labelImg, tint, seed = 0, flex = fa
     ctx.globalAlpha = 1;
   }
 
-  // Saint label, cover-fit below the wax line
+  // Saint label, contain-fit below the wax line so the artwork is
+  // never cropped — it's the featured image of the post. Whatever the
+  // label doesn't cover shows the cream wax, like a real jar sticker.
   const ly = y + waxH;
   const lh = bodyH - waxH;
   const iw = labelImg.naturalWidth || w;
   const ih = labelImg.naturalHeight || lh;
-  const cover = Math.max(w / iw, lh / ih);
-  const sw = w / cover;
-  const sh = lh / cover;
-  ctx.drawImage(labelImg, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, ly, w, lh);
+  const fit = Math.min(w / iw, lh / ih);
+  const dw = iw * fit;
+  const dh = ih * fit;
+  const dx = x + (w - dw) / 2;
+  const dy = ly + (lh - dh) / 2;
+  ctx.drawImage(labelImg, dx, dy, dw, dh);
 
-  // Gold label trim
+  // Gold trim hugging the artwork rather than the label area, so any
+  // wax margins read as intentional framing
   ctx.strokeStyle = 'rgba(241, 215, 122, 0.9)';
   ctx.lineWidth = 2;
-  ctx.strokeRect(x + 1.5, ly + 1, w - 3, lh - 2.5);
+  ctx.strokeRect(dx + 1, dy + 1, dw - 2, dh - 2);
 
   // Warm glow cast onto the wax from the flame — kept faint so it
   // doesn't bleach the wax tint to white
@@ -371,6 +367,10 @@ export function WatchlistPhoneTexture({
   const textureRef = useRef();
   const materialRef = useRef();
   const canvasContextRef = useRef(null);
+  // Device-pixel supersampling factor for the canvas. All drawing code
+  // works in logical 640×1280 coords; drawWatchlist applies this as a
+  // base transform.
+  const texScaleRef = useRef(1);
   
   // Activity feed state
   const [activities, setActivities] = useState([]);
@@ -391,6 +391,10 @@ export function WatchlistPhoneTexture({
   // User avatar cache for activity items
   const activityAvatarsRef = useRef({});
   const screenshotImagesRef = useRef({});
+  // Holder profile avatars for vigil candle rows — the votive label
+  // image lives in activityAvatarsRef; this is the human in the
+  // avatar slot.
+  const candleAvatarsRef = useRef({});
   // Votive prefs (saint image) per shrine-candle holder, fetched once
   // per userId per session.
   const votivePrefsCacheRef = useRef({});
@@ -553,6 +557,33 @@ export function WatchlistPhoneTexture({
   }, [activities]);
 
   // ===========================================
+  // LOAD HOLDER AVATARS FOR CANDLE ROWS
+  // ===========================================
+
+  useEffect(() => {
+    activities.forEach(activity => {
+      if (activity.type !== 'CANDLE' || !activity.avatarUrl) return;
+      if (candleAvatarsRef.current.hasOwnProperty(activity.id)) return;
+
+      candleAvatarsRef.current[activity.id] = 'loading';
+
+      const img = new Image();
+      // No non-CORS retry here: a tainted canvas can't upload to the
+      // WebGL texture, so a CORS-blocked avatar must fail to the
+      // initial circle instead.
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        candleAvatarsRef.current[activity.id] = img;
+        if (textureRef.current) textureRef.current.needsUpdate = true;
+      };
+      img.onerror = () => {
+        candleAvatarsRef.current[activity.id] = 'failed';
+      };
+      img.src = activity.avatarUrl;
+    });
+  }, [activities]);
+
+  // ===========================================
   // LOAD SCREENSHOT IMAGES FOR XPOSTS
   // ===========================================
 
@@ -582,8 +613,14 @@ export function WatchlistPhoneTexture({
   
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = 640;
-    canvas.height = 1280;
+    // 2× supersample on desktop so the texture stays crisp when the
+    // camera gets close to the phone. Mobile keeps 1× — the canvas is
+    // re-uploaded to the GPU every frame, and 2× quadruples that
+    // bandwidth.
+    const scale = window.matchMedia?.('(pointer: coarse)')?.matches ? 1 : 2;
+    texScaleRef.current = scale;
+    canvas.width = 640 * scale;
+    canvas.height = 1280 * scale;
     
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -661,6 +698,10 @@ export function WatchlistPhoneTexture({
           username: c.displayName || 'a pilgrim',
           userId: c.id,
           userImageUrl: image,
+          // Holder's profile picture for the avatar slot — most candle
+          // docs carry avatarUrl: null today, so this usually falls
+          // back to the wax-tinted initial circle.
+          avatarUrl: c.avatarUrl || null,
           // Shown in place of the generic verb when the holder dedicated
           // their flame.
           feedLine: dedication ? `Lit a candle ${dedication}` : null,
@@ -784,6 +825,7 @@ export function WatchlistPhoneTexture({
       username: justLitOffering.name || user?.firstName || 'You',
       userId: justLitOffering.userId,
       userImageUrl: justLitOffering.userImageUrl,
+      avatarUrl: justLitOffering.userImageUrl || null,
       prayerType: justLitOffering.type || 'petition', // petition, confession, appreciation
       amount: parseInt(justLitOffering.tokensBurned) || 1,
       timestamp: Date.now(),
@@ -1013,7 +1055,7 @@ export function WatchlistPhoneTexture({
       ctx.fillStyle = '#1a0033';
       ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'center';
-      const initial = notification.username?.charAt(0).toUpperCase() || '🙏';
+      const initial = notification.username ? nameInitial(notification.username) : '🙏';
       ctx.fillText(initial, centerX, avatarY + 16);
     }
     
@@ -1046,9 +1088,13 @@ export function WatchlistPhoneTexture({
       });
     }
     const ctx = canvasContextRef.current;
-    const width = canvas.width;
-    const height = canvas.height;
-    
+    // Logical coordinate space — the supersample factor is baked into
+    // the base transform, so every draw call below stays in 640×1280.
+    const scale = texScaleRef.current;
+    const width = canvas.width / scale;
+    const height = canvas.height / scale;
+
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     
@@ -1254,6 +1300,10 @@ export function WatchlistPhoneTexture({
         itemHeight = ssDisplayH; // Full image height, no cap
       } else if (activity.type === 'XPOST' && activity.replyText) {
         itemHeight = 200; // Taller card for reply pairs
+      } else if (activity.type === 'CANDLE' && activityAvatarsRef.current[activity.id] instanceof Image) {
+        // Expanded vigil row — once the votive label image is in, the
+        // candle renders centered like an attached image.
+        itemHeight = CONFIG.CANDLE_ITEM_HEIGHT;
       }
       const itemY = currentY;
       
@@ -1300,31 +1350,93 @@ export function WatchlistPhoneTexture({
       // User avatar (if available) - bigger size
       const avatarSize = 70;
       const avatarX = 70;
-      const avatarY = itemY + itemHeight / 2;
       let usernameX = 130; // Default position if no avatar
 
       const userAvatar = activityAvatarsRef.current[activity.id];
       // Check if it's an actual Image object (not 'loading' or 'failed' strings)
       const isImageLoaded = userAvatar && userAvatar instanceof Image;
+      // Expanded vigil rows pin the avatar to the header line;
+      // everything else stays vertically centered in its row.
+      const isBigCandle = activity.type === 'CANDLE' && isImageLoaded;
+      const avatarY = isBigCandle ? itemY + 42 : itemY + itemHeight / 2;
 
-      if (activity.type === 'CANDLE' && isImageLoaded) {
-        // Miniature novena candle — the holder's saint image as the
-        // jar label, their wax tint up top, live flickering flame.
-        const vw = 40;
-        const vh = 84;
+      if (isBigCandle) {
+        const tint =
+          activity.waxTint || fallbackTintFor(activity.userId || activity.id);
+
+        // Holder's avatar in the usual left slot (X-style, borderless);
+        // wax-tinted initial circle when they never set one.
+        const holderAvatar = candleAvatarsRef.current[activity.id];
+        if (holderAvatar instanceof Image) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(avatarX, avatarY, avatarSize / 2, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(
+            holderAvatar,
+            avatarX - avatarSize / 2,
+            avatarY - avatarSize / 2,
+            avatarSize,
+            avatarSize
+          );
+          ctx.restore();
+        } else {
+          ctx.save();
+          ctx.globalAlpha = 0.28;
+          ctx.fillStyle = tint;
+          ctx.beginPath();
+          ctx.arc(avatarX, avatarY, avatarSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = tint;
+          ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(nameInitial(activity.username), avatarX, avatarY + 2);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
+        }
+        usernameX = avatarX + avatarSize / 2 + 12;
+
+        // The votive itself — the holder's saint image as the jar
+        // label, their wax tint up top, live flickering flame —
+        // centered in the post like an attached image, inside a faint
+        // X-style media card.
+        const cardW = 208;
+        const cardH = 220;
+        const cardX = (width - cardW) / 2;
+        const cardY = itemY + 82;
+        ctx.fillStyle = '#101214';
+        ctx.strokeStyle = '#2f3336';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+        ctx.fill();
+        ctx.stroke();
+
+        // Scale the whole drawing instead of passing bigger w/h so the
+        // trim, glass shading, and flame keep their tuned small-size
+        // proportions.
+        const vScale = 2.0;
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+        ctx.clip();
+        ctx.translate(width / 2, cardY + cardH / 2 + 8);
+        ctx.scale(vScale, vScale);
         drawVotiveCandle(
           ctx,
-          avatarX,
-          avatarY,
-          vw,
-          vh,
+          0,
+          0,
+          40,
+          84,
           userAvatar,
-          activity.waxTint || fallbackTintFor(activity.userId || activity.id),
+          tint,
           index,
           activity.tokensBurned > 0,
         );
-
-        usernameX = avatarX + vw / 2 + 14;
+        ctx.restore();
       } else if (isImageLoaded) {
         // Draw avatar image
         ctx.save();
@@ -1366,11 +1478,10 @@ export function WatchlistPhoneTexture({
 
         // Draw initial in circle
         ctx.fillStyle = style.textColor;
-        ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const initial = activity.username?.charAt(0).toUpperCase() || '?';
-        ctx.fillText(initial, avatarX, avatarY);
+        ctx.fillText(nameInitial(activity.username), avatarX, avatarY);
 
         usernameX = avatarX + avatarSize / 2 + 10;
       }
@@ -1400,6 +1511,10 @@ export function WatchlistPhoneTexture({
       if (activity.type === 'XPOST') {
         // Show @handle next to username
         if (activity.handle) {
+          // Measure in the bold font the username was actually drawn
+          // in — the context is still on the 20px timestamp font here,
+          // which under-measures and overlapped the handle onto the name.
+          ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, sans-serif';
           const usernameWidth = ctx.measureText(activity.username).width;
           ctx.fillStyle = '#8899a6';
           ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
@@ -1650,6 +1765,8 @@ export function WatchlistPhoneTexture({
         h = ssDisplayH;
       } else if (a.type === 'XPOST' && a.replyText) {
         h = 200;
+      } else if (a.type === 'CANDLE' && activityAvatarsRef.current[a.id] instanceof Image) {
+        h = CONFIG.CANDLE_ITEM_HEIGHT;
       }
       return sum + h + CONFIG.ITEM_GAP;
     }, 0);
@@ -1663,10 +1780,11 @@ export function WatchlistPhoneTexture({
   const autoScrollPauseStartRef = useRef(Date.now());
 
   // Chamber-flick glide (external drive): each impulse animates the
-  // scroll with smoothstep easing — slow catch, fast middle, rolling
-  // stop — starting the same frame as the hand gesture so thumb and
-  // content accelerate together. The generic lerp below is bypassed
-  // (position and target are kept equal during the glide).
+  // scroll with quartic ease-out — snaps into motion the same frame as
+  // the thumb's quick pull, covering ~half the distance in the first
+  // quarter second, then a long momentum roll to a stop while her
+  // thumb drifts back. The generic lerp below is bypassed (position
+  // and target are kept equal during the glide).
   const FLICK_GLIDE_MS = 1600;
   const glideFromRef = useRef(0);
   const glideToRef = useRef(0);
@@ -1719,7 +1837,7 @@ export function WatchlistPhoneTexture({
               (now - glideStartRef.current) / FLICK_GLIDE_MS,
               1,
             );
-            const eased = u * u * (3 - 2 * u);
+            const eased = 1 - Math.pow(1 - u, 4);
             scrollPositionRef.current =
               glideFromRef.current +
               (glideToRef.current - glideFromRef.current) * eased;
