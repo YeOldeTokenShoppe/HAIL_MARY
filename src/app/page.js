@@ -17,6 +17,7 @@ import MusicButton from "@/components/MusicButton";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import ReliquaryRail from "@/components/ReliquaryRail";
+import Link from "next/link";
 import HolyTrinSection from "@/components/HolyTrinSection";
 import MaterExMachinaSection from "@/components/MaterExMachinaSection";
 import BusinessSection from "@/components/BusinessSection";
@@ -34,6 +35,7 @@ import {
 } from "@/lib/candleRitual";
 import { INTENTION_PRESETS } from "@/lib/intentions";
 import VigilTicker from "@/components/VigilTicker";
+import BurnOfferingPanel from "@/components/BurnOfferingPanel";
 import MaryChamber from "@/components/MaryChamber";
 import {
   readLocalCandle,
@@ -2775,8 +2777,8 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           child of <main>: the catch-all child rule strips its pointer
           events, so drags fall through to the canvas turntable. */}
       <div className="vestry-viewport" aria-hidden="true">
-        <span className="vestry-label">THE VESTRY</span>
-        <span className="vestry-sublabel">she sees every intention</span>
+        <span className="vestry-label"></span>
+        <span className="vestry-sublabel"></span>
       </div>
 
       {showSignInNudge && (
@@ -2916,6 +2918,15 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                 })}
               </div>
             </div>
+          )}
+
+          {/* Burnt offering — optional RL80 burn attached to the lit
+              candle. Gated like cosmetics (hold RL80) and on a lit
+              candle: the burn credits to the CURRENT flame, so there
+              must be one. Free candles stay the default; this is the
+              indulgence tier. */}
+          {candleLit && canCustomize && (
+            <BurnOfferingPanel />
           )}
 
           {/* Votive personalization — the votive is the only variant the
@@ -3409,6 +3420,56 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         >
           <img src="/farcaster_logo.webp" alt="Farcaster" style={{ width: "20px", height: "20px" }} />
         </a>
+
+        {/* Wishing Fountain — internal link, but styled identically to
+            the socials above: the rail reads as one group. Lucide
+            "hand-coins" = a coin given, not just a coin. */}
+        <Link
+          href="/fountain"
+          aria-label="Wishing Fountain — toss a coin for charity"
+          title="Wishing Fountain"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            background: "rgba(0, 0, 0, 0.5)",
+            transition: "all 0.3s ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17" />
+            <path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9" />
+            <path d="m2 16 6 6" />
+            <circle cx="16" cy="9" r="2.9" />
+            <circle cx="6" cy="5" r="3" />
+          </svg>
+        </Link>
       </div>
     </main>
   );

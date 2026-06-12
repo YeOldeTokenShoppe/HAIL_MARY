@@ -283,7 +283,7 @@ export default function FountainPage() {
       )}
 
       {/* Nav Controls - Top Right (desktop only) */}
-      {!isMobileDevice && (
+      {/* {!isMobileDevice && (
         <div style={{
           position: "absolute",
           top: "1rem",
@@ -305,10 +305,10 @@ export default function FountainPage() {
             onBuyClick={() => setShowBuyModal(true)}
           />
         </div>
-      )}
+      )} */}
 
       {/* Mobile: 80s button top-right + bottom nav */}
-      {isMobileDevice && (
+      {/* {isMobileDevice && (
         <>
           <button
             onClick={() => setContext80sMode(!is80sMode)}
@@ -373,16 +373,16 @@ export default function FountainPage() {
             show80sButton={false}
           />
         </>
-      )}
+      )} */}
       
       {/* CyberNav Menu Panel */}
-      <CyberNav
+      {/* <CyberNav
         is80sMode={is80sMode}
         position="fixed"
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         showButton={false}
-      />
+      /> */}
 
       {/* Buy Modal */}
       <BuyModal

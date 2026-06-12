@@ -51,7 +51,7 @@ import {
 // 2.44·gaze, dropped 1×s below the axis exactly like the original's
 // group sat 1 unit below its camera. The X tilt squares her to the
 // gaze so the framing matches the original's level camera.
-const CHAMBER_POSITION = [0, -9.0, -0.24];
+const CHAMBER_POSITION = [0, -8.8, -0.24];
 const CHAMBER_SCALE = 0.45;
 const CHAMBER_TILT_X = 0.224;
 // Page-scroll fraction that triggers the GLB + feed load. 0.45 leaves
@@ -425,7 +425,7 @@ function ChamberInner() {
           world units. */}
       <pointLight
         position={[0.3, 0.7, 1.2]}
-        intensity={1.1}
+        intensity={0.8}
         color="#ffc478"
         distance={4}
         decay={2}

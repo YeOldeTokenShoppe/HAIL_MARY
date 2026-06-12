@@ -1,13 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
-import { CHARITY_WALLETS } from '@/lib/contracts';
-import { useWriteContract } from 'wagmi';
-import { erc20Abi, parseEther } from 'viem';
-import { RL80_ADDRESS } from '@/lib/contracts';
-import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
+import { CHARITY_WALLETS, DEV_WALLET, USDC_ADDRESS } from '@/lib/contracts';
+import { useWriteContract, useSendTransaction, useBalance, useReadContract } from 'wagmi';
+import { erc20Abi, parseEther, parseUnits, formatUnits } from 'viem';
 
 const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselectedCharity = null }) => {
   const [selectedCharity, setSelectedCharity] = useState(null);
@@ -18,7 +15,6 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
   const [isMobile, setIsMobile] = useState(false);
   const [pendingDonation, setPendingDonation] = useState(null); // Store donation info for coin toss
 
-  const { user } = useUser();
   const {
     walletAddress,
     tokenBalance,
@@ -29,19 +25,32 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
   } = useWalletAuth();
 
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
 
-  // Get user display info for donation feed
-  const getUserDisplayName = () => {
-    if (user?.username) return user.username;
-    if (user?.firstName && user?.lastName) return `${user.firstName} ${user.lastName}`;
-    if (user?.firstName) return user.firstName;
-    if (walletAddress) return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
-    return 'Anonymous';
-  };
-
-  const getUserAvatar = () => {
-    return user?.imageUrl || null;
-  };
+  // ALL fountain giving — charities and the dev tip alike — is
+  // denominated in ETH or USDC (USDC default: donations are dollar
+  // amounts). RL80 donations were retired 2026-06-11: pools holding the
+  // project's own token needed a conversion step before forwarding and
+  // invited "team wallet dumping" optics when they sold.
+  const [payCurrency, setPayCurrency] = useState('USDC');
+  const { data: ethBalance } = useBalance({
+    address: walletAddress || undefined,
+    chainId: 8453,
+    query: { enabled: !!walletAddress },
+  });
+  const { data: usdcBalanceRaw } = useReadContract({
+    address: USDC_ADDRESS,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: walletAddress ? [walletAddress] : undefined,
+    chainId: 8453,
+    query: { enabled: !!walletAddress },
+  });
+  const usdcBalance = typeof usdcBalanceRaw === 'bigint' ? usdcBalanceRaw : 0n;
+  const payBalanceDisplay =
+    payCurrency === 'ETH'
+      ? Number(formatUnits(ethBalance?.value ?? 0n, 18)).toFixed(4)
+      : Number(formatUnits(usdcBalance, 6)).toFixed(2);
 
   const [isTransactionPending, setIsTransactionPending] = useState(false);
 
@@ -64,7 +73,11 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       setPendingDonation(null);
 
       // If charity is preselected from toggle, skip to amount step
-      if (preselectedCharity && CHARITY_WALLETS[preselectedCharity]) {
+      // ('DEV' = the coffee tip pseudo-charity from the fountain toggle)
+      if (
+        preselectedCharity &&
+        (preselectedCharity === 'DEV' || CHARITY_WALLETS[preselectedCharity])
+      ) {
         setSelectedCharity(preselectedCharity);
         setStep('amount');
       } else {
@@ -94,8 +107,19 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       setError('Please enter a valid amount');
       return;
     }
-    if (numAmount > parseFloat(tokenBalance || '0')) {
-      setError('Insufficient balance');
+    // Compare in base units to dodge float precision (USDC is 6
+    // decimals, not 18).
+    try {
+      const units =
+        payCurrency === 'ETH' ? parseEther(amount) : parseUnits(amount, 6);
+      const bal =
+        payCurrency === 'ETH' ? (ethBalance?.value ?? 0n) : usdcBalance;
+      if (units > bal) {
+        setError(`Insufficient ${payCurrency} balance`);
+        return;
+      }
+    } catch {
+      setError('Please enter a valid amount');
       return;
     }
     setError(null);
@@ -110,44 +134,45 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
     setIsTransactionPending(true);
 
     try {
-      const charity = CHARITY_WALLETS[selectedCharity];
+      const isDev = selectedCharity === 'DEV';
+      const charity = isDev ? DEV_WALLET : CHARITY_WALLETS[selectedCharity];
 
-      // Parse amount properly to avoid floating-point precision issues
-      // Split into integer and decimal parts
-      const decimals = 18;
-      const [intPart, decPart = ''] = amount.split('.');
-      const paddedDecimal = decPart.padEnd(decimals, '0').slice(0, decimals);
-      const amountInWei = BigInt(intPart + paddedDecimal);
-
-      // Send the transfer transaction using wagmi writeContractAsync
-      const txHashValue = await writeContractAsync({
-        address: RL80_ADDRESS,
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [charity.address, amountInWei],
-      });
+      // One payment path for every recipient: direct ETH send or USDC
+      // transfer (6 decimals). Recipients differ, mechanics don't.
+      let txHashValue;
+      if (payCurrency === 'ETH') {
+        txHashValue = await sendTransactionAsync({
+          to: charity.address,
+          value: parseEther(amount),
+          chainId: 8453,
+        });
+      } else {
+        const units = parseUnits(amount, 6);
+        txHashValue = await writeContractAsync({
+          address: USDC_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'transfer',
+          args: [charity.address, units],
+          chainId: 8453,
+        });
+      }
       setTxHash(txHashValue);
 
-      // Log to Firestore
-      try {
-        await addDoc(collection(db, 'fountain_donations'), {
-          donor: walletAddress,
-          userId: user?.id,
-          userName: getUserDisplayName(),
-          userAvatar: getUserAvatar(),
-          charity: selectedCharity,
-          charityName: charity.name,
-          charityAddress: charity.address,
-          amount: amount,
-          amountWei: amountInWei.toString(),
-          txHash: txHashValue,
-          timestamp: serverTimestamp(),
-          network: 'base'
-        });
-      } catch (firestoreError) {
-        console.error('Error logging donation to Firestore:', firestoreError);
-        // Don't fail the donation if Firestore logging fails
-      }
+      // Log via the server route: it waits for the receipt, verifies
+      // donor/recipient/amount on-chain, computes the dollar value, and
+      // writes fountain_donations with the admin SDK (the collection is
+      // write:false to clients). Fire-and-forget — the donation itself
+      // already succeeded, and the feed toast arrives via the fountain's
+      // snapshot listener once the server confirms. Idempotent per tx
+      // hash, so even a duplicate POST can't double-count.
+      fetch('/api/fountain-donation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash: txHashValue }),
+        keepalive: true,
+      }).catch((logError) => {
+        console.error('Error logging donation:', logError);
+      });
 
       // Refresh balance
       await refreshBalance();
@@ -172,7 +197,13 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
 
   if (!isOpen) return null;
 
-  const charity = selectedCharity ? CHARITY_WALLETS[selectedCharity] : null;
+  const isDevTip = selectedCharity === 'DEV';
+  const charity = selectedCharity
+    ? isDevTip
+      ? DEV_WALLET
+      : CHARITY_WALLETS[selectedCharity]
+    : null;
+  const displayCurrency = payCurrency;
 
   return (
     <>
@@ -376,7 +407,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
             fontSize: '0.85rem',
             fontFamily: "'Orbitron', monospace",
           }}>
-            Make a wish for good in the world
+            for
           </p>
 
           {/* Not Connected State */}
@@ -463,15 +494,66 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                   </a>
                 </div>
               ))}
+
+              {/* Dev tip jar — deliberately styled as the humble last
+                  option below the charities, and denominated in
+                  ETH/USDC rather than RL80 (see DEV_WALLET). */}
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.4)',
+                textAlign: 'center',
+                fontSize: '0.7rem',
+                margin: '0.25rem 0',
+              }}>
+                — or —
+              </p>
+              <div
+                className="charity-card"
+                onClick={() => handleCharitySelect('DEV')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{
+                      color: '#FFD700',
+                      fontSize: '0.95rem',
+                      fontFamily: "'Orbitron', monospace",
+                      marginBottom: '0.25rem',
+                    }}>
+                      {DEV_WALLET.icon} {DEV_WALLET.shortName}
+                    </h3>
+                    <p style={{
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      fontSize: '0.75rem',
+                      fontStyle: 'italic',
+                    }}>
+                      {DEV_WALLET.description}
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={`https://basescan.org/address/${DEV_WALLET.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: 'block',
+                    color: '#00f5d4',
+                    fontSize: '0.65rem',
+                    marginTop: '0.75rem',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  {DEV_WALLET.ens} · verify on BaseScan →
+                </a>
+              </div>
             </div>
           )}
 
           {/* Step: Enter Amount */}
           {isWalletConnected && step === 'amount' && charity && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <button className="back-btn" onClick={() => setStep('select')}>
+              {/* <button className="back-btn" onClick={() => setStep('select')}>
                 ← Back
-              </button>
+              </button> */}
 
               <div style={{ textAlign: 'center' }}>
                 <h3 style={{
@@ -484,6 +566,30 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                 </h3>
               </div>
 
+              {/* Everything is given in USDC or ETH — charities and dev
+                  tips alike */}
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                {['USDC', 'ETH'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className="back-btn"
+                    onClick={() => {
+                      setPayCurrency(c);
+                      setAmount('');
+                      setError(null);
+                    }}
+                    style={
+                      payCurrency === c
+                        ? { borderColor: '#FFD700', color: '#FFD700' }
+                        : undefined
+                    }
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+
               <div>
                 <label style={{
                   display: 'block',
@@ -494,7 +600,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                 }}>
-                  Amount (RL80 Tokens)
+                  Amount ({payCurrency})
                 </label>
                 <input
                   type="number"
@@ -502,16 +608,42 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
-                  min="1"
-                  step="1"
+                  min="0"
+                  step="any"
                 />
+                <div style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  justifyContent: 'center',
+                  marginTop: '0.5rem',
+                }}>
+                  {/* Coffee-sized presets for the dev, a bit more generous
+                      for the charities */}
+                  {(payCurrency === 'USDC'
+                    ? isDevTip
+                      ? ['2', '5', '10']
+                      : ['5', '10', '25']
+                    : isDevTip
+                      ? ['0.001', '0.002', '0.005']
+                      : ['0.002', '0.005', '0.01']
+                  ).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className="back-btn"
+                      onClick={() => setAmount(v)}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
                 <p style={{
                   color: 'rgba(255, 255, 255, 0.5)',
                   fontSize: '0.7rem',
                   marginTop: '0.5rem',
                   textAlign: 'right',
                 }}>
-                  Available: {tokenBalance || '0'} RL80
+                  Available: {payBalanceDisplay} {payCurrency}
                 </p>
               </div>
 
@@ -558,17 +690,19 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>Charity:</span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>{isDevTip ? 'Recipient:' : 'Charity:'}</span>
                     <span style={{ color: '#fff', fontSize: '0.85rem' }}>{charity.shortName}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>Amount:</span>
-                    <span style={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.85rem' }}>{amount} RL80</span>
+                    <span style={{ color: '#FFD700', fontWeight: 'bold', fontSize: '0.85rem' }}>{amount} {displayCurrency}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.85rem' }}>To:</span>
                     <span style={{ color: '#00f5d4', fontSize: '0.75rem' }}>
-                      {charity.address.slice(0, 6)}...{charity.address.slice(-4)}
+                      {isDevTip
+                        ? `${charity.ens} (${charity.address.slice(0, 6)}...${charity.address.slice(-4)})`
+                        : `${charity.address.slice(0, 6)}...${charity.address.slice(-4)}`}
                     </span>
                   </div>
                 </div>
@@ -580,8 +714,9 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                 textAlign: 'center',
                 lineHeight: 1.5,
               }}>
-                Tokens are collected and converted to ETH when the pool reaches ~$500,
-                then donated via The Giving Block.
+                {isDevTip
+                  ? 'Goes directly to the dev’s wallet. A voluntary tip — no perks, no promises, just thanks. ☕'
+                  : 'Donations pool in the charity wallet and are forwarded via The Giving Block once the pool reaches ~100 USDC in value (or the ETH equivalent).'}
               </p>
 
               <button
@@ -624,7 +759,11 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                 fontSize: '0.85rem',
                 marginBottom: '1rem',
               }}>
-                Your donation of <span style={{ color: '#FFD700' }}>{amount} RL80</span> to {charity.shortName} has been sent.
+                {isDevTip ? (
+                  <>Your <span style={{ color: '#FFD700' }}>{amount} {payCurrency}</span> coffee is on its way to the dev. ☕</>
+                ) : (
+                  <>Your donation of <span style={{ color: '#FFD700' }}>{amount} {payCurrency}</span> to {charity.shortName} has been sent.</>
+                )}
               </p>
 
               {txHash && (
@@ -699,8 +838,10 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                 textAlign: 'center',
                 lineHeight: 1.5,
               }}>
-                100% of donations go to charity. Tokens are batched and converted
-                when pool reaches ~$500. All transactions are publicly verifiable on-chain.
+                100% of charity donations go to charity (pooled, then forwarded
+                via The Giving Block at ~100 USDC in value, or the ETH
+                equivalent). Dev tips go straight to rl80.eth.
+                All transactions are publicly verifiable on-chain.
               </p>
             </div>
           )}

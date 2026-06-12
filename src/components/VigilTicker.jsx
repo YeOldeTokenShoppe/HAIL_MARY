@@ -31,6 +31,14 @@ function phraseFor(id) {
   return PHRASES[Math.abs(h) % PHRASES.length];
 }
 
+// Compact token amounts for burn flexes — full precision is noise at
+// memecoin scale.
+function fmtTokens(n) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(n);
+}
+
 function timeAgo(ms, now) {
   const s = Math.max(0, Math.floor((now - ms) / 1000));
   if (s < 60) return "just now";
@@ -125,11 +133,21 @@ export default function VigilTicker({
       // A user-picked dedication (preset key on the doc) beats the
       // synthesized phrase; unknown/missing keys fall back gracefully.
       const dedicated = intentionText(c.intention);
+      // Verified burnt offering (admin-SDK-written by /api/burn-offering;
+      // client writes of this field are blocked in firestore.rules) —
+      // outranks the candle phrases: sacrifice buys the flex.
+      const burned =
+        typeof c.tokensBurned === "number" && c.tokensBurned > 0;
       out.push({
         kind: "intention",
         key: id,
         name: c.displayName || "a pilgrim",
-        phrase: dedicated ? `lit a candle ${dedicated}` : phraseFor(id),
+        burned,
+        phrase: burned
+          ? `burned ${fmtTokens(c.tokensBurned)} RL80${dedicated ? ` ${dedicated}` : ""}`
+          : dedicated
+            ? `lit a candle ${dedicated}`
+            : phraseFor(id),
         when: timeAgo(c.litAtMs, now),
       });
       // Re-insert the price tick every few intentions so it's never far
@@ -174,8 +192,13 @@ export default function VigilTicker({
     }
     return (
       <>
-        <span className="vigil-name">{item.name}</span> {item.phrase} ·{" "}
-        {item.when}
+        <span className="vigil-name">{item.name}</span>{" "}
+        {item.burned ? (
+          <span className="vigil-burn">{item.phrase} 🔥</span>
+        ) : (
+          item.phrase
+        )}{" "}
+        · {item.when}
       </>
     );
   };
@@ -255,6 +278,10 @@ export default function VigilTicker({
         }
         .vigil-mine {
           color: rgba(255, 196, 120, 0.95);
+        }
+        .vigil-burn {
+          color: rgba(255, 150, 50, 0.98);
+          text-shadow: 0 0 8px rgba(255, 120, 30, 0.45);
         }
         .vigil-up {
           color: rgba(0, 255, 136, 0.85);

@@ -885,9 +885,9 @@
 			">
 				<span class="mobile-text" style="font-size: 11px; line-height: 1.5;">
 					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
-					• RL80 tokens go directly to charity wallets<br>
-					• At ~$500 value, tokens convert to ETH<br>
-					• ETH forwarded via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
+					• USDC or ETH goes directly to charity wallets<br>
+					• Pooled until ~100 USDC in value (or ETH equivalent)<br>
+					• Then forwarded via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
 					<strong style="color: #FFD700;">Charity Wallets (Base):</strong><br>
 					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a><br>
 					🐾 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
@@ -895,9 +895,9 @@
 				</span>
 				<span class="desktop-text" style="font-size: 12px; line-height: 1.6;">
 					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
-					• RL80 tokens are sent directly to charity wallets held by 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙<br>
-					• When pool value reaches ~$500, tokens are converted to ETH<br>
-					• ETH is forwarded to charities via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
+					• USDC or ETH donations are sent directly to charity wallets held by 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙<br>
+					• Donations pool until they reach ~100 USDC in value (or the ETH equivalent)<br>
+					• The pool is then forwarded to charities via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
 					<strong style="color: #FFD700;">Verify Charity Wallets (Base):</strong><br>
 					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's Children's Research Hospital</a><br>
 					🐾 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
@@ -1002,7 +1002,7 @@
 							line-height: 1;
 							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 						">
-							<span id="mobileRL80Total">0</span><span style="font-size: 0.65em; opacity: 0.8; margin-left: 2px;">RL80</span>
+							<span style="font-size: 0.65em; opacity: 0.8; margin-right: 1px;">$</span><span id="mobileRL80Total">0</span>
 						</div>
 					</div>
 					<!-- Info button -->
@@ -1132,7 +1132,7 @@
 				border: 1px solid rgba(255, 215, 0, 0.3);
 			">
 				<span style="font-size: 16px;">💎</span>
-				<span style="flex: 1; color: #FFD700; font-size: 12px;">Total Given: <span id="totalRL80Donated" style="font-weight: 700;">0</span> RL80</span>
+				<span style="flex: 1; color: #FFD700; font-size: 12px;">Total Given: $<span id="totalRL80Donated" style="font-weight: 700;">0</span></span>
 			</div>
 			<div style="
 				padding: 6px 10px;
@@ -1367,6 +1367,7 @@
 					'ASPCA': 'the ASPCA',
 					'st-judes': "St. Jude's Children's Hospital",
 					'aspca': 'the ASPCA',
+					'DEV': "the dev's coffee fund",
 					'donation': 'charity'
 				};
 				return charityNames[charityKey] || 'charity';
@@ -1377,7 +1378,8 @@
 					'ST_JUDES': '🏥',
 					'ASPCA': '🐾',
 					'st-judes': '🏥',
-					'aspca': '🐾'
+					'aspca': '🐾',
+					'DEV': '☕'
 				};
 				return charityEmojis[charityKey] || '💝';
 			}
@@ -1625,6 +1627,7 @@
 
 			function getCharityIcon(charityKey) {
 				const icons = {
+						'DEV': '☕',
 					'ST_JUDES': '🏥',
 					'ASPCA': '🐾',
 					'st-judes': '🏥',
@@ -1635,6 +1638,7 @@
 
 			function getCharityShortName(charityKey) {
 				const names = {
+						'DEV': 'The Dev',
 					'ST_JUDES': "St. Jude's",
 					'ASPCA': 'ASPCA',
 					'st-judes': "St. Jude's",
@@ -1716,7 +1720,7 @@
 					<div class="donation-toast-content">
 						<div class="donation-toast-name">${userName}${illumin80Badge}</div>
 						<div class="donation-toast-details">
-							<span class="donation-toast-amount">${amount.toLocaleString()} RL80</span>
+							<span class="donation-toast-amount">${amount.toLocaleString()} ${donation.currency || 'RL80'}</span>
 							<span>→</span>
 							<span class="donation-toast-charity">
 								<span class="donation-toast-charity-icon">${charityIcon}</span>
@@ -2038,9 +2042,14 @@
 			let charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
 			let isResetting = false;
 
-			// --- RL80 Donation Tracking ---
-			let totalRL80Donated = 0;
-			let rl80ByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
+			// --- Donation tracking (USD) ---
+			// Donations are USDC/ETH; totals are tracked in dollars. USDC
+			// counts at face value, ETH via the usdValue the modal logs at
+			// donation time. Legacy RL80 donations (docs without a
+			// `currency` field) and dev tips don't enter the charity
+			// counter. Element ids still say RL80 for markup-compat.
+			let totalUsdGiven = 0;
+			let usdByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
 
 			// Format large numbers (e.g., 1234567 -> "1.23M")
 			function formatNumber(num) {
@@ -2087,19 +2096,20 @@
 					mobileCurrentCountElement.textContent = totalCoinCount;
 				}
 
-				// Update RL80 totals
+				// Update dollar totals
+				const usdDisplay = formatNumber(Math.round(totalUsdGiven * 100) / 100);
 				if (totalRL80Element) {
-					totalRL80Element.textContent = formatNumber(totalRL80Donated);
+					totalRL80Element.textContent = usdDisplay;
 				}
 				if (mobileRL80Element) {
-					mobileRL80Element.textContent = formatNumber(totalRL80Donated);
+					mobileRL80Element.textContent = usdDisplay;
 				}
 
-				// Update allocation percentages based on RL80 amounts
-				const totalRL80 = rl80ByCharity['ST_JUDES'] + rl80ByCharity['ASPCA'];
-				if (totalRL80 > 0 && stJudesPercentageElement && aspcaPercentageElement) {
-					const stJudesPercent = Math.round((rl80ByCharity['ST_JUDES'] / totalRL80) * 100);
-					const aspcaPercent = Math.round((rl80ByCharity['ASPCA'] / totalRL80) * 100);
+				// Update allocation percentages based on dollar amounts
+				const totalSplit = usdByCharity['ST_JUDES'] + usdByCharity['ASPCA'];
+				if (totalSplit > 0 && stJudesPercentageElement && aspcaPercentageElement) {
+					const stJudesPercent = Math.round((usdByCharity['ST_JUDES'] / totalSplit) * 100);
+					const aspcaPercent = Math.round((usdByCharity['ASPCA'] / totalSplit) * 100);
 					stJudesPercentageElement.textContent = stJudesPercent;
 					aspcaPercentageElement.textContent = aspcaPercent;
 				} else if (stJudesPercentageElement && aspcaPercentageElement) {
@@ -2174,8 +2184,8 @@
 				donationsCollection.orderBy('timestamp', 'desc').limit(50).onSnapshot(
 					(snapshot) => {
 						// Reset totals
-						totalRL80Donated = 0;
-						rl80ByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
+						totalUsdGiven = 0;
+						usdByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
 
 						// Track current donation IDs and data
 						const currentDonationIds = new Set();
@@ -2186,11 +2196,23 @@
 							const data = doc.data();
 							const donationWithId = { ...data, id: doc.id };
 							const amount = parseFloat(data.amount) || 0;
-							totalRL80Donated += amount;
+							// Dollar value: USDC at face value, ETH via the
+							// usdValue logged at donation time. Legacy RL80 docs
+							// (no currency) stay out of the $ counter, and dev
+							// tips don't count as charity giving.
+							let usd = 0;
+							if (data.currency === 'USDC') {
+								usd = parseFloat(data.usdValue) || amount;
+							} else if (data.currency === 'ETH') {
+								usd = parseFloat(data.usdValue) || 0;
+							}
+							if (data.charity !== 'DEV') {
+								totalUsdGiven += usd;
+							}
 
-							// Track by charity
-							if (data.charity && rl80ByCharity[data.charity] !== undefined) {
-								rl80ByCharity[data.charity] += amount;
+							// Track by charity (same dollar basis; DEV isn't a key)
+							if (data.charity && usdByCharity[data.charity] !== undefined) {
+								usdByCharity[data.charity] += usd;
 							}
 
 							currentDonationIds.add(doc.id);
@@ -3395,6 +3417,10 @@
 								case 'stlukes':
 									// Open donation modal immediately - coin toss happens after successful donation
 									window.parent.postMessage({ type: 'openDonation', charity: 'ST_JUDES' }, '*');
+									break;
+								case 'devtip':
+									// Dev coffee tip — same modal, DEV pseudo-charity (ETH/USDC)
+									window.parent.postMessage({ type: 'openDonation', charity: 'DEV' }, '*');
 									break;
 							}
 						}
@@ -5995,6 +6021,11 @@
 							<span class="sr-only">Donate to St. Jude</span>
 						</label>
 						<input class="sr-only" type="radio" name="fountainMode" id="stlukes" />
+						<label for="devtip">
+							<span>☕ Dev</span>
+							<span class="sr-only">Tip the dev a coffee</span>
+						</label>
+						<input class="sr-only" type="radio" name="fountainMode" id="devtip" />
 					</div>
 				</div>
 			</div>
@@ -6030,7 +6061,7 @@
 			.fountain-toggle {
 				position: relative;
 				width: 100%;
-				max-width: 340px;
+				max-width: 400px;
 				height: 50px;
 				background: rgba(255, 255, 255, 0.15);
 				border-radius: 100px;
@@ -6045,7 +6076,7 @@
 			/* Desktop specific width */
 			@media (min-width: 769px) {
 				.fountain-toggle {
-					width: 340px;
+					width: 400px;
 				}
 			}
 
@@ -6101,7 +6132,7 @@
 			}
 			
 			.donate-main-label::after {
-				content: 'Donate RL80';
+				content: 'Donate';
 				display: block;
 				width: 100%;
 				height: 100%;
@@ -6112,7 +6143,7 @@
 			.donate-section {
 				display: grid;
 				position: absolute;
-				grid-template-columns: 1fr 1fr;
+				grid-template-columns: repeat(3, 1fr);
 				top: 0;
 				left: 50%;
 				width: 50%;
@@ -6126,7 +6157,7 @@
 			.donate-section .indicator {
 				position: absolute;
 				background: rgba(255, 255, 255, 0.95);
-				width: 50%;
+				width: 33.4%;
 				height: 100%;
 				left: 50%;
 				top: 0;
@@ -6141,7 +6172,7 @@
 			.donate-section label {
 				position: relative;
 				z-index: 4;
-				font-size: 12px;
+				font-size: 11px;
 			}
 			
 			.donate-section label span {
@@ -6191,52 +6222,60 @@
 			/* When donate is selected - main indicator becomes blue background */
 			.fountain-toggle__track:has(#donate:checked) > .indicator,
 			.fountain-toggle__track:has(#aspca:checked) > .indicator,
-			.fountain-toggle__track:has(#stlukes:checked) > .indicator {
+			.fountain-toggle__track:has(#stlukes:checked) > .indicator,
+			.fountain-toggle__track:has(#devtip:checked) > .indicator {
 				translate: 100% 0;
 				background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
 			}
-			
+
 			.fountain-toggle__track:has(#donate:checked) .donate-section,
 			.fountain-toggle__track:has(#aspca:checked) .donate-section,
-			.fountain-toggle__track:has(#stlukes:checked) .donate-section {
+			.fountain-toggle__track:has(#stlukes:checked) .donate-section,
+			.fountain-toggle__track:has(#devtip:checked) .donate-section {
 				opacity: 1;
 				pointer-events: all;
 			}
-			
-			/* When donate is first selected - show white pill on right */
+
+			/* When donate is first selected - show white pill on middle (St. Jude).
+			   Pill geometry: indicator is 33.4% wide with left: 50%, so
+			   translate -150% / -50% / 50% lands it on col 1 / 2 / 3. */
 			.fountain-toggle__track:has(#donate:checked) .donate-section .indicator {
 				opacity: 1;
 				clip-path: inset(0 0 0 0 round 100px);  /* Full pill */
-				translate: 0 0;  /* Position on right (St. Jude) */
+				translate: -50% 0;  /* Position on middle (St. Jude) */
 				background: rgba(255, 255, 255, 0.95);
 			}
-			
-			/* Both labels visible but dimmed when donate first selected */
-			.fountain-toggle__track:has(#donate:checked) .donate-section label[for="aspca"] span {
+
+			/* All labels visible but dimmed when donate first selected */
+			.fountain-toggle__track:has(#donate:checked) .donate-section label[for="aspca"] span,
+			.fountain-toggle__track:has(#donate:checked) .donate-section label[for="devtip"] span {
 				opacity: 1;
 				transform: scale(1);
 				color: rgba(255, 255, 255, 0.7);
 			}
-			
+
 			.fountain-toggle__track:has(#donate:checked) .donate-section label[for="stlukes"] span {
 				opacity: 1;
 				transform: scale(1);
 				color: rgba(0, 0, 0, 0.8);  /* Dark text on white pill */
 			}
-			
+
 			/* When any donate sub-option is selected */
 			.fountain-toggle__track:has(#aspca:checked),
-			.fountain-toggle__track:has(#stlukes:checked) {
+			.fountain-toggle__track:has(#stlukes:checked),
+			.fountain-toggle__track:has(#devtip:checked) {
 				/* Keep donate section visible */
 			}
-			
+
 			.fountain-toggle__track:has(#aspca:checked) > label[for="tossCoin"],
-			.fountain-toggle__track:has(#stlukes:checked) > label[for="tossCoin"] {
+			.fountain-toggle__track:has(#stlukes:checked) > label[for="tossCoin"],
+			.fountain-toggle__track:has(#devtip:checked) > label[for="tossCoin"] {
 				color: rgba(255, 255, 255, 0.5);
 			}
 
 			.fountain-toggle__track:has(#aspca:checked) .donate-main-label,
-			.fountain-toggle__track:has(#stlukes:checked) .donate-main-label {
+			.fountain-toggle__track:has(#stlukes:checked) .donate-main-label,
+			.fountain-toggle__track:has(#devtip:checked) .donate-main-label {
 				opacity: 0;
 				pointer-events: none;
 			}
@@ -6246,18 +6285,26 @@
 			.fountain-toggle__track:has(#aspca:checked) .donate-section .indicator {
 				opacity: 1;
 				clip-path: inset(0 0 0 0 round 100px);  /* Full pill! */
-				translate: -100% 0;
+				translate: -150% 0;
 				background: rgba(255, 255, 255, 0.95);
 			}
-			
-			/* When St. Jude is selected - white pill, positioned right */
+
+			/* When St. Jude is selected - white pill, positioned middle */
 			.fountain-toggle__track:has(#stlukes:checked) .donate-section .indicator {
 				opacity: 1;
 				clip-path: inset(0 0 0 0 round 100px);  /* Full pill! */
-				translate: 0 0;
+				translate: -50% 0;
 				background: rgba(255, 255, 255, 0.95);
 			}
-			
+
+			/* When Dev tip is selected - white pill, positioned right */
+			.fountain-toggle__track:has(#devtip:checked) .donate-section .indicator {
+				opacity: 1;
+				clip-path: inset(0 0 0 0 round 100px);  /* Full pill! */
+				translate: 50% 0;
+				background: rgba(255, 255, 255, 0.95);
+			}
+
 			/* Text colors - selected gets dark text, unselected gets dimmed white */
 			.fountain-toggle__track:has(#aspca:checked) .donate-section label[for="aspca"] span {
 				opacity: 1;
@@ -6265,21 +6312,37 @@
 				color: rgba(0, 0, 0, 0.85);  /* Dark text on white pill */
 				font-weight: 600;
 			}
-			
-			.fountain-toggle__track:has(#aspca:checked) .donate-section label[for="stlukes"] span {
+
+			.fountain-toggle__track:has(#aspca:checked) .donate-section label[for="stlukes"] span,
+			.fountain-toggle__track:has(#aspca:checked) .donate-section label[for="devtip"] span {
 				opacity: 0.75;
 				transform: scale(1);
 				color: rgba(255, 255, 255, 0.7);  /* Dimmed white on blue */
 			}
-			
+
 			.fountain-toggle__track:has(#stlukes:checked) .donate-section label[for="stlukes"] span {
 				opacity: 1;
 				transform: scale(1);
 				color: rgba(0, 0, 0, 0.85);  /* Dark text on white pill */
 				font-weight: 600;
 			}
-			
-			.fountain-toggle__track:has(#stlukes:checked) .donate-section label[for="aspca"] span {
+
+			.fountain-toggle__track:has(#stlukes:checked) .donate-section label[for="aspca"] span,
+			.fountain-toggle__track:has(#stlukes:checked) .donate-section label[for="devtip"] span {
+				opacity: 0.75;
+				transform: scale(1);
+				color: rgba(255, 255, 255, 0.7);  /* Dimmed white on blue */
+			}
+
+			.fountain-toggle__track:has(#devtip:checked) .donate-section label[for="devtip"] span {
+				opacity: 1;
+				transform: scale(1);
+				color: rgba(0, 0, 0, 0.85);  /* Dark text on white pill */
+				font-weight: 600;
+			}
+
+			.fountain-toggle__track:has(#devtip:checked) .donate-section label[for="aspca"] span,
+			.fountain-toggle__track:has(#devtip:checked) .donate-section label[for="stlukes"] span {
 				opacity: 0.75;
 				transform: scale(1);
 				color: rgba(255, 255, 255, 0.7);  /* Dimmed white on blue */

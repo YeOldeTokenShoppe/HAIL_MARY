@@ -194,6 +194,164 @@ function getTierStyle(tier) {
   }
 }
 
+// Simple monochrome settings gear (emoji ⚙ renders colored on Apple
+// platforms, so it's drawn by hand to match X's flat icon).
+function drawGear(ctx, x, y, r, color = '#e7e9ea') {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * (r - 6), y + Math.sin(a) * (r - 6));
+    ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, r - 7, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.28, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Fallback wax tints for holders who never picked one — the landing
+// page's picker presets (keep in sync with VOTIVE_TINT_PRESETS in
+// app/page.js), chosen deterministically per holder so the feed shows
+// a varied vigil without misrepresenting anyone's customization: a
+// real votiveTint pref always wins over the fallback.
+const VOTIVE_FALLBACK_TINTS = [
+  '#1fae5a', // shrine green (the old fixed default)
+  '#b83b3b', // crimson
+  '#d49f3a', // amber
+  '#e57aa7', // rose
+  '#8b5fbf', // violet
+  '#0ef178', // jade
+  '#14f7ff', // cyan
+];
+
+function fallbackTintFor(id = '') {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return VOTIVE_FALLBACK_TINTS[Math.abs(h) % VOTIVE_FALLBACK_TINTS.length];
+}
+
+// Miniature novena/prayer candle, stylized flat-vector (not photoreal):
+// glass jar, saint-image label with gold trim, tinted wax band at the
+// top, flickering teardrop flame. (cx, cy) is the center of the full
+// w×h footprint including the flame.
+function drawVotiveCandle(ctx, cx, cy, w, h, labelImg, tint, seed = 0, flex = false) {
+  // `flex` = the holder burned RL80 with this candle: gold rim, taller
+  // flame, hotter glow.
+  const flameH = h * (flex ? 0.25 : 0.2);
+  const bodyH = h - flameH;
+  const x = cx - w / 2;
+  const y = cy - h / 2 + flameH;
+  const r = w * 0.16;
+  const waxH = bodyH * 0.2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, bodyH, r);
+  ctx.clip();
+
+  // Wax, washed with the holder's votive tint. 0.7 alpha — at 0.35 the
+  // cream base plus the flame glow flattened every color to near-white
+  // at this size.
+  ctx.fillStyle = '#f5ecd8';
+  ctx.fillRect(x, y, w, bodyH);
+  if (tint) {
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = tint;
+    ctx.fillRect(x, y, w, waxH + 3);
+    ctx.globalAlpha = 1;
+  }
+
+  // Saint label, cover-fit below the wax line
+  const ly = y + waxH;
+  const lh = bodyH - waxH;
+  const iw = labelImg.naturalWidth || w;
+  const ih = labelImg.naturalHeight || lh;
+  const cover = Math.max(w / iw, lh / ih);
+  const sw = w / cover;
+  const sh = lh / cover;
+  ctx.drawImage(labelImg, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, ly, w, lh);
+
+  // Gold label trim
+  ctx.strokeStyle = 'rgba(241, 215, 122, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1.5, ly + 1, w - 3, lh - 2.5);
+
+  // Warm glow cast onto the wax from the flame — kept faint so it
+  // doesn't bleach the wax tint to white
+  const glow = ctx.createRadialGradient(cx, y + 3, 0, cx, y + 3, w * 0.75);
+  glow.addColorStop(0, 'rgba(255, 190, 90, 0.28)');
+  glow.addColorStop(1, 'rgba(255, 190, 90, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x, y, w, waxH + 6);
+
+  // Glass shading: highlight stripe left, shadow right
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.fillRect(x + 3, y, 3, bodyH);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+  ctx.fillRect(x + w - 6, y, 4, bodyH);
+
+  ctx.restore();
+
+  // Glass rim — gold for burnt offerings, otherwise the holder's wax
+  // tint (colored-glass look; a white rim left every candle reading as
+  // identical cream at this size)
+  ctx.lineWidth = flex ? 2.5 : 1.5;
+  if (flex) {
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)';
+  } else {
+    ctx.strokeStyle = tint || 'rgba(255, 255, 255, 0.45)';
+    ctx.globalAlpha = 0.85;
+  }
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, bodyH, r);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Flame — sways and stretches a little each frame; seed staggers
+  // the phase so a column of candles doesn't flicker in unison
+  const t = Date.now();
+  const sway = Math.sin(t / 120 + seed * 7) * 1.2;
+  const stretch = 1 + Math.sin(t / 85 + seed * 3) * 0.08;
+  const fx = cx + sway;
+  const fBase = y + 3;
+  const fTop = fBase - flameH * 1.15 * stretch;
+  const fw = flameH * 0.5;
+
+  const fGlow = ctx.createRadialGradient(
+    fx, fBase - flameH * 0.5, 0,
+    fx, fBase - flameH * 0.5, flameH * 1.5,
+  );
+  fGlow.addColorStop(0, `rgba(255, 170, 60, ${flex ? 0.55 : 0.4})`);
+  fGlow.addColorStop(1, 'rgba(255, 170, 60, 0)');
+  ctx.fillStyle = fGlow;
+  ctx.fillRect(fx - flameH * 1.5, fBase - flameH * 2, flameH * 3, flameH * 2.5);
+
+  const fGrad = ctx.createLinearGradient(fx, fTop, fx, fBase);
+  fGrad.addColorStop(0, '#ffd54a');
+  fGrad.addColorStop(0.6, '#ffa726');
+  fGrad.addColorStop(1, '#ff7043');
+  ctx.fillStyle = fGrad;
+  ctx.beginPath();
+  ctx.moveTo(fx, fTop);
+  ctx.bezierCurveTo(fx + fw, fBase - flameH * 0.45, fx + fw * 0.7, fBase, fx, fBase);
+  ctx.bezierCurveTo(fx - fw * 0.7, fBase, fx - fw, fBase - flameH * 0.45, fx, fTop);
+  ctx.fill();
+
+  // White-hot core
+  ctx.fillStyle = 'rgba(255, 252, 230, 0.9)';
+  ctx.beginPath();
+  ctx.ellipse(fx, fBase - flameH * 0.3, fw * 0.3, flameH * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // ===========================================
 // MAIN COMPONENT
 // ===========================================
@@ -507,6 +665,12 @@ export function WatchlistPhoneTexture({
           // their flame.
           feedLine: dedication ? `Lit a candle ${dedication}` : null,
           waxTint: prefs?.votiveTint || null,
+          // Verified on-chain burn credited by /api/burn-offering — the
+          // flex. Admin-SDK-written; firestore.rules block client forgery.
+          tokensBurned:
+            typeof c.tokensBurned === 'number' && c.tokensBurned > 0
+              ? c.tokensBurned
+              : 0,
           amount: 1,
           timestamp: c.litAt?.toMillis?.() || Date.now(),
           isNew: false,
@@ -746,14 +910,33 @@ export function WatchlistPhoneTexture({
   // ===========================================
   // FILTER ACTIVITIES BY TAB
   // ===========================================
-  
-  const filteredActivities = activities.filter(activity => {
+
+  const tabActivities = activities.filter(activity => {
     if (activeTab === 'ALL') return true;
     if (activeTab === 'CANDLES') return activity.type === 'CANDLE';
     if (activeTab === 'STAKING') return ['STAKE', 'UNSTAKE', 'CLAIM'].includes(activity.type);
     if (activeTab === 'XPOSTS') return activity.type === 'XPOST';
     return true;
   });
+
+  // Interleave the vigil candles with the post notifications. A strict
+  // timestamp sort clumps them into two blocks (the posts are usually
+  // older than the live candles), so instead spread the two streams
+  // evenly through each other — each keeps its own newest-first order,
+  // and just-lit candles stay pinned to the top.
+  const freshItems = tabActivities.filter(a => a.isNew);
+  const candleStream = tabActivities.filter(a => !a.isNew && a.type === 'CANDLE');
+  const postStream = tabActivities.filter(a => !a.isNew && a.type !== 'CANDLE');
+  const filteredActivities = [...freshItems];
+  let ci = 0;
+  let pi = 0;
+  while (ci < candleStream.length || pi < postStream.length) {
+    const takeCandle =
+      pi >= postStream.length ||
+      (ci < candleStream.length &&
+        ci * postStream.length <= pi * candleStream.length);
+    filteredActivities.push(takeCandle ? candleStream[ci++] : postStream[pi++]);
+  }
   
   // ===========================================
   // DRAW PRAYER RECEIVED NOTIFICATION
@@ -887,8 +1070,8 @@ export function WatchlistPhoneTexture({
     // BACKGROUND
     // ===========================================
     
-    // Solid dark background matching tweet card theme
-    ctx.fillStyle = '#15202b';
+    // Pure black — X "Lights Out" theme, matching the real account
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
     
     // Reset text alignment for content below
@@ -902,30 +1085,62 @@ export function WatchlistPhoneTexture({
     const minutes = currentTime.getMinutes();
     const formattedTime = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')}`;
 
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 34px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(formattedTime, 60, 40);
+    ctx.fillText(formattedTime, 48, 52);
+
+    // iOS system icons, right-aligned: signal bars, wifi, battery
+    const sbY = 50;
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 4; i++) {
+      const barH = 8 + i * 5;
+      ctx.beginPath();
+      ctx.roundRect(width - 178 + i * 11, sbY - barH, 7, barH, 2);
+      ctx.fill();
+    }
+
+    const wifiX = width - 112;
+    ctx.strokeStyle = '#fff';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 5;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.arc(wifiX, sbY, 10 + i * 9, Math.PI * 1.25, Math.PI * 1.75);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(wifiX, sbY - 3, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    const batX = width - 84;
+    const batY = sbY - 23;
+    ctx.beginPath();
+    ctx.roundRect(batX, batY, 52, 25, 7);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(batX + 54, batY + 7, 4, 11, 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 17px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('99', batX + 26, batY + 19);
 
     // ===========================================
-    // HEADER WITH AVATAR AND TITLE
+    // X NOTIFICATIONS HEADER (avatar / title / gear)
     // ===========================================
-    
-    const headerY = 120;
-    const avatarSize = 80;
-    const avatarX = 80;
-    
-    // Draw avatar if loaded
+
+    const headerY = 126;
+    const avatarSize = 60;
+    const avatarX = 72;
+
+    // Account avatar — small, borderless, like the real app
     if (avatarImageRef.current) {
       ctx.save();
-      
-      // Create circular clip for avatar
       ctx.beginPath();
       ctx.arc(avatarX, headerY, avatarSize / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      
-      // Draw avatar image
       ctx.drawImage(
         avatarImageRef.current,
         avatarX - avatarSize / 2,
@@ -933,28 +1148,47 @@ export function WatchlistPhoneTexture({
         avatarSize,
         avatarSize
       );
-      
       ctx.restore();
-      
-      // Draw border around avatar
-      ctx.strokeStyle = '#ffd700';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(avatarX, headerY, avatarSize / 2, 0, Math.PI * 2);
-      ctx.stroke();
     }
-    
-    // Draw title text
-    ctx.fillStyle = '#00ff66';
-    ctx.font = 'bold 28px serif';
+
+    // Centered title
+    ctx.fillStyle = '#e7e9ea';
+    ctx.font = 'bold 40px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Notifications', width / 2, headerY + 14);
+
+    // Settings gear on the right
+    drawGear(ctx, width - 66, headerY, 21);
+
+    // ===========================================
+    // TAB BAR — All | Mentions (All active)
+    // ===========================================
+
+    const tabsBaselineY = 208;
+    ctx.font = 'bold 30px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#e7e9ea';
+    ctx.fillText('All', width / 4, tabsBaselineY);
+    ctx.fillStyle = '#71767b';
+    ctx.fillText('Mentions', (3 * width) / 4, tabsBaselineY);
+
+    // Active-tab underline in X blue
+    ctx.fillStyle = '#1d9bf0';
+    ctx.beginPath();
+    ctx.roundRect(width / 4 - 34, tabsBaselineY + 14, 68, 7, 4);
+    ctx.fill();
+
+    // Hairline divider under the tab bar
+    ctx.fillStyle = '#2f3336';
+    ctx.fillRect(0, tabsBaselineY + 26, width, 2);
+
     ctx.textAlign = 'left';
-    ctx.fillText('𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙', avatarX + avatarSize / 2 + 15, headerY + 8);
     
     // ===========================================
     // ACTIVITY FEED
     // ===========================================
 
-    const feedStartY = 185;
+    const feedStartY = 245;
     const feedEndY = height - 100;
     const feedHeight = feedEndY - feedStartY;
     
@@ -1042,6 +1276,10 @@ export function WatchlistPhoneTexture({
         ctx.drawImage(screenshot, 20, itemY, ssW, ssH);
         ctx.restore();
 
+        // Hairline separator between rows
+        ctx.fillStyle = '#2f3336';
+        ctx.fillRect(0, itemY + itemHeight + CONFIG.ITEM_GAP / 2, width, 1);
+
         currentY += itemHeight + CONFIG.ITEM_GAP;
         return;
       }
@@ -1049,53 +1287,13 @@ export function WatchlistPhoneTexture({
       const tier = getActivityTier(activity.type, activity.amount);
       const style = getTierStyle(tier);
       const activityType = ACTIVITY_TYPES[activity.type];
-      
-      // Glow effect for whales
-      if (style.glowColor) {
-        ctx.shadowColor = style.glowColor;
-        ctx.shadowBlur = 15;
-      }
-      
-      // New item pulse
-      let itemAlpha = 1;
+
+      // Flat black rows like the real notifications feed — no card
+      // fill; unread items get X's faint blue tint instead of a pulse.
       if (activity.isNew) {
-        const elapsed = Date.now() - activity.timestamp;
-        const pulse = (Math.sin(elapsed / 150) + 1) / 2;
-        ctx.shadowColor = 'rgba(0, 255, 102, 0.5)';
-        ctx.shadowBlur = 10 + pulse * 10;
+        ctx.fillStyle = 'rgba(29, 155, 240, 0.08)';
+        ctx.fillRect(0, itemY - CONFIG.ITEM_GAP / 2, width, itemHeight + CONFIG.ITEM_GAP);
       }
-      
-      // Item background
-      // Use different colors based on activity type
-      const bgGradient = ctx.createLinearGradient(20, itemY, 20, itemY + itemHeight);
-      
-      if (activity.type === 'CANDLE') {
-        bgGradient.addColorStop(0, '#c86d35ff');  // Orange for candles/burns
-        bgGradient.addColorStop(1, '#89380cff');
-      } else if (['STAKE', 'UNSTAKE', 'CLAIM'].includes(activity.type)) {
-        bgGradient.addColorStop(0, '#071f39ff');  // Blue for staking
-        bgGradient.addColorStop(1, '#357abd');
-      } else if (activity.type === 'XPOST') {
-        bgGradient.addColorStop(0, '#15202b');  // Dark X/Twitter theme
-        bgGradient.addColorStop(1, '#192734');
-      } else {
-        bgGradient.addColorStop(0, style.bgGradient[0]);
-        bgGradient.addColorStop(1, style.bgGradient[1]);
-      }
-      
-      ctx.fillStyle = bgGradient;
-      ctx.beginPath();
-      ctx.roundRect(20, itemY, width - 40, itemHeight, 12);
-      ctx.fill();
-      
-      // Border for whales
-      if (tier === 'whale' || tier === 'mega') {
-        ctx.strokeStyle = style.borderColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      
-      ctx.shadowBlur = 0;
       
       // Emoji removed - shown in prayer type badge instead
       
@@ -1110,44 +1308,21 @@ export function WatchlistPhoneTexture({
       const isImageLoaded = userAvatar && userAvatar instanceof Image;
 
       if (activity.type === 'CANDLE' && isImageLoaded) {
-        // Miniature votive card — the holder's actual candle: saint
-        // image cover-fit in a glass-shaped frame with their wax tint
-        // at the base. (The VigilWall's 2D cards, relocated to her
-        // phone.)
-        const vw = 54;
-        const vh = 72;
-        const vx = avatarX - vw / 2;
-        const vy = avatarY - vh / 2;
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(vx, vy, vw, vh, 8);
-        ctx.clip();
-        const iw = userAvatar.naturalWidth || vw;
-        const ih = userAvatar.naturalHeight || vh;
-        const cover = Math.max(vw / iw, vh / ih);
-        const sw = vw / cover;
-        const sh = vh / cover;
-        ctx.drawImage(
-          userAvatar,
-          (iw - sw) / 2,
-          (ih - sh) / 2,
-          sw,
-          sh,
-          vx,
-          vy,
+        // Miniature novena candle — the holder's saint image as the
+        // jar label, their wax tint up top, live flickering flame.
+        const vw = 40;
+        const vh = 84;
+        drawVotiveCandle(
+          ctx,
+          avatarX,
+          avatarY,
           vw,
           vh,
+          userAvatar,
+          activity.waxTint || fallbackTintFor(activity.userId || activity.id),
+          index,
+          activity.tokensBurned > 0,
         );
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = activity.waxTint || '#1fae5a';
-        ctx.fillRect(vx, vy + vh - 10, vw, 10);
-        ctx.globalAlpha = 1;
-        ctx.restore();
-        ctx.strokeStyle = 'rgba(241, 215, 122, 0.7)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(vx, vy, vw, vh, 8);
-        ctx.stroke();
 
         usernameX = avatarX + vw / 2 + 14;
       } else if (isImageLoaded) {
@@ -1203,7 +1378,7 @@ export function WatchlistPhoneTexture({
       // Username
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#e7e9ea';
       ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.fillText(activity.username, usernameX, itemY + 35);
 
@@ -1217,7 +1392,7 @@ export function WatchlistPhoneTexture({
       }
 
       // Time ago (top right)
-      ctx.fillStyle = tier === 'mega' ? '#333' : '#888';
+      ctx.fillStyle = '#71767b';
       ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(formatTimeAgo(activity.timestamp), width - 40, itemY + 35);
@@ -1315,19 +1490,24 @@ export function WatchlistPhoneTexture({
       } else {
         // Action description (align with username)
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#71767b';
         ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
 
         ctx.fillText(activity.feedLine || activityType.verb, usernameX, itemY + 62);
 
         // Amount (bottom right)
+        const isBurnFlex =
+          activity.type === 'CANDLE' && activity.tokensBurned > 0;
         ctx.textAlign = 'right';
-        ctx.fillStyle = activityType.color;
+        ctx.fillStyle = isBurnFlex ? '#ffd700' : activityType.color;
         ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
 
-        // Candles show the glyph rather than a meaningless "+1".
+        // Candles show the glyph rather than a meaningless "+1" —
+        // unless the holder burned an offering, which IS the flex.
         const amountText = activity.type === 'CANDLE'
-          ? '🕯️'
+          ? isBurnFlex
+            ? `🔥 ${formatAmount(activity.tokensBurned, 'STAKE')} RL80`
+            : '🕯️'
           : `${activity.type === 'UNSTAKE' ? '-' : '+'}${formatAmount(activity.amount, activity.type)} ${activityType.unit}`;
         ctx.fillText(amountText, width - 40, itemY + 62);
 
@@ -1367,7 +1547,11 @@ export function WatchlistPhoneTexture({
       }
       
       ctx.textAlign = 'left';
-      
+
+      // Hairline separator between rows
+      ctx.fillStyle = '#2f3336';
+      ctx.fillRect(0, itemY + itemHeight + CONFIG.ITEM_GAP / 2, width, 1);
+
       currentY += itemHeight + CONFIG.ITEM_GAP;
     });
     
@@ -1505,7 +1689,7 @@ export function WatchlistPhoneTexture({
     const now = Date.now();
 
     // Auto-scroll logic for real-phone-like behavior
-    const feedVisibleHeight = 1280 - 100 - 185; // feedEndY - feedStartY
+    const feedVisibleHeight = 1280 - 100 - 245; // feedEndY - feedStartY
     const totalHeight = getTotalContentHeight();
     const maxScroll = Math.max(0, totalHeight - feedVisibleHeight);
 
@@ -1600,7 +1784,7 @@ export function WatchlistPhoneTexture({
   }, []);
   
   const scrollBy = useCallback((delta) => {
-    const feedVisibleHeight = 1280 - 100 - 185;
+    const feedVisibleHeight = 1280 - 100 - 245;
     const totalHeight = getTotalContentHeight();
     const maxScroll = Math.max(0, totalHeight - feedVisibleHeight);
     targetScrollRef.current = Math.max(0, Math.min(maxScroll, targetScrollRef.current + delta));

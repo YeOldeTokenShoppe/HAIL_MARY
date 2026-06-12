@@ -395,16 +395,49 @@
               || data.intention == null
               || data.intention in ['bags', 'bullrun', 'family', 'green', 'us-all']);
         }
+        // Burn credit (tokensBurned & friends) is written ONLY by
+        // /api/burn-offering via the admin SDK after verifying a real
+        // on-chain RL80 transfer to the dead address. Clients may never
+        // SET or ALTER these fields — but a re-light's full setDoc may
+        // REMOVE them (each fresh candle starts unburned), and merge
+        // writes that leave them unchanged must keep working. Note
+        // request.resource.data is the post-write doc, so equality
+        // against resource.data is the right "untouched" test.
+        function burnFieldsNotSet(data) {
+          return !('tokensBurned' in data)
+            && !('lastBurnTxHash' in data)
+            && !('lastBurnAt' in data);
+        }
+        function burnFieldsNotForged() {
+          return (!('tokensBurned' in request.resource.data)
+              || request.resource.data.tokensBurned == resource.data.get('tokensBurned', null))
+            && (!('lastBurnTxHash' in request.resource.data)
+              || request.resource.data.lastBurnTxHash == resource.data.get('lastBurnTxHash', null))
+            && (!('lastBurnAt' in request.resource.data)
+              || request.resource.data.lastBurnAt == resource.data.get('lastBurnAt', null));
+        }
         allow read: if true;
         allow create: if true
           && request.resource.data.keys().hasAll(['userId', 'litAt'])
           && request.resource.data.userId is string
           && request.resource.data.userId == userId
-          && validTickerFields(request.resource.data);
+          && validTickerFields(request.resource.data)
+          && burnFieldsNotSet(request.resource.data);
         allow update: if true
           && request.resource.data.userId == resource.data.userId
-          && validTickerFields(request.resource.data);
+          && validTickerFields(request.resource.data)
+          && burnFieldsNotForged();
         allow delete: if true;
+      }
+
+      // =========================================================================
+      // SHRINE BURNS — one doc per credited burn tx (doc ID = tx hash).
+      // Public provenance ledger for votive burn offerings; written only
+      // by /api/burn-offering (admin SDK) after on-chain verification.
+      // =========================================================================
+      match /shrineBurns/{txHash} {
+        allow read: if true;
+        allow write: if false;
       }
 
       // =========================================================================
