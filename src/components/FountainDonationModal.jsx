@@ -9,6 +9,12 @@ import { erc20Abi, parseEther, parseUnits, formatUnits } from 'viem';
 const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselectedCharity = null }) => {
   const [selectedCharity, setSelectedCharity] = useState(null);
   const [amount, setAmount] = useState('');
+  // Optional public one-liner carried by the golden coin — shown in the
+  // fountain's donation feed (server sanitizes + caps it).
+  const [wish, setWish] = useState('');
+  // Optional self-claimed donor name shown on the coin (server sanitizes +
+  // caps it; NOT chain-verified, so it's always paired with the address).
+  const [name, setName] = useState('');
   const [step, setStep] = useState('select'); // 'select', 'amount', 'confirm', 'processing', 'success', 'error'
   const [error, setError] = useState(null);
   const [txHash, setTxHash] = useState(null);
@@ -68,6 +74,8 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
   useEffect(() => {
     if (isOpen) {
       setAmount('');
+      setWish('');
+      setName('');
       setError(null);
       setTxHash(null);
       setPendingDonation(null);
@@ -165,10 +173,16 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       // already succeeded, and the feed toast arrives via the fountain's
       // snapshot listener once the server confirms. Idempotent per tx
       // hash, so even a duplicate POST can't double-count.
+      const trimmedWish = wish.trim().slice(0, 80);
+      const trimmedName = name.trim().slice(0, 24);
       fetch('/api/fountain-donation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash: txHashValue }),
+        body: JSON.stringify({
+          txHash: txHashValue,
+          ...(trimmedWish ? { wish: trimmedWish } : {}),
+          ...(trimmedName ? { donorName: trimmedName } : {}),
+        }),
         keepalive: true,
       }).catch((logError) => {
         console.error('Error logging donation:', logError);
@@ -177,10 +191,14 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       // Refresh balance
       await refreshBalance();
 
-      // Store donation info for coin toss (triggered when user clicks "Watch Your Coin!")
+      // Everything the fountain needs to arm the golden coin in hand
+      // (tossed by the user's next water tap).
       setPendingDonation({
         charity: selectedCharity,
         amount,
+        currency: payCurrency,
+        wish: trimmedWish || null,
+        donorName: trimmedName || null,
         txHash: txHashValue
       });
 
@@ -719,12 +737,58 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                   : 'Donations pool in the charity wallet and are forwarded via The Giving Block once the pool reaches ~100 USDC in value (or the ETH equivalent).'}
               </p>
 
+              <div style={{ marginBottom: '0.9rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.7rem',
+                  marginBottom: '0.4rem',
+                  fontFamily: "'Orbitron', monospace",
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>
+                  Your name <span style={{ opacity: 0.6, textTransform: 'none' }}>(optional · shown on your coin)</span>
+                </label>
+                <input
+                  type="text"
+                  className="amount-input"
+                  style={{ textAlign: 'left', fontSize: '0.8rem' }}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={24}
+                  placeholder="how you'd like to be credited…"
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.7rem',
+                  marginBottom: '0.4rem',
+                  fontFamily: "'Orbitron', monospace",
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>
+                  Attach a wish <span style={{ opacity: 0.6, textTransform: 'none' }}>(optional · shown publicly)</span>
+                </label>
+                <input
+                  type="text"
+                  className="amount-input"
+                  style={{ textAlign: 'left', fontSize: '0.8rem' }}
+                  value={wish}
+                  onChange={(e) => setWish(e.target.value)}
+                  maxLength={80}
+                  placeholder="carried into the fountain by your golden coin…"
+                />
+              </div>
+
               <button
                 className="donate-btn"
                 onClick={handleDonate}
                 disabled={isTransactionPending}
               >
-                {isTransactionPending ? 'Processing...' : 'Toss Coin'}
+                {isTransactionPending ? 'Processing...' : 'Mint Your Golden Coin'}
               </button>
             </div>
           )}
@@ -764,6 +828,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                 ) : (
                   <>Your donation of <span style={{ color: '#FFD700' }}>{amount} {payCurrency}</span> to {charity.shortName} has been sent.</>
                 )}
+                {' '}A golden coin is waiting in your hand — tap the water to toss it in.
               </p>
 
               {txHash && (
@@ -788,7 +853,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                 onClick={handleWatchCoin}
                 style={{ marginTop: '0.5rem' }}
               >
-                Aim & Toss Your Coin!
+                🥇 Take Your Golden Coin
               </button>
             </div>
           )}

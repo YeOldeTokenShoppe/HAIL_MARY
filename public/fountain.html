@@ -778,6 +778,18 @@
 			color: rgba(255, 255, 255, 0.5);
 			margin-top: 2px;
 		}
+
+		.donation-toast-wish {
+			font-size: 11px;
+			font-style: italic;
+			color: rgba(255, 215, 0, 0.85);
+			margin-top: 3px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+		}
 		/* ===== END DONATION TOAST STYLES ===== */
 		</style>
 		<script>
@@ -845,8 +857,6 @@
 
 		<!-- Loader -->
 
-
-
 		<div id="info" class="info-box pumpkin-modal" style="
 			position: absolute;
 			right: 30px;
@@ -884,6 +894,10 @@
 				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 			">
 				<span class="mobile-text" style="font-size: 11px; line-height: 1.5;">
+					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
+					• Tap anywhere — water, rim, or plaza — to toss the coin in your hand<br>
+					• Token coins are free &amp; unlimited<br>
+					• Tap the coin chip to pick up a Golden Coin — a real USDC/ETH donation. Aim for the water!<br><br>
 					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
 					• USDC or ETH goes directly to charity wallets<br>
 					• Pooled until ~100 USDC in value (or ETH equivalent)<br>
@@ -894,6 +908,10 @@
 					<span style="font-size: 9px; opacity: 0.8;">All transactions visible on-chain for full transparency.</span>
 				</span>
 				<span class="desktop-text" style="font-size: 12px; line-height: 1.6;">
+					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
+					• Tap anywhere — the water, the stonework, even the plaza — and the coin in your hand flies right where you tapped<br>
+					• Token coins are free and unlimited — toss away<br>
+					• Tap the coin chip below to pick up a Golden Coin: a real USDC/ETH donation, tossed by you. Land it in the water to join the fountain&rsquo;s coin pool<br><br>
 					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
 					• USDC or ETH donations are sent directly to charity wallets held by 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙<br>
 					• Donations pool until they reach ~100 USDC in value (or the ETH equivalent)<br>
@@ -936,30 +954,14 @@
 				padding-bottom: 8px;
 				border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 			">
-				<!-- Left side: Coin Cam -->
-				<div style="
-					display: flex;
-					align-items: center;
-					gap: 6px;
-				">
-					<input type="checkbox" id="coinCamToggle" checked style="
-						width: 16px;
-						height: 16px;
-						cursor: pointer;
-						accent-color: #FFD700;
-					">
-					<label for="coinCamToggle" style="
-						font-size: 12px;
-						font-weight: 600;
-						color: rgba(255, 255, 255, 0.9);
-						cursor: pointer;
-						text-transform: uppercase;
-						letter-spacing: 0.5px;
-						text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-						font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-						user-select: none;
-					">Coin Cam</label>
-				</div>
+				<!-- Left side: Coin Cam (preference, not a primary control —
+				     a small pill toggle instead of a checkbox row; off by
+				     default, must match coinCamEnabled's initial value) -->
+				<button type="button" id="coinCamToggle" class="coin-cam-btn"
+					aria-pressed="false"
+					title="Coin Cam: follow your coin underwater after a toss">
+					<span aria-hidden="true">🎥</span><span id="coinCamLabel">Cam off</span>
+				</button>
 				
 				<!-- Right side: Pool counter, RL80 total, and Info button -->
 				<div style="
@@ -967,44 +969,6 @@
 					align-items: flex-end;
 					gap: 10px;
 				">
-					<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-						<div style="
-							font-size: 8px;
-							font-weight: 600;
-							color: rgba(255, 255, 255, 0.6);
-							text-transform: uppercase;
-							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-							letter-spacing: 0.5px;
-						">🪙 Fountain</div>
-						<div style="
-							font-size: 16px;
-							font-weight: 700;
-							color: white;
-							line-height: 1;
-							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-						">
-							<span id="mobileCurrentCount">0</span><span style="font-size: 0.7em; opacity: 0.7;">/500</span>
-						</div>
-					</div>
-					<div style="width: 1px; height: 28px; background: rgba(255,255,255,0.2);"></div>
-					<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-						<div style="
-							font-size: 8px;
-							font-weight: 600;
-							color: rgba(255, 215, 0, 0.8);
-							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-							letter-spacing: 0.5px;
-						">💎 Total Given</div>
-						<div style="
-							font-size: 14px;
-							font-weight: 700;
-							color: #FFD700;
-							line-height: 1;
-							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-						">
-							<span style="font-size: 0.65em; opacity: 0.8; margin-right: 1px;">$</span><span id="mobileRL80Total">0</span>
-						</div>
-					</div>
 					<!-- Info button -->
 					<button id="mobileInfoBtn" onclick="toggleInstructions()" class="pumpkin-info-button" style="
 						display: none;
@@ -1111,17 +1075,6 @@
 			</div>
 			<!-- Full stats -->
 			<div class="full-stats desktop-only">
-			<div style="
-				display: flex;
-				align-items: center;
-				gap: 8px;
-				padding: 6px 10px;
-				background: rgba(255, 255, 255, 0.05);
-				border-radius: 10px;
-			">
-				<span class="coin-emoji" style="font-size: 16px;">🪙</span>
-				<span style="flex: 1; color: rgba(255, 255, 255, 0.95); font-size: 12px;">Fountain: <span id="coinCount" style="font-weight: 700;">0</span> / 500</span>
-			</div>
 			<div style="
 				display: flex;
 				align-items: center;
@@ -1280,12 +1233,12 @@
 					if (mobileCollectionCounter) {
 						mobileCollectionCounter.style.display = 'flex';
 						
-						// Get the toggle from original container and move it to mobile container for desktop too
-						const toggleContainer = document.querySelector('.fountain-toggle');
-						if (toggleContainer && mobileButtonsContainer) {
-							// Check if toggle needs to be moved to mobile container
-							if (toggleContainer.parentElement !== mobileButtonsContainer) {
-								mobileButtonsContainer.appendChild(toggleContainer);
+						// Get the coin chip from original container and move it to mobile container for desktop too
+						const chipDock = document.querySelector('.coin-chip-dock');
+						if (chipDock && mobileButtonsContainer) {
+							// Check if the chip needs to be moved to mobile container
+							if (chipDock.parentElement !== mobileButtonsContainer) {
+								mobileButtonsContainer.appendChild(chipDock);
 							}
 							// Show the mobile buttons container
 							mobileButtonsContainer.style.display = 'flex';
@@ -1647,6 +1600,17 @@
 				return names[charityKey] || 'Charity';
 			}
 
+			// The wish is the one client-authored string in the feed — always
+			// escape it before it touches innerHTML.
+			function escapeHtml(str) {
+				return String(str)
+					.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;')
+					.replace(/"/g, '&quot;')
+					.replace(/'/g, '&#39;');
+			}
+
 			function formatTimeAgo(timestamp) {
 				if (!timestamp) return '';
 
@@ -1715,6 +1679,11 @@
 					? `<img src="/images/ILLUMIN80_TATTOO.webp" alt="Illumin80" class="illumin80-badge" style="width: 20px; height: 20px; margin-left: 4px; vertical-align: middle;">`
 					: '';
 
+				// Optional one-line wish carried by the golden coin
+				const wish = typeof donation.wish === 'string' && donation.wish.trim()
+					? donation.wish.trim().slice(0, 100)
+					: null;
+
 				toast.innerHTML = `
 					<div class="donation-toast-avatar">${avatarContent}</div>
 					<div class="donation-toast-content">
@@ -1727,6 +1696,7 @@
 								${charityName}
 							</span>
 						</div>
+						${wish ? `<div class="donation-toast-wish">“${escapeHtml(wish)}”</div>` : ''}
 						${timeAgo ? `<div class="donation-toast-time">${isNew ? '✨ Just now!' : timeAgo}</div>` : ''}
 					</div>
 				`;
@@ -1961,7 +1931,6 @@
 					( texture2D( levelTexture, point1 + vec2( - cellSize.x, 0 ) ).x - texture2D( levelTexture, point1 + vec2( cellSize.x, 0 ) ).x ) * WIDTH / BOUNDS,
 					( texture2D( levelTexture, point1 + vec2( 0, - cellSize.y ) ).x - texture2D( levelTexture, point1 + vec2( 0, cellSize.y ) ).x ) * WIDTH / BOUNDS );
 
-
 				if ( gl_FragCoord.x < 1.5 ) {
 
 					gl_FragColor = encode_float( waterLevel );
@@ -1983,7 +1952,6 @@
 			}
 
 		</script>
-
 
 		<script type="importmap">
 			{
@@ -2014,7 +1982,6 @@
 			import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 			import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 			
-
 			// --- Coin Material and Geometry (moved up for Firebase functions) ---
 			const baseCoinMaterial = new THREE.MeshStandardMaterial({
 				color: 0xcebb43, 
@@ -2029,7 +1996,7 @@
 				side: THREE.DoubleSide // Render both sides
 			});
 			// const coinGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.002, 16); // Small cylinder for coin
-			const coinGeometry = new THREE.CylinderGeometry(0.02 * 2, 0.02 * 2, 0.005 * 2, 8); // Octagon shape with 8 segments
+			const coinGeometry = new THREE.CylinderGeometry(0.02 * 2, 0.02 * 2, 0.005 * 2, 32); // Round coin (32 radial segments)
 			coinGeometry.rotateX(Math.PI / 2); // Lay the coin flat
 
 			// Define coin dimensions for use in physics - MUST match geometry!
@@ -2396,7 +2363,6 @@
 					coinsCollection = db.collection('fountain_coins');
 					donationsCollection = db.collection('fountain_donations');
 
-
 					// Load collected total first
 					await loadCollectedTotal();
 
@@ -2434,7 +2400,8 @@
 						},
 						timestamp: firebase.firestore.FieldValue.serverTimestamp(),
 						isInUpperBowl: coinData.isInUpperBowl || false,
-						charity: coinData.charity || null
+						charity: coinData.charity || null,
+						txHash: coinData.txHash || null
 					});
 					if (coinData.charity) {
 					}
@@ -2485,7 +2452,9 @@
 								position: new THREE.Vector3(data.position.x, data.position.y, data.position.z),
 								rotation: new THREE.Euler(data.rotation.x || 0, data.rotation.y || 0, data.rotation.z || 0),
 								underwater: data.position.y < -0.4,
-								id: doc.id
+								id: doc.id,
+								txHash: data.txHash || null,
+								charity: data.charity || null
 							});
 						}
 						// Count charity allocations
@@ -2505,7 +2474,7 @@
 			}
 			
 			// Function to add a new static coin to the instanced mesh
-			function addStaticCoinToInstances(position, rotation, firestoreId) {
+			function addStaticCoinToInstances(position, rotation, firestoreId, txHash, charity) {
 				// Check if scene is initialized
 				if (!scene) {
 					console.warn('Scene not initialized yet, cannot create static coin');
@@ -2517,7 +2486,9 @@
 					position: position,
 					rotation: rotation,
 					underwater: position.y < -0.4,
-					id: firestoreId
+					id: firestoreId,
+					txHash: txHash || null,
+					charity: charity || null
 				});
 				
 				// Limit the array size
@@ -2549,7 +2520,13 @@
 			let composer, bloomPass;
 			let chromaticAberrationPass, scanlinePass, noisePass, vignettePass;
 			let mousedown = false;
-			let hasAimed = false; // Track if user has clicked water to aim
+			// "Coin in hand" model: a tap on the water always tosses whatever
+			// coin you're holding. heldGoldCoin is set on donationComplete
+			// ({charity, amount, currency, wish}) and cleared by the toss;
+			// null means the free token coin.
+			let heldGoldCoin = null;
+			let tapStart = null; // pointerdown snapshot for tap-vs-drag detection
+			let activePointers = 0; // >1 concurrent pointers = pinch, not a tap
 			let is80sMode = false; // Track 80s mode state
 			const mouseCoords = new THREE.Vector2();
 			const aimedCoords = new THREE.Vector2(); // Separate variable for aimed coin position
@@ -2591,17 +2568,28 @@
 			let frame = 0;
             const coins = []; // Array to hold active coins
             const gravity = 0.03; // Simple gravity strength
+            // Ground level for coins thrown outside the fountain — must match
+            // groundMesh.position.y in init(). Coins only raycast against
+            // fountain parts, so without this floor a plaza throw would fall
+            // through the world.
+            const PLAZA_Y = -2;
             const coinSplashDuration = 75; // ms the splash force lasts
             let coinSplashTimeout = null; // Timeout ID for resetting splash
             
             // Camera follow system variables
-            let coinCamEnabled = true; // User preference for coin camera animation
+            let coinCamEnabled = false; // User preference for coin camera animation (off until opted in)
             let cameraFollowActive = false;
             let followedCoin = null;
             let originalCameraPosition = null;
             let originalCameraTarget = null;
             let cameraPhase = 'none'; // 'none', 'following', 'impact', 'underwater', 'returning'
             let cameraReturnTimer = 0;
+            let cameraFollowStartedAt = 0;
+            // One persistent, smoothed goal point per camera/target: each
+            // phase writes its ideal into these via lerp, so phase switches
+            // bend the camera path instead of kinking it.
+            let cameraGoalPos = null;
+            let cameraGoalTarget = null;
             let underwaterStartTime = 0;
             let underwaterOverlay = null;
             let previouslyVisibleElements = new Map(); // Track which elements were visible
@@ -2878,8 +2866,7 @@
   depthTest: true,
   transparent: true,
   opacity: 0.1,
-  alphaTest: 0.1,
-  renderOrder: 999
+  alphaTest: 0.1
 				});
 				
 				splashParticleSystem = new THREE.Points(particleGeometry, particleMaterial);
@@ -3209,61 +3196,23 @@
 			// Track if modal is being shown to prevent immediate close
 			let modalJustOpened = false;
 
-			// Charity Modal Functions
-			function showAimReminderModal() {
-				// Create a simple reminder popup
-				const existingReminder = document.getElementById('aimReminder');
-				if (existingReminder) {
-					existingReminder.remove();
-				}
-
-				const reminder = document.createElement('div');
-				reminder.id = 'aimReminder';
-				reminder.className = 'pumpkin-modal';
-				reminder.style.cssText = `
-					position: fixed;
-					top: 50%;
-					left: 50%;
-					transform: translate(-50%, -50%);
-					z-index: 10001;
-					max-width: 90vw;
-					width: min(400px, 90vw);
-					animation: fadeIn 0.3s ease-out;
-				`;
-
-				reminder.innerHTML = `
-					<h3>⚠️ Aim First! ⚠️</h3>
-					<p>Please click on the water to aim where you want to toss your coin!</p>
-					<button onclick="document.getElementById('aimReminder').remove()" class="pumpkin-modal-button">
-						Got it!
-					</button>
-				`;
-
-				document.body.appendChild(reminder);
-
-				// Auto-remove after 3 seconds
-				setTimeout(() => {
-					if (document.getElementById('aimReminder')) {
-						document.getElementById('aimReminder').remove();
-					}
-				}, 3000);
-			}
-
-			// Show message after donation - instruct user to aim
-			function showAimForDonationMessage() {
-				const existingMsg = document.getElementById('donationAimMessage');
+			// Floating banner while a golden coin waits in hand — the payment
+			// is done, the ceremony (the toss) is the user's to take.
+			function showGoldCoinReadyMessage() {
+				const existingMsg = document.getElementById('goldCoinReadyMessage');
 				if (existingMsg) {
 					existingMsg.remove();
 				}
 
 				const msg = document.createElement('div');
-				msg.id = 'donationAimMessage';
+				msg.id = 'goldCoinReadyMessage';
 				msg.style.cssText = `
 					position: fixed;
 					top: 40%;
 					left: 50%;
 					transform: translateX(-50%);
 					z-index: 10001;
+					pointer-events: none;
 					background: rgba(20, 20, 30, 0.35);
 					max-width: 20rem;
 					border: 2px solid rgba(255, 215, 0, 0.4);
@@ -3282,14 +3231,13 @@
 					animation: fadeIn 0.3s ease-out;
 				`;
 
-				msg.innerHTML = `Click the water to aim and toss your coin`;
+				msg.innerHTML = `🥇 Golden coin in hand<br><span style="font-size: 0.75rem; opacity: 0.85;">tap the water to toss it</span>`;
 
 				document.body.appendChild(msg);
 			}
 
-			// Hide the donation aim message
-			function hideAimForDonationMessage() {
-				const msg = document.getElementById('donationAimMessage');
+			function hideGoldCoinReadyMessage() {
+				const msg = document.getElementById('goldCoinReadyMessage');
 				if (msg) {
 					msg.remove();
 				}
@@ -3389,47 +3337,60 @@
 				// No separate mobile handlers needed
 			}
 			
-			// Set up HTML button event handlers
+			// Chip = the coin currently in your hand; tray = swap coins.
+			// Tossing itself is NOT here — it's a tap on the water (onPointerUp).
 			function setupHTMLButtons() {
-				const tossCoinRadio = document.getElementById('tossCoin');
-				const aspcaRadio = document.getElementById('aspca');
-				const stlukesRadio = document.getElementById('stlukes');
-				const toggleLabels = document.querySelectorAll('.fountain-toggle label');
+				const chip = document.getElementById('coinChip');
+				const tray = document.getElementById('coinTray');
+				const dock = document.querySelector('.coin-chip-dock');
 
-				// Add click handlers to labels for triggering actions
-				toggleLabels.forEach(label => {
-					label.addEventListener('click', function(e) {
-						const forId = this.getAttribute('for');
-						const radio = document.getElementById(forId);
+				function setTrayOpen(open) {
+					if (!tray || !chip) return;
+					tray.hidden = !open;
+					chip.setAttribute('aria-expanded', String(open));
+					const tipEl = document.getElementById('coinChipTip');
+					if (tipEl) tipEl.style.opacity = open ? '0' : '1';
+				}
 
-						// If radio exists and clicking on already checked radio, trigger action
-						if (radio && radio.checked) {
-							switch(forId) {
-								case 'tossCoin':
-									// Free coin toss still requires aiming
-									if (!hasAimed) {
-										showAimReminderModal();
-										return;
-									}
-									triggerCoinToss(true);
-									break;
-								case 'aspca':
-									// Open donation modal immediately - coin toss happens after successful donation
-									window.parent.postMessage({ type: 'openDonation', charity: 'ASPCA' }, '*');
-									break;
-								case 'stlukes':
-									// Open donation modal immediately - coin toss happens after successful donation
-									window.parent.postMessage({ type: 'openDonation', charity: 'ST_JUDES' }, '*');
-									break;
-								case 'devtip':
-									// Dev coffee tip — same modal, DEV pseudo-charity (ETH/USDC)
-									window.parent.postMessage({ type: 'openDonation', charity: 'DEV' }, '*');
-									break;
-							}
+				if (chip) {
+					chip.addEventListener('click', function(e) {
+						e.stopPropagation();
+						// Holding a golden coin: the only move left is the toss.
+						if (heldGoldCoin) {
+							chip.classList.remove('pulse');
+							void chip.offsetWidth; // restart the nudge animation
+							chip.classList.add('pulse');
+							showGoldCoinReadyMessage();
+							return;
 						}
-						// If not checked, let the radio button change happen naturally
+						setTrayOpen(tray.hidden);
 					});
-				})
+				}
+
+				const tokenRow = document.getElementById('trayTokenCoin');
+				if (tokenRow) {
+					tokenRow.addEventListener('click', function(e) {
+						e.stopPropagation();
+						setTrayOpen(false);
+					});
+				}
+
+				document.querySelectorAll('.coin-tray-charity').forEach(btn => {
+					btn.addEventListener('click', function(e) {
+						e.stopPropagation();
+						setTrayOpen(false);
+						// Donation modal lives in the parent (wallet + amount +
+						// USDC/ETH); a golden coin lands in hand on completion.
+						window.parent.postMessage({ type: 'openDonation', charity: this.dataset.charity }, '*');
+					});
+				});
+
+				// Tapping anywhere else closes the tray
+				document.addEventListener('click', function(e) {
+					if (tray && !tray.hidden && dock && !dock.contains(e.target)) {
+						setTrayOpen(false);
+					}
+				});
 
 				// Listen for messages from parent
 				window.addEventListener('message', function(event) {
@@ -3440,19 +3401,50 @@
 						} else if (event.data.type === '80sMode') {
 							document.body.classList.toggle('mode-80s', event.data.value);
 						}
-						// Handle donation completion - let user aim, then toss
+						// Donation done — put a golden coin in the user's hand.
+						// The next water tap throws it (see onPointerUp).
 						else if (event.data.type === 'donationComplete') {
-							selectedCharity = event.data.donation?.charity || 'donation';
-
-							// Store pending toss and wait for user to click water
-							window.pendingDonationToss = true;
-							hasAimed = false;
-
-							// Show aim instruction
-							showAimForDonationMessage();
+							const d = event.data.donation || {};
+							heldGoldCoin = {
+								charity: d.charity || 'donation',
+								amount: d.amount || null,
+								currency: d.currency || 'USDC',
+								wish: typeof d.wish === 'string' && d.wish.trim() ? d.wish.trim() : null,
+								txHash: typeof d.txHash === 'string' ? d.txHash.toLowerCase() : null,
+								donorName: typeof d.donorName === 'string' && d.donorName.trim() ? d.donorName.trim() : null,
+							};
+							selectedCharity = heldGoldCoin.charity;
+							updateCoinChip();
+							showGoldCoinReadyMessage();
 						}
 					}
 				});
+			}
+
+			// Sync the chip with whatever coin is in hand
+			function updateCoinChip() {
+				const chip = document.getElementById('coinChip');
+				const label = document.getElementById('coinChipLabel');
+				const tip = document.getElementById('coinChipTip');
+				if (!chip || !label || !tip) return;
+				tip.style.opacity = '1';
+
+				syncHandCoinStyle();
+				if (heldGoldCoin) {
+					chip.classList.add('gold');
+					chip.setAttribute('aria-expanded', 'false');
+					const tray = document.getElementById('coinTray');
+					if (tray) tray.hidden = true;
+					const amountPart = heldGoldCoin.amount
+						? `${heldGoldCoin.amount} ${heldGoldCoin.currency} `
+						: '';
+					label.textContent = `Golden Coin · ${amountPart}→ ${getCharityShortName(heldGoldCoin.charity)}`;
+					tip.textContent = 'Tap the water to toss it';
+				} else {
+					chip.classList.remove('gold');
+					label.textContent = 'Click to donate coins';
+					tip.textContent = 'Tap anywhere to toss a coin';
+				}
 			}
 
 			async function init() {
@@ -3530,7 +3522,17 @@
 				container.style.touchAction = 'none';
 				container.addEventListener( 'pointermove', onPointerMove );
 				container.addEventListener( 'pointerdown', onPointerDown );
-				container.addEventListener( 'pointerup', onPointerUp );
+				// Up/cancel live on window so the pointer count and tap state
+				// can't leak when a press ends off-canvas or gets cancelled
+				// (e.g. a pinch turning into a gesture).
+				window.addEventListener( 'pointerup', onPointerUp );
+				window.addEventListener( 'pointercancel', onPointerCancel );
+				// Hand coin follows the pointer anywhere over the scene and
+				// hides over UI or when the pointer leaves the window
+				window.addEventListener( 'pointermove', positionHandCoinFromEvent );
+				window.addEventListener( 'pointerout', (e) => {
+					if (!e.relatedTarget) hideHandCoin();
+				} );
 
 				window.addEventListener( 'resize', onWindowResize );
                 window.addEventListener( 'keydown', onKeyDown );
@@ -3644,7 +3646,6 @@
 				const dracoLoader = new DRACOLoader();
 				dracoLoader.setDecoderPath('/draco/'); // Path to DRACO decoder files
 				loader.setDRACOLoader(dracoLoader);
-				
 				
 				// Add timeout for model loading
 				let modelLoadTimeout = setTimeout(() => {
@@ -3779,7 +3780,6 @@
 						 // Rotate if necessary (e.g., if it loads sideways)
 						 // fountainModel.rotation.y = Math.PI / 8; // Example: Rotate slightly if needed
 
-
 						// Enable shadows on all meshes within the loaded model
 						let meshCount = 0;
 						fountainModel.traverse( function ( child ) {
@@ -3824,10 +3824,8 @@
 				);
 				// --- END NEW ---
 
-
 				// Skip duck model loading
 				// duckModel = null;
-
 
 				// Comment out GUI code - remove control panel
 				// const gui = new GUI();
@@ -4075,7 +4073,6 @@
 
 			}
 
-
 			function initWater() {
 
 				const geometry = new THREE.PlaneGeometry( BOUNDS, BOUNDS, WIDTH - 1, WIDTH - 1 );
@@ -4193,7 +4190,6 @@
 				upperMeshRay.updateMatrix();
 				upperMeshRay.userData.isUpperBowl = true; // Mark this as upper bowl for raycasting
 				scene.add( upperMeshRay );
-
 
 				// Creates the gpu computation class and sets it up
 
@@ -4616,7 +4612,6 @@
 				});
 			}
 			
-			
 			function updateWaterFor80s(enabled) {
 				if (waterMesh && waterMesh.material) {
 					if (enabled) {
@@ -4744,7 +4739,6 @@
 
 			}
 
-
 			function onWindowResize() {
 
 				camera.aspect = window.innerWidth / window.innerHeight;
@@ -4755,19 +4749,27 @@
 			}
 
 			function onPointerDown( event ) {
+				// Pointer bookkeeping happens before any early return so the
+				// up-handler's decrement always balances this increment.
+				activePointers++;
+				tapStart = null;
+
 				// Don't process 3D interactions if modal is open
 				const modal = document.getElementById('charityModal');
 				if (modal && modal.style.display === 'block') {
 					return;
 				}
-				
-				// --- Update mouseCoords here --- 
+
+				// Touch has no hover: the held coin appears above the finger
+				// on press (desktop already placed it via pointermove)
+				positionHandCoinFromEvent(event);
+
+				// --- Update mouseCoords here ---
 				const dom = renderer.domElement;
 				const pointerX = ( event.clientX / dom.clientWidth ) * 2 - 1;
 				const pointerY = - ( event.clientY / dom.clientHeight ) * 2 + 1;
 				const currentPointerCoords = new THREE.Vector2(pointerX, pointerY); // Use temporary vector for this event
 				
-
 				raycaster.setFromCamera( currentPointerCoords, camera ); 
 
 				// --- Modified Raycasting Logic ---
@@ -4784,31 +4786,27 @@
 				*/
 				let buttonClicked = false;
 
-				// Only check for water interaction if button wasn't clicked
+				// Any press on the scene can become a toss — water, fountain
+				// stone, or the plaza (resolveTossTarget picks the 3D point).
 				let waterClicked = false;
 				if (!buttonClicked) {
+					aimedCoords.copy(currentPointerCoords); // Save aimed position for coin tosses
+
+					// Candidate tap: if this press ends nearby and soon
+					// (onPointerUp), it's a toss at this spot. A drag
+					// from here is still just camera rotation + ripples.
+					if (activePointers === 1) {
+						tapStart = { x: event.clientX, y: event.clientY, t: performance.now() };
+					}
+
+					// Water presses additionally stir up ripples
 					const waterIntersects = raycaster.intersectObjects( [meshRay, upperMeshRay] );
 					if (waterIntersects.length > 0) {
 						const firstHit = waterIntersects[0].object;
 						if (firstHit === meshRay || firstHit === upperMeshRay) {
-							// Update both mouseCoords (for water effect) and aimedCoords (for coin aiming)
-							mouseCoords.copy(currentPointerCoords);
-							aimedCoords.copy(currentPointerCoords); // Save aimed position for coin tosses
-							hasAimed = true; // Mark that user has aimed
+							mouseCoords.copy(currentPointerCoords); // for the water disturbance effect
 							mousedown = true; // Enable water disturbance via raycast() function
 							waterClicked = true;
-
-							// Optional: Log hit point for debugging water interaction itself
-
-							// If there's a pending donation toss, trigger it now that user has aimed
-							if (window.pendingDonationToss) {
-								hideAimForDonationMessage();
-								window.pendingDonationToss = false;
-								// Small delay so user sees the water ripple first
-								setTimeout(() => {
-									triggerCoinToss(false);
-								}, 300);
-							}
 						}
 					}
 				}
@@ -4822,47 +4820,346 @@
 			}
             function onKeyDown( event ) {
                 if ( event.key.toLowerCase() === 'c' ) {
-                    triggerCoinToss(); // Use the refactored function
+                    tossHeldCoin(); // keyboard shortcut throws whatever's in hand
                 }
             }
 
-            function triggerCoinToss(isLocalCoin = false) {
-                // Use the aimed coordinates (set when water was clicked) to determine target
+            // One coin in the air at a time: the hand stays empty (and taps
+            // throw nothing) until the tossed coin lands — splashes into the
+            // water, comes to rest on stone or plaza — or leaves the sim.
+            let inFlightCoin = null;
+            let inFlightTossedAt = 0;
+
+            function coinInFlight() {
+                if (!inFlightCoin) return false;
+                const u = inFlightCoin.userData;
+                const landed = u.underwater || u.stopped ||
+                    coins.indexOf(inFlightCoin) === -1 ||
+                    (performance.now() - inFlightTossedAt) > 5000; // safety net
+                if (landed) {
+                    inFlightCoin = null;
+                    return false;
+                }
+                return true;
+            }
+
+            // A tap throws the coin in hand: golden (one ceremonial toss per
+            // donation) or the infinite free token coin.
+            function tossHeldCoin() {
+                if (coinInFlight()) return; // hand is empty until it lands
+                flingHandCoin();
+                if (heldGoldCoin) {
+                    const gold = heldGoldCoin;
+                    heldGoldCoin = null;
+                    hideGoldCoinReadyMessage();
+                    selectedCharity = gold.charity; // createCoin stamps this on the coin
+                    inFlightCoin = triggerCoinToss(false);
+                    if (inFlightCoin) inFlightCoin.userData.txHash = gold.txHash || null;
+                    inFlightTossedAt = performance.now();
+                    updateCoinChip();
+                    showGoldSplashCredit(gold);
+                } else {
+                    inFlightCoin = triggerCoinToss(true);
+                    inFlightTossedAt = performance.now();
+                }
+            }
+
+            // Instant local credit at toss time ("You · $5 → St. Jude").
+            // The chain-verified toast still arrives via the Firestore
+            // listener once /api/fountain-donation confirms the tx.
+            function showGoldSplashCredit(gold) {
+                createDonationToast({
+                    userName: 'You',
+                    charity: gold.charity,
+                    amount: gold.amount,
+                    currency: gold.currency,
+                    wish: gold.wish,
+                }, true);
+            }
+
+            // ===== Donation coin inspector =====
+            // A landed donation coin can be tapped to reveal who gave, to
+            // which charity, and how much. The coin doc stores only the tx
+            // hash; the authoritative, server-sanitized details live in
+            // fountain_donations (keyed by that hash), so we look them up
+            // there and render them ESCAPED (donorName is self-claimed).
+            let coinInfoCardEl = null;
+            let coinInfoCardTimer = null;
+
+            function ensureCoinInfoCard() {
+                if (coinInfoCardEl) return coinInfoCardEl;
+                const style = document.createElement('style');
+                style.textContent = `
+                    #coinInfoCard {
+                        position: fixed; transform: translate(-50%, -100%);
+                        z-index: 5000; min-width: 132px; max-width: 220px;
+                        padding: 11px 16px 12px; box-sizing: border-box;
+                        background: rgba(22, 18, 40, 0.92);
+                        border: 1px solid rgba(255, 215, 0, 0.45); border-radius: 14px;
+                        box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 30px rgba(255, 215, 0, 0.15);
+                        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+                        color: #fff; text-align: center;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        opacity: 0; pointer-events: none; transition: opacity 0.18s ease;
+                    }
+                    #coinInfoCard.visible { opacity: 1; pointer-events: auto; }
+                    #coinInfoCard::after {
+                        content: ''; position: absolute; left: 50%; bottom: -7px;
+                        transform: translateX(-50%); width: 0; height: 0;
+                        border-left: 7px solid transparent; border-right: 7px solid transparent;
+                        border-top: 7px solid rgba(22, 18, 40, 0.92);
+                    }
+                    .coin-card-name { font-size: 14px; font-weight: 700; color: #FFD700; letter-spacing: 0.3px; word-break: break-word; line-height: 1.2; }
+                    .coin-card-addr { font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.55); font-family: ui-monospace, Menlo, monospace; margin-top: 2px; }
+                    .coin-card-meta { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.92); margin-top: 7px; }
+                    .coin-card-amt { font-size: 16px; font-weight: 800; color: #fff; margin-top: 2px; }
+                    .coin-card-close { position: absolute; top: 3px; right: 7px; width: 18px; height: 18px; line-height: 15px; padding: 0; background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 16px; cursor: pointer; }
+                    .coin-card-close:hover { color: #fff; }
+                `;
+                document.head.appendChild(style);
+                const el = document.createElement('div');
+                el.id = 'coinInfoCard';
+                el.addEventListener('pointerdown', (e) => e.stopPropagation());
+                document.body.appendChild(el);
+                coinInfoCardEl = el;
+                return el;
+            }
+
+            function hideCoinInfoCard() {
+                if (coinInfoCardTimer) { clearTimeout(coinInfoCardTimer); coinInfoCardTimer = null; }
+                if (coinInfoCardEl) coinInfoCardEl.classList.remove('visible');
+            }
+
+            // Find the donation record for a coin's tx hash — prefer the
+            // already-loaded recent feed, fall back to a one-off read.
+            function findCachedDonation(txHash) {
+                const list = (toastConfig && toastConfig.recentDonations) || [];
+                return list.find((d) => d && d.id === String(txHash).toLowerCase()) || null;
+            }
+            async function fetchDonation(txHash) {
+                try {
+                    if (!donationsCollection) return null;
+                    const doc = await donationsCollection.doc(String(txHash).toLowerCase()).get();
+                    return doc.exists ? { ...doc.data(), id: doc.id } : null;
+                } catch (e) { return null; }
+            }
+
+            function coinCardHTML(coinData, donation) {
+                const charityKey = (donation && donation.charity) || coinData.charity || null;
+                const charityName = charityKey ? getCharityDisplayName(charityKey) : null;
+                const charityEmoji = charityKey ? getCharityEmoji(charityKey) : '';
+                const rows = [];
+                if (donation) {
+                    if (donation.donorName) rows.push(`<div class="coin-card-name">${escapeHtml(donation.donorName)}</div>`);
+                    if (donation.userName) rows.push(`<div class="coin-card-addr">${escapeHtml(donation.userName)}</div>`);
+                    if (charityName) rows.push(`<div class="coin-card-meta">${charityEmoji} ${escapeHtml(charityName)}</div>`);
+                    const amt = donation.amount != null ? `${escapeHtml(String(donation.amount))} ${escapeHtml(donation.currency || '')}`.trim() : '';
+                    if (amt) rows.push(`<div class="coin-card-amt">${amt}</div>`);
+                } else if (charityName) {
+                    rows.push(`<div class="coin-card-meta">${charityEmoji} ${escapeHtml(charityName)}</div>`);
+                    rows.push(`<div class="coin-card-addr">a donation to the fountain</div>`);
+                } else {
+                    rows.push(`<div class="coin-card-addr">a coin in the fountain</div>`);
+                }
+                return `<button type="button" class="coin-card-close" aria-label="Close">&times;</button>${rows.join('')}`;
+            }
+
+            function positionCoinCard(el, worldPos) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                const v = worldPos.clone().project(camera);
+                const x = (v.x * 0.5 + 0.5) * rect.width + rect.left;
+                const y = (-v.y * 0.5 + 0.5) * rect.height + rect.top;
+                el.style.left = Math.max(80, Math.min(window.innerWidth - 80, x)) + 'px';
+                el.style.top = Math.max(70, y - 16) + 'px';
+            }
+
+            function renderCoinCard(el, coinData, donation) {
+                el.innerHTML = coinCardHTML(coinData, donation);
+                const close = el.querySelector('.coin-card-close');
+                if (close) close.addEventListener('click', (e) => { e.stopPropagation(); hideCoinInfoCard(); });
+            }
+
+            function showCoinInfoCard(coinData) {
+                const el = ensureCoinInfoCard();
+                el.dataset.txhash = coinData.txHash || '';
+                positionCoinCard(el, coinData.position);
+                const cached = coinData.txHash ? findCachedDonation(coinData.txHash) : null;
+                renderCoinCard(el, coinData, cached);
+                el.classList.add('visible');
+                if (coinInfoCardTimer) clearTimeout(coinInfoCardTimer);
+                coinInfoCardTimer = setTimeout(hideCoinInfoCard, 8000);
+                if (coinData.txHash && !cached) {
+                    fetchDonation(coinData.txHash).then((d) => {
+                        if (d && el.dataset.txhash === coinData.txHash && el.classList.contains('visible')) {
+                            renderCoinCard(el, coinData, d);
+                        }
+                    });
+                }
+            }
+
+            // Tap -> pick a landed coin from the instanced pile. Returns true
+            // when a coin was hit (card shown), false to fall through to a toss.
+            function tryInspectCoin(ndc) {
+                if (!staticCoinInstancedMesh || !staticCoinData.length) return false;
+                raycaster.setFromCamera(ndc, camera);
+                const hits = raycaster.intersectObject(staticCoinInstancedMesh, false);
+                if (!hits.length || hits[0].instanceId == null) return false;
+                const data = staticCoinData[hits[0].instanceId];
+                if (!data) return false;
+                showCoinInfoCard(data);
+                return true;
+            }
+
+            // --- Hand coin: the held coin rides with the pointer ---
+            // Desktop: follows the mouse while it's over the scene.
+            // Touch: appears just above the finger for the press duration.
+            let handCoinEl = null;
+
+            function ensureHandCoin() {
+                if (!handCoinEl) {
+                    handCoinEl = document.createElement('div');
+                    handCoinEl.id = 'handCoin';
+                    handCoinEl.innerHTML = '<div class="hand-coin-face"><span class="hand-coin-text"></span></div>';
+                    document.body.appendChild(handCoinEl);
+                }
+                return handCoinEl;
+            }
+
+            function syncHandCoinStyle() {
+                ensureHandCoin().classList.toggle('gold', !!heldGoldCoin);
+            }
+
+            function hideHandCoin() {
+                if (handCoinEl) handCoinEl.classList.remove('visible');
+            }
+
+            // Position + show, driven by any pointer event over the scene.
+            // The hand stays empty while a tossed coin is still in the air —
+            // the landing is what puts the next coin in your hand.
+            function positionHandCoinFromEvent(event) {
+                if (cameraFollowActive) return;
+                if (coinInFlight()) {
+                    hideHandCoin();
+                    return;
+                }
+                const overScene = renderer && container &&
+                    (event.target === renderer.domElement || container.contains(event.target));
+                if (!overScene) {
+                    hideHandCoin();
+                    return;
+                }
+                const el = ensureHandCoin();
+                const liftAboveFinger = event.pointerType === 'touch' ? 52 : 0;
+                el.style.transform = `translate3d(${event.clientX}px, ${event.clientY - liftAboveFinger}px, 0)`;
+                el.classList.add('visible');
+            }
+
+            // Toss handoff: the DOM coin vanishes the same instant the 3D
+            // coin spawns at the identical screen position (triggerCoinToss
+            // spawns on the camera→tap ray), so one coin appears to leave
+            // the hand and fly. coinInFlight() keeps the hand empty until
+            // that coin lands.
+            function flingHandCoin() {
+                hideHandCoin();
+                syncHandCoinStyle();
+            }
+            // --- End hand coin ---
+
+            // Find the 3D point under the aimed pixel: water, fountain stone,
+            // or the plaza — the coin can be thrown anywhere in the scene.
+            function resolveTossTarget() {
                 raycaster.setFromCamera( aimedCoords, camera );
 
-                // Raycast towards the invisible water plane (meshRay)
-
-                const intersects = raycaster.intersectObject( meshRay );
-
-                if ( intersects.length > 0 ) {
-                    const targetPoint = intersects[0].point; // Where the coin should land (approx)
-
-                    // --- Calculate Starting Position & Velocity ---
-                    // Start slightly above and in front of the camera, aimed towards the target
-                    const startPosition = new THREE.Vector3();
-                    camera.getWorldPosition(startPosition); // Get camera's world position
-
-                    // Move start position slightly forward from camera towards target
-                    const directionToTarget = new THREE.Vector3().subVectors(targetPoint, startPosition).normalize();
-                    startPosition.addScaledVector(directionToTarget, 1.5); // Start 1.5 units in front of camera
-                    startPosition.y += 0.5; // Start slightly higher
-
-                    // Calculate initial velocity vector
-                    const initialVelocity = new THREE.Vector3();
-                    const throwSpeed = 1.7; 
-                    const upwardAngle = 0.6; 
-                    initialVelocity.subVectors(targetPoint, startPosition).normalize(); // Direction
-                    initialVelocity.multiplyScalar(throwSpeed * Math.cos(upwardAngle)); // Horizontal speed component
-                    initialVelocity.y = throwSpeed * Math.sin(upwardAngle); // Vertical speed component
-
-                    createCoin(startPosition, initialVelocity, isLocalCoin);
-
-                } else {
+                // Water planes and fountain stonework together, closest hit
+                // wins (so the rim doesn't get shadowed by the invisible
+                // water plane behind it, and vice versa)
+                const solidTargets = [meshRay, upperMeshRay].filter(Boolean);
+                if (window.fountainModel) {
+                    window.fountainModel.traverse(function(node) {
+                        if (node.isMesh && node.userData.isFountainPart) {
+                            solidTargets.push(node);
+                        }
+                    });
                 }
+                const hits = raycaster.intersectObjects(solidTargets, false);
+                if (hits.length > 0) return hits[0].point;
+
+                // Off the fountain entirely: aim at the plaza ground plane
+                const plaza = new THREE.Plane(new THREE.Vector3(0, 1, 0), -PLAZA_Y);
+                const plazaPoint = new THREE.Vector3();
+                if (raycaster.ray.intersectPlane(plaza, plazaPoint)) {
+                    return plazaPoint;
+                }
+
+                // Sky tap: just throw along the ray and let gravity decide
+                return raycaster.ray.at(6, new THREE.Vector3());
+            }
+
+            // Returns the thrown coin mesh (or null) so the caller can track
+            // its flight.
+            function triggerCoinToss(isLocalCoin = false) {
+                let targetPoint = resolveTossTarget();
+                if (!targetPoint) return null;
+
+                // --- Calculate Starting Position ---
+                // Spawn ON the camera→tap ray: any point along it projects
+                // onto the tapped pixel, so the coin appears exactly where
+                // the hand coin sits and visibly leaves the hand. (An
+                // extra y-offset here would pop it into view above the
+                // cursor instead.) The distance along the ray is chosen so
+                // the coin's on-screen size at spawn matches the DOM hand
+                // coin it replaces (~48px), clamped so a zoomed-in camera
+                // can't spawn it at or past the landing surface.
+                const startPosition = new THREE.Vector3();
+                camera.getWorldPosition(startPosition); // Get camera's world position
+
+                // Very distant targets (plaza edge, sky taps) get pulled in
+                // so flight times stay watchable
+                const rawDist = startPosition.distanceTo(targetPoint);
+                if (rawDist > 12) {
+                    targetPoint = startPosition.clone()
+                        .addScaledVector(new THREE.Vector3().subVectors(targetPoint, startPosition).normalize(), 12);
+                }
+
+                const directionToTarget = new THREE.Vector3().subVectors(targetPoint, startPosition).normalize();
+                const distToTarget = startPosition.distanceTo(targetPoint);
+                const pxPerWorldUnit = renderer.domElement.clientHeight /
+                    (2 * Math.tan((camera.fov * Math.PI / 180) / 2));
+                const sizeMatchDist = (COIN_RADIUS * 2) * pxPerWorldUnit / 48;
+                const spawnDist = Math.min(Math.max(sizeMatchDist, 0.5), distToTarget * 0.6);
+                startPosition.addScaledVector(directionToTarget, spawnDist);
+
+                // --- Calculate Initial Velocity (ballistic solve) ---
+                // The old throw used a fixed speed + angle, so every coin flew
+                // roughly the same range: far-side aims landed on the near
+                // side. Instead, pick an arc apex and solve the parabola so
+                // the coin actually comes down at the tapped point. The sim
+                // applies `gravity` per frame and integrates position with
+                // dt = 1/60, so continuous-time gravity is gravity * 60.
+                const g = gravity * 60; // units/s²
+                const horiz = new THREE.Vector3(
+                    targetPoint.x - startPosition.x, 0, targetPoint.z - startPosition.z);
+                const hDist = horiz.length();
+                // Arc apex above the start: grows gently with distance, and
+                // always clears an uphill target (e.g. the upper bowl)
+                const apex = Math.max(
+                    0.3 + hDist * 0.1,
+                    (targetPoint.y - startPosition.y) + 0.25
+                );
+                const vy = Math.sqrt(2 * g * apex);
+                const tUp = vy / g;
+                const drop = Math.max(apex + (startPosition.y - targetPoint.y), 0.01);
+                const tDown = Math.sqrt(2 * drop / g);
+                const flightTime = tUp + tDown;
+
+                const initialVelocity = hDist > 0.001
+                    ? horiz.normalize().multiplyScalar(hDist / flightTime)
+                    : new THREE.Vector3();
+                initialVelocity.y = vy;
+
+                return createCoin(startPosition, initialVelocity, isLocalCoin);
             }
         
-
-          
             // Camera follow system functions
             function startCameraFollow(coin) {
                 // Check if coin cam is enabled by user preference
@@ -4872,6 +5169,9 @@
                 cameraFollowActive = true;
                 followedCoin = coin;
                 cameraPhase = 'following';
+                cameraFollowStartedAt = performance.now();
+                cameraGoalPos = camera.position.clone();
+                cameraGoalTarget = controls.target.clone();
                 
                 // Save original camera position and target
                 originalCameraPosition = camera.position.clone();
@@ -4886,6 +5186,10 @@
             }
             
             function hideUIForCinematic() {
+                // No hand coin while the camera chases the thrown one
+                // (cameraFollowActive also blocks re-showing on pointermove)
+                hideHandCoin();
+
                 // Clear previous visibility tracking
                 previouslyVisibleElements.clear();
                 
@@ -4950,31 +5254,92 @@
             
             function updateCameraFollow(deltaTime) {
                 if (!cameraFollowActive || !followedCoin) return;
-                
+
                 const smoothFactor = 0.1; // How quickly camera follows (0.1 = smooth, 1 = instant)
+                const goalSmooth = 0.08; // How quickly the goal itself bends toward each phase's ideal
                 const coinPos = followedCoin.position;
                 const coinVel = followedCoin.userData.velocity;
-                
+
+                // A coin that comes to rest WITHOUT entering the water (rim,
+                // statue, plaza) would otherwise strand the phase machine —
+                // 'impact' only exits via the underwater flag. Hold on the
+                // landed coin for a beat, then return.
+                if (followedCoin.userData.stopped && !followedCoin.userData.underwater &&
+                    (cameraPhase === 'following' || cameraPhase === 'impact')) {
+                    cameraPhase = 'returning';
+                    cameraReturnTimer = -1.2; // negative = pause before the return eases in
+                }
+
+                // Failsafe: if physics ever keeps a coin "flying" indefinitely
+                // (e.g. wedged in geometry), don't soft-lock the player in a
+                // cinematic with controls disabled and UI hidden.
+                if (cameraPhase !== 'returning' &&
+                    performance.now() - cameraFollowStartedAt > 15000) {
+                    cameraPhase = 'returning';
+                    cameraReturnTimer = 0;
+                }
+
+                // The horizontal bearing the camera already views the coin
+                // from — every phase offsets along this (rather than its own
+                // fixed direction) so phase hand-offs don't yank the camera
+                // onto a new heading.
+                const viewBearing = new THREE.Vector3().subVectors(camera.position, coinPos);
+                viewBearing.y = 0;
+                if (viewBearing.lengthSq() > 0.0001) {
+                    viewBearing.normalize();
+                } else {
+                    viewBearing.set(0.7, 0, 0.7);
+                }
+
                 switch(cameraPhase) {
                     case 'following':
                         // Follow coin from a dynamic angle during flight
-                        const followDistance = 3.0; // Increased for wider view (was 3.5)
-                        const followHeight = 1.5; // Increased for better overhead angle (was 1)
-                        
-                        // Calculate ideal camera position (behind and above the coin's trajectory)
-                        const velocityDir = coinVel.clone().normalize();
+                        const followDistance = 3.0;
+
+                        // Ease the chase in: nearly static for the first
+                        // moments so the throw reads from the thrower's own
+                        // viewpoint, ramping to full strength over the first
+                        // second of flight.
+                        followedCoin.userData.followT = (followedCoin.userData.followT || 0) + deltaTime;
+                        const followRamp = Math.min(followedCoin.userData.followT / 1.0, 1);
+                        const followStrength = 0.02 + (smoothFactor - 0.02) * followRamp;
+
+                        // Chase from the thrower's side: stay on the bearing
+                        // from the original viewpoint to the coin. (Placing
+                        // the camera "behind the velocity" swung wildly on
+                        // steep arcs — at launch the velocity is nearly
+                        // vertical, which parked the camera overhead, too
+                        // high and close, and lost the coin from frame.)
+                        const chaseDir = new THREE.Vector3().subVectors(coinPos, originalCameraPosition);
+                        chaseDir.y = 0;
+                        if (chaseDir.lengthSq() > 0.0001) {
+                            chaseDir.normalize();
+                        } else {
+                            chaseDir.set(0, 0, -1);
+                        }
+
+                        // Height: the player's eye level is the floor — rise
+                        // only while the coin actually climbs above it, and
+                        // never chase the descent down into the rim.
+                        const camHeight = Math.max(originalCameraPosition.y, coinPos.y + 0.5);
+
                         const idealCamPos = new THREE.Vector3(
-                            coinPos.x - velocityDir.x * followDistance - 0.3, // Shifted 0.3 units left
-                            coinPos.y + followHeight,
-                            coinPos.z - velocityDir.z * followDistance
+                            coinPos.x - chaseDir.x * followDistance - 0.3, // Shifted 0.3 units left
+                            camHeight,
+                            coinPos.z - chaseDir.z * followDistance
                         );
-                        
-                        // Smoothly move camera
-                        camera.position.lerp(idealCamPos, smoothFactor);
-                        
+
+                        // Bend the smoothed goal toward this phase's ideal,
+                        // then chase the goal — corners (height floor, phase
+                        // seams) become curves.
+                        cameraGoalPos.lerp(idealCamPos, goalSmooth);
+                        camera.position.lerp(cameraGoalPos, followStrength);
+
                         // Look slightly ahead of the coin's position
+                        const velocityDir = coinVel.clone().normalize();
                         const lookAheadTarget = coinPos.clone().add(velocityDir.clone().multiplyScalar(0.3));
-                        controls.target.lerp(lookAheadTarget, smoothFactor * 1.5);
+                        cameraGoalTarget.lerp(lookAheadTarget, goalSmooth * 1.5);
+                        controls.target.lerp(cameraGoalTarget, followStrength * 1.5);
                         
                         // Check if coin is about to hit water
                         // Determine which bowl the coin is heading for based on position
@@ -4992,18 +5357,22 @@
                         break;
                         
                     case 'impact':
-                        // Zoom in close for water impact
-                        const impactDistance = 1.5; // Increased from 0.5
-                        const impactHeight = 0; // Increased from 0.2
-                        
+                        // Zoom in close for water impact — along the bearing
+                        // the camera already has, so the hand-off from
+                        // 'following' is a continued move, not a new heading
+                        const impactDistance = 1.5;
+                        const impactHeight = 0;
+
                         const impactCamPos = new THREE.Vector3(
-                            coinPos.x + impactDistance - 0.2, // Slight left shift for consistency
+                            coinPos.x + viewBearing.x * impactDistance,
                             coinPos.y + impactHeight,
-                            coinPos.z + impactDistance
+                            coinPos.z + viewBearing.z * impactDistance
                         );
-                        
-                        camera.position.lerp(impactCamPos, smoothFactor * 0.7);
-                        controls.target.lerp(coinPos, smoothFactor);
+
+                        cameraGoalPos.lerp(impactCamPos, goalSmooth);
+                        camera.position.lerp(cameraGoalPos, smoothFactor * 0.7);
+                        cameraGoalTarget.lerp(coinPos, goalSmooth * 1.5);
+                        controls.target.lerp(cameraGoalTarget, smoothFactor);
                         
                         // Transition to underwater after coin enters water
                         if (followedCoin.userData.underwater) {
@@ -5013,16 +5382,19 @@
                         break;
                         
                     case 'underwater':
-                        // Follow coin underwater with blue tint effect
-                        const underwaterDistance = 1.2; // Increased for wider underwater view (was 0.3)
+                        // Follow coin underwater with blue tint effect —
+                        // same bearing-continuous placement as 'impact'
+                        const underwaterDistance = 0.6;
                         const underwaterCamPos = new THREE.Vector3(
-                            coinPos.x + underwaterDistance * 0.5 - 0.6, // Slight left shift
+                            coinPos.x + viewBearing.x * underwaterDistance,
                             coinPos.y + 0.2, // Raised camera slightly (was 0.1)
-                            coinPos.z + underwaterDistance * 0.5
+                            coinPos.z + viewBearing.z * underwaterDistance
                         );
-                        
-                        camera.position.lerp(underwaterCamPos, smoothFactor * 0.5);
-                        controls.target.lerp(coinPos, smoothFactor * 0.8);
+
+                        cameraGoalPos.lerp(underwaterCamPos, goalSmooth);
+                        camera.position.lerp(cameraGoalPos, smoothFactor * 0.5);
+                        cameraGoalTarget.lerp(coinPos, goalSmooth * 1.2);
+                        controls.target.lerp(cameraGoalTarget, smoothFactor * 0.8);
                         
                         // Show underwater overlay effect
                         if (underwaterOverlay) {
@@ -5038,9 +5410,10 @@
                         break;
                         
                     case 'returning':
-                        // Smoothly return to original position
+                        // Smoothly return to original position (timer may
+                        // start negative for a hold on dry landings)
                         cameraReturnTimer += deltaTime;
-                        const returnProgress = Math.min(cameraReturnTimer / 2, 1); // 2 second return
+                        const returnProgress = Math.max(0, Math.min(cameraReturnTimer / 2, 1)); // 2 second return
                         const eased = 1 - Math.pow(1 - returnProgress, 3); // Ease-out cubic
                         
                         camera.position.lerpVectors(camera.position, originalCameraPosition, eased * smoothFactor);
@@ -5072,6 +5445,111 @@
                 camera.updateProjectionMatrix();
             }
             
+            // After a coin comes to rest on stone, sit it ON the surface.
+            // The collision ray runs from the coin's CENTER, so a hit on a
+            // seam or side face can leave the disc visibly sunk in the mesh
+            // (the bounce offset is only ~COIN_THICKNESS/2 of clearance for
+            // a coin with 8x that radius). Look straight down from just
+            // above the rest point for the true top face and lift the coin
+            // onto it — small lifts only, so a coin tucked under the rim's
+            // lip can't get teleported on top of it.
+            function settleRestingCoin(coin) {
+                if (!window.fountainModel) return;
+                const parts = [];
+                window.fountainModel.traverse(function(node) {
+                    if (node.isMesh && node.userData.isFountainPart) parts.push(node);
+                });
+                if (parts.length === 0) return;
+
+                // Cast straight down from well above the coin so even a coin left
+                // embedded by a side/seam hit still finds the true top face. Walk
+                // the hits and seat flat on the first near-horizontal surface that
+                // is not far above where it fell (so a coin tucked under the rim
+                // lip cannot get teleported on top of it).
+                const settleRay = new THREE.Raycaster();
+                const origin = coin.position.clone();
+                origin.y += 0.25;
+                settleRay.set(origin, new THREE.Vector3(0, -1, 0));
+                const hits = settleRay.intersectObjects(parts, false);
+
+                let seated = false;
+                for (const hit of hits) {
+                    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+                    if (normal.y < 0.8) continue; // need a face it can lie flat on
+                    const restY = hit.point.y + COIN_THICKNESS / 2 + 0.002;
+                    if (restY - coin.position.y > 0.2) continue; // surface too far above
+                    coin.position.y = restY;
+                    // Lie flat on the horizontal face (same convention as coin stacking)
+                    coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
+                    seated = true;
+                    break;
+                }
+                if (!seated) return;
+
+                // Horizontal clearance: a disc that settled flat right next to a
+                // vertical wall (the basin rim, a step riser) has its rim buried
+                // in that wall. Probe outward in a ring at the disc's mid-height
+                // and slide it along the ledge until the whole footprint clears
+                // stone — but only while it stays supported, so it can't be
+                // shoved off the ledge into mid-air.
+                const rimR = COIN_RADIUS * (coin.scale.x || 1) + 0.004;
+                const RING = 12;
+                const ringDirs = [];
+                for (let a = 0; a < RING; a++) {
+                    const t = (a / RING) * Math.PI * 2;
+                    ringDirs.push(new THREE.Vector3(Math.cos(t), 0, Math.sin(t)));
+                }
+                const hRay = new THREE.Raycaster();
+                const ringPen = (px, py, pz) => {
+                    let m = 0; const oo = new THREE.Vector3(px, py, pz);
+                    for (const d of ringDirs) { hRay.set(oo, d); hRay.far = rimR; const wh = hRay.intersectObjects(parts, false); if (wh.length) m = Math.max(m, rimR - wh[0].distance); }
+                    return m;
+                };
+                for (let iter = 0; iter < 6; iter++) {
+                    const o = coin.position.clone();
+                    const push = new THREE.Vector3();
+                    let worst = 0;
+                    for (const d of ringDirs) {
+                        hRay.set(o, d);
+                        hRay.far = rimR;
+                        const wh = hRay.intersectObjects(parts, false);
+                        if (wh.length) {
+                            const pen = rimR - wh[0].distance; // how far the rim intrudes
+                            if (pen > 0) { push.addScaledVector(d, -pen); worst = Math.max(worst, pen); }
+                        }
+                    }
+                    if (worst < 0.001) break;
+                    // Step by the deepest single penetration along the clearance
+                    // direction — summing every ray's push overshoots (adjacent
+                    // rays stack) and flings the coin off the ledge in one go.
+                    const dir = push.clone().normalize();
+                    if (!isFinite(dir.x)) break;
+                    const step = worst + 0.002;
+                    const nx = coin.position.x + dir.x * step;
+                    const nz = coin.position.z + dir.z * step;
+                    // Re-seat onto whatever near-horizontal face is under the new
+                    // spot. Allow stepping DOWN onto a lower ledge/floor (so a
+                    // coin wedged on a narrow rim slides off into the open bowl)
+                    // but never climb UP onto higher geometry, and never off into
+                    // the void (no stone below within reach → leave it put).
+                    settleRay.set(new THREE.Vector3(nx, coin.position.y + 0.1, nz), new THREE.Vector3(0, -1, 0));
+                    const dh = settleRay.intersectObjects(parts, false);
+                    let newY = null;
+                    for (const hit of dh) {
+                        const nrm = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+                        if (nrm.y < 0.8) continue;
+                        const ry = hit.point.y + COIN_THICKNESS / 2 + 0.002;
+                        if (ry <= coin.position.y + 0.03 && ry >= coin.position.y - 0.25) newY = ry;
+                        break;
+                    }
+                    if (newY === null) break; // nothing to stand on out there — leave it
+                    if (ringPen(nx, newY, nz) >= worst) break; // candidate no better — stop
+                    coin.position.x = nx;
+                    coin.position.z = nz;
+                    coin.position.y = newY;
+                }
+            }
+
             function isWithinFountainWater(position) {
                 // Get distance from center of fountain
                 const centerX = 0;
@@ -5081,7 +5559,6 @@
                     Math.pow(position.z - centerZ, 2)
                 );
                 
-
                 const fountainWaterRadius = 1.15;
                 
                 // Return true if position is within the circular boundary
@@ -5090,14 +5567,25 @@
 
             function createCoin( startPosition, initialVelocity, isLocalCoin = false ) {
                 const coinMaterialInstance = baseCoinMaterial.clone();
-                
+
                 // Apply 80s mode emissive glow if in 80s mode
                 if (is80sMode) {
                     coinMaterialInstance.emissive = new THREE.Color('#FFEB38');
                     coinMaterialInstance.emissiveIntensity = 0.3;
                 }
-                
+
+                // Golden (donation) coins glow during their flight — the
+                // ceremony reads from across the plaza. Once landed they're
+                // swapped into the plain instanced pile like any other coin.
+                if (!isLocalCoin) {
+                    coinMaterialInstance.emissive = new THREE.Color('#FFB300');
+                    coinMaterialInstance.emissiveIntensity = 0.55;
+                }
+
                 const coin = new THREE.Mesh( coinGeometry, coinMaterialInstance );
+                if (!isLocalCoin) {
+                    coin.scale.setScalar(1.15);
+                }
                 coin.position.copy( startPosition );
                 coin.userData.velocity = initialVelocity.clone();
                 coin.userData.rotationAxis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
@@ -5115,13 +5603,13 @@
                 
                 // Initiate camera follow for this coin
                 startCameraFollow(coin);
+
+                return coin;
             }
 
 			// Make functions globally accessible for mobile buttons
 			window.triggerCoinToss = triggerCoinToss;
-			window.hasAimed = () => hasAimed;
-			window.setHasAimed = (value) => { hasAimed = value; };
-			window.showAimReminderModal = showAimReminderModal;
+			window.tossHeldCoin = tossHeldCoin;
 			window.showCharityModal = showCharityModal;
 			window.getSelectedCharity = () => selectedCharity;
 			window.setSelectedCharity = (charity) => { selectedCharity = charity; };
@@ -5133,20 +5621,56 @@
 				// Set up coin cam toggle handler
 				const coinCamToggle = document.getElementById('coinCamToggle');
 				if (coinCamToggle) {
-					coinCamToggle.addEventListener('change', function(e) {
-						coinCamEnabled = e.target.checked;
+					coinCamToggle.addEventListener('click', function() {
+						coinCamEnabled = !coinCamEnabled;
+						this.classList.toggle('active', coinCamEnabled);
+						this.setAttribute('aria-pressed', String(coinCamEnabled));
+						const label = document.getElementById('coinCamLabel');
+						if (label) label.textContent = coinCamEnabled ? 'Cam on' : 'Cam off';
 					});
 				}
 			}, 100);
 
-			function onPointerUp() {
+			function onPointerUp( event ) {
 
+				activePointers = Math.max(0, activePointers - 1);
 				mousedown = false;
 				// Always ensure controls are enabled after pointer up
 				if (!cameraFollowActive) {
 					controls.enabled = true;
 				}
 
+				// One-gesture toss: a short, steady press on the water throws
+				// the held coin at that spot (aimedCoords was captured on the
+				// down). Drags rotate the camera, pinches zoom — neither toss.
+				if (tapStart && activePointers === 0) {
+					const dx = (event && typeof event.clientX === 'number' ? event.clientX : tapStart.x) - tapStart.x;
+					const dy = (event && typeof event.clientY === 'number' ? event.clientY : tapStart.y) - tapStart.y;
+					const isTap = Math.hypot(dx, dy) < 10 && (performance.now() - tapStart.t) < 600;
+					tapStart = null;
+					if (isTap && !cameraFollowActive) {
+						// A tap on a landed donation coin opens its info card
+						// instead of tossing; a tap on open water still tosses.
+						hideCoinInfoCard();
+						if (!tryInspectCoin(aimedCoords)) {
+							tossHeldCoin();
+						}
+					}
+				}
+
+				// Finger lifted: nothing is "hovering" on touch, so the held
+				// coin goes back in the pocket until the next press
+				if (event && event.pointerType === 'touch') {
+					hideHandCoin();
+				}
+
+			}
+
+			function onPointerCancel() {
+				activePointers = Math.max(0, activePointers - 1);
+				tapStart = null;
+				mousedown = false;
+				hideHandCoin();
 			}
 
 			function onPointerMove( event ) {
@@ -5188,7 +5712,6 @@
 							
 							uniforms['mousePos'].value.set(coordX, coordZ);
 					
-							
 						} else if (hitObject === upperMeshRay) {
 							// Upper bowl - just use world position for now
 							uniforms['mousePos'].value.set(point.x, point.z);
@@ -5409,8 +5932,17 @@
                                 const impactPoint = intersects[0].point.clone();
                                 coin.position.copy(impactPoint.add(surfaceNormal.clone().multiplyScalar(offsetDistance)));
                                 
+                                // A coin wedged inside geometry re-collides
+                                // every frame and the reposition-along-normal
+                                // ratchets it through the stone (observed:
+                                // coins climbing inside the column, never
+                                // resting). No honest toss bounces this many
+                                // times — force it to rest.
+                                coin.userData.bounceCount = (coin.userData.bounceCount || 0) + 1;
+                                const wedged = coin.userData.bounceCount > 40;
+
                                 // Only bounce if impact speed is significant enough
-                                if (impactSpeed > minSpeedForBounce) {
+                                if (!wedged && impactSpeed > minSpeedForBounce) {
                                     // Reflect velocity vector along normal (bounce) and reduce magnitude
                                     velocity.reflect(surfaceNormal).multiplyScalar(bounceCoefficient);
                                     
@@ -5447,14 +5979,21 @@
                                     // Add a random rotation around the normal for visual variety
                                     const randomAngle = Math.random() * Math.PI * 2;
                                     coin.rotateOnWorldAxis(surfaceNormal, randomAngle);
-                                    
+
+                                    // Pull the disc up out of the mesh if the
+                                    // center-ray rest left it embedded (runs
+                                    // before the save so the corrected pose
+                                    // is what persists)
+                                    settleRestingCoin(coin);
+
                                     // Save coin to Firestore if not already saved (skip for local coins)
                                     if (!coin.userData.firestoreId && !coin.userData.isStatic && !coin.userData.isLocalCoin) {
                                         saveCoinToFirestore({
                                             position: coin.position,
                                             rotation: coin.rotation,
                                             isInUpperBowl: isInUpperBowl,
-                                            charity: coin.userData.charity
+                                            charity: coin.userData.charity,
+                                            txHash: coin.userData.txHash || null
                                         }).then(id => {
                                             if (id) {
                                                 coin.userData.firestoreId = id;
@@ -5465,7 +6004,7 @@
                                                 triggerCelebration(coin.userData.charity);
 
                                                 // Add to instanced mesh but KEEP as invisible collision obstacle
-                                                addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id);
+                                                addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
                                                 coin.visible = false; // Hide since instanced mesh shows it
                                                 coin.userData.isStaticObstacle = true; // Mark as static obstacle
 
@@ -5603,6 +6142,22 @@
                             }
                         }
                         
+                        // --- Rest on the plaza if the coin missed the fountain ---
+                        // Coins only raycast against fountain parts, so a coin
+                        // thrown onto the open plaza needs this explicit floor
+                        // or it falls through the ground mesh forever. Plaza
+                        // coins are session-local — deliberately NOT saved to
+                        // Firestore, since fountain_coins counts coins that
+                        // actually made it into the fountain.
+                        if (!isUnderwater && !coin.userData.stopped &&
+                            nextPosition.y <= PLAZA_Y + COIN_THICKNESS / 2 && velocity.y <= 0) {
+                            nextPosition.y = PLAZA_Y + COIN_THICKNESS / 2;
+                            velocity.set(0, 0, 0);
+                            coin.userData.stopped = true;
+                            // Same lie-flat convention as coin stacking
+                            coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
+                        }
+
                         // If coin landed on another coin underwater, handle the stop
                         if (landedOnCoin && coin.userData.stopped) {
                             // Save coin to Firestore if not already saved (skip for local coins)
@@ -5611,7 +6166,8 @@
                                     position: nextPosition,
                                     rotation: coin.rotation,
                                     isInUpperBowl: isInUpperBowl,
-                                    charity: coin.userData.charity
+                                    charity: coin.userData.charity,
+                                    txHash: coin.userData.txHash || null
                                 }).then(id => {
                                     if (id) {
                                         coin.userData.firestoreId = id;
@@ -5676,8 +6232,8 @@
                         }
 
                         // --- Check for Reaching Bottom ---
-                        if (isUnderwater && coin.position.y <= bottomDepth + 0.01) { // Check if close to or past bottom
-                             coin.position.y = bottomDepth; // Settle exactly at bottom
+                        if (isUnderwater && coin.position.y <= bottomDepth + COIN_THICKNESS / 2 + 0.01) { // Check if close to or past bottom
+                             coin.position.y = bottomDepth + COIN_THICKNESS / 2 + 0.001; // rest ON the bowl floor, not centered in the mesh
                              coin.userData.stopped = true;
                              velocity.set(0, 0, 0); // Stop all movement
 
@@ -5688,14 +6244,20 @@
                              // We might also want a random Z rotation so they don't all face the same way
                              coin.rotateZ(Math.random() * Math.PI * 2); // Add random rotation around world Z
                              // --- END ADJUSTMENT ---
-                             
+
+                             // Seat on the ACTUAL bowl-floor mesh (bottomDepth is
+                             // a hair above it); also corrects any spot where the
+                             // floor differs from the nominal depth.
+                             settleRestingCoin(coin);
+
                              // Save coin to Firestore if not already saved (skip for local coins)
                              if (!coin.userData.firestoreId && !coin.userData.isStatic && !coin.userData.isLocalCoin) {
                                  saveCoinToFirestore({
                                      position: coin.position,
                                      rotation: coin.rotation,
                                      isInUpperBowl: isInUpperBowl,
-                                     charity: coin.userData.charity
+                                     charity: coin.userData.charity,
+                                     txHash: coin.userData.txHash || null
                                  }).then(id => {
                                      if (id) {
                                          coin.userData.firestoreId = id;
@@ -5706,7 +6268,7 @@
                                          triggerCelebration(coin.userData.charity);
 
                                          // Add to instanced mesh but KEEP as invisible collision obstacle
-                                         addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id);
+                                         addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
                                          coin.visible = false; // Hide since instanced mesh shows it
                                          coin.userData.isStaticObstacle = true; // Mark as static obstacle
 
@@ -5761,7 +6323,6 @@
                     }
                 }
        
-
 				frame ++;
 
 				if ( frame >= 7 - effectController.speed ) {
@@ -5816,7 +6377,6 @@
 				}
 
 			}
-
 
 			//----------------------
 
@@ -5881,7 +6441,6 @@
 				}
 
 			}
-
 
 			const shaderChange = {
 
@@ -6033,7 +6592,10 @@
 
 		</script>
 
-		<!-- New Toggle Component for Coin Toss -->
+		<!-- "Coin in your hand" chip: tossing is always one tap on the water;
+		     this chip only chooses WHICH coin that tap throws. Tapping the
+		     chip opens the tray; picking a charity runs the parent's donation
+		     modal, and a successful donation puts a golden coin in hand. -->
 		<div id="coinTossButtons" style="
 			position: fixed;
 			bottom: 10vh;
@@ -6042,353 +6604,265 @@
 			z-index: 1500;
 			transition: all 0.3s ease;
 		">
-			<div class="fountain-toggle">
-				<div class="fountain-toggle__track">
-					<div class="indicator"></div>
-					<label for="tossCoin">Toss Free Coin</label>
-					<input class="sr-only" type="radio" name="fountainMode" id="tossCoin" checked />
-					<input class="sr-only" type="radio" name="fountainMode" id="donate" />
-					<label for="donate" class="donate-main-label"></label>
-					<div class="donate-section">
-						<div class="indicator"></div>
-						<label for="aspca">
-							<span>ASPCA</span>
-							<span class="sr-only">Donate to ASPCA</span>
-						</label>
-						<input class="sr-only" type="radio" name="fountainMode" id="aspca" />
-						<label for="stlukes">
-							<span>St. Jude</span>
-							<span class="sr-only">Donate to St. Jude</span>
-						</label>
-						<input class="sr-only" type="radio" name="fountainMode" id="stlukes" />
-						<label for="devtip">
-							<span>☕ Dev</span>
-							<span class="sr-only">Tip the dev a coffee</span>
-						</label>
-						<input class="sr-only" type="radio" name="fountainMode" id="devtip" />
+			<div class="coin-chip-dock">
+				<div class="coin-chip-tip" id="coinChipTip">Tap anywhere to toss a coin</div>
+				<div id="coinTray" class="coin-tray" hidden>
+					<button type="button" class="coin-tray-row" id="trayTokenCoin">
+						<span class="coin-tray-icon">🪙</span>
+						<span class="coin-tray-text">
+							<span class="coin-tray-title">Token Coin</span>
+							<span class="coin-tray-sub">free · toss as many as you like</span>
+						</span>
+						<span class="coin-tray-check" aria-hidden="true">✓</span>
+					</button>
+					<div class="coin-tray-divider"></div>
+					<div class="coin-tray-row coin-tray-gold-head">
+						<span class="coin-tray-icon">🥇</span>
+						<span class="coin-tray-text">
+							<span class="coin-tray-title">Golden Coin</span>
+							<span class="coin-tray-sub">a real USDC / ETH donation</span>
+						</span>
+					</div>
+					<div class="coin-tray-charities">
+						<button type="button" class="coin-tray-charity" data-charity="ST_JUDES">🏥 St. Jude</button>
+						<button type="button" class="coin-tray-charity" data-charity="ASPCA">🐾 ASPCA</button>
+						<button type="button" class="coin-tray-charity" data-charity="DEV">☕ Dev</button>
 					</div>
 				</div>
+				<button type="button" id="coinChip" class="coin-chip" aria-haspopup="true" aria-expanded="false">
+					<span class="coin-chip-text">
+						<span class="coin-chip-label" id="coinChipLabel">Click to donate coins</span>
+					</span>
+					<span class="coin-chip-caret" aria-hidden="true">▴</span>
+				</button>
 			</div>
 		</div>
 
 		<style>
-			/* Ripple effect */
-			.ripple {
-				position: absolute;
-				top: 50%;
-				left: 50%;
-				width: 0;
-				height: 0;
-				border-radius: 50%;
-				background: rgba(255, 255, 255, 0.5);
-				transform: translate(-50%, -50%);
-				pointer-events: none;
-			}
-
-			@keyframes rippleAnimation {
-				to {
-					width: 200px;
-					height: 200px;
-					opacity: 0;
-				}
-			}
-
-			.coin-toss-btn.clicked .ripple {
-				animation: rippleAnimation 0.6s ease-out;
-			}
-
-			/* Toggle Component Styles */
-			.fountain-toggle {
+			/* ===== Coin chip + tray ===== */
+			.coin-chip-dock {
 				position: relative;
 				width: 100%;
-				max-width: 400px;
-				height: 50px;
-				background: rgba(255, 255, 255, 0.15);
-				border-radius: 100px;
+				display: flex;
+				justify-content: center;
+			}
+
+			.coin-chip {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				width: auto;
+				min-width: 0;
+				max-width: 340px;
+				padding: 7px 18px;
+				background: rgba(255, 255, 255, 0.12);
 				border: 2px solid rgba(255, 255, 255, 0.3);
-				padding: 4px;
-				backdrop-filter: blur(10px);
-				box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3),
-					0 0 40px rgba(102, 126, 234, 0.2);
-				box-sizing: border-box;
-			}
-			
-			/* Desktop specific width */
-			@media (min-width: 769px) {
-				.fountain-toggle {
-					width: 400px;
-				}
-			}
-
-			.fountain-toggle__track {
-				display: grid;
-				place-items: center;
-				grid-template-columns: repeat(4, 1fr);
-				width: 100%;
-				height: 100%;
-				position: relative;
-			}
-
-			.fountain-toggle__track > .indicator {
-				position: absolute;
-				width: 50%;
-				left: 0;
-				top: 0;
-				bottom: 0;
-				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 				border-radius: 100px;
-				transition: translate 0.25s ease-out, background 0.25s ease-out;
-				box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
-				z-index: 1;
+				backdrop-filter: blur(10px);
+				-webkit-backdrop-filter: blur(10px);
+				box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 40px rgba(102, 126, 234, 0.2);
+				cursor: pointer;
+				box-sizing: border-box;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+				transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+				text-align: left;
 			}
 
-			.fountain-toggle label {
-				display: inline-block;
-				height: 100%;
-				width: 100%;
-				display: grid;
-				place-items: center;
-				cursor: pointer;
-				font-size: 13px;
-				font-weight: 600;
-				color: rgba(255, 255, 255, 0.6);
-				z-index: 2;
-				transition: color 0.25s ease-out;
+			.coin-chip:hover {
+				border-color: rgba(255, 255, 255, 0.55);
+				box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 50px rgba(102, 126, 234, 0.3);
+			}
+
+			.coin-chip-text {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				gap: 1px;
+				min-width: 0;
+			}
+
+			.coin-chip-label {
+				font-size: 12px;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.95);
 				letter-spacing: 0.3px;
 				white-space: nowrap;
 				overflow: hidden;
 				text-overflow: ellipsis;
-				padding: 0 4px;
 			}
 
-			.fountain-toggle__track > label[for="tossCoin"] {
-				grid-column: span 2;
-			}
-			
-			.donate-main-label {
-				grid-column: span 2;
-				position: relative;
-				z-index: 5;
-			}
-			
-			.donate-main-label::after {
-				content: 'Donate';
-				display: block;
-				width: 100%;
-				height: 100%;
-				display: grid;
-				place-items: center;
-			}
-
-			.donate-section {
-				display: grid;
+			.coin-chip-tip {
 				position: absolute;
-				grid-template-columns: repeat(3, 1fr);
-				top: 0;
+				bottom: calc(100% + 5px);
 				left: 50%;
-				width: 50%;
-				height: 100%;
+				transform: translateX(-50%);
+				font-size: 10px;
+				line-height: 1;
+				font-weight: 500;
+				color: rgba(255, 255, 255, 0.72);
+				letter-spacing: 0.3px;
+				white-space: nowrap;
+				text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 				pointer-events: none;
-				opacity: 0;
-				transition: opacity 0.25s ease-out;
+				transition: opacity 0.2s ease;
 			}
 
 
-			.donate-section .indicator {
-				position: absolute;
-				background: rgba(255, 255, 255, 0.95);
-				width: 33.4%;
-				height: 100%;
-				left: 50%;
-				top: 0;
-				translate: -50% 0;
-				border-radius: 100px;
-				transition: translate 0.25s ease-out, clip-path 0.25s ease-out, background 0.25s ease-out;
-				opacity: 0;
-				z-index: 1;
-				clip-path: inset(35% calc(50% + 1px) 35% calc(50% - 3px) round 100px);
-			}
-
-			.donate-section label {
-				position: relative;
-				z-index: 4;
-				font-size: 11px;
-			}
-			
-			.donate-section label span {
-				display: grid;
-				place-items: center;
-				height: 100%;
-				width: 100%;
-				transition: all 0.25s ease-out;
-				opacity: 0;
-				transform: scale(0.8);
-			}
-
-			/* Active states */
-			/* When Toss Coin is selected */
-			.fountain-toggle__track:has(#tossCoin:checked) > .indicator {
-				translate: 0 0;
-			}
-			
-			.fountain-toggle__track:has(#tossCoin:checked) > label[for="tossCoin"] {
-				color: rgba(255, 255, 255, 0.95);
-			}
-			
-			.fountain-toggle__track:has(#tossCoin:checked) .donate-main-label {
+			.coin-chip-caret {
+				font-size: 12px;
 				color: rgba(255, 255, 255, 0.6);
+				transition: transform 0.2s ease;
 			}
 
-			/* When donate is selected (show sub-options) */
-			.fountain-toggle__track:has(#donate:checked) > label[for="tossCoin"] {
-				color: rgba(255, 255, 255, 0.5);
+			.coin-chip[aria-expanded="true"] .coin-chip-caret {
+				transform: rotate(180deg);
 			}
-			
-			.fountain-toggle__track:has(#donate:checked) > .indicator {
-				translate: 100% 0;
+
+			/* Golden coin in hand: the chip itself glows until the toss */
+			.coin-chip.gold {
+				border-color: rgba(255, 215, 0, 0.75);
+				background: linear-gradient(135deg, rgba(255, 215, 0, 0.18) 0%, rgba(255, 165, 0, 0.14) 100%);
+				box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 215, 0, 0.45);
+				animation: goldChipGlow 1.8s ease-in-out infinite;
+			}
+
+			.coin-chip.gold .coin-chip-label {
+				color: #FFD700;
+			}
+
+			.coin-chip.gold .coin-chip-caret {
+				display: none;
+			}
+
+			@keyframes goldChipGlow {
+				0%, 100% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 25px rgba(255, 215, 0, 0.35); }
+				50% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 45px rgba(255, 215, 0, 0.65); }
+			}
+
+			.coin-chip.pulse {
+				animation: chipNudge 0.4s ease;
+			}
+
+			@keyframes chipNudge {
+				0%, 100% { transform: translateX(0); }
+				25% { transform: translateX(-5px); }
+				75% { transform: translateX(5px); }
+			}
+
+			/* Tray popover — opens upward from the chip */
+			.coin-tray {
+				position: absolute;
+				bottom: calc(100% + 10px);
+				left: 50%;
+				transform: translateX(-50%);
+				width: min(320px, calc(100vw - 24px));
+				padding: 8px;
+				background: rgba(22, 18, 40, 0.92);
+				border: 1px solid rgba(255, 255, 255, 0.22);
+				border-radius: 16px;
+				backdrop-filter: blur(14px);
+				-webkit-backdrop-filter: blur(14px);
+				box-shadow: 0 10px 35px rgba(0, 0, 0, 0.5), 0 0 40px rgba(102, 126, 234, 0.15);
+				z-index: 1700;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+				animation: trayRise 0.18s ease-out;
+			}
+
+			@keyframes trayRise {
+				from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+				to { opacity: 1; transform: translateX(-50%) translateY(0); }
+			}
+
+			.coin-tray-row {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				width: 100%;
+				padding: 8px 10px;
 				background: transparent;
-			}
-			
-			.fountain-toggle__track:has(#donate:checked) .donate-main-label {
-				opacity: 0;
-				pointer-events: none;
-			}
-			
-			.fountain-toggle__track:has(#donate:checked) .donate-section {
-				opacity: 1;
-				pointer-events: all;
-			}
-			
-			/* When donate is selected - main indicator becomes blue background */
-			.fountain-toggle__track:has(#donate:checked) > .indicator,
-			.fountain-toggle__track:has(#aspca:checked) > .indicator,
-			.fountain-toggle__track:has(#stlukes:checked) > .indicator,
-			.fountain-toggle__track:has(#devtip:checked) > .indicator {
-				translate: 100% 0;
-				background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+				border: none;
+				border-radius: 10px;
+				color: inherit;
+				text-align: left;
+				box-sizing: border-box;
 			}
 
-			.fountain-toggle__track:has(#donate:checked) .donate-section,
-			.fountain-toggle__track:has(#aspca:checked) .donate-section,
-			.fountain-toggle__track:has(#stlukes:checked) .donate-section,
-			.fountain-toggle__track:has(#devtip:checked) .donate-section {
-				opacity: 1;
-				pointer-events: all;
+			button.coin-tray-row {
+				cursor: pointer;
+				transition: background 0.15s ease;
 			}
 
-			/* When donate is first selected - show white pill on middle (St. Jude).
-			   Pill geometry: indicator is 33.4% wide with left: 50%, so
-			   translate -150% / -50% / 50% lands it on col 1 / 2 / 3. */
-			.fountain-toggle__track:has(#donate:checked) .donate-section .indicator {
-				opacity: 1;
-				clip-path: inset(0 0 0 0 round 100px);  /* Full pill */
-				translate: -50% 0;  /* Position on middle (St. Jude) */
-				background: rgba(255, 255, 255, 0.95);
+			button.coin-tray-row:hover {
+				background: rgba(255, 255, 255, 0.08);
 			}
 
-			/* All labels visible but dimmed when donate first selected */
-			.fountain-toggle__track:has(#donate:checked) .donate-section label[for="aspca"] span,
-			.fountain-toggle__track:has(#donate:checked) .donate-section label[for="devtip"] span {
-				opacity: 1;
-				transform: scale(1);
-				color: rgba(255, 255, 255, 0.7);
+			.coin-tray-icon {
+				font-size: 20px;
+				line-height: 1;
 			}
 
-			.fountain-toggle__track:has(#donate:checked) .donate-section label[for="stlukes"] span {
-				opacity: 1;
-				transform: scale(1);
-				color: rgba(0, 0, 0, 0.8);  /* Dark text on white pill */
+			.coin-tray-text {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				gap: 1px;
+				min-width: 0;
 			}
 
-			/* When any donate sub-option is selected */
-			.fountain-toggle__track:has(#aspca:checked),
-			.fountain-toggle__track:has(#stlukes:checked),
-			.fountain-toggle__track:has(#devtip:checked) {
-				/* Keep donate section visible */
+			.coin-tray-title {
+				font-size: 12px;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.95);
+				letter-spacing: 0.3px;
 			}
 
-			.fountain-toggle__track:has(#aspca:checked) > label[for="tossCoin"],
-			.fountain-toggle__track:has(#stlukes:checked) > label[for="tossCoin"],
-			.fountain-toggle__track:has(#devtip:checked) > label[for="tossCoin"] {
-				color: rgba(255, 255, 255, 0.5);
+			.coin-tray-gold-head .coin-tray-title {
+				color: #FFD700;
 			}
 
-			.fountain-toggle__track:has(#aspca:checked) .donate-main-label,
-			.fountain-toggle__track:has(#stlukes:checked) .donate-main-label,
-			.fountain-toggle__track:has(#devtip:checked) .donate-main-label {
-				opacity: 0;
-				pointer-events: none;
+			.coin-tray-sub {
+				font-size: 10px;
+				color: rgba(255, 255, 255, 0.55);
+				letter-spacing: 0.2px;
 			}
 
-
-			/* When ASPCA is selected - white pill, positioned left */
-			.fountain-toggle__track:has(#aspca:checked) .donate-section .indicator {
-				opacity: 1;
-				clip-path: inset(0 0 0 0 round 100px);  /* Full pill! */
-				translate: -150% 0;
-				background: rgba(255, 255, 255, 0.95);
+			.coin-tray-check {
+				font-size: 13px;
+				font-weight: 700;
+				color: #FFD700;
 			}
 
-			/* When St. Jude is selected - white pill, positioned middle */
-			.fountain-toggle__track:has(#stlukes:checked) .donate-section .indicator {
-				opacity: 1;
-				clip-path: inset(0 0 0 0 round 100px);  /* Full pill! */
-				translate: -50% 0;
-				background: rgba(255, 255, 255, 0.95);
+			.coin-tray-divider {
+				height: 1px;
+				margin: 6px 8px;
+				background: rgba(255, 255, 255, 0.12);
 			}
 
-			/* When Dev tip is selected - white pill, positioned right */
-			.fountain-toggle__track:has(#devtip:checked) .donate-section .indicator {
-				opacity: 1;
-				clip-path: inset(0 0 0 0 round 100px);  /* Full pill! */
-				translate: 50% 0;
-				background: rgba(255, 255, 255, 0.95);
+			.coin-tray-charities {
+				display: flex;
+				gap: 6px;
+				padding: 2px 10px 6px 40px;
 			}
 
-			/* Text colors - selected gets dark text, unselected gets dimmed white */
-			.fountain-toggle__track:has(#aspca:checked) .donate-section label[for="aspca"] span {
-				opacity: 1;
-				transform: scale(1);
-				color: rgba(0, 0, 0, 0.85);  /* Dark text on white pill */
+			.coin-tray-charity {
+				flex: 1;
+				padding: 7px 4px;
+				background: rgba(255, 215, 0, 0.1);
+				border: 1px solid rgba(255, 215, 0, 0.35);
+				border-radius: 100px;
+				color: #FFD700;
+				font-size: 11px;
 				font-weight: 600;
+				letter-spacing: 0.2px;
+				cursor: pointer;
+				white-space: nowrap;
+				transition: background 0.15s ease, box-shadow 0.15s ease;
 			}
 
-			.fountain-toggle__track:has(#aspca:checked) .donate-section label[for="stlukes"] span,
-			.fountain-toggle__track:has(#aspca:checked) .donate-section label[for="devtip"] span {
-				opacity: 0.75;
-				transform: scale(1);
-				color: rgba(255, 255, 255, 0.7);  /* Dimmed white on blue */
+			.coin-tray-charity:hover {
+				background: rgba(255, 215, 0, 0.22);
+				box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
 			}
-
-			.fountain-toggle__track:has(#stlukes:checked) .donate-section label[for="stlukes"] span {
-				opacity: 1;
-				transform: scale(1);
-				color: rgba(0, 0, 0, 0.85);  /* Dark text on white pill */
-				font-weight: 600;
-			}
-
-			.fountain-toggle__track:has(#stlukes:checked) .donate-section label[for="aspca"] span,
-			.fountain-toggle__track:has(#stlukes:checked) .donate-section label[for="devtip"] span {
-				opacity: 0.75;
-				transform: scale(1);
-				color: rgba(255, 255, 255, 0.7);  /* Dimmed white on blue */
-			}
-
-			.fountain-toggle__track:has(#devtip:checked) .donate-section label[for="devtip"] span {
-				opacity: 1;
-				transform: scale(1);
-				color: rgba(0, 0, 0, 0.85);  /* Dark text on white pill */
-				font-weight: 600;
-			}
-
-			.fountain-toggle__track:has(#devtip:checked) .donate-section label[for="aspca"] span,
-			.fountain-toggle__track:has(#devtip:checked) .donate-section label[for="stlukes"] span {
-				opacity: 0.75;
-				transform: scale(1);
-				color: rgba(255, 255, 255, 0.7);  /* Dimmed white on blue */
-			}
-			
-
 
 			/* Screen reader only helper */
 			.sr-only {
@@ -6403,46 +6877,157 @@
 				border-width: 0;
 			}
 
-			/* Button hover effects */
-			.coin-toss-btn:hover {
-				transform: translateY(-2px) scale(1.05);
-				box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+			/* Coin Cam icon toggle (panel header) */
+			.coin-cam-btn {
+				display: flex;
+				align-items: center;
+				gap: 5px;
+				padding: 4px 9px;
+				background: rgba(255, 215, 0, 0.12);
+				border: 1px solid rgba(255, 215, 0, 0.45);
+				border-radius: 100px;
+				color: #FFD700;
+				font-size: 10px;
+				font-weight: 700;
+				letter-spacing: 0.5px;
+				text-transform: uppercase;
+				cursor: pointer;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+				transition: opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 			}
 
-			.coin-toss-btn:active {
-				transform: translateY(0) scale(0.98);
+			.coin-cam-btn:not(.active) {
+				opacity: 0.45;
+				border-color: rgba(255, 255, 255, 0.25);
+				background: rgba(255, 255, 255, 0.05);
+				color: rgba(255, 255, 255, 0.7);
 			}
 
-			.coin-toss-btn.local-coin:hover {
-				background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-				box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+			/* The held coin rides with the pointer over the scene, so the
+			   toss visibly leaves your hand instead of materializing mid-air.
+			   Centered on the cursor (offset above the finger on touch). */
+			#handCoin {
+				position: fixed;
+				left: -17px;
+				top: -17px;
+				width: 34px;
+				height: 34px;
+				pointer-events: none;
+				z-index: 4000;
+				display: none;
+				will-change: transform;
+				filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.45));
 			}
 
-			.coin-toss-btn.real-coin:hover {
-				background: linear-gradient(135deg, #0083b0 0%, #00b4db 100%);
-				box-shadow: 0 8px 25px rgba(0, 180, 219, 0.6);
+			#handCoin.visible {
+				display: block;
+			}
+
+			.hand-coin-face {
+				position: relative;
+				width: 100%;
+				height: 100%;
+				border-radius: 50%;
+				/* Plain gold coin: clean minted disc with a soft edge highlight. */
+				background: radial-gradient(circle at 35% 28%, #fdf3c0 0%, #f0d268 26%, #d4a82e 60%, #8a6610 100%);
+				box-shadow: 0 0 0 1.5px rgba(255, 240, 180, 0.55) inset;
+				border: 1.5px solid rgba(90, 66, 10, 0.9);
+				box-sizing: border-box;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				animation: handCoinWobble 2.4s ease-in-out infinite;
+			}
+
+			.hand-coin-text {
+				position: relative;
+				z-index: 1;
+				font-family: 'Orbitron', monospace;
+				font-size: 11px;
+				font-weight: 700;
+				line-height: 1;
+				color: #6e4f0a;
+				text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+			}
+
+			/* Y-wobble instead of a full spin so the "80" never mirrors */
+			@keyframes handCoinWobble {
+				0%, 100% { transform: rotateY(-28deg) rotateZ(-4deg); }
+				50% { transform: rotateY(28deg) rotateZ(4deg); }
+			}
+
+			#handCoin.gold {
+				width: 40px;
+				height: 40px;
+				left: -20px;
+				top: -20px;
+			}
+
+			#handCoin.gold .hand-coin-face {
+				background: radial-gradient(circle at 35% 28%, #fffbe0 0%, #ffe066 28%, #ffc400 58%, #9a6b00 100%);
+				border-color: rgba(255, 215, 0, 0.95);
+				box-shadow:
+					0 0 0 1.5px rgba(255, 245, 200, 0.6) inset,
+					0 0 14px rgba(255, 215, 0, 0.75),
+					0 0 30px rgba(255, 215, 0, 0.4);
+			}
+
+			#handCoin.gold .hand-coin-text {
+				color: rgba(122, 84, 0, 0.98);
+			}
+
+			body.mode-80s .hand-coin-face {
+				background: radial-gradient(circle at 35% 28%, #eaffea 0%, #7dff7d 30%, #00cc44 62%, #004d1a 100%);
+				border-color: #00ff00;
+				box-shadow: 0 0 0 1.5px rgba(200, 255, 200, 0.5) inset;
+			}
+
+			body.mode-80s .hand-coin-text {
+				color: rgba(0, 70, 20, 0.95);
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.hand-coin-face {
+					animation: none;
+				}
 			}
 
 			/* 80s mode styles */
-			body.mode-80s .fountain-toggle {
+			body.mode-80s .coin-chip {
 				background: rgba(0, 0, 0, 0.8);
 				border: 2px solid #00ff00;
 				box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), 0 0 40px rgba(255, 0, 255, 0.3);
 			}
-			
-			body.mode-80s .fountain-toggle .indicator {
-				background: linear-gradient(135deg, #00ffff 0%, #ff00ff 100%);
-				box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
-			}
-			
-			body.mode-80s .donate-section .indicator {
-				background: linear-gradient(135deg, #ff00ff 0%, #ffff00 100%);
-				box-shadow: 0 0 15px rgba(255, 0, 255, 0.7);
-			}
-			
-			body.mode-80s .fountain-toggle label {
+
+			body.mode-80s .coin-chip-label {
 				color: #00ff00;
 				text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+			}
+
+			body.mode-80s .coin-chip.gold {
+				border-color: #ffff00;
+				box-shadow: 0 0 20px rgba(255, 255, 0, 0.6), 0 0 40px rgba(255, 0, 255, 0.3);
+			}
+
+			body.mode-80s .coin-chip.gold .coin-chip-label {
+				color: #ffff00;
+				text-shadow: 0 0 10px rgba(255, 255, 0, 0.8);
+			}
+
+			body.mode-80s .coin-tray {
+				background: rgba(0, 0, 0, 0.9);
+				border-color: #00ff00;
+				box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+			}
+
+			body.mode-80s .coin-tray-title {
+				color: #00ff00;
+			}
+
+			body.mode-80s .coin-tray-gold-head .coin-tray-title,
+			body.mode-80s .coin-tray-charity {
+				color: #ffff00;
+				border-color: rgba(255, 255, 0, 0.5);
 			}
 
 			/* Mobile responsive */
@@ -6457,92 +7042,26 @@
 					justify-content: center !important;
 					width: 100% !important;
 					padding: 0 !important;
-					padding-bottom: calc(20px + env(safe-area-inset-bottom, 20px)) !important;
 					box-sizing: border-box !important;
 				}
-				
-				.fountain-toggle {
-					width: calc(100vw - 20px) !important;
-					max-width: calc(100vw - 20px) !important;
-					margin: 0 !important;
-					height: 50px !important;
-				}
-				
-				.fountain-toggle__track {
-					width: 100% !important;
-					height: 100% !important;
-				}
-				
-				.fountain-toggle label {
-					font-size: 14px !important;
-					padding: 0 2px !important;
-				}
-				
-				.donate-main-label::after {
-					font-size: 14px !important;
-				}
-				
-				.donate-section {
-					width: 50% !important;
-					left: 50% !important;
-				}
-				
-				.donate-section label {
-					font-size: 11px !important;
-				}
-				
-				.donate-section label span {
-					padding: 0 4px !important;
-					white-space: nowrap !important;
-					font-size: 10px !important;
-				}
 
-				.coin-toss-btn {
+				.coin-chip {
+					min-width: 0 !important;
+					max-width: 100% !important;
 					width: auto !important;
-					padding: 8px 12px !important;
-					font-size: 11px !important;
-					border-radius: 20px !important;
-					letter-spacing: 0 !important;
-					white-space: nowrap;
-					text-align: center;
-					min-height: 36px;
-					display: inline-flex;
-					align-items: center;
-					justify-content: center;
-					flex: 0 0 auto;
-				}
-
-				.coin-toss-btn .btn-icon {
-					font-size: 14px !important;
-					margin-right: 6px !important;
-				}
-				
-				.coin-toss-btn .mobile-text {
-					display: inline !important;
-				}
-				
-				.coin-toss-btn .desktop-text {
-					display: none !important;
 				}
 
 				/* Compact mobile info boxes */
 				.info-box {
 					border-radius: 12px !important;
 				}
-				
+
 				#info > div:first-child,
 				#coinCounter > div:first-child {
 					font-size: 14px !important;
 					padding-bottom: 6px !important;
 					margin-bottom: 6px !important;
 				}
-			}
-
-			/* Disabled state */
-			.coin-toss-btn:disabled {
-				opacity: 0.5;
-				cursor: not-allowed;
-				transform: none !important;
 			}
 
 			/* Info box hover effects */

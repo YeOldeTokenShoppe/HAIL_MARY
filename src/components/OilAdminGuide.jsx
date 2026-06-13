@@ -75,8 +75,9 @@ export default function OilAdminGuide() {
   );
 }
 
-// Same parchment style language as OilVerifyPanel so the two admin accordions
-// read as one console.
+// Parchment/sepia style language shared with OilVerifyPanel, but the palette is
+// lightened: both accordions render on a DARK glassy background, so the text uses
+// light sepia/gold tones for contrast (dark sepia would be near-invisible).
 const s = {
   wrap: { borderBottom: "1px solid #d4c8b4" },
   header: {
@@ -85,17 +86,17 @@ const s = {
     cursor: "pointer", fontFamily: "'Share Tech Mono', monospace",
   },
   headerIcon: { display: "flex", alignItems: "center" },
-  headerText: { flex: 1, textAlign: "left", fontSize: 9, color: "#9a6f10", letterSpacing: "0.2em" },
-  chevron: { fontSize: 8, color: "#9e8e78", transition: "transform 0.2s" },
-  body: { padding: "0 14px 14px", fontFamily: "'Share Tech Mono', monospace" },
-  sectionTitle: { fontSize: 8, color: "#8b7d6b", letterSpacing: "0.15em", marginBottom: 6 },
+  headerText: { flex: 1, textAlign: "left", fontSize: 9, color: "#e2b860", letterSpacing: "0.2em" },
+  chevron: { fontSize: 8, color: "#c4b6a0", transition: "transform 0.2s" },
+  body: { padding: "0 14px 14px", fontFamily: "'Share Tech Mono', monospace", },
+  sectionTitle: { fontSize: 8, color: "#c8b894", letterSpacing: "0.15em", marginBottom: 6 },
   list: { margin: 0, paddingLeft: 16 },
-  step: { fontSize: 9, lineHeight: 1.5, marginBottom: 5, color: "#5a4e3e" },
-  stepAction: { color: "#9a6f10", fontWeight: 700, letterSpacing: "0.05em" },
-  stepDetail: { color: "#5a4e3e" },
+  step: { fontSize: 9, lineHeight: 1.5, marginBottom: 5, color: "#d8cbb4" },
+  stepAction: { color: "#e6bd63", fontWeight: 700, letterSpacing: "0.05em" },
+  stepDetail: { color: "#d8cbb4" },
   testCycle: {
-    marginTop: 8, padding: 8, fontSize: 8.5, lineHeight: 1.5, color: "#6b5b47",
-    background: "rgba(180,160,130,0.08)", border: "1px solid #d4c8b4",
+    marginTop: 8, padding: 8, fontSize: 8.5, lineHeight: 1.5, color: "#d0c2a8",
+    background: "rgba(180,160,130,0.1)", border: "1px solid #d4c8b4",
   },
-  note: { fontSize: 8, color: "#9e8e78", fontStyle: "italic", marginTop: 8, lineHeight: 1.4 },
+  note: { fontSize: 8, color: "#b3a48c", fontStyle: "italic", marginTop: 8, lineHeight: 1.4 },
 };

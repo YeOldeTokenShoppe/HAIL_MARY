@@ -30,6 +30,20 @@ export const ROGUE_CATALOG = [
     walkSpeed: 0.25,
   },
   {
+    id: "dinosaur",
+    label: "T-REX",
+    model: "/models/addons/t-rex.glb",
+    consequence: "delete_addon",
+    description: "Stomps in and devours a random add-on",
+    scale: 0.15,
+    // Ground rogue (no `movement` field → walks the corridors). The T-Rex GLB
+    // only ships Idle/Walk/Attack clips, so remap the ground rogue's default
+    // Run/Weapon keywords onto what this model actually has.
+    animation: "Walk",
+    walkSpeed: 0.3,
+    anims: { idle: "Idle", run: "Walk", weapon: "Attack" },
+  },
+  {
     id: "crudingo",
     label: "CRUDINGO",
     model: "/models/Crudingo.glb",
@@ -152,20 +166,31 @@ const ALIEN_BEAM_UP_TIME = 1.2;
 const TURN_DURATION = 0.4;
 // Walk speed — tune to match visual stride of StartWalk/Walk2 animations
 const ALIEN_WALK_SPEED = 0.025
+// Initial heading so the alien faces the sign's security camera while it taunts.
+// 90° clockwise (negative = clockwise about Y when viewed from above).
+const ALIEN_FACE_HEADING = -Math.PI / 2;
+// Beam-travel timing: the alien descends from the ship, then later ascends back.
+// It materializes (fades in) on the way down and dissolves (fades out) on the way
+// up, glowing the beam's energy color as it forms in / dissolves out.
+const ALIEN_DESCEND_TIME = 1.1;
+const ALIEN_MATERIALIZE_TIME = 0.9;
+const ALIEN_DISSOLVE_COLOR = new THREE.Color("#88ffcc");
 function buildAlienSequence() {
   return [
+    // ── Descend from the ship along the beam ──
+    { type: "descend" },
     // ── Intro anims ──
 
-         { type: "anim", anim: "Idle", loops: 0.5 },
-    { type: "anim", anim: "LookAround", loops: 2 },
-          { type: "anim", anim: "Idle", loops: 0.5 },
-                  { type: "anim", anim: "taunt", loops: 1 },
-                          { type: "anim", anim: "Insult", loops: 1 },
-                                      { type: "anim", anim: "ShakeFist", loops: 1 },
+         { type: "anim", anim: "Idle", loops: 1 },
+    // LookAround merges/cross-fades into ShakeFist — both loop and their weights
+    // blend through a 50/50 middle (smoothstep) instead of playing as two beats.
+    { type: "blend", from: "LookAround", to: "ShakeFist", loops: 2 },
+                  // { type: "anim", anim: "taunt", loops: 1 },
+                          // { type: "anim", anim: "Insult", loops: 1 },
     // { type: "anim", anim: "Booty", loops: 1 },
       // { type: "anim", anim: "Idle", loops: 0.2 },
         // { type: "anim", anim: "Waving", loops: 4 },
-                        { type: "anim", anim: "Idle", loops: 1 },
+                        // { type: "anim", anim: "Idle", loops: 1 },
     // ── Outbound patrol ──
     // { type: "walk", anim: "StartWalk", loops: 1 },
     // { type: "walk", anim: "Walk2", loops: 1 },
@@ -206,13 +231,41 @@ function AlienDrop({ landPos, ufoPos, beamUp, onReady, onGone }) {
   const [done, setDone] = useState(false);
   const readyFiredRef = useRef(false);
   const beamUpStartedRef = useRef(false);
+  const appearRef = useRef(0);       // materialize-in accumulator (seconds)
+  const beamProgressRef = useRef(0); // dissolve-out progress 0→1 during beam-up
 
-  const headingRef = useRef(0);
+  const headingRef = useRef(ALIEN_FACE_HEADING);
   const turnStartRef = useRef(0);
   const beamUpOriginRef = useRef(new THREE.Vector3());
+  const beamUpRef = useRef(false);
+  beamUpRef.current = beamUp; // mirror the latest prop for the frame loop to read
 
   const { scene, animations } = useGLTF("/models/alien2.glb");
   const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+
+  // Clone the materials so we can fade opacity + add a beam glow per-instance
+  // without mutating the shared cached GLTF. Drives the materialize/dissolve fx.
+  const dissolveMats = useMemo(() => {
+    const list = [];
+    const prep = (m) => {
+      const c = m.clone();
+      c.transparent = true;
+      const baseOpacity = c.opacity ?? 1;
+      c.opacity = 0; // start fully dissolved; useFrame fades it in during descent
+      list.push({
+        mat: c,
+        baseOpacity,
+        baseEmissive: c.emissive ? c.emissive.clone() : null,
+        baseEmissiveIntensity: c.emissiveIntensity ?? 1,
+      });
+      return c;
+    };
+    clonedScene.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      o.material = Array.isArray(o.material) ? o.material.map(prep) : prep(o.material);
+    });
+    return list;
+  }, [clonedScene]);
 
   // Strip position tracks from animation clips to prevent root motion sliding.
   // Keep position tracks for animations that need them (e.g. Samba hip movement).
@@ -250,6 +303,36 @@ function AlienDrop({ landPos, ufoPos, beamUp, onReady, onGone }) {
     a.reset().fadeIn(0.3).play();
   };
 
+  // Play two clips at once (looping), with their weights driven per-frame for a
+  // merged cross-fade. Fades out every other action so only the pair blends.
+  const playBlend = (fromName, toName) => {
+    const a = actions[fromName];
+    const b = actions[toName];
+    Object.values(actions).forEach((act) => { if (act !== a && act !== b) act.fadeOut(0.3); });
+    [a, b].forEach((act, i) => {
+      if (!act) return;
+      act.reset();
+      act.setLoop(THREE.LoopRepeat, Infinity);
+      act.clampWhenFinished = false;
+      act.enabled = true;
+      act.setEffectiveWeight(i === 0 ? 1 : 0); // start on `from`
+      act.play();
+    });
+  };
+
+  // Apply materialize/dissolve: opacity fade + beam-colored emissive glow.
+  // vis: 1 = fully solid, 0 = fully dissolved into the beam.
+  const applyVisibility = (vis) => {
+    const diss = 1 - vis;
+    for (const d of dissolveMats) {
+      d.mat.opacity = d.baseOpacity * vis;
+      if (d.baseEmissive) {
+        d.mat.emissive.copy(d.baseEmissive).lerp(ALIEN_DISSOLVE_COLOR, diss);
+        d.mat.emissiveIntensity = d.baseEmissiveIntensity + diss * 2.0;
+      }
+    }
+  };
+
   useEffect(() => {
     if (actions["Idle"]) actions["Idle"].reset().fadeIn(0.2).play();
   }, [actions]);
@@ -273,6 +356,10 @@ function AlienDrop({ landPos, ufoPos, beamUp, onReady, onGone }) {
 
       if (step.type === "anim" || step.type === "walk") {
         playAnim(step.anim, step.loops || 1);
+      } else if (step.type === "descend") {
+        playAnim("Idle", 1);
+      } else if (step.type === "blend") {
+        playBlend(step.from, step.to);
       } else if (step.type === "turn") {
         turnStartRef.current = headingRef.current;
       } else if (step.type === "ready") {
@@ -293,8 +380,33 @@ function AlienDrop({ landPos, ufoPos, beamUp, onReady, onGone }) {
       stepInitRef.current = false;
     };
 
-    if (step.type === "anim") {
+    if (step.type === "descend") {
+      // Float down the beam from the ship to the ground (ease-out = quick exit
+      // from the saucer, gentle landing). Materializes in via applyVisibility.
+      const f = Math.min(1, t / ALIEN_DESCEND_TIME);
+      const ease = 1 - Math.pow(1 - f, 2);
+      g.position.set(landPos.x, ufoPos.y + (0.02 - ufoPos.y) * ease, landPos.z);
+      g.scale.setScalar(ALIEN_SCALE);
+      if (f >= 1) {
+        g.position.set(landPos.x, 0.02, landPos.z);
+        advanceStep();
+      }
+
+    } else if (step.type === "anim") {
       const dur = clipDuration(step.anim) * (step.loops || 1);
+      g.scale.setScalar(ALIEN_SCALE);
+      if (t >= dur) advanceStep();
+
+    } else if (step.type === "blend") {
+      // Merge LookAround → ShakeFist: both loop, weights cross-fade through a
+      // 50/50 blended middle (smoothstep) so the gestures combine, then hand off.
+      const a = actions[step.from];
+      const b = actions[step.to];
+      const dur = Math.max(clipDuration(step.from), clipDuration(step.to)) * (step.loops || 2);
+      const f = Math.min(1, t / dur);
+      const w = f * f * (3 - 2 * f); // smoothstep
+      if (a) a.setEffectiveWeight(1 - w);
+      if (b) b.setEffectiveWeight(w);
       g.scale.setScalar(ALIEN_SCALE);
       if (t >= dur) advanceStep();
 
@@ -323,36 +435,45 @@ function AlienDrop({ landPos, ufoPos, beamUp, onReady, onGone }) {
     } else if (step.type === "ready") {
       // Idle on the ground until the UFO beam activates
       g.scale.setScalar(ALIEN_SCALE);
-      if (beamUp && !beamUpStartedRef.current) {
+      if (beamUpRef.current && !beamUpStartedRef.current) {
         beamUpStartedRef.current = true;
         g.getWorldPosition(beamUpOriginRef.current);
         tRef.current = 0;
       }
       if (beamUpStartedRef.current) {
         const f = Math.min(1, tRef.current / ALIEN_BEAM_UP_TIME);
-        const ease = f * f;
         const ox = beamUpOriginRef.current.x;
         const oy = beamUpOriginRef.current.y;
         const oz = beamUpOriginRef.current.z;
+        // Steady (linear) rise so the climb up the beam reads clearly...
         g.position.set(
-          ox + (ufoPos.x - ox) * ease,
-          oy + (ufoPos.y - oy) * ease,
-          oz + (ufoPos.z - oz) * ease
+          ox + (ufoPos.x - ox) * f,
+          oy + (ufoPos.y - oy) * f,
+          oz + (ufoPos.z - oz) * f
         );
-        g.scale.setScalar(ALIEN_SCALE * (1 - ease));
+        // ...then dissolve only across the top portion, so it dematerializes
+        // into the ship instead of fading out near the ground.
+        const diss = Math.max(0, (f - 0.55) / 0.45);
+        g.scale.setScalar(ALIEN_SCALE * (1 - 0.45 * diss));
         g.rotation.y += delta * 4;
+        beamProgressRef.current = diss;
         if (f >= 1) {
           setDone(true);
           onGone?.();
         }
       }
     }
+
+    // ── Materialize-in, then dissolve-out: drive opacity + beam glow ──
+    appearRef.current = Math.min(appearRef.current + delta, ALIEN_MATERIALIZE_TIME);
+    const visIn = appearRef.current / ALIEN_MATERIALIZE_TIME;
+    applyVisibility(Math.max(0, Math.min(1, visIn * (1 - beamProgressRef.current))));
   });
 
   if (done) return null;
 
   return (
-    <group ref={groupRef} position={[landPos.x, 0.02, landPos.z]} scale={[ALIEN_SCALE, ALIEN_SCALE, ALIEN_SCALE]}>
+    <group ref={groupRef} position={[landPos.x, ufoPos.y, landPos.z]} rotation={[0, ALIEN_FACE_HEADING, 0]} scale={[ALIEN_SCALE, ALIEN_SCALE, ALIEN_SCALE]}>
       <primitive object={clonedScene} />
     </group>
   );
@@ -377,6 +498,7 @@ function UfoRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog, onArr
   const [alienDropped, setAlienDropped] = useState(false);
   const [alienReady, setAlienReady] = useState(false);
   const [alienGone, setAlienGone] = useState(false);
+  const [beamingUp, setBeamingUp] = useState(false);
 
   const { scene, animations } = useGLTF(catalog.model);
   const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
@@ -492,6 +614,7 @@ function UfoRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog, onArr
       if (alienReady) {
         phaseRef.current = "beam_up";
         tRef.current = 0;
+        setBeamingUp(true); // state-driven → the alien reliably receives beamUp=true
       }
     } else if (phase === "beam_up") {
       // Second beam to pull alien back up, then fly away
@@ -542,7 +665,7 @@ function UfoRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog, onArr
         <AlienDrop
           landPos={alienLandPos}
           ufoPos={hoverPos}
-          beamUp={phaseRef.current === "beam_up"}
+          beamUp={beamingUp}
           onReady={() => setAlienReady(true)}
           onGone={() => setAlienGone(true)}
         />
@@ -949,7 +1072,7 @@ function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD, onArrive, o
         // Idle phase: stand at standoff, considering the target
         if (phaseRef.current !== "idle") {
           phaseRef.current = "idle";
-          playAnim("Idle");
+          playAnim(catalog.anims?.idle || "Idle");
           if (!arrivedRef.current) { arrivedRef.current = true; onArrive?.(event); }
         }
         g.position.copy(standoffPos);
@@ -957,7 +1080,7 @@ function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD, onArrive, o
         // Weapon phase: step forward to the addon and attack
         if (phaseRef.current !== "weapon") {
           phaseRef.current = "weapon";
-          playAnim("Weapon");
+          playAnim(catalog.anims?.weapon || "Weapon");
           if (!consequenceFiredRef.current) { consequenceFiredRef.current = true; onConsequence?.(event); }
         }
         // Lerp from standoff toward addon (stop at 80% to not overshoot)
@@ -971,7 +1094,7 @@ function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD, onArrive, o
     // Normal walking
     if (segIdx + 1 > targetWpIdx && phaseRef.current !== "walk_out") {
       phaseRef.current = "walk_out";
-      playAnim("Run");
+      playAnim(catalog.anims?.run || "Run");
     }
 
     const f = Math.min(1, localT / walkTime);
@@ -1004,11 +1127,15 @@ function RogueCharacter(props) {
     [props.event.characterType]
   );
 
-  // Skip stale events that are older than the max animation lifecycle
-  const createdAt = props.event.createdAt?.toMillis?.() ?? props.event.createdAt?.seconds * 1000;
-  if (createdAt && Date.now() - createdAt > ROGUE_MAX_AGE_MS) {
-    return null;
+  // Skip events that were already stale when this rogue first mounted — but
+  // decide ONCE. Re-checking every render would unmount an actively-playing
+  // rogue mid-animation (e.g. right as the alien beams back up).
+  const staleRef = useRef(undefined);
+  if (staleRef.current === undefined) {
+    const createdAt = props.event.createdAt?.toMillis?.() ?? props.event.createdAt?.seconds * 1000;
+    staleRef.current = !!(createdAt && Date.now() - createdAt > ROGUE_MAX_AGE_MS);
   }
+  if (staleRef.current) return null;
 
   if (catalog.movement === "ufo") {
     return <UfoRogueCharacter {...props} catalog={catalog} onArrive={props.onArrive} onConsequence={props.onConsequence} />;

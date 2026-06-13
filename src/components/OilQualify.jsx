@@ -378,7 +378,7 @@ export default function OilQualify({
               flexShrink: 0,
             }}
           >
-            <img src="/brand-mark-mono.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
+            <img src="/brand-mark-cyan.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
           </a>
           <NavControlsHome
             isPlaying={contextIsPlaying}
@@ -1708,7 +1708,7 @@ export default function OilQualify({
             {/* Fairness console — run COMMIT (with a lead sized to the season
                 start) from right here during registration; the anchor countdown
                 section above goes live the moment it lands. */}
-            <div style={{ marginBottom: 16, background: "rgba(240, 232, 220, 0.92)", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ marginBottom: 16, background: "rgba(20, 12, 28, 0.55)", backdropFilter: "blur(24px) saturate(1.2)", WebkitBackdropFilter: "blur(24px) saturate(1.2)", borderRadius: 4, overflow: "hidden" }}>
               <OilAdminGuide />
               <OilVerifyPanel adminPassword={adminPassword} />
             </div>

@@ -182,18 +182,21 @@ const s = {
     cursor: "pointer", fontFamily: "'Share Tech Mono', monospace",
   },
   headerIcon: { display: "flex", alignItems: "center" },
-  headerText: { flex: 1, textAlign: "left", fontSize: 9, color: "#5a8a3a", letterSpacing: "0.2em" },
-  chevron: { fontSize: 8, color: "#9e8e78", transition: "transform 0.2s" },
+  // Lightened palette — this panel renders on a DARK glassy background, so on-dark
+  // text uses light sepia/green tones. (The input field below keeps dark text: it
+  // has its own light #f0e8dc background.)
+  headerText: { flex: 1, textAlign: "left", fontSize: 9, color: "#86c95a", letterSpacing: "0.2em" },
+  chevron: { fontSize: 8, color: "#c4b6a0", transition: "transform 0.2s" },
   body: { padding: "0 14px 14px" },
   blockInfo: {
-    background: "rgba(180,160,130,0.08)", border: "1px solid #d4c8b4",
+    background: "rgba(180,160,130,0.1)", border: "1px solid #d4c8b4",
     padding: 8, marginBottom: 8,
   },
   infoRow: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 9, marginBottom: 3 },
-  infoKey: { color: "#8b7d6b", letterSpacing: "0.1em", flexShrink: 0, fontFamily: "'Share Tech Mono', monospace" },
-  infoVal: { color: "#5a4e3e", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, textAlign: "right" },
+  infoKey: { color: "#c8b894", letterSpacing: "0.1em", flexShrink: 0, fontFamily: "'Share Tech Mono', monospace" },
+  infoVal: { color: "#d8cbb4", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, textAlign: "right" },
   hashVal: {
-    color: "#8b7d6b", fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
+    color: "#c0b298", fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "62%", textAlign: "right",
   },
   inputRow: { display: "flex", gap: 4, marginBottom: 8 },
@@ -203,12 +206,12 @@ const s = {
     fontFamily: "'Share Tech Mono', monospace", fontSize: 11, outline: "none",
   },
   smallBtn: {
-    padding: "6px 8px", background: "rgba(180,160,130,0.1)", border: "1px solid #c8bfb0",
-    borderRadius: 2, color: "#6b5b47", fontFamily: "'Share Tech Mono', monospace",
+    padding: "6px 8px", background: "rgba(180,160,130,0.12)", border: "1px solid #c8bfb0",
+    borderRadius: 2, color: "#d0c2a8", fontFamily: "'Share Tech Mono', monospace",
     fontSize: 9, letterSpacing: "0.08em", cursor: "pointer", whiteSpace: "nowrap",
   },
   primaryBtn: { background: "#d4a854", border: "1px solid #b8922e", color: "#fff" },
-  error: { fontSize: 9, color: "#b8402c", marginBottom: 8, letterSpacing: "0.05em", fontFamily: "'Share Tech Mono', monospace" },
-  okMsg: { fontSize: 9, color: "#5a8a3a", marginBottom: 8, letterSpacing: "0.05em", fontFamily: "'Share Tech Mono', monospace" },
-  note: { fontSize: 8, color: "#9e8e78", fontFamily: "'Share Tech Mono', monospace", fontStyle: "italic", lineHeight: 1.4 },
+  error: { fontSize: 9, color: "#e2705a", marginBottom: 8, letterSpacing: "0.05em", fontFamily: "'Share Tech Mono', monospace" },
+  okMsg: { fontSize: 9, color: "#86c95a", marginBottom: 8, letterSpacing: "0.05em", fontFamily: "'Share Tech Mono', monospace" },
+  note: { fontSize: 8, color: "#b3a48c", fontFamily: "'Share Tech Mono', monospace", fontStyle: "italic", lineHeight: 1.4 },
 };

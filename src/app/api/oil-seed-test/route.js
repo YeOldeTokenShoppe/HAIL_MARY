@@ -27,7 +27,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Build a maxed-out pump config for fake user index `i`. Every plot gets a sign
 // and add-ons. `tubeManSet` = indices that get the (expensive) TubeMan; the
-// `animatedMap` = index → "dinosaur" | "zombie" (animated mixer add-ons).
+// `animatedMap` = index → "zombie" (animated mixer add-ons).
 function buildFakeConfig(i, tubeManSet, animatedMap) {
   const config = {
     signImageUrl: pick(SIGN_IMAGES), // every plot gets a sign image
@@ -45,12 +45,11 @@ function buildFakeConfig(i, tubeManSet, animatedMap) {
   }
 
   // Add-ons — designated animated ones in fixed slots, plus 1–2 static ones so
-  // every plot is decorated. (dinosaur is restricted to slots 3/4 in the catalog.)
+  // every plot is decorated.
   const addons = {};
   if (tubeManSet.has(i)) addons["0"] = { id: "tubeMan", rot: 0 };
   const animal = animatedMap.get(i);
-  if (animal === "dinosaur") addons["3"] = { id: "dinosaur", rot: 0 };
-  else if (animal === "zombie") addons["1"] = { id: "zombie", rot: 0 };
+  if (animal === "zombie") addons["1"] = { id: "zombie", rot: 0 };
 
   const freeSlots = ["2", "5", "6", "7"].filter((s) => !addons[s]);
   const nStatic = 1 + (Math.random() < 0.5 ? 1 : 0);
@@ -133,12 +132,12 @@ export async function POST(req) {
     }
     const total = Math.min(count, freeCells.length);
 
-    // Spread ~10 TubeMen and ~10 animated (dinosaur/zombie) across the field.
+    // Spread ~10 TubeMen and ~10 animated zombies across the field.
     const tubeManSet = new Set();
     const animatedMap = new Map();
     for (let i = 0; i < total; i++) {
       if (i % 10 === 3) tubeManSet.add(i);
-      if (i % 10 === 7) animatedMap.set(i, (Math.floor(i / 10) % 2 === 0) ? "dinosaur" : "zombie");
+      if (i % 10 === 7) animatedMap.set(i, "zombie");
     }
 
     for (let i = 0; i < total; i++) {

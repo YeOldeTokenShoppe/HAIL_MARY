@@ -17,12 +17,12 @@ import { intentionText } from "@/lib/intentions";
 // deterministically per doc id so entries don't reshuffle on every
 // snapshot or timer tick.
 const PHRASES = [
-  "lit a candle",
-  "lit a candle",
-  "lit a candle",
-  "lit a candle for their bags",
-  "keeps a flame burning",
-  "tends the vigil",
+  " lit a candle",
+  " lit a candle",
+  " lit a candle",
+  " lit a candle for their bags",
+  " keeps a flame burning",
+  // "tends the vigil",
 ];
 
 function phraseFor(id) {

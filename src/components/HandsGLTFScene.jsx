@@ -23,7 +23,13 @@ import { WatchlistPhoneTexture } from './WatchlistPhoneTexture'
 export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null, showLatestPolaroid = false, isHighlighting = false,
   // Phone aura glow overrides — defaults preserve the /illumin80 look;
   // other mounts (e.g. the landing page chamber) tune their own.
-  phoneAuraColor = '#00ffff', phoneAuraIntensity = 0.003, phoneAuraSize = 1, phoneAuraOpacity = 0.9 }) {
+  phoneAuraColor = '#00ffff', phoneAuraIntensity = 0.003, phoneAuraSize = 1, phoneAuraOpacity = 0.9,
+  // Staging overrides — when set, they pin the model's base scale and
+  // Y offset across ALL viewports, suppressing the internal
+  // isMobileLocal downscale below (which was tuned for /illumin80's
+  // framing). The landing-page chamber stages the model itself and
+  // needs one source of truth; defaults preserve /illumin80 behavior.
+  stagingScale = null, stagingOffsetY = null }) {
 
   // Get mobile state from parent or detect it locally
   const [isMobileLocal, setIsMobileLocal] = useState(false)
@@ -660,7 +666,7 @@ useFrame((state, delta) => {
 const handleClick = useCallback((event) => {
   // Stop propagation to prevent multiple handlers
   event.stopPropagation()
-  
+
   // Get the clicked object
   const clickedObject = event.object
   
@@ -784,10 +790,10 @@ const handlePhoneClick = useCallback(() => {
 // Return with swivel animation applied
 
 return (
-  <group position={[0, isMobileLocal ? -0.4 : -0.3, 0]}> {/* Position hands higher on mobile */}
-    <primitive 
-      object={gltf.scene} 
-      scale={ isMobileLocal ? [0.45, 0.45, 0.45] : [0.65, 0.65, 0.65] }
+  <group position={[0, stagingOffsetY ?? (isMobileLocal ? -0.4 : -0.3), 0]}> {/* Position hands higher on mobile */}
+    <primitive
+      object={gltf.scene}
+      scale={ stagingScale ?? (isMobileLocal ? 0.45 : 0.65) }
       rotation={[0, userRotation, 0]} // Apply user rotation to hands
       onClick={handleClick}
       onPointerOver={handlePointerOver}
@@ -850,8 +856,17 @@ return (
         e.stopPropagation();
         const wasDragging = isDragging.current;
         isDragging.current = false;
-        
+
         const deltaY = Math.abs(e.clientY - swipeStartY.current);
+        // Taps that land on the glass belong to the PhoneScreen mesh's
+        // own click handler (which also runs the watchlist UV
+        // hit-test) — firing here too made the same tap toggle focus
+        // mode on and instantly back off. This box only owns taps on
+        // the phone body that miss the screen.
+        const screenAlsoHit = e.intersections?.some(
+          (i) => i.object?.name === 'PhoneScreen'
+        );
+        if (screenAlsoHit) return;
         // For mouse/non-touch, any click toggles focus mode
         // For touch, only tap (no movement) toggles focus mode
         if (wasDragging && (e.pointerType !== 'touch' || deltaY < 10)) {

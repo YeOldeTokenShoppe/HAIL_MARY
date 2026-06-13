@@ -23,6 +23,7 @@ import MaterExMachinaSection from "@/components/MaterExMachinaSection";
 import BusinessSection from "@/components/BusinessSection";
 import DropInTitle from "../components/DropInTitle";
 import { useCandles } from "@/hooks/useCandles";
+
 import {
   readCandle,
   lightCandle,
@@ -37,6 +38,7 @@ import { INTENTION_PRESETS } from "@/lib/intentions";
 import VigilTicker from "@/components/VigilTicker";
 import BurnOfferingPanel from "@/components/BurnOfferingPanel";
 import MaryChamber from "@/components/MaryChamber";
+import { Perf } from "r3f-webgpu-perf";
 import {
   readLocalCandle,
   writeLocalCandle,
@@ -2655,6 +2657,22 @@ export default function HomePage() {
               scroll-gated inside the component, so it costs nothing
               until the visitor heads down. */}
           <MaryChamber />
+          {/* Dev-only perf HUD (benchmarked 55-60fps on mobile with
+              the chamber + halo corona live, 2026-06-12). It
+              portal-mounts inside the CRT wrapper's scaleX(1.2) box
+              (which bleeds 10% past each window edge), so pull it
+              back inside the visible window and unstretch: right
+              10%/1.2, counter-scale 1/1.2 anchored top-right. */}
+          {process.env.NODE_ENV === "development" && (
+            <Perf
+              position="top-right"
+              style={{
+                right: "8.333%",
+                transform: "scaleX(0.8333)",
+                transformOrigin: "top right",
+              }}
+            />
+          )}
           {/* <Stats className="r3f-stats" /> */}
         </StarfieldStatueScene>
       </div>

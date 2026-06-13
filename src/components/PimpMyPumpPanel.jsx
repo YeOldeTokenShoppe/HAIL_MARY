@@ -94,7 +94,8 @@ export const ADDON_CATALOG = [
   { id: "skeleton",      label: "HOME DEPOT SKELETON",       color: "#e8dcc8", shape: "cylinder", model: "/models/addons/HDSkeleton.glb" },
   { id: "flamingo",      label: "PINK FLAMINGO",  color: "#ff69b4", shape: "cone",     model: "/models/addons/pinkFlamingo.glb" },
   { id: "bearRug",       label: "BEAR RUG",       color: "#8B5A2B", shape: "box",      model: "/models/addons/Bear_Rug.glb" },
-  { id: "dinosaur",      label: "T-REX",       color: "#6b8e23", shape: "cone",     model: "/models/addons/t-rex.glb", animated: true, premium: true, allowedSlots: [3, 4], allowedRotations: [0, 2] },
+  // T-REX is no longer a placeable add-on — it now invades as a rogue character
+  // (see ROGUE_CATALOG "dinosaur" in RogueCharacter.jsx).
   { id: "goldRocks",     label: "GOLD ROCKS",     color: "#ffd700", shape: "sphere",   model: "/models/addons/goldRocks.glb" },
   { id: "palmTree",      label: "PALM TREE",      color: "#2d8a4e", shape: "cylinder", model: "/models/addons/palmTree.glb" },
   { id: "pumpkinPatch",  label: "PUMPKIN PATCH",  color: "#e87530", shape: "sphere",   model: "/models/addons/pumpkinPatch.glb" },

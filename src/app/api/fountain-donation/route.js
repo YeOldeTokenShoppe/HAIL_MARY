@@ -4,9 +4,14 @@
 // `fountain_donations` feed — the toasts and the "Total Given" counter
 // in fountain.html read from it. That collection is `write: if false`
 // for clients, so this route is its ONLY writer (admin SDK), and it
-// only writes what it can verify on-chain: the client sends nothing
-// but a tx hash; donor, recipient, amount, and currency all come from
-// the receipt. Same trust model as /api/burn-offering.
+// only writes what it can verify on-chain: donor, recipient, amount,
+// and currency all come from the receipt. Same trust model as
+// /api/burn-offering — with ONE deliberate exception: the optional
+// `wish` (a public one-liner attached to the golden coin). It can't be
+// chain-verified, so it's sanitized to short plain text here and must
+// be HTML-escaped by every renderer. First POST per tx hash wins
+// (create() idempotency), so attaching a wish to someone ELSE'S
+// donation requires beating the donor's own immediate POST.
 //
 // Verifies either form a donation can take:
 //   - USDC: an ERC-20 Transfer to a known recipient wallet
@@ -39,12 +44,37 @@ const RECIPIENTS = (() => {
 
 export async function POST(request) {
   try {
-    const { txHash } = await request.json();
+    const { txHash, wish: rawWish, donorName: rawName } = await request.json();
 
     if (typeof txHash !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
       return NextResponse.json({ error: 'invalid-tx-hash' }, { status: 400 });
     }
     const hash = txHash.toLowerCase();
+
+    // Sanitize the wish down to one short line of plain text: strip
+    // control/zero-width/bidi characters, collapse whitespace, cap at 80.
+    let wish = null;
+    if (typeof rawWish === 'string') {
+      const cleaned = rawWish
+        .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\ufeff]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80);
+      if (cleaned) wish = cleaned;
+    }
+
+    // Same treatment for the optional self-claimed donor name (shorter cap).
+    // Like `wish`, this is client-supplied and NOT chain-verified, so it is
+    // sanitized to short plain text here and MUST be HTML-escaped on render.
+    let donorName = null;
+    if (typeof rawName === 'string') {
+      const cleaned = rawName
+        .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\u202a-\u202e\ufeff]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 24);
+      if (cleaned) donorName = cleaned;
+    }
 
     let receipt;
     try {
@@ -145,9 +175,10 @@ export async function POST(request) {
       );
     }
 
-    // Display name derives from the chain, not client input — no
-    // injection surface into the public feed (same posture as the
-    // VigilTicker displayName pattern).
+    // `userName` derives from the chain, not client input — no injection
+    // surface (same posture as the VigilTicker displayName pattern). The
+    // optional `donorName` above IS client-supplied (sanitized, unverified),
+    // so renderers must escape it and pair it with this verified address.
     const shortDonor = `${donor.slice(0, 6)}...${donor.slice(-4)}`;
 
     try {
@@ -155,6 +186,7 @@ export async function POST(request) {
         donor,
         userId: donor,
         userName: shortDonor,
+        donorName,
         userAvatar: null,
         charity: recipient.key,
         charityName: recipient.name,
@@ -162,6 +194,7 @@ export async function POST(request) {
         amount: String(amount),
         currency,
         usdValue,
+        wish,
         amountWei: amountWei.toString(),
         txHash: hash,
         timestamp: FieldValue.serverTimestamp(),

@@ -195,7 +195,7 @@ export default function ModelViewerPage() {
            opens the overlay, so the slot returns to the root page. */
         onMenuClick={() => router.push('/')}
         menuIcon={
-          <img src="/brand-mark.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
+          <img src="/brand-mark-cyan.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
         }
         menuLabel="HOME"
         isUserSignedIn={isSignedIn}

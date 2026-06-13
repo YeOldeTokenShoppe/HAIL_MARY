@@ -8,6 +8,7 @@ import { OrbitControls, Cloud, Clouds } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import CleanCanvas from "@/components/canvas/CleanCanvas";
+import { Perf } from "r3f-webgpu-perf";
 import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { REFERRAL_BONUS } from "@/lib/oilBonusMath";
@@ -6562,7 +6563,7 @@ export default function OilPage() {
               title="Return to shrine"
               style={{ ...styles.logoMark, cursor: "pointer", textDecoration: "none" }}
             >
-              <img src="/brand-mark.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
+              <img src="/brand-mark-cyan.svg" alt="Home" style={{ width: 24, height: 24, objectFit: "contain", display: "block" }} />
             </Link>
             <div>
               <h1 style={{ ...styles.title, fontSize: 12, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
@@ -6725,7 +6726,26 @@ export default function OilPage() {
                   <CameraFlyIn onComplete={() => setIntroComplete(true)} mobile grid={gridSize} />
                 )}
                 <CameraShake shakeRef={shakeRef} />
+                {/* Dev-only perf HUD (plain canvas here — no CRT
+                    wrapper, so no bleed compensation needed). */}
+                {/* {process.env.NODE_ENV === "development" && (
+                  <Perf position="top-left" zIndex={10001} />
+                )} */}
               </CleanCanvas>
+              {/* The game's fixed overlays sit at z-index 10000; the
+                  perf panel bakes 9999 into its own stylesheet and
+                  ignores inline style on the fixed container, so
+                  out-rank it with !important (the package applies neither className nor style props to that container). */}
+              {process.env.NODE_ENV === "development" && (
+                <style>{`
+                .perf-panel { z-index: 10001 !important; }
+                /* The mobile app-shell owns the top ~90px (48px header
+                   + section tabs); start the HUD below it. */
+                @media (max-width: 768px) {
+                  .perf-panel.top-left { top: 100px !important; }
+                }
+              `}</style>
+              )}
               {cctvOverlay}
               {/* DrillGeode renders once in the control block below the canvas
                   (matches desktop). It used to also render here, inside the
@@ -6736,7 +6756,7 @@ export default function OilPage() {
               <div style={{ ...styles.cornerBracket, bottom: 6, left: 6, transform: "scaleY(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, right: 6, transform: "scale(-1)" }} />
               <div style={styles.gridLabel}>
-                {gridSize}&times;{gridSize}&times;{DEPTH_Z} VOXEL
+                {gridSize}&times;{gridSize}&times;{DEPTH_Z} 
               </div>
               {selectedX !== null && (() => {
                 const mineCol = userDrill?.col ?? myPlot?.col;
@@ -7263,14 +7283,30 @@ export default function OilPage() {
               <CameraFlyIn onComplete={() => setIntroComplete(true)} grid={gridSize} />
             )}
             <CameraShake shakeRef={shakeRef} />
+            {/* Dev-only perf HUD (plain canvas here — no CRT wrapper,
+                so no bleed compensation needed). */}
+            {/* {process.env.NODE_ENV === "development" && (
+              <Perf position="top-left" style={{zIndex: 10001}}/>
+            )} */}
           </CleanCanvas>
+          {/* Same z-index hook as the mobile canvas above. */}
+          {process.env.NODE_ENV === "development" && (
+            <style>{`
+                .perf-panel { z-index: 10001 !important; }
+                /* The mobile app-shell owns the top ~90px (48px header
+                   + section tabs); start the HUD below it. */
+                @media (max-width: 768px) {
+                  .perf-panel.top-left { top: 100px !important; }
+                }
+              `}</style>
+          )}
           {cctvOverlay}
           <div style={{ ...styles.cornerBracket, top: 8, left: 8 }} />
           <div style={{ ...styles.cornerBracket, top: 8, right: 8, transform: "scaleX(-1)" }} />
           <div style={{ ...styles.cornerBracket, bottom: 8, left: 8, transform: "scaleY(-1)" }} />
           <div style={{ ...styles.cornerBracket, bottom: 8, right: 8, transform: "scale(-1)" }} />
           <div style={styles.gridLabel}>
-            {gridSize}&times;{gridSize}&times;{DEPTH_Z} VOXEL GRID
+            {gridSize}&times;{gridSize}&times;{DEPTH_Z}
           </div>
           <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, ...TOOLBAR_TRAY }}>
             <button
