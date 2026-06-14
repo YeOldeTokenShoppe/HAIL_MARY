@@ -293,7 +293,11 @@ body:has(.shrine-page.neon) {
     width: calc(100% + 16px);
     margin: 4vh -8px 0;
     min-height: 300vh;
-    padding: 1px 8px calc(190px + env(safe-area-inset-bottom, 0px));
+    /* Same chamber-reveal clearance as the desktop rule above (the
+       reveal span is the same 3.4 screens on mobile; only the rotation
+       keyframes differ). 190px keeps the original gap; +65svh clears the
+       ~0.6-screen overlap with Our Lady's reveal. */
+    padding: 1px 8px calc(190px + 65svh + env(safe-area-inset-bottom, 0px));
     background: transparent;
   }
 
@@ -360,7 +364,18 @@ body:has(.shrine-page.neon) {
   width: calc(100% + 40px);
   margin: 35vh -20px 0;
   min-height: 320vh;
-  padding: 1px 20px calc(280px + env(safe-area-inset-bottom, 0px));
+  /* Bottom gap before the empty .vestry-viewport runway. The chamber's
+     scroll-driven reveal begins REVEAL_SPAN_SCREENS (3.4) viewport-heights
+     above the page bottom, at which point the viewport top still sits
+     ~0.6 screens above the vestry's top edge — so the last content
+     (HolyTrinSection + its trailing divider) needs ≳0.6svh of clearance
+     here or it overlaps Our Lady's reveal. 280px keeps the original
+     breathing room; the 65svh buffer guarantees the clearance on any
+     viewport. This lives ABOVE the vestry on purpose: the chamber rotation
+     and crane park are both anchored to distance-from-bottom, so adding
+     space here never shifts that timing. Don't move it into .vestry-viewport
+     (whose 380vh height is synced to cameraParkScreens). */
+  padding: 1px 20px calc(280px + 65svh + env(safe-area-inset-bottom, 0px));
   pointer-events: auto;
   touch-action: pan-y;
   overflow-anchor: none;

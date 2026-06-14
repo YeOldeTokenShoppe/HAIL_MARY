@@ -11,7 +11,7 @@ const PILLARS = [
     id: "integr80",
     label: "Integr80",
     tagline: "incorrupt",
-    color: "#2ad6ee",
+    color: "#00ff00",
     description:
       "Token contract renounced. 80% of supply in the LP. No admin keys, no mint function, no hidden levers.",
   },
@@ -19,7 +19,7 @@ const PILLARS = [
     id: "util80",
     label: "Util80",
     tagline: "in use",
-    color: "#d4af37",
+    color: "#ffd700",
     description:
       "Get access to the growing ecosystem of games and services built on the RL80 cosmology.",
   },
@@ -28,7 +28,7 @@ const PILLARS = [
     id: "liquid80",
     label: "Liquid80",
     tagline: "secured",
-    color: "#d92db0",
+    color: "#f4e4c1",
     description:
       "LP tokens burned. Liquidity locked permanently — Small pool, but unruggable.",
   },
@@ -121,14 +121,14 @@ export default function HolyTrinSection() {
         >
           <defs>
             <linearGradient id="trin-stroke" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#2ad6ee" />
-              <stop offset="50%" stopColor="#d4af37" />
-              <stop offset="100%" stopColor="#d92db0" />
+              <stop offset="0%" stopColor="#00ff00" />
+              <stop offset="50%" stopColor="#ffd700" />
+              <stop offset="100%" stopColor="#f4e4c1" />
             </linearGradient>
             <radialGradient id="trin-aura" cx="50%" cy="55%" r="55%">
-              <stop offset="0%" stopColor="#d92db0" stopOpacity="0.32" />
-              <stop offset="45%" stopColor="#d4af37" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#2ad6ee" stopOpacity="0" />
+              <stop offset="0%" stopColor="#f4e4c1" stopOpacity="0.32" />
+              <stop offset="45%" stopColor="#ffd700" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#00ff00" stopOpacity="0" />
             </radialGradient>
             <filter id="trin-glow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="2.4" result="blur" />
@@ -238,9 +238,9 @@ export default function HolyTrinSection() {
 
           {/* Vertex halos — pulse behind each vertex dot */}
           <g className="holy-trin-halos" filter="url(#trin-soft-glow)">
-            <circle className="holy-trin-halo holy-trin-halo--top" cx="150" cy="40" r="16" fill="#2ad6ee" />
-            <circle className="holy-trin-halo holy-trin-halo--bl" cx="40" cy="240" r="16" fill="#d4af37" />
-            <circle className="holy-trin-halo holy-trin-halo--br" cx="260" cy="240" r="16" fill="#d92db0" />
+            <circle className="holy-trin-halo holy-trin-halo--top" cx="150" cy="40" r="16" fill="#00ff00" />
+            <circle className="holy-trin-halo holy-trin-halo--bl" cx="40" cy="240" r="16" fill="#ffd700" />
+            <circle className="holy-trin-halo holy-trin-halo--br" cx="260" cy="240" r="16" fill="#f4e4c1" />
           </g>
 
           {/* Vertex dots */}

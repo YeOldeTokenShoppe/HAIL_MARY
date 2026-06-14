@@ -10,6 +10,15 @@ export default function DropInTitle({
   isMobile = false,
   onAnimationComplete = () => {},
   triggerAnimation = true,
+  // Hold the title hidden for a beat after the trigger fires. The
+  // trigger fires ~100-200px BEFORE the title is actually on screen
+  // (positive observer rootMargin + framer useInView margin), so on a
+  // quick scroll the drop-in can play out off-screen and be missed. The
+  // fromTo's immediate render snaps the letters to their hidden start
+  // state right away (they're CSS opacity:0 already, so no flash), then
+  // this delay waits before dropping them in — letting the scroll catch
+  // up so the effect plays while the title is in view.
+  delay = 0.25,
   instanceId
 }) {
   const stableId = useMemo(() => {
@@ -18,14 +27,17 @@ export default function DropInTitle({
     return `dropin-${contentHash}`;
   }, [instanceId, lines]);
   const containerRef = useRef(null);
-  // Latch the play state: both `triggerAnimation` (framer-motion
-  // useInView in callers) and the internal IntersectionObserver re-fire
-  // every time the section scrolls out and back into view, and the
-  // observer effect itself can re-attach mid-scroll if any dependency
-  // identity changes. Without the latch, those re-fires stack new GSAP
-  // timelines on top of each other and the title visibly keeps
-  // re-animating.
-  const hasPlayedRef = useRef(false);
+  // Edge-triggered replay latch. Two visibility signals drive playback:
+  // the `triggerAnimation` prop (framer-motion useInView in callers) and
+  // the internal IntersectionObserver below. We WANT the title to replay
+  // each time it scrolls back into view, but NOT to re-fire while it's
+  // sitting in view — both signals can pulse repeatedly mid-scroll (and
+  // the observer effect can re-attach if a dependency identity churns),
+  // and an unguarded play stacks GSAP timelines so the title visibly
+  // keeps re-animating. So we latch on the off-screen → on-screen edge:
+  // play once when it becomes visible, ignore further play calls until it
+  // leaves view, then release the latch so the next entry replays.
+  const inViewLatchRef = useRef(false);
   const timelineRef = useRef(null);
   // Pinned ref for the consumer's onComplete so playAnimation never
   // recaptures an identity-churning inline callback (the default
@@ -36,10 +48,11 @@ export default function DropInTitle({
   }, [onAnimationComplete]);
   const playAnimation = () => {
     if (!containerRef.current) return;
-    if (hasPlayedRef.current) return;
-    hasPlayedRef.current = true;
+    if (inViewLatchRef.current) return; // already played for this visit
+    inViewLatchRef.current = true;
     timelineRef.current?.kill();
     const tl = gsap.timeline({
+      delay,
       onComplete: () => onCompleteRef.current?.()
     });
     timelineRef.current = tl;
@@ -58,10 +71,16 @@ export default function DropInTitle({
     );
   };
 
+  // Release the latch when the title leaves view so the next entry
+  // replays. Calling this while still in view is a no-op-equivalent —
+  // the latch only matters on the next play call.
+  const releaseForReplay = () => {
+    inViewLatchRef.current = false;
+  };
+
   useEffect(() => {
-    if (triggerAnimation) {
-      playAnimation();
-    }
+    if (triggerAnimation) playAnimation();
+    else releaseForReplay();
   }, [triggerAnimation]);
 
   useEffect(() => {
@@ -69,9 +88,8 @@ export default function DropInTitle({
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          playAnimation();
-        }
+        if (entry.isIntersecting) playAnimation();
+        else releaseForReplay();
       },
       { threshold: 0.1, rootMargin: "100px 0px" }
     );
