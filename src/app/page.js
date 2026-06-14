@@ -2807,7 +2807,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
 
       {showSignInNudge && (
         <div className="flame-nudge" role="status" aria-live="polite">
-          <p className="flame-nudge-title">Your flame is burning.</p>
+          <p className="flame-nudge-title">Your candle is burning.</p>
           <p className="flame-nudge-sub">Connect a wallet and your votive:</p>
           <ul className="flame-nudge-benefits">
             <li>Burns 8 hours, not 1 minute</li>

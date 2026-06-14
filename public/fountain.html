@@ -55,6 +55,17 @@
 				}
 			}
 			
+			@keyframes slideInGlowDesktop {
+				from {
+					transform: translateX(calc(-50% + 24px)) translateY(-50%) scale(0.97);
+					opacity: 0;
+				}
+				to {
+					transform: translateX(-50%) translateY(-50%) scale(1);
+					opacity: 1;
+				}
+			}
+
 			@keyframes pulseGlow {
 				0%, 100% {
 					box-shadow: 
@@ -834,7 +845,7 @@
 						🍽️ World Central Kitchen
 					</button>
 					<button class="charity-button pumpkin-modal-button" data-charity="aspca">
-						🐾 ASPCA
+						🐶 ASPCA
 					</button>
 				</div>
 				<button class="modal-cancel pumpkin-modal-button cancel">Cancel</button>
@@ -895,32 +906,29 @@
 			">
 				<span class="mobile-text" style="font-size: 11px; line-height: 1.5;">
 					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
-					• Tap anywhere — water, rim, or plaza — to toss the coin in your hand<br>
-					• Token coins are free &amp; unlimited<br>
-					• Tap the coin chip to pick up a Golden Coin — a real USDC/ETH donation. Aim for the water!<br><br>
+					• Tap anywhere to toss the coin in your hand<br>
+					• Virtual coins are free &amp; unlimited<br>
+					• For a real USDC/ETH donation, tap <strong>Donate Coins</strong> (button at the bottom) and pick a charity. After you pay, a Golden Coin lands in your hand — aim for the water!<br><br>
 					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
 					• USDC or ETH goes directly to charity wallets<br>
 					• Pooled until ~100 USDC in value (or ETH equivalent)<br>
 					• Then forwarded via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
 					<strong style="color: #FFD700;">Charity Wallets (Base):</strong><br>
 					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a><br>
-					🐾 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
+					🐶 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
 					<span style="font-size: 9px; opacity: 0.8;">All transactions visible on-chain for full transparency.</span>
 				</span>
-				<span class="desktop-text" style="font-size: 12px; line-height: 1.6;">
+				<span class="desktop-text" style="font-size: 12px; line-height: 1.5;">
 					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
-					• Tap anywhere and the coin in your hand flies right where you tapped<br>
-					• Virtual coins are free and unlimited — toss away<br>
-					• Donate USDC or ETH: click the 'Donate' button to toss a permanent coin in the fountain when you donate to a charity or the dev.<br><br>
-					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
-					• USDC or ETH donations are sent directly to charity wallets held by 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙<br>
-					• Donations pool until they reach ~100 USDC in value (or the ETH equivalent)<br>
-					• The pool is then forwarded to charities via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
-					<strong style="color: #FFD700;">Verify Charity Wallets (Base):</strong><br>
-					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's Children's Research Hospital</a><br>
-					🐾 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
-						🏥 <a href="https://etherscan.io/address/0x07363eac9c24Af6451EBA07ff16CbD687dA4508A" target="_blank" style="color: #00e572; text-decoration: underline;">The Dev</a><br>
-					<span style="font-size: 10px; opacity: 0.8;">All transactions are recorded on-chain for complete transparency. Click wallet links to verify donations on BaseScan.</span>
+					• Tap anywhere — the coin flies where you tapped<br>
+					• Virtual coins are free &amp; unlimited<br>
+					• Real donation: click <strong>Donate Coins</strong> below, pick a charity, and pay — a Golden Coin lands in your hand to toss.<br><br>
+					<strong style="color: #FFD700;">How It Works:</strong><br>
+					• USDC/ETH goes straight to the charity wallets<br>
+					• Pooled to ~100 USDC, then sent via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
+					<strong style="color: #FFD700;">Verify Wallets (Base):</strong><br>
+					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a> · 🐶 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a> · ❤️ <a href="https://etherscan.io/address/0x07363eac9c24Af6451EBA07ff16CbD687dA4508A" target="_blank" style="color: #00e572; text-decoration: underline;">The Dev</a><br>
+					<span style="font-size: 10px; opacity: 0.8;">All on-chain for full transparency.</span>
 				</span>
 			</div>
 		</div>
@@ -971,6 +979,12 @@
 					gap: 10px;
 				">
 					<!-- Info button -->
+					<!-- Dismiss: hide the panel for a clear view of the fountain (tapping still tosses) -->
+					<button type="button" id="dismissUiBtn" onclick="dismissFountainUI()" title="Hide controls for a clear view" style="
+						width: 28px; height: 28px; font-size: 12px; border-radius: 50%; cursor: pointer; padding: 0; line-height: 1;
+						background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.8);
+						display: flex; align-items: center; justify-content: center;
+					">⌄</button>
 					<button id="mobileInfoBtn" onclick="toggleInstructions()" class="pumpkin-info-button" style="
 						display: none;
 						width: 28px;
@@ -1006,6 +1020,18 @@
 			">❓</button>
 		</div>
 		
+		<!-- Restore tab: shown only after the panel is dismissed; brings the controls back -->
+		<button type="button" id="restoreUiBtn" onclick="restoreFountainUI()" title="Show controls" style="
+			position: fixed; left: 50%; transform: translateX(-50%);
+			bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+			display: none; align-items: center; gap: 6px; z-index: 1600; cursor: pointer;
+			padding: 6px 14px; border-radius: 100px;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+			font-size: 10px; font-weight: 700; letter-spacing: 1px; color: rgba(255, 255, 255, 0.9);
+			background: rgba(20, 16, 40, 0.55); border: 1px solid rgba(255, 255, 255, 0.22);
+			backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+		"><span style="font-size: 13px; line-height: 1;">⌃</span> SHOW</button>
+
 		<!-- Coin Counter Display - Simplified for Mobile -->
 		<div id="coinCounter" class="coin-counter" style="
 			position: fixed;
@@ -1098,7 +1124,7 @@
 					<span style="flex: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px;">St. Jude's: <span id="stJudesPercentage" style="font-weight: 700;">0</span>%</span>
 				</div>
 				<div style="display: flex; align-items: center; gap: 6px;">
-					<span style="font-size: 14px;">🐾</span>
+					<span style="font-size: 14px;">🐶</span>
 					<span style="flex: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px;">ASPCA: <span id="aspcaPercentage" style="font-weight: 700;">0</span>%</span>
 				</div>
 			</div>
@@ -1222,7 +1248,7 @@
 					info.style.left = '85%';
 					info.style.top = '50%';
 					info.style.bottom = 'auto';
-					info.style.transform = 'translateY(-50%)';
+					info.style.transform = 'translateX(-50%) translateY(-50%)';
 					info.style.width = '280px';
 					info.style.display = 'none';
 					info.style.zIndex = '1000';
@@ -1281,13 +1307,13 @@
 				if (info.style.display === 'none' || info.style.display === '') {
 					// Show instructions with smooth animation
 					info.style.display = 'block';
-					info.style.animation = 'slideInGlow 0.4s ease-out forwards, pulseGlow 3s ease-in-out 0.4s infinite';
+					info.style.animation = (isMobile ? 'slideInGlow' : 'slideInGlowDesktop') + ' 0.4s ease-out forwards, pulseGlow 3s ease-in-out 0.4s infinite';
 					setTimeout(() => {
 						info.style.opacity = '1';
 						if (isMobile) {
 							info.style.transform = 'translateY(0)';
 						} else {
-							info.style.transform = 'translateY(-50%)';
+							info.style.transform = 'translateX(-50%) translateY(-50%)';
 						}
 					}, 10);
 				} else {
@@ -1297,7 +1323,7 @@
 					if (isMobile) {
 						info.style.transform = 'translateY(20px) scale(0.95)';
 					} else {
-						info.style.transform = 'translateY(-50%) translateX(20px) scale(0.95)';
+						info.style.transform = 'translateX(-50%) translateY(-50%) translateX(20px) scale(0.95)';
 					}
 					setTimeout(() => {
 						info.style.display = 'none';
@@ -1306,6 +1332,81 @@
 			}
 			// Make it globally accessible
 			window.toggleInstructions = toggleInstructions
+
+			// Dismiss the bottom control panel for an unobstructed view of the fountain.
+			// Tossing is tap-anywhere, so hiding the panel never blocks play; a small
+			// "SHOW" tab brings it back. Also auto-hides while the user orbits the camera
+			// (see wireAutoHideOnOrbit) and auto-restores when they go idle.
+			let fountainPanelHidden = false;     // is the panel currently tucked away?
+			let fountainPanelAutoHidden = false; // ...and was it hidden BY orbiting (vs the manual ⌄)?
+			function dismissFountainUI(opts) {
+				const card = document.getElementById('mobileCollectionCounter');
+				const restore = document.getElementById('restoreUiBtn');
+				const info = document.getElementById('info');
+				if (card) {
+					card.style.transition = 'transform 0.42s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease';
+					card.style.transform = 'translateX(-50%) translateY(260%)';
+					card.style.opacity = '0';
+					card.style.pointerEvents = 'none';
+				}
+				if (info) { info.style.display = 'none'; info.style.animation = 'none'; }
+				if (restore) {
+					restore.style.display = 'flex';
+					restore.style.transition = 'opacity 0.3s ease';
+					restore.style.opacity = '0';
+					requestAnimationFrame(() => requestAnimationFrame(() => { restore.style.opacity = '1'; }));
+				}
+				fountainPanelHidden = true;
+				fountainPanelAutoHidden = !!(opts && opts.auto);
+			}
+			function restoreFountainUI() {
+				const card = document.getElementById('mobileCollectionCounter');
+				const restore = document.getElementById('restoreUiBtn');
+				if (card) {
+					card.style.transform = 'translateX(-50%) translateY(0)';
+					card.style.opacity = '1';
+					card.style.pointerEvents = 'auto';
+				}
+				if (restore) { restore.style.opacity = '0'; setTimeout(() => { restore.style.display = 'none'; }, 260); }
+				fountainPanelHidden = false;
+				fountainPanelAutoHidden = false;
+			}
+
+			// Auto-hide the panel while the user orbits/zooms the camera; restore it when idle.
+			// A tap-to-toss barely moves the camera, so we require real travel (ORBIT_MOVE) to
+			// distinguish an orbit from a toss. Manual ⌄ dismiss is left alone (not auto-restored).
+			// controls + camera are passed in because this lives in the classic <script>,
+			// while those are declared inside the <script type="module"> (different scope).
+			function wireAutoHideOnOrbit(controls, camera) {
+				if (!controls || !camera) return;
+				let interacting = false, startPos = null, idleTimer = null;
+				const ORBIT_MOVE = 0.12;   // world-units the camera must travel to count as an orbit
+				const IDLE_MS = 2200;      // restore this long after the user stops moving the camera
+				controls.addEventListener('start', () => {
+					interacting = true;
+					startPos = camera.position.clone();
+					if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+				});
+				controls.addEventListener('change', () => {
+					if (interacting && !fountainPanelHidden && startPos &&
+						camera.position.distanceTo(startPos) > ORBIT_MOVE) {
+						dismissFountainUI({ auto: true });
+					}
+				});
+				controls.addEventListener('end', () => {
+					interacting = false;
+					if (fountainPanelAutoHidden) {
+						if (idleTimer) clearTimeout(idleTimer);
+						idleTimer = setTimeout(() => {
+							idleTimer = null;
+							if (fountainPanelAutoHidden && !interacting) restoreFountainUI();
+						}, IDLE_MS);
+					}
+				});
+			}
+
+			window.dismissFountainUI = dismissFountainUI;
+			window.restoreFountainUI = restoreFountainUI;
 
 			// ===== CELEBRATION VFX SYSTEM =====
 			const celebrationConfig = {
@@ -1330,10 +1431,10 @@
 			function getCharityEmoji(charityKey) {
 				const charityEmojis = {
 					'ST_JUDES': '🏥',
-					'ASPCA': '🐾',
+					'ASPCA': '🐶',
 					'st-judes': '🏥',
-					'aspca': '🐾',
-					'DEV': '☕'
+					'aspca': '🐶',
+					'DEV': '❤️'
 				};
 				return charityEmojis[charityKey] || '💝';
 			}
@@ -1583,9 +1684,9 @@
 				const icons = {
 						'DEV': '☕',
 					'ST_JUDES': '🏥',
-					'ASPCA': '🐾',
+					'ASPCA': '🐶',
 					'st-judes': '🏥',
-					'aspca': '🐾'
+					'aspca': '🐶'
 				};
 				return icons[charityKey] || '💝';
 			}
@@ -1782,7 +1883,7 @@
 						if (isMobile) {
 							info.style.transform = 'translateY(20px) scale(0.95)';
 						} else {
-							info.style.transform = 'translateY(-50%) translateX(20px) scale(0.95)';
+							info.style.transform = 'translateX(-50%) translateY(-50%) translateX(20px) scale(0.95)';
 						}
 						setTimeout(() => {
 							info.style.display = 'none';
@@ -2573,7 +2674,7 @@
             // groundMesh.position.y in init(). Coins only raycast against
             // fountain parts, so without this floor a plaza throw would fall
             // through the world.
-            const PLAZA_Y = -2;
+            const PLAZA_Y = -1.05;
             const coinSplashDuration = 75; // ms the splash force lasts
             let coinSplashTimeout = null; // Timeout ID for resetting splash
             
@@ -2646,6 +2747,31 @@
                                mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
                 }
 
+                // --- Smooth voronoi, adapted from Danil's water-splash shader (MIT,
+                //     after iq https://www.shadertoy.com/view/ldB3zc). 3x3 footprint
+                //     (vs the original 5x5) keeps it cheap enough for the column sheet. ---
+                vec2 hash22( vec2 p ) {
+                    vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+                    p3 += dot(p3, p3.yzx + 33.33);
+                    return fract((p3.xx + p3.yz) * p3.zy);
+                }
+                vec2 voronoi( vec2 x, float w, float t ) {
+                    vec2 n = floor(x);
+                    vec2 f = fract(x);
+                    vec2 m = vec2(8.0, 0.0);
+                    for (int j = -1; j <= 1; j++)
+                    for (int i = -1; i <= 1; i++) {
+                        vec2 g = vec2(float(i), float(j));
+                        vec2 o = hash22(n + g);
+                        o = 0.5 + 0.5 * sin(t + 6.2831 * o);
+                        float d = length(g - f + o);
+                        float h = smoothstep(0.0, 1.0, 0.5 + 0.5 * (m.x - d) / w);
+                        m.x = mix(m.x, d, h) - h * (1.0 - h) * w / (1.0 + 3.0 * w);
+                        m.y = mix(m.y, 0.75, h) - h * (1.0 - h) * w / (1.0 + 3.0 * w);
+                    }
+                    return m;
+                }
+
                 void main() {
                     // Falling coordinate: world height scrolled by time, so features move DOWN the sheet
                     float fall = vWorldPosition.y * 5.0 + iTime * 2.4;
@@ -2660,8 +2786,17 @@
                     float streak = sin(vUv.x * 6.2831853 * 18.0 + n1 * 5.0) * 0.5 + 0.5;
                     float pattern = streak * 0.55 + n1 * 0.45 + n2 * 0.45;
 
+                    // Voronoi "churn": animated cells tumbling DOWN the sheet (fall scrolls
+                    // them), sampled in world space like the noise above so there's no UV seam.
+                    // vor.x = distance to nearest cell centre, vor.y = a soft cell field.
+                    vec2 vor = voronoi(vec2(vWorldPosition.x * 13.0 + vWorldPosition.z * 5.0, fall * 0.7), 0.5, iTime * 0.6);
+                    float foam = smoothstep(0.22, 0.02, vor.x);   // bright crests where cells clump
+                    pattern = pattern * (0.7 + 0.4 * vor.y) + foam * 0.45;
+
                     vec3 baseColor = vec3(0.6, 0.8, 0.95);
+                    baseColor = mix(baseColor, vec3(0.93, 0.98, 1.0), foam * 0.6);  // white foam tint
                     float finalAlpha = 0.42 * smoothstep(0.25, 1.0, pattern);
+                    finalAlpha = max(finalAlpha, foam * 0.22);     // foam crests stay visible
 
                     // Fresnel rim: the sheet reads thicker at grazing angles and picks up
                     // a warm edge from the sunset
@@ -3513,7 +3648,10 @@
 				controls.zoomToCursor = true;
 				controls.minPolarAngle = 0;
 				controls.maxPolarAngle = Math.PI / 2;
-				
+
+				// Auto-hide the control panel while the user orbits/zooms (restores when idle)
+				wireAutoHideOnOrbit(controls, camera);
+
 				// Disable controls initially for cinematic intro
 				controls.enabled = false;
 
@@ -3689,7 +3827,7 @@
                     if (node.name && node.name.startsWith('Neon')) {
                         neonObjects.push(node);
                         // Set visibility based on current 80s mode state
-                        node.visible = is80sMode;
+                        node.visible = !is80sMode;
                     }
                     
                     // Check for Raybans objects (case-insensitive, partial match)
@@ -3960,7 +4098,7 @@
 				
 				const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
 				groundMesh.rotation.x = -Math.PI / 2; // Rotate to lie flat
-				groundMesh.position.y = -2; // Position below fountain
+				groundMesh.position.y = -1.05; // Plaza sits at the fountain's base (measured min.y ≈ -1.07). Was -2, which left a ~0.93u gap so the fountain read as hovering once a coin fell to the ground.
 				groundMesh.receiveShadow = true;
 				scene.add(groundMesh);
 				
@@ -4063,6 +4201,10 @@
 				distantMountainMesh.position.set(0, -2, -180); // Even farther
 				distantMountainMesh.scale.set(1.2, 2, 0.8); // Wider and more stretched
 				scene.add(distantMountainMesh);
+
+				// Back-horizon easter egg (see updateShootingStar)
+				createShootingStar();
+				createBackSun();
 
 				// Setup post-processing after shaders are defined
 				setupPostProcessing();
@@ -5736,6 +5878,108 @@
 			
 			let hasCheckedModelLoading = false;
 			
+			// ===== Easter egg: "wish upon a star" — a shooting star on the empty +Z back horizon. =====
+			// Mountains/building live at -Z, so the back sky is bare; this only frames up when the user
+			// orbits BEHIND the statue. Streaks by every ~12-30s, in normal AND 80s modes.
+			let shootingStar = null;
+			let backSun = null;
+			let shootingStarNextAt = null;
+			const shootingStarFX = { active: false, t: 0, dur: 1.4, from: null, to: null, dir: null };
+
+			function makeStreakTexture() {
+				const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+				const g = c.getContext('2d');
+				const head = g.createRadialGradient(232, 32, 0, 232, 32, 30);  // round head glow at the +U end
+				head.addColorStop(0, 'rgba(255,255,255,1)');
+				head.addColorStop(0.4, 'rgba(255,246,210,0.9)');
+				head.addColorStop(1, 'rgba(255,210,140,0)');
+				g.fillStyle = head; g.fillRect(150, 0, 106, 64);
+				const tail = g.createLinearGradient(0, 0, 232, 0);            // tapering tail to the left
+				tail.addColorStop(0, 'rgba(150,200,255,0)');
+				tail.addColorStop(0.65, 'rgba(220,235,255,0.28)');
+				tail.addColorStop(0.95, 'rgba(255,250,235,0.85)');
+				tail.addColorStop(1, 'rgba(255,255,255,0)');
+				g.globalCompositeOperation = 'lighter';
+				for (let i = 0; i < 64; i++) {                                // per-row vertical falloff = thin streak
+					const dy = Math.abs(i - 32) / 32;
+					g.globalAlpha = Math.max(0, 1 - dy * dy);
+					g.fillStyle = tail; g.fillRect(0, i, 234, 1);
+				}
+				const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true; return tex;
+			}
+
+			function createShootingStar() {
+				const mat = new THREE.MeshBasicMaterial({ map: makeStreakTexture(), transparent: true,
+					opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false });
+				shootingStar = new THREE.Mesh(new THREE.PlaneGeometry(24, 1.8), mat);
+				shootingStar.visible = false; shootingStar.renderOrder = 5;
+				scene.add(shootingStar);
+			}
+
+			// Scenic setting sun low on the empty +Z back horizon (pairs with the shooting star).
+			// Backdrop only — the warm key light still rakes in from the left, so this is just scenery,
+			// parked far behind the fountain where it only shows when you orbit around back.
+			function createBackSun() {
+				const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+				const g = c.getContext('2d');
+				const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+				grad.addColorStop(0.00, 'rgba(255,250,238,1)');   // hot core
+				grad.addColorStop(0.12, 'rgba(255,232,176,1)');
+				grad.addColorStop(0.28, 'rgba(255,178,92,0.95)'); // orange body
+				grad.addColorStop(0.50, 'rgba(240,120,64,0.5)');
+				grad.addColorStop(0.78, 'rgba(205,72,84,0.16)');  // dusk haze
+				grad.addColorStop(1.00, 'rgba(150,50,90,0)');     // fade out
+				g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+				const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+				const mat = new THREE.SpriteMaterial({ map: tex, blending: THREE.AdditiveBlending,
+					depthWrite: false, transparent: true, toneMapped: false });
+				backSun = new THREE.Sprite(mat);
+				backSun.position.set(-20, 12, 200);   // low, far out, slightly toward the light side
+				backSun.scale.set(64, 64, 1);
+				backSun.renderOrder = 2;
+				scene.add(backSun);
+			}
+
+			function triggerShootingStar() {
+				const sign = Math.random() < 0.5 ? -1 : 1;            // streak left or right
+				const z = 110 + Math.random() * 30;                   // far out on the empty +Z horizon
+				const sx = (8 + Math.random() * 30) * -sign;
+				const sy = 40 + Math.random() * 12;                   // high in the sky
+				const ex = sx + sign * (48 + Math.random() * 26);     // travel sideways...
+				const ey = sy - (20 + Math.random() * 12);            // ...and downward
+				shootingStarFX.from = new THREE.Vector3(sx, sy, z);
+				shootingStarFX.to = new THREE.Vector3(ex, ey, z);
+				shootingStarFX.dir = shootingStarFX.to.clone().sub(shootingStarFX.from).normalize();
+				shootingStarFX.dur = 1.2 + Math.random() * 0.6;
+				shootingStarFX.t = 0; shootingStarFX.active = true; shootingStar.visible = true;
+			}
+
+			const _ssToCam = new THREE.Vector3(), _ssX = new THREE.Vector3(), _ssY = new THREE.Vector3(), _ssBasis = new THREE.Matrix4();
+			function updateShootingStar(now, dt) {
+				if (!shootingStar) return;
+				if (!shootingStarFX.active) {
+					if (shootingStarNextAt === null) { shootingStarNextAt = now + 5000; return; }
+					if (now >= shootingStarNextAt) triggerShootingStar();
+					return;
+				}
+				shootingStarFX.t += dt;
+				const p = Math.min(shootingStarFX.t / shootingStarFX.dur, 1);
+				const eased = 1 - Math.pow(1 - p, 2);                 // ease-out arc
+				shootingStar.position.lerpVectors(shootingStarFX.from, shootingStarFX.to, eased);
+				const fadeIn = Math.min(p / 0.12, 1);
+				const fadeOut = p > 0.55 ? Math.max(0, 1 - (p - 0.55) / 0.45) : 1;
+				shootingStar.material.opacity = fadeIn * fadeOut;
+				_ssToCam.subVectors(camera.position, shootingStar.position).normalize();   // billboard to camera...
+				_ssX.copy(shootingStarFX.dir).addScaledVector(_ssToCam, -shootingStarFX.dir.dot(_ssToCam)).normalize(); // ...aligned to travel
+				_ssY.crossVectors(_ssToCam, _ssX).normalize();
+				_ssBasis.makeBasis(_ssX, _ssY, _ssToCam);
+				shootingStar.quaternion.setFromRotationMatrix(_ssBasis);
+				if (p >= 1) {
+					shootingStarFX.active = false; shootingStar.visible = false;
+					shootingStarNextAt = now + 12000 + Math.random() * 18000;  // next in 12-30s
+				}
+			}
+
 			function animate(currentTime) {
 				const deltaTime = Math.min((currentTime - lastTime) * 0.001, 0.1); // Convert to seconds, cap at 0.1s
 				lastTime = currentTime;
@@ -5770,6 +6014,7 @@
 				}
 				// --- END NEW ---
 
+				updateShootingStar(currentTime, deltaTime);
 				render();
 				// stats.update();
 
@@ -6563,6 +6808,26 @@
 				`,
 				common_frag: /* glsl */`				#include <common>
 				uniform float waterTime;
+				vec2 hash22( vec2 p ) {
+					vec3 p3 = fract( vec3( p.xyx ) * vec3( 0.1031, 0.1030, 0.0973 ) );
+					p3 += dot( p3, p3.yzx + 33.33 );
+					return fract( ( p3.xx + p3.yz ) * p3.zy );
+				}
+				vec2 voronoi( vec2 x, float w, float t ) {
+					vec2 n = floor( x ); vec2 f = fract( x );
+					vec2 m = vec2( 8.0, 0.0 );
+					for ( int j = -1; j <= 1; j++ )
+					for ( int i = -1; i <= 1; i++ ) {
+						vec2 g = vec2( float( i ), float( j ) );
+						vec2 o = hash22( n + g );
+						o = 0.5 + 0.5 * sin( t + 6.2831 * o );
+						float d = length( g - f + o );
+						float h = smoothstep( 0.0, 1.0, 0.5 + 0.5 * ( m.x - d ) / w );
+						m.x = mix( m.x, d, h ) - h * ( 1.0 - h ) * w / ( 1.0 + 3.0 * w );
+						m.y = mix( m.y, 0.75, h ) - h * ( 1.0 - h ) * w / ( 1.0 + 3.0 * w );
+					}
+					return m;
+				}
 				`,
 				// Fine ripple sparkle: high-frequency normal wobble at a scale the
 				// heightmap grid can't resolve. Runs after normal_fragment_maps so it
@@ -6588,6 +6853,25 @@
 					diffuseColor.a = clamp( diffuseColor.a * mix( 0.62, 1.3, fresnelW ), 0.0, 1.0 );
 				}
 				#include <opaque_fragment>
+				// --- Surface foam: expanding concentric rings + churning voronoi where the
+				//     falling-water column lands (adapted from the water-splash shader, MIT). ---
+				{
+					vec2 wp = ( vUv - 0.5 ) * BOUNDS;
+					vec2 dd = wp - vec2( 0.052, -0.01 );          // impact centre (matches heightmap)
+					float r = length( dd );
+					float ang = atan( dd.y, dd.x );
+					float radial = smoothstep( 1.15, 0.0, r );    // strong near the impact, gone by the rim
+					vec2 vor = voronoi( dd * 11.0, 0.5, waterTime * 0.9 );
+					// Break the perfect circles: wobble each ring radius by angle + voronoi turbulence,
+					// so they read as irregular surface waves rather than a clean bullseye.
+					float wob = sin( ang * 5.0 + waterTime * 1.3 ) * 0.5 + sin( ang * 9.0 - waterTime * 0.7 ) * 0.3;
+					float rr = r + wob * 0.05 + ( vor.y - 0.45 ) * 0.10;
+					float rings = 0.5 + 0.5 * sin( rr * 22.0 - waterTime * 3.2 );
+					rings = smoothstep( 0.5, 0.92, rings );
+					float churn = smoothstep( 0.45, 0.0, vor.x ) * smoothstep( 0.5, 0.0, r );
+					float foam = clamp( rings * radial * 0.6 + churn * 0.7, 0.0, 1.0 );
+					gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 0.95, 0.99, 1.0 ), foam * 0.8 );
+				}
 				`,
 			};
 
@@ -6609,25 +6893,25 @@
 				<div class="coin-chip-tip" id="coinChipTip">Tap anywhere to toss a coin</div>
 				<div id="coinTray" class="coin-tray" hidden>
 					<button type="button" class="coin-tray-row" id="trayTokenCoin">
-						<span class="coin-tray-icon">🪙</span>
+						<span class="coin-tray-icon">🟡</span>
 						<span class="coin-tray-text">
-							<span class="coin-tray-title">Token Coin</span>
+							<span class="coin-tray-title">Virtual Coin</span>
 							<span class="coin-tray-sub">free · toss as many as you like</span>
 						</span>
 						<span class="coin-tray-check" aria-hidden="true">✓</span>
 					</button>
 					<div class="coin-tray-divider"></div>
 					<div class="coin-tray-row coin-tray-gold-head">
-						<span class="coin-tray-icon">🥇</span>
+						<span class="coin-tray-icon"></span>
 						<span class="coin-tray-text">
-							<span class="coin-tray-title">Golden Coin</span>
+							<span class="coin-tray-title">Donate USDC or ETH</span>
 							<span class="coin-tray-sub">a real USDC / ETH donation</span>
 						</span>
 					</div>
 					<div class="coin-tray-charities">
-						<button type="button" class="coin-tray-charity" data-charity="ST_JUDES">🏥 St. Jude</button>
-						<button type="button" class="coin-tray-charity" data-charity="ASPCA">🐾 ASPCA</button>
-						<button type="button" class="coin-tray-charity" data-charity="DEV">☕ Dev</button>
+						<button type="button" class="coin-tray-charity" data-charity="ST_JUDES">🏥 St. Jude's</button>
+						<button type="button" class="coin-tray-charity" data-charity="ASPCA">🐶 ASPCA</button>
+						<button type="button" class="coin-tray-charity" data-charity="DEV">❤️ Dev</button>
 					</div>
 				</div>
 				<button type="button" id="coinChip" class="coin-chip" aria-haspopup="true" aria-expanded="false">
@@ -6641,27 +6925,29 @@
 
 		<style>
 			/* ===== Coin chip + tray ===== */
-			.coin-chip-dock {
+						.coin-chip-dock {
 				position: relative;
 				width: 100%;
 				display: flex;
-				justify-content: center;
+				flex-direction: column;
+				align-items: center;
+				gap: 7px;
 			}
 
 			.coin-chip {
 				display: flex;
 				align-items: center;
-				gap: 10px;
+				gap: 7px;
 				width: auto;
 				min-width: 0;
 				max-width: 340px;
-				padding: 7px 18px;
-				background: rgba(255, 255, 255, 0.12);
-				border: 2px solid rgba(255, 255, 255, 0.3);
+				padding: 5px 13px;
+				background: rgba(255, 255, 255, 0.07);
+				border: 1px solid rgba(255, 255, 255, 0.18);
 				border-radius: 100px;
 				backdrop-filter: blur(10px);
 				-webkit-backdrop-filter: blur(10px);
-				box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 40px rgba(102, 126, 234, 0.2);
+				box-shadow: 0 2px 9px rgba(0, 0, 0, 0.25);
 				cursor: pointer;
 				box-sizing: border-box;
 				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -6670,8 +6956,9 @@
 			}
 
 			.coin-chip:hover {
-				border-color: rgba(255, 255, 255, 0.55);
-				box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 50px rgba(102, 126, 234, 0.3);
+				border-color: rgba(255, 255, 255, 0.4);
+				background: rgba(255, 255, 255, 0.11);
+				box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
 			}
 
 			.coin-chip-text {
@@ -6683,35 +6970,38 @@
 			}
 
 			.coin-chip-label {
-				font-size: 12px;
-				font-weight: 700;
-				color: rgba(255, 255, 255, 0.95);
+				font-size: 11px;
+				font-weight: 600;
+				color: rgba(255, 255, 255, 0.72);
 				letter-spacing: 0.3px;
 				white-space: nowrap;
 				overflow: hidden;
 				text-overflow: ellipsis;
 			}
 
-			.coin-chip-tip {
-				position: absolute;
-				bottom: calc(100% + 5px);
-				left: 50%;
-				transform: translateX(-50%);
-				font-size: 10px;
-				line-height: 1;
-				font-weight: 500;
-				color: rgba(255, 255, 255, 0.72);
-				letter-spacing: 0.3px;
-				white-space: nowrap;
-				text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+						.coin-chip-tip {
+				/* Primary call-to-action: most visitors just toss coins for fun, so
+				   the toss instruction is the hero. Kept in NORMAL FLOW (not absolute)
+				   so the compact card grows to contain it instead of the text spilling
+				   over the panel edges. The donate chip below is the secondary one. */
+				order: -1;
+				text-align: center;
+				max-width: min(80vw, 300px);
+				font-size: clamp(14px, 4vw, 16px);
+				line-height: 1.15;
+				font-weight: 700;
+				color: rgba(255, 255, 255, 0.98);
+				letter-spacing: 0.4px;
+				text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85),
+				             0 0 14px rgba(120, 150, 255, 0.45);
 				pointer-events: none;
 				transition: opacity 0.2s ease;
 			}
 
 
 			.coin-chip-caret {
-				font-size: 12px;
-				color: rgba(255, 255, 255, 0.6);
+				font-size: 10px;
+				color: rgba(255, 255, 255, 0.5);
 				transition: transform 0.2s ease;
 			}
 
