@@ -302,6 +302,15 @@ function smoothRootScrollDepth(value) {
 const MELT_BASELINE_CACHE = new WeakMap();
 const DRIP_BASELINE_CACHE = new WeakMap();
 const FLAME_LIGHT_BASELINE_CACHE = new WeakMap();
+// Flame node baseline (authored scale + rotation). Same rationale as the
+// caches above: useGLTF keeps the scene alive across mounts, and the
+// per-frame flicker/melt animation leaves the flame node at an inflated
+// scale (the melt counter-scale can reach ~4×) when you navigate away
+// mid-burn. Without caching the ORIGINAL transform, the next mount would
+// read that inflated value back as "baseline" and stack flicker on top of
+// it — a runaway flame that only a full reload (which clears this cache)
+// resets. Keyed on the node so it survives remounts but dies on reload.
+const FLAME_BASELINE_CACHE = new WeakMap();
 
 // Personalized altar overlay — camera-anchored so it stays in a fixed screen
 // position while the crane shot orbits. Single Canvas, no extra WebGL context.
@@ -949,16 +958,31 @@ function HeroAltarObject({
         const upperName = obj.name.toUpperCase();
         if (upperName.startsWith("FLAME") && !upperName.includes("WICK")) {
           flameNodeRef.current = obj;
-          flameBaseScaleRef.current = {
-            x: obj.scale.x,
-            y: obj.scale.y,
-            z: obj.scale.z,
-          };
-          flameBaseRotationRef.current = {
-            x: obj.rotation.x,
-            y: obj.rotation.y,
-            z: obj.rotation.z,
-          };
+          // Cache the authored scale + rotation the FIRST time we ever see
+          // this node, then read the baseline back from the cache. On a
+          // later mount the live node may carry an inflated scale left by
+          // the previous mount's flicker/melt animation (useGLTF caches the
+          // scene), so reading obj.scale directly would treat that inflated
+          // value as baseline and the flame would grow each cycle. Mirrors
+          // the MELT/DRIP/FLAME_LIGHT baseline caches above.
+          if (!FLAME_BASELINE_CACHE.has(obj)) {
+            FLAME_BASELINE_CACHE.set(obj, {
+              scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z },
+              rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+            });
+          }
+          const flameBase = FLAME_BASELINE_CACHE.get(obj);
+          flameBaseScaleRef.current = flameBase.scale;
+          flameBaseRotationRef.current = flameBase.rotation;
+          // Snap the live node back to the authored baseline so any inflated
+          // scale leaked from a prior mount is gone before the first lit
+          // frame composes flicker on top of it.
+          obj.scale.set(flameBase.scale.x, flameBase.scale.y, flameBase.scale.z);
+          obj.rotation.set(
+            flameBase.rotation.x,
+            flameBase.rotation.y,
+            flameBase.rotation.z,
+          );
           // Flame materials: additive blending so the near-black alpha
           // texels of the cross-billboard quads add ~0 to the
           // framebuffer (invisible), while the bright flame pixels blaze
@@ -1353,6 +1377,16 @@ function HeroAltarObject({
     }
     if (flameLightRef.current) {
       flameLightRef.current.intensity = baseFlameLightIntensityRef.current;
+    }
+    // Snap the flame node back to its authored transform too, so a relight
+    // never momentarily composes flicker on top of a stale scale before the
+    // first lit useFrame recomputes it. useFrame overwrites this next frame
+    // when lit; when unlit it stays at baseline (and is hidden anyway).
+    if (flameNodeRef.current) {
+      const s = flameBaseScaleRef.current;
+      const r = flameBaseRotationRef.current;
+      flameNodeRef.current.scale.set(s.x, s.y, s.z);
+      flameNodeRef.current.rotation.set(r.x, r.y, r.z);
     }
   }, [candleLit, litAt]);
 
