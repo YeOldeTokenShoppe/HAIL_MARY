@@ -142,6 +142,12 @@ export default function MobileBottomNav({
   const nm = !m80 && neonMode; // cyan/fuchsia hologram mode
   const dk = !m80 && !nm && darkMode; // dark oil-field mode (fallback)
 
+  // Standard nav slots that get the snappy hover "pop" — now ALL slots,
+  // including BUY and MORE. Only excludes the prop-driven .btm-nav-highlight
+  // (the chart-hover link that morphs the BUY slot into a gold FAB), so that
+  // dramatic treatment still owns the slot while it's active.
+  const hoverSel = '.btm-nav-item:not(.btm-nav-highlight)';
+
   /* Renders a generic extra slot (placeholder / "coming soon" affordance).
      iconSrc renders as <img> (preserves color for multi-color SVGs like
      /tcg.svg); icon is used as-is for inline JSX. */
@@ -332,6 +338,19 @@ export default function MobileBottomNav({
           transform: scale(0.93);
         }
 
+        /* Press flash — the icon lights up on tap/click so the slot reads
+           as responsive even on touch (where there's no hover). */
+        .btm-nav-item:active .btm-nav-icon {
+          background: ${nm ? 'rgba(42, 214, 238, 0.18)' : m80 ? 'rgba(255, 0, 255, 0.18)' : dk ? 'rgba(212, 168, 84, 0.22)' : 'rgba(212, 175, 55, 0.18)'};
+          box-shadow: ${nm
+            ? '0 0 16px rgba(42, 214, 238, 0.5)'
+            : m80
+              ? '0 0 16px rgba(255, 0, 255, 0.45)'
+              : dk
+                ? '0 0 14px rgba(212, 168, 84, 0.4)'
+                : '0 0 14px rgba(212, 175, 55, 0.4)'};
+        }
+
         .btm-nav-icon {
           width: 32px;
           height: 32px;
@@ -401,23 +420,17 @@ export default function MobileBottomNav({
             transition: stroke 0.3s ease, filter 0.3s ease;
           }
           /* Lift the slot above the bar — translateY doesn't affect layout.
-             Triggered by:
-             - chart hover (.btm-nav-highlight prop-class on the BUY slot)
-             - hovering the BUY icon directly (.btm-nav-book:hover)
-             - hovering the EX LIBRIS / menu icon (.btm-nav-menu:hover, scoped
-               to slots that have an SVG override so hamburger pages stay
-               unaffected). */
-          .btm-nav-item.btm-nav-highlight,
-          .btm-nav-item.btm-nav-book:hover,
-          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover {
+             Triggered ONLY by the prop-driven .btm-nav-highlight (chart
+             hover on the BUY slot). Direct hover of the BUY / MORE slots no
+             longer morphs — they share the subtle "pop" below so the whole
+             bar reads consistently. */
+          .btm-nav-item.btm-nav-highlight {
             transform: translateY(-18px);
             z-index: 5;
           }
           /* Morph the icon: scale up + round + glow. Using transform: scale
              instead of width/height so the nav row's height stays fixed. */
-          .btm-nav-item.btm-nav-highlight .btm-nav-icon,
-          .btm-nav-item.btm-nav-book:hover .btm-nav-icon,
-          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover .btm-nav-icon {
+          .btm-nav-item.btm-nav-highlight .btm-nav-icon {
             transform: scale(1.85);
             border-radius: 50%;
             border: ${nm ? '1.5px solid transparent' : '1.6px solid rgba(255, 255, 255, 0.9)'};
@@ -427,9 +440,7 @@ export default function MobileBottomNav({
             animation: btmNavHighlightPulse 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
           }
           /* Brighten the inner glyph (parent transform handles size growth). */
-          .btm-nav-item.btm-nav-highlight .btm-nav-icon svg,
-          .btm-nav-item.btm-nav-book:hover .btm-nav-icon svg,
-          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover .btm-nav-icon svg {
+          .btm-nav-item.btm-nav-highlight .btm-nav-icon svg {
             stroke: ${nm ? '#ffd97a' : '#ffffff'};
             filter: drop-shadow(0 0 4px rgba(255, 215, 120, 0.8));
           }
@@ -439,10 +450,46 @@ export default function MobileBottomNav({
           .btm-nav-item .btm-nav-label {
             transition: opacity 0.3s ease;
           }
-          .btm-nav-item.btm-nav-highlight .btm-nav-label,
-          .btm-nav-item.btm-nav-book:hover .btm-nav-label,
-          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover .btm-nav-label {
+          .btm-nav-item.btm-nav-highlight .btm-nav-label {
             opacity: 0;
+          }
+        }
+
+        /* Snappy hover "pop" for ALL nav slots — CYBER, MUSIC, WALLET,
+           LOGIN/ACCT, MENU/MORE and BUY alike. Only the prop-driven
+           .btm-nav-highlight (chart-hover link) opts out via hoverSel so its
+           dramatic FAB morph still owns the BUY slot while it's active. */
+        @media (hover: hover) {
+          ${hoverSel} {
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+          }
+          ${hoverSel} .btm-nav-icon {
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        background 0.18s ease,
+                        box-shadow 0.18s ease;
+          }
+          ${hoverSel}:hover {
+            transform: translateY(-3px);
+          }
+          ${hoverSel}:hover .btm-nav-icon {
+            transform: scale(1.14);
+            background: ${nm ? 'rgba(42, 214, 238, 0.14)' : m80 ? 'rgba(255, 0, 255, 0.14)' : dk ? 'rgba(212, 168, 84, 0.18)' : 'rgba(212, 175, 55, 0.14)'};
+            box-shadow: ${nm
+              ? '0 0 16px rgba(42, 214, 238, 0.45)'
+              : m80
+                ? '0 0 16px rgba(255, 0, 255, 0.4)'
+                : dk
+                  ? '0 0 14px rgba(212, 168, 84, 0.35)'
+                  : '0 0 14px rgba(212, 175, 55, 0.35)'};
+          }
+          ${hoverSel}:hover .btm-nav-label {
+            color: ${nm ? '#d6faff' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#8b6914'};
+            opacity: 1;
+          }
+          /* Keep the press readable while hovering — combine the lift with
+             the scale-down so a desktop click still dips. */
+          ${hoverSel}:active {
+            transform: translateY(-2px) scale(0.94);
           }
         }
 

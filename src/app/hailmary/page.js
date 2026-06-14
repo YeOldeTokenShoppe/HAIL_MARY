@@ -5285,6 +5285,7 @@ export default function OilPage() {
         storedRef={typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null}
         gridSize={gridSize}
         prizePool={totalOilBudget}
+        gameStartDate={gameStartDate}
         onEnterField={() => setLobbyView(false)}
         seedCommitment={seedCommitment}
         anchorBlock={anchorBlock}

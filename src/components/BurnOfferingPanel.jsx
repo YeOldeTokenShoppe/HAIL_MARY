@@ -9,7 +9,7 @@
 // (WatchlistPhoneTexture) and the VigilTicker chyron both pick up
 // `tokensBurned` from the shrineCandles doc within moments.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { erc20Abi, parseUnits } from "viem";
 import { RL80_ADDRESS, BURN_ADDRESS } from "@/lib/contracts";
@@ -18,6 +18,15 @@ function fmtTokens(n) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return String(n);
+}
+
+// RL80 trades sub-cent, so a burn of a few thousand tokens can be worth a
+// fraction of a cent. Keep two decimals once we're above a penny; below it,
+// show "<$0.01" rather than a misleading "$0.00".
+function fmtUsd(v) {
+  if (!Number.isFinite(v) || v <= 0) return "$0.00";
+  if (v < 0.01) return "<$0.01";
+  return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const PRESETS = [10_000, 100_000, 1_000_000];
@@ -45,6 +54,24 @@ export default function BurnOfferingPanel({ onBurned }) {
   const [error, setError] = useState(null);
   const [pendingTxHash, setPendingTxHash] = useState(null);
   const [credited, setCredited] = useState(0);
+
+  // Live RL80 price (USD per token) from the same feed the chart/ticker use,
+  // so we can show what an offering is worth as the user picks an amount.
+  const [price, setPrice] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/rl80-price")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && typeof d?.price === "number") setPrice(d.price);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const usdValue = price != null && Number(amount) > 0 ? Number(amount) * price : null;
 
   const creditBurn = async (txHash) => {
     setPhase("verifying");
@@ -114,10 +141,9 @@ export default function BurnOfferingPanel({ onBurned }) {
 
   return (
     <div className="votive-customize burn-offering">
-      <p className="votive-customize-heading">Burnt offering</p>
+      <p className="votive-customize-heading">Get Lit for RL80</p>
       <p className="burn-offering-copy">
-        Burn RL80 with your candle — a pure burn, destroyed forever, not a
-        payment. Your offering will light up Our Lady's timeline.
+        Burn RL80 with your candle — a pure burn and symbolic sacrifice.
       </p>
 
       {phase === "done" ? (
@@ -194,8 +220,14 @@ export default function BurnOfferingPanel({ onBurned }) {
                     : "Burn 🔥"}
             </button>
           </div>
+          {usdValue != null && (
+            <p className="burn-offering-usd">
+              ≈ <strong>{fmtUsd(usdValue)}</strong> USD
+            </p>
+          )}
           <p className="burn-offering-balance">
             balance: {fmtTokens(balanceTokens)} RL80
+            {price != null && balanceTokens > 0 && ` (≈ ${fmtUsd(balanceTokens * price)})`}
           </p>
           {error && <p className="burn-offering-error">{error}</p>}
         </>
@@ -235,6 +267,14 @@ export default function BurnOfferingPanel({ onBurned }) {
         }
         .burn-offering-btn {
           white-space: nowrap;
+        }
+        .burn-offering-usd {
+          font-size: 0.74rem;
+          color: rgba(255, 196, 120, 0.95);
+          margin: 6px 0 0;
+        }
+        .burn-offering-usd strong {
+          font-weight: 700;
         }
         .burn-offering-balance {
           font-size: 0.68rem;

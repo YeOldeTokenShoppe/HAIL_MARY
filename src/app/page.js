@@ -17,7 +17,6 @@ import MusicButton from "@/components/MusicButton";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import ReliquaryRail from "@/components/ReliquaryRail";
-import Link from "next/link";
 import HolyTrinSection from "@/components/HolyTrinSection";
 import MaterExMachinaSection from "@/components/MaterExMachinaSection";
 import BusinessSection from "@/components/BusinessSection";
@@ -79,6 +78,9 @@ const VOTIVE_IMAGE_PRESETS = [
   { key: "heart", src: "/images/sacreCoeur.webp", thumbnail: "/images/sacreCoeur.webp", label: "Heart" },
     { key: "MotherOfMemes", src: "/images/face.png", thumbnail: "/images/face.png", label: "Mother of Memes" },
         { key: "RL80Power", src: "/images/RL80_KNUCKLES.webp", thumbnail: "/images/RL80_KNUCKLES.webp", label: "RL80 Power" },
+                { key: "Insight", src: "/images/ILLUMIN80_TATTOO.webp", thumbnail: "/images/ILLUMIN80_TATTOO.webp", label: "Insight" },
+                { key: "GoingPlaces", src: "/images/I-80.webp", thumbnail: "/images/I-80.webp", label: "Going places" },
+
 ];
 // A small curated palette for the wax tint, plus a "default" entry that
 // restores the baked color. Users can also enter any hex via the color
@@ -2206,6 +2208,10 @@ export default function HomePage() {
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useBuyModal();
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
+  // "MORE" nav popover (far-right bottom-nav slot) — holds the secondary
+  // destinations (Ex Libris, Coin Fountain) that don't each warrant a
+  // permanent nav slot.
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
   // Post-ignition nudge shown only to anonymous visitors who just lit a
@@ -3210,8 +3216,9 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         }
         centerSubLabel={candleLit ? "MY CANDLE" : "LIGHT CANDLE"}
         centerTitle={candleLit ? "Your candle" : "Light candle"}
-        /* Menu slot routes to /exlibris. */
-        onMenuClick={() => router.push('/exlibris')}
+        /* Far-right slot is a MORE popover holding the secondary
+           destinations (Ex Libris, Coin Fountain). */
+        onMenuClick={() => setShowMoreMenu((v) => !v)}
         menuIcon={
           <svg
             className="btm-book-icon-svg"
@@ -3224,13 +3231,13 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <path d="M15 12h-5" />
-            <path d="M15 8h-5" />
-            <path d="M19 17V5a2 2 0 0 0-2-2H4" />
-            <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
+            <circle cx="12" cy="12" r="10" />
+            <path d="M17 12h.01" />
+            <path d="M12 12h.01" />
+            <path d="M7 12h.01" />
           </svg>
         }
-        menuLabel="EX LIBRIS"
+        menuLabel="MORE"
         isUserSignedIn={isConnected}
         show80sButton={false}
         isMobile
@@ -3302,6 +3309,125 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           },
         ]}
       />
+
+      {/* MORE popover — anchored above the far-right bottom-nav slot. Holds
+          secondary destinations that don't each warrant a permanent slot.
+          Tap-away backdrop closes it; selecting an item navigates + closes. */}
+      {showMoreMenu && (
+        <>
+          <div
+            onClick={() => setShowMoreMenu(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 10001,
+              background: "transparent",
+            }}
+          />
+          <div
+            role="menu"
+            aria-label="More"
+            style={{
+              position: "fixed",
+              right: "10px",
+              bottom: "calc(74px + env(safe-area-inset-bottom, 0px))",
+              zIndex: 10002,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: "184px",
+              padding: "6px",
+              borderRadius: "14px",
+              background: "rgba(15, 0, 30, 0.97)",
+              border: "1px solid rgba(255, 0, 255, 0.3)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              boxShadow:
+                "0 -2px 24px rgba(255, 0, 255, 0.18), 0 8px 32px rgba(0, 0, 0, 0.5)",
+              fontFamily: "'Rajdhani', sans-serif",
+            }}
+          >
+            {[
+              {
+                path: "/exlibris",
+                label: "Ex Libris",
+                icon: (
+                  <>
+                    <path d="M15 12h-5" />
+                    <path d="M15 8h-5" />
+                    <path d="M19 17V5a2 2 0 0 0-2-2H4" />
+                    <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
+                  </>
+                ),
+              },
+              {
+                path: "/fountain",
+                label: "Coin Fountain",
+                icon: (
+                  <>
+                    <path d="M12 10L12 2" />
+                    <path d="M16 6L12 10L8 6" />
+                    <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
+                    <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
+                  </>
+                ),
+              },
+            ].map((link) => (
+              <button
+                key={link.path}
+                role="menuitem"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  router.push(link.path);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  width: "100%",
+                  padding: "11px 12px",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "rgba(255, 0, 255, 0.12)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ff00ff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ width: 22, height: 22, flexShrink: 0, display: "block" }}
+                  aria-hidden="true"
+                >
+                  {link.icon}
+                </svg>
+                <span
+                  style={{
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.5px",
+                    textTransform: "uppercase",
+                    color: "#ffffff",
+                  }}
+                >
+                  {link.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
 
@@ -3438,55 +3564,6 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         >
           <img src="/farcaster_logo.webp" alt="Farcaster" style={{ width: "20px", height: "20px" }} />
         </a>
-
-        {/* Wishing Fountain — internal link, but styled identically to
-            the socials above: the rail reads as one group. Lucide
-            "waves-arrow-down" = something dropping into water. */}
-        <Link
-          href="/fountain"
-          aria-label="Wishing Fountain — toss a coin for charity"
-          title="Wishing Fountain"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "44px",
-            height: "44px",
-            borderRadius: "50%",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-            background: "rgba(0, 0, 0, 0.5)",
-            transition: "all 0.3s ease",
-            cursor: "pointer",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
-            e.currentTarget.style.transform = "scale(1.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-            e.currentTarget.style.boxShadow = "none";
-            e.currentTarget.style.transform = "scale(1)";
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#fff"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 10L12 2" />
-            <path d="M16 6L12 10L8 6" />
-            <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
-            <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
-          </svg>
-        </Link>
       </div>
     </main>
   );

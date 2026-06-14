@@ -86,7 +86,7 @@
 
 .polaroidText {
   font-family: "Permanent Marker", cursive;
-  font-size: 14px; /* Slightly smaller */
+  font-size: 18px;
   color: #333;
   margin: 0;
   font-weight: 400;
@@ -131,7 +131,7 @@
   }
   
   .polaroidText {
-    font-size: 14px;
+    font-size: 17px;
   }
   
   .polaroid {

@@ -31,6 +31,9 @@ const PolaroidSnapshot = ({
   const [polaroidImageUrl, setPolaroidImageUrl] = useState(null); // Cached polaroid capture
   const [polaroidBlob, setPolaroidBlob] = useState(null); // Cached polaroid blob
   const [caption, setCaption] = useState(label);
+  // Referral overlay is optional — the user can remove it via a small 'x'.
+  // Reset to shown on each new snapshot trigger.
+  const [showReferral, setShowReferral] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const captionRef = useRef(null);
   const polaroidRef = useRef(null);
@@ -38,6 +41,7 @@ const PolaroidSnapshot = ({
   useEffect(() => {
     if (trigger) {
       setCaption(label);
+      setShowReferral(true);
       captureSnapshot();
     }
   }, [trigger]);
@@ -443,9 +447,11 @@ const PolaroidSnapshot = ({
       const clonedActionBtns = clonedPolaroid.querySelector(`.${styles.actionButtons}`);
       const clonedCloseBtn = clonedPolaroid.querySelector('button[aria-label="Close polaroid"]');
       const clonedShadow = clonedPolaroid.querySelector(`.${styles.polaroidShadow}`);
+      const clonedRemoveRef = clonedPolaroid.querySelector('button[aria-label="Remove referral link"]');
       if (clonedActionBtns) clonedActionBtns.style.visibility = 'hidden';
       if (clonedCloseBtn) clonedCloseBtn.style.visibility = 'hidden';
       if (clonedShadow) clonedShadow.style.visibility = 'hidden';
+      if (clonedRemoveRef) clonedRemoveRef.style.visibility = 'hidden';
 
       // Make sure the cloned image has the current composited imageUrl
       const clonedImg = clonedPolaroid.querySelector('img');
@@ -833,8 +839,9 @@ const PolaroidSnapshot = ({
             >
               {caption}
             </p>
-            {referralOverlay && (
+            {referralOverlay && showReferral && (
               <div style={{
+                position: 'relative',
                 marginTop: 6,
                 padding: '4px 8px',
                 background: 'rgba(0,0,0,0.06)',
@@ -842,6 +849,44 @@ const PolaroidSnapshot = ({
                 textAlign: 'center',
                 fontFamily: "'Share Tech Mono', monospace",
               }}>
+                {/* Remove the referral link — makes it optional. Carries the
+                    `action-button` class so the tap isn't treated as a close,
+                    and is hidden in the html2canvas clone so it's never baked
+                    into the downloaded/shared photo. */}
+                <button
+                  className="action-button"
+                  onClick={() => {
+                    setShowReferral(false);
+                    // Invalidate the cached polaroid so the next download/share
+                    // re-captures without the referral overlay.
+                    setPolaroidImageUrl(null);
+                    setPolaroidBlob(null);
+                  }}
+                  title="Remove referral link"
+                  aria-label="Remove referral link"
+                  style={{
+                    position: 'absolute',
+                    top: -7,
+                    right: -7,
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.6)',
+                    color: '#fff',
+                    border: '1.5px solid #fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                    lineHeight: 1,
+                    padding: 0,
+                    zIndex: 5,
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                  }}
+                >
+                  ✕
+                </button>
                 <div style={{ fontSize: 8, letterSpacing: '0.12em', color: '#666', marginBottom: 2 }}>
                   IT'S YOUR TURN TO RIG THE SYSTEM
                 </div>

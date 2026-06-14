@@ -37,7 +37,78 @@ function formatRl80Price(p) {
   return p.toFixed(10);
 }
 
+// Season start banner — shows the admin-set game start date (from
+// oilGame/settings.gameStartDate, a "YYYY-MM-DD" string) plus a live
+// countdown. Renders nothing until a valid date is set.
+function SeasonStartBanner({ gameStartDate, theme, isMobile }) {
+  const dateLabel = useMemo(() => {
+    if (!gameStartDate) return null;
+    const d = new Date(gameStartDate + "T00:00:00Z");
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }, [gameStartDate]);
+
+  const [countdown, setCountdown] = useState("");
+  useEffect(() => {
+    if (!gameStartDate) { setCountdown(""); return; }
+    const target = new Date(gameStartDate + "T00:00:00Z").getTime();
+    if (Number.isNaN(target)) { setCountdown(""); return; }
+    const tick = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) { setCountdown("STARTING SOON"); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const mn = Math.floor((diff % 3600000) / 60000);
+      setCountdown(
+        d > 0 ? `STARTS IN ${d}d ${h}h`
+          : h > 0 ? `STARTS IN ${h}h ${String(mn).padStart(2, "0")}m`
+          : `STARTS IN ${mn}m`,
+      );
+    };
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [gameStartDate]);
+
+  if (!dateLabel) return null;
+
+  return (
+    <div style={{
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: `1px solid ${theme.border}`,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 3,
+    }}>
+      <div style={{ fontSize: 9, letterSpacing: "0.35em", color: theme.muted }}>
+        SEASON STARTS
+      </div>
+      <div style={{
+        fontSize: isMobile ? 15 : 18,
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        color: theme.textStrong,
+      }}>
+        {dateLabel}
+      </div>
+      {countdown && (
+        <div style={{ fontSize: 11, letterSpacing: "0.18em", color: theme.gold }}>
+          {countdown}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OilQualify({
+  gameStartDate,
   theme: themeProp,
   darkMode,
   isMobile,
@@ -316,6 +387,21 @@ export default function OilQualify({
 
   const mono = "'Share Tech Mono', monospace";
 
+  // Brochure / panorama polaroids. Sources are straight; each gets a slight
+  // individual CSS tilt — like photos laid on a table — applied in one place
+  // so the grid thumbnail and the lightbox stay matched. Tweak `tilt` to taste.
+  const BROCHURE_IMAGES = [
+    { src: "/polaroid-3.webp", caption: "", tilt: -3 },
+    { src: "/polaroid-4.webp", caption: "", tilt: 4 },
+  ];
+  const PANORAMA_IMAGES = [
+    { src: "/polaroid-5.webp", caption: "", tilt: -4 },
+    { src: "/polaroid-6.webp", caption: "", tilt: 3.5 },
+  ];
+  // Tilt lookup across every polaroid (grid + lightbox); 0 if not found.
+  const polaroidTilt = (src) =>
+    [...BROCHURE_IMAGES, ...PANORAMA_IMAGES].find((p) => p.src === src)?.tilt ?? 0;
+
   // Format token balance for display
   const displayBalance = tokenBalance ? Number(tokenBalance).toLocaleString() : "0";
   const liveCheckError = liveCheck?.error ?? null;
@@ -489,6 +575,8 @@ export default function OilQualify({
           }}>
             HOLDING IS THE TICKET — YOU NEVER SPEND IT
           </div>
+
+          <SeasonStartBanner gameStartDate={gameStartDate} theme={theme} isMobile={isMobile} />
         </div>
 
         {/* Hero — Claim Certificate with dynamic fields + the share pipeline.
@@ -718,6 +806,7 @@ export default function OilQualify({
           seedCommitment={seedCommitment}
           anchorBlock={anchorBlock}
           anchorBlockHash={anchorBlockHash}
+          gameStartDate={gameStartDate}
         />
 
         {/* Brochure Images */}
@@ -727,27 +816,42 @@ export default function OilQualify({
           gap: 12,
           marginBottom: 24,
         }}>
-          {[
-            { src: "/plotPic5.webp", caption: "Customize your rig" },
-            { src: "/plotPic7.webp", caption: "Oil deposits determined by cryptographic hash" },
-          ].map(({ src, caption }) => (
+          {BROCHURE_IMAGES.map(({ src, caption, tilt }) => (
             <div key={src}>
               <button
                 type="button"
                 onClick={() => setLightboxSrc(src)}
                 style={{
-                  aspectRatio: "4 / 3",
-                  borderRadius: 4,
-                  border: `2px solid ${theme.gold}`,
-                  background: `linear-gradient(160deg, ${theme.gold}06, transparent)`,
-                  overflow: "hidden",
-                  padding: 0,
-                  cursor: "zoom-in",
+                  display: "block",
                   width: "100%",
+                  // Box matches the source aspect so the polaroids fill it
+                  // with no letterbox. MUST match the panorama box below so
+                  // all four images render at the same size.
+                  aspectRatio: "694 / 800",
+                  border: "none",
+                  padding: 0,
+                  margin: 0,
+                  background: "transparent",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  cursor: "zoom-in",
                 }}
                 aria-label="View larger"
               >
-                <img src={src} alt={caption} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                {/* Individual CSS tilt. scale(0.92) leaves headroom so the
+                    rotated corners don't clip; contain avoids cropping. */}
+                <img
+                  src={src}
+                  alt={caption}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    display: "block",
+                    transform: `rotate(${tilt}deg) scale(0.92)`,
+                    transformOrigin: "center",
+                  }}
+                />
               </button>
               <div style={{
                 padding: "6px 4px",
@@ -786,33 +890,35 @@ export default function OilQualify({
             QUALIFY TO PLAY
           </div>
 
-          {/* Secondary CTA — prospects who haven't signed up yet can peek inside.
-              Plain <a> (not next/link) so we force a full nav: OilPage stays
-              mounted on client-side routes to itself and its one-shot effect
-              wouldn't re-read ?preview=1. */}
-          <a
-            href="/hailmary?preview=1"
-            style={{
-              display: "block",
-              textAlign: "center",
-              padding: "12px 16px",
-              marginBottom: 18,
-              background: `linear-gradient(180deg, rgba(212,168,84,0.28), rgba(212,168,84,0.14))`,
-              border: `1px solid ${theme.gold}`,
-              borderRadius: 4,
-              color: theme.gold,
-              textDecoration: "none",
-              fontFamily: mono,
-              transition: "all 0.15s",
-            }}
-          >
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.18em" }}>
-              PREVIEW THE GAME &rarr;
-            </div>
-            <div style={{ fontSize: 10, color: "#e8dcc8", marginTop: 4, letterSpacing: "0.06em" }}>
-              See the rigs and grid before claiming a plot
-            </div>
-          </a>
+          {/* Preview link — shown ONLY while the player is not yet qualified.
+              Once qualified, the single game link becomes PICK YOUR PLOT (in
+              the confirmation panel below). Plain <a> (not next/link) forces a
+              full nav so OilPage's one-shot effect re-reads ?preview=1. */}
+          {!userPlayer?.qualified && (
+            <a
+              href="/hailmary?preview=1"
+              style={{
+                display: "block",
+                textAlign: "center",
+                padding: "12px 16px",
+                marginBottom: 18,
+                background: `linear-gradient(180deg, rgba(212,168,84,0.28), rgba(212,168,84,0.14))`,
+                border: `1px solid ${theme.gold}`,
+                borderRadius: 4,
+                color: theme.gold,
+                textDecoration: "none",
+                fontFamily: mono,
+                transition: "all 0.15s",
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.18em" }}>
+                PREVIEW THE GAME &rarr;
+              </div>
+              <div style={{ fontSize: 10, color: "#e8dcc8", marginTop: 4, letterSpacing: "0.06em" }}>
+                See the rigs and grid before claiming a plot
+              </div>
+            </a>
+          )}
 
           {!user ? (
             <div style={{
@@ -891,6 +997,49 @@ export default function OilQualify({
                 <div style={{ fontSize: 11, color: theme.muted, marginTop: 2 }}>
                   Last snapshot: ${userPlayer.lastSnapshotUsdValue.toFixed(2)} USD ({userPlayer.lastSnapshotBalance} RL80)
                 </div>
+              )}
+
+              {/* Combined here: once qualified (and no plot yet), this same
+                  panel carries the single game link — STAKE YOUR CLAIM. The
+                  pick itself happens on the 3D field via onEnterField. */}
+              {userPlayer?.qualified && !userHasPlot && (
+                <>
+                  <div style={{
+                    fontSize: 11,
+                    color: theme.muted,
+                    margin: "16px auto 14px",
+                    lineHeight: 1.6,
+                    maxWidth: 420,
+                  }}>
+                    Stake your claim — walk the live field and choose your
+                    ground. Click any open cell on the {GRID_SIZE}x{GRID_SIZE}{" "}
+                    grid and plant your rig where you want to drill. First come,
+                    first served.
+                  </div>
+                  <button
+                    onClick={onEnterField}
+                    disabled={!onEnterField}
+                    style={{
+                      padding: "14px 32px",
+                      background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
+                      border: `1px solid ${theme.goldBorder || theme.gold}`,
+                      borderRadius: 3,
+                      color: "#fff",
+                      fontFamily: mono,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      letterSpacing: "0.15em",
+                      cursor: onEnterField ? "pointer" : "default",
+                    }}
+                  >
+                    ⛏ PICK YOUR PLOT ON THE FIELD →
+                  </button>
+                  {error && (
+                    <div style={{ color: theme.red, fontSize: 11, textAlign: "center", marginTop: 8 }}>
+                      {error}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : (
@@ -1286,67 +1435,8 @@ export default function OilQualify({
           )}
         </div>
 
-        {/* Qualified, no plot yet → the pick happens ON THE FIELD (the page
-            swaps to the 3D field in pick mode via onEnterField; claiming a
-            cell there is the only claim path). */}
-        {userRegistered && userPlayer?.qualified && !userHasPlot && (
-          <div style={{
-            marginBottom: 24,
-            padding: isMobile ? 20 : 24,
-            border: `1px solid ${theme.gold}44`,
-            borderRadius: 4,
-            background: "rgba(20, 12, 28, 0.72)",
-            backdropFilter: "blur(24px) saturate(1.2)",
-            WebkitBackdropFilter: "blur(24px) saturate(1.2)",
-            textAlign: "center",
-          }}>
-            <div style={{
-              fontSize: 13,
-              letterSpacing: "0.15em",
-              color: theme.green,
-              marginBottom: 6,
-              fontWeight: 700,
-            }}>
-              YOU ARE QUALIFIED — STAKE YOUR CLAIM
-            </div>
-            <div style={{
-              fontSize: 11,
-              color: theme.muted,
-              marginBottom: 16,
-              lineHeight: 1.6,
-              maxWidth: 420,
-              marginLeft: "auto",
-              marginRight: "auto",
-            }}>
-              Walk the live field and choose your ground — click any open cell
-              on the {GRID_SIZE}x{GRID_SIZE} grid and plant your rig where you
-              want to drill. First come, first served.
-            </div>
-            <button
-              onClick={onEnterField}
-              disabled={!onEnterField}
-              style={{
-                padding: "14px 32px",
-                background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
-                border: `1px solid ${theme.goldBorder || theme.gold}`,
-                borderRadius: 3,
-                color: "#fff",
-                fontFamily: mono,
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: "0.15em",
-                cursor: onEnterField ? "pointer" : "default",
-              }}
-            >
-              ⛏ PICK YOUR PLOT ON THE FIELD →
-            </button>
-            {error && (
-              <div style={{ color: theme.red, fontSize: 11, textAlign: "center", marginTop: 8 }}>
-                {error}
-              </div>
-            )}
-          </div>
-        )}
+        {/* (Qualified-with-no-plot CTA merged into the "QUALIFY TO PLAY"
+            confirmation panel above — the single game link lives there now.) */}
 
         {/* Plot picked confirmation + referral code */}
         {userRegistered && userHasPlot && (
@@ -1574,20 +1664,43 @@ export default function OilQualify({
           gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
           gap: 12,
         }}>
-          {[
-            { src: "/images/moneyShot.webp", caption: "A gorgeous gusher!" },
-            { src: "/images/hell.webp", caption: "A demon is accidentally released from a hell pocket in the shale" },
-          ].map(({ src, caption }) => (
+          {PANORAMA_IMAGES.map(({ src, caption, tilt }) => (
             <div key={src}>
-              <div style={{
-                borderRadius: 4,
-                border: `2px solid ${theme.gold}`,
-                background: `linear-gradient(170deg, ${theme.gold}05, ${theme.gold}0a, ${theme.gold}03)`,
-                overflow: "hidden",
-                aspectRatio: "4 / 3",
-              }}>
-                <img src={src} alt={caption || "Oil rig at sunset"} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              </div>
+              <button
+                type="button"
+                onClick={() => setLightboxSrc(src)}
+                style={{
+                  // Box matches the source aspect (same as the brochure box
+                  // above) so all four polaroids render at the same size. The
+                  // per-image tilt is applied to the <img> below.
+                  display: "block",
+                  width: "100%",
+                  aspectRatio: "694 / 800",
+                  border: "none",
+                  padding: 0,
+                  margin: 0,
+                  background: "transparent",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  cursor: "zoom-in",
+                }}
+                aria-label="View larger"
+              >
+                {/* Individual CSS tilt. scale(0.92) leaves headroom so the
+                    rotated corners don't clip neighbors; contain avoids crop. */}
+                <img
+                  src={src}
+                  alt={caption || "Oil rig at sunset"}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    display: "block",
+                    transform: `rotate(${tilt}deg) scale(0.92)`,
+                    transformOrigin: "center",
+                  }}
+                />
+              </button>
               {caption && (
                 <div style={{
                   padding: "6px 4px",
@@ -1881,11 +1994,14 @@ export default function OilQualify({
             onClick={(e) => e.stopPropagation()}
             style={{
               maxWidth: "min(95vw, 1400px)",
-              maxHeight: "92vh",
+              maxHeight: "88vh",
               objectFit: "contain",
               borderRadius: 4,
               boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6)",
               cursor: "default",
+              // Keep the same slight tilt as the thumbnail.
+              transform: `rotate(${polaroidTilt(lightboxSrc)}deg)`,
+              transformOrigin: "center",
             }}
           />
         </div>

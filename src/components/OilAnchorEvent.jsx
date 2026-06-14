@@ -34,6 +34,16 @@ function formatEta(seconds) {
 
 const truncHash = (h) => (h && h.length > 18 ? `${h.slice(0, 10)}…${h.slice(-6)}` : h);
 
+// Admin-set "YYYY-MM-DD" season start → "JUNE 20, 2026" (UTC), or null.
+function formatStartDate(gameStartDate) {
+  if (!gameStartDate) return null;
+  const d = new Date(gameStartDate + "T00:00:00Z");
+  if (Number.isNaN(d.getTime())) return null;
+  return d
+    .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })
+    .toUpperCase();
+}
+
 // Live ETA to the anchor block. Returns null until the first poll resolves;
 // returns {blocksLeft, etaSeconds} after (blocksLeft <= 0 ⇒ mined, hash pending).
 function useAnchorEta(anchorBlock, active) {
@@ -80,12 +90,14 @@ export default function OilAnchorEvent({
   theme,
   compact = false,
   isMobile = false,
+  gameStartDate,
 }) {
   const committed = !!seedCommitment && anchorBlock != null;
   const anchored = !!anchorBlockHash;
   const counting = committed && !anchored;
   const eta = useAnchorEta(anchorBlock, counting);
   const mined = counting && eta != null && eta.blocksLeft <= 0;
+  const startLabel = formatStartDate(gameStartDate);
 
   const mono = "'Share Tech Mono', monospace";
   const gold = theme?.gold || "#d4a854";
@@ -186,6 +198,21 @@ export default function OilAnchorEvent({
             can verify it after the season.
           </div>
         </>
+      )}
+
+      {/* Concrete season start — turns "when the season opens" into a real,
+          checkable date. Subtle (this section's job is the fairness story). */}
+      {startLabel && !anchored && (
+        <div style={{
+          fontSize: 9,
+          color: muted,
+          marginTop: 14,
+          paddingTop: 10,
+          borderTop: `1px solid ${theme?.border || "rgba(212,168,84,0.25)"}`,
+          letterSpacing: "0.12em",
+        }}>
+          THE MAP LOCKS WHEN THE SEASON OPENS — <span style={{ color: gold, fontWeight: 700 }}>{startLabel}</span>
+        </div>
       )}
     </div>
   );
