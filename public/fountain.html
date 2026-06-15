@@ -3,7 +3,7 @@
 	<head>
 		<title>Char80 Fountain</title>
 		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 		<link type="text/css" rel="stylesheet" href="/main.css">
 		<script>
 			// Redirect to Next.js page if accessed directly (not in iframe)
@@ -157,7 +157,12 @@
 				
 				#mobileCollectionCounter {
 					display: flex !important; /* Ensure mobile counter shows */
-					bottom: max(80px, calc(80px + env(safe-area-inset-bottom))) !important;
+					/* Sit well above the iOS Safari bottom toolbar, which hides the
+					   coin-chip dock JS appends here (body{overflow:hidden} = no scroll
+					   to reach it). The page never scrolls, so the toolbar height is
+					   constant and a static offset is reliable; env()/visualViewport
+					   both proved unreliable on iOS for the large layout height. */
+					bottom: 185px !important;
 					/* right: 10px !important; */
 				}
 				
@@ -617,7 +622,7 @@
 
 		@media (max-width: 768px) {
 			#donationToastContainer {
-				bottom: 70px;
+				bottom: 150px;
 				left: 1rem;
 				right: auto;
 				/* max-width: 135px; */
@@ -908,6 +913,7 @@
 					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
 					• Tap anywhere to toss the coin in your hand<br>
 					• Virtual coins are free &amp; unlimited<br>
+					• Tap a ✨ sparkling ✨ coin to see its donation<br>
 					• For a real USDC/ETH donation, tap <strong>Donate Coins</strong> (button at the bottom) and pick a charity. After you pay, a Golden Coin lands in your hand — aim for the water!<br><br>
 					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
 					• USDC or ETH goes directly to charity wallets<br>
@@ -922,6 +928,7 @@
 					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
 					• Tap anywhere — the coin flies where you tapped<br>
 					• Virtual coins are free &amp; unlimited<br>
+					• Tap a ✨ sparkling ✨ coin to see its donation<br>
 					• Real donation: click <strong>Donate Coins</strong> below, pick a charity, and pay — a Golden Coin lands in your hand to toss.<br><br>
 					<strong style="color: #FFD700;">How It Works:</strong><br>
 					• USDC/ETH goes straight to the charity wallets<br>
@@ -1023,7 +1030,9 @@
 		<!-- Restore tab: shown only after the panel is dismissed; brings the controls back -->
 		<button type="button" id="restoreUiBtn" onclick="restoreFountainUI()" title="Show controls" style="
 			position: fixed; left: 50%; transform: translateX(-50%);
-			bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+			/* Match the panel's clearance so the SHOW pill isn't hidden behind the
+			   iOS Safari toolbar (it only appears while the panel is dismissed). */
+			bottom: 185px;
 			display: none; align-items: center; gap: 6px; z-index: 1600; cursor: pointer;
 			padding: 6px 14px; border-radius: 100px;
 			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -2098,11 +2107,11 @@
 				side: THREE.DoubleSide // Render both sides
 			});
 			// const coinGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.002, 16); // Small cylinder for coin
-			const coinGeometry = new THREE.CylinderGeometry(0.02 * 2, 0.02 * 2, 0.005 * 2, 32); // Round coin (32 radial segments)
+			const coinGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.005 * 2, 32); // Round coin (32 radial segments)
 			coinGeometry.rotateX(Math.PI / 2); // Lay the coin flat
 
 			// Define coin dimensions for use in physics - MUST match geometry!
-			const COIN_RADIUS = 0.02 * 2; // Match the actual geometry radius
+			const COIN_RADIUS = 0.03; // Match the actual geometry radius (0.03 = ~25% smaller circumference than the old 0.04)
 			const COIN_THICKNESS = 0.005 * 2; // Match the actual geometry thickness
 
 			// --- Coin Counter and Performance Settings ---
@@ -2400,8 +2409,35 @@
 					staticCoinMaterial.emissiveIntensity = 0.3;
 				}
 				
+				// Slow shimmer on the placed donation coins — a subtle, per-coin sparkle
+				// that signals they're tappable for the donor's info. Each coin's phase
+				// is seeded from its instance position so glints desync across the pile
+				// instead of pulsing in unison.
+				staticCoinMaterial.onBeforeCompile = (shader) => {
+					shader.uniforms.uShimmerTime = { value: 0 };
+					staticCoinMaterial.userData.shimmerUniform = shader.uniforms.uShimmerTime;
+					shader.vertexShader = shader.vertexShader
+						.replace('#include <common>', `#include <common>
+attribute float aIsDonor;
+varying float vShimmerSeed;
+varying float vIsDonor;`)
+						.replace('#include <begin_vertex>', `#include <begin_vertex>
+vShimmerSeed = instanceMatrix[3].x * 12.9898 + instanceMatrix[3].z * 78.233;
+vIsDonor = aIsDonor;`);
+					shader.fragmentShader = shader.fragmentShader
+						.replace('#include <common>', `#include <common>
+uniform float uShimmerTime;
+varying float vShimmerSeed;
+varying float vIsDonor;`)
+						.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+float _shimmer = pow(max(sin(uShimmerTime * 1.6 + vShimmerSeed), 0.0), 6.0) * vIsDonor;
+totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
+				};
+
+				const staticCoinGeometry = coinGeometry.clone(); // own geometry: isolates the per-instance donor flag + dispose()
+				const donorFlags = new Float32Array(instanceCount); // 1 = donation coin (shimmers + tappable), 0 = plain
 				staticCoinInstancedMesh = new THREE.InstancedMesh(
-					coinGeometry,
+					staticCoinGeometry,
 					staticCoinMaterial,
 					instanceCount
 				);
@@ -2426,8 +2462,10 @@
 					
 					matrix.compose(position, quaternion, scale);
 					staticCoinInstancedMesh.setMatrixAt(i, matrix);
+					donorFlags[i] = coinInfo.charity ? 1 : 0;
 				}
 				
+				staticCoinGeometry.setAttribute('aIsDonor', new THREE.InstancedBufferAttribute(donorFlags, 1));
 				staticCoinInstancedMesh.instanceMatrix.needsUpdate = true;
 				staticCoinInstancedMesh.renderOrder = 99;
 				scene.add(staticCoinInstancedMesh);
@@ -3115,6 +3153,7 @@
 			}
 			
 			function showUIElementsAfterIntro() {
+				window.handCoinReady = true; // camera has arrived & UI is showing — the hand coin can appear now
 				// Show mobile collection counter
 				const mobileCounter = document.getElementById('mobileCollectionCounter');
 				if (mobileCounter) {
@@ -3334,7 +3373,7 @@
 
 			// Floating banner while a golden coin waits in hand — the payment
 			// is done, the ceremony (the toss) is the user's to take.
-			function showGoldCoinReadyMessage() {
+			function showGoldCoinReadyMessage(innerHTML) {
 				const existingMsg = document.getElementById('goldCoinReadyMessage');
 				if (existingMsg) {
 					existingMsg.remove();
@@ -3367,9 +3406,13 @@
 					animation: fadeIn 0.3s ease-out;
 				`;
 
-				msg.innerHTML = `🥇 Golden coin in hand<br><span style="font-size: 0.75rem; opacity: 0.85;">tap the water to toss it</span>`;
+				msg.innerHTML = innerHTML || `Your coin is ready<br><span style="font-size: 0.75rem; opacity: 0.85;">tap the water to cast your offering</span>`;
 
 				document.body.appendChild(msg);
+			}
+
+			function showCoinMissedMessage() {
+				showGoldCoinReadyMessage(`💧 Missed the water!<br><span style="font-size: 0.75rem; opacity: 0.85;">your coin is back — tap to try again</span>`);
 			}
 
 			function hideGoldCoinReadyMessage() {
@@ -3567,15 +3610,15 @@
 
 				syncHandCoinStyle();
 				if (heldGoldCoin) {
-					chip.classList.add('gold');
+					chip.classList.remove('gold'); // de-golded: coins are already gold
 					chip.setAttribute('aria-expanded', 'false');
 					const tray = document.getElementById('coinTray');
 					if (tray) tray.hidden = true;
 					const amountPart = heldGoldCoin.amount
 						? `${heldGoldCoin.amount} ${heldGoldCoin.currency} `
 						: '';
-					label.textContent = `Golden Coin · ${amountPart}→ ${getCharityShortName(heldGoldCoin.charity)}`;
-					tip.textContent = 'Tap the water to toss it';
+					label.textContent = `Offering · ${amountPart}→ ${getCharityShortName(heldGoldCoin.charity)}`;
+					tip.textContent = 'Tap the water to cast it';
 				} else {
 					chip.classList.remove('gold');
 					label.textContent = 'Click to donate coins';
@@ -4306,7 +4349,7 @@
 				// Create and position the upper water mesh
 				upperWaterMesh = new THREE.Mesh( upperBowlGeometry, upperWaterMaterial );
 				upperWaterMesh.rotation.x = - Math.PI * 0.5;
-				upperWaterMesh.position.set(0.05, 0.4, -0.01); // Position at the upper bowl
+				upperWaterMesh.position.set(0.05, 0.42, -0.01); // Position at the upper bowl (raised so coins on the shallow floor sit under the surface, but kept below the rim)
 				upperWaterMesh.matrixAutoUpdate = true;
 				upperWaterMesh.updateMatrix();
 				
@@ -4997,10 +5040,16 @@
                     hideGoldCoinReadyMessage();
                     selectedCharity = gold.charity; // createCoin stamps this on the coin
                     inFlightCoin = triggerCoinToss(false);
-                    if (inFlightCoin) inFlightCoin.userData.txHash = gold.txHash || null;
+                    if (inFlightCoin) {
+                        inFlightCoin.userData.txHash = gold.txHash || null;
+                        // Carry the full donation so a missed toss can re-arm it and
+                        // the credit toast can fire on a successful landing (not now).
+                        inFlightCoin.userData.donation = gold;
+                    }
                     inFlightTossedAt = performance.now();
                     updateCoinChip();
-                    showGoldSplashCredit(gold);
+                    // Credit toast now fires when the coin actually lands in the
+                    // fountain (see the save branches), so a missed toss doesn't credit.
                 } else {
                     inFlightCoin = triggerCoinToss(true);
                     inFlightTossedAt = performance.now();
@@ -5056,6 +5105,7 @@
                     .coin-card-addr { font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.55); font-family: ui-monospace, Menlo, monospace; margin-top: 2px; }
                     .coin-card-meta { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.92); margin-top: 7px; }
                     .coin-card-amt { font-size: 16px; font-weight: 800; color: #fff; margin-top: 2px; }
+                    .coin-card-date { font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.6); letter-spacing: 0.3px; margin-top: 5px; }
                     .coin-card-close { position: absolute; top: 3px; right: 7px; width: 18px; height: 18px; line-height: 15px; padding: 0; background: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 16px; cursor: pointer; }
                     .coin-card-close:hover { color: #fff; }
                 `;
@@ -5087,17 +5137,35 @@
                 } catch (e) { return null; }
             }
 
+            // Absolute calendar date for the commemorative card (e.g. "Jun 14, 2026").
+            function formatDonationDate(timestamp) {
+                if (!timestamp) return '';
+                try {
+                    const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+                    if (isNaN(d.getTime())) return '';
+                    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                } catch (e) { return ''; }
+            }
+
             function coinCardHTML(coinData, donation) {
                 const charityKey = (donation && donation.charity) || coinData.charity || null;
                 const charityName = charityKey ? getCharityDisplayName(charityKey) : null;
                 const charityEmoji = charityKey ? getCharityEmoji(charityKey) : '';
                 const rows = [];
                 if (donation) {
-                    if (donation.donorName) rows.push(`<div class="coin-card-name">${escapeHtml(donation.donorName)}</div>`);
-                    if (donation.userName) rows.push(`<div class="coin-card-addr">${escapeHtml(donation.userName)}</div>`);
+                    // Donor name — prefer the entered name, then handle, then a
+                    // shortened wallet address (mirrors the toast's fallback).
+                    const donorName = donation.donorName || donation.userName ||
+                        (donation.donor ? `${donation.donor.slice(0, 6)}...${donation.donor.slice(-4)}` : null);
+                    if (donorName) rows.push(`<div class="coin-card-name">${escapeHtml(donorName)}</div>`);
+                    // Recipient
                     if (charityName) rows.push(`<div class="coin-card-meta">${charityEmoji} ${escapeHtml(charityName)}</div>`);
+                    // Amount
                     const amt = donation.amount != null ? `${escapeHtml(String(donation.amount))} ${escapeHtml(donation.currency || '')}`.trim() : '';
                     if (amt) rows.push(`<div class="coin-card-amt">${amt}</div>`);
+                    // Date
+                    const dateStr = formatDonationDate(donation.timestamp);
+                    if (dateStr) rows.push(`<div class="coin-card-date">${escapeHtml(dateStr)}</div>`);
                 } else if (charityName) {
                     rows.push(`<div class="coin-card-meta">${charityEmoji} ${escapeHtml(charityName)}</div>`);
                     rows.push(`<div class="coin-card-addr">a donation to the fountain</div>`);
@@ -5148,7 +5216,7 @@
                 const hits = raycaster.intersectObject(staticCoinInstancedMesh, false);
                 if (!hits.length || hits[0].instanceId == null) return false;
                 const data = staticCoinData[hits[0].instanceId];
-                if (!data) return false;
+                if (!data || !data.charity) return false; // only donation coins are clickable
                 showCoinInfoCard(data);
                 return true;
             }
@@ -5180,6 +5248,7 @@
             // The hand stays empty while a tossed coin is still in the air —
             // the landing is what puts the next coin in your hand.
             function positionHandCoinFromEvent(event) {
+                if (!window.handCoinReady) { hideHandCoin(); return; } // wait for the cinematic intro + UI to appear
                 if (cameraFollowActive) return;
                 if (coinInFlight()) {
                     hideHandCoin();
@@ -5996,6 +6065,11 @@
 				if (waterMesh) waterMesh.material.waterTime = performance.now() / 1000.0;
 				if (upperWaterMesh) upperWaterMesh.material.waterTime = performance.now() / 1000.0;
 
+				// Advance the donation-coin shimmer (uniform set in createStaticCoinInstances)
+				if (staticCoinInstancedMesh && staticCoinInstancedMesh.material.userData.shimmerUniform) {
+					staticCoinInstancedMesh.material.userData.shimmerUniform.value = performance.now() / 1000.0;
+				}
+
 				// --- NEW: Update splash particles ---
 				updateSplashParticles(deltaTime);
 				
@@ -6035,7 +6109,7 @@
                 const lowerBottomDepth = -0.78; // Adjusted bottom depth (-0.28 - 0.5)
                 
                 // Upper bowl water levels
-                const upperWaterLevel = 0.4; // Match upper water mesh Y position
+                const upperWaterLevel = 0.42; // Match upper water mesh Y position
                 const upperBottomDepth = 0.3; // Upper bowl bottom (adjust this value based on your fountain model)
                 
                 const waterDamping = 0.70;
@@ -6100,7 +6174,7 @@
                     
                     // --- Determine which bowl the coin is in FIRST ---
                     // Upper bowl center is at (0.05, 0.4, -0.01) with size 0.6
-                    const upperBowlRadius = 0.25; // Slightly smaller than half to ensure we're inside
+                    const upperBowlRadius = 0.3; // Match the visible upper water (0.6 plane -> 0.3 radius) so edge landings register as in-water
                     const distanceFromUpperCenter = Math.sqrt(
                         Math.pow(coin.position.x - 0.05, 2) + 
                         Math.pow(coin.position.z + 0.01, 2)
@@ -6113,8 +6187,10 @@
                         // Create a parabolic bowl shape: deeper in center, shallower at edges
                         const normalizedDistance = distanceFromUpperCenter / upperBowlRadius; // 0 at center, 1 at edge
                         const bowlCurve = normalizedDistance * normalizedDistance; // Quadratic curve
-                        // Interpolate between center depth (0.3) and edge depth (0.38)
-                        bottomDepth = 0.3 + (bowlCurve * 0.08); // Ranges from 0.3 to 0.38
+                        // Rest depth for the upper bowl. settleRestingCoin is skipped below
+                        // (it re-seats coins onto a higher inner ledge ~0.42 and lifts them to
+                        // the surface), so coins rest here — matching the model's baked coins.
+                        bottomDepth = 0.37 + (bowlCurve * 0.02); // 0.37 (center) to 0.39 (edge)
                     } else {
                         bottomDepth = lowerBottomDepth;
                     }
@@ -6226,6 +6302,24 @@
                                     const randomAngle = Math.random() * Math.PI * 2;
                                     coin.rotateOnWorldAxis(surfaceNormal, randomAngle);
 
+                                    // Donation coins only count if they land IN the water (the
+                                    // lower main pool or the upper bowl). A rest on dry stone /
+                                    // structure is a miss — bounce it back to hand to try again.
+                                    if (coin.userData.donation && !coin.userData.firestoreId && !coin.userData.isLocalCoin) {
+                                        const restedInWater = (isInUpperBowl && coin.position.y < upperWaterLevel) ||
+                                            (!isInUpperBowl && isWithinFountainWater(coin.position) && coin.position.y < lowerWaterLevel);
+                                        if (!restedInWater) {
+                                            heldGoldCoin = coin.userData.donation;
+                                            selectedCharity = heldGoldCoin.charity;
+                                            updateCoinChip();
+                                            showCoinMissedMessage();
+                                            scene.remove(coin);
+                                            coins.splice(i, 1);
+                                            if (inFlightCoin === coin) inFlightCoin = null;
+                                            continue;
+                                        }
+                                    }
+
                                     // Pull the disc up out of the mesh if the
                                     // center-ray rest left it embedded (runs
                                     // before the save so the corrected pose
@@ -6248,6 +6342,8 @@
 
                                                 // Trigger celebration VFX for real donations!
                                                 triggerCelebration(coin.userData.charity);
+                                        // One-time credit toast, only now that it's actually in the fountain.
+                                        if (coin.userData.donation) showGoldSplashCredit(coin.userData.donation);
 
                                                 // Add to instanced mesh but KEEP as invisible collision obstacle
                                                 addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
@@ -6400,6 +6496,19 @@
                             nextPosition.y = PLAZA_Y + COIN_THICKNESS / 2;
                             velocity.set(0, 0, 0);
                             coin.userData.stopped = true;
+                            // A real donation coin that missed the fountain isn't consumed —
+                            // re-arm it so the donor can try again until it lands. (Free
+                            // coins are session-local and just stay on the plaza.)
+                            if (coin.userData.donation && !coin.userData.firestoreId && !coin.userData.isLocalCoin) {
+                                heldGoldCoin = coin.userData.donation;
+                                selectedCharity = heldGoldCoin.charity;
+                                updateCoinChip();
+                                showCoinMissedMessage();
+                                scene.remove(coin);
+                                coins.splice(i, 1);
+                                if (inFlightCoin === coin) inFlightCoin = null;
+                                continue;
+                            }
                             // Same lie-flat convention as coin stacking
                             coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
                         }
@@ -6422,9 +6531,11 @@
 
                                         // Trigger celebration VFX for real donations!
                                         triggerCelebration(coin.userData.charity);
+                                        // One-time credit toast, only now that it's actually in the fountain.
+                                        if (coin.userData.donation) showGoldSplashCredit(coin.userData.donation);
 
                                         // Add to instanced mesh but KEEP as invisible collision obstacle
-                                        addStaticCoinToInstances(nextPosition.clone(), coin.rotation.clone(), id);
+                                        addStaticCoinToInstances(nextPosition.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
                                         coin.visible = false; // Hide since instanced mesh shows it
                                         coin.userData.isStaticObstacle = true; // Mark as static obstacle
 
@@ -6491,10 +6602,10 @@
                              coin.rotateZ(Math.random() * Math.PI * 2); // Add random rotation around world Z
                              // --- END ADJUSTMENT ---
 
-                             // Seat on the ACTUAL bowl-floor mesh (bottomDepth is
-                             // a hair above it); also corrects any spot where the
-                             // floor differs from the nominal depth.
-                             settleRestingCoin(coin);
+                             // Lower bowl: seat on the ACTUAL bowl-floor mesh. Upper bowl: skip
+                             // it — there it re-seats onto a higher inner ledge (~0.42), lifting
+                             // coins to the surface; the bottomDepth above is already the floor.
+                             if (!isInUpperBowl) settleRestingCoin(coin);
 
                              // Save coin to Firestore if not already saved (skip for local coins)
                              if (!coin.userData.firestoreId && !coin.userData.isStatic && !coin.userData.isLocalCoin) {
@@ -6512,6 +6623,8 @@
 
                                          // Trigger celebration VFX for real donations!
                                          triggerCelebration(coin.userData.charity);
+                                        // One-time credit toast, only now that it's actually in the fountain.
+                                        if (coin.userData.donation) showGoldSplashCredit(coin.userData.donation);
 
                                          // Add to instanced mesh but KEEP as invisible collision obstacle
                                          addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
@@ -7487,7 +7600,9 @@
 			/* Small phone screens (iPhone SE, older iPhones) */
 			@media (max-width: 480px) and (max-height: 700px) {
 				#mobileCollectionCounter {
-					bottom: 8% !important;
+					/* Same toolbar-clearance fix as the >768px rule, tighter for
+					   short screens. (Was 8% ≈ 53px — behind the bar.) */
+					bottom: 150px !important;
 				}
 				
 				.mobile-counter-buttons {
@@ -7530,6 +7645,6 @@
 				}
 			}
 		</style>
-		
+
 	</body>
 </html>
