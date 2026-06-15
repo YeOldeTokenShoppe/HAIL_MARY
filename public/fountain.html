@@ -970,14 +970,20 @@
 				padding-bottom: 8px;
 				border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 			">
-				<!-- Left side: Coin Cam (preference, not a primary control —
-				     a small pill toggle instead of a checkbox row; off by
-				     default, must match coinCamEnabled's initial value) -->
-				<button type="button" id="coinCamToggle" class="coin-cam-btn"
-					aria-pressed="false"
-					title="Coin Cam: follow your coin underwater after a toss">
-					<span aria-hidden="true">🎥</span><span id="coinCamLabel">Cam off</span>
-				</button>
+				<!-- Left side: Coin Cam + Water Sound (preferences as small pill
+				     toggles, stacked; cam off by default = coinCamEnabled, sound on) -->
+				<div style="display:flex; flex-direction:column; align-items:flex-start; gap:6px;">
+					<button type="button" id="coinCamToggle" class="coin-cam-btn"
+						aria-pressed="false"
+						title="Coin Cam: follow your coin underwater after a toss">
+						<span aria-hidden="true">🎥</span><span id="coinCamLabel">Cam off</span>
+					</button>
+					<button type="button" id="waterSoundToggle" class="coin-cam-btn active"
+						aria-pressed="true"
+						title="Water sound on/off">
+						<span id="waterSoundIcon" aria-hidden="true" style="display:flex; align-items:center;"></span><span id="waterSoundLabel">Sound on</span>
+					</button>
+				</div>
 				
 				<!-- Right side: Pool counter, RL80 total, and Info button -->
 				<div style="
@@ -988,17 +994,21 @@
 					<!-- Info button -->
 					<!-- Dismiss: hide the panel for a clear view of the fountain (tapping still tosses) -->
 					<button type="button" id="dismissUiBtn" onclick="dismissFountainUI()" title="Hide controls for a clear view" style="
-						width: 28px; height: 28px; font-size: 12px; border-radius: 50%; cursor: pointer; padding: 0; line-height: 1;
-						background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.8);
+						width: 2.5rem; height: 2.5rem; font-size: 1.6rem; border-radius: 50%; cursor: pointer; padding: 0; line-height: 1;
+						background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.92);
 						display: flex; align-items: center; justify-content: center;
-					">⌄</button>
+					"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:1.5rem;height:1.5rem;display:block"><path d="m6 9 6 6 6-6"/></svg></button>
 					<button id="mobileInfoBtn" onclick="toggleInstructions()" class="pumpkin-info-button" style="
 						display: none;
-						width: 28px;
-						height: 28px;
-						font-size: 14px;
+						width: 2.5rem;
+						height: 2.5rem;
+						font-size: 1.4rem;
+						line-height: 1;
 						border-radius: 50%;
 						cursor: pointer;
+						padding: 0;
+						align-items: center;
+						justify-content: center;
 					">❓</button>
 				</div>
 			</div>
@@ -1195,7 +1205,7 @@
 						// Show mobile info button (now part of the counter container)
 						const mobileInfoBtn = document.getElementById('mobileInfoBtn');
 						if (mobileInfoBtn) {
-							mobileInfoBtn.style.display = 'block';
+							mobileInfoBtn.style.display = 'flex';
 						}
 						// Hide desktop info button on mobile
 						const desktopInfoBtn = document.getElementById('desktopInfoBtn');
@@ -1283,7 +1293,7 @@
 						// Show info button
 						const mobileInfoBtn = document.getElementById('mobileInfoBtn');
 						if (mobileInfoBtn) {
-							mobileInfoBtn.style.display = 'block';
+							mobileInfoBtn.style.display = 'flex';
 						}
 						// Hide desktop info button
 						const desktopInfoBtn = document.getElementById('desktopInfoBtn');
@@ -2111,8 +2121,8 @@
 			coinGeometry.rotateX(Math.PI / 2); // Lay the coin flat
 
 			// Define coin dimensions for use in physics - MUST match geometry!
-			const COIN_RADIUS = 0.03; // Match the actual geometry radius (0.03 = ~25% smaller circumference than the old 0.04)
-			const COIN_THICKNESS = 0.005 * 2; // Match the actual geometry thickness
+			const COIN_RADIUS = 0.02; // Match the actual geometry radius (0.03 = ~25% smaller circumference than the old 0.04)
+			const COIN_THICKNESS = 0.002 * 2; // Match the actual geometry thickness
 
 			// --- Coin Counter and Performance Settings ---
 			let totalCoinCount = 0;
@@ -2436,11 +2446,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				const staticCoinGeometry = coinGeometry.clone(); // own geometry: isolates the per-instance donor flag + dispose()
 				const donorFlags = new Float32Array(instanceCount); // 1 = donation coin (shimmers + tappable), 0 = plain
-				staticCoinInstancedMesh = new THREE.InstancedMesh(
-					staticCoinGeometry,
-					staticCoinMaterial,
-					instanceCount
-				);
+				// staticCoinInstancedMesh = new THREE.InstancedMesh(
+				// 	staticCoinGeometry,
+				// 	staticCoinMaterial,
+				// 	instanceCount
+				// );
 				
 				// Set up transform matrices for each coin
 				const matrix = new THREE.Matrix4();
@@ -2675,6 +2685,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let sun;
 			let waterMesh;
 			let upperWaterMesh;
+			let topBowlWaterMesh;
 			let poolBorder;
 			let meshRay;
 			let upperMeshRay;
@@ -2739,6 +2750,31 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
         // We might add a noise texture sampler here later if needed
         // WN_TEX: { value: null }
     };
+
+			// --- Top-bowl spill (third water shader) -------------------------------
+			// A decorative water curtain spilling from the small raised central bowl
+			// (at the statue's base) down into the larger coin bowl, reusing the
+			// falling-water shader. Also defines a no-coin-landing zone over that
+			// small bowl so coins can't pile on its narrow rim. All values are
+			// tunable — edit and reload the page.
+			const TOP_BOWL_SPILL = {
+				centerX: 0.055,      // XZ centre of the small top bowl (≈ coin-bowl centre)
+				centerZ: -0.01,
+				radius:  0.16,      // curtain radius — the small bowl's rim (your "diameter"/2)
+				topY:    0.62,      // height the water spills FROM (the small bowl rim)
+				height:  0.22,      // how far the curtain falls (down to the coin-bowl water ≈0.42)
+				noCoinRadius: 0.16, // coins cannot rest within this radius of the centre
+				waterY:  0.613,      // height of the small bowl's own water surface (just below its rim)
+				// Central exclusion column: in flight, a coin inside noCoinRadius within
+				// this height band is deflected OUT into the surrounding bowl, so it
+				// can't fall through the small bowl or penetrate the statue/spout.
+				excludeYLow:  0.42, // bottom of the core (the coin-bowl water surface)
+				excludeYHigh: 1.00, // top of the band (covers the small bowl + statue base;
+				                    // raise if coins still clip the statue higher up)
+				// Splash where the curtain meets the coin-bowl water (particle ring at its
+				// foot). chance = per-frame emit probability, count = max particles/emit.
+				splash: { chance: 0.5, count: 3, size: 0.4, speed: 0.06, up: 0.01, spread: 0.05 },
+			};
 
 			const effectController = {
 				mouseSize: 0.08,
@@ -3047,12 +3083,19 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				scene.add(splashParticleSystem);
 			}
 			
-			function emitSplashParticles(centerX, centerZ, radius, particleCount = 20) {
+			function emitSplashParticles(centerX, centerZ, radius, particleCount = 20, opts = {}) {
 				const positions = splashParticleSystem.geometry.attributes.position.array;
 				const velocities = splashParticleSystem.geometry.attributes.velocity.array;
 				const lifetimes = splashParticleSystem.geometry.attributes.lifetime.array;
 				const sizes = splashParticleSystem.geometry.attributes.size.array;
-				
+
+				// Surface level + tuning (defaults preserve the original lower-pool splash).
+				const yLevel    = opts.y      !== undefined ? opts.y      : -0.489;
+				const spread    = opts.spread !== undefined ? opts.spread : 0.41;
+				const baseSpeed = opts.speed  !== undefined ? opts.speed  : 0.2;
+				const upVel     = opts.up     !== undefined ? opts.up     : 0;
+				const pSize     = opts.size   !== undefined ? opts.size   : 1.5;
+
 				let particlesEmitted = 0;
 				
 				// Find inactive particles and activate them
@@ -3060,22 +3103,22 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					if (lifetimes[i] <= 0) {
 						// Generate position on the ring
 						const angle = Math.random() * Math.PI * 2;
-						const r = radius + (Math.random() - 0.5) * 0.41; // Some variation in radius
+						const r = radius + (Math.random() - 0.5) * spread; // Some variation in radius
 				
 						positions[i * 3] = centerX + Math.cos(angle) * r;
-						positions[i * 3 + 1] = -0.489; // Water surface level
+						positions[i * 3 + 1] = yLevel; // Water surface level
 						positions[i * 3 + 2] = centerZ + Math.sin(angle) * r;
 						
 						// Generate upward and outward velocity
-						const speed = 0.2 + Math.random() * 0.002;;
+						const speed = baseSpeed + Math.random() * 0.002;
 						const upwardBias = 0.05 + Math.random() * 0.02;
 						
 						velocities[i * 3] = Math.cos(angle) * speed * (1 - upwardBias);
-						velocities[i * 3 + 1] = speed * upwardBias * 0.008;
+						velocities[i * 3 + 1] = speed * upwardBias * 0.008 + upVel;
 						velocities[i * 3 + 2] = Math.sin(angle) * speed * (1 - upwardBias);
 						
 						lifetimes[i] = 1.0;
-						sizes[i] = 1.5;
+						sizes[i] = pSize;
 						
 						particlesEmitted++;
 					}
@@ -3821,6 +3864,98 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				initSplashParticleSystem();
 				// --- END NEW ---
 
+				// --- Ambient water sound + mute toggle. Loops quietly; browsers block
+				// autoplay until a user gesture, so we try immediately (if already
+				// unlocked) and otherwise start on the first interaction. A corner
+				// button toggles it, and the choice is remembered across visits. ---
+				(function setupWaterAmbience() {
+					const WATER_VOLUME = 0.02; // 0..1 — drives the Web Audio gain below (tune here)
+					const STORE_KEY = 'fountain_water_muted';
+					const water = new Audio('/water.mp3');
+					water.loop = true;
+					water.volume = WATER_VOLUME;
+					water.preload = 'auto';
+					window.fountainWaterAudio = water; // exposed for live volume tweaks
+
+					let muted = false;
+					try { muted = localStorage.getItem(STORE_KEY) === '1'; } catch (e) {}
+					let playing = false;
+
+					const ICON_ON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>';
+					const ICON_OFF = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 9a5 5 0 0 1 .95 2.293"/><path d="M19.364 5.636a9 9 0 0 1 1.889 9.96"/><path d="m2 2 20 20"/><path d="m7 7-.587.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298V11"/><path d="M9.828 4.172A.686.686 0 0 1 11 4.657v.686"/></svg>';
+
+					// The toggle lives in the control panel, stacked under the Cam pill.
+					const btn = document.getElementById('waterSoundToggle');
+					const iconEl = document.getElementById('waterSoundIcon');
+					const labelEl = document.getElementById('waterSoundLabel');
+
+					// iOS Safari IGNORES HTMLAudioElement.volume (hardware-only), so
+					// WATER_VOLUME above has no effect there. Route the audio through a
+					// Web Audio GainNode, whose gain DOES control level on iOS + desktop.
+					// (Falls back to element.volume if Web Audio is unavailable.)
+					let audioCtx = null, gainNode = null, graphFailed = false;
+					function ensureGraph() {
+						if (gainNode || graphFailed) return;
+						const AC = window.AudioContext || window.webkitAudioContext;
+						if (!AC) { graphFailed = true; return; }
+						try {
+							audioCtx = new AC();
+							const src = audioCtx.createMediaElementSource(water);
+							gainNode = audioCtx.createGain();
+							gainNode.gain.value = WATER_VOLUME;
+							src.connect(gainNode).connect(audioCtx.destination);
+							water.volume = 1.0; // the gain controls the level now
+							window.fountainWaterGain = gainNode; // live tuning: .gain.value = 0..1
+						} catch (e) { graphFailed = true; gainNode = null; }
+					}
+
+					function removeUnlock() { events.forEach(e => window.removeEventListener(e, onGesture)); }
+					function applyAudio() {
+						if (muted) { water.pause(); playing = false; render(); return; }
+						ensureGraph();
+						if (audioCtx && audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
+						const p = water.play();
+						if (p && p.then) p.then(() => { playing = true; removeUnlock(); render(); }).catch(() => {});
+						else { playing = true; removeUnlock(); render(); }
+					}
+					function render() {
+						// Reflect the ACTUAL state: only show "on" once audio is really
+						// playing. Browsers block playback until the first gesture, so the
+						// toggle never claims to be on while it's still silent.
+						const on = playing && !muted;
+						if (iconEl) iconEl.innerHTML = on ? ICON_ON : ICON_OFF;
+						if (labelEl) labelEl.textContent = on ? 'Sound on' : 'Sound off';
+						if (btn) { btn.classList.toggle('active', on); btn.setAttribute('aria-pressed', String(on)); }
+					}
+					function persistMuted() { try { localStorage.setItem(STORE_KEY, muted ? '1' : '0'); } catch (e) {} }
+					render();
+					if (btn) btn.addEventListener('click', (e) => {
+						e.stopPropagation();
+						if (playing && !muted) {   // currently on → turn off
+							muted = true;
+							water.pause();
+							playing = false;
+						} else {                    // currently off → turn on (this click is a gesture)
+							muted = false;
+							applyAudio();
+						}
+						persistMuted();
+						render();
+					});
+
+					// Autoplay unlock: try now, and on the first user gesture anywhere.
+					const events = ['pointerdown', 'touchstart', 'keydown'];
+					function onGesture() { if (!muted && !playing) applyAudio(); }
+					applyAudio();
+					events.forEach(e => window.addEventListener(e, onGesture, { passive: true }));
+
+					// Be polite: pause when the tab is hidden, resume when visible (if on).
+					document.addEventListener('visibilitychange', () => {
+						if (document.hidden) water.pause();
+						else if (!muted) applyAudio(); // resumes the audio context too
+					});
+				})();
+
 				// --- NEW: Load Fountain GLB ---
 				const loader = new GLTFLoader();
 				
@@ -3943,6 +4078,27 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 fallingWaterMesh.receiveShadow = true; // Or false if preferred
 
                 scene.add(fallingWaterMesh);
+
+                // --- Third water shader: spill from the small raised top bowl into
+                // the coin bowl. Same look as the main curtain (shares its shader +
+                // animated time); geometry/placement come from TOP_BOWL_SPILL above.
+                // Not marked isFountainPart, so coins fall straight through it. ---
+                const topSpillGeometry = new THREE.CylinderGeometry(
+                    TOP_BOWL_SPILL.radius, TOP_BOWL_SPILL.radius, TOP_BOWL_SPILL.height, fallSegments, 1, true);
+                topSpillGeometry.translate(
+                    TOP_BOWL_SPILL.centerX, TOP_BOWL_SPILL.topY - TOP_BOWL_SPILL.height / 2, TOP_BOWL_SPILL.centerZ);
+                const topSpillMaterial = new THREE.ShaderMaterial({
+                    uniforms: fallingWaterUniforms, // shares the falling-water time/look
+                    vertexShader: fallingWaterVertexShader,
+                    fragmentShader: fallingWaterFragmentShader,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                });
+                const topBowlSpillMesh = new THREE.Mesh(topSpillGeometry, topSpillMaterial);
+                topBowlSpillMesh.castShadow = false;
+                topBowlSpillMesh.receiveShadow = true;
+                scene.add(topBowlSpillMesh);
+                window.topBowlSpillMesh = topBowlSpillMesh; // exposed for quick console tuning
 
 						// --- Adjust position, scale, rotation as needed ---
 						// Center it roughly where the water is
@@ -4355,8 +4511,36 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				upperWaterMesh.receiveShadow = true;
 				upperWaterMesh.castShadow = true;
-				
+
 				scene.add( upperWaterMesh );
+
+				// Smaller water surface for the raised top bowl — same rippling
+				// WaterMaterial + round mask as the upper bowl, sized and placed from
+				// TOP_BOWL_SPILL. Visual only (no ray mesh): coins are kept out of this
+				// area by the central exclusion, so it isn't a toss target.
+				const topBowlSize = TOP_BOWL_SPILL.radius * 2;
+				const topBowlWaterGeometry = new THREE.PlaneGeometry( topBowlSize, topBowlSize, WIDTH/4 - 1, WIDTH/4 - 1 );
+				const topBowlWaterMaterial = new WaterMaterial( {
+					color: 0x9bd2ec,
+					metalness: 0.9,
+					roughness: 0,
+					transparent: true,
+					opacity: 0.8,
+					alphaTest: 0.6,
+					side: THREE.DoubleSide,
+					depthTest: true,
+					depthWrite: false,
+					alphaMap: circleTexture, // round disc, like the upper bowl
+				} );
+				topBowlWaterMaterial.uCalm = 1.0; // top bowl: drop the concentric bullseye foam rings (keep normal waves)
+				topBowlWaterMesh = new THREE.Mesh( topBowlWaterGeometry, topBowlWaterMaterial );
+				topBowlWaterMesh.rotation.x = - Math.PI * 0.5;
+				topBowlWaterMesh.position.set( TOP_BOWL_SPILL.centerX, TOP_BOWL_SPILL.waterY, TOP_BOWL_SPILL.centerZ );
+				topBowlWaterMesh.matrixAutoUpdate = true;
+				topBowlWaterMesh.updateMatrix();
+				topBowlWaterMesh.receiveShadow = true;
+				topBowlWaterMesh.castShadow = true;
+				scene.add( topBowlWaterMesh );
 
 				// THREE.Mesh just for mouse raycasting
 				const geometryRay = new THREE.PlaneGeometry( BOUNDS, BOUNDS, 1, 1 );
@@ -5657,6 +5841,188 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 camera.updateProjectionMatrix();
             }
             
+            // Seat a resting upper-bowl coin ON the actual bowl surface beneath
+            // it, ALIGNED to that surface — so it lies flat on the central floor
+            // but tilts to lean against the banked side walls (its natural
+            // resting pose), instead of being forced perfectly horizontal and
+            // overhanging into the stone. We read the real slope with a short
+            // downward raycast, so no bowl dimensions are hard-coded.
+            //
+            // Returns true if it seated the coin. (settleRestingCoin is the
+            // wrong tool here: it only accepts near-horizontal faces and slides
+            // coins onto the higher inner ledge, lifting them to the surface.)
+            const UPPER_BOWL_MIN_FACE_Y = 0.2;   // shallowest face normal.y to lean on (steeper → skip)
+            const UPPER_BOWL_MAX_LIFT  = 0.12;   // never climb more than this above where it fell
+            const UPPER_BOWL_RIM_LIFT_CAP = 0.04; // cap on the edge-clearance lift
+            function seatCoinOnUpperBowlSurface(coin) {
+                if (!window.fountainModel) return false;
+                const parts = [];
+                window.fountainModel.traverse(function(node) {
+                    if (node.isMesh && node.userData.isFountainPart) parts.push(node);
+                });
+                if (parts.length === 0) return false;
+
+                const rimR = COIN_RADIUS * (coin.scale.x || 1);
+                const ray = new THREE.Raycaster();
+                const DOWN = new THREE.Vector3(0, -1, 0);
+
+                // Seat the coin on the bowl surface directly beneath it, aligned to
+                // that surface (flat in the centre, tilted on the banked walls).
+                // Returns the world-space surface normal, or null if nothing usable.
+                function seatOnce() {
+                    const origin = coin.position.clone();
+                    origin.y += 0.12; // start above the coin so we find the surface under it
+                    ray.set(origin, DOWN);
+                    ray.far = 0.4;
+                    const hits = ray.intersectObjects(parts, false);
+                    for (const hit of hits) {
+                        const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+                        if (normal.y < 0) normal.negate();            // face the up side
+                        if (normal.y < UPPER_BOWL_MIN_FACE_Y) continue; // too vertical — coin would stand on edge
+                        if (hit.point.y - coin.position.y > UPPER_BOWL_MAX_LIFT) continue; // don't climb the rim ledge
+                        coin.rotation.set(0, 0, 0);
+                        const coinUpVector = new THREE.Vector3(0, 0, 1); // coin's local face axis
+                        coin.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(coinUpVector, normal));
+                        coin.position.copy(hit.point.clone().addScaledVector(normal, COIN_THICKNESS / 2 + 0.002));
+                        return normal;
+                    }
+                    return null;
+                }
+
+                let normal = seatOnce();
+                if (!normal) return false;
+
+                // Spread coins so they don't intersect each other: nudge away from
+                // any already-rested coin we overlap, then re-seat on the surface.
+                // A few light passes settle a small cluster without flinging it.
+                const others = [];
+                for (const c of coins) {
+                    if (c !== coin && (c.userData.stopped || c.userData.isStaticObstacle)) others.push(c.position);
+                }
+                for (const sc of staticCoinData) others.push(sc.position);
+                const minSep = rimR * 1.7;
+                for (let iter = 0; iter < 4; iter++) {
+                    const push = new THREE.Vector3();
+                    let worst = 0;
+                    for (const op of others) {
+                        const dx = coin.position.x - op.x;
+                        const dz = coin.position.z - op.z;
+                        if (Math.abs(coin.position.y - op.y) > rimR) continue; // different layer
+                        const h = Math.sqrt(dx * dx + dz * dz);
+                        if (h < minSep && h > 1e-5) {
+                            const pen = minSep - h;
+                            push.x += (dx / h) * pen;
+                            push.z += (dz / h) * pen;
+                            worst = Math.max(worst, pen);
+                        }
+                    }
+                    if (worst < 0.002) break;
+                    coin.position.x += push.x;
+                    coin.position.z += push.z;
+                    const n2 = seatOnce();
+                    if (!n2) break;
+                    normal = n2;
+                }
+
+                // Rim clearance: a flat disc on a curved/banked surface digs its
+                // edge into the stone. Sample the rim, find the deepest point below
+                // the surface, and lift the coin along its normal until it clears.
+                const t1 = (Math.abs(normal.y) < 0.9
+                    ? new THREE.Vector3(0, 1, 0)
+                    : new THREE.Vector3(1, 0, 0)).cross(normal).normalize();
+                const t2 = new THREE.Vector3().crossVectors(normal, t1).normalize();
+                let maxPen = 0;
+                const SAMPLES = 10;
+                for (let s = 0; s < SAMPLES; s++) {
+                    const a = (s / SAMPLES) * Math.PI * 2;
+                    const rp = coin.position.clone()
+                        .addScaledVector(t1, Math.cos(a) * rimR)
+                        .addScaledVector(t2, Math.sin(a) * rimR);
+                    ray.set(rp.clone().setY(rp.y + 0.1), DOWN);
+                    ray.far = 0.3;
+                    const hh = ray.intersectObjects(parts, false);
+                    if (hh.length && hh[0].point.y > rp.y) maxPen = Math.max(maxPen, hh[0].point.y - rp.y);
+                }
+                if (maxPen > 0) {
+                    const lift = Math.min(maxPen / Math.max(normal.y, 0.3) + 0.002, UPPER_BOWL_RIM_LIFT_CAP);
+                    coin.position.addScaledVector(normal, lift);
+                }
+
+                // Random spin around the normal for variety (stays in the surface plane).
+                coin.rotateOnWorldAxis(normal, Math.random() * Math.PI * 2);
+                return true;
+            }
+
+            // Persist a coin that has come to rest (Firestore + instanced mesh).
+            // Shared by the instant lower-bowl rest and the upper-bowl settle ease.
+            function persistRestedCoin(coin, isInUpperBowl) {
+                if (coin.userData.firestoreId || coin.userData.isStatic || coin.userData.isLocalCoin) return;
+                saveCoinToFirestore({
+                    position: coin.position,
+                    rotation: coin.rotation,
+                    isInUpperBowl: isInUpperBowl,
+                    charity: coin.userData.charity,
+                    txHash: coin.userData.txHash || null
+                }).then(id => {
+                    if (id) {
+                        coin.userData.firestoreId = id;
+                        totalCoinCount++;
+                        updateCoinCounter();
+                        // Trigger celebration VFX for real donations!
+                        triggerCelebration(coin.userData.charity);
+                        // One-time credit toast, only now that it's actually in the fountain.
+                        if (coin.userData.donation) showGoldSplashCredit(coin.userData.donation);
+                        // Add to instanced mesh but KEEP as invisible collision obstacle
+                        addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
+                        coin.visible = false; // instanced mesh shows it now
+                        coin.userData.isStaticObstacle = true;
+                        if (totalCoinCount >= RESET_THRESHOLD && !isResetting) archiveAndResetFountain();
+                    }
+                });
+            }
+
+            // Begin the upper-bowl "settle": rather than snapping to rest, ease the
+            // coin from where it arrived into its final seated pose over a short
+            // time so it gently sinks into place (the bowl is too shallow for real
+            // sink-drag). The coin stays unstopped and is persisted only when the
+            // ease completes — see the settle handler at the top of the coin loop.
+            const UPPER_BOWL_SETTLE_DUR = 0.85; // seconds
+            function startUpperBowlSettle(coin) {
+                if (coin.userData.settling) return;
+                const startPos = coin.position.clone();
+                const startQuat = coin.quaternion.clone();
+                // No coins in the central top-bowl / spill zone: if the coin arrived
+                // over it, push it radially OUT into the surrounding coin bowl before
+                // seating, so it settles in the ring instead of on the small rim.
+                {
+                    const ndx = coin.position.x - TOP_BOWL_SPILL.centerX;
+                    const ndz = coin.position.z - TOP_BOWL_SPILL.centerZ;
+                    const nd = Math.sqrt(ndx * ndx + ndz * ndz);
+                    if (nd < TOP_BOWL_SPILL.noCoinRadius) {
+                        const ang = nd > 1e-5 ? Math.atan2(ndz, ndx) : Math.random() * Math.PI * 2;
+                        const r = TOP_BOWL_SPILL.noCoinRadius + 0.012;
+                        coin.position.x = TOP_BOWL_SPILL.centerX + Math.cos(ang) * r;
+                        coin.position.z = TOP_BOWL_SPILL.centerZ + Math.sin(ang) * r;
+                    }
+                }
+                // Compute the final pose by seating, capture it, then restore the start.
+                if (!seatCoinOnUpperBowlSurface(coin)) {
+                    coin.userData.stopped = true;
+                    coin.userData.velocity.set(0, 0, 0);
+                    persistRestedCoin(coin, true);
+                    return;
+                }
+                coin.userData.settleEndPos = coin.position.clone();
+                coin.userData.settleEndQuat = coin.quaternion.clone();
+                coin.position.copy(startPos);
+                coin.quaternion.copy(startQuat);
+                coin.userData.settleStartPos = startPos;
+                coin.userData.settleStartQuat = startQuat;
+                coin.userData.settleT = 0;
+                coin.userData.settling = true;
+                coin.userData.velocity.set(0, 0, 0);
+            }
+
             // After a coin comes to rest on stone, sit it ON the surface.
             // The collision ray runs from the coin's CENTER, so a hit on a
             // seam or side face can leave the disc visibly sunk in the mesh
@@ -5771,8 +6137,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     Math.pow(position.z - centerZ, 2)
                 );
                 
-                const fountainWaterRadius = 1.15;
-                
+                // *** Lower-pool water radius ***  Coins within this distance of the
+                // fountain centre get the water-based descent (enter water → damped
+                // sink) and count as landed-in-water. This circle approximates the
+                // octagonal pool — raise it so it reaches the visible water's outer
+                // edge, or perimeter/corner landings fall through without the effect.
+                const fountainWaterRadius = 1.3;
+
                 // Return true if position is within the circular boundary
                 return distanceFromCenter < fountainWaterRadius;
             }
@@ -5796,7 +6167,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
                 const coin = new THREE.Mesh( coinGeometry, coinMaterialInstance );
                 if (!isLocalCoin) {
-                    coin.scale.setScalar(1.15);
+                    coin.scale.setScalar(0.7);
                 }
                 coin.position.copy( startPosition );
                 coin.userData.velocity = initialVelocity.clone();
@@ -6064,6 +6435,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// Drive the pool surface sparkle (fine ripple normal wobble)
 				if (waterMesh) waterMesh.material.waterTime = performance.now() / 1000.0;
 				if (upperWaterMesh) upperWaterMesh.material.waterTime = performance.now() / 1000.0;
+				if (topBowlWaterMesh) topBowlWaterMesh.material.waterTime = performance.now() / 1000.0;
 
 				// Advance the donation-coin shimmer (uniform set in createStaticCoinInstances)
 				if (staticCoinInstancedMesh && staticCoinInstancedMesh.material.userData.shimmerUniform) {
@@ -6080,11 +6452,27 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// Emit a few particles each frame
 				if (Math.random() < 0.95) { // 80% chance each frame
 					emitSplashParticles(
-						fallingWaterCenter.x, 
-						fallingWaterCenter.y, 
-						fallingWaterRadius, 
+						fallingWaterCenter.x,
+						fallingWaterCenter.y,
+						fallingWaterRadius,
 						Math.floor(2 + Math.random() * 6) // 2-4 particles per emission
 					);
+				}
+
+				// Splash where the top-bowl spill curtain meets the coin-bowl water:
+				// a small particle ring at the curtain's foot (radius = curtain radius,
+				// height = where the curtain ends). Tuned via TOP_BOWL_SPILL.splash.
+				{
+					const sp = TOP_BOWL_SPILL.splash;
+					if (Math.random() < sp.chance) {
+						emitSplashParticles(
+							TOP_BOWL_SPILL.centerX,
+							TOP_BOWL_SPILL.centerZ,
+							TOP_BOWL_SPILL.radius,
+							Math.floor(1 + Math.random() * sp.count),
+							{ y: TOP_BOWL_SPILL.topY - TOP_BOWL_SPILL.height, up: sp.up, spread: sp.spread, speed: sp.speed, size: sp.size }
+						);
+					}
 				}
 				// --- END NEW ---
 
@@ -6134,7 +6522,24 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 for ( let i = coins.length - 1; i >= 0; i-- ) {
                     const coin = coins[i];
                     const velocity = coin.userData.velocity;
-                    
+
+                    // Upper-bowl settle: ease the coin into its seated pose (gentle
+                    // water settle), then persist it. While settling it owns its
+                    // transform, so skip all other physics for it.
+                    if (coin.userData.settling) {
+                        coin.userData.settleT += dt / UPPER_BOWL_SETTLE_DUR;
+                        const t = Math.min(coin.userData.settleT, 1);
+                        const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
+                        coin.position.lerpVectors(coin.userData.settleStartPos, coin.userData.settleEndPos, e);
+                        coin.quaternion.slerpQuaternions(coin.userData.settleStartQuat, coin.userData.settleEndQuat, e);
+                        if (t >= 1) {
+                            coin.userData.settling = false;
+                            coin.userData.stopped = true;
+                            persistRestedCoin(coin, true);
+                        }
+                        continue;
+                    }
+
                     // Simple collision check for ALL coins (stopped or not)
                     if (!coin.userData.stopped) {
                         // Check against all other coins for stacking
@@ -6204,7 +6609,31 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     if (hasStopped) {
                         continue;
                     }
-                    
+
+                    // --- Central statue / top-bowl exclusion ---
+                    // The small top bowl + statue/spout occupy the core. A coin aimed
+                    // there can slip past the thin bowl (or go "underwater" inside the
+                    // bowl radius, which disables mesh collision) and fall through /
+                    // penetrate the statue. So while a coin is in the core's height
+                    // band and inside the no-coin radius, hold it at that radius and
+                    // cancel any inward velocity — it deflects out into the surrounding
+                    // bowl (bounces off) and settles in the ring instead.
+                    if (coin.position.y > TOP_BOWL_SPILL.excludeYLow &&
+                        coin.position.y < TOP_BOWL_SPILL.excludeYHigh &&
+                        distanceFromUpperCenter < TOP_BOWL_SPILL.noCoinRadius) {
+                        const dx = coin.position.x - TOP_BOWL_SPILL.centerX;
+                        const dz = coin.position.z - TOP_BOWL_SPILL.centerZ;
+                        const d = distanceFromUpperCenter;
+                        const nx = d > 1e-5 ? dx / d : 1;
+                        const nz = d > 1e-5 ? dz / d : 0;
+                        coin.position.x = TOP_BOWL_SPILL.centerX + nx * TOP_BOWL_SPILL.noCoinRadius;
+                        coin.position.z = TOP_BOWL_SPILL.centerZ + nz * TOP_BOWL_SPILL.noCoinRadius;
+                        const vIn = velocity.x * nx + velocity.z * nz; // radial velocity (− = inward)
+                        if (vIn < 0) { velocity.x -= vIn * nx; velocity.z -= vIn * nz; } // kill inward push
+                        velocity.x += nx * 0.04; // gentle outward nudge so it clears the core
+                        velocity.z += nz * 0.04;
+                    }
+
                     // --- Apply Spin ---
                     coin.rotateOnWorldAxis(coin.userData.rotationAxis, coin.userData.rotationSpeed);
 
@@ -6286,28 +6715,39 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                 } else {
                                     // If impact speed is too low, the coin comes to rest on this surface
                                     velocity.set(0, 0, 0);
-                                    coin.userData.stopped = true;
-                                    
-                                    // Align coin with surface - ensure the FLAT side is parallel to surface
-                                    // First reset rotation
-                                    coin.rotation.set(0, 0, 0);
-                                    
-                                    // Then create rotation to align coin's up vector with surface normal
-                                    // Since coin was initially rotated PI/2 on X, its "up" is now along Z axis
-                                    const coinUpVector = new THREE.Vector3(0, 0, 1);
-                                    const quaternion = new THREE.Quaternion().setFromUnitVectors(coinUpVector, surfaceNormal);
-                                    coin.quaternion.copy(quaternion);
-                                    
-                                    // Add a random rotation around the normal for visual variety
-                                    const randomAngle = Math.random() * Math.PI * 2;
-                                    coin.rotateOnWorldAxis(surfaceNormal, randomAngle);
+
+                                    if (isInUpperBowl) {
+                                        // Upper bowl: submerge the coin; it eases into its seated
+                                        // pose below (the settle), so don't stop it here.
+                                        coin.userData.underwater = true;
+                                        coin.material.opacity = 0.6;
+                                        coin.scale.set(1.25, 1.25, 1.25);
+                                    } else {
+                                        coin.userData.stopped = true;
+                                        // Align coin with surface - ensure the FLAT side is parallel to surface
+                                        // First reset rotation
+                                        coin.rotation.set(0, 0, 0);
+
+                                        // Then create rotation to align coin's up vector with surface normal
+                                        // Since coin was initially rotated PI/2 on X, its "up" is now along Z axis
+                                        const coinUpVector = new THREE.Vector3(0, 0, 1);
+                                        const quaternion = new THREE.Quaternion().setFromUnitVectors(coinUpVector, surfaceNormal);
+                                        coin.quaternion.copy(quaternion);
+
+                                        // Add a random rotation around the normal for visual variety
+                                        const randomAngle = Math.random() * Math.PI * 2;
+                                        coin.rotateOnWorldAxis(surfaceNormal, randomAngle);
+                                    }
 
                                     // Donation coins only count if they land IN the water (the
                                     // lower main pool or the upper bowl). A rest on dry stone /
                                     // structure is a miss — bounce it back to hand to try again.
                                     if (coin.userData.donation && !coin.userData.firestoreId && !coin.userData.isLocalCoin) {
-                                        const restedInWater = (isInUpperBowl && coin.position.y < upperWaterLevel) ||
-                                            (!isInUpperBowl && isWithinFountainWater(coin.position) && coin.position.y < lowerWaterLevel);
+                                        // In the upper bowl, any rest counts — a coin leaning on a
+                                        // banked wall can sit slightly above the waterline and must
+                                        // not be treated as a miss (which would remove it).
+                                        const restedInWater = isInUpperBowl ||
+                                            (isWithinFountainWater(coin.position) && coin.position.y < lowerWaterLevel);
                                         if (!restedInWater) {
                                             heldGoldCoin = coin.userData.donation;
                                             selectedCharity = heldGoldCoin.charity;
@@ -6320,47 +6760,21 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                         }
                                     }
 
-                                    // Pull the disc up out of the mesh if the
-                                    // center-ray rest left it embedded (runs
-                                    // before the save so the corrected pose
-                                    // is what persists)
-                                    settleRestingCoin(coin);
-
-                                    // Save coin to Firestore if not already saved (skip for local coins)
-                                    if (!coin.userData.firestoreId && !coin.userData.isStatic && !coin.userData.isLocalCoin) {
-                                        saveCoinToFirestore({
-                                            position: coin.position,
-                                            rotation: coin.rotation,
-                                            isInUpperBowl: isInUpperBowl,
-                                            charity: coin.userData.charity,
-                                            txHash: coin.userData.txHash || null
-                                        }).then(id => {
-                                            if (id) {
-                                                coin.userData.firestoreId = id;
-                                                totalCoinCount++;
-                                                updateCoinCounter();
-
-                                                // Trigger celebration VFX for real donations!
-                                                triggerCelebration(coin.userData.charity);
-                                        // One-time credit toast, only now that it's actually in the fountain.
-                                        if (coin.userData.donation) showGoldSplashCredit(coin.userData.donation);
-
-                                                // Add to instanced mesh but KEEP as invisible collision obstacle
-                                                addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
-                                                coin.visible = false; // Hide since instanced mesh shows it
-                                                coin.userData.isStaticObstacle = true; // Mark as static obstacle
-
-                                                // Check if we've reached the reset threshold
-                                                if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
-                                                    archiveAndResetFountain();
-                                                }
-                                            }
-                                        });
+                                    if (isInUpperBowl) {
+                                        // Ease the coin into its seated pose; it is persisted when
+                                        // the ease completes (settle handler at the top of the loop).
+                                        startUpperBowlSettle(coin);
+                                    } else {
+                                        // Pull the disc up out of the mesh if the center-ray rest
+                                        // left it embedded (before persisting, so the corrected pose
+                                        // is what's saved).
+                                        settleRestingCoin(coin);
+                                        persistRestedCoin(coin, false);
                                     }
                                 }
 
-                                // If coin is stopped, continue to next coin
-                                if (coin.userData.stopped) {
+                                // If the coin has come to rest (or is easing into it), move on.
+                                if (coin.userData.stopped || coin.userData.settling) {
                                     continue;
                                 }
                             }
@@ -6590,53 +7004,23 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
                         // --- Check for Reaching Bottom ---
                         if (isUnderwater && coin.position.y <= bottomDepth + COIN_THICKNESS / 2 + 0.01) { // Check if close to or past bottom
-                             coin.position.y = bottomDepth + COIN_THICKNESS / 2 + 0.001; // rest ON the bowl floor, not centered in the mesh
-                             coin.userData.stopped = true;
-                             velocity.set(0, 0, 0); // Stop all movement
+                             // Hold the coin on the bowl floor (don't let it sink through the mesh).
+                             coin.position.y = bottomDepth + COIN_THICKNESS / 2 + 0.001;
 
-                             // --- ADJUSTMENT: Set rotation to flat on XZ plane ---
-                             // Apply rotation relative to the mesh's current state to align with world XZ plane
-                             // Since geometry was rotated PI/2 on X, we rotate mesh -PI/2 on X
-                             coin.rotation.set(-Math.PI / 2, 0, 0);
-                             // We might also want a random Z rotation so they don't all face the same way
-                             coin.rotateZ(Math.random() * Math.PI * 2); // Add random rotation around world Z
-                             // --- END ADJUSTMENT ---
-
-                             // Lower bowl: seat on the ACTUAL bowl-floor mesh. Upper bowl: skip
-                             // it — there it re-seats onto a higher inner ledge (~0.42), lifting
-                             // coins to the surface; the bottomDepth above is already the floor.
-                             if (!isInUpperBowl) settleRestingCoin(coin);
-
-                             // Save coin to Firestore if not already saved (skip for local coins)
-                             if (!coin.userData.firestoreId && !coin.userData.isStatic && !coin.userData.isLocalCoin) {
-                                 saveCoinToFirestore({
-                                     position: coin.position,
-                                     rotation: coin.rotation,
-                                     isInUpperBowl: isInUpperBowl,
-                                     charity: coin.userData.charity,
-                                     txHash: coin.userData.txHash || null
-                                 }).then(id => {
-                                     if (id) {
-                                         coin.userData.firestoreId = id;
-                                         totalCoinCount++;
-                                         updateCoinCounter();
-
-                                         // Trigger celebration VFX for real donations!
-                                         triggerCelebration(coin.userData.charity);
-                                        // One-time credit toast, only now that it's actually in the fountain.
-                                        if (coin.userData.donation) showGoldSplashCredit(coin.userData.donation);
-
-                                         // Add to instanced mesh but KEEP as invisible collision obstacle
-                                         addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id, coin.userData.txHash, coin.userData.charity);
-                                         coin.visible = false; // Hide since instanced mesh shows it
-                                         coin.userData.isStaticObstacle = true; // Mark as static obstacle
-
-                                         // Check if we've reached the reset threshold
-                                         if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
-                                             archiveAndResetFountain();
-                                         }
-                                     }
-                                 });
+                             if (isInUpperBowl) {
+                                 // Ease the coin into its final seated pose over a short time — a
+                                 // gentle water "settle" (the bowl is too shallow for the main
+                                 // pool's sink-drag to show). Persisted when the ease completes.
+                                 startUpperBowlSettle(coin);
+                             } else {
+                                 coin.userData.stopped = true;
+                                 velocity.set(0, 0, 0); // Stop all movement
+                                 // --- Set rotation flat on the XZ plane (lower bowl floor) ---
+                                 // Geometry was rotated PI/2 on X, so rotate the mesh -PI/2 on X.
+                                 coin.rotation.set(-Math.PI / 2, 0, 0);
+                                 coin.rotateZ(Math.random() * Math.PI * 2); // random spin so they don't all align
+                                 settleRestingCoin(coin); // seat on the ACTUAL bowl-floor mesh
+                                 persistRestedCoin(coin, false);
                              }
                         }
 
@@ -6694,6 +7078,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 					// Get compute output in custom uniform
 					if ( waterMesh ) waterMesh.material.heightmap = tmpHeightmap;
+					if ( topBowlWaterMesh ) topBowlWaterMesh.material.heightmap = tmpHeightmap;
 					// Also apply to upper water mesh
 					if ( upperWaterMesh ) upperWaterMesh.material.heightmap = tmpHeightmap;
 
@@ -6758,6 +7143,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 					this.addParameter( 'heightmap', null );
 					this.addParameter( 'waterTime', 0 );
+					this.addParameter( 'uCalm', 0 ); // 1 = drop the concentric bullseye foam rings
 
 					this.setValues( parameters );
 
@@ -6794,6 +7180,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', shaderChange.common_frag );
 					shader.fragmentShader = shader.fragmentShader.replace( '#include <normal_fragment_maps>', shaderChange.normal_fragment_maps );
 					shader.fragmentShader = shader.fragmentShader.replace( '#include <opaque_fragment>', shaderChange.opaque_fragment );
+
+					// Declare the calm flag in both stages (kept here so the GLSL
+					// template chunks stay untouched).
+					shader.vertexShader   = 'uniform float uCalm;\n' + shader.vertexShader;
+					shader.fragmentShader = 'uniform float uCalm;\n' + shader.fragmentShader;
 
 					this.userData.shader = shader;
 
@@ -6982,7 +7373,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					float rings = 0.5 + 0.5 * sin( rr * 22.0 - waterTime * 3.2 );
 					rings = smoothstep( 0.5, 0.92, rings );
 					float churn = smoothstep( 0.45, 0.0, vor.x ) * smoothstep( 0.5, 0.0, r );
-					float foam = clamp( rings * radial * 0.6 + churn * 0.7, 0.0, 1.0 );
+					float foam = clamp( rings * radial * 0.6 + churn * 0.7, 0.0, 1.0 ) * ( 1.0 - uCalm );
 					gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( 0.95, 0.99, 1.0 ), foam * 0.8 );
 				}
 				`,

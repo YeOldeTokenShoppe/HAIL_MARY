@@ -23,6 +23,11 @@ const non80sTracks = [
   { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
   { name: "Utopia - Goldfrapp", path: "audio/08 Utopia.m4a", bpm: 100 },
   { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
+    { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
+  { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 },
+  { name: "Sweet Dreams - Eurythmics", path: "audio/Sweet Dreams Eurythmics.m4a", bpm: 85 },
+  { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 },
+
   // { name: "Magnetic - Tunde Adebimpe", path: "audio/01 Magnetic.m4a", bpm: 130 },
   // { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 },
   // { name: "Ox Out The Cage - Cannibal Ox", path: "audio/Ox.mp3", bpm: 100 },
