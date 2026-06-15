@@ -3518,23 +3518,41 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             width: "44px",
             height: "44px",
             borderRadius: "50%",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
+            border: "1px solid rgba(212, 175, 55, 0.35)",
             background: "rgba(0, 0, 0, 0.5)",
             transition: "all 0.3s ease",
             cursor: "pointer",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
             e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.filter = "brightness(1.2)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
             e.currentTarget.style.boxShadow = "none";
             e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.filter = "none";
           }}
         >
-          <img src="/x_logo_white.webp" alt="X (Twitter)" style={{ width: "18px", height: "18px" }} />
+          <span
+            aria-hidden="true"
+            style={{
+              display: "block",
+              width: "18px",
+              height: "18px",
+              backgroundColor: "#d4a854",
+              WebkitMaskImage: "url(/x_logo_white.webp)",
+              maskImage: "url(/x_logo_white.webp)",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+              WebkitMaskSize: "contain",
+              maskSize: "contain",
+            }}
+          />
         </a>
 
         <a
@@ -3549,23 +3567,41 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             width: "44px",
             height: "44px",
             borderRadius: "50%",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
+            border: "1px solid rgba(212, 175, 55, 0.35)",
             background: "rgba(0, 0, 0, 0.5)",
             transition: "all 0.3s ease",
             cursor: "pointer",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
             e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.filter = "brightness(1.2)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
             e.currentTarget.style.boxShadow = "none";
             e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.filter = "none";
           }}
         >
-          <img src="/telegram_logo_white.webp" alt="Telegram" style={{ width: "20px", height: "20px" }} />
+          <span
+            aria-hidden="true"
+            style={{
+              display: "block",
+              width: "20px",
+              height: "20px",
+              backgroundColor: "#d4a854",
+              WebkitMaskImage: "url(/telegram_logo_white.webp)",
+              maskImage: "url(/telegram_logo_white.webp)",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+              WebkitMaskSize: "contain",
+              maskSize: "contain",
+            }}
+          />
         </a>
 
         <a
@@ -3580,23 +3616,41 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             width: "44px",
             height: "44px",
             borderRadius: "50%",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
+            border: "1px solid rgba(212, 175, 55, 0.35)",
             background: "rgba(0, 0, 0, 0.5)",
             transition: "all 0.3s ease",
             cursor: "pointer",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
             e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.filter = "brightness(1.2)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
             e.currentTarget.style.boxShadow = "none";
             e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.filter = "none";
           }}
         >
-          <img src="/farcaster_logo.webp" alt="Farcaster" style={{ width: "20px", height: "20px" }} />
+          <span
+            aria-hidden="true"
+            style={{
+              display: "block",
+              width: "20px",
+              height: "20px",
+              backgroundColor: "#d4a854",
+              WebkitMaskImage: "url(/farcaster_logo.webp)",
+              maskImage: "url(/farcaster_logo.webp)",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+              WebkitMaskSize: "contain",
+              maskSize: "contain",
+            }}
+          />
         </a>
       </div>
     </main>
