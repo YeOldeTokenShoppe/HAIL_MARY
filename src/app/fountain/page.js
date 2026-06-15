@@ -215,7 +215,7 @@ export default function FountainPage() {
                 marginTop: '1rem',
                 pointerEvents: 'auto',
               }}
-              // onClick={() => window.location.href = '/about'}
+              onClick={() => window.location.href = '/'}
             >
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>
@@ -252,7 +252,7 @@ export default function FountainPage() {
               cursor: "pointer",
             }}
           >
-            <Link href="/about" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({ length: 100 }).map((_, i) => {
@@ -296,7 +296,7 @@ export default function FountainPage() {
           pointerEvents: "auto",
         }}
       >
-        <Link
+        {/* <Link
           href="/"
           title="Home"
           aria-label="Home"
@@ -318,7 +318,7 @@ export default function FountainPage() {
             height="24"
             style={{ display: "block" }}
           />
-        </Link>
+        </Link> */}
         <MusicButton accent="#d4a854" />
       </div>
 
