@@ -32,6 +32,13 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
   const activeService = SERVICES.find((s) => s.id === selectedId) ?? SERVICES[0];
   const shellAccent = activeService.accent;
 
+  // Split the live service(s) from the not-yet-shipped ones. Live services
+  // render as full cards; locked ones collapse into slim teaser rows so the
+  // one actionable path dominates the rail instead of competing with two
+  // greyed-out equals.
+  const liveServices = SERVICES.filter((s) => !s.disabled);
+  const lockedServices = SERVICES.filter((s) => s.disabled);
+
   // Mobile collapses the rail into a single pill (active service + chevron)
   // by default; tapping the pill expands a popover above it with the full
   // chooser. Desktop ignores this state — CSS hides the pill at >520px and
@@ -86,10 +93,9 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
           SERVICES ONLINE
         </div>
         <div className="tsr-options" role="radiogroup" aria-label="Available services">
-          {SERVICES.map((service) => {
+          {liveServices.map((service) => {
             const isSelected = service.id === activeService.id;
-            const isDisabled = !!service.disabled;
-            const handleClick = !isSelected && !isDisabled && onSelect
+            const handleClick = !isSelected && onSelect
               ? () => {
                   onSelect(service.id);
                   // Auto-collapse mobile popover after a choice is made.
@@ -99,15 +105,14 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
             const className = [
               'tsr-card',
               `tsr-card-${service.accent}`,
-              isDisabled ? 'is-disabled' : isSelected ? 'is-active' : 'is-interactive',
+              isSelected ? 'is-active' : 'is-interactive',
             ].filter(Boolean).join(' ');
             return (
               <div
                 key={service.id}
                 role="radio"
-                tabIndex={isDisabled ? -1 : 0}
+                tabIndex={0}
                 aria-checked={isSelected}
-                aria-disabled={isDisabled}
                 onClick={handleClick}
                 onKeyDown={
                   handleClick
@@ -124,10 +129,35 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
                 <span className="tsr-card-eyebrow">{service.eyebrow}</span>
                 <span className="tsr-card-title">{service.title}</span>
                 <span className="tsr-card-desc">{service.desc}</span>
-                <span className="tsr-card-cta">{service.cta || (isSelected ? 'SELECTED' : 'SELECT')}</span>
+                {/* No "SELECTED" verb on the active card — the bottom-nav
+                    START button is the real action; the glow already marks
+                    this as the chosen service. Non-active live services keep
+                    a SELECT affordance for when more than one ships. */}
+                {!isSelected && <span className="tsr-card-cta">SELECT</span>}
               </div>
             );
           })}
+          {lockedServices.length > 0 && (
+            <div className="tsr-teasers">
+              {lockedServices.map((service) => (
+                <div
+                  key={service.id}
+                  role="radio"
+                  tabIndex={-1}
+                  aria-checked={false}
+                  aria-disabled
+                  className={`tsr-teaser tsr-card-${service.accent}`}
+                >
+                  <span className="tsr-teaser-lock" aria-hidden>🔒</span>
+                  <span className="tsr-teaser-body">
+                    <span className="tsr-teaser-eyebrow">{service.eyebrow}</span>
+                    <span className="tsr-teaser-title">{service.title}</span>
+                  </span>
+                  <span className="tsr-teaser-cta">SOON</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -215,12 +245,102 @@ const STYLES = `
 
 .tsr-options {
   display: grid;
-  grid-template-columns: 1.05fr 1fr 1fr;
-  gap: 7px;
+  /* Live card hugs a sensible content width rather than stretching the full
+     rail; the teaser stack sits at the right edge, with intentional negative
+     space distributed between them. */
+  grid-template-columns: minmax(264px, 392px) clamp(168px, 26%, 212px);
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 12px;
+}
+
+/* Stack of slim "coming soon" rows. Recedes next to the live card so the
+   actionable path reads first. */
+.tsr-teasers {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tsr-teaser {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px 8px 14px;
+  overflow: hidden;
+  border: 1px solid rgba(140, 150, 170, 0.18);
+  background: linear-gradient(180deg, rgba(10, 14, 22, 0.5), rgba(2, 3, 6, 0.45));
+  color: #c3ccd6;
+  opacity: 0.62;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+  font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+}
+
+/* Faint accent strip — keeps each teaser's color identity at low intensity. */
+.tsr-teaser::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--card-accent);
+  opacity: 0.5;
+}
+
+.tsr-teaser-lock {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+.tsr-teaser-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tsr-teaser-eyebrow {
+  color: var(--card-accent);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.tsr-teaser-title {
+  color: rgba(220, 228, 238, 0.78);
+  font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tsr-teaser-cta {
+  flex: 0 0 auto;
+  color: var(--card-accent);
+  font-family: 'Orbitron', 'IBM Plex Mono', monospace;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  opacity: 0.8;
 }
 
 .tsr-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   min-height: 78px;
   padding: 11px 12px 10px 20px;
   overflow: hidden;
@@ -417,7 +537,7 @@ const STYLES = `
     justify-content: center;
   }
   .tsr-options {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) clamp(150px, 38%, 200px);
   }
   .tsr-card {
     min-height: 72px;

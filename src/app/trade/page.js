@@ -2167,7 +2167,10 @@ export default function CyborgTemple() {
     [isMobileView],
   );
   const cameraInitialTarget = useMemo(() => [0, -0.5, 0], []);
-  const cameraZoomEndDistance = isMobileView ? 6.5 : 3.8;
+  // Tightened framing: dolly the resting shot ~15% closer so the workstation
+  // fills more of the frame and the empty sky band above the monitors crops
+  // down. Angle/target unchanged — same approved composition, just nearer.
+  const cameraZoomEndDistance = isMobileView ? 5.6 : 3.25;
 
   // First-visit hint: tells the user characters are clickable. Hides when
   // they click any character (focusedAgent flips truthy) or after a timer.

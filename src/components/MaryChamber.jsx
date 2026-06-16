@@ -309,8 +309,12 @@ function screenFaceNormal(mesh) {
 const HAND_FLICK_AMPLITUDE = 180;
 // Discrete gestures, not continuous bobbing: while the feed scrolls, a
 // single flick (DURATION of pull-and-glide) fires once per INTERVAL,
-// with the hand at rest in between.
-const HAND_FLICK_INTERVAL_S = 2.5;
+// with the hand at rest in between. INTERVAL is the floor; each rest is
+// that plus a random slice of JITTER so the rhythm never settles into a
+// mechanical beat. DURATION/AMPLITUDE/SCROLL_PX each get a small random
+// scale per flick too, so no two strokes are identical.
+const HAND_FLICK_INTERVAL_S = 1.8;
+const HAND_FLICK_INTERVAL_JITTER_S = 1.8;
 const HAND_FLICK_DURATION_S = 0.9;
 // Feed-pixels of content each flick pushes (the screen canvas is
 // 1280px tall with ~995px of visible feed, so ~380 ≈ a third-screen
@@ -462,6 +466,13 @@ function ChamberInner() {
   const handRef = useRef(null);
   const flickPhaseRef = useRef(0);
   const handOffsetRef = useRef(0);
+  // Per-gesture scheduling so the thumb's cadence is irregular, not a
+  // metronome: when the next flick fires, how long the current one runs,
+  // and how far it travels — each re-rolled at every flick.
+  const nextFlickAtRef = useRef(0);
+  const flickStartRef = useRef(0);
+  const flickDurRef = useRef(HAND_FLICK_DURATION_S);
+  const flickAmpRef = useRef(HAND_FLICK_AMPLITUDE);
   const focusedRef = useRef(false);
   // Zoom-affordance pill: shown during the armed hold window, gone
   // for good once the visitor has zoomed.
@@ -863,26 +874,39 @@ function ChamberInner() {
       const { phase } = getPhoneScroll();
       let target = 0;
       if (phase === "scrolling") {
-        // flickPhaseRef accumulates seconds across the scrolling phase;
-        // each interval opens with a gesture (the first DURATION), then
-        // the hand rests. At each gesture's start, push a scroll
-        // impulse to the feed — her flick is what moves the content.
-        const prevT = flickPhaseRef.current;
-        flickPhaseRef.current = prevT + delta;
-        const prevIdx = Math.floor(prevT / HAND_FLICK_INTERVAL_S);
-        const idx = Math.floor(flickPhaseRef.current / HAND_FLICK_INTERVAL_S);
-        if (prevT === 0 || idx !== prevIdx) {
-          requestPhoneScrollFlick(HAND_FLICK_SCROLL_PX);
+        // flickPhaseRef accumulates seconds across the scrolling phase.
+        // A flick fires when the clock crosses the scheduled time; the
+        // gesture then plays for its DURATION and the hand rests until
+        // the next scheduled time. Each flick re-rolls the next interval
+        // (and its own duration/amplitude/scroll) so the cadence is
+        // irregular — a real thumb, not a metronome. At each gesture's
+        // start, push a scroll impulse to the feed — her flick is what
+        // moves the content.
+        const t = (flickPhaseRef.current += delta);
+        if (t >= nextFlickAtRef.current) {
+          flickStartRef.current = t;
+          flickDurRef.current =
+            HAND_FLICK_DURATION_S * (0.85 + Math.random() * 0.35);
+          flickAmpRef.current =
+            HAND_FLICK_AMPLITUDE * (0.6 + Math.random() * 0.45);
+          requestPhoneScrollFlick(
+            HAND_FLICK_SCROLL_PX * (0.7 + Math.random() * 0.6),
+          );
+          nextFlickAtRef.current =
+            t +
+            HAND_FLICK_INTERVAL_S +
+            Math.random() * HAND_FLICK_INTERVAL_JITTER_S;
         }
-        const g =
-          (flickPhaseRef.current % HAND_FLICK_INTERVAL_S) /
-          HAND_FLICK_DURATION_S;
-        target = g < 1 ? HAND_FLICK_AMPLITUDE * flickCurve(g) : 0;
+        const g = (t - flickStartRef.current) / flickDurRef.current;
+        target = g < 1 ? flickAmpRef.current * flickCurve(g) : 0;
       } else if (phase === "scrolling_up") {
         // The feed gliding back to the top reads as one long pull-down.
         target = -0.6 * HAND_FLICK_AMPLITUDE;
       } else {
+        // Reset the clock AND the schedule so the next scrolling spell
+        // opens with an immediate flick (nextFlickAt of 0).
         flickPhaseRef.current = 0;
+        nextFlickAtRef.current = 0;
       }
       // Chase smooths both the flick cycle and the mode transitions so
       // the hand never pops between gestures.
