@@ -16,7 +16,7 @@
 export const INTENTION_PRESETS = [
   { key: "prosper80", label: "PROSPER80", text: "for PROSPER80" },
   { key: "secur80", label: "SECUR80", text: "for SECUR80" },
-  { key: "notori80", label: "NOTORI80", text: "for NOTORI80" },
+  { key: "equal80", label: "EQUAL80", text: "for EQUAL80" },
   { key: "liquid80", label: "LIQUID80", text: "for LIQUID80" },
   { key: "celebr80", label: "CELEBR80", text: "for CELEBR80" },
   { key: "etern80", label: "ETERN80", text: "for ETERN80" },

@@ -3677,6 +3677,8 @@ export default function CyborgTemple() {
           <>
             <MusicButton
               accent="#8effc4"
+              icon="/icon80.svg"
+              size={62}
               style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 1002 }}
             />
             {/* Nav Controls - Desktop only */}
@@ -5105,7 +5107,7 @@ export default function CyborgTemple() {
                 isMobile
                 is80sMode
                 onBookClick={() => setShowBuyModal(true)}
-                bookLabel="BUY"
+                bookLabel="BUY RL80"
                 bookTitle="Buy RL80"
                 bookIcon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#d4a854' }}>

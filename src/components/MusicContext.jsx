@@ -21,17 +21,19 @@ export const useMusic = () => {
 // Track lists
 const non80sTracks = [
   { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
-  { name: "Utopia - Goldfrapp", path: "audio/08 Utopia.m4a", bpm: 100 },
+  // { name: "Utopia - Goldfrapp", path: "audio/08 Utopia.m4a", bpm: 100 },
   { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
     { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
   { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 },
   { name: "Sweet Dreams - Eurythmics", path: "audio/Sweet Dreams Eurythmics.m4a", bpm: 85 },
   { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 },
-
-  // { name: "Magnetic - Tunde Adebimpe", path: "audio/01 Magnetic.m4a", bpm: 130 },
-  // { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 },
-  // { name: "Ox Out The Cage - Cannibal Ox", path: "audio/Ox.mp3", bpm: 100 },
-  // { name: "Corner of My Eye - Future Islands", path: "/audio/Future Islands - Corner of My Eye.mp3", bpm: 100 },
+  { name: "Like A Prayer - Madonna", path: "audio/like-a-prayer-madonna.m4a", bpm: 85 },
+    { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
+  { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
+  { name: "Cat People (Putting Out Fire) - David Bowie", path: "/audio/Cat People (Putting Out Fire).mp3", bpm: 100 },
+  { name: "Eyes Without A Face - Billy Idol", path: "/audio/Eyes Without A Face.mp3", bpm: 110 },
+  { name: "I Ran (So Far Away) - Flock of Seagulls", path: "/audio/I Ran (So Far Away).mp3", bpm: 100 },
+  { name: "Girls On Film - Duran Duran", path: "/audio/Girls On Film.mp3", bpm: 100 },
 ];
 
 // Ride page exclusive track

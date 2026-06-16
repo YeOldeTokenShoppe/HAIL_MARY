@@ -2657,6 +2657,9 @@ export default function HomePage() {
     >
       <MusicButton
         accent="#d4a854"
+        // Use the 80s artwork as the idle (play) icon instead of the ♫ glyph.
+        icon="/icon80.svg"
+        size={62}
         // top clears the VigilTicker chyron strip (~24px) pinned to the
         // viewport's top edge.
         style={{ position: "fixed", top: "2.5rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
@@ -3279,7 +3282,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         /* Left slot is BUY, permanently — it no longer vacates for the
            account slot when the candle lights. */
         onBookClick={() => setShowBuyModal(true)}
-        bookLabel="BUY"
+        bookLabel="BUY RL80"
         bookIcon={
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
             <line x1="12" y1="1" x2="12" y2="23" />

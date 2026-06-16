@@ -6603,7 +6603,7 @@ export default function OilPage() {
             >
               ?
             </button>
-            <MusicButton accent={theme.accent} />
+            <MusicButton accent={theme.accent} icon="/icon80.svg" />
           </div>
         </header>
 

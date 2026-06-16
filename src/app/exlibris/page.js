@@ -72,6 +72,8 @@ export default function ModelViewerPage() {
 
       <MusicButton
         accent="#d4a854"
+        icon="/icon80.svg"
+        size={62}
         style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 9999 }}
       />
 

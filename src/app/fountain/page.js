@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMusic } from '@/components/MusicContext';
 import MusicButton from '@/components/MusicButton';
 import CoinLoader from '@/components/CoinLoader';
@@ -22,6 +23,7 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
 export default function FountainPage() {
   // Get user from Clerk
   const { user, isSignedIn } = useUser();
+  const router = useRouter();
   
   const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode: context80sMode, setIs80sMode: setContext80sMode } = useMusic();
   const [isLoading, setIsLoading] = useState(true);
@@ -182,10 +184,16 @@ export default function FountainPage() {
             
             <h1 className='custom-title'
                 id="main-title"
-                style={{ 
+                style={{
                 position: "relative",
+                // Don't let the flex column stretch the title full-width — that gave
+                // it an invisible clickable band across the whole top of the screen
+                // (over the statue), so taps meant for the canvas navigated home.
+                // Constrain the hit box to just the text.
+                alignSelf: 'flex-start',
+                width: 'fit-content',
                 left: "2rem",
-                top: "-2rem",
+                // top: "-2rem",
                 color: is80sMode ? "#ffffff" : "#f6f5f1ff",
                 fontFamily: 'UnifrakturCook, serif',
                 textShadow: is80sMode 
@@ -215,7 +223,7 @@ export default function FountainPage() {
                 marginTop: '1rem',
                 pointerEvents: 'auto',
               }}
-              onClick={() => window.location.href = '/'}
+              onClick={() => router.push('/')}
             >
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>
@@ -319,7 +327,7 @@ export default function FountainPage() {
             style={{ display: "block" }}
           />
         </Link> */}
-        <MusicButton accent="#d4a854" />
+        <MusicButton accent="#d4a854" icon="/icon80.svg" size={62} />
       </div>
 
       {/* Nav Controls - Top Right (desktop only) */}

@@ -2124,6 +2124,18 @@
 			const COIN_RADIUS = 0.02; // Match the actual geometry radius (0.03 = ~25% smaller circumference than the old 0.04)
 			const COIN_THICKNESS = 0.002 * 2; // Match the actual geometry thickness
 
+			// Statue bounce tuning (live-tunable in the console via window.statueBounce,
+			// e.g. statueBounce.kick = 0.2). Coins ALWAYS bounce off the statue with an
+			// outward kick. Throw strength is fixed, so closeness is the control: a
+			// closer throw (shorter arc → smaller throwDist) gets a bigger kick and
+			// bounces harder.
+			//   coeff   – restitution of the reflected velocity
+			//   kick    – extra outward push added at the CLOSEST throw
+			//   kickMin – floor so even far throws still bounce clear (never stick)
+			//   farDist – throw distance at which closeness fades to 0
+			const STATUE_BOUNCE = { coeff: 0.4, kick: 0.12, kickMin: 0.02, farDist: 3.0 };
+			if (typeof window !== 'undefined') window.statueBounce = STATUE_BOUNCE;
+
 			// --- Coin Counter and Performance Settings ---
 			let totalCoinCount = 0;
 			let collectedCoinCount = 0;
@@ -3707,7 +3719,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				initializeFirebase();
 
 				// Create Venice sunset directional light
-				sun = new THREE.DirectionalLight( 0xff8c42, 3.5 ); // Warm sunset orange color
+				sun = new THREE.DirectionalLight( 0xff8c42, 4.5 ); // Warm sunset orange color
 				sun.position.set( -8, 3, -1 ); // Low on horizon for sunset effect
 				sun.castShadow = true;
 				scene.add( sun );
@@ -3956,6 +3968,203 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					});
 				})();
 
+				// --- Coin-splash SFX. A short one-shot played the instant a tossed
+				// coin breaks the water surface (triggered from the water-entry check
+				// in the animate loop via window.playCoinSplash). Uses Web Audio so
+				// several coins can splash at once AND so the splash layers cleanly
+				// over the looping water ambience — they're independent sources the
+				// browser mixes together. Volume works on iOS too (where
+				// HTMLAudioElement.volume is ignored). Honors the same Sound on/off
+				// toggle as the ambient water (the 'fountain_water_muted' key). ---
+				(function setupCoinSplashSfx() {
+					const SPLASH_VOLUME = 0.1;             // 0..1 base level (tune here)
+					const MUTE_KEY = 'fountain_water_muted';
+					const SRC = '/coinSplash.mp3';
+
+					const AC = window.AudioContext || window.webkitAudioContext;
+					let ctx = null, buffer = null, decoding = false, failed = false;
+
+					function isMuted() {
+						try { return localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { return false; }
+					}
+					function ensureCtx() {
+						if (ctx || failed) return ctx;
+						if (!AC) { failed = true; return null; }
+						try { ctx = new AC(); } catch (e) { failed = true; ctx = null; }
+						return ctx;
+					}
+					function loadBuffer() {
+						if (buffer || decoding || failed) return;
+						const c = ensureCtx();
+						if (!c) return;
+						decoding = true;
+						fetch(SRC)
+							.then(r => r.arrayBuffer())
+							.then(ab => c.decodeAudioData(ab))
+							.then(buf => { buffer = buf; decoding = false; })
+							.catch(() => { decoding = false; failed = true; });
+					}
+
+					// Unlock + warm the buffer on the first user gesture. Tossing a coin
+					// is itself a gesture, so the context is running well before any coin
+					// lands. Try eagerly too, in case audio is already unlocked.
+					const events = ['pointerdown', 'touchstart', 'keydown'];
+					function onGesture() {
+						const c = ensureCtx();
+						if (c && c.state !== 'running') c.resume().catch(() => {});
+						loadBuffer();
+					}
+					events.forEach(e => window.addEventListener(e, onGesture, { passive: true }));
+					loadBuffer();
+
+					window.playCoinSplash = function playCoinSplash() {
+						if (failed || isMuted()) return;
+						const c = ensureCtx();
+						if (!c) return;
+						if (c.state !== 'running') c.resume().catch(() => {});
+						if (!buffer) { loadBuffer(); return; } // not decoded yet — skip this one
+						try {
+							const src = c.createBufferSource();
+							src.buffer = buffer;
+							// A little pitch + level variation so back-to-back splashes
+							// don't sound machine-gunned.
+							src.playbackRate.value = 0.92 + Math.random() * 0.16;
+							const gain = c.createGain();
+							gain.gain.value = SPLASH_VOLUME * (0.85 + Math.random() * 0.3);
+							src.connect(gain).connect(c.destination);
+							src.start();
+						} catch (e) {}
+					};
+				})();
+
+				// --- Coin-plink SFX. The counterpart to the splash: played when a
+				// tossed coin strikes a NON-water solid surface — the fountain
+				// walls/edges, the statue, or the plaza stone. Same self-contained
+				// Web Audio one-shot, so it layers over the looping ambience, over the
+				// splash, and over itself across rapid bounces. playCoinPlink(intensity)
+				// takes a 0..1 loudness so a hard clink off the rim is louder than a
+				// gentle settle. Honors the same Sound on/off toggle. ---
+				(function setupCoinPlinkSfx() {
+					const PLINK_VOLUME = 0.5;              // 0..1 base level (tune here)
+					const MUTE_KEY = 'fountain_water_muted';
+					const SRC = '/coinPlink.mp3';
+
+					const AC = window.AudioContext || window.webkitAudioContext;
+					let ctx = null, buffer = null, decoding = false, failed = false;
+
+					function isMuted() {
+						try { return localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { return false; }
+					}
+					function ensureCtx() {
+						if (ctx || failed) return ctx;
+						if (!AC) { failed = true; return null; }
+						try { ctx = new AC(); } catch (e) { failed = true; ctx = null; }
+						return ctx;
+					}
+					function loadBuffer() {
+						if (buffer || decoding || failed) return;
+						const c = ensureCtx();
+						if (!c) return;
+						decoding = true;
+						fetch(SRC)
+							.then(r => r.arrayBuffer())
+							.then(ab => c.decodeAudioData(ab))
+							.then(buf => { buffer = buf; decoding = false; })
+							.catch(() => { decoding = false; failed = true; });
+					}
+
+					const events = ['pointerdown', 'touchstart', 'keydown'];
+					function onGesture() {
+						const c = ensureCtx();
+						if (c && c.state !== 'running') c.resume().catch(() => {});
+						loadBuffer();
+					}
+					events.forEach(e => window.addEventListener(e, onGesture, { passive: true }));
+					loadBuffer();
+
+					window.playCoinPlink = function playCoinPlink(intensity) {
+						if (failed || isMuted()) return;
+						const c = ensureCtx();
+						if (!c) return;
+						if (c.state !== 'running') c.resume().catch(() => {});
+						if (!buffer) { loadBuffer(); return; } // not decoded yet — skip this one
+						// Clamp the caller's loudness; default to a full-strength clink.
+						let amt = (intensity == null) ? 1 : intensity;
+						amt = Math.max(0, Math.min(1, amt));
+						if (amt <= 0.01) return;
+						try {
+							const src = c.createBufferSource();
+							src.buffer = buffer;
+							src.playbackRate.value = 0.94 + Math.random() * 0.12;
+							const gain = c.createGain();
+							gain.gain.value = PLINK_VOLUME * amt * (0.85 + Math.random() * 0.3);
+							src.connect(gain).connect(c.destination);
+							src.start();
+						} catch (e) {}
+					};
+				})();
+
+				// --- Soft rustle for coins that land in the grass. Same Web-Audio
+				// pattern + mute toggle as the plink. ---
+				(function setupCoinSoftSfx() {
+					const SOFT_VOLUME = 0.6;              // 0..1 base level (tune here)
+					const MUTE_KEY = 'fountain_water_muted';
+					const SRC = '/coinSoft.mp3';
+
+					const AC = window.AudioContext || window.webkitAudioContext;
+					let ctx = null, buffer = null, decoding = false, failed = false;
+
+					function isMuted() {
+						try { return localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { return false; }
+					}
+					function ensureCtx() {
+						if (ctx || failed) return ctx;
+						if (!AC) { failed = true; return null; }
+						try { ctx = new AC(); } catch (e) { failed = true; ctx = null; }
+						return ctx;
+					}
+					function loadBuffer() {
+						if (buffer || decoding || failed) return;
+						const c = ensureCtx();
+						if (!c) return;
+						decoding = true;
+						fetch(SRC)
+							.then(r => r.arrayBuffer())
+							.then(ab => c.decodeAudioData(ab))
+							.then(buf => { buffer = buf; decoding = false; })
+							.catch(() => { decoding = false; failed = true; });
+					}
+
+					const events = ['pointerdown', 'touchstart', 'keydown'];
+					function onGesture() {
+						const c = ensureCtx();
+						if (c && c.state !== 'running') c.resume().catch(() => {});
+						loadBuffer();
+					}
+					events.forEach(e => window.addEventListener(e, onGesture, { passive: true }));
+					loadBuffer();
+
+					window.playCoinSoft = function playCoinSoft(intensity) {
+						if (failed || isMuted()) return;
+						const c = ensureCtx();
+						if (!c) return;
+						if (c.state !== 'running') c.resume().catch(() => {});
+						if (!buffer) { loadBuffer(); return; } // not decoded yet — skip this one
+						let amt = (intensity == null) ? 1 : intensity;
+						amt = Math.max(0, Math.min(1, amt));
+						if (amt <= 0.01) return;
+						try {
+							const src = c.createBufferSource();
+							src.buffer = buffer;
+							src.playbackRate.value = 0.94 + Math.random() * 0.12;
+							const gain = c.createGain();
+							gain.gain.value = SOFT_VOLUME * amt * (0.85 + Math.random() * 0.3);
+							src.connect(gain).connect(c.destination);
+							src.start();
+						} catch (e) {}
+					};
+				})();
+
 				// --- NEW: Load Fountain GLB ---
 				const loader = new GLTFLoader();
 				
@@ -4050,6 +4259,14 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     // Make each part of the fountain model available for raycasting
                     if (node.isMesh) {
                         node.userData.isFountainPart = true;
+                        // Flag the statue so coins get dedicated bounce-off behaviour.
+                        if (node.name && node.name.toLowerCase() === 'statue') {
+                            node.userData.isStatue = true;
+                        }
+                        // Flag the grass so coins land softly in it (soft sound + rest).
+                        if (node.name && node.name.toLowerCase().startsWith('grass')) {
+                            node.userData.isGrass = true;
+                        }
                     }
                 });
                 
@@ -4892,7 +5109,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				// Modify water colors for neon effect
 				updateWaterFor80s(true);
-				
+
 				// Update button colors
 				updateButtonsFor80s(true);
 				
@@ -4925,7 +5142,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				// Restore original water colors
 				updateWaterFor80s(false);
-				
+
 				// Restore button colors
 				updateButtonsFor80s(false);
 				
@@ -5553,7 +5770,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     : new THREE.Vector3();
                 initialVelocity.y = vy;
 
-                return createCoin(startPosition, initialVelocity, isLocalCoin);
+                const tossedCoin = createCoin(startPosition, initialVelocity, isLocalCoin);
+                // Remember how far this coin was thrown — the statue bounce uses it so
+                // a closer throw bounces harder.
+                if (tossedCoin) tossedCoin.userData.throwDist = hDist;
+                return tossedCoin;
             }
         
             // Camera follow system functions
@@ -6356,28 +6577,75 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				scene.add(shootingStar);
 			}
 
-			// Scenic setting sun low on the empty +Z back horizon (pairs with the shooting star).
-			// Backdrop only — the warm key light still rakes in from the left, so this is just scenery,
-			// parked far behind the fountain where it only shows when you orbit around back.
-			function createBackSun() {
-				const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+			// Scenic synthwave setting-sun low on the +Z back horizon (pairs with the
+			// shooting star). Backdrop scenery, parked behind the fountain — shows when
+			// you orbit around back. Always on; not tied to 80s mode.
+
+			// Classic outrun/synthwave sun: a neon vertical-gradient disk with
+			// horizontal slits across the lower half that widen toward the base
+			// (the signature "dissolving" sun), wrapped in a soft pink halo so it
+			// still glows under the additive sprite blend.
+			function makeSynthwaveSunTexture() {
+				const S = 512;
+				const c = document.createElement('canvas'); c.width = S; c.height = S;
 				const g = c.getContext('2d');
-				const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
-				grad.addColorStop(0.00, 'rgba(255,250,238,1)');   // hot core
-				grad.addColorStop(0.12, 'rgba(255,232,176,1)');
-				grad.addColorStop(0.28, 'rgba(255,178,92,0.95)'); // orange body
-				grad.addColorStop(0.50, 'rgba(240,120,64,0.5)');
-				grad.addColorStop(0.78, 'rgba(205,72,84,0.16)');  // dusk haze
-				grad.addColorStop(1.00, 'rgba(150,50,90,0)');     // fade out
-				g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
-				const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
-				const mat = new THREE.SpriteMaterial({ map: tex, blending: THREE.AdditiveBlending,
-					depthWrite: false, transparent: true, toneMapped: false });
+				const cx = S / 2, cy = S / 2, R = S * 0.40;   // leave room for the halo
+
+				// Soft outer halo
+				const halo = g.createRadialGradient(cx, cy, R * 0.6, cx, cy, S * 0.5);
+				halo.addColorStop(0.0, 'rgba(255,80,170,0.55)');
+				halo.addColorStop(0.5, 'rgba(255,60,150,0.18)');
+				halo.addColorStop(1.0, 'rgba(120,30,120,0)');
+				g.fillStyle = halo; g.fillRect(0, 0, S, S);
+
+				// The disk: clip to a circle, fill top->bottom neon gradient
+				g.save();
+				g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
+				// Vivid synthwave hue ramp kept just below the bloom threshold so the
+				// top no longer blows into a white cap — the disk reads as one evenly
+				// bright, saturated gradient (yellow -> orange -> hot pink -> magenta)
+				// instead of a bright-white top over a darker base.
+				const sun = g.createLinearGradient(0, cy - R, 0, cy + R);
+				sun.addColorStop(0.00, '#ffd424');   // saturated yellow top (no white blowout)
+				sun.addColorStop(0.25, '#ffaa2e');   // amber
+				sun.addColorStop(0.50, '#ff7e4e');   // coral-orange
+				sun.addColorStop(0.75, '#ff5ca6');   // hot pink
+				sun.addColorStop(1.00, '#ff4fb0');   // bright magenta base
+				g.fillStyle = sun; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+				g.restore();
+
+				// Punch horizontal slits in the lower half — thicker + closer
+				// together the further down they go, so the base breaks into bands.
+				// Clip to the disk so the cuts don't streak out through the halo.
+				g.save();
+				g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
+				g.globalCompositeOperation = 'destination-out';
+				let y = cy - R * 0.42, gap = 4, step = 30;
+				while (y < cy + R) {
+					g.fillRect(cx - R, y, R * 2, gap);
+					y += step;
+					gap += 2.4;                         // wider gaps toward the base
+					step = Math.max(9, step - 2.0);     // and packed closer together
+				}
+				g.globalCompositeOperation = 'source-over';
+				g.restore();
+
+				const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true; return tex;
+			}
+
+			function createBackSun() {
+				// Normal blending so the neon gradient + horizontal bands read crisply
+				// (low-emissive — it doesn't additively clip to white). Shown in the
+				// normal scene; independent of 80s mode.
+				const mat = new THREE.SpriteMaterial({ map: makeSynthwaveSunTexture(),
+					blending: THREE.NormalBlending, depthWrite: false, transparent: true, toneMapped: false });
 				backSun = new THREE.Sprite(mat);
-				backSun.position.set(-20, 12, 200);   // low, far out, slightly toward the light side
-				backSun.scale.set(64, 64, 1);
+				backSun.position.set(-20, 13, 195);   // low, far out on the +Z back horizon, to the right (matches the scene's light direction)
+				backSun.scale.set(78, 78, 1);
 				backSun.renderOrder = 2;
 				scene.add(backSun);
+				// Exposed for live position experiments (console): backSun.position.set(x,y,z)
+				window.backSun = backSun;
 			}
 
 			function triggerShootingStar() {
@@ -6676,7 +6944,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                 const impactSpeed = velocity.length();
                                 const bounceCoefficient = 0.3; // How much the coin bounces (0-1)
                                 const minSpeedForBounce = 0.03; // Minimum speed needed to bounce
-                                
+                                // A coin can only come to rest on a roughly level surface. On a
+                                // steep face (the statue's hand/arm/robe folds) it can't rest —
+                                // it must slide/bounce off. Without this, a low-speed graze takes
+                                // the "rest" branch below and sticks the coin flat to a vertical
+                                // surface mid-air (it aligns the coin to the surface normal).
+                                const MIN_REST_FACE_Y = 0.5; // ~60° from vertical; steeper → no rest
+                                const tooSteepToRest = surfaceNormal.y < MIN_REST_FACE_Y;
+                                const isGrassHit = intersects[0].object.userData.isGrass === true;
+
                                 // Position coin near point of impact but offset along normal to prevent penetration
                                 // Use coin half-thickness plus a small buffer for the offset
                                 const offsetDistance = COIN_THICKNESS/2 + 0.003; // Ensure no embedding
@@ -6692,8 +6968,40 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                 coin.userData.bounceCount = (coin.userData.bounceCount || 0) + 1;
                                 const wedged = coin.userData.bounceCount > 40;
 
-                                // Only bounce if impact speed is significant enough
-                                if (!wedged && impactSpeed > minSpeedForBounce) {
+                                // Coins ALWAYS bounce off the statue (never stick/rest). Throw
+                                // strength is fixed, so closeness is the control: a closer throw
+                                // (shorter arc → smaller throwDist) gets a bigger outward kick and
+                                // bounces harder. Tunable live via window.statueBounce.
+                                if (intersects[0].object.userData.isStatue) {
+                                    const td = coin.userData.throwDist ?? STATUE_BOUNCE.farDist;
+                                    const closeness = Math.max(0, Math.min(1, 1 - td / STATUE_BOUNCE.farDist));
+                                    velocity.reflect(surfaceNormal).multiplyScalar(STATUE_BOUNCE.coeff);
+                                    velocity.addScaledVector(surfaceNormal, STATUE_BOUNCE.kickMin + STATUE_BOUNCE.kick * closeness);
+                                    velocity.x += (Math.random() - 0.5) * 0.01;
+                                    velocity.z += (Math.random() - 0.5) * 0.01;
+                                    coin.userData.rotationSpeed *= 1.5;
+                                    coin.userData.bounceCount = 0;            // bouncing off ≠ wedging
+                                    const _nowStatue = performance.now();
+                                    if (window.playCoinPlink && _nowStatue - (coin.userData.lastPlinkAt || 0) > 55) {
+                                        coin.userData.lastPlinkAt = _nowStatue;
+                                        window.playCoinPlink(Math.min(1, 0.4 + closeness * 0.6)); // louder for closer hits
+                                    }
+                                    continue; // bounced off the statue — keep flying, never rests
+                                }
+
+                                // Fast hits bounce off any surface (energetic ricochet) — EXCEPT
+                                // grass, which always catches the coin softly (it falls through to
+                                // the rest branch below where it settles + plays the soft sound,
+                                // regardless of how fast it was thrown).
+                                if (!wedged && impactSpeed > minSpeedForBounce && !isGrassHit) {
+                                    // Clink off the solid surface (wall / edge / statue), louder
+                                    // for harder impacts. A short per-coin cooldown keeps a coin
+                                    // that skitters down the stone from machine-gunning the SFX.
+                                    const _now = performance.now();
+                                    if (window.playCoinPlink && _now - (coin.userData.lastPlinkAt || 0) > 55) {
+                                        coin.userData.lastPlinkAt = _now;
+                                        window.playCoinPlink(Math.min(1, impactSpeed / 0.2));
+                                    }
                                     // Reflect velocity vector along normal (bounce) and reduce magnitude
                                     velocity.reflect(surfaceNormal).multiplyScalar(bounceCoefficient);
                                     
@@ -6712,6 +7020,30 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                     
                                     // Increase spin based on impact
                                     coin.userData.rotationSpeed *= 1.5;
+                                } else if (tooSteepToRest && !isInUpperBowl && !isGrassHit) {
+                                    // Slow hit (or a wedged coin) on a steep face OUTSIDE the upper
+                                    // bowl — the statue's hand/arm/robe folds. (Grass is excluded so
+                                    // coins settle into it rather than sliding off; in the upper bowl,
+                                    // steep banked walls keep their existing seat/submerge behaviour.)
+                                    // A coin can't rest here; SLIDE it off
+                                    // instead of sticking. Strip the velocity going INTO the face,
+                                    // add scrape friction + a small push off it, and let gravity
+                                    // carry it down and off. (Reflecting at low speed just ping-ponged
+                                    // it inside concave folds until the wedged backstop force-rested —
+                                    // stuck — it. That was the remaining bug.)
+                                    const into = velocity.dot(surfaceNormal);
+                                    if (into < 0) velocity.addScaledVector(surfaceNormal, -into); // cancel inward push
+                                    velocity.multiplyScalar(0.7);                                  // scrape friction
+                                    velocity.addScaledVector(surfaceNormal, 0.04);                 // ease off the face
+                                    coin.userData.bounceCount = 0;                                 // sliding off is not wedging
+                                    const _nowScrape = performance.now();
+                                    if (window.playCoinPlink && _nowScrape - (coin.userData.lastPlinkAt || 0) > 80) {
+                                        coin.userData.lastPlinkAt = _nowScrape;
+                                        window.playCoinPlink(Math.min(0.4, impactSpeed));          // soft scrape
+                                    }
+                                    // The coin stays at the offset impact point this frame and keeps
+                                    // falling next frame — never rests on the statue.
+                                    continue;
                                 } else {
                                     // If impact speed is too low, the coin comes to rest on this surface
                                     velocity.set(0, 0, 0);
@@ -6719,11 +7051,22 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                     if (isInUpperBowl) {
                                         // Upper bowl: submerge the coin; it eases into its seated
                                         // pose below (the settle), so don't stop it here.
+                                        if (!coin.userData.splashed) {
+                                            coin.userData.splashed = true;
+                                            if (window.playCoinSplash) window.playCoinSplash();
+                                        }
                                         coin.userData.underwater = true;
                                         coin.material.opacity = 0.6;
                                         coin.scale.set(1.25, 1.25, 1.25);
                                     } else {
                                         coin.userData.stopped = true;
+                                        if (isGrassHit) {
+                                            // Coin lands in the grass — soft rustle instead of a stone tap.
+                                            if (window.playCoinSoft) window.playCoinSoft(Math.min(1, 0.5 + impactSpeed * 2));
+                                        } else if (window.playCoinPlink) {
+                                            // Soft tap as the coin settles onto bare stone / the statue.
+                                            window.playCoinPlink(Math.min(0.5, 0.25 + impactSpeed * 2));
+                                        }
                                         // Align coin with surface - ensure the FLAT side is parallel to surface
                                         // First reset rotation
                                         coin.rotation.set(0, 0, 0);
@@ -6910,6 +7253,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                             nextPosition.y = PLAZA_Y + COIN_THICKNESS / 2;
                             velocity.set(0, 0, 0);
                             coin.userData.stopped = true;
+                            // Soft plink as the coin lands on the plaza stone (a miss).
+                            if (window.playCoinPlink) window.playCoinPlink(0.4);
                             // A real donation coin that missed the fountain isn't consumed —
                             // re-arm it so the donor can try again until it lands. (Free
                             // coins are session-local and just stay on the plaza.)
@@ -6979,6 +7324,14 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                         
                         // Trigger splash FIRST, then slow down
                         if (!isUnderwater && coin.position.y <= waterLevel && velocity.y < 0 && isInWaterArea) {
+
+                            // Play the splash SFX once, in sync with the visual splash,
+                            // the instant the coin breaks the surface. (splashed guards
+                            // against any double-fire across the two water-entry paths.)
+                            if (!coin.userData.splashed) {
+                                coin.userData.splashed = true;
+                                if (window.playCoinSplash) window.playCoinSplash();
+                            }
 
                             // --- Trigger Splash Immediately ---
                             const impactX = coin.position.x;
@@ -7094,16 +7447,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						// Pulse grid opacity
 						const pulse = Math.sin(Date.now() * 0.002) * 0.2 + 0.8;
 						neonGrid.material.opacity = pulse;
-					}
-					
-					// Animate retro sun
-					if (retroSun) {
-						// Slowly move sun up and down
-						retroSun.position.y = 3 + Math.sin(Date.now() * 0.0005) * 0.5;
-						// Update time uniform for shader animation
-						if (retroSun.material.uniforms && retroSun.material.uniforms.time) {
-							retroSun.material.uniforms.time.value = Date.now() * 0.001;
-						}
 					}
 					
 					// Pulse water glow
