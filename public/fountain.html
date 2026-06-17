@@ -46,11 +46,11 @@
 			/* Animation for info box */
 			@keyframes slideInGlow {
 				from {
-					transform: translateX(-50%) translateY(20px) scale(0.95);
+					transform: translateY(20px) scale(0.95);
 					opacity: 0;
 				}
 				to {
-					transform: translateX(-50%) translateY(0) scale(1);
+					transform: translateY(0) scale(1);
 					opacity: 1;
 				}
 			}
@@ -303,17 +303,129 @@
 
 		/* Force unified styling for info box */
 		#info.pumpkin-modal {
-			padding-top: 10px !important;
-			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-			border: 2px solid rgba(255, 255, 255, 0.2) !important;
-			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 80px rgba(102, 126, 234, 0.2) !important;
+			padding: 18px 18px 16px !important;
+			background:
+				linear-gradient(145deg, rgba(104, 125, 232, 0.88) 0%, rgba(116, 77, 166, 0.9) 100%) !important;
+			border: 1px solid rgba(210, 210, 255, 0.45) !important;
+			border-radius: 18px !important;
+			box-shadow: 0 16px 44px rgba(21, 12, 45, 0.34), 0 0 54px rgba(116, 92, 228, 0.22) !important;
 			backdrop-filter: blur(15px) !important;
 			-webkit-backdrop-filter: blur(15px) !important;
+			text-align: left !important;
 		}
 
 		/* Hide the invisible title that's taking up space */
 		#info .info-title {
 			display: none !important;
+		}
+
+		#info .info-content {
+			color: rgba(255, 255, 255, 0.95);
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+			font-size: 13px !important;
+			line-height: 1.35 !important;
+			text-align: left !important;
+			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+		}
+
+		#info > .info-content {
+			text-align: left !important;
+		}
+
+		#info .info-panel-heading {
+			margin: 0 0 12px;
+			color: #ffe93d;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+			font-size: 15px;
+			font-weight: 800;
+			line-height: 1.1;
+			text-align: left;
+			text-transform: uppercase;
+			letter-spacing: 0;
+			text-shadow: 0 2px 8px rgba(42, 25, 91, 0.5);
+		}
+
+		#info .info-section {
+			padding: 11px 0;
+			border-top: 1px solid rgba(255, 255, 255, 0.16);
+		}
+
+		#info .info-section:first-of-type {
+			border-top: 0;
+			padding-top: 0;
+		}
+
+		#info .info-section-title {
+			display: block;
+			margin-bottom: 7px;
+			color: #ffe93d;
+			font-size: 11px;
+			font-weight: 800;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+		}
+
+		#info .info-list {
+			display: grid;
+			gap: 7px;
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+
+		#info .info-list li {
+			position: relative;
+			margin: 0;
+			padding-left: 15px;
+		}
+
+		#info .info-list li::before {
+			content: "";
+			position: absolute;
+			left: 0;
+			top: 0.62em;
+			width: 5px;
+			height: 5px;
+			border-radius: 50%;
+			background: #ffe93d;
+			box-shadow: 0 0 8px rgba(255, 233, 61, 0.55);
+		}
+
+		#info .info-link {
+			color: #35f079;
+			font-weight: 800;
+			text-decoration: underline;
+			text-decoration-thickness: 2px;
+			text-underline-offset: 3px;
+		}
+
+		#info .wallet-links {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			margin-top: 8px;
+		}
+
+		#info .wallet-link {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			color: #35f079;
+			font-size: 12px;
+			font-weight: 800;
+			line-height: 1;
+			text-decoration: underline;
+			text-decoration-thickness: 2px;
+			text-underline-offset: 3px;
+			white-space: nowrap;
+		}
+
+		#info .info-footnote {
+			margin: 10px 0 0;
+			color: rgba(255, 255, 255, 0.74);
+			font-size: 11px;
+			line-height: 1.25;
+			text-align: left;
 		}
 
 		.pumpkin-modal p {
@@ -909,34 +1021,33 @@
 				color: rgba(255, 255, 255, 0.95);
 				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 			">
-				<span class="mobile-text" style="font-size: 11px; line-height: 1.5;">
-					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
-					• Tap anywhere to toss the coin in your hand<br>
-					• Virtual coins are free &amp; unlimited<br>
-					• Tap a ✨ sparkling ✨ coin to see its donation<br>
-					• For a real USDC/ETH donation, tap <strong>Donate Coins</strong> (button at the bottom) and pick a charity. After you pay, a Golden Coin lands in your hand — aim for the water!<br><br>
-					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
-					• USDC or ETH goes directly to charity wallets<br>
-					• Pooled until ~100 USDC in value (or ETH equivalent)<br>
-					• Then forwarded via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
-					<strong style="color: #FFD700;">Charity Wallets (Base):</strong><br>
-					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a><br>
-					🐶 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
-					<span style="font-size: 9px; opacity: 0.8;">All transactions visible on-chain for full transparency.</span>
-				</span>
-				<span class="desktop-text" style="font-size: 12px; line-height: 1.5;">
-					<strong style="color: #FFD700;">Tossing Coins:</strong><br>
-					• Tap anywhere — the coin flies where you tapped<br>
-					• Virtual coins are free &amp; unlimited<br>
-					• Tap a ✨ sparkling ✨ coin to see its donation<br>
-					• Real donation: click <strong>Donate Coins</strong> below, pick a charity, and pay — a Golden Coin lands in your hand to toss.<br><br>
-					<strong style="color: #FFD700;">How It Works:</strong><br>
-					• USDC/ETH goes straight to the charity wallets<br>
-					• Pooled to ~100 USDC, then sent via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
-					<strong style="color: #FFD700;">Verify Wallets (Base):</strong><br>
-					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a> · 🐶 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a> · ❤️ <a href="https://etherscan.io/address/0x07363eac9c24Af6451EBA07ff16CbD687dA4508A" target="_blank" style="color: #00e572; text-decoration: underline;">The Dev</a><br>
-					<span style="font-size: 10px; opacity: 0.8;">All on-chain for full transparency.</span>
-				</span>
+				<h2 class="info-panel-heading">Coin Guide</h2>
+				<section class="info-section">
+					<strong class="info-section-title">Tossing Coins</strong>
+					<ul class="info-list">
+						<li>Tap anywhere; the coin flies there.</li>
+						<li>Virtual coins are free and unlimited.</li>
+						<li>Tap a sparkling coin to view its donation.</li>
+						<li>Use <strong>Donate Coins</strong> to pick a charity, pay, then toss the Golden Coin.</li>
+						<li>Donated coins stay in the fountain.</li>
+					</ul>
+				</section>
+				<section class="info-section">
+					<strong class="info-section-title">How It Works</strong>
+					<ul class="info-list">
+						<li>USDC/ETH goes to the charity wallets.</li>
+						<li>Pooled near 100 USDC, then sent via <a class="info-link" href="https://thegivingblock.com" target="_blank">The Giving Block</a>.</li>
+					</ul>
+				</section>
+				<section class="info-section">
+					<strong class="info-section-title">Verify Wallets (Base)</strong>
+					<div class="wallet-links" aria-label="Wallet verification links">
+						<a class="wallet-link" href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank">🏥 St. Jude's</a>
+						<a class="wallet-link" href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank">🐶 ASPCA</a>
+						<a class="wallet-link" href="https://etherscan.io/address/0x07363eac9c24Af6451EBA07ff16CbD687dA4508A" target="_blank">❤️ The Dev</a>
+					</div>
+					<p class="info-footnote">All transactions are visible on-chain.</p>
+				</section>
 			</div>
 		</div>
 		
@@ -1180,8 +1291,8 @@
 					info.style.right = 'auto';
 					info.style.top = 'auto';
 					info.style.bottom = 'calc(150px + env(safe-area-inset-bottom))';
-					info.style.width = 'calc(100% - 100px)';
-					info.style.maxWidth = '280px';
+					info.style.width = 'calc(100% - 32px)';
+					info.style.maxWidth = '380px';
 					info.style.display = 'none';
 					info.style.zIndex = '10000';
 					
@@ -1268,7 +1379,7 @@
 					info.style.top = '50%';
 					info.style.bottom = 'auto';
 					info.style.transform = 'translateX(-50%) translateY(-50%)';
-					info.style.width = '280px';
+					info.style.width = '360px';
 					info.style.display = 'none';
 					info.style.zIndex = '1000';
 					
@@ -1887,6 +1998,12 @@
 			// ===== END DONATION TOAST SYSTEM =====
 
 			// Add click outside to close functionality
+			let infoPointerStartedInside = false;
+			document.addEventListener('pointerdown', function(event) {
+				const info = document.getElementById('info');
+				infoPointerStartedInside = !!(info && info.contains(event.target));
+			}, true);
+
 			document.addEventListener('click', function(event) {
 				const info = document.getElementById('info');
 				const helpButton = event.target.closest('button');
@@ -1894,6 +2011,10 @@
 				
 				// Check if info is visible
 				if (info && info.style.display === 'block') {
+					if (infoPointerStartedInside) {
+						infoPointerStartedInside = false;
+						return;
+					}
 					// Check if click was outside the info box and not on the help button
 					if (!info.contains(event.target) && (!helpButton || !helpButton.textContent.includes('❓'))) {
 						// Close the info box
@@ -8317,7 +8438,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 			/* Info box hover effects */
 			#info:hover {
-				transform: translateY(-50%) scale(1.02);
+				transform: translateX(-50%) translateY(-50%) scale(1.015);
 				box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 100px rgba(102, 126, 234, 0.3);
 			}
 
@@ -8458,6 +8579,103 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				#info {
 					bottom: 15vh !important;
+				}
+			}
+
+			@media (max-width: 768px) {
+				#info {
+					align-items: stretch !important;
+					justify-content: flex-start !important;
+					padding: 14px 16px 12px !important;
+					max-height: 66vh !important;
+					overflow-y: auto !important;
+				}
+
+				#info:hover {
+					transform: translateY(0) scale(1.01);
+				}
+
+				#info > .info-content,
+				#info .info-content {
+					font-size: 11px !important;
+					line-height: 1.24 !important;
+					text-align: left !important;
+				}
+
+				#info .info-panel-heading {
+					margin-bottom: 7px;
+					font-size: 13px;
+					text-align: left !important;
+				}
+
+				#info .info-section {
+					padding: 7px 0;
+					text-align: left !important;
+				}
+
+				#info .info-section-title {
+					margin-bottom: 5px;
+					font-size: 10px;
+				}
+
+				#info .info-section-title,
+				#info .info-list,
+				#info .info-list li,
+				#info .info-footnote {
+					text-align: left !important;
+				}
+
+				#info .info-list {
+					gap: 4px;
+				}
+
+				#info .info-list li {
+					padding-left: 12px;
+				}
+
+				#info .info-list li::before {
+					top: 0.55em;
+					width: 4px;
+					height: 4px;
+				}
+
+				#info .wallet-links {
+					gap: 5px 7px;
+					margin-top: 6px;
+				}
+
+				#info .wallet-link {
+					font-size: 11px;
+				}
+
+				#info .info-footnote {
+					margin-top: 7px;
+					font-size: 10px;
+				}
+			}
+
+			@media (max-width: 480px) and (max-height: 700px) {
+				#info {
+					bottom: 10vh !important;
+					max-height: 74vh !important;
+				}
+
+				#info > .info-content,
+				#info .info-content {
+					font-size: 10px !important;
+					line-height: 1.2 !important;
+				}
+
+				#info .info-panel-heading {
+					font-size: 12px;
+				}
+
+				#info .info-section {
+					padding: 6px 0;
+				}
+
+				#info .info-list {
+					gap: 3px;
 				}
 			}
 			

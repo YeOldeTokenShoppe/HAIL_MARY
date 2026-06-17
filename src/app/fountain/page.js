@@ -20,12 +20,30 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
   loading: () => <CoinLoader loading={true} />
 });
 
+// The fountain page restricts music to exactly these tracks (drawn from non80sTracks).
+// Paths must match the entries in MusicContext; normalized for leading-slash differences.
+const FOUNTAIN_TRACK_PATHS = [
+  "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
+  "/audio/I Ran (So Far Away).mp3",           // I Ran (So Far Away) - Flock of Seagulls
+  "/audio/Eyes Without A Face.mp3",           // Eyes Without A Face - Billy Idol
+  "/audio/Cat People (Putting Out Fire).mp3", // Cat People (Putting Out Fire) - David Bowie
+  "audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
+  "audio/99RedBalloons.m4a",        // 99 Luftballoons - Nena
+  "audio/PersonalJesus.m4a",        // Personal Jesus - Depeche Mode
+  "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
+  // "audio/ShesCrafty.m4a",          // She's Crafty - Beast
+  "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris
+  "audio/LoveMyWay.m4a",           // Love My Way - Psychedelic Furs
+  "audio/Heroes.m4a",              // Heroes - Janelle Monae
+  "audio/RocketsTail.m4a",     // Love Is A Stranger - Eurythmics (yes, again — the fountain loves it)
+].map((p) => p.replace(/^\//, ""));
+
 export default function FountainPage() {
   // Get user from Clerk
   const { user, isSignedIn } = useUser();
   const router = useRouter();
   
-  const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode: context80sMode, setIs80sMode: setContext80sMode } = useMusic();
+  const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode: context80sMode, setIs80sMode: setContext80sMode, setPagePlaylistOverride, non80sTracks } = useMusic();
   const [isLoading, setIsLoading] = useState(true);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
@@ -39,6 +57,18 @@ export default function FountainPage() {
   const loadingTimeoutRef = useRef(null);
 
   
+  // Restrict the playlist to the curated fountain tracks while on this page.
+  // This governs which track is chosen next (first play, skip, auto-advance) —
+  // a song already playing on arrival keeps playing untouched until it ends.
+  useEffect(() => {
+    const wanted = new Set(FOUNTAIN_TRACK_PATHS);
+    const override = (non80sTracks || []).filter((t) =>
+      wanted.has((t.path || "").replace(/^\//, ""))
+    );
+    setPagePlaylistOverride(override.length ? override : null);
+    return () => setPagePlaylistOverride(null);
+  }, [non80sTracks, setPagePlaylistOverride]);
+
   // Check if mobile - run immediately on mount
   useEffect(() => {
     const checkMobile = () => {
