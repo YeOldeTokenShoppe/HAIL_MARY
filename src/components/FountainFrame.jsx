@@ -9,11 +9,18 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded, onDonateCl
   // In production, bump this ?v= when fountain.html changes. In development, use a
   // unique query per page load so every reload fetches the latest file (computed
   // once per mount so the iframe doesn't reload on every re-render).
-  const [frameSrc] = useState(() =>
-    process.env.NODE_ENV === 'development'
-      ? `/fountain.html?dev=${Date.now()}`
-      : '/fountain.html?v=20260616'
-  );
+  const [frameSrc] = useState(() => {
+    const base =
+      process.env.NODE_ENV === 'development'
+        ? `/fountain.html?dev=${Date.now()}`
+        : '/fountain.html?v=20260616';
+    // Forward the dev light-tuning gate (/fountain?lights) into the iframe doc —
+    // the inner HTML reads its own location.search, which otherwise only has dev/v.
+    const onParent =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).has('lights');
+    return onParent ? `${base}&lights` : base;
+  });
 
   useImperativeHandle(ref, () => iframeRef.current);
 

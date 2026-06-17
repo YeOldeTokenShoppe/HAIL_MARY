@@ -35,7 +35,9 @@ const FOUNTAIN_TRACK_PATHS = [
   // "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris
   "audio/LoveMyWay.m4a",           // Love My Way - Psychedelic Furs
   // "audio/Heroes.m4a",              // Heroes - Janelle Monae
-  "audio/RocketsTail.m4a",     // Rocket's Tail - Kate Bush
+  // "audio/RocketsTail.m4a",     // Rocket's Tail - Kate Bush
+  "audio/IfYouAllGetToHeaven.m4a",       // If You Leave - Orchestral Manoeuvres in the D
+  "audio/for-those-about-to-rock-ac-dc.m4a"
 ].map((p) => p.replace(/^\//, ""));
 
 export default function FountainPage() {

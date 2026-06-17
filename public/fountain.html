@@ -339,7 +339,7 @@
 			font-size: 15px;
 			font-weight: 800;
 			line-height: 1.1;
-			text-align: left;
+			text-align: center;
 			text-transform: uppercase;
 			letter-spacing: 0;
 			text-shadow: 0 2px 8px rgba(42, 25, 91, 0.5);
@@ -1028,15 +1028,15 @@
 						<li>Tap anywhere; the coin flies there.</li>
 						<li>Virtual coins are free and unlimited.</li>
 						<li>Tap a sparkling coin to view its donation.</li>
-						<li>Use <strong>Donate Coins</strong> to pick a charity, pay, then toss the Golden Coin.</li>
+						<li>Use <strong>Donate Coins</strong> to pick a charity (or tip the Dev), pay, then toss the Golden Coin.</li>
 						<li>Donated coins stay in the fountain.</li>
 					</ul>
 				</section>
 				<section class="info-section">
 					<strong class="info-section-title">How It Works</strong>
 					<ul class="info-list">
-						<li>USDC/ETH goes to the charity wallets.</li>
-						<li>Pooled near 100 USDC, then sent via <a class="info-link" href="https://thegivingblock.com" target="_blank">The Giving Block</a>.</li>
+						<li>USDC/ETH goes to the selected recipient wallet.</li>
+						<li>Charity wallets are pooled to near 100 USDC, then sent via <a class="info-link" href="https://thegivingblock.com" target="_blank">The Giving Block</a>.</li>
 					</ul>
 				</section>
 				<section class="info-section">
@@ -2011,6 +2011,9 @@
 				
 				// Check if info is visible
 				if (info && info.style.display === 'block') {
+					// Ignore the trailing click from the coin tap that just opened the
+					// panel (info-hub opens on pointerup; this click would close it).
+					if (performance.now() - (window.__infoHubOpenedAt || 0) < 400) return;
 					if (infoPointerStartedInside) {
 						infoPointerStartedInside = false;
 						return;
@@ -2212,7 +2215,7 @@
 			
 			import * as THREE from 'three';
 			import Stats from 'three/addons/libs/stats.module.js';
-			// import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+			import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 			import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -2816,6 +2819,16 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			const raycaster = new THREE.Raycaster();
 
 			let sun;
+			let skyFill;
+			let hemiHelper;
+			let sunHelper;
+			let lightGui;
+			// Info-hub coin: model's goldCoin (hidden, used as a position/size
+			// reference) is replaced by this glowing, clickable script coin.
+			let infoHubAnchor = null;
+			let infoHubCoin = null;
+			let infoHubHit = null;
+			let infoHubPulse = 0;
 			let waterMesh;
 			let upperWaterMesh;
 			let topBowlWaterMesh;
@@ -3714,6 +3727,82 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			
 			// Chip = the coin currently in your hand; tray = swap coins.
 			// Tossing itself is NOT here — it's a tap on the water (onPointerUp).
+			// Visual helpers + lil-gui panel for the scene lights. Dev-only: gated
+			// behind /fountain?lights so regular visitors never see it. Tunes the
+			// hemisphere fill (cloud undersides) and the directional sun (which side
+			// of the clouds is lit vs shadowed), with position dials + live helpers.
+			function setupHemisphereGUI() {
+				if ( !skyFill ) return;
+
+				// Octahedron tinted with the hemisphere light's sky/ground colors.
+				hemiHelper = new THREE.HemisphereLightHelper( skyFill, 0.5 );
+				scene.add( hemiHelper );
+				// Directional helper: plane + line showing the sun's aim (position -> origin).
+				sunHelper = new THREE.DirectionalLightHelper( sun, 1, 0xffaa33 );
+				scene.add( sunHelper );
+
+				lightGui = new GUI({ title: 'Lights' });
+
+				// Dump current live values (after you've tuned the dials) so they can be
+				// baked in as defaults — copies JSON to the clipboard and logs it.
+				lightGui.add({ copy() {
+					const cfg = {
+						hemi: {
+							intensity: +skyFill.intensity.toFixed(3),
+							sky:    '#' + skyFill.color.getHexString(),
+							ground: '#' + skyFill.groundColor.getHexString(),
+						},
+						sun: {
+							intensity: +sun.intensity.toFixed(3),
+							color: '#' + sun.color.getHexString(),
+							position: sun.position.toArray().map( n => +n.toFixed(2) ),
+						},
+					};
+					const text = JSON.stringify( cfg, null, 2 );
+					console.log( '[Fountain] light settings:\n' + text );
+					if ( navigator.clipboard ) navigator.clipboard.writeText( text );
+				} }, 'copy' ).name( '⧉ copy settings → clipboard' );
+
+				// --- Hemisphere fill ---
+				const hemi = lightGui.addFolder( 'Hemisphere fill' );
+				// lil-gui edits color via a hex-string proxy so the picker works
+				const hemiProxy = {
+					sky:    '#' + skyFill.color.getHexString(),
+					ground: '#' + skyFill.groundColor.getHexString(),
+				};
+				hemi.add( skyFill, 'intensity', 0, 3, 0.05 ).name( 'intensity' )
+					.onChange( () => hemiHelper.update() );
+				hemi.addColor( hemiProxy, 'sky' ).name( 'sky (tops)' )
+					.onChange( v => { skyFill.color.set( v ); hemiHelper.update(); } );
+				hemi.addColor( hemiProxy, 'ground' ).name( 'ground (undersides)' )
+					.onChange( v => { skyFill.groundColor.set( v ); hemiHelper.update(); } );
+				hemi.add( skyFill, 'visible' ).name( 'light on' );
+				hemi.add( hemiHelper, 'visible' ).name( 'show helper' );
+				// Position is cosmetic for a hemisphere light (shading uses world-up
+				// only) - these dials just move the helper marker so you can see it.
+				const hemiPos = hemi.addFolder( 'position (helper marker only)' );
+				hemiPos.add( skyFill.position, 'x', -10, 10, 0.1 ).onChange( () => hemiHelper.update() );
+				hemiPos.add( skyFill.position, 'y', -10, 10, 0.1 ).onChange( () => hemiHelper.update() );
+				hemiPos.add( skyFill.position, 'z', -10, 10, 0.1 ).onChange( () => hemiHelper.update() );
+				hemiPos.close();
+
+				// --- Directional sun (this is what actually moves the lit/dark split) ---
+				const sunF = lightGui.addFolder( 'Sun (directional)' );
+				const sunProxy = { color: '#' + sun.color.getHexString() };
+				sunF.add( sun, 'intensity', 0, 10, 0.1 ).name( 'intensity' )
+					.onChange( () => sunHelper.update() );
+				sunF.addColor( sunProxy, 'color' ).name( 'color' )
+					.onChange( v => { sun.color.set( v ); sunHelper.update(); } );
+				sunF.add( sun, 'visible' ).name( 'light on' );
+				sunF.add( sunHelper, 'visible' ).name( 'show helper' );
+				// Position dials DO matter here: the sun aims from position -> origin,
+				// so dragging these swings which faces of the clouds catch the light.
+				const sunPos = sunF.addFolder( 'position' );
+				sunPos.add( sun.position, 'x', -20, 20, 0.5 ).onChange( () => sunHelper.update() );
+				sunPos.add( sun.position, 'y', -20, 20, 0.5 ).onChange( () => sunHelper.update() );
+				sunPos.add( sun.position, 'z', -20, 20, 0.5 ).onChange( () => sunHelper.update() );
+			}
+
 			function setupHTMLButtons() {
 				const chip = document.getElementById('coinChip');
 				const tray = document.getElementById('coinTray');
@@ -3860,10 +3949,27 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				initializeFirebase();
 
 				// Create Venice sunset directional light
-				sun = new THREE.DirectionalLight( 0xff8c42, 4.5 ); // Warm sunset orange color
-				sun.position.set( -8, 3, -1 ); // Low on horizon for sunset effect
+				sun = new THREE.DirectionalLight( 0xff8c42, 4.4 ); // Warm sunset orange color
+				sun.position.set( -8, 7.5, -1 ); // Low on horizon for sunset effect
 				sun.castShadow = true;
 				scene.add( sun );
+
+				// Sky/ground fill so down-facing surfaces (esp. the cloud undersides
+				// on SM_Env_Cloud_*) catch a warm sunset bounce instead of reading as
+				// dead black — the HDR environment's lower hemisphere is dark ground,
+				// so without this the underside of each cloud has nothing to light it.
+				// skyColor lights up-facing surfaces, groundColor lights down-facing.
+				skyFill = new THREE.HemisphereLight( 0xffe2c2, 0x9711df, 0.4 );
+				skyFill.position.set( 0, 1, 0 ); // doesn't affect shading (hemi uses world-up), only where the helper draws
+				scene.add( skyFill );
+				window.skyFill = skyFill; // exposed for quick console tuning (intensity/colors)
+
+				// Dev tuning panel + visual helper — load /fountain?lights to show them.
+				// The helper is an octahedron tinted with the sky/ground colors so you
+				// can see the light's orientation; the panel gives live sliders.
+				if ( new URLSearchParams( window.location.search ).has( 'lights' ) ) {
+					setupHemisphereGUI();
+				}
 
 				renderer = new THREE.WebGLRenderer( { 
 					antialias: !isMobileDevice, // Disable antialiasing on mobile
@@ -4413,7 +4519,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				loader.load(
 					// Resource URL - REPLACE WITH YOUR FILE PATH
-					'/models/fountain2.glb',
+					'/models/fountain3.glb',
 					// Called when the resource is loaded
 					function ( gltf ) {
 						clearTimeout(modelLoadTimeout);
@@ -4503,6 +4609,23 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 
                 // Store model reference for collision detection
                 window.fountainModel = fountainModel;
+                
+                // --- Info-hub coin: find the model's decorative goldCoin, hide it (kept
+                // as a positional/size reference), and build a glowing clickable script
+                // coin in its place. Case-insensitive + tolerant of GLTFLoader's _N suffix
+                // on duplicate names (GoldCoin -> GoldCoin_1); first matching mesh wins.
+                fountainModel.traverse(function (node) {
+                    if (!infoHubAnchor && node.isMesh && node.name &&
+                        node.name.toLowerCase().replace(/[_-]?\d+$/, '') === 'goldcoin') {
+                        infoHubAnchor = node;
+                    }
+                });
+                if (infoHubAnchor) {
+                    console.log('[Fountain] info-hub anchor:', infoHubAnchor.name);
+                    buildInfoHubCoin();
+                } else {
+                    console.warn('[Fountain] no goldCoin mesh found for the info hub');
+                }
 
                 const fallingWaterGeometry = new THREE.CylinderGeometry(fallRadius, fallRadius, fallHeight, fallSegments, 1, true); // Open ended cylinder
                 // Position it: Center X/Z, Y position depends on where the water should start falling from
@@ -5842,6 +5965,140 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
             // Tap -> pick a landed coin from the instanced pile. Returns true
             // when a coin was hit (card shown), false to fall through to a toss.
+            // === Info-hub coin =========================================================
+            // A glowing, clickable coin that stands in for the model's decorative
+            // goldCoin and acts as the single entry point to the info panel/UI.
+            const INFO_HUB_UP = new THREE.Vector3(0, 1, 0);
+            
+            function buildInfoHubCoin() {
+                if (!infoHubAnchor || infoHubCoin) return;
+                const anchor = infoHubAnchor;
+            
+                // Place the script coin as a SIBLING of the model coin: same parent + copied
+                // local transform => identical world placement (the earlier world-bbox center
+                // floated it). Scale-fit by the ratio of local bbox diameters to cover the
+                // same footprint.
+                const parent = anchor.parent || scene;
+                anchor.geometry.computeBoundingBox();
+                const aSize = anchor.geometry.boundingBox.getSize(new THREE.Vector3());
+                const aDia = Math.max(aSize.x, aSize.y, aSize.z) || 1;
+            
+                const geo = coinGeometry.clone();
+                // coinGeometry is pre-rotated upright (rotateX +90) so thrown coins face
+                // the camera mid-flight. Undo that so the info coin lies FLAT like the
+                // model coin; copying anchor.quaternion below then matches its exact pose.
+                geo.rotateX(-Math.PI / 2);
+                geo.computeBoundingBox();
+                const gSize = geo.boundingBox.getSize(new THREE.Vector3());
+                const gDia = Math.max(gSize.x, gSize.y, gSize.z) || 0.06;
+                const fit = aDia / gDia;
+            
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0xffd24a,
+                    metalness: 0.35,
+                    roughness: 0.35,
+                    emissive: new THREE.Color(0xffae1f),
+                    emissiveIntensity: 0.7, // bloom (UnrealBloomPass) turns this into a glow — toned down
+                    side: THREE.DoubleSide,
+                });
+            
+                infoHubCoin = new THREE.Mesh(geo, mat);
+                infoHubCoin.position.copy(anchor.position);
+                infoHubCoin.quaternion.copy(anchor.quaternion);
+                infoHubCoin.scale.copy(anchor.scale).multiplyScalar(fit);
+                infoHubCoin.renderOrder = 3;
+                infoHubCoin.userData.isInfoHub = true;
+                infoHubCoin.userData.baseScale = infoHubCoin.scale.clone();
+                infoHubCoin.userData.baseEmissive = mat.emissiveIntensity;
+                parent.add(infoHubCoin);
+            
+                // Invisible, larger hit-proxy (child of the coin, so it follows) for easy taps.
+                infoHubHit = new THREE.Mesh(
+                    new THREE.SphereGeometry(gDia * 1.3, 8, 8),
+                    new THREE.MeshBasicMaterial({ visible: false })
+                );
+                infoHubCoin.add(infoHubHit);
+            
+                anchor.visible = false; // keep as a positional reference, just don't draw it
+                window.infoHubCoin = infoHubCoin; // live console tuning
+            
+                const wp = infoHubCoin.getWorldPosition(new THREE.Vector3());
+                console.log('[Fountain] info-hub coin from anchor', anchor.name, '-> world',
+                    wp.x.toFixed(2), wp.y.toFixed(2), wp.z.toFixed(2));
+            }
+            
+            function updateInfoHubCoin(dt) {
+                if (!infoHubCoin) return;
+                infoHubPulse += dt;
+                const pulse = 0.5 + 0.5 * Math.sin(infoHubPulse * 2.2);
+                infoHubCoin.material.emissiveIntensity = infoHubCoin.userData.baseEmissive * (0.7 + 0.6 * pulse);
+                infoHubCoin.scale.copy(infoHubCoin.userData.baseScale).multiplyScalar(1 + 0.05 * pulse);
+                // Shine + pulse only — no spin/hover (the coin stays put on the rim).
+            }
+            
+            // Tap -> open the info hub. Returns true when the coin (or its hit-proxy)
+            // was hit so the caller skips the toss.
+            function tryClickInfoHub(ndc) {
+                if (!infoHubCoin) return false;
+                raycaster.setFromCamera(ndc, camera);
+                const targets = infoHubHit ? [infoHubCoin, infoHubHit] : [infoHubCoin];
+                if (!raycaster.intersectObjects(targets, false).length) return false;
+                openInfoHub();
+                return true;
+            }
+            
+            // === Info-hub panel ========================================================
+            // The hub IS the how-to-play (#info) panel, with the real Cam + Sound toggles
+            // MOVED in (not cloned -> their wired listeners + state come along, single
+            // source of truth) and a Donate button. Opened by the glowing coin.
+            function augmentInfoPanel() {
+                const info = document.getElementById('info');
+                if (!info || info.dataset.hubAugmented) return;
+                const content = info.querySelector('.info-content') || info;
+                const row = document.createElement('div');
+                row.id = 'infoHubControls';
+                row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px;'
+                    + 'margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.12);';
+                const cam = document.getElementById('coinCamToggle');
+                const sound = document.getElementById('waterSoundToggle');
+                if (cam) row.appendChild(cam);     // moved from the control strip, listeners intact
+                if (sound) row.appendChild(sound); // moved from the control strip, listeners intact
+                const donate = document.createElement('button');
+                donate.type = 'button';
+                donate.id = 'infoHubDonate';
+                donate.innerHTML = '<span aria-hidden="true">\uD83E\uDE99</span> Donate';
+                donate.style.cssText = 'margin-left:auto;padding:8px 16px;border-radius:12px;border:none;'
+                    + 'cursor:pointer;background:linear-gradient(135deg,#ffd700,#ffb700);color:#3a2c00;'
+                    + 'font-weight:800;font-size:13px;letter-spacing:0.3px;';
+                donate.addEventListener('click', function () {
+                    // Close the panel, then open the parent's real donation modal
+                    // (charity-select step). Same path as the old chip tray.
+                    if (info.style.display === 'block' && typeof toggleInstructions === 'function') toggleInstructions();
+                    try { window.parent.postMessage({ type: 'openDonation' }, '*'); } catch (e) {}
+                });
+                row.appendChild(donate);
+                content.insertBefore(row, content.firstChild);
+                // No close button — clicking outside the panel dismisses it (see the
+                // document click-outside handler), and the glowing coin reopens it.
+                info.dataset.hubAugmented = '1';
+            }
+            
+            // The glowing coin's action: ensure the controls are folded in, then show #info.
+            function openInfoHub() {
+                augmentInfoPanel();
+                const info = document.getElementById('info');
+                if (!info) return;
+                // The coin tap opens on pointerup; the browser then fires a trailing
+                // click on the canvas that the document "click-outside-to-close"
+                // handler would read as an outside click and shut the panel instantly.
+                // Stamp the open time so that handler can ignore that one click.
+                window.__infoHubOpenedAt = performance.now();
+                if (info.style.display !== 'block') {
+                    if (typeof toggleInstructions === 'function') toggleInstructions();
+                    else info.style.display = 'block';
+                }
+            }
+            
             function tryInspectCoin(ndc) {
                 if (!staticCoinInstancedMesh || !staticCoinData.length) return false;
                 raycaster.setFromCamera(ndc, camera);
@@ -6044,7 +6301,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 // Hide all UI elements
                 const elementsToHide = [
                     document.getElementById('coinTossButtons'),
-                    document.getElementById('info'),
+                    // NOTE: #info (the info-hub panel) is intentionally NOT hidden/restored
+                    // by the cinematic — it's controlled solely by the glowing coin. Tracking
+                    // it here made it auto-reappear after a coin toss (restore-on-cinematic-end).
                     document.getElementById('coinCounter'),
                     document.getElementById('mobileCollectionCounter'),
                     document.getElementById('desktopInfoBtn'),
@@ -6666,6 +6925,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				}
 			}, 100);
 
+			// Fold the Cam/Sound toggles + a Donate button into the #info (how-to-play)
+			// panel so the glowing info-hub coin opens one consolidated panel. Eager so
+			// the panel is identical whether opened by the coin or the ❓ button.
+			augmentInfoPanel();
+
 			function onPointerUp( event ) {
 
 				activePointers = Math.max(0, activePointers - 1);
@@ -6687,7 +6951,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						// A tap on a landed donation coin opens its info card
 						// instead of tossing; a tap on open water still tosses.
 						hideCoinInfoCard();
-						if (!tryInspectCoin(aimedCoords)) {
+						if (tryClickInfoHub(aimedCoords)) {
+							/* info coin opened the hub */
+						} else if (!tryInspectCoin(aimedCoords)) {
 							tossHeldCoin();
 						}
 					}
@@ -6991,6 +7257,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                  
                  // Update camera follow system
                  updateCameraFollow(dt);
+                 updateInfoHubCoin(dt);
 
                  // Drive the post-intro slow orbit (autoRotate is applied in update())
                  if (introOrbitActive) controls.update();
@@ -7958,6 +8225,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 		</script>
 
+		<!-- Info-hub consolidation: the glowing coin opens a popup carrying the
+		     how-to-play, Cam/Sound toggles and Donate, so the old bottom UI (the
+		     toss/donate chip + the counter card) is hidden. Delete this <style> to
+		     bring them back. -->
+		<style id="infoHubHideOldUI">
+			#coinTossButtons, #mobileCollectionCounter, #restoreUiBtn { display: none !important; }
+		</style>
 		<!-- "Coin in your hand" chip: tossing is always one tap on the water;
 		     this chip only chooses WHICH coin that tap throws. Tapping the
 		     chip opens the tray; picking a charity runs the parent's donation
@@ -8605,7 +8879,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				#info .info-panel-heading {
 					margin-bottom: 7px;
 					font-size: 13px;
-					text-align: left !important;
+					text-align: center !important;
 				}
 
 				#info .info-section {

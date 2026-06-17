@@ -46,6 +46,7 @@ const non80sTracks = [
     { name: "Wishing (If I Had a Photograph of You) - A Flock of Seagulls", path: "audio/Wishing.m4a", bpm: 85 },
     { name: "Rocket's Tail - Kate Bush", path: "audio/RocketsTail.m4a", bpm: 85 },
     { name: "Dizzy - Siouxsie & The Banshees", path: "audio/Dizzy.mp3", bpm: 85 },
+        { name: "If You All Get To Heaven - Terence Trent D'Arby", path: "audio/IfYouAllGetToHeaven.m4a", bpm: 85 },
 ];
 
 // Normalize a track path for comparison (some entries have a leading slash, some don't)
