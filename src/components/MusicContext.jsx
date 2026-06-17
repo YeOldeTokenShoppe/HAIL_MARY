@@ -34,6 +34,7 @@ const non80sTracks = [
   { name: "Eyes Without A Face - Billy Idol", path: "/audio/Eyes Without A Face.mp3", bpm: 110 },
   { name: "I Ran (So Far Away) - Flock of Seagulls", path: "/audio/I Ran (So Far Away).mp3", bpm: 100 },
   { name: "Girls On Film - Duran Duran", path: "/audio/Girls On Film.mp3", bpm: 100 },
+    { name: "Cities - Siouxsie & The Banshees", path: "/audio/Cities.mp3", bpm: 100 },
 ];
 
 // Ride page exclusive track

@@ -4,6 +4,17 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded, onDonateCl
   const iframeRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // iOS Safari caches the iframe document aggressively and there's no easy hard-
+  // refresh on iOS, so a stale public/fountain.html keeps loading on phones/tablets.
+  // In production, bump this ?v= when fountain.html changes. In development, use a
+  // unique query per page load so every reload fetches the latest file (computed
+  // once per mount so the iframe doesn't reload on every re-render).
+  const [frameSrc] = useState(() =>
+    process.env.NODE_ENV === 'development'
+      ? `/fountain.html?dev=${Date.now()}`
+      : '/fountain.html?v=20260616'
+  );
+
   useImperativeHandle(ref, () => iframeRef.current);
 
   useEffect(() => {
@@ -71,7 +82,7 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded, onDonateCl
     }}>
       <iframe
         ref={iframeRef}
-        src="/fountain.html"
+        src={frameSrc}
         onLoad={handleIframeLoad}
         style={{
           position: 'absolute',

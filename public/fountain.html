@@ -2742,6 +2742,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             // Camera follow system variables
             let coinCamEnabled = false; // User preference for coin camera animation (off until opted in)
             let cameraFollowActive = false;
+            // After the fly-in, the camera slowly orbits the fountain until the
+            // user's first interaction (stopped in stopIntroOrbit / onPointerDown).
+            let introOrbitActive = false;
             let followedCoin = null;
             let originalCameraPosition = null;
             let originalCameraTarget = null;
@@ -3255,10 +3258,6 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 				});
 				
-				// Initial camera position (far and high, looking down at fountain)
-				camera.position.set(0, 0, 10);
-				camera.lookAt(0, 0, 0);
-				
 				// Target positions for the camera animation (matching the default setup)
 				const startPos = { x: 0, y: 0, z: 18 };
 				const endPos = { x: 0, y: 1, z: 4.4 };  // Default camera position
@@ -3298,13 +3297,34 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						// Animation complete, enable controls
 						controls.enabled = true;
 						controls.update();
-						
+
 						// Show UI elements after cinematic
 						showUIElementsAfterIntro();
+
+						// Drift into a slow orbit around the fountain until the
+						// user's first interaction (see render loop + onPointerDown).
+						startIntroOrbit();
 					}
 				}
-				
+
 				animateCamera();
+			}
+
+			// Slow auto-orbit shown after the fly-in. OrbitControls applies the
+			// rotation inside update(), which the render loop calls only while
+			// introOrbitActive. The first pointer press anywhere stops it.
+			function startIntroOrbit() {
+				introOrbitActive = true;
+				controls.autoRotate = true;
+				controls.autoRotateSpeed = 1.0; // ~60s per revolution; lower = slower
+				window.addEventListener('pointerdown', stopIntroOrbit, { once: true });
+			}
+
+			function stopIntroOrbit() {
+				if (!introOrbitActive) return;
+				introOrbitActive = false;
+				controls.autoRotate = false;
+				window.removeEventListener('pointerdown', stopIntroOrbit);
 			}
 
 			// Function to update loading progress
@@ -3876,22 +3896,55 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				initSplashParticleSystem();
 				// --- END NEW ---
 
+				// --- ONE shared Web Audio context for ALL fountain sound (water ambience
+				// + every coin SFX). iOS Safari will not run multiple AudioContexts: a
+				// second context's resume() stays pending forever and it sits suspended
+				// (confirmed on iPad — the coin/splash context ran while a separate water
+				// context stayed suspended on the very same gesture). Routing every sound
+				// through a single context, unlocked once on the first gesture, makes them
+				// all play. get() lazily creates it; resume() unlocks it (idempotent). ---
+				window.__faCtx = window.__faCtx || (function () {
+					const AC = window.AudioContext || window.webkitAudioContext;
+					let ctx = null, failed = false;
+					function get() {
+						if (ctx || failed) return ctx;
+						if (!AC) { failed = true; return null; }
+						try { ctx = new AC(); } catch (e) { failed = true; ctx = null; }
+						return ctx;
+					}
+					function resume() {
+						const c = get();
+						if (c && c.state !== 'running') c.resume().catch(() => {});
+						return c;
+					}
+					// Unlock on the first user gesture anywhere (a coin toss is one).
+					const evs = ['pointerdown', 'touchstart', 'keydown'];
+					const onG = () => resume();
+					evs.forEach(e => window.addEventListener(e, onG, { passive: true }));
+					return { get: get, resume: resume };
+				})();
+
 				// --- Ambient water sound + mute toggle. Loops quietly; browsers block
 				// autoplay until a user gesture, so we try immediately (if already
 				// unlocked) and otherwise start on the first interaction. A corner
 				// button toggles it, and the choice is remembered across visits. ---
 				(function setupWaterAmbience() {
-					const WATER_VOLUME = 0.02; // 0..1 — drives the Web Audio gain below (tune here)
+					// Looping water ambience, played as a decoded AudioBuffer through a looping
+					// createBufferSource (NOT an <audio> element / MediaElementSource, which iOS
+					// routes silently through Web Audio). It shares the single __faCtx with the
+					// coin SFX — iOS will not run multiple AudioContexts, so every sound must go
+					// through one (see the __faCtx note above); that contention was why the
+					// fountain stayed silent on iOS while the coin sounds played. A GainNode
+					// keeps it quiet, since iOS ignores HTMLAudioElement.volume. The loop comes
+					// in on the first gesture (a coin toss), same as the coin sounds.
+					const WATER_VOLUME = 0.02; // 0..1 — Web Audio gain level (tune here)
 					const STORE_KEY = 'fountain_water_muted';
-					const water = new Audio('/water.mp3');
-					water.loop = true;
-					water.volume = WATER_VOLUME;
-					water.preload = 'auto';
-					window.fountainWaterAudio = water; // exposed for live volume tweaks
+					const SRC = '/water.mp3';
 
 					let muted = false;
 					try { muted = localStorage.getItem(STORE_KEY) === '1'; } catch (e) {}
-					let playing = false;
+					let playing = false;   // the loop source is started and audible
+					let gestured = false;  // a user gesture has unlocked audio at least once
 
 					const ICON_ON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>';
 					const ICON_OFF = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 9a5 5 0 0 1 .95 2.293"/><path d="M19.364 5.636a9 9 0 0 1 1.889 9.96"/><path d="m2 2 20 20"/><path d="m7 7-.587.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298V11"/><path d="M9.828 4.172A.686.686 0 0 1 11 4.657v.686"/></svg>';
@@ -3901,39 +3954,90 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					const iconEl = document.getElementById('waterSoundIcon');
 					const labelEl = document.getElementById('waterSoundLabel');
 
-					// iOS Safari IGNORES HTMLAudioElement.volume (hardware-only), so
-					// WATER_VOLUME above has no effect there. Route the audio through a
-					// Web Audio GainNode, whose gain DOES control level on iOS + desktop.
-					// (Falls back to element.volume if Web Audio is unavailable.)
-					let audioCtx = null, gainNode = null, graphFailed = false;
-					function ensureGraph() {
-						if (gainNode || graphFailed) return;
-						const AC = window.AudioContext || window.webkitAudioContext;
-						if (!AC) { graphFailed = true; return; }
+					let ctx = null, gainNode = null, buffer = null, srcNode = null;
+					let decoding = false, failed = false;
+
+					function ensureCtx() {
+						if (ctx || failed) return ctx;
+						const shared = window.__faCtx && window.__faCtx.get();
+						if (!shared) { failed = true; return null; }
 						try {
-							audioCtx = new AC();
-							const src = audioCtx.createMediaElementSource(water);
-							gainNode = audioCtx.createGain();
+							ctx = shared; // single shared context — see __faCtx note above
+							gainNode = ctx.createGain();
 							gainNode.gain.value = WATER_VOLUME;
-							src.connect(gainNode).connect(audioCtx.destination);
-							water.volume = 1.0; // the gain controls the level now
+							gainNode.connect(ctx.destination);
 							window.fountainWaterGain = gainNode; // live tuning: .gain.value = 0..1
-						} catch (e) { graphFailed = true; gainNode = null; }
+							// The label follows the REAL context state. A buffer source created
+							// while the context is still suspended is silent until iOS flips it to
+							// running (resume() is async); this fires then, so "Sound on" is only
+							// shown — and the unlock listeners only dropped — once it truly sounds.
+							ctx.onstatechange = () => {
+								// Drive source creation off the REAL running transition: a loop
+								// source created while suspended is fragile on iOS, so we only make
+								// it once the context truly runs.
+								if (ctx.state === 'running') { if (!muted) startLoop(); }
+								else { playing = false; render(); }
+							};
+						} catch (e) { failed = true; ctx = null; gainNode = null; }
+						return ctx;
+					}
+
+					function loadBuffer() {
+						if (buffer || decoding || failed) return;
+						const c = ensureCtx();
+						if (!c) return;
+						decoding = true;
+						fetch(SRC)
+							.then(r => r.arrayBuffer())
+							.then(ab => c.decodeAudioData(ab))
+							.then(buf => { buffer = buf; decoding = false; if (!muted) startLoop(); })
+							.catch(() => { decoding = false; failed = true; });
 					}
 
 					function removeUnlock() { events.forEach(e => window.removeEventListener(e, onGesture)); }
-					function applyAudio() {
-						if (muted) { water.pause(); playing = false; render(); return; }
-						ensureGraph();
-						if (audioCtx && audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
-						const p = water.play();
-						if (p && p.then) p.then(() => { playing = true; removeUnlock(); render(); }).catch(() => {});
-						else { playing = true; removeUnlock(); render(); }
+
+					// Create + start the looping source only once the context is TRULY running
+					// and the buffer is decoded — a loop source created on a suspended context
+					// is fragile on iOS. Each not-ready path re-enters startLoop later:
+					// resume()→onstatechange when the context runs, decode→.then when the buffer
+					// lands, another tap→kickStart. So a single coin toss reliably starts the
+					// loop the instant both conditions are met. Idempotent once looping.
+					function startLoop() {
+						if (muted || failed || srcNode) return;
+						const c = ensureCtx();
+						if (!c) return;
+						if (c.state !== 'running') { c.resume().then(startLoop).catch(() => {}); return; }
+						if (!buffer) { loadBuffer(); return; }
+						try {
+							srcNode = c.createBufferSource();
+							srcNode.buffer = buffer;
+							srcNode.loop = true;
+							srcNode.connect(gainNode);
+							srcNode.start();
+						} catch (e) { srcNode = null; return; }
+						playing = true;
+						removeUnlock();
+						render();
 					}
+
+					function stopLoop() {
+						if (srcNode) {
+							try { srcNode.stop(); } catch (e) {}
+							try { srcNode.disconnect(); } catch (e) {}
+							srcNode = null;
+						}
+						playing = false;
+						render();
+					}
+
+					// First user gesture (a coin toss is one) unlocks audio and starts the loop.
+					function kickStart() {
+						if (muted) return;
+						gestured = true;
+						startLoop();
+					}
+
 					function render() {
-						// Reflect the ACTUAL state: only show "on" once audio is really
-						// playing. Browsers block playback until the first gesture, so the
-						// toggle never claims to be on while it's still silent.
 						const on = playing && !muted;
 						if (iconEl) iconEl.innerHTML = on ? ICON_ON : ICON_OFF;
 						if (labelEl) labelEl.textContent = on ? 'Sound on' : 'Sound off';
@@ -3941,30 +4045,36 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 					function persistMuted() { try { localStorage.setItem(STORE_KEY, muted ? '1' : '0'); } catch (e) {} }
 					render();
+
 					if (btn) btn.addEventListener('click', (e) => {
 						e.stopPropagation();
 						if (playing && !muted) {   // currently on → turn off
 							muted = true;
-							water.pause();
-							playing = false;
+							stopLoop();
 						} else {                    // currently off → turn on (this click is a gesture)
 							muted = false;
-							applyAudio();
+							kickStart();
 						}
 						persistMuted();
 						render();
 					});
 
-					// Autoplay unlock: try now, and on the first user gesture anywhere.
+					// Begin decoding immediately (warm the buffer), and start the loop on the
+					// first user gesture anywhere — a coin toss is itself a gesture, so the
+					// ambience comes in with the very first coin.
 					const events = ['pointerdown', 'touchstart', 'keydown'];
-					function onGesture() { if (!muted && !playing) applyAudio(); }
-					applyAudio();
+					function onGesture() { kickStart(); }
+					if (!muted) loadBuffer();
 					events.forEach(e => window.addEventListener(e, onGesture, { passive: true }));
 
-					// Be polite: pause when the tab is hidden, resume when visible (if on).
+					// Be polite: suspend when the tab is hidden, resume when visible (if on).
 					document.addEventListener('visibilitychange', () => {
-						if (document.hidden) water.pause();
-						else if (!muted) applyAudio(); // resumes the audio context too
+						if (!ctx) return;
+						if (document.hidden) { ctx.suspend().catch(() => {}); }
+						else if (!muted && !failed) {
+							if (srcNode) ctx.resume().catch(() => {}); // already unlocked earlier
+							else if (gestured) kickStart();
+						}
 					});
 				})();
 
@@ -3989,8 +4099,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 					function ensureCtx() {
 						if (ctx || failed) return ctx;
-						if (!AC) { failed = true; return null; }
-						try { ctx = new AC(); } catch (e) { failed = true; ctx = null; }
+						ctx = window.__faCtx && window.__faCtx.get(); // single shared context
+						if (!ctx) failed = true;
 						return ctx;
 					}
 					function loadBuffer() {
@@ -4057,8 +4167,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 					function ensureCtx() {
 						if (ctx || failed) return ctx;
-						if (!AC) { failed = true; return null; }
-						try { ctx = new AC(); } catch (e) { failed = true; ctx = null; }
+						ctx = window.__faCtx && window.__faCtx.get(); // single shared context
+						if (!ctx) failed = true;
 						return ctx;
 					}
 					function loadBuffer() {
@@ -4119,8 +4229,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 					function ensureCtx() {
 						if (ctx || failed) return ctx;
-						if (!AC) { failed = true; return null; }
-						try { ctx = new AC(); } catch (e) { failed = true; ctx = null; }
+						ctx = window.__faCtx && window.__faCtx.get(); // single shared context
+						if (!ctx) failed = true;
 						return ctx;
 					}
 					function loadBuffer() {
@@ -6760,6 +6870,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                  
                  // Update camera follow system
                  updateCameraFollow(dt);
+
+                 // Drive the post-intro slow orbit (autoRotate is applied in update())
+                 if (introOrbitActive) controls.update();
                 // Lower bowl water levels
                 const lowerWaterLevel = -0.5; // Adjusted to match water mesh position
                 const lowerBottomDepth = -0.78; // Adjusted bottom depth (-0.28 - 0.5)

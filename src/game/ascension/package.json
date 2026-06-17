@@ -1,0 +1,4 @@
+{
+  "//": "Scoped ESM marker so Node's built-in test runner can load these .js files as modules (node --test). Isolated to this folder; Next compiles them regardless of this field.",
+  "type": "module"
+}
