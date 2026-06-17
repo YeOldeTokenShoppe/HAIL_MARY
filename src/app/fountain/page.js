@@ -24,18 +24,18 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
 // Paths must match the entries in MusicContext; normalized for leading-slash differences.
 const FOUNTAIN_TRACK_PATHS = [
   "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
-  "/audio/I Ran (So Far Away).mp3",           // I Ran (So Far Away) - Flock of Seagulls
+  "/audio/Wishing.m4a",           // Wishing (If I Had a Photograph of You) - A Flock of Seagulls
   "/audio/Eyes Without A Face.mp3",           // Eyes Without A Face - Billy Idol
   "/audio/Cat People (Putting Out Fire).mp3", // Cat People (Putting Out Fire) - David Bowie
   "audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
-  "audio/99RedBalloons.m4a",        // 99 Luftballoons - Nena
+  "audio/99RedBalloons.mp3",        // 99 Luftballoons - Nena
   "audio/PersonalJesus.m4a",        // Personal Jesus - Depeche Mode
   "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
-  // "audio/ShesCrafty.m4a",          // She's Crafty - Beast
-  "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris
+"audio/Dizzy.mp3",          // She's
+  // "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris
   "audio/LoveMyWay.m4a",           // Love My Way - Psychedelic Furs
-  "audio/Heroes.m4a",              // Heroes - Janelle Monae
-  "audio/RocketsTail.m4a",     // Love Is A Stranger - Eurythmics (yes, again — the fountain loves it)
+  // "audio/Heroes.m4a",              // Heroes - Janelle Monae
+  "audio/RocketsTail.m4a",     // Rocket's Tail - Kate Bush
 ].map((p) => p.replace(/^\//, ""));
 
 export default function FountainPage() {
