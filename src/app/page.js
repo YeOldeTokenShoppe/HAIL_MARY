@@ -2674,12 +2674,13 @@ export default function HomePage() {
           }}
           statueProps={{ scale: [3, 3, 3] }}
           cameraRadius={2.2}
-          scrollDepth
-          /* Park the crane 3 screens before the bottom so the chamber's
-             hold-on-the-phone and slow reveal play on a static shot —
-             paired with the tall .vestry-viewport that supplies that
-             scroll runway (keep the two in sync: vestry ≈ park + 0.8). */
-          cameraParkScreens={3}
+          /* Scroll-driven crane descent intentionally OFF: it only existed
+             to ride the camera down to Our Lady's chamber, which is now
+             skipped (MaryChamber unmounted below) for mobile perf. Without
+             a destination the descent would dive into empty void beneath
+             the statue, so we drop scrollDepth + cameraParkScreens and let
+             the camera hold its hero crane orbit while the (now short)
+             content scrolls over it. */
           priceDirection={skyPriceDirection}
           priceChange24h={data.loading ? null : data.priceChange24h}
           litCandleCount={litCandles.length}
@@ -2699,7 +2700,7 @@ export default function HomePage() {
           {/* Our Lady's chamber at the bottom of the crane descent —
               scroll-gated inside the component, so it costs nothing
               until the visitor heads down. */}
-          <MaryChamber />
+          {/* <MaryChamber /> */}
           {/* Dev-only perf HUD (benchmarked 55-60fps on mobile with
               the chamber + halo corona live, 2026-06-12). It
               portal-mounts inside the CRT wrapper's scaleX(1.2) box
@@ -2785,14 +2786,14 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             Vestry (WatchlistPhoneTexture CANDLE items) — the 2D VigilWall
             section was retired in their favor. VigilWall.jsx remains on
             disk, unmounted, if it's ever wanted back. */}
-
+{/* 
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
           <span className="section-divider-icon">&#x2020;</span>
           <span className="section-divider-line section-divider-line--right" />
-        </div>
+        </div> */}
 
-        <MaterExMachinaSection />
+        {/* <MaterExMachinaSection />
 
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
@@ -2806,7 +2807,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           <span className="section-divider-line section-divider-line--left" />
           <span className="section-divider-icon">&#x2021;</span>
           <span className="section-divider-line section-divider-line--right" />
-        </div>
+        </div> */}
 
         {/* <BusinessSection /> */}
 
@@ -2832,15 +2833,11 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         </button>
       </div> */}
 
-      {/* THE VESTRY — one empty viewport of scroll at the very bottom so
-          the canvas basement (Our Lady's chamber) plays out unobstructed
-          as the crane camera completes its descent. Deliberately a direct
-          child of <main>: the catch-all child rule strips its pointer
-          events, so drags fall through to the canvas turntable. */}
-      <div className="vestry-viewport" aria-hidden="true">
-        <span className="vestry-label"></span>
-        <span className="vestry-sublabel"></span>
-      </div>
+      {/* THE VESTRY removed with the chamber reveal (2026-06-17 mobile-perf
+          pass) — it was one+ empty viewport of scroll runway whose only job
+          was to give the crane descent room to reach Our Lady's chamber.
+          With the reveal skipped that scroll is pure dead space, so it's
+          gone. .vestry-viewport CSS remains in chart-shrine.css if needed. */}
 
       {showSignInNudge && (
         <div className="flame-nudge" role="status" aria-live="polite">
@@ -2860,7 +2857,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                 setShowAccountModal(true);
               }}
             >
-              Save my flame
+              Save my candle
             </button>
             <button
               type="button"

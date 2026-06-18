@@ -292,12 +292,14 @@ body:has(.shrine-page.neon) {
   .shrine-page.neon .below-fold-chamber {
     width: calc(100% + 16px);
     margin: 4vh -8px 0;
-    min-height: 300vh;
-    /* Same chamber-reveal clearance as the desktop rule above (the
-       reveal span is the same 3.4 screens on mobile; only the rotation
-       keyframes differ). 190px keeps the original gap; +65svh clears the
-       ~0.6-screen overlap with Our Lady's reveal. */
-    padding: 1px 8px calc(190px + 65svh + env(safe-area-inset-bottom, 0px));
+    /* Chamber-reveal runway removed (2026-06-17 mobile-perf pass). The old
+       300vh min-height + 65svh bottom buffer existed only to give the crane
+       descent room to reach Our Lady's reveal; with the reveal skipped that
+       was pure dead scroll. Height now follows the content (just the intro +
+       chart); the bottom padding only clears the fixed MobileBottomNav dock
+       (~132px) plus the safe-area inset. */
+    min-height: 0;
+    padding: 1px 8px calc(150px + env(safe-area-inset-bottom, 0px));
     background: transparent;
   }
 
@@ -363,19 +365,14 @@ body:has(.shrine-page.neon) {
   z-index: 2;
   width: calc(100% + 40px);
   margin: 35vh -20px 0;
-  min-height: 320vh;
-  /* Bottom gap before the empty .vestry-viewport runway. The chamber's
-     scroll-driven reveal begins REVEAL_SPAN_SCREENS (3.4) viewport-heights
-     above the page bottom, at which point the viewport top still sits
-     ~0.6 screens above the vestry's top edge — so the last content
-     (HolyTrinSection + its trailing divider) needs ≳0.6svh of clearance
-     here or it overlaps Our Lady's reveal. 280px keeps the original
-     breathing room; the 65svh buffer guarantees the clearance on any
-     viewport. This lives ABOVE the vestry on purpose: the chamber rotation
-     and crane park are both anchored to distance-from-bottom, so adding
-     space here never shifts that timing. Don't move it into .vestry-viewport
-     (whose 380vh height is synced to cameraParkScreens). */
-  padding: 1px 20px calc(280px + 65svh + env(safe-area-inset-bottom, 0px));
+  /* Chamber-reveal runway removed (2026-06-17 mobile-perf pass). The old
+     320vh min-height + 280px/65svh bottom buffer were sized to pace the
+     crane descent + below-fold sections down to Our Lady's reveal. With the
+     reveal skipped and MaterEx/HolyTrin pulled, all of that is dead scroll —
+     height now follows the content (intro + chart) with a modest bottom
+     gap for breathing room. */
+  min-height: 0;
+  padding: 1px 20px calc(120px + env(safe-area-inset-bottom, 0px));
   pointer-events: auto;
   touch-action: pan-y;
   overflow-anchor: none;
@@ -2158,6 +2155,28 @@ body:has(.shrine-page.neon) {
     flex-direction: column;
     gap: clamp(18px, 2vw, 28px);
     align-items: flex-start;
+    /* Dark "plaque" niche behind the copy on desktop too: the right
+       column sits directly over the bright statue, washing the pullquote
+       + intro to cyan-on-cyan. Width-capped + justified toward the gap so
+       it stays a tidy plaque rather than sprawling across the column. The
+       ChartWidget on the left is intentionally left unboxed — it reads
+       fine over the darker left region and its canvas stage has fragile
+       absolute positioning — so Our Lady stays visible in the center gap
+       between the glass window and the text plaque. */
+    justify-self: start;
+    max-width: 36rem;
+    padding: clamp(28px, 2.5vw, 40px) clamp(28px, 2.5vw, 38px);
+    border-radius: 18px;
+    background: radial-gradient(
+      120% 100% at 50% 0%,
+      rgba(6, 11, 19, 0.88) 0%,
+      rgba(3, 6, 12, 0.84) 55%,
+      rgba(0, 0, 0, 0.72) 100%
+    );
+    border: 1px solid rgba(42, 214, 238, 0.16);
+    box-shadow:
+      0 18px 44px rgba(0, 0, 0, 0.5),
+      0 0 20px rgba(42, 214, 238, 0.07);
   }
 
   .intro-chart-section__text .section-title-wrap {
@@ -2194,8 +2213,30 @@ body:has(.shrine-page.neon) {
     width: calc(100% - 32px);
     max-width: 480px;
     margin-top: clamp(250px, 3vw, 40px);
-    padding: 32px 16px 28px;
+    padding: 24px 18px 28px;
     text-align: center;
+    /* One dark "shrine niche" panel behind the whole intro block — both
+       the copy AND the ChartWidget. The fixed holographic statue stays
+       pinned behind everything and never fades on scroll, so without this
+       the intro copy read as cyan-on-cyan AND the ChartWidget (a canvas
+       stained-glass panel that's deliberately translucent so "the dark
+       page behind bleeds through the panes like real backlit stained
+       glass") washed out, with the bright statue bleeding through its
+       panes. A dark backdrop fixes both: legible copy + the glass reads
+       backlit as designed. No backdrop-blur on purpose — this page already
+       runs the 3D scene near the mobile GPU/memory ceiling, and an
+       opaque-enough gradient reads fine without paying for a live blur. */
+    background: radial-gradient(
+      115% 90% at 50% 0%,
+      rgba(6, 11, 19, 0.88) 0%,
+      rgba(3, 6, 12, 0.84) 55%,
+      rgba(0, 0, 0, 0.74) 100%
+    );
+    border: 1px solid rgba(42, 214, 238, 0.16);
+    border-radius: 16px;
+    box-shadow:
+      0 12px 36px rgba(0, 0, 0, 0.5),
+      0 0 18px rgba(42, 214, 238, 0.07);
   }
 
   .intro-chart-section__text {
