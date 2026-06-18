@@ -54,6 +54,11 @@ export default function FountainPage() {
   const [showDonationModal, setShowDonationModal] = useState(false);
   const [preselectedCharity, setPreselectedCharity] = useState(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  // The Coin Guide panel lives inside the fountain iframe; these social icons live
+  // here on the parent page. A z-index inside the iframe can't stack above them, so
+  // the iframe posts {type:'infoHubVisibility'} and we hide the social-stack while
+  // the panel is open — that's what lets the panel visually "cover" the icons.
+  const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const is80sMode = context80sMode;
   const iframeRef = useRef(null);
   const loadingTimeoutRef = useRef(null);
@@ -87,6 +92,18 @@ export default function FountainPage() {
     return () => {
       window.removeEventListener('resize', checkMobile);
     };
+  }, []);
+
+  // Hide the social-stack while the in-iframe Coin Guide panel is open (it can't
+  // win a z-index across the iframe boundary, so the iframe signals open/close).
+  useEffect(() => {
+    const onFrameMessage = (event) => {
+      if (event.data?.type === 'infoHubVisibility') {
+        setInfoPanelOpen(!!event.data.open);
+      }
+    };
+    window.addEventListener('message', onFrameMessage);
+    return () => window.removeEventListener('message', onFrameMessage);
   }, []);
 
   // Check if font is loaded
@@ -521,6 +538,11 @@ export default function FountainPage() {
             alignItems: "center",
             gap: "12px",
             zIndex: 1001,
+            // Yield to the Coin Guide panel while it's open (it lives in the iframe
+            // and can't out-z-index these parent-page icons).
+            opacity: infoPanelOpen ? 0 : 1,
+            pointerEvents: infoPanelOpen ? "none" : "auto",
+            transition: "opacity 0.25s ease",
           }}
         >
           {[

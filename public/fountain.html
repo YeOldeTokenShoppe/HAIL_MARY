@@ -304,11 +304,15 @@
 		/* Force unified styling for info box */
 		#info.pumpkin-modal {
 			padding: 18px 18px 16px !important;
+			/* Synthwave × old-world fusion: a deep twilight indigo→violet→wine glass
+			   (synthwave sunset, kept dark enough for white text) wrapped in the
+			   page's gold border (the old-world anchor), with a magenta+violet neon
+			   glow that picks up the fountain's neon. */
 			background:
-				linear-gradient(145deg, rgba(104, 125, 232, 0.88) 0%, rgba(116, 77, 166, 0.9) 100%) !important;
-			border: 1.5px solid rgba(212, 175, 55, 0.6) !important; /* gold border */
+				linear-gradient(155deg, rgba(34, 20, 52, 0.93) 0%, rgba(52, 20, 58, 0.93) 52%, rgba(44, 16, 40, 0.94) 100%) !important;
+			border: 1.5px solid rgba(212, 175, 55, 0.6) !important; /* gold border (old-world anchor) */
 			border-radius: 18px !important;
-			box-shadow: 0 16px 44px rgba(21, 12, 45, 0.34), 0 0 54px rgba(116, 92, 228, 0.22) !important;
+			box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5), 0 0 46px rgba(224, 64, 158, 0.26), 0 0 90px rgba(130, 60, 210, 0.16) !important;
 			backdrop-filter: blur(15px) !important;
 			-webkit-backdrop-filter: blur(15px) !important;
 			text-align: left !important;
@@ -1282,7 +1286,12 @@
 				const mobileCollectionCounter = document.getElementById('mobileCollectionCounter');
 				const originalButtonsContainer = document.getElementById('coinTossButtons');
 				const mobileButtonsContainer = document.querySelector('.mobile-buttons-inline');
-				
+
+				// This runs on load AND resize and always force-hides #info below; if
+				// the panel was open (e.g. an iPad rotate fires resize) let the parent
+				// know it's closing so its social-stack fades back in.
+				if (info && info.style.display === 'block') notifyInfoHubVisibility(false);
+
 				if (window.innerWidth <= 768) {
 					// Mobile layout - position only, styling handled by pumpkin-modal
 					info.style.position = 'fixed';
@@ -1437,6 +1446,10 @@
 				if (info.style.display === 'none' || info.style.display === '') {
 					// Show instructions with smooth animation
 					info.style.display = 'block';
+					// Tell the parent the panel is open so it can hide its social-stack
+					// (those icons live on the parent page, z-index can't reach them
+					// from inside this iframe — see notifyInfoHubVisibility).
+					notifyInfoHubVisibility(true);
 					info.style.animation = (isMobile ? 'slideInGlow' : 'slideInGlowDesktop') + ' 0.4s ease-out forwards, pulseGlow 3s ease-in-out 0.4s infinite';
 					setTimeout(() => {
 						info.style.opacity = '1';
@@ -1457,11 +1470,26 @@
 					}
 					setTimeout(() => {
 						info.style.display = 'none';
+						notifyInfoHubVisibility(false);
 					}, 300);
 				}
 			}
 			// Make it globally accessible
 			window.toggleInstructions = toggleInstructions
+
+			// The Coin Guide panel lives in this iframe; the social icons live on the
+			// parent page (page.js, .social-stack at z-index 1001). A z-index inside
+			// the iframe can't cross that boundary, so to let the open panel "cover"
+			// the icons we tell the parent to hide its social-stack while the panel is
+			// up, and show it again on close. Called from every open/close path.
+			function notifyInfoHubVisibility(open) {
+				try {
+					if (window.parent && window.parent !== window) {
+						window.parent.postMessage({ type: 'infoHubVisibility', open: !!open }, '*');
+					}
+				} catch (e) {}
+			}
+			window.notifyInfoHubVisibility = notifyInfoHubVisibility;
 
 			// Dismiss the bottom control panel for an unobstructed view of the fountain.
 			// Tossing is tap-anywhere, so hiding the panel never blocks play; a small
@@ -1479,7 +1507,7 @@
 					card.style.opacity = '0';
 					card.style.pointerEvents = 'none';
 				}
-				if (info) { info.style.display = 'none'; info.style.animation = 'none'; }
+				if (info) { info.style.display = 'none'; info.style.animation = 'none'; notifyInfoHubVisibility(false); }
 				if (restore) {
 					restore.style.display = 'flex';
 					restore.style.transition = 'opacity 0.3s ease';
@@ -2030,6 +2058,7 @@
 						}
 						setTimeout(() => {
 							info.style.display = 'none';
+							notifyInfoHubVisibility(false);
 							// Notify parent frame that instructions are closed (for mobile)
 							if (isMobile && window.parent !== window) {
 								window.parent.postMessage({ type: 'instructionsClosed' }, '*');
@@ -2829,6 +2858,10 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let infoHubCoin = null;
 			let infoHubHit = null;
 			let infoHubPulse = 0;
+			let infoHubParticles = null; // subtle gold-ember shader emitter rising off the coin
+			let infoHubBeam = null;      // conic volumetric light shaft up from the coin's rim
+			let infoHubHalo = null;      // camera-facing beacon glow + expanding ping rings (distance visibility)
+			let infoHubRingsMuting = false; // once the coin's been clicked, fade the halo's ping rings out (persisted in localStorage)
 			let waterMesh;
 			let upperWaterMesh;
 			let topBowlWaterMesh;
@@ -3989,7 +4022,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				controls = new OrbitControls( camera, container );
 				controls.minDistance = 0.1;
-				controls.maxDistance = 6;
+				controls.maxDistance = 8;
 				controls.zoomToCursor = true;
 				controls.minPolarAngle = 0;
 				controls.maxPolarAngle = Math.PI / 2;
@@ -4716,7 +4749,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						} );
 
 						scene.add( fountainModel );
-						
+
+						// Build the coin's ember emitter HERE — after the model is shifted
+						// (-0.5 Y), scaled (0.8) and added to the scene — so it anchors to the
+						// coin's FINAL world position + size. (buildInfoHubCoin already ran during
+						// the traverse above, before any of those transforms.)
+						buildInfoHubParticles();
+						buildInfoHubBeam();
+						buildInfoHubHalo();
+
 						// Calculate bounding box to see actual size
 						const box = new THREE.Box3().setFromObject(fountainModel);
 						const size = box.getSize(new THREE.Vector3());
@@ -6035,15 +6076,292 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 const wp = infoHubCoin.getWorldPosition(new THREE.Vector3());
                 console.log('[Fountain] info-hub coin from anchor', anchor.name, '-> world',
                     wp.x.toFixed(2), wp.y.toFixed(2), wp.z.toFixed(2));
+                // NOTE: the emitter is built later (right after scene.add(fountainModel)),
+                // NOT here — at this point the model hasn't been shifted (-0.5 Y), scaled
+                // (0.8) or added to the scene, so the coin's world position/size aren't final.
             }
-            
+
+            // A subtle stream of gold embers drifting up out of the coin. It's a single
+            // THREE.Points driven by a small shader: each point loops on its own phase,
+            // rising + drifting + fading, so the whole effect is one draw call, zero
+            // per-frame CPU work (we only tick uTime). Added to the scene at the coin's
+            // WORLD position with identity orientation, so "up" is true world-up and we
+            // don't inherit the coin's flat-on-the-rim rotation. Additive blending lets
+            // the existing UnrealBloomPass make them glow; procedural round point sprites
+            // (no texture) sidestep the iOS CanvasTexture/additive artifact.
+            function buildInfoHubParticles() {
+                if (!infoHubCoin || infoHubParticles || typeof scene === 'undefined' || !scene) return;
+
+                // World size of the coin → scale the emitter so it reads the same whether
+                // the model coin is tiny or large.
+                const gbb = infoHubCoin.geometry.boundingBox;
+                const localDia = gbb ? Math.max.apply(null, gbb.getSize(new THREE.Vector3()).toArray()) : 0.06;
+                const ws = infoHubCoin.getWorldScale(new THREE.Vector3());
+                const coinDia = localDia * Math.max(ws.x, ws.y, ws.z);
+                const wp = infoHubCoin.getWorldPosition(new THREE.Vector3());
+
+                // gl_PointSize is in drawing-buffer pixels; this converts a world-space
+                // sprite size to pixels at a given view depth (perspective attenuation).
+                const fovRad = ((camera && camera.fov) || 45) * Math.PI / 180;
+                const bufH = (renderer && renderer.domElement && renderer.domElement.height)
+                    || (window.innerHeight * Math.min(window.devicePixelRatio || 1, 2));
+                const heightScale = (bufH * 0.5) / Math.tan(fovRad / 2);
+
+                const COUNT = 40; // a ring of embers around the coin's edge
+                const positions = new Float32Array(COUNT * 3);
+                const aSeed = new Float32Array(COUNT);
+                const aSpeed = new Float32Array(COUNT);
+                const aScale = new Float32Array(COUNT);
+                const aDrift = new Float32Array(COUNT * 2);
+                const ringR = coinDia * 0.5; // the coin's rim = its diameter
+                for (let i = 0; i < COUNT; i++) {
+                    // Spread evenly around the circle (+ slight jitter) so they read as a
+                    // RING off the rim, not a column from the centre. The coin lies flat,
+                    // so this X/Z circle is horizontal — a halo at the coin's edge.
+                    const a = (i / COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.12;
+                    const r = ringR + (Math.random() - 0.5) * coinDia * 0.08; // thin ring band
+                    const cx = Math.cos(a), cz = Math.sin(a);
+                    positions[i * 3 + 0] = cx * r;
+                    positions[i * 3 + 1] = (Math.random() - 0.5) * coinDia * 0.06; // hug the coin plane
+                    positions[i * 3 + 2] = cz * r;
+                    aSeed[i] = Math.random();
+                    aSpeed[i] = 0.7 + Math.random() * 0.6;
+                    aScale[i] = 0.5 + Math.random() * 0.7;
+                    aDrift[i * 2 + 0] = cx; // drift outward along the radius (off the rim)
+                    aDrift[i * 2 + 1] = cz;
+                }
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geo.setAttribute('aSeed', new THREE.BufferAttribute(aSeed, 1));
+                geo.setAttribute('aSpeed', new THREE.BufferAttribute(aSpeed, 1));
+                geo.setAttribute('aScale', new THREE.BufferAttribute(aScale, 1));
+                geo.setAttribute('aDrift', new THREE.BufferAttribute(aDrift, 2));
+
+                const mat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    depthTest: true,
+                    blending: THREE.AdditiveBlending,
+                    uniforms: {
+                        uTime: { value: 0 },
+                        uLife: { value: 15.0 },                       // seconds per ember (higher = slower rise; raised in step with uRise to keep velocity gentle)
+                        uRise: { value: coinDia * 1.4 },             // taller halo so embers read from a distance
+                        uDrift: { value: coinDia * 0.28 },           // gentle outward bloom off the edge
+                        uSize: { value: coinDia * 0.085 * heightScale }, // bigger sprites so they don't vanish far out
+                        uColor: { value: new THREE.Color(0xffd98a) },   // warm gold, matches the coin
+                        uOpacity: { value: 0.9 },                    // a touch brighter for distance visibility
+                    },
+                    vertexShader: [
+                        'attribute float aSeed;',
+                        'attribute float aSpeed;',
+                        'attribute float aScale;',
+                        'attribute vec2 aDrift;',
+                        'uniform float uTime, uLife, uRise, uDrift, uSize;',
+                        'varying float vAlpha;',
+                        'varying float vSeed;',
+                        'void main() {',
+                        '  float t = mod(uTime * aSpeed + aSeed * uLife, uLife);',
+                        '  float f = t / uLife;',                    // 0..1 life fraction
+                        '  vec3 pos = position;',
+                        '  pos.y += f * uRise;',                     // rise
+                        '  pos.xz += aDrift * f * uDrift;',          // gentle outward drift
+                        '  pos.x += sin(f * 6.2831 + aSeed * 6.2831) * uDrift * 0.3;', // wobble
+                        '  vAlpha = smoothstep(0.0, 0.12, f) * (1.0 - smoothstep(0.5, 1.0, f));', // fade in/out
+                        '  vSeed = aSeed;',                          // hand the seed to the fragment for a random star rotation
+                        '  vec4 mv = modelViewMatrix * vec4(pos, 1.0);',
+                        '  gl_Position = projectionMatrix * mv;',
+                        '  gl_PointSize = clamp((uSize * aScale) / max(-mv.z, 0.001), 3.5, 22.0);',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'uniform vec3 uColor;',
+                        'uniform float uOpacity;',
+                        'varying float vAlpha;',
+                        'varying float vSeed;',
+                        'void main() {',
+                        '  vec2 d = gl_PointCoord - vec2(0.5);',
+                        '  float r = length(d) * 2.0;',              // 0 at centre .. 1 at sprite edge
+                        '  if (r > 1.0) discard;',
+                        '  float rot = vSeed * 6.2831;',             // random per-ember orientation
+                        '  float cs = cos(rot), sn = sin(rot);',
+                        '  vec2 dr = vec2(d.x * cs - d.y * sn, d.x * sn + d.y * cs);',
+                        '  float ang = atan(dr.y, dr.x);',
+                        '  float ray = pow(abs(cos(2.0 * ang)), 8.0) * pow(1.0 - r, 2.2);', // 4 thin rays along the axes
+                        '  float core = pow(1.0 - r, 3.0) * 0.5;',   // soft bright centre
+                        '  float s = clamp(core + ray, 0.0, 1.0);',  // 4-point star sparkle
+                        '  gl_FragColor = vec4(uColor, s * vAlpha * uOpacity);',
+                        '}'
+                    ].join('\n'),
+                });
+
+                infoHubParticles = new THREE.Points(geo, mat);
+                infoHubParticles.position.copy(wp);          // sit on the coin (world space)
+                infoHubParticles.renderOrder = 4;            // after the coin (renderOrder 3)
+                infoHubParticles.frustumCulled = false;      // bounds are computed pre-rise; don't pop out
+                scene.add(infoHubParticles);
+                window.infoHubParticles = infoHubParticles;  // live tuning: .material.uniforms.uSize.value, etc.
+            }
+
+            // A soft conic light shaft beaming up off the coin's rim. A single open-ended
+            // cone frustum (base = the coin's circumference, flaring out slightly as it
+            // rises) with an additive
+            // shader: vertical fade (bright at the coin, gone at the top) + a fresnel term
+            // that brightens the silhouette so it reads as volumetric rather than a solid
+            // cone. UnrealBloomPass blooms it into a glow. Same anchoring trick as the
+            // embers: added to the scene at the coin's WORLD position, identity orientation,
+            // so the beam points true world-up regardless of the coin's flat-on-rim pose.
+            function buildInfoHubBeam() {
+                if (!infoHubCoin || infoHubBeam || typeof scene === 'undefined' || !scene) return;
+
+                const gbb = infoHubCoin.geometry.boundingBox;
+                const localDia = gbb ? Math.max.apply(null, gbb.getSize(new THREE.Vector3()).toArray()) : 0.06;
+                const ws = infoHubCoin.getWorldScale(new THREE.Vector3());
+                const coinDia = localDia * Math.max(ws.x, ws.y, ws.z);
+                const wp = infoHubCoin.getWorldPosition(new THREE.Vector3());
+
+                const height = coinDia * 4.6;            // shaft height (world units)
+                const baseR = coinDia * 0.5;             // base ring = the coin's circumference
+                const topR = coinDia * 0.66;             // slightly WIDER than the base → gentle outward flare
+                // CylinderGeometry(topR, bottomR, height, radial, height, openEnded). Shift up
+                // by height/2 so the base sits on the coin plane and it grows upward.
+                const geo = new THREE.CylinderGeometry(topR, baseR, height, 40, 1, true);
+                geo.translate(0, height / 2, 0);
+
+                const mat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    depthTest: true,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    uniforms: {
+                        uTime: { value: 0 },
+                        uHeight: { value: height },
+                        uColor: { value: new THREE.Color(0xffe2a6) }, // light warm gold
+                        uOpacity: { value: 0.22 },                    // subtle — additive + bloom amplify it
+                    },
+                    vertexShader: [
+                        'uniform float uHeight;',
+                        'varying float vY;',
+                        'varying vec3 vN;',
+                        'varying vec3 vV;',
+                        'void main() {',
+                        '  vY = clamp(position.y / uHeight, 0.0, 1.0);', // 0 at base, 1 at top
+                        '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+                        '  vN = normalize(normalMatrix * normal);',
+                        '  vV = normalize(-mv.xyz);',
+                        '  gl_Position = projectionMatrix * mv;',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'uniform vec3 uColor;',
+                        'uniform float uOpacity;',
+                        'uniform float uTime;',
+                        'varying float vY;',
+                        'varying vec3 vN;',
+                        'varying vec3 vV;',
+                        'void main() {',
+                        '  float fade = pow(1.0 - vY, 1.6) * smoothstep(0.0, 0.06, vY);', // bright at base, emerges above the coin, gone by the top
+                        '  float fres = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.6);', // glow at the silhouette
+                        '  float shimmer = 0.85 + 0.15 * sin(vY * 16.0 - uTime * 1.8);', // faint vertical shimmer
+                        '  float a = uOpacity * fade * (0.5 + 0.5 * fres) * shimmer;',
+                        '  gl_FragColor = vec4(uColor, max(a, 0.0));',
+                        '}'
+                    ].join('\n'),
+                });
+
+                infoHubBeam = new THREE.Mesh(geo, mat);
+                infoHubBeam.position.copy(wp);
+                infoHubBeam.renderOrder = 2;        // before the coin (3) + embers (4); additive so order is cosmetic
+                infoHubBeam.frustumCulled = false;
+                scene.add(infoHubBeam);
+                window.infoHubBeam = infoHubBeam;   // live tuning: .material.uniforms.uOpacity/uColor, .scale.y, etc.
+            }
+
+            // A "beacon" for distance visibility: a camera-facing additive quad centred on
+            // the coin that draws (a) a soft central glow halo and (b) slow rings pinging
+            // outward — so even when the coin shrinks to a few pixels across the plaza,
+            // there's a big, simple, moving glow saying "here". Billboarded + uTime ticked
+            // in updateInfoHubCoin. depthTest:false so it stays a reliable marker (it reads
+            // as a glow, not a solid object); flip to true if you want it to hide behind
+            // the statue/rim when orbiting.
+            function buildInfoHubHalo() {
+                if (!infoHubCoin || infoHubHalo || typeof scene === 'undefined' || !scene) return;
+
+                const gbb = infoHubCoin.geometry.boundingBox;
+                const localDia = gbb ? Math.max.apply(null, gbb.getSize(new THREE.Vector3()).toArray()) : 0.06;
+                const ws = infoHubCoin.getWorldScale(new THREE.Vector3());
+                const coinDia = localDia * Math.max(ws.x, ws.y, ws.z);
+                const wp = infoHubCoin.getWorldPosition(new THREE.Vector3());
+
+                // If the coin was already clicked on a previous visit, start with the ping
+                // rings already muted (the steady glow still marks the coin).
+                let coinAlreadyClicked = false;
+                try { coinAlreadyClicked = localStorage.getItem('fountainInfoCoinClicked') === '1'; } catch (e) {}
+
+                const size = coinDia * 5.5; // halo + ring spread (world units) — bigger than the coin so it survives at distance
+                const geo = new THREE.PlaneGeometry(size, size);
+                const mat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    depthTest: false,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    uniforms: {
+                        uTime: { value: 0 },
+                        uColor: { value: new THREE.Color(0xffd98a) }, // warm gold
+                        uOpacity: { value: 0.4 },                     // additive + bloom amplify it
+                        uRings: { value: coinAlreadyClicked ? 0.0 : 1.0 }, // ping rings on until the coin is clicked
+                    },
+                    vertexShader: [
+                        'varying vec2 vUv;',
+                        'void main() {',
+                        '  vUv = uv;',
+                        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+                        '}'
+                    ].join('\n'),
+                    fragmentShader: [
+                        'uniform float uTime, uOpacity, uRings;',
+                        'uniform vec3 uColor;',
+                        'varying vec2 vUv;',
+                        'void main() {',
+                        '  float d = length(vUv - 0.5) * 2.0;',       // 0 centre .. 1 at the edge midpoints
+                        '  if (d > 1.0) discard;',
+                        '  float halo = pow(1.0 - d, 2.6);',          // soft central glow
+                        '  float ring = 0.0;',
+                        '  for (int i = 0; i < 2; i++) {',            // two staggered ping rings
+                        '    float ph = fract(uTime * 0.32 + float(i) * 0.5);',
+                        '    float rad = ph * 0.92;',                 // expand to the edge
+                        '    ring += smoothstep(0.05, 0.0, abs(d - rad)) * (1.0 - ph);', // thin ring, fading as it grows
+                        '  }',
+                        '  float a = (halo * 0.45 + ring * 0.7 * uRings) * uOpacity;',
+                        '  gl_FragColor = vec4(uColor, a);',
+                        '}'
+                    ].join('\n'),
+                });
+
+                infoHubHalo = new THREE.Mesh(geo, mat);
+                infoHubHalo.position.copy(wp);
+                infoHubHalo.renderOrder = 5;        // draw last (it's depth-test-off, additive)
+                infoHubHalo.frustumCulled = false;
+                scene.add(infoHubHalo);
+                window.infoHubHalo = infoHubHalo;   // live tuning: .material.uniforms.uOpacity, .scale.setScalar(n)
+            }
+
             function updateInfoHubCoin(dt) {
-                if (!infoHubCoin) return;
-                infoHubPulse += dt;
-                const pulse = 0.5 + 0.5 * Math.sin(infoHubPulse * 2.2);
-                infoHubCoin.material.emissiveIntensity = infoHubCoin.userData.baseEmissive * (0.7 + 0.6 * pulse);
-                infoHubCoin.scale.copy(infoHubCoin.userData.baseScale).multiplyScalar(1 + 0.05 * pulse);
-                // Shine + pulse only — no spin/hover (the coin stays put on the rim).
+                if (infoHubParticles) infoHubParticles.material.uniforms.uTime.value += dt;
+                if (infoHubBeam) infoHubBeam.material.uniforms.uTime.value += dt;
+                if (infoHubHalo) {
+                    infoHubHalo.material.uniforms.uTime.value += dt;
+                    if (camera) infoHubHalo.quaternion.copy(camera.quaternion); // billboard: face the camera
+                    if (infoHubRingsMuting) {                                   // fade the ping rings out after the first click
+                        const u = infoHubHalo.material.uniforms.uRings;
+                        if (u.value > 0.0) u.value = Math.max(0.0, u.value - dt * 1.6); // ~0.6s fade
+                    }
+                }
+                // Coin holds a STEADY glow now — no pulse/breathing. Its emissiveIntensity
+                // (0.7) + bloom and its base scale (set in buildInfoHubCoin) are left
+                // untouched; the rim embers are the only animated element. (infoHubPulse
+                // is no longer used.)
             }
             
             // Tap -> open the info hub. Returns true when the coin (or its hit-proxy)
@@ -6059,6 +6377,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 const isTouch = (navigator.maxTouchPoints || 0) > 0 || ('ontouchstart' in window);
                 if (isTouch && typeof window.enableFountainSound === 'function') {
                     window.enableFountainSound();
+                }
+                // The coin's been found/clicked — its job as an attractor is done, so mute
+                // the halo's ping rings (the steady glow stays) and remember it across visits.
+                if (!infoHubRingsMuting) {
+                    infoHubRingsMuting = true;
+                    try { localStorage.setItem('fountainInfoCoinClicked', '1'); } catch (e) {}
                 }
                 openInfoHub();
                 return true;
@@ -6105,43 +6429,43 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 // DESKTOP ONLY for now: the mobile panel doesn't scroll cleanly (a drag
                 // closes it), so the socials would be unreachable — revisit once the
                 // mobile scroll/close behavior is fixed.
-                if (!isMobileDevice) {
-                if (!document.getElementById('infoHubSocialStyle')) {
-                    const st = document.createElement('style');
-                    st.id = 'infoHubSocialStyle';
-                    st.textContent = '.info-social-btn:hover{background:rgba(212,175,55,0.15)!important;'
-                        + 'box-shadow:0 0 15px rgba(212,175,55,0.5);transform:scale(1.1);filter:brightness(1.2);}';
-                    document.head.appendChild(st);
-                }
-                const socials = [
-                    { href: 'https://x.com/rl80token', label: 'X (Twitter)', icon: '/x_logo_white.webp', size: 17 },
-                    { href: 'https://t.me/rl80token', label: 'Telegram', icon: '/telegram_logo_white.webp', size: 19 },
-                    { href: 'https://farcaster.xyz/rl80', label: 'Farcaster', icon: '/farcaster_logo.webp', size: 19 },
-                ];
-                const socialRow = document.createElement('div');
-                socialRow.id = 'infoHubSocials';
-                socialRow.style.cssText = 'display:flex;justify-content:center;gap:14px;'
-                    + 'margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.12);';
-                socials.forEach(function (s) {
-                    const a = document.createElement('a');
-                    a.href = s.href;
-                    a.target = '_blank';
-                    a.rel = 'noopener noreferrer';
-                    a.setAttribute('aria-label', s.label);
-                    a.className = 'info-social-btn';
-                    a.style.cssText = 'display:flex;align-items:center;justify-content:center;width:40px;height:40px;'
-                        + 'border-radius:50%;border:1px solid rgba(212,175,55,0.35);background:rgba(0,0,0,0.5);'
-                        + 'transition:all 0.25s ease;cursor:pointer;';
-                    const icon = document.createElement('span');
-                    icon.setAttribute('aria-hidden', 'true');
-                    icon.style.cssText = 'display:block;width:' + s.size + 'px;height:' + s.size + 'px;'
-                        + 'background-color:#d4a854;-webkit-mask:url(' + s.icon + ') center/contain no-repeat;'
-                        + 'mask:url(' + s.icon + ') center/contain no-repeat;';
-                    a.appendChild(icon);
-                    socialRow.appendChild(a);
-                });
-                content.appendChild(socialRow);
-                } // end !isMobileDevice (socials desktop-only)
+                // if (!isMobileDevice) {
+                // if (!document.getElementById('infoHubSocialStyle')) {
+                //     const st = document.createElement('style');
+                //     st.id = 'infoHubSocialStyle';
+                //     st.textContent = '.info-social-btn:hover{background:rgba(212,175,55,0.15)!important;'
+                //         + 'box-shadow:0 0 15px rgba(212,175,55,0.5);transform:scale(1.1);filter:brightness(1.2);}';
+                //     document.head.appendChild(st);
+                // }
+                // const socials = [
+                //     { href: 'https://x.com/rl80token', label: 'X (Twitter)', icon: '/x_logo_white.webp', size: 17 },
+                //     { href: 'https://t.me/rl80token', label: 'Telegram', icon: '/telegram_logo_white.webp', size: 19 },
+                //     { href: 'https://farcaster.xyz/rl80', label: 'Farcaster', icon: '/farcaster_logo.webp', size: 19 },
+                // ];
+                // const socialRow = document.createElement('div');
+                // socialRow.id = 'infoHubSocials';
+                // socialRow.style.cssText = 'display:flex;justify-content:center;gap:14px;'
+                //     + 'margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.12);';
+                // socials.forEach(function (s) {
+                //     const a = document.createElement('a');
+                //     a.href = s.href;
+                //     a.target = '_blank';
+                //     a.rel = 'noopener noreferrer';
+                //     a.setAttribute('aria-label', s.label);
+                //     a.className = 'info-social-btn';
+                //     a.style.cssText = 'display:flex;align-items:center;justify-content:center;width:40px;height:40px;'
+                //         + 'border-radius:50%;border:1px solid rgba(212,175,55,0.35);background:rgba(0,0,0,0.5);'
+                //         + 'transition:all 0.25s ease;cursor:pointer;';
+                //     const icon = document.createElement('span');
+                //     icon.setAttribute('aria-hidden', 'true');
+                //     icon.style.cssText = 'display:block;width:' + s.size + 'px;height:' + s.size + 'px;'
+                //         + 'background-color:#d4a854;-webkit-mask:url(' + s.icon + ') center/contain no-repeat;'
+                //         + 'mask:url(' + s.icon + ') center/contain no-repeat;';
+                //     a.appendChild(icon);
+                //     socialRow.appendChild(a);
+                // });
+                // content.appendChild(socialRow);
+                // } // end !isMobileDevice (socials desktop-only)
 
                 // No close button — clicking outside the panel dismisses it (see the
                 // document click-outside handler), and the glowing coin reopens it.
@@ -8301,7 +8625,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 		     this chip only chooses WHICH coin that tap throws. Tapping the
 		     chip opens the tray; picking a charity runs the parent's donation
 		     modal, and a successful donation puts a golden coin in hand. -->
-		<div id="coinTossButtons" style="
+		<!-- <div id="coinTossButtons" style="
 			position: fixed;
 			bottom: 10vh;
 			left: 50%;
@@ -8341,7 +8665,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					<span class="coin-chip-caret" aria-hidden="true">▴</span>
 				</button>
 			</div>
-		</div>
+		</div> -->
 
 		<style>
 			/* ===== Coin chip + tray ===== */
@@ -9018,27 +9342,34 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				}
 			}
 			
-			/* iPad Portrait */
+			/* iPad Portrait — the old bottom counter (the chevron + ❓ chip) stays
+			   retired here too; the glowing coin is the only way into the Coin Guide
+			   now, so we no longer re-show #mobileCollectionCounter (which would
+			   otherwise win over #infoHubHideOldUI by coming later in the cascade). */
 			@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
 				#coinTossButtons {
 					bottom: 8vh !important;
 				}
-				
-				#mobileCollectionCounter {
-					display: flex !important;
-					/* bottom: 25vh !important; */
-				}
 			}
-			
+
 			/* iPad Landscape */
 			@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
 				#coinTossButtons {
 					bottom: 8vh !important;
 				}
-				
-				#mobileCollectionCounter {
-					display: flex !important;
-					bottom: 5vh !important;
+
+				/* iPad mini landscape (≈1024px) is cramped: the desktop-positioned Coin
+				   Guide panel runs into the page's social-icon column (rendered by the
+				   parent page at right:2rem). Pull the panel in from the right so it
+				   clears that column and keeps a small right margin. (#info lives in
+				   this iframe and the social icons live on the parent page, so they
+				   can't share a z-index — separating them horizontally is what keeps
+				   the panel unobscured.) */
+				#info {
+					left: auto !important;
+					right: 90px !important;
+					transform: translateY(-50%) !important;
+					z-index: 10001 !important;
 				}
 			}
 			
