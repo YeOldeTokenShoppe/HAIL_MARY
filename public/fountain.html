@@ -95,7 +95,7 @@
 					right: 20px !important;
 					left: 20px !important;  /* Full width now that coin counter is removed */
 					top: auto !important;
-					bottom: 25vh !important;  /* Moved up above buttons and coin count */
+					bottom: 22vh !important;  /* keeps the panel clear of Safari's bottom toolbar */
 					transform: none !important;
 					width: auto !important;
 					max-width: none !important;
@@ -106,15 +106,15 @@
 						rgba(255, 255, 255, 0.15) 0%,
 						rgba(255, 215, 0, 0.12) 50%,
 						rgba(255, 183, 0, 0.10) 100%) !important;
-					border: 2px solid rgba(255, 215, 0, 0.4) !important;
+					border: 2px solid rgba(212, 175, 55, 0.6) !important;
 					border-radius: 24px !important;
 					height: auto !important;  /* Auto height to fit content */
 					min-height: 5rem !important;
-					max-height: 50vh !important;
+					max-height: 52vh !important;
 					overflow-y: auto !important;
 					display: flex;
 					flex-direction: column;
-					justify-content: center;
+					justify-content: flex-start; /* top-aligned so overflow scrolls to the bottom (socials reachable) */
 					align-items: center;
 					box-sizing: border-box;
 					overflow: visible;
@@ -306,7 +306,7 @@
 			padding: 18px 18px 16px !important;
 			background:
 				linear-gradient(145deg, rgba(104, 125, 232, 0.88) 0%, rgba(116, 77, 166, 0.9) 100%) !important;
-			border: 1px solid rgba(210, 210, 255, 0.45) !important;
+			border: 1.5px solid rgba(212, 175, 55, 0.6) !important; /* gold border */
 			border-radius: 18px !important;
 			box-shadow: 0 16px 44px rgba(21, 12, 45, 0.34), 0 0 54px rgba(116, 92, 228, 0.22) !important;
 			backdrop-filter: blur(15px) !important;
@@ -4286,6 +4286,16 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						render();
 					});
 
+					// Let other UI force the ambience ON — used when a phone/tablet user
+					// taps the info-hub coin. Called from inside that tap's gesture, so the
+					// resume() is honored on iOS. Unmutes, starts the loop, persists + syncs UI.
+					window.enableFountainSound = function () {
+						muted = false;
+						kickStart();
+						persistMuted();
+						render();
+					};
+
 					// Begin decoding immediately (warm the buffer), and start the loop on the
 					// first user gesture anywhere — a coin toss is itself a gesture, so the
 					// ambience comes in with the very first coin.
@@ -6043,6 +6053,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 raycaster.setFromCamera(ndc, camera);
                 const targets = infoHubHit ? [infoHubCoin, infoHubHit] : [infoHubCoin];
                 if (!raycaster.intersectObjects(targets, false).length) return false;
+                // On phone/tablet, tapping the coin also switches the ambience ON. Unlike a
+                // toss, a coin tap doesn't otherwise kick the loop on, so do it explicitly —
+                // this runs inside the tap gesture, so iOS honors the audio unlock.
+                const isTouch = (navigator.maxTouchPoints || 0) > 0 || ('ontouchstart' in window);
+                if (isTouch && typeof window.enableFountainSound === 'function') {
+                    window.enableFountainSound();
+                }
                 openInfoHub();
                 return true;
             }
@@ -6057,19 +6074,23 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 const content = info.querySelector('.info-content') || info;
                 const row = document.createElement('div');
                 row.id = 'infoHubControls';
-                row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px;'
+                // Two columns: the two toggles stacked on the left, Donate on the right.
+                row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;'
                     + 'margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.12);';
+                const toggles = document.createElement('div');
+                toggles.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:6px;';
                 const cam = document.getElementById('coinCamToggle');
                 const sound = document.getElementById('waterSoundToggle');
-                if (cam) row.appendChild(cam);     // moved from the control strip, listeners intact
-                if (sound) row.appendChild(sound); // moved from the control strip, listeners intact
+                if (cam) toggles.appendChild(cam);     // moved from the control strip, listeners intact
+                if (sound) toggles.appendChild(sound); // moved from the control strip, listeners intact
+                row.appendChild(toggles);
                 const donate = document.createElement('button');
                 donate.type = 'button';
                 donate.id = 'infoHubDonate';
                 donate.innerHTML = '<span aria-hidden="true">\uD83E\uDE99</span> Donate';
-                donate.style.cssText = 'margin-left:auto;padding:8px 16px;border-radius:12px;border:none;'
+                donate.style.cssText = 'flex:0 0 auto;padding:11px 20px;border-radius:12px;border:none;'
                     + 'cursor:pointer;background:linear-gradient(135deg,#ffd700,#ffb700);color:#3a2c00;'
-                    + 'font-weight:800;font-size:13px;letter-spacing:0.3px;';
+                    + 'font-weight:800;font-size:14px;letter-spacing:0.3px;';
                 donate.addEventListener('click', function () {
                     // Close the panel, then open the parent's real donation modal
                     // (charity-select step). Same path as the old chip tray.
@@ -6078,6 +6099,50 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 });
                 row.appendChild(donate);
                 content.insertBefore(row, content.firstChild);
+
+                // Social row at the BOTTOM of the panel — same brand as the desktop
+                // social-stack (gold mask-image icons, hover glow), sized for the panel.
+                // DESKTOP ONLY for now: the mobile panel doesn't scroll cleanly (a drag
+                // closes it), so the socials would be unreachable — revisit once the
+                // mobile scroll/close behavior is fixed.
+                if (!isMobileDevice) {
+                if (!document.getElementById('infoHubSocialStyle')) {
+                    const st = document.createElement('style');
+                    st.id = 'infoHubSocialStyle';
+                    st.textContent = '.info-social-btn:hover{background:rgba(212,175,55,0.15)!important;'
+                        + 'box-shadow:0 0 15px rgba(212,175,55,0.5);transform:scale(1.1);filter:brightness(1.2);}';
+                    document.head.appendChild(st);
+                }
+                const socials = [
+                    { href: 'https://x.com/rl80token', label: 'X (Twitter)', icon: '/x_logo_white.webp', size: 17 },
+                    { href: 'https://t.me/rl80token', label: 'Telegram', icon: '/telegram_logo_white.webp', size: 19 },
+                    { href: 'https://farcaster.xyz/rl80', label: 'Farcaster', icon: '/farcaster_logo.webp', size: 19 },
+                ];
+                const socialRow = document.createElement('div');
+                socialRow.id = 'infoHubSocials';
+                socialRow.style.cssText = 'display:flex;justify-content:center;gap:14px;'
+                    + 'margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.12);';
+                socials.forEach(function (s) {
+                    const a = document.createElement('a');
+                    a.href = s.href;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.setAttribute('aria-label', s.label);
+                    a.className = 'info-social-btn';
+                    a.style.cssText = 'display:flex;align-items:center;justify-content:center;width:40px;height:40px;'
+                        + 'border-radius:50%;border:1px solid rgba(212,175,55,0.35);background:rgba(0,0,0,0.5);'
+                        + 'transition:all 0.25s ease;cursor:pointer;';
+                    const icon = document.createElement('span');
+                    icon.setAttribute('aria-hidden', 'true');
+                    icon.style.cssText = 'display:block;width:' + s.size + 'px;height:' + s.size + 'px;'
+                        + 'background-color:#d4a854;-webkit-mask:url(' + s.icon + ') center/contain no-repeat;'
+                        + 'mask:url(' + s.icon + ') center/contain no-repeat;';
+                    a.appendChild(icon);
+                    socialRow.appendChild(a);
+                });
+                content.appendChild(socialRow);
+                } // end !isMobileDevice (socials desktop-only)
+
                 // No close button — clicking outside the panel dismisses it (see the
                 // document click-outside handler), and the glowing coin reopens it.
                 info.dataset.hubAugmented = '1';

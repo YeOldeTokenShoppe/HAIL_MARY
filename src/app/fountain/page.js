@@ -505,6 +505,81 @@ export default function FountainPage() {
           console.log('New candle created:', candle);
         }}
       /> */}
+
+      {/* Social links (X / Telegram / Farcaster) — desktop only, mirrors the
+          root page's social-stack (bottom-right, gold-bordered round buttons). */}
+      {!isMobileView && (
+        <div
+          className="social-stack"
+          style={{
+            position: "fixed",
+            bottom: "5rem",
+            right: "2rem",
+            left: "auto",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "12px",
+            zIndex: 1001,
+          }}
+        >
+          {[
+            { href: "https://x.com/rl80token", label: "X (Twitter)", icon: "/x_logo_white.webp", size: 18 },
+            { href: "https://t.me/rl80token", label: "Telegram", icon: "/telegram_logo_white.webp", size: 20 },
+            { href: "https://farcaster.xyz/rl80", label: "Farcaster", icon: "/farcaster_logo.webp", size: 20 },
+          ].map((s) => (
+            <a
+              key={s.href}
+              href={s.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={s.label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                border: "1px solid rgba(212, 175, 55, 0.35)",
+                background: "rgba(0, 0, 0, 0.5)",
+                transition: "all 0.3s ease",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
+                e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
+                e.currentTarget.style.transform = "scale(1.1)";
+                e.currentTarget.style.filter = "brightness(1.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.filter = "none";
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "block",
+                  width: `${s.size}px`,
+                  height: `${s.size}px`,
+                  backgroundColor: "#d4a854",
+                  WebkitMaskImage: `url(${s.icon})`,
+                  maskImage: `url(${s.icon})`,
+                  WebkitMaskRepeat: "no-repeat",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskPosition: "center",
+                  maskPosition: "center",
+                  WebkitMaskSize: "contain",
+                  maskSize: "contain",
+                }}
+              />
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
