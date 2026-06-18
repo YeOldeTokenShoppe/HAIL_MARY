@@ -231,7 +231,7 @@ export default function FountainPage() {
             pointerEvents: 'none',
           }}>
             
-            <h1 className='custom-title'
+            {/* <h1 className='custom-title'
                 id="main-title"
                 style={{
                 position: "relative",
@@ -280,7 +280,7 @@ export default function FountainPage() {
                 Perpetual
               </span>
               <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
-            </h1>
+            </h1> */}
 
           </div>
         </div>
@@ -376,7 +376,7 @@ export default function FountainPage() {
             style={{ display: "block" }}
           />
         </Link> */}
-        <MusicButton accent="#d4a854" icon="/icon80.svg" size={62} />
+        {/* <MusicButton accent="#d4a854" icon="/icon80.svg" size={62} /> */}
       </div>
 
       {/* Nav Controls - Top Right (desktop only) */}

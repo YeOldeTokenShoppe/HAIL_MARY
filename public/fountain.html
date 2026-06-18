@@ -2255,6 +2255,7 @@
 			import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 			import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 			import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+			import { Reflector } from 'three/addons/objects/Reflector.js';
 			
 			// --- Coin Material and Geometry (moved up for Firebase functions) ---
 			const baseCoinMaterial = new THREE.MeshStandardMaterial({
@@ -2865,6 +2866,49 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let waterMesh;
 			let upperWaterMesh;
 			let topBowlWaterMesh;
+			let floorCausticMats = [];   // Fountain_Floor materials patched with wave caustics (top-level so animate()/render() can update them)
+			window.floorCausticMats = floorCausticMats;   // live tuning: floorCausticMats[0].userData.causticShader.uniforms.uCausStrength.value = 0..1.5
+			let floorCausticOnStrength = 0.6;   // caustic brightness in the normal (above-water) view; faded to 0 while the coin-cam is underwater
+			window.floorCausticOnStrength = floorCausticOnStrength;   // live tuning: window.floorCausticOnStrength = 0..1.5
+			const WATER_SURFACE_Y = -0.5;   // main pool surface; camera eye below this = "underwater" (blue filter on, caustics off) even in free-look
+			window.WATER_SURFACE_Y = WATER_SURFACE_Y;   // live tuning of the trigger depth
+			let underwaterMinAlpha = 0.30;   // tint applied the INSTANT the eye dips under (matches the old flat value, so it never looks "gone" at the shallow depths free-look reaches)
+			let underwaterMaxAlpha = 0.50;   // strongest tint when deep
+			let underwaterFullDepth = 0.8;   // world units below the surface at which the tint reaches MAX
+			window.underwaterMinAlpha = underwaterMinAlpha;     // live tuning
+			window.underwaterMaxAlpha = underwaterMaxAlpha;     // live tuning
+			window.underwaterFullDepth = underwaterFullDepth;   // live tuning
+			// --- Normal-distorted refraction (water.js render-target pass) -------------
+			// Each frame the scene is rendered ONCE with the water hidden into refractRT;
+			// the water shader samples that "under-water" view bent by the surface normal,
+			// so the floor/coins seen through the surface WOBBLE with the ripples. Gated to
+			// desktop + low-res (it's an extra full-scene pass) and fully off when mix = 0.
+			const REFRACTION_ENABLED = !isMobileDevice;
+			let refractionMix = 0.1;     // subtle by default: refraction legitimately reveals the submerged pedestal/floor, so a low mix keeps it a shimmer (the reflection is the hero); raise for a stronger see-through
+			let refractionAmt = 0.04;    // screen-space ripple distortion strength
+			let refractRT = null;        // lazily created in render(), sized from the drawing buffer
+			const _refractSize = new THREE.Vector2();
+			const _refractRes  = new THREE.Vector2();
+			window.REFRACTION_ENABLED = REFRACTION_ENABLED;
+			window.refractionMix = refractionMix;   // live tuning: 0 disables (and skips the pass)
+			window.refractionAmt = refractionAmt;   // live tuning: ripple distortion strength
+			let stats = null, perfHud = null;   // perf monitor (FPS panel + draw-call/refraction readout); window.togglePerf() to hide
+			let _refractLastOn = refractionMix > 0 ? refractionMix : 0.5;   // remembers tuned mix across the 'P' on/off toggle
+			// --- Planar reflection (gated): a REAL upside-down mirror of the statue/scene
+			// on the water via THREE.Reflector (handles the mirror camera + below-surface
+			// clip). Separate full-scene pass (shows in the perf HUD draws), desktop-only,
+			// 'R' toggles it. This is the true reflection; refraction is the see-through.
+			const REFLECTION_ENABLED = !isMobileDevice;
+			let reflectionStrength = 1.4;   // 0..1+ overall strength (0 = off → hides the reflector, skipping its pass)
+			let waterReflector = null;
+			let _reflLastOn = reflectionStrength > 0 ? reflectionStrength : 0.5;   // remembers tuned strength across the 'R' toggle
+			window.reflectionStrength = reflectionStrength;   // live tuning
+			window.reflectDistort = 0.06;     // how much the reflection ripples with the water surface (0 = flat mirror)
+			window.splashDropScale = 1.0;     // coin-splash droplet COUNT multiplier (Water FX panel)
+			window.splashDropSize  = 0.045;   // coin-splash droplet world size
+			window.splashDropLaunch = 1.0;    // coin-splash droplet launch height/strength (lower = gentler arc)
+			window.splashDropOpacity = 0.35;  // coin-splash droplet opacity
+			window.minRestFaceY = 0.8;        // coins only rest on faces flatter than this (↑ = slide off steeper slopes)
 			let poolBorder;
 			let meshRay;
 			let upperMeshRay;
@@ -3175,6 +3219,81 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             // --- END NEW ---
 
 			// --- NEW: Splash Particle System Functions ---
+			// --- Coin-splash droplets ------------------------------------------------
+			// A few bright water beads that leap up + out on impact and arc back under
+			// gravity — layered on TOP of the existing flat foam ring. Pooled THREE.Points
+			// spray ported from the petri-dish water.js. Burst size + launch speed scale
+			// with the coin's impact velocity (see the emit at water entry), so a higher
+			// toss makes a bigger splash. Tunable live via the Water FX panel.
+			const DROP_MAX = 180;
+			const _dropPos  = new Float32Array(DROP_MAX * 3);
+			const _dropVel  = new Float32Array(DROP_MAX * 3);
+			const _dropLife = new Float32Array(DROP_MAX);
+			const _dropY0   = new Float32Array(DROP_MAX);   // launch surface Y (so each parks at its own pool)
+			let _dropHead = 0, dropletPoints = null;
+			function initDroplets() {
+				for (let i = 0; i < DROP_MAX; i++) _dropPos[i * 3 + 1] = -999;   // park all
+				const geo = new THREE.BufferGeometry();
+				geo.setAttribute('position', new THREE.BufferAttribute(_dropPos, 3));
+				// round droplet sprite: bright core fading to a soft blue-white rim
+				const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+				const cx = cv.getContext('2d');
+				const grad = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
+				grad.addColorStop(0.0, 'rgba(255,255,255,1)');
+				grad.addColorStop(0.35, 'rgba(226,242,255,0.85)');
+				grad.addColorStop(1.0, 'rgba(200,230,255,0)');
+				cx.fillStyle = grad; cx.beginPath(); cx.arc(32, 32, 32, 0, 7); cx.fill();
+				const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+				const mat = new THREE.PointsMaterial({
+					size: 0.045, map: tex, transparent: true, depthWrite: false,
+					blending: THREE.AdditiveBlending, sizeAttenuation: true, opacity: 0.95
+				});
+				dropletPoints = new THREE.Points(geo, mat);
+				dropletPoints.frustumCulled = false;
+				dropletPoints.renderOrder = 6;
+				scene.add(dropletPoints);
+			}
+			// emit `count` droplets from (x,y,z); `power` scales their launch speed.
+			function emitDroplets(x, y, z, count, power) {
+				if (!dropletPoints) return;
+				power = power == null ? 1 : power;
+				count = Math.round(count * (window.splashDropScale ?? 1));
+				for (let n = 0; n < count; n++) {
+					const i = _dropHead; _dropHead = (_dropHead + 1) % DROP_MAX;
+					const a = Math.random() * Math.PI * 2, r = Math.random();
+					const launch = (window.splashDropLaunch ?? 1.0);   // overall height/strength knob
+					const out = r * 0.28 * (0.6 + power) * launch;
+					_dropVel[i * 3]     = Math.cos(a) * out;                              // outward
+					_dropVel[i * 3 + 1] = (0.30 + Math.random() * 0.32) * (0.7 + power * 0.35) * launch;    // up (calmer arc)
+					_dropVel[i * 3 + 2] = Math.sin(a) * out;
+					_dropPos[i * 3]     = x;
+					_dropPos[i * 3 + 1] = y + 0.02;
+					_dropPos[i * 3 + 2] = z;
+					_dropY0[i]          = y;
+					_dropLife[i]        = 0.4 + Math.random() * 0.45;
+				}
+			}
+			function updateDroplets(dt) {
+				if (!dropletPoints) return;
+				dropletPoints.material.size = (window.splashDropSize ?? 0.045);
+				dropletPoints.material.opacity = (window.splashDropOpacity ?? 0.35);
+				let any = false;
+				for (let i = 0; i < DROP_MAX; i++) {
+					if (_dropLife[i] <= 0) continue;
+					any = true;
+					_dropLife[i] -= dt;
+					_dropVel[i * 3 + 1] -= 3.0 * dt;                  // gravity (fountain scale)
+					_dropPos[i * 3]     += _dropVel[i * 3]     * dt;
+					_dropPos[i * 3 + 1] += _dropVel[i * 3 + 1] * dt;
+					_dropPos[i * 3 + 2] += _dropVel[i * 3 + 2] * dt;
+					// park when spent, or once it falls back through its own launch surface
+					if (_dropLife[i] <= 0 || (_dropVel[i * 3 + 1] < 0.0 && _dropPos[i * 3 + 1] < _dropY0[i] - 0.01)) {
+						_dropLife[i] = 0; _dropPos[i * 3 + 1] = -999;
+					}
+				}
+				if (any) dropletPoints.geometry.attributes.position.needsUpdate = true;
+			}
+
 			function initSplashParticleSystem() {
 				// Create particle geometry
 				const particleGeometry = new THREE.BufferGeometry();
@@ -3764,6 +3883,46 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// behind /fountain?lights so regular visitors never see it. Tunes the
 			// hemisphere fill (cloud undersides) and the directional sun (which side
 			// of the clouds is lit vs shadowed), with position dials + live helpers.
+			// Dev tuning panel for the water shader effects — load /fountain?fx (or ?lights).
+			// Binds directly to the window.* knobs the render loop reads each frame, so every
+			// slider applies LIVE (no console, no refresh — the console can't reach the iframe
+			// window anyway). Top-left to clear the perf HUD; 'P'/'R' keys stay in sync (.listen()).
+			function setupWaterFxGUI() {
+				const fxGui = new GUI({ title: 'Water FX' });
+				fxGui.domElement.style.position = 'fixed';
+				fxGui.domElement.style.left = '8px';
+				fxGui.domElement.style.right = 'auto';
+				fxGui.domElement.style.top = '8px';
+				fxGui.domElement.style.zIndex = '10001';
+
+				const fr = fxGui.addFolder( 'Refraction (key: P)' );
+				fr.add( window, 'refractionMix', 0, 1.5, 0.01 ).name( 'mix  (0 = off)' ).listen();
+				fr.add( window, 'refractionAmt', 0, 0.15, 0.005 ).name( 'ripple amount' ).listen();
+
+				const rfl = fxGui.addFolder( 'Reflection (key: R)' );
+				rfl.add( window, 'reflectionStrength', 0, 2, 0.05 ).name( 'strength  (0 = off)' ).listen();
+				rfl.add( window, 'reflectDistort', 0, 0.1, 0.005 ).name( 'ripple distort' ).listen();
+
+				const fc = fxGui.addFolder( 'Floor caustics' );
+				fc.add( window, 'floorCausticOnStrength', 0, 1.5, 0.05 ).name( 'strength' ).listen();
+
+				const uw = fxGui.addFolder( 'Underwater tint' );
+				uw.add( window, 'underwaterMinAlpha', 0, 1, 0.01 ).name( 'min (at surface)' ).listen();
+				uw.add( window, 'underwaterMaxAlpha', 0, 1, 0.01 ).name( 'max (deep)' ).listen();
+				uw.add( window, 'underwaterFullDepth', 0.1, 3, 0.05 ).name( 'full-tint depth' ).listen();
+
+				const sp = fxGui.addFolder( 'Coin splash droplets' );
+				sp.add( window, 'splashDropScale', 0, 3, 0.1 ).name( 'amount ×' ).listen();
+				sp.add( window, 'splashDropLaunch', 0, 2, 0.05 ).name( 'launch height' ).listen();
+				sp.add( window, 'splashDropSize', 0, 0.03, 0.001 ).name( 'droplet size' ).listen();
+				sp.add( window, 'splashDropOpacity', 0, 1, 0.05 ).name( 'opacity' ).listen();
+
+				const cp = fxGui.addFolder( 'Coin physics' );
+				cp.add( window, 'minRestFaceY', 0.5, 1, 0.01 ).name( 'rest slope limit ↑=slide' ).listen();
+
+				fxGui.add( { perf() { if ( window.togglePerf ) window.togglePerf(); } }, 'perf' ).name( '⧉ toggle perf HUD' );
+			}
+
 			function setupHemisphereGUI() {
 				if ( !skyFill ) return;
 
@@ -4003,6 +4162,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				if ( new URLSearchParams( window.location.search ).has( 'lights' ) ) {
 					setupHemisphereGUI();
 				}
+				// Water FX live-tuning panel — /fountain?fx (also shows under ?lights).
+				if ( new URLSearchParams( window.location.search ).has( 'fx' ) ||
+				     new URLSearchParams( window.location.search ).has( 'lights' ) ) {
+					setupWaterFxGUI();
+				}
 
 				renderer = new THREE.WebGLRenderer( { 
 					antialias: !isMobileDevice, // Disable antialiasing on mobile
@@ -4033,8 +4197,25 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// Disable controls initially for cinematic intro
 				controls.enabled = false;
 
-				// stats = new Stats();
-				// container.appendChild( stats.dom );
+				// --- Perf monitor (compare refraction on/off) -------------------------
+				// stats.js (FPS/MS/MB) + a draw-call / triangle / refraction readout.
+				// Draw calls are the clearest A/B signal: the refraction pre-pass roughly
+				// DOUBLES them. renderer.info.autoReset is turned OFF so the count
+				// accumulates across the refraction pass + every composer pass each frame
+				// (reset manually at the top of render()). window.togglePerf() hides it.
+				renderer.info.autoReset = false;
+				stats = new Stats();
+				stats.showPanel( 0 ); // 0:FPS  1:MS  2:MB — click the panel to cycle
+				stats.dom.style.cssText = 'position:fixed; top:8px; right:8px; left:auto; z-index:10000; cursor:pointer;';
+				document.body.appendChild( stats.dom );
+				perfHud = document.createElement( 'div' );
+				perfHud.style.cssText = 'position:fixed; top:56px; right:8px; z-index:10000; font:11px/1.45 ui-monospace,monospace; color:#9ff; background:rgba(0,0,0,0.55); padding:4px 7px; border-radius:5px; pointer-events:none; white-space:pre; text-align:right;';
+				document.body.appendChild( perfHud );
+				window.togglePerf = () => {
+					const vis = stats.dom.style.display !== 'none';
+					stats.dom.style.display = vis ? 'none' : 'block';
+					perfHud.style.display  = vis ? 'none' : 'block';
+				};
 
 				container.style.touchAction = 'none';
 				container.addEventListener( 'pointermove', onPointerMove );
@@ -4154,6 +4335,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				// --- NEW: Initialize Splash Particle System ---
 				initSplashParticleSystem();
+				initDroplets();
 				// --- END NEW ---
 
 				// --- ONE shared Web Audio context for ALL fountain sound (water ambience
@@ -4545,6 +4727,82 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					};
 				})();
 
+				// --- Floor-projected caustics ----------------------------------------
+				// Cast the wave-focused dancing light onto the real basin floor
+				// (Fountain_Floor), seen THROUGH the clear water — the physically-correct
+				// version of the in-surface caustic. Driven by the same heightmap as the
+				// surface and mapped through WORLD space (not the floor's own UVs) so the
+				// bright bands stay locked to the visible ripples. Ported from the
+				// petri-dish water.js dish floor. (floorCausticMats is declared top-level
+				// alongside waterMesh so animate()/render() can update its uniforms.)
+				function patchFloorCaustics( mesh ) {
+					if ( ! mesh.material ) return;
+					// Clone so caustics never bleed onto any other mesh sharing this material.
+					// Handle single- and multi-material (array) meshes alike.
+					const isArr = Array.isArray( mesh.material );
+					const mats = ( isArr ? mesh.material : [ mesh.material ] ).map( ( m ) => m.clone() );
+					mesh.material = isArr ? mats : mats[ 0 ];
+					mats.forEach( ( mat ) => {
+					mat.onBeforeCompile = ( shader ) => {
+						shader.uniforms.heightmap     = { value: null };
+						shader.uniforms.waterTime     = { value: 0 };
+						shader.uniforms.uCausBounds   = { value: BOUNDS };
+						shader.uniforms.uCausTexel    = { value: 1.0 / WIDTH };
+						shader.uniforms.uCausStrength = { value: 0.6 };   // brightness knob
+
+						// world position → for the heightmap lookup
+						shader.vertexShader = 'varying vec3 vCausWorld;\n' + shader.vertexShader;
+						shader.vertexShader = shader.vertexShader.replace(
+							'#include <begin_vertex>',
+							'#include <begin_vertex>\n\tvCausWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;'
+						);
+
+						shader.fragmentShader = `
+							varying vec3 vCausWorld;
+							uniform sampler2D heightmap;
+							uniform float waterTime, uCausBounds, uCausTexel, uCausStrength;
+							float fcCaustic( vec2 uv ){
+								vec2 p = mod( uv * 6.28318, 6.28318 ) - 250.0;
+								vec2 i = p; float c = 1.0; float inten = 0.005;
+								for ( int n = 0; n < 5; n++ ){
+									float t = waterTime * 0.55 * ( 1.0 - ( 3.5 / float( n + 1 ) ) );
+									i = p + vec2( cos( t - i.x ) + sin( t + i.y ), sin( t - i.y ) + cos( t + i.x ) );
+									c += 1.0 / length( vec2( p.x / ( sin( i.x + t ) / inten ), p.y / ( cos( i.y + t ) / inten ) ) );
+								}
+								c /= 5.0; c = 1.17 - pow( c, 1.4 );
+								return pow( abs( c ), 8.0 );
+							}
+						` + shader.fragmentShader;
+
+						shader.fragmentShader = shader.fragmentShader.replace(
+							'#include <opaque_fragment>',
+							`#include <opaque_fragment>
+							{
+								// world XZ → heightmap UV (matches the water plane's own mapping:
+								// plane is at world-origin XZ, rotated -90° about X, sized BOUNDS).
+								vec2 huv = vec2( vCausWorld.x / uCausBounds + 0.5, - vCausWorld.z / uCausBounds + 0.5 );
+								float mask = smoothstep( 0.0, 0.06, huv.x ) * smoothstep( 1.0, 0.94, huv.x )
+										   * smoothstep( 0.0, 0.06, huv.y ) * smoothstep( 1.0, 0.94, huv.y );
+								if ( mask > 0.0 ) {
+									float h0  = texture2D( heightmap, huv ).x;
+									// wave curvature focuses light: troughs (concave) cast bright bands
+									float lap = texture2D( heightmap, huv + vec2( uCausTexel, 0.0 ) ).x
+											  + texture2D( heightmap, huv - vec2( uCausTexel, 0.0 ) ).x
+											  + texture2D( heightmap, huv + vec2( 0.0, uCausTexel ) ).x
+											  + texture2D( heightmap, huv - vec2( 0.0, uCausTexel ) ).x - 4.0 * h0;
+									float focus = clamp( 1.0 + lap * 120.0, 0.3, 2.6 );
+									float ca = fcCaustic( huv * 6.0 ) * focus;
+									gl_FragColor.rgb += vec3( 0.45, 0.72, 0.82 ) * ca * mask * uCausStrength;
+								}
+							}`
+						);
+						mat.userData.causticShader = shader;
+					};
+					mat.needsUpdate = true;
+					floorCausticMats.push( mat );
+					} );
+				}
+
 				// --- NEW: Load Fountain GLB ---
 				const loader = new GLTFLoader();
 				
@@ -4639,9 +4897,19 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     // Make each part of the fountain model available for raycasting
                     if (node.isMesh) {
                         node.userData.isFountainPart = true;
+                        // Project wave caustics onto the main basin floor (tolerant of
+                        // GLTFLoader's _N suffix on duplicate names).
+                        if (node.name && node.name.toLowerCase().replace(/_\d+$/, '') === 'fountain_floor') {
+                            patchFloorCaustics(node);
+                        }
                         // Flag the statue so coins get dedicated bounce-off behaviour.
                         if (node.name && node.name.toLowerCase() === 'statue') {
                             node.userData.isStatue = true;
+                        }
+                        // Flag the pedestal so coins deflect off it into the pool (never perch on
+                        // its narrow tiers). Tolerant of GLTFLoader's _N suffix.
+                        if (node.name && node.name.toLowerCase().replace(/_\d+$/, '') === 'pedestal') {
+                            node.userData.isPedestal = true;
                         }
                         // Flag the grass so coins land softly in it (soft sound + rest).
                         if (node.name && node.name.toLowerCase().startsWith('grass')) {
@@ -5037,6 +5305,81 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 			}
 
+			// Build the planar water reflection (called from initWater). A THREE.Reflector
+			// at the surface renders an upside-down mirror of the ABOVE-water scene each
+			// frame; the custom shader masks it to the octagon and weights it by Fresnel
+			// (subtle looking straight down, stronger at grazing angles, with a floor so
+			// the statue stays visible). Hiding the reflector (strength 0) skips its pass.
+			function setupWaterReflection() {
+				if ( ! REFLECTION_ENABLED ) return;
+				const maskTex = new THREE.TextureLoader().load( '/images/octagon.png' );
+				const reflShader = {
+					uniforms: {
+						color: { value: null },
+						tDiffuse: { value: null },
+						textureMatrix: { value: new THREE.Matrix4() },
+						uMask: { value: maskTex },
+						uStrength: { value: reflectionStrength },
+						uHeightmap: { value: null },
+						uHeightTexel: { value: 1.0 / WIDTH },
+						uHeightScale: { value: WIDTH / BOUNDS },
+						uReflectDistort: { value: 0.06 },
+					},
+					vertexShader: `
+						uniform mat4 textureMatrix;
+						varying vec4 vUv;
+						varying vec2 vMaskUv;
+						varying vec3 vWorldPos;
+						void main() {
+							vUv = textureMatrix * vec4( position, 1.0 );
+							vMaskUv = uv;
+							vWorldPos = ( modelMatrix * vec4( position, 1.0 ) ).xyz;
+							gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+						}`,
+					fragmentShader: `
+						uniform sampler2D tDiffuse;
+						uniform sampler2D uMask;
+						uniform sampler2D uHeightmap;
+						uniform float uStrength;
+						uniform float uHeightTexel, uHeightScale, uReflectDistort;
+						varying vec4 vUv;
+						varying vec2 vMaskUv;
+						varying vec3 vWorldPos;
+						void main() {
+							// Ripple the reflection by the wave slope (same heightmap as the
+							// surface) so the mirror moves/wobbles with the water. uVu.xy/uVu.w
+							// is the manual projective divide of the reflection coords.
+							float hl = texture2D( uHeightmap, vMaskUv - vec2( uHeightTexel, 0.0 ) ).x;
+							float hr = texture2D( uHeightmap, vMaskUv + vec2( uHeightTexel, 0.0 ) ).x;
+							float hd = texture2D( uHeightmap, vMaskUv - vec2( 0.0, uHeightTexel ) ).x;
+							float hu = texture2D( uHeightmap, vMaskUv + vec2( 0.0, uHeightTexel ) ).x;
+							vec2 slope = vec2( hl - hr, hd - hu ) * uHeightScale;
+							vec3 refl = texture2D( tDiffuse, ( vUv.xy / vUv.w ) + slope * uReflectDistort ).rgb;
+							float mask = texture2D( uMask, vMaskUv ).r;          // octagon: white inside
+							vec3 V = normalize( cameraPosition - vWorldPos );
+							// Fresnel for a horizontal surface: weak looking straight down,
+							// stronger at grazing angles, with a floor so the statue stays visible.
+							float fres = mix( 0.18, 1.0, pow( 1.0 - clamp( V.y, 0.0, 1.0 ), 2.5 ) );
+							float a = clamp( fres * uStrength, 0.0, 1.0 ) * mask;
+							gl_FragColor = vec4( refl, a );
+						}`,
+				};
+				waterReflector = new Reflector( new THREE.PlaneGeometry( BOUNDS, BOUNDS ), {
+					textureWidth: 512,
+					textureHeight: 512,
+					clipBias: 0.003,
+					color: 0xffffff,
+					shader: reflShader,
+				} );
+				waterReflector.material.transparent = true;
+				waterReflector.material.depthWrite = false;
+				waterReflector.rotation.x = - Math.PI * 0.5;
+				waterReflector.position.set( 0, WATER_SURFACE_Y + 0.004, 0 );   // just above the surface
+				waterReflector.renderOrder = 1;                                  // composite over the water
+				waterReflector.visible = reflectionStrength > 0;
+				scene.add( waterReflector );
+			}
+
 			function initWater() {
 
 				const geometry = new THREE.PlaneGeometry( BOUNDS, BOUNDS, WIDTH - 1, WIDTH - 1 );
@@ -5104,6 +5447,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				waterMesh.castShadow = true;
 
 				scene.add( waterMesh );
+
+				// Planar reflection on the main pool (gated/desktop-only; reflects the statue).
+				setupWaterReflection();
 
 				// Create a second, smaller water mesh for the upper bowl
 				const upperBowlSize = 0.6; // Smaller size for the upper bowl
@@ -5813,6 +6159,23 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             function onKeyDown( event ) {
                 if ( event.key.toLowerCase() === 'c' ) {
                     tossHeldCoin(); // keyboard shortcut throws whatever's in hand
+                }
+                // 'P' toggles refraction on/off for an instant A/B (the perf HUD's "refr"
+                // line + draw-call count reflect it). Remembers the last tuned mix.
+                if ( event.key.toLowerCase() === 'p' ) {
+                    const t = event.target;
+                    if ( t && ( t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable ) ) return;
+                    const cur = ( window.refractionMix ?? refractionMix );
+                    if ( cur > 0 ) { _refractLastOn = cur; window.refractionMix = 0; }
+                    else { window.refractionMix = _refractLastOn; }
+                }
+                // 'R' toggles the planar reflection (mirror pass) on/off, same A/B idea.
+                if ( event.key.toLowerCase() === 'r' ) {
+                    const t = event.target;
+                    if ( t && ( t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable ) ) return;
+                    const cur = ( window.reflectionStrength ?? reflectionStrength );
+                    if ( cur > 0 ) { _reflLastOn = cur; window.reflectionStrength = 0; }
+                    else { window.reflectionStrength = _reflLastOn; }
                 }
             }
 
@@ -7590,6 +7953,46 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				if (waterMesh) waterMesh.material.waterTime = performance.now() / 1000.0;
 				if (upperWaterMesh) upperWaterMesh.material.waterTime = performance.now() / 1000.0;
 				if (topBowlWaterMesh) topBowlWaterMesh.material.waterTime = performance.now() / 1000.0;
+				// --- Underwater feel, driven by the CAMERA height -----------------------
+				// "Underwater" = the camera eye is below the pool surface. This catches
+				// free-look orbit under the water, not just the coin-cam. During the coin-
+				// cam (cameraPhase !== 'none') its own state machine owns the blue overlay,
+				// so the free-look driver below only acts in the normal view to avoid a
+				// tug-of-war over the overlay's style.
+				const _depth = (window.WATER_SURFACE_Y ?? WATER_SURFACE_Y) - camera.position.y; // >0 below the surface
+				const _camUnderwater = _depth > 0;
+				// Free-look owns the overlay in every phase EXCEPT the two the coin-cam state
+				// machine drives itself ('underwater' on, 'returning' off) — so they never
+				// fight, and a stale blue tint can't survive into a coin-cam toss.
+				if (cameraPhase !== 'underwater' && cameraPhase !== 'returning' && underwaterOverlay) {
+					// Depth-based blue ramp: clear at the surface, deepening to MAX_ALPHA by
+					// FULL_DEPTH units down (clamped). Same hue the coin-cam uses; the
+					// overlay's 0.5s CSS transition smooths the per-frame steps.
+					const _full = (window.underwaterFullDepth ?? underwaterFullDepth);
+					const _minA = (window.underwaterMinAlpha ?? underwaterMinAlpha);
+					const _maxA = (window.underwaterMaxAlpha ?? underwaterMaxAlpha);
+					// Baseline tint the moment the eye is under (so it never reads as "off" at
+					// the shallow depths free-look reaches), ramping to MAX as you go deeper.
+					const _t = Math.max(0, Math.min(1, _depth / _full));
+					const _a = _camUnderwater ? (_minA + (_maxA - _minA) * _t) : 0.0;
+					underwaterOverlay.style.display = 'block';
+					underwaterOverlay.style.backgroundColor = 'rgba(0, 100, 200, ' + _a.toFixed(3) + ')';
+				}
+
+				// Floor-projected caustics advance every frame (heightmap is bound below).
+				// They read right only from ABOVE the surface; fade them to zero whenever
+				// the view is underwater — coin-cam (phase) OR free-look (camera height) —
+				// and back in for the normal above-water view.
+				const _causTarget = (cameraPhase === 'none' && !_camUnderwater)
+					? (window.floorCausticOnStrength ?? floorCausticOnStrength) : 0.0;
+				for (let fi = 0; fi < floorCausticMats.length; fi++) {
+					const sh = floorCausticMats[fi].userData.causticShader;
+					if (sh) {
+						sh.uniforms.waterTime.value = performance.now() / 1000.0;
+						const u = sh.uniforms.uCausStrength;
+						u.value += (_causTarget - u.value) * 0.12;   // smooth fade in / out
+					}
+				}
 
 				// Advance the donation-coin shimmer (uniform set in createStaticCoinInstances)
 				if (staticCoinInstancedMesh && staticCoinInstancedMesh.material.userData.shimmerUniform) {
@@ -7598,6 +8001,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				// --- NEW: Update splash particles ---
 				updateSplashParticles(deltaTime);
+				updateDroplets(deltaTime);   // coin-splash droplet spray (arcs up + falls back)
 				
 				// Continuously emit particles at the water intersection
 				const fallingWaterCenter = heightmapVariable.material.uniforms['fallingWaterCenter'].value;
@@ -7632,11 +8036,27 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				updateShootingStar(currentTime, deltaTime);
 				render();
-				// stats.update();
+				// Perf monitor: FPS panel + the per-frame draw-call / triangle / refraction
+				// readout (renderer.info now holds this frame's accumulated totals).
+				if (stats) stats.update();
+				if (perfHud) {
+					const ri = renderer.info.render;
+					const rMix = REFRACTION_ENABLED ? (window.refractionMix ?? refractionMix) : 0;
+					const rRefl = REFLECTION_ENABLED ? (window.reflectionStrength ?? reflectionStrength) : 0;
+					perfHud.textContent =
+						'draws ' + ri.calls + '\n' +
+						'tris  ' + (ri.triangles / 1000).toFixed(0) + 'k\n' +
+						'refr  ' + (rMix > 0 ? 'ON ×' + rMix : 'off') + '\n' +
+						'refl  ' + (rRefl > 0 ? 'ON ×' + rRefl : 'off');
+				}
 
 			}
 
 			function render() {
+
+				// Perf: start the per-frame draw-call tally (autoReset is off) so it sums
+				// the refraction pre-pass + gpu-compute + every composer pass this frame.
+				if (renderer && renderer.info) renderer.info.reset();
 
                 if (coinSplashTimeout === null) {
                     raycast(); // Process mouse interaction only if no coin splash is resetting
@@ -7839,7 +8259,10 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                 // it must slide/bounce off. Without this, a low-speed graze takes
                                 // the "rest" branch below and sticks the coin flat to a vertical
                                 // surface mid-air (it aligns the coin to the surface normal).
-                                const MIN_REST_FACE_Y = 0.5; // ~60° from vertical; steeper → no rest
+                                // Only rest on a roughly-level face. 0.8 ≈ allow up to a ~37°
+                                // slope; steeper → slide off. (Was 0.5 / ~60°, which let coins
+                                // sit flat-and-embedded on the pedestal's sloped tier faces.)
+                                const MIN_REST_FACE_Y = (window.minRestFaceY ?? 0.8);
                                 const tooSteepToRest = surfaceNormal.y < MIN_REST_FACE_Y;
                                 const isGrassHit = intersects[0].object.userData.isGrass === true;
 
@@ -7877,6 +8300,25 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                         window.playCoinPlink(Math.min(1, 0.4 + closeness * 0.6)); // louder for closer hits
                                     }
                                     continue; // bounced off the statue — keep flying, never rests
+                                }
+
+                                // Coins never perch on the pedestal — deflect them off in ONE hop
+                                // (a damped bounce + a firm outward push, or outward-from-center on
+                                // a flat tier top) so they tumble down the steps into the pool. The
+                                // push is large enough to clear the step in a single frame, so it
+                                // can't re-collide/re-snap every frame (that was the jitter).
+                                if (intersects[0].object.userData.isPedestal) {
+                                    let _ox = surfaceNormal.x, _oz = surfaceNormal.z;
+                                    if (Math.hypot(_ox, _oz) < 0.05) { _ox = coin.position.x; _oz = coin.position.z; } // flat top → outward from center
+                                    const _ol = Math.hypot(_ox, _oz) || 1;
+                                    velocity.reflect(surfaceNormal).multiplyScalar(0.4); // damped bounce off the face
+                                    velocity.x += (_ox / _ol) * 0.10;                    // firm outward — clears the step this frame
+                                    velocity.z += (_oz / _ol) * 0.10;
+                                    velocity.x += (Math.random() - 0.5) * 0.01;
+                                    velocity.z += (Math.random() - 0.5) * 0.01;
+                                    coin.userData.rotationSpeed *= 1.3;
+                                    coin.userData.bounceCount = 0;
+                                    continue; // tumbles off the pedestal into the pool — never perches
                                 }
 
                                 // Fast hits bounce off any surface (energetic ricochet) — EXCEPT
@@ -7944,6 +8386,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                         if (!coin.userData.splashed) {
                                             coin.userData.splashed = true;
                                             if (window.playCoinSplash) window.playCoinSplash();
+                                            // small droplet pop for the gentle upper-bowl entry (impactSpeed is low here)
+                                            emitDroplets( coin.position.x, coin.position.y, coin.position.z,
+                                                Math.round( 2 + Math.min( impactSpeed * 8.0, 6.0 ) ), 0.3 + Math.min( impactSpeed * 2.0, 0.6 ) );
                                         }
                                         coin.userData.underwater = true;
                                         coin.material.opacity = 0.6;
@@ -8228,6 +8673,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                             const impactZ = coin.position.z;
                             uniforms['mousePos'].value.set( impactX, impactZ );
 
+                            // Droplet spray — bigger with a faster impact (i.e. a higher toss).
+                            // velocity.y is the coin's downward speed as it breaks the surface.
+                            const _vimp = Math.abs( velocity.y || 0 );
+                            const _t = Math.min( 1.5, _vimp * 2.2 );           // 0 (drop-in) → 1.5 (high toss)
+                            emitDroplets( impactX, waterLevel, impactZ, Math.round( 4 + _t * 9 ), 0.5 + _t * 0.8 );
+
                             if ( coinSplashTimeout !== null ) clearTimeout( coinSplashTimeout );
                             coinSplashTimeout = setTimeout( () => {
                                 if (heightmapVariable) uniforms['mousePos'].value.set( 10000, 10000 );
@@ -8324,6 +8775,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					if ( topBowlWaterMesh ) topBowlWaterMesh.material.heightmap = tmpHeightmap;
 					// Also apply to upper water mesh
 					if ( upperWaterMesh ) upperWaterMesh.material.heightmap = tmpHeightmap;
+					// Ripple the planar reflection with the same heightmap.
+					if ( waterReflector && waterReflector.material.uniforms.uHeightmap ) waterReflector.material.uniforms.uHeightmap.value = tmpHeightmap;
+					// Bind the same live heightmap to the floor-caustic materials.
+					for ( let fi = 0; fi < floorCausticMats.length; fi++ ) {
+						const sh = floorCausticMats[ fi ].userData.causticShader;
+						if ( sh ) sh.uniforms.heightmap.value = tmpHeightmap;
+					}
 
 					frame = 0;
 
@@ -8343,6 +8801,51 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					if (waterMesh && waterMesh.material) {
 						const glow = Math.sin(Date.now() * 0.003) * 0.15 + 0.3;
 						waterMesh.material.emissiveIntensity = glow;
+					}
+				}
+
+				// --- Normal-distorted refraction pre-pass ------------------------------
+				// Render the scene ONCE with the water hidden into refractRT, then feed it
+				// (and its resolution) to the water materials so their shader can sample the
+				// under-water view bent by the ripple normals. Desktop-only + gated by mix.
+				const _rMix = REFRACTION_ENABLED ? (window.refractionMix ?? refractionMix) : 0.0;
+				const _waterMeshes = [waterMesh, upperWaterMesh, topBowlWaterMesh].filter(Boolean);
+				if (_rMix > 0 && _waterMeshes.length) {
+					renderer.getDrawingBufferSize(_refractSize);
+					const _rw = Math.max(2, Math.floor(_refractSize.x * 0.6));   // low-res: refraction is soft anyway
+					const _rh = Math.max(2, Math.floor(_refractSize.y * 0.6));
+					if (!refractRT) {
+						refractRT = new THREE.WebGLRenderTarget(_rw, _rh, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true });
+						refractRT.depthTexture = new THREE.DepthTexture(_rw, _rh);   // capture scene depth for foreground rejection
+					} else if (refractRT.width !== _rw || refractRT.height !== _rh) {
+						refractRT.setSize(_rw, _rh);
+					}
+					_refractRes.set(_rw, _rh);
+					for (const m of _waterMeshes) m.visible = false;
+					if (waterReflector) waterReflector.visible = false;   // keep the mirror plane out of the refraction (re-gated below)
+					const _prevRT = renderer.getRenderTarget();
+					renderer.setRenderTarget(refractRT);
+					renderer.render(scene, camera);          // "everything under the water"
+					renderer.setRenderTarget(_prevRT);
+					for (const m of _waterMeshes) m.visible = true;
+					for (const m of _waterMeshes) {
+						m.material.uRefract = refractRT.texture;
+						m.material.uRefractRes = _refractRes;
+						m.material.uRefractAmt = (window.refractionAmt ?? refractionAmt);
+						m.material.uRefractDepth = refractRT.depthTexture;
+					}
+				}
+				for (const m of _waterMeshes) { if (m.material && ('uRefractMix' in m.material)) m.material.uRefractMix = _rMix; }
+
+				// Planar reflection: update strength + gate. Hiding the reflector when off
+				// skips its onBeforeRender (the mirror pass) entirely. When on, it renders
+				// once inside composer.render() below (the refraction pre-pass hid it).
+				if (waterReflector) {
+					const _refl = REFLECTION_ENABLED ? (window.reflectionStrength ?? reflectionStrength) : 0;
+					waterReflector.visible = _refl > 0;
+					if (_refl > 0) {
+						waterReflector.material.uniforms.uStrength.value = _refl;
+						waterReflector.material.uniforms.uReflectDistort.value = (window.reflectDistort ?? 0.06);
 					}
 				}
 
@@ -8377,6 +8880,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					this.addParameter( 'heightmap', null );
 					this.addParameter( 'waterTime', 0 );
 					this.addParameter( 'uCalm', 0 ); // 1 = drop the concentric bullseye foam rings
+
+					// Refraction: GLSL compiled in only on desktop; the render() pre-pass
+					// feeds these each frame (uRefractMix 0 = no-op, even when compiled in).
+					if ( REFRACTION_ENABLED ) this.defines.USE_REFRACTION = '';
+					this.addParameter( 'uRefract', null );
+					this.addParameter( 'uRefractRes', new THREE.Vector2( 1, 1 ) );
+					this.addParameter( 'uRefractAmt', 0.04 );
+					this.addParameter( 'uRefractMix', 0.0 );
+					this.addParameter( 'uRefractDepth', null );   // under-water scene depth → reject foreground (statue/pedestal)
 
 					this.setValues( parameters );
 
@@ -8545,6 +9057,37 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				`,
 				common_frag: /* glsl */`				#include <common>
 				uniform float waterTime;
+				uniform sampler2D heightmap;     // live wave height — drives depth tint, crest glow & caustic focus
+				#ifdef USE_REFRACTION
+				uniform sampler2D uRefract;      // scene rendered with the water hidden (the "under-water" view)
+				uniform sampler2D uRefractDepth; // its depth — to reject foreground geometry (statue/pedestal)
+				uniform vec2 uRefractRes;        // refractRT pixel size (for screen-space sampling)
+				uniform float uRefractAmt;       // distortion strength
+				uniform float uRefractMix;       // 0..1 blend toward the refracted view
+				#endif
+
+				// --- value-noise FBM (ported from water.js) for organic micro-ripple normals ---
+				float vhash21( vec2 p ){ return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+				float vnoise2( vec2 p ){
+					vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f );
+					float a = vhash21( i ), b = vhash21( i + vec2( 1, 0 ) ), c = vhash21( i + vec2( 0, 1 ) ), d = vhash21( i + vec2( 1, 1 ) );
+					return mix( mix( a, b, f.x ), mix( c, d, f.x ), f.y );
+				}
+				float fbm2( vec2 p ){ float s = 0.0, a = 0.5; for ( int i = 0; i < 4; i++ ){ s += a * vnoise2( p ); p *= 2.02; a *= 0.5; } return s; }
+
+				// --- classic TDM caustic (ported from water.js dish floor) — the fine dancing net of light ---
+				float caustic( vec2 uv ){
+					vec2 p = mod( uv * 6.28318, 6.28318 ) - 250.0;
+					vec2 i = p; float c = 1.0; float inten = 0.005;
+					for ( int n = 0; n < 5; n++ ){
+						float t = waterTime * 0.55 * ( 1.0 - ( 3.5 / float( n + 1 ) ) );
+						i = p + vec2( cos( t - i.x ) + sin( t + i.y ), sin( t - i.y ) + cos( t + i.x ) );
+						c += 1.0 / length( vec2( p.x / ( sin( i.x + t ) / inten ), p.y / ( cos( i.y + t ) / inten ) ) );
+					}
+					c /= 5.0; c = 1.17 - pow( c, 1.4 );
+					return pow( abs( c ), 8.0 );
+				}
+
 				vec2 hash22( vec2 p ) {
 					vec3 p3 = fract( vec3( p.xyx ) * vec3( 0.1031, 0.1030, 0.0973 ) );
 					p3 += dot( p3, p3.yzx + 33.33 );
@@ -8578,6 +9121,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					float sparkle2 = sin( sp.x * 0.6 - sp.y * 1.9 + st * 2.1 ) + sin( ( sp.x - sp.y ) * 1.47 + st * 2.9 );
 					normal = normalize( normal + vec3( sparkle1, sparkle2, 0.0 ) * 0.02 );
 				}
+				// FBM micro-ripple: organic, slowly-scrolling normal detail at a scale the
+				// heightmap grid can't resolve (ported from water.js). Tune the 0.06 strength.
+				{
+					vec2 fuv = vUv * 9.0;
+					vec2 fscroll = vec2( waterTime * 0.04, waterTime * 0.025 );
+					float nx = fbm2( fuv - fscroll ) - 0.5;
+					float nz = fbm2( fuv + vec2( 19.0 ) - fscroll ) - 0.5;
+					normal = normalize( normal + vec3( nx, nz, 0.0 ) * 0.06 );
+				}
 				`,
 				// Fresnel-driven transparency: see-through from above, mirror-like at
 				// grazing angles. Scales the existing alpha (opacity x alphaMap) so the
@@ -8588,8 +9140,62 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					float fresnelNV = saturate( dot( normalize( normal ), normalize( vViewPosition ) ) );
 					float fresnelW = pow( 1.0 - fresnelNV, 3.0 );
 					diffuseColor.a = clamp( diffuseColor.a * mix( 0.62, 1.3, fresnelW ), 0.0, 1.0 );
+
+					// Beer-Lambert depth tint (water.js): wave troughs read deeper/teal and a
+					// touch more opaque; crests stay clear. Centred at rest (wh≈0) so flat
+					// water is untouched. Knobs: -wh*18.0 (selectivity), 0.5 / 0.2 (strength).
+					float wh = texture2D( heightmap, vUv ).x;
+					float depthT = clamp( -wh * 18.0, 0.0, 1.0 );
+					diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.03, 0.18, 0.25 ), depthT * 0.5 );
+					diffuseColor.a = clamp( diffuseColor.a * ( 1.0 + depthT * 0.2 ), 0.0, 1.0 );
 				}
 				#include <opaque_fragment>
+				#ifdef USE_REFRACTION
+				// Normal-distorted refraction: replace the straight-through view with a
+				// ripple-bent sample of the under-water render (the scene drawn with the
+				// water hidden), so the floor/coins seen through the surface WOBBLE.
+				// IMPORTANT: offset by the WAVE SLOPE (heightmap gradient), which is ~zero on
+				// flat water — NOT the view-space normal. The view normal of an upward face
+				// seen by an angled camera carries a constant screen tilt that dragged the
+				// upright statue/pedestal down into the water as a fake right-side-up image.
+				{
+					vec2 _cs = vec2( 1.0 / WIDTH );
+					float _hl = texture2D( heightmap, vUv - vec2( _cs.x, 0.0 ) ).x;
+					float _hr = texture2D( heightmap, vUv + vec2( _cs.x, 0.0 ) ).x;
+					float _hd = texture2D( heightmap, vUv - vec2( 0.0, _cs.y ) ).x;
+					float _hu = texture2D( heightmap, vUv + vec2( 0.0, _cs.y ) ).x;
+					vec2 _slope = vec2( _hl - _hr, _hd - _hu ) * ( WIDTH / BOUNDS );  // 0 at rest
+					vec2 _baseUv = gl_FragCoord.xy / uRefractRes;
+					vec2 _offUv  = clamp( _baseUv + _slope * uRefractAmt, 0.002, 0.998 );
+					// Depth reject (kills the upright statue smear): window-space depth is
+					// monotonic with distance, so a sample whose scene depth is SMALLER than
+					// this water fragment's is geometry IN FRONT of the surface (the statue/
+					// pedestal piercing it) — never refract onto that.
+					if ( texture2D( uRefractDepth, _offUv ).x < gl_FragCoord.z ) _offUv = _baseUv;   // bent onto foreground → straighten
+					float _valid = ( texture2D( uRefractDepth, _baseUv ).x >= gl_FragCoord.z ) ? 1.0 : 0.0; // foreground over the water itself → no refraction
+					vec3 _refr = texture2D( uRefract, _offUv ).rgb;
+					gl_FragColor.rgb = mix( gl_FragColor.rgb, _refr, uRefractMix * _valid );
+				}
+				#endif
+				// Wave-driven caustics + crest sub-surface glow (both ported from water.js).
+				// The caustic net is focused by the real wave curvature (laplacian of the
+				// heightmap), so bright bands travel WITH the ripples; the crest term gives
+				// peaks an aqua back-light. Pure ADD of transmitted light — no floor mesh
+				// needed, so it works on all three water surfaces. Strength knobs inline.
+				{
+					float tx = 1.0 / WIDTH;
+					float h0 = texture2D( heightmap, vUv ).x;
+					float lap = texture2D( heightmap, vUv + vec2( tx, 0.0 ) ).x
+							  + texture2D( heightmap, vUv - vec2( tx, 0.0 ) ).x
+							  + texture2D( heightmap, vUv + vec2( 0.0, tx ) ).x
+							  + texture2D( heightmap, vUv - vec2( 0.0, tx ) ).x - 4.0 * h0;
+					float focus = clamp( 1.0 + lap * 120.0, 0.4, 2.2 );
+					float ca = caustic( vUv * 6.0 ) * focus;
+					gl_FragColor.rgb += vec3( 0.40, 0.66, 0.78 ) * ca * ( 0.35 * ( 1.0 - uCalm ) );
+
+					float crest = smoothstep( 0.004, 0.025, h0 );
+					gl_FragColor.rgb += vec3( 0.0, 0.22, 0.18 ) * crest * 0.4;
+				}
 				// --- Surface foam: expanding concentric rings + churning voronoi where the
 				//     falling-water column lands (adapted from the water-splash shader, MIT). ---
 				{
