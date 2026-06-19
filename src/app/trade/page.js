@@ -25,7 +25,6 @@ import VideoScreens from "@/components/VideoScreens";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
-import MusicButton from '@/components/MusicButton';
 import { useUser, useClerk } from "@clerk/nextjs";
 import CyberNav from '@/components/CyberNav';
 import NavControls from '@/components/NavControls';
@@ -3675,15 +3674,12 @@ export default function CyborgTemple() {
           </div>
         </div>
 
-        {/* Top Controls Container - Music, User, and Nav */}
+        {/* Top Controls Container - User and Nav.
+            No music control here on purpose: /trade is a speaking-avatars page,
+            so music would compete with the dialogue. (Any music already playing
+            from another page is ducked during speech via setMusicDucked.) */}
         {mounted && (
           <>
-            <MusicButton
-              accent="#8effc4"
-              icon="/icon80.svg"
-              size={62}
-              style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 1002 }}
-            />
             {/* Nav Controls - Desktop only */}
             {!isMobileView && (
               <div

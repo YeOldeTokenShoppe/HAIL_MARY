@@ -26,8 +26,23 @@ export default function MusicButton({
   // without cluttering the idle state. Pass a URL like "/icon80.svg".
   // When omitted, the button falls back to ♫ / ⏸ glyphs.
   icon = null,
+  // Optional alternate face shown when the music era is "modern" (NOW). Rendered
+  // as a round, spinning record (spins only while playing) — a visual cue that
+  // the era flipped. Pass a URL like "/virginRecords.jpg". Only used when
+  // showModeToggle is on; falls back to `icon` otherwise.
+  modernIcon = null,
+  // When true, shows a compact "80s | NOW" segmented switch beside the
+  // play/pause button that flips the music era (which playlist plays). Off by
+  // default so existing drop-ins stay play/pause-only. Don't enable it on pages
+  // that pin their own playlist (e.g. the fountain) — the switch wouldn't change
+  // anything there.
+  showModeToggle = false,
+  // When true, the control starts collapsed to a single small music-note button
+  // and expands to reveal the era switch + disc face on tap (tapping outside
+  // collapses it again). Used to declutter cramped mobile headers.
+  collapsible = false,
 }) {
-  const { play, pause, isPlaying, isLoadingTrack, nextTrack } = useMusic();
+  const { play, pause, isPlaying, isLoadingTrack, nextTrack, musicEra, setMusicEra } = useMusic();
 
   const label = isLoadingTrack
     ? "Loading music…"
@@ -35,16 +50,57 @@ export default function MusicButton({
     ? "Pause music"
     : "Play music";
 
-  // For an icon-faced button, hide the chrome until the control is active
-  // so the idle state is just the bare image. Glyph-only buttons keep their
-  // chrome at all times (the glyph alone reads as too faint without it).
-  const showChrome = !icon || isPlaying || isLoadingTrack;
+  // The active face follows the era when the toggle is shown: the 80s `icon`
+  // (synthwave sun) or the modern `modernIcon` (vinyl record).
+  const faceSrc = showModeToggle && musicEra === "modern" && modernIcon ? modernIcon : icon;
+  const faceIsVideo = /\.(mp4|webm|ogv|mov)$/i.test(faceSrc || "");
+
+  // With the era toggle shown, image faces render as round spinning discs (sun /
+  // record). Without it, an icon renders as its plain square self (e.g. the
+  // fountain's badge). A video face never renders as a disc.
+  const isDisc = showModeToggle && !faceIsVideo && !!faceSrc;
+
+  // Hide the rectangular chrome for self-contained faces (the round record and
+  // video faces carry their own visual), so the idle state is just the bare art.
+  // Static-image and glyph buttons keep the chrome-on-active behavior.
+  const showChrome = isDisc || faceIsVideo ? false : !icon || isPlaying || isLoadingTrack;
+
+  // Drive a video face's playback from the music state: animate while playing,
+  // freeze on a frame when paused (mirrors the record's spin-while-playing).
+  const videoRef = React.useRef(null);
+  React.useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (isPlaying) {
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [isPlaying, faceIsVideo, faceSrc]);
+
+  // Collapsed mode: render just a music-note button until tapped; expand reveals
+  // the full control, and a tap outside collapses it again.
+  const containerRef = React.useRef(null);
+  const [expanded, setExpanded] = React.useState(false);
+  React.useEffect(() => {
+    if (!collapsible || !expanded) return;
+    const onDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [collapsible, expanded]);
 
   const btnStyle = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: size,
+    // A widescreen video face keeps its native aspect (auto width, fixed
+    // height) so it isn't cropped to a square; every other face stays square.
+    width: faceIsVideo && !isDisc ? "auto" : size,
     height: size,
     borderRadius: 10,
     background: showChrome ? background : "transparent",
@@ -58,8 +114,101 @@ export default function MusicButton({
     transition: "background 0.2s ease, border-color 0.2s ease",
   };
 
+  // The fixed square that holds non-video faces (image / record / spinner).
+  const squareFaceStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: size - 6,
+    height: size - 6,
+  };
+
+  // Compact two-segment era switch. Active segment is filled with the accent;
+  // the inactive one is dimmed. Robust across whatever accent a page passes.
+  const segBase = {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    color: accent,
+    fontFamily: "inherit",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.5px",
+    lineHeight: 1,
+    padding: "5px 9px",
+    borderRadius: 8,
+    cursor: "pointer",
+    transition: "background 0.18s ease, color 0.18s ease, opacity 0.18s ease",
+  };
+  const segStyle = (active) =>
+    active
+      ? { ...segBase, background: accent, color: "#1b1205", boxShadow: `0 0 8px ${accent}66` }
+      : { ...segBase, opacity: 0.55 };
+
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, ...style }}>
+    <div ref={containerRef} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...style }}>
+      {collapsible && !expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          title={title || "Music"}
+          aria-label="Show music controls"
+          aria-expanded={false}
+          style={{
+            ...btnStyle,
+            width: size,
+            background,
+            border: `1.5px solid ${borderColor}`,
+            boxShadow: isPlaying ? `0 0 10px ${accent}55` : "none",
+          }}
+        >
+          <span
+            style={
+              isLoadingTrack
+                ? { display: "inline-block", animation: "mbSpin 0.9s linear infinite" }
+                : undefined
+            }
+          >
+            {isLoadingTrack ? "◌" : "♫"}
+          </span>
+        </button>
+      ) : (
+        <>
+      {showModeToggle && typeof setMusicEra === "function" && (
+        <div
+          role="group"
+          aria-label="Music era"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            padding: 3,
+            borderRadius: 10,
+            background,
+            border: `1.5px solid ${borderColor}`,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setMusicEra("80s")}
+            aria-pressed={musicEra !== "modern"}
+            title="Play 80s music"
+            style={segStyle(musicEra !== "modern")}
+          >
+            80s
+          </button>
+          <button
+            type="button"
+            onClick={() => setMusicEra("modern")}
+            aria-pressed={musicEra === "modern"}
+            title="Play the mix"
+            style={segStyle(musicEra === "modern")}
+          >
+            MIX
+          </button>
+        </div>
+      )}
       <button
         onClick={() => {
           if (isLoadingTrack) return;
@@ -71,20 +220,66 @@ export default function MusicButton({
         disabled={isLoadingTrack}
         style={btnStyle}
       >
-        {icon ? (
-          <span
+        {isLoadingTrack ? (
+          <span style={squareFaceStyle}>
+            <span style={{ display: "inline-block", animation: "mbSpin 0.9s linear infinite" }}>
+              ◌
+            </span>
+          </span>
+        ) : faceIsVideo && !isDisc ? (
+          // Widescreen clip: fixed height, auto width — the whole frame shows
+          // instead of being cropped to a square.
+          <video
+            ref={videoRef}
+            src={faceSrc}
+            muted
+            loop
+            playsInline
+            preload="auto"
+            aria-hidden="true"
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: size - 6,
               height: size - 6,
+              width: "auto",
+              borderRadius: 8,
+              display: "block",
             }}
-          >
-            {isLoadingTrack ? (
-              <span style={{ display: "inline-block", animation: "mbSpin 0.9s linear infinite" }}>
-                ◌
-              </span>
+          />
+        ) : (icon || isDisc) ? (
+          <span style={squareFaceStyle}>
+            {faceIsVideo ? (
+              <video
+                ref={videoRef}
+                src={faceSrc}
+                muted
+                loop
+                playsInline
+                preload="auto"
+                aria-hidden="true"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                  display: "block",
+                  boxShadow: `0 0 0 2px rgba(0,0,0,0.35), 0 0 10px ${accent}55`,
+                }}
+              />
+            ) : isDisc ? (
+              <span
+                aria-hidden="true"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  display: "block",
+                  backgroundImage: `url('${faceSrc}')`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  boxShadow: `0 0 0 2px rgba(0,0,0,0.35), 0 0 10px ${accent}55`,
+                  animation: isPlaying ? "mbDisc 4s linear infinite" : "none",
+                }}
+              />
             ) : (
               <img
                 src={icon}
@@ -96,6 +291,7 @@ export default function MusicButton({
                   objectFit: "contain",
                   borderRadius: 8,
                   display: "block",
+                  animation: isPlaying ? "mbDisc 4s linear infinite" : "none",
                 }}
               />
             )}
@@ -121,12 +317,14 @@ export default function MusicButton({
           title="Skip track"
           aria-label="Skip to next track"
           disabled={isLoadingTrack}
-          style={{ ...btnStyle, fontSize: 16 }}
+          style={{ ...btnStyle, width: size, fontSize: 16 }}
         >
           ⏭
         </button>
       )}
-      <style>{"@keyframes mbSpin{to{transform:rotate(360deg)}}"}</style>
+        </>
+      )}
+      <style>{"@keyframes mbSpin{to{transform:rotate(360deg)}}@keyframes mbDisc{to{transform:rotate(360deg)}}"}</style>
     </div>
   );
 }

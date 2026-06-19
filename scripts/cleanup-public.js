@@ -7,13 +7,13 @@ const { execSync } = require('child_process');
 const USED_FILES = new Set([
   // Icons and Favicons
   'favicon.svg',
-  'apple-icon.png',
+  'apple-icon.svg',
   'icon.png',
   'favicon.ico',
   
   // Images (General)
   'defaultAvatar.png',
-  'senora.png',
+  'goldGuadalupe.svg',
   'PinkCloudA.png',
   'nosferatu.png',
   'queenOfHearts1.jpg',

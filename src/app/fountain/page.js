@@ -20,7 +20,8 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
   loading: () => <CoinLoader loading={true} />
 });
 
-// The fountain page restricts music to exactly these tracks (drawn from non80sTracks).
+// The fountain page restricts music to exactly these tracks (resolved by path
+// against the full catalog `allTracks`, regardless of era bucket).
 // Paths must match the entries in MusicContext; normalized for leading-slash differences.
 const FOUNTAIN_TRACK_PATHS = [
   "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
@@ -45,7 +46,7 @@ export default function FountainPage() {
   const { user, isSignedIn } = useUser();
   const router = useRouter();
   
-  const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode: context80sMode, setIs80sMode: setContext80sMode, setPagePlaylistOverride, non80sTracks } = useMusic();
+  const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode: context80sMode, setIs80sMode: setContext80sMode, setPagePlaylistOverride, allTracks, musicEra } = useMusic();
   const [isLoading, setIsLoading] = useState(true);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
@@ -67,14 +68,20 @@ export default function FountainPage() {
   // Restrict the playlist to the curated fountain tracks while on this page.
   // This governs which track is chosen next (first play, skip, auto-advance) —
   // a song already playing on arrival keeps playing untouched until it ends.
+  // The curated set is all 80s; in MIX (modern) era we release the override so
+  // the era toggle on the music button actually changes the music here.
   useEffect(() => {
+    if (musicEra === "modern") {
+      setPagePlaylistOverride(null);
+      return () => setPagePlaylistOverride(null);
+    }
     const wanted = new Set(FOUNTAIN_TRACK_PATHS);
-    const override = (non80sTracks || []).filter((t) =>
+    const override = (allTracks || []).filter((t) =>
       wanted.has((t.path || "").replace(/^\//, ""))
     );
     setPagePlaylistOverride(override.length ? override : null);
     return () => setPagePlaylistOverride(null);
-  }, [non80sTracks, setPagePlaylistOverride]);
+  }, [allTracks, musicEra, setPagePlaylistOverride]);
 
   // Check if mobile - run immediately on mount
   useEffect(() => {
@@ -209,7 +216,7 @@ export default function FountainPage() {
       />
 
       {/* UI Overlay - Our Lady of Perpetual Profit Logo (Desktop) / RL80 (Mobile) */}
-      {fontLoaded && !isMobileView && (
+      {/* {fontLoaded && !isMobileView && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -231,7 +238,7 @@ export default function FountainPage() {
             pointerEvents: 'none',
           }}>
             
-            {/* <h1 className='custom-title'
+            <h1 className='custom-title'
                 id="main-title"
                 style={{
                 position: "relative",
@@ -280,14 +287,14 @@ export default function FountainPage() {
                 Perpetual
               </span>
               <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
-            </h1> */}
+            </h1>
 
           </div>
         </div>
-      )}
+      )} */}
       
       {/* RL80 Logo - Mobile Only */}
-      {fontLoaded && isMobileView && (
+      {/* {fontLoaded && isMobileView && ( */}
         <div style={{
           position: "fixed",
           top: "20px",
@@ -338,7 +345,7 @@ export default function FountainPage() {
             })}
           </div>
         </div>
-      )}
+      {/* )} */}
 
       {/* Top-right controls: brand-mark home link + shared music toggle */}
       <div
@@ -376,7 +383,13 @@ export default function FountainPage() {
             style={{ display: "block" }}
           />
         </Link> */}
-        {/* <MusicButton accent="#d4a854" icon="/icon80.svg" size={62} /> */}
+        <MusicButton
+          accent="#d4a854"
+          icon="/synthwave-sun-80s.svg"
+          modernIcon="/virginRecords.jpg"
+          showModeToggle
+          size={62}
+        />
       </div>
 
       {/* Nav Controls - Top Right (desktop only) */}
@@ -563,7 +576,7 @@ export default function FountainPage() {
                 width: "44px",
                 height: "44px",
                 borderRadius: "50%",
-                border: "1px solid rgba(212, 175, 55, 0.35)",
+                border: "2px solid rgba(212, 175, 55, 0.65)",
                 background: "rgba(0, 0, 0, 0.5)",
                 transition: "all 0.3s ease",
                 cursor: "pointer",

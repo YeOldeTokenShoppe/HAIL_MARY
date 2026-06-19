@@ -18,58 +18,67 @@ export const useMusic = () => {
   return context;
 };
 
-// Track lists
-const non80sTracks = [
+// Track lists, sorted by actual release era.
+//
+// `eightyTracks` is the brand's headline playlist: genuine 1980s material.
+// `non80sTracks` is the "NOW"/modern bucket — anything post-1989. It's
+// deliberately the small list right now; ADD MORE MODERN TRACKS HERE to make
+// the era toggle feel balanced (the music era switch on MusicButton flips
+// between these two). Both are exposed via `allTracks` for any page that needs
+// to resolve a curated subset by path (e.g. the fountain override) without
+// caring which era bucket a song lives in.
+const eightyTracks = [
+  { name: "Walking in L.A. - Missing Persons", path: "audio/walking_in_LA.m4a", bpm: 85 },
   { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
-  // { name: "Utopia - Goldfrapp", path: "audio/08 Utopia.m4a", bpm: 100 },
-  { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
-    { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
-  { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 },
+  { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
   { name: "Sweet Dreams - Eurythmics", path: "audio/Sweet Dreams Eurythmics.m4a", bpm: 85 },
   { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 },
   { name: "Like A Prayer - Madonna", path: "audio/like-a-prayer-madonna.m4a", bpm: 85 },
-    { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
-  { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
   { name: "Cat People (Putting Out Fire) - David Bowie", path: "/audio/Cat People (Putting Out Fire).mp3", bpm: 100 },
   { name: "Eyes Without A Face - Billy Idol", path: "/audio/Eyes Without A Face.mp3", bpm: 110 },
   { name: "I Ran (So Far Away) - Flock of Seagulls", path: "/audio/I Ran (So Far Away).mp3", bpm: 100 },
-  { name: "Girls On Film - Duran Duran", path: "/audio/Girls On Film.mp3", bpm: 100 },
-    { name: "Cities - Siouxsie & The Banshees", path: "/audio/Cities.mp3", bpm: 100 },
-    { name: "99 Luftballoons - Nena", path: "audio/99RedBalloons.mp3", bpm: 85 },
-    { name: "Personal Jesus - Depeche Mode", path: "audio/PersonalJesus.m4a", bpm: 85 },
-    { name: "Twilight Zone - Golden Earring", path: "audio/TwilightZone.m4a", bpm: 85 },
-    { name: "She's Crafty - Beastie Boys", path: "audio/ShesCrafty.m4a", bpm: 85 },
-    { name: "Ah Leah! Donnie Iris", path: "audio/AhLeah.m4a", bpm: 85 },
-    { name: "Love My Way - Psychedelic Furs", path: "audio/LoveMyWay.m4a", bpm: 85 },
-    { name: "Heroes - Janelle Monae", path: "audio/Heroes.m4a", bpm: 85 },
-    { name: "Love Is A Stranger - Eurythmics", path: "audio/LoveIsAStranger.m4a", bpm: 85 },
-    { name: "Wishing (If I Had a Photograph of You) - A Flock of Seagulls", path: "audio/Wishing.m4a", bpm: 85 },
-    { name: "Rocket's Tail - Kate Bush", path: "audio/RocketsTail.m4a", bpm: 85 },
-    { name: "Dizzy - Siouxsie & The Banshees", path: "audio/Dizzy.mp3", bpm: 85 },
-        { name: "If You All Get To Heaven - Terence Trent D'Arby", path: "audio/IfYouAllGetToHeaven.m4a", bpm: 85 },
+  // { name: "Girls On Film - Duran Duran", path: "/audio/Girls On Film.mp3", bpm: 100 },
+  { name: "Cities - Siouxsie & The Banshees", path: "/audio/Cities.mp3", bpm: 100 },
+  { name: "99 Luftballoons - Nena", path: "audio/99RedBalloons.mp3", bpm: 85 },
+  { name: "Personal Jesus - Depeche Mode", path: "audio/PersonalJesus.m4a", bpm: 85 },
+  { name: "Twilight Zone - Golden Earring", path: "audio/TwilightZone.m4a", bpm: 85 },
+  { name: "She's Crafty - Beastie Boys", path: "audio/ShesCrafty.m4a", bpm: 85 },
+  { name: "Ah Leah! Donnie Iris", path: "audio/AhLeah.m4a", bpm: 85 },
+  { name: "Love My Way - Psychedelic Furs", path: "audio/LoveMyWay.m4a", bpm: 85 },
+  { name: "Love Is A Stranger - Eurythmics", path: "audio/LoveIsAStranger.m4a", bpm: 85 },
+  { name: "Wishing (If I Had a Photograph of You) - A Flock of Seagulls", path: "audio/Wishing.m4a", bpm: 85 },
+  // { name: "Rocket's Tail - Kate Bush", path: "audio/RocketsTail.m4a", bpm: 85 },
+  { name: "Dizzy - Siouxsie & The Banshees", path: "audio/Dizzy.mp3", bpm: 85 },
+  { name: "If You All Get To Heaven - Terence Trent D'Arby", path: "audio/IfYouAllGetToHeaven.m4a", bpm: 85 },
+  { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
 ];
+
+// Modern / "NOW" bucket — genuinely post-1989. Thin on purpose; grow this list.
+const non80sTracks = [
+
+  // { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 },
+  // { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
+  // { name: "Heroes - Janelle Monae", path: "audio/Heroes.m4a", bpm: 85 },
+  { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
+];
+
+// Every track across both eras, deduped by path. Used to resolve curated
+// per-page subsets (the fountain pins a handful by path) independent of era.
+const allTracks = (() => {
+  const seen = new Set();
+  return [...eightyTracks, ...non80sTracks].filter((t) => {
+    const key = (t.path || '').replace(/^\//, '');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+})();
 
 // Normalize a track path for comparison (some entries have a leading slash, some don't)
 const normalizeTrackPath = (p) => (p || '').replace(/^\//, '');
 
 // Ride page exclusive track
 export const gangstasParadiseTrack = { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 };
-const eightyTracks = [
-  { name: "Walking in L.A. - Missing Persons", path: "audio/walking_in_LA.m4a", bpm: 85 },
-  // { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
-    { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
-
-  { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
-  { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
-  { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
-  // { name: "Good Life - Inner City", path: "audio/good-life-inner-city.m4a", bpm: 120 },
-  { name: "Like A Prayer - Madonna", path: "audio/like-a-prayer-madonna.m4a", bpm: 85 },
-  // { name: "99 Luftballoons - Nena", path: "audio/99 Luftballoons Nena.m4a", bpm: 85 },
-  { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 },
-  { name: "Sweet Dreams - Eurythmics", path: "audio/Sweet Dreams Eurythmics.m4a", bpm: 85 },
-  { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 },
-  { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
-];
 
 // Music Provider component
 export const MusicProvider = ({ children }) => {
@@ -81,6 +90,10 @@ export const MusicProvider = ({ children }) => {
   const [trackProgress, setTrackProgress] = useState(0);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [is80sMode, setIs80sMode] = useState(false);
+  // Which playlist plays. Independent of the visual is80sMode theme flag so the
+  // music toggle never repaints a page. '80s' (brand default) -> eightyTracks,
+  // 'modern' -> non80sTracks.
+  const [musicEra, setMusicEraState] = useState('80s');
   const [currentTrackUrl, setCurrentTrackUrl] = useState('');
   const [currentTrackPath, setCurrentTrackPath] = useState(''); // Add path tracking
   const [currentTrackBPM, setCurrentTrackBPM] = useState(100); // Add BPM tracking
@@ -100,6 +113,7 @@ export const MusicProvider = ({ children }) => {
   // Use refs to track current values for event handlers
   const currentTrackIndexRef = React.useRef(0);
   const is80sModeRef = React.useRef(false);
+  const musicEraRef = React.useRef('80s');
   const loadTrackRef = React.useRef(null);
   const shuffleHistoryRef = React.useRef([]);
   const pageSpecificTracksRef = React.useRef([]);
@@ -113,9 +127,9 @@ export const MusicProvider = ({ children }) => {
     if (pagePlaylistOverride && pagePlaylistOverride.length) {
       return pagePlaylistOverride;
     }
-    const baseTracks = is80sMode ? eightyTracks : non80sTracks;
+    const baseTracks = musicEra === 'modern' ? non80sTracks : eightyTracks;
     return [...baseTracks, ...pageSpecificTracks];
-  }, [is80sMode, pageSpecificTracks, pagePlaylistOverride]);
+  }, [musicEra, pageSpecificTracks, pagePlaylistOverride]);
 
   // Add a track for the current page
   const addPageTrack = useCallback((track) => {
@@ -146,6 +160,10 @@ export const MusicProvider = ({ children }) => {
   React.useEffect(() => {
     is80sModeRef.current = is80sMode;
   }, [is80sMode]);
+
+  React.useEffect(() => {
+    musicEraRef.current = musicEra;
+  }, [musicEra]);
 
   React.useEffect(() => {
     shuffleHistoryRef.current = shuffleHistory;
@@ -610,7 +628,13 @@ export const MusicProvider = ({ children }) => {
     
     // Restore state from global manager
     const savedState = globalAudioManager.getState();
-    
+
+    // Music era persists on its own (a user can set it before any track loads).
+    if (savedState.musicEra) {
+      setMusicEraState(savedState.musicEra);
+      musicEraRef.current = savedState.musicEra;
+    }
+
     if (savedState.src) {
       // Restore all state
       setCurrentTrackIndex(savedState.currentTrackIndex);
@@ -644,7 +668,7 @@ export const MusicProvider = ({ children }) => {
       // For auto-advance, always play the next track. Honor a page playlist
       // override (e.g. the fountain page) so auto-advance stays within it.
       const override = pagePlaylistOverrideRef.current;
-      const baseTracks = is80sModeRef.current ? eightyTracks : non80sTracks;
+      const baseTracks = musicEraRef.current === 'modern' ? non80sTracks : eightyTracks;
       const playlist = (override && override.length)
         ? override
         : [...baseTracks, ...pageSpecificTracksRef.current];
@@ -713,21 +737,29 @@ export const MusicProvider = ({ children }) => {
     };
   }, []);
 
-  // Handle 80s mode change - reload track from new playlist
+  // Persist the visual 80s theme flag. It no longer touches the music — the
+  // music playlist is governed by `musicEra` (see effect below) — so flipping a
+  // page's theme never interrupts playback.
   useEffect(() => {
-    
-    // Save mode change to global manager
     if (globalAudioManager) {
       globalAudioManager.setState({ is80sMode });
     }
-    
+  }, [is80sMode]);
+
+  // Handle music-era change - persist it and reload a track from the new
+  // playlist so the switch is audible immediately.
+  useEffect(() => {
+    if (globalAudioManager) {
+      globalAudioManager.setState({ musicEra });
+    }
+
     // If we have a track playing or paused, reload from the new playlist
     if (audioRef.current && audioRef.current.src) {
       const wasPlaying = !audioRef.current.paused;
 
-      // Get the playlist for the new mode
+      // Get the playlist for the new era
       const playlist = getCurrentPlaylist();
-      
+
       // Choose a random track if shuffled, otherwise start at 0
       let newTrackIndex = 0;
       if (isShuffled && playlist.length > 0) {
@@ -738,11 +770,11 @@ export const MusicProvider = ({ children }) => {
           globalAudioManager.setState({ shuffleHistory: [] });
         }
       }
-      
+
       setCurrentTrackIndex(newTrackIndex);
       loadTrack(newTrackIndex, wasPlaying);
     }
-  }, [is80sMode, isShuffled, loadTrack]);
+  }, [musicEra, isShuffled, loadTrack]);
   
   // Update volume when it changes, with a smooth "duck" ramp while a character
   // is speaking (isDucked) so dialogue stays intelligible over the music.
@@ -796,6 +828,15 @@ export const MusicProvider = ({ children }) => {
     setCurrentTrackIndex,
     is80sMode,
     setIs80sMode,
+    musicEra,
+    setMusicEra: (era) => {
+      const next = era === 'modern' ? 'modern' : '80s';
+      setMusicEraState(next);
+      musicEraRef.current = next;
+      if (globalAudioManager) {
+        globalAudioManager.setState({ musicEra: next });
+      }
+    },
     currentTrackUrl,
     setCurrentTrackUrl,
     currentTrackPath,
@@ -815,6 +856,7 @@ export const MusicProvider = ({ children }) => {
     isLoadingTrack,
     non80sTracks,
     eightyTracks,
+    allTracks,
     loadTrackByPath,
     isShuffled,
     addPageTrack,

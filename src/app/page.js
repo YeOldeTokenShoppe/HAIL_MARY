@@ -71,7 +71,7 @@ const VOTIVE_IMAGE_PRESETS = [
   {
     key: "default",
     src: null,
-    thumbnail: "/images/nuestraSenora.webp",
+    thumbnail: "/goldGuadalupe.svg  ",
     label: "Guadalupe",
   },
   { key: "queenOfHearts", src: "/queenOfHearts1.jpg", label: "Queen of Hearts" },
@@ -2657,8 +2657,15 @@ export default function HomePage() {
     >
       <MusicButton
         accent="#d4a854"
-        // Use the 80s artwork as the idle (play) icon instead of the ♫ glyph.
-        icon="/icon80.svg"
+        // Two round faces that spin while the music plays: a synthwave-sun "80s"
+        // badge, and the vinyl record for MIX.
+        icon="/synthwave-sun-80s.svg"
+        modernIcon="/virginRecords.jpg"
+        // Tap the icon = play/pause; the "80s | MIX" switch flips the music era.
+        showModeToggle
+        // Mobile is cramped up top: collapse to a single gold ♫ that expands to
+        // the full pill + disc on tap.
+        collapsible={isMobileDevice}
         size={62}
         // top clears the VigilTicker chyron strip (~24px) pinned to the
         // viewport's top edge.

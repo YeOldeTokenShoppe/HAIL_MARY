@@ -5,7 +5,7 @@ export const metadata = {
   title: '𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙',
   icons: {
     icon: '/favicon.svg',
-    apple: '/apple-icon.png',
+    apple: '/apple-icon.svg',
   },
   // PWA manifest — required for iOS Add-to-Home-Screen install, which is what
   // unlocks web push on iPhone (Safari only delivers push to installed apps).

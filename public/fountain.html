@@ -2898,17 +2898,19 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// on the water via THREE.Reflector (handles the mirror camera + below-surface
 			// clip). Separate full-scene pass (shows in the perf HUD draws), desktop-only,
 			// 'R' toggles it. This is the true reflection; refraction is the see-through.
-			const REFLECTION_ENABLED = !isMobileDevice;
+			const REFLECTION_ENABLED = true;   // EXPERIMENT: un-gated for mobile too (was !isMobileDevice). Revert if perf suffers.
 			let reflectionStrength = 1.4;   // 0..1+ overall strength (0 = off → hides the reflector, skipping its pass)
 			let waterReflector = null;
 			let _reflLastOn = reflectionStrength > 0 ? reflectionStrength : 0.5;   // remembers tuned strength across the 'R' toggle
 			window.reflectionStrength = reflectionStrength;   // live tuning
 			window.reflectDistort = 0.06;     // how much the reflection ripples with the water surface (0 = flat mirror)
+			window.reflectEveryN = (typeof isMobileDevice !== 'undefined' && isMobileDevice) ? 3 : 1;  // re-render the mirror every Nth frame (↑ = cheaper, staler)
 			window.splashDropScale = 1.0;     // coin-splash droplet COUNT multiplier (Water FX panel)
 			window.splashDropSize  = 0.045;   // coin-splash droplet world size
 			window.splashDropLaunch = 1.0;    // coin-splash droplet launch height/strength (lower = gentler arc)
 			window.splashDropOpacity = 0.35;  // coin-splash droplet opacity
 			window.minRestFaceY = 0.8;        // coins only rest on faces flatter than this (↑ = slide off steeper slopes)
+			window.introOrbitIdleMs = 5000;   // resume the slow auto-orbit after this many ms of no interaction
 			let poolBorder;
 			let meshRay;
 			let upperMeshRay;
@@ -3596,22 +3598,43 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				animateCamera();
 			}
 
-			// Slow auto-orbit shown after the fly-in. OrbitControls applies the
-			// rotation inside update(), which the render loop calls only while
-			// introOrbitActive. The first pointer press anywhere stops it.
+			// Slow auto-orbit shown after the fly-in — an "attract mode". OrbitControls
+			// applies the rotation inside update(), called from the render loop only while
+			// introOrbitActive. Any interaction PAUSES it; it RESUMES after a few seconds of
+			// stillness (window.introOrbitIdleMs) — but never while the coin-cam owns the
+			// camera (cameraPhase) or controls are disabled.
+			let introOrbitIdleTimer = null;
+			let introOrbitPointers = 0;   // pointers currently down (a drag in progress)
+
 			function startIntroOrbit() {
 				introOrbitActive = true;
 				controls.autoRotate = true;
 				controls.autoRotateSpeed = 1.0; // ~60s per revolution; lower = slower
-				window.addEventListener('pointerdown', stopIntroOrbit, { once: true });
 			}
-
-			function stopIntroOrbit() {
-				if (!introOrbitActive) return;
-				introOrbitActive = false;
-				controls.autoRotate = false;
-				window.removeEventListener('pointerdown', stopIntroOrbit);
+			function stopIntroOrbit() {       // pause + cancel any pending resume
+				if (introOrbitActive) {
+					introOrbitActive = false;
+					controls.autoRotate = false;
+				}
+				if (introOrbitIdleTimer) { clearTimeout(introOrbitIdleTimer); introOrbitIdleTimer = null; }
 			}
+			function armIntroOrbitResume() {  // resume the orbit after the idle delay
+				if (introOrbitIdleTimer) clearTimeout(introOrbitIdleTimer);
+				introOrbitIdleTimer = setTimeout(function tick() {
+					introOrbitIdleTimer = null;
+					if (introOrbitPointers > 0) return;                          // still touching — pointerup re-arms
+					if (cameraPhase !== 'none' || (controls && !controls.enabled)) {
+						introOrbitIdleTimer = setTimeout(tick, window.introOrbitIdleMs ?? 5000); // coin-cam busy — retry later
+						return;
+					}
+					startIntroOrbit();
+				}, window.introOrbitIdleMs ?? 5000);
+			}
+			// Pause while the user touches/drags; resume after idle once they let go.
+			window.addEventListener('pointerdown',   () => { introOrbitPointers++; stopIntroOrbit(); }, { passive: true });
+			window.addEventListener('pointerup',     () => { introOrbitPointers = Math.max(0, introOrbitPointers - 1); armIntroOrbitResume(); }, { passive: true });
+			window.addEventListener('pointercancel', () => { introOrbitPointers = Math.max(0, introOrbitPointers - 1); armIntroOrbitResume(); }, { passive: true });
+			window.addEventListener('wheel',         () => { stopIntroOrbit(); armIntroOrbitResume(); }, { passive: true });
 
 			// Function to update loading progress
 			function updateLoadingProgress(progress) {
@@ -3902,6 +3925,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				const rfl = fxGui.addFolder( 'Reflection (key: R)' );
 				rfl.add( window, 'reflectionStrength', 0, 2, 0.05 ).name( 'strength  (0 = off)' ).listen();
 				rfl.add( window, 'reflectDistort', 0, 0.1, 0.005 ).name( 'ripple distort' ).listen();
+				rfl.add( window, 'reflectEveryN', 1, 4, 1 ).name( 'render every N frames' ).listen();
 
 				const fc = fxGui.addFolder( 'Floor caustics' );
 				fc.add( window, 'floorCausticOnStrength', 0, 1.5, 0.05 ).name( 'strength' ).listen();
@@ -3920,7 +3944,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				const cp = fxGui.addFolder( 'Coin physics' );
 				cp.add( window, 'minRestFaceY', 0.5, 1, 0.01 ).name( 'rest slope limit ↑=slide' ).listen();
 
-				fxGui.add( { perf() { if ( window.togglePerf ) window.togglePerf(); } }, 'perf' ).name( '⧉ toggle perf HUD' );
+				// PERF monitor disabled — re-enable the creation block to restore window.togglePerf.
+				// fxGui.add( { perf() { if ( window.togglePerf ) window.togglePerf(); } }, 'perf' ).name( '⧉ toggle perf HUD' );
 			}
 
 			function setupHemisphereGUI() {
@@ -4203,6 +4228,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// DOUBLES them. renderer.info.autoReset is turned OFF so the count
 				// accumulates across the refraction pass + every composer pass each frame
 				// (reset manually at the top of render()). window.togglePerf() hides it.
+				/* PERF MONITOR DISABLED — uncomment this block + the two marked "PERF" below to re-enable.
 				renderer.info.autoReset = false;
 				stats = new Stats();
 				stats.showPanel( 0 ); // 0:FPS  1:MS  2:MB — click the panel to cycle
@@ -4216,6 +4242,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					stats.dom.style.display = vis ? 'none' : 'block';
 					perfHud.style.display  = vis ? 'none' : 'block';
 				};
+				*/
 
 				container.style.touchAction = 'none';
 				container.addEventListener( 'pointermove', onPointerMove );
@@ -5365,8 +5392,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						}`,
 				};
 				waterReflector = new Reflector( new THREE.PlaneGeometry( BOUNDS, BOUNDS ), {
-					textureWidth: 512,
-					textureHeight: 512,
+					textureWidth: isMobileDevice ? 256 : 512,    // smaller mirror RT on mobile (it's a full-scene pass)
+					textureHeight: isMobileDevice ? 256 : 512,
 					clipBias: 0.003,
 					color: 0xffffff,
 					shader: reflShader,
@@ -5377,6 +5404,16 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				waterReflector.position.set( 0, WATER_SURFACE_Y + 0.004, 0 );   // just above the surface
 				waterReflector.renderOrder = 1;                                  // composite over the water
 				waterReflector.visible = reflectionStrength > 0;
+				// Throttle the (expensive) mirror render: re-render the reflection texture only
+				// every Nth frame; on the others the plane still draws with the last texture (the
+				// ripple distortion hides the 1-frame staleness). Roughly halves the cost on mobile.
+				const _reflectOBR = waterReflector.onBeforeRender;
+				let _reflectFrame = 0;
+				waterReflector.onBeforeRender = function ( r, s, c, g, m, grp ) {
+					const N = Math.max( 1, Math.round( window.reflectEveryN ?? ( isMobileDevice ? 3 : 1 ) ) );
+					if ( ( _reflectFrame++ % N ) !== 0 ) return;   // skip the mirror render this frame
+					_reflectOBR.call( this, r, s, c, g, m, grp );
+				};
 				scene.add( waterReflector );
 			}
 
@@ -8036,8 +8073,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				updateShootingStar(currentTime, deltaTime);
 				render();
-				// Perf monitor: FPS panel + the per-frame draw-call / triangle / refraction
-				// readout (renderer.info now holds this frame's accumulated totals).
+				/* PERF monitor update — uncomment to re-enable.
 				if (stats) stats.update();
 				if (perfHud) {
 					const ri = renderer.info.render;
@@ -8049,14 +8085,14 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						'refr  ' + (rMix > 0 ? 'ON ×' + rMix : 'off') + '\n' +
 						'refl  ' + (rRefl > 0 ? 'ON ×' + rRefl : 'off');
 				}
+				*/
 
 			}
 
 			function render() {
 
-				// Perf: start the per-frame draw-call tally (autoReset is off) so it sums
-				// the refraction pre-pass + gpu-compute + every composer pass this frame.
-				if (renderer && renderer.info) renderer.info.reset();
+				// PERF monitor disabled — uncomment to re-enable the per-frame draw-call tally.
+				// if (renderer && renderer.info) renderer.info.reset();
 
                 if (coinSplashTimeout === null) {
                     raycast(); // Process mouse interaction only if no coin splash is resetting
