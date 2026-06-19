@@ -32,7 +32,7 @@ const FOUNTAIN_TRACK_PATHS = [
   // "audio/99RedBalloons.mp3",        // 99 Luftballoons - Nena
   "audio/PersonalJesus.m4a",        // Personal Jesus - Depeche Mode
   "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
-"audio/Dizzy.mp3",          // She's
+"audio/Cities.mp3",          // She's
   // "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris
   "audio/LoveMyWay.m4a",           // Love My Way - Psychedelic Furs
   // "audio/Heroes.m4a",              // Heroes - Janelle Monae
