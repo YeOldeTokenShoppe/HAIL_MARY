@@ -13,15 +13,16 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded, onDonateCl
     const base =
       process.env.NODE_ENV === 'development'
         ? `/fountain.html?dev=${Date.now()}`
-        : '/fountain.html?v=20260616';
-    // Forward the dev tuning gates (/fountain?lights, /fountain?fx) into the iframe
-    // doc — the inner HTML reads its own location.search, which otherwise only has
-    // dev/v. ?fx opens the live Water FX panel (refraction/reflection/caustics).
+        : '/fountain.html?v=20260619';
+    // Forward the dev tuning gates (/fountain?lights, /fountain?fx, /fountain?perf)
+    // into the iframe doc — the inner HTML reads its OWN location.search, which
+    // otherwise only has dev/v. ?fx opens the live Water FX panel
+    // (refraction/reflection/caustics); ?perf shows the stats.js FPS + draw-call HUD.
     const params =
       typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search)
         : null;
-    const flags = ['lights', 'fx'].filter((f) => params?.has(f));
+    const flags = ['lights', 'fx', 'perf'].filter((f) => params?.has(f));
     return flags.length ? `${base}&${flags.join('&')}` : base;
   });
 

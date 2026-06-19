@@ -25,11 +25,11 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
 // Paths must match the entries in MusicContext; normalized for leading-slash differences.
 const FOUNTAIN_TRACK_PATHS = [
   "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
-  "/audio/Wishing.m4a",           // Wishing (If I Had a Photograph of You) - A Flock of Seagulls
+  // "/audio/Wishing.m4a",           // Wishing (If I Had a Photograph of You) - A Flock of Seagulls
   "/audio/Eyes Without A Face.mp3",           // Eyes Without A Face - Billy Idol
-  "/audio/Cat People (Putting Out Fire).mp3", // Cat People (Putting Out Fire) - David Bowie
-  "audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
-  "audio/99RedBalloons.mp3",        // 99 Luftballoons - Nena
+  // "/audio/Cat People (Putting Out Fire).mp3", // Cat People (Putting Out Fire) - David Bowie
+  // "audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
+  // "audio/99RedBalloons.mp3",        // 99 Luftballoons - Nena
   "audio/PersonalJesus.m4a",        // Personal Jesus - Depeche Mode
   "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
 "audio/Dizzy.mp3",          // She's
@@ -38,7 +38,9 @@ const FOUNTAIN_TRACK_PATHS = [
   // "audio/Heroes.m4a",              // Heroes - Janelle Monae
   // "audio/RocketsTail.m4a",     // Rocket's Tail - Kate Bush
   "audio/IfYouAllGetToHeaven.m4a",       // If You Leave - Orchestral Manoeuvres in the D
-  "audio/for-those-about-to-rock-ac-dc.m4a"
+  "audio/for-those-about-to-rock-ac-dc.m4a",
+  // "audio/AhLeah.m4a",
+  
 ].map((p) => p.replace(/^\//, ""));
 
 export default function FountainPage() {

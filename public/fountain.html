@@ -2319,8 +2319,16 @@
 			let staticCoinInstancedMesh = null;
 			let staticCoinData = [];
 			
-			// Mobile detection for other optimizations
-			const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+			// Mobile detection for GPU-cost gating ONLY (refraction, reflection throttle,
+			// RT sizes, devicePixelRatio cap, AA, shadow res). The in-iframe UI layout does
+			// NOT use this — it has its own `window.innerWidth <= 768` checks — so widening
+			// this won't shrink the coin counter or flip to the phone UI.
+			// iPadOS 13+ Safari defaults to desktop-class browsing: it reports a "Macintosh"
+			// UA (no "iPad" token) at width > 768, so the iPad Pro slipped through as DESKTOP
+			// and ran full refraction + every-frame reflection at 2× DPR — the periodic
+			// camera-rotation stutter (2026-06-19). Detect it as a Mac with a touchscreen.
+			const isIPadDesktopMode = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+			const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || isIPadDesktopMode || window.innerWidth <= 768;
 			
 			// Performance settings - InstancedMesh handles these efficiently in a single draw call
 			const MAX_STATIC_COINS = 500;
@@ -3944,8 +3952,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				const cp = fxGui.addFolder( 'Coin physics' );
 				cp.add( window, 'minRestFaceY', 0.5, 1, 0.01 ).name( 'rest slope limit ↑=slide' ).listen();
 
-				// PERF monitor disabled — re-enable the creation block to restore window.togglePerf.
-				// fxGui.add( { perf() { if ( window.togglePerf ) window.togglePerf(); } }, 'perf' ).name( '⧉ toggle perf HUD' );
+				// PERF monitor — re-enabled 2026-06-19. window.togglePerf() exists again.
+				fxGui.add( { perf() { if ( window.togglePerf ) window.togglePerf(); } }, 'perf' ).name( '⧉ toggle perf HUD' );
 			}
 
 			function setupHemisphereGUI() {
@@ -4228,21 +4236,30 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// DOUBLES them. renderer.info.autoReset is turned OFF so the count
 				// accumulates across the refraction pass + every composer pass each frame
 				// (reset manually at the top of render()). window.togglePerf() hides it.
-				/* PERF MONITOR DISABLED — uncomment this block + the two marked "PERF" below to re-enable.
-				renderer.info.autoReset = false;
-				stats = new Stats();
-				stats.showPanel( 0 ); // 0:FPS  1:MS  2:MB — click the panel to cycle
-				stats.dom.style.cssText = 'position:fixed; top:8px; right:8px; left:auto; z-index:10000; cursor:pointer;';
-				document.body.appendChild( stats.dom );
-				perfHud = document.createElement( 'div' );
-				perfHud.style.cssText = 'position:fixed; top:56px; right:8px; z-index:10000; font:11px/1.45 ui-monospace,monospace; color:#9ff; background:rgba(0,0,0,0.55); padding:4px 7px; border-radius:5px; pointer-events:none; white-space:pre; text-align:right;';
-				document.body.appendChild( perfHud );
-				window.togglePerf = () => {
-					const vis = stats.dom.style.display !== 'none';
-					stats.dom.style.display = vis ? 'none' : 'block';
-					perfHud.style.display  = vis ? 'none' : 'block';
-				};
-				*/
+				// PERF MONITOR — re-enabled 2026-06-19 to debug iPad camera-rotation stutter.
+				// Dev-gated: load /fountain?perf (also shows under ?fx / ?lights) so regular
+				// visitors never see it. stats/perfHud stay null otherwise, and the per-frame
+				// update + reset blocks below no-op on the null guards.
+				// stats.dom sits below the top-right music button (top:120) so it doesn't overlap it.
+				const perfParams = new URLSearchParams( window.location.search );
+				if ( perfParams.has( 'perf' ) || perfParams.has( 'fx' ) || perfParams.has( 'lights' ) ) {
+					renderer.info.autoReset = false;
+					stats = new Stats();
+					stats.showPanel( 1 ); // default to MS (frame time) — the stutter signal. 0:FPS 1:MS 2:MB; tap to cycle
+					// The stats.js widget is tiny; scale it ~2.4× so MS is legible on a high-DPI
+					// iPad. Anchored top-right (origin 100% 0) so it grows left+down, clear of the
+					// music button above it. ~115px tall after scaling → perfHud starts at 230.
+					stats.dom.style.cssText = 'position:fixed; top:96px; right:10px; left:auto; z-index:10000; cursor:pointer; transform:scale(2.4); transform-origin:100% 0;';
+					document.body.appendChild( stats.dom );
+					perfHud = document.createElement( 'div' );
+					perfHud.style.cssText = 'position:fixed; top:230px; right:10px; z-index:10000; font:14px/1.5 ui-monospace,monospace; color:#9ff; background:rgba(0,0,0,0.6); padding:5px 9px; border-radius:6px; pointer-events:none; white-space:pre; text-align:right;';
+					document.body.appendChild( perfHud );
+					window.togglePerf = () => {
+						const vis = stats.dom.style.display !== 'none';
+						stats.dom.style.display = vis ? 'none' : 'block';
+						perfHud.style.display  = vis ? 'none' : 'block';
+					};
+				}
 
 				container.style.touchAction = 'none';
 				container.addEventListener( 'pointermove', onPointerMove );
@@ -8073,7 +8090,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				updateShootingStar(currentTime, deltaTime);
 				render();
-				/* PERF monitor update — uncomment to re-enable.
+				// PERF monitor update — re-enabled 2026-06-19.
 				if (stats) stats.update();
 				if (perfHud) {
 					const ri = renderer.info.render;
@@ -8085,14 +8102,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						'refr  ' + (rMix > 0 ? 'ON ×' + rMix : 'off') + '\n' +
 						'refl  ' + (rRefl > 0 ? 'ON ×' + rRefl : 'off');
 				}
-				*/
 
 			}
 
 			function render() {
 
-				// PERF monitor disabled — uncomment to re-enable the per-frame draw-call tally.
-				// if (renderer && renderer.info) renderer.info.reset();
+				// PERF monitor — re-enabled 2026-06-19. Only when the HUD is active we turned
+				// autoReset off, so reset the per-frame draw-call tally here before the refraction
+				// + composer passes accumulate. (stats is null unless ?perf/?fx/?lights is set.)
+				if (stats && renderer && renderer.info) renderer.info.reset();
 
                 if (coinSplashTimeout === null) {
                     raycast(); // Process mouse interaction only if no coin splash is resetting
@@ -9750,6 +9768,15 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			#coinCounter:hover {
 				transform: translateY(0) scale(1.02);
 				box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 100px rgba(240, 147, 251, 0.3);
+			}
+
+			/* Charity-pool count box retired 2026-06-19 — its stats now live in the
+			   goldCoin info-hub. Hidden on ALL widths (the mobile media query already
+			   hid it <=768; on desktop/iPad it used to fade in at startup — the "flash on").
+			   !important so it wins over the cinematic restore's inline display=''; the
+			   counter-update JS keeps writing into the hidden child spans harmlessly. */
+			#coinCounter {
+				display: none !important;
 			}
 
 			/* 80s mode for info boxes */
