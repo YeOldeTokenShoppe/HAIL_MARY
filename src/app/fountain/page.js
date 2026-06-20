@@ -42,7 +42,8 @@ const FOUNTAIN_TRACK_PATHS = [
   "audio/for-those-about-to-rock-ac-dc.m4a",
   // "/audio/GoldDustWoman.m4a",          // Gold
   // "audio/AhLeah.m4a",
-  
+  "/audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
+  "audio/HowToBeAZillionaire.mp3",          // How To Be A Zillionaire - ABC
 ].map((p) => p.replace(/^\//, ""));
 
 export default function FountainPage() {
@@ -319,10 +320,11 @@ export default function FountainPage() {
               color: "#ffffff",
               cursor: "pointer",
             }}
+             onClick={() => router.push('/')}
           >
-            <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            {/* <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}> */}
               RL80
-            </Link>
+            {/* </Link> */}
             {Array.from({ length: 100 }).map((_, i) => {
               const index = i + 1;
               return (

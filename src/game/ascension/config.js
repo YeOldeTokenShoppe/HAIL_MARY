@@ -61,31 +61,31 @@ export const DRACO_PATH = "/draco/"; // local Draco decoder (matches main scene)
 
 export const RACER_VISUALS = {
   monk: {
-    model: "/models/GR80.glb", // Saint GR80 — the real Android Monk (walk/idle/pray)
-    scale: 1,
-    facing: Math.PI / 2, // rotate to face +X (down the track)
+    model: "/models/Monk_WinningStreak.glb",
+    scale: 1, // tune against a screenshot
+    facing: Math.PI / 2, // tune to face +X (down the track)
     yOffset: 0,
     clips: {
-      idle: "idle",
-      running: "walk", // no run clip on this rig; walk stands in
-      falling: "idle",
-      down: "idle",
-      rising: "idle",
-      celebrating: "pray", // the monk prays at the moon
+      idle: "Praying", // the monk's idle is prayer
+      running: "Walking", // StartWalking is a lead-in we can layer later
+      falling: "Tripping",
+      down: "Tripping",
+      rising: "GetUp",
+      celebrating: "Cheer",
     },
   },
   demon: {
-    model: "/models/blueDemon.glb", // stand-in: full Run / HitReact / Idle / Wave kit
-    scale: 0.4, // stand-in renders large at 1.0 — scaled down to match the Monk
+    model: "/models/John_Barron.glb",
+    scale: 1,
     facing: Math.PI / 2,
     yOffset: 0,
     clips: {
-      idle: "CharacterArmature|Idle",
-      running: "CharacterArmature|Run",
-      falling: "CharacterArmature|HitReact",
-      down: "CharacterArmature|HitReact",
-      rising: "CharacterArmature|Idle",
-      celebrating: "CharacterArmature|Wave",
+      idle: "Idle",
+      running: "Walking",
+      falling: "Tripping",
+      down: "Defeated",
+      rising: "StandingUp",
+      celebrating: "Rallying",
     },
   },
 };

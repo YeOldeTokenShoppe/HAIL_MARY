@@ -353,7 +353,7 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
         <pointLight position={[12, 8, 7]}   color="#ff2200" intensity={3} distance={18} decay={1.5} />
       </>}
       {hell ? (
-        <Clouds material={THREE.MeshLambertMaterial}>
+        <Clouds material={THREE.MeshLambertMaterial} texture="/cloud.png">
           {/* Low canopy layer */}
           <Cloud position={[-5, 8, -6]}   speed={0.45} opacity={0.7}  color="#bbbbbb" width={12} depth={2.5} segments={12} />
           <Cloud position={[8, 7, -3]}     speed={0.48} opacity={0.65} color="#aaaaaa" width={14} depth={3}   segments={14} />
@@ -367,7 +367,7 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
           <Cloud position={[10, 15, 4]}    speed={0.4}  opacity={0.5}  color="#999999" width={15} depth={3}   segments={14} />
         </Clouds>
       ) : (
-        <Clouds material={THREE.MeshBasicMaterial}>
+        <Clouds material={THREE.MeshBasicMaterial} texture="/cloud.png">
           <Cloud position={[-8, 10, -12]} speed={0.02} opacity={cloudOpacity * 1.25} width={1.2} depth={0.15} segments={4} />
           <Cloud position={[14, 12, -6]} speed={0.03} opacity={cloudOpacity} width={1.5} depth={0.12} segments={4} />
           <Cloud position={[3, 11, 16]} speed={0.015} opacity={cloudOpacity * 1.1} width={1} depth={0.1} segments={3} />

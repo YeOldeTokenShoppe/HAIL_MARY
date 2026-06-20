@@ -252,7 +252,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, is80sMode, ...props }, r
             {/* Hemisphere Light with Helper for Clouds */}
   <HemisphereLightComponent is80sMode={is80sMode} />
 
-            <Clouds material={THREE.MeshStandardMaterial} limit={400} frustumCulled={false} receiveShadow={false} castShadow={false}>
+            <Clouds material={THREE.MeshStandardMaterial} texture="/cloud.png" limit={400} frustumCulled={false} receiveShadow={false} castShadow={false}>
               {/* Main large white cloud  that is DIRECTLY under the bull */}
               <Cloud 
                 ref={cloud0}

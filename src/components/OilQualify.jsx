@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ShaderText from "@/components/ShaderText";
 import NoiseBackground from "@/components/NoiseBackground";
 import { SignInButton } from "@clerk/nextjs";
@@ -130,6 +132,7 @@ export default function OilQualify({
   // Live values from oilGame/settings (passed by the page) with safe fallbacks
   const GRID_SIZE = gridSize || DEFAULT_GRID_SIZE;
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [players, setPlayers] = useState([]);
@@ -452,7 +455,7 @@ export default function OilQualify({
       )}
       {!isMobile && (
         <div style={{ position: "fixed", top: 12, right: 12, zIndex: 100, display: "flex", alignItems: "center", gap: 6 }}>
-          <a
+          <Link
             href="/"
             title="Return to shrine"
             style={{
@@ -465,7 +468,7 @@ export default function OilQualify({
             }}
           >
             <img src="/brand-mark-cyan.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
-          </a>
+          </Link>
           <NavControlsHome
             isPlaying={contextIsPlaying}
             onPlayMusic={() => play()}
@@ -1961,7 +1964,7 @@ export default function OilQualify({
           key: "home",
           label: "HOME",
           title: "Return to shrine",
-          onClick: () => { window.location.href = "/"; },
+          onClick: () => router.push("/"),
           icon: <img src="/brand-mark-mono.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
         }]}
       />}

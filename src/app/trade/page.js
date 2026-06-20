@@ -3231,7 +3231,7 @@ export default function CyborgTemple() {
                 />
                 
                 {/* Scattered clouds for 80s atmosphere - avoiding SynthSunset area */}
-                <Clouds material={THREE.MeshBasicMaterial}>
+                <Clouds material={THREE.MeshBasicMaterial} texture="/cloud.png">
                   {/* Clouds positioned to avoid the sunset at [0, 8, -20] */}
                   {/* Far left side clouds */}
                   <Cloud 

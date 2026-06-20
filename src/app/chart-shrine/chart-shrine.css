@@ -745,7 +745,10 @@ body:has(.shrine-page.neon) {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 2.7em;
+  /* Fixed (not min-) height so the rotating quote always fills the same box and
+     centers within it — keeps the source line + intro copy below from nudging
+     up/down as quotes of different line-counts cycle. */
+  height: 2.7em;
   margin: 0;
   font-family: "UnifrakturCook", "Pirata One", serif;
   font-size: clamp(1.3rem, 2.5vw, 1.75rem);
@@ -756,7 +759,7 @@ body:has(.shrine-page.neon) {
     0 0 10px rgba(241, 215, 122, 0.35),
     0 0 22px rgba(217, 45, 176, 0.25);
   text-wrap: balance;
-  white-space: nowrap;
+  white-space: normal;
   opacity: 0;
   animation: heroPullquoteReveal 6800ms ease-in-out both;
 }
@@ -844,6 +847,10 @@ body:has(.shrine-page.neon) {
   .shrine-page.neon .hero-pullquote-latin {
     white-space: normal;
     font-size: clamp(1.15rem, 5.2vw, 1.5rem);
+    /* Allow growth on narrow phones where the quote can run to 3 lines —
+       clipping would be worse than a small reflow in the single-column layout. */
+    height: auto;
+    min-height: 2.7em;
   }
 }
 

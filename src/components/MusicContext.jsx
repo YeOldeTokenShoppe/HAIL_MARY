@@ -53,6 +53,7 @@ const eightyTracks = [
   { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
     { name: "Heart Of Glass - Blondie", path: "audio/HeartOfGlass.mp3", bpm: 100 },
       { name: "Gold Dust Woman - Fleetwood Mac", path: "audio/GoldDustWoman.m4a", bpm: 100 },
+            { name: "How To Be A Zillionaire - ABC", path: "audio/HowToBeAZillionaire.mp3", bpm: 100 },
 
 ];
 
@@ -752,10 +753,24 @@ export const MusicProvider = ({ children }) => {
 
   // Handle music-era change - persist it and reload a track from the new
   // playlist so the switch is audible immediately.
+  //
+  // IMPORTANT: this effect lists `loadTrack` as a dep (it calls it), and
+  // `loadTrack`'s identity churns whenever the playlist changes — including
+  // when a page sets/clears `pagePlaylistOverride` on mount/unmount (e.g. the
+  // fountain page). Without the era guard below, simply navigating to/from such
+  // a page would re-run this effect and restart the current song with a new
+  // random track. Only reload when the era GENUINELY changed.
+  const prevMusicEraRef = React.useRef(musicEra);
   useEffect(() => {
     if (globalAudioManager) {
       globalAudioManager.setState({ musicEra });
     }
+
+    // Bail unless the era actually changed (skips override/loadTrack churn).
+    if (prevMusicEraRef.current === musicEra) {
+      return;
+    }
+    prevMusicEraRef.current = musicEra;
 
     // If we have a track playing or paused, reload from the new playlist
     if (audioRef.current && audioRef.current.src) {
