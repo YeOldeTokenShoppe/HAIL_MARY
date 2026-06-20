@@ -396,9 +396,11 @@ export default function FountainPage() {
           showModeToggle
           // Mobile is cramped over the fountain scene: collapse to a single small
           // ♫ that expands to the full "80s | MIX" pill + disc on tap (matches
-          // the landing page). Stays the full cluster on desktop.
+          // the landing page). `compact` + a smaller size keep the *expanded*
+          // cluster from eating ~half the width. Full-size cluster on desktop.
           collapsible={isMobileView}
-          size={62}
+          compact={isMobileView}
+          size={isMobileView ? 44 : 62}
         />
       </div>
 

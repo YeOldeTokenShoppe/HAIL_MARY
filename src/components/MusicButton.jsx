@@ -41,6 +41,11 @@ export default function MusicButton({
   // and expands to reveal the era switch + disc face on tap (tapping outside
   // collapses it again). Used to declutter cramped mobile headers.
   collapsible = false,
+  // When true, tightens the horizontal footprint of the *expanded* cluster:
+  // smaller era-switch text/padding and narrower inter-element gaps. Pair with a
+  // smaller `size` on mobile so the toggle + disc (+ skip) don't eat ~half the
+  // viewport width. Off by default so existing drop-ins are unaffected.
+  compact = false,
 }) {
   const { play, pause, isPlaying, isLoadingTrack, nextTrack, musicEra, setMusicEra } = useMusic();
 
@@ -131,11 +136,11 @@ export default function MusicButton({
     background: "transparent",
     color: accent,
     fontFamily: "inherit",
-    fontSize: 11,
+    fontSize: compact ? 10 : 11,
     fontWeight: 700,
-    letterSpacing: "0.5px",
+    letterSpacing: compact ? "0.3px" : "0.5px",
     lineHeight: 1,
-    padding: "5px 9px",
+    padding: compact ? "4px 6px" : "5px 9px",
     borderRadius: 8,
     cursor: "pointer",
     transition: "background 0.18s ease, color 0.18s ease, opacity 0.18s ease",
@@ -146,7 +151,7 @@ export default function MusicButton({
       : { ...segBase, opacity: 0.55 };
 
   return (
-    <div ref={containerRef} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...style }}>
+    <div ref={containerRef} style={{ display: "inline-flex", alignItems: "center", gap: compact ? 4 : 6, ...style }}>
       {collapsible && !expanded ? (
         <button
           type="button"
@@ -182,7 +187,7 @@ export default function MusicButton({
             display: "inline-flex",
             alignItems: "center",
             gap: 2,
-            padding: 3,
+            padding: compact ? 2 : 3,
             borderRadius: 10,
             background,
             border: `1.5px solid ${borderColor}`,
