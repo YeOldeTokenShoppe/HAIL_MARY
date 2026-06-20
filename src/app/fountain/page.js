@@ -24,6 +24,7 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
 // against the full catalog `allTracks`, regardless of era bucket).
 // Paths must match the entries in MusicContext; normalized for leading-slash differences.
 const FOUNTAIN_TRACK_PATHS = [
+  "/audio/HeartOfGlass.mp3",          // Heart Of Glass - Blondie
   "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
   // "/audio/Wishing.m4a",           // Wishing (If I Had a Photograph of You) - A Flock of Seagulls
   "/audio/Eyes Without A Face.mp3",           // Eyes Without A Face - Billy Idol
@@ -37,8 +38,9 @@ const FOUNTAIN_TRACK_PATHS = [
   "audio/LoveMyWay.m4a",           // Love My Way - Psychedelic Furs
   // "audio/Heroes.m4a",              // Heroes - Janelle Monae
   // "audio/RocketsTail.m4a",     // Rocket's Tail - Kate Bush
-  "audio/IfYouAllGetToHeaven.m4a",       // If You Leave - Orchestral Manoeuvres in the D
+  // "audio/IfYouAllGetToHeaven.m4a",       // If You Leave - Orchestral Manoeuvres in the D
   "audio/for-those-about-to-rock-ac-dc.m4a",
+  // "/audio/GoldDustWoman.m4a",          // Gold
   // "audio/AhLeah.m4a",
   
 ].map((p) => p.replace(/^\//, ""));

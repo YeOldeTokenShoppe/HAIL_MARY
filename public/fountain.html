@@ -2625,7 +2625,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// 	staticCoinMaterial,
 				// 	instanceCount
 				// );
-				
+
+				// Static-coin instancing is disabled (the InstancedMesh constructor above is
+				// commented out for mobile perf), so the mesh stays null. Bail before the loop
+				// below dereferences it — re-enable by uncommenting the constructor above.
+				if (!staticCoinInstancedMesh) return;
+
 				// Set up transform matrices for each coin
 				const matrix = new THREE.Matrix4();
 				const position = new THREE.Vector3();
@@ -2871,6 +2876,66 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let infoHubBeam = null;      // conic volumetric light shaft up from the coin's rim
 			let infoHubHalo = null;      // camera-facing beacon glow + expanding ping rings (distance visibility)
 			let infoHubRingsMuting = false; // once the coin's been clicked, fade the halo's ping rings out (persisted in localStorage)
+			// Second model coin (goldCoin2): a glowing, tappable coin that fires the coin-stream
+			// shower (goldCoin1 opens the info panel; this one rains coins from the hands).
+			let showerAnchor = null;
+			let showerCoin = null;
+			let showerHit = null;
+			// Coin-stream bursts: two celebratory showers of coins (one per statue hand)
+			// flung up when the info-hub coin is tapped. Vanilla port of the React
+			// <CoinStream> component — each is one InstancedMesh of parabolic-arc instances
+			// ticked in animate(). Origins are eyeballed onto the hands via the ?coins GUI.
+			//
+			// This config + state MUST be declared here, before init() runs (init() is
+			// called during top-level execution). The ?coins GUI builds the streams from
+			// inside init(), so a COIN_STREAM/coinStreamMat declared later in the file
+			// would still be in the temporal dead zone at that point and throw.
+			const COIN_STREAM_MAX = 80;          // instances allocated per emitter (count ≤ this, live-adjustable)
+			const COIN_STREAM_SETTLED_MAX = 600; // coins kept resting on the pool floor (session-only ring buffer)
+			const COIN_STREAM = {
+				count: 20,         // active instances per hand
+				spread: 1.0,      // horizontal launch speed — coins spray radially outward
+				lift: 1.05,       // vertical launch speed (apex ≈ lift²/(2·|gravity|))
+				gravity: -3.9,    // continuous fall
+				timeScale: 0.4,   // slow-mo for the WHOLE flight (1 = current speed; lower = slower, same arc/sink/tumble shape)
+				duration: 7.0,    // safety cutoff: how long a burst's instances live before forced-settle
+				stagger: 1.1,     // release window — coins leave over this many seconds
+				scale: 1.0,       // instance scale: 1.0 == a free (local) tossed coin's size
+				spin: 8.9,        // base tumble speed (rad/s); per-coin ×0.6–1.3 — constant fixed-axis spin
+				sink: 0.15,       // terminal underwater sink speed (u/s) — the gentle drift after the entry slows
+				sinkResist: 4.2,  // water resistance: how fast the entry speed eases to terminal (higher = stops sooner)
+				restDepth: 0.28,  // how far below the surface coins come to rest (basin floor ≈ 0.28; tune to the visible floor)
+				floorDrop: 2.5,   // hide a coin once it falls this far below the launch point (if it never hit water)
+				// Per-hand launch origins (WORLD space), eyeballed onto the statue's hands
+				// with the ?coins panel ("show hand markers" → drag → "copy config").
+				hands: [
+					{ name: 'Left hand',  x: -0.17, y: 1.02, z: 0.12 },
+					{ name: 'Right hand', x:  0.22, y: 1.02, z: 0.15 },
+				],
+			};
+			window.coinStream = COIN_STREAM; // live tuning from the console
+			let coinStreamMat = null;          // shared gold material for both emitters
+			let coinStreams = null;            // [{ mesh, coins, elapsed, active, origin }, ...] (built lazily)
+			let coinStreamMarkers = null;      // ?coins GUI: draggable spheres marking each hand origin
+			let coinStreamLastSplashSnd = 0;   // throttle so a 50-coin shower's splash SFX reads as a cascade
+			let coinStreamRippleOn = false;    // true while the shower is driving the shared water-ripple point
+			let coinStreamSettled = null;      // persistent InstancedMesh: coins resting on the pool floor (whole session)
+			let coinStreamSettledCount = 0;    // total settled so far (ring-buffer index into coinStreamSettled)
+			const coinStreamDummy = new THREE.Object3D();
+			const coinStreamSplashPos = new THREE.Vector3(); // scratch for the water-area test
+			const coinStreamDQ = new THREE.Quaternion();     // scratch: per-frame tumble delta
+			const coinStreamRaycaster = new THREE.Raycaster();   // finds stone/ledge below an out-of-water coin
+			const coinStreamRayOrigin = new THREE.Vector3();     // scratch ray origin
+			const COIN_STREAM_DOWN = new THREE.Vector3(0, -1, 0);
+			const COIN_STREAM_GROUND_SCAN_Y = 0.3; // only scan for stone below this height (rim/plaza are low; keeps coins off tall pieces)
+			const COIN_STREAM_UP = new THREE.Vector3(0, 1, 0);   // up normal for flat (floor/plaza) rests
+			const COIN_STREAM_FACE = new THREE.Vector3(0, 0, 1); // coin's local face normal (geom pre-rotated +90° X)
+			const coinStreamHitNormal = new THREE.Vector3();     // surface normal from the last ground raycast
+			let coinStreamHitGrass = false;                      // was that surface grass?
+			let coinStreamLastPlink = 0;                         // throttle for hard-surface tap SFX
+			const coinStreamProbe = new THREE.Raycaster();       // footprint-support probe (overhang test)
+			const coinStreamOffDir = new THREE.Vector3();        // horizontal direction toward an overhang
+			const COIN_STREAM_SUPPORT_RING = 8;                  // footprint sample points
 			let waterMesh;
 			let upperWaterMesh;
 			let topBowlWaterMesh;
@@ -2892,7 +2957,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			// so the floor/coins seen through the surface WOBBLE with the ripples. Gated to
 			// desktop + low-res (it's an extra full-scene pass) and fully off when mix = 0.
 			const REFRACTION_ENABLED = !isMobileDevice;
-			let refractionMix = 0.1;     // subtle by default: refraction legitimately reveals the submerged pedestal/floor, so a low mix keeps it a shimmer (the reflection is the hero); raise for a stronger see-through
+			let refractionMix = 0.12;     // subtle by default: refraction legitimately reveals the submerged pedestal/floor, so a low mix keeps it a shimmer (the reflection is the hero); raise for a stronger see-through
 			let refractionAmt = 0.04;    // screen-space ripple distortion strength
 			let refractRT = null;        // lazily created in render(), sized from the drawing buffer
 			const _refractSize = new THREE.Vector2();
@@ -2918,6 +2983,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			window.splashDropLaunch = 1.0;    // coin-splash droplet launch height/strength (lower = gentler arc)
 			window.splashDropOpacity = 0.35;  // coin-splash droplet opacity
 			window.minRestFaceY = 0.8;        // coins only rest on faces flatter than this (↑ = slide off steeper slopes)
+			window.coinFountainClearance = 0.006; // gap a coin rests above the fountain stone parts (ledge/rim/statue) — small; tossed + stream
+			window.coinGroundClearance = 0.092;  // gap a coin rests above the open GROUND/plaza only (its plane sits below the visible ground, so it needs more) — tossed + stream
 			window.introOrbitIdleMs = 5000;   // resume the slow auto-orbit after this many ms of no interaction
 			let poolBorder;
 			let meshRay;
@@ -3951,6 +4018,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				const cp = fxGui.addFolder( 'Coin physics' );
 				cp.add( window, 'minRestFaceY', 0.5, 1, 0.01 ).name( 'rest slope limit ↑=slide' ).listen();
+				cp.add( window, 'coinFountainClearance', 0, 0.2, 0.002 ).name( 'fountain clearance' ).listen();
+					cp.add( window, 'coinGroundClearance', 0, 0.5, 0.002 ).name( 'ground clearance ↑=higher' ).listen();
 
 				// PERF monitor — re-enabled 2026-06-19. window.togglePerf() exists again.
 				fxGui.add( { perf() { if ( window.togglePerf ) window.togglePerf(); } }, 'perf' ).name( '⧉ toggle perf HUD' );
@@ -4199,6 +4268,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				if ( new URLSearchParams( window.location.search ).has( 'fx' ) ||
 				     new URLSearchParams( window.location.search ).has( 'lights' ) ) {
 					setupWaterFxGUI();
+				}
+				// Coin-stream hand-positioning panel — /fountain?coins. Sliders + draggable
+				// markers to line each emitter up with a statue hand, plus a test-fire button.
+				if ( new URLSearchParams( window.location.search ).has( 'coins' ) ) {
+					setupCoinStreamGUI();
 				}
 
 				renderer = new THREE.WebGLRenderer( { 
@@ -4965,21 +5039,28 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 // Store model reference for collision detection
                 window.fountainModel = fountainModel;
                 
-                // --- Info-hub coin: find the model's decorative goldCoin, hide it (kept
-                // as a positional/size reference), and build a glowing clickable script
-                // coin in its place. Case-insensitive + tolerant of GLTFLoader's _N suffix
-                // on duplicate names (GoldCoin -> GoldCoin_1); first matching mesh wins.
+                // --- Tappable model coins: goldCoin1 opens the info panel, goldCoin2 fires the
+                // coin-stream shower. Each decorative model coin is hidden and replaced by a
+                // glowing, clickable script coin in its place. Case-insensitive; we strip only
+                // GLTFLoader's `_N` collision suffix (goldCoin1 -> goldCoin1_1) so the meaningful
+                // 1/2 is preserved. A lone "goldCoin" (no number) falls back to the info panel.
                 fountainModel.traverse(function (node) {
-                    if (!infoHubAnchor && node.isMesh && node.name &&
-                        node.name.toLowerCase().replace(/[_-]?\d+$/, '') === 'goldcoin') {
-                        infoHubAnchor = node;
-                    }
+                    if (!node.isMesh || !node.name) return;
+                    const n = node.name.toLowerCase().replace(/_\d+$/, '');
+                    if (!infoHubAnchor && (n === 'goldcoin1' || n === 'goldcoin')) infoHubAnchor = node;
+                    else if (!showerAnchor && n === 'goldcoin2') showerAnchor = node;
                 });
                 if (infoHubAnchor) {
-                    console.log('[Fountain] info-hub anchor:', infoHubAnchor.name);
+                    console.log('[Fountain] info-hub anchor (goldCoin1):', infoHubAnchor.name);
                     buildInfoHubCoin();
                 } else {
-                    console.warn('[Fountain] no goldCoin mesh found for the info hub');
+                    console.warn('[Fountain] no goldCoin1 mesh found for the info hub');
+                }
+                if (showerAnchor) {
+                    console.log('[Fountain] coin-stream anchor (goldCoin2):', showerAnchor.name);
+                    buildShowerCoin();
+                } else {
+                    console.warn('[Fountain] no goldCoin2 mesh found for the coin stream');
                 }
 
                 const fallingWaterGeometry = new THREE.CylinderGeometry(fallRadius, fallRadius, fallHeight, fallSegments, 1, true); // Open ended cylinder
@@ -5231,7 +5312,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
 				groundMesh.rotation.x = -Math.PI / 2; // Rotate to lie flat
-				groundMesh.position.y = -1.05; // Plaza sits at the fountain's base (measured min.y ≈ -1.07). Was -2, which left a ~0.93u gap so the fountain read as hovering once a coin fell to the ground.
+				groundMesh.position.y = -0.958; // Plaza sits at the fountain's base (measured min.y ≈ -1.07). Was -2, which left a ~0.93u gap so the fountain read as hovering once a coin fell to the ground.
 				groundMesh.receiveShadow = true;
 				scene.add(groundMesh);
 				
@@ -6438,29 +6519,27 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             // goldCoin and acts as the single entry point to the info panel/UI.
             const INFO_HUB_UP = new THREE.Vector3(0, 1, 0);
             
-            function buildInfoHubCoin() {
-                if (!infoHubAnchor || infoHubCoin) return;
-                const anchor = infoHubAnchor;
-            
-                // Place the script coin as a SIBLING of the model coin: same parent + copied
-                // local transform => identical world placement (the earlier world-bbox center
-                // floated it). Scale-fit by the ratio of local bbox diameters to cover the
-                // same footprint.
+            // Replace a (decorative, dim) model coin with a glowing, tappable script coin in
+            // the SAME world pose: built as a SIBLING of the model coin (same parent + copied
+            // local transform => identical placement), scale-fit by the ratio of local bbox
+            // diameters, with an invisible larger hit-proxy for easy taps. Hides the model coin.
+            // Returns { coin, hit }. Shared by goldCoin1 (info) and goldCoin2 (coin stream).
+            function buildGlowCoin(anchor) {
                 const parent = anchor.parent || scene;
                 anchor.geometry.computeBoundingBox();
                 const aSize = anchor.geometry.boundingBox.getSize(new THREE.Vector3());
                 const aDia = Math.max(aSize.x, aSize.y, aSize.z) || 1;
-            
+
                 const geo = coinGeometry.clone();
-                // coinGeometry is pre-rotated upright (rotateX +90) so thrown coins face
-                // the camera mid-flight. Undo that so the info coin lies FLAT like the
-                // model coin; copying anchor.quaternion below then matches its exact pose.
+                // coinGeometry is pre-rotated upright (rotateX +90) so thrown coins face the
+                // camera mid-flight. Undo that so this coin lies FLAT like the model coin;
+                // copying anchor.quaternion below then matches its exact pose.
                 geo.rotateX(-Math.PI / 2);
                 geo.computeBoundingBox();
                 const gSize = geo.boundingBox.getSize(new THREE.Vector3());
                 const gDia = Math.max(gSize.x, gSize.y, gSize.z) || 0.06;
                 const fit = aDia / gDia;
-            
+
                 const mat = new THREE.MeshStandardMaterial({
                     color: 0xffd24a,
                     metalness: 0.35,
@@ -6469,33 +6548,46 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     emissiveIntensity: 0.7, // bloom (UnrealBloomPass) turns this into a glow — toned down
                     side: THREE.DoubleSide,
                 });
-            
-                infoHubCoin = new THREE.Mesh(geo, mat);
-                infoHubCoin.position.copy(anchor.position);
-                infoHubCoin.quaternion.copy(anchor.quaternion);
-                infoHubCoin.scale.copy(anchor.scale).multiplyScalar(fit);
-                infoHubCoin.renderOrder = 3;
-                infoHubCoin.userData.isInfoHub = true;
-                infoHubCoin.userData.baseScale = infoHubCoin.scale.clone();
-                infoHubCoin.userData.baseEmissive = mat.emissiveIntensity;
-                parent.add(infoHubCoin);
-            
-                // Invisible, larger hit-proxy (child of the coin, so it follows) for easy taps.
-                infoHubHit = new THREE.Mesh(
+
+                const coin = new THREE.Mesh(geo, mat);
+                coin.position.copy(anchor.position);
+                coin.quaternion.copy(anchor.quaternion);
+                coin.scale.copy(anchor.scale).multiplyScalar(fit);
+                coin.renderOrder = 3;
+                coin.userData.baseScale = coin.scale.clone();
+                coin.userData.baseEmissive = mat.emissiveIntensity;
+                parent.add(coin);
+
+                const hit = new THREE.Mesh(
                     new THREE.SphereGeometry(gDia * 1.3, 8, 8),
                     new THREE.MeshBasicMaterial({ visible: false })
                 );
-                infoHubCoin.add(infoHubHit);
-            
+                coin.add(hit);
+
                 anchor.visible = false; // keep as a positional reference, just don't draw it
+                return { coin: coin, hit: hit };
+            }
+
+            function buildInfoHubCoin() {
+                if (!infoHubAnchor || infoHubCoin) return;
+                const built = buildGlowCoin(infoHubAnchor);
+                infoHubCoin = built.coin;
+                infoHubHit = built.hit;
+                infoHubCoin.userData.isInfoHub = true;
                 window.infoHubCoin = infoHubCoin; // live console tuning
-            
-                const wp = infoHubCoin.getWorldPosition(new THREE.Vector3());
-                console.log('[Fountain] info-hub coin from anchor', anchor.name, '-> world',
-                    wp.x.toFixed(2), wp.y.toFixed(2), wp.z.toFixed(2));
-                // NOTE: the emitter is built later (right after scene.add(fountainModel)),
-                // NOT here — at this point the model hasn't been shifted (-0.5 Y), scaled
-                // (0.8) or added to the scene, so the coin's world position/size aren't final.
+                // NOTE: the ember/beam/halo emitters are built later (right after
+                // scene.add(fountainModel)), NOT here — at this point the model hasn't been
+                // shifted (-0.5 Y), scaled (0.8) or added, so world position/size aren't final.
+            }
+
+            // goldCoin2 → the glowing coin that fires the coin-stream shower on tap. Same build
+            // as the info coin (base glow + bloom), minus the info coin's ember/beam/halo extras.
+            function buildShowerCoin() {
+                if (!showerAnchor || showerCoin) return;
+                const built = buildGlowCoin(showerAnchor);
+                showerCoin = built.coin;
+                showerHit = built.hit;
+                window.showerCoin = showerCoin; // live console tuning
             }
 
             // A subtle stream of gold embers drifting up out of the coin. It's a single
@@ -6543,7 +6635,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     positions[i * 3 + 2] = cz * r;
                     aSeed[i] = Math.random();
                     aSpeed[i] = 0.7 + Math.random() * 0.6;
-                    aScale[i] = 0.5 + Math.random() * 0.7;
+                    aScale[i] = 0.5 + Math.random() * 1.9;
                     aDrift[i * 2 + 0] = cx; // drift outward along the radius (off the rim)
                     aDrift[i * 2 + 1] = cz;
                 }
@@ -6562,7 +6654,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     uniforms: {
                         uTime: { value: 0 },
                         uLife: { value: 15.0 },                       // seconds per ember (higher = slower rise; raised in step with uRise to keep velocity gentle)
-                        uRise: { value: coinDia * 1.4 },             // taller halo so embers read from a distance
+                        uRise: { value: coinDia * 4.0 },             // taller halo so embers read from a distance
                         uDrift: { value: coinDia * 0.28 },           // gentle outward bloom off the edge
                         uSize: { value: coinDia * 0.085 * heightScale }, // bigger sprites so they don't vanish far out
                         uColor: { value: new THREE.Color(0xffd98a) },   // warm gold, matches the coin
@@ -6780,7 +6872,500 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 // untouched; the rim embers are the only animated element. (infoHubPulse
                 // is no longer used.)
             }
-            
+
+            // === Coin-stream bursts (two, one per statue hand) =========================
+            // A vanilla port of the React <CoinStream> component, run as TWO emitters so a
+            // shower of coins appears to spring from each of the statue's hands. Each is one
+            // InstancedMesh of parabolic-arc instances, drawn into the same scene/camera as
+            // everything else (so the bloom pass makes the gold glow), and ticked from
+            // animate(). Both fire together on the info-hub coin tap.
+            //
+            // The statue has no separately-named hand nodes, so each emitter's launch point
+            // is an editable world-space position eyeballed onto a hand via the ?coins GUI
+            // (sliders + draggable markers + a "copy config" button to bake in the result).
+            // Tuning is shared across both hands; only the origins differ.
+            //
+            // Speeds are world units/s; the fountain's normal toss peaks ~1.2 u/s with
+            // g≈1.8 u/s² (gravity 0.03/frame × 60) and BOUNDS≈2.65, so these stay at scale.
+            // (COIN_STREAM config + coinStreamMat/coinStreams state are declared up top,
+            // before init() — see the TDZ note there. The functions below are hoisted.)
+
+            // Build the two InstancedMeshes once (lazily). Reuses the real fountain coin
+            // geometry; a bright self-lit gold material drives the bloom. Each mesh is
+            // allocated at COIN_STREAM_MAX and uses .count to draw only the active subset.
+            function buildCoinStreams() {
+                if (coinStreams || typeof scene === 'undefined' || !scene) return;
+                coinStreamMat = new THREE.MeshStandardMaterial({
+                    color: 0xffd24a,
+                    metalness: 0.6,
+                    roughness: 0.25,
+                    emissive: new THREE.Color(0xffae1f),
+                    emissiveIntensity: 0.5,
+                    side: THREE.DoubleSide,
+                });
+                coinStreams = COIN_STREAM.hands.map(function () {
+                    const mesh = new THREE.InstancedMesh(coinGeometry, coinStreamMat, COIN_STREAM_MAX);
+                    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                    mesh.frustumCulled = false; // instances roam far past the mesh's origin bounds
+                    mesh.renderOrder = 3;
+                    mesh.count = 0;             // nothing drawn until a burst fires
+                    scene.add(mesh);
+                    return { mesh: mesh, coins: null, elapsed: 0, active: false, origin: new THREE.Vector3() };
+                });
+                window.coinStreams = coinStreams; // inspection
+            }
+
+            // Fresh random launch params for one emitter, so no two showers look alike.
+            // Each coin gets a radial direction (a full spray, not the React component's
+            // one-directional drift), a staggered release, spin, and a little jitter.
+            function makeStreamCoins() {
+                const n = COIN_STREAM.count;
+                const out = new Array(n);
+                for (let i = 0; i < n; i++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const rad = 0.4 + Math.random() * 0.6;            // 0.4..1.0 of full spread
+                    out[i] = {
+                        delay: (i / n) * COIN_STREAM.stagger,
+                        vx: Math.cos(ang) * COIN_STREAM.spread * rad,
+                        vy: COIN_STREAM.lift * (0.8 + Math.random() * 0.5),
+                        vz: Math.sin(ang) * COIN_STREAM.spread * rad,
+                        ox: (Math.random() - 0.5) * 0.06,
+                        oy: (Math.random() - 0.5) * 0.03,
+                        oz: (Math.random() - 0.5) * 0.06,
+                        // Constant fixed-axis tumble (like a tossed coin's rotateOnWorldAxis):
+                        // a random world axis + steady spin rate, integrated into `quat` each frame.
+                        axis: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(),
+                        spinRate: COIN_STREAM.spin * (0.6 + Math.random() * 0.7), // rad/s
+                        quat: new THREE.Quaternion().setFromEuler(
+                            new THREE.Euler(Math.random() * 6.283, Math.random() * 6.283, Math.random() * 6.283)
+                        ),
+                        splashed: false,                              // broke the surface → now sinking
+                        settled: false,                              // reached the floor → moved to the persistent pile
+                        splashT: 0,                                  // burst-elapsed time at the splash
+                        wx: 0, wz: 0,                                // splash x/z (held while it sinks straight down)
+                        uwVy: 0, uwY: 0,                             // underwater vertical velocity + integrated depth
+                        loose: false,                                // handed off to velocity-fall near a surface
+                        lx: 0, ly: 0, lz: 0, lvx: 0, lvy: 0, lvz: 0, // loose-fall position + velocity
+                    };
+                }
+                return out;
+            }
+
+            // Splash exactly like a tossed coin breaking the lower pool: droplet spray +
+            // a surface ripple (shared GPGPU point) + the splash SFX (throttled so a whole
+            // shower reads as a cascade, not a wall of noise). Mirrors the water-entry block
+            // in animate().
+            function coinStreamSplash(x, z, impactSpeed) {
+                const t = Math.min(1.5, impactSpeed * 2.2);          // 0 (drop-in) → 1.5 (fast)
+                if (typeof emitDroplets === 'function') {
+                    emitDroplets(x, WATER_SURFACE_Y, z, Math.round(4 + t * 9), 0.5 + t * 0.8);
+                }
+                if (typeof heightmapVariable !== 'undefined' && heightmapVariable) {
+                    heightmapVariable.material.uniforms['mousePos'].value.set(x, z); // ripple at impact
+                    coinStreamRippleOn = true;
+                }
+                const now = performance.now();
+                if (typeof window.playCoinSplash === 'function' && now - coinStreamLastSplashSnd > 80) {
+                    coinStreamLastSplashSnd = now;
+                    window.playCoinSplash();
+                }
+            }
+
+            // Hard-surface tap (stone, via playCoinPlink) or soft rustle (grass, via
+            // playCoinSoft) — the SFX tossed coins make when they hit something solid,
+            // scaled by impact speed and throttled so a cascade doesn't machine-gun it.
+            function coinStreamPlink(intensity, grass) {
+                const now = performance.now();
+                if (now - coinStreamLastPlink < 45) return;
+                coinStreamLastPlink = now;
+                if (grass) {
+                    if (typeof window.playCoinSoft === 'function') window.playCoinSoft(Math.min(1, 0.4 + intensity));
+                } else if (typeof window.playCoinPlink === 'function') {
+                    window.playCoinPlink(Math.min(1, 0.2 + intensity * 2.5));
+                }
+            }
+
+            // The settled pile: ONE persistent InstancedMesh holding every coin that has
+            // sunk to the floor this session (a ring buffer capped at COIN_STREAM_SETTLED_MAX).
+            // It's never animated after a coin lands — one draw call, zero per-frame cost — so
+            // hundreds of coins can rest in the pool without the per-coin physics tossed coins
+            // carry. Lives in memory only (not saved to Firestore); it's gone on reload.
+            function buildCoinStreamSettled() {
+                if (coinStreamSettled || typeof scene === 'undefined' || !scene) return;
+                const mat = baseCoinMaterial.clone(); // same gold as the tossed coins
+                mat.transparent = false; mat.opacity = 1.0; // solid; the water tint does the "underwater" look
+                coinStreamSettled = new THREE.InstancedMesh(coinGeometry, mat, COIN_STREAM_SETTLED_MAX);
+                coinStreamSettled.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+                coinStreamSettled.frustumCulled = false;
+                coinStreamSettled.renderOrder = 99; // same as resting tossed coins
+                coinStreamSettled.count = 0;
+                scene.add(coinStreamSettled);
+                window.coinStreamSettled = coinStreamSettled; // inspection / clear-from-console
+            }
+
+            // Park a coin permanently at (x,y,z): lie it dead flat (with a little scatter) at
+            // the given scale, and append it to the persistent pile. Used for coins resting on
+            // the basin floor (underwater, scaled up) AND on the dry ledge/plaza (scale 1).
+            function settleCoinStreamCoin(x, y, z, scale, normal) {
+                buildCoinStreamSettled();
+                if (!coinStreamSettled) return;
+                const n = normal || COIN_STREAM_UP;
+                const idx = coinStreamSettledCount % COIN_STREAM_SETTLED_MAX;
+                coinStreamDummy.position.set(
+                    x + (Math.random() - 0.5) * 0.03,
+                    y,
+                    z + (Math.random() - 0.5) * 0.03
+                );
+                // Lay the flat face ON the surface (aligned to its normal) — same rest pose as a
+                // tossed coin, so on a sloped ledge it sits at the slope's angle — then a random
+                // spin about the normal so they don't all align.
+                coinStreamDummy.quaternion.setFromUnitVectors(COIN_STREAM_FACE, n);
+                coinStreamDummy.rotateOnWorldAxis(n, Math.random() * Math.PI * 2);
+                coinStreamDummy.scale.setScalar(scale);
+                coinStreamDummy.updateMatrix();
+                coinStreamSettled.setMatrixAt(idx, coinStreamDummy.matrix);
+                coinStreamSettled.instanceMatrix.needsUpdate = true;
+                coinStreamSettledCount++;
+                coinStreamSettled.count = Math.min(coinStreamSettledCount, COIN_STREAM_SETTLED_MAX);
+            }
+
+            // Top stone surface directly below (x, fromY, z), or null if nothing's there.
+            // Raycasts the fountain's collision meshes (the same isFountainPart set tossed
+            // coins use), so a stream coin can land on the rim/ledge/statue base like a toss.
+            let coinStreamColliders = null;
+            function coinStreamGroundY(x, z, fromY) {
+                if (!coinStreamColliders) {
+                    if (!window.fountainModel) return null; // model not ready — don't cache an empty set
+                    coinStreamColliders = [];
+                    window.fountainModel.traverse(function (n) {
+                        if (n.isMesh && n.userData.isFountainPart) coinStreamColliders.push(n);
+                    });
+                }
+                if (!coinStreamColliders.length) return null;
+                coinStreamRayOrigin.set(x, fromY + 0.05, z);
+                coinStreamRaycaster.set(coinStreamRayOrigin, COIN_STREAM_DOWN);
+                const hits = coinStreamRaycaster.intersectObjects(coinStreamColliders, false);
+                if (!hits.length) return null;
+                const h = hits[0];
+                // World-space surface normal (face up) + whether it's grass — used to decide
+                // rest vs slide-off and which sound to play, like a tossed coin.
+                if (h.face) {
+                    coinStreamHitNormal.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+                    if (coinStreamHitNormal.y < 0) coinStreamHitNormal.negate();
+                } else {
+                    coinStreamHitNormal.copy(COIN_STREAM_UP);
+                }
+                coinStreamHitGrass = h.object.userData.isGrass === true;
+                return h.point.y;
+            }
+
+            // What fraction of the coin's footprint rim has stone directly under it, at about
+            // this height? <0.5 means more than half the disc overhangs an edge, so it should
+            // tip/slide off instead of perching. Also sets coinStreamOffDir → the horizontal
+            // direction toward the unsupported side (push it that way so it falls off).
+            function coinStreamSupportFraction(x, y, z, radius) {
+                if (!coinStreamColliders || !coinStreamColliders.length) return 1;
+                let supported = 0;
+                coinStreamOffDir.set(0, 0, 0);
+                for (let a = 0; a < COIN_STREAM_SUPPORT_RING; a++) {
+                    const t = (a / COIN_STREAM_SUPPORT_RING) * Math.PI * 2;
+                    const cx = Math.cos(t), cz = Math.sin(t);
+                    coinStreamRayOrigin.set(x + cx * radius, y + 0.04, z + cz * radius);
+                    coinStreamProbe.set(coinStreamRayOrigin, COIN_STREAM_DOWN);
+                    coinStreamProbe.far = 0.1;
+                    const hits = coinStreamProbe.intersectObjects(coinStreamColliders, false);
+                    if (hits.length && Math.abs(hits[0].point.y - y) < 0.06) {
+                        supported++;
+                    } else {
+                        coinStreamOffDir.x += cx; coinStreamOffDir.z += cz; // overhang on this side
+                    }
+                }
+                if (coinStreamOffDir.lengthSq() > 1e-6) coinStreamOffDir.normalize();
+                return supported / COIN_STREAM_SUPPORT_RING;
+            }
+
+            // Clear the settled pile (handy from the ?coins GUI / console while tuning).
+            function clearCoinStreamSettled() {
+                coinStreamSettledCount = 0;
+                if (coinStreamSettled) coinStreamSettled.count = 0;
+            }
+            window.clearCoinStreamSettled = clearCoinStreamSettled;
+
+            // Fire both bursts. Called from the info-hub coin tap (tryClickInfoHub).
+            function triggerCoinStream() {
+                buildCoinStreams();
+                if (!coinStreams) return;
+                for (let s = 0; s < coinStreams.length; s++) {
+                    const stream = coinStreams[s];
+                    const h = COIN_STREAM.hands[s];
+                    stream.origin.set(h.x, h.y, h.z);     // launch from this hand (current GUI value)
+                    stream.coins = makeStreamCoins();
+                    stream.elapsed = 0;
+                    stream.active = true;
+                    stream.mesh.count = COIN_STREAM.count;
+                }
+                // iOS-safe coin shower through the shared AudioContext helpers — a soft
+                // whoosh plus a short cascade of plinks (the tap is the user gesture that
+                // unlocks audio, so these are honoured on iOS).
+                if (typeof window.playCoinSoft === 'function') window.playCoinSoft(0.7);
+                if (typeof window.playCoinPlink === 'function') {
+                    for (let k = 0; k < 5; k++) {
+                        setTimeout(function () {
+                            if (typeof window.playCoinPlink === 'function') {
+                                window.playCoinPlink(0.3 + Math.random() * 0.3);
+                            }
+                        }, 140 + k * 130);
+                    }
+                }
+            }
+            window.triggerCoinStream = triggerCoinStream; // manual fire for tuning
+
+            // Per-frame tick (called from animate with the sim dt = 1/60). Advances each
+            // active emitter along its arcs and fades coins out as the burst ages.
+            function updateCoinStream(dt) {
+                updateCoinStreamMarkers(); // keep the GUI hand markers glued to the live origins
+                if (!coinStreams) return;
+                const g = COIN_STREAM.gravity;
+                // Scaled timestep: drives the arc clock + all integration, so timeScale<1 runs
+                // the entire effect in slow motion along the exact same paths (apex/range/sink
+                // unchanged). Marker/cleanup below stay on real time.
+                const sdt = dt * (COIN_STREAM.timeScale ?? 1);
+                for (let s = 0; s < coinStreams.length; s++) {
+                    const stream = coinStreams[s];
+                    if (!stream.active) continue;
+                    stream.elapsed += sdt;
+                    if (stream.elapsed > COIN_STREAM.duration) {
+                        // Safety net: settle anything still sinking so it persists rather than
+                        // vanishing at the cutoff (normally everything has already landed).
+                        for (let i = 0; i < stream.coins.length; i++) {
+                            const c = stream.coins[i];
+                            if (c.settled) continue;
+                            if (c.splashed) { settleCoinStreamCoin(c.wx, WATER_SURFACE_Y - COIN_STREAM.restDepth, c.wz, 1.25, COIN_STREAM_UP); c.settled = true; }
+                            else if (c.loose) { settleCoinStreamCoin(c.lx, PLAZA_Y + COIN_THICKNESS / 2 + (window.coinGroundClearance ?? 0.004), c.lz, COIN_STREAM.scale, COIN_STREAM_UP); c.settled = true; }
+                        }
+                        stream.active = false;
+                        stream.mesh.count = 0; // stop drawing this emitter
+                        continue;
+                    }
+                    const t0 = stream.elapsed;
+                    const o = stream.origin;
+                    const coins = stream.coins;
+                    const mesh = stream.mesh;
+                    const restY = WATER_SURFACE_Y - COIN_STREAM.restDepth; // pool floor (tunable via ?coins)
+                    // Loop over THIS burst's coins (count slider changes apply on next fire).
+                    for (let i = 0; i < coins.length; i++) {
+                        const c = coins[i];
+                        if (c.settled) { hideStreamInstance(mesh, i); continue; } // now in the persistent pile
+                        const ct = t0 - c.delay;          // this coin's own age (it may not have left yet)
+                        if (ct < 0) { hideStreamInstance(mesh, i); continue; }
+
+                        let x, y, z, sc = COIN_STREAM.scale;
+                        if (c.splashed) {
+                            // Underwater: water resistance. The coin keeps the downward speed it
+                            // entered with, then that speed is eased toward a slow terminal sink —
+                            // so it visibly decelerates on entry and drifts gently to the floor
+                            // (like a tossed coin's waterDamping), where it snaps flat and settles.
+                            const terminal = -COIN_STREAM.sink;
+                            c.uwVy += (terminal - c.uwVy) * Math.min(1, sdt * COIN_STREAM.sinkResist);
+                            c.uwY  += c.uwVy * sdt;
+                            x = c.wx; z = c.wz; y = c.uwY; sc = 1.25;
+                            if (y <= restY) {
+                                settleCoinStreamCoin(c.wx, restY, c.wz, 1.25, COIN_STREAM_UP);
+                                c.settled = true;
+                                hideStreamInstance(mesh, i);
+                                continue;
+                            }
+                        } else if (c.loose) {
+                            // Velocity-integrated fall once it nears a surface — resolves a splash,
+                            // an aligned rest, or (on a face too steep to rest, per minRestFaceY) a
+                            // deflected slide/tumble off, exactly like a tossed coin.
+                            c.lvy += g * sdt;
+                            c.lx += c.lvx * sdt; c.ly += c.lvy * sdt; c.lz += c.lvz * sdt;
+                            x = c.lx; y = c.ly; z = c.lz;
+                            const overWater = isWithinFountainWater(coinStreamSplashPos.set(x, WATER_SURFACE_Y, z));
+                            if (overWater) {
+                                if (y <= WATER_SURFACE_Y) {
+                                    c.loose = false; c.splashed = true; c.splashT = t0; c.wx = x; c.wz = z;
+                                    c.uwY = WATER_SURFACE_Y;
+                                    c.uwVy = Math.max(c.lvy, -COIN_STREAM.sink * 2.6); // carry entry speed, capped
+                                    coinStreamSplash(x, z, Math.abs(c.lvy));
+                                    y = WATER_SURFACE_Y; sc = 1.25;
+                                }
+                            } else if (y < COIN_STREAM_GROUND_SCAN_Y) {
+                                // Coin-center rest height above a surface. The coin RESTS as soon as it
+                                // descends to this height (trigger == placement), so it never dips to the
+                                // collision mesh — which sits below the visible ledge — and snaps back up.
+                                // Fountain parts (ledge/rim/statue) and the open ground (plaza) get their
+                                // OWN clearance, since the plaza plane sits lower than the visible ground.
+                                const fountainRest = COIN_THICKNESS / 2 + (window.coinFountainClearance ?? 0.01);
+                                const plazaRest    = COIN_THICKNESS / 2 + (window.coinGroundClearance ?? 0.01);
+                                const gy = coinStreamGroundY(x, z, y);
+                                if (gy !== null && y <= gy + fountainRest) {
+                                    const tooSteep = coinStreamHitNormal.y < (window.minRestFaceY ?? 0.8);
+                                    if (tooSteep && !coinStreamHitGrass) {
+                                        // Can't rest on this slope: strip the into-surface motion, add a
+                                        // nudge off the face + scrape friction, and keep tumbling down.
+                                        if (c.ly < gy + 0.005) c.ly = gy + 0.005; // only lift if embedded
+                                        const into = c.lvx * coinStreamHitNormal.x + c.lvy * coinStreamHitNormal.y + c.lvz * coinStreamHitNormal.z;
+                                        if (into < 0) { c.lvx -= into * coinStreamHitNormal.x; c.lvy -= into * coinStreamHitNormal.y; c.lvz -= into * coinStreamHitNormal.z; }
+                                        c.lvx = (c.lvx + coinStreamHitNormal.x * 0.15) * 0.7;
+                                        c.lvy *= 0.7;
+                                        c.lvz = (c.lvz + coinStreamHitNormal.z * 0.15) * 0.7;
+                                        coinStreamPlink(Math.abs(c.lvy) * 0.5, false); // scrape
+                                        y = c.ly;
+                                    } else if (!coinStreamHitGrass &&
+                                               coinStreamSupportFraction(x, gy, z, 0.03 * COIN_STREAM.scale) < 0.5) {
+                                        // Less than half the coin is over stone — it overhangs the edge,
+                                        // so it tips/slides off toward the unsupported side rather than perching.
+                                        if (c.ly < gy + 0.005) c.ly = gy + 0.005; // only lift if embedded
+                                        c.lvx += coinStreamOffDir.x * 0.25;
+                                        c.lvz += coinStreamOffDir.z * 0.25;
+                                        if (c.lvy > -0.1) c.lvy = -0.1; // make sure it starts dropping
+                                        coinStreamPlink(0.2, false);     // a little clink as it tips off
+                                        y = c.ly;
+                                    } else {
+                                        // Rest lying on the surface (grass → soft rustle).
+                                        settleCoinStreamCoin(x, gy + fountainRest, z, COIN_STREAM.scale, coinStreamHitNormal);
+                                        coinStreamPlink(Math.abs(c.lvy), coinStreamHitGrass);
+                                        c.settled = true; hideStreamInstance(mesh, i); continue;
+                                    }
+                                } else if (y <= PLAZA_Y + plazaRest) {
+                                    settleCoinStreamCoin(x, PLAZA_Y + plazaRest, z, COIN_STREAM.scale, COIN_STREAM_UP);
+                                    coinStreamPlink(Math.abs(c.lvy), false);
+                                    c.settled = true; hideStreamInstance(mesh, i); continue;
+                                }
+                            }
+                        } else {
+                            // Above water: the parabolic launch arc, until it nears a surface — then
+                            // hand off to the loose velocity-faller (above) that lands/slides it.
+                            x = o.x + c.vx * ct + c.ox;
+                            y = o.y + c.vy * ct + 0.5 * g * ct * ct + c.oy;
+                            z = o.z + c.vz * ct + c.oz;
+                            if ((c.vy + g * ct) < 0 && y < COIN_STREAM_GROUND_SCAN_Y) {
+                                c.loose = true;
+                                c.lx = x; c.ly = y; c.lz = z;
+                                c.lvx = c.vx; c.lvy = c.vy + g * ct; c.lvz = c.vz;
+                            }
+                        }
+
+                        // Constant fixed-axis tumble the whole way down — falling AND sinking the
+                        // coin keeps spinning (like a tossed coin's rotateOnWorldAxis), until it
+                        // snaps flat on the floor (the rest pose is set in settleCoinStreamCoin).
+                        c.quat.premultiply(coinStreamDQ.setFromAxisAngle(c.axis, c.spinRate * sdt));
+
+                        // Draw, unless a coin that MISSED the water has aged/fallen out of view.
+                        const maxT = COIN_STREAM.duration - c.delay;
+                        const opacity = Math.max(0, 1 - ct / maxT);
+                        if (c.splashed || c.loose || (y > o.y - COIN_STREAM.floorDrop && opacity > 0.1)) {
+                            coinStreamDummy.position.set(x, y, z);
+                            coinStreamDummy.quaternion.copy(c.quat);
+                            coinStreamDummy.scale.setScalar(sc);
+                            coinStreamDummy.updateMatrix();
+                            mesh.setMatrixAt(i, coinStreamDummy.matrix);
+                        } else {
+                            hideStreamInstance(mesh, i);
+                        }
+                    }
+                    mesh.instanceMatrix.needsUpdate = true;
+                }
+                // Release the shared water-ripple point once the whole shower is done, so we
+                // don't keep poking the heightmap at the last impact (which never settles).
+                if (coinStreamRippleOn) {
+                    let anyActive = false;
+                    for (let s = 0; s < coinStreams.length; s++) { if (coinStreams[s].active) { anyActive = true; break; } }
+                    if (!anyActive) {
+                        if (typeof heightmapVariable !== 'undefined' && heightmapVariable) {
+                            heightmapVariable.material.uniforms['mousePos'].value.set(10000, 10000);
+                        }
+                        coinStreamRippleOn = false;
+                    }
+                }
+            }
+
+            function hideStreamInstance(mesh, i) {
+                coinStreamDummy.position.set(0, -1000, 0);
+                coinStreamDummy.scale.setScalar(0);
+                coinStreamDummy.updateMatrix();
+                mesh.setMatrixAt(i, coinStreamDummy.matrix);
+            }
+
+            // --- Hand-position GUI (?coins) -------------------------------------------
+            // Draggable markers + sliders to line each emitter up with a statue hand,
+            // a test-fire button, and a copy-config dump (same pattern as the lights GUI).
+            function setCoinStreamMarkers(show) {
+                if (show && !coinStreamMarkers) {
+                    coinStreamMarkers = COIN_STREAM.hands.map(function () {
+                        const m = new THREE.Mesh(
+                            new THREE.SphereGeometry(0.05, 12, 12),
+                            new THREE.MeshBasicMaterial({ color: 0x00e5ff, depthTest: false, transparent: true, opacity: 0.9 })
+                        );
+                        m.renderOrder = 999; // draw on top so it's always findable
+                        scene.add(m);
+                        return m;
+                    });
+                }
+                if (coinStreamMarkers) coinStreamMarkers.forEach(function (m) { m.visible = !!show; });
+            }
+
+            function updateCoinStreamMarkers() {
+                if (!coinStreamMarkers) return;
+                for (let i = 0; i < coinStreamMarkers.length && i < COIN_STREAM.hands.length; i++) {
+                    const h = COIN_STREAM.hands[i];
+                    coinStreamMarkers[i].position.set(h.x, h.y, h.z);
+                }
+            }
+
+            function setupCoinStreamGUI() {
+                buildCoinStreams(); // so markers + test-fire work immediately
+                const gui = new GUI({ title: 'Coin Streams (hands)' });
+                gui.domElement.style.position = 'fixed';
+                gui.domElement.style.right = '8px';
+                gui.domElement.style.top = '8px';
+                gui.domElement.style.zIndex = '10001';
+
+                const ui = { showMarkers: false };
+                gui.add(ui, 'showMarkers').name('show hand markers')
+                    .onChange(function (v) { setCoinStreamMarkers(v); });
+
+                COIN_STREAM.hands.forEach(function (h) {
+                    const f = gui.addFolder(h.name + ' position');
+                    f.add(h, 'x', -2, 2, 0.01).listen();
+                    f.add(h, 'y', 0, 3, 0.01).listen();
+                    f.add(h, 'z', -2, 2, 0.01).listen();
+                });
+
+                const phys = gui.addFolder('Launch (both hands)');
+                phys.add(COIN_STREAM, 'lift', 0, 5, 0.05).name('lift (up speed)');
+                phys.add(COIN_STREAM, 'spread', 0, 3, 0.05).name('spread (out speed)');
+                phys.add(COIN_STREAM, 'gravity', -8, -0.3, 0.05).name('gravity');
+                phys.add(COIN_STREAM, 'timeScale', 0.2, 1.5, 0.05).name('speed ↓=slower');
+                phys.add(COIN_STREAM, 'sink', 0.05, 2, 0.05).name('sink speed (terminal)');
+                phys.add(COIN_STREAM, 'sinkResist', 0.5, 8, 0.1).name('water resistance');
+                phys.add(COIN_STREAM, 'restDepth', 0.05, 1.2, 0.01).name('rest depth ↓ to floor');
+                phys.add(window, 'minRestFaceY', 0.5, 1, 0.01).name('rest slope limit ↑=slide');
+                phys.add(window, 'coinFountainClearance', 0, 0.2, 0.002).name('fountain clearance');
+                phys.add(window, 'coinGroundClearance', 0, 0.5, 0.002).name('ground/plaza clearance');
+                phys.add(COIN_STREAM, 'scale', 0.2, 4, 0.05).name('coin size');
+                phys.add(COIN_STREAM, 'count', 1, COIN_STREAM_MAX, 1).name('coins / hand');
+                phys.add(COIN_STREAM, 'duration', 1, 12, 0.1).name('life cutoff (s)');
+                phys.add(COIN_STREAM, 'stagger', 0, 3, 0.05).name('release window (s)');
+                phys.add(COIN_STREAM, 'spin', 0, 15, 0.1).name('spin');
+
+                gui.add({ fire: function () { triggerCoinStream(); } }, 'fire').name('▶ test fire');
+                gui.add({ clear: function () { clearCoinStreamSettled(); } }, 'clear').name('🧹 clear settled coins');
+                gui.add({ copy: function () {
+                    const json = JSON.stringify(COIN_STREAM, null, 2);
+                    // The clearances live on window.* (shared with tossed coins), not in
+                    // COIN_STREAM, so include them here too — that's why they weren't copying.
+                    const clearances =
+                        'window.coinFountainClearance = ' + (window.coinFountainClearance ?? 0.006) + ';\n' +
+                        'window.coinGroundClearance = ' + (window.coinGroundClearance ?? 0.092) + ';';
+                    const out = json + '\n\n' + clearances;
+                    try { navigator.clipboard.writeText(out); } catch (e) {}
+                    console.log('[CoinStream] config (paste over COIN_STREAM defaults):\n' + out);
+                } }, 'copy').name('⧉ copy config');
+            }
+
             // Tap -> open the info hub. Returns true when the coin (or its hit-proxy)
             // was hit so the caller skips the toss.
             function tryClickInfoHub(ndc) {
@@ -6802,6 +7387,22 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     try { localStorage.setItem('fountainInfoCoinClicked', '1'); } catch (e) {}
                 }
                 openInfoHub();
+                return true;
+            }
+
+            // Tap goldCoin2 -> fire the coin-stream shower. Returns true when the coin (or its
+            // hit-proxy) was hit so the caller skips the toss.
+            function tryClickShowerCoin(ndc) {
+                if (!showerCoin) return false;
+                raycaster.setFromCamera(ndc, camera);
+                const targets = showerHit ? [showerCoin, showerHit] : [showerCoin];
+                if (!raycaster.intersectObjects(targets, false).length) return false;
+                // Tapping is a user gesture — unlock the ambience on touch like the info coin.
+                const isTouch = (navigator.maxTouchPoints || 0) > 0 || ('ontouchstart' in window);
+                if (isTouch && typeof window.enableFountainSound === 'function') {
+                    window.enableFountainSound();
+                }
+                triggerCoinStream(); // celebratory shower of coins from the statue's hands
                 return true;
             }
             
@@ -7571,7 +8172,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 for (const hit of hits) {
                     const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
                     if (normal.y < 0.8) continue; // need a face it can lie flat on
-                    const restY = hit.point.y + COIN_THICKNESS / 2 + 0.002;
+                    const restY = hit.point.y + COIN_THICKNESS / 2 + (window.coinFountainClearance ?? 0.01);
                     if (restY - coin.position.y > 0.2) continue; // surface too far above
                     coin.position.y = restY;
                     // Lie flat on the horizontal face (same convention as coin stacking)
@@ -7633,7 +8234,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     for (const hit of dh) {
                         const nrm = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
                         if (nrm.y < 0.8) continue;
-                        const ry = hit.point.y + COIN_THICKNESS / 2 + 0.002;
+                        const ry = hit.point.y + COIN_THICKNESS / 2 + (window.coinFountainClearance ?? 0.01);
                         if (ry <= coin.position.y + 0.03 && ry >= coin.position.y - 0.25) newY = ry;
                         break;
                     }
@@ -7758,7 +8359,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						// instead of tossing; a tap on open water still tosses.
 						hideCoinInfoCard();
 						if (tryClickInfoHub(aimedCoords)) {
-							/* info coin opened the hub */
+							/* goldCoin1 opened the info hub */
+						} else if (tryClickShowerCoin(aimedCoords)) {
+							/* goldCoin2 fired the coin-stream shower */
 						} else if (!tryInspectCoin(aimedCoords)) {
 							tossHeldCoin();
 						}
@@ -8014,7 +8617,10 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// so the free-look driver below only acts in the normal view to avoid a
 				// tug-of-war over the overlay's style.
 				const _depth = (window.WATER_SURFACE_Y ?? WATER_SURFACE_Y) - camera.position.y; // >0 below the surface
-				const _camUnderwater = _depth > 0;
+				// Underwater only if the eye is below the surface AND actually over the pool —
+				// otherwise zooming to a coin resting on the dry ledge/plaza (which sits below
+				// the surface height, but outside the water) wrongly tinted the view blue.
+				const _camUnderwater = _depth > 0 && isWithinFountainWater(camera.position);
 				// Free-look owns the overlay in every phase EXCEPT the two the coin-cam state
 				// machine drives itself ('underwater' on, 'returning' off) — so they never
 				// fight, and a stale blue tint can't survive into a coin-cam toss.
@@ -8121,6 +8727,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                  // Update camera follow system
                  updateCameraFollow(dt);
                  updateInfoHubCoin(dt);
+                 updateCoinStream(dt);
 
                  // Drive the post-intro slow orbit (autoRotate is applied in update())
                  if (introOrbitActive) controls.update();
@@ -8638,8 +9245,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                         // Firestore, since fountain_coins counts coins that
                         // actually made it into the fountain.
                         if (!isUnderwater && !coin.userData.stopped &&
-                            nextPosition.y <= PLAZA_Y + COIN_THICKNESS / 2 && velocity.y <= 0) {
-                            nextPosition.y = PLAZA_Y + COIN_THICKNESS / 2;
+                            nextPosition.y <= PLAZA_Y + COIN_THICKNESS / 2 + (window.coinGroundClearance ?? 0.004) && velocity.y <= 0) {
+                            nextPosition.y = PLAZA_Y + COIN_THICKNESS / 2 + (window.coinGroundClearance ?? 0.004);
                             velocity.set(0, 0, 0);
                             coin.userData.stopped = true;
                             // Soft plink as the coin lands on the plaza stone (a miss).
