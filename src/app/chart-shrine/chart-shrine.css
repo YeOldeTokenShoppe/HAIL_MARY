@@ -728,13 +728,23 @@ body:has(.shrine-page.neon) {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  /* One gap for quote→source (and source→gloss on touch). Applies equally to
+     every quote so the source keeps consistent breathing room whether the
+     quote runs 2 or 3 lines. */
+  gap: 12px;
   text-align: center;
   max-width: 56ch;
+  /* Reserves enough height that every quote (worst case: 3-line modern + source
+     ≈ 87px at the ~16px inherited base) fits inside it, so the box stays this
+     height for all of them and the centered quote+source group floats within —
+     the intro copy below never shifts as quotes cycle. min- (not fixed) so an
+     unusually tall wrap on a very narrow phone grows the box instead of
+     clipping. */
   min-height: 6.5em;
 }
 
 @media (hover: none) {
+  /* Touch devices also render the always-on gloss line under the source. */
   .shrine-page.neon .hero-pullquote {
     min-height: 8.5em;
   }
@@ -745,10 +755,10 @@ body:has(.shrine-page.neon) {
   align-items: center;
   justify-content: center;
   width: 100%;
-  /* Fixed (not min-) height so the rotating quote always fills the same box and
-     centers within it — keeps the source line + intro copy below from nudging
-     up/down as quotes of different line-counts cycle. */
-  height: 2.7em;
+  /* Content-sized (no min-height) so the 2-line Latin and 3-line modern quotes
+     both sit the same `gap` above the source. A min-height taller than the
+     2-line Latin would pad only Latin, leaving modern looking tight by contrast.
+     The constant section height is held by the blockquote container instead. */
   margin: 0;
   font-family: "UnifrakturCook", "Pirata One", serif;
   font-size: clamp(1.3rem, 2.5vw, 1.75rem);
@@ -847,10 +857,6 @@ body:has(.shrine-page.neon) {
   .shrine-page.neon .hero-pullquote-latin {
     white-space: normal;
     font-size: clamp(1.15rem, 5.2vw, 1.5rem);
-    /* Allow growth on narrow phones where the quote can run to 3 lines —
-       clipping would be worse than a small reflow in the single-column layout. */
-    height: auto;
-    min-height: 2.7em;
   }
 }
 
