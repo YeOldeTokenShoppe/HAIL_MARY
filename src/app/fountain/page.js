@@ -759,12 +759,13 @@ export default function FountainPage() {
         style={{
           position: "fixed",
           bottom: isMobileView ? "6rem" : "2rem",
-          left: isMobileView ? "1rem" : "2rem",
-          width: "48px",
-          height: "48px",
-          borderRadius: "50%",
-          border: "2px solid rgba(212, 175, 55, 0.65)",
-          background: "rgba(0, 0, 0, 0.5)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: isMobileView ? "44px" : "48px",
+          height: isMobileView ? "44px" : "48px",
+          borderRadius: "10px",
+          border: "1.5px solid rgba(212, 175, 55, 0.2)",
+          background: "rgba(212, 175, 55, 0.05)",
           color: "#d4a854",
           fontSize: "22px",
           lineHeight: 1,
@@ -780,15 +781,34 @@ export default function FountainPage() {
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
           e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
-          e.currentTarget.style.transform = "scale(1.1)";
+          e.currentTarget.style.transform = "translateX(-50%) scale(1.1)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+          e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.05)";
           e.currentTarget.style.boxShadow = "none";
-          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.transform = "translateX(-50%) scale(1)";
         }}
       >
-        <span aria-hidden="true">{snapshotPending ? "…" : "📸"}</span>
+        <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {snapshotPending ? (
+            "…"
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" />
+              <circle cx="12" cy="13" r="3" />
+            </svg>
+          )}
+        </span>
       </button>
 
       {/* Hidden canvas: the iframe's captured frame is drawn here, then PolaroidSnapshot
