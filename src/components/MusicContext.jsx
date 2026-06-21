@@ -54,6 +54,7 @@ const eightyTracks = [
     { name: "Heart Of Glass - Blondie", path: "audio/HeartOfGlass.mp3", bpm: 100 },
       { name: "Gold Dust Woman - Fleetwood Mac", path: "audio/GoldDustWoman.m4a", bpm: 100 },
             { name: "How To Be A Zillionaire - ABC", path: "audio/HowToBeAZillionaire.mp3", bpm: 100 },
+                   { name: "Church of the Poison Mind - Culture Club", path: "audio/ChurchOfThePoisonMind.mp3", bpm: 100 },
 
 ];
 
@@ -65,6 +66,7 @@ const non80sTracks = [
   // { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
   // { name: "Heroes - Janelle Monae", path: "audio/Heroes.m4a", bpm: 85 },
   { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
+    { name: "Amor Amor - Arno Elias", path: "audio/AmorAmor.m4a", bpm: 105 },
 ];
 
 // Every track across both eras, deduped by path. Used to resolve curated

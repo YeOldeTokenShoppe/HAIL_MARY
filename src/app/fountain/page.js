@@ -26,10 +26,10 @@ const FountainFrame = dynamic(() => import('@/components/FountainFrame'), {
 // against the full catalog `allTracks`, regardless of era bucket).
 // Paths must match the entries in MusicContext; normalized for leading-slash differences.
 const FOUNTAIN_TRACK_PATHS = [
-  "/audio/HeartOfGlass.mp3",          // Heart Of Glass - Blondie
-  "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
+  // "/audio/HeartOfGlass.mp3",          // Heart Of Glass - Blondie
+  // "/audio/LoveIsAStranger.m4a",               // Love Is A Stranger - Eurythmics
   // "/audio/Wishing.m4a",           // Wishing (If I Had a Photograph of You) - A Flock of Seagulls
-  "/audio/Eyes Without A Face.mp3",           // Eyes Without A Face - Billy Idol
+  // "/audio/Eyes Without A Face.mp3",           // Eyes Without A Face - Billy Idol
   // "/audio/Cat People (Putting Out Fire).mp3", // Cat People (Putting Out Fire) - David Bowie
   // "audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
   // "audio/99RedBalloons.mp3",        // 99 Luftballoons - Nena
@@ -45,7 +45,8 @@ const FOUNTAIN_TRACK_PATHS = [
   // "/audio/GoldDustWoman.m4a",          // Gold
   // "audio/AhLeah.m4a",
   "/audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
-  "audio/HowToBeAZillionaire.mp3",          // How To Be A Zillionaire - ABC
+  // "audio/ChurchOfThePoisonMind.mp3",          // Church of the Poison Mind - Culture Club
+// Amor Amor - Arno Elias
 ].map((p) => p.replace(/^\//, ""));
 
 export default function FountainPage() {
