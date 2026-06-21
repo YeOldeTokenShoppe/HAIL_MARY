@@ -758,9 +758,12 @@ export default function FountainPage() {
         title="Take a snapshot"
         style={{
           position: "fixed",
-          bottom: isMobileView ? "6rem" : "2rem",
-          left: "50%",
-          transform: "translateX(-50%)",
+          // Sit directly under the top-right music button (44px mobile / 62px
+          // desktop tall, anchored at top:1rem + safe-area), offset by an 8px gap.
+          top: isMobileView
+            ? "calc(1rem + env(safe-area-inset-top) + 52px)"
+            : "calc(1rem + 70px)",
+          right: "1rem",
           width: isMobileView ? "44px" : "48px",
           height: isMobileView ? "44px" : "48px",
           borderRadius: "10px",
@@ -773,7 +776,7 @@ export default function FountainPage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          zIndex: 1001,
+          zIndex: 30000,
           opacity: infoPanelOpen ? 0 : (snapshotPending ? 0.6 : 1),
           pointerEvents: infoPanelOpen ? "none" : "auto",
           transition: "opacity 0.25s ease, transform 0.3s ease, box-shadow 0.3s ease",
@@ -781,12 +784,12 @@ export default function FountainPage() {
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
           e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
-          e.currentTarget.style.transform = "translateX(-50%) scale(1.1)";
+          e.currentTarget.style.transform = "scale(1.1)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.05)";
           e.currentTarget.style.boxShadow = "none";
-          e.currentTarget.style.transform = "translateX(-50%) scale(1)";
+          e.currentTarget.style.transform = "scale(1)";
         }}
       >
         <span aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>

@@ -9882,11 +9882,35 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// up to the parent, which wraps it in the Polaroid.
 				if (pendingSnapshot) {
 					pendingSnapshot = false;
+					// The parent's Polaroid is square. On a portrait (mobile) frame, squaring
+					// keeps the full width but crops top/bottom — which frames the tall statue
+					// too tight and too low. For the snapshot only: widen the FOV (zoom out)
+					// and lens-shift the view up a touch (a pure vertical pan, no tilt, so
+					// verticals stay straight) so the whole subject — head included — fits in
+					// the square. Then restore + repaint the normal view this same task (no flash).
+					const _dom = renderer.domElement;
+					const _portraitSnap = _dom.height > _dom.width;
+					const _savedFov = camera.fov;
+					let _snapAdjusted = false;
 					try {
-						const snapUrl = renderer.domElement.toDataURL('image/jpeg', 0.92);
+						if (_portraitSnap) {
+							camera.fov = Math.min(_savedFov * 1.45, 100);
+							// Negative offsetY pans the framing upward (more headroom above).
+							camera.setViewOffset(_dom.width, _dom.height, 0, -_dom.height * 0.1, _dom.width, _dom.height);
+							camera.updateProjectionMatrix();
+							_snapAdjusted = true;
+							if (composer) { composer.render(); } else { renderer.render(scene, camera); }
+						}
+						const snapUrl = _dom.toDataURL('image/jpeg', 0.92);
 						window.parent.postMessage({ type: 'fountainSnapshot', dataUrl: snapUrl }, '*');
 					} catch (err) {
 						window.parent.postMessage({ type: 'fountainSnapshot', error: String((err && err.message) || err) }, '*');
+					} finally {
+						if (_snapAdjusted) {
+							camera.fov = _savedFov;
+							camera.clearViewOffset();   // restores normal projection (calls updateProjectionMatrix)
+							if (composer) { composer.render(); } else { renderer.render(scene, camera); }
+						}
 					}
 				}
 
