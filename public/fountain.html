@@ -1035,6 +1035,7 @@
 						<li>Click <strong>'Donate'</strong> button above to give to a charity (or tip the Dev), pay, then toss the Golden Coin.</li>
 						<li>Donated coins stay in the fountain.</li>
 								<li>Tap a sparkling coin to view donation details.</li>
+										<li>Look around. You might find a surprise or two.</li>
 					</ul>
 				</section>
 				<section class="info-section">
@@ -3551,7 +3552,18 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let isLoading = true;
 			let loadingProgress = 0;
 			let fountainModelLoaded = false;
-			
+			let fountainMixer = null; // AnimationMixer for the fountain GLB's NLA tracks
+			let monkAction = null;    // the Combined_SitStand AnimationAction (for frame-windowed events)
+			let drinkingMouth = null; // mesh shown only during the drinking window of the monk anim
+			let drinkingMouthBaseScale = null; // its rest scale, captured at load (animated open/close)
+			let pendingSnapshot = false; // parent asked for a frame grab; captured next render (see animate)
+			let partyWindows = []; // Window1-6 meshes + their cloned mats/base emissive (house-party light show)
+			let partyMode = false; // music is playing on the parent page → light the windows up
+			let partyClock = 0;    // seconds accumulated while partyMode (drives colour + beat strobe)
+			let partyLevels = null; // {bands:[6], overall} streamed from the desktop analyser (else null)
+			let partyLevelsAt = 0;  // performance.now() of the last musicLevels msg (staleness → beat sim)
+			const _partyColor = new THREE.Color(); // scratch colour for the per-frame window tint
+
 			// Asset loading tracker
 			const assetsToLoad = {
 				fountainModel: false,
@@ -4176,6 +4188,22 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 							updateCoinChip();
 							showGoldCoinReadyMessage();
 						}
+						// Parent page wants a snapshot of the scene (for the Polaroid). Flag it; the
+						// grab happens at the end of the next render so the WebGL drawing buffer still
+						// holds the pixels (see animate()).
+						else if (event.data.type === 'captureFountain') {
+							pendingSnapshot = true;
+						}
+						// Music started/stopped on the parent page → run/stop the window light show.
+						else if (event.data.type === 'musicPlaying') {
+							partyMode = !!event.data.playing;
+						}
+						// Live audio spectrum from the parent's analyser (desktop). Drives the
+						// windows in sync with the music; staleness falls back to the beat sim.
+						else if (event.data.type === 'musicLevels') {
+							partyLevels = event.data;
+							partyLevelsAt = performance.now();
+						}
 					}
 				});
 			}
@@ -4294,7 +4322,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 				controls = new OrbitControls( camera, container );
 				controls.minDistance = 0.1;
-				controls.maxDistance = 8;
+				controls.maxDistance = 23;
 				controls.zoomToCursor = true;
 				controls.minPolarAngle = 0;
 				controls.maxPolarAngle = Math.PI / 2;
@@ -4939,7 +4967,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				loader.load(
 					// Resource URL - REPLACE WITH YOUR FILE PATH
-					'/models/fountain3.glb',
+					'/models/fountain4.glb',
 					// Called when the resource is loaded
 					function ( gltf ) {
 						clearTimeout(modelLoadTimeout);
@@ -5039,7 +5067,30 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 
                 // Store model reference for collision detection
                 window.fountainModel = fountainModel;
-                
+
+                // --- House-party windows ---
+                // Window1-6 light up (emissive) when music plays. Clone each material so the
+                // windows animate independently, and remember the rest emissive to fade back to.
+                // Tolerant of GLTFLoader's `_N` collision suffix + case.
+                partyWindows = [];
+                fountainModel.traverse(function (node) {
+                    if (!node.isMesh || !node.name) return;
+                    const m = node.name.toLowerCase().replace(/_\d+$/, '').match(/^window(\d+)$/);
+                    if (!m) return;
+                    const mat = (node.material && node.material.clone) ? node.material.clone() : node.material;
+                    if (!mat) return;
+                    node.material = mat;
+                    if (!mat.emissive) mat.emissive = new THREE.Color(0x000000);
+                    partyWindows.push({
+                        mat: mat,
+                        num: parseInt(m[1], 10), // window number (8/9 get their own hue; rest synced)
+                        baseEmissive: mat.emissive.clone(),
+                        baseIntensity: (mat.emissiveIntensity != null ? mat.emissiveIntensity : 1),
+                        lvl: 0, // smoothed per-window level (VU-style), drives emissive intensity
+                    });
+                });
+                console.log('[Fountain] house-party windows found:', partyWindows.length);
+
                 // --- Tappable model coins: goldCoin1 opens the info panel, goldCoin2 fires the
                 // coin-stream shower. Each decorative model coin is hidden and replaced by a
                 // glowing, clickable script coin in its place. Case-insensitive; we strip only
@@ -5151,6 +5202,52 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						buildInfoHubParticles();
 						buildInfoHubBeam();
 						buildInfoHubHalo();
+
+						// --- NEW: Play the character's looping NLA track ---
+						// The GLB ships its baked NLA tracks as AnimationClips on gltf.animations.
+						// Drive the 'Combined_SitStand' track on a mixer rooted at the model so its
+						// bones (which live under fountainModel) animate. Tolerant of GLTFLoader's
+						// `_N` collision suffix and case, just like the node-name matching above.
+						if (gltf.animations && gltf.animations.length) {
+							const wanted = 'combined_sitstand';
+							let sitStandClip = THREE.AnimationClip.findByName(gltf.animations, 'Combined_SitStand');
+							if (!sitStandClip) {
+								sitStandClip = gltf.animations.find(c =>
+									c.name && c.name.toLowerCase().replace(/_\d+$/, '') === wanted);
+							}
+							if (sitStandClip) {
+								fountainMixer = new THREE.AnimationMixer(fountainModel);
+								monkAction = fountainMixer.clipAction(sitStandClip);
+								monkAction.setLoop(THREE.LoopRepeat, Infinity);
+								monkAction.clampWhenFinished = false;
+								monkAction.play();
+								console.log('[Fountain] playing looping NLA track:', sitStandClip.name,
+									'(' + sitStandClip.duration.toFixed(2) + 's)');
+							} else {
+								console.warn('[Fountain] no "Combined_SitStand" clip found in fountain4.glb. Available:',
+									gltf.animations.map(c => c.name));
+							}
+						} else {
+							console.warn('[Fountain] fountain4.glb has no animation clips');
+						}
+
+						// The drinking mouth is a separate mesh that should only show while the monk
+						// raises the goblet (frames 95-150 of the ~267-frame Combined_SitStand clip).
+						// Find it and start it hidden; the animate loop flips it within that window.
+						// Tolerant of GLTFLoader's `_N` collision suffix + case.
+						fountainModel.traverse(function (node) {
+							if (node.isMesh && node.name &&
+								node.name.toLowerCase().replace(/_\d+$/, '') === 'drinkingmouth') {
+								drinkingMouth = node;
+							}
+						});
+						if (drinkingMouth) {
+							drinkingMouth.visible = false;
+							drinkingMouthBaseScale = drinkingMouth.scale.clone(); // animate around this
+							console.log('[Fountain] DrinkingMouth found — opens/closes over frames 95-150');
+						} else {
+							console.warn('[Fountain] no "DrinkingMouth" mesh found in fountain4.glb');
+						}
 
 						// Calculate bounding box to see actual size
 						const box = new THREE.Box3().setFromObject(fountainModel);
@@ -8598,7 +8695,106 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			function animate(currentTime) {
 				const deltaTime = Math.min((currentTime - lastTime) * 0.001, 0.1); // Convert to seconds, cap at 0.1s
 				lastTime = currentTime;
-				
+
+				// Advance the fountain GLB's looping NLA track (Combined_SitStand)
+				if (fountainMixer) fountainMixer.update(deltaTime);
+
+				// Frame-windowed mesh reveal: the DrinkingMouth eases OPEN, holds, then eases
+				// CLOSED across the monk's drink window (it scales on one axis instead of popping
+				// on/off). Mapped proportionally to the clip's local time (monkAction.time wraps
+				// within [0, duration] each loop); frames are normalised by the clip's TOTAL frame
+				// count, so the window lands at the same proportion regardless of export fps.
+				// All knobs are live-tunable via window.monkDrink* in the console.
+				if (monkAction && drinkingMouth && drinkingMouthBaseScale) {
+					const dur = monkAction.getClip().duration || 1;
+					const total = window.monkAnimTotalFrames ?? 267;
+					const onT = ((window.monkDrinkFrameOn ?? 95) / total) * dur;
+					const offT = ((window.monkDrinkFrameOff ?? 130) / total) * dur;
+					const t = ((monkAction.time % dur) + dur) % dur; // local clip time, normalised to [0,dur)
+					const inWindow = (t >= onT && t <= offT);
+					drinkingMouth.visible = inWindow;
+					if (inWindow) {
+						// Trapezoid envelope: open over the first `ramp` of the window, hold, close
+						// over the last `ramp`. smoothstep softens the ramps. k scales the chosen
+						// axis from minScale (≈closed) up to 1 (fully open) and back.
+						const span = Math.max(offT - onT, 1e-4);
+						const p = (t - onT) / span;                       // 0..1 through the window
+						const ramp = Math.min(Math.max(window.monkDrinkRamp ?? 0.3, 0.01), 0.5);
+						let e = p < ramp ? p / ramp : (p > 1 - ramp ? (1 - p) / ramp : 1);
+						e = e * e * (3 - 2 * e);                          // smoothstep
+						const minS = window.monkDrinkMinScale ?? 0.05;    // closed scale (≈flat)
+						const k = minS + (1 - minS) * e;                  // axis multiplier
+						const axis = window.monkDrinkAxis ?? 'y';         // 'x' | 'y' | 'z'
+						drinkingMouth.scale.set(
+							drinkingMouthBaseScale.x * (axis === 'x' ? k : 1),
+							drinkingMouthBaseScale.y * (axis === 'y' ? k : 1),
+							drinkingMouthBaseScale.z * (axis === 'z' ? k : 1));
+					} else {
+						drinkingMouth.scale.copy(drinkingMouthBaseScale); // restore when hidden
+					}
+				}
+
+				// House-party windows: while music plays, each window sweeps through party
+				// colours (a rainbow offset per window) and strobes to a simulated beat; the
+				// scene's bloom turns that into a glow. When the music stops, fade back to the
+				// rest emissive. Live-tunable via window.party* in the console.
+				if (partyWindows.length) {
+					if (partyMode) {
+						partyClock += deltaTime;
+						const bps = (window.partyBPM ?? 120) / 60;        // beats per second (sim fallback)
+						const hueSpeed = window.partyHueSpeed ?? 0.18;    // rainbow sweep rate
+						const peak = window.partyPeak ?? 1.5;             // emissive intensity at full level
+						const low = window.partyLow ?? 0.25;              // glow at zero level
+						const gain = window.partyGain ?? 2.0;             // boost so quiet bands still pop
+						const n = partyWindows.length;
+						// Use the live audio spectrum when it's arriving (desktop); otherwise fall
+						// back to the simulated beat (mobile/iOS, or before the first packet).
+						const reactive = partyLevels && partyLevels.bands &&
+							(performance.now() - partyLevelsAt < 250);
+						// Base hue is shared by all the "synced" windows; Window8/Window9 ride a
+						// fixed offset off it so they're always a different colour (from the group
+						// and each other). Per-window intensity still reacts to its own band.
+						const baseHue = (partyClock * hueSpeed) % 1;
+						for (let i = 0; i < n; i++) {
+							const w = partyWindows[i];
+							let hueOff = 0;
+							if (w.num === 8) hueOff = window.party8HueOffset ?? 0.33;
+							else if (w.num === 9) hueOff = window.party9HueOffset ?? 0.66;
+							_partyColor.setHSL((baseHue + hueOff) % 1, 1.0, 0.55);
+							let target;
+							if (reactive) {
+								// One frequency band per window (bass → treble across the row).
+								const band = partyLevels.bands[i % partyLevels.bands.length] || 0;
+								target = Math.min(1, band * gain + (partyLevels.overall || 0) * 0.15);
+							} else {
+								const bp = ((partyClock + i * 0.37) * bps) % 1; // desynced beat
+								target = Math.pow(1 - bp, 2.2);                 // sharp attack, quick decay
+							}
+							// VU-style smoothing: snappy attack, gentle release.
+							w.lvl += (target - w.lvl) * (target > w.lvl ? 0.6 : 0.12);
+							w.mat.emissive.copy(_partyColor);
+							w.mat.emissiveIntensity = low + (peak - low) * w.lvl;
+						}
+					} else if (partyClock > 0) {
+						// Ease back to the rest look, then stop touching the materials.
+						let settled = true;
+						for (let i = 0; i < partyWindows.length; i++) {
+							const w = partyWindows[i];
+							w.mat.emissiveIntensity += (w.baseIntensity - w.mat.emissiveIntensity) * 0.1;
+							w.mat.emissive.lerp(w.baseEmissive, 0.1);
+							w.lvl = 0;
+							if (Math.abs(w.mat.emissiveIntensity - w.baseIntensity) > 0.02) settled = false;
+						}
+						if (settled) {
+							for (const w of partyWindows) {
+								w.mat.emissiveIntensity = w.baseIntensity;
+								w.mat.emissive.copy(w.baseEmissive);
+							}
+							partyClock = 0;
+						}
+					}
+				}
+
 				// No need to check in animation loop anymore - assets are tracked properly
 				
 				fallingWaterUniforms.iTime.value = performance.now() / 1000.0; // Pass time in seconds
@@ -9516,6 +9712,20 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					composer.render();
 				} else {
 					renderer.render( scene, camera );
+				}
+
+				// On-demand snapshot for the parent page's Polaroid. Read the freshly rendered
+				// frame HERE — same JS task, right after the final render — so the WebGL drawing
+				// buffer still holds the pixels (no preserveDrawingBuffer needed). Post the image
+				// up to the parent, which wraps it in the Polaroid.
+				if (pendingSnapshot) {
+					pendingSnapshot = false;
+					try {
+						const snapUrl = renderer.domElement.toDataURL('image/jpeg', 0.92);
+						window.parent.postMessage({ type: 'fountainSnapshot', dataUrl: snapUrl }, '*');
+					} catch (err) {
+						window.parent.postMessage({ type: 'fountainSnapshot', error: String((err && err.message) || err) }, '*');
+					}
 				}
 
 			}

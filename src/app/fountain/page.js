@@ -12,6 +12,8 @@ import NavControlsHome from '@/components/NavControlsHome';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import FountainDonationModal from '@/components/FountainDonationModal';
 import BuyModal from '@/components/BuyModal';
+import PolaroidSnapshot from '@/components/PolaroidSnapshot';
+import globalAudioManager from '@/lib/globalAudio';
 import { useUser, SignInButton, UserButton } from '@clerk/nextjs';
 
 // Dynamic import for the FountainFrame component
@@ -67,6 +69,11 @@ export default function FountainPage() {
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const is80sMode = context80sMode;
   const iframeRef = useRef(null);
+  // Snapshot: the scene lives in the iframe, so we ask it to grab its canvas, draw the
+  // returned image onto a hidden parent canvas, then hand that to <PolaroidSnapshot>.
+  const [snapshotTrigger, setSnapshotTrigger] = useState(false);
+  const [snapshotPending, setSnapshotPending] = useState(false);
+  const snapCanvasRef = useRef(null);
   const loadingTimeoutRef = useRef(null);
 
   
@@ -113,10 +120,122 @@ export default function FountainPage() {
       if (event.data?.type === 'infoHubVisibility') {
         setInfoPanelOpen(!!event.data.open);
       }
+      // The iframe returns a snapshot of its WebGL canvas. Draw it onto our hidden
+      // canvas (a data URL isn't tainted), then trigger the Polaroid which reads it.
+      else if (event.data?.type === 'fountainSnapshot') {
+        setSnapshotPending(false);
+        if (event.data.error || !event.data.dataUrl) {
+          console.error('[Fountain] snapshot failed:', event.data.error);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          const c = snapCanvasRef.current;
+          if (!c) return;
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          const ctx = c.getContext('2d');
+          ctx.clearRect(0, 0, c.width, c.height);
+          ctx.drawImage(img, 0, 0);
+          setSnapshotTrigger(false);            // reset so the trigger edge re-fires
+          requestAnimationFrame(() => setSnapshotTrigger(true));
+        };
+        img.onerror = () => console.error('[Fountain] snapshot image decode failed');
+        img.src = event.data.dataUrl;
+      }
     };
     window.addEventListener('message', onFrameMessage);
     return () => window.removeEventListener('message', onFrameMessage);
   }, []);
+
+  // Ask the iframe to capture the current scene (the actual grab + reply happens there).
+  const requestSnapshot = useCallback(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    setSnapshotPending(true);
+    win.postMessage({ type: 'captureFountain' }, '*');
+    // Safety: clear the pending state if the iframe never answers.
+    setTimeout(() => setSnapshotPending(false), 4000);
+  }, []);
+
+  const handleSnapshotComplete = useCallback(() => {
+    setTimeout(() => setSnapshotTrigger(false), 100);
+  }, []);
+
+  // Tell the iframe whether music is playing so it can run the window light show.
+  // Re-sent when the fountain finishes loading (isLoading flips) so the initial
+  // state syncs even if the iframe wasn't listening yet at mount.
+  useEffect(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage({ type: 'musicPlaying', playing: !!contextIsPlaying }, '*');
+  }, [contextIsPlaying, isLoading]);
+
+  // --- Desktop audio-reactive window light show -------------------------------
+  // Tap the shared music element with an AnalyserNode and stream per-band energies
+  // to the iframe each frame so the windows pulse in sync with the song. Desktop
+  // only: createMediaElementSource is silent on iOS Safari, so mobile keeps the
+  // simulated beat (the iframe auto-falls-back when no levels arrive). The context
+  // + source are created ONCE and stashed on the audio manager — re-creating
+  // createMediaElementSource throws, and the element must stay routed to
+  // destination or music goes silent app-wide.
+  const ensureAnalyser = useCallback(() => {
+    const mgr = globalAudioManager;
+    if (!mgr || typeof window === 'undefined') return null;
+    if (mgr.__fountainAnalyser) return mgr.__fountainAnalyser;
+    const audio = mgr.getAudio?.();
+    if (!audio) return null;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      const ctx = mgr.__fountainAudioCtx || new Ctx();
+      mgr.__fountainAudioCtx = ctx;
+      const source = mgr.__fountainSource || ctx.createMediaElementSource(audio);
+      mgr.__fountainSource = source;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.6;
+      source.connect(analyser);
+      analyser.connect(ctx.destination); // keep the music audible through the graph
+      mgr.__fountainAnalyser = analyser;
+      return analyser;
+    } catch (e) {
+      console.error('[Fountain] audio analyser setup failed:', e);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMobileView) return;        // mobile/iOS → iframe uses the simulated beat
+    if (!contextIsPlaying) return;
+    const analyser = ensureAnalyser();
+    if (!analyser) return;
+    const ctx = globalAudioManager?.__fountainAudioCtx;
+    if (ctx?.state === 'suspended') ctx.resume().catch(() => {});
+    const bins = new Uint8Array(analyser.frequencyBinCount);
+    const BANDS = 6;
+    let raf;
+    const tick = () => {
+      analyser.getByteFrequencyData(bins);
+      const len = bins.length;
+      let overall = 0;
+      for (let i = 0; i < len; i++) overall += bins[i];
+      overall = overall / (len * 255);
+      // Quadratic band edges: more resolution in the bass/mid where music lives.
+      const bands = new Array(BANDS);
+      for (let b = 0; b < BANDS; b++) {
+        const lo = Math.floor(1 + (len - 1) * Math.pow(b / BANDS, 2));
+        const hi = Math.max(lo + 1, Math.floor(1 + (len - 1) * Math.pow((b + 1) / BANDS, 2)));
+        let sum = 0, cnt = 0;
+        for (let i = lo; i < hi && i < len; i++) { sum += bins[i]; cnt++; }
+        bands[b] = cnt ? (sum / cnt) / 255 : 0;
+      }
+      iframeRef.current?.contentWindow?.postMessage({ type: 'musicLevels', bands, overall }, '*');
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [contextIsPlaying, isMobileView, ensureAnalyser]);
 
   // Check if font is loaded
   useEffect(() => {
@@ -627,6 +746,67 @@ export default function FountainPage() {
           ))}
         </div>
       )}
+
+      {/* Snapshot button — grab a photo of the scene (find the hidden monk!) and
+          share it. Works on desktop + mobile; hidden while the Coin Guide is open. */}
+      <button
+        type="button"
+        onClick={requestSnapshot}
+        disabled={snapshotPending}
+        aria-label="Take a snapshot"
+        title="Take a snapshot"
+        style={{
+          position: "fixed",
+          bottom: isMobileView ? "6rem" : "2rem",
+          left: isMobileView ? "1rem" : "2rem",
+          width: "48px",
+          height: "48px",
+          borderRadius: "50%",
+          border: "2px solid rgba(212, 175, 55, 0.65)",
+          background: "rgba(0, 0, 0, 0.5)",
+          color: "#d4a854",
+          fontSize: "22px",
+          lineHeight: 1,
+          cursor: snapshotPending ? "wait" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1001,
+          opacity: infoPanelOpen ? 0 : (snapshotPending ? 0.6 : 1),
+          pointerEvents: infoPanelOpen ? "none" : "auto",
+          transition: "opacity 0.25s ease, transform 0.3s ease, box-shadow 0.3s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.15)";
+          e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.5)";
+          e.currentTarget.style.transform = "scale(1.1)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+          e.currentTarget.style.boxShadow = "none";
+          e.currentTarget.style.transform = "scale(1)";
+        }}
+      >
+        <span aria-hidden="true">{snapshotPending ? "…" : "📸"}</span>
+      </button>
+
+      {/* Hidden canvas: the iframe's captured frame is drawn here, then PolaroidSnapshot
+          reads it by id. Off-screen rather than display:none so the canvas still rasterizes. */}
+      <canvas
+        id="fountainSnapCanvas"
+        ref={snapCanvasRef}
+        style={{ position: "fixed", left: "-99999px", top: 0, width: "1px", height: "1px", pointerEvents: "none" }}
+      />
+
+      <PolaroidSnapshot
+        trigger={snapshotTrigger}
+        captureElementId="fountainSnapCanvas"
+        label="Add your caption here!"
+        watermark={false}
+        shareCaption=""
+        shareLink=""
+        onComplete={handleSnapshotComplete}
+      />
     </div>
   );
 }

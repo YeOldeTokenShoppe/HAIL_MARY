@@ -11,6 +11,9 @@ const PolaroidSnapshot = ({
   backgroundImage = null,
   referralOverlay = null, // { code, link } — overlaid on polaroid bottom
   onPublish = null, // admin-only: async ({ dataUrl, caption }) => { ok, error } — shows a "Publish to Feed" button
+  watermark = true, // false skips the "Hail Mary / Prospecting Co." corner signature (e.g. /fountain)
+  shareCaption = undefined, // override the share text; '' = share with no caption (e.g. /fountain)
+  shareLink = undefined,    // override the share URL; '' = share with no link (e.g. /fountain)
 }) => {
   const instanceId = React.useRef(Math.random().toString(36).substring(7));
   React.useEffect(() => {
@@ -220,8 +223,8 @@ const PolaroidSnapshot = ({
           tempCtx.clearRect(0, 0, canvas.width, canvas.height);
           tempCtx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
           tempCtx.drawImage(characterCanvas, 0, 0);
-          
-          await drawWatermark(tempCtx);
+
+          if (watermark) await drawWatermark(tempCtx);
 
           const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
           if (dataUrl) {
@@ -262,7 +265,7 @@ const PolaroidSnapshot = ({
         sqCtx.drawImage(canvas, (canvas.width - s) / 2, (canvas.height - s) / 2, s, s, 0, 0, s, s);
 
         (async () => {
-          await drawWatermark(sqCtx);
+          if (watermark) await drawWatermark(sqCtx);
 
           const dataUrl = sqCanvas.toDataURL('image/jpeg', 0.6);
           if (dataUrl) {
@@ -604,10 +607,14 @@ const PolaroidSnapshot = ({
 
   const handleShare = async (platform) => {
     const refSuffix = referralOverlay?.code ? `?ref=${referralOverlay.code}` : '';
-    const shareText = referralOverlay?.code
-      ? `Now it's our turn to rig the system 🤑`
-      : `Check out my rig! 🤑`;
-    const shareUrl = `https://rl80.com/hailmary${refSuffix}`;
+    // Callers can override (or blank out) the share caption/link; otherwise fall back
+    // to the default oil-game copy. An empty string => share the image with no text/link.
+    const shareText = shareCaption !== undefined
+      ? shareCaption
+      : (referralOverlay?.code ? `Now it's our turn to rig the system 🤑` : `Check out my rig! 🤑`);
+    const shareUrl = shareLink !== undefined
+      ? shareLink
+      : `https://rl80.com/hailmary${refSuffix}`;
     
     switch(platform) {
       case 'twitter':
@@ -642,7 +649,7 @@ const PolaroidSnapshot = ({
 
         // Open Twitter compose — no URL in text, user pastes image directly
         window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`,
+          `https://twitter.com/intent/tweet${shareText ? `?text=${encodeURIComponent(shareText)}` : ''}`,
           '_blank',
           'width=550,height=420'
         );
@@ -674,9 +681,13 @@ const PolaroidSnapshot = ({
               showNotification('Image copied to clipboard! 📋');
             }
           } catch (fallbackErr) {
-            // Final fallback: copy URL
-            navigator.clipboard.writeText(shareUrl);
-            showNotification('Link copied to clipboard!');
+            // Final fallback: copy URL (only if there is one)
+            if (shareUrl) {
+              navigator.clipboard.writeText(shareUrl);
+              showNotification('Link copied to clipboard!');
+            } else {
+              showNotification('Copy failed');
+            }
           }
         }
         break;
@@ -694,12 +705,12 @@ const PolaroidSnapshot = ({
             const blob = polaroidBlob || await fetch(imageUrl).then(r => r.blob());
             const file = new File([blob], 'polaroid.webp', { type: 'image/webp' });
             
-            await navigator.share({
-              title: 'RL80 Capture',
-              text: shareText,
-              files: [file],
-              url: shareUrl
-            });
+            // Only include text/url when present — an empty string makes the share
+            // sheet show a blank caption/link, which is exactly what we're avoiding.
+            const sharePayload = { title: 'Lots of liquidity at RL80...', files: [file] };
+            if (shareText) sharePayload.text = shareText;
+            if (shareUrl) sharePayload.url = shareUrl;
+            await navigator.share(sharePayload);
           } catch (err) {
             if (err.name !== 'AbortError') {
               console.error('Share failed:', err);
