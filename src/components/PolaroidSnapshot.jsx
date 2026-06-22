@@ -415,7 +415,12 @@ const PolaroidSnapshot = ({
 
   // Capture the polaroid once when it becomes visible
   const capturePolaroid = async () => {
-    if (!polaroidRef.current || polaroidImageUrl) return polaroidImageUrl; // Return existing if already captured
+    // Returns { dataUrl, blob }. Callers MUST read from this return value, not from
+    // the polaroidImageUrl/polaroidBlob state — capturePolaroid stores those via
+    // setState, which is not reflected in the caller's closure on the same tick.
+    // Relying on the state is what made share/copy fall back to the raw screenshot
+    // (no polaroid frame/caption) instead of the framed capture.
+    if (!polaroidRef.current || polaroidImageUrl) return { dataUrl: polaroidImageUrl, blob: polaroidBlob }; // existing capture
 
     // Declared outside the try so the finally block can always clean it up,
     // even if html2canvas throws (common on mobile).
@@ -500,11 +505,12 @@ const PolaroidSnapshot = ({
       setPolaroidImageUrl(dataUrl);
       setPolaroidBlob(blob);
 
-      // Return the data URL so it can be used immediately
-      return dataUrl;
+      // Return both so callers can use them immediately — the setState calls above
+      // won't be visible in the caller's closure until the next render.
+      return { dataUrl, blob };
     } catch (error) {
       console.error('Failed to capture polaroid:', error);
-      return null;
+      return { dataUrl: null, blob: null };
     } finally {
       // Always remove the temp capture container, even if html2canvas threw.
       // The live polaroid's buttons are never touched anymore (we hide them in
@@ -533,8 +539,8 @@ const PolaroidSnapshot = ({
           return; // Don't capture yet
         }
         
-        const capturedUrl = await capturePolaroid();
-        
+        const { dataUrl: capturedUrl } = await capturePolaroid();
+
         // Pass the complete polaroid to onComplete after it's captured
         if (onComplete && capturedUrl && !hasCalledOnCompleteRef.current) {
           hasCalledOnCompleteRef.current = true; // Mark as called
@@ -562,8 +568,8 @@ const PolaroidSnapshot = ({
 
   const handleDownload = async () => {
     // Ensure polaroid is captured first and get the URL
-    const capturedUrl = await capturePolaroid();
-    
+    const { dataUrl: capturedUrl } = await capturePolaroid();
+
     // Use the captured polaroid image
     if (capturedUrl) {
       const link = document.createElement('a');
@@ -589,7 +595,7 @@ const PolaroidSnapshot = ({
     try {
       // Publish exactly what's on screen: the captured polaroid + the admin's
       // final (possibly edited) caption.
-      const url = polaroidImageUrl || await capturePolaroid();
+      const url = polaroidImageUrl || (await capturePolaroid()).dataUrl;
       const finalCaption = captionRef.current?.textContent?.trim() || caption;
       const result = await onPublish({ dataUrl: url, caption: finalCaption });
       if (result?.ok) {
@@ -619,7 +625,7 @@ const PolaroidSnapshot = ({
     switch(platform) {
       case 'twitter':
         // Ensure polaroid is captured first
-        const capturedUrl = polaroidImageUrl || await capturePolaroid();
+        const capturedUrl = polaroidImageUrl || (await capturePolaroid()).dataUrl;
         const imgSrc = capturedUrl || imageUrl;
 
         // Copy image to clipboard as PNG so user can paste into tweet
@@ -655,18 +661,19 @@ const PolaroidSnapshot = ({
         );
         break;
         
-      case 'copy':
-        // Ensure polaroid is captured first
-        if (!polaroidBlob) {
-          await capturePolaroid();
-        }
-        
-        // Use the cached polaroid blob
+      case 'copy': {
+        // Capture (or reuse) the framed polaroid and read the blob from the RETURN
+        // value — the polaroidBlob state isn't updated in this closure yet, so
+        // reading it here copied nothing (and previously fell back to the raw image).
+        const { blob: copyBlob } = await capturePolaroid();
+
         try {
-          if (polaroidBlob && navigator.clipboard && window.ClipboardItem) {
-            const item = new ClipboardItem({ 'image/webp': polaroidBlob });
+          if (copyBlob && navigator.clipboard && window.ClipboardItem) {
+            const item = new ClipboardItem({ 'image/webp': copyBlob });
             await navigator.clipboard.write([item]);
             showNotification('Polaroid copied to clipboard! 📋');
+          } else {
+            throw new Error('No polaroid blob to copy');
           }
         } catch (err) {
           console.error('Failed to copy polaroid:', err);
@@ -691,18 +698,19 @@ const PolaroidSnapshot = ({
           }
         }
         break;
-        
+      }
+
       case 'share':
         // Use Web Share API if available (mobile)
         if (navigator.share) {
           try {
-            // Ensure polaroid is captured first
-            if (!polaroidBlob) {
-              await capturePolaroid();
-            }
-            
-            // Use the cached polaroid blob or fallback to original
-            const blob = polaroidBlob || await fetch(imageUrl).then(r => r.blob());
+            // Capture (or reuse) the framed polaroid and read the blob from the
+            // RETURN value — the polaroidBlob state isn't updated in this closure
+            // yet, so reading it here fell back to the raw (unframed) screenshot.
+            const { blob: shareBlob } = await capturePolaroid();
+
+            // Use the captured polaroid blob, or fall back to the raw image.
+            const blob = shareBlob || await fetch(imageUrl).then(r => r.blob());
             const file = new File([blob], 'polaroid.webp', { type: 'image/webp' });
             
             // Only include text/url when present — an empty string makes the share
