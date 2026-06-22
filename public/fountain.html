@@ -2344,7 +2344,10 @@
 				ip.numInternalPgsIterations = RAPIER_P.numInternalPgsIterations;
 				if ('lengthUnit' in ip) ip.lengthUnit = RAPIER_P.lengthUnit;
 				else console.warn('[rapier] lengthUnit unsupported — coins may intermesh at this scale');
-				rapierEvents = new RAPIER.EventQueue(true); // collision events for plink SFX
+				// autoDrain=FALSE: we step() multiple substeps before draining, so the queue must
+				// accumulate across them and NOT self-clear each step (autoDrain=true dropped the
+				// first contact when it landed in an early substep → no plink on a coin's first hit).
+				rapierEvents = new RAPIER.EventQueue(false);
 				rapierReady = true;
 				console.log('[rapier] world ready (?rapier=1)');
 				maybeBuildFountainColliders();
