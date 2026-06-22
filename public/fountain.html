@@ -2305,7 +2305,7 @@
 				numSolverIterations: 12, numAdditionalFrictionIterations: 6, numInternalPgsIterations: 2,
 				gravity: -1, timestep: 1 / 60, substeps: 4,
 				// Stage 2: applied when a coin crosses below the waterline (slow-sink + buoyancy).
-				waterLinearDamping: 6.8, waterAngularDamping: 10.3, waterGravityScale: 0.3,
+				waterLinearDamping: 11.0, waterAngularDamping: 0.0, waterGravityScale: 0.35,
 				tossSpin: 10, // launch tumble (rad/s) so coins hit the water at varied angles, not dead-flat
 				freeze: true, // Stage 3: settled coins become static collider + instanced render, dynamic body dropped (perf)
 				streamVelScale: 0.5, // hand-shower launch speed vs the old slow-mo stream (Rapier gravity is gentler)

@@ -36,7 +36,7 @@ const FOUNTAIN_TRACK_PATHS = [
   "audio/PersonalJesus.m4a",        // Personal Jesus - Depeche Mode
   "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
 "audio/Cities.mp3",          
-"/audio/Wishing Well.m4a",          // Wishing Well - Sananda Maitraya
+"/audio/WishingWell.m4a",          // Wishing Well - Sananda Maitraya
   // "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris
   "audio/LoveMyWay.m4a",           // Love My Way - Psychedelic Furs
   // "audio/Heroes.m4a",              // Heroes - Janelle Monae
