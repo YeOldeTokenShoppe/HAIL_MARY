@@ -47,7 +47,7 @@ const eightyTracks = [
   { name: "Love My Way - Psychedelic Furs", path: "audio/LoveMyWay.m4a", bpm: 85 },
   { name: "Love Is A Stranger - Eurythmics", path: "audio/LoveIsAStranger.m4a", bpm: 85 },
   { name: "Wishing (If I Had a Photograph of You) - A Flock of Seagulls", path: "audio/Wishing.m4a", bpm: 85 },
-  // { name: "Rocket's Tail - Kate Bush", path: "audio/RocketsTail.m4a", bpm: 85 },
+  { name: "Wishing Well - Sananda Maitraya", path: "audio/WishingWell.m4a", bpm: 85 },
   { name: "Dizzy - Siouxsie & The Banshees", path: "audio/Dizzy.mp3", bpm: 85 },
   { name: "If You All Get To Heaven - Terence Trent D'Arby", path: "audio/IfYouAllGetToHeaven.m4a", bpm: 85 },
   { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },

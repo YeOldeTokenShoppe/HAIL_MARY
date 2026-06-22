@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rapier coin pile — scale/intermesh prototype</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #20242c; overflow: hidden; font-family: ui-monospace, Menlo, monospace; }
+  #hud {
+    position: fixed; top: 10px; left: 10px; z-index: 10;
+    color: #cfe3ff; font-size: 12px; line-height: 1.5; white-space: pre;
+    background: rgba(0,0,0,0.45); padding: 10px 12px; border-radius: 8px;
+    pointer-events: none; text-shadow: 0 1px 2px #000;
+  }
+  #note {
+    position: fixed; bottom: 10px; left: 10px; z-index: 10; max-width: 520px;
+    color: #9fb4cc; font-size: 11px; line-height: 1.5;
+    background: rgba(0,0,0,0.4); padding: 8px 10px; border-radius: 8px;
+  }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; color: #cfe3ff; font-size: 14px; z-index: 20; }
+  .lil-gui { --width: 300px; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "@dimforge/rapier3d-compat": "https://unpkg.com/@dimforge/rapier3d-compat@0.19.3/rapier.es.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="loading">loading Rapier WASM…</div>
+<div id="hud"></div>
+<div id="note">
+Coins are at the REAL fountain scale (radius 0.03, thickness 0.004). The whole point:
+does Rapier keep these thin discs from intermeshing, and stay stable, at this tiny scale?
+WATCH FOR — discs passing through each other (skin too small / iters too low),
+coins sinking into the floor or each other (lengthUnit too big), or coins buzzing/exploding
+at rest (scale instability). Tune live in the panel (top-right). 'R' resets the pile.
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import RAPIER from '@dimforge/rapier3d-compat';
+
+// ---------------------------------------------------------------------------
+// Coin + world constants — matched to public/fountain.html so a success here
+// ports 1:1 (no coordinate remapping).
+// ---------------------------------------------------------------------------
+const COIN_RADIUS       = 0.03;    // == fountain CylinderGeometry radius
+const COIN_THICKNESS    = 0.004;   // == fountain COIN_THICKNESS (0.002 * 2)
+const COIN_HALF_VIS     = COIN_THICKNESS / 2;
+const BASIN_RADIUS      = 0.40;    // pool the coins pile into
+const BASIN_WALL_H      = 0.10;
+
+// Live-tunable knobs (the five .jsx ideas + scale). Edit in the GUI or console
+// via window.P. Most need a reset ('R' or the button) to fully take effect.
+const P = {
+  // --- the scale fix ---
+  lengthUnit: 0.05,        // tells Rapier "objects are ~5cm" so its 1mm-default tolerances shrink to match thin coins
+  // --- collider shape (idea #2: collider a touch TALLER than the visible coin) ---
+  colliderHalfHeight: COIN_HALF_VIS * 1.25,  // slightly taller than visual half-thickness
+  contactSkin: 0.0010,     // idea #1: invisible margin so thin discs never interpenetrate
+  // --- material (idea #5) ---
+  friction: 0.9,
+  restitution: 0.03,
+  linearDamping: 0.3,
+  angularDamping: 0.6,
+  density: 5,
+  ccd: true,               // idea #3: no tunneling for fast droppers
+  // --- solver (idea #4) ---
+  numSolverIterations: 12,
+  numAdditionalFrictionIterations: 6,
+  numInternalPgsIterations: 2,
+  // --- sim / spawn ---
+  gravity: -9.81,
+  timestep: 1/60,
+  spawnRate: 6,            // coins per second
+  maxCoins: 80,
+  dropHeight: 0.32,
+  dropJitter: 0.08,
+  spawning: true,
+  reset: () => resetPile(),
+};
+window.P = P;
+
+// ---------------------------------------------------------------------------
+// THREE scene
+// ---------------------------------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x20242c);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.001, 100);
+camera.position.set(0.7, 0.55, 0.7);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.04, 0);
+controls.update();
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+dir.position.set(0.4, 0.8, 0.5);
+dir.castShadow = true;
+dir.shadow.mapSize.set(1024, 1024);
+dir.shadow.camera.near = 0.01; dir.shadow.camera.far = 5;
+dir.shadow.camera.left = -0.6; dir.shadow.camera.right = 0.6;
+dir.shadow.camera.top = 0.6; dir.shadow.camera.bottom = -0.6;
+scene.add(dir);
+
+// Shared coin render assets (cylinder axis = Y, which is also Rapier's cylinder axis,
+// so a flat coin needs NO extra rotation — collider and mesh align natively).
+const coinGeo = new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, COIN_THICKNESS, 40);
+const coinMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.25 });
+
+// Floor + basin (visual)
+const floorMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(BASIN_RADIUS + 0.06, BASIN_RADIUS + 0.06, 0.02, 64),
+  new THREE.MeshStandardMaterial({ color: 0x3a3f4a, roughness: 1 })
+);
+floorMesh.position.y = -0.01; floorMesh.receiveShadow = true;
+scene.add(floorMesh);
+const wallMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(BASIN_RADIUS + 0.012, BASIN_RADIUS + 0.012, BASIN_WALL_H, 64, 1, true),
+  new THREE.MeshStandardMaterial({ color: 0x4a505c, roughness: 1, side: THREE.DoubleSide, transparent: true, opacity: 0.35 })
+);
+wallMesh.position.y = BASIN_WALL_H / 2; scene.add(wallMesh);
+
+// ---------------------------------------------------------------------------
+// Rapier world
+// ---------------------------------------------------------------------------
+let world = null;
+const coins = [];   // { body, collider, mesh }
+let supportsContactSkin = true;
+let supportsLengthUnit = true;
+
+function buildWorld() {
+  world = new RAPIER.World({ x: 0, y: P.gravity, z: 0 });
+  world.timestep = P.timestep;
+  const ip = world.integrationParameters;
+  ip.numSolverIterations = P.numSolverIterations;
+  ip.numAdditionalFrictionIterations = P.numAdditionalFrictionIterations;
+  ip.numInternalPgsIterations = P.numInternalPgsIterations;
+  if ('lengthUnit' in ip) ip.lengthUnit = P.lengthUnit; else supportsLengthUnit = false;
+
+  // Static floor: a thin wide cylinder.
+  const floorBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.01, 0));
+  world.createCollider(
+    RAPIER.ColliderDesc.cylinder(0.01, BASIN_RADIUS + 0.06).setFriction(1).setRestitution(0),
+    floorBody
+  );
+
+  // Static basin wall: a ring of thin box colliders (Rapier has no tube collider).
+  const SEG = 36;
+  for (let i = 0; i < SEG; i++) {
+    const a = (i / SEG) * Math.PI * 2;
+    const x = Math.cos(a) * (BASIN_RADIUS + 0.012);
+    const z = Math.sin(a) * (BASIN_RADIUS + 0.012);
+    const segW = (Math.PI * 2 * (BASIN_RADIUS + 0.012)) / SEG * 0.62; // half-width-ish overlap
+    const wb = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, BASIN_WALL_H / 2, z).setRotation(quatFromY(-a)));
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(0.01, BASIN_WALL_H / 2, segW).setFriction(0.6).setRestitution(0),
+      wb
+    );
+  }
+}
+
+function quatFromY(angle) {
+  const h = angle / 2;
+  return { x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) };
+}
+
+function spawnCoin() {
+  if (coins.length >= P.maxCoins) {            // recycle oldest
+    const old = coins.shift();
+    world.removeRigidBody(old.body);
+    scene.remove(old.mesh);
+  }
+  const jx = (Math.random() - 0.5) * P.dropJitter;
+  const jz = (Math.random() - 0.5) * P.dropJitter;
+  const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+    .setTranslation(jx, P.dropHeight, jz)
+    .setRotation(randomQuat())
+    .setLinearDamping(P.linearDamping)
+    .setAngularDamping(P.angularDamping)
+    .setCcdEnabled(P.ccd);
+  const body = world.createRigidBody(bodyDesc);
+
+  let cd = RAPIER.ColliderDesc.cylinder(P.colliderHalfHeight, COIN_RADIUS)
+    .setFriction(P.friction)
+    .setRestitution(P.restitution)
+    .setDensity(P.density);
+  if (typeof cd.setContactSkin === 'function') cd.setContactSkin(P.contactSkin);
+  else supportsContactSkin = false;
+  const collider = world.createCollider(cd, body);
+
+  const mesh = new THREE.Mesh(coinGeo, coinMat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  coins.push({ body, collider, mesh });
+}
+
+function randomQuat() {
+  const q = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(Math.random() * 0.4 - 0.2, Math.random() * Math.PI * 2, Math.random() * 0.4 - 0.2)
+  );
+  return { x: q.x, y: q.y, z: q.z, w: q.w };
+}
+
+function resetPile() {
+  for (const c of coins) { world.removeRigidBody(c.body); scene.remove(c.mesh); }
+  coins.length = 0;
+  // rebuild integration params live
+  const ip = world.integrationParameters;
+  ip.numSolverIterations = P.numSolverIterations;
+  ip.numAdditionalFrictionIterations = P.numAdditionalFrictionIterations;
+  ip.numInternalPgsIterations = P.numInternalPgsIterations;
+  if ('lengthUnit' in ip) ip.lengthUnit = P.lengthUnit;
+  world.timestep = P.timestep;
+  world.gravity = { x: 0, y: P.gravity, z: 0 };
+}
+
+// ---------------------------------------------------------------------------
+// GUI
+// ---------------------------------------------------------------------------
+function buildGUI() {
+  const gui = new GUI({ title: 'Rapier coin knobs' });
+  const fScale = gui.addFolder('scale fix');
+  fScale.add(P, 'lengthUnit', 0.005, 1, 0.005).onFinishChange(resetPile);
+  const fShape = gui.addFolder('collider (idea 1+2)');
+  fShape.add(P, 'colliderHalfHeight', COIN_HALF_VIS * 0.8, COIN_HALF_VIS * 2.5, 0.0001).onFinishChange(resetPile);
+  fShape.add(P, 'contactSkin', 0, 0.004, 0.0001).onFinishChange(resetPile);
+  const fMat = gui.addFolder('material (idea 5)');
+  fMat.add(P, 'friction', 0, 2, 0.05).onFinishChange(resetPile);
+  fMat.add(P, 'restitution', 0, 0.5, 0.01).onFinishChange(resetPile);
+  fMat.add(P, 'linearDamping', 0, 2, 0.05).onFinishChange(resetPile);
+  fMat.add(P, 'angularDamping', 0, 2, 0.05).onFinishChange(resetPile);
+  fMat.add(P, 'density', 0.5, 20, 0.5).onFinishChange(resetPile);
+  fMat.add(P, 'ccd').onFinishChange(resetPile);
+  const fSolver = gui.addFolder('solver (idea 4)');
+  fSolver.add(P, 'numSolverIterations', 1, 32, 1).onFinishChange(resetPile);
+  fSolver.add(P, 'numAdditionalFrictionIterations', 0, 16, 1).onFinishChange(resetPile);
+  fSolver.add(P, 'numInternalPgsIterations', 1, 8, 1).onFinishChange(resetPile);
+  const fSim = gui.addFolder('sim / spawn');
+  fSim.add(P, 'gravity', -30, -1, 0.5).onFinishChange(resetPile);
+  fSim.add(P, 'timestep', 1/240, 1/30, 1/240).onFinishChange(resetPile);
+  fSim.add(P, 'spawnRate', 0, 30, 1);
+  fSim.add(P, 'maxCoins', 5, 200, 5);
+  fSim.add(P, 'dropHeight', 0.05, 1, 0.01);
+  fSim.add(P, 'spawning');
+  gui.add(P, 'reset').name('↺ reset pile (R)');
+}
+
+// ---------------------------------------------------------------------------
+// Loop
+// ---------------------------------------------------------------------------
+const hud = document.getElementById('hud');
+let lastSpawn = 0, lastT = 0, fps = 0;
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (!world) return;
+  const now = t * 0.001;
+  const dt = now - (lastT || now);
+  lastT = now;
+  fps += ((dt > 0 ? 1 / dt : fps) - fps) * 0.1; // smoothed
+
+  if (P.spawning && P.spawnRate > 0 && now - lastSpawn > 1 / P.spawnRate) {
+    spawnCoin();
+    lastSpawn = now;
+  }
+
+  world.step();
+
+  let asleep = 0, maxPen = 0;
+  for (const c of coins) {
+    const p = c.body.translation();
+    const r = c.body.rotation();
+    c.mesh.position.set(p.x, p.y, p.z);
+    c.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+    if (c.body.isSleeping()) asleep++;
+    if (p.y < -0.05) maxPen = Math.max(maxPen, -p.y); // sank through floor?
+  }
+
+  renderer.render(scene, camera);
+
+  hud.textContent =
+    `fps          ${Math.round(fps)}\n` +
+    `coins        ${coins.length} / ${P.maxCoins}\n` +
+    `settled      ${asleep}\n` +
+    `lengthUnit   ${P.lengthUnit}${supportsLengthUnit ? '' : '  (UNSUPPORTED!)'}\n` +
+    `contactSkin  ${P.contactSkin}${supportsContactSkin ? '' : '  (UNSUPPORTED!)'}\n` +
+    `solver       ${P.numSolverIterations} + ${P.numAdditionalFrictionIterations}f\n` +
+    `colliderH/vis ${(P.colliderHalfHeight / COIN_HALF_VIS).toFixed(2)}x\n` +
+    `ccd          ${P.ccd ? 'on' : 'off'}\n` +
+    (maxPen > 0.001 ? `⚠ sinking    ${maxPen.toFixed(4)} below floor\n` : '');
+}
+
+addEventListener('keydown', (e) => { if (e.key === 'r' || e.key === 'R') resetPile(); });
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+(async () => {
+  await RAPIER.init();
+  buildWorld();
+  buildGUI();
+  if (!supportsLengthUnit) console.warn('[rapier-test] lengthUnit unsupported in this build');
+  document.getElementById('loading').remove();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

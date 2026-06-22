@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>Char80 Fountain</title>
+		<title>Liquid80 Fountain</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 		<link type="text/css" rel="stylesheet" href="/main.css">
@@ -2233,7 +2233,8 @@
 			{
 				"imports": {
 					"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-					"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+					"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+					"@dimforge/rapier3d-compat": "/vendor/rapier3d-compat/rapier.mjs"
 				}
 			}
 		</script>
@@ -2279,6 +2280,505 @@
 			// Define coin dimensions for use in physics - MUST match geometry!
 			const COIN_RADIUS = 0.02; // Match the actual geometry radius (0.03 = ~25% smaller circumference than the old 0.04)
 			const COIN_THICKNESS = 0.002 * 2; // Match the actual geometry thickness
+
+			// ====================================================================
+			// RAPIER COIN PHYSICS — Stage 1, behind ?rapier=1 ---------------------
+			// Real rigid-body coins so thin discs pile without intermeshing instead
+			// of the hand-rolled separation. Params validated at this exact coin
+			// scale in public/rapier-coins-test.html. The live fountain (no flag)
+			// is untouched and never loads the Rapier WASM (dynamic import below).
+			// ====================================================================
+			// Rapier physics is now the DEFAULT on /fountain (flipped 2026-06-21). Opt out with
+			// ?norapier=1 to fall back to the old hand-rolled coin physics.
+			const RAPIER_MODE = !new URLSearchParams(location.search).has('norapier');
+			// The live tuning panel only shows on the explicit dev URL (?rapier=1), never on
+			// production /fountain, even though the physics runs there by default.
+			const RAPIER_GUI = new URLSearchParams(location.search).has('rapier');
+			const RAPIER_COIN_RADIUS = 0.03; // == CylinderGeometry radius (NOT COIN_RADIUS 0.02)
+			const RAPIER_P = { // window.rapierP for live console tuning
+				lengthUnit: 0.05, colliderHalfHeight: 0.0019, contactSkin: 0.0007,
+				// NB: linearDamping is AIR DRAG here — high values (the drop-tuned 1.55) bleed a
+				// thrown coin's horizontal speed mid-flight so it lands short. 0 = arcs carry to
+				// the tap exactly; the slow-sink damping returns IN THE WATER (Stage 2).
+				friction: 2.50, restitution: 0.4, linearDamping: 0, angularDamping: 1.35,
+				density: 2.5, ccd: true,
+				numSolverIterations: 12, numAdditionalFrictionIterations: 6, numInternalPgsIterations: 2,
+				gravity: -1, timestep: 1 / 60, substeps: 4,
+				// Stage 2: applied when a coin crosses below the waterline (slow-sink + buoyancy).
+				waterLinearDamping: 6.8, waterAngularDamping: 10.3, waterGravityScale: 0.3,
+				tossSpin: 10, // launch tumble (rad/s) so coins hit the water at varied angles, not dead-flat
+				freeze: true, // Stage 3: settled coins become static collider + instanced render, dynamic body dropped (perf)
+				streamVelScale: 0.5, // hand-shower launch speed vs the old slow-mo stream (Rapier gravity is gentler)
+			};
+			if (typeof window !== 'undefined') window.rapierP = RAPIER_P;
+			// Fresh axis-Y coin geometry: the scene's coinGeometry is pre-rotated X+90°,
+			// which would NOT align with Rapier's Y-axis cylinder collider.
+			const rapierCoinGeo = new THREE.CylinderGeometry(RAPIER_COIN_RADIUS, RAPIER_COIN_RADIUS, COIN_THICKNESS, 32);
+			let RAPIER = null, rapierWorld = null, rapierReady = false, rapierCollidersBuilt = false;
+			let fountainModelReady = false; // set true only AFTER the model is scaled/positioned + added to the scene
+			let rapierEvents = null;        // collision-event queue → plink SFX on dry impacts
+			const rapierGrassColliders = new Set(); // grass collider handles → soft rustle SFX, not a plink
+			const rapierCoins = []; // { body, mesh, colliderHandle, inWater, splashed, counted }
+			// Stage 2 water volumes — bounds mirror the scene's water meshes. lowerLevel is read
+			// at runtime from window.WATER_SURFACE_Y (that const is declared later in the file).
+			const RAPIER_WATER = { upperLevel: 0.42, upperCx: 0.05, upperCz: -0.01, upperR2: 0.3 * 0.3 };
+			// Collision groups (memberships<<16 | filter): the hand-SHOWER coins spawn right at
+			// the statue's hands, so they ignore the statue/pedestal to avoid jamming in its mesh.
+			// Tossed coins keep default groups and still bounce off the statue.
+			const RAPIER_GROUP_STATUE = (0x0002 << 16) | 0xFFFF;    // statue/pedestal: own bit, collide with all
+			const RAPIER_GROUP_NO_STATUE = (0x0001 << 16) | 0xFFFD; // shower coins: collide with all EXCEPT statue bit
+
+			async function initRapier() {
+				if (!RAPIER_MODE) return;
+				console.log('[rapier] ?rapier=1 detected — loading WASM…');
+				try {
+					const mod = await import('@dimforge/rapier3d-compat');
+					RAPIER = mod.default || mod;
+					await RAPIER.init();
+				} catch (e) { console.error('[rapier] failed to load', e); return; }
+				rapierWorld = new RAPIER.World({ x: 0, y: RAPIER_P.gravity, z: 0 });
+				rapierWorld.timestep = RAPIER_P.timestep;
+				const ip = rapierWorld.integrationParameters;
+				ip.numSolverIterations = RAPIER_P.numSolverIterations;
+				ip.numAdditionalFrictionIterations = RAPIER_P.numAdditionalFrictionIterations;
+				ip.numInternalPgsIterations = RAPIER_P.numInternalPgsIterations;
+				if ('lengthUnit' in ip) ip.lengthUnit = RAPIER_P.lengthUnit;
+				else console.warn('[rapier] lengthUnit unsupported — coins may intermesh at this scale');
+				rapierEvents = new RAPIER.EventQueue(true); // collision events for plink SFX
+				rapierReady = true;
+				console.log('[rapier] world ready (?rapier=1)');
+				maybeBuildFountainColliders();
+				buildRapierGUI();
+			}
+
+			// Static trimesh colliders from the SAME meshes the old code raycast
+			// (userData.isFountainPart). Verts are world-space, so one fixed body at origin.
+			function maybeBuildFountainColliders() {
+				// Needs BOTH the world ready AND the model fully transformed — building from
+				// the model before its 0.8 scale / y=-0.5 shift puts colliders off the visible mesh.
+				if (!RAPIER_MODE || !rapierReady || rapierCollidersBuilt || !fountainModelReady || !window.fountainModel) return;
+				const parts = [];
+				window.fountainModel.traverse(n => {
+					if (!(n.isMesh && n.userData.isFountainPart && n.geometry)) return;
+					// Skip meshes that MOVE — a static trimesh from their load pose becomes a
+					// phantom collider. goldCoin1/2 (info-hub + shower anchors) float in mid-air;
+					// the DrinkingMouth animates. Those would catch coins on nothing-visible.
+					const nm = (n.name || '').toLowerCase();
+					if (nm.includes('coin') || nm.includes('gold') || nm.includes('mouth')) return;
+					parts.push(n);
+				});
+				if (!parts.length) return;
+				const fixed = rapierWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+				let built = 0, tris = 0;
+				const v = new THREE.Vector3();
+				for (const mesh of parts) {
+					const geo = mesh.geometry, pos = geo.attributes.position;
+					if (!pos) continue;
+					mesh.updateWorldMatrix(true, false);
+					const verts = new Float32Array(pos.count * 3);
+					for (let i = 0; i < pos.count; i++) {
+						v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+						verts[i * 3] = v.x; verts[i * 3 + 1] = v.y; verts[i * 3 + 2] = v.z;
+					}
+					let idx;
+					if (geo.index) idx = (geo.index.array instanceof Uint32Array) ? geo.index.array : new Uint32Array(geo.index.array);
+					else { idx = new Uint32Array(pos.count); for (let i = 0; i < pos.count; i++) idx[i] = i; }
+					try {
+						let tdesc = RAPIER.ColliderDesc.trimesh(verts, idx).setFriction(0.85).setRestitution(0.15);
+						if (mesh.userData.isStatue || mesh.userData.isPedestal) tdesc = tdesc.setCollisionGroups(RAPIER_GROUP_STATUE);
+						const col = rapierWorld.createCollider(tdesc, fixed);
+						if (mesh.userData.isGrass) rapierGrassColliders.add(col.handle); // → soft rustle, not plink
+						built++; tris += idx.length / 3;
+					} catch (e) { console.warn('[rapier] trimesh failed:', mesh.name, e); }
+				}
+				// Plaza/ground slab so coins that miss the fountain rest on the ground instead of
+				// falling forever. Top face at the visible ground mesh (y = -0.958).
+				const GROUND_Y = -0.958;
+				rapierWorld.createCollider(
+					RAPIER.ColliderDesc.cuboid(50, 0.1, 50).setTranslation(0, GROUND_Y - 0.1, 0).setFriction(0.9).setRestitution(0.1),
+					fixed
+				);
+				rapierCollidersBuilt = true;
+				console.log(`[rapier] built ${built} fountain colliders (${tris | 0} tris) + ground`);
+			}
+
+			// Spawn one Rapier coin at `startPosition` with linear velocity `vel`. Shared by the
+			// tap-toss and the hand coin-stream (shower). Returns { mesh, body } or null.
+			function rapierSpawnCoin(startPosition, vel, isLocalCoin, opts) {
+				if (!rapierReady || !rapierWorld) return null;
+				opts = opts || {};
+				const mat = baseCoinMaterial.clone();
+				if (is80sMode) { mat.emissive = new THREE.Color('#FFEB38'); mat.emissiveIntensity = 0.3; }
+				if (!isLocalCoin) { mat.emissive = new THREE.Color('#FFB300'); mat.emissiveIntensity = 0.55; }
+				const scl = opts.scale != null ? opts.scale : (isLocalCoin ? 1 : 0.7);
+				// Optional grow-in: the mesh starts at `growFrom` and scales up to `scl` over the
+				// fall (shower coins pour small from the hands, hit the water at full size). The
+				// COLLIDER is always full-size `scl`, so the resting/frozen pile is uniform.
+				const startScl = opts.growFrom != null ? opts.growFrom : scl;
+				const mesh = new THREE.Mesh(rapierCoinGeo, mat);
+				mesh.scale.setScalar(startScl);
+				mesh.position.set(startPosition.x, startPosition.y, startPosition.z);
+				mesh.renderOrder = 99;
+				// Stamp metadata used at freeze time to decide persistence (same rule as the old
+				// path: only real, non-local coins that land in water are saved). txHash/donation
+				// are stamped onto mesh.userData by tossHeldCoin AFTER this returns.
+				mesh.userData.isLocalCoin = isLocalCoin;
+				mesh.userData.charity = isLocalCoin ? null : (typeof selectedCharity !== 'undefined' ? selectedCharity : null);
+				// The coin-cam (updateCameraFollow) reads these on the followed coin — keep them
+				// present + synced or it derefs undefined velocity and freezes the render loop.
+				mesh.userData.velocity = new THREE.Vector3(vel.x, vel.y, vel.z);
+				mesh.userData.underwater = false;
+				mesh.userData.stopped = false;
+				scene.add(mesh);
+
+				// Random launch tilt + a flip-style tumble so coins hit the water at varied angles
+				// instead of dead-flat. Spin is biased to a horizontal axis (a coin flip); the air
+				// angularDamping bleeds it over the arc so each lands at a different tilt.
+				const _tiltA = Math.random() * Math.PI * 2, _tiltMag = Math.random() * 0.6; // up to ~34°
+				const _q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.cos(_tiltA) * _tiltMag, Math.random() * Math.PI * 2, Math.sin(_tiltA) * _tiltMag));
+				const _spin = RAPIER_P.tossSpin * (0.5 + Math.random() * 0.5), _flipA = Math.random() * Math.PI * 2;
+				const body = rapierWorld.createRigidBody(
+					RAPIER.RigidBodyDesc.dynamic()
+						.setTranslation(startPosition.x, startPosition.y, startPosition.z)
+						.setRotation({ x: _q0.x, y: _q0.y, z: _q0.z, w: _q0.w })
+						.setLinvel(vel.x, vel.y, vel.z)
+						.setAngvel({ x: Math.cos(_flipA) * _spin, y: (Math.random() * 2 - 1) * _spin * 0.2, z: Math.sin(_flipA) * _spin })
+						.setLinearDamping(RAPIER_P.linearDamping)
+						.setAngularDamping(RAPIER_P.angularDamping)
+						.setCcdEnabled(RAPIER_P.ccd)
+				);
+				const cd = RAPIER.ColliderDesc.cylinder(RAPIER_P.colliderHalfHeight * scl, RAPIER_COIN_RADIUS * scl)
+					.setFriction(RAPIER_P.friction).setRestitution(RAPIER_P.restitution).setDensity(RAPIER_P.density)
+					.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS); // so dry impacts fire a plink
+				if (typeof cd.setContactSkin === 'function') cd.setContactSkin(RAPIER_P.contactSkin);
+				if (opts.noStatue) cd.setCollisionGroups(RAPIER_GROUP_NO_STATUE); // shower coins pour past the statue
+				const collider = rapierWorld.createCollider(cd, body);
+
+				rapierCoins.push({ body, mesh, colliderHandle: collider.handle, scale: scl, growStart: startScl, growT: 0, isLocal: !!isLocalCoin, inWater: false, inUpper: false, splashed: false, saved: false });
+				return { mesh, body };
+			}
+
+			// Toss a coin as a Rapier rigid body (replaces createCoin under ?rapier=1).
+			function rapierTossCoin(startPosition, initialVelocity, isLocalCoin) {
+				const r = rapierSpawnCoin(startPosition, initialVelocity, isLocalCoin);
+				if (!r) { console.warn('[rapier] toss ignored — world not ready yet'); return null; }
+				startCameraFollow(r.mesh);
+				return r.mesh;
+			}
+
+			// ---- Rapier coin-stream (the hand "shower", replaces the old instanced stream) ----
+			// triggerCoinStream() routes here under ?rapier=1: schedule each hand's burst of coins
+			// (staggered release, per-coin radial velocity) as real Rapier bodies that splash/sink/
+			// pile like any tossed coin. Velocities are scaled down because the old stream ran in
+			// slow-mo under its own stronger gravity (-3.9); Rapier uses the global gravity (-1).
+			const rapierStreamQueue = [];
+			function rapierTriggerStream() {
+				if (!rapierReady) return;
+				const now = performance.now();
+				const hands = COIN_STREAM.hands || [];
+				const n = COIN_STREAM.count, vScale = (RAPIER_P.streamVelScale ?? 0.5);
+				for (let s = 0; s < hands.length; s++) {
+					const h = hands[s];
+					for (let i = 0; i < n; i++) {
+						// POUR, don't spray: Rapier coins collide, so the old upward `lift` made
+						// ~18 coins hang at the hand at once and jam. Launch outward + DOWNWARD from
+						// a spread-out ring so each leaves the source immediately and fans into the pool.
+						const ang = Math.random() * Math.PI * 2, rad = 0.4 + Math.random() * 0.6;
+						const out = COIN_STREAM.spread * rad * vScale;          // radial speed
+						const jr = 0.05 + Math.random() * 0.06;                 // spawn-ring radius (avoids birth overlap)
+						rapierStreamQueue.push({
+							at: now + (i / n) * COIN_STREAM.stagger * 1000, // stagger is in seconds
+							ox: h.x + Math.cos(ang) * jr, oy: h.y + (Math.random() - 0.5) * 0.04, oz: h.z + Math.sin(ang) * jr,
+							vx: Math.cos(ang) * out,
+							vy: -(0.1 + Math.random() * 0.3),                   // downward — no upward hang at the source
+							vz: Math.sin(ang) * out,
+						});
+					}
+				}
+			}
+			function drainRapierStream() {
+				if (!rapierStreamQueue.length) return;
+				const now = performance.now();
+				for (let i = rapierStreamQueue.length - 1; i >= 0; i--) {
+					const q = rapierStreamQueue[i];
+					if (q.at > now) continue;
+					rapierStreamQueue.splice(i, 1);
+					rapierSpawnCoin({ x: q.ox, y: q.oy, z: q.oz }, { x: q.vx, y: q.vy, z: q.vz }, true, { noStatue: true, scale: 1, growFrom: COIN_STREAM.scale });
+				}
+			}
+
+			// ---- Stage 3: freeze settled coins → static collider + instanced render ----
+			// Once a coin sleeps it can't usefully stay a dynamic body, and keeping hundreds
+			// of them risks a wake-cascade when a new coin lands on the heap. So we bake it
+			// into a shared InstancedMesh (one draw call) + a STATIC cylinder collider (so
+			// new coins still pile on it) and remove the dynamic body. Active bodies then =
+			// only coins in flight or still settling.
+			const FROZEN_CAP = 700;
+			let rapierFrozenMesh = null, rapierFrozenBody = null, rapierFrozenCount = 0;
+			let rapierPendingLoad = null; // coins fetched from Firestore, frozen on the first ready frame
+			const rapierFrozenColliders = []; // per instance slot, for ring-buffer cleanup past the cap
+			const _frozenDummy = new THREE.Object3D();
+			const _frozenQuat = new THREE.Quaternion(), _frozenEuler = new THREE.Euler();
+
+			function buildRapierFrozen() {
+				if (rapierFrozenMesh || typeof scene === 'undefined' || !scene) return;
+				rapierFrozenMesh = new THREE.InstancedMesh(rapierCoinGeo, baseCoinMaterial.clone(), FROZEN_CAP);
+				rapierFrozenMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+				rapierFrozenMesh.frustumCulled = false;
+				rapierFrozenMesh.renderOrder = 98;
+				rapierFrozenMesh.count = 0;
+				scene.add(rapierFrozenMesh);
+				rapierFrozenBody = rapierWorld.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+			}
+
+			// Core freeze: write a render instance + a static collider at a world transform.
+			// q is a quaternion {x,y,z,w}. Shared by settle-freeze and the Firestore load.
+			function freezeRapierCoinAt(p, q, s) {
+				buildRapierFrozen();
+				if (!rapierFrozenMesh) return;
+				const idx = rapierFrozenCount % FROZEN_CAP;
+				_frozenDummy.position.set(p.x, p.y, p.z);
+				_frozenDummy.quaternion.set(q.x, q.y, q.z, q.w);
+				_frozenDummy.scale.setScalar(s);
+				_frozenDummy.updateMatrix();
+				rapierFrozenMesh.setMatrixAt(idx, _frozenDummy.matrix);
+				rapierFrozenMesh.instanceMatrix.needsUpdate = true;
+				rapierFrozenMesh.count = Math.min(rapierFrozenCount + 1, FROZEN_CAP);
+				if (rapierFrozenColliders[idx]) { try { rapierWorld.removeCollider(rapierFrozenColliders[idx], false); } catch (e) {} }
+				let cd = RAPIER.ColliderDesc.cylinder(RAPIER_P.colliderHalfHeight * s, RAPIER_COIN_RADIUS * s)
+					.setTranslation(p.x, p.y, p.z).setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
+					.setFriction(RAPIER_P.friction).setRestitution(RAPIER_P.restitution);
+				if (typeof cd.setContactSkin === 'function') cd = cd.setContactSkin(RAPIER_P.contactSkin);
+				rapierFrozenColliders[idx] = rapierWorld.createCollider(cd, rapierFrozenBody);
+				rapierFrozenCount++;
+			}
+
+			// Freeze a settled dynamic coin, persist it if it's a real water coin, drop its body.
+			function freezeRapierCoin(rc) {
+				const p = rc.body.translation(), r = rc.body.rotation();
+				freezeRapierCoinAt(p, r, rc.scale || 1);
+				// Persist only REAL (non-free) coins that settled IN the water (same rule as before).
+				if (!rc.saved && !rc.isLocal && rc.inWater && typeof coinsCollection !== 'undefined' && coinsCollection) {
+					rc.saved = true;
+					_frozenEuler.setFromQuaternion(_frozenQuat.set(r.x, r.y, r.z, r.w));
+					saveCoinToFirestore({
+						position: { x: p.x, y: p.y, z: p.z },
+						rotation: { x: _frozenEuler.x, y: _frozenEuler.y, z: _frozenEuler.z },
+						isInUpperBowl: !!rc.inUpper,
+						charity: rc.mesh.userData.charity || null,
+						txHash: rc.mesh.userData.txHash || null,
+						scale: rc.scale || 1,
+					});
+				}
+				// If the coin-cam was chasing this coin, mark it stopped so updateCameraFollow
+				// eases back and releases (the mesh is about to leave the scene).
+				if (rc.mesh === followedCoin) {
+					followedCoin.userData.stopped = true;
+					followedCoin.userData.underwater = rc.inWater;
+					if (followedCoin.userData.velocity) followedCoin.userData.velocity.set(0, 0, 0);
+				}
+				rapierWorld.removeRigidBody(rc.body);
+				scene.remove(rc.mesh);
+				if (rc.mesh.material && rc.mesh.material !== baseCoinMaterial) rc.mesh.material.dispose();
+			}
+
+			// Freeze a coin loaded from Firestore (rotation stored as an Euler {rx,ry,rz}).
+			function freezeRapierCoinFromData(d) {
+				_frozenQuat.setFromEuler(_frozenEuler.set(d.rx || 0, d.ry || 0, d.rz || 0));
+				freezeRapierCoinAt({ x: d.x, y: d.y, z: d.z }, _frozenQuat, d.scale || 1);
+			}
+
+			function clearRapierFrozen() {
+				if (rapierFrozenMesh) { scene.remove(rapierFrozenMesh); rapierFrozenMesh.material.dispose(); rapierFrozenMesh = null; }
+				if (rapierFrozenBody && rapierWorld) { rapierWorld.removeRigidBody(rapierFrozenBody); rapierFrozenBody = null; } // removes its colliders too
+				rapierFrozenColliders.length = 0;
+				rapierFrozenCount = 0;
+			}
+
+			function rapierCoinByCollider(handle) {
+				for (let i = 0; i < rapierCoins.length; i++) if (rapierCoins[i].colliderHandle === handle) return rapierCoins[i];
+				return null;
+			}
+
+			// Stage 2 — water entry → splash FX/sound + slow-sink drag; settle → counter.
+			function updateRapierCoinWater(rc, p) {
+				const lowerLevel = (window.WATER_SURFACE_Y ?? -0.5);
+				const inLower = p.y < lowerLevel && isWithinFountainWater(p);
+				const dxu = p.x - RAPIER_WATER.upperCx, dzu = p.z - RAPIER_WATER.upperCz;
+				const inUpper = p.y < RAPIER_WATER.upperLevel && p.y > 0.2 && (dxu * dxu + dzu * dzu) < RAPIER_WATER.upperR2;
+				const inWater = inLower || inUpper;
+
+				if (inWater && !rc.inWater) {
+					rc.inWater = true;
+					rc.inUpper = inUpper; // remembered for the isInUpperBowl save field
+					const level = inUpper ? RAPIER_WATER.upperLevel : lowerLevel;
+					// Splash SFX once per coin.
+					if (!rc.splashed) { rc.splashed = true; if (window.playCoinSplash) window.playCoinSplash(); }
+					// Surface ripple: poke the shared water heightmap at the impact point.
+					if (heightmapVariable && heightmapVariable.material) {
+						heightmapVariable.material.uniforms['mousePos'].value.set(p.x, p.z);
+						if (coinSplashTimeout) clearTimeout(coinSplashTimeout);
+						coinSplashTimeout = setTimeout(() => {
+							if (heightmapVariable && heightmapVariable.material) heightmapVariable.material.uniforms['mousePos'].value.set(10000, 10000);
+							coinSplashTimeout = null;
+						}, coinSplashDuration);
+					}
+					// Droplet spray, bigger for a faster (higher-tossed) impact.
+					const _t = Math.min(1.5, (rc.speed || 0) * 2.2);
+					emitDroplets(p.x, level, p.z, Math.round(4 + _t * 9), 0.5 + _t * 0.8);
+					// Switch to underwater drag so it sinks slowly and settles (Rapier has no fluids).
+					rc.body.setLinearDamping(RAPIER_P.waterLinearDamping);
+					rc.body.setAngularDamping(RAPIER_P.waterAngularDamping);
+					rc.body.setGravityScale(RAPIER_P.waterGravityScale, true);
+				} else if (!inWater && rc.inWater) {
+					// Left the water (a near-surface bounce) — restore air behaviour.
+					rc.inWater = false;
+					rc.body.setLinearDamping(RAPIER_P.linearDamping);
+					rc.body.setAngularDamping(RAPIER_P.angularDamping);
+					rc.body.setGravityScale(1, true);
+				}
+			}
+
+			// Step the Rapier world + sync coin meshes (called each frame in render()).
+			function stepRapierCoins() {
+				if (!rapierReady || !rapierWorld) return;
+				if (rapierPendingLoad) { // freeze the saved pile (loaded from Firestore) now that the world is ready
+					for (const d of rapierPendingLoad) freezeRapierCoinFromData(d);
+					console.log('[rapier] loaded ' + rapierPendingLoad.length + ' saved coins into the pile');
+					rapierPendingLoad = null;
+				}
+				drainRapierStream(); // release any staggered hand-shower coins that are now due
+				if (rapierWorld.gravity.y !== RAPIER_P.gravity) rapierWorld.gravity.y = RAPIER_P.gravity;
+				// Cache each coin's pre-step speed for plink intensity (impact ≈ speed before contact).
+				for (const rc of rapierCoins) { const v = rc.body.linvel(); rc.speed = Math.hypot(v.x, v.y, v.z); }
+				// Substep so a fast-falling coin can't tunnel through the thin trimesh bowl in
+				// one 1/60 slice: smaller dt → CCD + discrete contacts catch every impact.
+				const n = Math.max(1, RAPIER_P.substeps | 0);
+				rapierWorld.timestep = RAPIER_P.timestep / n;
+				for (let s = 0; s < n; s++) rapierWorld.step(rapierEvents);
+
+				// Plink on dry impacts (coin↔stone or coin↔coin above the waterline).
+				if (rapierEvents) rapierEvents.drainCollisionEvents((h1, h2, started) => {
+					if (!started) return;
+					const rcA = rapierCoinByCollider(h1), rcB = rapierCoinByCollider(h2);
+					const rc = rcA || rcB;
+					if (!rc || rc.inWater) return;                 // underwater entry already played a splash
+					const now = performance.now();
+					if (now - (rc.lastPlink || 0) < 60) return;    // cooldown so skitter doesn't machine-gun
+					rc.lastPlink = now;
+					const otherHandle = rcA ? h2 : h1;             // the surface the coin struck
+					const intensity = Math.min(1, (rc.speed || 0) * 1.5);
+					if (rapierGrassColliders.has(otherHandle)) {
+						if (window.playCoinSoft) window.playCoinSoft(Math.min(1, 0.4 + intensity)); // grass → soft rustle
+					} else if (window.playCoinPlink) {
+						window.playCoinPlink(intensity);                                            // stone/coin → plink
+					}
+				});
+
+				for (let i = rapierCoins.length - 1; i >= 0; i--) {
+					const rc = rapierCoins[i];
+					const p = rc.body.translation();
+					if (p.y < -10) { rapierWorld.removeRigidBody(rc.body); scene.remove(rc.mesh); rapierCoins.splice(i, 1); continue; }
+					const r = rc.body.rotation();
+					rc.mesh.position.set(p.x, p.y, p.z);
+					rc.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+					if (rc.growStart < rc.scale) { // grow the visual up to full size over ~0.5s of the fall
+						rc.growT += 1 / 60;
+						const gp = Math.min(rc.growT / 0.5, 1);
+						rc.mesh.scale.setScalar(rc.growStart + (rc.scale - rc.growStart) * gp);
+						if (gp >= 1) rc.growStart = rc.scale; // reached full size — stop animating
+					}
+					if (cameraFollowActive && rc.mesh === followedCoin) { // feed the coin-cam from the body
+						const lv = rc.body.linvel();
+						rc.mesh.userData.velocity.set(lv.x, lv.y, lv.z);
+						rc.mesh.userData.underwater = rc.inWater;
+					}
+					updateRapierCoinWater(rc, p);
+					if (rc.body.isSleeping()) {
+						// Freeze it → static collider + instance, drop the dynamic body (perf).
+						// freezeRapierCoin also PERSISTS real water coins to Firestore; the realtime
+						// snapshot then drives totalCoinCount (no local increment → no double-count).
+						if (RAPIER_P.freeze !== false) { freezeRapierCoin(rc); rapierCoins.splice(i, 1); continue; }
+					}
+				}
+				rapierStats.coins = rapierCoins.length;
+				rapierStats.frozen = rapierFrozenCount;
+			}
+
+			// Remove every coin — live AND frozen (handy while tuning).
+			function clearRapierCoins() {
+				if (!rapierWorld) return;
+				for (const rc of rapierCoins) { rapierWorld.removeRigidBody(rc.body); scene.remove(rc.mesh); }
+				rapierCoins.length = 0;
+				clearRapierFrozen();
+				rapierStats.coins = 0; rapierStats.frozen = 0;
+			}
+			if (typeof window !== 'undefined') window.clearRapierCoins = clearRapierCoins;
+
+			// Perf stress test: rain `n` coins into the pool at once to build the pile fast and
+			// stress the worst case (many active bodies → they then freeze). Watch FPS via ?perf.
+			// e.g. window.rapierStress(200). Logs active/frozen counts.
+			if (typeof window !== 'undefined') window.rapierStress = function (n) {
+				n = (n | 0) || 100;
+				if (!rapierReady) { console.warn('[rapier] not ready'); return; }
+				for (let i = 0; i < n; i++) {
+					const x = (Math.random() - 0.5) * 1.6, z = (Math.random() - 0.5) * 1.6;
+					rapierSpawnCoin({ x, y: 0.7 + Math.random() * 0.5, z }, { x: 0, y: -0.25, z: 0 }, true);
+				}
+				console.log('[rapier] stress +' + n + ' → active=' + rapierCoins.length + ' frozen=' + rapierFrozenCount);
+			};
+
+			// Live tuning panel (lil-gui, already imported). Folders flag which knobs apply
+			// to the WORLD immediately vs. only to the NEXT coin tossed (collider/material are
+			// baked at body creation, so they can't retro-change coins already in the scene).
+			const rapierStats = { coins: 0, frozen: 0 };
+			function buildRapierGUI() {
+				if (!RAPIER_GUI || typeof GUI === 'undefined') return; // dev panel: ?rapier=1 only
+				// No tuning panel on phones/small screens — it crowds the perf HUD. Tune from a
+				// desktop, or use window.rapierP / window.rapierStress() from a console.
+				if ((typeof isMobileDevice !== 'undefined' && isMobileDevice) || window.innerWidth <= 768) return;
+				let gui;
+				try { gui = new GUI({ title: 'Rapier coins (?rapier=1)' }); }
+				catch (e) { console.warn('[rapier] GUI unavailable', e); return; }
+				gui.domElement.style.zIndex = '10001';
+				// Anchor top-LEFT so it never covers the perf HUD / music button (top-right).
+				gui.domElement.style.top = '8px';
+				gui.domElement.style.left = '8px';
+				gui.domElement.style.right = 'auto';
+
+				const live = gui.addFolder('world — applies live');
+				live.add(RAPIER_P, 'gravity', -8, -0.3, 0.05).onChange(v => { if (rapierWorld) rapierWorld.gravity.y = v; });
+				live.add(RAPIER_P, 'substeps', 1, 6, 1).name('substeps (anti-tunnel)');
+				live.add(RAPIER_P, 'freeze').name('freeze settled (perf)');
+				live.add(RAPIER_P, 'streamVelScale', 0.1, 1.5, 0.05).name('shower speed');
+				live.add(RAPIER_P, 'numSolverIterations', 1, 24, 1).name('solverIters').onChange(v => { if (rapierWorld) rapierWorld.integrationParameters.numSolverIterations = v; });
+				live.add(RAPIER_P, 'lengthUnit', 0.005, 0.5, 0.005).onChange(v => { if (rapierWorld && 'lengthUnit' in rapierWorld.integrationParameters) rapierWorld.integrationParameters.lengthUnit = v; });
+
+				const next = gui.addFolder('coin — applies to NEXT toss');
+				next.add(RAPIER_P, 'restitution', 0, 1, 0.01).name('restitution (bounce)');
+				next.add(RAPIER_P, 'friction', 0, 4, 0.05);
+				next.add(RAPIER_P, 'linearDamping', 0, 3, 0.05).name('linearDamping (air drag)');
+				next.add(RAPIER_P, 'angularDamping', 0, 3, 0.05);
+				next.add(RAPIER_P, 'density', 0.5, 20, 0.5);
+				next.add(RAPIER_P, 'ccd');
+				next.add(RAPIER_P, 'colliderHalfHeight', 0.0008, 0.004, 0.0001).name('colliderHalfH');
+				next.add(RAPIER_P, 'contactSkin', 0, 0.002, 0.0001);
+				next.add(RAPIER_P, 'tossSpin', 0, 20, 0.5).name('tossSpin (tumble)');
+
+				const water = gui.addFolder('water — applies on next entry');
+				water.add(RAPIER_P, 'waterLinearDamping', 0, 12, 0.1).name('sink drag');
+				water.add(RAPIER_P, 'waterAngularDamping', 0, 12, 0.1).name('spin drag');
+				water.add(RAPIER_P, 'waterGravityScale', 0, 1, 0.05).name('gravity (buoyancy)');
+
+				gui.add(rapierStats, 'coins').listen().disable().name('active coins');
+				gui.add(rapierStats, 'frozen').listen().disable().name('frozen coins');
+				gui.add({ clear: clearRapierCoins }, 'clear').name('🧹 clear coins');
+			}
+
+			if (typeof window !== 'undefined') window.rapierStatus = () =>
+				({ mode: RAPIER_MODE, ready: rapierReady, collidersBuilt: rapierCollidersBuilt, coins: rapierCoins.length, modelLoaded: !!window.fountainModel });
+			initRapier();
+			// ==================== END RAPIER (Stage 1) ==========================
 
 			// Statue bounce tuning (live-tunable in the console via window.statueBounce,
 			// e.g. statueBounce.kick = 0.2). Coins ALWAYS bounce off the statue with an
@@ -2544,10 +3044,11 @@
 						charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
 						updateCoinCounter();
 						
-						// Clear visual coins
+						// Clear visual coins (old instanced pile + the Rapier frozen pile/colliders)
 						staticCoinData = [];
 						createStaticCoinInstances();
-						
+						if (RAPIER_MODE) { clearRapierFrozen(); rapierPendingLoad = null; }
+
 						// Hide reset message after a moment
 						setTimeout(() => {
 							if (resetMessage) {
@@ -2732,7 +3233,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						timestamp: firebase.firestore.FieldValue.serverTimestamp(),
 						isInUpperBowl: coinData.isInUpperBowl || false,
 						charity: coinData.charity || null,
-						txHash: coinData.txHash || null
+						txHash: coinData.txHash || null,
+						scale: coinData.scale || 1 // Rapier coin size; old callers omit it → 1
 					});
 					if (coinData.charity) {
 					}
@@ -2775,30 +3277,48 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					// Clear existing static coin data and reset charity allocation
 					staticCoinData = [];
 					charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
-					
-					snapshot.forEach((doc) => {
-						const data = doc.data();
-						if (data.position) {
-							staticCoinData.push({
-								position: new THREE.Vector3(data.position.x, data.position.y, data.position.z),
-								rotation: new THREE.Euler(data.rotation.x || 0, data.rotation.y || 0, data.rotation.z || 0),
-								underwater: data.position.y < -0.4,
-								id: doc.id,
-								txHash: data.txHash || null,
-								charity: data.charity || null
+
+					// RAPIER mode: load the saved pile as FROZEN Rapier coins (static collider +
+					// instanced render) so new coins pile on it. Defer the actual freeze to the first
+					// ready frame (stepRapierCoins drains rapierPendingLoad) since the world may still
+					// be loading. The old instanced-mesh path is used only when the flag is off.
+					if (RAPIER_MODE) {
+						const pend = [];
+						snapshot.forEach((doc) => {
+							const data = doc.data();
+							if (data.position) pend.push({
+								x: data.position.x, y: data.position.y, z: data.position.z,
+								rx: (data.rotation && data.rotation.x) || 0, ry: (data.rotation && data.rotation.y) || 0, rz: (data.rotation && data.rotation.z) || 0,
+								scale: data.scale || 1,
 							});
-						}
-						// Count charity allocations
-						if (data.charity) {
-							if (charityAllocation[data.charity] !== undefined) {
-								charityAllocation[data.charity]++;
+							if (data.charity && charityAllocation[data.charity] !== undefined) charityAllocation[data.charity]++;
+						});
+						rapierPendingLoad = pend;
+					} else {
+						snapshot.forEach((doc) => {
+							const data = doc.data();
+							if (data.position) {
+								staticCoinData.push({
+									position: new THREE.Vector3(data.position.x, data.position.y, data.position.z),
+									rotation: new THREE.Euler(data.rotation.x || 0, data.rotation.y || 0, data.rotation.z || 0),
+									underwater: data.position.y < -0.4,
+									id: doc.id,
+									txHash: data.txHash || null,
+									charity: data.charity || null
+								});
 							}
-						}
-					});
-					
-					// Create instanced mesh for all static coins
-					createStaticCoinInstances();
-					
+							// Count charity allocations
+							if (data.charity) {
+								if (charityAllocation[data.charity] !== undefined) {
+									charityAllocation[data.charity]++;
+								}
+							}
+						});
+
+						// Create instanced mesh for all static coins
+						createStaticCoinInstances();
+					}
+
 				} catch (error) {
 					console.error("Error loading saved coins: ", error);
 				}
@@ -2895,14 +3415,14 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			const COIN_STREAM_MAX = 80;          // instances allocated per emitter (count ≤ this, live-adjustable)
 			const COIN_STREAM_SETTLED_MAX = 600; // coins kept resting on the pool floor (session-only ring buffer)
 			const COIN_STREAM = {
-				count: 20,         // active instances per hand
-				spread: 1.0,      // horizontal launch speed — coins spray radially outward
-				lift: 1.05,       // vertical launch speed (apex ≈ lift²/(2·|gravity|))
-				gravity: -3.9,    // continuous fall
+				count: 10,         // active instances per hand
+				spread: 1.4,      // horizontal launch speed — coins spray radially outward
+				lift: 0,          // vertical launch speed (apex ≈ lift²/(2·|gravity|))
+				gravity: -0.3,    // continuous fall
 				timeScale: 0.4,   // slow-mo for the WHOLE flight (1 = current speed; lower = slower, same arc/sink/tumble shape)
 				duration: 7.0,    // safety cutoff: how long a burst's instances live before forced-settle
 				stagger: 1.1,     // release window — coins leave over this many seconds
-				scale: 1.0,       // instance scale: 1.0 == a free (local) tossed coin's size
+				scale: 0.5,       // instance scale: 1.0 == a free (local) tossed coin's size
 				spin: 8.9,        // base tumble speed (rad/s); per-coin ×0.6–1.3 — constant fixed-axis spin
 				sink: 0.15,       // terminal underwater sink speed (u/s) — the gentle drift after the entry slows
 				sinkResist: 4.2,  // water resistance: how fast the entry speed eases to terminal (higher = stops sooner)
@@ -2911,8 +3431,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// Per-hand launch origins (WORLD space), eyeballed onto the statue's hands
 				// with the ?coins panel ("show hand markers" → drag → "copy config").
 				hands: [
-					{ name: 'Left hand',  x: -0.17, y: 1.02, z: 0.12 },
-					{ name: 'Right hand', x:  0.22, y: 1.02, z: 0.15 },
+					{ name: 'Left hand',  x: -0.15, y: 1.00, z: 0.15 },
+					{ name: 'Right hand', x:  0.2, y: 1.0, z: 0.15 },
 				],
 			};
 			window.coinStream = COIN_STREAM; // live tuning from the console
@@ -5294,6 +5814,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
 						scene.add( fountainModel );
 
+						// ?rapier=1: the model is now scaled (0.8) + positioned (y=-0.5) and in the
+						// scene, so its world matrices are final — safe to build colliders from it now.
+						fountainModelReady = true;
+						maybeBuildFountainColliders();
+
 						// Build the coin's ember emitter HERE — after the model is shifted
 						// (-0.5 Y), scaled (0.8) and added to the scene — so it anchors to the
 						// coin's FINAL world position + size. (buildInfoHubCoin already ran during
@@ -7290,16 +7815,20 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 
             // Fire both bursts. Called from the info-hub coin tap (tryClickInfoHub).
             function triggerCoinStream() {
-                buildCoinStreams();
-                if (!coinStreams) return;
-                for (let s = 0; s < coinStreams.length; s++) {
-                    const stream = coinStreams[s];
-                    const h = COIN_STREAM.hands[s];
-                    stream.origin.set(h.x, h.y, h.z);     // launch from this hand (current GUI value)
-                    stream.coins = makeStreamCoins();
-                    stream.elapsed = 0;
-                    stream.active = true;
-                    stream.mesh.count = COIN_STREAM.count;
+                if (RAPIER_MODE) {
+                    rapierTriggerStream(); // route the shower through Rapier bodies (old stream stays idle)
+                } else {
+                    buildCoinStreams();
+                    if (!coinStreams) return;
+                    for (let s = 0; s < coinStreams.length; s++) {
+                        const stream = coinStreams[s];
+                        const h = COIN_STREAM.hands[s];
+                        stream.origin.set(h.x, h.y, h.z);     // launch from this hand (current GUI value)
+                        stream.coins = makeStreamCoins();
+                        stream.elapsed = 0;
+                        stream.active = true;
+                        stream.mesh.count = COIN_STREAM.count;
+                    }
                 }
                 // iOS-safe coin shower through the shared AudioContext helpers — a soft
                 // whoosh plus a short cascade of plinks (the tap is the user gesture that
@@ -7854,7 +8383,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                 // the coin actually comes down at the tapped point. The sim
                 // applies `gravity` per frame and integrates position with
                 // dt = 1/60, so continuous-time gravity is gravity * 60.
-                const g = gravity * 60; // units/s²
+                // Rapier mode arcs under Rapier's (gentler) gravity, so solve with that.
+                const g = RAPIER_MODE ? Math.abs(RAPIER_P.gravity) : gravity * 60; // units/s²
                 const horiz = new THREE.Vector3(
                     targetPoint.x - startPosition.x, 0, targetPoint.z - startPosition.z);
                 const hDist = horiz.length();
@@ -7875,7 +8405,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     : new THREE.Vector3();
                 initialVelocity.y = vy;
 
-                const tossedCoin = createCoin(startPosition, initialVelocity, isLocalCoin);
+                const tossedCoin = RAPIER_MODE
+                    ? rapierTossCoin(startPosition, initialVelocity, isLocalCoin)
+                    : createCoin(startPosition, initialVelocity, isLocalCoin);
                 // Remember how far this coin was thrown — the statue bounce uses it so
                 // a closer throw bounces harder.
                 if (tossedCoin) tossedCoin.userData.throwDist = hDist;
@@ -7979,8 +8511,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             function updateCameraFollow(deltaTime) {
                 if (!cameraFollowActive || !followedCoin) return;
 
-                const smoothFactor = 0.1; // How quickly camera follows (0.1 = smooth, 1 = instant)
-                const goalSmooth = 0.08; // How quickly the goal itself bends toward each phase's ideal
+                // Coin-cam responsiveness. Rapier coins arc/sink more gently than the old physics,
+                // so the chase felt sluggish at the old lerp rate — use a snappier default under
+                // Rapier. Tune live with window.coinCamSpeed (1 = old feel, higher = snappier).
+                const camSpd = (typeof window !== 'undefined' && window.coinCamSpeed) ? window.coinCamSpeed : (RAPIER_MODE ? 1.7 : 1);
+                const smoothFactor = Math.min(0.1 * camSpd, 1); // How quickly camera follows (0.1 = smooth, 1 = instant)
+                const goalSmooth = Math.min(0.08 * camSpd, 1); // How quickly the goal itself bends toward each phase's ideal
                 const coinPos = followedCoin.position;
                 const coinVel = followedCoin.userData.velocity;
 
@@ -9086,10 +9622,21 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                  // Update camera follow system
                  updateCameraFollow(dt);
                  updateInfoHubCoin(dt);
-                 updateCoinStream(dt);
+                 if (!RAPIER_MODE) updateCoinStream(dt); // old instanced stream; Rapier mode uses stepRapierCoins' drain
+                 else updateCoinStreamMarkers();        // keep the ?coins hand markers glued under ?rapier=1
+                 if (RAPIER_MODE) stepRapierCoins(); // ?rapier=1: advance + sync rigid-body coins
 
                  // Drive the post-intro slow orbit (autoRotate is applied in update())
                  if (introOrbitActive) controls.update();
+
+                 // Floor the camera at ground level during free user control so orbiting /
+                 // zooming can't drop the view under the plaza. Only while the user is in
+                 // control (cameraPhase 'none'): the cinematic follow + underwater phases
+                 // intentionally dip low and are left alone. Ground mesh sits at y = -0.958.
+                 if (cameraPhase === 'none' && controls && controls.enabled) {
+                     const CAM_MIN_Y = -0.958 + 0.12; // small lift keeps the near plane off the ground
+                     if (camera.position.y < CAM_MIN_Y) camera.position.y = CAM_MIN_Y;
+                 }
                 // Lower bowl water levels
                 const lowerWaterLevel = -0.5; // Adjusted to match water mesh position
                 const lowerBottomDepth = -0.78; // Adjusted bottom depth (-0.28 - 0.5)
@@ -9520,7 +10067,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                     coin.userData.stopped = true;
                                     velocity.set(0, 0, 0);
                                     landedOnCoin = true;
-                                    
+
                                     // Force flat rotation
                                     coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
                                     break;
@@ -9587,7 +10134,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                                         coin.userData.stopped = true;
                                         velocity.set(0, 0, 0);
                                         landedOnCoin = true;
-                                        
+
                                         // Force flat rotation
                                         coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
                                         break;
@@ -9779,7 +10326,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                          coins.splice( i, 1 );
                     }
                 }
-       
+
 				frame ++;
 
 				if ( frame >= 7 - effectController.speed ) {
