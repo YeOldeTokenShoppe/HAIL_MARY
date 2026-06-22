@@ -43,11 +43,12 @@ const FOUNTAIN_TRACK_PATHS = [
   // "audio/RocketsTail.m4a",     // Rocket's Tail - Kate Bush
   // "audio/IfYouAllGetToHeaven.m4a",       // If You Leave - Orchestral Manoeuvres in the D
   "audio/for-those-about-to-rock-ac-dc.m4a",
-  // "/audio/GoldDustWoman.m4a",          // Gold
+  "/audio/GoldDustWoman.m4a",          // Gold
   // "audio/AhLeah.m4a",
   "/audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
   // "audio/ChurchOfThePoisonMind.mp3",          // Church of the Poison Mind - Culture Club
 // Amor Amor - Arno Elias
+"/audio/SinInMyHeart.mp3",          // Sin In My Heart - Siouxsie & The Banshees
 ].map((p) => p.replace(/^\//, ""));
 
 export default function FountainPage() {

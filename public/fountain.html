@@ -3507,7 +3507,9 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			window.minRestFaceY = 0.8;        // coins only rest on faces flatter than this (↑ = slide off steeper slopes)
 			window.coinFountainClearance = 0.006; // gap a coin rests above the fountain stone parts (ledge/rim/statue) — small; tossed + stream
 			window.coinGroundClearance = 0.092;  // gap a coin rests above the open GROUND/plaza only (its plane sits below the visible ground, so it needs more) — tossed + stream
-			window.introOrbitIdleMs = 5000;   // resume the slow auto-orbit after this many ms of no interaction
+			window.introOrbitIdleMs = 10000;  // resume the slow auto-orbit after this many ms of no interaction
+			window.introOrbitSpeed = 1.0;     // target auto-orbit speed (~60s/rev); the resume eases up to this
+			window.introOrbitRampTau = 1.6;   // ease-in time constant (s) — higher = gentler ramp from a standstill
 			let poolBorder;
 			let meshRay;
 			let upperMeshRay;
@@ -4076,6 +4078,12 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let monkAction = null;    // the Combined_SitStand AnimationAction (for frame-windowed events)
 			let drinkingMouth = null; // mesh shown only during the drinking window of the monk anim
 			let drinkingMouthBaseScale = null; // its rest scale, captured at load (animated open/close)
+			let monkEyes = [];            // 'Monk_Eyes' sub-meshes — GLTFLoader split it into Monk_Eyes_1 + _2 (one per material); hidden together for the idle blink
+			const monkBlinkState = {      // random-interval blink driver (visibility toggle, like the Detective in CyborgTempleScene)
+				lastBlinkTime: 0,
+				nextBlinkDelay: Math.random() * 3000 + 2000, // first blink 2-5s after start
+				isBlinking: false,
+			};
 			let pendingSnapshot = false; // parent asked for a frame grab; captured next render (see animate)
 			let bellMeshes = []; // Bell1/Bell2 meshes — tap to ring the church bell
 			const _swingQuat = new THREE.Quaternion(); // scratch: per-frame bell swing rotation
@@ -4222,7 +4230,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			function startIntroOrbit() {
 				introOrbitActive = true;
 				controls.autoRotate = true;
-				controls.autoRotateSpeed = 1.0; // ~60s per revolution; lower = slower
+				controls.autoRotateSpeed = 0; // ease in from a standstill — the render loop ramps up to window.introOrbitSpeed
 			}
 			function stopIntroOrbit() {       // pause + cancel any pending resume
 				if (introOrbitActive) {
@@ -4237,11 +4245,11 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					introOrbitIdleTimer = null;
 					if (introOrbitPointers > 0) return;                          // still touching — pointerup re-arms
 					if (cameraPhase !== 'none' || (controls && !controls.enabled)) {
-						introOrbitIdleTimer = setTimeout(tick, window.introOrbitIdleMs ?? 5000); // coin-cam busy — retry later
+						introOrbitIdleTimer = setTimeout(tick, window.introOrbitIdleMs ?? 10000); // coin-cam busy — retry later
 						return;
 					}
 					startIntroOrbit();
-				}, window.introOrbitIdleMs ?? 5000);
+				}, window.introOrbitIdleMs ?? 10000);
 			}
 			// Pause while the user touches/drags; resume after idle once they let go.
 			window.addEventListener('pointerdown',   () => { introOrbitPointers++; stopIntroOrbit(); }, { passive: true });
@@ -5864,6 +5872,13 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								node.name.toLowerCase().replace(/_\d+$/, '') === 'drinkingmouth') {
 								drinkingMouth = node;
 							}
+							// Eye meshes for the idle blink. GLTFLoader splits the single Monk_Eyes mesh
+							// into Monk_Eyes_1 + Monk_Eyes_2 (one per material) — collect BOTH, since hiding
+							// just one layer leaves the eye looking open. Tolerant of the `_N` suffix + case.
+							if (node.isMesh && node.name &&
+								node.name.toLowerCase().replace(/_\d+$/, '') === 'monk_eyes') {
+								monkEyes.push(node);
+							}
 						});
 						if (drinkingMouth) {
 							drinkingMouth.visible = false;
@@ -5871,6 +5886,17 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 							console.log('[Fountain] DrinkingMouth found — opens/closes over frames 95-150');
 						} else {
 							console.warn('[Fountain] no "DrinkingMouth" mesh found in fountain4.glb');
+						}
+						if (monkEyes.length) {
+							// Monk_Eyes is skinned, so scaling/opacity are unreliable — blink by hiding the
+							// meshes for a few frames (visible=false skips the draw entirely). Both sub-meshes
+							// toggle together so the whole eye closes.
+							window.monkEyes = monkEyes; // debug handle: `monkEyes.forEach(m=>m.visible=false)`
+							console.log('[Fountain] Monk_Eyes found (' +
+								monkEyes.map(function (m) { return m.name; }).join(', ') +
+								') — idle blink (visibility toggle) enabled');
+						} else {
+							console.warn('[Fountain] no "Monk_Eyes" mesh found in fountain4.glb');
 						}
 
 						// Calculate bounding box to see actual size
@@ -9388,6 +9414,23 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 				}
 
+				// Idle eye blink: hide Monk_Eyes for ~130ms at random intervals, then show it again.
+				// visible=false skips the draw entirely, so it works regardless of the mesh being
+				// skinned or how its material handles opacity — mirrors the Detective blink in CyborgTempleScene.
+				if (monkEyes.length) {
+					const nowMs = currentTime; // rAF timestamp (ms) — same clock as lastBlinkTime
+					const b = monkBlinkState;
+					if (!b.isBlinking && nowMs - b.lastBlinkTime > b.nextBlinkDelay) {
+						b.isBlinking = true;
+						b.lastBlinkTime = nowMs;
+						b.nextBlinkDelay = Math.random() * 3000 + 2000; // 2-5s until the next blink
+						for (let i = 0; i < monkEyes.length; i++) monkEyes[i].visible = false; // eyes shut
+					} else if (b.isBlinking && nowMs - b.lastBlinkTime > 130) {
+						b.isBlinking = false;
+						for (let i = 0; i < monkEyes.length; i++) monkEyes[i].visible = true; // eyes open again
+					}
+				}
+
 				// Windows: candle-lit idle when the music's off → ripple ON (staggered) when it
 				// starts → audio-reactive party → ripple OFF (reverse) → back to idle. Per-window
 				// envelopes (w.on = party power, w.idle = candle glow) blend additively in emissive
@@ -9626,8 +9669,14 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                  else updateCoinStreamMarkers();        // keep the ?coins hand markers glued under ?rapier=1
                  if (RAPIER_MODE) stepRapierCoins(); // ?rapier=1: advance + sync rigid-body coins
 
-                 // Drive the post-intro slow orbit (autoRotate is applied in update())
-                 if (introOrbitActive) controls.update();
+                 // Drive the post-intro slow orbit (autoRotate is applied in update()). Ease the
+                 // speed up from a standstill so the resume glides in instead of jolting to full.
+                 if (introOrbitActive) {
+                     const target = window.introOrbitSpeed ?? 1.0;
+                     const tau = window.introOrbitRampTau ?? 1.6;
+                     controls.autoRotateSpeed += (target - controls.autoRotateSpeed) * (1 - Math.exp(-dt / tau));
+                     controls.update();
+                 }
 
                  // Floor the camera at ground level during free user control so orbiting /
                  // zooming can't drop the view under the plaza. Only while the user is in
