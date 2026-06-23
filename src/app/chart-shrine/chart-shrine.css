@@ -2267,7 +2267,7 @@ body:has(.shrine-page.neon) {
   .intro-chart-section {
     width: calc(100% - 32px);
     max-width: 480px;
-    margin-top: clamp(250px, 3vw, 40px);
+    margin-top: clamp(250px, 40px);
     padding: 24px 18px 28px;
     text-align: center;
     /* One dark "shrine niche" panel behind the whole intro block — both

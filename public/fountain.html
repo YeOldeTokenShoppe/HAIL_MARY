@@ -4078,6 +4078,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let fountainModelLoaded = false;
 			let fountainMixer = null; // AnimationMixer for the fountain GLB's NLA tracks
 			let monkAction = null;    // the Combined_SitStand AnimationAction (for frame-windowed events)
+			let takeAction = null;    // the 'Take 001' AnimationAction (new prop's looping NLA track)
 			let drinkingMouth = null; // mesh shown only during the drinking window of the monk anim
 			let drinkingMouthBaseScale = null; // its rest scale, captured at load (animated open/close)
 			let monkEyes = [];            // 'Monk_Eyes' sub-meshes — GLTFLoader split it into Monk_Eyes_1 + _2 (one per material); hidden together for the idle blink
@@ -5880,6 +5881,30 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 									'(' + sitStandClip.duration.toFixed(2) + 's)');
 							} else {
 								console.warn('[Fountain] no "Combined_SitStand" clip found in fountain4.glb. Available:',
+									gltf.animations.map(c => c.name));
+							}
+
+							// --- Play the new prop's looping NLA track ('Take 001') ---
+							// A separate clip (4 rotation channels on Shape/Shape001..003). It rides the
+							// SAME mixer rooted at fountainModel — those nodes live under the model and the
+							// mixer is already advanced each frame. Create the mixer here if the monk clip
+							// above wasn't found, so this track still plays on its own. Tolerant of a
+							// trailing `_N`/`.NNN` duplicate suffix + case, like the matching above.
+							let takeClip = THREE.AnimationClip.findByName(gltf.animations, 'Take 001');
+							if (!takeClip) {
+								takeClip = gltf.animations.find(c =>
+									c.name && c.name.toLowerCase().replace(/[_.]\d+$/, '').trim() === 'take 001');
+							}
+							if (takeClip) {
+								if (!fountainMixer) fountainMixer = new THREE.AnimationMixer(fountainModel);
+								takeAction = fountainMixer.clipAction(takeClip);
+								takeAction.setLoop(THREE.LoopRepeat, Infinity);
+								takeAction.clampWhenFinished = false;
+								takeAction.play();
+								console.log('[Fountain] playing looping NLA track:', takeClip.name,
+									'(' + takeClip.duration.toFixed(2) + 's)');
+							} else {
+								console.warn('[Fountain] no "Take 001" clip found. Available:',
 									gltf.animations.map(c => c.name));
 							}
 						} else {
