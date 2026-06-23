@@ -56,7 +56,7 @@ export default function FountainPage() {
   const { user, isSignedIn } = useUser();
   const router = useRouter();
   
-  const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode: context80sMode, setIs80sMode: setContext80sMode, setPagePlaylistOverride, allTracks, musicEra } = useMusic();
+  const { play, pause, isPlaying: contextIsPlaying, nextTrack, setPagePlaylistOverride, allTracks, musicEra } = useMusic();
   const [isLoading, setIsLoading] = useState(true);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
@@ -70,7 +70,6 @@ export default function FountainPage() {
   // the iframe posts {type:'infoHubVisibility'} and we hide the social-stack while
   // the panel is open — that's what lets the panel visually "cover" the icons.
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
-  const is80sMode = context80sMode;
   const iframeRef = useRef(null);
   // Snapshot: the scene lives in the iframe, so we ask it to grab its canvas, draw the
   // returned image onto a hidden parent canvas, then hand that to <PolaroidSnapshot>.
@@ -333,7 +332,6 @@ export default function FountainPage() {
 
       {/* The Fountain iframe */}
       <FountainFrame
-        is80sMode={is80sMode}
         ref={iframeRef}
         onFullyLoaded={handleFountainReady}
         onDonateClick={(charity) => {
@@ -459,9 +457,7 @@ export default function FountainPage() {
                     zIndex: -1,
                     top: 0,
                     left: 0,
-                    color: is80sMode
-                      ? `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})`
-                      : `rgba(${255 - index * 2}, ${255 - index * 3}, ${255 - index * 2})`,
+                    color: `rgba(${255 - index * 2}, ${255 - index * 3}, ${255 - index * 2})`,
                     filter: "blur(0.1rem)",
                     transform: `translate(${index * 0.1}rem, ${index * 0.1}rem) scale(${1 + index * 0.01})`,
                     opacity: (1 / index) * 1.5,
@@ -511,19 +507,16 @@ export default function FountainPage() {
             style={{ display: "block" }}
           />
         </Link> */}
-        <MusicButton
-          accent="#d4a854"
-          icon="/synthwave-sun-80s.svg"
-          modernIcon="/virginRecords.jpg"
-          showModeToggle
-          // Mobile is cramped over the fountain scene: collapse to a single small
-          // ♫ that expands to the full "80s | MIX" pill + disc on tap (matches
-          // the landing page). `compact` + a smaller size keep the *expanded*
-          // cluster from eating ~half the width. Full-size cluster on desktop.
-          collapsible={isMobileView}
-          compact={isMobileView}
-          size={isMobileView ? 44 : 62}
-        />
+        {/* Music control is desktop-only — removed on mobile. */}
+        {!isMobileView && (
+          <MusicButton
+            accent="#d4a854"
+            icon="/synthwave-sun-80s.svg"
+            modernIcon="/virginRecords.jpg"
+            showModeToggle
+            size={62}
+          />
+        )}
       </div>
 
       {/* Nav Controls - Top Right (desktop only) */}
@@ -760,10 +753,11 @@ export default function FountainPage() {
         title="Take a snapshot"
         style={{
           position: "fixed",
-          // Sit directly under the top-right music button (44px mobile / 62px
-          // desktop tall, anchored at top:1rem + safe-area), offset by an 8px gap.
+          // Mobile: the music button is gone, so the camera takes the now-vacated
+          // top-right corner. Desktop: still tucked under the music button
+          // (62px tall, anchored at top:1rem) with an 8px gap.
           top: isMobileView
-            ? "calc(1rem + env(safe-area-inset-top) + 52px)"
+            ? "calc(1rem + env(safe-area-inset-top))"
             : "calc(1rem + 70px)",
           right: "1rem",
           width: isMobileView ? "44px" : "48px",

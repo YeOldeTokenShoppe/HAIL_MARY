@@ -274,20 +274,20 @@ export default function VigilTicker({
           opacity: 0.4;
         }
         .vigil-name {
-          color: rgba(42, 214, 238, 0.85);
+          color: rgba(42, 214, 238);
         }
         .vigil-mine {
-          color: rgba(255, 196, 120, 0.95);
+          color: rgba(255, 196, 120);
         }
         .vigil-burn {
           color: rgba(255, 150, 50, 0.98);
-          text-shadow: 0 0 8px rgba(255, 120, 30, 0.45);
+          text-shadow: 0 0 8px rgba(255, 120, 30);
         }
         .vigil-up {
-          color: rgba(0, 255, 136, 0.85);
+          color: rgba(0, 255, 136);
         }
         .vigil-down {
-          color: rgba(255, 80, 80, 0.85);
+          color: rgba(255, 80, 80);
         }
         @keyframes vigilTickerScroll {
           from { transform: translateX(0); }

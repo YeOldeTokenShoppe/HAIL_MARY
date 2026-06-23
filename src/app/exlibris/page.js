@@ -41,6 +41,15 @@ export default function ModelViewerPage() {
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const is80sMode = context80sMode;
 
+  // Music control is desktop-only — hide the MusicButton on mobile.
+  const [isMobileView, setIsMobileView] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobileView(window.innerWidth <= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // Track the cursor only while the Book is hovered, so the tooltip follows it.
   useEffect(() => {
     if (!isBookHovered) return;
@@ -70,14 +79,17 @@ export default function ModelViewerPage() {
         onBookHoverChange={setIsBookHovered}
       />
 
-      <MusicButton
-        accent="#d4a854"
-        icon="/synthwave-sun-80s.svg"
-        modernIcon="/virginRecords.jpg"
-        showModeToggle
-        size={62}
-        style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 9999 }}
-      />
+      {/* Music control is desktop-only — removed on mobile. */}
+      {!isMobileView && (
+        <MusicButton
+          accent="#d4a854"
+          icon="/synthwave-sun-80s.svg"
+          modernIcon="/virginRecords.jpg"
+          showModeToggle
+          size={62}
+          style={{ position: "fixed", top: "1rem", right: "1rem", zIndex: 9999 }}
+        />
+      )}
 
       {isBookHovered && !showLittleBook && (
         <div

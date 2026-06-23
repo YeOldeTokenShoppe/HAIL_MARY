@@ -67,17 +67,25 @@ export async function lightCandle(
   }
 }
 
-// Attach a dedication to the user's currently-lit candle. Preset keys
-// only (see lib/intentions.js) — enforced again in firestore.rules so a
-// raw client-SDK write can't scroll arbitrary text across the landing
-// page. Merge-write: the burn (litAt) is untouched, and a re-light's
-// full setDoc naturally clears the dedication for the next burn.
-export async function dedicateCandle(userId, intentionKey) {
+// Attach dedications to the user's currently-lit candle. A candle may
+// carry several intentions now ("all that apply"), so `intention` is
+// stored as an array of preset keys — an empty selection clears it to
+// null. Preset keys only (see lib/intentions.js) — enforced again in
+// firestore.rules so a raw client-SDK write can't scroll arbitrary text
+// across the landing page. Merge-write: the burn (litAt) is untouched,
+// and a re-light's full setDoc naturally clears the dedication for the
+// next burn.
+export async function dedicateCandle(userId, intention) {
   if (!db || !userId) return;
+  const value = Array.isArray(intention)
+    ? intention.length
+      ? intention
+      : null
+    : intention ?? null;
   try {
     await setDoc(
       doc(db, COLLECTION, userId),
-      { intention: intentionKey ?? null },
+      { intention: value },
       { merge: true },
     );
   } catch (err) {

@@ -33,7 +33,7 @@ import {
   subscribeLitCandles,
   PREFS_IMAGE_MAX_BYTES,
 } from "@/lib/candleRitual";
-import { INTENTION_PRESETS } from "@/lib/intentions";
+import { INTENTION_PRESETS, toIntentionKeys } from "@/lib/intentions";
 import VigilTicker from "@/components/VigilTicker";
 import BurnOfferingPanel from "@/components/BurnOfferingPanel";
 import MaryChamber from "@/components/MaryChamber";
@@ -2256,10 +2256,12 @@ export default function HomePage() {
   // VigilTicker. The signed-in sibling of the anon sign-in nudge: same
   // timing beat, same card frame, never both at once.
   const [showDedication, setShowDedication] = useState(false);
-  // The current burn's dedication (preset key or null). Mirrors the
-  // `intention` field on the shrineCandles doc so the picker chips can
-  // show the selected state; hydrated alongside lit state below.
-  const [intention, setIntention] = useState(null);
+  // The current burn's dedications — an array of preset keys, since a
+  // candle can carry "all that apply." Mirrors the `intention` field on
+  // the shrineCandles doc (toIntentionKeys normalizes legacy single-key
+  // string docs into an array) so the picker chips can show selected
+  // state; hydrated alongside lit state below.
+  const [intentions, setIntentions] = useState([]);
   const debugRef = useRef(null);
   // Close the wallet modal (and a lingering sign-in nudge) the moment a
   // connection lands — their job is done, and leaving them up buries the
@@ -2284,12 +2286,14 @@ export default function HomePage() {
     if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
     if (dedicationTimerRef.current) clearTimeout(dedicationTimerRef.current);
   }, []);
-  // Auto-dismiss the dedication card — it's an offer, not a gate.
+  // Auto-dismiss the dedication card — it's an offer, not a gate. The
+  // window resets on each pick (intentions in deps) so a user choosing
+  // "all that apply" isn't cut off mid-selection.
   useEffect(() => {
     if (!showDedication) return undefined;
     const id = setTimeout(() => setShowDedication(false), 12000);
     return () => clearTimeout(id);
-  }, [showDedication]);
+  }, [showDedication, intentions]);
   // One-time coachmark: once lit, the candle itself is the only door to
   // the customization picker, and nothing else advertises that. Shown
   // once per device, after the dedication card's beat has fully played
@@ -2397,7 +2401,7 @@ export default function HomePage() {
       if (remoteLive) {
         setLitAt(remote.litAtMs);
         setCandleLit(true);
-        setIntention(remote.intention ?? null);
+        setIntentions(toIntentionKeys(remote.intention));
         if (local) clearLocalCandle();
       } else if (localLive) {
         // Promote the anonymous candle to the signed-in ledger so it
@@ -2410,7 +2414,7 @@ export default function HomePage() {
         });
         setLitAt(local.litAtMs);
         setCandleLit(true);
-        setIntention(null);
+        setIntentions([]);
         clearLocalCandle();
         // The just-promoted flame is the natural moment to offer a
         // dedication — the user signed in *for this candle*. Short
@@ -2429,7 +2433,7 @@ export default function HomePage() {
         if (local?.litAtMs) clearLocalCandle();
         setLitAt(null);
         setCandleLit(false);
-        setIntention(null);
+        setIntentions([]);
       }
     }
     hydrate();
@@ -2446,7 +2450,7 @@ export default function HomePage() {
     setShowSignInNudge(false);
     setShowDedication(false);
     setShowCandleCoachmark(false);
-    setIntention(null);
+    setIntentions([]);
     // Cancel pending cards so they don't fire on a now-dark candle.
     if (nudgeTimerRef.current) {
       clearTimeout(nudgeTimerRef.current);
@@ -2462,7 +2466,7 @@ export default function HomePage() {
     const now = Date.now();
     // Fresh burn, fresh dedication — lightCandle's full overwrite also
     // clears the remote `intention` field.
-    setIntention(null);
+    setIntentions([]);
     if (userId) {
       lightCandle(userId, {
         displayName: shortAddress,
@@ -2520,14 +2524,18 @@ export default function HomePage() {
     doLight();
   };
 
-  // Commit a dedication chip (null clears it). Optimistic: update local
-  // state and close the card immediately, let the Firestore write land
-  // in the background — the ticker's live subscription surfaces it
-  // within moments, which is its own feedback.
-  const handleDedicate = (intentionKey) => {
-    if (userId) dedicateCandle(userId, intentionKey);
-    setIntention(intentionKey ?? null);
-    setShowDedication(false);
+  // Toggle a dedication chip on/off — a candle can carry "all that
+  // apply," so chips accumulate instead of replacing each other, and the
+  // card stays open while the user picks. Optimistic: update local state
+  // and persist the full set immediately (empty array clears the field),
+  // letting the Firestore write land in the background — the ticker's
+  // live subscription surfaces it within moments, its own feedback.
+  const toggleIntention = (intentionKey) => {
+    const next = intentions.includes(intentionKey)
+      ? intentions.filter((k) => k !== intentionKey)
+      : [...intentions, intentionKey];
+    setIntentions(next);
+    if (userId) dedicateCandle(userId, next);
   };
 
   // Commit a votive image choice. `src == null` clears the preference
@@ -2655,22 +2663,22 @@ export default function HomePage() {
         showSignInNudge || showCandlePicker ? " has-overlay" : ""
       }`}
     >
-      <MusicButton
-        accent="#d4a854"
-        // Two round faces that spin while the music plays: a synthwave-sun "80s"
-        // badge, and the vinyl record for MIX.
-        icon="/synthwave-sun-80s.svg"
-        modernIcon="/virginRecords.jpg"
-        // Tap the icon = play/pause; the "80s | MIX" switch flips the music era.
-        showModeToggle
-        // Mobile is cramped up top: collapse to a single gold ♫ that expands to
-        // the full pill + disc on tap.
-        collapsible={isMobileDevice}
-        size={62}
-        // top clears the VigilTicker chyron strip (~24px) pinned to the
-        // viewport's top edge.
-        style={{ position: "fixed", top: "2.5rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
-      />
+      {/* Music control is desktop-only — removed on mobile. */}
+      {!isMobileDevice && (
+        <MusicButton
+          accent="#d4a854"
+          // Two round faces that spin while the music plays: a synthwave-sun "80s"
+          // badge, and the vinyl record for MIX.
+          icon="/synthwave-sun-80s.svg"
+          modernIcon="/virginRecords.jpg"
+          // Tap the icon = play/pause; the "80s | MIX" switch flips the music era.
+          showModeToggle
+          size={62}
+          // top clears the VigilTicker chyron strip (~24px) pinned to the
+          // viewport's top edge.
+          style={{ position: "fixed", top: "2.5rem", right: "1rem", zIndex: 1000, pointerEvents: "auto" }}
+        />
+      )}
       <div className="scene-background">
         <StarfieldStatueScene
           style={{
@@ -2773,7 +2781,7 @@ export default function HomePage() {
                 ) : null}
               </blockquote>
               <p className="hero-intro">
-Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment against scams in the Liminal Terminal, or scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order.
+Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment against scams in the Liminal Terminal, or scan any token for multidimensional review — spiritual verdict included. RL80 is the <span className="hero-intro__pop">deflationary utility</span> token of her order.
 </p>
             </div>
           </div>
@@ -2885,18 +2893,24 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           aria-label="Dedicate your flame"
         >
           <p className="flame-nudge-title">Dedicate your flame</p>
-          <p className="flame-nudge-sub">Your intention joins the ticker</p>
+          <p className="flame-nudge-sub">
+            Pick all that apply — your intentions join the ticker
+          </p>
           <div className="dedication-chips">
-            {INTENTION_PRESETS.map((preset) => (
-              <button
-                key={preset.key}
-                type="button"
-                className="dedication-chip"
-                onClick={() => handleDedicate(preset.key)}
-              >
-                {preset.label}
-              </button>
-            ))}
+            {INTENTION_PRESETS.map((preset) => {
+              const isActive = intentions.includes(preset.key);
+              return (
+                <button
+                  key={preset.key}
+                  type="button"
+                  className={`dedication-chip${isActive ? " is-active" : ""}`}
+                  aria-pressed={isActive}
+                  onClick={() => toggleIntention(preset.key)}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
           </div>
           <button
             type="button"
@@ -2966,16 +2980,17 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
               Tapping the active chip clears the dedication. */}
           {candleLit && (
             <div className="votive-customize">
-              <p className="votive-customize-heading">Intention</p>
+              <p className="votive-customize-heading">Intentions</p>
               <div className="dedication-chips">
                 {INTENTION_PRESETS.map((preset) => {
-                  const isActive = intention === preset.key;
+                  const isActive = intentions.includes(preset.key);
                   return (
                     <button
                       key={preset.key}
                       type="button"
                       className={`dedication-chip${isActive ? " is-active" : ""}`}
-                      onClick={() => handleDedicate(isActive ? null : preset.key)}
+                      aria-pressed={isActive}
+                      onClick={() => toggleIntention(preset.key)}
                     >
                       {preset.label}
                     </button>
@@ -3388,18 +3403,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             }}
           >
             {[
-              {
-                path: "/exlibris",
-                label: "Ex Libris",
-                icon: (
-                  <>
-                    <path d="M15 12h-5" />
-                    <path d="M15 8h-5" />
-                    <path d="M19 17V5a2 2 0 0 0-2-2H4" />
-                    <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
-                  </>
-                ),
-              },
+
               {
                 path: "/fountain",
                 label: "Coin Fountain",
@@ -3409,6 +3413,18 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                     <path d="M16 6L12 10L8 6" />
                     <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
                     <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
+                  </>
+                ),
+              },
+                            {
+                path: "/exlibris",
+                label: "Ex Libris",
+                icon: (
+                  <>
+                    <path d="M15 12h-5" />
+                    <path d="M15 8h-5" />
+                    <path d="M19 17V5a2 2 0 0 0-2-2H4" />
+                    <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
                   </>
                 ),
               },

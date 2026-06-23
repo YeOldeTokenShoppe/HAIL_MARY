@@ -22,7 +22,6 @@ import OilOverlayModal from "@/components/OilOverlayModal";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
-import MusicButton from "@/components/MusicButton";
 import NavControlsHome from "@/components/NavControlsHome";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
@@ -6603,7 +6602,6 @@ export default function OilPage() {
             >
               ?
             </button>
-            <MusicButton accent={theme.accent} icon="/icon80.svg" />
           </div>
         </header>
 

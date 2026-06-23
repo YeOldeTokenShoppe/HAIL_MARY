@@ -382,10 +382,13 @@
         // These docs feed the landing-page VigilTicker, so every
         // writable display field is tightly shaped: displayName must
         // look like the app's shortened wallet address (0x1234…abcd)
-        // and intention must be one of the preset keys from
+        // and every intention must be one of the preset keys from
         // src/lib/intentions.js — keep that list and this one in sync.
         // Without this, a raw client-SDK write could scroll arbitrary
         // text (scam links, slurs) across the homepage chyron.
+        // A candle can carry several intentions ("all that apply"), so
+        // `intention` is normally an array; the bare-string form is
+        // still accepted for legacy docs and stale clients mid-deploy.
         function validTickerFields(data) {
           return (!('displayName' in data)
               || data.displayName == null
@@ -393,8 +396,13 @@
                   && data.displayName.matches('0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}')))
             && (!('intention' in data)
               || data.intention == null
-              || data.intention in ['prosper80', 'secur80', 'soci80',
-                  'liquid80', 'char80', 'char80',]);
+              || data.intention in ['prosper80', 'secur80', 'human80',
+                  'liquid80', 'opportun80', 'char80', 'π80', 'etern80']
+              || (data.intention is list
+                  && data.intention.size() <= 8
+                  && data.intention.hasOnly(['prosper80', 'secur80',
+                      'human80', 'liquid80', 'opportun80', 'char80',
+                      'π80', 'etern80'])));
         }
         // Burn credit (tokensBurned & friends) is written ONLY by
         // /api/burn-offering via the admin SDK after verifying a real
