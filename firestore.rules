@@ -397,12 +397,12 @@
             && (!('intention' in data)
               || data.intention == null
               || data.intention in ['prosper80', 'secur80', 'human80',
-                  'liquid80', 'opportun80', 'char80', 'π80', 'etern80']
+                  'liquid80', 'sobri80', 'opportun80', 'char80', 'π80', 'immortal80']
               || (data.intention is list
                   && data.intention.size() <= 8
                   && data.intention.hasOnly(['prosper80', 'secur80',
-                      'human80', 'liquid80', 'opportun80', 'char80',
-                      'π80', 'etern80'])));
+                      'human80', 'liquid80', 'sobri80', 'opportun80', 'char80',
+                      'π80', 'immortal80'])));
         }
         // Burn credit (tokensBurned & friends) is written ONLY by
         // /api/burn-offering via the admin SDK after verifying a real

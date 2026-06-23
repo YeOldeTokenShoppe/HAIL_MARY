@@ -4090,6 +4090,8 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let bellMeshes = []; // Bell1/Bell2 meshes — tap to ring the church bell
 			const _swingQuat = new THREE.Quaternion(); // scratch: per-frame bell swing rotation
 			const _swingAxis = new THREE.Vector3();    // scratch: bell swing axis
+			let serverLeds = []; // SM_Prop_Server_01* blade meshes — per-blade cloned mats, hash-blinked LED dots
+			const ledHash = (n) => { const s = Math.sin(n) * 43758.5453123; return s - Math.floor(s); }; // deterministic 0..1 noise (Blender white-noise threshold trick)
 			let partyWindows = []; // Window1-6 meshes + their cloned mats/base emissive (house-party light show)
 			let partyMode = false; // music is playing on the parent page → light the windows up
 			let partyClock = 0;    // seconds accumulated while partyMode (drives colour + beat strobe)
@@ -5558,7 +5560,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				
 				loader.load(
 					// Resource URL - REPLACE WITH YOUR FILE PATH
-					'/models/fountain4.glb',
+					'/models/mission.glb',
 					// Called when the resource is loaded
 					function ( gltf ) {
 						clearTimeout(modelLoadTimeout);
@@ -5708,6 +5710,34 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                     }
                 });
                 console.log('[Fountain] bells found (tap to ring):', bellMeshes.length);
+
+                // --- Server-rack LEDs ---
+                // The data-centre props (SM_Prop_Server_01*) carry an emissive TEXTURE that masks
+                // the glow down to the little indicator dots on each blade. Clone the material per
+                // blade so each can blink on its own clock, then drive emissiveIntensity from a
+                // deterministic hash in the animate loop (the same white-noise threshold trick as
+                // the Blender node group). toneMapped=false keeps lit dots above the bloom
+                // threshold so they actually glow. Tolerant of GLTFLoader's `.NNN` duplicate suffix.
+                serverLeds = [];
+                fountainModel.traverse(function (node) {
+                    if (!node.isMesh || !node.name) return;
+                    if (!/_Blade_\d+/i.test(node.name)) return;            // server blades carry the LED dots
+                    if (!node.material || !node.material.emissiveMap) return; // must be the LED-textured material
+                    const mat = node.material.clone();                     // unique material per blade
+                    mat.toneMapped = false;                               // don't clamp to 1.0 — let bloom catch it
+                    if (!mat.emissive) mat.emissive = new THREE.Color(0xffffff);
+                    mat.emissiveIntensity = 0;                            // start dark; animate loop drives it
+                    node.material = mat;
+                    const amber = ledHash(node.id + 7) > 0.5;             // deterministic "amber vs green" role
+                    serverLeds.push({
+                        mat: mat,
+                        seed: ledHash(node.id) * 1000,
+                        speed: amber ? 0.30 : 0.18,                       // amber blinkier, green steadier
+                        threshold: amber ? 0.55 : 0.35,                   // higher → more "off" time
+                        bright: amber ? 8 : 10,                           // emissiveIntensity when lit
+                    });
+                });
+                console.log('[Fountain] server-rack LEDs found:', serverLeds.length);
 
                 // --- Tappable model coins: goldCoin1 opens the info panel, goldCoin2 fires the
                 // coin-stream shower. Each decorative model coin is hidden and replaced by a
@@ -9279,6 +9309,21 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								_partyColor.b * partyI + _idleColor.b * idleI);
 							w.mat.emissiveIntensity = 1;
 						}
+					}
+				}
+
+				// Server-rack LEDs: each blade's indicator dots blink on their own deterministic
+				// clock — a hash-thresholded time bucket (the same white-noise trick used in the
+				// Blender node group). The emissive texture masks the glow to just the dots, so we
+				// only drive intensity. window.ledBright scales all of them for quick tuning.
+				if (serverLeds.length) {
+					const ledFrames = currentTime * 0.001 * 24; // ~Blender frames at 24fps
+					const ledMul = window.ledBright ?? 1;
+					for (let i = 0; i < serverLeds.length; i++) {
+						const l = serverLeds[i];
+						const bucket = Math.floor(ledFrames * l.speed);
+						const on = ledHash(bucket + l.seed) > l.threshold ? 1 : 0;
+						l.mat.emissiveIntensity = on * l.bright * ledMul;
 					}
 				}
 
