@@ -40,11 +40,28 @@ const PolaroidSnapshot = ({
   const [isPublishing, setIsPublishing] = useState(false);
   const captionRef = useRef(null);
   const polaroidRef = useRef(null);
+  const shutterAudioRef = useRef(null);
+
+  // Play the camera shutter sound the moment a snapshot is taken.
+  const playShutter = () => {
+    try {
+      if (!shutterAudioRef.current) {
+        shutterAudioRef.current = new Audio('/audio/cameraShutter.mp3');
+        shutterAudioRef.current.preload = 'auto';
+      }
+      const a = shutterAudioRef.current;
+      a.currentTime = 0;
+      a.play().catch(() => {}); // ignore autoplay rejections
+    } catch (e) {
+      // Audio is non-essential — never let it block the snapshot.
+    }
+  };
 
   useEffect(() => {
     if (trigger) {
       setCaption(label);
       setShowReferral(true);
+      playShutter();
       captureSnapshot();
     }
   }, [trigger]);

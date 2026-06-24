@@ -17,11 +17,11 @@ import { intentionText } from "@/lib/intentions";
 // deterministically per doc id so entries don't reshuffle on every
 // snapshot or timer tick.
 const PHRASES = [
-  " lit a candle",
-  " lit a candle",
-  " lit a candle",
-  " lit a candle for their bags",
-  " keeps a flame burning",
+  "  lit a candle",
+  "  lit a candle",
+  "  lit a candle",
+  "  lit a candle for their bags",
+  "  keeps a flame burning",
   // "tends the vigil",
 ];
 
@@ -146,7 +146,7 @@ export default function VigilTicker({
         phrase: burned
           ? `burned ${fmtTokens(c.tokensBurned)} RL80${dedicated ? ` ${dedicated}` : ""}`
           : dedicated
-            ? `lit a candle ${dedicated}`
+            ? `  lit a candle ${dedicated}`
             : phraseFor(id),
         when: timeAgo(c.litAtMs, now),
       });
