@@ -3831,6 +3831,49 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 			let partyModeChangedAt = 0; // performance.now() of the last partyMode flip (drives the staggered on/off ripple)
 			const _partyColor = new THREE.Color(); // scratch colour for the per-frame window tint
 			const _idleColor = new THREE.Color();  // scratch colour for the candle-lit idle glow
+			let votiveFlames = []; // tinyVotiveOnly2 FLAME meshes baked into mission.glb (the 4 XCandle01 instances) — procedural noise flicker, ported from the landing page (HeroAltarObject)
+			let votiveLights = []; // the 4 Point lights baked alongside them — normalized to a warm candle glow + flicker (Blender exported them white @ ~543 candela)
+
+			// --- Click-a-candle to zoom in close ---
+			// Tap any votive candle to dolly the camera in and frame it; tap elsewhere (or the
+			// Back pill / Escape) to ease back out. Self-contained tween that borrows the
+			// OrbitControls target but stays out of the coin-cam phase machine.
+			let candleFocusEntries = []; // per-candle { node, center:Vector3, radius } (world space)
+			let candleHitMeshes = [];    // raycast targets (each mesh.userData.candle -> its entry)
+			let candleFocusActive = false;
+			let candleFocusPhase = 'idle'; // 'idle' | 'in' | 'hold' | 'out'
+			let candleFocusStartMs = 0;
+			const CANDLE_FOCUS_DUR = 900; // ms ease in/out
+			const _candleFromPos = new THREE.Vector3();
+			const _candleFromTarget = new THREE.Vector3();
+			const _candleToPos = new THREE.Vector3();
+			const _candleToTarget = new THREE.Vector3();
+			const _candleSavedPos = new THREE.Vector3();
+			const _candleSavedTarget = new THREE.Vector3();
+			const _candleTmp = new THREE.Vector3();
+
+			// --- Votive flame flicker noise (ported verbatim from src/app/page.js) ---
+			// Hash-based 1D value noise. Sines give rhythmically repeating motion that reads
+			// as "dancing"; interpolated random samples give genuine aperiodic variation.
+			// Offset the input per channel (scale / stretch / the two sway axes) so the streams
+			// decorrelate — no rhythmic pulsing the way pure sines produce.
+			function flameHash1D(n) {
+				n = (n * 2654435761) | 0;
+				n = ((n >>> 16) ^ n) * 0x45d9f3b;
+				n = ((n >>> 16) ^ n) * 0x45d9f3b;
+				n = (n >>> 16) ^ n;
+				return ((n >>> 0) / 4294967295) * 2 - 1;
+			}
+			function flameNoise1D(t) {
+				const i = Math.floor(t);
+				const f = t - i;
+				const sf = f * f * (3 - 2 * f); // smoothstep between integer samples
+				return flameHash1D(i) * (1 - sf) + flameHash1D(i + 1) * sf;
+			}
+			// Two-octave fBm — base variation plus fast jitter, feels like a real flame.
+			function flameFbm1D(t) {
+				return flameNoise1D(t) * 0.65 + flameNoise1D(t * 2.3 + 17.1) * 0.35;
+			}
 
 			// Asset loading tracker
 			const assetsToLoad = {
@@ -3977,7 +4020,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				introOrbitIdleTimer = setTimeout(function tick() {
 					introOrbitIdleTimer = null;
 					if (introOrbitPointers > 0) return;                          // still touching — pointerup re-arms
-					if (cameraPhase !== 'none' || (controls && !controls.enabled)) {
+					if (cameraPhase !== 'none' || candleFocusActive || (controls && !controls.enabled)) {
 						introOrbitIdleTimer = setTimeout(tick, window.introOrbitIdleMs ?? 10000); // coin-cam busy — retry later
 						return;
 					}
@@ -5487,8 +5530,19 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 								meshCount++;
 								child.castShadow = true;
 								child.receiveShadow = true;
+								// Preserve the votive candle's authored materials. Everything under an
+								// XCandle01* node — the alpha-blended glass, the alpha-cutout `senora`
+								// saint decal, the green wax, and the flame — relies on transparency /
+								// tint. Forcing transparent=false + opacity=1 here turns the glass into
+								// an opaque grey wall (which hides the senora decal and washes the green
+								// wax to pale grey) and the flame into an opaque rectangle. Skip the
+								// override for those; the flame is revealed/animated separately below.
+								let votive = false;
+								for (let p = child; p; p = p.parent) {
+									if (p.name && p.name.toUpperCase().startsWith('XCANDLE')) { votive = true; break; }
+								}
 								// Make sure materials are visible
-								if (child.material) {
+								if (child.material && !votive) {
 									child.material.opacity = 1.0;
 									child.material.transparent = false;
 									// Log material info
@@ -5497,6 +5551,104 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						} );
 
 						scene.add( fountainModel );
+
+						// --- Votive candle flames ---
+						// The 4 tinyVotiveOnly2 instances baked into mission.glb each carry a FLAME
+						// mesh (FLAME, FLAME.001/.002/.003). They ship static; here we reveal each
+						// flame and cache its authored scale + rotation so the animate loop can layer
+						// the landing page's noise-driven flicker/sway on top (see flameFbm1D + the
+						// votiveFlames block in animate). The alpha-blended Candle_flame material is
+						// preserved (the shadow loop above skips the whole votive subtree); toneMapped=false +
+						// depthWrite=false keep the warm emissive popping through ACES exposure +
+						// bloom without z-fighting the glass. Each flame gets a phase offset so the
+						// 4 candles don't flicker in lockstep (the landing page only has one flame).
+						votiveFlames = [];
+						fountainModel.traverse(function (node) {
+							if (!node.isMesh || !node.name) return;
+							const u = node.name.toUpperCase();
+							if (!u.startsWith('FLAME') || u.includes('WICK')) return;
+							node.visible = true;
+							node.castShadow = false;
+							node.receiveShadow = false;
+							// Flames now animate (scale/rotation), so drop them as physics/raycast
+							// targets: a static trimesh from their load pose would be a phantom
+							// collider catching coins on an invisible flame (see maybeBuildFountainColliders).
+							node.userData.isFountainPart = false;
+							if (node.material) {
+								node.material.transparent = true;  // restore the authored alpha blend
+								node.material.depthWrite = false;  // don't occlude the glass / each other
+								node.material.opacity = 1.0;
+								node.material.toneMapped = false;  // stay bright under exposure 0.5 + catch bloom
+								node.material.needsUpdate = true;
+							}
+							votiveFlames.push({
+								node: node,
+								baseScale: node.scale.clone(),
+								baseRot: node.rotation.clone(),
+								phase: votiveFlames.length * 37.13, // decorrelate the flames
+							});
+						});
+						console.log('[Fountain] votive flames found (flicker):', votiveFlames.length);
+
+						// --- Votive candle point lights ---
+						// The 4 Point lights baked into mission.glb (Point, Point.001/.002/.003) sit at
+						// the candle positions. GLTFLoader imports them as THREE.PointLights, but the
+						// Blender watt→candela conversion lands on a wild intensity (~543) with a white
+						// colour, so normalize them to a warm, tunable candle glow here. No shadows: 4
+						// point-light cube shadow maps would be too costly on top of the water shaders
+						// + bloom + physics, and the directional sun already grounds the candles.
+						// intensity / colour / distance / flicker are live-tunable from the console via
+						// the window.votiveLight* knobs. Each light flickers off the same fBm noise as
+						// the flames, with a per-light phase so they don't pulse in lockstep.
+						votiveLights = [];
+						fountainModel.traverse(function (node) {
+							if (!node.isPointLight) return;
+							node.color.set(window.votiveLightColor ?? 0xff9a40); // warm candle hue
+							node.decay = 2;                                       // physically-correct falloff
+							node.distance = window.votiveLightDistance ?? 1.0;    // bound the glow to the alcove
+							node.castShadow = false;
+							node.intensity = window.votiveLightIntensity ?? 0.05;
+							votiveLights.push({
+								light: node,
+								phase: votiveLights.length * 29.7, // decorrelate from the other lights
+							});
+						});
+						console.log('[Fountain] votive point lights found:', votiveLights.length);
+
+						// --- Candle click-to-zoom targets ---
+						// Collect each XCandle01* instance: its descendant meshes become tap targets
+						// (tagged with their candle entry), and a world-space bounding sphere drives
+						// the framing distance so the dolly-in fits the candle regardless of its size.
+						candleFocusEntries = [];
+						candleHitMeshes = [];
+						const _candleBox = new THREE.Box3();
+						const _candleMeshBox = new THREE.Box3();
+						const _candleMeshScale = new THREE.Vector3();
+						fountainModel.traverse(function (node) {
+							if (!node.name || !node.name.toUpperCase().startsWith('XCANDLE')) return;
+							node.updateWorldMatrix(true, true);
+							_candleBox.makeEmpty();
+							const meshes = [];
+							node.traverse(function (m) {
+								if (!m.isMesh || !m.geometry) return;
+								// Skip degenerate stray meshes — mission.glb's base XCandle01 carries a
+								// scale-0 orphan (glass.004) parked far away that would otherwise blow up
+								// the bounding sphere (setFromObject counts its origin) and send the dolly
+								// outward instead of in.
+								m.getWorldScale(_candleMeshScale);
+								if (_candleMeshScale.x === 0 || _candleMeshScale.y === 0 || _candleMeshScale.z === 0) return;
+								if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+								_candleMeshBox.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld);
+								_candleBox.union(_candleMeshBox);
+								meshes.push(m);
+							});
+							if (_candleBox.isEmpty()) return;
+							const sphere = _candleBox.getBoundingSphere(new THREE.Sphere());
+							const entry = { node: node, center: sphere.center.clone(), radius: sphere.radius };
+							candleFocusEntries.push(entry);
+							meshes.forEach(function (m) { m.userData.candle = entry; candleHitMeshes.push(m); });
+						});
+						console.log('[Fountain] candle zoom targets:', candleFocusEntries.length);
 
 						// ?rapier=1: the model is now scaled (0.8) + positioned (y=-0.5) and in the
 						// scene, so its world matrices are final — safe to build colliders from it now.
@@ -6221,6 +6373,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 				// --- End Modified Logic ---
 			}
             function onKeyDown( event ) {
+                if ( event.key === 'Escape' && candleFocusActive ) { startCandleZoomOut(); return; }
                 if ( event.key.toLowerCase() === 'c' ) {
                     tossHeldCoin(); // keyboard shortcut throws whatever's in hand
                 }
@@ -7583,6 +7736,119 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
             }
         
             // Camera follow system functions
+            // ---- Candle click-to-zoom ----------------------------------------------
+            function easeInOutCubic(t) {
+                return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            }
+
+            // Frame `entry` (a candle) and start easing the camera toward it. Keeps the
+            // current viewing bearing (a straight dolly-in) so the move never swings around
+            // or clips the niche wall. Re-callable while focused to hop between candles.
+            function startCandleZoomIn(entry) {
+                if (!entry || cameraFollowActive) return;
+                if (candleFocusPhase === 'in' || candleFocusPhase === 'out') return; // mid-tween
+                // Remember the free-look view only when entering from un-focused, so zoom-out
+                // always returns to the fountain, not a previously-viewed candle.
+                if (!candleFocusActive) {
+                    _candleSavedPos.copy(camera.position);
+                    _candleSavedTarget.copy(controls.target);
+                }
+                _candleFromPos.copy(camera.position);
+                _candleFromTarget.copy(controls.target);
+                _candleToTarget.copy(entry.center);
+                // Distance that fits the bounding sphere in BOTH view dimensions (portrait
+                // screens are horizontally tighter), with a margin so the candle doesn't fill
+                // the frame edge-to-edge.
+                const margin = window.candleFocusMargin ?? 1.5;
+                const fovV = camera.fov * Math.PI / 180;
+                const fovH = 2 * Math.atan(Math.tan(fovV / 2) * camera.aspect);
+                const fit = entry.radius / Math.sin(Math.min(fovV, fovH) / 2);
+                let dist = fit * margin;
+                dist = Math.max(controls.minDistance + 0.05, Math.min(dist, controls.maxDistance));
+                _candleTmp.subVectors(camera.position, entry.center);
+                if (_candleTmp.lengthSq() < 1e-6) _candleTmp.set(0, 0.2, 1); // degenerate guard
+                _candleTmp.normalize();
+                _candleToPos.copy(entry.center).addScaledVector(_candleTmp, dist);
+                candleFocusActive = true;
+                candleFocusPhase = 'in';
+                candleFocusStartMs = performance.now();
+                controls.enabled = false;
+                stopIntroOrbit();
+                showCandleBackBtn();
+            }
+
+            function startCandleZoomOut() {
+                if (!candleFocusActive || candleFocusPhase === 'out') return;
+                _candleFromPos.copy(camera.position);
+                _candleFromTarget.copy(controls.target);
+                _candleToPos.copy(_candleSavedPos);
+                _candleToTarget.copy(_candleSavedTarget);
+                candleFocusPhase = 'out';
+                candleFocusStartMs = performance.now();
+                controls.enabled = false;
+            }
+
+            // Tap test against the candle cups. Returns true on a hit (so the caller skips the
+            // toss) and starts / hops the zoom.
+            function tryClickCandle(ndc) {
+                if (!candleHitMeshes.length || cameraFollowActive) return false;
+                if (candleFocusPhase === 'in' || candleFocusPhase === 'out') return true; // swallow taps mid-tween
+                raycaster.setFromCamera(ndc, camera);
+                const hits = raycaster.intersectObjects(candleHitMeshes, false);
+                if (!hits.length) return false;
+                startCandleZoomIn(hits[0].object.userData.candle);
+                return true;
+            }
+
+            function updateCandleFocus() {
+                if (candleFocusPhase !== 'in' && candleFocusPhase !== 'out') return;
+                const t = Math.min((performance.now() - candleFocusStartMs) / CANDLE_FOCUS_DUR, 1);
+                const e = easeInOutCubic(t);
+                camera.position.lerpVectors(_candleFromPos, _candleToPos, e);
+                _candleTmp.lerpVectors(_candleFromTarget, _candleToTarget, e);
+                controls.target.copy(_candleTmp);
+                camera.lookAt(_candleTmp);
+                if (t >= 1) {
+                    if (candleFocusPhase === 'in') {
+                        candleFocusPhase = 'hold';
+                        controls.enabled = true;   // free orbit / zoom AROUND the candle
+                        controls.update();
+                    } else { // 'out' finished
+                        candleFocusPhase = 'idle';
+                        candleFocusActive = false;
+                        controls.enabled = true;
+                        controls.update();
+                        hideCandleBackBtn();
+                        armIntroOrbitResume();
+                    }
+                }
+            }
+
+            // Small floating "exit close-up" pill, created on first use.
+            let candleBackBtn = null;
+            function showCandleBackBtn() {
+                if (!candleBackBtn) {
+                    candleBackBtn = document.createElement('button');
+                    candleBackBtn.type = 'button';
+                    candleBackBtn.textContent = '✕ Close-up';
+                    candleBackBtn.style.cssText = 'position:fixed; top:18px; left:18px; z-index:10001;' +
+                        'padding:8px 14px; border:1px solid rgba(255,210,150,0.5); border-radius:999px;' +
+                        'background:rgba(20,12,6,0.62); color:#ffe2c2; font:600 13px/1 ui-sans-serif,system-ui,sans-serif;' +
+                        'cursor:pointer; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);' +
+                        'box-shadow:0 2px 10px rgba(0,0,0,0.4); transition:opacity .25s ease; opacity:0;';
+                    candleBackBtn.addEventListener('click', function (e) { e.stopPropagation(); startCandleZoomOut(); });
+                    candleBackBtn.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+                    document.body.appendChild(candleBackBtn);
+                }
+                candleBackBtn.style.display = 'block';
+                requestAnimationFrame(function () { if (candleBackBtn) candleBackBtn.style.opacity = '1'; });
+            }
+            function hideCandleBackBtn() {
+                if (!candleBackBtn) return;
+                candleBackBtn.style.opacity = '0';
+                setTimeout(function () { if (candleBackBtn && !candleFocusActive) candleBackBtn.style.display = 'none'; }, 250);
+            }
+
             function startCameraFollow(coin) {
                 // Check if coin cam is enabled by user preference
                 if (!coinCamEnabled) return;
@@ -8261,13 +8527,19 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 						// A tap on a landed donation coin opens its info card
 						// instead of tossing; a tap on open water still tosses.
 						hideCoinInfoCard();
-						if (tryClickBell(aimedCoords)) {
+						if (candleFocusActive) {
+								// In candle close-up: tapping another candle hops to it; tapping
+								// anywhere else eases back out (taps don't toss while focused).
+								if (!tryClickCandle(aimedCoords)) startCandleZoomOut();
+							} else if (tryClickBell(aimedCoords)) {
 								/* tapped a bell -> rang the church bell */
 							} else if (tryClickInfoHub(aimedCoords)) {
 							/* goldCoin1 opened the info hub */
 						} else if (tryClickShowerCoin(aimedCoords)) {
 							/* goldCoin2 fired the coin-stream shower */
-						} else if (!tryInspectCoin(aimedCoords)) {
+						} else if (tryClickCandle(aimedCoords)) {
+								/* tapped a votive candle -> zoom in close */
+							} else if (!tryInspectCoin(aimedCoords)) {
 							tossHeldCoin();
 						}
 					}
@@ -8562,6 +8834,41 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
 					}
 				}
 
+				// Votive candle flames: layer the landing page's noise-driven flicker on top of
+				// each flame's authored transform. Different noise offsets per channel (overall
+				// scale / vertical stretch / two sway axes) decorrelate the streams so the flame
+				// dances rather than pulses; a per-flame `phase` offsets all four so the candles
+				// flicker independently. baseScale/baseRot were cached at load.
+				if (votiveFlames.length) {
+					const ft = currentTime * 0.001; // rAF clock → seconds
+					for (let i = 0; i < votiveFlames.length; i++) {
+						const f = votiveFlames[i];
+						const ph = f.phase;
+						const flicker = 1 + flameFbm1D(ft * 3.5 + ph) * 0.09;
+						const stretch = 1 + flameFbm1D(ft * 3.0 + 100 + ph) * 0.06;
+						const bs = f.baseScale, br = f.baseRot;
+						f.node.scale.set(bs.x * flicker, bs.y * flicker * stretch, bs.z * flicker);
+						f.node.rotation.x = br.x + flameFbm1D(ft * 1.9 + 200 + ph) * 0.03;
+						f.node.rotation.z = br.z + flameFbm1D(ft * 2.2 + 300 + ph) * 0.045;
+					}
+				}
+
+				// Votive point lights: warm candle glow on the alcove walls, flickering in sync
+				// with the flames (own per-light phase). Re-reads the window.votiveLight* knobs each
+				// frame so intensity / colour / distance / amplitude can be tuned live in the console.
+				if (votiveLights.length) {
+					const lt = currentTime * 0.001;
+					const baseI = window.votiveLightIntensity ?? 0.05;
+					const dist = window.votiveLightDistance ?? 1.0;
+					const amp = window.votiveLightFlicker ?? 0.18;
+					for (let i = 0; i < votiveLights.length; i++) {
+						const vl = votiveLights[i];
+						if (window.votiveLightColor != null) vl.light.color.set(window.votiveLightColor);
+						vl.light.distance = dist;
+						vl.light.intensity = baseI * (1 + flameFbm1D(lt * 3.5 + vl.phase) * amp);
+					}
+				}
+
 				// Windows: candle-lit idle when the music's off → ripple ON (staggered) when it
 				// starts → audio-reactive party → ripple OFF (reverse) → back to idle. Per-window
 				// envelopes (w.on = party power, w.idle = candle glow) blend additively in emissive
@@ -8810,6 +9117,7 @@ totalEmissiveRadiance += vec3(1.0, 0.84, 0.45) * _shimmer * 0.6;`);
                  
                  // Update camera follow system
                  updateCameraFollow(dt);
+                 updateCandleFocus(); // candle click-to-zoom dolly tween
                  updateInfoHubCoin(dt);
                  if (!RAPIER_MODE) updateCoinStream(dt); // old instanced stream; Rapier mode uses stepRapierCoins' drain
                  else updateCoinStreamMarkers();        // keep the ?coins hand markers glued under ?rapier=1

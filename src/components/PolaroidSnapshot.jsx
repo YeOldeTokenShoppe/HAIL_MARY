@@ -42,14 +42,45 @@ const PolaroidSnapshot = ({
   const polaroidRef = useRef(null);
   const shutterAudioRef = useRef(null);
 
+  // Pre-warm the shutter sound on mount so the first snapshot fires it instantly.
+  // Lazily creating + playing the Audio on the trigger added a decode/fetch delay
+  // that landed the sound ~half a beat late; loading it ahead of time removes that.
+  useEffect(() => {
+    if (typeof Audio === 'undefined') return;
+    const a = new Audio('/audio/cameraShutter.mp3');
+    a.preload = 'auto';
+    a.load();
+    shutterAudioRef.current = a;
+  }, []);
+
+  // Convert any image source (data/blob URL) to a PNG blob. The async Clipboard
+  // API only reliably accepts image/png — the captured polaroid is WebP, which
+  // every major browser rejects, so writing it directly made the copy button
+  // silently fail. (The Twitter path already does this conversion, which is why
+  // it worked and copy didn't.)
+  const toPngBlob = (src) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth || img.width;
+        c.height = img.naturalHeight || img.height;
+        c.getContext('2d').drawImage(img, 0, 0);
+        c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob returned null'))), 'image/png');
+      } catch (e) {
+        reject(e);
+      }
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+
   // Play the camera shutter sound the moment a snapshot is taken.
   const playShutter = () => {
     try {
-      if (!shutterAudioRef.current) {
-        shutterAudioRef.current = new Audio('/audio/cameraShutter.mp3');
-        shutterAudioRef.current.preload = 'auto';
-      }
       const a = shutterAudioRef.current;
+      if (!a) return;
       a.currentTime = 0;
       a.play().catch(() => {}); // ignore autoplay rejections
     } catch (e) {
@@ -679,39 +710,27 @@ const PolaroidSnapshot = ({
         break;
         
       case 'copy': {
-        // Capture (or reuse) the framed polaroid and read the blob from the RETURN
-        // value — the polaroidBlob state isn't updated in this closure yet, so
-        // reading it here copied nothing (and previously fell back to the raw image).
-        const { blob: copyBlob } = await capturePolaroid();
+        // Capture (or reuse) the framed polaroid and read the data URL from the
+        // RETURN value — the polaroid* state isn't updated in this closure yet.
+        const { dataUrl: copyUrl } = await capturePolaroid();
+        const srcToCopy = copyUrl || imageUrl;
 
         try {
-          if (copyBlob && navigator.clipboard && window.ClipboardItem) {
-            const item = new ClipboardItem({ 'image/webp': copyBlob });
-            await navigator.clipboard.write([item]);
-            showNotification('Polaroid copied to clipboard! 📋');
-          } else {
-            throw new Error('No polaroid blob to copy');
+          if (!srcToCopy || !navigator.clipboard || !window.ClipboardItem) {
+            throw new Error('Clipboard image write unsupported');
           }
+          // Clipboard API only accepts PNG — convert the WebP capture first.
+          const pngBlob = await toPngBlob(srcToCopy);
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+          showNotification('Polaroid copied to clipboard! 📋');
         } catch (err) {
           console.error('Failed to copy polaroid:', err);
-          // Fallback: copy original image
-          try {
-            const response = await fetch(imageUrl);
-            const blob = await response.blob();
-            
-            if (navigator.clipboard && window.ClipboardItem) {
-              const item = new ClipboardItem({ 'image/webp': blob });
-              await navigator.clipboard.write([item]);
-              showNotification('Image copied to clipboard! 📋');
-            }
-          } catch (fallbackErr) {
-            // Final fallback: copy URL (only if there is one)
-            if (shareUrl) {
-              navigator.clipboard.writeText(shareUrl);
-              showNotification('Link copied to clipboard!');
-            } else {
-              showNotification('Copy failed');
-            }
+          // Final fallback: copy the share link if there is one.
+          if (shareUrl && navigator.clipboard) {
+            navigator.clipboard.writeText(shareUrl);
+            showNotification('Link copied to clipboard!');
+          } else {
+            showNotification('Copy failed');
           }
         }
         break;

@@ -31,6 +31,7 @@ import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import CoinLoader from '@/components/CoinLoader';
+import MobileLobbyScene from '@/components/MobileLobbyScene';
 import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
 import { useBuyModal } from '@/lib/useBuyModal';
@@ -1077,6 +1078,17 @@ export default function CyborgTemple() {
   // Start button's label/action.
   // 'game' = Token Task Force, 'analysis' = Token Review.
   const [selectedService, setSelectedService] = useState('game');
+  // Lobby service-drawer open state. Lifted out of TradeServiceRail so the
+  // center "START" button can reveal the menu — first-time visitors were
+  // missing the slim edge handle.
+  const [railExpanded, setRailExpanded] = useState(false);
+  // Lobby "MORE" popover (right bottom-nav slot) — mirrors the shrine's MORE
+  // menu so the bottom nav reads as one shared system across pages.
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  // Mobile: launching a case isn't wired yet (the clip player lands in a
+  // later phase), so START shows a brief "coming soon" notice instead of
+  // entering game mode (which needs the live scene we don't mount on mobile).
+  const [mobileSoon, setMobileSoon] = useState(false);
   // Which modality the user has entered. null = lobby (no mode chosen).
   // 'game' = Liminal Terminal active → verdict buttons replace MENU in center.
   const [tradeMode, setTradeMode] = useState(null);
@@ -2449,6 +2461,24 @@ export default function CyborgTemple() {
     return () => clearTimeout(fallbackTimer);
   }, [isSceneLoading, isMobileView, modelLoaded]);
 
+  // Mobile lobby renders a baked backdrop instead of the live scene, so the
+  // model-load gate (handleSceneLoad → modelLoaded) never fires. Mark the
+  // scene "ready" on mobile so the loader clears and the lobby shows.
+  useEffect(() => {
+    if (!isMobileView) return;
+    setModelLoaded(true);
+    setTickerReady(true);
+    setSceneReady(true);
+    setIsSceneLoading(false);
+  }, [isMobileView]);
+
+  // Auto-dismiss the mobile "coming soon" notice.
+  useEffect(() => {
+    if (!mobileSoon) return;
+    const t = setTimeout(() => setMobileSoon(false), 2600);
+    return () => clearTimeout(t);
+  }, [mobileSoon]);
+
   // Hand-tap GIF prompt: ~3s after the scene reveals, fade in for ~3.5s,
   // then fade out. Skip entirely if the user has already focused something
   // (they don't need the hint) or if the entry overlay is up. Also skip if
@@ -2794,7 +2824,7 @@ export default function CyborgTemple() {
           focus. One WebGL/AudioContext shared across all characters.
           Container kept onscreen-but-invisible (left:0, opacity:0.01)
           to avoid the WebGL throttling that hits offscreen canvases. */}
-      {mounted && <SitePalHostEmbed config={HOST_SITEPAL_CONFIG} />}
+      {mounted && !isMobileView && <SitePalHostEmbed config={HOST_SITEPAL_CONFIG} />}
           
       <div 
         style={{ 
@@ -3120,8 +3150,10 @@ export default function CyborgTemple() {
           </div>
         )}
 
-        {/* Main Canvas */}
-        {canvasReady && (
+        {/* Main Canvas — desktop only. On mobile the live four-character
+            scene (plus SitePal projection, video screens, post) is the perf
+            problem, so we swap in a baked backdrop below. */}
+        {canvasReady && !isMobileView && (
         <CleanCanvas
           key="temple-canvas"
           camera={{
@@ -3477,6 +3509,10 @@ export default function CyborgTemple() {
         </CleanCanvas>
         )}
 
+        {/* Mobile lobby → lite "council of coins" scene (small angel+coins
+            GLB with portrait-textured coins) instead of the full diorama. */}
+        {canvasReady && isMobileView && <MobileLobbyScene />}
+
         {/* Floating Character Label on Focus */}
         {(() => {
           const agentInfo = {
@@ -3716,6 +3752,17 @@ export default function CyborgTemple() {
                 <TradeServiceRail
                   selectedId={selectedService}
                   onSelect={setSelectedService}
+                  open={railExpanded}
+                  onOpenChange={setRailExpanded}
+                  onLaunch={(id) => {
+                    if (isMobileView) {
+                      setRailExpanded(false);
+                      setMobileSoon(true);
+                      return;
+                    }
+                    if (id === 'analysis') setShowReviewFunnel(true);
+                    else enterGameMode();
+                  }}
                 />
               )}
               {/* In-scene HUD strip — top of viewport, 40px tall, doesn't
@@ -4922,10 +4969,26 @@ export default function CyborgTemple() {
               <MobileBottomNav
                   hideWallet
                   accountOnLeft
-                /* Trade-style center: three side-by-side actions (BUY / HOLD /
-                   SELL). BUY opens the existing BuyModal; HOLD and SELL are
-                   placeholders for now. */
-                onBuyClick={() => {}}
+                /* Lobby center is the round START FAB — consistent with the
+                   shrine's MY CANDLE FAB. onBuyClick is the FAB's action and
+                   opens the services drawer. In game/review modes the
+                   centerSlot below overrides the FAB with the verdict UI. */
+                onBuyClick={() => {
+                  if (railExpanded) {
+                    setRailExpanded(false);
+                  } else {
+                    setFocusedAgent(null);
+                    setRailExpanded(true);
+                  }
+                }}
+                centerLabel={
+                  <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 26, height: 26, display: 'block', color: '#ffffff' }} aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                }
+                centerSubLabel="START"
+                centerTitle="Open services"
+                centerHighlight={railExpanded}
                 centerSlot={
                   // Once a verdict is committed the verdict control is dropped
                   // and, in the final reveal beat, replaced with the NEXT CASE /
@@ -5035,47 +5098,58 @@ export default function CyborgTemple() {
                       onCommit={(p, bucket) => submitVerdict(bucket, p)}
                     />
                   ) : (
-                    (() => {
-                      const isReview = selectedService === 'analysis';
-                      // Accent color drives the whole button via the --sa CSS
-                      // var; the rest of the styling (dark translucent fill,
-                      // glowing left strip, sheen sweep) lives in TSR_START_CSS
-                      // so the button reads as an "armed" sibling of the
-                      // service-rail cards rather than a flat gradient pill.
-                      const accent = isReview ? '#8ee9ff' : '#78ffb4';
-                      const handleStart = isReview
-                        ? () => setShowReviewFunnel(true)
-                        : enterGameMode;
-                      return (
-                        <>
-                          <style>{TSR_START_CSS}</style>
-                          <button
-                            type="button"
-                            onClick={handleStart}
-                            aria-label={isReview ? 'Start Token Review' : 'Start Token Task Force'}
-                            className="tsr-start"
-                            style={{ '--sa': accent }}
-                          >
-                            <span className="tsr-start__eyebrow">START</span>
-                            <span className="tsr-start__label">
-                              {isReview ? 'TOKEN REVIEW' : 'TOKEN FORENSICS'}
-                            </span>
-                            <span className="tsr-start__chev" aria-hidden>▸</span>
-                          </button>
-                        </>
-                      );
-                    })()
+                    // Lobby → no centerSlot override, so the round START FAB
+                    // (centerLabel/centerSubLabel above) renders, matching the
+                    // shrine's center FAB. The FAB's onBuyClick opens the
+                    // services drawer; each service launches from its own card.
+                    null
                   )
                 }
-                /* Right slot: in lobby it's HOME; in game mode it becomes
-                   MENU so the path picker is always reachable (verdict
+                /* Shared app-nav slots (lobby only): a cross-link back to the
+                   shrine on the left, Hail Mary on the right — mirrors the
+                   shrine's BUY | Terminal | CANDLE | Hail Mary | MORE layout.
+                   Suppressed in game/review so the immersive nav stays minimal
+                   and can't bypass the leave-game confirm. */
+                extraLeft={
+                  tradeMode ? [] : [
+                    {
+                      key: 'shrine',
+                      label: 'Shrine',
+                      title: 'Our Lady of Perpetual Profit',
+                      onClick: () => router.push('/'),
+                      icon: (
+                        <img src="/images/flame.svg" alt="" style={{ width: 24, height: 24, display: 'block' }} />
+                      ),
+                    },
+                  ]
+                }
+                extraRight={
+                  tradeMode ? [] : [
+                    {
+                      key: 'hailmary',
+                      label: 'Hail Mary',
+                      title: 'Hail Mary Prospecting Co — coming soon',
+                      onClick: () => router.push('/hailmary'),
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff5db1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: 'block' }} aria-hidden="true">
+                          <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+                          <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
+                          <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
+                          <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+                        </svg>
+                      ),
+                    },
+                  ]
+                }
+                /* Right slot: lobby → MORE popover (matches the shrine);
+                   game mode → MENU so the path picker is reachable (verdict
                    buttons have taken the center). Book slot (left) is BUY.
-                   Mid-case (game mode, no verdict yet) → confirm first so a
-                   stray tap doesn't nuke an in-progress investigation. */
+                   Mid-case (game, no verdict yet) → confirm first so a stray
+                   tap doesn't nuke an in-progress investigation. */
                 onMenuClick={
                   tradeMode === 'game'
                     ? (verdict ? returnToServiceRail : () => setShowLeaveGameConfirm(true))
-                    : () => router.push('/')
+                    : () => setShowMoreMenu((v) => !v)
                 }
                 menuIcon={
                   tradeMode === 'game' ? (
@@ -5096,10 +5170,25 @@ export default function CyborgTemple() {
                       <rect x="14" y="14" width="7" height="7" rx="1" />
                     </svg>
                   ) : (
-                    <img src="/brand-mark-cyan.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
+                    <svg
+                      className="btm-book-icon-svg"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M17 12h.01" />
+                      <path d="M12 12h.01" />
+                      <path d="M7 12h.01" />
+                    </svg>
                   )
                 }
-                menuLabel={tradeMode === 'game' ? 'MENU' : 'HOME'}
+                menuLabel={tradeMode === 'game' ? 'MENU' : 'MORE'}
                 isUserSignedIn={isSignedIn}
                 userImage={user?.imageUrl}
                 show80sButton={false}
@@ -5116,6 +5205,134 @@ export default function CyborgTemple() {
                 }
               />
             </>
+
+            {/* MORE popover — secondary destinations; mirrors the shrine's
+                MORE menu so the nav system reads the same across pages.
+                Lobby-only (the lobby right slot is MORE). */}
+            {showMoreMenu && (
+              <>
+                <div
+                  onClick={() => setShowMoreMenu(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'transparent' }}
+                />
+                <div
+                  role="menu"
+                  aria-label="More"
+                  style={{
+                    position: 'fixed',
+                    right: '10px',
+                    bottom: 'calc(74px + env(safe-area-inset-bottom, 0px))',
+                    zIndex: 10002,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minWidth: '184px',
+                    padding: '6px',
+                    borderRadius: '14px',
+                    background: 'rgba(15, 0, 30, 0.97)',
+                    border: '1px solid rgba(255, 0, 255, 0.3)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    boxShadow: '0 -2px 24px rgba(255, 0, 255, 0.18), 0 8px 32px rgba(0, 0, 0, 0.5)',
+                    fontFamily: "'Rajdhani', sans-serif",
+                  }}
+                >
+                  {[
+                    {
+                      path: '/fountain',
+                      label: 'Coin Fountain',
+                      icon: (
+                        <>
+                          <path d="M12 10L12 2" />
+                          <path d="M16 6L12 10L8 6" />
+                          <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
+                          <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
+                        </>
+                      ),
+                    },
+                    {
+                      path: '/exlibris',
+                      label: 'Ex Libris',
+                      icon: (
+                        <>
+                          <path d="M15 12h-5" />
+                          <path d="M15 8h-5" />
+                          <path d="M19 17V5a2 2 0 0 0-2-2H4" />
+                          <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
+                        </>
+                      ),
+                    },
+                  ].map((link) => (
+                    <button
+                      key={link.path}
+                      role="menuitem"
+                      onClick={() => { setShowMoreMenu(false); router.push(link.path); }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        width: '100%',
+                        padding: '11px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 0, 255, 0.12)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#ff00ff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ width: 22, height: 22, flexShrink: 0, display: 'block' }}
+                        aria-hidden="true"
+                      >
+                        {link.icon}
+                      </svg>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: '#ffffff' }}>
+                        {link.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Mobile "coming soon" notice — shown when START is tapped on
+                mobile, where the case player isn't wired yet. */}
+            {mobileSoon && (
+              <div
+                onClick={() => setMobileSoon(false)}
+                style={{
+                  position: 'fixed',
+                  left: '50%',
+                  bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10050,
+                  maxWidth: 'calc(100vw - 32px)',
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  background: 'rgba(8, 12, 18, 0.92)',
+                  border: '1px solid rgba(77, 255, 170, 0.5)',
+                  boxShadow: '0 0 18px rgba(77, 255, 170, 0.2)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  color: '#c8ffe0',
+                  fontFamily: "'IBM Plex Mono', 'SF Mono', Menlo, monospace",
+                  fontSize: 12,
+                  letterSpacing: '0.04em',
+                  textAlign: 'center',
+                }}
+              >
+                Cases play on desktop — mobile coming soon.
+              </div>
+            )}
 
             {/* Buy Modal — triggered from the repurposed menu slot */}
             <BuyModal

@@ -28,7 +28,22 @@ const SERVICES = [
   },
 ];
 
-export default function TradeServiceRail({ selectedId = "game", onSelect } = {}) {
+// Leading icon per service — rendered inside the circular accent chip.
+// Inline SVG (not an icon font) so it needs no extra deps; the stroke
+// inherits the chip's currentColor (the service accent).
+const svgIcon = (paths) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths}</svg>
+);
+const SERVICE_ICONS = {
+  // Forensics → magnifier
+  game: svgIcon(<><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>),
+  // Analysis → bar chart
+  analysis: svgIcon(<><line x1="3" y1="20" x2="21" y2="20" /><line x1="6.5" y1="20" x2="6.5" y2="12" /><line x1="12" y1="20" x2="12" y2="5" /><line x1="17.5" y1="20" x2="17.5" y2="9" /></>),
+  // Trading card game → card stack
+  'terminal-traders': svgIcon(<><rect x="8" y="4" width="12" height="16" rx="2" /><path d="M4 8v10a2 2 0 0 0 2 2h7" /></>),
+};
+
+export default function TradeServiceRail({ selectedId = "game", onSelect, onLaunch, open, onOpenChange } = {}) {
   const activeService = SERVICES.find((s) => s.id === selectedId) ?? SERVICES[0];
   const shellAccent = activeService.accent;
 
@@ -43,8 +58,43 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
   // by default; tapping the pill expands a popover above it with the full
   // chooser. Desktop ignores this state — CSS hides the pill at >520px and
   // shows the options inline.
-  const [expanded, setExpanded] = useState(false);
+  // The drawer's open state can be controlled by the parent (the lobby lifts
+  // it so the center "START" button can reveal the menu) or managed
+  // internally (uncontrolled fallback). When controlled, the parent owns
+  // persistence; uncontrolled mode remembers the choice in localStorage.
+  const isControlled = open !== undefined;
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const expanded = isControlled ? open : internalExpanded;
   const rootRef = useRef(null);
+
+  // Persist the desktop drawer's open/closed choice across visits. Skipped
+  // on mobile (≤520px), where the rail is a tap-to-open pill rather than a
+  // remembered drawer — so a saved "open" never auto-pops the mobile popover.
+  const persistExpanded = (next) => {
+    if (isControlled) return;
+    try {
+      if (typeof window !== 'undefined' && window.innerWidth > 520) {
+        window.localStorage.setItem('tsrRailExpanded', next ? '1' : '0');
+      }
+    } catch (e) {}
+  };
+  const applyExpanded = (next) => {
+    persistExpanded(next);
+    if (isControlled) onOpenChange?.(next);
+    else setInternalExpanded(next);
+  };
+  const openRail = () => applyExpanded(true);
+  const closeRail = () => applyExpanded(false);
+
+  // Restore the last desktop drawer state on mount (uncontrolled only).
+  // Mobile always boots collapsed (the pill); only wider viewports honor it.
+  useEffect(() => {
+    if (isControlled) return;
+    if (typeof window === 'undefined' || window.innerWidth <= 520) return;
+    try {
+      if (window.localStorage.getItem('tsrRailExpanded') === '1') setInternalExpanded(true);
+    } catch (e) {}
+  }, [isControlled]);
 
   // Dismiss popover on outside-tap / Escape so the user isn't stranded
   // with the options floating over the canvas.
@@ -52,11 +102,11 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
     if (!expanded) return;
     const onPointerDown = (e) => {
       if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setExpanded(false);
+        closeRail();
       }
     };
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') setExpanded(false);
+      if (e.key === 'Escape') closeRail();
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -69,16 +119,38 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
   return (
     <div
       ref={rootRef}
-      className={`tsr-root${expanded ? ' is-expanded' : ''}`}
+      className={`tsr-root tsr-${shellAccent}${expanded ? ' is-expanded' : ''}`}
       aria-label="Trade page services"
     >
       <style>{STYLES}</style>
+      {/* Desktop-only collapsed edge handle. Hidden by CSS on mobile (the
+          pill takes over) and when the drawer is expanded. Clicking it
+          slides the shell in from the right. */}
+      <button
+        type="button"
+        className="tsr-handle"
+        onClick={openRail}
+        aria-expanded={expanded}
+        aria-label="Open services panel"
+      >
+        <span className="tsr-pip" aria-hidden />
+        <span className="tsr-handle-label">SERVICES</span>
+        <span className="tsr-handle-chevron" aria-hidden>‹</span>
+      </button>
       <div className={`tsr-shell tsr-${shellAccent}`}>
+        {/* Desktop-only collapse control — retracts the drawer back to the
+            edge handle. Hidden on mobile (the pill chevron does this job). */}
+        <button
+          type="button"
+          className="tsr-collapse"
+          onClick={closeRail}
+          aria-label="Collapse services panel"
+        >›</button>
         {/* Mobile-only collapsed pill. Hidden by CSS on desktop. */}
         <button
           type="button"
           className={`tsr-pill tsr-card-${activeService.accent}`}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => (expanded ? closeRail() : openRail())}
           aria-expanded={expanded}
           aria-label={`Active service: ${activeService.title}. Tap to ${expanded ? 'close' : 'change'}.`}
         >
@@ -95,17 +167,19 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
         <div className="tsr-options" role="radiogroup" aria-label="Available services">
           {liveServices.map((service) => {
             const isSelected = service.id === activeService.id;
-            const handleClick = !isSelected && onSelect
-              ? () => {
-                  onSelect(service.id);
-                  // Auto-collapse mobile popover after a choice is made.
-                  setExpanded(false);
-                }
-              : undefined;
+            // Live cards launch their service directly — the drawer is the
+            // menu, each card its own START. (The center bottom button just
+            // opens this menu.) Falls back to select + collapse if no onLaunch.
+            const handleClick = () => {
+              onSelect?.(service.id);
+              if (onLaunch) onLaunch(service.id);
+              else closeRail();
+            };
             const className = [
               'tsr-card',
               `tsr-card-${service.accent}`,
-              isSelected ? 'is-active' : 'is-interactive',
+              'is-interactive',
+              isSelected ? 'is-active' : null,
             ].filter(Boolean).join(' ');
             return (
               <div
@@ -126,14 +200,16 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
                 }
                 className={className}
               >
-                <span className="tsr-card-eyebrow">{service.eyebrow}</span>
-                <span className="tsr-card-title">{service.title}</span>
-                <span className="tsr-card-desc">{service.desc}</span>
-                {/* No "SELECTED" verb on the active card — the bottom-nav
-                    START button is the real action; the glow already marks
-                    this as the chosen service. Non-active live services keep
-                    a SELECT affordance for when more than one ships. */}
-                {!isSelected && <span className="tsr-card-cta">SELECT</span>}
+                <span className="tsr-card-chip" aria-hidden>{SERVICE_ICONS[service.id]}</span>
+                <span className="tsr-card-body">
+                  <span className="tsr-card-eyebrow">{service.eyebrow}</span>
+                  <span className="tsr-card-title">{service.title}</span>
+                  <span className="tsr-card-desc">{service.desc}</span>
+                </span>
+                {/* Each live card is its own launch button now — the center
+                    bottom button only opens this menu, so the card carries
+                    the START action. */}
+                <span className="tsr-card-cta">START ▸</span>
               </div>
             );
           })}
@@ -148,12 +224,19 @@ export default function TradeServiceRail({ selectedId = "game", onSelect } = {})
                   aria-disabled
                   className={`tsr-teaser tsr-card-${service.accent}`}
                 >
-                  <span className="tsr-teaser-lock" aria-hidden>🔒</span>
+                  <span className="tsr-teaser-chip" aria-hidden>{SERVICE_ICONS[service.id]}</span>
                   <span className="tsr-teaser-body">
                     <span className="tsr-teaser-eyebrow">{service.eyebrow}</span>
                     <span className="tsr-teaser-title">{service.title}</span>
                   </span>
-                  <span className="tsr-teaser-cta">SOON</span>
+                  <span className="tsr-teaser-cta">
+                    <span className="tsr-teaser-lock" aria-hidden>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 11, height: 11, display: 'block' }}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </span>
+                    SOON
+                  </span>
                 </div>
               ))}
             </div>
@@ -179,21 +262,35 @@ const STYLES = `
   --tsr-accent: #8effc4;
   --tsr-accent-soft: rgba(77, 255, 170, 0.22);
   --tsr-accent-faint: rgba(77, 255, 170, 0.08);
+  position: relative;
   pointer-events: auto;
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: stretch;
   gap: 10px;
-  padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--tsr-accent) 62%, transparent);
-  background:
-    linear-gradient(180deg, rgba(6, 8, 14, 0.88), rgba(2, 3, 6, 0.78)),
-    radial-gradient(circle at 18% 50%, var(--tsr-accent-faint), transparent 56%);
-  box-shadow:
-    0 0 28px var(--tsr-accent-soft),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 10px 8px 8px;
+  border: 1px solid color-mix(in srgb, var(--tsr-accent) 40%, rgba(140, 150, 170, 0.2));
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(6, 8, 14, 0.92), rgba(2, 3, 6, 0.84));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+
+/* Bridge hairline — magenta (the nav FAB) → green (this panel). Makes the
+   FAB→drawer handoff read as intentional. Inset past the corner radius so it
+   sits along the top edge without overflow:hidden (which would clip the
+   mobile popover). */
+.tsr-shell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, #c54bd6, var(--tsr-accent));
+  opacity: 0.9;
 }
 
 .tsr-phos {
@@ -267,35 +364,40 @@ const STYLES = `
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 11px 8px 14px;
+  gap: 10px;
+  padding: 9px 11px;
   overflow: hidden;
-  border: 1px solid rgba(140, 150, 170, 0.18);
-  background: linear-gradient(180deg, rgba(10, 14, 22, 0.5), rgba(2, 3, 6, 0.45));
+  border: 1px solid rgba(140, 150, 170, 0.16);
+  border-radius: 9px;
+  background: rgba(8, 11, 16, 0.5);
   color: #c3ccd6;
-  opacity: 0.62;
+  opacity: 0.66;
   cursor: not-allowed;
-  filter: grayscale(0.25);
   font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
 }
 
-/* Faint accent strip — keeps each teaser's color identity at low intensity. */
-.tsr-teaser::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: var(--card-accent);
-  opacity: 0.5;
+/* Dimmer sibling of the live-card chip. */
+.tsr-teaser-chip {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-accent) 30%, transparent);
 }
+.tsr-teaser-chip svg { width: 17px; height: 17px; display: block; }
+
+/* Faint accent strip — keeps each teaser's color identity at low intensity. */
+.tsr-teaser::after { content: none; }
 
 .tsr-teaser-lock {
   flex: 0 0 auto;
-  font-size: 11px;
-  opacity: 0.65;
+  display: flex;
+  opacity: 0.8;
 }
 
 .tsr-teaser-body {
@@ -316,11 +418,12 @@ const STYLES = `
 }
 
 .tsr-teaser-title {
-  color: rgba(220, 228, 238, 0.78);
-  font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+  color: rgba(220, 228, 238, 0.82);
+  font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
   font-size: 12px;
-  letter-spacing: 0.04em;
-  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -328,54 +431,65 @@ const STYLES = `
 
 .tsr-teaser-cta {
   flex: 0 0 auto;
-  color: var(--card-accent);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: color-mix(in srgb, var(--card-accent) 70%, #9fb0bb);
   font-family: 'Orbitron', 'IBM Plex Mono', monospace;
-  font-size: 7px;
+  font-size: 7.5px;
   font-weight: 900;
-  letter-spacing: 0.18em;
-  opacity: 0.8;
+  letter-spacing: 0.16em;
+  opacity: 0.85;
 }
 
 .tsr-card {
   position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 78px;
-  padding: 11px 12px 10px 20px;
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  min-height: 62px;
+  padding: 10px 12px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--card-accent) 48%, rgba(140, 150, 170, 0.2));
-  border-top-color: color-mix(in srgb, var(--card-accent) 78%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 14%, rgba(8, 10, 16, 0.55)), color-mix(in srgb, var(--card-accent) 4%, rgba(2, 3, 6, 0.5)));
+  border: 1px solid color-mix(in srgb, var(--card-accent) 30%, rgba(140, 150, 170, 0.18));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--card-accent) 7%, rgba(8, 11, 16, 0.55));
   color: #e4ecf2;
   cursor: default;
   text-align: left;
   font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
   transition:
     border-color 180ms ease,
-    background 180ms ease,
-    box-shadow 180ms ease;
+    background 180ms ease;
+}
+
+/* Circular accent icon chip (the B-direction motif). */
+.tsr-card-chip {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-accent) 50%, transparent);
+}
+.tsr-card-chip svg { width: 20px; height: 20px; display: block; }
+
+.tsr-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Left-edge accent strip — gives each card a quick read of its color
    even when not selected. Sits inside the padding so it doesn't shift
    the text. */
-.tsr-card::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 5px;
-  border-radius: 0 3px 3px 0;
-  background: var(--card-accent);
-  box-shadow:
-    0 0 12px color-mix(in srgb, var(--card-accent) 75%, transparent),
-    0 0 24px color-mix(in srgb, var(--card-accent) 35%, transparent);
-  opacity: 0.85;
-  transition: opacity 180ms ease, box-shadow 180ms ease;
-}
+/* Left accent strip retired — the circular chip carries the accent now. */
+.tsr-card::after { content: none; }
 
 .tsr-card::before {
   content: "";
@@ -388,12 +502,9 @@ const STYLES = `
 }
 
 .tsr-card.is-active {
-  border-color: color-mix(in srgb, var(--card-accent) 90%, white 8%);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--card-accent) 28%, rgba(8, 10, 16, 0.45)), color-mix(in srgb, var(--card-accent) 8%, rgba(2, 3, 6, 0.55)));
-  box-shadow:
-    0 0 28px color-mix(in srgb, var(--card-accent) 45%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 55%, transparent);
+  border-color: color-mix(in srgb, var(--card-accent) 72%, transparent);
+  background: color-mix(in srgb, var(--card-accent) 13%, rgba(8, 11, 16, 0.5));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--card-accent) 30%, transparent);
 }
 
 .tsr-card.is-active::after {
@@ -470,17 +581,17 @@ const STYLES = `
   font-weight: 800;
   letter-spacing: 0.22em;
   line-height: 1;
-  margin-bottom: 7px;
+  margin-bottom: 4px;
   text-shadow: 0 0 10px color-mix(in srgb, var(--card-accent) 60%, transparent);
 }
 
 .tsr-card-title {
   color: #f3f6fa;
-  font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
-  font-size: 14px;
-  letter-spacing: 0.06em;
-  line-height: 1.05;
-  text-shadow: 0 0 12px color-mix(in srgb, var(--card-accent) 32%, transparent);
+  font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.12;
 }
 
 .tsr-card-desc {
@@ -492,22 +603,27 @@ const STYLES = `
 }
 
 .tsr-card-cta {
-  position: absolute;
-  right: 10px;
-  bottom: 8px;
+  flex: 0 0 auto;
+  align-self: center;
   color: var(--card-accent);
   font-family: 'Orbitron', 'IBM Plex Mono', monospace;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.18em;
-  opacity: 0.85;
-  text-shadow: 0 0 8px color-mix(in srgb, var(--card-accent) 55%, transparent);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 /* Collapsed-pill view of the rail — hidden on desktop, becomes the
    default visible state on narrow viewports (≤520px). The full chooser
    slides up over it as a popover when expanded. */
 .tsr-pill {
+  display: none;
+}
+
+/* Desktop drawer chrome — off by default; the min-width rule below turns
+   it on for wider viewports. Keeps mobile (the pill) untouched. */
+.tsr-handle,
+.tsr-collapse {
   display: none;
 }
 
@@ -598,9 +714,10 @@ const STYLES = `
   .tsr-pill-title {
     flex: 1;
     min-width: 0;
-    font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+    font-family: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
     font-size: 13px;
-    letter-spacing: 0.05em;
+    font-weight: 600;
+    letter-spacing: 0.03em;
     color: #effff5;
     text-shadow: 0 0 10px color-mix(in srgb, var(--card-accent) 24%, transparent);
     overflow: hidden;
@@ -653,6 +770,154 @@ const STYLES = `
     width: 100%;
     min-height: 64px;
     scroll-snap-align: none;
+  }
+}
+
+/* === Desktop / tablet horizontal side-dock ============================
+   Additive: docks the rail to the right edge and slides it in/out along
+   the X axis. Default = collapsed to a slim edge handle so the diorama
+   stays clear; expanding slides the chooser in from the right. Scoped to
+   >520px so the ≤520px pill behaviour above is untouched. The root is a
+   fixed, click-through clipping viewport (overflow:hidden) — the off-screen
+   collapsed shell is clipped rather than spilling a horizontal scrollbar. */
+@media (min-width: 521px) {
+  .tsr-root {
+    left: auto;
+    right: 0;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    width: min(940px, calc(100vw - 8px));
+    transform: none;
+    pointer-events: none;
+    overflow: hidden;
+    padding: 28px 0 28px 28px;
+  }
+
+  /* The chooser. A fixed-width vertical panel docked right; slides on X. */
+  .tsr-shell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    width: 296px;
+    max-width: 100%;
+    margin-left: auto;
+    transform: translateX(0);
+    transition:
+      transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      opacity 220ms ease;
+  }
+  /* Status becomes a top header row instead of a left rail. */
+  .tsr-shell .tsr-status {
+    min-width: 0;
+    padding: 2px 4px 8px;
+    border-right: none;
+    border-bottom: 1px solid rgba(180, 180, 200, 0.12);
+    justify-content: flex-start;
+  }
+  /* Services stack vertically (live card, then the locked teasers). */
+  .tsr-shell .tsr-options {
+    grid-template-columns: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Collapsed: shell slides off the right edge (clipped by the root). */
+  .tsr-root:not(.is-expanded) .tsr-shell {
+    transform: translateX(calc(100% + 44px));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Edge handle — the always-present collapsed affordance. */
+  .tsr-handle {
+    position: absolute;
+    right: 0;
+    bottom: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 9px;
+    pointer-events: auto;
+    border: 1px solid color-mix(in srgb, var(--tsr-accent) 55%, transparent);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    background: linear-gradient(180deg, rgba(6, 8, 14, 0.9), rgba(2, 3, 6, 0.82));
+    box-shadow:
+      0 0 22px var(--tsr-accent-soft),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--tsr-accent);
+    cursor: pointer;
+    transition:
+      box-shadow 180ms ease,
+      transform 200ms ease,
+      opacity 200ms ease;
+  }
+  .tsr-handle:hover,
+  .tsr-handle:focus-visible {
+    transform: translateX(-3px);
+    box-shadow: 0 0 30px color-mix(in srgb, var(--tsr-accent) 40%, transparent);
+    outline: none;
+  }
+  .tsr-handle-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-family: 'Orbitron', 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 10px var(--tsr-accent-soft);
+  }
+  .tsr-handle-chevron {
+    font-size: 16px;
+    line-height: 1;
+    font-weight: 700;
+  }
+
+  /* Expanded: fade the handle out so it doesn't collide with the shell. */
+  .tsr-root.is-expanded .tsr-handle {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(16px);
+  }
+
+  /* Retract control — mirrors the handle, lives in the shell's top-right. */
+  .tsr-collapse {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    pointer-events: auto;
+    border: 1px solid rgba(180, 190, 210, 0.22);
+    border-radius: 5px;
+    background: rgba(8, 10, 16, 0.65);
+    color: var(--tsr-accent);
+    cursor: pointer;
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    line-height: 1;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .tsr-collapse:hover,
+  .tsr-collapse:focus-visible {
+    border-color: var(--tsr-accent);
+    box-shadow: 0 0 12px var(--tsr-accent-soft);
+    outline: none;
+  }
+
+  /* Respect reduced-motion: snap instead of slide. */
+  @media (prefers-reduced-motion: reduce) {
+    .tsr-shell,
+    .tsr-handle { transition: none; }
   }
 }
 `;
