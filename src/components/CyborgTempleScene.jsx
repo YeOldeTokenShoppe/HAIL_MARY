@@ -5,6 +5,7 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
+import { unicornGlow } from "@/lib/trade/unicornGlow";
 import { Html, SpotLight } from "@react-three/drei";
 import AnnotationSystem from "@/components/AnnotationSystem";
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
@@ -519,10 +520,9 @@ const CyborgTempleScene = ({
   const applyCharacterReaction = (agentId, outcome) => {
     // console.log('[reaction-debug] entered', { agentId, outcome });
     const pattern = REACTION_PATTERNS[agentId]?.[outcome];
-    // if (!pattern) {
-    //   console.log('[reaction-debug] no pattern for', agentId, outcome);
-    //   return;
-    // }
+    // No pattern for this outcome (e.g. the neutral 'council' lineup) — line the
+    // character up with no reaction anim rather than crashing on .test() below.
+    if (!pattern) return;
     const actions = actionsRef.current[agentId];
     const state = (
       agentId === 'Monk'      ? monkAnimStateRef.current      :
@@ -1219,6 +1219,9 @@ const CyborgTempleScene = ({
 
   // Unicorn eye mesh refs (L_EYE, R_EYE parented to head bone) — opacity blink
   const unicornEyesRef = useRef([]);
+  // Unicorn glow target — cloned material(s) whose emissive pulses while the
+  // Unicorn speaks (driven by playUnicornBeat via the unicornGlow bridge).
+  const unicornGlowMatsRef = useRef([]);
   const unicornBlinkStateRef = useRef({
     lastBlinkTime: 0,
     nextBlinkDelay: Math.random() * 4000 + 3000,
@@ -2564,8 +2567,36 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           };
           
           setClickableData(child);
+
+          // Unicorn horn/aura glow target. The Unicorn has no SitePal face, so
+          // while it speaks its emissive pulses with the audio amplitude
+          // (playUnicornBeat → unicornGlow bridge) — that pulse is its "lip-sync".
+          // Prefer a dedicated horn mesh; fall back to the body. Clone materials
+          // so we never tint shared slots (eyes/flame excluded).
+          if (!unicornGlowMatsRef.current.length) {
+            const all = [];
+            child.traverse((o) => { if (o.isMesh && o.material && !/eye|flame/i.test(o.name || '')) all.push(o); });
+            const horn = all.filter((m) => /horn/i.test(m.name || ''));
+            const targets = horn.length ? horn : all;
+            const collected = [];
+            targets.forEach((mesh) => {
+              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              const cloned = mats.map((m) => {
+                if (!m) return m;
+                const c = m.clone();
+                if (!c.emissive || c.emissive.getHex() === 0x000000) c.emissive = new THREE.Color(0x39e6ff);
+                c.toneMapped = false;
+                c.needsUpdate = true;
+                collected.push({ mat: c, base: c.emissiveIntensity || 0 });
+                return c;
+              });
+              mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
+            });
+            unicornGlowMatsRef.current = collected;
+            console.log(`[CyborgTempleScene] unicorn glow → ${horn.length ? 'horn' : 'body'} (${collected.length} mat):`, targets.map((m) => m.name));
+          }
         }
-        
+
         // Make the council characters clickable
         if (child.name === 'Demon' || child.name === 'Demon_empty' || child.name === 'Demon_Empty' ||
             child.name === 'Devil_empty' || child.name === 'Devil_Empty' ||
@@ -4397,6 +4428,17 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     flameMaterialsRef.current.forEach(mat => {
       mat.uniforms.uTime.value = state.clock.elapsedTime;
     });
+
+    // Unicorn horn/aura glow — pulse emissive with the speaking Unicorn's audio
+    // amplitude. unicornGlow.value (0..1) is written by playUnicornBeat's
+    // analyser; it's 0 when idle, so emissive returns to its base each frame.
+    {
+      const g = unicornGlow.value || 0;
+      const glowMats = unicornGlowMatsRef.current;
+      for (let i = 0; i < glowMats.length; i++) {
+        glowMats[i].mat.emissiveIntensity = glowMats[i].base + g * 2.4; // gain — tune
+      }
+    }
 
     // SitePal projections. One shared host portal provides the active
     // source canvas; each character owns a crop canvas + Face2 target.

@@ -42,6 +42,8 @@ import ConfidenceVerdict from '@/components/ConfidenceVerdict';
 import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine, lensLabel, recordCaseResult, readSessionScore, sessionAvgBrier, sessionAccuracy } from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
 import SitePalCropPanel from '@/components/SitePalCropPanel';
+import { runDirectedTurn } from '@/lib/trade/beatRunner';
+import { clipMenuForDirector, clipById } from '@/lib/trade/reactionBank';
 import { useRouter } from 'next/navigation';
 
 // Mounts the SitePal embed offscreen so CyborgTempleScene can crop it
@@ -1017,6 +1019,17 @@ const CHARACTER_TO_STATION = {
   Detective: 'marisol',
   RL80: 'eugene',
 };
+// Monk's only live SitePal voice (Gilbert), used for sayText in the live turn.
+const GILBERT = { voice: '9', lang: 1, engine: 7, effect: 'T', effLevel: 3 };
+
+// Compact case summary handed to the director as caseContext.
+function caseSummaryForDirector(c) {
+  if (!c) return '';
+  const m = c.surfaceMetrics || {};
+  return `${c.projectName || 'Token'} (${c.ticker || ''}) on ${c.chain || 'chain'} — ${c.tagline || ''}. `
+    + `Surface: age ${m.age || '?'}, mcap ${m.mcap || '?'}, holders ${m.holders || '?'}, 24h ${m.change24h || '?'}.`;
+}
+
 const STATION_TO_CHARACTER = Object.fromEntries(
   Object.entries(CHARACTER_TO_STATION).map(([agent, station]) => [station, agent])
 );
@@ -1419,6 +1432,18 @@ export default function CyborgTemple() {
     return () => clearTimeout(t);
   }, [currentSpeech, pendingSpeech]);
   const [verdict, setVerdict] = useState(null);
+  // Live four-voice turn (option A): gated by ?live=free|paid. 'off' keeps the
+  // legacy single recorded reaction. liveTurnRef suppresses the reveal driver
+  // while the argument plays.
+  const liveTier = useMemo(() => {
+    if (typeof window === 'undefined') return 'off';
+    const p = (new URLSearchParams(window.location.search).get('live') || '')
+      .toLowerCase().replace(/[^a-z]/g, ''); // tolerate stray punctuation (e.g. a trailing comma)
+    return p === 'paid' || p === 'free' ? p : 'off';
+  }, []);
+  const liveTurnRef = useRef(false);
+  // Paid live argument is playing in the curtain-call lineup (no outcome shown yet).
+  const [councilActive, setCouncilActive] = useState(false);
   const [brier, setBrier] = useState(null);
   // The player's committed P(scam) from the confidence slider (0..1), or null
   // for review mode / team verdicts. Drives the Brier score and the reveal HUD.
@@ -1579,6 +1604,10 @@ export default function CyborgTemple() {
   // the dramatic beat (after the focused character's reaction). Maps the
   // verdict against ground truth: aligned / missed / abstained.
   const revealMode = useMemo(() => {
+    // Paid live argument: line the four up (props hidden, wide shot) WITHOUT
+    // revealing the outcome. 'council' isn't an outcome key, so the reveal
+    // effect stages the lineup but plays no spoiler reaction.
+    if (councilActive) return 'council';
     if (!verdict) return null;
     if (revealPhase !== 'reveal' && revealPhase !== 'vindicate') return null;
     if (verdict === 'abstain') return 'abstained';
@@ -1587,7 +1616,7 @@ export default function CyborgTemple() {
     // phantom right/wrong grading against a non-existent answer key).
     if (caseData.correctVerdict == null) return 'abstained';
     return verdict === caseData.correctVerdict ? 'aligned' : 'missed';
-  }, [verdict, revealPhase, caseData.correctVerdict]);
+  }, [councilActive, verdict, revealPhase, caseData.correctVerdict]);
 
   // Forceful stop for SitePal audio. Per the SitePal docs, stopSpeech()
   // only halts audio that's currently speaking — it "does not prevent
@@ -1871,6 +1900,57 @@ export default function CyborgTemple() {
     }
   }, []);
 
+  // Live-turn glue: a speaker for the beat runner that goes through the SAME
+  // focus → speakLine pipeline a player click uses (so SitePal scene swaps and
+  // auto-greeting suppression behave), and resolves when the line ends.
+  const focusedAgentRef = useRef(null);
+  useEffect(() => { focusedAgentRef.current = focusedAgent; }, [focusedAgent]);
+
+  const waitForSpeechEnd = useCallback((text) => new Promise((resolve) => {
+    let started = false;
+    const t0 = Date.now();
+    const max = Math.min(30000, Math.max(6000, String(text || '').length * 90 + 1500));
+    const iv = setInterval(() => {
+      const active = speechActiveRef.current;
+      if (active) started = true;
+      if ((started && !active) || Date.now() - t0 > max) {
+        clearInterval(iv);
+        resolve();
+      }
+    }, 120);
+  }), []);
+
+  const speakBeat = useCallback((characterId, speech) => {
+    const stationKey = CHARACTER_TO_STATION[characterId];
+    if (!stationKey) return Promise.resolve();
+    // Focus the speaker so the scene swaps the proper (player-click) way.
+    // No-op when they're already focused — which is the free-tier Monk case,
+    // so no re-focus, no intro, no collision.
+    if (focusedAgentRef.current !== characterId) setFocusedAgent(characterId);
+    const line = speech.type === 'audio'
+      ? { audio: speech.audioName, text: speech.text }
+      : { text: speech.text };
+    speakLine(line, stationKey);
+    return waitForSpeechEnd(speech.text);
+  }, [speakLine, waitForSpeechEnd]);
+
+  // Council speaker (paid lineup) — plays through the pipeline on the CURRENTLY
+  // loaded scene (no swap, no focus, no auto-greeting), so all four can speak in
+  // the wide shot with audio + caption while nobody's face is projected. Monk
+  // carries Gilbert's voice for live TTS; Demon/Detective play their clip.
+  const speakCouncil = useCallback((characterId, speech) => {
+    if (typeof window === 'undefined') return Promise.resolve();
+    const sceneId = window.__sitePalCurrentSceneId; // current scene — do not swap
+    const full = speech.type === 'text' ? { ...speech, ...GILBERT } : speech;
+    try {
+      window.__sitePalPendingSpeech = { characterId, sceneId, speech: full };
+      if (typeof window.__sitePalSpeakPending === 'function') window.__sitePalSpeakPending(null);
+    } catch (e) {
+      console.warn('[council speak] failed', e);
+    }
+    return waitForSpeechEnd(speech.text);
+  }, [waitForSpeechEnd]);
+
   // When the player rotates to a game character in game mode, play their intro
   // (or return micro-line on revisit). Slight delay so the camera fly-in lands
   // before the line fires. Eugene's lines are rendered in the panel, not TTS.
@@ -2099,6 +2179,75 @@ export default function CyborgTemple() {
       try { setSessionScore(recordCaseResult({ brier: score, correct })); } catch (e) {}
     }
     setRevealPhase('weighing');
+
+    // Option A — live four-voice argument replaces the single recorded reaction
+    // when the live tier is on. paid = all four; free = Monk only. On completion
+    // we advance weighing → reveal (the driver below is held off via liveTurnRef).
+    console.log('[live] commit', { v, liveTier, isReviewMode, focusedAgent });
+    // Free preview covers only Monk (the live-TTS voice) and only when he's the
+    // focused character — so the line plays in his already-loaded scene with no
+    // swap/intro collision. Paid covers all four. Otherwise fall through to the
+    // recorded reaction.
+    const doLive = liveTier === 'paid' || (liveTier === 'free' && focusedAgent === 'Monk');
+    if (doLive) {
+      const isPaid = liveTier === 'paid';
+      const voices = liveTier === 'paid'
+        ? ['Monk', 'Demon', 'Detective', 'Unicorn']
+        : ['Monk'];
+      const focusStation = (focusedAgent && CHARACTER_TO_STATION[focusedAgent]) || 'monk';
+
+      // Merge this case's recorded verdictReaction lines (Demon/Detective) into
+      // the director menu as PREFERRED, with the generic bank as fallback. Per-
+      // case clips resolve via extraClips; generic via clipById.
+      const menu = clipMenuForDirector(null);
+      const extraClips = {};
+      for (const ch of ['Demon', 'Detective']) {
+        const sk = CHARACTER_TO_STATION[ch];
+        const vr = caseData?.stations?.[sk]?.verdictReaction;
+        if (!vr || !menu[ch]) continue;
+        for (const vk of ['believe', 'doubt', 'abstain']) {
+          const ln = vr[vk];
+          const audio = ln && typeof ln === 'object' ? ln.audio : null;
+          const text = ln && typeof ln === 'object' ? ln.text : null;
+          if (!audio || !text) continue;
+          const id = `case_${ch}_${vk}`;
+          const tag = vk === 'believe' ? 'verdict-trust' : vk === 'doubt' ? 'verdict-doubt' : 'verdict-abstain';
+          extraClips[id] = { audioName: audio, text };
+          menu[ch].unshift({ id, tag, text, preferred: true });
+        }
+      }
+
+      let liveSpeaker = null;
+      liveTurnRef.current = true;
+      // Paid = the council: drop the 1:1 zoom and engage the curtain-call lineup
+      // (props hidden, wide shot, four standing) WITHOUT revealing the outcome.
+      if (isPaid) { setFocusedAgent(null); setCouncilActive(true); }
+      runDirectedTurn(
+        {
+          phase: 'case',
+          caseContext: caseSummaryForDirector(caseData),
+          playerAction: `${v}${prob != null ? ` at ${Math.round(prob * 100)}%` : ''}`,
+          clipBank: menu,
+          voices,
+          // ?uni=1 forces a Unicorn beat — for verifying the faceless voice path.
+          forceUnicorn: typeof window !== 'undefined'
+            && new URLSearchParams(window.location.search).get('uni') === '1',
+        },
+        {
+          speak: isPaid ? speakCouncil : speakBeat,
+          resolveClip: (id) => extraClips[id] || clipById(id),
+          setSpeaker: (id) => { liveSpeaker = id; },
+          setCaption: (text) => setActiveReaction({ stationKey: CHARACTER_TO_STATION[liveSpeaker] || focusStation, text }),
+          playAnim: () => {},
+        },
+      ).finally(() => {
+        liveTurnRef.current = false;
+        if (isPaid) setCouncilActive(false);
+        setRevealPhase('reveal');
+      });
+      return;
+    }
+
     // Play the focused character's immediate verdict reaction. The reveal
     // phase driver below transitions weighing → reveal (when reaction ends)
     // → vindicate (after a beat for the player to absorb the truth).
@@ -2149,6 +2298,9 @@ export default function CyborgTemple() {
     }
 
     if (revealPhase === 'weighing') {
+      // Live four-voice turn in progress — submitVerdict advances to 'reveal'
+      // when the whole argument ends; don't let the single-line driver cut in.
+      if (liveTurnRef.current) return;
       const isEugene = (focusedAgent && CHARACTER_TO_STATION[focusedAgent]) === 'eugene';
       if (!isEugene && speechActive) return; // reaction still playing
       const reactionMs = isEugene
@@ -2486,7 +2638,9 @@ export default function CyborgTemple() {
   // would otherwise re-fire this effect and re-show the GIF. Hide
   // immediately on the first click/tap anywhere — they've engaged.
   useEffect(() => {
-    if (!sceneReady || focusedAgent || userHasInteracted) return;
+    // Desktop-only: the mobile lobby is the coin scene (no full diorama to
+    // nudge a tap into), so skip the hand-tap prompt there entirely.
+    if (!sceneReady || focusedAgent || userHasInteracted || isMobileView) return;
     const showTimer = setTimeout(() => setShowHandTap(true), 12500);
     const hideTimer = setTimeout(() => setShowHandTap(false), 15500);
     const hideOnInteraction = () => {
@@ -2500,7 +2654,7 @@ export default function CyborgTemple() {
       clearTimeout(hideTimer);
       window.removeEventListener('pointerdown', hideOnInteraction);
     };
-  }, [sceneReady, focusedAgent, userHasInteracted]);
+  }, [sceneReady, focusedAgent, userHasInteracted, isMobileView]);
 
   // Show the "tap a character" hint once the scene is visible. Auto-fade
   // after 6s; if the user clicks a character before then, hide immediately.
@@ -3025,17 +3179,18 @@ export default function CyborgTemple() {
               style={{
                 position: "relative",
                 left: isMobileView ? "1rem" : "1rem",
-                top: isMobileView ? "0rem" : "-2rem",
+                top: isMobileView ? "0.5rem" : "-2rem",
                 color: "#f6f5f1ff",
                 fontFamily: "UnifrakturCook, serif",
                 textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
-                fontSize: isMobileView ? "2rem" : "3rem",
+                fontSize: isMobileView ? "2.5rem" : "3rem",
                 fontWeight: 900,
                 lineHeight: 0.85,
                 transform: "rotate(-8deg) skew(-15deg)",
                 zIndex: 1000,
                 whiteSpace: "nowrap",
                 marginTop: "0",
+     
                 // Fade out the title while a character/screen is focused so
                 // the close-up has the visual stage to itself.
                 opacity: focusedAgent ? 0 : 1,
@@ -3047,10 +3202,10 @@ export default function CyborgTemple() {
                 transition: "opacity 0.4s ease",
               }}
             >
-            <span className="title-line" style={{ display: 'block', position: 'relative' }}>The</span>
+            <span className="title-line" style={{ display: 'block', position: 'relative', fontSize: "1rem", marginLeft: "0.75rem" }}>The</span>
             <span className="title-line" style={{ display: 'block', marginLeft: isMobileView ? "1rem" : "2rem",position: 'relative' }}>
 
-              <span style={{ fontSize: "2rem" }}></span>
+              {/* <span style={{ fontSize: "3rem" }}></span> */}
                 Liminal
             </span>
             <span className="title-line" style={{ display: 'block', marginLeft: isMobileView ? "2rem" : "4rem", position: 'relative' }}>Terminal</span>
@@ -3748,12 +3903,13 @@ export default function CyborgTemple() {
             {/* Bottom Nav — rendered on both mobile and desktop, mirrors
                 /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY). */}
             <>
-              {!tradeMode && !focusedAgent && (
+              {!tradeMode && !focusedAgent && (!isMobileView || railExpanded) && (
                 <TradeServiceRail
                   selectedId={selectedService}
                   onSelect={setSelectedService}
                   open={railExpanded}
                   onOpenChange={setRailExpanded}
+                  sheet={isMobileView}
                   onLaunch={(id) => {
                     if (isMobileView) {
                       setRailExpanded(false);

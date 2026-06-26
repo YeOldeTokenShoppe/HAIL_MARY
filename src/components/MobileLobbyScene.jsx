@@ -2,6 +2,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
+import { EffectComposer, SelectiveBloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 
 // ── Mobile /trade lobby — "council of coins" lite-scene ──────────────────────
@@ -17,7 +18,7 @@ import * as THREE from "three";
 //   • coin names → meshes whose name matches COIN_NAME_RE, sorted by name,
 //                  map to CONSULTANTS in order. Name them Coin1..Coin4 (or
 //                  Coin_GR80, etc.) to control the mapping.
-const GLB_PATH = "/models/mobile_angel_coins.glb";
+const GLB_PATH = "/models/mobile_angel_coins3.glb";
 const COIN_NAME_RE = /coin/i;
 
 // `img` = coin-face portrait + intro poster. `introVideo` = the per-character
@@ -25,31 +26,34 @@ const COIN_NAME_RE = /coin/i;
 // null falls back to the still portrait). `tagline` is an optional caption.
 const CONSULTANTS = [
   { id: "gr80",    name: "GR80",    lens: "ETHOS",  accent: "#4dffaa", img: "/thumbnail_gr80.png",       introVideo: null, tagline: null },
-  { id: "demon",   name: "Barron",  lens: "PATHOS", accent: "#ff5db1", img: "/thumbnail_johnBarron.png", introVideo: null, tagline: null },
+  { id: "demon",   name: "John Barron",  lens: "PATHOS", accent: "#ff5db1", img: "/thumbnail_johnBarron.png", introVideo: null, tagline: null },
   { id: "marisol", name: "Marisol", lens: "LOGOS",  accent: "#38e0d0", img: "/thumbnail_marisol.png",    introVideo: null, tagline: null },
   { id: "eugene",  name: "Eugene",  lens: "MYTHOS", accent: "#c49ff0", img: "/thumbnail_eugene.png",      introVideo: null, tagline: null },
 ];
 
-// Generated placeholder coin face (accent ring + initials) so the scaffold
-// renders before real portraits exist. Replaced by the real image when a
-// consultant's `img` is set.
+// Placeholder shown for the beat before the portrait image loads: a blank
+// gold coin with the SAME rim as the struck coin (makeCoinTexture), so the
+// swap is seamless — no character-name text to flash. Center is neutral with
+// a faint accent ring to hint the consultant.
 function makePlaceholderTexture(consultant) {
-  const size = 256;
+  const size = 512;
   const c = document.createElement("canvas");
   c.width = c.height = size;
   const ctx = c.getContext("2d");
+  const cx = size / 2, cy = size / 2;
+  const rOuter = size / 2 - 4;
+  const rInner = rOuter - 30;
+  const g = ctx.createLinearGradient(0, cy - rOuter, 0, cy + rOuter);
+  g.addColorStop(0, "#ffeaa6"); g.addColorStop(0.5, "#d8a93e"); g.addColorStop(1, "#7e5a12");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, rOuter, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = "#0a0e14";
-  ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2); ctx.fill();
-  ctx.lineWidth = 14;
+  ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = 2;
   ctx.strokeStyle = consultant.accent;
-  ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2 - 10, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = consultant.accent;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "bold 88px 'IBM Plex Mono', monospace";
-  ctx.fillText(consultant.name.slice(0, 2).toUpperCase(), size / 2, size / 2 - 8);
-  ctx.font = "bold 26px 'IBM Plex Mono', monospace";
-  ctx.fillText(consultant.lens, size / 2, size / 2 + 66);
+  ctx.globalAlpha = 0.4;
+  ctx.beginPath(); ctx.arc(cx, cy, rInner - 6, 0, Math.PI * 2); ctx.stroke();
+  ctx.globalAlpha = 1;
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -98,21 +102,36 @@ function makeCoinTexture(image, accent) {
   return tex;
 }
 
-function AngelCoins({ onCoinTap }) {
+function AngelCoins({ onCoinTap, onHalo }) {
   const { scene, animations } = useGLTF(GLB_PATH);
   const { actions } = useAnimations(animations, scene);
-  const { camera } = useThree();
+  const { camera, size } = useThree();
 
   // Play whatever animation clips the GLB ships with (angel hover, coin drift).
   useEffect(() => {
     Object.values(actions || {}).forEach((a) => a && a.reset().play());
   }, [actions]);
 
-  // Find coin meshes, assign a consultant + portrait to each.
-  const coins = useMemo(() => {
+  // Find the coin meshes (gold-rim portraits) and Our Lady's halo (emissive,
+  // lifted out for selective bloom).
+  const { coins, halo } = useMemo(() => {
     const found = [];
+    let halo = null;
     scene.traverse((o) => {
-      if (o.isMesh && COIN_NAME_RE.test(o.name)) found.push(o);
+      if (!o.isMesh) return;
+      if (COIN_NAME_RE.test(o.name)) { found.push(o); return; }
+      if (o.name === "Halo") {
+        // Emissive green halo (from the archived selective-bloom setup).
+        // toneMapped:false lets it exceed 1.0 so the bloom pass reads it hot.
+        o.material = o.material.clone();
+        o.material.emissive = new THREE.Color(0xaaff88);
+        o.material.emissiveIntensity = 1.5;
+        o.material.transparent = true;
+        o.material.opacity = 0.95;
+        o.material.toneMapped = false;
+        o.material.needsUpdate = true;
+        halo = o;
+      }
     });
     found.sort((a, b) => a.name.localeCompare(b.name));
     found.forEach((mesh, i) => {
@@ -140,12 +159,55 @@ function AngelCoins({ onCoinTap }) {
       mesh.frustumCulled = false;
       mesh.userData.consultant = consultant;
       // Coins import facing away — flip 180° so the portrait face points at the
-      // camera. If the face ends up upside-down instead of front-facing, switch
-      // rotateX → rotateY.
+      // camera. Idempotent: capture the authored orientation once, then reset
+      // to it before flipping, so a double-invoked useMemo (StrictMode / HMR)
+      // on the cached GLTF can't accumulate rotations and land it upside-down.
+      // (If the face ends up upside-down rather than front-facing, switch
+      // rotateX → rotateY.)
+      if (!mesh.userData._baseQuat) mesh.userData._baseQuat = mesh.quaternion.clone();
+      mesh.quaternion.copy(mesh.userData._baseQuat);
       mesh.rotateX(Math.PI);
     });
-    return found;
+    return { coins: found, halo };
   }, [scene]);
+
+  // Lift the halo mesh to the parent so the EffectComposer can bloom just it.
+  useEffect(() => { if (onHalo) onHalo(halo); }, [halo, onHalo]);
+
+  // Responsive framing: fit + center the content into the band ABOVE the bottom
+  // nav (not the full viewport), so the bottom coins never tuck behind the nav
+  // on short screens — yet it still fills nicely on tall ones. Self-calibrating
+  // from the GLB bounds; recomputes on resize. Tune:
+  //   MARGIN  — breathing room within the band (1.0 = edge-to-edge)
+  //   NAV_PX  — bottom space to reserve (nav + safe area)
+  //   TOP_PX  — top breathing room (under the title)
+  // NOTE: raising the model in Blender won't move it — the camera re-centers on
+  // the model bounds. These screen-space reserves are the lever instead.
+  const MARGIN = 1.32;
+  const NAV_PX = 138;
+  const TOP_PX = 46;
+  useEffect(() => {
+    if (!scene || !size.width || !size.height) return;
+    const box = new THREE.Box3().setFromObject(scene);
+    if (box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const dim = box.getSize(new THREE.Vector3());
+    const aspect = size.width / size.height;
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const tan = Math.tan(vFov / 2);
+    // Fit dim.y into the usable band (height minus nav/top), not the full height.
+    const usableFrac = Math.max(0.4, (size.height - NAV_PX - TOP_PX) / size.height);
+    const fitH = dim.y / (2 * tan * usableFrac);
+    const fitW = dim.x / (2 * tan * aspect);
+    const dist = MARGIN * Math.max(fitH, fitW);
+    // Raise the content so it's centered in that band (reserve more at bottom).
+    const worldH = 2 * dist * tan;
+    const shift = ((NAV_PX - TOP_PX) / size.height) * (worldH / 2);
+    camera.up.set(0, 1, 0);
+    camera.position.set(center.x, center.y - shift, center.z + dist);
+    camera.lookAt(center.x, center.y - shift, center.z);
+    camera.updateProjectionMatrix();
+  }, [scene, size.width, size.height, camera]);
 
   // Gentle idle float — the GLB ships no animation clips, so the liveliness
   // is added here: each coin bobs around its modeled Y, slightly out of phase.
@@ -188,6 +250,7 @@ class SceneBoundary extends React.Component {
 
 export default function MobileLobbyScene({ backdropSrc = null }) {
   const [intro, setIntro] = useState(null); // tapped consultant, or null
+  const [halo, setHalo] = useState(null);   // Our Lady's halo mesh, for bloom
 
   const dpr = typeof window !== "undefined" ? Math.min(window.devicePixelRatio || 1, 1.5) : 1;
 
@@ -214,9 +277,23 @@ export default function MobileLobbyScene({ backdropSrc = null }) {
         <directionalLight position={[2, 4, 5]} intensity={1.1} />
         <Suspense fallback={null}>
           <SceneBoundary>
-            <AngelCoins onCoinTap={setIntro} />
+            <AngelCoins onCoinTap={setIntro} onHalo={setHalo} />
           </SceneBoundary>
         </Suspense>
+        {/* Selective bloom — only Our Lady's halo glows (luminanceThreshold 0
+            blooms the whole selection regardless of the rest of the scene). */}
+        {halo && (
+          <EffectComposer disableNormalPass>
+            <SelectiveBloom
+              selection={[halo]}
+              intensity={2.0}
+              luminanceThreshold={0}
+              luminanceSmoothing={0.3}
+              radius={0.6}
+              mipmapBlur
+            />
+          </EffectComposer>
+        )}
       </Canvas>
 
       {/* Square intro overlay — placeholder. Drop the per-character intro

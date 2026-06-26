@@ -1,26 +1,27 @@
 import React, { useEffect, useRef, useState } from "react";
 
 const SERVICES = [
-  {
-    id: "game",
-    eyebrow: "LEARN",
-    title: "Token Task Force",
-    desc: "Three questions. One verdict.",
-    accent: "phos",
-  },
-  {
-    id: "analysis",
-    eyebrow: "ANALYSIS",
-    title: "Token Review",
-    desc: "Request a team analysis of any token.",
-    accent: "cyan",
+    {
+    id: "quiz",
+    eyebrow: "QUIZ",
+    title: "WHAT KIND OF INVESTOR ARE YOU?",
+    desc: "Find your investor type — and its blind spot.",
+    accent: "amber",
     disabled: true,
     cta: "COMING SOON",
   },
   {
+    id: "game",
+    eyebrow: "LEARN",
+    title: "Crypto Forensic Files",
+    desc: "Three questions. One verdict.",
+    accent: "phos",
+  },
+
+  {
     id: "terminal-traders",
     eyebrow: "PLAY",
-    title: "Terminal Traders",
+    title: "The Trading Card Game",
     desc: "The Trading Card Game.",
     accent: "magenta",
     disabled: true,
@@ -35,6 +36,8 @@ const svgIcon = (paths) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths}</svg>
 );
 const SERVICE_ICONS = {
+  // Investor personality test → brain (lucide "brain")
+  quiz: svgIcon(<><path d="M12 18V5" /><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4" /><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5" /><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77" /><path d="M18 18a4 4 0 0 0 2-7.464" /><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" /><path d="M6 18a4 4 0 0 1-2-7.464" /><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" /></>),
   // Forensics → magnifier
   game: svgIcon(<><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>),
   // Analysis → bar chart
@@ -43,7 +46,7 @@ const SERVICE_ICONS = {
   'terminal-traders': svgIcon(<><rect x="8" y="4" width="12" height="16" rx="2" /><path d="M4 8v10a2 2 0 0 0 2 2h7" /></>),
 };
 
-export default function TradeServiceRail({ selectedId = "game", onSelect, onLaunch, open, onOpenChange } = {}) {
+export default function TradeServiceRail({ selectedId = "game", onSelect, onLaunch, open, onOpenChange, sheet = false } = {}) {
   const activeService = SERVICES.find((s) => s.id === selectedId) ?? SERVICES[0];
   const shellAccent = activeService.accent;
 
@@ -119,8 +122,9 @@ export default function TradeServiceRail({ selectedId = "game", onSelect, onLaun
   return (
     <div
       ref={rootRef}
-      className={`tsr-root tsr-${shellAccent}${expanded ? ' is-expanded' : ''}`}
+      className={`tsr-root tsr-${shellAccent}${expanded ? ' is-expanded' : ''}${sheet ? ' is-sheet' : ''}`}
       aria-label="Trade page services"
+      onClick={sheet ? (e) => { if (e.target === e.currentTarget) closeRail(); } : undefined}
     >
       <style>{STYLES}</style>
       {/* Desktop-only collapsed edge handle. Hidden by CSS on mobile (the
@@ -919,5 +923,78 @@ const STYLES = `
     .tsr-shell,
     .tsr-handle { transition: none; }
   }
+}
+
+/* === Mobile bottom sheet =============================================
+   When sheet mode is set (the mobile lobby), the rail is NOT a persistent bar —
+   it only mounts when opened (via the START FAB) and presents as a full-screen
+   scrim with a slide-up sheet, so nothing covers the scene at rest. Overrides
+   both the ≤520 pill and the desktop dock via specificity. */
+.tsr-root.is-sheet {
+  position: fixed;
+  inset: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: none;
+  transform: none;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: auto;
+  overflow: visible;
+  padding: 0;
+  background: rgba(2, 4, 8, 0.55);
+  animation: tsr-fade-in 180ms ease-out;
+}
+.tsr-root.is-sheet .tsr-handle,
+.tsr-root.is-sheet .tsr-pill { display: none; }
+.tsr-root.is-sheet .tsr-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0;
+  border-radius: 16px 16px 0 0;
+  padding: 18px 14px calc(16px + env(safe-area-inset-bottom));
+  transform: none;
+  animation: tsr-sheet-up 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+/* Grab handle — signals the sheet is dismissible. */
+.tsr-root.is-sheet .tsr-shell::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(200, 210, 222, 0.3);
+}
+.tsr-root.is-sheet .tsr-status {
+  display: flex;
+  min-width: 0;
+  padding: 4px 4px 9px;
+  border-right: none;
+  border-bottom: 1px solid rgba(180, 180, 200, 0.12);
+  justify-content: flex-start;
+}
+.tsr-root.is-sheet .tsr-options {
+  grid-template-columns: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+@keyframes tsr-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tsr-sheet-up { from { transform: translateY(101%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .tsr-root.is-sheet,
+  .tsr-root.is-sheet .tsr-shell { animation: none; }
 }
 `;
