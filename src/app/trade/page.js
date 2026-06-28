@@ -32,6 +32,8 @@ import NavControlsMobile from '@/components/NavControlsMobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import CoinLoader from '@/components/CoinLoader';
 import MobileLobbyScene from '@/components/MobileLobbyScene';
+import HolyGrailPortal from '@/components/HolyGrailPortal';
+import TradeLaptop from '@/components/TradeLaptop';
 import SynthSunset from '@/components/SynthSunset';
 import BuyModal from '@/components/BuyModal';
 import { useBuyModal } from '@/lib/useBuyModal';
@@ -62,6 +64,13 @@ import { useRouter } from 'next/navigation';
 // context=1 (10th positional) is REQUIRED for Next.js per SitePal docs;
 // it switches the embed into the JS-framework bootstrap path so
 // setPlayerVolume / saySilent / replay behave correctly.
+// Mobile /trade hero scene selector — flip to compare candidates without
+// deleting either. 'laptop' = TradeLaptop (the laptop/CRT shell with a clean
+// portal screen, no inner rider — the new direction); 'grail' = HolyGrailPortal
+// (same laptop but with the ironHorseRider emerging through the screen);
+// 'lobby' = MobileLobbyScene (the council-of-coins lite scene).
+const MOBILE_SCENE = 'laptop';
+
 const HOST_SITEPAL_CONFIG = {
   containerId: DEMON_SITEPAL_CONTAINER_ID, // shared host container
   account: "9308752",
@@ -1062,6 +1071,9 @@ function pickInitialCaseIndex(caseFiles) {
 
 export default function CyborgTemple() {
   const [isMobileView, setIsMobileView] = useState(false);
+  // True while HolyGrailPortal is zoomed into its CRT screen — used to hide the
+  // /trade chrome (bottom nav / title) so the fullscreen CRT overlay reads clean.
+  const [grailZoomed, setGrailZoomed] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isSceneLoading, setIsSceneLoading] = useState(true);
@@ -3317,7 +3329,7 @@ export default function CyborgTemple() {
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
             // Raised + tilted down via CameraControlsRig setLookAt below; these
             // values are the seed before the rig takes over.
-            position: isMobileView ? [0, 4.5, 7] : [0, 3.5, 5.5],
+            position: isMobileView ? [0, 4.5, 8] : [0, 3.5, 5.5],
             fov: isMobileView ? 55 : 50
           }}
           gl={{
@@ -3664,9 +3676,21 @@ export default function CyborgTemple() {
         </CleanCanvas>
         )}
 
-        {/* Mobile lobby → lite "council of coins" scene (small angel+coins
-            GLB with portrait-textured coins) instead of the full diorama. */}
-        {canvasReady && isMobileView && <MobileLobbyScene />}
+        {/* Mobile hero scene — selectable via MOBILE_SCENE. 'grail' = the
+            laptop/CRT portal (tap the screen → zoom → fullscreen CRT terminal);
+            'lobby' = the council-of-coins lite scene (angel+coins GLB). */}
+        {canvasReady && isMobileView && (
+          MOBILE_SCENE === 'laptop'
+            ? <TradeLaptop isMobile isActive onZoomChange={setGrailZoomed} />
+            : MOBILE_SCENE === 'grail'
+              ? <HolyGrailPortal isMobile isActive onZoomChange={setGrailZoomed} />
+              : <MobileLobbyScene />
+        )}
+        {/* While zoomed into the CRT, hide the /trade chrome so the fullscreen
+            CRT overlay (z 9999) isn't pierced by the bottom nav (z 10000)/title. */}
+        {grailZoomed && (
+          <style>{`.btm-nav-dock{display:none!important}.custom-title{opacity:0!important;pointer-events:none!important}`}</style>
+        )}
 
         {/* Floating Character Label on Focus */}
         {(() => {

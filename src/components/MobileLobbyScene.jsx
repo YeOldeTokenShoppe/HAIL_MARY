@@ -1,9 +1,10 @@
 "use client";
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { EffectComposer, SelectiveBloom } from "@react-three/postprocessing";
 import * as THREE from "three";
+import { createAsciiDecryptScreen } from "./asciiDecryptScreen";
 
 // ── Mobile /trade lobby — "council of coins" lite-scene ──────────────────────
 // A small angel+coins GLB animated in R3F (the only live WebGL on mobile),
@@ -20,6 +21,11 @@ import * as THREE from "three";
 //                  Coin_GR80, etc.) to control the mapping.
 const GLB_PATH = "/models/mobile_angel_coins3.glb";
 const COIN_NAME_RE = /coin/i;
+
+// The monitor "Screen" mesh (GLTFLoader may suffix duplicates → Screen_1).
+// It's driven by the "ASCII decrypt" reveal ported from ascii-animation.html
+// (see ./asciiDecryptScreen).
+const SCREEN_NAME_RE = /^Screen(_\d+)?$/i;
 
 // `img` = coin-face portrait + intro poster. `introVideo` = the per-character
 // intro clip shown in the tap-to-meet square (set the path when clips exist;
@@ -114,12 +120,14 @@ function AngelCoins({ onCoinTap, onHalo }) {
 
   // Find the coin meshes (gold-rim portraits) and Our Lady's halo (emissive,
   // lifted out for selective bloom).
-  const { coins, halo } = useMemo(() => {
+  const { coins, halo, screen } = useMemo(() => {
     const found = [];
     let halo = null;
+    let screenMesh = null;
     scene.traverse((o) => {
       if (!o.isMesh) return;
       if (COIN_NAME_RE.test(o.name)) { found.push(o); return; }
+      if (SCREEN_NAME_RE.test(o.name)) { screenMesh = o; return; }
       if (o.name === "Halo") {
         // Emissive green halo (from the archived selective-bloom setup).
         // toneMapped:false lets it exceed 1.0 so the bloom pass reads it hot.
@@ -168,11 +176,26 @@ function AngelCoins({ onCoinTap, onHalo }) {
       mesh.quaternion.copy(mesh.userData._baseQuat);
       mesh.rotateX(Math.PI);
     });
-    return { coins: found, halo };
+    // Build the ascii-decrypt screen controller once per mesh (guard against a
+    // double-invoked useMemo on the cached GLTF leaking a second texture).
+    let screen = null;
+    if (screenMesh) {
+      if (!screenMesh.userData._ascii) screenMesh.userData._ascii = createAsciiDecryptScreen(screenMesh);
+      screen = screenMesh.userData._ascii;
+    }
+    return { coins: found, halo, screen };
   }, [scene]);
 
   // Lift the halo mesh to the parent so the EffectComposer can bloom just it.
   useEffect(() => { if (onHalo) onHalo(halo); }, [halo, onHalo]);
+
+  // Dispose the screen's canvas texture when this scene unmounts.
+  useEffect(() => () => { if (screen) screen.dispose(); }, [screen]);
+
+  // Throttle the ascii-decrypt redraw to ~20fps (the scramble shimmer reads fine
+  // there, and it self-stops once settled). Pass real elapsed time so the
+  // decrypt timeline stays accurate despite the throttle.
+  const screenAccum = useRef(0);
 
   // Responsive framing: fit + center the content into the band ABOVE the bottom
   // nav (not the full viewport), so the bottom coins never tuck behind the nav
@@ -183,9 +206,9 @@ function AngelCoins({ onCoinTap, onHalo }) {
   //   TOP_PX  — top breathing room (under the title)
   // NOTE: raising the model in Blender won't move it — the camera re-centers on
   // the model bounds. These screen-space reserves are the lever instead.
-  const MARGIN = 1.32;
-  const NAV_PX = 138;
-  const TOP_PX = 46;
+  const MARGIN = 0.88;
+  const NAV_PX = 7;
+  const TOP_PX = 226;
   useEffect(() => {
     if (!scene || !size.width || !size.height) return;
     const box = new THREE.Box3().setFromObject(scene);
@@ -216,13 +239,21 @@ function AngelCoins({ onCoinTap, onHalo }) {
   // from the GLB. lookAt can flip a flat disc edge-on, so only enable it if a
   // coin's face turns away.
   const BILLBOARD = false;
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     coins.forEach((m, i) => {
       if (m.userData.baseY === undefined) m.userData.baseY = m.position.y;
       m.position.y = m.userData.baseY + Math.sin(t * 0.8 + i * 1.3) * 0.05;
       if (BILLBOARD) m.lookAt(camera.position);
     });
+    if (screen) {
+      screenAccum.current += delta;
+      if (screenAccum.current >= 0.05) {
+        const elapsed = screenAccum.current;
+        screenAccum.current = 0;
+        screen.update(elapsed);
+      }
+    }
   });
 
   return (
@@ -258,12 +289,12 @@ export default function MobileLobbyScene({ backdropSrc = null }) {
     <div className="mls-root">
       <style>{STYLES}</style>
 
-      {/* Backdrop. Defaults to a CSS synthwave grid + starfield so the live
-          GLB angel isn't doubled by a baked one. Pass backdropSrc to use an
-          image set instead (use one WITHOUT the angel/coins). */}
+      {/* Backdrop. Defaults to a CSS daytime blue sky (gradient + drifting
+          clouds) so the live GLB angel isn't doubled by a baked one. Pass
+          backdropSrc to use an image set instead (use one WITHOUT the angel/coins). */}
       {backdropSrc
         ? <img className="mls-bg" src={backdropSrc} alt="" aria-hidden="true" />
-        : <><div className="mls-stars" aria-hidden="true" /><div className="mls-grid" aria-hidden="true" /></>}
+        : <><div className="mls-sky" aria-hidden="true" /><div className="mls-clouds" aria-hidden="true" /></>}
 
       <Canvas
         className="mls-canvas"
@@ -331,30 +362,30 @@ export default function MobileLobbyScene({ backdropSrc = null }) {
 }
 
 const STYLES = `
-.mls-root { position: absolute; inset: 0; overflow: hidden; background: #000; z-index: 2; }
+.mls-root { position: absolute; inset: 0; overflow: hidden; background: #bfe0f5; z-index: 2; }
 .mls-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .mls-canvas { touch-action: manipulation; }
 
-.mls-stars {
-  position: absolute; top: 0; left: 0; right: 0; height: 60%; pointer-events: none;
-  background-image:
-    radial-gradient(1.2px 1.2px at 14% 24%, rgba(255,255,255,0.9), transparent),
-    radial-gradient(1px 1px at 32% 12%, rgba(255,255,255,0.7), transparent),
-    radial-gradient(1.3px 1.3px at 67% 20%, rgba(255,255,255,0.85), transparent),
-    radial-gradient(1px 1px at 84% 14%, rgba(255,255,255,0.6), transparent),
-    radial-gradient(1.1px 1.1px at 90% 32%, rgba(255,255,255,0.75), transparent);
-  animation: mls-twinkle 4.2s ease-in-out infinite;
+/* Daytime blue sky: deep azure at the zenith fading to pale haze at the horizon,
+   with a soft sun glow in the upper area. */
+.mls-sky {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 78% 8%, rgba(255,252,235,0.55), transparent 42%),
+    linear-gradient(to bottom, #3f86cf 0%, #6fb0e6 38%, #a9d6f2 72%, #e3f2fb 100%);
 }
-.mls-grid {
-  position: absolute; left: 50%; bottom: 0; width: 320%; height: 52%;
-  transform: translateX(-50%) perspective(340px) rotateX(70deg);
-  transform-origin: bottom center; pointer-events: none;
+/* Drifting soft clouds — fluffy white radial blobs that slowly pan across. */
+.mls-clouds {
+  position: absolute; top: 0; left: -20%; right: -20%; height: 70%; pointer-events: none;
   background-image:
-    linear-gradient(rgba(77,255,140,0.32) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(77,255,140,0.32) 1px, transparent 1px);
-  background-size: 46px 46px;
-  -webkit-mask-image: linear-gradient(to top, #000 26%, transparent 88%);
-          mask-image: linear-gradient(to top, #000 26%, transparent 88%);
+    radial-gradient(70px 28px at 18% 30%, rgba(255,255,255,0.95), transparent 70%),
+    radial-gradient(90px 34px at 26% 38%, rgba(255,255,255,0.9), transparent 72%),
+    radial-gradient(60px 24px at 33% 28%, rgba(255,255,255,0.85), transparent 70%),
+    radial-gradient(80px 30px at 64% 18%, rgba(255,255,255,0.92), transparent 72%),
+    radial-gradient(100px 36px at 73% 26%, rgba(255,255,255,0.88), transparent 72%),
+    radial-gradient(64px 26px at 88% 44%, rgba(255,255,255,0.8), transparent 70%);
+  background-repeat: no-repeat;
+  animation: mls-drift 60s linear infinite;
 }
 
 .mls-intro-backdrop {
@@ -384,6 +415,6 @@ const STYLES = `
 .mls-intro-lens { font-size: 10px; font-weight: 800; letter-spacing: 0.22em; }
 .mls-intro-caption { margin-top: 4px; font-size: 11px; color: rgba(200,210,222,0.6); }
 
-@keyframes mls-twinkle { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .mls-stars { animation: none; } }
+@keyframes mls-drift { from { transform: translateX(0); } to { transform: translateX(6%); } }
+@media (prefers-reduced-motion: reduce) { .mls-clouds { animation: none; } }
 `;
