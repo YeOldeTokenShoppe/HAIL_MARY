@@ -1685,7 +1685,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                       fontStyle: 'italic',
                       pointerEvents: 'none'
                     }}>
-                      Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
+                      Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, metaphysicist and medieval scholar.
                     </p>
                     
                     {/* Additional flavor text */}
@@ -1994,7 +1994,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                     textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px rgba(212, 175, 55, 0.3)',
                     fontStyle: 'italic',
                   }}>
-                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
+                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, metaphysicist and medieval scholar.
                   </p>
                   <p style={{
                     color: '#8e662b',
@@ -2172,7 +2172,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
                       fontStyle: 'italic',
                     }}
                   >
-                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
+                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, metaphysicist and medieval scholar.
                   </p>
                   <p
                     style={{

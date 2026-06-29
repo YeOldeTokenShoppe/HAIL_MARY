@@ -19,6 +19,7 @@ import { useGLTF, MeshPortalMaterial, CameraControls, Text, useProgress, RenderT
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import BuyModal from './BuyModal';
 import FullscreenCRTOverlay from './FullscreenCRTOverlay';
+import MobileTerminalGame from './trade/MobileTerminalGame';
 import { useLanguage } from './LanguageProvider';
 import { createAsciiDecryptScreen } from './asciiDecryptScreen';
 
@@ -569,7 +570,7 @@ function AsciiModelScreen({
           <RenderTexture attach="uniforms-uSource-value" width={fboSize} height={fboSize}>
             {/* Pulled back so the full figure + halo fits the square frame with
                 headroom (was clipping the top); fboSize bump keeps the detail. */}
-            <PerspectiveCamera makeDefault manual aspect={1} fov={32} position={[0, 0, 3.8]} />
+            <PerspectiveCamera makeDefault manual aspect={1} fov={32} position={[0, 0.0, 3.8]} />
             <color attach="background" args={['#000000']} />
             <ambientLight intensity={1.1} />
             <directionalLight position={[2, 3, 4]} intensity={2.4} />
@@ -711,16 +712,43 @@ function HudOverlay({ screenWidth = 1.45, screenHeight = 1.0, infoRef, ...props 
       const sb = 2 + Math.floor((Math.sin(frame * 0.25) * 0.5 + 0.5) * 3);
       for (let i = 0; i < 4; i++) { const bh = 6 + i * 5; ctx.fillStyle = i < sb ? HUD_CY : HUD_CYd; ctx.fillRect(fp.x + fp.w - 74 + i * 13, fp.y + 22 - bh, 9, bh); }
 
-      // waveform inside the SIGNAL panel
+      // [SIGNAL] panel: a 2D trace of the geometric beacon (the same sacred-
+      // geometry knot the desktop projector casts) instead of a generic
+      // waveform — a Lissajous knot that slowly rotates/morphs. Cyan with a
+      // gold echo nods to the beacon's multi-strand look and ties mobile to the
+      // desktop scene.
       const wv = px(HUD.wave);
-      if (frame % 2 === 0) { wave.push(Math.random()); wave.shift(); }
-      ctx.strokeStyle = HUD_CY; ctx.lineWidth = 2; ctx.beginPath();
-      for (let i = 0; i < wave.length; i++) {
-        const x = wv.x + 10 + (i / (wave.length - 1)) * (wv.w - 20);
-        const y = wv.y + wv.h * 0.62 + (wave[i] - 0.5) * (wv.h * 0.5);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      const kcx = wv.x + wv.w / 2;
+      const kcy = wv.y + wv.h * 0.56;
+      const krx = wv.w * 0.34;
+      const kry = wv.h * 0.34;
+      const phi = frame * 0.05;
+      // Four strands in the beacon's four colours — one per character lens — so
+      // the SIGNAL knot mirrors the desktop beacon's "four strands, one signal".
+      // Phase-offset so they weave around each other as they rotate.
+      const strands = [
+        { col: '#37e3e3',              ph: 0.0 }, // cyan
+        { col: 'rgba(255,210,58,0.85)', ph: 0.5 }, // gold
+        { col: 'rgba(255,92,200,0.8)',  ph: 1.0 }, // magenta
+        { col: 'rgba(92,255,155,0.8)',  ph: 1.5 }, // green
+      ];
+      ctx.save();
+      ctx.lineWidth = 1.6;
+      ctx.shadowBlur = 5;
+      const KN = 180;
+      for (const s of strands) {
+        ctx.strokeStyle = s.col;
+        ctx.shadowColor = s.col;
+        ctx.beginPath();
+        for (let i = 0; i <= KN; i++) {
+          const th = (i / KN) * Math.PI * 2;
+          const x = kcx + krx * Math.sin(3 * th + phi + s.ph);
+          const y = kcy + kry * Math.sin(2 * th - phi * 0.6);
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
+      ctx.restore();
 
       // footer status line
       const ft = px(HUD.footer);
@@ -1615,8 +1643,8 @@ export default function TradeLaptop({ isMobile = false, isTabletPortrait = false
           alpha: true,
         }}
         camera={{
-          fov: 50,
-          position: [0, 0.5, 5],
+          fov: 60,
+          position: [0, 1.0, 4.5],
           near: 0.1,
           far: 100
         }}
@@ -1694,35 +1722,21 @@ export default function TradeLaptop({ isMobile = false, isTabletPortrait = false
         }}
       />
 
-      {/* Fullscreen CRT Overlay - rendered via portal to escape carousel transforms */}
+      {/* Mobile: tapping into the laptop opens the Liminal Terminal game
+          (COUNCIL grid → live SitePal consultant channels), portaled to escape
+          carousel transforms. Replaces the old credo CRT boot (FullscreenCRTOverlay,
+          kept imported for the planned in-game MENU that will front this — "menu
+          options instead of the credo"). */}
       {typeof document !== 'undefined' && createPortal(
-        <FullscreenCRTOverlay
-          isActive={showFullscreenCRT}
-          onClose={() => {
-            // Fade out overlay, then return to the pre-zoom view
+        <MobileTerminalGame
+          active={showFullscreenCRT}
+          onExit={() => {
+            // Fade out, then return to the pre-zoom laptop view.
             setShowFullscreenCRT(false);
             setTimeout(() => {
               restoreView(true);
               setIsZoomedIn(false);
             }, 300);
-          }}
-          onLineComplete={() => {
-            if (digitalTextSoundRef.current) {
-              digitalTextSoundRef.current.currentTime = 0;
-              digitalTextSoundRef.current.play().catch(() => {});
-            }
-          }}
-          locale={locale}
-          textSequence={getCrtTextSequence(t, locale)}
-          terminalTitle={t('crtScreen.terminalTitle') || 'RL80 TERMINAL v1.0'}
-          terminalStatus={t('crtScreen.secureConnection') || 'SECURE CONNECTION'}
-          tapToReturnLabel={t('crtScreen.tapToReturn') || '> tap anywhere to return'}
-          actionButton={{
-            label: t('crtScreen.buyButton') || 'BUY RL80',
-            onClick: () => {
-              setShowFullscreenCRT(false);
-              setShowBuyModal(true);
-            },
           }}
         />,
         document.body

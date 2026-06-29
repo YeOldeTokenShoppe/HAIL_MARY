@@ -10,6 +10,8 @@ import { Html, SpotLight } from "@react-three/drei";
 import AnnotationSystem from "@/components/AnnotationSystem";
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
 import HolographicStatue3 from "@/components/HolographicStatue3";
+import BeaconBeam from "@/components/BeaconBeam";
+import { createLaptopCrtScreen } from "@/components/laptopCrtScreen";
 
 // Agent camera focus settings — module-level so the dev tuning panel
 // (CameraTuningPanel) can mutate values in place. The click handler reads
@@ -119,6 +121,20 @@ export const HOLO_STATUE_MOBILE = {
   position: [-0.085, 0.9, -0.03], // placeholder — tune for the mobile shift
   scale: [0.5, 0.5, 0.5],
   rotation: [0, -Math.PI * 0.2, 0],
+};
+
+// Nudge the geometric "sacred geometry" beacon from code instead of
+// re-exporting the GLB. Applied every frame on top of the shape cluster's
+// baked transform (the "Empty" container of the Shape* meshes):
+//   position — added, in the container's local units (x, y, z)
+//   rotation — added, in radians (the Take 001 spin is separate; this just
+//              reorients the whole cluster)
+//   scale    — multiplies the baked scale
+// All-zero / scale 1 leaves it exactly as baked. Edit + save to see it live.
+export const GEOMETRIC_SHAPE_NUDGE = {
+  position: [-0.05, 0, 0.05],
+  rotation: [0, 0, 0],
+  scale: 1,
 };
 
 // XZ nudge applied to Angel_Empty so the angel sits centered on the
@@ -438,7 +454,17 @@ const CyborgTempleScene = ({
   // Refs for MOBILE.glb animated objects
   const angelEmptyRef = useRef(); // Parent container for angel and coins
   const angelRef = useRef();
-  const angelSpotTarget = useMemo(() => new THREE.Object3D(), []);
+  // Broadcast-beam target — tracks the geometric beacon baked into the scene
+  // GLB (captured into beaconRef at load). Renamed from angelSpotTarget: the
+  // cherub it used to reference is gone as of v76.
+  const beamTarget = useMemo(() => new THREE.Object3D(), []);
+  const beaconRef = useRef(null);
+  const projectorRef = useRef(null); // hologram-projector base the beam rises from
+  const beamTmp = useRef(new THREE.Vector3());
+  const beaconContainerRef = useRef(null); // "Empty" parent of the Shape* meshes
+  const beaconBaked = useRef(null);        // its baked transform (nudge baseline)
+  const laptopCrtRef = useRef(null);       // shared CRT terminal texture for desk laptops
+  useEffect(() => () => { laptopCrtRef.current?.dispose?.(); laptopCrtRef.current = null; }, []);
   // Per-character spotlight targets for the curtain call. Positioned at
   // each character's stage-lineup x, mid-chest height, so the spotlights
   // converge on their torsos. Created once and reused via primitive refs.
@@ -1616,8 +1642,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v70_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v70.glb";
+    let modelPath = "/models/RL80_4anims_v78_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v78.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -2034,6 +2060,22 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         actionsRef.current[charName] = {};
       });
 
+      // Geometric "sacred geometry" beacon (baked into the scene GLB) — its
+      // "Take 001" clip rotates the four colored emissive shapes (the spin +
+      // color-shift that presides over the floor in lieu of a figure). It's not
+      // a character, so give it its own mixer rooted at the scene; the per-frame
+      // loop ticks every mixer registered in mixersRef.
+      {
+        const geoClip = gltf.animations.find((a) => a.name === 'Take 001');
+        if (geoClip) {
+          const geoMixer = new THREE.AnimationMixer(templeScene);
+          const geoAction = geoMixer.clipAction(geoClip);
+          geoAction.setLoop(THREE.LoopRepeat, Infinity);
+          geoAction.play();
+          mixersRef.current['GeometricShape'] = geoMixer;
+        }
+      }
+
       // Helper function to clean animation tracks - only remove truly problematic tracks
       const cleanAnimationTracks = (animation, targetObject) => {
         // Get all bone names in the target object, including nested paths
@@ -2374,10 +2416,41 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
       const gridGeometry = new THREE.BufferGeometry();
       gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridPositions, 3));
-      const gridMaterial = new THREE.LineBasicMaterial({
-        color: 0x00ff41,
-        opacity: 0.3,
+      // Teal phosphor grid that dissolves into the void with distance (radial
+      // fade in the shader) instead of the old hard acid-green Tron grid — joins
+      // the cyan beam/screen palette and reads as "decoded space" rather than a
+      // synthwave starter grid.
+      const gridMaterial = new THREE.ShaderMaterial({
         transparent: true,
+        depthWrite: false,
+        uniforms: {
+          uColor: { value: new THREE.Color(0x35e8ff) },
+          uOpacity: { value: 0.6 },
+          uRadius: { value: gridRadius },
+        },
+        vertexShader: `
+          varying vec3 vPos;
+          void main() {
+            vPos = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vPos;
+          uniform vec3 uColor;
+          uniform float uOpacity;
+          uniform float uRadius;
+          void main() {
+            // Radial distance must be computed PER FRAGMENT: the grid chords
+            // have both endpoints on the rim, so a vertex-stage distance would
+            // interpolate to a constant (rim) along the whole line. Deriving it
+            // from the interpolated position fixes that.
+            float d = length(vPos.xz) / uRadius;
+            float fade = 1.0 - smoothstep(0.65, 1.0, d);
+            if (fade <= 0.001) discard;
+            gl_FragColor = vec4(uColor, uOpacity * fade);
+          }
+        `,
       });
       const gridHelper = new THREE.LineSegments(gridGeometry, gridMaterial);
       gridHelper.position.y = -0.06;
@@ -2682,11 +2755,94 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           child.position.z += ANGEL_POSITION_OFFSET.z;
         }
 
+        // Capture the geometric beacon (the spinning "sacred geometry" shapes
+        // baked into the GLB) so the broadcast beam can aim at its real world
+        // position. The four Shape* meshes are concentric → first one ≈ center.
+        if (child.isMesh && child.name.startsWith('Shape') && !beaconRef.current) {
+          beaconRef.current = child;
+        }
+
+        // Capture the hologram-projector base (the "_hologram_basewire" mesh at
+        // the center of the desks). The broadcast beam emanates from here and
+        // rises up so the beacon shape floats within the projected cone.
+        if (child.isMesh && !projectorRef.current) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          if (mats.some((m) => m && /basewire/i.test(m.name || ''))) {
+            projectorRef.current = child;
+          }
+        }
+
+        // Capture the geometric beacon container (the "Empty" parent of the four
+        // Shape* meshes) and its baked transform, so GEOMETRIC_SHAPE_NUDGE can
+        // offset the whole cluster from code without re-exporting the GLB.
+        if (!beaconContainerRef.current && child.children &&
+            child.children.filter((c) => c.name && c.name.startsWith('Shape')).length >= 2) {
+          beaconContainerRef.current = child;
+          beaconBaked.current = {
+            pos: child.position.clone(),
+            rot: child.rotation.clone(),
+            scl: child.scale.clone(),
+          };
+        }
+
+        // Give the flat grey desks corner definition. They're MeshStandard but
+        // the uniform grey + dim lighting hides their edges, so derive edge
+        // lines from each desk's geometry and add them as a child (effectively a
+        // clone of the geometry with a different material). Subtle cyan reads as
+        // a rim/corner highlight, on-palette with the grid and beam.
+        if (child.isMesh && child.name.startsWith('Desk') && !child.userData.__edged) {
+          child.userData.__edged = true;
+          const deskEdges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(child.geometry, 30),
+            new THREE.LineBasicMaterial({
+              color: 0x8fd6e6,
+              transparent: true,
+              opacity: 0.4,
+              depthWrite: false,
+            })
+          );
+          child.add(deskEdges);
+        }
+
+        // Desk laptops (LaptopScreen1-4) start as blank cyan screens — give them
+        // the Liminal Terminal CRT treatment: a shared animated code-feed texture
+        // (unlit so the screen glows), echoing the mobile hero's terminal.
+        if (child.isMesh && /^LaptopScreen/.test(child.name)) {
+          if (!laptopCrtRef.current) laptopCrtRef.current = createLaptopCrtScreen({ w: 512, h: 320 });
+          child.material = new THREE.MeshBasicMaterial({
+            map: laptopCrtRef.current.texture,
+            toneMapped: false,
+            side: THREE.DoubleSide,
+          });
+          // The screen quad's baked UVs only cover a sub-rect of a texture atlas
+          // (u 0→~0.66), so the full CRT canvas wouldn't fill it. Normalize the
+          // quad's UVs to a clean 0–1 rect so the texture maps edge-to-edge — no
+          // GLB re-export needed.
+          const uv = child.geometry.attributes.uv;
+          if (uv) {
+            let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+            for (let i = 0; i < uv.count; i++) {
+              const u = uv.getX(i), v = uv.getY(i);
+              minU = Math.min(minU, u); maxU = Math.max(maxU, u);
+              minV = Math.min(minV, v); maxV = Math.max(maxV, v);
+            }
+            const du = (maxU - minU) || 1, dv = (maxV - minV) || 1;
+            for (let i = 0; i < uv.count; i++) {
+              uv.setXY(i, (uv.getX(i) - minU) / du, (uv.getY(i) - minV) / dv);
+            }
+            uv.needsUpdate = true;
+          }
+        }
+
         // Capture the angel mesh on every device — the desktop and mobile
         // GLBs both ship with a visible angel and we want focus to work in
         // both contexts.
         if (child.name === 'angel' || child.name === 'Angel') {
           angelRef.current = child;
+          // Redesign: the holographic Our Lady now presides over the desktop
+          // scene, so hide the marble cherub there. Mobile keeps it (the
+          // TradeLaptop hero covers this scene on phones anyway).
+          if (!isOnMobile) child.visible = false;
           // Swap unlit MeshBasicMaterial for MeshStandardMaterial so the
           // altar spotlight actually illuminates the angel surface.
           child.traverse((obj) => {
@@ -4591,6 +4747,27 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         }
       });
     }
+
+    // Aim the broadcast beam at the geometric beacon's live world position
+    // (replaces the old fixed angel-spot target — the primitive's position prop
+    // is now just a pre-load fallback). worldToLocal puts it into the beam
+    // target's parent space so the SpotLight points exactly at the beacon.
+    if (beaconRef.current && beamTarget.parent) {
+      beaconRef.current.getWorldPosition(beamTmp.current);
+      beamTarget.parent.worldToLocal(beamTmp.current);
+      beamTarget.position.copy(beamTmp.current);
+    }
+
+    // Apply GEOMETRIC_SHAPE_NUDGE on top of the beacon container's baked
+    // transform (lets the shape be nudged from code without re-exporting).
+    if (beaconContainerRef.current && beaconBaked.current) {
+      const c = beaconContainerRef.current;
+      const b = beaconBaked.current;
+      const n = GEOMETRIC_SHAPE_NUDGE;
+      c.position.set(b.pos.x + n.position[0], b.pos.y + n.position[1], b.pos.z + n.position[2]);
+      c.rotation.set(b.rot.x + n.rotation[0], b.rot.y + n.rotation[1], b.rot.z + n.rotation[2]);
+      c.scale.set(b.scl.x * n.scale, b.scl.y * n.scale, b.scl.z * n.scale);
+    }
     
     // Handle Demon animation alternation — mostly typing/idle, occasional
     // one-shot fistpump/laughing.
@@ -5824,6 +6001,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           const cfg = isOnMobile ? HOLO_STATUE_MOBILE : HOLO_STATUE_DESKTOP;
           return (
             <>
+              {/* HolographicStatue3 disabled — the presiding element is now the
+                  baked-in geometric "sacred geometry" beacon (Take 001 clip) that
+                  ships inside the scene GLB (v76), not a statue. Avoids reusing the
+                  landing page's holographic Our Lady. Kept here for reference. */}
               {/* <HolographicStatue3
                 position={cfg.position}
                 scale={cfg.scale}
@@ -5838,19 +6019,35 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               {!revealMode && (
                 <>
                   <primitive
-                    object={angelSpotTarget}
-                    position={[cfg.position[0], cfg.position[1] + 15, cfg.position[2]]}
+                    object={beamTarget}
+                    position={[cfg.position[0], cfg.position[1] + 2, cfg.position[2]]}
                   />
                   <SpotLight
-                    position={[-0.05, 1.52, 0]}
-                    target={angelSpotTarget}
-                    angle={0.35}
+                    position={[0, 1.52, 0.05]}
+                    target={beamTarget}
+                    angle={Math.PI / 6}
                     castShadow
-                    intensity={1}
-                    penumbra={0.1}
-                    color={'#e9f1ea'}
-                    distance={15}
-                    opacity={0.2}
+                    intensity={0}
+                    penumbra={0.2}
+                    color={'#ffffff'}
+                    distance={2.0}
+                    opacity={0}
+                    // attenuation={4}
+                    // anglePower={6}
+                  />
+                  {/* Visible beam mesh — the SpotLight volumetric above is too
+                      faint to read, so this shaft is the actual beam. It emanates
+                      from the hologram-projector base (projectorRef) at the center
+                      of the desks and rises up, projecting the beacon shape within
+                      it. Tune via props; drop the SpotLight's opacity to 0 if you
+                      only want this. */}
+                  <BeaconBeam
+                    anchorRef={projectorRef}
+                    color="#35e8ff"
+                    height={0.7}
+                    topRadius={0.20}
+                    bottomRadius={0.03}
+                    opacity={0.1}
                   />
                 </>
               )}
