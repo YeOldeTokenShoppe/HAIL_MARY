@@ -1183,10 +1183,12 @@ const CyborgTempleScene = ({
   // is showing the SitePal avatar so they don't draw over its face.
   const demonBrowMeshesRef = useRef([]);
 
-  // Monk SitePal refs (Face1/Face2/Eyes + per-character crop canvas).
+  // Monk SitePal refs (Face1/Face2/Eyes + per-character crop canvas). Eyes are
+  // collected as an ARRAY — the mesh was split into MonkEyeR / MonkEyeL (two
+  // objects sharing the MonkEyes geometry), so both must be hidden.
   const monkFace1MeshRef = useRef(null);
   const monkFace2MeshRef = useRef(null);
-  const monkEyesMeshRef = useRef(null);
+  const monkEyesMeshesRef = useRef([]);
   const monkSitePalRef = useRef({
     cropCanvas: null,
     cropCtx: null,
@@ -1642,8 +1644,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v78_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v78.glb";
+    let modelPath = "/models/RL80_4anims_v80_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v80.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -1952,9 +1954,12 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               bone.visible = false;
             }
             if (bone.isMesh &&
-                /^monk_eyes([._]\w+)?$/i.test(bone.name || '') &&
-                !monkEyesMeshRef.current) {
-              monkEyesMeshRef.current = bone;
+                // Match MonkEyes / MonkEyeR / MonkEyeL (no underscore — unlike
+                // Monk_Face1/2) plus suffix variants, and collect ALL of them so
+                // the split L/R eye meshes both hide behind the SitePal projection.
+                /^monk_?eye(s|r|l)?([._]\w+)?$/i.test(bone.name || '') &&
+                !monkEyesMeshesRef.current.includes(bone)) {
+              monkEyesMeshesRef.current.push(bone);
             }
           });
           monkHeadBoneRef.current =
@@ -4694,7 +4699,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       state: monkSitePalRef.current,
       face1Ref: monkFace1MeshRef,
       face2Ref: monkFace2MeshRef,
-      hideRefs: [monkEyesMeshRef],
+      hideMeshes: [...monkEyesMeshesRef.current],
     });
 
     // One-shot: establish camera-controls' internal spherical state at

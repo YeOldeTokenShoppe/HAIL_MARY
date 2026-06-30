@@ -71,6 +71,12 @@ import { useRouter } from 'next/navigation';
 // 'lobby' = MobileLobbyScene (the council-of-coins lite scene).
 const MOBILE_SCENE = 'laptop';
 
+// Top in-scene HUD strip (// CASE picker + ticker + "investigate or render
+// verdict" hint + help). Hidden by default — scans live in the bottom station
+// cluster, the verdict control + MENU live in the bottom dock, so the strip is
+// redundant. Flip to true to bring it back (e.g. when multi-case switching ships).
+const SHOW_CASE_HUD_STRIP = false;
+
 const HOST_SITEPAL_CONFIG = {
   containerId: DEMON_SITEPAL_CONTAINER_ID, // shared host container
   account: "9308752",
@@ -1157,6 +1163,10 @@ export default function CyborgTemple() {
   // Stations the player has rotated to at least once — drives intro vs return
   // micro-line selection. Reset on enterGameMode.
   const [visitedStations, setVisitedStations] = useState(() => new Set());
+  // The last consultant (SitePal-voiced station) the player sat with. Persists
+  // after focus drops for the curtain call, so the end-of-case debrief can be
+  // SPOKEN by that character — mirrors the mobile RevealScreen's hero speaker.
+  const [lastConsultantStation, setLastConsultantStation] = useState(null);
   // The currently-displayed Q&A in the side panel. Cleared on character switch
   // or when the player taps a new question. `null` = show the question list.
   const [activeAnswer, setActiveAnswer] = useState(null);
@@ -1175,6 +1185,13 @@ export default function CyborgTemple() {
   // on asking a question, or on character switch.
   const [currentSpeech, setCurrentSpeech] = useState(null);
   // shape: { stationKey, text, kind: 'intro' | 'return' } | null
+
+  // SitePal's built-in transcript (.vhsshtml5_transcript), mirrored from the
+  // hidden shared host. When captions are enabled on the scenes it streams the
+  // spoken text in perfect sync with the audio — we show it in place of
+  // ProgressiveText's ~70ms/char estimate, falling back to ProgressiveText when
+  // it's empty (no transcript for that line / captions off).
+  const [hostCaption, setHostCaption] = useState("");
 
   // Queued next speech beat. Used to split the monk's first-visit rules
   // preamble from his intro line — rules render first; CONTINUE swaps in the
@@ -1406,6 +1423,35 @@ export default function CyborgTemple() {
     return () => clearTimeout(t);
   }, [currentSpeech]);
 
+  // Clear the mirrored SitePal caption when a new beat starts, so stale text
+  // doesn't linger before the new line's transcript streams in.
+  useEffect(() => { setHostCaption(""); }, [currentSpeech]);
+
+  // Mirror SitePal's audio-synced transcript from the (hidden) shared host into
+  // hostCaption. The node is created asynchronously and reused across scene
+  // swaps, so poll until it exists, then observe it. Empty updates are ignored
+  // so the last line lingers until the next beat resets it.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    let obs, poll, cancelled = false;
+    const attach = () => {
+      const host = document.getElementById(DEMON_SITEPAL_CONTAINER_ID);
+      const el = host && host.querySelector(".vhsshtml5_transcript");
+      if (!el) return false;
+      const emit = () => {
+        if (cancelled) return;
+        const t = (el.innerText || "").replace(/\s+/g, " ").trim();
+        if (t) setHostCaption(t);
+      };
+      obs = new MutationObserver(emit);
+      obs.observe(el, { childList: true, subtree: true, characterData: true });
+      emit();
+      return true;
+    };
+    if (!attach()) poll = setInterval(() => { if (attach()) clearInterval(poll); }, 400);
+    return () => { cancelled = true; if (obs) obs.disconnect(); if (poll) clearInterval(poll); };
+  }, []);
+
   // Drive speechReady from the audio lifecycle: mark "started" while audio
   // is playing, then flip ready true on the next transition to false.
   useEffect(() => {
@@ -1565,6 +1611,7 @@ export default function CyborgTemple() {
     setReviewCase(null);
     setAsked(createEmptyAskedMap());
     setVisitedStations(new Set());
+    setLastConsultantStation(null);
     setActiveAnswer(null);
     setActiveReaction(null);
     rulesSpokenRef.current = false;
@@ -1585,6 +1632,7 @@ export default function CyborgTemple() {
     setGameStarted(true);
     setAsked(createEmptyAskedMap());
     setVisitedStations(new Set());
+    setLastConsultantStation(null);
     setActiveAnswer(null);
     setActiveReaction(null);
     rulesSpokenRef.current = true; // skip rules on reviews — players got them in forensics
@@ -1720,6 +1768,7 @@ export default function CyborgTemple() {
     setCurrentCaseIndex(index);
     setAsked(createEmptyAskedMap());
     setVisitedStations(new Set());
+    setLastConsultantStation(null);
     setVerdict(null);
     setBrier(null);
     setConfidence(null);
@@ -2282,9 +2331,22 @@ export default function CyborgTemple() {
   // Computed: what the focused character will say after the truth is revealed.
   // Stores the raw line so the speak effect can pass audio through; `text` is
   // pre-resolved for the reveal modal's display.
+  // Track the last consultant the player focused that actually has a SitePal
+  // voice (Demon/Detective/Monk — not text-only Eugene), so the debrief can be
+  // delivered by them once focus drops for the curtain call.
+  useEffect(() => {
+    if (!focusedAgent || !SITEPAL_PROJECTION_CONFIG[focusedAgent]) return;
+    const st = CHARACTER_TO_STATION[focusedAgent];
+    if (st) setLastConsultantStation(st);
+  }, [focusedAgent]);
+
   const vindicationDelivery = useMemo(() => {
     if (!verdict) return null;
-    const stationKey = focusedAgent && CHARACTER_TO_STATION[focusedAgent];
+    // Prefer the currently-focused consultant; once focus drops for the curtain
+    // call, fall back to the last consultant the player sat with, then to monk
+    // (who emcees) — so the debrief is always SPOKEN by a character rather than
+    // shown as the silent "THE TERMINAL" text. Mirrors the mobile reveal speaker.
+    const stationKey = (focusedAgent && CHARACTER_TO_STATION[focusedAgent]) || lastConsultantStation || 'monk';
     if (!stationKey) return null;
     const station = caseData.stations[stationKey];
     const vKey = pickVindicationKey(verdict, caseData.correctVerdict);
@@ -2292,7 +2354,7 @@ export default function CyborgTemple() {
     const resolved = resolveLine(line);
     if (!resolved || !resolved.text) return null;
     return { stationKey, character: station.character, line, text: resolved.text };
-  }, [verdict, focusedAgent, caseData]);
+  }, [verdict, focusedAgent, caseData, lastConsultantStation]);
 
   // Reveal-phase driver.
   //
@@ -2459,7 +2521,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v78_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v80_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -3949,8 +4011,9 @@ export default function CyborgTemple() {
                 />
               )}
               {/* In-scene HUD strip — top of viewport, 40px tall, doesn't
-                  block. Shows case name + scans remaining. */}
-              {tradeMode === 'game' && !verdict && (
+                  block. Case picker + ticker + hint + help. Hidden via
+                  SHOW_CASE_HUD_STRIP (redundant with the bottom dock). */}
+              {SHOW_CASE_HUD_STRIP && tradeMode === 'game' && !verdict && (
                 <div
                   style={{
                     position: 'fixed',
@@ -4245,7 +4308,7 @@ export default function CyborgTemple() {
                   {/* Top section: question content state machine, or a
                       "tap a consultant" hint when no character is focused. */}
                   {focusedAgent && CHARACTER_TO_STATION[focusedAgent] && gameStation ? (
-                  <div style={{ minHeight: currentSpeech ? (isMobileView ? 0 : 210) : 0, maxHeight: isMobileView ? '38vh' : '46vh', overflowY: 'auto', padding: isMobileView ? '8px 10px' : '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ minHeight: currentSpeech ? (isMobileView ? 0 : 130) : 0, maxHeight: isMobileView ? '38vh' : '46vh', overflowY: 'auto', padding: isMobileView ? '8px 10px' : '10px 14px', borderBottom: '1px solid rgba(77,255,170,0.18)', display: 'flex', flexDirection: 'column' }}>
                     {(() => {
                       const stationKey = gameActiveStation;
                       const askedAtStation = asked[stationKey] || new Set();
@@ -4282,15 +4345,15 @@ export default function CyborgTemple() {
                                 — her pink bubble already serves this role. */}
                             {stationKey !== 'eugene' && !isMobileView && (
                               <div style={{
-                                padding: '14px 16px',
+                                padding: '8px 12px',
                                 borderLeft: '2px solid #ff3ea0',
                                 background: 'rgba(255,62,160,0.05)',
                               }}>
-                                <div style={{
+                                <div translate="no" className="notranslate" style={{
                                   fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                  fontSize: 24,
+                                  fontSize: 18,
                                   color: '#c8ffe0',
-                                  lineHeight: 1.45,
+                                  lineHeight: 1.35,
                                 }}>
                                   "{resolveLine(activeAnswer.a)?.text || ''}"
                                 </div>
@@ -4421,19 +4484,30 @@ export default function CyborgTemple() {
                                 clear. */}
                             {showCaption && (
                             <div style={{
-                              padding: isMobileView ? '8px 10px' : '14px 16px',
+                              padding: isMobileView ? '8px 10px' : '8px 12px',
                               borderLeft: '2px solid #ff3ea0',
                               background: 'rgba(255,62,160,0.05)',
                             }}>
-                              <div style={{
+                              {/* translate="no": the caption is a live, rapidly-
+                                  mutating text node mirroring the avatar's ENGLISH
+                                  audio. Letting Chrome/Google translate rewrite it
+                                  (it wraps text in <font> tags) races React's
+                                  updates and throws "removeChild ... not a child". */}
+                              <div translate="no" style={{
                                 fontFamily: "'Cinzel Decorative','Cinzel',serif",
-                                fontSize: isMobileView ? 15 : 24,
+                                fontSize: isMobileView ? 15 : 18,
                                 color: '#c8ffe0',
-                                lineHeight: 1.4,
+                                lineHeight: 1.35,
                                 textAlign: 'center',
                                 minHeight: isMobileView ? '1.4em' : undefined,
                               }}>
-                                {isMobileView ? (
+                                {/* SitePal's transcript is audio-synced; prefer it
+                                    over the estimated reveal. Falls back to the
+                                    progressive reveal when it's empty (captions off
+                                    on the scene, or before the line streams in). */}
+                                {hostCaption ? (
+                                  <span className="notranslate">{hostCaption}</span>
+                                ) : isMobileView ? (
                                   <LiveCaption
                                     text={currentSpeech.text}
                                     isPlaying={speechActive}
@@ -4444,8 +4518,8 @@ export default function CyborgTemple() {
                                     text={currentSpeech.text}
                                     isPlaying={speechActive}
                                     audioDurationMs={currentSpeech.audioDurationMs}
-                                    maxVisibleLines={3}
-                                    approxLineHeight={1.4}
+                                    maxVisibleLines={2}
+                                    approxLineHeight={1.35}
                                   />
                                 )}
                               </div>
@@ -4872,7 +4946,7 @@ export default function CyborgTemple() {
                           {vindicated && (
                             <div
                               style={{
-                                width: isMobileView ? 'min(720px, calc(100vw - 24px))' : 'min(620px, 64vw)',
+                                width: isMobileView ? 'min(720px, calc(100vw - 24px))' : 'auto',
                                 padding: '10px 16px 11px',
                                 border: '1px solid rgba(255,62,160,0.45)',
                                 // Accent on the left in the mobile sheet, on top
@@ -4886,8 +4960,14 @@ export default function CyborgTemple() {
                                 ...(isMobileView ? {} : {
                                   position: 'fixed',
                                   top: '1.5rem',
-                                  left: '50%',
-                                  transform: 'translateX(-50%)',
+                                  // Reserve the right-docked score panel's column
+                                  // (min(360px,34vw) + its ~0.85rem padding) so the
+                                  // banner can't overlap it, then center the banner
+                                  // (capped at 620px) within the remaining left space.
+                                  left: '1.5rem',
+                                  right: 'calc(min(360px, 34vw) + 2rem)',
+                                  maxWidth: '620px',
+                                  margin: '0 auto',
                                   zIndex: 10600,
                                   textAlign: 'center',
                                 }),
@@ -4905,10 +4985,9 @@ export default function CyborgTemple() {
                                 lineHeight: 1.4,
                                 pointerEvents: 'auto',
                                 ...fadeIn(true),
-                                // Re-assert the centering transform AFTER fadeIn,
-                                // which would otherwise overwrite it with
-                                // translateY(0) and leave the quote off-center.
-                                ...(isMobileView ? {} : { transform: 'translateX(-50%)' }),
+                                // Banner now centers via left/right/margin (not a
+                                // transform), so fadeIn's translateY runs as-is —
+                                // no transform re-assert needed.
                               }}
                             >
                               <div style={{
