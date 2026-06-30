@@ -372,10 +372,10 @@ const MarketEmojis = ({ centerPosition = [1, 15, -9], onDataUpdate, manualFearGr
   useEffect(() => {
     const fetchFearGreedIndex = async () => {
       try {
-        // Try CoinMarketCap API first with your API key
-        const cmcApiKey = process.env.NEXT_PUBLIC_COINMARKETCAP;
-        if (cmcApiKey) {
-          // Using proxy to avoid CORS issues
+        // Try CoinMarketCap first via the server-side proxy. The API key
+        // lives on the server only, so the client never sees it — we just
+        // hit the proxy and fall through to /api/fear-greed if it fails.
+        {
           const cmcResponse = await fetch('/api/cmc-fear-greed', {
             method: 'GET',
             headers: {

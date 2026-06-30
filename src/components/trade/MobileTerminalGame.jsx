@@ -16,7 +16,7 @@ import CASE_001 from "@/components/game/cases/case-001";
 //
 // TODO: front this with a MENU screen ("menu options instead of the credo"),
 // and connect the state to the real case sequence + Brier scoring in page.js.
-const SITEPAL_SCENES = { monk: 2774449, demon: 2774900, marisol: 2774916 };
+const SITEPAL_SCENES = { monk: 2774449, demon: 2775052, marisol: 2774916 };
 
 // Top-level hub options shown after boot. TODO: confirm full list with design —
 // currently Learning Modules + the live Case Files investigation.
@@ -36,6 +36,9 @@ export default function MobileTerminalGame({ active = true, caseData = CASE_001,
   const [asked, setAsked] = useState({});       // { stationKey: number[] }
   const [revealed, setRevealed] = useState({}); // { stationKey: string[] }
   const [visited, setVisited] = useState([]);
+  // True once the boot intro has played; subsequent returns to the hub skip the
+  // welcome animation and show the menu options straight away.
+  const [bootSeen, setBootSeen] = useState(false);
 
   const openChannel = (key) => {
     setActiveStation(key);
@@ -54,12 +57,19 @@ export default function MobileTerminalGame({ active = true, caseData = CASE_001,
 
   if (!active) return null;
 
+  // Hero speaker for the reveal: the last consultant the player actually sat with
+  // who has a live SitePal scene (Eugene is text-only); Monk emcees as the fallback
+  // since he opens the briefing.
+  const revealSpeaker = [...visited].reverse().find((k) => SITEPAL_SCENES[k]) || "monk";
+
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 10050, background: "#02100e" }}>
       {screen === "boot" ? (
         <TerminalBoot
           options={HUB_OPTIONS}
+          instant={bootSeen}
           onSelect={(key) => {
+            setBootSeen(true);
             if (key === "cases") { setScreen("menu"); return; }
             setPlaceholderLabel(HUB_OPTIONS.find((o) => o.key === key)?.label || "MODULE");
             setScreen("placeholder");
@@ -90,6 +100,9 @@ export default function MobileTerminalGame({ active = true, caseData = CASE_001,
           caseData={caseData}
           verdict={verdict}
           confidence={confidence}
+          investigated={Object.keys(asked).filter((k) => (asked[k]?.length || 0) > 0)}
+          speakerKey={revealSpeaker}
+          speakerSceneId={SITEPAL_SCENES[revealSpeaker]}
           onExit={() => {
             // reset for a fresh investigation, return to the hub
             setScansUsed(0); setAsked({}); setRevealed({}); setVisited([]);
@@ -101,6 +114,7 @@ export default function MobileTerminalGame({ active = true, caseData = CASE_001,
         <ChannelView
           stationKey={activeStation}
           station={caseData.stations[activeStation]}
+          caseId={caseData.id}
           scansUsed={scansUsed}
           scansMax={scansMax}
           asked={asked[activeStation] || []}

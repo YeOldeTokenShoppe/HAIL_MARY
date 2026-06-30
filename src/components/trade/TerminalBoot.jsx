@@ -14,12 +14,15 @@ const BOOT_LINES = [
   { t: "SELECT A MODULE", c: "gold" },
 ];
 
-export default function TerminalBoot({ options = [], onSelect, onExit }) {
-  const [lineIdx, setLineIdx] = useState(0);
+export default function TerminalBoot({ options = [], onSelect, onExit, instant = false }) {
+  // `instant` skips the welcome typing and jumps straight to the hub menu — used
+  // when returning to the terminal so you don't re-watch the login animation.
+  const [lineIdx, setLineIdx] = useState(instant ? BOOT_LINES.length : 0);
   const [typed, setTyped] = useState("");
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(instant);
 
   useEffect(() => {
+    if (instant) return;
     if (lineIdx >= BOOT_LINES.length) { setDone(true); return; }
     const full = BOOT_LINES[lineIdx].t;
     setTyped("");
@@ -33,11 +36,13 @@ export default function TerminalBoot({ options = [], onSelect, onExit }) {
       }
     }, 26);
     return () => clearInterval(id);
-  }, [lineIdx]);
+  }, [lineIdx, instant]);
 
   const skip = () => { if (!done) { setLineIdx(BOOT_LINES.length); setDone(true); } };
 
-  const shown = BOOT_LINES.slice(0, lineIdx);
+  // On instant return, show only the "SELECT A MODULE" header (skip the verbose
+  // login log); otherwise reveal the log progressively as it types.
+  const shown = instant ? BOOT_LINES.slice(-1) : BOOT_LINES.slice(0, lineIdx);
   const current = lineIdx < BOOT_LINES.length ? BOOT_LINES[lineIdx] : null;
   const pfx = (l) => (l.c === "hi" || l.c === "gold" ? "" : "> ");
 
@@ -82,7 +87,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit }) {
       </div>
 
       {done && (
-        <button className="tb-exit" onClick={(e) => { e.stopPropagation(); onExit?.(); }}>◀ DISCONNECT</button>
+        <button className="tb-exit" onClick={(e) => { e.stopPropagation(); onExit?.(); }}>◀ EXIT</button>
       )}
 
       <style>{`

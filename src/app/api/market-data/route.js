@@ -354,16 +354,18 @@ async function fetchFundingRates() {
 async function fetchOpenInterest() {
   try {
     // First try CoinMarketCap if we have API key
-    const cmcApiKey = process.env.NEXT_PUBLIC_COINMARKETCAP || process.env.COINMARKETCAP_API_KEY;
-    
+    const cmcApiKey = process.env.COINMARKETCAP_API_KEY;
+
     if (cmcApiKey) {
       try {
-        // Try to get global metrics which includes derivatives data
+        // Try to get global metrics which includes derivatives data.
+        // Cache upstream for 5 min — global metrics barely move minute-to-minute.
         const globalResponse = await fetch('https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest', {
           headers: {
             'X-CMC_PRO_API_KEY': cmcApiKey,
             'Accept': 'application/json'
-          }
+          },
+          next: { revalidate: 300 },
         });
         
         if (globalResponse.ok) {

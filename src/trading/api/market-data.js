@@ -308,7 +308,7 @@ async function fetchFundingRates() {
 async function fetchOpenInterest() {
   try {
     // First try CoinMarketCap if we have API key
-    const cmcApiKey = process.env.NEXT_PUBLIC_COINMARKETCAP || process.env.COINMARKETCAP_API_KEY;
+    const cmcApiKey = process.env.COINMARKETCAP_API_KEY;
     
     if (cmcApiKey) {
       try {

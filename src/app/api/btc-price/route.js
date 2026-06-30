@@ -5,19 +5,22 @@ const TRADEABLE_SYMBOLS = 'BTC,ETH,SOL,XRP';
 
 export async function GET() {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_COINMARKETCAP;
+    const apiKey = process.env.COINMARKETCAP_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
     }
 
-    // CoinMarketCap - fetch all tradeable assets in a single batched call
+    // CoinMarketCap - fetch all tradeable assets in a single batched call.
+    // Cache the upstream response for 60s so bursts of visitors reuse one
+    // CMC call instead of burning a credit each — prices are fine at 1-min granularity.
     const response = await fetch(`https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${TRADEABLE_SYMBOLS}`, {
       method: 'GET',
       headers: {
         'X-CMC_PRO_API_KEY': apiKey,
         'Accept': 'application/json',
-      }
+      },
+      next: { revalidate: 60 },
     });
 
     if (!response.ok) {

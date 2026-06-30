@@ -34,7 +34,8 @@ const FOUNTAIN_TRACK_PATHS = [
   // "audio/like-a-prayer-madonna.m4a",          // Like A Prayer - Madonna
   // "audio/99RedBalloons.mp3",        // 99 Luftballoons - Nena
   "audio/PersonalJesus.m4a",        // Personal Jesus - Depeche Mode
-  "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
+  // "audio/TwilightZone.m4a",         // Twilight Zone - Golden Earring
+  "/audio/EveryLittleThing.mp3",
 "audio/Cities.mp3",          
 "/audio/WishingWell.m4a",          // Wishing Well - Sananda Maitraya
   // "audio/AhLeah.m4a",              // Ah Leah! Donnie Iris

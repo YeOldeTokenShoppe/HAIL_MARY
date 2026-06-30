@@ -41,7 +41,7 @@ import ReviewFunnel from '@/components/ReviewFunnel';
 import ConsensusRibbon from '@/components/ConsensusRibbon';
 import TradeServiceRail from '@/components/TradeServiceRail';
 import ConfidenceVerdict from '@/components/ConfidenceVerdict';
-import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine, lensLabel, recordCaseResult, readSessionScore, sessionAvgBrier, sessionAccuracy } from '@/components/GameOverlay';
+import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine, lensLabel, coverageNote, recordCaseResult, readSessionScore, sessionAvgBrier, sessionAccuracy } from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
 import SitePalCropPanel from '@/components/SitePalCropPanel';
 import { runDirectedTurn } from '@/lib/trade/beatRunner';
@@ -1107,6 +1107,9 @@ export default function CyborgTemple() {
   // center "START" button can reveal the menu — first-time visitors were
   // missing the slim edge handle.
   const [railExpanded, setRailExpanded] = useState(false);
+  // Imperative handle to the mobile TradeLaptop so the START FAB can dive
+  // straight into the CRT terminal (same as tapping the laptop screen).
+  const laptopRef = useRef(null);
   // Lobby "MORE" popover (right bottom-nav slot) — mirrors the shrine's MORE
   // menu so the bottom nav reads as one shared system across pages.
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -3681,7 +3684,7 @@ export default function CyborgTemple() {
             'lobby' = the council-of-coins lite scene (angel+coins GLB). */}
         {canvasReady && isMobileView && (
           MOBILE_SCENE === 'laptop'
-            ? <TradeLaptop isMobile isActive onZoomChange={setGrailZoomed} />
+            ? <TradeLaptop ref={laptopRef} isMobile isActive onZoomChange={setGrailZoomed} />
             : MOBILE_SCENE === 'grail'
               ? <HolyGrailPortal isMobile isActive onZoomChange={setGrailZoomed} />
               : <MobileLobbyScene />
@@ -4833,33 +4836,10 @@ export default function CyborgTemple() {
                       const gradeColor = !hasBrier ? '#6db59a' : brier <= 0.15 ? '#8effc4' : brier <= 0.30 ? '#ffb84d' : '#ff4d6d';
                       // Committed P(scam) from the confidence slider, for the HUD.
                       const confPct = confidence != null ? Math.round(confidence * 100) : null;
-                      // Lens coaching — where the case-cracking evidence lived
-                      // (decisiveLenses = station keys) vs. where the player
-                      // actually spent scans (investigated = Set of station keys).
-                      const decisive = Array.isArray(caseData.decisiveLenses) ? caseData.decisiveLenses : [];
-                      const lensName = (k) => lensLabel(caseData.stations[k]) || k;
-                      const charName = (k) => caseData.stations[k]?.character || lensName(k);
-                      // Always pair the character with their lens — "Saint GR80
-                      // (CREDIBILITY)" — so the note teaches the mapping rather than
-                      // assuming the player already knows who owns which lens.
-                      const tag = (k) => `${charName(k)} (${lensName(k)})`;
-                      const joinAnd = (arr) =>
-                        arr.length <= 1 ? (arr[0] || '')
-                        : arr.length === 2 ? `${arr[0]} and ${arr[1]}`
-                        : `${arr.slice(0, -1).join(', ')}, and ${arr[arr.length - 1]}`;
-                      const missedDecisive = decisive.filter((k) => !investigated.has(k));
-                      const caughtDecisive = decisive.filter((k) => investigated.has(k));
-                      let lensNote = null;
-                      if (decisive.length > 0) {
-                        const where = `The tell was in ${joinAnd(decisive.map(tag))}.`;
-                        if (missedDecisive.length === 0) {
-                          lensNote = `${where} You looked there — good instincts.`;
-                        } else if (caughtDecisive.length === 0) {
-                          lensNote = `${where} And you never looked there.`;
-                        } else {
-                          lensNote = `${where} You consulted ${joinAnd(caughtDecisive.map(charName))} but never ${joinAnd(missedDecisive.map(charName))}.`;
-                        }
-                      }
+                      // Breadth nudge — encourages triangulating across multiple
+                      // consultants rather than one lens. Shared helper so the
+                      // mobile RevealScreen renders the identical note.
+                      const { note: lensNote, tone: lensTone } = coverageNote(caseData, investigated);
                       // Running session totals (snapshotted at commit time).
                       const avgB = sessionAvgBrier(sessionScore);
                       const acc = sessionAccuracy(sessionScore);
@@ -5075,9 +5055,9 @@ export default function CyborgTemple() {
                                       fontSize: 9.5,
                                       lineHeight: 1.4,
                                       letterSpacing: '0.02em',
-                                      color: missedDecisive.length === 0 ? '#7fe6b3' : '#f0c98a',
+                                      color: lensTone === 'affirm' ? '#7fe6b3' : '#9fdcea',
                                     }}>
-                                      <span style={{ letterSpacing: '0.22em', color: '#3a6b54' }}>// LENS · </span>
+                                      <span style={{ letterSpacing: '0.22em', color: '#3a6b54' }}>// TRADECRAFT · </span>
                                       {lensNote}
                                     </div>
                                   )}
@@ -5154,6 +5134,14 @@ export default function CyborgTemple() {
                    opens the services drawer. In game/review modes the
                    centerSlot below overrides the FAB with the verdict UI. */
                 onBuyClick={() => {
+                  // Mobile: START dives straight into the CRT terminal (same as
+                  // tapping the laptop screen / green key), skipping the services
+                  // rail. Desktop keeps the rail-drawer toggle.
+                  if (isMobileView) {
+                    setFocusedAgent(null);
+                    laptopRef.current?.enterTerminal();
+                    return;
+                  }
                   if (railExpanded) {
                     setRailExpanded(false);
                   } else {

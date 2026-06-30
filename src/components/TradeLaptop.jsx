@@ -11,7 +11,7 @@
 // LaptopFrame children. The rider's sky-gradient world, clouds, breath smoke,
 // spotlight and the model-through-screen clipping have all been stripped out.
 
-import React, { useRef, useState, useEffect, Suspense, useMemo } from "react";
+import React, { useRef, useState, useEffect, Suspense, useMemo, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -1450,7 +1450,7 @@ function SceneLoader({ children }) {
 }
 
 // Main exported component
-export default function TradeLaptop({ isMobile = false, isTabletPortrait = false, onZoomChange, viewOffsetX = 0, isActive = true }) {
+const TradeLaptop = forwardRef(function TradeLaptop({ isMobile = false, isTabletPortrait = false, onZoomChange, viewOffsetX = 0, isActive = true }, ref) {
   const [clientReady, setClientReady] = useState(false);
   const cameraControlsRef = useRef();
   const feedAnchorRef = useRef(); // world anchor at the ASCII feed centre (fly-in target)
@@ -1585,11 +1585,12 @@ export default function TradeLaptop({ isMobile = false, isTabletPortrait = false
           }
         });
         setIsZoomedIn(true);
-        // Show fullscreen overlay after zoom animation, play data display sound
+        // Show fullscreen overlay after the zoom — the camera settles by ~600ms,
+        // then we LINGER on the zoomed-in laptop screen before the CRT takes over.
         setTimeout(() => {
           setShowFullscreenCRT(true);
           playSound(dataDisplaySoundRef);
-        }, 600); // Delay to let camera zoom complete
+        }, 1400); // ~600ms zoom + ~800ms hold on the zoomed view
       }
       return;
     }
@@ -1624,6 +1625,15 @@ export default function TradeLaptop({ isMobile = false, isTabletPortrait = false
       setIsZoomedIn(true);
     }
   };
+
+  // Imperative entry used by the page's mobile START button so it dives straight
+  // into the CRT terminal (same as tapping the laptop screen / green key) rather
+  // than opening the services rail. No-op if already zoomed in / in the CRT.
+  useImperativeHandle(ref, () => ({
+    enterTerminal: () => {
+      if (!showFullscreenCRT && !isZoomedIn) handleCameraZoom();
+    },
+  }), [showFullscreenCRT, isZoomedIn]);
 
   return (
     <div style={{
@@ -1743,7 +1753,9 @@ export default function TradeLaptop({ isMobile = false, isTabletPortrait = false
       )}
     </div>
   );
-}
+});
+
+export default TradeLaptop;
 
 // Preload the models
 useGLTF.preload('/models/laptop.glb');

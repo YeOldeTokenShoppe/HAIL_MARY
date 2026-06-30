@@ -10,9 +10,9 @@
 //   • If CMC_X402_BASE_URL is set, route through that proxy — it pays
 //     the per-call x402 fee out of the proxy's wallet. No CMC key needed
 //     here. Matches the "metered via cmc-x402" choice from the design.
-//   • Otherwise use the regular CMC Pro API key (COINMARKETCAP_API_KEY
-//     or NEXT_PUBLIC_COINMARKETCAP — the latter matches the existing
-//     env-var names used by /api/cmc-fear-greed and /api/market-data).
+//   • Otherwise use the regular CMC Pro API key (COINMARKETCAP_API_KEY).
+//     This is a server-only var — never NEXT_PUBLIC — shared with
+//     /api/cmc-fear-greed, /api/btc-price and /api/market-data.
 //
 // CMC's `/v2/cryptocurrency/info?address=...` returns a map keyed by
 // CMC numeric id; each entry has a `platform` plus a `contract_address`
@@ -65,10 +65,7 @@ function resolveCmcAuth() {
   if (proxy) {
     return { mode: 'x402', baseUrl: proxy.replace(/\/+$/, ''), apiKey: null };
   }
-  const apiKey =
-    process.env.COINMARKETCAP_API_KEY ||
-    process.env.NEXT_PUBLIC_COINMARKETCAP ||
-    null;
+  const apiKey = process.env.COINMARKETCAP_API_KEY || null;
   return {
     mode: 'direct',
     baseUrl: 'https://pro-api.coinmarketcap.com',

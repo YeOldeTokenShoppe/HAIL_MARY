@@ -4,7 +4,7 @@
 export default async function handler(req, res) {
   try {
     // Use CoinMarketCap API if key is available
-    const cmcApiKey = process.env.NEXT_PUBLIC_COINMARKETCAP || process.env.COINMARKETCAP_API_KEY;
+    const cmcApiKey = process.env.COINMARKETCAP_API_KEY;
     
     if (cmcApiKey) {
       // Fetch Fear & Greed from CoinMarketCap

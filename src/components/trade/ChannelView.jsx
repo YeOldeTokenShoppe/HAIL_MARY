@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CHARACTER_META } from "@/components/CaseFile/characterMeta";
 import SitePalFeed from "@/components/trade/SitePalFeed";
+import EvidenceOverlay, { hasRichVisual } from "@/components/EvidenceOverlay";
 
 // Mobile CHANNEL view — what opens when you tap a consultant in the COUNCIL
 // comms grid. The consultant's "feed" fills the CRT (portrait + scanlines +
@@ -17,6 +18,7 @@ const THREAT_COLORS = { red: "#ff5454", amber: "#ffb13a", green: "#4dffaa" };
 export default function ChannelView({
   stationKey,
   station,            // caseData.stations[stationKey]
+  caseId,             // e.g. "case-001" — used to resolve rich evidence visuals
   scansUsed = 0,
   scansMax = 3,
   asked = [],         // question indices already asked of THIS station
@@ -48,30 +50,67 @@ export default function ChannelView({
     voice: station.voice,
   } : null;
 
-  // Typewriter
+  // Live SitePal drives its own speaking state via talk callbacks
+  // (vh_talkStarted → 'speaking', vh_talkEnded → 'ready'); the static portrait
+  // path falls back to the typewriter as the speaking proxy.
+  const [feedStatus, setFeedStatus] = useState("connecting");
+  // SitePal's built-in caption text, mirrored up from SitePalFeed. It's perfectly
+  // audio-synced, so when SitePal is driving we show THIS in the body caption below
+  // (SitePal's on-video overlay is hidden), falling back to the typewriter only
+  // until SitePal emits text for the current line.
+  const [sitePalCaption, setSitePalCaption] = useState("");
+  // Evidence entry currently expanded into the fullscreen EvidenceOverlay.
+  const [evidenceEntry, setEvidenceEntry] = useState(null);
+
+  // Caption typewriter (fallback when SitePal isn't supplying synced text). For the live SitePal feed we ANCHOR the caption to the
+  // avatar's real speech instead of racing ahead on a fixed timer: it holds at
+  // empty until talk actually begins ('speaking'), types at roughly speech pace,
+  // and snaps to the full line the instant talk ends ('ready') so it never lags
+  // the audio's finish. The static-portrait / Web-Speech path types immediately.
+  const CHAR_MS = 108; // ~21 chars/sec — near natural speech, a hair ahead of it
   const [typed, setTyped] = useState("");
+  const typedRef = useRef(0);
+
+  // Reset the caption (and kick optional Web-Speech TTS) on each new line.
   useEffect(() => {
+    typedRef.current = 0;
     setTyped("");
-    let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      setTyped(currentLine.slice(0, i));
-      if (i >= currentLine.length) clearInterval(id);
-    }, 22);
-    if (tts && typeof window !== "undefined" && window.speechSynthesis) {
+    setSitePalCaption("");
+    if (!useSitePal && tts && typeof window !== "undefined" && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(currentLine));
       } catch (e) {}
     }
-    return () => clearInterval(id);
-  }, [currentLine, tts]);
-  const speaking = typed.length < currentLine.length;
+  }, [currentLine, tts, useSitePal]);
 
-  // Live SitePal drives its own speaking state via talk callbacks; the static
-  // portrait path falls back to the typewriter as the speaking proxy.
-  const [feedStatus, setFeedStatus] = useState("connecting");
+  // When SitePal speech ends, snap to the full line so the caption can't trail
+  // behind the audio finishing.
+  useEffect(() => {
+    if (useSitePal && feedStatus === "ready" && typedRef.current > 0 && typedRef.current < currentLine.length) {
+      typedRef.current = currentLine.length;
+      setTyped(currentLine);
+    }
+  }, [feedStatus, useSitePal, currentLine]);
+
+  // Run the typewriter. For SitePal, only advance while the avatar is actually
+  // speaking; the static path types straight away.
+  useEffect(() => {
+    const active = useSitePal ? feedStatus === "speaking" : true;
+    if (!active || typedRef.current >= currentLine.length) return;
+    const id = setInterval(() => {
+      typedRef.current += 1;
+      setTyped(currentLine.slice(0, typedRef.current));
+      if (typedRef.current >= currentLine.length) clearInterval(id);
+    }, CHAR_MS);
+    return () => clearInterval(id);
+  }, [currentLine, feedStatus, useSitePal]);
+
+  const speaking = typed.length < currentLine.length;
   const isSpeaking = useSitePal ? feedStatus === "speaking" : speaking;
+  // Prefer SitePal's perfectly-synced caption when it's driving; fall back to the
+  // typewriter (non-SitePal, or before SitePal emits text for this line).
+  const captionText = useSitePal ? (sitePalCaption || typed) : typed;
   const xmitLabel = useSitePal
     ? (feedStatus === "connecting" ? "CONNECTING" : feedStatus === "speaking" ? "TRANSMITTING" : "LISTENING")
     : (speaking ? "TRANSMITTING" : "STANDBY");
@@ -94,7 +133,7 @@ export default function ChannelView({
       {/* the feed */}
       <div className="cv-feed">
         {useSitePal ? (
-          <SitePalFeed sceneId={sitePalSceneId} line={lineObj} onStatus={setFeedStatus} />
+          <SitePalFeed sceneId={sitePalSceneId} line={lineObj} onStatus={setFeedStatus} onCaption={setSitePalCaption} />
         ) : (
           <>
             <img className="cv-portrait" src={meta.portrait} alt={meta.name} draggable={false} />
@@ -114,8 +153,14 @@ export default function ChannelView({
 
       {/* scrollable body */}
       <div className="cv-body">
-        <div className="cv-caption">
-          {typed}<span className="cv-cursor">{speaking ? "▋" : ""}</span>
+        {/* translate="no": the caption is a live, rapidly-mutating text node that
+            mirrors the avatar's ENGLISH audio. Letting Chrome/Google translate
+            rewrite it (it wraps text in <font> tags) races React's updates and
+            throws "removeChild ... not a child of this node". Excluding it also
+            keeps the subtitle in sync with the spoken voice. */}
+        <div className="cv-caption" translate="no">
+          <span className="cv-caption-text notranslate">{captionText}</span>
+          <span className="cv-cursor">{isSpeaking ? "▋" : ""}</span>
         </div>
 
         {evidence.length > 0 && (
@@ -124,6 +169,9 @@ export default function ChannelView({
               <div key={e.label} className="cv-card" style={{ "--th": THREAT_COLORS[e.threat] || color }}>
                 <span className="cv-card-label">▣ {e.label}</span>
                 <span className="cv-card-value">{e.value}</span>
+                {hasRichVisual(caseId, stationKey, e) && (
+                  <button className="cv-card-view" onClick={() => setEvidenceEntry(e)}>▸ VIEW EVIDENCE</button>
+                )}
               </div>
             ))}
           </div>
@@ -152,6 +200,18 @@ export default function ChannelView({
       {/* footer */}
       <button className="cv-verdict" onClick={onVerdict}>RENDER VERDICT ▸</button>
 
+      {/* Fullscreen "monitor view" of a revealed evidence card — same overlay
+          the desktop VIEW EVIDENCE button opens. position:fixed, so it escapes
+          the channel and covers the viewport. */}
+      <EvidenceOverlay
+        isActive={!!evidenceEntry}
+        caseId={caseId}
+        stationKey={stationKey}
+        station={station}
+        entry={evidenceEntry}
+        onClose={() => setEvidenceEntry(null)}
+      />
+
       <style>{`
         .cv-root {
           position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -178,7 +238,7 @@ export default function ChannelView({
         .cv-pip--on { background: #ffd23a; opacity: 1; box-shadow: 0 0 5px #ffd23a; }
 
         .cv-feed {
-          position: relative; height: 230px; margin: 0 12px; overflow: hidden; flex-shrink: 0;
+          position: relative; height: 420px; margin: 0 12px; overflow: hidden; flex-shrink: 0;
           border: 1.5px solid var(--cvc);
           clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
           box-shadow: inset 0 0 30px color-mix(in srgb, var(--cvc) 28%, transparent);
@@ -205,8 +265,10 @@ export default function ChannelView({
 
         .cv-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; z-index: 6; }
         .cv-caption {
-          min-height: 64px; font-size: 13.5px; line-height: 1.5; color: #d6fff6;
-          border-left: 2px solid var(--cvc); padding: 6px 0 10px 10px; margin-bottom: 12px;
+          /* SitePal feeds at most ~2 lines at a time, so the box only needs to
+             reserve 2 lines (it still grows if a line wraps longer). */
+          min-height: 38px; font-size: 13.5px; line-height: 1.4; color: #d6fff6;
+          text-align: center; padding: 4px 12px 6px; margin-bottom: 10px;
           text-shadow: 0 0 6px rgba(47,214,214,0.25);
         }
         .cv-cursor { color: var(--cvc); }
@@ -218,6 +280,14 @@ export default function ChannelView({
         }
         .cv-card-label { font-size: 10.5px; letter-spacing: 0.08em; color: var(--th); text-shadow: 0 0 6px color-mix(in srgb, var(--th) 50%, transparent); }
         .cv-card-value { font-size: 12.5px; color: #eafff9; }
+        .cv-card-view {
+          margin-top: 7px; align-self: flex-start;
+          background: color-mix(in srgb, var(--th) 12%, transparent);
+          border: 1px solid var(--th); color: var(--th);
+          font: inherit; font-size: 10px; letter-spacing: 0.2em; padding: 5px 11px; cursor: pointer;
+          clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+        }
+        .cv-card-view:active { transform: scale(0.98); }
 
         .cv-qhead { font-size: 10.5px; letter-spacing: 0.12em; color: #ffd23a; opacity: 0.85; margin-bottom: 8px; }
         .cv-questions { display: flex; flex-direction: column; gap: 7px; }

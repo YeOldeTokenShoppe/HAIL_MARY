@@ -1,6 +1,8 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
+import SitePalFeed from "@/components/trade/SitePalFeed";
 import { CHARACTER_META, CHARACTER_ORDER } from "@/components/CaseFile/characterMeta";
+import { coverageNote } from "@/components/GameOverlay";
 
 // Reveal screen — outcome + Brier + the case truth + each consultant's
 // vindication line + the decisive lens. Self-contained off the case data.
@@ -13,15 +15,33 @@ const OUT = {
 // vindication values are sometimes {text,audio}, sometimes a bare string.
 const vtext = (v) => (typeof v === "string" ? v : v?.text || "");
 
-export default function RevealScreen({ caseData, verdict, confidence = 0.5, onExit }) {
+export default function RevealScreen({ caseData, verdict, confidence = 0.5, investigated = [], speakerKey, speakerSceneId, onExit }) {
   const correct = caseData.correctVerdict;
   const outcome = verdict === "abstain" ? "abstained" : verdict === correct ? "aligned" : "missed";
   const o = OUT[outcome];
   const wasScam = correct === "doubt";
   const brier = Math.pow(confidence - (wasScam ? 1 : 0), 2);
-  const decisive = (caseData.decisiveLenses || [])
-    .map((k) => `${CHARACTER_META[k]?.role} · ${CHARACTER_META[k]?.name}`)
-    .filter(Boolean);
+  // Breadth nudge (shared with desktop) — encourages cross-checking multiple
+  // consultants instead of reading the case through one character's lens.
+  const { note: lensNote, tone: lensTone } = coverageNote(caseData, investigated);
+
+  // Hero speaker — the last consultant the player sat with (chosen by the parent)
+  // delivers their vindication line live via SitePal, reusing the channel's exact
+  // plumbing. The rest of the council stays as text. Caption falls back to the raw
+  // line until SitePal emits its audio-synced transcript (mirrors ChannelView).
+  const [spkCaption, setSpkCaption] = useState("");
+  const speaker = speakerKey ? caseData.stations[speakerKey] : null;
+  const speakerMeta = speakerKey ? CHARACTER_META[speakerKey] : null;
+  const speakerRaw = speaker?.vindication?.[outcome];
+  const speakerText = vtext(speakerRaw);
+  const speakerLine = speaker && speakerText
+    ? {
+        key: `${speakerKey}-${outcome}`,
+        audio: (speakerRaw && typeof speakerRaw === "object" ? speakerRaw.audio : null) || null,
+        text: speakerText,
+        voice: speaker.voice,
+      }
+    : null;
 
   return (
     <div className="rv-root">
@@ -34,11 +54,29 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, onEx
           <span className="rv-brier">BRIER {brier.toFixed(2)} <i>· 0 = perfect</i></span>
         </div>
 
+        {speakerSceneId && speakerLine && (
+          <div className="rv-feed">
+            <div className="rv-feed-frame">
+              <SitePalFeed sceneId={speakerSceneId} line={speakerLine} onCaption={setSpkCaption} />
+              <span className="rv-feed-live" style={{ "--c": speakerMeta?.color || "#4dffaa" }}>◉ ON THE LINE</span>
+            </div>
+            <div className="rv-feed-name" style={{ color: speakerMeta?.color || "#4dffaa" }}>
+              {speakerMeta?.sigil} {speakerMeta?.name}
+            </div>
+            <div className="rv-feed-cap">{spkCaption || speakerText}</div>
+          </div>
+        )}
+
         {caseData.reveal?.summary && <div className="rv-truth">{caseData.reveal.summary}</div>}
         {caseData.reveal?.voices?.[verdict] && <div className="rv-narr">{caseData.reveal.voices[verdict]}</div>}
 
-        {decisive.length > 0 && (
-          <div className="rv-decisive">✦ DECISIVE LENS — {decisive.join(", ")}</div>
+        {lensNote && (
+          <div
+            className="rv-decisive"
+            style={{ "--dc": lensTone === "affirm" ? "#4dffaa" : "#2fd6d6" }}
+          >
+            ✦ {lensNote}
+          </div>
         )}
 
         <div className="rv-vhead">THE COUNCIL WEIGHS IN</div>
@@ -50,7 +88,10 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, onEx
             if (!text) return null;
             return (
               <div key={k} className="rv-vind" style={{ "--c": meta.color }}>
-                <span className="rv-vname">{meta.sigil} {meta.name}</span>
+                <span className="rv-vname">
+                  {meta.sigil} {meta.name}
+                  {k === speakerKey && <span className="rv-vlive"> ◉ ON THE LINE</span>}
+                </span>
                 <span className="rv-vtext">{text}</span>
               </div>
             );
@@ -80,13 +121,35 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, onEx
         .rv-brier i { color: #2fd6d6; opacity: 0.7; font-style: normal; font-size: 10px; }
         .rv-truth { font-size: 13px; line-height: 1.55; color: #d6fff6; border-left: 2px solid #2fd6d6; padding: 4px 0 4px 12px; margin-bottom: 12px; }
         .rv-narr { font-size: 12.5px; line-height: 1.55; color: #bfeede; opacity: 0.92; margin-bottom: 14px; }
-        .rv-decisive { font-size: 11.5px; letter-spacing: 0.06em; color: #ffd23a; margin-bottom: 16px;
-          border: 1px dashed color-mix(in srgb, #ffd23a 50%, transparent); padding: 8px 10px; }
+        .rv-decisive { font-size: 11.5px; letter-spacing: 0.06em; line-height: 1.5; color: var(--dc, #ffd23a); margin-bottom: 16px;
+          border: 1px dashed color-mix(in srgb, var(--dc, #ffd23a) 50%, transparent); padding: 8px 10px; }
         .rv-vhead { font-size: 10.5px; letter-spacing: 0.14em; color: #2fd6d6; opacity: 0.8; margin-bottom: 9px; }
         .rv-vinds { display: flex; flex-direction: column; gap: 9px; }
         .rv-vind { border-left: 2px solid var(--c); padding: 5px 0 6px 11px; }
         .rv-vname { display: block; font-size: 12px; font-weight: bold; color: var(--c); letter-spacing: 0.03em; }
         .rv-vtext { display: block; font-size: 12.5px; line-height: 1.45; color: #eafff9; margin-top: 2px; }
+        .rv-vlive { font-size: 9px; letter-spacing: 0.1em; color: #4dffaa; text-shadow: 0 0 6px rgba(77,255,170,0.6); }
+        /* Live consultant feed — the hero speaker. */
+        .rv-feed { margin-bottom: 16px; animation: rv-in 0.5s 0.15s both; }
+        /* Fluid box: the SitePal embed fills its frame (its wrapper is absolutely
+           positioned), so we give the frame a responsive aspect-ratio instead of a
+           fixed pixel height — it scales to the card width on any screen. */
+        .rv-feed-frame { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border: 1px solid rgba(47,214,214,0.4);
+          border-radius: 8px; background: #02100e; box-shadow: inset 0 0 30px rgba(0,0,0,0.5); }
+        .rv-feed-live { position: absolute; top: 8px; left: 8px; z-index: 5; font-size: 9px; letter-spacing: 0.14em;
+          color: var(--c); padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+          background: rgba(2,16,14,0.7); text-shadow: 0 0 6px var(--c); }
+        .rv-feed-name { margin-top: 8px; font-size: 12px; font-weight: bold; letter-spacing: 0.04em; }
+        .rv-feed-cap { margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: #eafff9; min-height: 1.2em; font-style: italic; }
+        /* Staggered entrance so the reveal lands as beats, not a wall of text. */
+        @keyframes rv-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes rv-pop { 0% { opacity: 0; transform: scale(0.94); } 60% { transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
+        .rv-banner { animation: rv-pop 0.5s both; }
+        .rv-vind { animation: rv-in 0.45s both; }
+        .rv-vinds .rv-vind:nth-child(1) { animation-delay: 0.05s; }
+        .rv-vinds .rv-vind:nth-child(2) { animation-delay: 0.18s; }
+        .rv-vinds .rv-vind:nth-child(3) { animation-delay: 0.31s; }
+        .rv-vinds .rv-vind:nth-child(4) { animation-delay: 0.44s; }
         .rv-exit { margin: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 6;
           background: none; border: 1px solid color-mix(in srgb, #2fd6d6 50%, transparent); color: #2fd6d6; font: inherit;
           font-size: 12px; letter-spacing: 0.06em; padding: 11px; cursor: pointer;

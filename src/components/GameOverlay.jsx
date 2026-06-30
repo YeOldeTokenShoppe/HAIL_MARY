@@ -45,6 +45,32 @@ export function lensLabel(station) {
   return (parts[parts.length - 1] || station.role).trim();
 }
 
+// Reflection on investigative breadth — nudges the player to triangulate across
+// multiple consultants instead of reading a case through one character's lens.
+// Deliberately outcome-agnostic (never scolds a correct call) and independent of
+// any "decisive lens" label: it only counts how many *distinct* lenses the player
+// actually spent scans on, since most cases have tells that converge across
+// several voices. Shared by the desktop reveal (trade/page.js) and the mobile
+// RevealScreen so the two can't drift. `investigated` may be a Set or an array of
+// station keys. Returns { note, tone } — tone is 'affirm' (breadth), 'nudge'
+// (single lens), or null (nothing investigated).
+export function coverageNote(caseData, investigated) {
+  const inv = investigated instanceof Set ? investigated : new Set(investigated || []);
+  const consulted = inv.size;
+  const total = caseData?.stations ? Object.keys(caseData.stations).length : 0;
+  if (consulted === 0) return { note: null, tone: null };
+  if (consulted === 1) {
+    return {
+      tone: "nudge",
+      note: "You read this case through a single voice. The strongest calls come from cross-checking angles — one lens can mislead, but consultants who agree independently rarely do.",
+    };
+  }
+  return {
+    tone: "affirm",
+    note: `You triangulated across ${consulted}${total ? ` of ${total}` : ""} voices — that's how you tell a real signal from one loud tell.`,
+  };
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // SESSION SCORE — a running scorecard persisted in localStorage so the
 // player can watch their calibration improve across cases. Graded (forensic)

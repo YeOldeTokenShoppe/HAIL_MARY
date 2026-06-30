@@ -132,10 +132,9 @@ env:
     availability:
       - BUILD
       - RUNTIME
-  - variable: NEXT_PUBLIC_COINMARKETCAP
-    secret: NEXT_PUBLIC_COINMARKETCAP
+  - variable: COINMARKETCAP_API_KEY
+    secret: COINMARKETCAP_API_KEY
     availability:
-      - BUILD
       - RUNTIME
   - variable: OIL_PURCHASE_TREASURY
     secret: OIL_PURCHASE_TREASURY

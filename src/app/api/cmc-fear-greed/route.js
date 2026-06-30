@@ -2,19 +2,22 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_COINMARKETCAP;
-    
+    const apiKey = process.env.COINMARKETCAP_API_KEY;
+
     if (!apiKey) {
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
     }
 
-    // CoinMarketCap Fear & Greed endpoint - get latest value
+    // CoinMarketCap Fear & Greed endpoint - get latest value.
+    // The index only updates about once a day, so cache the upstream
+    // response for an hour — this is essentially free to serve.
     const response = await fetch('https://pro-api.coinmarketcap.com/v3/fear-and-greed/latest', {
       method: 'GET',
       headers: {
         'X-CMC_PRO_API_KEY': apiKey,
         'Accept': 'application/json',
-      }
+      },
+      next: { revalidate: 3600 },
     });
 
     if (!response.ok) {
