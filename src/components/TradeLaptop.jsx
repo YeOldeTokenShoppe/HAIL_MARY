@@ -1667,6 +1667,13 @@ const TradeLaptop = forwardRef(function TradeLaptop({ isMobile = false, isTablet
         <Suspense fallback={null}>
           {/* Apply view offset to shift laptop to left side without affecting rotation */}
           {!isMobile && viewOffsetX !== 0 && <CameraViewOffset offsetX={viewOffsetX} />}
+          {/* Free the heavy 3D scene (GLTF models, ASCII-screen FBO, bloom buffers)
+              while the fullscreen terminal game covers the screen. Otherwise it keeps
+              rendering behind the opaque overlay and its GPU memory competes with
+              SitePal's avatar renderer — enough to crash iOS Safari on channel load.
+              CameraControls stays mounted so the exit camera-restore still works; the
+              scene remounts instantly from the cached (preloaded) GLTFs on close. */}
+          {!showFullscreenCRT && (
           <SceneLoader>
             <PortalScene
               isMobile={isMobile}
@@ -1684,6 +1691,7 @@ const TradeLaptop = forwardRef(function TradeLaptop({ isMobile = false, isTablet
               locale={locale}
             />
           </SceneLoader>
+          )}
           <CameraControls
             ref={cameraControlsRef}
             makeDefault
@@ -1708,6 +1716,7 @@ const TradeLaptop = forwardRef(function TradeLaptop({ isMobile = false, isTablet
               three: 0,   // NONE
             }}
           />
+          {!showFullscreenCRT && (
           <EffectComposer>
             <Bloom
               intensity={BLOOM.intensity}
@@ -1717,6 +1726,7 @@ const TradeLaptop = forwardRef(function TradeLaptop({ isMobile = false, isTablet
               mipmapBlur
             />
           </EffectComposer>
+          )}
         </Suspense>
       </Canvas>
 

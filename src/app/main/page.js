@@ -15,7 +15,7 @@ import Confessional from "@/components/Confessional";
 import { useMusic } from "@/components/MusicContext";
 
 const CHARACTERS = [
-  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not3.glb", defaultAnim: "textWalk" },
+  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting" },
 
   { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk" },
   { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence" },
@@ -81,7 +81,7 @@ const USE_SITEPAL = true;
 
 // SitePal embed config
 const SITEPAL_ACCOUNT = "9308752";
-const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,1,2774675,0,1,1,\"KNB3GdOhtWudqvlDS8OB3EwsKcsbP12A\",0,1";
+const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,0,2775208,0,1,0,\"ems57rTHD1CA9qWccGFh3xItuvs1GN3o\",0,1";
 
 function SitePalEmbed() {
   const containerRef = useRef(null);
@@ -349,22 +349,23 @@ export default function MainPage() {
   const handleCharacterSelectRef = useRef(handleCharacterSelect);
   handleCharacterSelectRef.current = handleCharacterSelect;
   const lastInteractionRef = useRef(0);
-  useEffect(() => {
-    const onInteract = () => { lastInteractionRef.current = Date.now(); };
-    window.addEventListener("pointerdown", onInteract, true);
-    window.addEventListener("touchstart", onInteract, true);
-    const timer = setInterval(() => {
-      if (Date.now() - lastInteractionRef.current < 10000) return;
-      if (glitchActiveRef.current) return;
-      const next = (charIndexRef.current + 1) % CHARACTERS.length;
-      handleCharacterSelectRef.current(next);
-    }, 10000);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("pointerdown", onInteract, true);
-      window.removeEventListener("touchstart", onInteract, true);
-    };
-  }, []);
+  // Auto-advance disabled — stay on Our Lady; characters switch only via manual select
+  // useEffect(() => {
+  //   const onInteract = () => { lastInteractionRef.current = Date.now(); };
+  //   window.addEventListener("pointerdown", onInteract, true);
+  //   window.addEventListener("touchstart", onInteract, true);
+  //   const timer = setInterval(() => {
+  //     if (Date.now() - lastInteractionRef.current < 10000) return;
+  //     if (glitchActiveRef.current) return;
+  //     const next = (charIndexRef.current + 1) % CHARACTERS.length;
+  //     handleCharacterSelectRef.current(next);
+  //   }, 10000);
+  //   return () => {
+  //     clearInterval(timer);
+  //     window.removeEventListener("pointerdown", onInteract, true);
+  //     window.removeEventListener("touchstart", onInteract, true);
+  //   };
+  // }, []);
 
   // Fallback timeout — don't wait forever if something fails to load
   useEffect(() => {
@@ -595,7 +596,7 @@ export default function MainPage() {
         characterZOffset={CHARACTERS[activeCharIndex].zOffset || 0}
         glitchIntensity={glitchIntensity}
         isMobile={isMobile}
-        holdTalking={!!chatMessage}
+        holdTalking={chatOpen}
       />
 
       {/* Glitch transition overlay */}

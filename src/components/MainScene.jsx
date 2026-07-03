@@ -397,13 +397,23 @@ function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 6, count = 8,
 function waitForSitePalElement(container, timeout = 15000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
+    let firstCanvasAt = 0;
     const check = () => {
-      // SitePal creates multiple canvases — the animated one is the last.
-      // Wait until at least 2 appear, then grab the last one.
+      // Older SitePal player creates multiple canvases (animated one is the
+      // last); the current player renders a single canvas. Take the last of
+      // 2+, or a lone canvas once it's had a moment to prove no sibling is
+      // coming.
       const canvases = container.querySelectorAll("canvas");
       if (canvases.length >= 2) {
         resolve(canvases[canvases.length - 1]);
         return;
+      }
+      if (canvases.length === 1) {
+        if (!firstCanvasAt) firstCanvasAt = Date.now();
+        if (Date.now() - firstCanvasAt > 1500) {
+          resolve(canvases[0]);
+          return;
+        }
       }
       // Fallback: single video element
       const video = container.querySelector("video");
@@ -446,12 +456,13 @@ function waitForSitePalElement(container, timeout = 15000) {
 }
 
 
-function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContainerId = "sitepal-container", activeAnim, defaultAnim, onClipsLoaded, modelRef, modelUrl = "/models/fortuneTeller_not3.glb", zOffset = 0 }) {
+function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContainerId = "sitepal-container", activeAnim, defaultAnim, onClipsLoaded, modelRef, modelUrl = "/models/fortuneTeller_not3.glb", zOffset = 0, onCharacterTap }) {
   const groupRef = useRef();
   const videoRef = useRef(null);
   const mixerRef = useRef(null);
   const textureRef = useRef(null);
   const actionsRef = useRef({});
+  const initialPlayRef = useRef(null); // clip the loader started — skip its fade-in
   const pendingModelRef = useRef(null); // model hidden until mixer ticks
   const pendingFrameCount = useRef(0);
   const defaultAnimRef = useRef(defaultAnim);
@@ -481,6 +492,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   const smartPhoneRef = useRef();
   const faceMeshRef = useRef();
   const face2MeshRef = useRef();
+  const faceAccessoryMeshesRef = useRef([]); // Brows/EyeLiner etc — hidden with Face1 during projection
   const blinkStateRef = useRef({
     lastBlinkTime: 0,
     nextBlinkDelay: Math.random() * 3000 + 2000,
@@ -596,10 +608,16 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
         let foundFace = false;
         model.traverse((child) => {
           if (child.isMesh) {
-            if (child.name === "Face") {
+            if (child.name === "Face" || child.name === "Face1") {
               foundFace = true;
               faceMeshRef.current = child;
               // Face mesh stays always visible with its original material
+            }
+
+            // Extra face pieces that swap out with Face1 when the SitePal
+            // projection takes over Face2
+            if (child.name === "Brows" || /^EyeLiner\d*$/.test(child.name)) {
+              faceAccessoryMeshesRef.current.push(child);
             }
 
             if (child.name === "Face2") {
@@ -618,10 +636,12 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
 
           // Find eye meshes — default pair and textWalk pair
           // Clone material for _Text eyes so they don't share opacity with default eyes
-          if (child.name === "EyeL") {
+          // Match "EyeL" and Blender-suffixed exports ("EyeL.002" → "EyeL002"),
+          // but not the separate "EyeL_Text" pair
+          if (/^EyeL\d*$/.test(child.name)) {
             leftEyeRef.current = child;
             if (child.material) { child.material.transparent = true; child.material.needsUpdate = true; }
-          } else if (child.name === "EyeR") {
+          } else if (/^EyeR\d*$/.test(child.name)) {
             rightEyeRef.current = child;
             if (child.material) { child.material.transparent = true; child.material.needsUpdate = true; }
           } else if (child.name === "EyeL_Text") {
@@ -646,7 +666,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
                 demonEyesHalfTexRef.current = tex;
               });
             }
-          } else if (child.name === "SmartPhone" || child.name === "phone") {
+          } else if (child.name === "phone" || child.name.includes("SmartPhone")) {
             smartPhoneRef.current = child;
           }
 
@@ -672,7 +692,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             // Strip any tracks targeting Face/Face2 meshes so animations
             // don't override programmatic visibility/scale control
             clip.tracks = clip.tracks.filter(
-              (t) => !t.name.startsWith("Face.") && !t.name.startsWith("Face2.")
+              (t) => !t.name.startsWith("Face.") && !t.name.startsWith("Face1.") && !t.name.startsWith("Face2.")
             );
             // Strip root motion (X/Z) from Pelvis position track so character stays in place
             const pelvisTrack = clip.tracks.find(t => t.name === "Pelvis.position");
@@ -690,6 +710,16 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             actionsRef.current[clip.name] = action;
             clipNames.push(clip.name);
           });
+          // Models without a dedicated "Talking" clip speak over their idle
+          // pose — register a cloned idle action under the "Talking" name so
+          // all the Talking-gated logic (projection, gaze, volume) works
+          if (!actionsRef.current["Talking"] && actionsRef.current["idle"]) {
+            const idleClip = gltf.animations.find((c) => c.name === "idle");
+            const talkingClip = idleClip.clone();
+            talkingClip.name = "Talking";
+            actionsRef.current["Talking"] = mixer.clipAction(talkingClip);
+            clipNames.push("Talking");
+          }
           if (onClipsLoaded) onClipsLoaded(clipNames);
           // Play the default walk animation, or fall back to first clip
           if (clipNames.length > 0) {
@@ -699,8 +729,10 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             }
             if (actionsRef.current[first]) {
               actionsRef.current[first].play();
+              initialPlayRef.current = first;
             } else {
               actionsRef.current[clipNames[0]].play();
+              initialPlayRef.current = clipNames[0];
             }
           }
         }
@@ -729,6 +761,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       skateboardReparented.current = false;
       faceMeshRef.current = null;
       face2MeshRef.current = null;
+      faceAccessoryMeshesRef.current = [];
       leftEyeRef.current = null;
       rightEyeRef.current = null;
       leftEyeTextRef.current = null;
@@ -738,6 +771,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       demonEyesDefaultTexRef.current = null;
       demonEyesDefaultEmissiveRef.current = null;
       smartPhoneRef.current = null;
+      document.body.style.cursor = "";
       cropCanvasRef.current = null;
       cropCtxRef.current = null;
       sitePalSourceRef.current = null;
@@ -811,10 +845,15 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       return;
     }
 
-    // Default: fade out all, fade in selected
+    // Default: fade out all, fade in selected.
+    // Skip the fade-in when this is the clip the loader already started at
+    // full weight — fading in a lone action blends up from the bind pose,
+    // which shows as a brief T-pose flash on load/character switch.
+    const initialPlay = initialPlayRef.current;
+    initialPlayRef.current = null;
     Object.entries(actions).forEach(([name, action]) => {
       if (name === activeAnim) {
-        action.reset().fadeIn(0.3).play();
+        if (name !== initialPlay) action.reset().fadeIn(0.3).play();
       } else {
         action.fadeOut(0.3);
       }
@@ -845,7 +884,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     }
   }, [activeAnim, useSitePal]);
 
-  const cropControls = { cropX: 215, cropY: 60, cropW: 170, cropH: 210, rotateZ: 0, rotateX: 0 };
+  const cropControls = { cropX: 205, cropY: 150, cropW: 180, cropH: 205, rotateZ: 0, rotateX: 0 };
   const videoControls = { repeatX: 0.75, repeatY: 0.5, offsetX: 0.185, offsetY: 0.165 };
 
   const cropCanvasRef = useRef(null);
@@ -860,10 +899,22 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     // Restore model scale after mixer has settled into the pose
     if (pendingModelRef.current) {
       pendingFrameCount.current++;
-      if (pendingFrameCount.current >= 8) {
+      if (pendingFrameCount.current === 8) {
         pendingModelRef.current.scale.set(1, 1, 1);
+      } else if (pendingFrameCount.current >= 9) {
+        // One frame after the scale restore (so bone matrices reflect full
+        // scale): refresh skinned-mesh raycast bounds. Their bounding sphere
+        // is cached on first raycast, which can happen during the scale-0
+        // warm-up — leaving a collapsed sphere that makes clothing unclickable.
+        // Inflate so pose changes (raised arms) stay inside the broad phase.
+        pendingModelRef.current.traverse((child) => {
+          if (child.isSkinnedMesh) {
+            child.computeBoundingSphere();
+            child.boundingSphere.radius *= 1.5;
+            child.boundingBox = null;
+          }
+        });
         pendingModelRef.current = null;
-
       }
     }
 
@@ -961,21 +1012,23 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     const leftEyeText = leftEyeTextRef.current;
     const rightEyeText = rightEyeTextRef.current;
     const isTalking = activeAnim === "Talking";
+    // Projection live: Talking mode AND the SitePal texture is bound to Face2.
+    // The whole default face set (Face1, eyes, brows, liner) swaps against
+    // Face2 on this one flag so the face never half-disappears
+    const face2Ready = isTalking && face2MeshRef.current?.userData?.faceMaterial?.map;
     const useTextEyes = !isTalking && (activeAnim === "textWalk" || activeAnim === "Praying");
-    const useDefaultEyes = !isTalking && !useTextEyes;
+    const useDefaultEyes = !face2Ready && !useTextEyes;
 
-    // Toggle visibility: Talking hides all eyes and shows Face; otherwise Face hidden
     if (leftEye) leftEye.visible = useDefaultEyes;
     if (rightEye) rightEye.visible = useDefaultEyes;
     if (leftEyeText) leftEyeText.visible = useTextEyes;
     if (rightEyeText) rightEyeText.visible = useTextEyes;
-    // Talking mode: show Face2 (SitePal target), hide Face — but only if texture is ready
-    const face2Ready = isTalking && face2MeshRef.current?.userData?.faceMaterial?.map;
     if (face2MeshRef.current) face2MeshRef.current.visible = !!face2Ready;
     if (faceMeshRef.current) faceMeshRef.current.visible = !face2Ready;
+    for (const m of faceAccessoryMeshesRef.current) m.visible = !face2Ready;
 
-    // SmartPhone only visible during texting-walk animations
-    if (smartPhoneRef.current) smartPhoneRef.current.visible = activeAnim === "textWalk" || activeAnim === "walkText";
+    // SmartPhone only visible during texting animations
+    if (smartPhoneRef.current) smartPhoneRef.current.visible = activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "texting";
 
     // Swap demon_eyes texture: half-lidded during walkText, default otherwise
     // Image is connected to both BaseColor (map) and Emission (emissiveMap) in Blender
@@ -1073,7 +1126,15 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     }
   });
 
-  return <group ref={groupRef} position={[0, 0, zOffset]} />;
+  return (
+    <group
+      ref={groupRef}
+      position={[0, 0, zOffset]}
+      onClick={onCharacterTap ? (e) => { e.stopPropagation(); onCharacterTap(); } : undefined}
+      onPointerOver={onCharacterTap ? () => { document.body.style.cursor = "pointer"; } : undefined}
+      onPointerOut={onCharacterTap ? () => { document.body.style.cursor = ""; } : undefined}
+    />
+  );
 }
 
 /* ── Per-character speech config ── */
@@ -1179,15 +1240,49 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
     hasSpokeRef.current = false;
   }, [characterModel]);
 
-  useEffect(() => {
-    // Speech trigger intentionally disabled — will be re-enabled with interaction UI
-    return () => {
-      if (speechTimerRef.current) {
-        clearTimeout(speechTimerRef.current);
-        speechTimerRef.current = null;
+  // Tap-to-talk: tapping the character switches to Talking mode and speaks
+  // via SitePal. The tap doubles as the user gesture that unblocks audio.
+  const speechConfig = getSpeechConfig(characterModel);
+  const handleCharacterTap = useCallback(() => {
+    const speech = getSpeechConfig(characterModel);
+    if (!speech || !clipNames.includes("Talking")) return;
+    if (lingerTimerRef.current) {
+      clearTimeout(lingerTimerRef.current);
+      lingerTimerRef.current = null;
+    }
+    hasSpokeRef.current = true;
+    setActiveAnim("Talking");
+
+    // SitePal may still be initializing on the first tap — retry briefly.
+    // Re-tapping while already in Talking re-attempts speech (recovers from
+    // a failed first try instead of wedging in Talking mode).
+    const attempt = () => {
+      if (typeof window.sayText === "function") {
+        window.sayText(speech.text, speech.voice, speech.lang, speech.engine);
+        return true;
       }
+      return false;
     };
-  }, [clipNames, characterModel]);
+    if (speechTimerRef.current) {
+      clearInterval(speechTimerRef.current);
+      speechTimerRef.current = null;
+    }
+    if (!attempt()) {
+      console.warn("[MainScene] sayText not available yet — SitePal still loading, retrying…");
+      let tries = 0;
+      speechTimerRef.current = setInterval(() => {
+        tries++;
+        if (attempt()) {
+          clearInterval(speechTimerRef.current);
+          speechTimerRef.current = null;
+        } else if (tries >= 20) {
+          clearInterval(speechTimerRef.current);
+          speechTimerRef.current = null;
+          console.warn("[MainScene] SitePal sayText never became available — check embed load");
+        }
+      }, 300);
+    }
+  }, [characterModel, clipNames]);
 
   // ── vh_talkEnded: when SitePal finishes speaking, linger then return to walk ──
   const lingerTimerRef = useRef(null);
@@ -1232,12 +1327,17 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
   }, [activeAnim, clipNames, defaultAnim, characterModel]);
 
   // holdTalking: keep character in Talking while chat is active, revert when released
+  const prevHoldTalkingRef = useRef(holdTalking);
   useEffect(() => {
+    const wasHolding = prevHoldTalkingRef.current;
+    prevHoldTalkingRef.current = holdTalking;
     if (holdTalking && hasSpokeRef.current && activeAnim !== "Talking" && clipNames.includes("Talking")) {
       // Chat is active but she drifted away — snap back to Talking
       setActiveAnim("Talking");
-    } else if (!holdTalking && hasSpokeRef.current && activeAnim === "Talking") {
-      // Chat dismissed — revert to walk
+    } else if (!holdTalking && wasHolding && hasSpokeRef.current && activeAnim === "Talking") {
+      // Chat just closed — revert to walk. Only on the true→false transition:
+      // reverting whenever holdTalking is merely false would instantly bounce
+      // tap-triggered Talking back to the default anim.
       const fallback = resolvedAnimRef.current || defaultAnim || clipNames[0];
       if (fallback && clipNames.includes(fallback)) {
         setActiveAnim(fallback);
@@ -1286,14 +1386,14 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         distance={12}
         debug={false}
       />
-      <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} defaultAnim={defaultAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} zOffset={characterZOffset} />
+      <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} defaultAnim={defaultAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} zOffset={characterZOffset} onCharacterTap={speechConfig ? handleCharacterTap : undefined} />
       {/* Transition effect handled by page-level GlitchTransition overlay */}
       <SynthwaveSun position={[10, 3, -15]} scale={1} />
       <Skyline position={[0, -0.5, 30]} rotation={[0, 0, 0]} scale={0.25} />
       {/* Scrolling environment — always mounted, stops when not walking */}
       {(() => {
         const isSkate = activeAnim === "skateSequence" || activeAnim === "sequence" || activeAnim === "skate1" || activeAnim === "skate2" || activeAnim === "skate3";
-        const isMoving = activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk" || isSkate;
+        const isMoving = activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk" || activeAnim === "texting" || activeAnim === "praying" || activeAnim === "waving" || isSkate;
         const groundSpeed = isSkate ? 0.9 : 0.3;
         const treeSpeed = isSkate ? 4.5 : 1.5;
         return (

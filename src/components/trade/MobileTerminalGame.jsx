@@ -21,7 +21,7 @@ const SITEPAL_SCENES = { monk: 2774449, demon: 2775052, marisol: 2774916 };
 // Top-level hub options shown after boot. TODO: confirm full list with design —
 // currently Learning Modules + the live Case Files investigation.
 const HUB_OPTIONS = [
-  { key: "scan", label: "LIMINAL SCAN", sub: "trading assessment" },
+  { key: "scan", label: "LIMINAL SCAN", sub: "your trading type assessment" },
   { key: "cases", label: "CASE FILES", sub: "live token investigation" },
 ];
 

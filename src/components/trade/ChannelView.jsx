@@ -238,7 +238,13 @@ export default function ChannelView({
         .cv-pip--on { background: #ffd23a; opacity: 1; box-shadow: 0 0 5px #ffd23a; }
 
         .cv-feed {
-          position: relative; height: 420px; margin: 0 12px; overflow: hidden; flex-shrink: 0;
+          /* Scale with the viewport so the feed never eats the whole screen on
+             shorter phones — it shrinks to keep room for the caption, evidence
+             and INTERROGATE questions below, and caps at 420px on tall screens.
+             (plain-vh line is a fallback for browsers without dvh support.) */
+          position: relative; margin: 0 12px; overflow: hidden; flex-shrink: 0;
+          height: clamp(220px, 42vh, 420px);
+          height: clamp(220px, 42dvh, 420px);
           border: 1.5px solid var(--cvc);
           clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
           box-shadow: inset 0 0 30px color-mix(in srgb, var(--cvc) 28%, transparent);
