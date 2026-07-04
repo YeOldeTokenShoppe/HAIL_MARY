@@ -10,12 +10,11 @@ import CharacterSelect from "@/components/CharacterSelect";
 import GlitchTransition from "@/components/GlitchTransition";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
-import MainMobileNav from "@/components/MainMobileNav";
 import Confessional from "@/components/Confessional";
 import { useMusic } from "@/components/MusicContext";
 
 const CHARACTERS = [
-  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting" },
+  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting", portraitModel: "/models/framedOurLady.glb" },
 
   { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk" },
   { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence" },
@@ -27,6 +26,7 @@ const SCENE_GLBS = [
   "/models/Sun.glb",
   "/models/wireframePalmTree.glb",
   "/models/neonFrame.glb",
+  "/models/framedOurLady.glb",
 ];
 
 function preloadImage(src) {
@@ -81,7 +81,7 @@ const USE_SITEPAL = true;
 
 // SitePal embed config
 const SITEPAL_ACCOUNT = "9308752";
-const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,0,2775208,0,1,0,\"ems57rTHD1CA9qWccGFh3xItuvs1GN3o\",0,1";
+const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,0,2775211,0,1,0,\"uWRXObfnG6ZZgaqGhkVagBACFz5pCmzF\",0,1";
 
 function SitePalEmbed() {
   const containerRef = useRef(null);
@@ -196,7 +196,9 @@ function SitePalEmbed() {
 }
 
 export default function MainPage() {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [sceneReady, setSceneReady] = useState(false);
   const [activeAnim, setActiveAnim] = useState(null);
@@ -213,6 +215,19 @@ export default function MainPage() {
 
   // Preload all GLB models and character images
   useEffect(() => {
+    // Mobile shows only the side panel (framed portrait) — skip the heavy
+    // walking-scene assets entirely
+    if (isMobile) {
+      Promise.all([
+        preloadGLBParsed(CHARACTERS[0].portraitModel || CHARACTERS[0].model),
+        ...CHARACTERS.map((c) => preloadImage(c.image)),
+      ]).then(() => {
+        assetsReadyRef.current = true;
+        if (sceneReadyRef.current) setIsLoading(false);
+      });
+      return;
+    }
+
     // First character GLB gets fully parsed so it's GPU-ready immediately
     const firstModel = CHARACTERS[0].model;
     const otherGlbs = [
@@ -236,6 +251,12 @@ export default function MainPage() {
     setSceneReady(true);
     if (assetsReadyRef.current) setIsLoading(false);
   }, []);
+
+  // Mobile has no MainScene — mark the scene "ready" so the loader clears
+  // and the SitePal embed (the portrait's face source) mounts
+  useEffect(() => {
+    if (isMobile) handleSceneLoaded();
+  }, [isMobile, handleSceneLoaded]);
 
   // Music controls — force 80s playlist on this page
   const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode, setIs80sMode } = useMusic();
@@ -459,35 +480,7 @@ export default function MainPage() {
             })}
           </div>
         </div> */}
-      {/* Mobile title — top left */}
-      {isMobile && (
-        <h1
-          className="custom-title"
-          style={{
-            position: "fixed",
-            top: "1rem",
-            left: "1rem",
-            zIndex: 290,
-            color: "#f6f5f1ff",
-            fontFamily: "UnifrakturCook, serif",
-            textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7)",
-            fontSize: "2.5rem",
-            fontWeight: 900,
-            lineHeight: 0.85,
-            transform: "rotate(-8deg) skew(-15deg)",
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            margin: 0,
-          }}
-        >
-          <span className="title-line" style={{ display: "block" }}>Our Lady</span>
-          <span className="title-line" style={{ display: "block" }}>
-            <span style={{ fontSize: "1rem" }}>    of    </span>
-            Perpetual
-          </span>
-          <span className="title-line" style={{ display: "block", marginLeft: "2rem" }}>Profit</span>
-        </h1>
-      )}
+      {/* Mobile shows the side panel full-width — it carries its own title */}
 
       {/* Music controls — top left (desktop only) */}
       <div style={{ position: "fixed", top: "1rem", left: "1rem", zIndex: 290, display: isMobile ? "none" : "block" }}>
@@ -587,17 +580,20 @@ export default function MainPage() {
       {/* SitePal embed — deferred until Three.js scene is ready to avoid WebGL context conflict */}
       {USE_SITEPAL && sceneReady && <SitePalEmbed />}
 
-      <MainScene
-        onLoaded={handleSceneLoaded}
-        useSitePal={USE_SITEPAL}
-        onAnimChange={setActiveAnim}
-        characterModel={displayedModel}
-        defaultAnim={CHARACTERS[activeCharIndex].defaultAnim}
-        characterZOffset={CHARACTERS[activeCharIndex].zOffset || 0}
-        glitchIntensity={glitchIntensity}
-        isMobile={isMobile}
-        holdTalking={chatOpen}
-      />
+      {/* Walking scene is desktop-only — mobile is the side panel alone */}
+      {!isMobile && (
+        <MainScene
+          onLoaded={handleSceneLoaded}
+          useSitePal={USE_SITEPAL}
+          onAnimChange={setActiveAnim}
+          characterModel={displayedModel}
+          defaultAnim={CHARACTERS[activeCharIndex].defaultAnim}
+          characterZOffset={CHARACTERS[activeCharIndex].zOffset || 0}
+          glitchIntensity={glitchIntensity}
+          isMobile={isMobile}
+          holdTalking={chatOpen}
+        />
+      )}
 
       {/* Glitch transition overlay */}
       <GlitchTransition
@@ -615,10 +611,11 @@ export default function MainPage() {
           top: 0,
           right: 0,
           bottom: 0,
-          width: 280,
+          width: isMobile ? "100%" : 280,
           zIndex: 100,
-          display: isMobile ? "none" : "flex",
+          display: "flex",
           flexDirection: "column",
+          overflowY: "auto",
           fontFamily: "'Cyber', 'Geo', sans-serif",
           background: "rgba(0, 0, 0, 0.5)",
           backdropFilter: "saturate(180%) blur(8px)",
@@ -672,7 +669,7 @@ export default function MainPage() {
             characters={CHARACTERS}
             activeIndex={activeCharIndex}
             onSelect={handleCharacterSelect}
-            size={220}
+            size={isMobile ? 340 : 220}
           />
         </div>
 
@@ -851,65 +848,7 @@ export default function MainPage() {
       {/* Buy Modal */}
       <BuyModal isOpen={buyModalOpen} onClose={() => setBuyModalOpen(false)} />
 
-      {/* Mobile bottom nav */}
-      {isMobile && (
-        <MainMobileNav
-          characters={CHARACTERS}
-          activeCharIndex={activeCharIndex}
-          onCharSelect={handleCharacterSelect}
-          onBuyClick={() => setBuyModalOpen(true)}
-          businesses={[
-            {
-              label: "Hail Mary Prospecting Co",
-              live: true,
-              onProceed: () => { window.location.href = "/hailmary?mode=test"; },
-              icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
-                  <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
-                  <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
-                  <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
-                </svg>
-              ),
-            },
-            {
-              label: "The Liminal Terminal",
-              live: false,
-              icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 5c0 9-4 12-6 12s-6-3-6-12c0-2 2-3 6-3s6 1 6 3" />
-                  <path d="M10.1 7.1C9 7.2 7.7 7.7 6 8.6c-3.5 2-4.7 3.9-3.7 5.6 4.5 7.8 9.5 8.4 11.2 7.4.9-.5 1.9-2.1 1.9-4.7" />
-                </svg>
-              ),
-            },
-            {
-              label: "Market Rally Race Game",
-              live: true,
-              onProceed: () => { window.location.href = "/race"; },
-              icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-                  <line x1="4" y1="22" x2="4" y2="15" />
-                </svg>
-              ),
-            },
-            {
-              label: "Interventions",
-              live: false,
-              icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 4V2" />
-                  <path d="M15 16v-2" />
-                  <path d="M8 9h2" />
-                  <path d="M20 9h2" />
-                  <path d="M15 9h.01" />
-                  <path d="m3 21 9-9" />
-                </svg>
-              ),
-            },
-          ]}
-        />
-      )}
+      {/* Mobile bottom nav removed — mobile uses the full-width side panel */}
 
       {/* Confessional chat drawer — appears after character speaks */}
       {chatMessage && (

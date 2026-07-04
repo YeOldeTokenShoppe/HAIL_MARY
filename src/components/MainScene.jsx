@@ -1139,17 +1139,17 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
 
 /* ── Per-character speech config ── */
 const CHARACTER_SPEECH = {
-  // Our Lady — walks in texting, then notices the viewer
-  "fortuneTeller": {
-    delay: 3000,           // ms after clips load before switching to Talking
-    text: "Oh, hello!",
-    voice: 3,
-    lang: 1,
-    engine: 3,
-    linger: 3000,          // ms to stay in Talking after speech ends
-  },
-  // Add more characters here as needed:
-  // "GR80": { delay: 4000, text: "...", voice: 3, lang: 1, engine: 3 },
+  // Walking-character speech disabled while the sidebar framed-portrait
+  // experiment owns the single SitePal embed (two embeds on one page don't
+  // work). Uncomment to restore tap-to-talk on the walking character.
+  // "fortuneTeller": {
+  //   delay: 3000,           // ms after clips load before switching to Talking
+  //   text: "Oh, hello!",
+  //   voice: 3,
+  //   lang: 1,
+  //   engine: 3,
+  //   linger: 3000,          // ms to stay in Talking after speech ends
+  // },
 };
 
 /** Match a model URL to its speech config key */
