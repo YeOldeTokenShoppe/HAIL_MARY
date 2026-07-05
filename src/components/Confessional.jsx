@@ -11,10 +11,23 @@ import "./Confessional.css";
  *  - onToggle:        () => void — called to flip open/closed
  *  - characterName:   string — display name for the speaking character
  *  - initialMessage:  string — the character's opening line (typewriter reveal)
+ *  - onSendMessage:   async (text, history) => replyText — called with the
+ *                     user's message and full history; the resolved string is
+ *                     appended as the character's reply. Without it, a static
+ *                     placeholder response is used.
+ *  - hideLauncher:    when true, the collapsed-state bubble CTA is NOT rendered
+ *                     and the greeting's typewriter is deferred until the drawer
+ *                     opens. Use when an external control (e.g. a SPEAK button)
+ *                     is the sole launcher, so no conversation text appears
+ *                     until the user chooses to open it.
+ *  - bottomOffset:    px number — raises the drawer's bottom anchor by this much
+ *                     (+ safe-area) so its input row clears a fixed bottom nav
+ *                     dock. Null keeps the default 0.75rem anchor.
  */
-export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "" }) {
+export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null }) {
   const [messages, setMessages] = useState([]);
   const [inputVal, setInputVal] = useState("");
+  const [pending, setPending] = useState(false);
   const [phase, setPhase] = useState("closed"); // closed | entering | open | exiting
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -43,6 +56,9 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   // Typewriter tick
   useEffect(() => {
     if (!typingRef.current || messages.length === 0) return;
+    // In launcher-less mode the greeting reveals only once the drawer opens,
+    // so the typewriter doesn't run down invisibly before the user taps in.
+    if (hideLauncher && !isOpen) return;
     const fullText = messages[0]?.text || "";
     if (typedLen >= fullText.length) {
       typingRef.current = false;
@@ -61,7 +77,7 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
     }, delay);
 
     return () => clearTimeout(typingTimerRef.current);
-  }, [typedLen, messages, scrollToBottom]);
+  }, [typedLen, messages, scrollToBottom, isOpen, hideLauncher]);
 
   // ── Open/close transitions ──
   useEffect(() => {
@@ -69,7 +85,12 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
       setPhase("entering");
       const t = setTimeout(() => {
         setPhase("open");
-        inputRef.current?.focus();
+        // Auto-focus only on pointer devices — on touch it would pop the
+        // keyboard over the freshly revealed portrait (and on iOS, trigger
+        // the input auto-zoom viewport shift)
+        if (typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) {
+          inputRef.current?.focus();
+        }
       }, 400);
       return () => clearTimeout(t);
     }
@@ -80,22 +101,41 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
     }
   }, [isOpen, phase]);
 
-  // Send user message (UI-only for now)
-  const handleSend = () => {
+  // Send user message → oracle (or placeholder when no handler wired)
+  const handleSend = async () => {
     const text = inputVal.trim();
-    if (!text) return;
-    setMessages((prev) => [...prev, { role: "user", text }]);
+    if (!text || pending) return;
+    const history = [...messages, { role: "user", text }];
+    setMessages(history);
     setInputVal("");
     scrollToBottom();
-    // TODO: hook up SitePal AI agent here
-    // For now, simulate a placeholder response after a beat
-    setTimeout(() => {
+
+    if (!onSendMessage) {
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          { role: "character", text: "The faithful must be patient... my voice grows stronger each day." },
+        ]);
+        scrollToBottom();
+      }, 1500);
+      return;
+    }
+
+    setPending(true);
+    try {
+      const reply = await onSendMessage(text, history);
+      if (reply) {
+        setMessages((prev) => [...prev, { role: "character", text: reply }]);
+      }
+    } catch (e) {
       setMessages((prev) => [
         ...prev,
-        { role: "character", text: "The faithful must be patient... my voice grows stronger each day." },
+        { role: "character", text: e?.message || "The connection to the beyond wavers... ask again, child." },
       ]);
+    } finally {
+      setPending(false);
       scrollToBottom();
-    }, 1500);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -110,6 +150,9 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
 
   // ── Bubble CTA (collapsed state) — shows her message as an invitation ──
   if (phase === "closed" && !isOpen) {
+    // Launcher-less mode: an external control (the SPEAK FAB) is the sole way
+    // in, so render nothing when collapsed — no premature conversation text.
+    if (hideLauncher) return null;
     const bubbleText = initialMessage || "";
     const showTyped = typingRef.current ? bubbleText.slice(0, typedLen) : bubbleText;
     const showCursor = typingRef.current && typedLen < bubbleText.length;
@@ -139,7 +182,14 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   ].filter(Boolean).join(" ");
 
   return (
-    <div className={drawerClass}>
+    <div
+      className={drawerClass}
+      style={
+        bottomOffset != null
+          ? { bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px))` }
+          : undefined
+      }
+    >
       {/* Header */}
       <div className="confessional-header">
         <div className="confessional-header-left">
@@ -177,6 +227,11 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
             </div>
           );
         })}
+        {pending && (
+          <div className="confessional-msg confessional-msg--character" aria-label="thinking">
+            <span className="confessional-cursor" />
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 

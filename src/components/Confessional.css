@@ -277,14 +277,16 @@
 
 .confessional-input {
   flex: 1;
-  height: 34px;
+  height: 38px;
   padding: 0 10px;
   border-radius: 6px;
   border: 1px solid rgba(0, 255, 255, 0.15);
   background: rgba(0, 0, 0, 0.3);
   color: rgba(255, 255, 255, 0.9);
   font-family: 'Cyber', 'Geo', sans-serif;
-  font-size: 0.82rem;
+  /* 16px minimum — anything smaller triggers iOS Safari's input auto-zoom,
+     which leaves the whole page zoomed/offset after the keyboard closes */
+  font-size: 16px;
   letter-spacing: 0.03em;
   outline: none;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;

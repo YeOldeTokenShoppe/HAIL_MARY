@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { UnifiedAccountModal } from './UnifiedAccountModal';
 import { useLanguage } from './LanguageProvider';
+import useCyberConfirm from './useCyberConfirm';
 
 // Bottom mobile app-style navigation bar — drop-in replacement for NavControlsHome
 export default function MobileBottomNav({
@@ -95,6 +96,11 @@ export default function MobileBottomNav({
   const clerk = useClerk();
   const { t } = useLanguage();
 
+  // Cyberpunk confirm modal (shared with /main's portfolio buttons) — used
+  // by any extra slot that opts in via `slot.confirm`. Reuses CyberButton's
+  // glitch + sound-effect dialog instead of navigating on first tap.
+  const [confirmModal, cyberConfirm] = useCyberConfirm();
+
   useEffect(() => {
     setIsHydrated(true);
   }, []);
@@ -150,12 +156,22 @@ export default function MobileBottomNav({
 
   /* Renders a generic extra slot (placeholder / "coming soon" affordance).
      iconSrc renders as <img> (preserves color for multi-color SVGs like
-     /tcg.svg); icon is used as-is for inline JSX. */
+     /tcg.svg); icon is used as-is for inline JSX.
+
+     When a slot carries `confirm` ({ title, body, accent?, shadow?, ... }),
+     tapping it opens the shared cyberpunk confirm modal (glitch + sounds)
+     and `slot.onClick` becomes the modal's Proceed action — so the dock
+     keeps its app-style ergonomics but destination taps get the /main
+     ceremony. Slots without `confirm` fire onClick immediately as before. */
   const renderExtraSlot = (slot, idx) => (
     <button
       key={slot.key ?? `${slot.label}-${idx}`}
       className={`btm-nav-item ${slot.comingSoon ? 'btm-coming-soon' : ''}`}
-      onClick={slot.onClick}
+      onClick={
+        slot.confirm
+          ? () => cyberConfirm({ ...slot.confirm, onProceed: slot.onClick })
+          : slot.onClick
+      }
       title={slot.title ?? (slot.comingSoon ? `${slot.label} — coming soon` : slot.label)}
     >
       <div className="btm-nav-icon" style={{ position: 'relative' }}>
@@ -263,6 +279,17 @@ export default function MobileBottomNav({
           padding: 0 4px;
           padding-top: 6px;
           padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+          /* iOS: pin tiny label fonts (Safari otherwise auto-inflates them,
+             widening the slots past the viewport = horizontal "play") and
+             restrict gestures to vertical panning. NOTE: do NOT add overflow
+             clipping here — overflow-x:hidden forces overflow-y:auto (scroll
+             container), and clipping + backdrop-filter on the same element
+             is an iOS Safari compositing bug that renders the bar blank.
+             The flex-portion slots already make horizontal overflow
+             impossible. */
+          -webkit-text-size-adjust: 100%;
+          text-size-adjust: 100%;
+          touch-action: pan-y;
           background: ${nm
             ? 'rgba(6, 10, 18, 0.85)'
             : m80
@@ -297,7 +324,13 @@ export default function MobileBottomNav({
           -webkit-tap-highlight-color: transparent;
           background: transparent;
           border: none;
-          min-width: 56px;
+          /* Fluid slots: divide the bar's width evenly and shrink as needed
+             (Safari page zoom / text inflation shrink the effective CSS
+             viewport — fixed-px slots would burst out; flex portions can't).
+             max-width keeps them from sprawling on wide screens. */
+          flex: 1 1 0;
+          min-width: 0;
+          max-width: 88px;
           position: relative;
         }
 
@@ -372,10 +405,15 @@ export default function MobileBottomNav({
         }
 
         .btm-nav-label {
-          font-size: 8px;
+          /* Viewport-relative with caps so labels track the effective
+             viewport (incl. Safari page zoom) instead of a fixed px size */
+          font-size: clamp(6.5px, 2.1vw, 8px);
           font-weight: 700;
           letter-spacing: 0.5px;
           text-transform: uppercase;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
           color: ${nm ? 'rgba(111, 168, 196, 0.9)' : m80 ? 'rgba(200, 180, 220, 0.6)' : dk ? 'rgba(200, 190, 170, 0.5)' : 'rgba(120, 105, 85, 0.6)'};
           transition: color 0.15s ease;
           line-height: 1;
@@ -1020,6 +1058,9 @@ export default function MobileBottomNav({
         theme={accountModalTheme}
         unlockedItems={accountModalUnlockedItems}
       />
+
+      {/* Shared cyberpunk confirm modal for `confirm`-enabled extra slots. */}
+      {confirmModal}
     </>
   );
 }

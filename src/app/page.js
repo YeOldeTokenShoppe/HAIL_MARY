@@ -13,6 +13,7 @@ import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import ChartWidget from "@/components/ChartWidget";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import useCyberConfirm from "@/components/useCyberConfirm";
 import MusicButton from "@/components/MusicButton";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
@@ -2241,6 +2242,10 @@ export default function HomePage() {
   }, [userId]);
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useBuyModal();
+  // Shared cyberpunk confirm modal for the MORE-popover destinations
+  // (Ex Libris, Coin Fountain) — same glitch/sound dialog the dock's
+  // Terminal/Hail Mary slots use via MobileBottomNav's own confirm.
+  const [moreConfirmModal, moreConfirm] = useCyberConfirm();
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
   // "MORE" nav popover (far-right bottom-nav slot) — holds the secondary
   // destinations (Ex Libris, Coin Fountain) that don't each warrant a
@@ -3314,6 +3319,12 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
             label: 'Terminal',
             title: 'The Liminal Terminal',
             onClick: () => { router.push('/trade'); },
+            confirm: {
+              title: 'The Liminal Terminal',
+              body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
+              accent: 'hsl(111, 100%, 54%)',
+              shadow: 'hsl(111, 80%, 34%)',
+            },
             icon: (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -3342,9 +3353,15 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           {
             key: 'lode',
             label: 'Hail Mary',
-            title: 'Hail Mary Prospecting Co — coming soon',
+            title: 'Hail Mary Prospecting Co',
               onClick: () => { router.push('/hailmary'); },
             comingSoon: false,
+            confirm: {
+              title: 'Hail Mary Prospecting Co',
+              body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+              accent: 'hsl(189, 84%, 55%)',
+              shadow: 'hsl(189, 70%, 38%)',
+            },
             icon: (
               <svg
                 viewBox="0 0 24 24"
@@ -3407,6 +3424,12 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
               {
                 path: "/fountain",
                 label: "Coin Fountain",
+                confirm: {
+                  title: "Coin Fountain",
+                  body: "Toss a coin, whisper a wish. Our Lady keeps every offering the faithful let fall.",
+                  accent: "hsl(45, 100%, 60%)",
+                  shadow: "hsl(38, 90%, 42%)",
+                },
                 icon: (
                   <>
                     <path d="M12 10L12 2" />
@@ -3419,6 +3442,12 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                             {
                 path: "/exlibris",
                 label: "Ex Libris",
+                confirm: {
+                  title: "Ex Libris",
+                  body: "The perpetual ledger. Every flame, every name, inscribed for those who came to pray.",
+                  accent: "hsl(300, 90%, 62%)",
+                  shadow: "hsl(300, 75%, 42%)",
+                },
                 icon: (
                   <>
                     <path d="M15 12h-5" />
@@ -3434,7 +3463,10 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                 role="menuitem"
                 onClick={() => {
                   setShowMoreMenu(false);
-                  router.push(link.path);
+                  moreConfirm({
+                    ...link.confirm,
+                    onProceed: () => router.push(link.path),
+                  });
                 }}
                 style={{
                   display: "flex",
@@ -3487,6 +3519,9 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
       )}
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
+
+      {/* Cyberpunk confirm modal for MORE-popover destinations. */}
+      {moreConfirmModal}
 
       <UnifiedAccountModal
         isOpen={showAccountModal}

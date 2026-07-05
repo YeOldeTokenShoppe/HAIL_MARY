@@ -11,14 +11,18 @@ import GlitchTransition from "@/components/GlitchTransition";
 import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import Confessional from "@/components/Confessional";
+import SitePalExpressionPanel from "@/components/SitePalExpressionPanel";
+import { askOracle, speakOracle, ORACLE_VOICE } from "@/lib/oracleSpeech";
 import { useMusic } from "@/components/MusicContext";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import useCyberConfirm from "@/components/useCyberConfirm";
 
 const CHARACTERS = [
-  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting", portraitModel: "/models/framedOurLady.glb" },
+  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting", portraitModel: "/models/framedOurLady2.glb", frameHue: "#c300ff" },
 
-  { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk" },
-  { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence" },
-  { name: "Virgil", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk" },
+  { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk", frameHue: "#22ccff" },
+  { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence", frameHue: "#ff2d75" },
+  { name: "Virgil", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk", frameHue: "#52ff7a" },
 ];
 
 // Scene GLBs that aren't character models
@@ -26,7 +30,7 @@ const SCENE_GLBS = [
   "/models/Sun.glb",
   "/models/wireframePalmTree.glb",
   "/models/neonFrame.glb",
-  "/models/framedOurLady.glb",
+  "/models/framedOurLady2.glb",
 ];
 
 function preloadImage(src) {
@@ -78,6 +82,10 @@ const MainScene = dynamic(
 
 // Toggle this to switch between video file and SitePal embed
 const USE_SITEPAL = true;
+
+// Her opening line — shown by the Confessional's typewriter AND spoken aloud
+// on first drawer open
+const ORACLE_GREETING = "Oh, hello! Speak, child — the ticker tape hears all.";
 
 // SitePal embed config
 const SITEPAL_ACCOUNT = "9308752";
@@ -213,33 +221,12 @@ export default function MainPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Preload all GLB models and character images
+  // Preload the framed portrait + cameo images. The page is panel-only on
+  // all viewports now — the walking-scene assets are no longer loaded.
   useEffect(() => {
-    // Mobile shows only the side panel (framed portrait) — skip the heavy
-    // walking-scene assets entirely
-    if (isMobile) {
-      Promise.all([
-        preloadGLBParsed(CHARACTERS[0].portraitModel || CHARACTERS[0].model),
-        ...CHARACTERS.map((c) => preloadImage(c.image)),
-      ]).then(() => {
-        assetsReadyRef.current = true;
-        if (sceneReadyRef.current) setIsLoading(false);
-      });
-      return;
-    }
-
-    // First character GLB gets fully parsed so it's GPU-ready immediately
-    const firstModel = CHARACTERS[0].model;
-    const otherGlbs = [
-      ...CHARACTERS.slice(1).map((c) => c.model),
-      ...SCENE_GLBS,
-    ];
-    const imageUrls = CHARACTERS.map((c) => c.image);
-
     Promise.all([
-      preloadGLBParsed(firstModel),
-      ...otherGlbs.map(preloadGLB),
-      ...imageUrls.map(preloadImage),
+      preloadGLBParsed(CHARACTERS[0].portraitModel || CHARACTERS[0].model),
+      ...CHARACTERS.map((c) => preloadImage(c.image)),
     ]).then(() => {
       assetsReadyRef.current = true;
       if (sceneReadyRef.current) setIsLoading(false);
@@ -252,11 +239,11 @@ export default function MainPage() {
     if (assetsReadyRef.current) setIsLoading(false);
   }, []);
 
-  // Mobile has no MainScene — mark the scene "ready" so the loader clears
-  // and the SitePal embed (the portrait's face source) mounts
+  // No walking scene mounts anymore — mark the scene "ready" so the loader
+  // clears and the SitePal embed (the portrait's face source) mounts
   useEffect(() => {
-    if (isMobile) handleSceneLoaded();
-  }, [isMobile, handleSceneLoaded]);
+    handleSceneLoaded();
+  }, [handleSceneLoaded]);
 
   // Music controls — force 80s playlist on this page
   const { play, pause, isPlaying: contextIsPlaying, nextTrack, is80sMode, setIs80sMode } = useMusic();
@@ -301,6 +288,10 @@ export default function MainPage() {
   const isTalking = activeAnim === "Talking";
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
+  // Bottom-dock MORE popover + shared cyberpunk confirm modal for its
+  // destinations (mirrors the root page's dock treatment).
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [moreConfirmModal, moreConfirm] = useCyberConfirm();
 
   // Show Confessional FAB when a character speaks (Talking anim triggered)
   const hasOfferedChatRef = useRef(false);
@@ -348,6 +339,36 @@ export default function MainPage() {
     };
     glitchAnimRef.current = requestAnimationFrame(animate);
   };
+
+  // Oracle conversation: POST the drawer history to /api/oracle, speak the
+  // reply through SitePal (ElevenLabs voice) with timed facial expressions
+  const handleOracleMessage = useCallback(async (text, history) => {
+    const data = await askOracle(history);
+    speakOracle(data);
+    return data.reply;
+  }, []);
+
+  // Speak the greeting aloud the first time the drawer opens — the open tap
+  // doubles as the audio-unlock gesture, and the typewriter text runs in step.
+  // Spoken softly via an ElevenLabs v3 audio tag (model override in xData);
+  // the drawer displays the clean text without the [tag].
+  const hasGreetedRef = useRef(false);
+  useEffect(() => {
+    if (chatOpen && !hasGreetedRef.current) {
+      hasGreetedRef.current = true;
+      speakOracle(
+        {
+          reply: ORACLE_GREETING,
+          expressions: [{ name: "ClosedSmile", amplitude: 0.6, duration: 3, at: 0 }],
+        },
+        // Soft delivery via ElevenLabs voice settings: high stability + zero
+        // style = calm, gentle read. (v3 audio tags like "[softly]" are
+        // rejected by SitePal's engine-14 proxy as of Jul 2026 — retest later;
+        // speakOracle auto-falls-back if an xData call ever fails.)
+        { ...ORACLE_VOICE, xData: "stability=0.9,style=0,similarity_boost=0.4" }
+      );
+    }
+  }, [chatOpen]);
 
   const handleGlitchMidpoint = () => {
     if (pendingCharRef.current !== null) {
@@ -580,20 +601,8 @@ export default function MainPage() {
       {/* SitePal embed — deferred until Three.js scene is ready to avoid WebGL context conflict */}
       {USE_SITEPAL && sceneReady && <SitePalEmbed />}
 
-      {/* Walking scene is desktop-only — mobile is the side panel alone */}
-      {!isMobile && (
-        <MainScene
-          onLoaded={handleSceneLoaded}
-          useSitePal={USE_SITEPAL}
-          onAnimChange={setActiveAnim}
-          characterModel={displayedModel}
-          defaultAnim={CHARACTERS[activeCharIndex].defaultAnim}
-          characterZOffset={CHARACTERS[activeCharIndex].zOffset || 0}
-          glitchIntensity={glitchIntensity}
-          isMobile={isMobile}
-          holdTalking={chatOpen}
-        />
-      )}
+      {/* Walking scene retired from /main — the framed-portrait panel is the
+          page on all viewports. Restore by re-rendering <MainScene /> here. */}
 
       {/* Glitch transition overlay */}
       <GlitchTransition
@@ -609,21 +618,32 @@ export default function MainPage() {
         style={{
           position: "fixed",
           top: 0,
+          left: 0,
           right: 0,
           bottom: 0,
-          width: isMobile ? "100%" : 280,
+          width: "100%",
+          maxWidth: isMobile ? "100%" : 440,
+          margin: "0 auto",
           zIndex: 100,
           display: "flex",
           flexDirection: "column",
           overflowY: "auto",
+          // iOS: the rotated/skewed title's transformed bounds extend past the
+          // viewport, which Safari treats as pannable overflow ("horizontal
+          // play"). Clip it and restrict touch gestures to vertical panning.
+          overflowX: "hidden",
+          touchAction: "pan-y",
+          overscrollBehavior: "contain",
           fontFamily: "'Cyber', 'Geo', sans-serif",
           background: "rgba(0, 0, 0, 0.5)",
           backdropFilter: "saturate(180%) blur(8px)",
           borderLeft: "1px solid rgba(0, 255, 255, 0.2)",
-          boxShadow: "-4px 0 20px rgba(0, 0, 0, 0.4), inset 1px 0 0 rgba(0, 255, 255, 0.05)",
+          borderRight: "1px solid rgba(0, 255, 255, 0.2)",
+          boxShadow: "0 0 20px rgba(0, 0, 0, 0.4), inset 1px 0 0 rgba(0, 255, 255, 0.05)",
         }}
       >
-        {/* ── Title heading ── */}
+        {/* ── Title heading ── collapses while the chat drawer is open on
+            phones so the portrait can rise above the conversation */}
         <h1
           className="custom-title"
           style={{
@@ -631,9 +651,9 @@ export default function MainPage() {
             left: "3rem",
             top: "1.0rem",
             color: "#f6f5f1ff",
-            fontFamily: "UnifrakturCook, serif",
+            fontFamily: "Blackletter, serif",
             textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
-            fontSize: "2rem",
+            fontSize: "2.5rem",
             fontWeight: 900,
             lineHeight: 0.85,
             transform: "rotate(-8deg) skew(-15deg)",
@@ -642,18 +662,33 @@ export default function MainPage() {
             cursor: "pointer",
             marginTop: "0",
             pointerEvents: "auto",
+            maxHeight: isMobile && chatOpen ? 0 : 300,
+            opacity: isMobile && chatOpen ? 0 : 1,
+            // Clip only while collapsed — at rest the rotated/skewed text
+            // renders outside its layout box and must not be cut
+            overflow: isMobile && chatOpen ? "hidden" : "visible",
+            transition: "max-height 0.35s ease, opacity 0.25s ease",
           }}
         >
-          <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+          <span className="title-line" style={{ display: 'block', position: 'relative',  fontFamily: "Orbitron, serif", }}>Ask</span>
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-            <span style={{ fontSize: "1rem" }}>    of    </span>
-            Perpetual
+            <span style={{ fontSize: "3rem",  }}>RL80</span>
+            
           </span>
-          <span className="title-line" style={{ display: 'block', marginLeft: "3rem", position: 'relative' }}>Profit</span>
+          {/* <span className="title-line" style={{ display: 'block', marginLeft: "3rem", position: 'relative' }}>Profit</span> */}
         </h1>
 
-        {/* ── Agent Select section ── */}
-        <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid rgba(0, 255, 255, 0.1)" }}>
+        {/* ── Agent Select section ── shrinks toward the top while the chat
+            drawer is open on phones, keeping her whole face visible above it */}
+        <div
+          style={{
+            padding: "16px 16px 12px",
+            borderBottom: "1px solid rgba(0, 255, 255, 0.1)",
+            transform: isMobile && chatOpen ? "scale(0.7) translateY(-4%)" : "none",
+            transformOrigin: "top center",
+            transition: "transform 0.35s ease",
+          }}
+        >
           {/* <div
             style={{
               fontSize: "0.6rem",
@@ -669,166 +704,16 @@ export default function MainPage() {
             characters={CHARACTERS}
             activeIndex={activeCharIndex}
             onSelect={handleCharacterSelect}
-            size={isMobile ? 340 : 220}
+            size={340}
+            pageLoading={isLoading}
           />
         </div>
 
-        {/* ── Action buttons (Buy + Stake) ── */}
-        <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          {/* Buy RL80 — green accent, opens BuyModal directly (no CyberButton modal) */}
-          <CyberButton
-            label="Buy RL80"
-            accent="hsl(152, 100%, 45%)"
-            shadow="hsl(152, 80%, 35%)"
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
-                <path d="M12 18V6" />
-              </svg>
-            }
-            modalTitle="Buy RL80"
-            modalBody={<p>Purchase RL80 tokens on Base. Fund the mission — Our Lady rewards the faithful.</p>}
-            onProceed={() => setBuyModalOpen(true)}
-            style={{ fontSize: "1.05rem" }}
-          />
-
-          {/* Stake button — gold accent to differentiate */}
-          {/* <CyberButton
-            label="Stake"
-            accent="hsl(45, 90%, 55%)"
-            shadow="hsl(30, 100%, 50%)"
-            icon={
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17" />
-                <path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9" />
-                <path d="m2 16 6 6" />
-                <circle cx="16" cy="9" r="2.9" />
-                <circle cx="6" cy="5" r="3" />
-              </svg>
-            }
-            modalTitle="Staking Services"
-            modalBody={<p>Stake your faith and reap the rewards. Perpetual profit awaits the devoted.</p>}
-            onProceed={() => window.location.href = "/"}
-            style={{ fontSize: "1.05rem" }}
-          /> */}
-        </div>
-
-        {/* ── Divider ── */}
-        <div style={{ padding: "0 16px", margin: "6px 0" }}>
-          <div style={{ height: "1px", background: "linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent)" }} />
-        </div>
-
-        {/* ── Portfolio section (micro-businesses) ── */}
-        <div style={{ padding: "4px 16px 16px", flex: 1 }}>
-          <div
-            style={{
-              fontSize: "0.6rem",
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "hsl(183 38% 57%)",
-              marginBottom: 10,
-            }}
-          >
-            // Portfolio
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {/* Prospecting Co — LIVE */}
-            <div style={{ position: "relative" }}>
-              <CyberButton
-                label="Hail Mary Prospecting Co"
-                icon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
-                    <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
-                    <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
-                    <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
-                  </svg>
-                }
-                modalTitle="Hail Mary Prospecting Co"
-                modalBody={<p>Strike gold in the digital frontier. Our Lady&apos;s miners never rest.</p>}
-                onProceed={() => { window.location.href = "/hailmary?mode=test"; }}
-                style={{ fontSize: "1rem" }}
-              />
-              {/* Live indicator dot */}
-              <span style={{
-                position: "absolute",
-                top: "50%",
-                right: 6,
-                transform: "translateY(-50%)",
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#00e572",
-                boxShadow: "0 0 6px rgba(0, 229, 114, 0.8)",
-              }} />
-            </div>
-
-            {/* Party Rentals — COMING SOON */}
-            <div style={{ position: "relative" }}>
-              <CyberButton
-                label="The Liminal Terminal"
-                icon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-               <path d="M12 19h8"/><path d="m4 17 6-6-6-6"/>
-                  </svg>
-                }
-                modalTitle="The Liminal Terminal"
-                modalBody={<p></p>}
-                 onProceed={() => { window.location.href = "/trade"; }}
-                style={{ fontSize: "1rem" }}
-              />
-              {/* Live indicator dot */}
-              <span style={{
-                position: "absolute",
-                top: "50%",
-                right: 6,
-                transform: "translateY(-50%)",
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#00e572",
-                boxShadow: "0 0 6px rgba(0, 229, 114, 0.8)",
-              }} />
-            </div>
-
-            {/* Interventions — COMING SOON */}
-            <div style={{ position: "relative" }}>
-              <CyberButton
-                label="Market Rally Race Game"
-                icon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 4V2" />
-                    <path d="M15 16v-2" />
-                    <path d="M8 9h2" />
-                    <path d="M20 9h2" />
-                    <path d="M17.8 11.8 19 13" />
-                    <path d="M15 9h.01" />
-                    <path d="M17.8 6.2 19 5" />
-                    <path d="m3 21 9-9" />
-                    <path d="M12.2 6.2 11 5" />
-                  </svg>
-                }
-                modalTitle="Market Rally Race Game"
-                modalBody={<p>Get ready to race in the market! Compete with others and come out on top.</p>}
-           onProceed={() => { window.location.href = "/race"; }}
-                style={{ fontSize: "1rem" }}
-              />
-              {/* Coming soon badge */}
-              <span style={{
-                position: "absolute",
-                top: "50%",
-                right: 4,
-                transform: "translateY(-50%)",
-                fontSize: "0.4rem",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "hsl(40, 100%, 60%)",
-                fontFamily: "'Cyber', 'Geo', sans-serif",
-              }}>soon</span>
-            </div>
-          </div>
-        </div>
+        {/* Portfolio + Buy moved into the bottom dock (MobileBottomNav) so
+            /main shares the site's unified nav. Destination taps still run
+            through the cyberpunk confirm modal — the panel just keeps the
+            portrait + character picker now. Spacer pins the footer down. */}
+        <div style={{ flex: 1 }} />
 
         {/* ── Footer status line ── */}
         <div
@@ -848,15 +733,205 @@ export default function MainPage() {
       {/* Buy Modal */}
       <BuyModal isOpen={buyModalOpen} onClose={() => setBuyModalOpen(false)} />
 
-      {/* Mobile bottom nav removed — mobile uses the full-width side panel */}
+      {/* SitePal animation-control experiment panel — dev only */}
+      {process.env.NODE_ENV !== "production" && <SitePalExpressionPanel />}
 
-      {/* Confessional chat drawer — appears after character speaks */}
-      {chatMessage && (
+      {/* ── Unified bottom dock ── App-style nav (MobileBottomNav) carrying
+          the portfolio that used to live in the panel. Destination taps run
+          through the shared cyberpunk confirm modal (glitch + sounds); Buy
+          opens BuyModal directly and the center FAB opens the Confessional.
+          Slots L→R: $ BUY | TERMINAL | SPEAK (center) | HAIL MARY | MORE. */}
+      <MobileBottomNav
+        neonMode
+        is80sMode={false}
+        show80sButton={false}
+        hideWallet
+        isMobile
+        accountOnLeft
+        /* Left slot — BUY RL80 → BuyModal (no confirm, matches root). */
+        onBookClick={() => setBuyModalOpen(true)}
+        bookLabel="BUY RL80"
+        bookIcon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#2ad6ee" }}>
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        }
+        /* Center FAB — SPEAK → opens the Confessional (converse with Our Lady),
+           /main's signature action (mirrors root's LIGHT CANDLE center). */
+        onBuyClick={() => setChatOpen(true)}
+        centerSubLabel="SPEAK"
+        centerTitle="Speak to Our Lady"
+        centerLabel={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 28, height: 28, display: "block", color: "#ffffff" }} aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        }
+        /* Far-right — MORE popover (Market Rally Race + back to Shrine). */
+        onMenuClick={() => setShowMoreMenu((v) => !v)}
+        menuLabel="MORE"
+        menuIcon={
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, color: "#2ad6ee" }} aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M17 12h.01" />
+            <path d="M12 12h.01" />
+            <path d="M7 12h.01" />
+          </svg>
+        }
+        extraLeft={[
+          {
+            key: "terminal",
+            label: "Terminal",
+            title: "The Liminal Terminal",
+            onClick: () => { window.location.href = "/trade"; },
+            confirm: {
+              title: "The Liminal Terminal",
+              body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
+              accent: "hsl(111, 100%, 54%)",
+              shadow: "hsl(111, 80%, 34%)",
+            },
+            icon: (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#39ff14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))" }} aria-hidden="true">
+                <rect width="20" height="14" x="2" y="3" rx="2" />
+                <line x1="8" x2="16" y1="21" y2="21" />
+                <line x1="12" x2="12" y1="17" y2="21" />
+              </svg>
+            ),
+          },
+        ]}
+        extraRight={[
+          {
+            key: "lode",
+            label: "Hail Mary",
+            title: "Hail Mary Prospecting Co",
+            onClick: () => { window.location.href = "/hailmary?mode=test"; },
+            confirm: {
+              title: "Hail Mary Prospecting Co",
+              body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+              accent: "hsl(189, 84%, 55%)",
+              shadow: "hsl(189, 70%, 38%)",
+            },
+            icon: (
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2ad6ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block" }} aria-hidden="true">
+                <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+                <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
+                <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
+                <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+              </svg>
+            ),
+          },
+        ]}
+      />
+
+      {/* MORE popover — anchored above the far-right dock slot. Holds the
+          Race game (confirm-gated) + a Shrine return (direct nav). */}
+      {showMoreMenu && (
+        <>
+          <div
+            onClick={() => setShowMoreMenu(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 10001, background: "transparent" }}
+          />
+          <div
+            role="menu"
+            aria-label="More"
+            style={{
+              position: "fixed",
+              right: "10px",
+              bottom: "calc(74px + env(safe-area-inset-bottom, 0px))",
+              zIndex: 10002,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: "184px",
+              padding: "6px",
+              borderRadius: "14px",
+              background: "rgba(6, 10, 18, 0.97)",
+              border: "1px solid rgba(42, 214, 238, 0.3)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              boxShadow: "0 -2px 24px rgba(42, 214, 238, 0.18), 0 8px 32px rgba(0, 0, 0, 0.5)",
+              fontFamily: "'Rajdhani', sans-serif",
+            }}
+          >
+            {[
+              {
+                label: "Market Rally Race",
+                stroke: "#f1d77a",
+                onSelect: () => moreConfirm({
+                  title: "Market Rally Race Game",
+                  body: "Get ready to race in the market! Compete with others and come out on top.",
+                  accent: "hsl(45, 100%, 60%)",
+                  shadow: "hsl(38, 90%, 42%)",
+                  onProceed: () => { window.location.href = "/race"; },
+                }),
+                icon: (
+                  <>
+                    <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
+                    <path d="M17.8 11.8 19 13" /><path d="M15 9h.01" /><path d="M17.8 6.2 19 5" />
+                    <path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" />
+                  </>
+                ),
+              },
+              {
+                label: "Shrine",
+                stroke: "#2ad6ee",
+                onSelect: () => { window.location.href = "/"; },
+                icon: (
+                  <>
+                    <path d="M3 9.5 12 3l9 6.5" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" />
+                  </>
+                ),
+              },
+            ].map((link) => (
+              <button
+                key={link.label}
+                role="menuitem"
+                onClick={() => { setShowMoreMenu(false); link.onSelect(); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  width: "100%",
+                  padding: "11px 12px",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(42, 214, 238, 0.12)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke={link.stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, flexShrink: 0, display: "block" }} aria-hidden="true">
+                  {link.icon}
+                </svg>
+                <span style={{ fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#ffffff" }}>
+                  {link.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Cyberpunk confirm modal for the MORE-popover destinations. */}
+      {moreConfirmModal}
+
+      {/* Confessional chat drawer — converse with the framed portrait.
+          Replies come from /api/oracle and are spoken with timed expressions. */}
+      {CHARACTERS[activeCharIndex]?.portraitModel && (
         <Confessional
           isOpen={chatOpen}
           onToggle={() => setChatOpen((o) => !o)}
-          characterName={CHARACTERS[activeCharIndex]?.name || "Our Lady"}
-          initialMessage={chatMessage}
+          characterName="Our Lady"
+          initialMessage={ORACLE_GREETING}
+          onSendMessage={handleOracleMessage}
+          /* SPEAK (center dock FAB) is the sole launcher — no auto-appearing
+             conversation bubble before the user chooses to speak. */
+          hideLauncher
+          /* Lift the drawer above the bottom dock so its input row (and the
+             protruding center FAB) don't occlude the reply field. */
+          bottomOffset={88}
         />
       )}
 
