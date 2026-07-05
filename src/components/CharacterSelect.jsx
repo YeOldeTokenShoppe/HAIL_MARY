@@ -739,6 +739,93 @@ function FramedPortraitModel({ url }) {
   return <group ref={groupRef} />;
 }
 
+/* ── Live 2D SitePal portrait — mirrors the raw SitePal canvas into the
+      frame's oval slot each frame. No 3D bust, no face projection: the
+      comparison version. The page's single portal must have this character's
+      scene loaded (page-level loadSceneByID swap). ── */
+function SitePalLivePortrait() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let raf = null;
+    let src = null;
+    let still = null;
+    // Still fallback shown until the live feed arrives (also covers the
+    // scene-swap gap after switching characters)
+    const stillImg = new Image();
+    stillImg.onload = () => { still = stillImg; };
+    stillImg.src = "/images/mary.png";
+    waitForSitePalCanvas()
+      .then((el) => { if (!cancelled) src = el; })
+      .catch(() => {});
+
+    // Show the full bust: take the central column of the source (the live
+    // SitePal canvas is 600×450 landscape with the bust centered) and
+    // CONTAIN-fit it below a small top pad so the head clears the frame ring.
+    const LIVE_RECT = { x: 0.18, y: 0.0, w: 0.64, h: 1.0 }; // bust column of the SitePal canvas
+    const STILL_RECT = { x: 0.10, y: 0.0, w: 0.80, h: 1.0 }; // bust region of mary.png
+    const TOP_PAD = 0.06; // slot-space padding above the head
+    const drawCover = (ctx, c, source, sw, sh, rect) => {
+      const sx = sw * rect.x;
+      const sy = sh * rect.y;
+      const sww = sw * rect.w;
+      const shh = sh * rect.h;
+      const availH = c.height * (1 - TOP_PAD);
+      const scale = Math.min(c.width / sww, availH / shh);
+      const dw = sww * scale;
+      const dh = shh * scale;
+      ctx.drawImage(source, sx, sy, sww, shh, (c.width - dw) / 2, c.height * TOP_PAD, dw, dh);
+    };
+
+    const tick = () => {
+      if (cancelled) return;
+      const c = canvasRef.current;
+      if (c) {
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#0a0a12";
+        ctx.fillRect(0, 0, c.width, c.height);
+        let drewLive = false;
+        if (src) {
+          try {
+            drawCover(ctx, c, src, src.width || 600, src.height || 450, LIVE_RECT);
+            drewLive = true;
+          } catch (e) {
+            // live source not ready yet
+          }
+        }
+        if (!drewLive && still) {
+          drawCover(ctx, c, still, still.naturalWidth, still.naturalHeight, STILL_RECT);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={512}
+      height={600}
+      style={{
+        position: "absolute",
+        left: "23%",
+        top: "22.5%",
+        width: "54%",
+        height: "56%",
+        borderRadius: "50%",
+        objectFit: "cover",
+        zIndex: 1,
+      }}
+    />
+  );
+}
+
 /* ── Character portrait inside the frame ── */
 function CharacterPortrait({ image, onClick }) {
   return (
@@ -833,8 +920,12 @@ export default function CharacterSelect({
           margin: "0 auto",
         }}
       >
-        {/* 3D frame canvas */}
+        {/* 3D frame canvas. resize.offsetSize measures LAYOUT size instead of
+            getBoundingClientRect — the ancestor chat-open scale() transform
+            otherwise feeds back into R3F's resize handling and ratchets the
+            canvas smaller on every re-measure (frame displaced from portrait). */}
         <Canvas
+          resize={{ offsetSize: true }}
           camera={{ position: [0, 0, 2], fov: 45 }}
           style={{
             position: "absolute",
@@ -877,8 +968,11 @@ export default function CharacterSelect({
           </EffectComposer>
         </Canvas>
 
-        {/* Portrait behind the frame — or click-to-speak overlay for 3D portraits */}
-        {current.portraitModel ? (
+        {/* Portrait behind the frame: live 2D SitePal mirror, 3D-projection
+            portrait (rendered in the canvas above), or static cameo image.
+            Speaking characters get the click-to-speak overlay. */}
+        {current.sitePalScene && <SitePalLivePortrait key={`live-${index}`} />}
+        {current.portraitModel || current.sitePalScene ? (
           <div
             onClick={speakPortrait}
             title="Speak to Our Lady"

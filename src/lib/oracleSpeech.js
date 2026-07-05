@@ -6,7 +6,7 @@
 // Voice + engine for the oracle's spoken replies.
 // Engine 14 = ElevenLabs via the SitePal-connected account; id = EL voice UUID.
 export const ORACLE_VOICE = {
-  id: "navAk1NkF4pKAFksu1H9", // her chosen ElevenLabs voice
+  id: "wLEii5giu6adITuwTzY1", // her chosen ElevenLabs voice
   lang: 1,
   engine: 14,
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ORACLE_VOICE } from "@/lib/oracleSpeech";
 
 // Dev experiment panel for the SitePal Client API animation controls
 // (setFacialExpression / setIdleMovement / setSpeechMovement / setGaze /
@@ -103,9 +104,10 @@ export default function SitePalExpressionPanel() {
   const [gazeDeg, setGazeDeg] = useState(90);
   const [follow, setFollow] = useState(null);
   // TTS engine test — engine 14 = ElevenLabs (voice = ElevenLabs voice UUID
-  // from the connected account), 15 = OpenAI, 3 = classic built-in
-  const [ttsEngine, setTtsEngine] = useState(14);
-  const [ttsVoice, setTtsVoice] = useState("EXAVITQu4vr4xnSDxMaL"); // Sarah
+  // from the connected account), 15 = OpenAI, 3 = classic built-in.
+  // Defaults to the oracle's current voice so auditions match production.
+  const [ttsEngine, setTtsEngine] = useState(ORACLE_VOICE.engine);
+  const [ttsVoice, setTtsVoice] = useState(ORACLE_VOICE.id);
   const [ttsText, setTtsText] = useState("Blessed are the believers, for theirs is the perpetual profit.");
   const [ttsStatus, setTtsStatus] = useState("");
 

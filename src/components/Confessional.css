@@ -360,7 +360,11 @@
 
   .confessional-drawer {
     width: 100vw;
-    max-height: 55vh;
+    /* Cap below the chat-shrunken portrait: ~378px of portrait + ~108px of
+       dock/offset must stay clear above/below the drawer. Floor keeps the
+       chat usable on very short viewports (accepting slight overlap there),
+       ceiling keeps it tidy on tall phones. */
+    max-height: clamp(160px, calc(100dvh - 486px), 320px);
     border-radius: 14px 14px 0 0;
   }
 }

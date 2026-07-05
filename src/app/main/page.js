@@ -18,7 +18,14 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import useCyberConfirm from "@/components/useCyberConfirm";
 
 const CHARACTERS = [
-  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting", portraitModel: "/models/framedOurLady2.glb", frameHue: "#c300ff" },
+  // Retired 3D-bust + face-projection version (lost the bake-off to the 2D
+  // SitePal mirror, 2026-07-05). To revive: uncomment — its sitePalScene
+  // field makes the scene-swap effect load the projection scene for her.
+  // { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 3D", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting", portraitModel: "/models/framedOurLady2.glb", sitePalScene: 2775211, frameHue: "#c300ff" },
+
+  // Our Lady — the raw SitePal scene mirrored live behind the neon frame
+  // (no 3D bust, no face projection). Her scene is the embed default.
+  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", sitePalScene: 2775218, frameHue: "#ffb347" },
 
   { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk", frameHue: "#22ccff" },
   { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence", frameHue: "#ff2d75" },
@@ -85,11 +92,16 @@ const USE_SITEPAL = true;
 
 // Her opening line — shown by the Confessional's typewriter AND spoken aloud
 // on first drawer open
-const ORACLE_GREETING = "Oh, hello! Speak, child — the ticker tape hears all.";
+// NOTE: SitePal caches rendered TTS by text — if the voice changes, edit
+// this line (even slightly) to bust the cache, or the greeting will replay
+// in the previous voice while novel sentences use the new one.
+const ORACLE_GREETING = "Oh, hello! Speak, child — the ticker tape hears all things.";
 
-// SitePal embed config
+// SitePal embed config — ONE portal per page; characters that use a
+// different scene are swapped in via loadSceneByID (see scene-swap effect)
 const SITEPAL_ACCOUNT = "9308752";
-const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,0,2775211,0,1,0,\"uWRXObfnG6ZZgaqGhkVagBACFz5pCmzF\",0,1";
+const SITEPAL_DEFAULT_SCENE = 2775218; // Our Lady's 2D scene (embed default)
+const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,0,2775218,0,1,0,\"zJsmiZ8gNv9BHZ93vMq3antYxZOiHmlX\",0,1";
 
 function SitePalEmbed() {
   const containerRef = useRef(null);
@@ -221,11 +233,14 @@ export default function MainPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Preload the framed portrait + cameo images. The page is panel-only on
-  // all viewports now — the walking-scene assets are no longer loaded.
+  // Preload the frame assets + stills + cameo images. The default character
+  // is the live 2D SitePal mirror, so no character GLB is needed unless a
+  // portraitModel character is in the roster.
   useEffect(() => {
+    const firstGlb = CHARACTERS[0].portraitModel || CHARACTERS[0].model;
     Promise.all([
-      preloadGLBParsed(CHARACTERS[0].portraitModel || CHARACTERS[0].model),
+      ...(firstGlb ? [preloadGLBParsed(firstGlb)] : []),
+      preloadImage("/images/mary.png"),
       ...CHARACTERS.map((c) => preloadImage(c.image)),
     ]).then(() => {
       assetsReadyRef.current = true;
@@ -347,6 +362,28 @@ export default function MainPage() {
     speakOracle(data);
     return data.reply;
   }, []);
+
+  // Swap the single SitePal portal to the active character's scene (and back
+  // to the portrait scene). vh_sceneLoaded re-mutes on each load.
+  const loadedSceneRef = useRef(SITEPAL_DEFAULT_SCENE);
+  useEffect(() => {
+    const target = CHARACTERS[activeCharIndex]?.sitePalScene || SITEPAL_DEFAULT_SCENE;
+    if (target === loadedSceneRef.current) return;
+    let poll = null;
+    const trySwap = () => {
+      if (typeof window.loadSceneByID === "function") {
+        window.loadSceneByID(target);
+        loadedSceneRef.current = target;
+        return true;
+      }
+      return false;
+    };
+    if (!trySwap()) {
+      poll = setInterval(() => { if (trySwap()) clearInterval(poll); }, 400);
+      setTimeout(() => poll && clearInterval(poll), 8000);
+    }
+    return () => { if (poll) clearInterval(poll); };
+  }, [activeCharIndex]);
 
   // Speak the greeting aloud the first time the drawer opens — the open tap
   // doubles as the audio-unlock gesture, and the typewriter text runs in step.
@@ -651,7 +688,7 @@ export default function MainPage() {
             left: "3rem",
             top: "1.0rem",
             color: "#f6f5f1ff",
-            fontFamily: "Blackletter, serif",
+            fontFamily: "Orbitron, serif",
             textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
             fontSize: "2.5rem",
             fontWeight: 900,
@@ -919,7 +956,7 @@ export default function MainPage() {
 
       {/* Confessional chat drawer — converse with the framed portrait.
           Replies come from /api/oracle and are spoken with timed expressions. */}
-      {CHARACTERS[activeCharIndex]?.portraitModel && (
+      {(CHARACTERS[activeCharIndex]?.portraitModel || CHARACTERS[activeCharIndex]?.sitePalScene) && (
         <Confessional
           isOpen={chatOpen}
           onToggle={() => setChatOpen((o) => !o)}
