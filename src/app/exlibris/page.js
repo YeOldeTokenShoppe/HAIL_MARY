@@ -11,6 +11,7 @@ import CyberNav from '@/components/CyberNav';
 import CompactCandleModal from '@/components/CompactCandleModal';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import BuyModal from '@/components/BuyModal';
+import useCyberConfirm from '@/components/useCyberConfirm';
 
 const Philosophy = dynamic(() => import('@/components/Philosophy'), {
   ssr: false,
@@ -36,6 +37,8 @@ export default function ModelViewerPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [moreConfirmModal, moreConfirm] = useCyberConfirm();
   const [showLittleBook, setShowLittleBook] = useState(false);
   const [isBookHovered, setIsBookHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -207,13 +210,18 @@ export default function ModelViewerPage() {
         /* Filling gold arc around the FAB — 0 when just lit, 1 at
            burnout. Only rendered while a candle is actually lit. */
         // centerProgress={candleLit ? meltProgress : null}
-        /* Menu slot (right) routes home — the 3D Book mesh already
-           opens the overlay, so the slot returns to the root page. */
-        onMenuClick={() => router.push('/')}
+        /* Menu slot (right) is now a MORE popover (holds Terminal). Home moved
+           to the dock's dedicated left slot; the 3D Book mesh opens the overlay. */
+        onMenuClick={() => setShowMoreMenu((v) => !v)}
         menuIcon={
-          <img src="/brand-mark.svg" alt="Home" width="24" height="24" style={{ display: "block" }} />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#2ad6ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, color: "#2ad6ee" }} aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M17 12h.01" />
+            <path d="M12 12h.01" />
+            <path d="M7 12h.01" />
+          </svg>
         }
-        menuLabel="HOME"
+        menuLabel="MORE"
         isUserSignedIn={isSignedIn}
         userImage={user?.imageUrl}
         show80sButton={false}
@@ -226,37 +234,19 @@ export default function ModelViewerPage() {
         bookLabel="BUY"
         bookTitle="Buy RL80"
         bookIcon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#39ff14", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))" }}>
             <line x1="12" y1="1" x2="12" y2="23" />
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         }
         extraLeft={[
           {
-            key: 'terminal',
-            label: 'TERMINAL',
-            title: 'The Liminal Terminal',
-            onClick: () => { router.push('/trade'); },
-            icon: (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#39ff14"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: 'block',
-                  filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))',
-                }}
-                aria-hidden="true"
-              >
-<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>
-              </svg>
-            ),
+            key: 'home',
+            label: 'Home',
+            title: 'Return to the shrine',
+            onClick: () => { router.push('/'); },
+            // Same brand mark this slot used before, now in the Terminal spot.
+            iconSrc: '/brand-mark.svg',
           },
         ]}
         extraRight={[
@@ -270,11 +260,11 @@ export default function ModelViewerPage() {
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#2ad6ee"
+                stroke="#f1d77a"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ width: 24, height: 24, display: 'block' }}
+                style={{ width: 24, height: 24, display: 'block', filter: 'drop-shadow(0 0 4px rgba(241, 215, 122, 0.6))' }}
                 aria-hidden="true"
               >
                 <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
@@ -286,6 +276,110 @@ export default function ModelViewerPage() {
           },
         ]}
       />
+
+      {/* MORE popover — anchored above the far-right dock slot. Holds the
+          Terminal (and any future secondary destinations). */}
+      {showMoreMenu && (
+        <>
+          <div
+            onClick={() => setShowMoreMenu(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 10001, background: "transparent" }}
+          />
+          <div
+            role="menu"
+            aria-label="More"
+            style={{
+              position: "fixed",
+              right: "10px",
+              bottom: "calc(74px + env(safe-area-inset-bottom, 0px))",
+              zIndex: 10002,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: "184px",
+              padding: "6px",
+              borderRadius: "14px",
+              background: "rgba(15, 0, 30, 0.97)",
+              border: "1px solid rgba(255, 0, 255, 0.3)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              boxShadow: "0 -2px 24px rgba(255, 0, 255, 0.18), 0 8px 32px rgba(0, 0, 0, 0.5)",
+              fontFamily: "'Rajdhani', sans-serif",
+            }}
+          >
+            {[
+              {
+                label: "Coin Fountain",
+                stroke: "#2ad6ee",
+                onSelect: () => moreConfirm({
+                  title: "Coin Fountain",
+                  body: "Toss a coin, whisper a wish. Our Lady keeps every offering the faithful let fall.",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
+                  onProceed: () => { router.push('/fountain'); },
+                }),
+                icon: (
+                  <>
+                    <path d="M12 10L12 2" />
+                    <path d="M16 6L12 10L8 6" />
+                    <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
+                    <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
+                  </>
+                ),
+              },
+              {
+                label: "Terminal",
+                stroke: "#39ff14",
+                onSelect: () => moreConfirm({
+                  title: "The Liminal Terminal",
+                  body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
+                  onProceed: () => { router.push('/trade'); },
+                }),
+                icon: (
+                  <>
+                    <rect width="20" height="14" x="2" y="3" rx="2" />
+                    <line x1="8" x2="16" y1="21" y2="21" />
+                    <line x1="12" x2="12" y1="17" y2="21" />
+                  </>
+                ),
+              },
+            ].map((link) => (
+              <button
+                key={link.label}
+                role="menuitem"
+                onClick={() => { setShowMoreMenu(false); link.onSelect(); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  width: "100%",
+                  padding: "11px 12px",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 0, 255, 0.12)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke={link.stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, flexShrink: 0, display: "block", filter: `drop-shadow(0 0 4px ${link.stroke}66)` }} aria-hidden="true">
+                  {link.icon}
+                </svg>
+                <span style={{ fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", color: "#ffffff" }}>
+                  {link.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Cyber confirm modal for the MORE-popover destinations. */}
+      {moreConfirmModal}
+
           {/* CyberNav Menu Panel */}
           <CyberNav
             is80sMode={is80sMode}

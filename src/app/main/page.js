@@ -834,7 +834,7 @@ export default function MainPage() {
         onBookClick={() => setBuyModalOpen(true)}
         bookLabel="BUY RL80"
         bookIcon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#2ad6ee" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#39ff14", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))" }}>
             <line x1="12" y1="1" x2="12" y2="23" />
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
@@ -862,23 +862,18 @@ export default function MainPage() {
         }
         extraLeft={[
           {
-            key: "terminal",
-            label: "Terminal",
-            title: "The Liminal Terminal",
-            onClick: () => { window.location.href = "/trade"; },
+            key: "shrine",
+            label: "Shrine",
+            title: "Return to the shrine",
+            onClick: () => { window.location.href = "/"; },
             confirm: {
-              title: "The Liminal Terminal",
-              body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
-              accent: "hsl(111, 100%, 54%)",
-              shadow: "hsl(111, 80%, 34%)",
+              title: "Return to the Shrine",
+              body: "Step back into Our Lady's candlelit hall — your vigil keeps burning.",
+              accent: "hsl(189, 84%, 55%)",
+              shadow: "hsl(189, 70%, 38%)",
             },
-            icon: (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#39ff14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))" }} aria-hidden="true">
-                <rect width="20" height="14" x="2" y="3" rx="2" />
-                <line x1="8" x2="16" y1="21" y2="21" />
-                <line x1="12" x2="12" y1="17" y2="21" />
-              </svg>
-            ),
+            // Same brand mark the /exlibris dock uses for its HOME slot.
+            iconSrc: "/brand-mark.svg",
           },
         ]}
         extraRight={[
@@ -894,7 +889,7 @@ export default function MainPage() {
               shadow: "hsl(189, 70%, 38%)",
             },
             icon: (
-              <svg viewBox="0 0 24 24" fill="none" stroke="#2ad6ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block" }} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ff44d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(255, 68, 212, 0.6))" }} aria-hidden="true">
                 <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
                 <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
                 <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
@@ -936,13 +931,51 @@ export default function MainPage() {
           >
             {[
               {
+                label: "Coin Fountain",
+                stroke: "#2ad6ee",
+                onSelect: () => moreConfirm({
+                  title: "Coin Fountain",
+                  body: "Toss a coin, whisper a wish. Our Lady keeps every offering the faithful let fall.",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
+                  onProceed: () => { window.location.href = "/fountain"; },
+                }),
+                icon: (
+                  <>
+                    <path d="M12 10L12 2" />
+                    <path d="M16 6L12 10L8 6" />
+                    <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" />
+                    <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />
+                  </>
+                ),
+              },
+              {
+                label: "Ex Libris",
+                stroke: "#ff44d4",
+                onSelect: () => moreConfirm({
+                  title: "Ex Libris",
+                  body: "The perpetual ledger. Every flame, every name, inscribed for those who came to pray.",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
+                  onProceed: () => { window.location.href = "/exlibris"; },
+                }),
+                icon: (
+                  <>
+                    <path d="M15 12h-5" />
+                    <path d="M15 8h-5" />
+                    <path d="M19 17V5a2 2 0 0 0-2-2H4" />
+                    <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
+                  </>
+                ),
+              },
+              {
                 label: "Market Rally Race",
                 stroke: "#f1d77a",
                 onSelect: () => moreConfirm({
                   title: "Market Rally Race Game",
                   body: "Get ready to race in the market! Compete with others and come out on top.",
-                  accent: "hsl(45, 100%, 60%)",
-                  shadow: "hsl(38, 90%, 42%)",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
                   onProceed: () => { window.location.href = "/race"; },
                 }),
                 icon: (
@@ -953,16 +986,7 @@ export default function MainPage() {
                   </>
                 ),
               },
-              {
-                label: "Shrine",
-                stroke: "#2ad6ee",
-                onSelect: () => { window.location.href = "/"; },
-                icon: (
-                  <>
-                    <path d="M3 9.5 12 3l9 6.5" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" />
-                  </>
-                ),
-              },
+              // "Shrine" moved to the dock's dedicated slot (was here + there).
             ].map((link) => (
               <button
                 key={link.label}

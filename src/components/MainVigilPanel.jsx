@@ -12,13 +12,31 @@
 // the neon-frame R3F canvas or the SitePal embed for GPU on smaller devices.
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useAccount } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
+import { erc20Abi } from "viem";
+import { RL80_ADDRESS } from "@/lib/contracts";
 import { useCandles } from "@/hooks/useCandles";
-import { readCandle, readCandlePrefs, subscribeLitCandles } from "@/lib/candleRitual";
-import { readLocalCandle } from "@/lib/localCandle";
-import { intentionText } from "@/lib/intentions";
+import {
+  readCandle,
+  readCandlePrefs,
+  subscribeLitCandles,
+  lightCandle,
+  extinguishCandle,
+  dedicateCandle,
+  writeCandlePrefs,
+} from "@/lib/candleRitual";
+import { readLocalCandle, writeLocalCandle, clearLocalCandle } from "@/lib/localCandle";
+import { intentionText, toIntentionKeys } from "@/lib/intentions";
+import {
+  VOTIVE_IMAGE_STORAGE_PREFIX,
+  writeVotiveImage,
+  writeVotiveTint,
+  compressVotiveImage,
+} from "@/lib/candlePrefs";
+import CandleCustomizePicker from "@/components/CandleCustomizePicker";
+import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
+import BuyModal from "@/components/BuyModal";
 
 // Real 3D votive — client-only, its own WebGL context. Loaded lazily so the
 // panel's price/dedication paint immediately while the model streams in.
@@ -113,11 +131,32 @@ export default function MainVigilPanel({ show = true }) {
 
   const { latestPrice, priceChange24h } = useCandles({ count: 2, days: 1 });
 
+  // RL80 holding gates the customization picker (cosmetics only) — mirrors the
+  // landing page. Intentions/lighting stay free.
+  const { data: rl80BalanceRaw } = useReadContract({
+    address: RL80_ADDRESS,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+  const hasRL80 = typeof rl80BalanceRaw === "bigint" && rl80BalanceRaw > 0n;
+
   const [candle, setCandle] = useState(null); // { litAtMs, intention, displayName }
-  const [prefs, setPrefs] = useState(null); // { votiveImage, votiveTint }
   const [recent, setRecent] = useState([]);
   const [closeup, setCloseup] = useState(false); // click the votive → enlarge
   const tapStartRef = useRef({ x: 0, y: 0 }); // distinguish a tap (enlarge) from a drag (rotate)
+  // Live cosmetics + dedications, edited in place via the shared picker. Seeded
+  // from Firestore prefs / the candle doc on load; persisted through the same
+  // candleRitual + candlePrefs helpers the landing page uses, so both stay in
+  // sync (the two pages share the votive GLB cache — see PanelVotive).
+  const [votiveImage, setVotiveImage] = useState(null);
+  const [votiveTint, setVotiveTint] = useState(null);
+  const [intentions, setIntentions] = useState([]);
+  const [showPicker, setShowPicker] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [votiveUploadError, setVotiveUploadError] = useState(null);
 
   // Load the current user's candle + cosmetics (or the anon local candle).
   useEffect(() => {
@@ -130,13 +169,17 @@ export default function MainVigilPanel({ show = true }) {
         ]);
         if (!cancelled) {
           setCandle(c && c.litAtMs ? c : null);
-          setPrefs(p || null);
+          setVotiveImage(p?.votiveImage || null);
+          setVotiveTint(p?.votiveTint || null);
+          setIntentions(c?.intention ? toIntentionKeys(c.intention) : []);
         }
       } else {
         const local = readLocalCandle();
         if (!cancelled) {
           setCandle(local && local.litAtMs ? { litAtMs: local.litAtMs } : null);
-          setPrefs(null);
+          setVotiveImage(null);
+          setVotiveTint(null);
+          setIntentions([]);
         }
       }
     })();
@@ -155,10 +198,100 @@ export default function MainVigilPanel({ show = true }) {
 
   const lit = !!candle?.litAtMs;
   const up = (priceChange24h ?? 0) >= 0;
-  // null → keep the votive's baked saint decal; a pref path/data-URL overrides it.
-  const votiveImage = prefs?.votiveImage || null;
-  const votiveTint = prefs?.votiveTint || null;
   const dedication = candle?.intention ? intentionText(candle.intention) : null;
+  const shortAddress = address
+    ? `${address.slice(0, 6)}…${address.slice(-4)}`
+    : null;
+  const canCustomize = !!userId && hasRL80;
+
+  // --- Candle actions (mirror the landing page's FAB, scoped to the panel) ---
+  const doLight = () => {
+    const now = Date.now();
+    if (userId) {
+      lightCandle(userId, { displayName: shortAddress, avatarUrl: null });
+    } else {
+      writeLocalCandle(now);
+    }
+    setIntentions([]);
+    // Optimistic flip so the votive lights + PanelVotive mounts immediately.
+    setCandle((prev) => ({
+      ...(prev || {}),
+      litAtMs: now,
+      displayName: shortAddress || prev?.displayName || null,
+      intention: null,
+    }));
+  };
+
+  const doExtinguish = () => {
+    if (userId) extinguishCandle(userId);
+    else clearLocalCandle();
+    setCandle(null);
+    setIntentions([]);
+    setShowPicker(false);
+  };
+
+  const toggleIntention = (key) => {
+    const next = intentions.includes(key)
+      ? intentions.filter((k) => k !== key)
+      : [...intentions, key];
+    setIntentions(next);
+    setCandle((prev) => (prev ? { ...prev, intention: next.length ? next : null } : prev));
+    if (userId) dedicateCandle(userId, next);
+  };
+
+  const handlePickImage = (src) => {
+    if (!canCustomize) return;
+    setVotiveUploadError(null);
+    setVotiveImage(src ?? null);
+    writeVotiveImage(userId, src ?? null);
+    writeCandlePrefs(userId, { votiveImage: src ?? null });
+  };
+
+  const handleUpload = async (file) => {
+    if (!file || !canCustomize) return;
+    setVotiveUploadError(null);
+    try {
+      const compressed = await compressVotiveImage(file);
+      try {
+        window.localStorage.setItem(VOTIVE_IMAGE_STORAGE_PREFIX + userId, compressed);
+      } catch {
+        setVotiveUploadError(
+          "Image too large to save on this device — try a smaller one.",
+        );
+        return;
+      }
+      setVotiveImage(compressed);
+      const result = await writeCandlePrefs(userId, { votiveImage: compressed });
+      if (result && !result.ok && result.reason === "image-too-large") {
+        setVotiveUploadError(
+          "Image saved on this device, but it's too large to sync to your other devices.",
+        );
+      }
+    } catch {
+      setVotiveUploadError("Couldn't read that image.");
+    }
+  };
+
+  const handlePickTint = (hex) => {
+    if (!canCustomize) return;
+    setVotiveTint(hex ?? null);
+    writeVotiveTint(userId, hex ?? null);
+    writeCandlePrefs(userId, { votiveTint: hex ?? null });
+  };
+
+  // Button under the votive, mirroring the landing FAB:
+  //   unlit → light · lit+signed-in → customize · lit+anon → connect to save.
+  const onCandleButton = () => {
+    if (!lit) {
+      doLight();
+      return;
+    }
+    if (userId) {
+      setShowPicker(true);
+      return;
+    }
+    setShowAccountModal(true);
+  };
 
   return (
     <aside
@@ -263,53 +396,91 @@ export default function MainVigilPanel({ show = true }) {
             >
               Your flame · lit {timeAgo(candle?.litAtMs)}
             </div>
+            {/* Discreet round edit button — a lit candle shouldn't shout a
+                text CTA; the pencil invites customization without competing
+                with the flame. Anon taps route to connect-to-save. */}
+            <button
+              type="button"
+              onClick={onCandleButton}
+              title={userId ? "Customize candle" : "Connect to save & customize"}
+              aria-label={userId ? "Customize candle" : "Connect to save & customize"}
+              style={{
+                marginTop: 2,
+                alignSelf: "center",
+                width: 30,
+                height: 30,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "50%",
+                cursor: "pointer",
+                color: "rgba(212, 175, 55, 0.85)",
+                background: "rgba(212, 175, 55, 0.08)",
+                border: "1px solid rgba(212, 175, 55, 0.35)",
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ width: 14, height: 14 }}
+              >
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+            </button>
           </div>
         </div>
       ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-            padding: "28px 16px",
-            textAlign: "center",
-            borderRadius: 10,
-            border: "1px dashed rgba(255, 211, 107, 0.25)",
-            background:
-              "radial-gradient(ellipse 70% 60% at 50% 30%, rgba(255,180,90,0.08), rgba(0,0,0,0) 70%)",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "UnifrakturCook, serif",
-              fontSize: "1.4rem",
-              color: GOLD,
-            }}
-          >
-            No candle lit
+        // Unlit: show the (dark) votive with its default saint image so the
+        // niche reads as a ready-to-light candle — like the shrine — instead of
+        // an empty placeholder. Small CTA below lights it in place.
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <CandleNiche>
+            <PanelVotive
+              lit={false}
+              votiveImage={votiveImage}
+              votiveTint={votiveTint}
+              height={260}
+              draggable
+            />
+          </CandleNiche>
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              style={{
+                fontSize: "0.6rem",
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: "rgba(255, 211, 107, 0.45)",
+              }}
+            >
+              Your candle · unlit
+            </div>
+            <button
+              type="button"
+              onClick={onCandleButton}
+              style={{
+                alignSelf: "center",
+                padding: "8px 20px",
+                borderRadius: 999,
+                fontSize: "0.66rem",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                fontWeight: 700,
+                cursor: "pointer",
+                color: "#0a0a0f",
+                background: GOLD,
+                border: "none",
+                boxShadow: "0 0 16px rgba(212,175,55,0.4)",
+              }}
+            >
+              Light a candle
+            </button>
           </div>
-          <p style={{ fontSize: "0.78rem", color: "rgba(232,246,246,0.6)", margin: 0, lineHeight: 1.5 }}>
-            Light one at the shrine and your flame will keep vigil here.
-          </p>
-          <Link
-            href="/"
-            style={{
-              marginTop: 4,
-              padding: "9px 18px",
-              borderRadius: 999,
-              fontSize: "0.7rem",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              fontWeight: 700,
-              color: "#0a0a0f",
-              background: GOLD,
-              textDecoration: "none",
-              boxShadow: "0 0 16px rgba(212,175,55,0.4)",
-            }}
-          >
-            Light a candle
-          </Link>
         </div>
       )}
 
@@ -389,6 +560,46 @@ export default function MainVigilPanel({ show = true }) {
           </div>
         </div>
       )}
+
+      {/* ── Customize modal — same picker the landing FAB opens, shared via
+          CandleCustomizePicker. Cosmetics gated on holding RL80; intentions
+          free. Persists through candleRitual + candlePrefs so edits made here
+          show up on the shrine and vice-versa. ── */}
+      <CandleCustomizePicker
+        open={showPicker}
+        placement="modal"
+        onClose={() => setShowPicker(false)}
+        canCustomize={canCustomize}
+        candleLit={lit}
+        votiveImage={votiveImage}
+        votiveTint={votiveTint}
+        intentions={intentions}
+        votiveUploadError={votiveUploadError}
+        onToggleIntention={toggleIntention}
+        onPickImage={handlePickImage}
+        onUploadImage={handleUpload}
+        onPickTint={handlePickTint}
+        onExtinguish={() => {
+          setShowPicker(false);
+          doExtinguish();
+        }}
+        onBuyRL80={() => {
+          setShowPicker(false);
+          setShowBuyModal(true);
+        }}
+      />
+
+      {/* Wallet connect / account — opened by the lit+anon "connect to save"
+          button. */}
+      <UnifiedAccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        initialTab="wallet"
+        theme="cyber"
+      />
+
+      {/* Buy RL80 — opened by the picker's lock CTA (signed in, no RL80). */}
+      <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
     </aside>
   );
 }

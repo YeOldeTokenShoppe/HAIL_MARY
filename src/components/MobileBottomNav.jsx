@@ -607,12 +607,12 @@ export default function MobileBottomNav({
           cursor: pointer;
           border: ${nm ? '2px solid transparent' : `3px solid ${m80 ? 'rgba(255, 255, 255, 0.15)' : dk ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.9)'}`};
           background: ${nm
-            ? 'linear-gradient(180deg, rgba(6, 10, 18, 0.92), rgba(2, 5, 9, 0.95)) padding-box, linear-gradient(135deg, #2ad6ee 0%, #d6faff 40%, #d92db0 60%, #ff7de0 100%) border-box'
+            ? 'linear-gradient(180deg, rgba(6, 10, 18, 0.92), rgba(2, 5, 9, 0.95)) padding-box, linear-gradient(135deg, #d4a854 0%, #ffedbe 40%, #f4b53f 60%, #ffd97a 100%) border-box'
             : m80
               ? 'linear-gradient(145deg, #d946ef, #a21caf)'
               : 'linear-gradient(145deg, #d4a854, #b8922e)'};
           box-shadow: ${nm
-            ? '0 4px 18px rgba(42, 214, 238, 0.45), 0 0 28px rgba(217, 45, 176, 0.3), 0 2px 6px rgba(0, 0, 0, 0.35)'
+            ? '0 4px 18px rgba(244, 181, 63, 0.45), 0 0 28px rgba(255, 200, 90, 0.3), 0 2px 6px rgba(0, 0, 0, 0.35)'
             : m80
               ? '0 4px 16px rgba(217, 70, 239, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)'
               : '0 4px 16px rgba(184, 146, 46, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15)'};
@@ -624,7 +624,7 @@ export default function MobileBottomNav({
         .btm-buy-fab:active {
           transform: scale(0.93);
           box-shadow: ${nm
-            ? '0 2px 10px rgba(42, 214, 238, 0.6), 0 0 18px rgba(217, 45, 176, 0.4), 0 1px 3px rgba(0, 0, 0, 0.35)'
+            ? '0 2px 10px rgba(244, 181, 63, 0.6), 0 0 18px rgba(255, 200, 90, 0.4), 0 1px 3px rgba(0, 0, 0, 0.35)'
             : m80
               ? '0 2px 8px rgba(217, 70, 239, 0.6), 0 1px 3px rgba(0, 0, 0, 0.3)'
               : '0 2px 8px rgba(184, 146, 46, 0.5), 0 1px 3px rgba(0, 0, 0, 0.15)'};
@@ -637,7 +637,7 @@ export default function MobileBottomNav({
           letter-spacing: ${nm ? '3px' : '2px'};
           color: #ffffff;
           text-shadow: ${nm
-            ? '0 0 8px rgba(42, 214, 238, 0.7), 0 0 14px rgba(217, 45, 176, 0.4)'
+            ? '0 0 8px rgba(244, 181, 63, 0.7), 0 0 14px rgba(255, 200, 90, 0.4)'
             : '0 1px 2px rgba(0, 0, 0, 0.2)'};
         }
 
@@ -646,19 +646,19 @@ export default function MobileBottomNav({
           font-weight: 700;
           letter-spacing: 0.5px;
           text-transform: uppercase;
-          color: ${nm ? 'rgba(111, 168, 196, 0.9)' : m80 ? 'rgba(200, 180, 220, 0.6)' : dk ? 'rgba(200, 190, 170, 0.5)' : 'rgba(120, 105, 85, 0.6)'};
+          color: ${nm ? 'rgba(224, 196, 120, 0.8)' : m80 ? 'rgba(200, 180, 220, 0.6)' : dk ? 'rgba(200, 190, 170, 0.5)' : 'rgba(120, 105, 85, 0.6)'};
           margin-top: 4px;
           line-height: 1;
         }
 
         @keyframes btmFabPulse {
           0%, 100% { box-shadow: ${nm
-            ? '0 4px 18px rgba(42, 214, 238, 0.45), 0 0 28px rgba(217, 45, 176, 0.3), 0 2px 6px rgba(0, 0, 0, 0.35)'
+            ? '0 4px 18px rgba(244, 181, 63, 0.45), 0 0 28px rgba(255, 200, 90, 0.3), 0 2px 6px rgba(0, 0, 0, 0.35)'
             : m80
               ? '0 4px 16px rgba(217, 70, 239, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)'
               : '0 4px 16px rgba(184, 146, 46, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15)'}; }
           50% { box-shadow: ${nm
-            ? '0 4px 28px rgba(42, 214, 238, 0.7), 0 0 48px rgba(217, 45, 176, 0.4), 0 2px 6px rgba(0, 0, 0, 0.35)'
+            ? '0 4px 28px rgba(244, 181, 63, 0.7), 0 0 48px rgba(255, 200, 90, 0.4), 0 2px 6px rgba(0, 0, 0, 0.35)'
             : m80
               ? '0 4px 24px rgba(217, 70, 239, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 40px rgba(217, 70, 239, 0.2)'
               : '0 4px 24px rgba(184, 146, 46, 0.6), 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 40px rgba(184, 146, 46, 0.15)'}; }
@@ -685,7 +685,7 @@ export default function MobileBottomNav({
         .btm-buy-fab.btm-buy-fab-hovered:not(.btm-disabled) {
           transform: scale(1.06);
           box-shadow: ${nm
-            ? '0 6px 26px rgba(42, 214, 238, 0.7), 0 0 48px rgba(217, 45, 176, 0.55), 0 0 80px rgba(255, 200, 90, 0.25), 0 2px 6px rgba(0, 0, 0, 0.4)'
+            ? '0 6px 26px rgba(244, 181, 63, 0.7), 0 0 48px rgba(255, 200, 90, 0.55), 0 0 80px rgba(255, 200, 90, 0.25), 0 2px 6px rgba(0, 0, 0, 0.4)'
             : m80
               ? '0 6px 24px rgba(217, 70, 239, 0.75), 0 0 48px rgba(217, 70, 239, 0.4), 0 2px 6px rgba(0, 0, 0, 0.35)'
               : '0 6px 24px rgba(255, 215, 120, 0.85), 0 0 48px rgba(255, 200, 90, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2)'};
@@ -703,7 +703,7 @@ export default function MobileBottomNav({
           .btm-buy-fab:not(.btm-disabled):hover {
             transform: scale(1.06);
             box-shadow: ${nm
-              ? '0 6px 26px rgba(42, 214, 238, 0.7), 0 0 48px rgba(217, 45, 176, 0.55), 0 0 80px rgba(255, 200, 90, 0.25), 0 2px 6px rgba(0, 0, 0, 0.4)'
+              ? '0 6px 26px rgba(244, 181, 63, 0.7), 0 0 48px rgba(255, 200, 90, 0.55), 0 0 80px rgba(255, 200, 90, 0.25), 0 2px 6px rgba(0, 0, 0, 0.4)'
               : m80
                 ? '0 6px 24px rgba(217, 70, 239, 0.75), 0 0 48px rgba(217, 70, 239, 0.4), 0 2px 6px rgba(0, 0, 0, 0.35)'
                 : '0 6px 24px rgba(255, 215, 120, 0.85), 0 0 48px rgba(255, 200, 90, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2)'};

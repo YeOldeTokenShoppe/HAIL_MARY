@@ -1,0 +1,662 @@
+/* CandleCustomizePicker — modal shell for the /main placement, where
+   chart-shrine.css is NOT loaded. The picker-control rules below this header
+   are copied verbatim from chart-shrine.css so the look matches the landing
+   page. On the landing page (placement="anchored") the card is styled by
+   chart-shrine.css and this file's duplicate base rules are identical (the
+   neon-scoped `.shrine-page.neon` variants there still win by specificity),
+   so nothing changes there. The `.ccp-backdrop` centering + `.ccp-modal-card`
+   position resets only apply to the /main modal. */
+
+.ccp-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 3, 8, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  overflow-y: auto;
+  font-family: 'Rajdhani', 'Cyber', sans-serif;
+}
+
+/* Neutralize the anchored card's fixed corner-positioning + entrance
+   animation so the backdrop can center it as a true modal. */
+.ccp-backdrop .ccp-modal-card.candle-picker-popup {
+  position: static !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+  animation: none !important;
+  width: min(420px, 92vw) !important;
+  max-width: 92vw !important;
+  max-height: min(86vh, 780px) !important;
+  overflow-y: auto !important;
+}
+
+/* ===== copied verbatim from chart-shrine.css ===== */
+.shrine-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 20px;
+  border: 1px solid #9a7a35;
+  color: #e9d48d;
+  text-decoration: none;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  background: rgba(20, 10, 6, 0.65);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  border-radius: 2px;
+}
+
+.shrine-btn:hover {
+  background: rgba(241, 215, 122, 0.1);
+  color: #fff4c2;
+  border-color: #f1d77a;
+}
+
+.shrine-btn.primary {
+  background: linear-gradient(180deg, #d6b762 0%, #9a7a35 100%);
+  color: #160a06;
+  border-color: #f1d77a;
+  font-weight: 600;
+}
+
+.shrine-btn.primary:hover {
+  background: linear-gradient(180deg, #f1d77a 0%, #b58f45 100%);
+  color: #0d0604;
+}
+
+.shrine-btn.ghost {
+  border-color: #4a3a2a;
+  color: #a89970;
+}
+
+/* Responsive .shrine-btn override — from @media (max-width: 700px) block */
+@media (max-width: 700px) {
+  .shrine-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+}
+
+.flame-nudge {
+  position: fixed;
+  left: 50%;
+  bottom: calc(15rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 1002;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 18px 22px 16px;
+  width: min(340px, calc(100vw - 32px));
+  background: rgba(20, 16, 28, 0.88);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid rgba(241, 215, 122, 0.18);
+  border-left: 2px solid #d4a854;
+  border-radius: 3px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 28px rgba(241, 215, 122, 0.12);
+  animation: flameNudgeIn 280ms cubic-bezier(0.2, 0.9, 0.25, 1);
+  overflow: hidden;
+}
+
+/* Gold gradient hairline across the top — same accent the testimonial
+   modal uses, ties the two panels together visually. */
+.flame-nudge::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(241, 215, 122, 0.9),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.flame-nudge-title {
+  margin: 0;
+  color: #f1d77a;
+  font-family: "Cinzel", serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-align: center;
+  text-shadow: 0 0 18px rgba(241, 215, 122, 0.25);
+}
+
+.flame-nudge-sub {
+  margin: -2px 0 2px;
+  color: #d4a854;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* Legacy single-line text from the pre-structured nudge copy — kept so
+   any surface still using it renders cleanly. */
+.flame-nudge-text {
+  margin: 0;
+  color: #e9e3d4;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.flame-nudge-benefits {
+  margin: 2px 0 4px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+}
+
+.flame-nudge-benefits li {
+  position: relative;
+  padding-left: 18px;
+  color: #e9e3d4;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.2px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.flame-nudge-benefits li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  background: #d4a854;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(241, 215, 122, 0.4);
+}
+
+.flame-nudge-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.flame-nudge-cta {
+  padding: 9px 22px;
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+/* Close × lives in the corner now, not in the action row — frees
+   the action row for CTAs and matches the testimonial modal pattern. */
+.flame-nudge-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: #a39a82;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 160ms ease;
+  z-index: 1;
+}
+
+.flame-nudge-dismiss:hover {
+  color: #f1d77a;
+}
+
+/* Dedication card — preset intention chips inside the flame-nudge frame.
+   Pills in the gold accent; wraps to extra rows on narrow screens. */
+.dedication-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.dedication-chip {
+  padding: 7px 14px;
+  background: rgba(241, 215, 122, 0.07);
+  border: 1px solid rgba(241, 215, 122, 0.35);
+  border-radius: 999px;
+  color: #f1d77a;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.dedication-chip:hover {
+  background: rgba(241, 215, 122, 0.16);
+  border-color: rgba(241, 215, 122, 0.7);
+  color: #fff3c4;
+}
+
+.dedication-chip.is-active {
+  background: rgba(241, 215, 122, 0.22);
+  border-color: #f1d77a;
+  color: #fff7d6;
+  box-shadow: 0 0 10px rgba(241, 215, 122, 0.25);
+}
+
+/* Picker variant — same frame, but centered in the viewport rather
+   than docked at the bottom. Bottom-anchored was easy to miss since
+   the user's eye is already on the candle (also near the bottom) when
+   they tap the FAB; center-of-screen forces the focus. */
+.flame-nudge.candle-picker-popup {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  animation-name: candlePickerIn;
+  /* Never taller than the viewport minus breathing room for the bottom
+     nav — the Disconnect button at the bottom must stay reachable on
+     short screens. Content scrolls inside instead. dvh where supported
+     (mobile URL-bar-aware), vh fallback above it. */
+  max-height: calc(100vh - 150px);
+  max-height: calc(100dvh - 150px);
+  overflow-y: auto;
+}
+
+/* Secondary actions stacked beneath the picker tiles — currently
+   "Extinguish candle" (only while lit) and "Sign out". Styled as
+   subtle monospace links so the primary eye-path stays on the tiles. */
+.candle-picker-secondary {
+  margin-top: 2px;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  color: #8a7a5a;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease;
+  align-self: center;
+}
+
+.candle-picker-secondary:hover {
+  color: #f1d77a;
+}
+
+/* ---------- LOCK STATE ----------
+   When a connected wallet holds zero RL80, the picker renders a banner
+   explaining the gate and a CTA to BuyModal. Tiles still render (so the
+   user can see what they'd unlock) but are disabled and visually dimmed. */
+.candle-picker-lock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px 14px;
+  margin-top: 2px;
+  border-top: 1px dashed rgba(241, 215, 122, 0.18);
+  border-bottom: 1px dashed rgba(241, 215, 122, 0.18);
+}
+
+.candle-picker-lock-text {
+  margin: 0;
+  text-align: center;
+  color: #c8b994;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  letter-spacing: 0.2px;
+  font-style: italic;
+}
+
+.candle-picker-lock-cta {
+  /* Inherits .shrine-btn.primary's gold gradient + dark text — match
+     .flame-nudge-cta's tighter Cinzel typography so the CTA reads as a
+     sibling of "Save my flame" rather than a generic shrine button. */
+  padding: 8px 22px;
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.candle-picker-popup.is-locked .candle-picker-tiles {
+  opacity: 0.55;
+  filter: saturate(0.6);
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+
+/* ---------- VOTIVE PERSONALIZATION ----------
+   Extra controls rendered inside .candle-picker-popup when the votive
+   variant is active. Lets the faithful swap the saint decal and tint the
+   wax hue. Reuses the picker's color language (parchment gold + deep
+   black) so it reads as one continuous panel rather than a bolt-on. */
+.votive-customize {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(241, 215, 122, 0.14);
+}
+
+.votive-customize-heading {
+  margin: 0;
+  color: #f1d77a;
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.votive-image-presets {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.votive-image-presets::-webkit-scrollbar {
+  display: none;
+}
+
+.votive-image-tile {
+  position: relative;
+  flex: 0 0 60px;
+  height: 60px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(241, 215, 122, 0.18);
+  border-radius: 4px;
+  color: #a39a82;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 160ms ease, box-shadow 160ms ease,
+    background 160ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.votive-image-tile:hover {
+  border-color: rgba(241, 215, 122, 0.45);
+}
+.votive-image-tile.is-active {
+  border-color: #f1d77a;
+  box-shadow: 0 0 14px rgba(241, 215, 122, 0.28);
+}
+.votive-image-tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.votive-image-tile-default {
+  font-size: 20px;
+  color: #d4a854;
+  opacity: 0.7;
+}
+.votive-image-tile-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 3px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.0) 100%
+  );
+  color: #f1d77a;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-align: center;
+  pointer-events: none;
+}
+
+.votive-image-upload {
+  /* <label> is a block by default; override so its flex centering works
+     like the button siblings. */
+  display: flex;
+}
+.votive-image-upload input[type="file"] {
+  /* Hidden but still clickable via label. */
+  display: none;
+}
+
+.votive-upload-error {
+  margin: 0;
+  color: #e08a8a;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  line-height: 1.3;
+}
+
+/* Muted hint beneath the upload row — sets aspect-ratio expectations
+   upfront so users don't have to discover by trial that square selfies
+   crop oddly into the portrait-oriented decal. */
+.votive-upload-hint {
+  margin: 0;
+  color: #8a7a5a;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2px;
+  line-height: 1.35;
+  opacity: 0.75;
+}
+
+/* Small ×-in-circle that appears on the Upload tile only when a custom
+   image is active. Lets the user go back to the "+" empty state without
+   having to pick a preset first. Positioned inside the tile frame so the
+   thumbnail shows through around it. */
+.votive-image-clear {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(241, 215, 122, 0.55);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.72);
+  color: #f1d77a;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: background 140ms ease, transform 140ms ease;
+}
+.votive-image-clear:hover {
+  background: rgba(231, 120, 120, 0.85);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.votive-tint-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.votive-tint-swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1.5px solid rgba(241, 215, 122, 0.25);
+  border-radius: 50%;
+  background: transparent;
+  color: #a39a82;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease,
+    box-shadow 160ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.votive-tint-swatch:hover {
+  border-color: rgba(241, 215, 122, 0.55);
+  transform: scale(1.08);
+}
+.votive-tint-swatch.is-active {
+  border-color: #f1d77a;
+  box-shadow: 0 0 10px rgba(241, 215, 122, 0.4);
+}
+
+/* The "Natural" reset swatch has no hex fill — give it a dim candle-tone
+   backdrop so the inline flame glyph has something to read against, and
+   color the flame a warm gold that evokes the wick glow. */
+.votive-tint-swatch.votive-tint-swatch--natural {
+  background: rgba(26, 20, 14, 0.85);
+  color: #f1d77a;
+}
+.votive-tint-swatch.votive-tint-swatch--natural:hover {
+  background: rgba(40, 30, 18, 0.9);
+}
+
+.votive-tint-custom {
+  overflow: hidden;
+}
+.votive-tint-custom input[type="color"] {
+  /* Expand past the 28px swatch so the native picker square fills it
+     cleanly across browsers. */
+  position: absolute;
+  inset: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.votive-tint-custom input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.votive-tint-custom input[type="color"]::-webkit-color-swatch {
+  border: none;
+}
+
+/* Mobile overrides — from @media (max-width: 700px) block */
+@media (max-width: 700px) {
+  /* Sign-in nudge on mobile keeps the full pitch (title + eyebrow +
+     benefits + CTA) but with tighter rhythm so it fits above the FAB
+     without cropping. max-height + overflow keeps it honest on very
+     short devices. */
+  .flame-nudge {
+    gap: 10px;
+    padding: 14px 34px 14px 18px;
+    width: min(calc(100vw - 20px), 360px);
+    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 200px);
+    overflow-y: auto;
+  }
+
+  .flame-nudge-title {
+    font-size: 13px;
+    letter-spacing: 1.2px;
+  }
+
+  .flame-nudge-sub {
+    font-size: 9px;
+    letter-spacing: 2.2px;
+  }
+
+  .flame-nudge-benefits {
+    gap: 5px;
+  }
+
+  .flame-nudge-benefits li {
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+
+  .flame-nudge-cta {
+    padding: 8px 18px;
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  /* Picker is an exception — it still needs the two-tile column layout
+     to be usable. Override the row-flex from above so tiles stack and
+     the title centers again. */
+  .flame-nudge.candle-picker-popup {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 16px 20px 14px;
+    /* Anchor from 30% so the top two-thirds of the viewport keep the
+       candle visible while the reader is picking. `translateX` only —
+       no vertical transform — so `top:30%` reads as "top of popup at
+       30% of viewport height" and the picker grows downward from there.
+       Falls back to scrolling if content is too tall to fit. */
+    top: 5%;
+    bottom: auto;
+    transform: translateX(-50%);
+    width: min(calc(100vw - 32px), 360px);
+    max-height: calc(70dvh - 24px - env(safe-area-inset-bottom, 0px));
+  }
+
+  .flame-nudge.candle-picker-popup .flame-nudge-title {
+    text-align: center;
+    flex: none;
+    font-size: 14px;
+  }
+}
+
+/* ── Candle countdown timer inside picker panel ── */
+.candle-picker-timer {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  font-variant-numeric: tabular-nums;
+  color: #f1d77a;
+  text-align: center;
+  margin: -4px 0 8px;
+  text-shadow: 0 0 6px rgba(241, 215, 122, 0.4);
+  opacity: 0.85;
+}

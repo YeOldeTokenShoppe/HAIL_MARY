@@ -80,7 +80,7 @@ function upgradeWaxMaterial(oldMat) {
 
 const norm = (s) => (s ? s.replace(/[._]/g, "").toLowerCase() : null);
 
-function VotiveModel({ votiveImage, votiveTint, draggable = true }) {
+function VotiveModel({ votiveImage, votiveTint, draggable = true, lit = true }) {
   const { scene } = useGLTF(MODEL_PATH);
   const spinRef = useRef(null);
   const flameNodeRef = useRef(null);
@@ -104,11 +104,30 @@ function VotiveModel({ votiveImage, votiveTint, draggable = true }) {
       const node = clone.getObjectByName(name);
       if (node && node.parent) node.parent.remove(node);
     });
+    // Scrub the baked-texture caches the ROOT page's HeroAltarObject may have
+    // stashed on these materials' `userData` (bakedMap / bakedEmissiveMap).
+    // Both pages share the same useGLTF cache for this GLB; the landing renders
+    // it directly and caches real THREE.Texture objects there. Material.clone()
+    // deep-copies userData via JSON.parse(JSON.stringify(...)) (three r150+),
+    // which turns those Textures into plain objects with no `.matrix`. Our
+    // decal effect below would then assign one back to `.map` on the "restore
+    // baked" path, and the renderer crashes reading `map.matrix.elements` every
+    // frame. Dropping them forces our own effects to re-cache from the (valid)
+    // cloned textures. authoredColor/authoredEmissive are cleared too so our
+    // tint baseline is derived here, not inherited from the landing's state.
+    const scrubStaleCaches = (m) => {
+      if (!m?.userData) return m;
+      delete m.userData.bakedMap;
+      delete m.userData.bakedEmissiveMap;
+      delete m.userData.authoredColor;
+      delete m.userData.authoredEmissive;
+      return m;
+    };
     clone.traverse((obj) => {
       if (obj.isMesh && obj.material) {
         obj.material = Array.isArray(obj.material)
-          ? obj.material.map((m) => m.clone())
-          : obj.material.clone();
+          ? obj.material.map((m) => scrubStaleCaches(m.clone()))
+          : scrubStaleCaches(obj.material.clone());
       }
     });
     return clone;
@@ -214,6 +233,18 @@ function VotiveModel({ votiveImage, votiveTint, draggable = true }) {
               m.blending = THREE.AdditiveBlending;
               m.depthWrite = false;
               m.transparent = true;
+              // Self-illuminate so the flame GLOWS instead of being lit (dimly)
+              // by the scene. Drive the emissive from the flame's own texture so
+              // its shape/gradient reads, tint it warm, and push intensity past
+              // 1. toneMapped:false lets the hot core bloom past the tone-map
+              // ceiling — additive blending then lays that glow over the niche.
+              if (m.emissive) {
+                m.emissive.setRGB(1.0, 0.82, 0.5);
+                if (m.map && !m.emissiveMap) m.emissiveMap = m.map;
+                if ("emissiveIntensity" in m) m.emissiveIntensity = 3.4;
+              }
+              m.toneMapped = false;
+              m.needsUpdate = true;
             });
             d.renderOrder = 240;
           });
@@ -353,9 +384,25 @@ function VotiveModel({ votiveImage, votiveTint, draggable = true }) {
     window.addEventListener("pointercancel", end);
   };
 
+  // Flame on/off — hide the flame billboard + its point light when unlit so the
+  // panel can show a dark, ready-to-light votive (matches the landing candle
+  // before ignition). The refs are populated by the material-setup effect above;
+  // this re-applies whenever `lit` (or the freshly cloned scene) changes.
+  useEffect(() => {
+    const fn = flameNodeRef.current;
+    if (fn) {
+      fn.visible = lit;
+      fn.traverse((d) => {
+        d.visible = lit;
+      });
+    }
+    if (flameLightRef.current) flameLightRef.current.visible = lit;
+  }, [votive, lit]);
+
   useFrame((state) => {
     // No auto-rotate — the votive holds still; the user drags to turn it
     // (drag enabled only on the close-up instance). Flame keeps flickering.
+    if (!lit) return; // unlit: flame is hidden, nothing to animate
     const ft = state.clock.elapsedTime;
     // Flame flicker — subtle scale + sway noise so it looks alive.
     const fn = flameNodeRef.current;
@@ -390,6 +437,7 @@ export default function PanelVotive({
   votiveTint = null, // hex string for wax color; null = authored color
   height = 260, // px number OR CSS length (e.g. "100%") for the canvas box
   draggable = false, // drag-to-rotate; off in the small panel, on in the close-up
+  lit = true, // false → show the votive dark (flame + flame-light hidden)
   className = "",
 }) {
   return (
@@ -405,7 +453,7 @@ export default function PanelVotive({
         {/* Warm fill near the flame so the wax picks up candle-light. */}
         <pointLight position={[0.3, 0.9, 0.6]} intensity={1.3} color="#ffd9a0" distance={8} />
         <Suspense fallback={null}>
-          <VotiveModel votiveImage={votiveImage} votiveTint={votiveTint} draggable={draggable} />
+          <VotiveModel votiveImage={votiveImage} votiveTint={votiveTint} draggable={draggable} lit={lit} />
         </Suspense>
       </Canvas>
     </div>

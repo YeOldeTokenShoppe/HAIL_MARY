@@ -1381,7 +1381,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
       // Desktop
       'desktop': {
         left: '0',
-        bottom: '4rem',
+        bottom: '1rem',
         width: '50%',
         height: '55%'
       },
@@ -1916,6 +1916,8 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
             maxAzimuthAngle={Math.PI / 8}   // +22.5 degrees (±22.5° total range)
             rotateSpeed={0.3}
             zoomSpeed={0.8}
+            zoomDampingFactor={0.1}
+            zoomToCursor={true}
             dampingFactor={0.05}
             enableDamping={true}
             target={[0, 0, 0]}

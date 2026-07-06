@@ -37,6 +37,7 @@ import {
 import { INTENTION_PRESETS, toIntentionKeys } from "@/lib/intentions";
 import VigilTicker from "@/components/VigilTicker";
 import BurnOfferingPanel from "@/components/BurnOfferingPanel";
+import CandleCustomizePicker from "@/components/CandleCustomizePicker";
 import MaryChamber from "@/components/MaryChamber";
 import { Perf } from "r3f-webgpu-perf";
 import {
@@ -44,6 +45,17 @@ import {
   writeLocalCandle,
   clearLocalCandle,
 } from "@/lib/localCandle";
+import {
+  VOTIVE_IMAGE_STORAGE_PREFIX,
+  VOTIVE_TINT_STORAGE_PREFIX,
+  VOTIVE_IMAGE_PRESETS,
+  VOTIVE_TINT_PRESETS,
+  readVotiveImage,
+  writeVotiveImage,
+  readVotiveTint,
+  writeVotiveTint,
+  compressVotiveImage,
+} from "@/lib/candlePrefs";
 import { fireCandleIgnitionPulse } from "@/utils/candleIgnitionPulse";
 import CommunityCandles from "@/components/CommunityCandles";
 import "./chart-shrine/chart-shrine.css";
@@ -59,83 +71,9 @@ useGLTF.preload("/models/tinyVotiveOnly2.glb");
 // hydrate local first, then reconcile with Firestore when it returns.
 // Keyed by userId so each signed-in user on a shared device gets their
 // own prefs.
-const VOTIVE_IMAGE_STORAGE_PREFIX = "rl80:votiveImage:";
-const VOTIVE_TINT_STORAGE_PREFIX = "rl80:votiveTint:";
-// Preset list for the votive image picker. `src: null` means "restore the
-// baked-in texture that ships with the GLB". Anything else is a URL that
-// the TextureLoader can resolve, including data: URLs from uploads.
-const VOTIVE_IMAGE_PRESETS = [
-  // `src: null` restores the GLB's baked-in decal; `thumbnail` is used
-  // only for the picker tile so we can show a preview that matches the
-  // baked texture without having to load the full-resolution version
-  // as the actual decal.
-  {
-    key: "default",
-    src: null,
-    thumbnail: "/goldGuadalupe.svg  ",
-    label: "Guadalupe",
-  },
-  { key: "queenOfHearts", src: "/queenOfHearts1.jpg", label: "Queen of Hearts" },
-  { key: "heart", src: "/images/sacreCoeur.webp", thumbnail: "/images/sacreCoeur.webp", label: "Heart" },
-    { key: "MotherOfMemes", src: "/images/face.png", thumbnail: "/images/face.png", label: "Mother of Memes" },
-        { key: "RL80Power", src: "/images/RL80_KNUCKLES.webp", thumbnail: "/images/RL80_KNUCKLES.webp", label: "RL80 Power" },
-                { key: "Insight", src: "/images/ILLUMIN80_TATTOO.webp", thumbnail: "/images/ILLUMIN80_TATTOO.webp", label: "Insight" },
-                { key: "GoingPlaces", src: "/images/I-80.webp", thumbnail: "/images/I-80.webp", label: "Going places" },
-
-];
-// A small curated palette for the wax tint, plus a "default" entry that
-// restores the baked color. Users can also enter any hex via the color
-// input. Values are multiplied, not replaced, so the wax keeps its
-// authored shading; picking white = no visible tint.
-const VOTIVE_TINT_PRESETS = [
-  { key: "default", hex: null, label: "Natural" },
-  { key: "crimson", hex: "#b83b3b", label: "Crimson" },
-  { key: "amber", hex: "#d49f3a", label: "Amber" },
-  { key: "rose", hex: "#e57aa7", label: "Rose" },
-  { key: "violet", hex: "#8b5fbf", label: "Violet" },
-  { key: "jade", hex: "#0ef178", label: "Jade" },
-  { key: "cyan", hex: "#14f7ff", label: "Cyan" },
-];
-function readVotiveImage(userId) {
-  if (!userId || typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(VOTIVE_IMAGE_STORAGE_PREFIX + userId);
-  } catch {
-    return null;
-  }
-}
-function writeVotiveImage(userId, src) {
-  if (!userId || typeof window === "undefined") return;
-  try {
-    // setItem throws QuotaExceeded when a large data: URL overflows the
-    // 5MB bucket; swallow and let the picker UI surface the failure.
-    // Null clears the preference (restores the baked-in texture).
-    if (src == null) {
-      window.localStorage.removeItem(VOTIVE_IMAGE_STORAGE_PREFIX + userId);
-    } else {
-      window.localStorage.setItem(VOTIVE_IMAGE_STORAGE_PREFIX + userId, src);
-    }
-  } catch {}
-}
-
-function readVotiveTint(userId) {
-  if (!userId || typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(VOTIVE_TINT_STORAGE_PREFIX + userId);
-  } catch {
-    return null;
-  }
-}
-function writeVotiveTint(userId, hex) {
-  if (!userId || typeof window === "undefined") return;
-  try {
-    if (hex == null) {
-      window.localStorage.removeItem(VOTIVE_TINT_STORAGE_PREFIX + userId);
-    } else {
-      window.localStorage.setItem(VOTIVE_TINT_STORAGE_PREFIX + userId, hex);
-    }
-  } catch {}
-}
+// Votive cosmetic presets + device-local pref storage now live in the shared
+// lib/candlePrefs module (imported above) so the /main vigil panel can drive
+// the same customization picker. See CandleCustomizePicker.jsx.
 
 // One-time "tap your candle to customize" coachmark. Per-device (not
 // per-user): the lesson is about the UI, not the account. Marked seen
@@ -2244,7 +2182,7 @@ export default function HomePage() {
   const [showBuyModal, setShowBuyModal] = useBuyModal();
   // Shared cyberpunk confirm modal for the MORE-popover destinations
   // (Ex Libris, Coin Fountain) — same glitch/sound dialog the dock's
-  // Terminal/Hail Mary slots use via MobileBottomNav's own confirm.
+  // Ask RL80/Hail Mary slots use via MobileBottomNav's own confirm.
   const [moreConfirmModal, moreConfirm] = useCyberConfirm();
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
   // "MORE" nav popover (far-right bottom-nav slot) — holds the secondary
@@ -2572,46 +2510,9 @@ export default function HomePage() {
     if (!canCustomize) return;
     setVotiveUploadError(null);
     try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-      const img = await new Promise((resolve, reject) => {
-        const el = new Image();
-        el.onload = () => resolve(el);
-        el.onerror = () => reject(new Error("image decode failed"));
-        el.src = dataUrl;
-      });
-      // Center-crop source rect to target aspect. If the image is wider
-      // than the target ratio we trim width; if taller, we trim height.
-      const TARGET_ASPECT = 2 / 3; // width / height — portrait
-      const imgAspect = img.width / img.height;
-      let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
-      if (imgAspect > TARGET_ASPECT) {
-        srcW = Math.round(img.height * TARGET_ASPECT);
-        srcX = Math.round((img.width - srcW) / 2);
-      } else if (imgAspect < TARGET_ASPECT) {
-        srcH = Math.round(img.width / TARGET_ASPECT);
-        srcY = Math.round((img.height - srcH) / 2);
-      }
-      const MAX = 1024;
-      const scale = Math.min(1, MAX / Math.max(srcW, srcH));
-      const w = Math.max(1, Math.round(srcW * scale));
-      const h = Math.max(1, Math.round(srcH * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      // Without these, Chrome/Safari use a cheap box filter that softens
-      // edges noticeably on portrait crops. High-quality smoothing is a
-      // single-pass lanczos-ish resample — worth the minor CPU cost for
-      // a one-shot upload.
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, w, h);
-      const compressed = canvas.toDataURL("image/jpeg", 0.88);
+      // Crop/downscale/re-encode lives in lib/candlePrefs so /main's panel
+      // shares the exact same pipeline.
+      const compressed = await compressVotiveImage(file);
       // Round-trip through writeVotiveImage so QuotaExceeded surfaces here.
       try {
         window.localStorage.setItem(
@@ -2947,259 +2848,40 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         </div>
       )}
 
-      {showCandlePicker && (
-        <div
-          className={`flame-nudge candle-picker-popup${
-            canCustomize ? "" : " is-locked"
-          }`}
-          role="dialog"
-          aria-label="Your candle"
-        >
-          <p className="flame-nudge-title">Your candle</p>
-          {candleLit && litAt && (
-            <div className="candle-picker-timer">
-              {formatRemaining(litAt, meltDuration)}
-            </div>
-          )}
-          {!canCustomize && (
-            <div className="candle-picker-lock">
-              <p className="candle-picker-lock-text">
-                Hold any RL80 to customize your candle.
-              </p>
-              <button
-                type="button"
-                className="shrine-btn primary candle-picker-lock-cta"
-                onClick={() => {
-                  setShowCandlePicker(false);
-                  setShowBuyModal(true);
-                }}
-              >
-                Buy RL80
-              </button>
-            </div>
-          )}
-          {/* Dedication — available to any signed-in user with a lit
-              candle, deliberately NOT gated by canCustomize: intentions
-              are free, cosmetics cost RL80. This is the mid-burn surface;
-              the post-light dedication card covers fresh lightings.
-              Tapping the active chip clears the dedication. */}
-          {candleLit && (
-            <div className="votive-customize">
-              <p className="votive-customize-heading">Intentions</p>
-              <div className="dedication-chips">
-                {INTENTION_PRESETS.map((preset) => {
-                  const isActive = intentions.includes(preset.key);
-                  return (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      className={`dedication-chip${isActive ? " is-active" : ""}`}
-                      aria-pressed={isActive}
-                      onClick={() => toggleIntention(preset.key)}
-                    >
-                      {preset.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Burnt offering — optional RL80 burn attached to the lit
-              candle. Gated like cosmetics (hold RL80) and on a lit
-              candle: the burn credits to the CURRENT flame, so there
-              must be one. Free candles stay the default; this is the
-              indulgence tier. */}
-          {candleLit && canCustomize && (
-            <BurnOfferingPanel />
-          )}
-
-          {/* Votive personalization — the votive is the only variant the
-              picker offers now (the pillar tile was retired when the
-              votive became the site-wide default; its model + config
-              remain in CANDLE_VARIANTS if it ever returns). */}
-          <div className="votive-customize">
-              <p className="votive-customize-heading">Image</p>
-              <div className="votive-image-presets">
-                {VOTIVE_IMAGE_PRESETS.map((preset) => {
-                  const isActive =
-                    (preset.src == null && !votiveImage) ||
-                    (preset.src != null && votiveImage === preset.src);
-                  return (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      className={`votive-image-tile${isActive ? " is-active" : ""}`}
-                      onClick={() => handlePickVotiveImage(preset.src)}
-                      title={preset.label}
-                      aria-label={preset.label}
-                    >
-                      {preset.thumbnail || preset.src ? (
-                        <img src={preset.thumbnail ?? preset.src} alt="" />
-                      ) : (
-                        <span className="votive-image-tile-default">✨</span>
-                      )}
-                      <span className="votive-image-tile-label">
-                        {preset.label}
-                      </span>
-                    </button>
-                  );
-                })}
-                {(() => {
-                  const hasCustomUpload =
-                    votiveImage &&
-                    !VOTIVE_IMAGE_PRESETS.some((p) => p.src === votiveImage);
-                  return (
-                    <label
-                      className={`votive-image-tile votive-image-upload${
-                        hasCustomUpload ? " is-active" : ""
-                      }`}
-                      title="Upload your own"
-                    >
-                      {hasCustomUpload ? (
-                        <img src={votiveImage} alt="" />
-                      ) : (
-                        <span className="votive-image-tile-default">+</span>
-                      )}
-                      <span className="votive-image-tile-label">Upload</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleUploadVotiveImage(file);
-                          // Reset so re-selecting the same file fires change again.
-                          e.target.value = "";
-                        }}
-                        style={{ display: "none" }}
-                      />
-                      {hasCustomUpload && (
-                        /* Clear the custom upload without triggering the
-                           file picker. stopPropagation + preventDefault
-                           keep the wrapping <label> from forwarding the
-                           click to its hidden <input>. */
-                        <button
-                          type="button"
-                          className="votive-image-clear"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handlePickVotiveImage(null);
-                          }}
-                          aria-label="Clear uploaded image"
-                          title="Clear uploaded image"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </label>
-                  );
-                })()}
-              </div>
-              <p className="votive-upload-hint">
-                Uploads are resized and
-                saved only on this device.
-              </p>
-              {votiveUploadError && (
-                <p className="votive-upload-error">{votiveUploadError}</p>
-              )}
-
-              <p className="votive-customize-heading">Wax color</p>
-              <div className="votive-tint-swatches">
-                {VOTIVE_TINT_PRESETS.map((preset) => {
-                  const isActive =
-                    (preset.hex == null && !votiveTint) ||
-                    (preset.hex != null &&
-                      votiveTint?.toLowerCase() === preset.hex.toLowerCase());
-                  return (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      className={`votive-tint-swatch${
-                        preset.hex == null ? " votive-tint-swatch--natural" : ""
-                      }${isActive ? " is-active" : ""}`}
-                      onClick={() => handlePickVotiveTint(preset.hex)}
-                      title={preset.label}
-                      aria-label={preset.label}
-                      style={
-                        preset.hex
-                          ? { background: preset.hex }
-                          : undefined
-                      }
-                    >
-                      {preset.hex == null && (
-                        /* Flame glyph — reads as "the candle's own color"
-                           so the reset swatch looks native to the shrine
-                           rather than a "no-access" slash. */
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                          style={{ width: 14, height: 14 }}
-                        >
-                          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-                        </svg>
-                      )}
-                    </button>
-                  );
-                })}
-                {/* Free-form hex picker. Syncs back to votiveTint so the
-                    active-swatch highlight updates if the user happens to
-                    land on a preset value. */}
-                <label
-                  className="votive-tint-swatch votive-tint-custom"
-                  title="Custom color"
-                >
-                  <input
-                    type="color"
-                    value={votiveTint ?? "#ffffff"}
-                    onChange={(e) => handlePickVotiveTint(e.target.value)}
-                  />
-                </label>
-              </div>
-          </div>
-
-          {candleLit && (
-            <button
-              type="button"
-              className="candle-picker-secondary"
-              onClick={() => {
-                setShowCandlePicker(false);
-                doExtinguish();
-              }}
-            >
-              Extinguish candle
-            </button>
-          )}
-          <button
-            type="button"
-            className="candle-picker-secondary"
-            onClick={() => {
-              setShowCandlePicker(false);
-              disconnect();
-              // Re-open the wallet modal so the user can reconnect a
-              // different wallet right away — common path when someone
-              // disconnects to switch to one that holds RL80. Without
-              // this they'd be stranded with no visible re-connect surface.
-              setShowAccountModal(true);
-            }}
-          >
-            Disconnect wallet
-          </button>
-          <button
-            type="button"
-            className="flame-nudge-dismiss"
-            onClick={() => setShowCandlePicker(false)}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
+      <CandleCustomizePicker
+        open={showCandlePicker}
+        placement="anchored"
+        onClose={() => setShowCandlePicker(false)}
+        canCustomize={canCustomize}
+        candleLit={candleLit}
+        timerText={candleLit && litAt ? formatRemaining(litAt, meltDuration) : null}
+        votiveImage={votiveImage}
+        votiveTint={votiveTint}
+        intentions={intentions}
+        votiveUploadError={votiveUploadError}
+        onToggleIntention={toggleIntention}
+        onPickImage={handlePickVotiveImage}
+        onUploadImage={handleUploadVotiveImage}
+        onPickTint={handlePickVotiveTint}
+        onExtinguish={() => {
+          setShowCandlePicker(false);
+          doExtinguish();
+        }}
+        onDisconnect={() => {
+          setShowCandlePicker(false);
+          disconnect();
+          // Re-open the wallet modal so the user can reconnect a different
+          // wallet right away — common path when someone disconnects to
+          // switch to one that holds RL80. Without this they'd be stranded
+          // with no visible re-connect surface.
+          setShowAccountModal(true);
+        }}
+        onBuyRL80={() => {
+          setShowCandlePicker(false);
+          setShowBuyModal(true);
+        }}
+        burnOfferingSlot={<BurnOfferingPanel />}
+      />
 
       <VigilTicker
         candles={litCandles}
@@ -3308,29 +2990,29 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
         onBookClick={() => setShowBuyModal(true)}
         bookLabel="BUY RL80"
         bookIcon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#39ff14", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))" }}>
             <line x1="12" y1="1" x2="12" y2="23" />
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         }
         extraLeft={[
           {
-            key: 'terminal',
-            label: 'Terminal',
-            title: 'The Liminal Terminal',
-            onClick: () => { router.push('/trade'); },
+            key: 'ask',
+            label: 'Ask RL80',
+            title: 'Ask RL80',
+            onClick: () => { router.push('/main'); },
             confirm: {
-              title: 'The Liminal Terminal',
-              body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
-              accent: 'hsl(111, 100%, 54%)',
-              shadow: 'hsl(111, 80%, 34%)',
+              title: 'Ask RL80',
+              body: "Approach Our Lady. Speak your question aloud — she answers those who seek in earnest.",
+              accent: 'hsl(189, 84%, 55%)',
+              shadow: 'hsl(189, 70%, 38%)',
             },
             icon: (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#39ff14"
+                stroke="#f4b53f"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -3338,13 +3020,11 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                   width: 24,
                   height: 24,
                   display: 'block',
-                  filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))',
+                  filter: 'drop-shadow(0 0 4px rgba(244, 181, 63, 0.7))',
                 }}
                 aria-hidden="true"
               >
-    
-<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>
- 
+                <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
               </svg>
             ),
           },
@@ -3424,11 +3104,12 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
               {
                 path: "/fountain",
                 label: "Coin Fountain",
+                stroke: "#2ad6ee",
                 confirm: {
                   title: "Coin Fountain",
                   body: "Toss a coin, whisper a wish. Our Lady keeps every offering the faithful let fall.",
-                  accent: "hsl(45, 100%, 60%)",
-                  shadow: "hsl(38, 90%, 42%)",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
                 },
                 icon: (
                   <>
@@ -3442,11 +3123,12 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                             {
                 path: "/exlibris",
                 label: "Ex Libris",
+                stroke: "#ff44d4",
                 confirm: {
                   title: "Ex Libris",
                   body: "The perpetual ledger. Every flame, every name, inscribed for those who came to pray.",
-                  accent: "hsl(300, 90%, 62%)",
-                  shadow: "hsl(300, 75%, 42%)",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
                 },
                 icon: (
                   <>
@@ -3492,11 +3174,11 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#ff00ff"
+                  stroke={link.stroke}
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  style={{ width: 22, height: 22, flexShrink: 0, display: "block" }}
+                  style={{ width: 22, height: 22, flexShrink: 0, display: "block", filter: `drop-shadow(0 0 4px ${link.stroke}66)` }}
                   aria-hidden="true"
                 >
                   {link.icon}
