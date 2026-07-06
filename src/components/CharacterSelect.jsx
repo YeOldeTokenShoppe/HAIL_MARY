@@ -29,10 +29,12 @@ function StudioEnvironment() {
 /* ── Neon frame model ── */
 
 // Frame glow tuning. Each character sets its own hue (CHARACTERS[i].frameHue);
-// the neon core is that hue at HDR intensity (drives bloom — higher = brighter
-// but whiter), the translucent glass shell is the hue lightened toward white.
+// the neon core is that hue, brightness-NORMALIZED then boosted to HDR so it
+// drives bloom equally for dark and light hues; the glass shell is the hue
+// lightened toward white. (Emission was previously kept low to avoid over-
+// blooming a retired model's halo — that constraint is gone, so it's back up.)
 const FRAME_DEFAULT_HUE = "#c300ff";
-const FRAME_CORE_INTENSITY = 2.0;
+const FRAME_CORE_INTENSITY = 2.6;
 const FRAME_GLASS_LIGHTEN = 0.4;
 
 function NeonFrame({ hue = FRAME_DEFAULT_HUE }) {
@@ -43,7 +45,13 @@ function NeonFrame({ hue = FRAME_DEFAULT_HUE }) {
   hueRef.current = hue;
 
   const applyHue = (h) => {
-    const core = new THREE.Color(h).multiplyScalar(FRAME_CORE_INTENSITY);
+    // Normalize the hue to a consistent brightness before the HDR boost, so a
+    // dark saint's hue (e.g. Guadalupe's deep green) blooms as brightly as a
+    // light one — a dark base color otherwise barely crosses the bloom
+    // threshold and reads as a flat, unlit outline.
+    const core = new THREE.Color(h);
+    const maxCh = Math.max(core.r, core.g, core.b) || 1;
+    core.multiplyScalar(FRAME_CORE_INTENSITY / maxCh);
     const glass = new THREE.Color(h).lerp(new THREE.Color("#ffffff"), FRAME_GLASS_LIGHTEN);
     coreMatsRef.current.forEach((m) => m.color.copy(core));
     glassMatsRef.current.forEach((m) => m.color.copy(glass));

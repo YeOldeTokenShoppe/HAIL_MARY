@@ -769,7 +769,7 @@ export default function MainPage() {
             transition: "max-height 0.35s ease, opacity 0.25s ease",
           }}
         >
-          <span className="title-line" style={{ display: 'block', position: 'relative' }}>Ask</span>
+          <span className="title-line" style={{ display: 'block', position: 'relative' }}>{CHARACTERS[activeCharIndex]?.askWord || "Ask"}</span>
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>
             <span style={{ fontSize: "3rem",  }}>RL80</span>
             
