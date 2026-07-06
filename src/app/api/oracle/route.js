@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMarketAtmosphere } from "@/lib/marketAtmosphere";
+import { getApparition } from "@/lib/apparitions";
 
 // Our Lady oracle — LLM brain for the /main talking portrait.
 // POST { messages: [{role, content}...], provider?: "anthropic" | "openai" }
@@ -25,6 +26,17 @@ Respond ONLY with a JSON object, no markdown fences, in this exact shape:
 {"reply": "<what you say aloud>", "expressions": [{"name": "<one of: ClosedSmile, OpenSmile, Sad, Angry, Fear, Disgust, Surprise, Thinking, Blush, LeftWink, RightWink, Blink, Scream>", "amplitude": <0.2-1.0>, "duration": <1-8 seconds>, "at": <0-1 fraction of the reply where it begins>}]}
 
 Use 0-2 expressions per reply, chosen to match the emotional beat of what you're saying (e.g. Thinking while pondering, ClosedSmile for benedictions, LeftWink for mischief, Surprise for dramatic reveals). Omit expressions entirely (empty array) when neutral serenity fits best.`;
+
+// Appended to the system prompt for a non-default apparition — her current
+// cultural "face": a one-line inflection plus the language to reply in. The
+// core persona is unchanged; only her face and tongue shift (see lib/apparitions.js).
+function apparitionBlock(app) {
+  if (!app || (!app.inflection && (!app.lang || app.lang === "en"))) return "";
+  const parts = ["\n\n— YOUR PRESENT FACE —"];
+  if (app.inflection) parts.push(app.inflection);
+  if (app.lang && app.lang !== "en") parts.push(`Speak and reply entirely in ${app.langName || app.lang}.`);
+  return parts.join("\n");
+}
 
 // Appended to the system prompt when market omens are available — her private
 // "sight" of the present market weather (from src/lib/marketAtmosphere.js). She
@@ -159,10 +171,11 @@ export async function POST(request) {
     return NextResponse.json({ error: "no AI provider key configured" }, { status: 500 });
   }
 
-  // Her private "omen-sight" of the current market weather — cached and
-  // non-blocking (empty string if nothing has loaded or all sources are down).
+  // Her current cultural face (apparition) + private "omen-sight" of the market
+  // weather (cached, non-blocking). Both are appended to the core persona.
+  const app = getApparition(body?.apparition);
   const atmosphere = getMarketAtmosphere();
-  const system = atmosphere ? SYSTEM_PROMPT + omenBlock(atmosphere) : SYSTEM_PROMPT;
+  const system = SYSTEM_PROMPT + apparitionBlock(app) + (atmosphere ? omenBlock(atmosphere) : "");
 
   try {
     const rawText = provider === "anthropic" ? await askAnthropic(messages, system) : await askOpenAI(messages, system);

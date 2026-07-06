@@ -881,6 +881,7 @@ export default function CharacterSelect({
   onSelect,
   size = 200,
   pageLoading = false,
+  greeting = "",
 }) {
   const [index, setIndex] = useState(activeIndex);
 
@@ -892,12 +893,16 @@ export default function CharacterSelect({
   const current = characters[index] || { name: "Unknown", image: null };
 
   // Tap the framed portrait → she greets through the SitePal embed with a
-  // random line, same voice as the oracle conversation
+  // random line, in the CURRENT apparition's voice + language (not always the
+  // classic English one).
+  // Tap the framed portrait → she speaks the SAME greeting the Confessional is
+  // already showing (so the audio matches the on-screen transcript — no second,
+  // mismatched caption), in the current apparition's voice.
   const speakPortrait = () => {
+    if (!greeting || typeof window.sayText !== "function") return;
     if (typeof window.setPlayerVolume === "function") window.setPlayerVolume(7);
-    if (typeof window.sayText === "function") {
-      window.sayText(pickGreeting(), ORACLE_VOICE.id, ORACLE_VOICE.lang, ORACLE_VOICE.engine);
-    }
+    const voice = current.voice || ORACLE_VOICE;
+    window.sayText(greeting, voice.id, voice.lang, voice.engine);
   };
 
   const prev = () => {
@@ -978,7 +983,7 @@ export default function CharacterSelect({
         {current.portraitModel || current.sitePalScene ? (
           <div
             onClick={speakPortrait}
-            title="Speak to Our Lady"
+            title={`Speak to ${current.title || current.name || "Our Lady"}`}
             style={{
               position: "absolute",
               inset: "10%",

@@ -3,6 +3,8 @@
 // SitePal: speaks the reply and fires setFacialExpression at the annotated
 // points across the (estimated) speech duration.
 
+import { getApparition } from "./apparitions";
+
 // Voice + engine for the oracle's spoken replies.
 // Engine 14 = ElevenLabs via the SitePal-connected account; id = EL voice UUID.
 export const ORACLE_VOICE = {
@@ -11,20 +13,16 @@ export const ORACLE_VOICE = {
   engine: 14,
 };
 
-// Greeting variety — used by the portrait tap and the chat drawer's opener.
-// NOTE: SitePal caches rendered TTS by text, so after a voice change each
-// line replays in the old voice once cached — reword lines to bust the cache.
-export const ORACLE_GREETINGS = [
-  "Oh, hello! Speak, seeker — the ticker tape hears all things.",
-  "Ah, a pilgrim approaches. What troubles your portfolio today?",
-  "Blessings, wanderer. The candles flicker in your favor — for now.",
-  "You have found me. Ask, before the market opens its jaws again.",
-  "Welcome, dear degen. Confess your positions freely.",
-  "The mirror sees you, traveler. What wisdom do you seek?",
-];
+// Greeting variety — now kept per-apparition in lib/apparitions.js. The classic
+// English set is re-exported here for anything that referenced it directly.
+// NOTE: SitePal caches rendered TTS by text, so after a voice change each line
+// replays in the old voice once cached — reword lines to bust the cache.
+export const ORACLE_GREETINGS = getApparition("classic").greetings;
 
-export function pickGreeting() {
-  return ORACLE_GREETINGS[Math.floor(Math.random() * ORACLE_GREETINGS.length)];
+/** Pick a random greeting for the given apparition (defaults to the classic). */
+export function pickGreeting(apparitionKey = "classic") {
+  const greetings = getApparition(apparitionKey).greetings || ORACLE_GREETINGS;
+  return greetings[Math.floor(Math.random() * greetings.length)];
 }
 
 // ElevenLabs (SitePal engine 14) reads the token "RL80" as "R-L-eighty".
@@ -124,15 +122,18 @@ export function speakOracle({ reply, expressions = [] }, voice = ORACLE_VOICE) {
 }
 
 /** POST the conversation to /api/oracle. history: [{role, text}] in drawer format. */
-export async function askOracle(history, provider) {
+export async function askOracle(history, provider, apparition) {
   const messages = history.map((m) => ({
     role: m.role === "character" ? "assistant" : "user",
     content: m.text,
   }));
+  const payload = { messages };
+  if (provider) payload.provider = provider;
+  if (apparition) payload.apparition = apparition;
   const res = await fetch("/api/oracle", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(provider ? { messages, provider } : { messages }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

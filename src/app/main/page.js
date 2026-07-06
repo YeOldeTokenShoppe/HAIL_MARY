@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
@@ -13,25 +13,19 @@ import { useBuyModal } from "@/lib/useBuyModal";
 import Confessional from "@/components/Confessional";
 import SitePalExpressionPanel from "@/components/SitePalExpressionPanel";
 import { askOracle, speakOracle, ORACLE_VOICE, pickGreeting } from "@/lib/oracleSpeech";
+import { APPARITIONS as CHARACTERS } from "@/lib/apparitions";
 import { useMusic } from "@/components/MusicContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import MainVigilPanel from "@/components/MainVigilPanel";
 import useCyberConfirm from "@/components/useCyberConfirm";
 
-const CHARACTERS = [
-  // Retired 3D-bust + face-projection version (lost the bake-off to the 2D
-  // SitePal mirror, 2026-07-05). To revive: uncomment — its sitePalScene
-  // field makes the scene-swap effect load the projection scene for her.
-  // { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 3D", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not5.glb", defaultAnim: "texting", portraitModel: "/models/framedOurLady2.glb", sitePalScene: 2775211, frameHue: "#c300ff" },
-
-  // Our Lady — the raw SitePal scene mirrored live behind the neon frame
-  // (no 3D bust, no face projection). Her scene is the embed default.
-  { name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", image: "/cameo_rl80.webp", sitePalScene: 2775218, frameHue: "#ffb347" },
-
-  { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk", frameHue: "#22ccff" },
-  { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence", frameHue: "#ff2d75" },
-  { name: "Virgil", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk", frameHue: "#52ff7a" },
-];
+// The /main roster is Our Lady's APPARITIONS — her cultural faces (see
+// src/lib/apparitions.js), imported above as CHARACTERS. The other pantheon
+// characters live on their own pages, not in her shrine's carousel.
+// (Former /main cameos, kept for reference:
+//   { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk", frameHue: "#22ccff" },
+//   { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence", frameHue: "#ff2d75" },
+//   { name: "Virgil", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk", frameHue: "#52ff7a" }, )
 
 // Scene GLBs that aren't character models
 const SCENE_GLBS = [
@@ -125,12 +119,10 @@ function SitePalEmbed({ onReady }) {
   onReadyRef.current = onReady;
 
   useEffect(() => {
-    // Fire onReady exactly once, on the FIRST vh_sceneLoaded (later
-    // loadSceneByID swaps re-fire it, but the summoning only reveals once).
-    let readyFired = false;
+    // Fire onReady on EVERY vh_sceneLoaded — the initial load AND every
+    // loadSceneByID apparition swap — so the summoning swirl can re-hold and
+    // re-reveal per face (the page drops sitePalReady to false on each switch).
     const markReady = () => {
-      if (readyFired) return;
-      readyFired = true;
       onReadyRef.current?.();
     };
 
@@ -267,6 +259,14 @@ export default function MainPage() {
   // Gates the magic-mirror swirl so it dissolves only when her face is ready.
   const [sitePalReady, setSitePalReady] = useState(false);
   const handleSitePalReady = useCallback(() => setSitePalReady(true), []);
+  // Safety: never let the summoning swirl hang. Whenever we're waiting on a
+  // SitePal scene (sitePalReady false — initial load OR an apparition swap),
+  // force-reveal after 15s if vh_sceneLoaded never arrives.
+  useEffect(() => {
+    if (sitePalReady) return;
+    const t = setTimeout(() => setSitePalReady(true), 15000);
+    return () => clearTimeout(t);
+  }, [sitePalReady]);
   const [activeAnim, setActiveAnim] = useState(null);
   const assetsReadyRef = useRef(false);
   const sceneReadyRef = useRef(false);
@@ -378,6 +378,12 @@ export default function MainPage() {
 
   const handleCharacterSelect = (i) => {
     if (i === activeCharIndex || glitchActive) return;
+    // If this apparition loads a different SitePal scene, re-hold the summoning
+    // swirl until that new scene reports loaded — so she doesn't reveal her new
+    // face before it's ready.
+    if (CHARACTERS[i]?.sitePalScene !== CHARACTERS[activeCharIndex]?.sitePalScene) {
+      setSitePalReady(false);
+    }
     pendingCharRef.current = i;
     setActiveCharIndex(i);
     setGlitchKey((k) => k + 1);
@@ -407,10 +413,11 @@ export default function MainPage() {
   // Oracle conversation: POST the drawer history to /api/oracle, speak the
   // reply through SitePal (ElevenLabs voice) with timed facial expressions
   const handleOracleMessage = useCallback(async (text, history) => {
-    const data = await askOracle(history);
-    speakOracle(data);
+    const app = CHARACTERS[activeCharIndex];
+    const data = await askOracle(history, undefined, app?.key);
+    speakOracle(data, app?.voice || ORACLE_VOICE);
     return data.reply;
-  }, []);
+  }, [activeCharIndex]);
 
   // Swap the single SitePal portal to the active character's scene (and back
   // to the portrait scene). vh_sceneLoaded re-mutes on each load.
@@ -436,7 +443,10 @@ export default function MainPage() {
 
   // One greeting picked per visit — shared by the drawer's typewriter text
   // and the spoken line so they always match
-  const [oracleGreeting] = useState(() => pickGreeting());
+  const oracleGreeting = useMemo(
+    () => pickGreeting(CHARACTERS[activeCharIndex]?.key),
+    [activeCharIndex],
+  );
 
   // Speak the greeting aloud the first time the drawer opens — the open tap
   // doubles as the audio-unlock gesture, and the typewriter text runs in step
@@ -453,7 +463,7 @@ export default function MainPage() {
         // style = calm, gentle read. (v3 audio tags like "[softly]" are
         // rejected by SitePal's engine-14 proxy as of Jul 2026 — retest later;
         // speakOracle auto-falls-back if an xData call ever fails.)
-        { ...ORACLE_VOICE, xData: "stability=0.9,style=0,similarity_boost=0.4" }
+        { ...(CHARACTERS[activeCharIndex]?.voice || ORACLE_VOICE), xData: "stability=0.9,style=0,similarity_boost=0.4" }
       );
     }
   }, [chatOpen]);
@@ -797,6 +807,9 @@ export default function MainPage() {
             /* Hold the summoning swirl until SitePal's face is actually loaded
                & displayed — not just when the page's asset loader clears. */
             pageLoading={!sitePalReady}
+            /* The line she speaks on a portrait tap = the one the Confessional
+               shows, so audio matches the on-screen transcript (no 2nd caption). */
+            greeting={sitePalReady ? oracleGreeting : ""}
           />
         </div>
 
@@ -1014,8 +1027,10 @@ export default function MainPage() {
         <Confessional
           isOpen={chatOpen}
           onToggle={() => setChatOpen((o) => !o)}
-          characterName="Our Lady"
-          initialMessage={oracleGreeting}
+          characterName={CHARACTERS[activeCharIndex]?.speaker || "Our Lady"}
+          /* Hold the greeting text until her face is actually loaded, so it
+             doesn't type itself out before she appears. */
+          initialMessage={sitePalReady ? oracleGreeting : ""}
           onSendMessage={handleOracleMessage}
           /* SPEAK (center dock FAB) is the sole launcher — no auto-appearing
              conversation bubble before the user chooses to speak. */
