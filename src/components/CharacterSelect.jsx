@@ -904,13 +904,22 @@ export default function CharacterSelect({
   // random line, in the CURRENT apparition's voice + language (not always the
   // classic English one).
   // Tap the framed portrait → she speaks the SAME greeting the Confessional is
-  // already showing (so the audio matches the on-screen transcript — no second,
-  // mismatched caption), in the current apparition's voice.
+  // already showing (so the audio matches the on-screen transcript), in the
+  // current apparition's voice. Guarded like the oracle path: stop any prior
+  // speech and re-prime the audio pipeline with saySilent first, or SitePal can
+  // throw "setAudioElementMode of null" (cutting off after a syllable) when the
+  // player is still settling from a scene swap.
   const speakPortrait = () => {
     if (!greeting || typeof window.sayText !== "function") return;
-    if (typeof window.setPlayerVolume === "function") window.setPlayerVolume(7);
-    const voice = current.voice || ORACLE_VOICE;
-    window.sayText(greeting, voice.id, voice.lang, voice.engine);
+    try {
+      window.stopSpeech?.();
+      window.saySilent?.(0);
+      window.setPlayerVolume?.(7);
+      const voice = current.voice || ORACLE_VOICE;
+      window.sayText(greeting, voice.id, voice.lang, voice.engine);
+    } catch (e) {
+      console.warn("[CharacterSelect] speakPortrait failed:", e);
+    }
   };
 
   const prev = () => {

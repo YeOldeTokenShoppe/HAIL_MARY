@@ -428,6 +428,10 @@ export default function MainPage() {
     let poll = null;
     const trySwap = () => {
       if (typeof window.loadSceneByID === "function") {
+        // Stop any in-flight speech before swapping scenes, so the player's
+        // audio element isn't torn down mid-word — otherwise SitePal throws
+        // "setAudioElementMode of null" and the speech cuts off.
+        try { window.stopSpeech?.(); } catch (e) {}
         window.loadSceneByID(target);
         loadedSceneRef.current = target;
         return true;
