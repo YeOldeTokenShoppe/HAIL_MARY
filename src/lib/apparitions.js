@@ -26,6 +26,7 @@ export const APPARITIONS = [
     askWord: "Ask", // verb in the "Ask RL80" heading — RL80 stays constant
     image: "/cameo_rl80.webp",
     sitePalScene: 2775218,
+    embedId: "zJsmiZ8gNv9BHZ93vMq3antYxZOiHmlX", // this scene's own SitePal embed token
     frameHue: "#ffb347",
     lang: "en",
     langName: "English",
@@ -48,7 +49,8 @@ export const APPARITIONS = [
     speaker: "Nuestra Señora", // Confessional header (her Spanish title)
     askWord: "Consulta", // "Consulta RL80" — only the verb localizes (swap to "Pregunta" if preferred)
     image: "/cameo_guadalupe.webp",
-    sitePalScene: 2775220, // her own SitePal scene (embedId nbXkrOr…), loaded via loadSceneByID
+    sitePalScene: 2775220,
+    embedId: "nbXkrOrELvsp3J8HwrYtaenxK5jn2rAk", // her scene's own SitePal embed token
     frameHue: "#1f7a4d", // Guadalupe green (her mantle), with rose accents
     lang: "es",
     langName: "Spanish",

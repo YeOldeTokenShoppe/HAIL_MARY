@@ -106,13 +106,16 @@ const ASK_HEADING = {
 // Her opening lines now come from ORACLE_GREETINGS in lib/oracleSpeech.js —
 // one is picked per visit and used for both the drawer text and the audio.
 
-// SitePal embed config — ONE portal per page; characters that use a
-// different scene are swapped in via loadSceneByID (see scene-swap effect)
+// SitePal embed config. Each apparition is its OWN embed (its own scene + token);
+// SitePalEmbed builds the AC_VHost_Embed params from the active apparition. We
+// re-embed FRESH per apparition (page reload via ?char) rather than swapping in
+// place with loadSceneByID — the latter leaves the new scene's audio subsystem
+// null ("setAudioElementMode of null") so she won't speak.
 const SITEPAL_ACCOUNT = "9308752";
-const SITEPAL_DEFAULT_SCENE = 2775218; // Our Lady's 2D scene (embed default)
-const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,0,2775218,0,1,0,\"zJsmiZ8gNv9BHZ93vMq3antYxZOiHmlX\",0,1";
+const SITEPAL_DEFAULT_SCENE = 2775218; // Our Lady's classic 2D scene
+const SITEPAL_DEFAULT_EMBEDID = "zJsmiZ8gNv9BHZ93vMq3antYxZOiHmlX";
 
-function SitePalEmbed({ onReady }) {
+function SitePalEmbed({ scene = SITEPAL_DEFAULT_SCENE, embedId = SITEPAL_DEFAULT_EMBEDID, onReady }) {
   const containerRef = useRef(null);
   // Keep the latest onReady without re-running the mount-only effect below.
   const onReadyRef = useRef(onReady);
@@ -144,7 +147,10 @@ function SitePalEmbed({ onReady }) {
     script1.onload = () => {
       const script2 = document.createElement("script");
       script2.type = "text/javascript";
-      script2.textContent = `AC_VHost_Embed(${SITEPAL_EMBED_PARAMS});`;
+      // Params from the active apparition — scene is #7, embedId is #11; load=1
+      // (JS framework), responsive=1. Fresh embed => her audio comes up right.
+      const params = `${SITEPAL_ACCOUNT},600,800,"",1,0,${scene},0,1,0,"${embedId}",0,1`;
+      script2.textContent = `AC_VHost_Embed(${params});`;
       containerRef.current?.appendChild(script2);
 
       // Restore original getContext after SitePal has initialized
@@ -377,37 +383,12 @@ export default function MainPage() {
   }, [activeCharIndex]);
 
   const handleCharacterSelect = (i) => {
-    if (i === activeCharIndex || glitchActive) return;
-    // If this apparition loads a different SitePal scene, re-hold the summoning
-    // swirl until that new scene reports loaded — so she doesn't reveal her new
-    // face before it's ready.
-    if (CHARACTERS[i]?.sitePalScene !== CHARACTERS[activeCharIndex]?.sitePalScene) {
-      setSitePalReady(false);
-    }
-    pendingCharRef.current = i;
-    setActiveCharIndex(i);
-    setGlitchKey((k) => k + 1);
-    setGlitchActive(true);
-
-    // Animate glitchIntensity: 0 → 1 → 0 over the duration
-    const duration = 1000;
-    const start = performance.now();
-    const animate = () => {
-      const elapsed = performance.now() - start;
-      const t = Math.min(elapsed / duration, 1);
-      // Peak at 0.45 (midpoint), smooth triangle curve
-      const peak = 0.45;
-      const intensity = t < peak
-        ? t / peak
-        : 1 - (t - peak) / (1 - peak);
-      setGlitchIntensity(Math.max(0, intensity));
-      if (t < 1) {
-        glitchAnimRef.current = requestAnimationFrame(animate);
-      } else {
-        setGlitchIntensity(0);
-      }
-    };
-    glitchAnimRef.current = requestAnimationFrame(animate);
+    if (i === activeCharIndex) return;
+    // Each apparition is its own SitePal embed (its own scene + token). Swap by
+    // reloading with ?char so her scene embeds FRESH — an in-place loadSceneByID
+    // leaves the new scene's audio null (SitePal "setAudioElementMode of null",
+    // and she won't speak). The reload's own loader + swirl cover the summoning.
+    if (typeof window !== "undefined") window.location.assign(`/main?char=${i}`);
   };
 
   // Oracle conversation: POST the drawer history to /api/oracle, speak the
@@ -419,31 +400,8 @@ export default function MainPage() {
     return data.reply;
   }, [activeCharIndex]);
 
-  // Swap the single SitePal portal to the active character's scene (and back
-  // to the portrait scene). vh_sceneLoaded re-mutes on each load.
-  const loadedSceneRef = useRef(SITEPAL_DEFAULT_SCENE);
-  useEffect(() => {
-    const target = CHARACTERS[activeCharIndex]?.sitePalScene || SITEPAL_DEFAULT_SCENE;
-    if (target === loadedSceneRef.current) return;
-    let poll = null;
-    const trySwap = () => {
-      if (typeof window.loadSceneByID === "function") {
-        // Stop any in-flight speech before swapping scenes, so the player's
-        // audio element isn't torn down mid-word — otherwise SitePal throws
-        // "setAudioElementMode of null" and the speech cuts off.
-        try { window.stopSpeech?.(); } catch (e) {}
-        window.loadSceneByID(target);
-        loadedSceneRef.current = target;
-        return true;
-      }
-      return false;
-    };
-    if (!trySwap()) {
-      poll = setInterval(() => { if (trySwap()) clearInterval(poll); }, 400);
-      setTimeout(() => poll && clearInterval(poll), 8000);
-    }
-    return () => { if (poll) clearInterval(poll); };
-  }, [activeCharIndex]);
+  // (Scene swapping removed — each apparition embeds its own scene fresh on
+  // load via ?char; see handleCharacterSelect + SitePalEmbed.)
 
   // One greeting picked per visit — shared by the drawer's typewriter text
   // and the spoken line so they always match
@@ -701,7 +659,13 @@ export default function MainPage() {
       </div> */}
 
       {/* SitePal embed — deferred until Three.js scene is ready to avoid WebGL context conflict */}
-      {USE_SITEPAL && sceneReady && <SitePalEmbed onReady={handleSitePalReady} />}
+      {USE_SITEPAL && sceneReady && (
+        <SitePalEmbed
+          scene={CHARACTERS[activeCharIndex]?.sitePalScene || SITEPAL_DEFAULT_SCENE}
+          embedId={CHARACTERS[activeCharIndex]?.embedId || SITEPAL_DEFAULT_EMBEDID}
+          onReady={handleSitePalReady}
+        />
+      )}
 
       {/* Walking scene retired from /main — the framed-portrait panel is the
           page on all viewports. Restore by re-rendering <MainScene /> here. */}
