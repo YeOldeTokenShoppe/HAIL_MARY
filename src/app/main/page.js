@@ -273,6 +273,16 @@ export default function MainPage() {
     const t = setTimeout(() => setSitePalReady(true), 15000);
     return () => clearTimeout(t);
   }, [sitePalReady]);
+
+  // Her greeting text appears a beat AFTER she's fully revealed. The summoning
+  // swirl takes ~3.6s to dissolve past sitePalReady, so wait a touch longer
+  // (~2.4s after) so the welcome never types itself out before her face.
+  const [greetingVisible, setGreetingVisible] = useState(false);
+  useEffect(() => {
+    if (!sitePalReady) { setGreetingVisible(false); return; }
+    const t = setTimeout(() => setGreetingVisible(true), 6000);
+    return () => clearTimeout(t);
+  }, [sitePalReady]);
   const [activeAnim, setActiveAnim] = useState(null);
   const assetsReadyRef = useRef(false);
   const sceneReadyRef = useRef(false);
@@ -996,9 +1006,9 @@ export default function MainPage() {
           isOpen={chatOpen}
           onToggle={() => setChatOpen((o) => !o)}
           characterName={CHARACTERS[activeCharIndex]?.speaker || "Our Lady"}
-          /* Hold the greeting text until her face is actually loaded, so it
-             doesn't type itself out before she appears. */
-          initialMessage={sitePalReady ? oracleGreeting : ""}
+          /* Hold the greeting text until a beat after she's fully revealed
+             (greetingVisible), so it never types out before her face. */
+          initialMessage={greetingVisible ? oracleGreeting : ""}
           onSendMessage={handleOracleMessage}
           /* SPEAK (center dock FAB) is the sole launcher — no auto-appearing
              conversation bubble before the user chooses to speak. */
