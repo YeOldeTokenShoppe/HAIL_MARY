@@ -6,7 +6,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
-import { ORACLE_VOICE } from "@/lib/oracleSpeech";
+import { ORACLE_VOICE, pickGreeting } from "@/lib/oracleSpeech";
 import * as THREE from "three";
 
 /* ── Image-based lighting for the portrait — metals are dead without an
@@ -243,8 +243,9 @@ function MirrorSwirl({ hue = FRAME_DEFAULT_HUE, active = true }) {
     const o = (typeof window !== "undefined" && window.__mirrorSwirl) || SWIRL_OVAL;
     meshRef.current.position.set(o.x ?? 0, o.y ?? 0, o.z ?? SWIRL_OVAL.z);
     meshRef.current.scale.set(o.rx ?? SWIRL_OVAL.rx, o.ry ?? SWIRL_OVAL.ry, 1);
-    // Hold the full swirl until the page's loading overlay clears — the
-    // countdown starts only once the mirror is actually visible
+    // Hold the full swirl until `active` goes true — on /main the page keeps
+    // it false (via pageLoading) until SitePal's face is actually loaded &
+    // displayed, so the reveal countdown starts only once she's really there.
     if (!active) return;
     if (startRef.current === null) startRef.current = state.clock.elapsedTime;
     const tMs = (state.clock.elapsedTime - startRef.current) * 1000;
@@ -763,9 +764,11 @@ function SitePalLivePortrait() {
     // Show the full bust: take the central column of the source (the live
     // SitePal canvas is 600×450 landscape with the bust centered) and
     // CONTAIN-fit it below a small top pad so the head clears the frame ring.
-    const LIVE_RECT = { x: 0.18, y: 0.0, w: 0.64, h: 1.0 }; // bust column of the SitePal canvas
-    const STILL_RECT = { x: 0.10, y: 0.0, w: 0.80, h: 1.0 }; // bust region of mary.png
-    const TOP_PAD = 0.06; // slot-space padding above the head
+    // Slice of the SitePal canvas to show. Wider w (with x re-centered:
+    // x = (1 - w) / 2) = camera pushed back, more of the character visible.
+    const LIVE_RECT = { x: 0.14, y: -0.03, w: 0.67, h: 1.00 };
+    const STILL_RECT = { x: 0.12, y: 0.0, w: 0.72, h: 1.00 }; // bust region of mary.png
+    const TOP_PAD = 0.09; // slot-space padding above the head
     const drawCover = (ctx, c, source, sw, sh, rect) => {
       const sx = sw * rect.x;
       const sy = sh * rect.y;
@@ -888,12 +891,12 @@ export default function CharacterSelect({
 
   const current = characters[index] || { name: "Unknown", image: null };
 
-  // Tap the framed portrait → she greets through the SitePal embed, using
-  // the same voice as the oracle conversation
+  // Tap the framed portrait → she greets through the SitePal embed with a
+  // random line, same voice as the oracle conversation
   const speakPortrait = () => {
     if (typeof window.setPlayerVolume === "function") window.setPlayerVolume(7);
     if (typeof window.sayText === "function") {
-      window.sayText("Oh, hello!", ORACLE_VOICE.id, ORACLE_VOICE.lang, ORACLE_VOICE.engine);
+      window.sayText(pickGreeting(), ORACLE_VOICE.id, ORACLE_VOICE.lang, ORACLE_VOICE.engine);
     }
   };
 

@@ -6,10 +6,36 @@
 // Voice + engine for the oracle's spoken replies.
 // Engine 14 = ElevenLabs via the SitePal-connected account; id = EL voice UUID.
 export const ORACLE_VOICE = {
-  id: "wLEii5giu6adITuwTzY1", // her chosen ElevenLabs voice
+  id: "7NjvbWLjy10CTPz8IsPC", // her chosen ElevenLabs voice
   lang: 1,
   engine: 14,
 };
+
+// Greeting variety — used by the portrait tap and the chat drawer's opener.
+// NOTE: SitePal caches rendered TTS by text, so after a voice change each
+// line replays in the old voice once cached — reword lines to bust the cache.
+export const ORACLE_GREETINGS = [
+  "Oh, hello! Speak, seeker — the ticker tape hears all things.",
+  "Ah, a pilgrim approaches. What troubles your portfolio today?",
+  "Blessings, wanderer. The candles flicker in your favor — for now.",
+  "You have found me. Ask, before the market opens its jaws again.",
+  "Welcome, dear degen. Confess your positions freely.",
+  "The mirror sees you, traveler. What wisdom do you seek?",
+];
+
+export function pickGreeting() {
+  return ORACLE_GREETINGS[Math.floor(Math.random() * ORACLE_GREETINGS.length)];
+}
+
+// ElevenLabs (SitePal engine 14) reads the token "RL80" as "R-L-eighty".
+// The project pronounces it "R-Lady" (≈ "are lady"), so rewrite it phonetically
+// for the spoken audio ONLY — the on-screen reply text keeps the real "RL80"
+// spelling. "R-Lady" matches the studio/how-to-play scripts so the whole app
+// says the token the same way. Handles an optional "$" ticker prefix and
+// RL-80 / RL 80 spacing variants.
+function toSpeech(text) {
+  return text.replace(/\$?\bRL[-\s]?80\b/gi, "R-Lady");
+}
 
 let timers = [];
 let hooked = false;
@@ -72,12 +98,14 @@ export function speakOracle({ reply, expressions = [] }, voice = ORACLE_VOICE) {
   clearTimers();
   window.stopSpeech?.();
   window.setPlayerVolume?.(7);
+  // Phonetic rewrite for the spoken audio; the displayed reply is untouched.
+  const spoken = toSpeech(reply);
   // Rough ElevenLabs speaking pace ≈ 65ms/char; floor for very short lines
-  estMs = Math.max(1800, reply.length * 65);
+  estMs = Math.max(1800, spoken.length * 65);
   pendingExpressions = expressions;
   const res = voice.xData
-    ? window.sayText(reply, voice.id, voice.lang, voice.engine, "", "", voice.xData)
-    : window.sayText(reply, voice.id, voice.lang, voice.engine);
+    ? window.sayText(spoken, voice.id, voice.lang, voice.engine, "", "", voice.xData)
+    : window.sayText(spoken, voice.id, voice.lang, voice.engine);
   // Surface silent failures (bad voice ID, engine not enabled, domain not
   // licensed) — the promise resolves with status 1 instead of throwing
   if (res?.then) {
@@ -86,7 +114,7 @@ export function speakOracle({ reply, expressions = [] }, voice = ORACLE_VOICE) {
         console.warn("[oracleSpeech] sayText failed:", JSON.stringify(r), "— check ORACLE_VOICE id/engine and SitePal licensed domains");
         if (voice.xData) {
           console.warn("[oracleSpeech] retrying without xData (model override unavailable?)");
-          const plain = reply.replace(/\[[^\]]*\]\s*/g, "");
+          const plain = spoken.replace(/\[[^\]]*\]\s*/g, "");
           window.sayText(plain, voice.id, voice.lang, voice.engine);
         }
       }

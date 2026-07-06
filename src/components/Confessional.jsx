@@ -24,7 +24,7 @@ import "./Confessional.css";
  *                     (+ safe-area) so its input row clears a fixed bottom nav
  *                     dock. Null keeps the default 0.75rem anchor.
  */
-export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null }) {
+export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null, docked = false }) {
   const [messages, setMessages] = useState([]);
   const [inputVal, setInputVal] = useState("");
   const [pending, setPending] = useState(false);
@@ -58,7 +58,8 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
     if (!typingRef.current || messages.length === 0) return;
     // In launcher-less mode the greeting reveals only once the drawer opens,
     // so the typewriter doesn't run down invisibly before the user taps in.
-    if (hideLauncher && !isOpen) return;
+    // Docked mode is always visible, so let it type right away.
+    if (hideLauncher && !isOpen && !docked) return;
     const fullText = messages[0]?.text || "";
     if (typedLen >= fullText.length) {
       typingRef.current = false;
@@ -77,7 +78,7 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
     }, delay);
 
     return () => clearTimeout(typingTimerRef.current);
-  }, [typedLen, messages, scrollToBottom, isOpen, hideLauncher]);
+  }, [typedLen, messages, scrollToBottom, isOpen, hideLauncher, docked]);
 
   // ── Open/close transitions ──
   useEffect(() => {
@@ -130,7 +131,7 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
     } catch (e) {
       setMessages((prev) => [
         ...prev,
-        { role: "character", text: e?.message || "The connection to the beyond wavers... ask again, child." },
+        { role: "character", text: e?.message || "The connection to the beyond wavers... ask again, seeker." },
       ]);
     } finally {
       setPending(false);
@@ -149,7 +150,8 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   };
 
   // ── Bubble CTA (collapsed state) — shows her message as an invitation ──
-  if (phase === "closed" && !isOpen) {
+  // Docked mode is always rendered as a panel, so it never collapses.
+  if (!docked && phase === "closed" && !isOpen) {
     // Launcher-less mode: an external control (the SPEAK FAB) is the sole way
     // in, so render nothing when collapsed — no premature conversation text.
     if (hideLauncher) return null;
@@ -177,15 +179,16 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   // ── Drawer ──
   const drawerClass = [
     "confessional-drawer",
-    phase === "entering" && "confessional-drawer--entering",
-    phase === "exiting" && "confessional-drawer--exiting",
+    docked && "confessional-drawer--docked",
+    !docked && phase === "entering" && "confessional-drawer--entering",
+    !docked && phase === "exiting" && "confessional-drawer--exiting",
   ].filter(Boolean).join(" ");
 
   return (
     <div
       className={drawerClass}
       style={
-        bottomOffset != null
+        !docked && bottomOffset != null
           ? { bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px))` }
           : undefined
       }
@@ -196,12 +199,15 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
           <span className="confessional-status-dot" />
           <span className="confessional-title">{characterName}</span>
         </div>
-        <button className="confessional-close-btn" onClick={onToggle} aria-label="Close chat">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        {/* Docked mode is a permanent panel — no close affordance. */}
+        {!docked && (
+          <button className="confessional-close-btn" onClick={onToggle} aria-label="Close chat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Messages */}

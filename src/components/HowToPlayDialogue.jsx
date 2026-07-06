@@ -75,7 +75,10 @@ const BG_COLOR = "0b0b0f";
 const SCRIPT = [
   { who: "monk", text: "Welcome prospector! The field is sealed before anyone plays — its riches hidden even from us. Provably fair." },
   { who: "john", audioName: "john_01" },
-  { who: "monk", text: "Hold a little RL80 — that is your key. No spending. Sell whenever you wish." },
+  // "R-Lady" is the phonetic spelling of RL80 for TTS (SitePal reads "RL80" as
+  // "R-L-eighty"); the on-screen caption keeps the real spelling. Matches the
+  // studio recording script (hailmary/studio/page.js).
+  { who: "monk", text: "Hold a little R-Lady — that is your key. No spending. Sell whenever you wish." },
   { who: "john", audioName: "john_02" },
   { who: "monk", text: "Your rig drills on its own, day and night. It strikes when the earth decides. Patience." },
   { who: "john", audioName: "john_03" },

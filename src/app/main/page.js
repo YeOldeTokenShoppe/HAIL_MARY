@@ -12,9 +12,10 @@ import BuyModal from "@/components/BuyModal";
 import { useBuyModal } from "@/lib/useBuyModal";
 import Confessional from "@/components/Confessional";
 import SitePalExpressionPanel from "@/components/SitePalExpressionPanel";
-import { askOracle, speakOracle, ORACLE_VOICE } from "@/lib/oracleSpeech";
+import { askOracle, speakOracle, ORACLE_VOICE, pickGreeting } from "@/lib/oracleSpeech";
 import { useMusic } from "@/components/MusicContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import MainVigilPanel from "@/components/MainVigilPanel";
 import useCyberConfirm from "@/components/useCyberConfirm";
 
 const CHARACTERS = [
@@ -90,12 +91,26 @@ const MainScene = dynamic(
 // Toggle this to switch between video file and SitePal embed
 const USE_SITEPAL = true;
 
+// Two "materials" for the Ask RL80 heading — click the title to A/B them live
+// (or ?heading=neon|classic). `neon` = hollow gold neon-TUBE lettering that
+// matches the shrine frame's tubing; `classic` = the original solid-white glow.
+// "Ask RL80" heading — Grenze Gotisch (gothic-meets-modern, legible) rendered as
+// a hollow gold neon TUBE to match the shrine frame's tubing. Weight 500 keeps
+// the fraktur strokes light enough that the tube interiors stay hollow rather
+// than flooding with the inner glow.
+const ASK_HEADING = {
+  fontFamily: "'Grenze Gotisch', serif",
+  fontWeight: 500,
+  color: "transparent",
+  WebkitTextStroke: "1.5px #ffedbe",
+  textShadow:
+    "0 0 2px #fff2cc, 0 0 22px rgba(244,181,63,0.7), 0 0 46px rgba(240,168,44,0.45), 0 0 84px rgba(240,168,44,0.25)",
+};
+
 // Her opening line — shown by the Confessional's typewriter AND spoken aloud
 // on first drawer open
-// NOTE: SitePal caches rendered TTS by text — if the voice changes, edit
-// this line (even slightly) to bust the cache, or the greeting will replay
-// in the previous voice while novel sentences use the new one.
-const ORACLE_GREETING = "Oh, hello! Speak, child — the ticker tape hears all things.";
+// Her opening lines now come from ORACLE_GREETINGS in lib/oracleSpeech.js —
+// one is picked per visit and used for both the drawer text and the audio.
 
 // SitePal embed config — ONE portal per page; characters that use a
 // different scene are swapped in via loadSceneByID (see scene-swap effect)
@@ -103,10 +118,22 @@ const SITEPAL_ACCOUNT = "9308752";
 const SITEPAL_DEFAULT_SCENE = 2775218; // Our Lady's 2D scene (embed default)
 const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,0,2775218,0,1,0,\"zJsmiZ8gNv9BHZ93vMq3antYxZOiHmlX\",0,1";
 
-function SitePalEmbed() {
+function SitePalEmbed({ onReady }) {
   const containerRef = useRef(null);
+  // Keep the latest onReady without re-running the mount-only effect below.
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   useEffect(() => {
+    // Fire onReady exactly once, on the FIRST vh_sceneLoaded (later
+    // loadSceneByID swaps re-fire it, but the summoning only reveals once).
+    let readyFired = false;
+    const markReady = () => {
+      if (readyFired) return;
+      readyFired = true;
+      onReadyRef.current?.();
+    };
+
     // Monkey-patch WebGL getContext to force preserveDrawingBuffer
     // so we can read SitePal's canvas each frame via drawImage
     const origGetContext = HTMLCanvasElement.prototype.getContext;
@@ -146,12 +173,20 @@ function SitePalEmbed() {
 
     document.head.appendChild(script1);
 
-    // Register vh_sceneLoaded callback — mute SitePal on load so it doesn't talk until Talking mode
+    // Register vh_sceneLoaded callback — mute SitePal on load so it doesn't
+    // talk until Talking mode, and signal the page that her face is fully
+    // loaded & displayed so the magic-mirror swirl can dissolve to reveal her.
+    // (Per SitePal docs, vh_sceneLoaded = "Scene is fully loaded & displayed".)
     window.vh_sceneLoaded = () => {
       if (typeof window.setPlayerVolume === "function") {
         window.setPlayerVolume(0);
       }
+      markReady();
     };
+
+    // Safety net: if the scene callback never arrives (network / SitePal
+    // failure), reveal anyway after 20s so the swirl can't spin forever.
+    const readyFallback = setTimeout(markReady, 20000);
 
     // Resume suspended AudioContexts on first user interaction
     // Don't unmute audio/video — the scene controls muting based on active animation
@@ -186,6 +221,7 @@ function SitePalEmbed() {
     }
 
     return () => {
+      clearTimeout(readyFallback);
       if (script1.parentNode) script1.parentNode.removeChild(script1);
       window.removeEventListener("click", resumeAudio);
       window.removeEventListener("touchstart", resumeAudio);
@@ -219,15 +255,28 @@ export default function MainPage() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
+  // Wide enough to flank the centered portrait with the two triptych side
+  // panels (Confessional left, Vigil right) without crowding the 440px center.
+  // Below this we keep the center-only layout.
+  const [isWide, setIsWide] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 1200 : false
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [sceneReady, setSceneReady] = useState(false);
+  // True once SitePal's avatar has actually loaded & displayed (vh_sceneLoaded).
+  // Gates the magic-mirror swirl so it dissolves only when her face is ready.
+  const [sitePalReady, setSitePalReady] = useState(false);
+  const handleSitePalReady = useCallback(() => setSitePalReady(true), []);
   const [activeAnim, setActiveAnim] = useState(null);
   const assetsReadyRef = useRef(false);
   const sceneReadyRef = useRef(false);
 
-  // Mobile breakpoint detection
+  // Mobile + wide breakpoint detection
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
+    const check = () => {
+      setIsMobile(window.innerWidth < 768);
+      setIsWide(window.innerWidth >= 1200);
+    };
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -385,17 +434,19 @@ export default function MainPage() {
     return () => { if (poll) clearInterval(poll); };
   }, [activeCharIndex]);
 
+  // One greeting picked per visit — shared by the drawer's typewriter text
+  // and the spoken line so they always match
+  const [oracleGreeting] = useState(() => pickGreeting());
+
   // Speak the greeting aloud the first time the drawer opens — the open tap
-  // doubles as the audio-unlock gesture, and the typewriter text runs in step.
-  // Spoken softly via an ElevenLabs v3 audio tag (model override in xData);
-  // the drawer displays the clean text without the [tag].
+  // doubles as the audio-unlock gesture, and the typewriter text runs in step
   const hasGreetedRef = useRef(false);
   useEffect(() => {
     if (chatOpen && !hasGreetedRef.current) {
       hasGreetedRef.current = true;
       speakOracle(
         {
-          reply: ORACLE_GREETING,
+          reply: oracleGreeting,
           expressions: [{ name: "ClosedSmile", amplitude: 0.6, duration: 3, at: 0 }],
         },
         // Soft delivery via ElevenLabs voice settings: high stability + zero
@@ -541,7 +592,7 @@ export default function MainPage() {
       {/* Mobile shows the side panel full-width — it carries its own title */}
 
       {/* Music controls — top left (desktop only) */}
-      <div style={{ position: "fixed", top: "1rem", left: "1rem", zIndex: 290, display: isMobile ? "none" : "block" }}>
+      {/* <div style={{ position: "fixed", top: "1rem", left: "1rem", zIndex: 290, display: isMobile ? "none" : "block" }}>
         {!showMusicControls ? (
           <button
             onClick={() => handleMusicToggle(true)}
@@ -633,10 +684,10 @@ export default function MainPage() {
             </button>
           </div>
         )}
-      </div>
+      </div> */}
 
       {/* SitePal embed — deferred until Three.js scene is ready to avoid WebGL context conflict */}
-      {USE_SITEPAL && sceneReady && <SitePalEmbed />}
+      {USE_SITEPAL && sceneReady && <SitePalEmbed onReady={handleSitePalReady} />}
 
       {/* Walking scene retired from /main — the framed-portrait panel is the
           page on all viewports. Restore by re-rendering <MainScene /> here. */}
@@ -687,16 +738,17 @@ export default function MainPage() {
             position: "relative",
             left: "3rem",
             top: "1.0rem",
-            color: "#f6f5f1ff",
-            fontFamily: "Orbitron, serif",
-            textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
+            color: ASK_HEADING.color,
+            WebkitTextStroke: ASK_HEADING.WebkitTextStroke,
+            fontFamily: ASK_HEADING.fontFamily,
+            textShadow: ASK_HEADING.textShadow,
             fontSize: "2.5rem",
-            fontWeight: 900,
+            fontWeight: ASK_HEADING.fontWeight,
             lineHeight: 0.85,
             transform: "rotate(-8deg) skew(-15deg)",
             zIndex: 1000,
             whiteSpace: "nowrap",
-            cursor: "pointer",
+            cursor: "default",
             marginTop: "0",
             pointerEvents: "auto",
             maxHeight: isMobile && chatOpen ? 0 : 300,
@@ -707,7 +759,7 @@ export default function MainPage() {
             transition: "max-height 0.35s ease, opacity 0.25s ease",
           }}
         >
-          <span className="title-line" style={{ display: 'block', position: 'relative',  fontFamily: "Orbitron, serif", }}>Ask</span>
+          <span className="title-line" style={{ display: 'block', position: 'relative' }}>Ask</span>
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>
             <span style={{ fontSize: "3rem",  }}>RL80</span>
             
@@ -742,7 +794,9 @@ export default function MainPage() {
             activeIndex={activeCharIndex}
             onSelect={handleCharacterSelect}
             size={340}
-            pageLoading={isLoading}
+            /* Hold the summoning swirl until SitePal's face is actually loaded
+               & displayed — not just when the page's asset loader clears. */
+            pageLoading={!sitePalReady}
           />
         </div>
 
@@ -797,7 +851,7 @@ export default function MainPage() {
         /* Center FAB — SPEAK → opens the Confessional (converse with Our Lady),
            /main's signature action (mirrors root's LIGHT CANDLE center). */
         onBuyClick={() => setChatOpen(true)}
-        centerSubLabel="SPEAK"
+        centerSubLabel="ASK"
         centerTitle="Speak to Our Lady"
         centerLabel={
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 28, height: 28, display: "block", color: "#ffffff" }} aria-hidden="true">
@@ -961,7 +1015,7 @@ export default function MainPage() {
           isOpen={chatOpen}
           onToggle={() => setChatOpen((o) => !o)}
           characterName="Our Lady"
-          initialMessage={ORACLE_GREETING}
+          initialMessage={oracleGreeting}
           onSendMessage={handleOracleMessage}
           /* SPEAK (center dock FAB) is the sole launcher — no auto-appearing
              conversation bubble before the user chooses to speak. */
@@ -969,8 +1023,14 @@ export default function MainPage() {
           /* Lift the drawer above the bottom dock so its input row (and the
              protruding center FAB) don't occlude the reply field. */
           bottomOffset={88}
+          /* On wide viewports the confession docks as the left triptych wing
+             (always visible) instead of a floating drawer. */
+          docked={isWide && !isMobile}
         />
       )}
+
+      {/* ── Right triptych wing — YOUR VIGIL (price + the user's candle) ── */}
+      <MainVigilPanel show={isWide && !isMobile} />
 
     </div>
   );
