@@ -15,8 +15,8 @@ export const RARITIES = {
 
 export const TRADERS = [
   {
-    id: "unihood",
-    name: "Unihood",
+    id: "eugene",
+    name: "Eugene",
     type: CARD_TYPES.TRADER,
     rarity: RARITIES.MYTHIC,
     handle: "Meme Prophet",
@@ -30,8 +30,8 @@ export const TRADERS = [
     quote: "Charts are just vibes with timestamps.",
   },
   {
-    id: "det-trinity",
-    name: "Det. Trinity",
+    id: "marisol",
+    name: "Marisol",
     type: CARD_TYPES.TRADER,
     rarity: RARITIES.MYTHIC,
     handle: "Onchain Investigator",
@@ -82,7 +82,7 @@ export const COIN_CARDS = [
   coin("blackpalm", "BlackPalm", "PALM", "defi", RARITIES.UNCOMMON, 6, 9, 3),
   coin("chainseraph", "ChainSeraph", "SERA", "infra", RARITIES.RARE, 9, 13, 2),
   coin("goblingas", "GoblinGas", "GAS", "meme", RARITIES.COMMON, 4, 7, 6),
-  coin("trinitycoin", "TrinityCoin", "TRIN", "analysis", RARITIES.RARE, 7, 10, 1),
+  coin("marisolcoin", "MarisolCoin", "MRSL", "analysis", RARITIES.RARE, 7, 10, 1),
   coin("halo-protocol", "Halo Protocol", "HALO", "automation", RARITIES.RARE, 8, 12, 2),
   coin("bullish-ink", "Bullish Ink", "INK", "hype", RARITIES.COMMON, 5, 8, 4),
   coin("neon-oracle", "Neon Oracle", "NRCL", "analysis", RARITIES.UNCOMMON, 6, 8, 1),
@@ -97,18 +97,26 @@ export const COIN_CARDS = [
   coin("vaporwarex", "VaporwareX", "VPRX", "hype", RARITIES.COMMON, 4, 8, 6),
   coin("angel-ledger", "Angel Ledger", "ANGEL", "infra", RARITIES.RARE, 8, 11, 1),
   coin("genesis-terminal", "Genesis Terminal", "GEN", "terminal", RARITIES.FOIL, 10, 16, 3),
+  coin("wick-street", "Wick Street", "WICK", "hype", RARITIES.COMMON, 4, 7, 5),
+  coin("votive-chain", "Votive Chain", "VOTV", "infra", RARITIES.COMMON, 4, 6, 1),
+  coin("monk-stack", "Monk Stack", "MONK", "defense", RARITIES.UNCOMMON, 6, 8, 0),
+  coin("oil-standard", "Oil Standard", "OIL", "bluechip", RARITIES.UNCOMMON, 7, 10, 1),
+  coin("lucky-capsule", "Lucky Capsule", "LUCK", "meme", RARITIES.UNCOMMON, 5, 9, 5),
+  coin("demon-desk", "Demon Desk", "DMON", "hype", RARITIES.RARE, 8, 13, 6),
+  coin("prophet-margin", "Prophet Margin", "PRFT", "analysis", RARITIES.RARE, 8, 11, 1),
+  coin("our-lady-rl80", "Our Lady RL80", "RL80", "terminal", RARITIES.FOIL, 9, 14, 4),
 ];
 
 export const ACTION_CARDS = [
-  action("pump-signal", "Pump Signal", "pump", RARITIES.COMMON, 2, "+10 portfolio. Unihood and Bullhorn get extra edge.", { portfolio: 10 }),
+  action("pump-signal", "Pump Signal", "pump", RARITIES.COMMON, 2, "+10 portfolio. Eugene and Bullhorn get extra edge.", { portfolio: 10 }),
   action("diamond-hands", "Diamond Hands", "defense", RARITIES.COMMON, 2, "Gain +3 portfolio and +1 Cred.", { portfolio: 3, cred: 1 }),
   action("terminal-hack", "Terminal Hack", "hack", RARITIES.UNCOMMON, 3, "Gain +8 portfolio. Bots lose a little tempo.", { portfolio: 8, opponentPortfolio: -2 }),
-  action("rug-warning", "Rug Warning", "investigation", RARITIES.UNCOMMON, 2, "Gain +5 portfolio and +3 extra as Det. Trinity.", { portfolio: 5 }),
+  action("rug-warning", "Rug Warning", "investigation", RARITIES.UNCOMMON, 2, "Gain +5 portfolio and +3 extra as Marisol.", { portfolio: 5 }),
   action("leverage-spiral", "Leverage Spiral", "risk", RARITIES.RARE, 1, "Gain +15 portfolio, then lose 3 Cred.", { portfolio: 15, cred: -3 }),
   action("insider-ping", "Insider Ping", "investigation", RARITIES.COMMON, 1, "Gain +2 Cred and +4 portfolio.", { portfolio: 4, cred: 2 }),
   action("cold-wallet", "Cold Wallet", "defense", RARITIES.UNCOMMON, 2, "Gain +6 portfolio and reduce crash pressure.", { portfolio: 6, shield: 1 }),
   action("botnet-arbitrage", "Botnet Arbitrage", "automation", RARITIES.RARE, 3, "Gain +12 portfolio. Halo Node gains +3 more.", { portfolio: 12 }),
-  action("meme-blessing", "Meme Blessing", "meme", RARITIES.UNCOMMON, 2, "Gain +9 portfolio. Unihood gains +4 more.", { portfolio: 9 }),
+  action("meme-blessing", "Meme Blessing", "meme", RARITIES.UNCOMMON, 2, "Gain +9 portfolio. Eugene gains +4 more.", { portfolio: 9 }),
   action("short-the-noise", "Short the Noise", "analysis", RARITIES.UNCOMMON, 2, "Gain +7 portfolio and +1 Cred.", { portfolio: 7, cred: 1 }),
   action("liquidity-ladder", "Liquidity Ladder", "defi", RARITIES.COMMON, 2, "Gain +4 Cred.", { cred: 4 }),
   action("market-sermon", "Market Sermon", "hype", RARITIES.COMMON, 1, "Gain +6 portfolio. Bullhorn gains +4 more.", { portfolio: 6 }),
@@ -126,6 +134,13 @@ export const ACTION_CARDS = [
   action("server-room-alpha", "Server Room Alpha", "automation", RARITIES.RARE, 3, "Gain +13 portfolio.", { portfolio: 13 }),
   action("oracle-crosscheck", "Oracle Crosscheck", "analysis", RARITIES.COMMON, 1, "Gain +5 portfolio and +1 Cred.", { portfolio: 5, cred: 1 }),
   action("terminal-foil-moment", "Terminal Foil Moment", "terminal", RARITIES.FOIL, 4, "Gain +18 portfolio. This is the table-stopper.", { portfolio: 18 }),
+  action("candle-vigil", "Candle Vigil", "defense", RARITIES.COMMON, 1, "Gain +3 portfolio and +1 shield.", { portfolio: 3, shield: 1 }),
+  action("copium-drip", "Copium Drip", "meme", RARITIES.COMMON, 1, "Gain +4 portfolio and +1 Cred.", { portfolio: 4, cred: 1 }),
+  action("tithe-rebate", "Tithe Rebate", "defi", RARITIES.COMMON, 0, "Gain +3 Cred.", { cred: 3 }),
+  action("fomo-cascade", "FOMO Cascade", "pump", RARITIES.UNCOMMON, 3, "Gain +12 portfolio. Eugene and Bullhorn get extra edge.", { portfolio: 12 }),
+  action("wallet-seance", "Wallet Séance", "investigation", RARITIES.UNCOMMON, 2, "Gain +7 portfolio and +1 Cred.", { portfolio: 7, cred: 1 }),
+  action("mempool-prophecy", "Mempool Prophecy", "analysis", RARITIES.RARE, 2, "Gain +6 portfolio and draw a card.", { portfolio: 6, draw: 1 }),
+  action("rug-pull-reversal", "Rug Pull Reversal", "hack", RARITIES.RARE, 3, "Gain +9 portfolio. Every rival loses 3.", { portfolio: 9, opponentPortfolio: -3 }),
 ];
 
 export const MARKET_CARDS = [
@@ -139,6 +154,11 @@ export const MARKET_CARDS = [
   market("volatility-mass", "Volatility Mass", RARITIES.RARE, "High-risk traders gain +9 portfolio and lose 2 Cred.", { styleBonus: { meme: 9, hype: 9 }, styleCred: { meme: -2, hype: -2 } }),
   market("dead-chain-hour", "Dead Chain Hour", RARITIES.COMMON, "Everyone loses 4 portfolio unless shielded.", { portfolioAll: -4, crash: true }),
   market("genesis-candle", "Genesis Candle", RARITIES.FOIL, "Everyone gains +12 portfolio. The market remembers.", { portfolioAll: 12 }),
+  market("airdrop-monsoon", "Airdrop Monsoon", RARITIES.COMMON, "Everyone gains +2 portfolio and +2 Cred.", { portfolioAll: 2, credAll: 2 }),
+  market("influencer-eclipse", "Influencer Eclipse", RARITIES.COMMON, "Hype traders lose 4 portfolio and 1 Cred.", { stylePenalty: { hype: -4 }, styleCred: { hype: -1 } }),
+  market("rug-harvest", "Rug Harvest", RARITIES.UNCOMMON, "Everyone loses 3 portfolio unless shielded.", { portfolioAll: -3, crash: true }),
+  market("halving-eve", "Halving Eve", RARITIES.RARE, "Automation traders gain +8 portfolio. Others gain +2.", { styleBonus: { automation: 8 }, portfolioAll: 2 }),
+  market("our-lady-appears", "Our Lady Appears", RARITIES.RARE, "Analysis and meme traders gain +6 portfolio.", { styleBonus: { analysis: 6, meme: 6 } }),
 ];
 
 export const GENESIS_SET = [

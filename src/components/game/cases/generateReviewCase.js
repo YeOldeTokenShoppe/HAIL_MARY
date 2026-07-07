@@ -9,7 +9,7 @@
 // steps:
 //
 //   1. (this) funnel + case-shape plumbing  ← we're here
-//   2. wire Trinity (marisol) station to real CDP onchain data
+//   2. wire Marisol (marisol) station to real CDP onchain data
 //   3. add x402 paywall in front of the "begin" button
 //   4. add LLM generation for monk/demon/eugene
 //
@@ -278,7 +278,7 @@ export default function generateReviewCase({
   onchain = null,
   // Output of /api/review/characters — when present, each station's
   // intro/questions/entries/summary/verdict come from Claude. When
-  // absent, the case falls back to either onchain-derived (Trinity)
+  // absent, the case falls back to either onchain-derived (Marisol)
   // or the buildStation placeholder copy (everyone else).
   characters = null,
 }) {
@@ -333,14 +333,14 @@ export default function generateReviewCase({
       ),
       marisol: (() => {
         const base = buildStation({
-          character: 'Detective Trinity',
+          character: 'Detective Marisol',
           role: 'LOGOS · ONCHAIN',
           sigil: '✧',
           tagline: 'The chain does not lie. Read the receipts.',
           voice: DEFAULT_STATION_VOICE.marisol,
           ticker, name: projectName, address,
         });
-        // Layer order matters. Onchain data first (gives Trinity real
+        // Layer order matters. Onchain data first (gives Marisol real
         // numbers even on a partial LLM failure); LLM payload last so
         // when Claude is up, her voice takes precedence — her LLM call
         // already saw the same onchain data via the user message.

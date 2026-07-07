@@ -4,13 +4,18 @@ const WIN_PORTFOLIO = 100;
 const MAX_ROUNDS = 10;
 const STARTING_HAND_SIZE = 5;
 
-export function createGame({ traderId = "unihood", seed = Date.now() } = {}) {
+export function createGame({ traderId = "eugene", seed = Date.now(), cardPool = null } = {}) {
   const selectedTrader = TRADERS.find((trader) => trader.id === traderId) || TRADERS[0];
   const playerOrder = [
     selectedTrader,
     ...TRADERS.filter((trader) => trader.id !== selectedTrader.id),
   ];
-  const drawDeck = shuffle([...COIN_CARDS, ...ACTION_CARDS], seed);
+  // A collection-gated pool that is too small to deal opening hands and feed
+  // three bots falls back to the full set rather than producing a dead table.
+  const pool = Array.isArray(cardPool) && cardPool.length >= STARTING_HAND_SIZE * 2
+    ? cardPool
+    : [...COIN_CARDS, ...ACTION_CARDS];
+  const drawDeck = shuffle([...pool], seed);
   const marketDeck = shuffle([...MARKET_CARDS], seed + 404);
   const players = playerOrder.map((trader, index) => ({
     id: trader.id,
@@ -31,6 +36,7 @@ export function createGame({ traderId = "unihood", seed = Date.now() } = {}) {
   let state = {
     id: `tt-${seed}`,
     seed,
+    cardPool: pool,
     round: 1,
     maxRounds: MAX_ROUNDS,
     activePlayerIndex: 0,
@@ -156,7 +162,11 @@ export function revealMarket(state) {
 }
 
 export function chooseTrader(state, traderId) {
-  return createGame({ traderId, seed: state?.seed || Date.now() });
+  return createGame({
+    traderId,
+    seed: state?.seed || Date.now(),
+    cardPool: state?.cardPool || null,
+  });
 }
 
 export function getWinner(state) {
@@ -199,10 +209,10 @@ function runBotTurn(state, playerIndex) {
 function applyPlayedCard(state, player, card) {
   if (card.type === CARD_TYPES.COIN) {
     let value = card.baseValue;
-    if (player.id === "unihood" && card.tag === "meme" && !player.abilityUsed) {
+    if (player.id === "eugene" && card.tag === "meme" && !player.abilityUsed) {
       value += 8;
       player.abilityUsed = true;
-      state.log.unshift("Unihood's Rainbow Candle adds +8 to a meme coin.");
+      state.log.unshift("Eugene's Rainbow Candle adds +8 to a meme coin.");
     }
     player.holdings.push({ cardId: card.id, name: card.name, value, tag: card.tag });
     player.portfolio += value;
@@ -214,9 +224,9 @@ function applyPlayedCard(state, player, card) {
   let portfolioDelta = card.effect?.portfolio || 0;
   let credDelta = card.effect?.cred || 0;
 
-  if (player.id === "det-trinity" && card.tag === "investigation") portfolioDelta += 3;
+  if (player.id === "marisol" && card.tag === "investigation") portfolioDelta += 3;
   if (player.id === "halo-node" && card.tag === "automation") portfolioDelta += 3;
-  if (player.id === "unihood" && card.tag === "meme") portfolioDelta += 4;
+  if (player.id === "eugene" && card.tag === "meme") portfolioDelta += 4;
   if (player.id === "bullhorn-broker" && (card.tag === "hype" || card.tag === "pump")) portfolioDelta += 4;
 
   player.portfolio += portfolioDelta;
@@ -315,13 +325,13 @@ function scoreBotCard(card, player) {
 }
 
 const BOT_PERSONALITIES = {
-  "unihood": {
+  "eugene": {
     preferredTags: ["meme", "pump"],
     avoidedTags: ["analysis"],
     volatilityBias: 1.4,
     riskBias: 2,
   },
-  "det-trinity": {
+  "marisol": {
     preferredTags: ["investigation", "analysis", "defense"],
     avoidedTags: ["hype", "risk"],
     volatilityBias: -0.8,

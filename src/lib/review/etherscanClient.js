@@ -18,7 +18,7 @@
 // The transfer-activity numbers are a *lower bound*: tokentx returns at
 // most 10k records per page. For high-volume tokens that's a cap, not a
 // total. Callers should treat transferCount with the `isLowerBound` flag
-// in mind. For DORMANT detection (the use case Trinity actually leans
+// in mind. For DORMANT detection (the use case Marisol actually leans
 // on) this is fine — DORMANT means <100 lifetime transfers, far under
 // the page cap.
 

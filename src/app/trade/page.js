@@ -3763,7 +3763,7 @@ export default function CyborgTemple() {
             RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Every story wants to be a myth. The rare ones earn it.' },
             Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Short seller. Insider trader.' },
             Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android theologian hell-bent on saving humanity from itself.' },
-            Detective: { name: 'Detective Trinity', pronunciation: '', tagline: 'Field agent for an interdimensional cyber-crimes task force.' },
+            Detective: { name: 'Detective Marisol', pronunciation: '', tagline: 'Field agent for an interdimensional cyber-crimes task force.' },
           };
           // In game mode, the in-scene evidence side panel takes over —
           // suppress the floating agent label so the two cards don't stack.

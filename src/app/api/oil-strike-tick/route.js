@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, FieldValue } from "@/lib/firebaseAdmin";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
+import { generateArtifactDistribution3D, artifactKey } from "@/lib/artifactDistribution";
 import { createDemonBounty } from "@/lib/oilDemon";
 import { logTimeline } from "@/lib/oilTimeline";
 import { sendPlayerAlert } from "@/lib/oilAlerts";
@@ -42,6 +43,45 @@ const DEFAULT_DEPTH_Z = 20;
 
 // Firestore Timestamp → ms (the strike clock works in plain ms; see oilStrikeClock).
 const tsMillis = (ts) => (ts && typeof ts.toMillis === "function" ? ts.toMillis() : null);
+
+// ── Buried-artifact layer (docs/artifact-expansion.md) ───────────────────────
+// Generated from the SAME committed seed as the oil, on separate RNG streams,
+// so both derive deterministically per tick with no extra storage. Settings
+// knobs let an admin tune a season PRE-ANCHOR only — like the oil radius band,
+// changing them after commit remaps every seed.
+function generateArtifacts(settings, seed, gridSize, depthZ, grid, hellPockets) {
+  return generateArtifactDistribution3D({
+    blockHash: seed,
+    gridX: gridSize,
+    gridY: gridSize,
+    depthZ,
+    oilGrid: grid,
+    hellPockets,
+    perColumn: settings.artifactPerColumn ?? 3,
+    relicFraction: settings.artifactRelicFraction ?? 0.15,
+    cursedFraction: settings.artifactCursedFraction ?? 0.25,
+    mapCopies: settings.artifactMapCopies ?? 2,
+    shallowCap: PASSIVE_DRILLS, // ≥1 artifact reachable on a zero-bonus rig
+  });
+}
+
+// Flat inventory key on oilDrills.artifacts — duplicates increment (dupes
+// level the item, they're never waste). Underscores, not dots/colons:
+// Firestore treats dots in merge keys as path separators.
+function artifactItemKey(a) {
+  if (a.type === "amber") return `amber_${a.specimenId}_${a.fragmentIndex}`;
+  if (a.type === "relic") return `relic_${a.relicId}`;
+  if (a.type === "map") return `map_${a.pieceIndex}`;
+  return "cache";
+}
+
+// Payload persisted on the plot's revealedArtifacts map + lastStrikeArtifact.
+// Coords stripped — the plot doc IS the coordinate; keep reveals coordinate-free
+// everywhere else (same rule as the timeline).
+function publicArtifact(a) {
+  const { x, y, z, ...payload } = a;
+  return payload;
+}
 
 // End-of-season buzzer: flip the phase once (txn-guarded so concurrent ticks
 // don't double-run), auto-bank every rig's un-banked tank so nobody loses oil to
@@ -169,6 +209,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
     numberOfHellPockets: settings.numberOfHellPockets ?? null, // null ⇒ derive from grid
   });
   const hellSet = new Set((hellPockets || []).map((p) => `${p.x}_${p.y}_${p.z}`));
+  const { byKey: artifactsByKey } = generateArtifacts(settings, seed, gridSize, depthZ, grid, hellPockets);
   // Strike tiers, relative to the field's single richest cell (self-calibrating
   // per season). gusher ≥ 50%, motherlode ≥ 85%. Drives the feed label AND the
   // scaled 3D response (gusherEvents.tier) in step 2.
@@ -186,7 +227,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
 
   const drillsSnap = await db.collection("oilDrills").get();
 
-  const summary = { struck: 0, skipped: 0, depleted: 0, errors: 0, demonsSummoned: 0, skipReasons: {} };
+  const summary = { struck: 0, skipped: 0, depleted: 0, errors: 0, demonsSummoned: 0, artifactsFound: 0, cursesTriggered: 0, skipReasons: {} };
   // Tally a skip with a human-readable reason so the admin FORCE STRIKE toast can
   // say *why* nothing struck (e.g. every rig lost its plot to a board reset).
   const skip = (reason) => { summary.skipped++; summary.skipReasons[reason] = (summary.skipReasons[reason] || 0) + 1; };
@@ -275,6 +316,9 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
           const layerIndex = currentDepth; // layers 0..drillDay-1 are revealed
           const oilAtLayer = grid?.[col]?.[row]?.[layerIndex] ?? 0;
           const isHell = hellSet.has(`${col}_${row}_${layerIndex}`);
+          // Buried artifact at this layer (never co-located with hell — the
+          // generator avoids those cells, so hell and artifact paths are exclusive).
+          const artifact = artifactsByKey[artifactKey(col, row, layerIndex)] || null;
 
           t.set(plotRef, {
             col, row,
@@ -286,6 +330,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             // previously revealed layers are preserved.
             revealed: { [layerIndex]: oilAtLayer },
             ...(isHell ? { hellLayers: { [layerIndex]: true } } : {}),
+            ...(artifact ? { revealedArtifacts: { [layerIndex]: publicArtifact(artifact) } } : {}),
           }, { merge: true });
 
           t.set(drillRef, {
@@ -296,11 +341,18 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             lastStrikeOil: oilAtLayer,
             lastStrikeDepth: newDepth,
             lastStrikeHell: isHell,
+            lastStrikeArtifact: artifact ? publicArtifact(artifact) : null,
+            // Inventory: flat item-key → count. Dupes increment (item leveling);
+            // artifactFinds is the running Museum tally for recap/leaderboard.
+            ...(artifact ? {
+              artifacts: { [artifactItemKey(artifact)]: FieldValue.increment(1) },
+              artifactFinds: FieldValue.increment(1),
+            } : {}),
             rigDepleted: false, // a successful strike clears any stale depleted cache
             updatedAt: FieldValue.serverTimestamp(),
           }, { merge: true });
 
-          return { status: "struck", oil: oilAtLayer, depth: newDepth, isHell, username: drillNow.username || null, newTank: (drillNow.tankOil || 0) + oilAtLayer };
+          return { status: "struck", oil: oilAtLayer, depth: newDepth, isHell, artifact, username: drillNow.username || null, newTank: (drillNow.tankOil || 0) + oilAtLayer };
         });
 
         if (outcome.status === "struck") {
@@ -350,21 +402,72 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             // FIELD ACTIVITY feed (who/what/when only — no amount, no coords).
             await logTimeline(db, { type: strikeTier, username: outcome.username, userId });
           }
+
+          // Buried artifact side effects (docs/artifact-expansion.md). Timeline
+          // stays coordinate-free like every other event type.
+          const art = outcome.artifact;
+          if (art) {
+            summary.artifactsFound++;
+            if (art.type === "relic" && art.cursed) {
+              summary.cursesTriggered++;
+              // Curse record: phase-4's tick-driven spread/cleanse acts on this.
+              // Coords included (like demonBounty) — the curse is field-visible.
+              await db.collection("oilCurses").add({
+                status: "active",
+                col, row,
+                layerIndex: outcome.depth - 1,
+                relicId: art.relicId,
+                summonerId: userId,
+                summonerUsername: outcome.username,
+                createdAt: FieldValue.serverTimestamp(),
+                // Spreads to a neighboring plot after 24h unless cleansed.
+                spreadAtMs: Date.now() + 24 * 3600 * 1000,
+              });
+              await logTimeline(db, { type: "curse", username: outcome.username, userId, detail: "disturbed a cursed burial ground" });
+            } else if (art.type === "cache") {
+              // Payout split (community pool) lands in phase 4 — the find is
+              // recorded and celebrated now.
+              await logTimeline(db, { type: "cache_found", username: outcome.username, userId, detail: "unearthed the outlaw cache" });
+            } else {
+              const findDetail = art.type === "amber" ? "unearthed an amber shard"
+                : art.type === "map" ? "dug up a torn map fragment"
+                : "unearthed a relic";
+              await logTimeline(db, { type: "artifact_find", username: outcome.username, userId, detail: findDetail });
+            }
+          }
+
           // Best-effort retention hook — skipped during deep admin drills to avoid spam.
           if (deep === 1) {
+            // One artifact line, appended to a strike push or standing alone.
+            const artLine = !art ? ""
+              : art.type === "amber" ? `🦴 Amber shard unearthed — ${art.specimenId.toUpperCase()} fragment ${art.fragmentIndex + 1}/6.`
+              : art.type === "map" ? `🗺 Torn map fragment ${art.pieceIndex + 1} — someone out there holds the rest.`
+              : art.type === "cache" ? `💰 THE OUTLAW CACHE. You found it.`
+              : art.cursed ? `⚰️ ${art.relicId.toUpperCase()} relic — the ground here was a grave. Something stirred.`
+              : `🗿 ${art.relicId.toUpperCase()} relic recovered for the Museum.`;
             if (outcome.oil > 0) {
               // Fixed-rate ≈$ tag — the dollar figure is what makes the ping land.
               const usdVal = (outcome.oil * (settings.totalOilBudget || 500)) / OIL_FIELD_UNITS;
               const usdTag = usdVal >= 0.005 ? ` (≈ $${usdVal.toFixed(2)})` : "";
+              const artSuffix = artLine ? `\n${artLine}` : "";
               await sendPlayerAlert(db, userId, {
                 title: "⛽ YOUR RIG STRUCK!",
-                body: `Plot (${col}, ${row}) hit ${outcome.oil.toLocaleString()}${usdTag} at depth ${outcome.depth}. Bank it before a dino comes sniffing.`,
+                body: `Plot (${col}, ${row}) hit ${outcome.oil.toLocaleString()}${usdTag} at depth ${outcome.depth}. Bank it before a dino comes sniffing.${artSuffix}`,
                 tag: "hmpc-strike",
-                telegramHtml: `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col}, ${row}) hit ${outcome.oil}${usdTag} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.`,
+                telegramHtml: `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col}, ${row}) hit ${outcome.oil}${usdTag} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.${artSuffix}`,
+              });
+            } else if (art) {
+              // A dry layer with an artifact is a FIND, not a miss — it gets a
+              // real push. This is the "dry strikes stop being silent" beat.
+              await sendPlayerAlert(db, userId, {
+                title: art.type === "cache" ? "💰 OUTLAW CACHE FOUND!" : "🏺 ARTIFACT UNEARTHED!",
+                body: `Depth ${outcome.depth} at (${col}, ${row}): no LYQUID80… but the drill hit something else.\n${artLine}`,
+                tag: "hmpc-artifact",
+                telegramHtml: `🏺 <b>ARTIFACT UNEARTHED!</b>\nDepth ${outcome.depth} at (${col}, ${row}) — ${artLine}`,
               });
             } else {
-              // Dry layers go to Telegram only — push stays reserved for
-              // paydirt so the notification keeps its signal value.
+              // Truly empty layers go to Telegram only — push stays reserved
+              // for paydirt so the notification keeps its signal value.
               await sendPlayerAlert(db, userId, {
                 title: "🪨 Dry layer",
                 body: `Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`,
@@ -444,7 +547,24 @@ async function scoutOil() {
     layer: p.z + 1, // 1-based; force-strike to this DEPTH to breach it
   }));
 
-  return { ok: true, gridSize, depthZ, richest: cells.slice(0, 10), hell };
+  // Artifact layer (admin only) — same seed + knobs as the tick, so a tester
+  // can park a rig on a cache/cursed relic and force-strike to its layer.
+  const artifacts = generateArtifacts(settings, seed, gridSize, depthZ, grid, hellPockets);
+  const artifactCells = artifacts.cells.map((c) => ({
+    col: c.x, row: c.y,
+    label: `(${c.x + 1}, ${c.y + 1})`,
+    layer: c.z + 1, // 1-based; force-strike to this DEPTH to unearth it
+    type: c.type,
+    ...(c.type === "amber" ? { specimenId: c.specimenId, fragmentIndex: c.fragmentIndex } : {}),
+    ...(c.type === "relic" ? { relicId: c.relicId, cursed: c.cursed } : {}),
+    ...(c.type === "map" ? { pieceIndex: c.pieceIndex } : {}),
+  }));
+
+  return {
+    ok: true, gridSize, depthZ, richest: cells.slice(0, 10), hell,
+    artifactSummary: artifacts.summary,
+    artifacts: artifactCells,
+  };
 }
 
 // Admin test helper: reset a single user's claim-jump counter (and re-arm the rig)

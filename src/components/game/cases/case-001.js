@@ -279,13 +279,13 @@ rulesIntro: {
       },
     },
     marisol: {
-      // Display name is "Detective Trinity" — the internal station key
+      // Display name is "Detective Marisol" — the internal station key
       // stays `marisol` so we don't have to refactor every reference to
       // it across the scene, EvidenceScreens, EvidenceOverlay, railway,
       // fullscreen overlay, etc. The player only sees the `character`
       // value in the UI. Railway shortname derives from the last word,
       // so the portrait label reads "TRINITY".
-      character: "Detective Trinity",
+      character: "Detective Marisol",
       role: "LOGOS · ONCHAIN",
       sigil: "✧",
       tagline: "The chain doesn't lie. Read the receipts.",

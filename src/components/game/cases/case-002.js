@@ -401,7 +401,7 @@ const CASE_002 = {
       },
     },
     marisol: {
-      character: "Detective Trinity",
+      character: "Detective Marisol",
       role: "LOGOS · ONCHAIN",
       sigil: "✧",
       tagline: "The chain doesn't lie. Read the receipts.",

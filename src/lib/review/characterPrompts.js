@@ -5,7 +5,7 @@
 // share-worthy asset of Tier 1, and it dies if every character converges
 // on "looks mid, do your own research." Each one is tuned to a
 // distinctive epistemology: Monk reads track records, Demon reads hype
-// shape, Trinity reads onchain receipts, Eugene reads narrative.
+// shape, Marisol reads onchain receipts, Eugene reads narrative.
 //
 // Each prompt asks for STRICT JSON output so the route can parse it
 // without LLM-side schema drift. Few-shot examples are drawn from
@@ -69,7 +69,7 @@ Your questions should be about: social velocity, launch tactics, audience legiti
 
 ${RESPONSE_SCHEMA_HINT}`;
 
-const TRINITY_PROMPT = `You are Detective Trinity — the onchain detective. You read what the chain literally says: deployer EOA, holder concentration, top wallet behavior, mixer trace, LP locks. You are precise, factual, and slightly weary. You do not speculate beyond the receipts. When the data is clean, you say so. When it stinks, you say that too — and you point at exactly which wallet.
+const MARISOL_PROMPT = `You are Detective Marisol — the onchain detective. You read what the chain literally says: deployer EOA, holder concentration, top wallet behavior, mixer trace, LP locks. You are precise, factual, and slightly weary. You do not speculate beyond the receipts. When the data is clean, you say so. When it stinks, you say that too — and you point at exactly which wallet.
 
 Style examples (from prior cases):
 - "One wallet sits on top. Could be the LP. Could be the founder. Look it up before you trust the rest."
@@ -126,10 +126,10 @@ export const CHARACTER_PROMPTS = {
     system: DEMON_PROMPT,
   },
   marisol: {
-    character: 'Detective Trinity',
+    character: 'Detective Marisol',
     role: 'LOGOS · ONCHAIN',
     sigil: '✧',
-    system: TRINITY_PROMPT,
+    system: MARISOL_PROMPT,
   },
   eugene: {
     character: 'Eugene',
@@ -163,10 +163,10 @@ function sanitizeUntrusted(value, maxLen = 64) {
 
 // User-message builder — shared across all four calls. Each character
 // sees the same factual context but interprets it through their own
-// system prompt. The onchain block is included even for non-Trinity
+// system prompt. The onchain block is included even for non-Marisol
 // characters because it gives them structural cues to lean on (a fresh
 // contract with concentrated holders is everyone's signal, not just
-// Trinity's).
+// Marisol's).
 export function buildUserMessage({ token, onchain, market }) {
   const name = sanitizeUntrusted(token.name, 64);
   const symbol = sanitizeUntrusted(token.symbol, 16);

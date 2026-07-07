@@ -158,7 +158,7 @@ async function callCharacter(stationKey, system, userMsg) {
         system,
         messages: [{ role: 'user', content: userMsg }],
         max_tokens: 1200,
-        // Lower temperature on Trinity (factual onchain reads benefit
+        // Lower temperature on Marisol (factual onchain reads benefit
         // from less variance), higher on Demon/Eugene whose value is in
         // the entertainment voice.
         temperature: stationKey === 'marisol' ? 0.5 : 0.85,

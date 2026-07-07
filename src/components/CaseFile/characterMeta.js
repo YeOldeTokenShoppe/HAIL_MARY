@@ -27,7 +27,7 @@ export const CHARACTER_META = {
     color: '#ff3ea0',    // magenta accent
   },
   marisol: {
-    name: 'Detective Trinity',
+    name: 'Detective Marisol',
     role: 'LOGOS',
     roleSub: 'ONCHAIN',
     sigil: '✧',

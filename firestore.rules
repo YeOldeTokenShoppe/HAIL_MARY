@@ -236,6 +236,36 @@
         allow read, create: if true;
       }
 
+      // =========================================================================
+      // TRADING CARDS (Terminal Traders / Genesis set)
+      // =========================================================================
+
+      // Card ownership. Public read so binders/showcases can be shared; ALL
+      // writes go through /api/tcg-collection (starter grant) and future
+      // pack/reward routes via the Admin SDK — a client-forged "I own the
+      // foil" write is impossible.
+      match /cardCollections/{userId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      // Grant audit trail — server-only, one doc per grant (starter, packs,
+      // rewards). Not client-readable; it exists so every owned card traces
+      // back to a recorded grant.
+      match /cardGrants/{grantId} {
+        allow read: if false;
+        allow write: if false;
+      }
+
+      // Pack burn claims — one doc per burn tx hash, written only by
+      // /api/tcg-pack-purchase (Admin SDK). Public read: pack contents are
+      // deterministic from the public tx hash anyway, and readable claims let
+      // the ticker/binder show pulls.
+      match /packBurns/{txHash} {
+        allow read: if true;
+        allow write: if false;
+      }
+
       // X OAuth tokens — server-only (Admin SDK). No client read OR write:
       // write:true previously let anyone overwrite config/x_oauth and hijack the
       // account's tokens. All writers (auth/x/callback, cron) use the Admin SDK.
@@ -495,6 +525,9 @@
       // read:false collections.
       // =========================================================================
       match /demonBounty/{d}      { allow read: if true; allow write: if false; }
+      // Buried-artifact curses (docs/artifact-expansion.md) — field-visible like
+      // demon bounties; written only by the strike-tick / cleanse routes.
+      match /oilCurses/{d}        { allow read: if true; allow write: if false; }
       match /oilPurchases/{d}     { allow read: if true; allow write: if false; }
       match /polaroids/{d}        { allow read: if true; allow write: if false; }
       // Auto-capture news/social feed (gusher + hell milestones). Public read is

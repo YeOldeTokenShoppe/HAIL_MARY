@@ -9,6 +9,7 @@ const RARITY_ACCENT = {
   Epic: "#c597ff",
   Legendary: "#ffd166",
   Mythic: "#ff5ec4",
+  "Terminal Foil": "#ffe27a",
 };
 
 const TYPE_ACCENT = {
@@ -53,6 +54,14 @@ export default function TradingCard({
   const foilTier =
     data.foilStyle ||
     (["Mythic", "Legendary"].includes(data.rarity) ? "hero" : "subtle");
+  const statPair =
+    data.statPair ||
+    (data.startingCred != null
+      ? [
+          { label: "CRED", value: data.startingCred, title: "Cred — spend to play cards" },
+          { label: "PV", value: data.startingPortfolio, suffix: "/100", title: "Portfolio Value — first to 100 wins" },
+        ]
+      : null);
 
   const applyAt = (clientX, clientY) => {
     if (!cardRef.current) return;
@@ -219,19 +228,23 @@ export default function TradingCard({
                 )}
               </div>
 
-              <div className="tc-stat-pair">
-                <div className="tc-cred" title="Cred — spend to play cards">
-                  <span>CRED</span>
-                  <strong>{data.startingCred}</strong>
+              {statPair && (
+                <div className="tc-stat-pair">
+                  {statPair.map((stat, index) => (
+                    <div
+                      key={stat.label}
+                      className={index === 0 ? "tc-cred" : "tc-portfolio"}
+                      title={stat.title}
+                    >
+                      <span>{stat.label}</span>
+                      <strong>
+                        {stat.value}
+                        {stat.suffix && <em>{stat.suffix}</em>}
+                      </strong>
+                    </div>
+                  ))}
                 </div>
-                <div className="tc-portfolio" title="Portfolio Value — first to 100 wins">
-                  <span>PV</span>
-                  <strong>
-                    {data.startingPortfolio}
-                    <em>/100</em>
-                  </strong>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* ───── FLOATING BOTTOM OVERLAY (rarity tag only) ───── */}
@@ -243,24 +256,26 @@ export default function TradingCard({
           </div>
 
           {/* ───── ABILITY (image badge OR oblique-label fallback) ───── */}
-          <section className="tc-ability">
-            <div className="tc-ability-badge">
-              {data.ability.badgeImage ? (
-                <img
-                  className="tc-ability-badge-img"
-                  src={data.ability.badgeImage}
-                  alt="Ability"
-                  draggable={false}
-                />
-              ) : (
-                <ObliqueLabel variant="ability">Ability</ObliqueLabel>
-              )}
-            </div>
-            <div className="tc-ability-body">
-              <h2>{data.ability.name}</h2>
-              <p>{data.ability.text}</p>
-            </div>
-          </section>
+          {data.ability && (
+            <section className="tc-ability">
+              <div className="tc-ability-badge">
+                {data.ability.badgeImage ? (
+                  <img
+                    className="tc-ability-badge-img"
+                    src={data.ability.badgeImage}
+                    alt="Ability"
+                    draggable={false}
+                  />
+                ) : (
+                  <ObliqueLabel variant="ability">Ability</ObliqueLabel>
+                )}
+              </div>
+              <div className="tc-ability-body">
+                <h2>{data.ability.name}</h2>
+                <p>{data.ability.text}</p>
+              </div>
+            </section>
+          )}
 
           {/* ───── FLAVOR (sits just below the Ability) ───── */}
           {data.flavorText && (
@@ -289,27 +304,29 @@ export default function TradingCard({
             </section>
           )}
 
-          {/* ───── BATTLE STRIP (pushed below the flavor quote) ───── */}
-          <footer className="tc-battle">
-            <div className="tc-battle-stat">
-              <span>weakness</span>
-              <strong>{data.weakness}</strong>
-            </div>
-            <div className="tc-battle-sep" />
-            <div className="tc-battle-stat">
-              <span>resistance</span>
-              <strong>{data.resistance}</strong>
-            </div>
-            <div className="tc-battle-sep" />
-            <div className="tc-battle-stat">
-              <span>pivot cost</span>
-              <strong className="tc-battle-bolts">
-                {Array.from({ length: data.pivotCost }).map((_, i) => (
-                  <span key={i}>⚡</span>
-                ))}
-              </strong>
-            </div>
-          </footer>
+          {/* ───── BATTLE STRIP (renders only when battle data is set) ───── */}
+          {(data.weakness || data.resistance || data.pivotCost) && (
+            <footer className="tc-battle">
+              <div className="tc-battle-stat">
+                <span>weakness</span>
+                <strong>{data.weakness || "—"}</strong>
+              </div>
+              <div className="tc-battle-sep" />
+              <div className="tc-battle-stat">
+                <span>resistance</span>
+                <strong>{data.resistance || "—"}</strong>
+              </div>
+              <div className="tc-battle-sep" />
+              <div className="tc-battle-stat">
+                <span>pivot cost</span>
+                <strong className="tc-battle-bolts">
+                  {Array.from({ length: data.pivotCost || 0 }).map((_, i) => (
+                    <span key={i}>⚡</span>
+                  ))}
+                </strong>
+              </div>
+            </footer>
+          )}
 
           <div className="tc-meta">
             <span>

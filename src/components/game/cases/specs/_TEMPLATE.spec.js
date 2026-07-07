@@ -100,7 +100,7 @@ export default {
       vindication:     { aligned: "...", missed: "...", abstained: "..." },
     },
 
-    // Detective Trinity — terse, hardboiled noir.
+    // Detective Marisol — terse, hardboiled noir.
     marisol: {
       intro: "...",
       returnLines: ["...", "...", "..."],

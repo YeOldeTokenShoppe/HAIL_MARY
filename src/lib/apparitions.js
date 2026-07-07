@@ -22,7 +22,7 @@ export const APPARITIONS = [
     key: "classic",
     name: "𝓞𝖚𝖗 𝕷𝖆𝖉𝖞", // carousel label (matches the original)
     title: "Our Lady of Perpetual Profit",
-    speaker: "Our Lady", // Confessional header / message-sender label
+    speaker: "Our Lady of Perpetual Profit", // Confessional header / message-sender label
     askWord: "Ask", // verb in the "Ask RL80" heading — RL80 stays constant
     image: "/cameo_rl80.webp",
     sitePalScene: 2775218,
@@ -46,7 +46,7 @@ export const APPARITIONS = [
     key: "guadalupe",
     name: "Guadalupe",
     title: "Nuestra Señora del Lucro Perpetuo",
-    speaker: "Nuestra Señora", // Confessional header (her Spanish title)
+    speaker: "Nuestra Señora del Lucro Perpetuo", // Confessional header (her Spanish title)
     askWord: "Consulta", // "Consulta RL80" — only the verb localizes (swap to "Pregunta" if preferred)
     image: "/cameo_guadalupe.webp",
     sitePalScene: 2775220,

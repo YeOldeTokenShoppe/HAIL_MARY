@@ -626,6 +626,8 @@ const OilClaimCertificate = dynamic(() => import("@/components/OilClaimCertifica
 const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
 const OilPlotChat = dynamic(() => import("@/components/OilPlotChat"), { ssr: false });
 const CoreSamplePanel = dynamic(() => import("@/components/CoreSamplePanel"), { ssr: false });
+const MuseumPanel = dynamic(() => import("@/components/MuseumPanel"), { ssr: false });
+const ConcretionModal = dynamic(() => import("@/components/ConcretionModal"), { ssr: false });
 const DrillGeode = dynamic(() => import("@/components/DrillGeode"), { ssr: false });
 const OilChatModal = dynamic(() => import("@/components/OilChatModal"), { ssr: false });
 const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
@@ -1919,7 +1921,7 @@ export default function OilPage() {
       setDrillLoaded(true);
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0 });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -2107,6 +2109,26 @@ export default function OilPage() {
   // Preview hooks: ?recap=1 forces it with real data over a synthetic 26h
   // window; ?recap=demo renders a fully synthetic showcase.
   const [awayRecap, setAwayRecap] = useState(null);
+
+  // ── The Concretion: artifact reveal modal (docs/artifact-expansion.md) ──────
+  // Keyed off lastStrikeArtifact + lastStrikeAt so it fires ONLY for finds
+  // credited to THIS player — claim-jumping onto a pre-dug plot never pops
+  // someone else's finds. localStorage remembers the last-opened strike time
+  // (same pattern as the away-recap baseline); multiple finds while away show
+  // only the latest here — the recap covers the batch.
+  const [pendingConcretion, setPendingConcretion] = useState(null);
+  useEffect(() => {
+    const a = userDrill?.lastStrikeArtifact;
+    const at = userDrill?.lastStrikeAt?.toMillis?.() ?? null;
+    if (!a || !at || previewMode) return;
+    let last = 0;
+    try { last = Number(localStorage.getItem("hmpc_concretion_opened") || 0); } catch {}
+    if (at > last) setPendingConcretion({ ...a, at });
+  }, [userDrill?.lastStrikeAt, userDrill?.lastStrikeArtifact, previewMode]);
+  const dismissConcretion = () => {
+    try { if (pendingConcretion?.at) localStorage.setItem("hmpc_concretion_opened", String(pendingConcretion.at)); } catch {}
+    setPendingConcretion(null);
+  };
   const awayRecapRanRef = useRef(false);
   useEffect(() => {
     if (awayRecapRanRef.current || typeof window === "undefined") return;
@@ -2160,13 +2182,17 @@ export default function OilPage() {
 
     const revealed = userPlotState.revealed || {};
     const hells = userPlotState.hellLayers || {};
+    const arts = userPlotState.revealedArtifacts || {};
     const strikes = [];
+    const artifactsFound = [];
     let oilGained = 0, hellHit = false;
     for (let L = prev.depth; L < cur.depth; L++) {
       const oil = Number(revealed[L] ?? revealed[String(L)] ?? 0);
       if (oil > 0) strikes.push({ layer: L, oil });
       oilGained += oil;
       if (hells[L] || hells[String(L)]) hellHit = true;
+      const art = arts[L] ?? arts[String(L)];
+      if (art) artifactsFound.push({ layer: L, ...art });
     }
     const fieldEvents = timelineEvents.filter((ev) => {
       const t = ev.createdAt?.toMillis?.() ?? (ev.createdAt?.seconds ? ev.createdAt.seconds * 1000 : 0);
@@ -2174,11 +2200,12 @@ export default function OilPage() {
     });
     const unreadCount = Object.keys(plotsWithMessages).length;
     const bankedDelta = Math.max(0, cur.banked - prev.banked);
-    const notable = strikes.length > 0 || cur.depth > prev.depth || bankedDelta > 0 || fieldEvents.length > 0 || unreadCount > 0;
+    const notable = strikes.length > 0 || artifactsFound.length > 0 || cur.depth > prev.depth || bankedDelta > 0 || fieldEvents.length > 0 || unreadCount > 0;
 
     if (force === "1" || notable) {
       setAwayRecap({
         awayMs, fromDepth: prev.depth, toDepth: cur.depth, strikes, oilGained, hellHit,
+        artifactsFound,
         tank: cur.tank, tankDelta: cur.tank - prev.tank, bankedDelta,
         fieldEvents: fieldEvents.slice(0, 4).map(({ type, username, detail }) => ({ type, username, detail })),
         fieldEventCount: fieldEvents.length, unreadCount,
@@ -2470,6 +2497,22 @@ export default function OilPage() {
       const us = key.indexOf("_");
       const cx = Number(key.slice(0, us)), cy = Number(key.slice(us + 1));
       for (const zStr in hl) if (hl[zStr]) m[`${cx}_${cy}_${Number(zStr)}`] = true;
+    }
+    return m;
+  }, [allPlotsMap]);
+
+  // Artifacts revealed by the server (docs/artifact-expansion.md): "x_y" →
+  // [{ z, type, ... }] sorted by depth. Seed-free, like the hell map — the
+  // client only ever sees what the strike-tick has written into oilPlots.
+  const revealedArtifactsByPlot = useMemo(() => {
+    const m = {};
+    for (const key in allPlotsMap) {
+      const ra = allPlotsMap[key]?.revealedArtifacts;
+      if (!ra) continue;
+      const marks = [];
+      for (const zStr in ra) marks.push({ z: Number(zStr), ...ra[zStr] });
+      marks.sort((a, b) => a.z - b.z);
+      m[key] = marks;
     }
     return m;
   }, [allPlotsMap]);
@@ -3963,7 +4006,33 @@ export default function OilPage() {
       >
         {previewAsPlayer ? "VIEW AS PLAYER: ON" : "VIEW AS PLAYER: OFF"}
       </button>
+      {/* Concretion previews — pure client-side (no writes): pops the reveal
+          modal with a synthetic artifact to test each encasement skin. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+        {[
+          ["🟠 AMBER", { type: "amber", specimenId: "raptor", fragmentIndex: 3, at: 0 }],
+          ["🗿 RELIC", { type: "relic", relicId: "idol", cursed: false, at: 0 }],
+          ["⚰ CURSED", { type: "relic", relicId: "bell", cursed: true, at: 0 }],
+          ["🗺 MAP", { type: "map", pieceIndex: 2, at: 0 }],
+          ["💰 CACHE", { type: "cache", at: 0 }],
+        ].map(([label, art]) => (
+          <button key={label} style={styles.btn} onClick={() => setPendingConcretion(art)}
+            title="Preview the concretion reveal modal (client-only, nothing is written)">
+            {label}
+          </button>
+        ))}
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Scouting artifacts", async () => {
+          const pw = encodeURIComponent(adminPassword);
+          const r = await fetch(`/api/oil-strike-tick?password=${pw}&scout=1`).then((x) => x.json());
+          if (!r?.ok) throw new Error(r?.error || "scout failed");
+          const s = r.artifactSummary || {};
+          const cursed = (r.artifacts || []).filter((a) => a.cursed);
+          const cache = (r.artifacts || []).find((a) => a.type === "cache");
+          console.log("[artifact scout]", r.artifacts);
+          return `✓ ${s.total} artifacts · ${s.amber} amber · ${s.relics} relics (${s.cursedRelics} cursed${cursed[0] ? ` — first at ${cursed[0].label} L${cursed[0].layer}` : ""}) · cache at ${cache ? `${cache.label} L${cache.layer}` : "?"} · full list in console`;
+        })}>ARTIFACT SCOUT</button>
         <button disabled={toolBusy} style={styles.btn} onClick={() => runTool("Seeding + revealing", async () => {
           const pw = encodeURIComponent(adminPassword);
           const r1 = await fetch("/api/oil-seed-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, count: 30 }) }).then(r => r.json());
@@ -4314,6 +4383,10 @@ export default function OilPage() {
     rogue:   { icon: "⚠", color: theme.warn, fill: false, verb: "spotted a rogue prospector" },
     claim:   { icon: "⚑", color: theme.muted, fill: false, verb: "claimed a plot" },
     system:  { icon: "◆", color: theme.accent, fill: true,  verb: "" },
+    // Buried-artifact layer (docs/artifact-expansion.md)
+    artifact_find: { icon: "🏺", color: "#c79bff", fill: false, verb: "unearthed an artifact" },
+    curse:   { icon: "⚰", color: theme.red, fill: true, verb: "disturbed a cursed burial ground" },
+    cache_found: { icon: "💰", color: theme.gold, fill: true, verb: "found the OUTLAW CACHE!" },
   };
 
   const testerBadgeStyle = {
@@ -6927,9 +7000,16 @@ export default function OilPage() {
             selectedY={sliceY}
             drillDepth={effectiveDrillDay}
             hellPockets={displayHellPockets}
+            artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
           />
           {gusherShutoffPanel}
           {playerDrillPanel}
+          <MuseumPanel
+            inventory={userDrill?.artifacts || {}}
+            artifactFinds={userDrill?.artifactFinds || 0}
+            darkMode={uiDark}
+            isMobile
+          />
           {isAdmin && parametersPanel}
           {isAdmin && testToolsPanel}
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
@@ -7016,6 +7096,11 @@ export default function OilPage() {
         />
 
         <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+
+        {/* Concretion reveal waits until the away-recap is dismissed. */}
+        {!awayRecap && pendingConcretion && (
+          <ConcretionModal artifact={pendingConcretion} onDone={dismissConcretion} darkMode={uiDark} />
+        )}
 
         <OilAwayRecap
           recap={awayRecap}
@@ -7444,9 +7529,15 @@ export default function OilPage() {
               selectedY={sliceY}
               drillDepth={effectiveDrillDay}
               hellPockets={displayHellPockets}
+              artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
             />
             {gusherShutoffPanel}
             {playerDrillPanel}
+            <MuseumPanel
+              inventory={userDrill?.artifacts || {}}
+              artifactFinds={userDrill?.artifactFinds || 0}
+              darkMode={uiDark}
+            />
             {isAdmin && parametersPanel}
           {isAdmin && testToolsPanel}
             {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
@@ -7553,6 +7644,11 @@ export default function OilPage() {
       />
 
       <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+
+      {/* Concretion reveal waits until the away-recap is dismissed. */}
+      {!awayRecap && pendingConcretion && (
+        <ConcretionModal artifact={pendingConcretion} onDone={dismissConcretion} darkMode={uiDark} />
+      )}
 
       <OilAwayRecap
         recap={awayRecap}

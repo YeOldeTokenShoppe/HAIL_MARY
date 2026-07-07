@@ -1,28 +1,23 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ACTION_CARDS, CARD_TYPES, COIN_CARDS, GENESIS_SET, MARKET_CARDS, TRADERS } from "@/game/terminal-traders/cards";
 import { TERMINAL_TRADERS_RULES, bankCred, chooseTrader, createGame, endTurn, getWinner, hasPlayableCard, playCard, recoverHand } from "@/game/terminal-traders/engine";
+import { getCardArt, toTemplateCard } from "@/game/terminal-traders/templateCard";
+import TradingCard from "@/components/TradingCard";
 
 const TRADER_THUMBNAILS = {
-  "unihood": { portrait: "/thumbnail_eugene.png", label: "MEME" },
-  "det-trinity": { portrait: "/thumbnail_marisol.png", label: "LOGOS" },
+  "eugene": { portrait: "/thumbnail_eugene.png", label: "MEME" },
+  "marisol": { portrait: "/thumbnail_marisol.png", label: "LOGOS" },
   "halo-node": { portrait: "/thumbnail_gr80.png", label: "NODE" },
   "bullhorn-broker": { portrait: "/thumbnail_johnBarron.png", label: "HYPE" },
 };
 
-const CARD_ART = {
-  "unihood": "/TCG/traderUnicorn.webp",
-  "moonpony": "/TCG/coinCard_MoonPony.png",
-  "pump-signal": "/TCG/actionCard_PumpSignal.png",
-};
-
-export default function TerminalTradersGame({ variant = "page", onExit } = {}) {
+export default function TerminalTradersGame({ variant = "page", onExit, cardPool = null } = {}) {
   const isSceneMode = variant === "scene";
   const [game, setGame] = useState(null);
-  const [previewTraderId, setPreviewTraderId] = useState("unihood");
+  const [previewTraderId, setPreviewTraderId] = useState("eugene");
   const [inspectedCardId, setInspectedCardId] = useState(null);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, mx: 50, my: 50 });
   const winner = game ? getWinner(game) : null;
   const inspectedCard = game?.hand.find((card) => card.id === inspectedCardId) || null;
   const activeTrader = game ? TRADERS.find((trader) => trader.id === game.players[0].traderId) : null;
@@ -46,7 +41,7 @@ export default function TerminalTradersGame({ variant = "page", onExit } = {}) {
   };
 
   const handleStartWithTrader = (traderId) => {
-    setGame((current) => current ? chooseTrader(current, traderId) : createGame({ traderId, seed: Date.now() }));
+    setGame((current) => current ? chooseTrader(current, traderId) : createGame({ traderId, seed: Date.now(), cardPool }));
     setPreviewTraderId(traderId);
   };
 
@@ -73,26 +68,13 @@ export default function TerminalTradersGame({ variant = "page", onExit } = {}) {
 
   const handleReset = () => {
     const traderId = activeTrader?.id || previewTrader.id;
-    setGame(createGame({ traderId, seed: Date.now() }));
+    setGame(createGame({ traderId, seed: Date.now(), cardPool }));
     setPreviewTraderId(traderId);
     setInspectedCardId(null);
   };
 
-  const handleInspectMove = (event) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
-    setTilt({
-      mx: x,
-      my: y,
-      rx: ((y - 50) / 50) * -8,
-      ry: ((x - 50) / 50) * 8,
-    });
-  };
-
   const closeInspect = () => {
     setInspectedCardId(null);
-    setTilt({ rx: 0, ry: 0, mx: 50, my: 50 });
   };
 
   if (isSceneMode) {
@@ -258,8 +240,6 @@ export default function TerminalTradersGame({ variant = "page", onExit } = {}) {
                 canPlay={game.status === "playing" && game.playsRemaining > 0 && inspectedCard.cost <= game.players[0].cred}
                 onPlay={() => handlePlayCard(inspectedCard.id)}
                 onClose={closeInspect}
-                onMove={handleInspectMove}
-                tilt={tilt}
               />
             )}
           </>
@@ -498,8 +478,6 @@ export default function TerminalTradersGame({ variant = "page", onExit } = {}) {
           canPlay={game.status === "playing" && game.playsRemaining > 0 && inspectedCard.cost <= game.players[0].cred}
           onPlay={() => handlePlayCard(inspectedCard.id)}
           onClose={closeInspect}
-          onMove={handleInspectMove}
-          tilt={tilt}
         />
       )}
     </main>
@@ -562,7 +540,7 @@ function PlayableCard({ card, canPlay, onInspect }) {
   const cardTypeLabel = card.type === CARD_TYPES.COIN ? "Coin Card" : "Action Card";
   const gainLabel = getGainLabel(card);
   const styleLabel = card.type === CARD_TYPES.COIN ? card.tag : card.tag;
-  const artSrc = CARD_ART[card.id];
+  const artSrc = getCardArt(card.id);
 
   return (
     <button
@@ -601,41 +579,31 @@ function PlayableCard({ card, canPlay, onInspect }) {
   );
 }
 
-function CardInspectOverlay({ card, canPlay, onPlay, onClose, onMove, tilt }) {
-  const artSrc = CARD_ART[card.id];
+function CardInspectOverlay({ card, canPlay, onPlay, onClose }) {
   const cardTypeLabel = card.type === CARD_TYPES.COIN ? "Coin Card" : "Action Card";
   const gainLabel = getGainLabel(card);
   const styleLabel = card.type === CARD_TYPES.COIN ? card.tag : card.tag;
   const unavailableReason = canPlay ? "" : `Needs ${card.cost} Cred and an available play.`;
+  const templateData = useMemo(() => toTemplateCard(card), [card]);
+  const [scale, setScale] = useState(0.42);
+
+  useEffect(() => {
+    const adjust = () => {
+      const byHeight = (window.innerHeight - 140) / 1038;
+      const byWidth = Math.min(430, window.innerWidth * 0.9) / 744;
+      setScale(Math.max(0.28, Math.min(0.56, byHeight, byWidth)));
+    };
+    adjust();
+    window.addEventListener("resize", adjust);
+    return () => window.removeEventListener("resize", adjust);
+  }, []);
 
   return (
     <div className="tt-inspect-backdrop" onClick={onClose}>
       <div className="tt-inspect-shell" onClick={(event) => event.stopPropagation()}>
         <button className="tt-inspect-close" onClick={onClose} aria-label="Close card preview">Close</button>
-        <div
-          className={`tt-inspect-card ${artSrc ? "has-art" : ""}`}
-          onMouseMove={onMove}
-          onMouseLeave={() => onMove({ currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1, height: 1 }) }, clientX: 0.5, clientY: 0.5 })}
-          style={{
-            "--rx": `${tilt.rx}deg`,
-            "--ry": `${tilt.ry}deg`,
-            "--mx": `${tilt.mx}%`,
-            "--my": `${tilt.my}%`,
-          }}
-        >
-          <div className="tt-inspect-rotator">
-            {artSrc ? (
-              <img src={artSrc} alt={card.name} />
-            ) : (
-              <div className="tt-inspect-generated">
-                <span>{card.rarity}</span>
-                <h2>{card.name}</h2>
-                <strong>{cardTypeLabel}</strong>
-                <p>{card.effectText}</p>
-              </div>
-            )}
-            <div className="tt-inspect-shine" />
-          </div>
+        <div className="tt-inspect-template">
+          <TradingCard data={templateData} scale={scale} />
         </div>
         <div className="tt-inspect-info">
           <div>
@@ -1351,56 +1319,11 @@ const STYLES = `
     font-size: 12px;
   }
 
-  .tt-inspect-card {
-    perspective: 900px;
-    transform-style: preserve-3d;
-  }
-
-  .tt-inspect-rotator {
-    position: relative;
-    overflow: hidden;
-    border-radius: 18px;
-    transform: rotateX(var(--rx)) rotateY(var(--ry));
-    transform-style: preserve-3d;
-    transition: transform 120ms ease-out, box-shadow 180ms ease;
-    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 34px rgba(83, 255, 214, 0.22);
-    background: #050707;
-  }
-
-  .tt-inspect-card img {
-    display: block;
-    width: 100%;
-    max-height: min(74vh, 620px);
-    object-fit: contain;
-    border-radius: 18px;
-  }
-
-  .tt-inspect-shine {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    mix-blend-mode: screen;
-    opacity: 0.62;
-    background:
-      radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.68), transparent 18%),
-      linear-gradient(115deg, transparent 24%, rgba(83, 255, 214, 0.22), rgba(255, 122, 217, 0.24), transparent 58%);
-    transform: translateZ(1px);
-  }
-
-  .tt-inspect-generated {
-    min-height: 560px;
-    padding: 26px;
+  .tt-inspect-template {
     display: grid;
-    align-content: start;
-    gap: 14px;
-    border: 1px solid rgba(156, 252, 233, 0.32);
-    background:
-      radial-gradient(circle at 30% 20%, rgba(255, 122, 217, 0.18), transparent 34%),
-      linear-gradient(135deg, rgba(5, 12, 13, 0.98), rgba(10, 22, 24, 0.96));
+    place-items: center;
   }
 
-  .tt-inspect-generated span,
   .tt-inspect-info span,
   .tt-inspect-info dt {
     color: #9cfce9;
@@ -1408,7 +1331,6 @@ const STYLES = `
     font-size: 12px;
   }
 
-  .tt-inspect-generated h2,
   .tt-inspect-info h2 {
     margin: 0;
     font-family: Georgia, "Times New Roman", serif;
@@ -2086,10 +2008,6 @@ const STYLES = `
       grid-template-columns: 1fr;
       max-height: calc(100vh - 48px);
       overflow-y: auto;
-    }
-
-    .tt-inspect-card img {
-      max-height: 58vh;
     }
 
     .tt-inspect-info dl {

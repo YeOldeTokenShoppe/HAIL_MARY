@@ -5,7 +5,7 @@ import TradingCard from "@/components/TradingCard";
 
 const EUGENE = {
   name: "Eugene",
-  subtitle: "Unihood",
+  subtitle: "Meme Prophet",
   cardType: "Trader",
   style: "Meme",
   rarity: "Mythic",
@@ -80,7 +80,7 @@ const DEMON = {
 
 const MARISOL = {
   name: "Marisol",
-  subtitle: "Det. Trinity",
+  subtitle: "Onchain Investigator",
   cardType: "Trader",
   style: "Logos",
   rarity: "Legendary",
@@ -97,7 +97,7 @@ const MARISOL = {
   resistance: "Audits",
   pivotCost: 3,
   flavorText: "Every wallet leaves a fingerprint.",
-  backgroundImage: "/TCG/traderUnicorn.webp",
+  backgroundImage: "/TCG/traderMarisol.webp",
   artFocus: "center 28%",
   artZoom: 1.25,
 };

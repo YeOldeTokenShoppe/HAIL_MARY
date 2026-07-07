@@ -79,7 +79,7 @@ function RelicImage({ src, backSrc, alt }) {
 
 const EUGENE = {
   name: "Eugene",
-  subtitle: "Unihood",
+  subtitle: "Meme Prophet",
   cardType: "Trader",
   style: "Meme",
   rarity: "Mythic",

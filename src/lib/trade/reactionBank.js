@@ -19,7 +19,7 @@
 //
 // Voices (from src/lib/review/characterPrompts.js):
 //   Demon = John Barron — hype-critic, loud, staccato, cynical, names the greed.
-//   Detective = Trinity — cold, agnostic, states evidence, renders NO verdict.
+//   Detective = Marisol — cold, agnostic, states evidence, renders NO verdict.
 //
 // Fields: id (director returns this as clipId) · character · audioName (the
 // SitePal clip name) · tag (situation) · text (spoken words + caption).
@@ -49,7 +49,7 @@ export const REACTION_BANK = [
   { id: 'd_clean',   character: 'Demon', audioName: 'demon_clean',   tag: 'clean-legit',
     text: "Annoyingly clean. Even I can't find the knife." },
 
-  // ── Detective — Trinity. States the evidence, renders no verdict. ──
+  // ── Detective — Marisol. States the evidence, renders no verdict. ──
   { id: 't_trust',   character: 'Detective', audioName: 'detective_trust',   tag: 'verdict-trust',
     text: "You weighted toward Trust. The evidence permits it. It does not insist on it." },
   { id: 't_doubt',   character: 'Detective', audioName: 'detective_doubt',   tag: 'verdict-doubt',

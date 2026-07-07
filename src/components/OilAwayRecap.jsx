@@ -180,6 +180,17 @@ export default function OilAwayRecap({
                 LYQUID80 STRUCK {usd(recap.oilGained) ? `· ${usd(recap.oilGained)}` : ""}
               </div>
             </>
+          ) : (recap.artifactsFound?.length || 0) > 0 ? (
+            // No oil, but the drill hit the OTHER game board — lead with the find,
+            // not the miss (the dry-plot player's recap must contain THEIR progress).
+            <>
+              <div style={{ fontSize: isMobile ? 34 : 32, fontWeight: 700, color: "#c79bff", fontFamily: mono, lineHeight: 1, textShadow: "0 0 18px #c79bff44" }}>
+                ◆ {recap.artifactsFound.length}
+              </div>
+              <div style={{ fontSize: isMobile ? 11 : 10, letterSpacing: "0.25em", color: muted, marginTop: 5, fontFamily: mono }}>
+                ARTIFACT{recap.artifactsFound.length === 1 ? "" : "S"} UNEARTHED
+              </div>
+            </>
           ) : layersGround > 0 ? (
             <div style={{ fontSize: isMobile ? 13 : 12, color: muted, fontFamily: mono, fontStyle: "italic", lineHeight: 1.6 }}>
               {layersGround} layer{layersGround === 1 ? "" : "s"} of dry shale —<br />the vein is still down there.
@@ -208,6 +219,27 @@ export default function OilAwayRecap({
           <div style={{ ...row, color: red }}>
             <span>▲</span>
             <span style={{ color: red }}>you cracked a <b>hell pocket</b> — something got out</span>
+          </div>
+        )}
+        {(recap.artifactsFound?.length || 0) > 0 && (
+          <div style={row}>
+            <span style={{ color: "#c79bff" }}>◆</span>
+            <span>
+              <b style={{ color: "#c79bff" }}>{recap.artifactsFound.length}</b> artifact{recap.artifactsFound.length === 1 ? "" : "s"} unearthed —{" "}
+              {recap.artifactsFound.slice(0, 2).map((a) =>
+                a.type === "amber" ? `amber shard (${(a.specimenId || "").toUpperCase()} ${(a.fragmentIndex ?? 0) + 1}/6)`
+                : a.type === "map" ? `map fragment #${(a.pieceIndex ?? 0) + 1}`
+                : a.type === "cache" ? "THE OUTLAW CACHE"
+                : `${(a.relicId || "relic").toUpperCase()}${a.cursed ? " (CURSED)" : ""}`
+              ).join(", ")}
+              {recap.artifactsFound.length > 2 ? "…" : ""}
+            </span>
+          </div>
+        )}
+        {recap.artifactsFound?.some((a) => a.cursed) && (
+          <div style={{ ...row, color: red }}>
+            <span>▲</span>
+            <span style={{ color: red }}>one of them was <b>cursed</b> — check the field before it spreads</span>
           </div>
         )}
         {recap.bankedDelta > 0 && (

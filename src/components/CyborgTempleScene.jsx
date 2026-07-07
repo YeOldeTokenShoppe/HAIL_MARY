@@ -529,7 +529,7 @@ const CyborgTempleScene = ({
   // Reaction animation map for the verdict-reveal curtain call. Outcome is
   // the player's result against ground truth: aligned / missed / abstained.
   // Where a character is missing a dedicated abstain clip we fall back to
-  // their idle — laconic stillness reads fine for Trinity, and a calm idle
+  // their idle — laconic stillness reads fine for Marisol, and a calm idle
   // for Eugene (RL80) lets her bubble carry the moment.
   // Outcome → reaction clip. Curtain-call clips are full-body standing
   // animations (cheering / clapping / shrug / disappointed / defeat / pray);

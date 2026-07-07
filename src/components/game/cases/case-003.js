@@ -5,7 +5,7 @@
 //
 // Teaching beat: a confident TRUST is the trap. The exit was pre-built and the
 // credentials are all REAL. The case only cracks if the player connects dots
-// ACROSS lenses: a proxy-admin upgrade path that the audit excluded (Trinity),
+// ACROSS lenses: a proxy-admin upgrade path that the audit excluded (Marisol),
 // plus a co-founder/admin-key with a quietly-funded prior-soft-rug history
 // (GR80). Either alone is dismissible; together they describe a planned exit.
 // With only 3 scans, WHICH lenses you pick decides whether you see it.
@@ -423,7 +423,7 @@ const CASE_003 = {
     },
 
     marisol: {
-      character: "Detective Trinity",
+      character: "Detective Marisol",
       role: "LOGOS · ONCHAIN",
       sigil: "✧",
       tagline: "The chain doesn't lie. Read the receipts.",
@@ -816,7 +816,7 @@ const CASE_003 = {
   maxScans: 3,
   correctVerdict: "doubt",
   // No single lens cracks this one. The case-making evidence is SPREAD: the
-  // audit-excluded one-key upgrade path (Trinity) plus a co-founder/ops-partner
+  // audit-excluded one-key upgrade path (Marisol) plus a co-founder/ops-partner
   // with a quietly-funded prior soft rug (GR80). Either alone is dismissible;
   // together they describe a pre-built exit with a hand that's done it before.
   // Sentiment's seeded first-movers and narrative's template echo are

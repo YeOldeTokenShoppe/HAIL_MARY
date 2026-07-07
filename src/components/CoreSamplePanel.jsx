@@ -35,11 +35,21 @@ const DENSITY_COLORS_LIGHT = [
 // strata (the ◈ theme only restyles the console chrome, not the material).
 const PARABOLUM_COLORS = (dark) => (dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT);
 
+// Buried-artifact markers (docs/artifact-expansion.md) — drawn as diamonds ON
+// the strata band, not as strata: an artifact shares its layer with whatever
+// rock it was buried in. Warm/violet hues so they read against the teal strata.
+const ARTIFACT_MARKS = {
+  amber: { fill: "#ffb84d", label: "AMBER" },
+  relic: { fill: "#c79bff", label: "RELIC" },
+  map:   { fill: "#ffe9a8", label: "MAP" },
+  cache: { fill: "#ffd700", label: "CACHE" },
+};
+
 // Horizontal drill core / depth-progress band — surface at LEFT, deepest at RIGHT.
 // Drilled strata (colored) fill the left; UNCHARTED (hatched) on the right; the
 // steel auger bores rightward at the cut face. Tight horizontal element so it reads
 // as a live "drilling" status line, distinct from the vertical strata charts.
-function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], parabolum = false }) {
+function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], artifactMarks = [], parabolum = false }) {
   const svgW = 280;
   const barX = 14, barW = svgW - 28;        // 252
   const barY = 8, barH = 40;
@@ -111,6 +121,20 @@ function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], p
         {hellDepths.filter((z) => z < dd).map((z) => (
           <rect key={`h-${z}`} x={barX + z * segW} y={barY} width={segW + 0.5} height={barH} fill="#cc1100" opacity="0.35" />
         ))}
+
+        {/* Artifacts unearthed — diamond over the layer they were buried in */}
+        {artifactMarks.filter((m) => m.z < dd).map((m) => {
+          const mark = ARTIFACT_MARKS[m.type] || ARTIFACT_MARKS.relic;
+          const cx = barX + m.z * segW + segW / 2;
+          const cy = barY + barH * 0.28;
+          const r = Math.min(5, segW * 0.55);
+          return (
+            <polygon key={`a-${m.z}`} filter="url(#bar-glow)"
+              points={`${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`}
+              fill={mark.fill} opacity="0.95"
+              stroke={m.cursed ? "#ff3b1f" : "rgba(0,0,0,0.45)"} strokeWidth={m.cursed ? 1.2 : 0.6} />
+          );
+        })}
 
         {/* Drill auger — bores rightward at the cut face */}
         {drilling && (
@@ -215,6 +239,23 @@ function Legend({ dark, parabolum = false }) {
           </span>
         </div>
       ))}
+      {/* Artifact marks — diamonds, matching the drill-bar markers */}
+      {Object.entries(ARTIFACT_MARKS).map(([k, m]) => (
+        <div key={k} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{
+            width: 8, height: 8, background: m.fill, opacity: 0.95,
+            transform: "rotate(45deg)",
+            border: `0.5px solid ${dark ? "#444" : "#bbb"}`,
+          }} />
+          <span style={{
+            fontSize: 9, letterSpacing: "0.08em",
+            color: dark ? "#8a98a8" : "#6e6050",
+            fontFamily: "'Share Tech Mono', monospace",
+          }}>
+            {m.label}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -233,6 +274,11 @@ export default function CoreSamplePanel({
   selectedY = null,
   drillDepth = 0,
   hellPockets = [],
+  // Unearthed artifacts on the selected plot: [{ z, type, cursed }] from the
+  // server-authoritative revealedArtifacts map (docs/artifact-expansion.md).
+  artifactMarks = [],
+  // Public per-column placement guarantee — drives the seismic lower bound.
+  artifactGuaranteeMin = 3,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -360,8 +406,36 @@ export default function CoreSamplePanel({
                 drillDepth={drillDepth}
                 dark={dark}
                 hellDepths={hellDepthsForPlot}
+                artifactMarks={artifactMarks}
                 parabolum={parabolum}
               />
+              {(() => {
+                // SEISMIC READING — an honest ratchet, not a psychological one.
+                // ≥artifactGuaranteeMin artifacts per column is a public,
+                // seed-committed guarantee, so (guaranteed − found) ÷ layers
+                // remaining is a true LOWER bound on the next-layer find chance.
+                // It can only climb as dry layers accumulate.
+                const dd = Math.min(Math.max(drillDepth, 0), DEPTH_Z);
+                const found = artifactMarks.filter((m) => m.z < dd).length;
+                const undrilled = DEPTH_Z - dd;
+                const owed = Math.max(0, artifactGuaranteeMin - found);
+                const pct = undrilled > 0 && owed > 0 ? Math.min(100, Math.ceil((owed / undrilled) * 100)) : 0;
+                return (
+                  <div style={{
+                    fontSize: 9, letterSpacing: "0.1em", padding: "3px 2px 0",
+                    fontFamily: "'Share Tech Mono', monospace",
+                    display: "flex", justifyContent: "space-between",
+                    color: c.muted,
+                  }}>
+                    <span>SEISMIC · ARTIFACTS {found}{owed > 0 ? `/${artifactGuaranteeMin}+` : " RECOVERED"}</span>
+                    {owed > 0 && undrilled > 0 ? (
+                      <span style={{ color: "#c79bff" }}>NEXT-LAYER FIND ≥ {pct}%</span>
+                    ) : (
+                      <span>DEEPER SIGNATURES UNKNOWN</span>
+                    )}
+                  </div>
+                );
+              })()}
               {fieldMaxPeak > 0 && (
                 <div style={{ marginTop: 6 }}>
                   <div style={{

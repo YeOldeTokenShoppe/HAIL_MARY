@@ -343,6 +343,31 @@ hard page swap:
 - Disqualified players' plots are released but marked as disqualified (drill depth preserved).
 - Released plots are available for others to claim jump to.
 
+### Buried artifacts — "The Substrate" (phases 1–3 BUILT 2026-07-07)
+> Full design + phase plan: [artifact-expansion.md](artifact-expansion.md). Short version here.
+
+- A second, non-oil discovery layer for the ~60% of rigs that never strike paydirt: **amber
+  shards** (8 sequenceable saurian specimens, 6 distinct fragments each; dupes level the item),
+  **burial relics** (a deterministic fraction *cursed* → creates an `oilCurses` doc, spread/cleanse
+  logic is phase 4), **outlaw-map fragments** (6 pieces × 2 copies field-wide), and exactly **1 cache**.
+- Generated in `src/lib/artifactDistribution.js` from the **same committed seed** on separate RNG
+  streams (the hell-pocket pattern) — artifact tuning never moves oil; summary counts are
+  publishable at anchor. Unit tests: `scripts/test-artifact-distribution.mjs`.
+- **Placement guarantees:** every column ≥ `artifactPerColumn` (default 3) artifacts, ≥ 1 above the
+  base depth cap, dry-cell-biased (fully-dry columns get +1); never at z<2, never on hell cells.
+  One-way coupling: re-tuning hell pockets can move artifacts, never the reverse.
+- Strike-tick detects artifacts alongside oil: reveals into `oilPlots.revealedArtifacts`, credits
+  the flat `oilDrills.artifacts` inventory, logs coordinate-free timeline events (`artifact_find`,
+  `curse`, `cache_found`). **A dry layer with an artifact sends a real push** (dry-only layers stay
+  Telegram-only).
+- UI: diamond markers + legend in the Core Sample panel; **SEISMIC** line shows an honest
+  next-layer find lower bound `(guaranteed − found) ÷ layers remaining`; **ARTIFACTS** side panel
+  (`MuseumPanel.jsx`) is the collection book with a Museum score (phase-4 Curators leaderboard
+  uses the same formula); away-recap leads with artifact finds when there's no oil.
+- **Phase 4 (not built):** curse spread/cleanse, daily field scan, cache payout split from the
+  community pool, Curators leaderboard + season-end second podium, seismic-anomaly event, 3D
+  ceremony FX via `gusherEvents`.
+
 ## Data Model
 
 ### `oilPlots/{col_row}` — Per-Cell State
@@ -359,6 +384,7 @@ Per-cell state that persists across owners.
 | `lastDrillDate` | string\|null | "YYYY-MM-DD" |
 | `revealed` | map | Server-authoritative per-layer oil reveal `{ [layer]: oil }` (client renders from this, never the seed) |
 | `hellLayers` | map | `{ [layer]: true }` for hell-pocket layers |
+| `revealedArtifacts` | map | `{ [layer]: { type, ...payload } }` — unearthed artifacts (coordinate-free payload; type `amber`\|`relic`\|`map`\|`cache`) |
 | `lastStrikeAt` | timestamp | Last strike on this cell |
 
 ### `oilDrills/{userId}` — Player Stats
@@ -379,6 +405,9 @@ Per-cell state that persists across owners.
 | `armed` / `rigDepleted` | boolean | Strike-loop state (armed pumps; depleted = reached `depthCap`) |
 | `lastStrikeAt` | timestamp | Last strike time — opens the next interval window |
 | `lastStrikeOil` / `lastStrikeDepth` / `lastStrikeHell` | number/number/bool | Last strike result |
+| `artifacts` | map | Flat inventory `{ itemKey: count }` — keys `amber_{specimen}_{frag}` / `relic_{id}` / `map_{piece}` / `cache`; dupes increment (item leveling) |
+| `artifactFinds` | number | Running artifact tally (recap + Curators leaderboard) |
+| `lastStrikeArtifact` | map\|null | Payload of the last strike's artifact, if any |
 | `username` | string | Display name |
 | `updatedAt` | timestamp | Last modification |
 
@@ -413,6 +442,7 @@ Per-cell state that persists across owners.
 | `seasonLengthDays` | number | Fixed season length (default 10); enables the fill-the-season strike pacing |
 | `seasonEndedAt` | timestamp | Set when the buzzer auto-ends the season |
 | `seedCommitment` / `seedReveal` | string | Provable-fairness commit / post-game reveal |
+| `artifactPerColumn` / `artifactRelicFraction` / `artifactCursedFraction` / `artifactMapCopies` | number | Buried-artifact season knobs (defaults 3 / 0.15 / 0.25 / 2). **Pre-anchor only** — like the deposit radius band, changing them post-commit remaps every seed |
 
 ### `pumpConfigs/{userId_col_row}` — Pump Customization
 No schema change. Stores pump visual config per cell.

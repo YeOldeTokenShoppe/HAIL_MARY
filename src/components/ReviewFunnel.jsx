@@ -171,9 +171,9 @@ export default function ReviewFunnel({ isOpen, onClose, onConfirm }) {
   }, [resolveStatus, fallbackLoading, fallbackError, fallbackData, resolvingAddress]);
 
   // Onchain snapshot — fires in parallel with character resolution.
-  // Trinity (marisol station) consumes this to compose her actual
+  // Marisol (marisol station) consumes this to compose her actual
   // onchain read. Failure here is non-blocking: we still let the user
-  // begin the review and Trinity falls back to placeholder copy.
+  // begin the review and Marisol falls back to placeholder copy.
   const [onchain, setOnchain] = useState(null);
   const [onchainLoading, setOnchainLoading] = useState(false);
   const [onchainError, setOnchainError] = useState(null);
@@ -670,7 +670,7 @@ function CompilingStep({ phase }) {
           <>
             Saint GR80 is reading the deployer&rsquo;s track record.<br />
             John Barron is reading the launch shape.<br />
-            Detective Trinity has the wallets pulled up.<br />
+            Detective Marisol has the wallets pulled up.<br />
             Eugene is checking the pitch against past patterns.
           </>
         )}
@@ -760,9 +760,9 @@ function ConfirmStep({ token, onEdit, onConfirm, onchainLoading, onchainReady, o
         }}
       >
         {onchainError
-          ? `// onchain snapshot unavailable — Trinity will improvise`
+          ? `// onchain snapshot unavailable — Marisol will improvise`
           : onchainReady
-          ? `// onchain snapshot ready · Trinity has the receipts`
+          ? `// onchain snapshot ready · Marisol has the receipts`
           : onchainLoading
           ? `// reading the chain…`
           : `// onchain snapshot queued`}

@@ -5,7 +5,8 @@ import { FieldValue } from "@/lib/firebaseAdmin";
 // live feed can't be used as a treasure map (cell locations stay secret until the
 // post-game reveal). Server-only writes (oilTimeline is read:true/write:false).
 //
-// type: "strike" | "gusher" | "hell" | "contain" | "claim" | "rogue" | "system"
+// type: "strike" | "gusher" | "motherlode" | "hell" | "contain" | "claim" | "rogue" | "system"
+//     | "artifact_find" | "curse" | "cache_found"   (buried-artifact layer, docs/artifact-expansion.md)
 export async function logTimeline(db, { type, username = null, userId = null, detail = null }) {
   try {
     await db.collection("oilTimeline").add({

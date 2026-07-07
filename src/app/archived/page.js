@@ -26,7 +26,7 @@ const CREW = [
     sitepal: { account: SITEPAL_ACCOUNT, sceneId: 2774433, hash: "9XtgV3Ko3oxgH0LEHPcDQPrwuyz7zjTZ" },
   },
   {
-    id: "comms", name: "Captain Trinity", role: "Captain", image: "/cameo_Trin80.webp",
+    id: "comms", name: "Captain Marisol", role: "Captain", image: "/cameo_Trin80.webp",
     sitepal: { account: SITEPAL_ACCOUNT, sceneId: 2774779, hash: "tGfN2lZ9bvwkMgqqwf18M2F6PVDmx4HP" },
   },
 ];

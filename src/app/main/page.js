@@ -74,14 +74,6 @@ function preloadGLBParsed(url) {
   });
 }
 
-const MainScene = dynamic(
-  () => import("@/components/MainScene"),
-  {
-    ssr: false,
-    loading: () => <CoinLoader loading={true} />,
-  }
-);
-
 // Toggle this to switch between video file and SitePal embed
 const USE_SITEPAL = true;
 
@@ -678,7 +670,8 @@ export default function MainPage() {
       )}
 
       {/* Walking scene retired from /main — the framed-portrait panel is the
-          page on all viewports. Restore by re-rendering <MainScene /> here. */}
+          page on all viewports. (The old MainScene walking-character component
+          was deleted; recover it from git history if it's ever wanted back.) */}
 
       {/* Glitch transition overlay */}
       <GlitchTransition
