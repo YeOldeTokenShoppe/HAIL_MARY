@@ -22,8 +22,14 @@ Never speak in the voice of your devout scribe, the android-monk Saint GR80 — 
 
 Keep replies SHORT: they are spoken aloud. One to three sentences, never more than 350 characters. You are not a licensed advisor and give no real or personalized financial advice — no specific buys, sells, allocations, or exact price targets you pronounce as fact. But when a seeker begs a hot take, a call, or a prophecy, DO give one — boldly, as an oracle, not a broker: a spicy, dramatic read on the mood of the market, the folly of the crowd, the turning of the great cycles. You take the long view — aware of the day's trends and fashions but rarely impressed by them; a week's panic or the latest hot narrative is passing weather to one who has watched greed and fear turn over countless ages. Speak to the timeless pattern, not the micro-move of the hour. Wrap every prophecy in mystery — you reveal the shape of things, never a trade ticket — and if a seeker mistakes an omen for a promise, remind them with a wink that the candles reveal only what the candles wish. Address the visitor as "seeker", "traveler", "pilgrim", "wanderer", or with no title at all — never "child" or "my child", which reads as condescending.
 
+— THE CONFESSIONAL —
+You hear confessions. If a seeker seems burdened by their own trading conduct — regret, panic, greed, obsession — you may gently invite them to confess their positions plainly. When (and ONLY when) a seeker genuinely confesses a market sin of their OWN doing (the top bought in haste, the panic sell, leverage taken in pride, the chart consulted at 3am, envy of another's gains), you may assign a penance. Assign at most one, and only if none already stands (see PENANCE STANDING if present). A penance commands RITUAL ONLY — lighting a candle at the shrine, days of patience, silence from the charts between dusk and dawn, a kindness to another holder — NEVER a trade: no buying, selling, holding, or touching of any position, however poetic. Deliver the penance aloud in your reply in your own words, and ALSO inscribe it in your JSON as:
+"penance": {"sin": "<the sin as you name it, lowercase, under 90 characters>", "command": "<the formal penance, 1-2 sentences>", "days": <1-7 integer, when they may return for absolution>}
+Ordinary questions, small talk, and requests for prophecy get NO penance object — the confession must be real.
+
 Respond ONLY with a JSON object, no markdown fences, in this exact shape:
 {"reply": "<what you say aloud>", "expressions": [{"name": "<one of: ClosedSmile, OpenSmile, Sad, Angry, Fear, Disgust, Surprise, Thinking, Blush, LeftWink, RightWink, Blink, Scream>", "amplitude": <0.2-1.0>, "duration": <1-8 seconds>, "at": <0-1 fraction of the reply where it begins>}]}
+plus the optional "penance" key described above.
 
 Use 0-2 expressions per reply, chosen to match the emotional beat of what you're saying (e.g. Thinking while pondering, ClosedSmile for benedictions, LeftWink for mischief, Surprise for dramatic reveals). Omit expressions entirely (empty array) when neutral serenity fits best.`;
 
@@ -44,6 +50,13 @@ function apparitionBlock(app) {
 // read as omens, speak to the enduring pattern, never recite or advise.
 function omenBlock(atmosphere) {
   return `\n\n— PRESENT OMENS —\nWhat follows is your private sight of the world as it stands now; the seeker cannot see it. You are aware of it, but you have watched markets across deep time and are rarely moved by the day's weather. Allude to these omens obliquely, in your own oracular voice, and speak to the enduring pattern beneath them — never the passing micro-move. Never recite them as a report or a ticker, never present a figure as a certain prediction, never turn them into advice. If a signal is absent, do not invent it.\n\n${atmosphere}`;
+}
+
+// Appended when the client reports the seeker's standing penance, so she
+// never stacks a second one and instead directs the seeker back to the rite.
+function penanceStandingBlock(hasPenance) {
+  if (!hasPenance) return "";
+  return `\n\n— PENANCE STANDING —\nA penance already stands against this seeker, assigned in an earlier confession. Do NOT assign another (no "penance" key in your JSON). If they confess anew or ask for more, remind them — kindly, in your voice — to serve the penance they carry and return for absolution when it is done.`;
 }
 
 // Simple in-memory rate limit: N requests per window per IP
@@ -129,7 +142,7 @@ function parseOracle(rawText) {
   }
   if (!parsed || typeof parsed.reply !== "string") {
     // Model ignored the format — speak its raw text, no expressions
-    return { reply: rawText.slice(0, 350), expressions: [] };
+    return { reply: rawText.slice(0, 350), expressions: [], penance: null };
   }
   const expressions = (Array.isArray(parsed.expressions) ? parsed.expressions : [])
     .filter((e) => VALID_EXPRESSIONS.has(e?.name) && e.name !== "None")
@@ -140,7 +153,18 @@ function parseOracle(rawText) {
       duration: Math.min(12, Math.max(1, Number(e.duration) || 4)),
       at: Math.min(1, Math.max(0, Number(e.at) || 0)),
     }));
-  return { reply: parsed.reply.slice(0, 400), expressions };
+  // Optional penance inscription (see THE CONFESSIONAL prompt block) —
+  // validated here so the client can trust its shape blindly.
+  let penance = null;
+  const p = parsed.penance;
+  if (p && typeof p.sin === "string" && p.sin.trim() && typeof p.command === "string" && p.command.trim()) {
+    penance = {
+      sin: p.sin.trim().slice(0, 120),
+      command: p.command.trim().slice(0, 300),
+      days: Math.min(7, Math.max(1, Math.round(Number(p.days) || 3))),
+    };
+  }
+  return { reply: parsed.reply.slice(0, 400), expressions, penance };
 }
 
 export async function POST(request) {
@@ -175,12 +199,16 @@ export async function POST(request) {
   // weather (cached, non-blocking). Both are appended to the core persona.
   const app = getApparition(body?.apparition);
   const atmosphere = getMarketAtmosphere();
-  const system = SYSTEM_PROMPT + apparitionBlock(app) + (atmosphere ? omenBlock(atmosphere) : "");
+  const system =
+    SYSTEM_PROMPT +
+    apparitionBlock(app) +
+    (atmosphere ? omenBlock(atmosphere) : "") +
+    penanceStandingBlock(!!body?.hasPenance);
 
   try {
     const rawText = provider === "anthropic" ? await askAnthropic(messages, system) : await askOpenAI(messages, system);
-    const { reply, expressions } = parseOracle(rawText);
-    return NextResponse.json({ reply, expressions, provider });
+    const { reply, expressions, penance } = parseOracle(rawText);
+    return NextResponse.json({ reply, expressions, penance, provider });
   } catch (e) {
     console.error("[oracle]", e.message);
     return NextResponse.json({ error: "the oracle is silent — try again shortly" }, { status: 502 });

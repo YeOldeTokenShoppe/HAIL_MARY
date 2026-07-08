@@ -14,9 +14,13 @@ import Confessional from "@/components/Confessional";
 import SitePalExpressionPanel from "@/components/SitePalExpressionPanel";
 import { askOracle, speakOracle, ORACLE_VOICE, pickGreeting } from "@/lib/oracleSpeech";
 import { APPARITIONS as CHARACTERS } from "@/lib/apparitions";
+import ApparitionTriptych from "@/components/ApparitionTriptych";
+import { readApparitionKey, writeApparitionKey } from "@/lib/apparitionPrefs";
 import { useMusic } from "@/components/MusicContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import MainVigilPanel from "@/components/MainVigilPanel";
+import PenanceOfRecord from "@/components/PenanceOfRecord";
+import { readPenance, mintPenance } from "@/lib/penance";
 import useCyberConfirm from "@/components/useCyberConfirm";
 
 // The /main roster is Our Lady's APPARITIONS — her cultural faces (see
@@ -257,14 +261,37 @@ export default function MainPage() {
   // Gates the magic-mirror swirl so it dissolves only when her face is ready.
   const [sitePalReady, setSitePalReady] = useState(false);
   const handleSitePalReady = useCallback(() => setSitePalReady(true), []);
+  // First visit (no stored face, no explicit ?char): hold the SitePal embed
+  // and open the apparition triptych, so all of her faces appear before any
+  // single one reads as "the default". Picking a panel writes the preference
+  // and mounts the embed fresh for that face — no reload needed, since
+  // nothing was embedded yet.
+  const [pickerOpen, setPickerOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    const char = parseInt(params.get("char"), 10);
+    if (!isNaN(char) && char >= 0 && char < CHARACTERS.length) return false;
+    return !CHARACTERS.some((c) => c.key === readApparitionKey());
+  });
+  // An explicit ?char deep link (incl. the arrow/medallion reload) is a
+  // choice too — remember it so the triptych never re-asks this device.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const char = parseInt(params.get("char"), 10);
+    if (!isNaN(char) && char >= 0 && char < CHARACTERS.length) {
+      writeApparitionKey(CHARACTERS[char].key);
+    }
+  }, []);
   // Safety: never let the summoning swirl hang. Whenever we're waiting on a
   // SitePal scene (sitePalReady false — initial load OR an apparition swap),
-  // force-reveal after 15s if vh_sceneLoaded never arrives.
+  // force-reveal after 15s if vh_sceneLoaded never arrives. While the
+  // triptych is open no embed is mounted at all — don't start the countdown
+  // until a face has been chosen.
   useEffect(() => {
-    if (sitePalReady) return;
+    if (sitePalReady || pickerOpen) return;
     const t = setTimeout(() => setSitePalReady(true), 15000);
     return () => clearTimeout(t);
-  }, [sitePalReady]);
+  }, [sitePalReady, pickerOpen]);
 
   // Her greeting text appears a beat AFTER she's fully revealed. The summoning
   // swirl takes ~3.6s to dissolve past sitePalReady, so wait a touch longer
@@ -278,6 +305,26 @@ export default function MainPage() {
   const [activeAnim, setActiveAnim] = useState(null);
   const assetsReadyRef = useRef(false);
   const sceneReadyRef = useRef(false);
+  // True once CharacterSelect reports its canvas has PRESENTED frames with
+  // the neon frame mounted. The CoinLoader (opaque solid black — the one
+  // overlay Chrome can composite without rasterizing, so it can never
+  // white-flash) holds until then: revealing the page before the GPU has
+  // committed real frames is what showed white canvas-layer tiles.
+  const portraitReadyRef = useRef(false);
+  const maybeFinishLoading = useCallback(() => {
+    if (assetsReadyRef.current && sceneReadyRef.current && portraitReadyRef.current) {
+      setIsLoading(false);
+    }
+  }, []);
+  const handlePortraitReady = useCallback(() => {
+    if (portraitReadyRef.current) return;
+    portraitReadyRef.current = true;
+    // Signal time = frames committed, but CharacterSelect's dark cover is
+    // only STARTING its 0.4s fade. Hold the loader a beat longer so the
+    // whole crossfade happens behind solid black and the reveal lands on
+    // the finished composition.
+    setTimeout(maybeFinishLoading, 450);
+  }, [maybeFinishLoading]);
 
   // Mobile + wide breakpoint detection
   useEffect(() => {
@@ -297,19 +344,23 @@ export default function MainPage() {
     const firstGlb = CHARACTERS[0].portraitModel || CHARACTERS[0].model;
     Promise.all([
       ...(firstGlb ? [preloadGLBParsed(firstGlb)] : []),
+      // The shared neon frame loads lazily inside CharacterSelect's canvas —
+      // without this warm-up it arrives visibly AFTER the loader clears and
+      // pops in against the already-revealed page.
+      preloadGLBParsed("/models/neonFrame.glb"),
       preloadImage("/images/mary.png"),
       ...CHARACTERS.map((c) => preloadImage(c.image)),
     ]).then(() => {
       assetsReadyRef.current = true;
-      if (sceneReadyRef.current) setIsLoading(false);
+      maybeFinishLoading();
     });
-  }, []);
+  }, [maybeFinishLoading]);
 
   const handleSceneLoaded = useCallback(() => {
     sceneReadyRef.current = true;
     setSceneReady(true);
-    if (assetsReadyRef.current) setIsLoading(false);
-  }, []);
+    maybeFinishLoading();
+  }, [maybeFinishLoading]);
 
   // No walking scene mounts anymore — mark the scene "ready" so the loader
   // clears and the SitePal embed (the portrait's face source) mounts
@@ -341,6 +392,9 @@ export default function MainPage() {
       const params = new URLSearchParams(window.location.search);
       const char = parseInt(params.get('char'), 10);
       if (!isNaN(char) && char >= 0 && char < CHARACTERS.length) return char;
+      // No explicit ?char — fall back to the face this device chose before
+      const storedIdx = CHARACTERS.findIndex((c) => c.key === readApparitionKey());
+      if (storedIdx >= 0) return storedIdx;
     }
     return 0;
   });
@@ -390,14 +444,29 @@ export default function MainPage() {
     // reloading with ?char so her scene embeds FRESH — an in-place loadSceneByID
     // leaves the new scene's audio null (SitePal "setAudioElementMode of null",
     // and she won't speak). The reload's own loader + swirl cover the summoning.
+    writeApparitionKey(CHARACTERS[i]?.key);
     if (typeof window !== "undefined") window.location.assign(`/main?char=${i}`);
   };
 
+  // First-visit triptych choice — remember the face and summon her. The
+  // SitePal embed hasn't mounted yet (gated on !pickerOpen), so unlike a
+  // later switch this needs no reload: the chosen scene embeds fresh now.
+  const handleApparitionChoose = (i) => {
+    writeApparitionKey(CHARACTERS[i]?.key);
+    setActiveCharIndex(i);
+    setPickerOpen(false);
+  };
+
   // Oracle conversation: POST the drawer history to /api/oracle, speak the
-  // reply through SitePal (ElevenLabs voice) with timed facial expressions
+  // reply through SitePal (ElevenLabs voice) with timed facial expressions.
+  // The request carries whether a penance already stands (so she reminds
+  // instead of stacking); a `penance` in the reply is minted to the device
+  // ledger, and PenanceOfRecord re-reads it via the PENANCE_EVENT.
   const handleOracleMessage = useCallback(async (text, history) => {
     const app = CHARACTERS[activeCharIndex];
-    const data = await askOracle(history, undefined, app?.key);
+    const standing = readPenance();
+    const data = await askOracle(history, undefined, app?.key, { hasPenance: !!standing });
+    if (data.penance && !standing) mintPenance(data.penance);
     speakOracle(data, app?.voice || ORACLE_VOICE);
     return data.reply;
   }, [activeCharIndex]);
@@ -660,8 +729,10 @@ export default function MainPage() {
         )}
       </div> */}
 
-      {/* SitePal embed — deferred until Three.js scene is ready to avoid WebGL context conflict */}
-      {USE_SITEPAL && sceneReady && (
+      {/* SitePal embed — deferred until Three.js scene is ready to avoid WebGL
+          context conflict, and until the first-visit triptych (if any) has
+          been answered, so the chosen face is the one that embeds. */}
+      {USE_SITEPAL && sceneReady && !pickerOpen && (
         <SitePalEmbed
           scene={CHARACTERS[activeCharIndex]?.sitePalScene || SITEPAL_DEFAULT_SCENE}
           embedId={CHARACTERS[activeCharIndex]?.embedId || SITEPAL_DEFAULT_EMBEDID}
@@ -781,8 +852,19 @@ export default function MainPage() {
             /* The line she speaks on a portrait tap = the one the Confessional
                shows, so audio matches the on-screen transcript (no 2nd caption). */
             greeting={sitePalReady ? oracleGreeting : ""}
+            /* Hold the CoinLoader until the frame canvas has committed real
+               frames — the reveal must find the GPU already settled. */
+            onReady={handlePortraitReady}
           />
         </div>
+
+        {/* ── Penance of Record ── the visitor's standing penance + the
+            parish ledger, filling the dead space beneath the portrait. The
+            confess → penance → absolution loop puts the return visit inside
+            the rite itself. Reads the REAL device ledger (lib/penance);
+            CONFESS opens the Confessional. Desktop only — phones keep the
+            column tight. (Parish tally still mock.) */}
+        {!isMobile && <PenanceOfRecord onConfess={() => setChatOpen(true)} />}
 
         {/* Portfolio + Buy moved into the bottom dock (MobileBottomNav) so
             /main shares the site's unified nav. Destination taps still run
@@ -1041,6 +1123,13 @@ export default function MainPage() {
 
       {/* ── Right triptych wing — YOUR VIGIL (price + the user's candle) ── */}
       <MainVigilPanel show={isWide && !isMobile} />
+
+      {/* ── First-visit apparition triptych ── all of Our Lady's faces, side
+          by side, before any one of them reads as the default. Held until the
+          asset loader clears so its entrance animation is actually seen. */}
+      {pickerOpen && !isLoading && (
+        <ApparitionTriptych apparitions={CHARACTERS} onChoose={handleApparitionChoose} />
+      )}
 
     </div>
   );

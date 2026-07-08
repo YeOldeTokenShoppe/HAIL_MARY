@@ -121,8 +121,12 @@ export function speakOracle({ reply, expressions = [] }, voice = ORACLE_VOICE) {
   return true;
 }
 
-/** POST the conversation to /api/oracle. history: [{role, text}] in drawer format. */
-export async function askOracle(history, provider, apparition) {
+/**
+ * POST the conversation to /api/oracle. history: [{role, text}] in drawer format.
+ * opts.hasPenance: tell her a penance already stands against this seeker, so
+ * she reminds rather than stacking a second one.
+ */
+export async function askOracle(history, provider, apparition, opts = {}) {
   const messages = history.map((m) => ({
     role: m.role === "character" ? "assistant" : "user",
     content: m.text,
@@ -130,6 +134,7 @@ export async function askOracle(history, provider, apparition) {
   const payload = { messages };
   if (provider) payload.provider = provider;
   if (apparition) payload.apparition = apparition;
+  if (opts.hasPenance != null) payload.hasPenance = !!opts.hasPenance;
   const res = await fetch("/api/oracle", {
     method: "POST",
     headers: { "content-type": "application/json" },

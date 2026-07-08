@@ -5,7 +5,7 @@
 // landing page's HeroAltarObject minus all scroll/melt/ignition VFX.
 // Self-contained — does NOT import from src/app/page.js.
 
-import React, { Suspense, useEffect, useMemo, useRef } from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -440,12 +440,24 @@ export default function PanelVotive({
   lit = true, // false → show the votive dark (flame + flame-light hidden)
   className = "",
 }) {
+  // True once the canvas has PRESENTED frames WITH the votive model in the
+  // scene (the signal mounts inside the Suspense boundary, after the model
+  // resolves). Until then an opaque dark cover hides the box: a visible
+  // WebGL layer with no committed frame composites as solid WHITE on some
+  // GPUs, and canvas-side opacity can't prevent it — only software-painted
+  // opaque content above it reliably occludes.
+  const [painted, setPainted] = useState(false);
   return (
-    <div className={className} style={{ width: "100%", height }}>
+    <div className={className} style={{ width: "100%", height, position: "relative" }}>
       <Canvas
         dpr={[1, 1.75]}
         gl={{ alpha: true, antialias: true }}
         camera={{ position: [0, 0.1, 3.4], fov: 32, near: 0.1, far: 100 }}
+        onCreated={({ gl }) => {
+          // Insurance: initialize the buffer dark before the first frame
+          gl.setClearColor(0x000000, 0);
+          gl.clear();
+        }}
       >
         {/* Soft omnidirectional base so the wax reads with shading. */}
         <ambientLight intensity={0.6} color="#ffffff" />
@@ -454,10 +466,39 @@ export default function PanelVotive({
         <pointLight position={[0.3, 0.9, 0.6]} intensity={1.3} color="#ffd9a0" distance={8} />
         <Suspense fallback={null}>
           <VotiveModel votiveImage={votiveImage} votiveTint={votiveTint} draggable={draggable} lit={lit} />
+          <FirstFramesSignal onReady={() => setPainted(true)} />
         </Suspense>
       </Canvas>
+      {/* Opaque dark cover — lifts only after the candle has really drawn */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "#050508",
+          opacity: painted ? 0 : 1,
+          transition: "opacity 0.4s ease",
+          pointerEvents: "none",
+        }}
+      />
     </div>
   );
+}
+
+// Fires onReady once the canvas has actually presented a couple of frames —
+// mounted after the model inside Suspense, so "frames" means frames WITH the
+// candle drawn, not an empty scene.
+function FirstFramesSignal({ onReady }) {
+  const count = useRef(0);
+  const done = useRef(false);
+  useFrame(() => {
+    if (done.current) return;
+    count.current += 1;
+    if (count.current >= 2) {
+      done.current = true;
+      onReady?.();
+    }
+  });
+  return null;
 }
 
 useGLTF.preload(MODEL_PATH);

@@ -37,7 +37,7 @@ const FRAME_DEFAULT_HUE = "#c300ff";
 const FRAME_CORE_INTENSITY = 2.6;
 const FRAME_GLASS_LIGHTEN = 0.4;
 
-function NeonFrame({ hue = FRAME_DEFAULT_HUE }) {
+function NeonFrame({ hue = FRAME_DEFAULT_HUE, onLoaded }) {
   const groupRef = useRef();
   const coreMatsRef = useRef([]);
   const glassMatsRef = useRef([]);
@@ -103,6 +103,12 @@ function NeonFrame({ hue = FRAME_DEFAULT_HUE }) {
       if (groupRef.current) {
         groupRef.current.add(model);
       }
+      // Frame is in the scene — the canvas may now reveal as one composed
+      // unit (frame + swirl together) instead of the tubes popping in late.
+      onLoaded?.();
+    }, undefined, () => {
+      // Load failure: reveal anyway (swirl + portrait still work frameless)
+      onLoaded?.();
     });
 
     return () => {
@@ -752,7 +758,7 @@ function FramedPortraitModel({ url }) {
       frame's oval slot each frame. No 3D bust, no face projection: the
       comparison version. The page's single portal must have this character's
       scene loaded (page-level loadSceneByID swap). ── */
-function SitePalLivePortrait() {
+function SitePalLivePortrait({ visible = true }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -832,9 +838,33 @@ function SitePalLivePortrait() {
         borderRadius: "50%",
         objectFit: "cover",
         zIndex: 1,
+        // Held with the frame canvas (same reveal signal) — the swirl that
+        // veils her lives in that canvas, so showing the portrait earlier
+        // means a beat of frameless, unveiled face.
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.35s ease",
       }}
     />
   );
+}
+
+/* ── First-frames signal ── fires onReady once the canvas has actually
+      PRESENTED a couple of frames. onCreated is not enough: the renderer
+      exists before the first frame (Bloom shader compile can stall it for
+      seconds), and Chrome composites a visible-but-frameless WebGL layer as
+      solid white on some GPUs. Only a presented frame is proof of pixels. ── */
+function FirstFramesSignal({ onReady }) {
+  const count = useRef(0);
+  const done = useRef(false);
+  useFrame(() => {
+    if (done.current) return;
+    count.current += 1;
+    if (count.current >= 2) {
+      done.current = true;
+      onReady?.();
+    }
+  });
+  return null;
 }
 
 /* ── Character portrait inside the frame ── */
@@ -890,8 +920,33 @@ export default function CharacterSelect({
   size = 200,
   pageLoading = false,
   greeting = "",
+  onReady, // fires once the frame canvas has PRESENTED frames with the GLB mounted
 }) {
   const [index, setIndex] = useState(activeIndex);
+  // True once the 3D canvas has PRESENTED real frames (FirstFramesSignal).
+  // Until then an opaque dark cover div hides the whole frame/portrait box:
+  // a visible WebGL layer with no committed frame composites as solid WHITE
+  // on some GPUs (canvas-side opacity/transition can't prevent it — the
+  // compositor animates the unready layer anyway; only software-painted
+  // opaque content above it reliably occludes).
+  const [canvasPainted, setCanvasPainted] = useState(false);
+  // ...and until the neon frame GLB is actually in the scene, so the frame
+  // and swirl arrive as ONE composition instead of the tubes popping in a
+  // beat after the reveal. Safety timer covers a stalled fetch.
+  const [frameLoaded, setFrameLoaded] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFrameLoaded(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Tell the page the composition is provably on screen (frames presented +
+  // frame GLB in the scene) — /main holds its opaque CoinLoader on this, the
+  // one overlay that can't white-flash (solid-color layers need no raster).
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  useEffect(() => {
+    if (canvasPainted && frameLoaded) onReadyRef.current?.();
+  }, [canvasPainted, frameLoaded]);
 
   // Sync internal index when parent changes it (e.g. auto-advance)
   useEffect(() => {
@@ -959,11 +1014,17 @@ export default function CharacterSelect({
             pointerEvents: "none",
           }}
           gl={{ alpha: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+          onCreated={({ gl }) => {
+            // Insurance: initialize the buffer dark before the first frame
+            gl.setClearColor(0x000000, 0);
+            gl.clear();
+          }}
         >
+          <FirstFramesSignal onReady={() => setCanvasPainted(true)} />
           <ambientLight intensity={current.portraitModel ? 0.35 : 0.3} />
           <pointLight position={[0, 2, 3]} intensity={1} color="#ffd36b" />
           {/* All characters share the neon frame; each brings its own hue */}
-          <NeonFrame hue={current.frameHue} />
+          <NeonFrame hue={current.frameHue} onLoaded={() => setFrameLoaded(true)} />
           {/* Magic-mirror summoning veil for EVERY character — the key forces
               a remount on switch, so each arrival re-plays the summoning.
               (For cameo characters the canvas sits above their portrait img,
@@ -996,7 +1057,9 @@ export default function CharacterSelect({
         {/* Portrait behind the frame: live 2D SitePal mirror, 3D-projection
             portrait (rendered in the canvas above), or static cameo image.
             Speaking characters get the click-to-speak overlay. */}
-        {current.sitePalScene && <SitePalLivePortrait key={`live-${index}`} />}
+        {current.sitePalScene && (
+          <SitePalLivePortrait key={`live-${index}`} visible={canvasPainted && frameLoaded} />
+        )}
         {current.portraitModel || current.sitePalScene ? (
           <div
             onClick={speakPortrait}
@@ -1011,15 +1074,33 @@ export default function CharacterSelect({
         ) : (
           <CharacterPortrait image={current.image} onClick={next} />
         )}
+
+        {/* Opaque dark cover — occludes the canvas + portrait stack until
+            real frames exist AND the frame GLB is in the scene, so the
+            composition arrives whole (never a white layer, never a
+            frameless face). Software-painted, so it can't flash. */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 4,
+            background: "#0a0a0f",
+            opacity: canvasPainted && frameLoaded ? 0 : 1,
+            transition: "opacity 0.4s ease",
+            pointerEvents: "none",
+          }}
+        />
       </div>
 
-      {/* Character name + nav row */}
+      {/* Character nav — arrows flank a medallion per apparition, so all the
+          faces are advertised at all times (arrows alone hid the roster: a
+          first-time visitor had no cue that other faces exist). Name below. */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 12,
+          gap: 10,
           marginTop: 8,
         }}
       >
@@ -1044,17 +1125,42 @@ export default function CharacterSelect({
             ‹
           </button>
         )}
-        <span
-          style={{
-            fontSize: "0.9rem",
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-            color: "hsl(183 38% 57%)",
-            textShadow: "0 0 8px rgba(0,255,255,0.4)",
-          }}
-        >
-          {current.name}
-        </span>
+        {characters.length > 1 &&
+          characters.map((c, i) => {
+            const hue = c.frameHue || "#22ccff";
+            const active = i === index;
+            return (
+              <button
+                key={c.key || c.name || i}
+                onClick={() => {
+                  if (i === index) return;
+                  setIndex(i);
+                  if (onSelect) onSelect(i);
+                }}
+                aria-label={`Select ${c.name}`}
+                aria-current={active}
+                title={c.title || c.name}
+                style={{
+                  width: active ? 38 : 30,
+                  height: active ? 38 : 30,
+                  padding: 0,
+                  borderRadius: "50%",
+                  cursor: active ? "default" : "pointer",
+                  border: `2px solid ${hue}`,
+                  // Cameo over a hue glow — the glow doubles as the fallback
+                  // when a cameo asset is missing (the url() layer 404s and
+                  // the gradient beneath shows through).
+                  backgroundImage: `url(${c.image}), radial-gradient(circle at 50% 38%, ${hue}66 0%, #0d0d15 80%)`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center top",
+                  opacity: active ? 1 : 0.5,
+                  filter: active ? "none" : "saturate(0.6)",
+                  boxShadow: active ? `0 0 10px ${hue}, 0 0 22px ${hue}66` : "none",
+                  transition: "all 0.25s ease",
+                }}
+              />
+            );
+          })}
         {characters.length > 1 && (
           <button
             onClick={next}
@@ -1076,6 +1182,19 @@ export default function CharacterSelect({
             ›
           </button>
         )}
+      </div>
+      <div
+        style={{
+          textAlign: "center",
+          marginTop: 6,
+          fontSize: "0.9rem",
+          letterSpacing: "0.15em",
+          textTransform: "uppercase",
+          color: "hsl(183 38% 57%)",
+          textShadow: "0 0 8px rgba(0,255,255,0.4)",
+        }}
+      >
+        {current.name}
       </div>
     </div>
   );

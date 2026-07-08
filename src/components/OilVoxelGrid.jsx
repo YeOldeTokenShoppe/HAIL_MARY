@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, Html, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
+import { generateArtifactDistribution3D } from "@/lib/artifactDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
@@ -6610,10 +6611,17 @@ export default function OilVoxelGrid({
   const worldH = depthZ * depthCellSize;
   const worldD = gridY * cellSize;
 
-  const { deposits, hellPockets: generatedHellPockets, peakDepthMap } = useMemo(() => {
+  const { deposits, hellPockets: generatedHellPockets, artifactCells, peakDepthMap } = useMemo(() => {
     const result = generateOilDistribution3D({
       blockHash, gridX, gridY, depthZ, totalOilBudget: OIL_FIELD_UNITS, numberOfDeposits,
       numberOfHellPockets, // match the server/admin count — else the 3D derives a different one
+    });
+    // Buried artifacts, derived from the same seed (default knobs — must match
+    // the server's artifactPerColumn etc. if those are ever tuned per-season).
+    // Only rendered behind the same reveal gate as hell pockets (admin/report).
+    const artifacts = generateArtifactDistribution3D({
+      blockHash, gridX, gridY, depthZ,
+      oilGrid: result.grid, hellPockets: result.hellPockets,
     });
     // Per-column deposit depth: the layer (z) holding the most oil in that column.
     // The gusher feeder emanates from here so the beam rises out of the deposit the
@@ -6630,7 +6638,7 @@ export default function OilVoxelGrid({
         if (bestZ >= 0) peak[`${x}_${y}`] = bestZ;
       }
     }
-    return { deposits: result.deposits, hellPockets: result.hellPockets, peakDepthMap: peak };
+    return { deposits: result.deposits, hellPockets: result.hellPockets, artifactCells: artifacts.cells, peakDepthMap: peak };
   }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, numberOfHellPockets, totalOilBudget]);
 
   // Build fragment shader with deposit data baked in as constants
@@ -6713,6 +6721,28 @@ export default function OilVoxelGrid({
               />
             </mesh>
             <pointLight color="#ff2200" intensity={3} distance={cellSize * 1.5} decay={2} />
+          </group>
+        );
+      })}
+
+      {/* Buried artifacts (docs/artifact-expansion.md) — same reveal gate as hell
+          pockets. Octahedra colored per vein; cursed relics pulse-lit red. */}
+      {(animateReveal || revealProgress > 0) && artifactCells.map((a, i) => {
+        const ax = -worldW / 2 + a.x * cellSize + cellSize / 2;
+        const ay = -a.z * depthCellSize;
+        const az = worldD / 2 - a.y * cellSize - cellSize / 2;
+        const col = a.type === "amber" ? "#ffb84d" : a.type === "map" ? "#ffe9a8"
+          : a.type === "cache" ? "#ffd700" : a.cursed ? "#ff3b1f" : "#c79bff";
+        return (
+          <group key={`art-${i}`} position={[ax, ay, az]}>
+            <mesh>
+              <octahedronGeometry args={[cellSize * (a.type === "cache" ? 0.22 : 0.13), 0]} />
+              <meshStandardMaterial color={col} emissive={col}
+                emissiveIntensity={a.type === "cache" ? 2 : 1.2} transparent opacity={0.9} />
+            </mesh>
+            {(a.type === "cache" || a.cursed) && (
+              <pointLight color={col} intensity={2} distance={cellSize * 1.2} decay={2} />
+            )}
           </group>
         );
       })}
