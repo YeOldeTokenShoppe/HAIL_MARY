@@ -149,7 +149,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 12px;
+  /* 16px right inset so the close button lines up with the inline send button
+     below it, rather than hugging the corner and pulling the eye off-center. */
+  padding: 7px 16px;
   border-bottom: 1px solid rgba(255, 211, 107, 0.08);
   flex-shrink: 0;
   cursor: default;
@@ -277,6 +279,40 @@
   50% { opacity: 0; }
 }
 
+/* Typing indicator — three pulsing dots while the oracle composes a reply.
+   Clear, unmistakable "she's responding" feedback (the old lone 1px blinking
+   cursor was too easy to miss after hitting send). */
+.confessional-msg--typing {
+  padding: 10px 12px;
+}
+
+.confessional-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.confessional-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd36b;
+  box-shadow: 0 0 6px rgba(255, 211, 107, 0.5);
+  animation: confessional-typing-bounce 1.2s ease-in-out infinite;
+}
+
+.confessional-typing-dots span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.confessional-typing-dots span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes confessional-typing-bounce {
+  0%, 80%, 100% { opacity: 0.35; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+
 /* User (right) */
 .confessional-msg--user {
   align-self: flex-end;
@@ -289,16 +325,21 @@
 .confessional-input-area {
   display: flex;
   align-items: center;
-  gap: 6px;
   padding: 8px 10px 10px;
   border-top: 1px solid rgba(255, 211, 107, 0.06);
   flex-shrink: 0;
+  /* Anchor the send button, which now sits INSIDE the input on the right
+     rather than as a separate column that protruded past the field and made
+     the drawer feel right-heavy / off-center. */
+  position: relative;
 }
 
 .confessional-input {
   flex: 1;
   height: 38px;
-  padding: 0 10px;
+  /* Extra right padding clears the inline send button so typed text never
+     runs under it. */
+  padding: 0 44px 0 12px;
   border-radius: 6px;
   border: 1px solid rgba(0, 255, 255, 0.15);
   background: rgba(0, 0, 0, 0.3);
@@ -323,23 +364,28 @@
 }
 
 .confessional-send-btn {
-  width: 34px;
-  height: 34px;
+  /* Sits inside the input field, its right edge 16px from the drawer edge —
+     the same inset as the close button above, so both right-side controls
+     line up instead of protruding past everything else. */
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
-  border: 1px solid rgba(0, 255, 255, 0.15);
-  background: rgba(0, 255, 255, 0.05);
+  border: none;
+  background: transparent;
   color: hsl(183, 38%, 57%);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  flex-shrink: 0;
 }
 
 .confessional-send-btn:hover:not(:disabled) {
   background: rgba(0, 255, 255, 0.12);
-  border-color: rgba(0, 255, 255, 0.35);
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
 }
 
@@ -379,12 +425,21 @@
   }
 
   .confessional-drawer {
-    width: 100vw;
-    /* Cap below the chat-shrunken portrait: ~378px of portrait + ~108px of
-       dock/offset must stay clear above/below the drawer. Floor keeps the
-       chat usable on very short viewports (accepting slight overlap there),
+    /* Span the viewport flush via left/right rather than width:100vw. The base
+       rule's `left: 1rem` combined with a 100vw width pushed the right edge
+       1rem past the viewport — a fixed element poking out there gives iOS its
+       "horizontal play" (the close button, being rightmost, looked like the
+       culprit). left:0/right:0 also sidesteps 100vw over-counting scrollbars. */
+    left: 0;
+    right: 0;
+    width: auto;
+    /* Cap below the chat-shrunken portrait. The bottom dock is hidden while
+       the chat is open on phones, so the drawer anchors low (bottomOffset 16)
+       and can take more height than when the ~88px dock was in play — the
+       subtracted constant drops accordingly, giving the conversation more of
+       the screen above the keyboard. Floor keeps it usable on short viewports;
        ceiling keeps it tidy on tall phones. */
-    max-height: clamp(160px, calc(100dvh - 486px), 320px);
+    max-height: clamp(200px, calc(100dvh - 400px), 400px);
     border-radius: 14px 14px 0 0;
   }
 }

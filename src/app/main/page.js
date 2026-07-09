@@ -22,6 +22,7 @@ import MainVigilPanel from "@/components/MainVigilPanel";
 import PenanceOfRecord from "@/components/PenanceOfRecord";
 import { readPenance, mintPenance } from "@/lib/penance";
 import useCyberConfirm from "@/components/useCyberConfirm";
+import DropInTitle from "@/components/DropInTitle";
 
 // The /main roster is Our Lady's APPARITIONS — her cultural faces (see
 // src/lib/apparitions.js), imported above as CHARACTERS. The other pantheon
@@ -81,21 +82,9 @@ function preloadGLBParsed(url) {
 // Toggle this to switch between video file and SitePal embed
 const USE_SITEPAL = true;
 
-// Two "materials" for the Ask RL80 heading — click the title to A/B them live
-// (or ?heading=neon|classic). `neon` = hollow gold neon-TUBE lettering that
-// matches the shrine frame's tubing; `classic` = the original solid-white glow.
-// "Ask RL80" heading — Grenze Gotisch (gothic-meets-modern, legible) rendered as
-// a hollow gold neon TUBE to match the shrine frame's tubing. Weight 500 keeps
-// the fraktur strokes light enough that the tube interiors stay hollow rather
-// than flooding with the inner glow.
-const ASK_HEADING = {
-  fontFamily: "'Grenze Gotisch', serif",
-  fontWeight: 500,
-  color: "transparent",
-  WebkitTextStroke: "1.5px #ffedbe",
-  textShadow:
-    "0 0 2px #fff2cc, 0 0 22px rgba(244,181,63,0.7), 0 0 46px rgba(240,168,44,0.45), 0 0 84px rgba(240,168,44,0.25)",
-};
+// The page heading is now the shared DropInTitle component ("Our Lady of
+// Perpetual Profit"), rendered in the panel below — see the JSX. (The former
+// gold-neon-tube "Ask RL80" <h1> lives in git history if we want it back.)
 
 // Her opening line — shown by the Confessional's typewriter AND spoken aloud
 // on first drawer open
@@ -782,42 +771,33 @@ export default function MainPage() {
           boxShadow: "0 0 20px rgba(0, 0, 0, 0.4), inset 1px 0 0 rgba(0, 255, 255, 0.05)",
         }}
       >
-        {/* ── Title heading ── collapses while the chat drawer is open on
-            phones so the portrait can rise above the conversation */}
-        <h1
+        {/* ── Title heading ── DropInTitle "Our Lady of Perpetual Profit"
+            (letters drop in on mount, per the shared landing-page component).
+            The green "Profit" line echoes Our Lady's glowing green eyes in the
+            portrait below. Collapses while the chat drawer is open on phones so
+            the portrait can rise above the conversation. */}
+        <div
           className="custom-title"
           style={{
             position: "relative",
-            left: "3rem",
-            top: "1.0rem",
-            color: ASK_HEADING.color,
-            WebkitTextStroke: ASK_HEADING.WebkitTextStroke,
-            fontFamily: ASK_HEADING.fontFamily,
-            textShadow: ASK_HEADING.textShadow,
-            fontSize: "2.5rem",
-            fontWeight: ASK_HEADING.fontWeight,
-            lineHeight: 0.85,
-            transform: "rotate(-8deg) skew(-15deg)",
             zIndex: 1000,
-            whiteSpace: "nowrap",
-            cursor: "default",
-            marginTop: "0",
+            paddingTop: "1.25rem",
             pointerEvents: "auto",
-            maxHeight: isMobile && chatOpen ? 0 : 300,
+            maxHeight: isMobile && chatOpen ? 0 : 320,
             opacity: isMobile && chatOpen ? 0 : 1,
-            // Clip only while collapsed — at rest the rotated/skewed text
-            // renders outside its layout box and must not be cut
+            // Clip only while collapsed — at rest the rotated/skewed letters
+            // render outside their layout box and must not be cut
             overflow: isMobile && chatOpen ? "hidden" : "visible",
             transition: "max-height 0.35s ease, opacity 0.25s ease",
           }}
         >
-          <span className="title-line" style={{ display: 'block', position: 'relative' }}>{CHARACTERS[activeCharIndex]?.askWord || "Ask"}</span>
-          <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-            <span style={{ fontSize: "3rem",  }}>RL80</span>
-            
-          </span>
-          {/* <span className="title-line" style={{ display: 'block', marginLeft: "3rem", position: 'relative' }}>Profit</span> */}
-        </h1>
+          <DropInTitle
+            lines={["Our Lady", "of Perpetual", "Profit"]}
+            colors={["#f4e4c1", "#f4b53f", "#3ad17a"]}
+            fontSize={{ mobile: "1.85rem", desktop: "2.4rem" }}
+            isMobile={isMobile}
+          />
+        </div>
 
         {/* ── Agent Select section ── shrinks toward the top while the chat
             drawer is open on phones, keeping her whole face visible above it */}
@@ -897,7 +877,12 @@ export default function MainPage() {
           the portfolio that used to live in the panel. Destination taps run
           through the shared cyberpunk confirm modal (glitch + sounds); Buy
           opens BuyModal directly and the center FAB opens the Confessional.
-          Slots L→R: $ BUY | TERMINAL | SPEAK (center) | HAIL MARY | MORE. */}
+          Slots L→R: $ BUY | TERMINAL | SPEAK (center) | HAIL MARY | MORE.
+          Hidden on phones while the Confessional is open so the conversation
+          reclaims the ~88px the dock (and the drawer's clearance offset) ate —
+          the keyboard was leaving only a sliver for the chat. Close via the
+          drawer's X to bring the dock back. */}
+      {!(isMobile && chatOpen) && (
       <MobileBottomNav
         neonMode
         is80sMode={false}
@@ -974,6 +959,7 @@ export default function MainPage() {
           },
         ]}
       />
+      )}
 
       {/* MORE popover — anchored above the far-right dock slot. Holds the
           Race game (confirm-gated) + a Shrine return (direct nav). */}
@@ -1113,8 +1099,11 @@ export default function MainPage() {
              conversation bubble before the user chooses to speak. */
           hideLauncher
           /* Lift the drawer above the bottom dock so its input row (and the
-             protruding center FAB) don't occlude the reply field. */
-          bottomOffset={88}
+             protruding center FAB) don't occlude the reply field. On phones
+             the dock is hidden while the chat is open (see MobileBottomNav
+             gating), so the drawer only needs to clear the safe area — anchor
+             it low to give the conversation maximum room above the keyboard. */
+          bottomOffset={isMobile ? 16 : 88}
           /* On wide viewports the confession docks as the left triptych wing
              (always visible) instead of a floating drawer. */
           docked={isWide && !isMobile}

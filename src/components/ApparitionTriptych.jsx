@@ -71,24 +71,29 @@ export default function ApparitionTriptych({ apparitions = [], onChoose }) {
           to { opacity: 1; transform: translateY(0); }
         }
         .apparition-panel {
-          background: none;
-          border: none;
-          padding: 0;
+          background: rgba(7, 11, 18, 0.16);
+          border: 1px solid transparent;
           cursor: pointer;
-          transition: transform 0.25s ease;
+          border-radius: 8px;
+          transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
         }
         .apparition-panel:hover,
         .apparition-panel:focus-visible {
           transform: translateY(-6px);
+          background: rgba(11, 19, 28, 0.58);
           outline: none;
         }
         .apparition-panel:hover .apparition-oval,
         .apparition-panel:focus-visible .apparition-oval {
           filter: brightness(1.15);
         }
+        .apparition-panel:hover .apparition-action,
+        .apparition-panel:focus-visible .apparition-action {
+          filter: brightness(1.22);
+        }
         .apparition-panel:hover .apparition-consult,
         .apparition-panel:focus-visible .apparition-consult {
-          opacity: 1;
+          opacity: 0.82;
         }
       `}</style>
 
@@ -99,40 +104,41 @@ export default function ApparitionTriptych({ apparitions = [], onChoose }) {
           letterSpacing: "0.25em",
           textTransform: "uppercase",
           color: "hsl(183 38% 57%)",
-          textShadow: "0 0 8px rgba(0,255,255,0.4)",
-          marginBottom: 10,
+          textShadow: "0 0 8px rgba(0,255,255,0.28)",
+          marginBottom: 12,
         }}
       >
-        {"// apparition select"}
+        {"// benevolent intelligence online"}
       </div>
       <h2
         style={{
           margin: 0,
-          fontFamily: "'Grenze Gotisch', serif",
-          fontWeight: 500,
-          fontSize: "clamp(1.8rem, 5vw, 2.8rem)",
-          color: "transparent",
-          WebkitTextStroke: "1.2px #ffedbe",
+          fontFamily: "'Cyber', 'Geo', sans-serif",
+          fontWeight: 400,
+          fontSize: "clamp(1.55rem, 4.4vw, 2.35rem)",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "rgba(231, 248, 246, 0.92)",
           textShadow:
-            "0 0 2px #fff2cc, 0 0 22px rgba(244,181,63,0.7), 0 0 46px rgba(240,168,44,0.45)",
+            "0 0 10px rgba(118, 255, 230, 0.22), 0 0 28px rgba(244,181,63,0.22)",
           textAlign: "center",
         }}
       >
-        She Has Many Faces
+        Mater Ex Machina
       </h2>
       <p
         style={{
-          margin: "12px 0 30px",
-          maxWidth: 560,
+          margin: "14px 0 30px",
+          maxWidth: 600,
           textAlign: "center",
           fontSize: "0.8rem",
           lineHeight: 1.6,
           letterSpacing: "0.06em",
-          color: "rgba(200, 230, 235, 0.75)",
+          color: "rgba(205, 232, 235, 0.72)",
         }}
       >
-        Our Lady of Perpetual Profit appears to every seeker in a different
-        guise. Choose the face you would consult.
+        A merciful intelligence appears in the form each seeker can hear.
+        Choose the face through which she should answer.
       </p>
 
       {/* ── The panels ── */}
@@ -221,8 +227,26 @@ export default function ApparitionTriptych({ apparitions = [], onChoose }) {
                 textAlign: isNarrow ? "left" : "center",
                 gap: isNarrow ? 16 : 14,
                 flex: isNarrow ? "none" : "0 1 260px",
+                padding: isNarrow ? "8px 10px 8px 0" : "12px 12px 14px",
+                borderColor: `${hue}22`,
                 animation: `apparitionRise 0.5s ease ${0.15 + slot * 0.12}s both`,
                 fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = `${hue}88`;
+                e.currentTarget.style.boxShadow = `0 0 22px ${hue}22`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = `${hue}22`;
+                e.currentTarget.style.boxShadow = "none";
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = `${hue}88`;
+                e.currentTarget.style.boxShadow = `0 0 22px ${hue}22`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = `${hue}22`;
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
               {oval}
@@ -264,6 +288,35 @@ export default function ApparitionTriptych({ apparitions = [], onChoose }) {
                   }}
                 >
                   “{(a.greetings && a.greetings[0]) || ""}”
+                </div>
+                <div
+                  className="apparition-action"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    marginTop: 12,
+                    padding: "6px 10px",
+                    minHeight: 28,
+                    border: `1px solid ${hue}88`,
+                    borderRadius: 4,
+                    color: hue,
+                    background: `linear-gradient(90deg, ${hue}18, ${hue}08)`,
+                    boxShadow: `0 0 12px ${hue}22`,
+                    fontSize: "0.58rem",
+                    lineHeight: 1,
+                    letterSpacing: "0.24em",
+                    textTransform: "uppercase",
+                    textShadow: `0 0 6px ${hue}`,
+                    transition:
+                      "color 0.2s ease, background 0.2s ease, text-shadow 0.2s ease",
+                  }}
+                >
+                  <span>Consult</span>
+                  <span aria-hidden="true" style={{ letterSpacing: 0 }}>
+                    &gt;
+                  </span>
                 </div>
               </div>
             </button>

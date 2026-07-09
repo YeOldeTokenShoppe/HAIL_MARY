@@ -29,7 +29,7 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   const [inputVal, setInputVal] = useState("");
   const [pending, setPending] = useState(false);
   const [phase, setPhase] = useState("closed"); // closed | entering | open | exiting
-  const messagesEndRef = useRef(null);
+  const messagesRef = useRef(null);
   const inputRef = useRef(null);
   const prevInitialRef = useRef("");
 
@@ -38,9 +38,52 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   const typingRef = useRef(false);
   const typingTimerRef = useRef(null);
 
-  // Scroll to bottom on new messages
+  // ── iOS keyboard viewport pinning ──
+  // On phones the drawer is a full-width `position: fixed` element, which sizes
+  // against the LAYOUT viewport. iOS shrinks only the VISUAL viewport for the
+  // keyboard and can leave the two desynced after the keyboard retracts — the
+  // layout viewport stays wider than what's visible, so the drawer's right edge
+  // (and the close button) ends up off-screen with no way to pan to it. CSS has
+  // no unit for the visual-viewport width, so we pin the drawer's horizontal
+  // box to window.visualViewport. Mobile + floating only (docked/desktop use
+  // the CSS rules untouched); vertical anchoring is left to CSS so the keyboard
+  // behavior we already tuned doesn't change.
+  const [vvBox, setVvBox] = useState(null);
+  useEffect(() => {
+    if (docked || typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      if (!mq.matches) {
+        setVvBox((prev) => (prev === null ? prev : null));
+        return;
+      }
+      const next = { width: Math.round(vv.width), left: Math.round(vv.offsetLeft) };
+      setVvBox((prev) =>
+        prev && prev.width === next.width && prev.left === next.left ? prev : next
+      );
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    mq.addEventListener?.("change", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      mq.removeEventListener?.("change", update);
+    };
+  }, [docked]);
+
+  // Scroll to bottom on new messages. Scroll the messages CONTAINER directly
+  // rather than messagesEndRef.scrollIntoView() — on iOS with the keyboard up,
+  // scrollIntoView can scroll the whole page (shifting the fixed drawer) or
+  // silently no-op, so a just-sent bubble lands below the fold and the send
+  // reads as "did nothing". Setting scrollTop only moves the list, and the
+  // container's CSS `scroll-behavior: smooth` keeps it animated.
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
   // When initialMessage changes, start a new conversation with typewriter
@@ -187,11 +230,15 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   return (
     <div
       className={drawerClass}
-      style={
-        !docked && bottomOffset != null
+      style={{
+        ...(!docked && bottomOffset != null
           ? { bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px))` }
-          : undefined
-      }
+          : {}),
+        // Horizontal box pinned to the visual viewport on mobile (see vvBox
+        // effect) so the keyboard show/dismiss can't leave the drawer wider
+        // than the screen. Overrides the CSS left:0/right:0/width:auto.
+        ...(vvBox ? { left: `${vvBox.left}px`, right: "auto", width: `${vvBox.width}px` } : {}),
+      }}
     >
       {/* Header */}
       <div className="confessional-header">
@@ -211,7 +258,7 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
       </div>
 
       {/* Messages */}
-      <div className="confessional-messages">
+      <div className="confessional-messages" ref={messagesRef}>
         {messages.map((msg, i) => {
           const isCharacter = msg.role === "character";
           // First message gets typewriter; subsequent character messages show instantly
@@ -234,11 +281,12 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
           );
         })}
         {pending && (
-          <div className="confessional-msg confessional-msg--character" aria-label="thinking">
-            <span className="confessional-cursor" />
+          <div className="confessional-msg confessional-msg--character confessional-msg--typing" aria-label="thinking">
+            <span className="confessional-typing-dots">
+              <span /><span /><span />
+            </span>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
