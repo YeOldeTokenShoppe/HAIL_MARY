@@ -241,19 +241,19 @@ export default function ModelViewerPage() {
         }
         extraLeft={[
           {
-            key: 'home',
-            label: 'Home',
-            title: 'Return to the shrine',
+            key: 'candelarium',
+            label: 'Candelarium',
+            title: 'Return to the candelarium',
             onClick: () => { router.push('/'); },
             // Same brand mark this slot used before, now in the Terminal spot.
-            iconSrc: '/brand-mark.svg',
+            iconSrc: '/images/flame.svg',
           },
         ]}
         extraRight={[
           {
             key: 'lode',
             label: 'Hail Mary',
-            title: 'Hail Mary Prospecting Co — coming soon',
+            title: 'Hail Mary Prospecting Co',
             onClick: () => { router.push('/hailmary'); },
             comingSoon: false,
             icon: (

@@ -922,18 +922,18 @@ export default function MainPage() {
         }
         extraLeft={[
           {
-            key: "shrine",
-            label: "Shrine",
-            title: "Return to the shrine",
+            key: "candelarium",
+            label: "Candelarium",
+            title: "Return to the candelarium",
             onClick: () => { window.location.href = "/"; },
             confirm: {
-              title: "Return to the Shrine",
+              title: "Return to the Candelarium",
               body: "Step back into Our Lady's candlelit hall — your vigil keeps burning.",
               accent: "hsl(189, 84%, 55%)",
               shadow: "hsl(189, 70%, 38%)",
             },
-            // Same brand mark the /exlibris dock uses for its HOME slot.
-            iconSrc: "/brand-mark.svg",
+            // Same flame mark the other pages use for the candelarium slot.
+            iconSrc: "/images/flame.svg",
           },
         ]}
         extraRight={[
@@ -949,7 +949,7 @@ export default function MainPage() {
               shadow: "hsl(189, 70%, 38%)",
             },
             icon: (
-              <svg viewBox="0 0 24 24" fill="none" stroke="#ff44d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(255, 68, 212, 0.6))" }} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f1d77a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(241, 215, 122, 0.6))" }} aria-hidden="true">
                 <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
                 <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
                 <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
@@ -961,8 +961,8 @@ export default function MainPage() {
       />
       )}
 
-      {/* MORE popover — anchored above the far-right dock slot. Holds the
-          Race game (confirm-gated) + a Shrine return (direct nav). */}
+      {/* MORE popover — anchored above the far-right dock slot. Holds
+          secondary destinations (Coin Fountain, Ex Libris), confirm-gated. */}
       {showMoreMenu && (
         <>
           <div
@@ -1026,24 +1026,6 @@ export default function MainPage() {
                     <path d="M15 8h-5" />
                     <path d="M19 17V5a2 2 0 0 0-2-2H4" />
                     <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
-                  </>
-                ),
-              },
-              {
-                label: "Market Rally Race",
-                stroke: "#f1d77a",
-                onSelect: () => moreConfirm({
-                  title: "Market Rally Race Game",
-                  body: "Get ready to race in the market! Compete with others and come out on top.",
-                  accent: "hsl(189, 84%, 55%)",
-                  shadow: "hsl(189, 70%, 38%)",
-                  onProceed: () => { window.location.href = "/race"; },
-                }),
-                icon: (
-                  <>
-                    <path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" />
-                    <path d="M17.8 11.8 19 13" /><path d="M15 9h.01" /><path d="M17.8 6.2 19 5" />
-                    <path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" />
                   </>
                 ),
               },

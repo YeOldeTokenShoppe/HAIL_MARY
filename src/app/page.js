@@ -3012,7 +3012,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#f4b53f"
+                stroke="#2ad6ee"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -3020,7 +3020,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                   width: 24,
                   height: 24,
                   display: 'block',
-                  filter: 'drop-shadow(0 0 4px rgba(244, 181, 63, 0.7))',
+                  filter: 'drop-shadow(0 0 4px rgba(42, 214, 238, 0.6))',
                 }}
                 aria-hidden="true"
               >
@@ -3046,11 +3046,11 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#2ad6ee"
+                stroke="#f1d77a"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ width: 24, height: 24, display: 'block' }}
+                style={{ width: 24, height: 24, display: 'block', filter: 'drop-shadow(0 0 4px rgba(241, 215, 122, 0.6))' }}
                 aria-hidden="true"
               >
                 <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />

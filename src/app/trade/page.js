@@ -5360,8 +5360,8 @@ export default function CyborgTemple() {
                 extraLeft={
                   tradeMode ? [] : [
                     {
-                      key: 'shrine',
-                      label: 'Shrine',
+                      key: 'candelarium',
+                      label: 'Candelarium',
                       title: 'Our Lady of Perpetual Profit',
                       onClick: () => router.push('/'),
                       icon: (
@@ -5378,7 +5378,7 @@ export default function CyborgTemple() {
                       title: 'Hail Mary Prospecting Co — coming soon',
                       onClick: () => router.push('/hailmary'),
                       icon: (
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff5db1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: 'block' }} aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#f1d77a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: 'block', filter: 'drop-shadow(0 0 4px rgba(241, 215, 122, 0.6))' }} aria-hidden="true">
                           <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
                           <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
                           <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
@@ -5405,7 +5405,7 @@ export default function CyborgTemple() {
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="currentColor"
+                      stroke="#2ad6ee"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -5422,7 +5422,7 @@ export default function CyborgTemple() {
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="currentColor"
+                      stroke="#2ad6ee"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -5445,7 +5445,7 @@ export default function CyborgTemple() {
                 bookLabel="BUY RL80"
                 bookTitle="Buy RL80"
                 bookIcon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#d4a854' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#39ff14', filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))' }}>
                     <line x1="12" y1="1" x2="12" y2="23" />
                     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
@@ -5487,6 +5487,7 @@ export default function CyborgTemple() {
                     {
                       path: '/fountain',
                       label: 'Coin Fountain',
+                      stroke: '#2ad6ee',
                       icon: (
                         <>
                           <path d="M12 10L12 2" />
@@ -5499,6 +5500,7 @@ export default function CyborgTemple() {
                     {
                       path: '/exlibris',
                       label: 'Ex Libris',
+                      stroke: '#ff44d4',
                       icon: (
                         <>
                           <path d="M15 12h-5" />
@@ -5533,11 +5535,11 @@ export default function CyborgTemple() {
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#ff00ff"
+                        stroke={link.stroke}
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        style={{ width: 22, height: 22, flexShrink: 0, display: 'block' }}
+                        style={{ width: 22, height: 22, flexShrink: 0, display: 'block', filter: `drop-shadow(0 0 4px ${link.stroke}66)` }}
                         aria-hidden="true"
                       >
                         {link.icon}
