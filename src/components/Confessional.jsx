@@ -23,8 +23,11 @@ import "./Confessional.css";
  *  - bottomOffset:    px number — raises the drawer's bottom anchor by this much
  *                     (+ safe-area) so its input row clears a fixed bottom nav
  *                     dock. Null keeps the default 0.75rem anchor.
+ *  - presetInput:     seeds the input field when the drawer opens (e.g. the
+ *                     rite buttons' "Bless me, Our Lady, for I have sinned — ").
+ *                     The seeker finishes the sentence; empty string is a no-op.
  */
-export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null, docked = false }) {
+export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null, docked = false, presetInput = "" }) {
   const [messages, setMessages] = useState([]);
   const [inputVal, setInputVal] = useState("");
   const [pending, setPending] = useState(false);
@@ -37,6 +40,15 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
   const [typedLen, setTypedLen] = useState(0);
   const typingRef = useRef(false);
   const typingTimerRef = useRef(null);
+
+  // Seed the input when a rite button opens the drawer (or, docked, when the
+  // seed arrives) — the seeker completes the sentence.
+  useEffect(() => {
+    if (presetInput && (isOpen || docked)) {
+      setInputVal(presetInput);
+      inputRef.current?.focus();
+    }
+  }, [presetInput, isOpen, docked]);
 
   // ── iOS keyboard viewport pinning ──
   // On phones the drawer is a full-width `position: fixed` element, which sizes

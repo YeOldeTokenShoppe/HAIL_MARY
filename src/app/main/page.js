@@ -19,8 +19,8 @@ import { readApparitionKey, writeApparitionKey } from "@/lib/apparitionPrefs";
 import { useMusic } from "@/components/MusicContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import MainVigilPanel from "@/components/MainVigilPanel";
-import PenanceOfRecord from "@/components/PenanceOfRecord";
-import { readPenance, mintPenance } from "@/lib/penance";
+import GraceOfRecord from "@/components/GraceOfRecord";
+import { readGrace, mintPenance, mintBlessing } from "@/lib/grace";
 import useCyberConfirm from "@/components/useCyberConfirm";
 import DropInTitle from "@/components/DropInTitle";
 
@@ -448,17 +448,32 @@ export default function MainPage() {
 
   // Oracle conversation: POST the drawer history to /api/oracle, speak the
   // reply through SitePal (ElevenLabs voice) with timed facial expressions.
-  // The request carries whether a penance already stands (so she reminds
-  // instead of stacking); a `penance` in the reply is minted to the device
-  // ledger, and PenanceOfRecord re-reads it via the PENANCE_EVENT.
+  // The request carries the seeker's standing grace kind (so she reminds
+  // instead of stacking); a `penance` or `blessing` inscription in the
+  // reply is minted to the device ledger, and GraceOfRecord re-reads it
+  // via GRACE_EVENT.
   const handleOracleMessage = useCallback(async (text, history) => {
     const app = CHARACTERS[activeCharIndex];
-    const standing = readPenance();
-    const data = await askOracle(history, undefined, app?.key, { hasPenance: !!standing });
-    if (data.penance && !standing) mintPenance(data.penance);
+    const standing = readGrace();
+    const data = await askOracle(history, undefined, app?.key, { standing: standing?.kind });
+    if (!standing) {
+      if (data.penance) mintPenance(data.penance);
+      else if (data.blessing) mintBlessing(data.blessing);
+    }
     speakOracle(data, app?.voice || ORACLE_VOICE);
     return data.reply;
   }, [activeCharIndex]);
+
+  // The rite buttons open the Confessional with a seeded opening line, so
+  // the seeker lands in the right register (she takes it from there).
+  const [chatSeed, setChatSeed] = useState("");
+  useEffect(() => {
+    if (!chatOpen) setChatSeed("");
+  }, [chatOpen]);
+  const openRite = useCallback((seed) => {
+    setChatSeed(seed);
+    setChatOpen(true);
+  }, []);
 
   // (Scene swapping removed — each apparition embeds its own scene fresh on
   // load via ?char; see handleCharacterSelect + SitePalEmbed.)
@@ -838,13 +853,19 @@ export default function MainPage() {
           />
         </div>
 
-        {/* ── Penance of Record ── the visitor's standing penance + the
-            parish ledger, filling the dead space beneath the portrait. The
-            confess → penance → absolution loop puts the return visit inside
-            the rite itself. Reads the REAL device ledger (lib/penance);
-            CONFESS opens the Confessional. Desktop only — phones keep the
+        {/* ── Grace of Record ── the visitor's ONE standing grace (blessing
+            from a petition, or penance from a confession) + the parish
+            ledger, filling the dead space beneath the portrait. Both rites
+            put the return visit inside the ritual itself. Reads the REAL
+            device ledger (lib/grace); the buttons open the Confessional
+            seeded for the chosen rite. Desktop only — phones keep the
             column tight. (Parish tally still mock.) */}
-        {!isMobile && <PenanceOfRecord onConfess={() => setChatOpen(true)} />}
+        {!isMobile && (
+          <GraceOfRecord
+            onPetition={() => openRite("Our Lady, I come with a petition — ")}
+            onConfess={() => openRite("Bless me, Our Lady, for I have sinned — ")}
+          />
+        )}
 
         {/* Portfolio + Buy moved into the bottom dock (MobileBottomNav) so
             /main shares the site's unified nav. Destination taps still run
@@ -1077,6 +1098,9 @@ export default function MainPage() {
              (greetingVisible), so it never types out before her face. */
           initialMessage={greetingVisible ? oracleGreeting : ""}
           onSendMessage={handleOracleMessage}
+          /* Rite buttons (GraceOfRecord) seed the input with an opening
+             line — "Bless me, Our Lady, for I have sinned — " etc. */
+          presetInput={chatSeed}
           /* SPEAK (center dock FAB) is the sole launcher — no auto-appearing
              conversation bubble before the user chooses to speak. */
           hideLauncher

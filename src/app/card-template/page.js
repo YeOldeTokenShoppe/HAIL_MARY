@@ -22,7 +22,7 @@ const EUGENE = {
   resistance: "Meme Season",
   pivotCost: 2,
   flavorText: "Charts are just vibes with timestamps.",
-  backgroundImage: "/TCG/traderUnicorn.webp",
+  backgroundImage: "/TCG/eugeneFractal.png",
   artFocus: "center 28%",
   artZoom: 1.25,
   overlayImage: "/cardOverlay.webp",

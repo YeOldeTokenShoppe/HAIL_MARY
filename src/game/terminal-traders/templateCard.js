@@ -4,7 +4,7 @@ import { CARD_TYPES, GENESIS_SET } from "./cards.js";
 // lands, add one entry per card id; everything else renders the framed
 // no-art variant of the template.
 export const CARD_ART = {
-  "eugene": { src: "/TCG/traderUnicorn.webp", artFocus: "center 28%", artZoom: 1.25, overlayImage: "/cardOverlay.webp" },
+  "eugene": { src: "/TCG/eugeneFractal.png", artFocus: "center 28%", artZoom: 1.25, overlayImage: "/cardOverlay.webp" },
   "marisol": { src: "/TCG/traderMarisol.webp", artFocus: "center 28%", artZoom: 1.25 },
   // moonpony + pump-signal assets are legacy pre-rendered full cards (frame
   // and text baked in), so the template crops hard into their art area.

@@ -1,23 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readPenance, penanceDaysLeft, penanceIsDue, PENANCE_EVENT } from "@/lib/penance";
+import { readGrace, graceDaysLeft, penanceIsDue, GRACE_EVENT } from "@/lib/grace";
 
-// PenanceOfRecord — the visitor's standing penance, beneath the portrait.
-// The sacramental loop: confess your positions in the Confessional → she
-// assigns penance (a `penance` object in the oracle reply, minted to the
-// device ledger by /main) → return when it's served to receive absolution.
-// The return visit is required by the rite itself.
+// GraceOfRecord — the visitor's ONE standing grace, beneath the portrait.
+// Bimodal rites: PETITION (ask her favor → a blessing that holds N days)
+// or CONFESSION (own a market sin → a penance, absolution on return).
+// Both are administered in the Confessional conversation; the buttons here
+// open it with a seeded opening line so the seeker knows the register.
 //
-// States: none (a call to confession), assigned (countdown), due (return to
-// her). The absolution CEREMONY — her granting it in conversation when the
-// seeker returns, flipping the ledger to absolved — is the next phase; so is
-// the real parish tally (the absolved/lapsed row below is still MOCK).
+// States: none (the call to the rites), blessed (boon + favor countdown),
+// penance assigned (command + absolution countdown), penance due (return
+// to her). The absolution CEREMONY — her granting it in conversation,
+// flipping the ledger — is the next phase; so is the real parish tally
+// (the absolved/lapsed row below is still MOCK).
 
 const MOCK_PARISH = [true, true, false, true, true, true, false, true, true, false, true, true];
 const MOCK_LEDGER = { absolved: 24, lapsed: 8 };
 
-// Liturgical numerals for the countdown.
+// Liturgical numerals for the countdowns.
 function roman(n) {
   if (n <= 0) return "0";
   const table = [[10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
@@ -33,31 +34,56 @@ const label = {
   color: "rgba(200, 230, 235, 0.45)",
 };
 
-export default function PenanceOfRecord({ onConfess }) {
+const goldItalic = {
+  margin: 0,
+  fontStyle: "italic",
+  fontSize: "0.82rem",
+  lineHeight: 1.65,
+  color: "#ffedbe",
+  textShadow: "0 0 12px rgba(244, 181, 63, 0.25)",
+};
+
+const riteButton = {
+  background: "none",
+  border: "1px solid rgba(0,255,255,0.3)",
+  color: "hsl(183 38% 57%)",
+  fontFamily: "inherit",
+  fontSize: "0.55rem",
+  letterSpacing: "0.25em",
+  textTransform: "uppercase",
+  padding: "6px 14px",
+  cursor: "pointer",
+  clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)",
+};
+
+export default function GraceOfRecord({ onPetition, onConfess }) {
   // Read after mount (SSR has no localStorage) and re-read whenever the
-  // ledger changes — /main mints a penance out of the oracle conversation
-  // and fires PENANCE_EVENT.
-  const [penance, setPenance] = useState(null);
+  // ledger changes — /main mints graces out of the oracle conversation
+  // and lib/grace fires GRACE_EVENT.
+  const [grace, setGrace] = useState(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    const sync = () => setPenance(readPenance());
+    const sync = () => setGrace(readGrace());
     sync();
     setMounted(true);
-    window.addEventListener(PENANCE_EVENT, sync);
-    return () => window.removeEventListener(PENANCE_EVENT, sync);
+    window.addEventListener(GRACE_EVENT, sync);
+    return () => window.removeEventListener(GRACE_EVENT, sync);
   }, []);
 
   if (!mounted) return null;
 
-  const due = penanceIsDue(penance);
-  const daysLeft = penance ? penanceDaysLeft(penance) : 0;
+  const isBlessing = grace?.kind === "blessing";
+  const due = penanceIsDue(grace);
+  const daysLeft = grace ? graceDaysLeft(grace) : 0;
   const total = MOCK_LEDGER.absolved + MOCK_LEDGER.lapsed;
 
-  const chip = !penance
-    ? { text: "none stands", color: "rgba(0, 255, 255, 0.55)", border: "rgba(0, 255, 255, 0.3)" }
-    : due
-      ? { text: "absolution awaits", color: "#8dffb0", border: "rgba(141, 255, 176, 0.45)" }
-      : { text: "assigned", color: "#f1d77a", border: "rgba(241, 215, 122, 0.4)" };
+  const chip = !grace
+    ? { text: "the rites are open", color: "rgba(0, 255, 255, 0.55)", border: "rgba(0, 255, 255, 0.3)" }
+    : isBlessing
+      ? { text: "blessed", color: "#ffd9f2", border: "rgba(255, 150, 220, 0.45)" }
+      : due
+        ? { text: "absolution awaits", color: "#8dffb0", border: "rgba(141, 255, 176, 0.45)" }
+        : { text: "penance assigned", color: "#f1d77a", border: "rgba(241, 215, 122, 0.4)" };
 
   return (
     <div style={{ padding: "14px 16px 0", fontFamily: "'Cyber', 'Geo', sans-serif" }}>
@@ -88,7 +114,7 @@ export default function PenanceOfRecord({ onConfess }) {
               textShadow: "0 0 8px rgba(0,255,255,0.35)",
             }}
           >
-            {"// your penance"}
+            {isBlessing ? "// your blessing" : grace ? "// your penance" : "// the rites"}
           </span>
           <span
             style={{
@@ -105,79 +131,51 @@ export default function PenanceOfRecord({ onConfess }) {
           </span>
         </div>
 
-        {penance ? (
+        {grace ? (
           <>
-            {/* The confessed sin — dim, set apart from her voice */}
+            {/* What was brought to her — dim, set apart from her voice */}
             <div style={{ ...label, fontSize: "0.6rem", letterSpacing: "0.12em", lineHeight: 1.6, marginBottom: 8, textTransform: "none" }}>
-              for the sin of {penance.sin} —
+              {isBlessing ? `upon your petition for ${grace.petition} —` : `for the sin of ${grace.sin} —`}
             </div>
 
-            {/* Her command */}
-            <p
-              style={{
-                margin: 0,
-                fontStyle: "italic",
-                fontSize: "0.82rem",
-                lineHeight: 1.65,
-                color: "#ffedbe",
-                textShadow: "0 0 12px rgba(244, 181, 63, 0.25)",
-              }}
-            >
-              “{penance.command}”
-            </p>
+            {/* Her pronouncement */}
+            <p style={goldItalic}>“{isBlessing ? grace.boon : grace.command}”</p>
 
-            {/* Countdown / call to return */}
+            {/* Countdown */}
             <div
               style={{
                 marginTop: 10,
                 fontSize: "0.55rem",
                 letterSpacing: "0.22em",
                 textTransform: "uppercase",
-                color: due ? "#8dffb0" : "rgba(0, 255, 255, 0.55)",
+                color: due ? "#8dffb0" : isBlessing ? "#ffd9f2" : "rgba(0, 255, 255, 0.55)",
               }}
             >
               {due
                 ? "your penance is served — return to her"
-                : `absolution in ${roman(daysLeft)} day${daysLeft === 1 ? "" : "s"}`}
+                : isBlessing
+                  ? `her favor holds ${roman(daysLeft)} day${daysLeft === 1 ? "" : "s"} more`
+                  : `absolution in ${roman(daysLeft)} day${daysLeft === 1 ? "" : "s"}`}
             </div>
           </>
         ) : (
           <>
-            {/* No penance — the call to confession. This is where the rite
-                SOLICITS: the button opens the Confessional, and she takes
-                it from there in conversation. */}
-            <p
-              style={{
-                margin: 0,
-                fontStyle: "italic",
-                fontSize: "0.82rem",
-                lineHeight: 1.65,
-                color: "#ffedbe",
-                textShadow: "0 0 12px rgba(244, 181, 63, 0.25)",
-              }}
-            >
-              “No penance stands against you, seeker. Confess your positions —
-              the mirror has heard worse than yours.”
+            {/* No grace stands — the call to the rites. This is where the
+                shrine SOLICITS: each button opens the Confessional with a
+                seeded opening line, and she takes it from there. */}
+            <p style={goldItalic}>
+              “Come with a petition or a confession, seeker. Our Lady dispenses
+              blessings, penances, and the occasional light roasting. All
+              grace is final.”
             </p>
-            <button
-              onClick={onConfess}
-              style={{
-                marginTop: 10,
-                background: "none",
-                border: "1px solid rgba(0,255,255,0.3)",
-                color: "hsl(183 38% 57%)",
-                fontFamily: "inherit",
-                fontSize: "0.55rem",
-                letterSpacing: "0.25em",
-                textTransform: "uppercase",
-                padding: "6px 14px",
-                cursor: "pointer",
-                clipPath:
-                  "polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)",
-              }}
-            >
-              confess
-            </button>
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <button onClick={onPetition} style={riteButton}>
+                petition
+              </button>
+              <button onClick={onConfess} style={riteButton}>
+                confess
+              </button>
+            </div>
           </>
         )}
 
