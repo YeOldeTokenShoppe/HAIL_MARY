@@ -1,30 +1,66 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readGrace, graceDaysLeft, penanceIsDue, GRACE_EVENT } from "@/lib/grace";
+import { readGrace, graceDaysLeft, GRACE_EVENT } from "@/lib/grace";
 
-// GraceOfRecord — the visitor's ONE standing grace, beneath the portrait.
-// Bimodal rites: PETITION (ask her favor → a blessing that holds N days)
-// or CONFESSION (own a market sin → a penance, absolution on return).
-// Both are administered in the Confessional conversation; the buttons here
-// open it with a seeded opening line so the seeker knows the register.
+// GraceOfRecord — the altar module beneath the portrait.
 //
-// States: none (the call to the rites), blessed (boon + favor countdown),
-// penance assigned (command + absolution countdown), penance due (return
-// to her). The absolution CEREMONY — her granting it in conversation,
-// flipping the ledger — is the next phase; so is the real parish tally
-// (the absolved/lapsed row below is still MOCK).
+// Featured slot (the gold italic line in the box):
+//   • no blessing standing → TODAY'S READING — her one inscribed line for
+//     the day (/api/daily-reading: omens-fed, Firestore-archived, in the
+//     apparition's tongue), with the PETITION button beneath it. Falls back
+//     to the petition invitation if the reading hasn't loaded.
+//   • blessing standing → the seeker's boon + favor countdown, with the
+//     day's reading tucked quietly below the box instead.
+//
+// PETITION opens the Confessional seeded in her tongue; she takes it from
+// there (guidance, intercession, protection, fortune — no penances: she
+// hears sins as a mother, not a confessor).
+//
+// Per-apparition overrides for HER VOICE come via the `ui` block in
+// lib/apparitions.js. Terminal chrome stays English site-wide.
 
-const MOCK_PARISH = [true, true, false, true, true, true, false, true, true, false, true, true];
-const MOCK_LEDGER = { absolved: 24, lapsed: 8 };
-
-// Liturgical numerals for the countdowns.
+// Liturgical numerals for the countdown.
 function roman(n) {
   if (n <= 0) return "0";
   const table = [[10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
   let out = "";
   for (const [v, s] of table) while (n >= v) { out += s; n -= v; }
   return out;
+}
+
+// Fetch the day's inscribed line — server-cached per (day, apparition);
+// null (component shows the fallback) on any failure. Returns { reading,
+// date } — the SERVER's ledger date, which is what the label must show:
+// the ledger runs on UTC, so the client's local date can disagree with the
+// day the inscription actually belongs to.
+function useDailyReading(apparitionKey) {
+  const [daily, setDaily] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    setDaily(null);
+    fetch(`/api/daily-reading?apparition=${encodeURIComponent(apparitionKey || "classic")}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.reading) setDaily({ reading: d.reading, date: d.date });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [apparitionKey]);
+  return daily;
+}
+
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+// "2026-07-11" → "july 11" (string parts only — new Date("YYYY-MM-DD")
+// parses as UTC midnight and would shift the day right back in western
+// timezones, recreating the bug this fixes)
+function ledgerDateLine(isoDate) {
+  const [, m, d] = String(isoDate || "").split("-").map(Number);
+  if (!m || !d) return "";
+  return `${MONTHS[m - 1]} ${d}`;
 }
 
 const label = {
@@ -43,22 +79,9 @@ const goldItalic = {
   textShadow: "0 0 12px rgba(244, 181, 63, 0.25)",
 };
 
-const riteButton = {
-  background: "none",
-  border: "1px solid rgba(0,255,255,0.3)",
-  color: "hsl(183 38% 57%)",
-  fontFamily: "inherit",
-  fontSize: "0.55rem",
-  letterSpacing: "0.25em",
-  textTransform: "uppercase",
-  padding: "6px 14px",
-  cursor: "pointer",
-  clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)",
-};
-
-export default function GraceOfRecord({ onPetition, onConfess }) {
+export default function GraceOfRecord({ onPetition, ui = {}, apparitionKey = "classic" }) {
   // Read after mount (SSR has no localStorage) and re-read whenever the
-  // ledger changes — /main mints graces out of the oracle conversation
+  // ledger changes — /main mints blessings out of the oracle conversation
   // and lib/grace fires GRACE_EVENT.
   const [grace, setGrace] = useState(null);
   const [mounted, setMounted] = useState(false);
@@ -70,20 +93,17 @@ export default function GraceOfRecord({ onPetition, onConfess }) {
     return () => window.removeEventListener(GRACE_EVENT, sync);
   }, []);
 
+  const daily = useDailyReading(apparitionKey);
+  const reading = daily?.reading || null;
+
   if (!mounted) return null;
 
-  const isBlessing = grace?.kind === "blessing";
-  const due = penanceIsDue(grace);
   const daysLeft = grace ? graceDaysLeft(grace) : 0;
-  const total = MOCK_LEDGER.absolved + MOCK_LEDGER.lapsed;
-
-  const chip = !grace
-    ? { text: "the rites are open", color: "rgba(0, 255, 255, 0.55)", border: "rgba(0, 255, 255, 0.3)" }
-    : isBlessing
-      ? { text: "blessed", color: "#ffd9f2", border: "rgba(255, 150, 220, 0.45)" }
-      : due
-        ? { text: "absolution awaits", color: "#8dffb0", border: "rgba(141, 255, 176, 0.45)" }
-        : { text: "penance assigned", color: "#f1d77a", border: "rgba(241, 215, 122, 0.4)" };
+  // The ledger's date, not the client clock — they disagree near midnight UTC
+  const dateLine = ledgerDateLine(daily?.date);
+  const chip = grace
+    ? { text: "blessed", color: "#ffd9f2", border: "rgba(255, 150, 220, 0.45)" }
+    : { text: "the altar is open", color: "rgba(0, 255, 255, 0.55)", border: "rgba(0, 255, 255, 0.3)" };
 
   return (
     <div style={{ padding: "14px 16px 0", fontFamily: "'Cyber', 'Geo', sans-serif" }}>
@@ -114,7 +134,11 @@ export default function GraceOfRecord({ onPetition, onConfess }) {
               textShadow: "0 0 8px rgba(0,255,255,0.35)",
             }}
           >
-            {isBlessing ? "// your blessing" : grace ? "// your penance" : "// the rites"}
+            {grace
+              ? "// your blessing"
+              : reading
+                ? `// today's reading · ${dateLine}`
+                : "// petitions"}
           </span>
           <span
             style={{
@@ -133,92 +157,92 @@ export default function GraceOfRecord({ onPetition, onConfess }) {
 
         {grace ? (
           <>
-            {/* What was brought to her — dim, set apart from her voice */}
+            {/* What was asked of her — dim, set apart from her voice */}
             <div style={{ ...label, fontSize: "0.6rem", letterSpacing: "0.12em", lineHeight: 1.6, marginBottom: 8, textTransform: "none" }}>
-              {isBlessing ? `upon your petition for ${grace.petition} —` : `for the sin of ${grace.sin} —`}
+              {`${ui.petitionLead || "upon your petition for"} ${grace.petition} —`}
             </div>
 
-            {/* Her pronouncement */}
-            <p style={goldItalic}>“{isBlessing ? grace.boon : grace.command}”</p>
+            {/* Her boon */}
+            <p style={goldItalic}>“{grace.boon}”</p>
 
-            {/* Countdown */}
+            {/* Favor countdown */}
             <div
               style={{
                 marginTop: 10,
                 fontSize: "0.55rem",
                 letterSpacing: "0.22em",
                 textTransform: "uppercase",
-                color: due ? "#8dffb0" : isBlessing ? "#ffd9f2" : "rgba(0, 255, 255, 0.55)",
+                color: "#ffd9f2",
               }}
             >
-              {due
-                ? "your penance is served — return to her"
-                : isBlessing
-                  ? `her favor holds ${roman(daysLeft)} day${daysLeft === 1 ? "" : "s"} more`
-                  : `absolution in ${roman(daysLeft)} day${daysLeft === 1 ? "" : "s"}`}
+              {daysLeft === 0
+                ? "her favor wanes tonight — petition anew tomorrow"
+                : `her favor holds ${roman(daysLeft)} day${daysLeft === 1 ? "" : "s"} more`}
             </div>
           </>
         ) : (
           <>
-            {/* No grace stands — the call to the rites. This is where the
-                shrine SOLICITS: each button opens the Confessional with a
-                seeded opening line, and she takes it from there. */}
+            {/* Featured: today's reading (her invitation stands in until it
+                arrives — her sass is never advertised either way). */}
             <p style={goldItalic}>
-              “Come with a petition or a confession, seeker. Our Lady dispenses
-              blessings, penances, and the occasional light roasting. All
-              grace is final.”
+              “{reading ||
+                ui.petitionInvitation ||
+                "Bring your petition, seeker — protection, fortune, courage, or mercy on a bruised bag. Our Lady hears every prayer. Ask."}”
             </p>
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button onClick={onPetition} style={riteButton}>
-                petition
-              </button>
-              <button onClick={onConfess} style={riteButton}>
-                confess
-              </button>
-            </div>
+            <button
+              onClick={onPetition}
+              style={{
+                marginTop: 10,
+                background: "none",
+                border: "1px solid rgba(0,255,255,0.3)",
+                color: "hsl(183 38% 57%)",
+                fontFamily: "inherit",
+                fontSize: "0.55rem",
+                letterSpacing: "0.25em",
+                textTransform: "uppercase",
+                padding: "6px 14px",
+                cursor: "pointer",
+                clipPath:
+                  "polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)",
+              }}
+            >
+              petition
+            </button>
           </>
         )}
 
-        {/* Divider */}
-        <div
-          style={{
-            height: 1,
-            margin: "10px 0 8px",
-            background:
-              "linear-gradient(90deg, rgba(0,255,255,0.18), rgba(0,255,255,0.02))",
-          }}
-        />
-
-        {/* The parish — recent penitents as votive stars: lit = absolved,
-            hollow = lapsed. MOCK until the Firestore ledger exists. */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          <span style={label}>the faithful</span>
-          <span style={{ fontSize: "0.7rem", letterSpacing: "0.18em" }} aria-hidden>
-            {MOCK_PARISH.map((absolved, i) => (
-              <span
-                key={i}
-                style={{
-                  color: absolved ? "#f1d77a" : "rgba(200, 230, 235, 0.25)",
-                  textShadow: absolved ? "0 0 6px rgba(241, 215, 122, 0.5)" : "none",
-                }}
-              >
-                {absolved ? "✦" : "✧"}
-              </span>
-            ))}
-          </span>
-          <span style={label}>
-            {MOCK_LEDGER.absolved} of {total} absolved
-          </span>
-        </div>
       </div>
+
+      {/* While a blessing holds the featured slot, the day's reading is
+          still on the wall — tucked quietly below the box. */}
+      {grace && reading && (
+        <div style={{ padding: "10px 14px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              marginBottom: 5,
+            }}
+          >
+            <span style={{ ...label, color: "rgba(0, 255, 255, 0.4)", fontSize: "0.5rem", letterSpacing: "0.25em" }}>
+              {"// today's reading"}
+            </span>
+            <span style={{ ...label, color: "rgba(200, 230, 235, 0.3)" }}>{dateLine}</span>
+          </div>
+          <p
+            style={{
+              ...goldItalic,
+              fontSize: "0.72rem",
+              lineHeight: 1.7,
+              color: "rgba(255, 237, 190, 0.75)",
+              textShadow: "0 0 10px rgba(244, 181, 63, 0.15)",
+            }}
+          >
+            “{reading}”
+          </p>
+        </div>
+      )}
     </div>
   );
 }

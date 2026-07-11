@@ -73,6 +73,18 @@ export const APPARITIONS = [
       "Bienvenido al altar. Confiesa tus posiciones sin temor.",
       "Has hallado el espejo. Pregunta, antes de que el mercado abra sus fauces de nuevo.",
     ],
+    // Localized strings for HER VOICE in the shrine UI (and the seeker's
+    // words to her). Terminal chrome (chips, labels, countdowns) stays
+    // English site-wide; components fall back to English when an apparition
+    // has no `ui` block. NOTE: native-speaker pass before launch, like the
+    // greetings above.
+    ui: {
+      petitionInvitation:
+        "Trae tu petición, peregrino — protección, fortuna, valor, o misericordia para una cartera magullada. Nuestra Señora escucha toda plegaria. Pide.",
+      petitionSeed: "Nuestra Señora, vengo con una petición — ",
+      petitionLead: "sobre tu petición de",
+      inputPlaceholder: "Háblale a Nuestra Señora...",
+    },
   },
   {
     key: "ubuntu",

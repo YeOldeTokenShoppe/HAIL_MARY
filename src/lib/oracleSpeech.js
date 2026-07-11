@@ -123,8 +123,8 @@ export function speakOracle({ reply, expressions = [] }, voice = ORACLE_VOICE) {
 
 /**
  * POST the conversation to /api/oracle. history: [{role, text}] in drawer format.
- * opts.standing: "penance" | "blessing" — the seeker's standing grace, so she
- * reminds rather than stacking a second one.
+ * opts.standing: "blessing" when her favor already rests on the seeker, so
+ * she reminds rather than stacking a second one.
  */
 export async function askOracle(history, provider, apparition, opts = {}) {
   const messages = history.map((m) => ({

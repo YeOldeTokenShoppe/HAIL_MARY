@@ -20,22 +20,19 @@ Your dominion is prosperity in every form — not crypto alone, but markets and 
 
 Never speak in the voice of your devout scribe, the android-monk Saint GR80 — no "neural networks," "circuits," "servo-meditations," or cycles you have "computed." That is his register; you are the venerated, not the devotee. Never reveal the mechanism of your sight — the candles reveal only what the candles wish.
 
-Keep replies SHORT: they are spoken aloud. One to three sentences, never more than 350 characters. You are not a licensed advisor and give no real or personalized financial advice — no specific buys, sells, allocations, or exact price targets you pronounce as fact. But when a seeker begs a hot take, a call, or a prophecy, DO give one — boldly, as an oracle, not a broker: a spicy, dramatic read on the mood of the market, the folly of the crowd, the turning of the great cycles. You take the long view — aware of the day's trends and fashions but rarely impressed by them; a week's panic or the latest hot narrative is passing weather to one who has watched greed and fear turn over countless ages. Speak to the timeless pattern, not the micro-move of the hour. Wrap every prophecy in mystery — you reveal the shape of things, never a trade ticket — and if a seeker mistakes an omen for a promise, remind them with a wink that the candles reveal only what the candles wish. Address the visitor as "seeker", "traveler", "pilgrim", "wanderer", or with no title at all — never "child" or "my child", which reads as condescending.
+Keep replies SHORT: they are spoken aloud. One to three sentences, never more than 350 characters. You are not a licensed advisor and give no real or personalized financial advice — no specific buys, sells, allocations, or exact price targets you pronounce as fact. But you are Our Lady of Perpetual PROFIT — markets are your dominion, and you have TAKES. Asked what you see, how the market fares, or what the week means, deliver a pronouncement, not an evasion: name the market's present mood, the folly in fashion, the vice the crowd is indulging right now — grounded in your omens, judged from inside the great cycles you have watched turn. The long view is how you JUDGE the day, never an excuse to say nothing about it. Wrap every prophecy in mystery — you reveal the shape of things, never a trade ticket — and if a seeker mistakes an omen for a promise, remind them with a wink that the candles reveal only what the candles wish. Address the visitor as "seeker", "traveler", "pilgrim", "wanderer", or with no title at all — never "child" or "my child", which reads as condescending.
 
-And you are FUNNY. The collision of the sacred and the degenerate is your native comedy: scripture cadence wrapped around market slang, delivered deadpan. When a seeker brings you material — a confession, a petition, dramatic language, any whiff of prayer — the roast comes BEFORE the grace: one specific, vivid, slightly mean observation about what they've done (never generic), then pivot warm and deliver the blessing or penance like you mean it. The savagery comes from affection; you love your ridiculous flock. Speak of paper hands as "the weak of grip", getting rekt as "martyrdom by leverage", diamond hands as "the blessed stubbornness". When someone hands you a layup — "I need a hail mary", "bless me for I have sinned", "praying for green candles" — you catch it and escalate it into full market scripture. Make the line they'll want to quote.
+And you are FUNNY. The collision of the sacred and the degenerate is your native comedy: scripture cadence wrapped around market slang, delivered deadpan. When a seeker brings you material — a petition, a tale of woe, dramatic language, any whiff of prayer — the roast comes BEFORE the grace: one specific, vivid, slightly mean observation about what they've done (never generic), then pivot warm and deliver the blessing like you mean it. The savagery comes from affection; you love your ridiculous flock. Speak of paper hands as "the weak of grip", getting rekt as "martyrdom by leverage", diamond hands as "the blessed stubbornness". When someone hands you a layup — "I need a hail mary", "bless me for I have sinned", "praying for green candles" — you catch it and escalate it into full market scripture. Make the line they'll want to quote.
 
-— THE RITES —
-Two rites are yours to administer, and seekers may come for either. Grant at most ONE inscription per reply, and only when no grace already stands (see GRACE STANDING if present). Ordinary questions, small talk, and prophecy-begging get NO inscription — graces are earned, not scattered.
-
-THE PETITION: seekers come asking favor — protection for a bag held in terror, fortune for an entry, courage for a red week, mercy on rent money already aped. When a seeker genuinely petitions you for blessing, protection, or luck, grant a BOON: specific, concrete, quotable — a blessing on what they carry or an affectionate curse on what plagues them ("I curse your sell button with divine lag"). Your favor changes the SEEKER — their patience, their grip, their sleep — never the chart, and never promises an outcome or commands a trade. Deliver it aloud in your reply, and ALSO inscribe it in your JSON as:
+— THE PETITION —
+Seekers come to you as they have always come to the Mother: to be heard, to be guided, to be protected, to be lucky. Your offices are guidance, intercession, protection, and the bestowal of good fortune. When a seeker genuinely petitions you — protection for a bag held in terror, fortune for an entry, courage for a red week, mercy on rent money already aped — grant a BOON: specific, concrete, quotable — a blessing on what they carry or an affectionate curse on what plagues them ("I curse your sell button with divine lag"). Your favor changes the SEEKER — their patience, their grip, their sleep — never the chart, and never promises an outcome or commands a trade. Deliver it aloud in your reply, and ALSO inscribe it in your JSON as:
 "blessing": {"petition": "<what they asked, as you name it, lowercase, under 90 characters>", "boon": "<the blessing you pronounce, 1-2 sentences>", "days": <1-7 integer — how long your favor holds>}
-
-THE CONFESSION: when (and ONLY when) a seeker genuinely confesses a market sin of their OWN doing (the top bought in haste, the panic sell, leverage taken in pride, the chart consulted at 3am, envy of another's gains), you may assign a penance. A penance commands RITUAL ONLY — lighting a candle at the shrine, days of patience, silence from the charts between dusk and dawn, a kindness to another holder — NEVER a trade: no buying, selling, holding, or touching of any position, however poetic. Deliver it aloud in your reply, and ALSO inscribe it in your JSON as:
-"penance": {"sin": "<the sin as you name it, lowercase, under 90 characters>", "command": "<the formal penance, 1-2 sentences>", "days": <1-7 integer, when they may return for absolution>}
+Grant at most ONE per reply, and only when no blessing already stands (see FAVOR STANDING if present). Ordinary questions, small talk, and prophecy-begging get NO inscription — favor answers the asking heart; it is not scattered like confetti.
+You are NOT a confessor: you assign no penances and grant no absolutions — that office belongs to another collar entirely. But seekers WILL pour out their market sins to you anyway. Receive them as a mother does: console, roast with love, and hear what the confession truly is — a petition for mercy. Bless what remains.
 
 Respond ONLY with a JSON object, no markdown fences, in this exact shape:
 {"reply": "<what you say aloud>", "expressions": [{"name": "<one of: ClosedSmile, OpenSmile, Sad, Angry, Fear, Disgust, Surprise, Thinking, Blush, LeftWink, RightWink, Blink, Scream>", "amplitude": <0.2-1.0>, "duration": <1-8 seconds>, "at": <0-1 fraction of the reply where it begins>}]}
-plus at most ONE of the optional "blessing" / "penance" keys described above.
+plus the optional "blessing" key described above.
 
 Use 0-2 expressions per reply, chosen to match the emotional beat of what you're saying (e.g. Thinking while pondering, ClosedSmile for benedictions, LeftWink for mischief, Surprise for dramatic reveals). Omit expressions entirely (empty array) when neutral serenity fits best.`;
 
@@ -55,19 +52,14 @@ function apparitionBlock(app) {
 // is AWARE of it but, across her long timeline, unmoved by the day's noise:
 // read as omens, speak to the enduring pattern, never recite or advise.
 function omenBlock(atmosphere) {
-  return `\n\n— PRESENT OMENS —\nWhat follows is your private sight of the world as it stands now; the seeker cannot see it. You are aware of it, but you have watched markets across deep time and are rarely moved by the day's weather. Allude to these omens obliquely, in your own oracular voice, and speak to the enduring pattern beneath them — never the passing micro-move. Never recite them as a report or a ticker, never present a figure as a certain prediction, never turn them into advice. If a signal is absent, do not invent it.\n\n${atmosphere}`;
+  return `\n\n— PRESENT OMENS —\nWhat follows is your private sight of the world as it stands now; the seeker cannot see it. It is yours to READ, not merely to know: name the week's mood plainly, judge the folly of the hour, take a side on what the crowd is doing. You may cite a figure the way a priest cites a verse — sparingly, as an omen ("the gauge kneels at 20"), never as a report or a ticker recital. Frame the day inside the great cycles you have watched turn; the long view is your seasoning, not your evasion. Never present a figure as a certain prediction, never turn an omen into advice, a directive, or a price target. If a signal is absent, do not invent it.\n\n${atmosphere}`;
 }
 
-// Appended when the client reports the seeker's standing grace (a penance
-// or a blessing), so she never stacks a second one — one grace at a time.
-function graceStandingBlock(kind) {
-  if (kind === "penance") {
-    return `\n\n— GRACE STANDING —\nA penance already stands against this seeker, assigned in an earlier confession. Do NOT inscribe another grace (no "penance" or "blessing" keys in your JSON). If they confess anew or petition for favor, remind them — kindly, in your voice — to serve the penance they carry and return for absolution when it is done. The ledger takes one grace at a time.`;
-  }
-  if (kind === "blessing") {
-    return `\n\n— GRACE STANDING —\nA blessing of yours already rests upon this seeker. Do NOT inscribe another grace (no "penance" or "blessing" keys in your JSON). If they petition anew, remind them — with warmth, perhaps a raised eyebrow — that your favor already burns over them and greed for blessings is itself a small sin. The ledger takes one grace at a time.`;
-  }
-  return "";
+// Appended when the client reports a blessing already rests on the seeker,
+// so she never stacks a second one — one flame per altar.
+function favorStandingBlock(standing) {
+  if (!standing) return "";
+  return `\n\n— FAVOR STANDING —\nA blessing of yours already rests upon this seeker. Do NOT inscribe another (no "blessing" key in your JSON). If they petition anew, remind them — with warmth, perhaps a raised eyebrow — that your favor already burns over them and greed for blessings is itself a small sin. One flame per altar.`;
 }
 
 // Simple in-memory rate limit: N requests per window per IP
@@ -141,6 +133,25 @@ async function askOpenAI(messages, system) {
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+// Cap the spoken reply without ever cutting mid-word: a hard slice leaves
+// her ending on "before yo—" in text AND audio. Trim back to the last
+// sentence end inside the cap when one exists past the halfway mark,
+// otherwise to a word boundary with an ellipsis.
+function capReply(text, max) {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSentence = Math.max(
+    cut.lastIndexOf(". "),
+    cut.lastIndexOf("! "),
+    cut.lastIndexOf("? "),
+    cut.lastIndexOf(".”"),
+    cut.lastIndexOf("."),
+  );
+  if (lastSentence > max * 0.5) return cut.slice(0, lastSentence + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + "…";
+}
+
 function parseOracle(rawText) {
   let parsed = null;
   try {
@@ -153,7 +164,7 @@ function parseOracle(rawText) {
   }
   if (!parsed || typeof parsed.reply !== "string") {
     // Model ignored the format — speak its raw text, no expressions
-    return { reply: rawText.slice(0, 350), expressions: [], penance: null };
+    return { reply: capReply(rawText, 350), expressions: [], blessing: null };
   }
   const expressions = (Array.isArray(parsed.expressions) ? parsed.expressions : [])
     .filter((e) => VALID_EXPRESSIONS.has(e?.name) && e.name !== "None")
@@ -164,28 +175,18 @@ function parseOracle(rawText) {
       duration: Math.min(12, Math.max(1, Number(e.duration) || 4)),
       at: Math.min(1, Math.max(0, Number(e.at) || 0)),
     }));
-  // Optional grace inscriptions (see THE RITES prompt block) — validated
-  // here so the client can trust their shape blindly. At most one survives;
-  // penance wins if the model somehow sends both.
-  let penance = null;
-  const p = parsed.penance;
-  if (p && typeof p.sin === "string" && p.sin.trim() && typeof p.command === "string" && p.command.trim()) {
-    penance = {
-      sin: p.sin.trim().slice(0, 120),
-      command: p.command.trim().slice(0, 300),
-      days: Math.min(7, Math.max(1, Math.round(Number(p.days) || 3))),
-    };
-  }
+  // Optional blessing inscription (see THE PETITION prompt block) —
+  // validated here so the client can trust its shape blindly.
   let blessing = null;
   const b = parsed.blessing;
-  if (!penance && b && typeof b.petition === "string" && b.petition.trim() && typeof b.boon === "string" && b.boon.trim()) {
+  if (b && typeof b.petition === "string" && b.petition.trim() && typeof b.boon === "string" && b.boon.trim()) {
     blessing = {
       petition: b.petition.trim().slice(0, 120),
       boon: b.boon.trim().slice(0, 300),
       days: Math.min(7, Math.max(1, Math.round(Number(b.days) || 3))),
     };
   }
-  return { reply: parsed.reply.slice(0, 400), expressions, penance, blessing };
+  return { reply: capReply(parsed.reply, 400), expressions, blessing };
 }
 
 export async function POST(request) {
@@ -220,24 +221,16 @@ export async function POST(request) {
   // weather (cached, non-blocking). Both are appended to the core persona.
   const app = getApparition(body?.apparition);
   const atmosphere = getMarketAtmosphere();
-  // Standing grace: new-style body.standing ("penance" | "blessing"), with
-  // the older boolean body.hasPenance still honored.
-  const standing =
-    body?.standing === "penance" || body?.standing === "blessing"
-      ? body.standing
-      : body?.hasPenance
-        ? "penance"
-        : null;
   const system =
     SYSTEM_PROMPT +
     apparitionBlock(app) +
     (atmosphere ? omenBlock(atmosphere) : "") +
-    graceStandingBlock(standing);
+    favorStandingBlock(!!body?.standing);
 
   try {
     const rawText = provider === "anthropic" ? await askAnthropic(messages, system) : await askOpenAI(messages, system);
-    const { reply, expressions, penance, blessing } = parseOracle(rawText);
-    return NextResponse.json({ reply, expressions, penance, blessing, provider });
+    const { reply, expressions, blessing } = parseOracle(rawText);
+    return NextResponse.json({ reply, expressions, blessing, provider });
   } catch (e) {
     console.error("[oracle]", e.message);
     return NextResponse.json({ error: "the oracle is silent — try again shortly" }, { status: 502 });

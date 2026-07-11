@@ -20,7 +20,7 @@ import { useMusic } from "@/components/MusicContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import MainVigilPanel from "@/components/MainVigilPanel";
 import GraceOfRecord from "@/components/GraceOfRecord";
-import { readGrace, mintPenance, mintBlessing } from "@/lib/grace";
+import { readGrace, mintBlessing } from "@/lib/grace";
 import useCyberConfirm from "@/components/useCyberConfirm";
 import DropInTitle from "@/components/DropInTitle";
 
@@ -448,21 +448,22 @@ export default function MainPage() {
 
   // Oracle conversation: POST the drawer history to /api/oracle, speak the
   // reply through SitePal (ElevenLabs voice) with timed facial expressions.
-  // The request carries the seeker's standing grace kind (so she reminds
-  // instead of stacking); a `penance` or `blessing` inscription in the
-  // reply is minted to the device ledger, and GraceOfRecord re-reads it
-  // via GRACE_EVENT.
+  // The request carries whether her favor already rests on the seeker (so
+  // she declines to stack — one flame per altar); a `blessing` inscription
+  // in the reply is minted to the device ledger, and GraceOfRecord re-reads
+  // it via GRACE_EVENT.
   const handleOracleMessage = useCallback(async (text, history) => {
     const app = CHARACTERS[activeCharIndex];
     const standing = readGrace();
     const data = await askOracle(history, undefined, app?.key, { standing: standing?.kind });
-    if (!standing) {
-      if (data.penance) mintPenance(data.penance);
-      else if (data.blessing) mintBlessing(data.blessing);
-    }
+    if (!standing && data.blessing) mintBlessing(data.blessing);
     speakOracle(data, app?.voice || ORACLE_VOICE);
     return data.reply;
   }, [activeCharIndex]);
+
+  // Localized her-voice strings for the active apparition (empty for the
+  // English faces — components fall back to their English defaults).
+  const appUi = CHARACTERS[activeCharIndex]?.ui || {};
 
   // The rite buttons open the Confessional with a seeded opening line, so
   // the seeker lands in the right register (she takes it from there).
@@ -778,6 +779,10 @@ export default function MainPage() {
           overflowX: "hidden",
           touchAction: "pan-y",
           overscrollBehavior: "contain",
+          // Clearance for the fixed bottom dock: without it the column's
+          // last ~100px (the altar module's tail) can never scroll out from
+          // behind the nav — visible above the fold, unreachable below it.
+          paddingBottom: isMobile ? "calc(96px + env(safe-area-inset-bottom, 0px))" : 0,
           fontFamily: "'Cyber', 'Geo', sans-serif",
           background: "rgba(0, 0, 0, 0.5)",
           backdropFilter: "saturate(180%) blur(8px)",
@@ -853,17 +858,21 @@ export default function MainPage() {
           />
         </div>
 
-        {/* ── Grace of Record ── the visitor's ONE standing grace (blessing
-            from a petition, or penance from a confession) + the parish
-            ledger, filling the dead space beneath the portrait. Both rites
-            put the return visit inside the ritual itself. Reads the REAL
-            device ledger (lib/grace); the buttons open the Confessional
-            seeded for the chosen rite. Desktop only — phones keep the
-            column tight. (Parish tally still mock.) */}
-        {!isMobile && (
+        {/* ── Grace of Record ── the visitor's standing blessing + the
+            parish ledger, beneath the portrait on every viewport (the panel
+            column scrolls on phones). Favor expires after its allotted
+            days, reopening the altar — the return visit lives inside the
+            rite. Reads the REAL device ledger (lib/grace); PETITION opens
+            the Confessional seeded in her tongue. (Parish tally still
+            mock.) Hidden while the phone drawer is up — the shrunken
+            portrait + conversation own that screen. */}
+        {!(isMobile && chatOpen) && (
           <GraceOfRecord
-            onPetition={() => openRite("Our Lady, I come with a petition — ")}
-            onConfess={() => openRite("Bless me, Our Lady, for I have sinned — ")}
+            ui={appUi}
+            /* Today's reading fills the module's featured slot when no
+               blessing stands — her daily proof she has something to say. */
+            apparitionKey={CHARACTERS[activeCharIndex]?.key}
+            onPetition={() => openRite(appUi.petitionSeed || "Our Lady, I come with a petition — ")}
           />
         )}
 
@@ -1101,6 +1110,8 @@ export default function MainPage() {
           /* Rite buttons (GraceOfRecord) seed the input with an opening
              line — "Bless me, Our Lady, for I have sinned — " etc. */
           presetInput={chatSeed}
+          /* Input placeholder follows the apparition's tongue */
+          placeholder={appUi.inputPlaceholder}
           /* SPEAK (center dock FAB) is the sole launcher — no auto-appearing
              conversation bubble before the user chooses to speak. */
           hideLauncher

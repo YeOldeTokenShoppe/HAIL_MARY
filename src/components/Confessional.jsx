@@ -26,8 +26,11 @@ import "./Confessional.css";
  *  - presetInput:     seeds the input field when the drawer opens (e.g. the
  *                     rite buttons' "Bless me, Our Lady, for I have sinned — ").
  *                     The seeker finishes the sentence; empty string is a no-op.
+ *  - placeholder:     input placeholder — pass the apparition's localized
+ *                     line (e.g. "Háblale a Nuestra Señora...") to keep the
+ *                     invitation in her tongue.
  */
-export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null, docked = false, presetInput = "" }) {
+export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null, docked = false, presetInput = "", placeholder = "Speak to Our Lady..." }) {
   const [messages, setMessages] = useState([]);
   const [inputVal, setInputVal] = useState("");
   const [pending, setPending] = useState(false);
@@ -307,7 +310,7 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
           ref={inputRef}
           className="confessional-input"
           type="text"
-          placeholder="Speak to Our Lady..."
+          placeholder={placeholder}
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={handleKeyDown}
