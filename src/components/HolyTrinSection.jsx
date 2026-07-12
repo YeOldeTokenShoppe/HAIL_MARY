@@ -7,6 +7,15 @@ import DropInTitle from "./DropInTitle";
 import "./holyTrin.css";
 
 const PILLARS = [
+
+    {
+    id: "util80",
+    label: "Util80",
+    tagline: "in use",
+    color: "#ffd700",
+    description:
+      "Get access to the growing ecosystem of games and services built on the RL80 cosmology.",
+  },
     {
     id: "integr80",
     label: "Integr80",
@@ -15,14 +24,7 @@ const PILLARS = [
     description:
       "Token contract renounced. 80% of supply in the LP. No admin keys, no mint function, no hidden levers.",
   },
-  {
-    id: "util80",
-    label: "Util80",
-    tagline: "in use",
-    color: "#ffd700",
-    description:
-      "Get access to the growing ecosystem of games and services built on the RL80 cosmology.",
-  },
+
 
   {
     id: "liquid80",
@@ -67,7 +69,7 @@ export default function HolyTrinSection() {
     >
       <div className="holy-trin-text">
         <DropInTitle
-          lines={["The Holy", "Trin80", "of Tokens"]}
+          lines={["The Holy", "Trin80 of", "Digital Assets"]}
       colors={["#00ff00", "#f4e4c1", "#ffd700"]}
           fontSize={{ mobile: "3rem", desktop: "3.4rem" }}
           isMobile={typeof window !== "undefined" && window.innerWidth <= 900}
@@ -238,8 +240,8 @@ export default function HolyTrinSection() {
 
           {/* Vertex halos — pulse behind each vertex dot */}
           <g className="holy-trin-halos" filter="url(#trin-soft-glow)">
-            <circle className="holy-trin-halo holy-trin-halo--top" cx="150" cy="40" r="16" fill="#00ff00" />
-            <circle className="holy-trin-halo holy-trin-halo--bl" cx="40" cy="240" r="16" fill="#ffd700" />
+            <circle className="holy-trin-halo holy-trin-halo--top" cx="150" cy="40" r="16" fill="#ffd700" />
+            <circle className="holy-trin-halo holy-trin-halo--bl" cx="40" cy="240" r="16" fill="#00ff00" />
             <circle className="holy-trin-halo holy-trin-halo--br" cx="260" cy="240" r="16" fill="#f4e4c1" />
           </g>
 

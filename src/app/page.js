@@ -2049,6 +2049,23 @@ function MobileSectionDropInTitle() {
 export default function HomePage() {
   const [timeframeKey, setTimeframeKey] = useState("30m");
   const [heroPullquoteIndex, setHeroPullquoteIndex] = useState(0);
+  // The hero title alternates between the full devotional name and the RL80
+  // ticker so the tie between the two reads at a glance. Our Lady holds the
+  // frame, then the ticker flashes in (with the /fountain god-ray treatment)
+  // and fades back. Both faces stay mounted and crossfade, so the below-fold
+  // content never reflows.
+  const [heroShowTicker, setHeroShowTicker] = useState(false);
+  useEffect(() => {
+    let timer;
+    let showing = false;
+    const tick = () => {
+      showing = !showing;
+      setHeroShowTicker(showing);
+      timer = setTimeout(tick, showing ? 2600 : 5200);
+    };
+    timer = setTimeout(tick, 5200);
+    return () => clearTimeout(timer);
+  }, []);
   const tfOpt =
     TIMEFRAME_OPTIONS.find((o) => o.key === timeframeKey) ||
     TIMEFRAME_OPTIONS[0];
@@ -2645,13 +2662,45 @@ export default function HomePage() {
       {/* <CommunityCandles /> */}
 
       <div className="hero-header">
-        <h1 className="our-lady-title">
-          <span className="title-line">Our Lady</span>
-          <span className="title-line">
-            <span className="title-of">of </span>Perpetual
-          </span>
-          <span className="title-line title-line-profit">Profit</span>
-        </h1>
+        <div
+          className={`hero-title-stack${heroShowTicker ? " is-ticker" : ""}`}
+        >
+          <h1 className="our-lady-title" aria-hidden={heroShowTicker}>
+            <span className="title-line">Our Lady</span>
+            <span className="title-line">
+              <span className="title-of">of </span>Perpetual
+            </span>
+            <span className="title-line title-line-profit">Profit</span>
+          </h1>
+          {/* Ticker face: same anchor, borrowing /fountain's UnifrakturMaguntia
+              plus its stacked-copy god-ray beams. aria-hidden flips with the
+              crossfade so screen readers only announce the visible face. */}
+          <div className="rl80-ticker-title" aria-hidden={!heroShowTicker}>
+            RL80
+            {Array.from({ length: 100 }).map((_, i) => {
+              const index = i + 1;
+              return (
+                <span
+                  key={index}
+                  className="rl80-ticker-ray"
+                  style={{
+                    // White letters; beams graduate from warm gold at the
+                    // source to cool blue as each copy recedes.
+                    color: `rgb(${212 - index * 1.52}, ${175 - index * 0.35}, ${
+                      55 + index * 2
+                    })`,
+                    transform: `translate(${index * 0.1}rem, ${
+                      index * 0.1
+                    }rem) scale(${1 + index * 0.01})`,
+                    opacity: (1 / index) * 1.5,
+                  }}
+                >
+                  RL80
+                </span>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="below-fold-chamber">
@@ -2687,7 +2736,7 @@ export default function HomePage() {
                 ) : null}
               </blockquote>
               <p className="hero-intro">
-Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment against scams in the Liminal Terminal, or scan any token for multidimensional review — spiritual verdict included. RL80 is the <span className="hero-intro__pop">deflationary utility</span> token of her order.
+Stake a claim with The Hail Mary Prospecting Co. Sharpen your eye for scams and market signals in the Liminal Terminal. Confess your sins and petition for your portfolio in live chat. Burn a votive candle to Our Lady. RL80 is the <span className="hero-intro__pop">deflationary utility</span> token of her order.
 </p>
             </div>
           </div>
@@ -2714,7 +2763,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
           <span className="section-divider-line section-divider-line--right" />
         </div> */}
 
-        {/* <MaterExMachinaSection />
+        {/* <MaterExMachinaSection /> */}
 
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
@@ -2724,11 +2773,12 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
 
         <HolyTrinSection />
 
+
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
           <span className="section-divider-icon">&#x2021;</span>
           <span className="section-divider-line section-divider-line--right" />
-        </div> */}
+        </div>
 
         {/* <BusinessSection /> */}
 
@@ -3012,7 +3062,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#2ad6ee"
+                stroke="#f4b53f"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -3020,7 +3070,7 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                   width: 24,
                   height: 24,
                   display: 'block',
-                  filter: 'drop-shadow(0 0 4px rgba(42, 214, 238, 0.6))',
+                  filter: 'drop-shadow(0 0 4px rgba(244, 181, 63, 0.7))',
                 }}
                 aria-hidden="true"
               >
@@ -3046,11 +3096,11 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#f1d77a"
+                stroke="#2ad6ee"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ width: 24, height: 24, display: 'block', filter: 'drop-shadow(0 0 4px rgba(241, 215, 122, 0.6))' }}
+                style={{ width: 24, height: 24, display: 'block' }}
                 aria-hidden="true"
               >
                 <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
@@ -3127,8 +3177,8 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your discernment agains
                 confirm: {
                   title: "Ex Libris",
                   body: "The perpetual ledger. Every flame, every name, inscribed for those who came to pray.",
-                  accent: "hsl(189, 84%, 55%)",
-                  shadow: "hsl(189, 70%, 38%)",
+                  accent: "hsl(300, 90%, 62%)",
+                  shadow: "hsl(300, 75%, 42%)",
                 },
                 icon: (
                   <>

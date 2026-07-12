@@ -16,10 +16,9 @@
   .holy-trin.holy-trin {
     width: min(100% - 64px, 1280px);
     display: grid;
-    /* Reversed: visual-left, text-right. The 1fr/1.25fr ratio keeps
-       the text column the wider one of the two, matching the prior
-       balance — just on the opposite side. */
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    /* Text-left, visual-right. The 1.25fr/1fr ratio keeps the text
+       column the wider one of the two. */
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     gap: clamp(32px, 4vw, 72px);
     align-items:end;
     text-align: left;
@@ -32,11 +31,8 @@
     box-shadow: none;
     border-radius: 0;
   }
-  /* Move the visual into the first grid column so the JSX reading order
-     (text first, visual second) renders as visual-left, text-right. */
-  .holy-trin-visual {
-    order: -1;
-  }
+  /* No reorder: the JSX reading order (text first, visual second) maps
+     directly to text-left, visual-right. */
   /* Decorative glow was tuned for the centered card layout — in the
      split layout it shows as a bright horizontal band between columns. */
   .holy-trin::before { display: none; }
@@ -71,7 +67,31 @@
   .holy-trin-text {
     display: flex;
     flex-direction: column;
-    gap: clamp(18px, 2vw, 28px);
+    /* Gap doubles as the space below the heading — the subtitle is
+       commented out, so the only two children are the DropInTitle and the
+       pillars list. Bumped up for a touch more breathing room under the
+       title. */
+    gap: clamp(28px, 3vw, 40px);
+    /* Dark "plaque" niche behind the copy — matches the
+       .intro-chart-section__text plaque in the section directly above so
+       the two read as siblings. The visual (triangle diagram) is left
+       unboxed, exactly as the chart is over there. Now in the left
+       column, so hug the end (center rule) — mirroring the sibling
+       plaque, which hugs the same divider from the right. */
+    justify-self: end;
+    max-width: 36rem;
+    padding: clamp(28px, 2.5vw, 40px) clamp(28px, 2.5vw, 38px);
+    border-radius: 18px;
+    background: radial-gradient(
+      120% 100% at 50% 0%,
+      rgba(6, 11, 19, 0.88) 0%,
+      rgba(3, 6, 12, 0.84) 55%,
+      rgba(0, 0, 0, 0.72) 100%
+    );
+    border: 1px solid rgba(42, 214, 238, 0.16);
+    box-shadow:
+      0 18px 44px rgba(0, 0, 0, 0.5),
+      0 0 20px rgba(42, 214, 238, 0.07);
   }
   .holy-trin-text .holy-trin-heading {
     margin: 0;
@@ -189,7 +209,7 @@
   flex-direction: column;
   align-items: center;
   width: min(100% - 48px, 880px);
-  margin: clamp(280px, 85vh, 880px) auto 22px;
+  margin: clamp(280px, 0vh, 880px) auto 22px;
   padding: clamp(36px, 5vw, 56px) clamp(20px, 5vw, 54px)
     clamp(34px, 5vw, 50px);
   background: linear-gradient(
@@ -316,15 +336,15 @@
 }
 
 .holy-trin-corner--integr80 {
-  top: 14.29%;
-  left: 50%;
-  transform: translate(-50%, calc(-100% - 6px));
-}
-
-.holy-trin-corner--util80 {
   top: 85.71%;
   left: 13.33%;
   transform: translate(calc(-50% - 4px), 14px);
+}
+
+.holy-trin-corner--util80 {
+  top: 14.29%;
+  left: 50%;
+  transform: translate(-50%, calc(-100% - 6px));
 }
 
 .holy-trin-corner--liquid80 {
@@ -366,12 +386,25 @@
     max-width: 360px;
     margin: clamp(220px, 75vh, 600px) auto 0;
     padding: 32px 16px 28px;
-    background: none;
-    border-top: none;
-    border-radius: 0;
+    /* One dark "shrine niche" behind the whole block — matches the
+       .intro-chart-section mobile panel in the section directly above so
+       the two read as siblings. No backdrop-blur on purpose (this page
+       runs near the mobile GPU ceiling; the base rule's blur is dropped
+       here). */
+    background: radial-gradient(
+      115% 90% at 50% 0%,
+      rgba(6, 11, 19, 0.88) 0%,
+      rgba(3, 6, 12, 0.84) 55%,
+      rgba(0, 0, 0, 0.74) 100%
+    );
+    backdrop-filter: none;
+    border: 1px solid rgba(42, 214, 238, 0.16);
+    border-radius: 16px;
     color: #f1d77a;
     text-align: center;
-    box-shadow: none;
+    box-shadow:
+      0 12px 36px rgba(0, 0, 0, 0.5),
+      0 0 18px rgba(42, 214, 238, 0.07);
   }
 
   .holy-trin::before {
@@ -393,7 +426,7 @@
   /* Mirrors .reliquary-heading so the two sections read as siblings. */
   .holy-trin-heading {
     display: inline-block;
-    margin: 0 auto 22px;
+    margin: 0 auto 32px;
     font-family: "UnifrakturCook", serif;
     color: #d4af37;
     font-size: clamp(2rem, 5.5vw, 2.8rem);
@@ -443,18 +476,18 @@
     padding: 6px 8px;
   }
 
-  /* Top apex: (150, 40) → (50%, 14.29%). Label sits above the apex. */
-  .holy-trin-corner--integr80 {
-    top: 14.29%;
-    left: 50%;
-    transform: translate(-50%, calc(-100% - 6px));
-  }
-
   /* Bottom-left: (40, 240) → (13.33%, 85.71%). Label sits below + left. */
-  .holy-trin-corner--util80 {
+  .holy-trin-corner--integr80 {
     top: 85.71%;
     left: 13.33%;
     transform: translate(calc(-50% - 4px), 14px);
+  }
+
+  /* Top apex: (150, 40) → (50%, 14.29%). Label sits above the apex. */
+  .holy-trin-corner--util80 {
+    top: 14.29%;
+    left: 50%;
+    transform: translate(-50%, calc(-100% - 6px));
   }
 
   /* Bottom-right: (260, 240) → (86.67%, 85.71%). Label sits below + right. */

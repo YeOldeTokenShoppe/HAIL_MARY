@@ -33,7 +33,7 @@ almost regardless of scale.
 
 | Type | Count | Notes |
 |---|---|---|
-| Traders | 4 | The cast: Eugene, Marisol, Halo Node, Bullhorn Broker. All Mythic. Playable characters, never in the draw pool. |
+| Traders | 4 | The cast: Eugene, Marisol, Halo Node, Bullhorn Broker. All Mythic. Playable characters, never in the draw pool. **Cast reconciliation planned** — Halo Node → Saint GR80, Bullhorn Broker → John Barron, Eugene recharacterized (pattern/rare-finds, not memes); see [CASE_TABLE.md](./CASE_TABLE.md) §2. |
 | Coin cards | 28 | Buy-and-hold portfolio entries. `cost` → `baseValue`, plus `volatility` (bot-AI signal today; reserved for future market mechanics). |
 | Action cards | 33 | One-shot effects. Engine-supported effect fields: `portfolio`, `cred`, `shield`, `draw`, `opponentPortfolio`. |
 | Market cards | 15 | Global end-of-round events. Effect fields: `portfolioAll`, `credAll`, `styleBonus`, `stylePenalty`, `styleCred`, `crash`. |
@@ -50,7 +50,11 @@ almost regardless of scale.
 | terminal-foil | radiant | 3 exist: Genesis Terminal, Our Lady RL80 (coins), Terminal Foil Moment (action — the only foil action, keep it unique) |
 
 Edition numbers ("n/80") derive from each card's position in `GENESIS_SET` —
-stable as long as new cards are only ever appended.
+stable as long as new cards are only ever appended. **Pre-art-lock, the set
+is a live draft** (decided 2026-07-11): ids, tags, and card lists may be
+revised freely until the Genesis art run lands and packs go on sale, at
+which point ids/editions freeze and append-only takes over
+(see [CASE_TABLE.md](./CASE_TABLE.md) §2.3 and §3.2a).
 
 **Balance envelope** (hold these when adding cards): coin value ≈ cost +2…+5;
 action portfolio gain ≈ 3–5× cost; volatility 0–7. Cross-universe names are
@@ -250,6 +254,11 @@ rule (section 5) is also what keeps assets engine-portable.
 - [ ] Binder/album page (80 slots, owned in holofoil, unowned ghosted, share)
 - [ ] Game results persistence (wins/streaks to Firestore — nothing recorded today)
 - [ ] Reward hooks: game wins / Prophet cases / oil milestones grant packs
+      (= Phase 1 of the Case Table plan)
+- [ ] **Case Table integration** — merge with the Prophet case-files game:
+      cards as investigative kit (Phase 2), then the unified Case Table
+      (Phase 3). Full spec: [CASE_TABLE.md](./CASE_TABLE.md). Supersedes the
+      standalone 10-round game as the headline mode (see CASE_TABLE.md §4.8).
 - [ ] Duplicate crafting sink
 - [ ] USDC premium SKUs via x402
 - [ ] Launch surfaces: /trade dock entry + root ticker events

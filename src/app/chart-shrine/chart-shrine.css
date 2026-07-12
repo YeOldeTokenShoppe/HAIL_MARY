@@ -511,6 +511,71 @@ body:has(.shrine-page.neon) {
   margin-left: 4.2rem;
 }
 
+/* --- Alternating hero title: "Our Lady of Perpetual Profit" <-> "RL80" ---
+   Both faces share one anchor inside .hero-title-stack and crossfade on a
+   timer (driven by .is-ticker, toggled in page.js). The RL80 face borrows the
+   /fountain treatment: UnifrakturMaguntia + 100 stacked, blurred, diagonally
+   offset copies that read as volumetric god-rays streaming down over the
+   scene. Both faces stay mounted so the below-fold content never reflows. */
+.shrine-page.neon .hero-title-stack {
+  position: relative;
+  display: inline-block;
+}
+
+.shrine-page.neon .hero-title-stack .our-lady-title {
+  transition: opacity 900ms ease, filter 900ms ease;
+}
+
+.shrine-page.neon .hero-title-stack.is-ticker .our-lady-title {
+  opacity: 0;
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+.shrine-page.neon .rl80-ticker-title {
+  position: absolute;
+  top: 0.35em;
+  left: 0.1em;
+  font-family: "UnifrakturMaguntia", serif;
+  font-size: clamp(2.8rem, 5.6vw, 4rem);
+  line-height: 0.9;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(10px);
+  filter: blur(6px);
+  transition: opacity 900ms ease, transform 900ms ease, filter 900ms ease;
+  pointer-events: none;
+}
+
+.shrine-page.neon .hero-title-stack.is-ticker .rl80-ticker-title {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* Stacked copies behind the solid white "RL80" — the god-ray beams. */
+.shrine-page.neon .rl80-ticker-ray {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(0.1rem);
+}
+
+/* Respect reduced-motion: no diagonal reveal, just a plain opacity swap. */
+@media (prefers-reduced-motion: reduce) {
+  .shrine-page.neon .rl80-ticker-title {
+    transform: none;
+    filter: none;
+  }
+  .shrine-page.neon .hero-title-stack.is-ticker .our-lady-title {
+    filter: none;
+  }
+}
+
 /* Section heading that ties the below-canvas content back to the hero
    title visually. Mirrors .our-lady-title's font / color / glow and
    borrows its skew + multi-line stagger for matching authority. */

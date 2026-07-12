@@ -250,18 +250,19 @@ export default function MainPage() {
   // Gates the magic-mirror swirl so it dissolves only when her face is ready.
   const [sitePalReady, setSitePalReady] = useState(false);
   const handleSitePalReady = useCallback(() => setSitePalReady(true), []);
-  // First visit (no stored face, no explicit ?char): hold the SitePal embed
-  // and open the apparition triptych, so all of her faces appear before any
-  // single one reads as "the default". Picking a panel writes the preference
-  // and mounts the embed fresh for that face — no reload needed, since
-  // nothing was embedded yet.
-  const [pickerOpen, setPickerOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const params = new URLSearchParams(window.location.search);
-    const char = parseInt(params.get("char"), 10);
-    if (!isNaN(char) && char >= 0 && char < CHARACTERS.length) return false;
-    return !CHARACTERS.some((c) => c.key === readApparitionKey());
-  });
+  // First-visit apparition chooser is DISABLED for now — the page just
+  // defaults to Byzantine Protocol (CHARACTERS[0], the "classic" face) for
+  // anyone who hasn't explicitly picked via ?char or a stored preference
+  // (see the activeCharIndex initializer, which falls back to index 0).
+  // Restore the commented initializer below to re-open the triptych.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // const [pickerOpen, setPickerOpen] = useState(() => {
+  //   if (typeof window === "undefined") return false;
+  //   const params = new URLSearchParams(window.location.search);
+  //   const char = parseInt(params.get("char"), 10);
+  //   if (!isNaN(char) && char >= 0 && char < CHARACTERS.length) return false;
+  //   return !CHARACTERS.some((c) => c.key === readApparitionKey());
+  // });
   // An explicit ?char deep link (incl. the arrow/medallion reload) is a
   // choice too — remember it so the triptych never re-asks this device.
   useEffect(() => {
