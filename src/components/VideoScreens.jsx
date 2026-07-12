@@ -16,6 +16,7 @@ import PortfolioScreen from './PortfolioScreen';
 import LiminalTeaserScreen from './LiminalTeaserScreen';
 import SlotMachineScreen from './SlotMachineScreen';
 import CRTScreen from './CRTScreen';
+import MobiusScreen from './MobiusScreen';
 
 function VideoScreens({ is80sMode = false, previewMode = false }) {
   const { scene } = useThree();
@@ -1027,10 +1028,10 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
           textureGlobal="__screen2Texture"
           variant="scope"
         />
-        <CRTScreen
+        {/* Screen4 → Möbius / spiral-cell shader (Pixelomo, MIT) */}
+        <MobiusScreen
           canvasGlobal="__screen4Canvas"
           textureGlobal="__screen4Texture"
-          variant="terminal"
         />
 
         {/* Side panels — countdown + scanline + glyph fields for atmosphere */}

@@ -8,14 +8,15 @@ import { readGrace, graceDaysLeft, GRACE_EVENT } from "@/lib/grace";
 // Featured slot (the gold italic line in the box):
 //   • no blessing standing → TODAY'S READING — her one inscribed line for
 //     the day (/api/daily-reading: omens-fed, Firestore-archived, in the
-//     apparition's tongue), with the PETITION button beneath it. Falls back
-//     to the petition invitation if the reading hasn't loaded.
+//     apparition's tongue). Falls back to the petition invitation if the
+//     reading hasn't loaded.
 //   • blessing standing → the seeker's boon + favor countdown, with the
 //     day's reading tucked quietly below the box instead.
 //
-// PETITION opens the Confessional seeded in her tongue; she takes it from
-// there (guidance, intercession, protection, fortune — no penances: she
-// hears sins as a mother, not a confessor).
+// This is a READING/LEDGER display — no CTA of its own. The conversation is
+// entered through the dock's ASK button (mobile) or the always-open docked
+// Confessional (wide desktop); a redundant seeded "petition" button was
+// removed. "THE ALTAR IS OPEN" chip carries the invitation.
 //
 // Per-apparition overrides for HER VOICE come via the `ui` block in
 // lib/apparitions.js. Terminal chrome stays English site-wide.
@@ -79,7 +80,7 @@ const goldItalic = {
   textShadow: "0 0 12px rgba(244, 181, 63, 0.25)",
 };
 
-export default function GraceOfRecord({ onPetition, ui = {}, apparitionKey = "classic" }) {
+export default function GraceOfRecord({ ui = {}, apparitionKey = "classic" }) {
   // Read after mount (SSR has no localStorage) and re-read whenever the
   // ledger changes — /main mints blessings out of the oracle conversation
   // and lib/grace fires GRACE_EVENT.
@@ -189,25 +190,6 @@ export default function GraceOfRecord({ onPetition, ui = {}, apparitionKey = "cl
                 ui.petitionInvitation ||
                 "Bring your petition, seeker — protection, fortune, courage, or mercy on a bruised bag. Our Lady hears every prayer. Ask."}”
             </p>
-            <button
-              onClick={onPetition}
-              style={{
-                marginTop: 10,
-                background: "none",
-                border: "1px solid rgba(0,255,255,0.3)",
-                color: "hsl(183 38% 57%)",
-                fontFamily: "inherit",
-                fontSize: "0.55rem",
-                letterSpacing: "0.25em",
-                textTransform: "uppercase",
-                padding: "6px 14px",
-                cursor: "pointer",
-                clipPath:
-                  "polygon(0 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%)",
-              }}
-            >
-              petition
-            </button>
           </>
         )}
 

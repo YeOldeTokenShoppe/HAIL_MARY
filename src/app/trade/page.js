@@ -2427,9 +2427,10 @@ export default function CyborgTemple() {
   // after the camera fly-in. The 3D screens are unreadable on phones.
   const [screenOverlay, setScreenOverlay] = useState(null);
   const screenOverlayTimerRef = useRef(null);
-  // Mobile-only: ScreenA-D all paint the same council group chat. After the
-  // fly-in, fade in a readable chat overlay instead of the canvas-painted
-  // texture (illegible at phone resolution).
+  // ScreenA-D all paint the same council group chat. After the fly-in (or
+  // via the COUNCIL CHANNEL pill), fade in the readable chat overlay — now
+  // interactive: visitors can join the channel and chat with the council
+  // (FullscreenChatOverlay → /api/council-chat).
   const [chatOverlay, setChatOverlay] = useState(false);
   const chatOverlayTimerRef = useRef(null);
   useEffect(() => {
@@ -3107,7 +3108,18 @@ export default function CyborgTemple() {
           to {
             transform: rotate(360deg);
           }
-        } 
+        }
+
+        @keyframes councilCtaPulse {
+          0%, 100% {
+            opacity: 0.55;
+            box-shadow: 0 0 4px #4dffaa;
+          }
+          50% {
+            opacity: 1;
+            box-shadow: 0 0 10px #4dffaa;
+          }
+        }
         
         @keyframes pulse {
           0% {
@@ -3656,9 +3668,11 @@ export default function CyborgTemple() {
                       setScreenOverlay(agentId);
                     }, 1100);
                   }
-                  // Mobile: ScreenA-D share the council group chat — fade in
-                  // the readable chat overlay after the fly-in completes.
-                  if (isMobileView && /^Screen[A-D]$/.test(agentId)) {
+                  // ScreenA-D share the council group chat — fade in the
+                  // readable/interactive chat overlay after the fly-in
+                  // completes. Both platforms: the overlay is now the live
+                  // channel (join + chat), not just a readability aid.
+                  if (/^Screen[A-D]$/.test(agentId)) {
                     if (chatOverlayTimerRef.current) {
                       clearTimeout(chatOverlayTimerRef.current);
                     }
@@ -3953,6 +3967,70 @@ export default function CyborgTemple() {
             Tap characters &amp; screens
           </div>
         </div>
+
+        {/* Council-channel edge tab — desktop lobby only. Mirrors the
+            SERVICES edge handle (TradeServiceRail's .tsr-handle) and stacks
+            above it on the right edge; opens the live chat overlay directly.
+            The mobile entry is the dock's COUNCIL slot instead. */}
+        {mounted && !isMobileView && !tradeMode && (() => {
+          const ctaHidden = !!focusedAgent || chatOverlay || revealMode || railExpanded;
+          return (
+            <button
+              type="button"
+              onClick={() => setChatOverlay(true)}
+              aria-label="Open the team chat"
+              style={{
+                position: 'fixed',
+                right: 0,
+                // Above the SERVICES edge handle (which floats around the
+                // lower third of the right edge) at any window height.
+                top: '36%',
+                zIndex: 40,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '14px 9px',
+                border: '1px solid rgba(77, 255, 170, 0.55)',
+                borderRight: 'none',
+                borderRadius: '8px 0 0 8px',
+                background: 'linear-gradient(180deg, rgba(6, 8, 14, 0.9), rgba(2, 3, 6, 0.82))',
+                boxShadow: '0 0 22px rgba(77, 255, 170, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                color: '#4dffaa',
+                cursor: 'pointer',
+                opacity: ctaHidden ? 0 : 1,
+                pointerEvents: ctaHidden ? 'none' : 'auto',
+                transition: 'opacity 0.3s ease',
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: '#4dffaa',
+                  animation: 'councilCtaPulse 2.2s ease-in-out infinite',
+                }}
+              />
+              <span
+                style={{
+                  writingMode: 'vertical-rl',
+                  textOrientation: 'mixed',
+                  transform: 'rotate(180deg)',
+                  fontFamily: "'Orbitron', 'IBM Plex Mono', monospace",
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  letterSpacing: '0.3em',
+                  textShadow: '0 0 10px rgba(77, 255, 170, 0.35)',
+                }}
+              >
+                TEAM CHAT
+              </span>
+            </button>
+          );
+        })()}
 
         {/* Top Controls Container - User and Nav.
             No music control here on purpose: /trade is a speaking-avatars page,
@@ -5371,18 +5449,21 @@ export default function CyborgTemple() {
                   ]
                 }
                 extraRight={
+                  /* Council Channel slot — opens the live chat overlay in
+                     place (action slot, like /main's SPEAK). Hail Mary moved
+                     to the MORE list to free this space. */
                   tradeMode ? [] : [
                     {
-                      key: 'hailmary',
-                      label: 'Hail Mary',
-                      title: 'Hail Mary Prospecting Co — coming soon',
-                      onClick: () => router.push('/hailmary'),
+                      key: 'teamchat',
+                      label: 'Team Chat',
+                      title: 'Team chat — live',
+                      onClick: () => setChatOverlay(true),
                       icon: (
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#f1d77a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: 'block', filter: 'drop-shadow(0 0 4px rgba(241, 215, 122, 0.6))' }} aria-hidden="true">
-                          <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
-                          <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
-                          <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
-                          <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#4dffaa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: 'block', filter: 'drop-shadow(0 0 4px rgba(77, 255, 170, 0.6))' }} aria-hidden="true">
+                          <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                          <path d="M8 12h.01" />
+                          <path d="M12 12h.01" />
+                          <path d="M16 12h.01" />
                         </svg>
                       ),
                     },
@@ -5484,6 +5565,19 @@ export default function CyborgTemple() {
                   }}
                 >
                   {[
+                    {
+                      path: '/hailmary',
+                      label: 'Hail Mary',
+                      stroke: '#f1d77a',
+                      icon: (
+                        <>
+                          <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+                          <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
+                          <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
+                          <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+                        </>
+                      ),
+                    },
                     {
                       path: '/fountain',
                       label: 'Coin Fountain',
@@ -5789,7 +5883,9 @@ export default function CyborgTemple() {
               document.body
             )}
 
-            {/* Mobile fullscreen council-chat overlay for ScreenA-D taps. */}
+            {/* Fullscreen council-chat overlay — ScreenA-D taps (both
+                platforms) and the COUNCIL CHANNEL pill. Interactive: join
+                the channel + chat with the council. */}
             {typeof document !== 'undefined' && createPortal(
               <FullscreenChatOverlay
                 isActive={chatOverlay}

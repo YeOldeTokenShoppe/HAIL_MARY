@@ -5,7 +5,7 @@ import TradingCard from "@/components/TradingCard";
 
 const EUGENE = {
   name: "Eugene",
-  subtitle: "Meme Prophet",
+  subtitle: "Rare Finds Researcher",
   cardType: "Trader",
   style: "Meme",
   rarity: "Mythic",
@@ -13,19 +13,19 @@ const EUGENE = {
   startingCred: 20,
   startingPortfolio: 0,
   ability: {
-    name: "Mean Meme Game",
+    name: "Pattern Recognition",
     icon: "\u{1F680}",
     badgeImage: "/abilityBadge.png",
-    text: "First Meme Coin bought each game enters with +8 Portfolio.",
+    text: "The first Coin card you play each game enters with +4 Portfolio. If it is Rare or Terminal Foil, gain +2 Cred.",
   },
-  weakness: "Rug Pulls",
-  resistance: "Meme Season",
+  weakness: "Noise",
+  resistance: "Panic Selling",
   pivotCost: 2,
-  flavorText: "Charts are just vibes with timestamps.",
+  flavorText: "Every story wants to be a myth.",
   backgroundImage: "/TCG/eugeneFractal.png",
   artFocus: "center 28%",
   artZoom: 1.25,
-  overlayImage: "/cardOverlay.webp",
+  overlayImage: "/cardOverlay2.webp",
 };
 
 const SAINT = {

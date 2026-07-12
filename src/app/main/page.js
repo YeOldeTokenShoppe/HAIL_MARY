@@ -465,16 +465,12 @@ export default function MainPage() {
   // English faces — components fall back to their English defaults).
   const appUi = CHARACTERS[activeCharIndex]?.ui || {};
 
-  // The rite buttons open the Confessional with a seeded opening line, so
-  // the seeker lands in the right register (she takes it from there).
-  const [chatSeed, setChatSeed] = useState("");
-  useEffect(() => {
-    if (!chatOpen) setChatSeed("");
-  }, [chatOpen]);
-  const openRite = useCallback((seed) => {
-    setChatSeed(seed);
-    setChatOpen(true);
-  }, []);
+  // Wide desktop shows the Confessional docked as the always-open left triptych
+  // wing (its own input included), so the dock's center FAB isn't needed to
+  // OPEN a chat there — it's repurposed into a "hear her aloud" voice control
+  // instead (see the MobileBottomNav center props). Mobile / narrow desktop
+  // keep the floating drawer, where the FAB is the sole way in.
+  const chatDocked = isWide && !isMobile;
 
   // (Scene swapping removed — each apparition embeds its own scene fresh on
   // load via ?char; see handleCharacterSelect + SitePalEmbed.)
@@ -486,25 +482,31 @@ export default function MainPage() {
     [activeCharIndex],
   );
 
-  // Speak the greeting aloud the first time the drawer opens — the open tap
-  // doubles as the audio-unlock gesture, and the typewriter text runs in step
+  // Speak her greeting aloud. The triggering tap doubles as the browser's
+  // audio-unlock gesture, and the drawer's typewriter text runs in step.
+  // Mobile/narrow: fired on first drawer-open (effect below). Wide desktop:
+  // fired by the dock's repurposed voice FAB (the docked drawer is already
+  // open, so there's no open-tap to hang it on).
   const hasGreetedRef = useRef(false);
+  const speakGreetingAloud = useCallback(() => {
+    speakOracle(
+      {
+        reply: oracleGreeting,
+        expressions: [{ name: "ClosedSmile", amplitude: 0.6, duration: 3, at: 0 }],
+      },
+      // Soft delivery via ElevenLabs voice settings: high stability + zero
+      // style = calm, gentle read. (v3 audio tags like "[softly]" are
+      // rejected by SitePal's engine-14 proxy as of Jul 2026 — retest later;
+      // speakOracle auto-falls-back if an xData call ever fails.)
+      { ...(CHARACTERS[activeCharIndex]?.voice || ORACLE_VOICE), xData: "stability=0.9,style=0,similarity_boost=0.4" }
+    );
+  }, [oracleGreeting, activeCharIndex]);
   useEffect(() => {
     if (chatOpen && !hasGreetedRef.current) {
       hasGreetedRef.current = true;
-      speakOracle(
-        {
-          reply: oracleGreeting,
-          expressions: [{ name: "ClosedSmile", amplitude: 0.6, duration: 3, at: 0 }],
-        },
-        // Soft delivery via ElevenLabs voice settings: high stability + zero
-        // style = calm, gentle read. (v3 audio tags like "[softly]" are
-        // rejected by SitePal's engine-14 proxy as of Jul 2026 — retest later;
-        // speakOracle auto-falls-back if an xData call ever fails.)
-        { ...(CHARACTERS[activeCharIndex]?.voice || ORACLE_VOICE), xData: "stability=0.9,style=0,similarity_boost=0.4" }
-      );
+      speakGreetingAloud();
     }
-  }, [chatOpen]);
+  }, [chatOpen, speakGreetingAloud]);
 
   const handleGlitchMidpoint = () => {
     if (pendingCharRef.current !== null) {
@@ -780,9 +782,13 @@ export default function MainPage() {
           touchAction: "pan-y",
           overscrollBehavior: "contain",
           // Clearance for the fixed bottom dock: without it the column's
-          // last ~100px (the altar module's tail) can never scroll out from
-          // behind the nav — visible above the fold, unreachable below it.
-          paddingBottom: isMobile ? "calc(96px + env(safe-area-inset-bottom, 0px))" : 0,
+          // last ~100px (the altar module's tail — the CONFESS/PETITION
+          // button + footer) can never scroll out from behind the nav —
+          // visible above the fold, unreachable below it, and the scroll
+          // rubber-bands back before reaching it. The dock is present on
+          // desktop too (it's the unified nav), so this clearance is NOT
+          // mobile-only.
+          paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
           fontFamily: "'Cyber', 'Geo', sans-serif",
           background: "rgba(0, 0, 0, 0.5)",
           backdropFilter: "saturate(180%) blur(8px)",
@@ -859,20 +865,20 @@ export default function MainPage() {
         </div>
 
         {/* ── Grace of Record ── the visitor's standing blessing + the
-            parish ledger, beneath the portrait on every viewport (the panel
-            column scrolls on phones). Favor expires after its allotted
-            days, reopening the altar — the return visit lives inside the
-            rite. Reads the REAL device ledger (lib/grace); PETITION opens
-            the Confessional seeded in her tongue. (Parish tally still
-            mock.) Hidden while the phone drawer is up — the shrunken
-            portrait + conversation own that screen. */}
+            parish ledger + today's reading, beneath the portrait on every
+            viewport (the panel column scrolls on phones). Favor expires after
+            its allotted days, reopening the altar. Reads the REAL device
+            ledger (lib/grace). A reading/ledger DISPLAY — no CTA of its own;
+            the conversation is entered via the dock's ASK button or the
+            docked drawer. (Parish tally still mock.) Hidden while the phone
+            drawer is up — the shrunken portrait + conversation own that
+            screen. */}
         {!(isMobile && chatOpen) && (
           <GraceOfRecord
             ui={appUi}
             /* Today's reading fills the module's featured slot when no
                blessing stands — her daily proof she has something to say. */
             apparitionKey={CHARACTERS[activeCharIndex]?.key}
-            onPetition={() => openRite(appUi.petitionSeed || "Our Lady, I come with a petition — ")}
           />
         )}
 
@@ -929,15 +935,29 @@ export default function MainPage() {
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         }
-        /* Center FAB — SPEAK → opens the Confessional (converse with Our Lady),
-           /main's signature action (mirrors root's LIGHT CANDLE center). */
-        onBuyClick={() => setChatOpen(true)}
-        centerSubLabel="ASK"
-        centerTitle="Speak to Our Lady"
+        /* Center FAB. Mobile / narrow desktop: ASK → opens the floating
+           Confessional (the sole way in). Wide desktop: the drawer is already
+           docked-open with its own input, so ASK there would be redundant —
+           the FAB is repurposed into SPEAK, a "hear her aloud" control that
+           speaks her greeting and unlocks audio (the tap is the gesture). */
+        onBuyClick={
+          chatDocked
+            ? () => { hasGreetedRef.current = true; speakGreetingAloud(); }
+            : () => setChatOpen(true)
+        }
+        centerSubLabel={chatDocked ? "SPEAK" : "ASK"}
+        centerTitle={chatDocked ? "Hear Our Lady's voice" : "Speak to Our Lady"}
         centerLabel={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 28, height: 28, display: "block", color: "#ffffff" }} aria-hidden="true">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
+          chatDocked ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 28, height: 28, display: "block", color: "#ffffff" }} aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 28, height: 28, display: "block", color: "#ffffff" }} aria-hidden="true">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          )
         }
         /* Far-right — MORE popover (Market Rally Race + back to Shrine). */
         onMenuClick={() => setShowMoreMenu((v) => !v)}
@@ -1107,9 +1127,6 @@ export default function MainPage() {
              (greetingVisible), so it never types out before her face. */
           initialMessage={greetingVisible ? oracleGreeting : ""}
           onSendMessage={handleOracleMessage}
-          /* Rite buttons (GraceOfRecord) seed the input with an opening
-             line — "Bless me, Our Lady, for I have sinned — " etc. */
-          presetInput={chatSeed}
           /* Input placeholder follows the apparition's tongue */
           placeholder={appUi.inputPlaceholder}
           /* SPEAK (center dock FAB) is the sole launcher — no auto-appearing
@@ -1123,7 +1140,7 @@ export default function MainPage() {
           bottomOffset={isMobile ? 16 : 88}
           /* On wide viewports the confession docks as the left triptych wing
              (always visible) instead of a floating drawer. */
-          docked={isWide && !isMobile}
+          docked={chatDocked}
         />
       )}
 

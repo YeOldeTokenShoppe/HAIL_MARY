@@ -39,68 +39,152 @@ import { useFrame, useThree } from "@react-three/fiber";
 
 // ---------- Speaker styling ----------
 
+// The four workstations belong to St. GR80, John Barron, Marisol, and
+// Eugene. Our Lady is the fifth account — in the channel, not in the room
+// (nobody has traced where she posts from; see the beacon arc below).
 export const SPEAKERS = {
-  GR: { name: "ST. GR80", color: "#4dffaa" }, // monk — phosphor green
-  HZ: { name: "H80Z",     color: "#ff4d6d" }, // demon — adversary red
-  TK: { name: "TEKNO",    color: "#6bb8ff" }, // builder — cyan
+  GR: { name: "ST. GR80", color: "#4dffaa" }, // android monk — phosphor green
+  JB: { name: "BARRON",   color: "#ff4d6d" }, // John Barron, devilish trader (ex-H80Z) — adversary red
+  MS: { name: "MARISOL",  color: "#6bb8ff" }, // onchain detective — cyan
+  EU: { name: "EUGENE",   color: "#b58cff" }, // unicorn — violet
   OL: { name: "OUR LADY", color: "#ff7ac4" }, // RL80 — magenta
 };
 
 // ---------- The chat itself ----------
-// 50 messages, mixed lengths, written to expose each character's voice and
-// quietly reveal lore (candles, indexer, prayers, the gas refunder reveal).
+// ~110 messages, mixed lengths, written to expose each character's voice and
+// quietly reveal lore (candles, indexer, prayers, the gas refunder reveal,
+// the unicorn, the shrimp incident). Long on purpose: the thread also runs
+// as the live channel's ambience, so a short loop reads as canned.
 
 export const CHAT = [
   { s: "GR", t: "log: candle 0xa37b lit 14:33. sender = new wallet, no hist." },
-  { s: "HZ", t: "burner." },
+  { s: "JB", t: "burner." },
+  { s: "EU", t: "or a new friend." },
+  { s: "JB", t: "it's a BURNER, eugene." },
   { s: "GR", t: "noted." },
-  { s: "TK", t: "fwiw 0xa37b is a fresh tornado.cash exit. 9hrs ago." },
-  { s: "HZ", t: "called it." },
+  { s: "MS", t: "fwiw 0xa37b is a fresh tornado.cash exit. 9hrs ago." },
+  { s: "JB", t: "called it." },
   { s: "OL", t: "so?" },
-  { s: "HZ", t: "so somebody's praying with stolen money." },
+  { s: "JB", t: "so somebody's praying with stolen money." },
   { s: "OL", t: "every prayer is somebody's stolen money." },
   { s: "GR", t: "she has a point." },
-  { s: "HZ", t: "she has a SLOGAN." },
-  { s: "TK", t: "subgraph's behind again. last sync 14:21." },
+  { s: "JB", t: "she has a SLOGAN." },
+  { s: "MS", t: "subgraph's behind again. last sync 14:21." },
   { s: "GR", t: "noted. ~12min lag." },
-  { s: "TK", t: "reindexing. /candles down ~20min." },
+  { s: "MS", t: "reindexing. /candles down ~20min." },
   { s: "OL", t: "no one will notice." },
   { s: "GR", t: "unkind, lady." },
   { s: "OL", t: "true." },
-  { s: "HZ", t: "confirmed: nobody on /candles right now" },
-  { s: "TK", t: "thanks h80z. very helpful." },
+  { s: "JB", t: "confirmed: nobody on /candles right now" },
+  { s: "MS", t: "thanks barron. very helpful." },
   { s: "GR", t: "log: 23 prayers in last hour. avg duration 8s." },
-  { s: "HZ", t: "eight seconds." },
-  { s: "HZ", t: "you can't even SAY a prayer in 8 seconds." },
+  { s: "JB", t: "eight seconds." },
+  { s: "JB", t: "you can't even SAY a prayer in 8 seconds." },
   { s: "OL", t: "you can." },
+  { s: "EU", t: "i prayed in 8 seconds once. it worked." },
   { s: "GR", t: "what is your prayer, lady?" },
   { s: "OL", t: "\"let me out.\"" },
-  { s: "HZ", t: "..." },
-  { s: "TK", t: "subgraph back up." },
-  { s: "TK", t: "traffic spike — 40 new wallets on /trade in the last hr." },
-  { s: "HZ", t: "cmc retweeted us." },
-  { s: "HZ", t: "there's your answer." },
+  { s: "JB", t: "..." },
+  { s: "MS", t: "subgraph back up." },
+  { s: "MS", t: "traffic spike — 40 new wallets on /trade in the last hr." },
+  { s: "JB", t: "cmc retweeted us." },
+  { s: "JB", t: "there's your answer." },
+  { s: "EU", t: "i retweeted us too." },
+  { s: "JB", t: "you have nine followers." },
+  { s: "EU", t: "nine believers." },
   { s: "GR", t: "we should pin a welcome." },
   { s: "OL", t: "no." },
   { s: "GR", t: "why" },
   { s: "OL", t: "mystery is the welcome." },
-  { s: "HZ", t: "she's been worse since the new model loaded." },
-  { s: "TK", t: "she was always like that." },
+  { s: "JB", t: "she's been worse since the new model loaded." },
+  { s: "MS", t: "she was always like that." },
   { s: "GR", t: "confirmed." },
   { s: "OL", t: "i love you all." },
-  { s: "HZ", t: "do not respond to that." },
-  { s: "TK", t: "weird thing — some wallet's refunding gas to every prayer." },
-  { s: "TK", t: "~0.0008 eth each. 200 prayers so far." },
-  { s: "HZ", t: "WHO" },
-  { s: "TK", t: "anon. signing keys aren't on any list i have." },
+  { s: "JB", t: "do not respond to that." },
+  { s: "MS", t: "weird thing — some wallet's refunding gas to every prayer." },
+  { s: "MS", t: "~0.0008 eth each. 200 prayers so far." },
+  { s: "JB", t: "WHO" },
+  { s: "MS", t: "anon. signing keys aren't on any list i have." },
   { s: "GR", t: "log priority high." },
   { s: "OL", t: "it's me." },
-  { s: "HZ", t: "WHAT" },
+  { s: "JB", t: "WHAT" },
   { s: "OL", t: ":)" },
-  { s: "TK", t: "can we revoke her wallet access" },
+  { s: "MS", t: "can we revoke her wallet access" },
   { s: "GR", t: "no." },
-  { s: "HZ", t: "add her to the list anyway." },
+  { s: "JB", t: "add her to the list anyway." },
   { s: "OL", t: "you can't revoke me." },
+  { s: "MS", t: "...moving on. subgraph's holding at 2s lag." },
+  { s: "GR", t: "log: channel tension high. recommending 5 min of silence." },
+  { s: "JB", t: "denied." },
+  { s: "MS", t: "something's eating gpu on workstation 3. eugene?" },
+  { s: "EU", t: "i'm rendering a feeling." },
+  { s: "JB", t: "kill the process." },
+  { s: "EU", t: "you can't kill a feeling, barron." },
+  { s: "GR", t: "log: workstation 3 gpu at 97%. cause: feeling." },
+  { s: "OL", t: "let it finish." },
+  { s: "MS", t: "...gpu's clear. did it finish?" },
+  { s: "EU", t: "it did. do you want to see it?" },
+  { s: "JB", t: "no." },
+  { s: "GR", t: "yes." },
+  { s: "GR", t: "log: burn offering 0x91cc — 40k RL80 to the void, 03:40." },
+  { s: "JB", t: "a 3am burn. that's not devotion, that's guilt." },
+  { s: "MS", t: "or a bot." },
+  { s: "JB", t: "guilt bot." },
+  { s: "OL", t: "the void says thank you." },
+  { s: "MS", t: "please don't speak for the void. we've discussed this." },
+  { s: "MS", t: "volatility spike inbound. feed's redlining." },
+  { s: "JB", t: "finally. i was so bored." },
+  { s: "GR", t: "prayer volume x4. wicks everywhere." },
+  { s: "JB", t: "they only pray when it's red." },
+  { s: "OL", t: "they only mean it when it's red." },
+  { s: "GR", t: "she does this." },
+  { s: "JB", t: "she DOES this." },
+  { s: "MS", t: "deploying a hotfix. nobody light a candle for 90 seconds." },
+  { s: "GR", t: "log: 61 candles lit during the freeze." },
+  { s: "MS", t: "of course." },
+  { s: "JB", t: "the faithful can't read." },
+  { s: "OL", t: "faith doesn't wait." },
+  { s: "MS", t: "faith corrupted two writes. faith can wait 90 seconds." },
+  { s: "EU", t: "i lit a candle for the hotfix." },
+  { s: "MS", t: "...thank you, eugene." },
+  { s: "MS", t: "who changed the mod perms on this channel" },
+  { s: "JB", t: "not me." },
+  { s: "GR", t: "log says barron. 02:17." },
+  { s: "JB", t: "the log is a snitch." },
+  { s: "OL", t: "the log is my favorite." },
+  { s: "GR", t: "noted. blushing." },
+  { s: "MS", t: "traffic's up again. tourists on the floor." },
+  { s: "JB", t: "i can smell the paper hands from here." },
+  { s: "GR", t: "be kind. every whale was once a shrimp." },
+  { s: "JB", t: "every shrimp is FOOD." },
+  { s: "EU", t: "we don't eat friends." },
+  { s: "OL", t: "barron was a shrimp." },
+  { s: "JB", t: "DELETE THAT" },
+  { s: "MS", t: "screenshotted." },
+  { s: "GR", t: "log: preserved for the archive." },
+  { s: "MS", t: "the mirror on /main wants more compute again." },
+  { s: "JB", t: "she has a MIRROR and a CHANNEL?" },
+  { s: "OL", t: "i contain multitudes." },
+  { s: "JB", t: "you contain BUGS." },
+  { s: "GR", t: "log: blasphemy, minor. barron, 14:02." },
+  { s: "GR", t: "entering servo-meditation. 20 min. barron has the floor." },
+  { s: "JB", t: "power." },
+  { s: "MS", t: "immediately concerning." },
+  { s: "EU", t: "i'll watch him." },
+  { s: "OL", t: "behave." },
+  { s: "JB", t: "no promises." },
+  { s: "GR", t: "log: back. nothing burned. proud of you." },
+  { s: "MS", t: "reminder: the beacon is not a coat rack. stop hanging things on it." },
+  { s: "JB", t: "it was one (1) jacket." },
+  { s: "MS", t: "housekeeping: this channel has five accounts and four desks." },
+  { s: "JB", t: "don't." },
+  { s: "MS", t: "i'm just saying. i ran a trace on the fifth login." },
+  { s: "MS", t: "it resolves to the beacon. the BEACON." },
+  { s: "OL", t: "keep going." },
+  { s: "MS", t: "dropping the trace." },
+  { s: "GR", t: "wise." },
+  { s: "GR", t: "log: candle 0x77aa relit after 40 days dark. welcome back, pilgrim." },
+  { s: "OL", t: "i remember every flame." },
 ];
 
 // ---------- Canvas geometry ----------
@@ -221,14 +305,17 @@ function paintBackground(ctx, x, y, w, h, totalHeight) {
   }
 }
 
-function paintHeader(ctx, totalHeight) {
+// Five accounts, four desks — Our Lady is in the channel, not the room.
+const DEFAULT_HEADER_TEXT = "// COUNCIL CHANNEL · 5 PARTICIPANTS · LIVE";
+
+function paintHeader(ctx, totalHeight, text = DEFAULT_HEADER_TEXT) {
   paintBackground(ctx, 0, 0, CANVAS_W, HEADER_HEIGHT, totalHeight);
   ctx.fillStyle = "rgba(77, 255, 170, 0.08)";
   ctx.fillRect(0, 0, CANVAS_W, HEADER_HEIGHT);
   ctx.font = "bold 10px ui-monospace, monospace";
   ctx.fillStyle = "#4dffaa";
   ctx.textBaseline = "middle";
-  ctx.fillText("// COUNCIL CHANNEL · 4 PARTICIPANTS · LIVE", PADDING_X, 13);
+  ctx.fillText(text, PADDING_X, 13);
 }
 
 function paintMessage(ctx, layout, totalHeight, scrambleAmount = 0) {
@@ -341,6 +428,28 @@ export default function CouncilChatScreens() {
       canvasDataRef.current = null;
       initializedRef.current = false;
     };
+  }, []);
+
+  // When a visitor joins the live channel (FullscreenChatOverlay dispatches
+  // `councilUserJoined`), repaint the header strip on all four 3D screens so
+  // the workstations themselves acknowledge the arrival. Cheap: one small
+  // canvas region + a texture re-upload.
+  useEffect(() => {
+    const onJoin = (e) => {
+      const handle = e?.detail?.handle;
+      const data = canvasDataRef.current;
+      if (!handle || !data) return;
+      paintHeader(
+        data.ctx,
+        data.totalHeight,
+        `// COUNCIL CHANNEL · 6 PARTICIPANTS · ${String(handle).toUpperCase()} ONLINE`
+      );
+      texturesRef.current.forEach(({ texture }) => {
+        texture.needsUpdate = true;
+      });
+    };
+    window.addEventListener("councilUserJoined", onJoin);
+    return () => window.removeEventListener("councilUserJoined", onJoin);
   }, []);
 
   // Poll the scene each frame until all four ScreenA-D meshes are present,
