@@ -386,8 +386,12 @@ rulesIntro: {
       role: "MYTHOS · NARRATIVE",
       sigil: "❖",
       tagline: "Every rug wears a story. Find the seams.",
-      // Eugene is text-only — these lines render as HTML chat bubbles near her head,
-      // not TTS. Soft typing chime + bubble drop-in per line. (No SitePal scene for her.)
+      // Eugene has no SitePal scene — these lines render as HTML chat bubbles
+      // near her head (soft typing chime + bubble drop-in per line). They ALSO
+      // speak now, via her own ElevenLabs voice (playUnicornBeat): the bubble
+      // shows this text verbatim, while TTS speaks a speechify()-normalized
+      // version (emoji stripped, $/%/RL80 expanded). For a line that needs exact
+      // spoken phrasing, make it an object and add a `spoken:` override.
       textOnly: true,
       intro: "Okay, Prophet Token actually has a pitch deck and it's... kinda coherent? Mystical branding, but there's real wiring underneath. Let's poke it.",
       returnLines: [

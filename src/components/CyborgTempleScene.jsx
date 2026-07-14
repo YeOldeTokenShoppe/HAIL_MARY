@@ -6,6 +6,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
 import { unicornGlow } from "@/lib/trade/unicornGlow";
+import { unicornMouth } from "@/lib/trade/unicornMouth";
 import { Html, SpotLight } from "@react-three/drei";
 import AnnotationSystem from "@/components/AnnotationSystem";
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
@@ -408,9 +409,23 @@ function FloatingWordCluster({ words = WORD_CLUSTER_WORDS, center = [0, 1.5, 0],
 }
 
 
+// Single source of truth for Eugene's code-made mouth overlay (Path A2).
+// BOTH the live-tuner init and the per-frame driver read these — edit here (or
+// tune live with Shift+M + keys / window.__rl80Mouth) and there's no "which
+// section?" ambiguity. offset is HEAD-LOCAL: +z toward the muzzle tip, so a
+// SMALLER z sits the mouth closer to her head. rot is [pitchX, yawY, rollZ] deg.
+const RL80_MOUTH_DEFAULTS = {
+  offset: [0, 0.012, 0.191],
+  rot: [15, 0, 0], // pitch forward ~12° (rot[0]=pitch; flip to -12 if it tilts back)
+  width: 0.024,
+  minH: 0.0024,
+  maxH: 0.015,
+  color: 0x140a10,
+  gain: 1,
+};
 
 
-const CyborgTempleScene = ({ 
+const CyborgTempleScene = ({
   onLoad, 
   position = [0, 0, 0],
   rotation = [0, 0, 0],
@@ -436,6 +451,7 @@ const CyborgTempleScene = ({
   speechActive = false, // When true, the focused character cross-fades to idle (speaking to player). When false, they cross-fade to typing (looking up info). Parent flips this when game-flow audio starts/ends.
   revealMode = null, // null | 'aligned' | 'missed' | 'abstained'. When set, hides the StageProps collection, flies the camera to the Stage preset, and plays each character's reaction animation. Parent sets this after the verdict is locked; clear it to restore the gameplay scene for the next case.
   showEugeneLobbyBubble = false, // When true (lobby + RL80 focused), render Eugene's in-scene intro chat bubble anchored to her head bone. Lets her introduce herself in her own medium (chat bubble) without overlaying her head.
+  eugeneLobbyLine = null, // The specific greeting she's saying in the lobby (from EUGENE_LOBBY_GREETINGS). Shown as the bubble's tagline so it matches her spoken voice. Falls back to a default tagline when null.
   eugeneGameBubble = null, // String dialogue line for Eugene's in-game speech. When set, renders the same head-anchored chat bubble but with just the dialogue content. Mutually exclusive with the lobby intro variant.
 }) => {
   const groupRef = useRef();
@@ -511,6 +527,81 @@ const CyborgTempleScene = ({
     return () => {
       if (window.__cameraTuner) delete window.__cameraTuner;
     };
+  }, []);
+
+  // Live tuning for the code-made mouth overlay (Path A2). Two jobs:
+  //   1. Initialize window.__rl80Mouth so field edits from the console never
+  //      hit "undefined".
+  //   2. Key nudging so the flat disc can be placed AND aimed by eye. Toggle
+  //      with Shift+M (distinct from a plain 'm' mute); when ON:
+  //        ← → ↑ ↓  move x / y        [ ]  depth toward/away snout
+  //        q a      rotate pitch (X)  w s  rotate yaw (Y)   e d  rotate roll (Z)
+  //        - =      width             9 0  open amount (maxH)
+  //        Shift = larger step. Each change logs the full config to copy back.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.__rl80Mouth = window.__rl80Mouth || {
+      ...RL80_MOUTH_DEFAULTS,
+      offset: [...RL80_MOUTH_DEFAULTS.offset], // clone so key/console nudging
+      rot: [...RL80_MOUTH_DEFAULTS.rot],       // never mutates the shared const
+    };
+    if (!Array.isArray(window.__rl80Mouth.offset)) window.__rl80Mouth.offset = [...RL80_MOUTH_DEFAULTS.offset];
+    if (!Array.isArray(window.__rl80Mouth.rot)) {
+      const r0 = typeof window.__rl80Mouth.roll === 'number' ? window.__rl80Mouth.roll : 0;
+      window.__rl80Mouth.rot = [0, 0, r0];
+    }
+    console.log('[rl80Mouth] tuner ready — press Shift+M to toggle key nudging');
+
+    const onKey = (e) => {
+      // Toggle FIRST, before the input-focus guard, so Shift+M always works.
+      // Match on physical key code (robust across layouts / shift state).
+      if (e.code === 'KeyM' && e.shiftKey) {
+        window.__rl80MouthTune = !window.__rl80MouthTune;
+        console.log('[rl80Mouth] tuning', window.__rl80MouthTune
+          ? 'ON — arrows move · [ ] depth · q/a w/s e/d rotate X/Y/Z · - = width · 9 0 open · Shift=bigger'
+          : 'OFF');
+        e.preventDefault();
+        return;
+      }
+      if (!window.__rl80MouthTune) return;
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      const c = window.__rl80Mouth;
+      if (!Array.isArray(c.rot)) c.rot = [0, 0, 0];
+      const s = e.shiftKey ? 0.02 : 0.005;
+      const rs = e.shiftKey ? 15 : 5;
+      let handled = true;
+      switch (e.key) {
+        case 'ArrowRight': c.offset[0] += s; break;
+        case 'ArrowLeft':  c.offset[0] -= s; break;
+        case 'ArrowUp':    c.offset[1] += s; break;
+        case 'ArrowDown':  c.offset[1] -= s; break;
+        case ']':          c.offset[2] += s; break;
+        case '[':          c.offset[2] -= s; break;
+        case 'q':          c.rot[0] += rs; break;   // pitch
+        case 'a':          c.rot[0] -= rs; break;
+        case 'w':          c.rot[1] += rs; break;   // yaw
+        case 's':          c.rot[1] -= rs; break;
+        case 'e':          c.rot[2] += rs; break;   // roll
+        case 'd':          c.rot[2] -= rs; break;
+        case '=':          c.width = Math.max(0.001, (c.width ?? 0.03) + s); break;
+        case '-':          c.width = Math.max(0.001, (c.width ?? 0.03) - s); break;
+        case '0':          c.maxH = Math.max(0.001, (c.maxH ?? 0.015) + s); break;
+        case '9':          c.maxH = Math.max(0.001, (c.maxH ?? 0.015) - s); break;
+        default: handled = false;
+      }
+      if (handled) {
+        e.preventDefault();
+        const r = (n) => Math.round(n * 1000) / 1000;
+        console.log('[rl80Mouth]', JSON.stringify({
+          offset: c.offset.map(r), rot: c.rot.map(r), width: r(c.width ?? 0.03),
+          maxH: r(c.maxH ?? 0.015), color: c.color,
+        }));
+      }
+    };
+    // Capture phase so we run even if the game/canvas stops key propagation.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
   // Cross-fade a character into either their idle or typing animation.
@@ -1153,6 +1244,8 @@ const CyborgTempleScene = ({
   const monkHeadBoneRef = useRef();
   const monkFocusedRef = useRef(false); // true when camera is zoomed in on Monk
   const rl80HeadBoneRef = useRef();
+  const rl80JawBoneRef = useRef(); // Eugene's Jaw bone — amplitude lip-sync (Path A; inert until a jaw bone is added in Blender)
+  const rl80MouthMeshRef = useRef(); // Code-made oval "mouth" anchored at her snout, scaled by amplitude (Path A2, no Blender)
   const rl80FocusedRef = useRef(false); // true when camera is zoomed in on RL80
   const fluffyHeadBoneRef = useRef();
   const detectiveHeadBoneRef = useRef();
@@ -1815,6 +1908,68 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             console.warn('[CyborgTempleScene] RL80 head bone not found — head-anchored UI will park off-screen');
           }
           captureHeadRestPose(rl80HeadBoneRef);
+
+          // Jaw bone for amplitude lip-sync (Path A). IMPORTANT: the base GLB's
+          // `Jaw`/`Jaw_2` bones belong to the DETECTIVE and MONK rigs, NOT the
+          // unicorn — her own rig (under Unicorn_Empty) is a plain Mixamo
+          // skeleton with mixamorig:Head and NO jaw. So this search (scoped to
+          // her subtree) currently finds nothing and the lip-sync no-ops. It's a
+          // ready harness: add a jaw bone named `Jaw*` parented under the
+          // unicorn head in Blender, re-export, and it activates automatically.
+          // We prefer a jaw parented to her resolved head bone to be safe.
+          const rl80JawCandidates = [];
+          child.traverse((bone) => {
+            if (bone.isBone && /^jaw/i.test(bone.name)) rl80JawCandidates.push(bone);
+          });
+          if (rl80JawCandidates.length === 0) {
+            const unicornArmature =
+              templeScene.getObjectByName('Root_1') ||
+              templeScene.getObjectByName('Root_1.001') ||
+              templeScene.getObjectByName('Armature_Unicorn');
+            if (unicornArmature) {
+              unicornArmature.traverse((bone) => {
+                if (bone.isBone && /^jaw/i.test(bone.name)) rl80JawCandidates.push(bone);
+              });
+            }
+          }
+          rl80JawBoneRef.current =
+            rl80JawCandidates.find(b => b.parent === rl80HeadBoneRef.current) ||
+            rl80JawCandidates[0] ||
+            null;
+          // Capture the jaw's REST (closed-mouth) local quaternion; the useFrame
+          // lip-sync opens from this each frame. captureHeadRestPose stores it
+          // as `_baseQuat` — reuse it.
+          captureHeadRestPose(rl80JawBoneRef);
+          if (!rl80JawBoneRef.current) {
+            console.warn('[CyborgTempleScene] RL80 jaw bone not found (expected — unicorn has no jaw bone); using the code-made oval mouth instead');
+          }
+
+          // Code-made "mouth" (Path A2, no Blender): a FLAT dark disc anchored at
+          // her snout that scales open with speech amplitude. She has no jaw
+          // bone/morphs, so we overlay a simple primitive and drive its vertical
+          // scale from unicornMouth.value. A flat CircleGeometry (not a sphere)
+          // so it can never read as a chunky round blob — closed it's a thin
+          // line, open it's an ellipse. Its +Z normal is aimed at the muzzle via
+          // the tunable rotation below. Created once, added to the R3F scene
+          // root, positioned/scaled/oriented each frame in useFrame from the
+          // head bone. Guard against re-creation on re-runs.
+          if (!rl80MouthMeshRef.current) {
+            const mouthGeo = new THREE.CircleGeometry(1, 32); // unit disc in XY, faces +Z
+            const mouthMat = new THREE.MeshBasicMaterial({
+              color: 0x140a10,            // dark maw; override live via window.__rl80Mouth.color
+              transparent: true,
+              opacity: 0.97,
+              depthWrite: false,          // an overlay on the snout, don't fight its depth
+              side: THREE.DoubleSide,     // visible whichever way it ends up facing
+            });
+            const mouthMesh = new THREE.Mesh(mouthGeo, mouthMat);
+            mouthMesh.name = 'RL80_MouthOverlay';
+            mouthMesh.renderOrder = 6;
+            mouthMesh.frustumCulled = false;
+            mouthMesh.visible = false;    // shown once positioned in useFrame
+            scene.add(mouthMesh);
+            rl80MouthMeshRef.current = mouthMesh;
+          }
           // V2 model: the unicorn's mesh sits under Unicorn_Empty but its
           // Mixamo armature (Root_1, with mixamorig* bones) is a SIBLING in
           // the scene root — so we wire its descendant meshes to the click
@@ -5596,8 +5751,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       // Symmetric yaw/pitch clamp relative to the CURRENT pose. Decompose
       // (lookAt − currentPose) in current-pose's frame, clamp each axis
       // around zero, recompose, apply.
-      const maxYaw   = 0.6;  // ~34° left/right
-      const maxPitch = 0.4;  // ~23° up/down
+      const maxYaw   = 0.95; // ~54° left/right
+      const maxPitch = 0.6;  // ~34° up/down
       const maxRoll  = 0.0;
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -5629,6 +5784,92 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     } else if (rl80HeadBoneRef._smoothedQuat) {
       rl80HeadBoneRef._smoothedQuat = null;
       rl80HeadBoneRef._dummy = null;
+    }
+
+    // RL80 jaw lip-sync (Path A) — open the Jaw bone proportionally to speech
+    // amplitude (unicornMouth.value, written by playUnicornBeat's RMS analyser).
+    // Applied after mixer.update so it layers on the body animation, like the
+    // head override above. Each frame we reset to the captured closed pose then
+    // rotate open, so it never accumulates even though no clip animates the jaw.
+    // Axis/sign/gain are rig-specific — tune live in the console via
+    //   window.__rl80Jaw = { axis:'x'|'y'|'z', sign:1|-1, maxAngle:<radians> }
+    // until the mouth opens naturally downward, then bake the values below.
+    if (rl80JawBoneRef.current && rl80JawBoneRef._baseQuat) {
+      const jaw = rl80JawBoneRef.current;
+      const cfg = (typeof window !== 'undefined' && window.__rl80Jaw) || null;
+      const axis = (cfg && cfg.axis) || 'x';
+      const sign = (cfg && cfg.sign) || 1;
+      const maxAngle = cfg && typeof cfg.maxAngle === 'number' ? cfg.maxAngle : 0.5;
+      // Smooth the raw amplitude so the jaw eases rather than buzzing per-sample.
+      const prev = rl80JawBoneRef._open || 0;
+      rl80JawBoneRef._open = prev + (unicornMouth.value - prev) * 0.4;
+      const a = sign * maxAngle * rl80JawBoneRef._open;
+      if (!rl80JawBoneRef._axisVec) rl80JawBoneRef._axisVec = new THREE.Vector3();
+      if (!rl80JawBoneRef._openQuat) rl80JawBoneRef._openQuat = new THREE.Quaternion();
+      rl80JawBoneRef._axisVec.set(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
+      rl80JawBoneRef._openQuat.setFromAxisAngle(rl80JawBoneRef._axisVec, a);
+      jaw.quaternion.copy(rl80JawBoneRef._baseQuat).multiply(rl80JawBoneRef._openQuat);
+      if (!rl80JawBoneRef._loggedHint) {
+        rl80JawBoneRef._loggedHint = true;
+        console.log('[CyborgTempleScene] RL80 jaw lip-sync active on bone', jaw.name,
+          '— if the mouth opens wrong, tune window.__rl80Jaw = { axis:"x", sign:1, maxAngle:0.5 }');
+      }
+    }
+
+    // RL80 code-made mouth overlay (Path A2) — a flat disc anchored at her snout
+    // (head-bone-local offset, so it tracks her head) whose +Z normal is aimed
+    // at the muzzle by `rot` [pitchX, yawY, rollZ] degrees, scaled open in Y by
+    // the smoothed speech amplitude. Live-tunable via
+    //   window.__rl80Mouth = { offset:[x,y,z], rot:[x,y,z], width, minH, maxH,
+    //                          color:0xrrggbb, gain, hideWhenQuiet:true }
+    // offset is HEAD-LOCAL (+Z toward the muzzle tip). `roll` is kept as an alias
+    // for rot[2]. Because the disc is flat, closed (open≈0) reads as a thin line
+    // and it can never look like a chunky round blob.
+    if (rl80MouthMeshRef.current && rl80HeadBoneRef.current) {
+      const mouth = rl80MouthMeshRef.current;
+      const head = rl80HeadBoneRef.current;
+      const cfg = (typeof window !== 'undefined' && window.__rl80Mouth) || null;
+      // Fallbacks all read RL80_MOUTH_DEFAULTS — single source of truth. In
+      // practice cfg is always set (the tuner init seeds window.__rl80Mouth).
+      const MD = RL80_MOUTH_DEFAULTS;
+      const offset = (cfg && cfg.offset) || MD.offset;
+      const rot    = (cfg && Array.isArray(cfg.rot)) ? cfg.rot
+                   : [0, 0, (cfg && typeof cfg.roll === 'number') ? cfg.roll : MD.rot[2]];
+      const width  = cfg && typeof cfg.width === 'number' ? cfg.width : MD.width;
+      const minH   = cfg && typeof cfg.minH  === 'number' ? cfg.minH  : MD.minH;
+      const maxH   = cfg && typeof cfg.maxH  === 'number' ? cfg.maxH  : MD.maxH;
+      const gain   = cfg && typeof cfg.gain  === 'number' ? cfg.gain  : MD.gain;
+      if (cfg && typeof cfg.color === 'number' && mouth.material.color.getHex() !== cfg.color) {
+        mouth.material.color.setHex(cfg.color);
+      }
+
+      head.updateWorldMatrix(true, false);
+      if (!mouth._hp) {
+        mouth._hp = new THREE.Vector3(); mouth._hq = new THREE.Quaternion();
+        mouth._off = new THREE.Vector3(); mouth._rotQ = new THREE.Quaternion();
+        mouth._rotE = new THREE.Euler();
+      }
+      head.getWorldPosition(mouth._hp);
+      head.getWorldQuaternion(mouth._hq);
+      mouth._off.set(offset[0], offset[1], offset[2]).applyQuaternion(mouth._hq);
+      mouth.position.copy(mouth._hp).add(mouth._off);
+      // Orient: head frame, then the tunable local Euler to aim the disc.
+      const D = Math.PI / 180;
+      mouth._rotE.set(rot[0] * D, rot[1] * D, rot[2] * D, 'XYZ');
+      mouth._rotQ.setFromEuler(mouth._rotE);
+      mouth.quaternion.copy(mouth._hq).multiply(mouth._rotQ);
+
+      // Smooth the amplitude so the mouth eases rather than buzzing per-sample.
+      const target = Math.min(1, unicornMouth.value * gain);
+      mouth._open = (mouth._open || 0) + (target - (mouth._open || 0)) * 0.4;
+      mouth.scale.set(width, minH + (maxH - minH) * mouth._open, 1); // flat: Z scale unused
+      mouth.visible = cfg && cfg.hideWhenQuiet ? mouth._open > 0.02 : true;
+
+      if (!mouth._loggedHint) {
+        mouth._loggedHint = true;
+        console.log('[CyborgTempleScene] RL80 mouth overlay active — Shift+M then arrows/[ ] move, ' +
+          'q/a w/s e/d rotate; defaults:', JSON.stringify(RL80_MOUTH_DEFAULTS));
+      }
     }
 
     // Detective head look-at-camera override — mirrors the RL80 setup.
@@ -6176,7 +6417,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                     /yoo-JEEN/
                   </div>
                   <div style={{ fontStyle: 'italic' }}>
-                    Every story wants to be a myth. The rare ones earn it.
+                    {eugeneLobbyLine || 'Every story wants to be a myth. The rare ones earn it.'}
                   </div>
                 </>
               ) : (
@@ -6272,7 +6513,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                     /yoo-JEEN/
                   </div>
                   <div style={{ fontStyle: 'italic' }}>
-                    Every story wants to be a myth. The rare ones earn it.
+                    {eugeneLobbyLine || 'Every story wants to be a myth. The rare ones earn it.'}
                   </div>
                 </>
               ) : (

@@ -534,7 +534,7 @@ body:has(.shrine-page.neon) {
 
 .shrine-page.neon .rl80-ticker-title {
   position: absolute;
-  top: 0.35em;
+  top: 0;
   left: 0.1em;
   font-family: "UnifrakturMaguntia", serif;
   font-size: clamp(2.8rem, 5.6vw, 4rem);
@@ -543,7 +543,8 @@ body:has(.shrine-page.neon) {
   letter-spacing: 0.02em;
   white-space: nowrap;
   opacity: 0;
-  transform: translateY(10px);
+  transform: rotate(-6deg) skew(-12deg) translateY(10px);
+  transform-origin: left center;
   filter: blur(6px);
   transition: opacity 900ms ease, transform 900ms ease, filter 900ms ease;
   pointer-events: none;
@@ -551,7 +552,7 @@ body:has(.shrine-page.neon) {
 
 .shrine-page.neon .hero-title-stack.is-ticker .rl80-ticker-title {
   opacity: 1;
-  transform: translateY(0);
+  transform: rotate(-6deg) skew(-12deg) translateY(0);
   filter: blur(0);
 }
 
@@ -568,7 +569,7 @@ body:has(.shrine-page.neon) {
 /* Respect reduced-motion: no diagonal reveal, just a plain opacity swap. */
 @media (prefers-reduced-motion: reduce) {
   .shrine-page.neon .rl80-ticker-title {
-    transform: none;
+    transform: rotate(-6deg) skew(-12deg);
     filter: none;
   }
   .shrine-page.neon .hero-title-stack.is-ticker .our-lady-title {
@@ -933,6 +934,84 @@ body:has(.shrine-page.neon) {
   letter-spacing: 0.02em;
   margin: 0;
   max-width: 42ch;
+}
+
+/* The battle cry — the emotional lede. A touch larger and brighter than the
+   body copy so it lands as a headline, not a paragraph. */
+.shrine-page.neon .hero-intro__cry {
+  margin: 0;
+  font-size: clamp(1.05rem, 2.4vw, 1.28rem);
+  line-height: 1.4;
+  color: #f4e3b6;
+  text-wrap: balance;
+}
+
+/* The dek — states the territory plainly. Dimmer and slightly smaller so it
+   reads as a subtitle beneath the cry. */
+.shrine-page.neon .hero-intro__dek {
+  margin: 0.7em 0 0;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: #c9b487;
+  opacity: 0.92;
+}
+
+/* The key — the conversion line. Follows the rites list and names RL80 as
+   the single key to all of them, so it reads brighter than the dek: this is
+   the line that fronts the buy CTA. */
+.shrine-page.neon .hero-intro__key {
+  margin: 1.2em 0 0;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  color: #f4e3b6;
+}
+
+/* Hero buy CTA — breathing room below the key line. Inherits the full
+   .shrine-btn.primary treatment. */
+.shrine-page.neon .hero-intro__cta {
+  margin-top: 1.1em;
+}
+
+/* Buy CTA reprise beneath the Holy Trin80 section. */
+.shrine-page.neon .holy-trin-cta-row {
+  display: flex;
+  justify-content: center;
+  margin: 2.2rem 0 0;
+}
+
+/* The litany — feature rites. Custom cross markers instead of default disc
+   bullets keep the sacred register through the list. */
+.shrine-page.neon .hero-intro__rites {
+  margin: 1.1em 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55em;
+}
+
+.shrine-page.neon .hero-intro__rites li {
+  position: relative;
+  padding-left: 1.4em;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.shrine-page.neon .hero-intro__rites li::before {
+  content: ""; /* plain round bullet */
+  position: absolute;
+  left: 0.35em;
+  top: 0.5em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffd60a;
+  opacity: 0.75;
+}
+
+.shrine-page.neon .hero-intro__rites strong {
+  color: #f4e3b6;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 /* "deflationary utility" — a glinting gold sheen that sweeps across the
@@ -2237,7 +2316,12 @@ body:has(.shrine-page.neon) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
     gap: clamp(32px, 4vw, 72px);
-    align-items: center;
+    /* Top-align the columns: the portrait ChartWidget is shorter than the
+       text plaque, so centering left it floating with empty bands above and
+       below. Aligning to the top anchors the glass to the "PROSPER80" title
+       and lets the litany trail below it — an intentional editorial layout
+       rather than an adrift artwork. */
+    align-items: start;
     text-align: left;
     padding: clamp(56px, 6vw, 88px) clamp(40px, 5vw, 80px);
     background: none;

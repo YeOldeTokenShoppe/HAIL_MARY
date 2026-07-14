@@ -197,8 +197,9 @@ export default function ChannelView({
         </div>
       </div>
 
-      {/* footer */}
-      <button className="cv-verdict" onClick={onVerdict}>RENDER VERDICT ▸</button>
+      {/* footer — hidden when the parent hasn't opened the verdict phase yet
+          (the Case Table gates it until all actions are spent) */}
+      {onVerdict && <button className="cv-verdict" onClick={onVerdict}>RENDER VERDICT ▸</button>}
 
       {/* Fullscreen "monitor view" of a revealed evidence card — same overlay
           the desktop VIEW EVIDENCE button opens. position:fixed, so it escapes

@@ -237,7 +237,9 @@ Phase 1 routes. (Server-side docket validation arrives in Phase 3.)
 
 ### 3.6 Phase 2 checklist
 
-- [ ] Cast reconciliation (§2) — rename ids, retag pass, Eugene rework
+- [x] Cast reconciliation (§2) — rename ids, retag pass, Eugene rework
+      (applied 2026-07-14: cards.js/engine.js ids + tags, `LENS_BY_TAG`
+      export in cards.js, `traderId` join in characterMeta.js)
 - [ ] Genesis revision pass (§3.2a) — actions redesigned kit-first, coins
       gain `caseRef`, markets become docket events; declare art-lock rule
 - [ ] `caseKit.js` + `LENS_BY_TAG`
@@ -504,6 +506,31 @@ P&L beside all four now-unsealed benchmark books, docket events, and
 standings scored as "you beat N of 4 partners" (bust = "the Order
 withdraws its blessing"). Deterministic per docket seed. Mock omissions:
 Cred costs, crowd odds, voices, persistence. (v1/v2 lessons below.)
+
+**v4 (2026-07-14): the three-dial position ticket.** The commit is a ticket,
+not a slider: **P(SCAM)** (calibration), **STAKE 0–50** (sizing — the council
+benchmarks a flat 25; the Ledger names your sizing against the
+conviction-justified stake `|p−.5|/.5 × 50`), and **HORIZON** (opt-in timing
+side pot: DAYS / WEEKS / MONTHS window, +10 hit / −4 miss, keyed to a new
+`collapseDay` field in `caseSignals.js` — the evidence genuinely informs it:
+PRPHT's deployer history says days, MERIDIAN's latent upgrade door says
+months, and a call on a token that holds always loses). Design rules carried
+in: **three dials max**, **no unscored dials** (each gets its own named
+Ledger line), sizing math hidden at commit ("felt, not computed"), side-pot
+terms public. A max-conviction full-stake miss costs 150 — more than the
+book — so one case can now end you, which is the drama the stake dial exists
+to create. Open question for playtests: does the sizing debrief coach too
+hard, and should HORIZON appear only on cases with timing-relevant evidence?
+*v4.1 (same day): onboarding pass — lobby copy restructured into three
+numbered steps, first-run scaffolds on the desk / pundit calls / ticket
+(localStorage-once, per the primitives doc's scaffold-once rule), the dock
+counter reads ACTIONS n/max with a KIT label, an out-of-actions nudge in the
+desk feed, and the docket seed tucked into a DEV chip (in production it
+becomes the Daily Docket date, not a control). Pundit calls now GATE on the
+investigation being spent (§4.2 order; actions don't bank, so an early call
+was a pure newbie trap). Open question: does a deliberate "fast fold" —
+calling the table early on a case you've already decided — ever earn its
+place, e.g. banking the saved action as +1 Cred?*
 
 **Playtest lesson (v1 → v2, 2026-07-12):** a kit that lives in a separate
 drawer outside the scan economy reads as "the old game plus a menu" — the

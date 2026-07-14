@@ -19,6 +19,7 @@
 export const CASE_SIGNALS = {
   "case-001": {
     truth: 1, // PROPHET TOKEN — serial-deployer rug; monk is decisive
+    collapseDay: 6, // ground truth: "Pulled day 6" — fast exit-window pattern
     stations: {
       monk: [
         { label: "DEPLOYER WALLET AGE", dir: "scam", w: 1 },
@@ -53,6 +54,7 @@ export const CASE_SIGNALS = {
 
   "case-002": {
     truth: 0, // HARBORLIGHT — scary surface, legit core; marisol+eugene decisive
+    collapseDay: null, // legit — it never rugs; any horizon call loses
     stations: {
       monk: [
         { label: "TEAM HISTORY", dir: "scam", w: 1 },
@@ -87,6 +89,7 @@ export const CASE_SIGNALS = {
 
   "case-003": {
     truth: 1, // MERIDIAN — latent upgrade-door rug; marisol+monk cross is decisive
+    collapseDay: 61, // ground truth: "rugged on day 61" — slow latent drain
     stations: {
       monk: [
         { label: "TEAM IDENTITY", dir: "legit", w: 2 },

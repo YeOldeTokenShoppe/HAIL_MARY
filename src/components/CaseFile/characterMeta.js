@@ -9,9 +9,13 @@
 // gold for GR80, the magenta/cyan/green accent trio for the other
 // three), so no new design tokens are introduced.
 
+// traderId joins each station to its canonical Genesis trader card
+// (CASE_TABLE.md §2.3) — station keys stay monk/demon because they're
+// baked into the authored cases and SitePal audio slot names.
 export const CHARACTER_META = {
   monk: {
     name: 'Saint GR80',
+    traderId: 'gr80',
     role: 'ETHOS',
     roleSub: 'CREDIBILITY',
     sigil: '✠',
@@ -20,6 +24,7 @@ export const CHARACTER_META = {
   },
   demon: {
     name: 'John Barron',
+    traderId: 'john-barron',
     role: 'PATHOS',
     roleSub: 'HYPE',
     sigil: '◬',
@@ -28,6 +33,7 @@ export const CHARACTER_META = {
   },
   marisol: {
     name: 'Detective Marisol',
+    traderId: 'marisol',
     role: 'LOGOS',
     roleSub: 'ONCHAIN',
     sigil: '✧',
@@ -36,6 +42,7 @@ export const CHARACTER_META = {
   },
   eugene: {
     name: 'Eugene',
+    traderId: 'eugene',
     role: 'MYTHOS',
     roleSub: 'STORY',
     sigil: '⟁',

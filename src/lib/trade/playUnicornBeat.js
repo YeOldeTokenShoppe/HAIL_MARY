@@ -20,6 +20,9 @@
 //   playAnim(name)     crossfade the unicorn mixer to a body gesture
 //   audioCtx           optional shared AudioContext (reuse the page's single ctx)
 
+import { speechify } from './speechify';
+import { setUnicornMouth } from './unicornMouth';
+
 // Director mood → an existing unicorn animation state. Reuse what you have
 // (unicorn_clapping / unicorn_disappointed / UnicornWaving from the verdict
 // reaction map); add a neutral "unicorn_speak" gesture for the common cases.
@@ -64,11 +67,41 @@ function getReverbIR(ctx) {
 const wordCount = (s) => (s ? s.trim().split(/\s+/).length : 0);
 const estimateMs = (line) => Math.max(1400, wordCount(line) * 360 + 700);
 
+// Tracks the in-flight beat so a new line (or an explicit stop) can interrupt
+// it — otherwise rapid clicks in case-file review would stack overlapping
+// oracle voices. Holds a { stop } handle installed once playback begins.
+let _activeBeat = null;
+
+// Interrupt whatever Eugene is currently saying (audio + glow). Safe to call
+// when nothing is playing. Invoked automatically at the start of each beat, and
+// exported so the page can silence her on un-focus / case change.
+export function stopUnicornBeat() {
+  const b = _activeBeat;
+  _activeBeat = null;
+  if (b && typeof b.stop === 'function') {
+    try { b.stop(); } catch {}
+  }
+}
+
 export async function playUnicornBeat(beat, hooks = {}) {
   const { setCaption, setSpeaker, setGlow, playAnim, audioCtx } = hooks;
   const line = (beat && beat.line) || '';
 
-  console.log('[playUnicornBeat] start', { line: line.slice(0, 50) });
+  // Interrupt any in-flight beat, then claim the active slot. isCurrent() gates
+  // every async continuation below so a superseded beat can't fight the new one
+  // over the shared glow.
+  stopUnicornBeat();
+  const self = {};
+  _activeBeat = self;
+  const isCurrent = () => _activeBeat === self;
+
+  // What she SAYS vs what shows on screen. `line` is the raw bubble/caption
+  // text (emoji, $340K, RL80). `spoken` is the coherent version sent to TTS:
+  // an authored `beat.spoken` override if present, else `line`, both run
+  // through speechify() to strip emoji and expand symbols.
+  const spoken = speechify((beat && beat.spoken) || line);
+
+  console.log('[playUnicornBeat] start', { line: line.slice(0, 50), spoken: spoken.slice(0, 50) });
   setSpeaker?.('Unicorn');
   setCaption?.(line);
   playAnim?.(MOOD_TO_UNICORN_ANIM[beat?.mood] || 'unicorn_speak');
@@ -77,12 +110,12 @@ export async function playUnicornBeat(beat, hooks = {}) {
 
   // Fetch the TTS bytes. If anything fails, fall back to a caption-only beat.
   let audioBuf = null;
-  if (ctx) {
+  if (ctx && spoken) {
     try {
       const res = await fetch('/api/trade/unicorn-voice', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: line }),
+        body: JSON.stringify({ text: spoken }),
       });
       console.log('[playUnicornBeat] voice route status', res.status);
       if (res.ok) {
@@ -99,17 +132,24 @@ export async function playUnicornBeat(beat, hooks = {}) {
     const ms = estimateMs(line);
     // Soft glow pulse so the horn still reacts even without audio.
     let raf, t0 = performance.now();
-    const pulse = () => {
-      const e = (performance.now() - t0) / ms;
-      if (e >= 1) { setGlow?.(0); return; }
-      setGlow?.(0.4 + 0.3 * Math.sin(e * Math.PI * 6));
-      raf = requestAnimationFrame(pulse);
-    };
-    pulse();
-    await new Promise((r) => setTimeout(r, ms));
+    await new Promise((resolve) => {
+      self.stop = () => { cancelAnimationFrame(raf); setGlow?.(0); setUnicornMouth(0); resolve(); };
+      const pulse = () => {
+        if (!isCurrent()) return;
+        const e = (performance.now() - t0) / ms;
+        if (e >= 1) { setGlow?.(0); resolve(); return; }
+        setGlow?.(0.4 + 0.3 * Math.sin(e * Math.PI * 6));
+        raf = requestAnimationFrame(pulse);
+      };
+      pulse();
+    });
     cancelAnimationFrame(raf);
-    setGlow?.(0);
-    playAnim?.(UNICORN_IDLE_ANIM);
+    if (isCurrent()) {
+      setGlow?.(0);
+      setUnicornMouth(0);
+      playAnim?.(UNICORN_IDLE_ANIM);
+      _activeBeat = null;
+    }
     return;
   }
 
@@ -134,6 +174,7 @@ export async function playUnicornBeat(beat, hooks = {}) {
   const data = new Uint8Array(analyser.fftSize);
   let raf, glow = 0;
   const tick = () => {
+    if (!isCurrent()) return;
     analyser.getByteTimeDomainData(data);
     let sum = 0;
     for (let i = 0; i < data.length; i++) {
@@ -143,16 +184,33 @@ export async function playUnicornBeat(beat, hooks = {}) {
     const rms = Math.sqrt(sum / data.length);          // 0..~0.5
     glow += (Math.min(1, rms * 3.2) - glow) * 0.3;     // smooth
     setGlow?.(glow);
+    // Jaw lip-sync (Path A): the same RMS drives her Jaw bone open amount.
+    // A touch snappier than the glow so the mouth reads as articulating; the
+    // scene smooths it further before rotating the bone.
+    setUnicornMouth(Math.min(1, rms * 3.8));
     raf = requestAnimationFrame(tick);
   };
   tick();
 
   await new Promise((resolve) => {
+    // Interruptible: a new beat (or stopUnicornBeat) stops the source, which
+    // resolves this promise via the same path as natural end-of-audio.
+    self.stop = () => {
+      try { src.onended = null; src.stop(); } catch {}
+      cancelAnimationFrame(raf);
+      setGlow?.(0);
+      setUnicornMouth(0);
+      resolve();
+    };
     src.onended = resolve;
     try { src.start(0); } catch { resolve(); }
   });
 
   cancelAnimationFrame(raf);
-  setGlow?.(0);
-  playAnim?.(UNICORN_IDLE_ANIM);
+  if (isCurrent()) {
+    setGlow?.(0);
+    setUnicornMouth(0);
+    playAnim?.(UNICORN_IDLE_ANIM);
+    _activeBeat = null;
+  }
 }

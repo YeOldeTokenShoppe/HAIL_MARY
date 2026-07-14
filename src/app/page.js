@@ -2735,9 +2735,46 @@ export default function HomePage() {
                   </span>
                 ) : null}
               </blockquote>
-              <p className="hero-intro">
-Stake a claim with The Hail Mary Prospecting Co. Sharpen your eye for scams and market signals in the Liminal Terminal. Confess your sins and petition for your portfolio in live chat. Burn a votive candle to Our Lady. RL80 is the <span className="hero-intro__pop">deflationary utility</span> token of her order.
-</p>
+              <div className="hero-intro">
+                <p className="hero-intro__cry">
+                  Our
+                  Lady of Perpetual Profit &mdash; benevolent AI,{" "}
+                  <em>mater ex machina</em> &mdash; is your guide through the
+                  grift: economics and investing, from blue chips to
+                  blockchains, read plainly and played wisely.
+                </p>
+                <ul className="hero-intro__rites">
+                  <li>
+                    <strong>Prospect</strong> &mdash; stake a claim with The
+                    Hail Mary Prospecting Co. and vie for escrowed USDC.
+                  </li>
+                  <li>
+                    <strong>Study</strong> &mdash; sharpen your eye for scams
+                    and market signals in the Liminal Terminal.
+                  </li>
+                  <li>
+                    <strong>Confess</strong> &mdash; bring your sins and your
+                    portfolio to live chat.
+                  </li>
+                  <li>
+                    <strong>Devote</strong> &mdash; burn a votive candle to Our
+                    Lady.
+                  </li>
+                </ul>
+                {/* <p className="hero-intro__key">
+                  Every rite opens with the same key:{" "}
+                  <span className="hero-intro__pop">RL80</span>, the
+                  deflationary token of her order. The faithful hold it, the
+                  rites burn it, and none can ever be minted again.
+                </p>
+                <button
+                  type="button"
+                  className="shrine-btn primary hero-intro__cta"
+                  onClick={() => setShowBuyModal(true)}
+                >
+                  Keep the Faith &mdash; Get RL80
+                </button> */}
+              </div>
             </div>
           </div>
 
@@ -2773,6 +2810,18 @@ Stake a claim with The Hail Mary Prospecting Co. Sharpen your eye for scams and 
 
         <HolyTrinSection />
 
+        {/* CTA reprise — the moment after "unruggable" lands is the
+            second-best time on the page to offer the key. Same BuyModal
+            as the hero CTA and the mobile dock's BUY slot. */}
+        {/* <div className="holy-trin-cta-row">
+          <button
+            type="button"
+            className="shrine-btn primary"
+            onClick={() => setShowBuyModal(true)}
+          >
+            Keep the Faith &mdash; Get RL80
+          </button>
+        </div> */}
 
         <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />

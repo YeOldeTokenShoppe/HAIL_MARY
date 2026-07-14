@@ -33,7 +33,7 @@ almost regardless of scale.
 
 | Type | Count | Notes |
 |---|---|---|
-| Traders | 4 | The cast: Eugene, Marisol, Halo Node, Bullhorn Broker. All Mythic. Playable characters, never in the draw pool. **Cast reconciliation planned** — Halo Node → Saint GR80, Bullhorn Broker → John Barron, Eugene recharacterized (pattern/rare-finds, not memes); see [CASE_TABLE.md](./CASE_TABLE.md) §2. |
+| Traders | 4 | The cast: Eugene, Marisol, Saint GR80, John Barron. All Mythic. Playable characters, never in the draw pool. **Cast reconciliation applied 2026-07-14** — `halo-node` → `gr80`, `bullhorn-broker` → `john-barron`, Eugene recharacterized as the Pattern Prophet ("Déjà Vu" ability), `automation` tag → `discipline`, new `pattern` tag, meme lane moved to Barron; see [CASE_TABLE.md](./CASE_TABLE.md) §2. |
 | Coin cards | 28 | Buy-and-hold portfolio entries. `cost` → `baseValue`, plus `volatility` (bot-AI signal today; reserved for future market mechanics). |
 | Action cards | 33 | One-shot effects. Engine-supported effect fields: `portfolio`, `cred`, `shield`, `draw`, `opponentPortfolio`. |
 | Market cards | 15 | Global end-of-round events. Effect fields: `portfolioAll`, `credAll`, `styleBonus`, `stylePenalty`, `styleCred`, `crash`. |
@@ -72,8 +72,9 @@ Margin) — they make the set a tour of the RL80 world.
 - Turn: up to **2 plays**; Cred pays card costs; bank +3 Cred when nothing is
   playable; end of round flips a Market card affecting everyone; shields
   absorb one negative market hit.
-- Trader abilities are engine-coded per trader id (e.g. Eugene's first meme
-  coin +8; Halo Node ignores the first crash).
+- Trader abilities are engine-coded per trader id (e.g. Eugene's Déjà Vu:
+  first coin sharing a tag with a held coin +8; Saint GR80 ignores the
+  first crash).
 - Engine is **pure JS, framework-free, seeded-deterministic** — simulate
   thousands of games headlessly for balance work (200-game sim suites were
   used to validate the Genesis 80 and the starter deck).

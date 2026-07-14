@@ -7,10 +7,10 @@ import { getCardArt, toTemplateCard } from "@/game/terminal-traders/templateCard
 import TradingCard from "@/components/TradingCard";
 
 const TRADER_THUMBNAILS = {
-  "eugene": { portrait: "/thumbnail_eugene.png", label: "MEME" },
+  "eugene": { portrait: "/thumbnail_eugene.png", label: "MYTHOS" },
   "marisol": { portrait: "/thumbnail_marisol.png", label: "LOGOS" },
-  "halo-node": { portrait: "/thumbnail_gr80.png", label: "NODE" },
-  "bullhorn-broker": { portrait: "/thumbnail_johnBarron.png", label: "HYPE" },
+  "gr80": { portrait: "/thumbnail_gr80.png", label: "ETHOS" },
+  "john-barron": { portrait: "/thumbnail_johnBarron.png", label: "PATHOS" },
 };
 
 export default function TerminalTradersGame({ variant = "page", onExit, cardPool = null } = {}) {

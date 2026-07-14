@@ -144,7 +144,7 @@ export { SAMPLE_CASE, CASE_002, CASE_FILES, CASES } from "./game/cases";
 // at playback time when SitePal sayAudio is available.
 export function resolveLine(line) {
   if (line == null) return null;
-  if (typeof line === 'string') return { text: line, audio: null, audioDurationMs: null };
+  if (typeof line === 'string') return { text: line, audio: null, audioDurationMs: null, spoken: null };
   if (typeof line === 'object') {
     return {
       text: line.text || '',
@@ -154,6 +154,12 @@ export function resolveLine(line) {
       // land together. Without it they fall back to char-count pacing,
       // which can lag behind slow-spoken or heavily-paused lines.
       audioDurationMs: typeof line.audioDurationMs === 'number' ? line.audioDurationMs : null,
+      // Optional spoken variant for TTS characters authored for on-screen
+      // reading (Eugene): the bubble shows `text`, but her ElevenLabs voice
+      // speaks `spoken` when present. Both are run through speechify() before
+      // TTS; this just lets the writer supply exact phrasing where the auto
+      // normalizer isn't enough. Falls back to `text` when absent.
+      spoken: typeof line.spoken === 'string' ? line.spoken : null,
     };
   }
   return null;

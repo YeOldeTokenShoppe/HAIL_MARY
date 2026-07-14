@@ -209,10 +209,14 @@ function runBotTurn(state, playerIndex) {
 function applyPlayedCard(state, player, card) {
   if (card.type === CARD_TYPES.COIN) {
     let value = card.baseValue;
-    if (player.id === "eugene" && card.tag === "meme" && !player.abilityUsed) {
+    if (
+      player.id === "eugene"
+      && !player.abilityUsed
+      && player.holdings.some((held) => held.tag === card.tag)
+    ) {
       value += 8;
       player.abilityUsed = true;
-      state.log.unshift("Eugene's Rainbow Candle adds +8 to a meme coin.");
+      state.log.unshift(`Eugene's Déjà Vu: he has seen ${card.name}'s pattern before (+8).`);
     }
     player.holdings.push({ cardId: card.id, name: card.name, value, tag: card.tag });
     player.portfolio += value;
@@ -225,9 +229,9 @@ function applyPlayedCard(state, player, card) {
   let credDelta = card.effect?.cred || 0;
 
   if (player.id === "marisol" && card.tag === "investigation") portfolioDelta += 3;
-  if (player.id === "halo-node" && card.tag === "automation") portfolioDelta += 3;
-  if (player.id === "eugene" && card.tag === "meme") portfolioDelta += 4;
-  if (player.id === "bullhorn-broker" && (card.tag === "hype" || card.tag === "pump")) portfolioDelta += 4;
+  if (player.id === "gr80" && card.tag === "discipline") portfolioDelta += 3;
+  if (player.id === "eugene" && card.tag === "pattern") portfolioDelta += 4;
+  if (player.id === "john-barron" && (card.tag === "hype" || card.tag === "pump" || card.tag === "meme")) portfolioDelta += 4;
 
   player.portfolio += portfolioDelta;
   player.cred += credDelta;
@@ -259,19 +263,20 @@ function applyMarket(state, market) {
     if (effect.stylePenalty?.[player.style]) portfolioDelta += effect.stylePenalty[player.style];
     if (effect.styleCred?.[player.style]) credDelta += effect.styleCred[player.style];
 
+    // Cold Wallet Shield is free — check it before spending a real shield.
+    if (portfolioDelta < 0 && player.id === "gr80" && !player.crashIgnored && effect.crash) {
+      player.crashIgnored = true;
+      portfolioDelta = 0;
+      state.log.unshift("Saint GR80's Cold Wallet Shield ignores the first crash.");
+    }
+
     if (portfolioDelta < 0 && player.shields > 0) {
       player.shields -= 1;
       portfolioDelta = 0;
       state.log.unshift(`${player.name}'s shield absorbs the hit.`);
     }
 
-    if (portfolioDelta < 0 && player.id === "halo-node" && !player.crashIgnored && effect.crash) {
-      player.crashIgnored = true;
-      portfolioDelta = 0;
-      state.log.unshift("Halo Node ignores the first crash.");
-    }
-
-    if (portfolioDelta < 0 && player.id === "bullhorn-broker") {
+    if (portfolioDelta < 0 && player.id === "john-barron") {
       portfolioDelta -= 3;
     }
 
@@ -326,10 +331,10 @@ function scoreBotCard(card, player) {
 
 const BOT_PERSONALITIES = {
   "eugene": {
-    preferredTags: ["meme", "pump"],
-    avoidedTags: ["analysis"],
-    volatilityBias: 1.4,
-    riskBias: 2,
+    preferredTags: ["pattern", "terminal"],
+    avoidedTags: ["hype"],
+    volatilityBias: 0.6,
+    riskBias: 1,
   },
   "marisol": {
     preferredTags: ["investigation", "analysis", "defense"],
@@ -337,13 +342,13 @@ const BOT_PERSONALITIES = {
     volatilityBias: -0.8,
     defenseBias: 4,
   },
-  "halo-node": {
-    preferredTags: ["automation", "defense", "bluechip"],
+  "gr80": {
+    preferredTags: ["discipline", "defense", "bluechip"],
     avoidedTags: ["meme", "hype"],
     volatilityBias: -0.4,
     defenseBias: 5,
   },
-  "bullhorn-broker": {
+  "john-barron": {
     preferredTags: ["hype", "pump", "risk", "meme"],
     avoidedTags: ["defense"],
     volatilityBias: 1,
