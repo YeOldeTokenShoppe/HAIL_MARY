@@ -29,6 +29,9 @@ export default function ChannelView({
   tts = false,
   useSitePal = false,   // live SitePal avatar in the feed (Monk channel test)
   sitePalSceneId = 2774449,
+  compact = false,      // desk (Case Table) layout: small fitted portrait card,
+                        // caption beside it, centered column — mobile keeps the
+                        // full-bleed hero when false
 }) {
   const meta = CHARACTER_META[stationKey] || {};
   const color = meta.color || "#37e3e3";
@@ -120,8 +123,46 @@ export default function ChannelView({
     .map((label) => station.entries?.find((e) => e.label === label))
     .filter(Boolean);
 
+  // translate="no": the caption is a live, rapidly-mutating text node that
+  // mirrors the avatar's ENGLISH audio. Letting Chrome/Google translate
+  // rewrite it (it wraps text in <font> tags) races React's updates and
+  // throws "removeChild ... not a child of this node". Excluding it also
+  // keeps the subtitle in sync with the spoken voice.
+  const captionBlock = (
+    <div className="cv-caption" translate="no">
+      <span className="cv-caption-text notranslate">{captionText}</span>
+      <span className="cv-cursor">{isSpeaking ? "▋" : ""}</span>
+    </div>
+  );
+
+  const feedBlock = (
+    <div className="cv-feed">
+      {useSitePal ? (
+        <SitePalFeed sceneId={sitePalSceneId} line={lineObj} onStatus={setFeedStatus} onCaption={setSitePalCaption} />
+      ) : (
+        <>
+          <img className="cv-portrait" src={meta.portrait} alt={meta.name} draggable={false} />
+          <span className="cv-tint" />
+          <span className="cv-scan" />
+        </>
+      )}
+      {!compact && (
+        <span className="cv-feedtop">
+          <span className="cv-name">{meta.name}</span>
+          <span className="cv-xmit"><i className={`cv-dot${isSpeaking ? "" : " cv-dot--listen"}`} />{xmitLabel}</span>
+        </span>
+      )}
+      {!compact && (
+        <span className="cv-role">{meta.role} · {meta.roleSub} <span className="cv-sigil">{meta.sigil}</span></span>
+      )}
+      <span className={`cv-eq${isSpeaking ? " cv-eq--on" : ""}`}>
+        {Array.from({ length: 9 }, (_, i) => <i key={i} style={{ animationDelay: `${i * 0.08}s` }} />)}
+      </span>
+    </div>
+  );
+
   return (
-    <div className="cv-root" style={{ "--cvc": color }}>
+    <div className={`cv-root${compact ? " cv-root--compact" : ""}`} style={{ "--cvc": color }}>
       {/* header */}
       <div className="cv-header">
         <button className="cv-back" onClick={onBack}>◀ COUNCIL</button>
@@ -130,38 +171,27 @@ export default function ChannelView({
         ))}</span>
       </div>
 
-      {/* the feed */}
-      <div className="cv-feed">
-        {useSitePal ? (
-          <SitePalFeed sceneId={sitePalSceneId} line={lineObj} onStatus={setFeedStatus} onCaption={setSitePalCaption} />
-        ) : (
-          <>
-            <img className="cv-portrait" src={meta.portrait} alt={meta.name} draggable={false} />
-            <span className="cv-tint" />
-            <span className="cv-scan" />
-          </>
-        )}
-        <span className="cv-feedtop">
-          <span className="cv-name">{meta.name}</span>
-          <span className="cv-xmit"><i className={`cv-dot${isSpeaking ? "" : " cv-dot--listen"}`} />{xmitLabel}</span>
-        </span>
-        <span className="cv-role">{meta.role} · {meta.roleSub} <span className="cv-sigil">{meta.sigil}</span></span>
-        <span className={`cv-eq${isSpeaking ? " cv-eq--on" : ""}`}>
-          {Array.from({ length: 9 }, (_, i) => <i key={i} style={{ animationDelay: `${i * 0.08}s` }} />)}
-        </span>
-      </div>
+      {/* the feed — compact mode seats the fitted portrait card beside the
+          caption; mobile keeps the full-bleed hero */}
+      {compact ? (
+        <div className="cv-hero">
+          {feedBlock}
+          <div className="cv-herotext">
+            <div className="cv-herohead">
+              <span className="cv-name">{meta.name}</span>
+              <span className="cv-role-inline">{meta.role} · {meta.roleSub} <span className="cv-sigil">{meta.sigil}</span></span>
+              <span className="cv-xmit"><i className={`cv-dot${isSpeaking ? "" : " cv-dot--listen"}`} />{xmitLabel}</span>
+            </div>
+            {captionBlock}
+          </div>
+        </div>
+      ) : (
+        feedBlock
+      )}
 
       {/* scrollable body */}
       <div className="cv-body">
-        {/* translate="no": the caption is a live, rapidly-mutating text node that
-            mirrors the avatar's ENGLISH audio. Letting Chrome/Google translate
-            rewrite it (it wraps text in <font> tags) races React's updates and
-            throws "removeChild ... not a child of this node". Excluding it also
-            keeps the subtitle in sync with the spoken voice. */}
-        <div className="cv-caption" translate="no">
-          <span className="cv-caption-text notranslate">{captionText}</span>
-          <span className="cv-cursor">{isSpeaking ? "▋" : ""}</span>
-        </div>
+        {!compact && captionBlock}
 
         {evidence.length > 0 && (
           <div className="cv-evidence">
@@ -318,6 +348,23 @@ export default function ChannelView({
           clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
           box-shadow: 0 0 14px color-mix(in srgb, var(--cvc) 35%, transparent);
         }
+
+        /* --- compact (desk / Case Table) variant --- */
+        .cv-root--compact .cv-header,
+        .cv-root--compact .cv-body,
+        .cv-root--compact .cv-verdict,
+        .cv-hero {
+          width: 100%; max-width: 1000px; margin-left: auto; margin-right: auto; box-sizing: border-box;
+        }
+        .cv-hero { display: flex; gap: 16px; padding: 0 12px; align-items: stretch; z-index: 6; }
+        .cv-root--compact .cv-feed {
+          width: 168px; height: 224px; margin: 0; flex-shrink: 0;
+          clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+        }
+        .cv-herotext { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 9px; }
+        .cv-herohead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+        .cv-role-inline { font-size: 10px; letter-spacing: 0.12em; color: var(--cvc); }
+        .cv-root--compact .cv-caption { text-align: left; padding: 0; margin: 0; min-height: 0; }
       `}</style>
     </div>
   );

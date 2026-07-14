@@ -36,7 +36,7 @@ const STAKE = TABLE_RULES.stake; // the council's flat benchmark stake
 const START_PF = TABLE_RULES.startPortfolio;
 const BASE_ACTIONS = 3;
 const BOT_ROUNDS = 3;
-const DOCK_H = 118;
+const DOCK_H = 240; // tall enough for the card-shaped kit hand
 
 const bucket = (p) => (p < 0.4 ? "believe" : p > 0.6 ? "doubt" : "abstain");
 const VLABEL = { believe: "TRUST", doubt: "DOUBT", abstain: "ABSTAIN" };
@@ -94,10 +94,12 @@ const LEAN_LINES = {
 };
 
 // Docket events (simplified MARKET_CARDS stand-ins — same odds as the sim).
+// `effect` is the player-facing consequence line — every event states what it
+// did to the books, including "nothing", so the banner is never ambiguous.
 const EVENTS = [
-  { id: "crash", p: 0.3, label: "DEAD CHAIN HOUR", text: "Liquidity evaporates. Every book takes −10.", portfolioAll: -10 },
-  { id: "boost", p: 0.2, label: "BULL RUN", text: "The tide lifts. Next case pays ×1.25.", payoutMult: 1.25 },
-  { id: "calm", p: 0.5, label: "STABLECOIN WEATHER", text: "Nothing moves. The desk breathes." },
+  { id: "crash", p: 0.3, label: "DEAD CHAIN HOUR", text: "Liquidity evaporates.", effect: "ALL BOOKS −10 · APPLIED ABOVE", portfolioAll: -10 },
+  { id: "boost", p: 0.2, label: "BULL RUN", text: "The tide lifts.", effect: "NEXT CASE PAYS ×1.25", payoutMult: 1.25 },
+  { id: "calm", p: 0.5, label: "STABLECOIN WEATHER", text: "Nothing moves. The desk breathes.", effect: "NO EFFECT ON ANY BOOK" },
 ];
 
 function rollEvent(rand) {
@@ -109,20 +111,29 @@ function rollEvent(rand) {
   return EVENTS[EVENTS.length - 1];
 }
 
-// Your kit — real Genesis cards in their §3.2a roles. Playing a card IS an
-// investigation action (§4.2). Once each per case.
+// Your kit — THE FIRST TWELVE (CASE_TABLE.md §3.2b): the art-scope subset.
+// Every kit role, every tier, and every ticket dial has a card that serves
+// it. Playing a card IS an investigation action (§4.2). Once each per case.
 const KIT_CARDS = [
   { id: "audit-flare", name: "Audit Flare", rarity: "common", kind: "lensKey", station: "monk", text: "GR80 slides you his 2 strongest evidence cards." },
   { id: "forked-rumor", name: "Forked Rumor", rarity: "common", kind: "lensKey", station: "demon", text: "Barron slides you his 2 strongest evidence cards." },
   { id: "wallet-seance", name: "Wallet Séance", rarity: "common", kind: "lensKey", station: "marisol", text: "Marisol slides you her 2 strongest evidence cards." },
   { id: "mempool-prophecy", name: "Mempool Prophecy", rarity: "common", kind: "lensKey", station: "eugene", text: "Eugene slides you his 2 strongest evidence cards." },
+  { id: "cold-wallet", name: "Cold Wallet", rarity: "uncommon", kind: "deepScan", station: "monk", text: "Deep scan — GR80 opens the cold archive: everything he still holds." },
+  { id: "chart-exorcism", name: "Chart Exorcism", rarity: "uncommon", kind: "deepScan", station: "marisol", text: "Deep scan — Marisol drags out everything the chain still hides." },
   { id: "oracle-crosscheck", name: "Oracle Crosscheck", rarity: "rare", kind: "crossref", text: "Pull the strongest evidence card from every station you haven't visited." },
-  { id: "cold-wallet", name: "Cold Wallet", rarity: "uncommon", kind: "shield", text: "Shield: absorb one negative market flip this docket." },
+  { id: "rug-warning", name: "Rug Warning", rarity: "rare", kind: "trace", text: "Sweep for a fast-exit fingerprint. Finds it only if the rug is days away." },
+  { id: "candle-vigil", name: "Candle Vigil", rarity: "common", kind: "shield", text: "Shield: absorb one negative market flip this docket." },
+  { id: "neon-stop-loss", name: "Neon Stop Loss", rarity: "uncommon", kind: "stoploss", text: "This case's ticket can't lose more than 25, whatever you staked." },
   { id: "insider-ping", name: "Insider Ping", rarity: "uncommon", kind: "peek", text: "At pundit calls, wiretap one partner and see their exact sealed number." },
   { id: "terminal-foil-moment", name: "Terminal Foil Moment", rarity: "terminal-foil", kind: "wildcard", text: "The desk stops — take two extra actions this case." },
 ];
 const RARITY_COLOR = { common: "#bfeede", uncommon: "#4dffaa", rare: "#8ee9ff", "terminal-foil": "#ffd23a" };
-const KIND_LABEL = { lensKey: "LENS KEY", crossref: "CROSS-REF", shield: "SHIELD", peek: "WIRETAP", wildcard: "WILDCARD" };
+const KIND_LABEL = {
+  lensKey: "LENS KEY", deepScan: "DEEP SCAN", crossref: "CROSS-REF", trace: "EXIT TRACE",
+  shield: "SHIELD", stoploss: "STOP LOSS", peek: "WIRETAP", wildcard: "WILDCARD",
+};
+const STOP_LOSS_FLOOR = -25;
 
 // Each partner's signature play (round 3, ~70%) — readable tells.
 const BOT_SIG = {
@@ -180,6 +191,7 @@ export default function CaseTableDev() {
   const [selectedCard, setSelectedCard] = useState(null);
   const [shields, setShields] = useState(0);
   const [shieldSpent, setShieldSpent] = useState(false);
+  const [stopLossArmed, setStopLossArmed] = useState(false); // Neon Stop Loss — this case only
   const [peekArmed, setPeekArmed] = useState(false);
   const [peekChoice, setPeekChoice] = useState(null);
   const [marisolFreeUsed, setMarisolFreeUsed] = useState(false);
@@ -292,9 +304,24 @@ export default function CaseTableDev() {
       });
       setRevealed(next);
       log(`⟡ You play ${card.name} — crosscheck pulls: ${got.join(" · ") || "nothing new"}`);
+    } else if (card.kind === "deepScan") {
+      const labels = strongestUnrevealed(card.station, revealed, 99);
+      if (!labels.length) { log(`⟡ ${card.name}: ${shortName(card.station)} has nothing left to show you.`); return; }
+      setRevealed((r) => ({ ...r, [card.station]: [...(r[card.station] || []), ...labels] }));
+      log(`⟡ You play ${card.name} — deep scan: ${shortName(card.station)} opens everything (${labels.length} more entr${labels.length === 1 ? "y" : "ies"})`);
+    } else if (card.kind === "trace") {
+      // Fast-exit fingerprints only: a slow rug and a legit token both read
+      // "no fingerprint" — the trace informs HORIZON, never the verdict.
+      const day = signals.collapseDay;
+      log(day != null && day <= 7
+        ? "⟡ Rug Warning — FAST-EXIT FINGERPRINT FOUND. If this thing blows, it blows in DAYS."
+        : "⟡ Rug Warning — no fast-exit fingerprint. If it dies, it dies slow. Or not at all.");
+    } else if (card.kind === "stoploss") {
+      setStopLossArmed(true);
+      log(`⟡ You play Neon Stop Loss — this case's ticket can't lose more than ${-STOP_LOSS_FLOOR}.`);
     } else if (card.kind === "shield") {
       setShields((s) => s + 1);
-      log("⟡ You play Cold Wallet — the next bad market flip bounces off your book.");
+      log(`⟡ You play ${card.name} — the next bad market flip bounces off your book.`);
     } else if (card.kind === "peek") {
       setPeekArmed(true);
       log("⟡ You play Insider Ping — wiretap live. Pick a partner at pundit calls.");
@@ -342,7 +369,7 @@ export default function CaseTableDev() {
     setAsked({}); setRevealed({}); setVisited([]);
     setPlayerP(null); setPlayerVerdict(null);
     setTicketP(50); setTicketStake(STAKE); setTicketHorizon(0);
-    setKitPlayed([]); setSelectedCard(null); setShieldSpent(false);
+    setKitPlayed([]); setSelectedCard(null); setShieldSpent(false); setStopLossArmed(false);
     setPeekArmed(false); setPeekChoice(null); setMarisolFreeUsed(false);
     setTableLog([]); setPunditFinal({});
     botRef.current = { roundsDone: 0, scanned: {}, mods: {}, shield: {} };
@@ -377,6 +404,13 @@ export default function CaseTableDev() {
         horizon = { idx: horizonIdx, hit, delta, day };
       }
 
+      // Neon Stop Loss — floors the whole ticket (stake P&L + side pot).
+      let stopLoss = null;
+      if (isYou && stopLossArmed && pnl < STOP_LOSS_FLOOR) {
+        stopLoss = { from: Math.round(pnl) };
+        pnl = STOP_LOSS_FLOOR;
+      }
+
       // Dial 2 — sizing debrief (you only): stake vs conviction-justified.
       let sizing = null;
       if (isYou) {
@@ -398,7 +432,7 @@ export default function CaseTableDev() {
       nextBriers[k] = [...(nextBriers[k] || []), brier];
       if (nextBooks[k] <= 0) nextBusted[k] = true;
       rows.push({
-        seat: k, p, pnl, brier, bold, stake, horizon, sizing,
+        seat: k, p, pnl, brier, bold, stake, horizon, sizing, stopLoss,
         book: nextBooks[k],
         justBusted: nextBooks[k] <= 0,
         scanned: isYou
@@ -482,46 +516,55 @@ export default function CaseTableDev() {
           : tableLog.slice(-2).map((line, i) => <div key={tableLog.length + "-" + i} className="td-line">{line}</div>)}
       </div>
       <div className="td-handrow">
-        <span className="td-actions" title="An action = one question or one card">
-          ACTIONS<br />{Math.max(0, actionsMax - actionsUsed)}/{actionsMax}
+        <span className={`td-actions${actionsMax - actionsUsed === 1 ? " low" : ""}`} title="An action = one question or one card">
+          <span className="td-actions-label">ACTIONS</span>
+          <span className="td-actions-num">{Math.max(0, actionsMax - actionsUsed)}<i className="td-actions-max">/{actionsMax}</i></span>
+          <span className="td-actions-pips">
+            {Array.from({ length: actionsMax }, (_, i) => (
+              <i key={i} className={`td-apip${i < actionsMax - actionsUsed ? " on" : ""}`} />
+            ))}
+          </span>
+          <span className="td-book" title="Your allocated book — the ticket stakes come out of this">
+            ◈ BOOK {Math.round(books[YOU] ?? START_PF)}
+          </span>
         </span>
-        {patron === "eugene" && !hintUsed && (
-          <button className="td-card td-hint" style={{ "--rc": "#4dffaa" }} onClick={useHint}>⟁ DÉJÀ VU</button>
-        )}
-        <span className="td-kitlabel">KIT ▸</span>
         <div className="td-hand">
+          {patron === "eugene" && !hintUsed && (
+            <KitCard
+              small
+              color="#4dffaa"
+              name="⟁ Déjà Vu"
+              kind="PATRON · FREE"
+              text="Eugene mutters where the crack lives."
+              footer="WHISPER ▸"
+              state="armed"
+              onClick={useHint}
+            />
+          )}
           {KIT_CARDS.map((card) => {
             const played = kitPlayed.includes(card.id);
+            const sel = selectedCard === card.id;
+            const noActions = actionsUsed >= actionsMax;
             return (
-              <button
+              <KitCard
                 key={card.id}
-                className={`td-card ${played ? "played" : ""} ${selectedCard === card.id ? "sel" : ""}`}
-                style={{ "--rc": RARITY_COLOR[card.rarity] }}
-                onClick={() => setSelectedCard(selectedCard === card.id ? null : card.id)}
-              >
-                {card.name}
-              </button>
+                small
+                color={RARITY_COLOR[card.rarity]}
+                name={card.name}
+                kind={`${card.rarity.toUpperCase()} · ${KIND_LABEL[card.kind]}`}
+                text={card.text}
+                state={played ? "played" : sel ? "armed" : "idle"}
+                footer={played ? "PLAYED" : !sel ? "TAP TO ARM" : noActions ? "NO ACTIONS LEFT" : "TAP AGAIN — 1 ACT ▸"}
+                onClick={() => {
+                  if (played) return;
+                  if (!sel) { setSelectedCard(card.id); return; }
+                  if (!noActions) playKitCard(card);
+                }}
+              />
             );
           })}
         </div>
       </div>
-      {selectedCard && (() => {
-        const card = KIT_CARDS.find((c) => c.id === selectedCard);
-        const played = kitPlayed.includes(card.id);
-        const noActions = actionsUsed >= actionsMax;
-        return (
-          <div className="td-pop" style={{ "--rc": RARITY_COLOR[card.rarity] }}>
-            <div className="td-pop-name">{card.name} <span className="td-pop-type">{card.rarity.toUpperCase()}{card.station ? ` · ${CHARACTER_META[card.station].role}` : ""}</span></div>
-            <div className="td-pop-text">{card.text}</div>
-            <div className="td-pop-row">
-              <button className="td-pop-play" disabled={played || noActions} onClick={() => playKitCard(card)}>
-                {played ? "ALREADY PLAYED" : noActions ? "NO ACTIONS LEFT" : "PLAY — COSTS 1 ACTION ▸"}
-              </button>
-              <button className="td-pop-close" onClick={() => setSelectedCard(null)}>✕</button>
-            </div>
-          </div>
-        );
-      })()}
       <style>{`
         .td-root { position: absolute; left: 0; right: 0; bottom: 0; height: ${DOCK_H}px; z-index: 10070;
           background: #030f0c; border-top: 1px solid rgba(255,210,58,0.45);
@@ -529,31 +572,23 @@ export default function CaseTableDev() {
         .td-feed { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
         .td-line { font-size: 10.5px; color: #eafff9; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .td-dim { color: #bfeede; opacity: 0.7; }
-        .td-handrow { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
-        .td-actions { font-size: 9.5px; font-weight: bold; color: #ffd23a; letter-spacing: 0.06em; flex-shrink: 0;
-          line-height: 1.35; text-align: center; }
-        .td-kitlabel { font-size: 9.5px; color: #bfeede; opacity: 0.65; letter-spacing: 0.1em; flex-shrink: 0; }
-        .td-hand { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+        .td-handrow { display: flex; align-items: center; gap: 10px; margin-top: 5px; min-height: 0; }
+        .td-actions { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 4px; }
+        .td-actions-label { font-size: 9.5px; font-weight: bold; color: #ffd23a; letter-spacing: 0.14em; }
+        .td-actions-num { font-size: 24px; font-weight: bold; color: #f4fffb; line-height: 1;
+          text-shadow: 0 0 12px rgba(255,210,58,0.55); }
+        .td-actions-max { font-size: 12px; font-style: normal; font-weight: normal; color: #bfeede; opacity: 0.6; }
+        .td-actions-pips { display: flex; gap: 5px; }
+        .td-apip { width: 13px; height: 13px; border: 1.5px solid #ffd23a; opacity: 0.28;
+          clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px)); }
+        .td-apip.on { background: #ffd23a; opacity: 1; box-shadow: 0 0 8px rgba(255,210,58,0.7); }
+        .td-actions.low .td-apip.on { animation: dgpulse 0.9s ease-in-out infinite; }
+        @keyframes dgpulse { 50% { opacity: 0.45; box-shadow: 0 0 4px rgba(255,210,58,0.3); } }
+        .td-book { font-size: 10px; font-weight: bold; letter-spacing: 0.08em; color: #2fd6d6;
+          margin-top: 3px; text-shadow: 0 0 8px rgba(47,214,214,0.45); white-space: nowrap; }
+        .td-hand { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
         .td-hand::-webkit-scrollbar { display: none; }
-        .td-card { flex-shrink: 0; background: color-mix(in srgb, var(--rc) 9%, #04140f); border: 1px solid var(--rc);
-          color: #f4fffb; font-family: inherit; font-size: 10px; font-weight: bold; letter-spacing: 0.03em;
-          padding: 7px 9px; cursor: pointer; white-space: nowrap;
-          clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px)); }
-        .td-card.played { opacity: 0.32; }
-        .td-card.sel { box-shadow: 0 0 10px var(--rc); }
-        .td-hint { box-shadow: 0 0 8px rgba(77,255,170,0.4); }
-        .td-pop { position: absolute; left: 10px; right: 10px; bottom: ${DOCK_H - 8}px; z-index: 10075;
-          background: #04140f; border: 1.5px solid var(--rc); padding: 12px;
-          clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-          box-shadow: 0 -4px 24px rgba(0,0,0,0.6), 0 0 14px color-mix(in srgb, var(--rc) 30%, transparent); }
-        .td-pop-name { color: #f4fffb; font-weight: bold; font-size: 13px; }
-        .td-pop-type { color: var(--rc); font-size: 9.5px; letter-spacing: 0.1em; font-weight: normal; margin-left: 6px; }
-        .td-pop-text { color: #bfeede; font-size: 11.5px; line-height: 1.5; margin: 6px 0 10px; }
-        .td-pop-row { display: flex; gap: 8px; }
-        .td-pop-play { flex: 1; background: color-mix(in srgb, var(--rc) 16%, transparent); border: 1px solid var(--rc);
-          color: #f4fffb; font-family: inherit; font-size: 11px; font-weight: bold; letter-spacing: 0.05em; padding: 9px; cursor: pointer; }
-        .td-pop-play:disabled { opacity: 0.5; cursor: default; }
-        .td-pop-close { background: none; border: 1px solid rgba(47,214,214,0.5); color: #2fd6d6; font-family: inherit; padding: 0 12px; cursor: pointer; }
+        ${KC_CSS}
       `}</style>
     </div>
   );
@@ -565,7 +600,7 @@ export default function CaseTableDev() {
       <div className="dg-inner">
         <div className="dg-header">
           <span className="dg-title">LIMINAL // COUNCIL</span>
-          <span className="dg-case">{caseData.ticker} · {caseData.chain}</span>
+          <span className="dg-case">{caseData.ticker} · {caseData.chain} — CASE {caseIndex + 1}/{DOCKET.length}</span>
           <span className="dg-live"><i className="dg-dot" />4 CHANNELS</span>
         </div>
 
@@ -618,46 +653,56 @@ export default function CaseTableDev() {
         <div className="dg-eyebrow">▸ YOUR KIT — A CARD COSTS AN ACTION</div>
         <div className="dg-row">
           {patron === "eugene" && !hintUsed && (
-            <button className="dg-card dg-kitcard dg-hintcard" style={{ "--cc": "#4dffaa" }} onClick={useHint}>
-              <span className="dg-kit-name">⟁ Déjà Vu</span>
-              <span className="dg-kit-kind">PATRON · FREE</span>
-              <span className="dg-kit-text">Eugene mutters where the crack lives — the case's decisive lenses. Costs nothing.</span>
-              <span className="dg-kit-play live">WHISPER ▸</span>
-            </button>
+            <KitCard
+              color="#4dffaa"
+              name="⟁ Déjà Vu"
+              kind="PATRON · FREE"
+              text="Eugene mutters where the crack lives — the case's decisive lenses. Costs nothing."
+              footer="WHISPER ▸"
+              state="armed"
+              onClick={useHint}
+            />
           )}
           {KIT_CARDS.map((card) => {
             const played = kitPlayed.includes(card.id);
             const sel = selectedCard === card.id;
             const noActions = actionsUsed >= actionsMax;
             return (
-              <button
+              <KitCard
                 key={card.id}
-                className={`dg-card dg-kitcard ${played ? "played" : ""} ${sel ? "sel" : ""}`}
-                style={{ "--cc": RARITY_COLOR[card.rarity] }}
+                color={RARITY_COLOR[card.rarity]}
+                name={card.name}
+                kind={`${card.rarity.toUpperCase()} · ${KIND_LABEL[card.kind]}`}
+                text={card.text}
+                state={played ? "played" : sel ? "armed" : "idle"}
+                footer={played ? "PLAYED" : !sel ? "TAP TO ARM" : noActions ? "NO ACTIONS LEFT" : "TAP AGAIN — 1 ACTION ▸"}
                 onClick={() => {
                   if (played) return;
                   if (!sel) { setSelectedCard(card.id); return; }
                   if (!noActions) playKitCard(card);
                 }}
-              >
-                <span className="dg-kit-name">{card.name}</span>
-                <span className="dg-kit-kind">{card.rarity.toUpperCase()} · {KIND_LABEL[card.kind]}</span>
-                <span className="dg-kit-text">{card.text}</span>
-                <span className={`dg-kit-play ${sel && !played ? "live" : ""}`}>
-                  {played ? "PLAYED" : !sel ? "TAP TO ARM" : noActions ? "NO ACTIONS LEFT" : "TAP AGAIN — 1 ACTION ▸"}
-                </span>
-              </button>
+              />
             );
           })}
         </div>
 
         <div className="dg-footer">
-          <span className="dg-actions" title="An action = one question or one card">
-            ACTIONS {actionsLeft}/{actionsMax}
-          </span>
+          <div className={`dg-actions${actionsLeft === 1 ? " low" : ""}`} title="An action = one question or one card">
+            <span className="dg-actions-label">ACTIONS</span>
+            <span className="dg-actions-pips">
+              {Array.from({ length: actionsMax }, (_, i) => (
+                <i key={i} className={`dg-apip${i < actionsLeft ? " on" : ""}`} />
+              ))}
+            </span>
+            <span className="dg-actions-num">{actionsLeft}<span className="dg-actions-max">/{actionsMax}</span></span>
+          </div>
+          <div className="dg-book" title="Your allocated book — the ticket stakes come out of this">
+            <span className="dg-book-label">◈ YOUR BOOK</span>
+            <span className="dg-book-num">{Math.round(books[YOU] ?? START_PF)}</span>
+          </div>
           {callsOpen
             ? <button className="dg-cta" onClick={enterCalls}>PUNDIT CALLS ▸</button>
-            : <span className="dg-wait">THE TABLE CALLS WHEN YOUR ACTIONS ARE SPENT — {actionsLeft} LEFT</span>}
+            : <span className="dg-wait">THE TABLE CALLS WHEN YOUR ACTIONS ARE SPENT</span>}
         </div>
       </div>
       <style>{`
@@ -704,23 +749,27 @@ export default function CaseTableDev() {
         .dg-name { font-size: 12.5px; font-weight: bold; color: #f4fffb;
           text-shadow: 0 0 8px color-mix(in srgb, var(--cc) 65%, transparent); }
         .dg-role { font-size: 8.5px; letter-spacing: 0.12em; color: var(--cc); }
-        .dg-kitcard { display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 9px;
-          background: color-mix(in srgb, var(--cc) 7%, #04140f); }
-        .dg-kit-name { font-size: 12.5px; font-weight: bold; color: #f4fffb; line-height: 1.25; }
-        .dg-kit-kind { font-size: 8px; letter-spacing: 0.12em; color: var(--cc); }
-        .dg-kit-text { font-size: 10.5px; line-height: 1.45; color: #bfeede; opacity: 0.85; flex: 1; }
-        .dg-kit-play { font-size: 9.5px; font-weight: bold; letter-spacing: 0.06em; color: var(--cc);
-          border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent); padding: 6px 4px; text-align: center; opacity: 0.7; }
-        .dg-kit-play.live { background: color-mix(in srgb, var(--cc) 18%, transparent); opacity: 1; }
-        .dg-kitcard.sel { border-color: var(--cc); box-shadow: 0 0 14px color-mix(in srgb, var(--cc) 45%, transparent); }
-        .dg-kitcard.played { opacity: 0.35; cursor: default; }
-        .dg-hintcard { box-shadow: 0 0 10px rgba(77,255,170,0.35); }
+        ${KC_CSS}
         .dg-feedstrip { border: 1px solid rgba(255,210,58,0.28); background: rgba(4,20,15,0.6);
           padding: 7px 10px; min-height: 42px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
         .dg-line { font-size: 10.5px; color: #eafff9; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .dg-dim { opacity: 0.65; }
         .dg-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; }
-        .dg-actions { font-size: 11.5px; font-weight: bold; color: #ffd23a; letter-spacing: 0.08em; }
+        .dg-actions { display: flex; align-items: center; gap: 12px; }
+        .dg-actions-label { font-size: 12px; font-weight: bold; letter-spacing: 0.16em; color: #ffd23a; }
+        .dg-actions-pips { display: flex; gap: 7px; }
+        .dg-apip { width: 20px; height: 20px; border: 2px solid #ffd23a; opacity: 0.28;
+          clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+        .dg-apip.on { background: #ffd23a; opacity: 1; box-shadow: 0 0 12px rgba(255,210,58,0.7); }
+        .dg-actions.low .dg-apip.on { animation: dgpulse 0.9s ease-in-out infinite; }
+        @keyframes dgpulse { 50% { opacity: 0.45; box-shadow: 0 0 4px rgba(255,210,58,0.3); } }
+        .dg-actions-num { font-size: 27px; font-weight: bold; color: #f4fffb; line-height: 1;
+          text-shadow: 0 0 14px rgba(255,210,58,0.55); }
+        .dg-actions-max { font-size: 14px; font-weight: normal; color: #bfeede; opacity: 0.6; }
+        .dg-book { display: flex; align-items: baseline; gap: 9px; }
+        .dg-book-label { font-size: 10.5px; font-weight: bold; letter-spacing: 0.16em; color: #2fd6d6; opacity: 0.85; }
+        .dg-book-num { font-size: 27px; font-weight: bold; color: #f4fffb; line-height: 1;
+          text-shadow: 0 0 14px rgba(47,214,214,0.55); }
         .dg-wait { font-size: 10.5px; letter-spacing: 0.08em; color: #bfeede; opacity: 0.6; text-align: right; }
         .dg-cta { background: rgba(47,214,214,0.12); border: 1.5px solid #2fd6d6; color: #f4fffb; font: inherit;
           font-weight: bold; letter-spacing: 0.08em; font-size: 13px; padding: 11px 20px; cursor: pointer;
@@ -939,16 +988,22 @@ export default function CaseTableDev() {
                           : `it never rugged (${HORIZON_MISS})`}
                     </div>
                   )}
+                  {row.seat === YOU && row.stopLoss && (
+                    <div className="ct-debrief" style={{ color: "#4dffaa" }}>
+                      ⟡ NEON STOP LOSS — a {row.stopLoss.from} ticket capped at {STOP_LOSS_FLOOR}
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
           {pendingEvent && (
-            <div className="ct-event">
-              <div className="ct-event-label">◈ MARKET FLIPS: {pendingEvent.label}</div>
+            <div className={`ct-event${pendingEvent.id === "calm" ? " ct-event--calm" : ""}`}>
+              <div className="ct-event-label">◈ MARKET FLIPS BETWEEN CASES — {pendingEvent.label}</div>
               <div className="ct-event-text">{pendingEvent.text}</div>
+              <div className="ct-event-effect">EFFECT · {pendingEvent.effect}</div>
               {shieldSpent && pendingEvent.portfolioAll < 0 && (
-                <div className="ct-event-text" style={{ color: "#4dffaa" }}>Your shield absorbs the hit.</div>
+                <div className="ct-event-text" style={{ color: "#4dffaa" }}>Your shield absorbs the hit — your book takes nothing.</div>
               )}
               {pendingEvent.portfolioAll < 0 && botRef.current.shield.monk && !busted.monk && (
                 <div className="ct-event-text" style={{ color: "#daa520" }}>GR80's cold storage holds — he takes nothing.</div>
@@ -1032,6 +1087,7 @@ export default function CaseTableDev() {
               onBack={() => setScreen("grid")}
               onVerdict={callsOpen ? enterCalls : undefined}
               useSitePal={false}
+              compact
             />
           </div>
           {tableDock}
@@ -1042,6 +1098,49 @@ export default function CaseTableDev() {
     </div>
   );
 }
+
+// Card-shaped kit card, shared by the desk row and the channel dock (the
+// kc- styles live in both surfaces' style blocks). Two-tap flow: arm → play.
+function KitCard({ color, name, kind, text, footer, state = "idle", small, onClick }) {
+  return (
+    <button
+      className={`kc-card ${state}${small ? " kc-small" : ""}`}
+      style={{ "--cc": color }}
+      onClick={onClick}
+    >
+      <span className="kc-name">{name}</span>
+      <span className="kc-kind">{kind}</span>
+      <span className="kc-text">{text}</span>
+      <span className="kc-play">{footer}</span>
+    </button>
+  );
+}
+
+// Shared kc- rules, embedded by both the desk and the dock style blocks.
+const KC_CSS = `
+  .kc-card { position: relative; flex: 0 0 auto; width: 168px; aspect-ratio: 3 / 4; cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 9px; text-align: left;
+    border: 1.5px solid color-mix(in srgb, var(--cc) 65%, transparent);
+    background: color-mix(in srgb, var(--cc) 7%, #04140f); color: #f4fffb; font-family: 'Courier New', monospace;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    box-shadow: inset 0 0 18px color-mix(in srgb, var(--cc) 14%, transparent);
+    transition: box-shadow 0.15s ease, transform 0.1s ease; }
+  .kc-card:hover { box-shadow: inset 0 0 24px color-mix(in srgb, var(--cc) 26%, transparent),
+    0 0 12px color-mix(in srgb, var(--cc) 40%, transparent); }
+  .kc-card:active { transform: scale(0.98); }
+  .kc-card.kc-small { width: 136px; padding: 8px 8px 7px; gap: 5px; }
+  .kc-name { font-size: 12.5px; font-weight: bold; line-height: 1.25; }
+  .kc-small .kc-name { font-size: 10.5px; }
+  .kc-kind { font-size: 8px; letter-spacing: 0.12em; color: var(--cc); }
+  .kc-text { font-size: 10.5px; line-height: 1.45; color: #bfeede; opacity: 0.85; flex: 1; overflow: hidden; }
+  .kc-small .kc-text { font-size: 9.5px; line-height: 1.4; }
+  .kc-play { font-size: 9.5px; font-weight: bold; letter-spacing: 0.06em; color: var(--cc); text-align: center;
+    border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent); padding: 6px 4px; opacity: 0.7; }
+  .kc-small .kc-play { font-size: 8px; padding: 5px 3px; }
+  .kc-card.armed { border-color: var(--cc); box-shadow: 0 0 14px color-mix(in srgb, var(--cc) 45%, transparent); }
+  .kc-card.armed .kc-play { background: color-mix(in srgb, var(--cc) 18%, transparent); opacity: 1; }
+  .kc-card.played { opacity: 0.35; cursor: default; }
+`;
 
 // One-time mechanic scaffold. Self-styled so it works on Shell screens and
 // on the dock screens alike (style tags here are global, not scoped).
@@ -1133,6 +1232,9 @@ function Shell({ children }) {
         .ct-event { border: 1px dashed rgba(255,210,58,0.55); padding: 12px; margin-top: 4px; }
         .ct-event-label { color: #ffd23a; font-size: 12px; letter-spacing: 0.1em; font-weight: bold; }
         .ct-event-text { font-size: 12px; color: #eafff9; margin-top: 4px; }
+        .ct-event-effect { font-size: 10px; letter-spacing: 0.12em; font-weight: bold; color: #ffd23a; margin-top: 6px; }
+        .ct-event--calm { opacity: 0.55; border-style: dotted; }
+        .ct-event--calm .ct-event-effect { color: #bfeede; }
         .ct-cta { margin-top: 10px; background: rgba(47,214,214,0.12); border: 1.5px solid #2fd6d6; color: #f4fffb; font: inherit;
           font-weight: bold; letter-spacing: 0.08em; font-size: 14px; padding: 13px; cursor: pointer;
           clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));

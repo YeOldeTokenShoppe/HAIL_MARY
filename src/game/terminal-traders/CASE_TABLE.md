@@ -178,6 +178,39 @@ Eugene's `patternRefs` (§4.4) a lore-native vocabulary — "this smells like
 Ponzi Siren" is both a bot mechanic and a collector hook. Market cards are
 authored directly as docket events (§4.6).
 
+### 3.2b The First Twelve (art scope, 2026-07-14)
+
+The first cards to get art — a playable, representative slice of the §3.2a
+composition, chosen so every kit role, every rarity tier, and **every ticket
+dial** (read / stake / horizon) has at least one card that serves it. All
+twelve are live in the `/case-table-dev` mock (stand-in effects noted where
+Tier-2 `deepEntries` don't exist yet). Expand outward from these — the
+remaining lens keys and deep scans are variations on shapes proven here.
+
+| # | Card | Tier | Role | Effect (mock stand-in in parens) |
+|---|---|---|---|---|
+| 1 | Audit Flare | common | Lens Key · ETHOS | GR80 slides his 2 strongest evidence cards |
+| 2 | Forked Rumor | common | Lens Key · PATHOS | Barron slides his 2 strongest evidence cards |
+| 3 | Wallet Séance | common | Lens Key · LOGOS | Marisol slides her 2 strongest evidence cards |
+| 4 | Mempool Prophecy | common | Lens Key · MYTHOS | Eugene slides his 2 strongest evidence cards |
+| 5 | Cold Wallet | uncommon | Deep Scan · ETHOS | opens GR80's cold archive (mock: reveal ALL his remaining entries) — the §3.2 flavor note already names it the ETHOS deep scan |
+| 6 | Chart Exorcism | uncommon | Deep Scan · LOGOS | drags out everything the chain still hides (mock: reveal ALL of Marisol's remaining entries) |
+| 7 | Oracle Crosscheck | rare | Cross-Reference · LOGOS+ETHOS | the authored connection entry (mock: strongest card from every unvisited station) |
+| 8 | Rug Warning | rare | **Exit Trace** (new role, v4) | sweeps for a fast-exit fingerprint: reveals "DAYS" only when `collapseDay ≤ 7`; slow rugs and legit tokens both read "no fingerprint" — informs the HORIZON dial without buying the verdict |
+| 9 | Candle Vigil | common | Insurance · shield | absorb one negative docket event |
+| 10 | Neon Stop Loss | uncommon | Insurance · floor | this case's ticket can't lose more than 25, whatever you staked — sizing insurance for the STAKE dial |
+| 11 | Insider Ping | uncommon | Pundit Audit | wiretap one partner's exact sealed number at pundit calls (§4.5's sanctioned crack) |
+| 12 | Terminal Foil Moment | terminal-foil | Wildcard | the table-stopper (mock: +2 actions this case) |
+
+Deviations from §3.2a, both deliberate: (1) **Exit Trace** is a new role the
+v4 three-dial ticket created demand for — it makes the horizon side pot a
+read instead of a coin flip, and only on fast rugs; (2) the two insurance
+cards split into **shield** (docket events) and **floor** (ticket P&L)
+rather than two shields — two distinct fears, two distinct cards. Tier
+spread: 5 common / 4 uncommon / 2 rare / 1 foil, matching the §3.2a pyramid.
+Cold Wallet's old mock role (shield) moves to Candle Vigil, which held the
+`shield: 1` effect in Genesis anyway.
+
 ### 3.3 Case schema extensions
 
 Per station (extends the `_template.js` schema):
@@ -656,6 +689,7 @@ which is the exact failure this doc exists to prevent.
 ## 6. Rollout order
 
 1. **Cast reconciliation** (§2) — do first, while collections are empty.
+   *(Applied 2026-07-14.)*
 2. **Phase 1** (GENESIS.md roadmap): case wins grant packs. Proves the
    reward rail.
 3. **Phase 2** on the existing 3 cases. Proves instrumental card demand
@@ -663,3 +697,101 @@ which is the exact failure this doc exists to prevent.
 4. **Phase 3 alpha**: one hand-authored docket vs bots, fixed stakes, local
    only. Sim suite runs before any reward is attached.
 5. **Daily Docket + server-verified rewards.** This is launch.
+6. **The Gauntlet** (§7) — post-launch second mode; its design gate sim
+   (§7.5) can run any time after Phase 2, but it ships only after the
+   Docket is live. It must never preempt steps 2–5.
+
+---
+
+## 7. The Gauntlet — survival mode (PROPOSAL, 2026-07-14)
+
+**One line:** the Docket trains *judgment under hidden truth*; the Gauntlet
+trains *sizing under randomness*. Same terminal, same cast, same cards —
+a different fear. It is the learning-modules doc's **Gambler's Ruin**
+(survive repeated rounds; ergodicity is the lesson) and **Right and
+Liquidated** (correct and dead anyway) wearing the Liminal Terminal's
+fiction, and it is where the retired classic mode's chassis (§4.8) gets
+recycled instead of deleted.
+
+### 7.1 Shape of a run
+
+- A **book of 100**, a seeded run of **10 rounds** (count is a sim lever).
+  Daily seed → everyone plays the same storm (§4.7 trust model applies:
+  transcript replay, server-verified rewards).
+- **Draft**: pick 3 coin cards into the book (from collection; a cardless
+  player gets a starter draft). Market cards hit coins **by tag** — the
+  dormant `volatility` stat finally works: high-vol coins swing harder both
+  ways. This answers §4.9's "coins at the table" open question: **not at
+  the table — in the Gauntlet.**
+- **Round loop**, four beats:
+  1. **TELEGRAPH** — an imperfect weather read ("vol rising, probably";
+     "regulator activity smells close"). Authored per market card with
+     deliberate noise; reading it is the skill.
+  2. **POSITION** — one dial: **exposure**, 0–100% of the book riding this
+     round. Optionally one kit-card play (insurance cards do their §3.2b
+     jobs; lens keys are inert here — different mode, different tools).
+  3. **FLIP** — a market card resolves from the full 15-card deck. Exposed
+     fraction takes the hit or the gain.
+  4. **LINE** — a named Ledger line on the *sizing decision* ("right read,
+     oversized — the wick got you"), same debrief voice as the ticket.
+- **Bust = out** (Barron's fate, now yours to dodge). Survive all 10 →
+  graded on final book **and** telegraph-forecast calibration.
+
+### 7.2 The three invariants (anti-slot-machine rules)
+
+1. **Score survival and sizing, never raw P&L.** A +EV bet at the wrong
+   size still ruins you — that's the module's whole lesson. Leaderboard =
+   survived rounds, then book, with a calibration multiplier from the
+   telegraph forecasts.
+2. **Seeded and replayable.** No un-seeded randomness anywhere in a run.
+3. **Every round contains a read.** Telegraphs, tells, offers — if a round
+   has no decision that changes the player's expected outcome, cut the
+   round. Randomness sets the stage; judgment must move the result.
+
+### 7.3 Rogues — the adversarial layer
+
+§4.6a lane 3, brought forward from Season 2 in miniature: **the council
+never lies; a rogue would.** Two or three rounds per run, a rogue
+interrupts with an **offer** instead of a market flip:
+
+- the **honeypot dealer** — yield too good, exit fee buried;
+- the **exit-pumping KOL** — a "buy signal" on a coin he is dumping;
+- the **false auditor** — insurance that never pays out.
+
+An offer is a mini-ticket: **P(trap)** plus accept/decline, Brier-scored
+like everything else. Tells are authored and *recur across runs* — learning
+a rogue's tell is pattern recognition made mechanical (Eugene's lens as
+gameplay). Rogues are seeded from the three Genesis Underworld cards
+(§4.6a); declining a trap (or riding a genuine offer) at high calibration
+is a natural second path to their Underworld trophy drops. Crowd NPCs
+(§4.6a lane 2) populate the art. The two inert table-talk cards (§3.2a)
+may find a PvE life as anti-rogue counters — open question.
+
+### 7.4 What it reuses
+
+`applyMarket` + shield logic and the 15 MARKET_CARDS from `engine.js`
+(authored once as docket events, consumed by both modes); `mulberry32`
+seeding and the pure-sim discipline from `caseTable.js`; the mock's book /
+event-banner / ticket / debrief UI, nearly verbatim; §3.2b's insurance
+cards (Candle Vigil, Neon Stop Loss) in their existing roles. Estimated
+new surface: telegraph authoring (15 lines + noise model), rogue offers
+(3 characters × tells), exposure math, one lobby mode-select.
+
+### 7.5 Design gate & checklist
+
+**The gate (run before any UI is built):** a Gauntlet sim suite where a
+Kelly-ish exposure policy must beat coin-flip exposure by a wide, stable
+margin across 2,000 seeded runs — and a tell-reading rogue policy must
+beat tell-blind by a visible margin. If sizing skill and reads don't
+dominate luck over 10 rounds, the mode is a lottery and doesn't ship.
+
+- [ ] Gauntlet sim (`gauntlet.js` beside `caseTable.js`, same idioms) +
+      the design-gate experiments above
+- [ ] Market deck authoring pass: 15 cards → gauntlet effects + telegraphs
+- [ ] Rogue offers ×3 authored (tells, payouts, Underworld drop hooks)
+- [ ] `/gauntlet-dev` mock (phase B, CaseTableDev pattern)
+- [ ] Daily Gauntlet seed + leaderboard (post-launch)
+
+Open questions: one bankroll across modes or separate books; telegraph
+Brier's weight in the final grade; whether exposure is one dial or
+per-coin (start with one — three dials max applies to rounds too).

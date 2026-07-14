@@ -47,6 +47,7 @@ import SitePalCropPanel from '@/components/SitePalCropPanel';
 import { runDirectedTurn } from '@/lib/trade/beatRunner';
 import { playUnicornBeat, stopUnicornBeat } from '@/lib/trade/playUnicornBeat';
 import { setUnicornGlow } from '@/lib/trade/unicornGlow';
+import { triggerUnicornWave } from '@/lib/trade/unicornWave';
 import { clipMenuForDirector, clipById } from '@/lib/trade/reactionBank';
 import { useRouter } from 'next/navigation';
 
@@ -1039,14 +1040,29 @@ const CHARACTER_TO_STATION = {
 // Monk's only live SitePal voice (Gilbert), used for sayText in the live turn.
 const GILBERT = { voice: '9', lang: 1, engine: 7, effect: 'T', effLevel: 3 };
 
-// Eugene's lobby/discovery greetings — one is picked at random each time she's
-// clicked outside the game and spoken via her ElevenLabs voice. The chosen line
-// is also shown in her head-anchored lobby bubble, so voice and bubble stay in
-// sync. ADD MORE LINES HERE — keep them in her voice (mythic, a little wry).
-// They're run through speechify() before TTS, so emoji/shorthand are fine.
+// Eugene's opening greeting — a literal "hello" that fires his waving
+// animation, so the wave stays tied to the words. One is picked at random the
+// FIRST time he's clicked outside the game; after that he moves on to the
+// reflective follow-up lines below. ADD MORE WAVE LINES HERE.
+const EUGENE_WAVE_GREETINGS = [
+  'Hello!',
+  'Hiiiiii!',
+];
+
+// Eugene's follow-up lobby/discovery greetings — one is picked at random on
+// every greeting AFTER his opening wave, and spoken via his ElevenLabs voice.
+// ADD MORE LINES HERE — keep them in his voice (mythic, a little wry). They're
+// run through speechify() before TTS, so emoji/shorthand are fine. An entry may
+// be a plain string, OR { text, spoken } when the voice needs a pronunciation
+// override on a word speechify() can't disambiguate.
 const EUGENE_LOBBY_GREETINGS = [
   'Every story wants to be a myth. The rare ones earn it.',
-  'I read the story a token tells about itself — and the ones it tries not to.',
+  // "read" here is present tense (/riːd/); the voice defaults to past-tense
+  // "red", so respell it in the spoken form only — the same trick as hi→high.
+  {
+    text: 'I read the story a token tells about itself — and the ones it tries not to.',
+    spoken: 'I reed the story a token tells about itself — and the ones it tries not to.',
+  },
   'Narrative is a kind of collateral. I check whether it is backed by anything.',
   'Every rug wears a story. I look for the seams.',
 ];
@@ -1187,17 +1203,15 @@ export default function CyborgTemple() {
   // The verdict-reaction line currently displayed by the focused character
   // (immediate response on Believe/Abstain/Doubt commit, before the reveal modal).
   const [activeReaction, setActiveReaction] = useState(null);
-  // Eugene (the unicorn, RL80 agent) is text-only — SitePal can't drive her
-  // head shape. This holds her current spoken line so we can render it as an
-  // HTML chat bubble near her position. The bubble persists until the player
-  // proceeds (CONTINUE / switch consultant / ask another question).
-  const [eugeneBubble, setEugeneBubble] = useState(null);
-  // The lobby/discovery greeting Eugene is currently saying (picked at random
-  // from EUGENE_LOBBY_GREETINGS on lobby focus). Shown in her lobby bubble AND
-  // spoken, so the two stay in sync. lastLobbyGreetingRef avoids repeating the
-  // same line back-to-back.
-  const [eugeneLobbyLine, setEugeneLobbyLine] = useState(null);
+  // Avoids repeating the same lobby/discovery greeting back-to-back (see
+  // EUGENE_LOBBY_GREETINGS). Eugene's chat bubbles were removed once he got a
+  // real voice — his lines are now spoken, not displayed. (Captions could be
+  // added later via the shared caption path the other consultants use.)
   const lastLobbyGreetingRef = useRef(-1);
+  // False until Eugene has actually delivered a lobby greeting this session.
+  // His first one is always the waving "hello"; later focuses use the
+  // reflective follow-up lines (EUGENE_LOBBY_GREETINGS).
+  const eugeneHasGreetedRef = useRef(false);
   // When set, the unified widget's top section shows this spoken-line text +
   // a CONTINUE button INSTEAD of the question list. Used to gate the player
   // on the intro / return line — so they can read along while listening,
@@ -1807,7 +1821,6 @@ export default function CyborgTemple() {
     setActiveAnswer(null);
     setActiveReaction(null);
     stopUnicornBeat();
-    setEugeneBubble(null);
     setCurrentSpeech(null);
     setPendingSpeech(null);
     setFocusedAgent(null);
@@ -1877,11 +1890,11 @@ export default function CyborgTemple() {
     const charBudget = options?.estimatedChars ?? resolved.text.length;
 
     if (stationKey === 'eugene') {
-      // Eugene has no SitePal mesh — she speaks via her own ElevenLabs path
-      // (playUnicornBeat: Web Audio playback + horn glow), while her line rides
-      // in the head-anchored chat bubble. Flip speechActive immediately so the
-      // bubble's typing animation starts, backed by a generous safety-net timer;
-      // the real audio end (below) clears it sooner when TTS succeeds.
+      // Eugene has no SitePal mesh — he speaks via his own ElevenLabs path
+      // (playUnicornBeat: Web Audio playback + horn glow + jaw/mouth overlay).
+      // Flip speechActive immediately so his attentive-idle animation holds,
+      // backed by a generous safety-net timer; the real audio end (below) clears
+      // it sooner when TTS succeeds. (His chat bubble was removed — voice only.)
       setSpeechActive(true);
       const safetyMs = Math.max(8000, Math.min(90000, charBudget * 100));
       const myTimer = setTimeout(() => {
@@ -1889,12 +1902,11 @@ export default function CyborgTemple() {
         if (speechEndTimerRef.current === myTimer) speechEndTimerRef.current = null;
       }, safetyMs);
       speechEndTimerRef.current = myTimer;
-      setEugeneBubble(resolved.text);
 
       // Speak the line aloud. playUnicornBeat interrupts any in-flight Eugene
       // audio, proxies TTS via /api/trade/unicorn-voice, plays it, and drives
-      // the horn glow through the unicornGlow bridge. On any failure it degrades
-      // to a silent, caption-only beat, so the bubble still shows.
+      // the horn glow + mouth through the unicornGlow/unicornMouth bridges. On
+      // any failure it degrades to a silent, timed beat so the scene never hangs.
       playUnicornBeat({ line: resolved.text, spoken: resolved.spoken }, { setGlow: setUnicornGlow })
         .then(() => {
           // Real audio ended — clear speech state now unless a newer line began.
@@ -2099,8 +2111,7 @@ export default function CyborgTemple() {
     setPendingSpeech(null);
     pendingAudioRef.current = null;
     if (stationKey !== 'eugene') {
-      stopUnicornBeat();
-      setEugeneBubble(null);
+      stopUnicornBeat(); // stop Eugene's voice when switching to another consultant
     }
 
     // Compute the spoken line + display text SYNCHRONOUSLY so the question
@@ -2188,9 +2199,10 @@ export default function CyborgTemple() {
       }
     }
 
-    // Eugene's dialog is rendered exclusively in her floating chat bubble
-    // (speakLine sets eugeneBubble for her). Skip currentSpeech for her so
-    // the bottom transcript doesn't duplicate the same line.
+    // Eugene is voice-only now (his chat bubble was removed) — skip currentSpeech
+    // so he shows no transcript line. TO ADD CAPTIONS LATER: drop the
+    // `stationKey !== 'eugene'` guard on the setCurrentSpeech call below and he
+    // joins the shared caption flow like the other consultants.
     // Pull the audioDurationMs of whichever line drives the CURRENT
     // displayed text (rules first if the chain fires, otherwise intro
     // or return). Lets ProgressiveText/LiveCaption pace the reveal to
@@ -2223,25 +2235,41 @@ export default function CyborgTemple() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedAgent, tradeMode, verdict, caseData, speakLine]);
 
-  // Lobby/discovery: when Eugene is clicked outside the game she greets aloud in
-  // her own ElevenLabs voice, matching how the SitePal consultants greet on a
-  // lobby click (their meet-lines fire via activateSitePalProjection, a path she
-  // skips having no SitePal scene). Her head-anchored lobby bubble already shows
-  // this same tagline — playUnicornBeat adds the voice + mouth/glow. The
-  // game-mode intro effect above returns early in the lobby, so no double-speak;
-  // a short delay lets the focus camera settle first, and un-focus stops her.
+  // Lobby/discovery: when Eugene is clicked outside the game he greets aloud in
+  // his own ElevenLabs voice, matching how the SitePal consultants greet on a
+  // lobby click (their meet-lines fire via activateSitePalProjection, a path he
+  // skips having no SitePal scene). The game-mode intro effect above returns
+  // early in the lobby, so no double-speak; a short delay lets the focus camera
+  // settle first, and un-focus stops him.
   useEffect(() => {
     if (tradeMode === 'game') return;
     if (focusedAgent !== 'RL80') return;
-    // Pick a greeting, avoiding an immediate repeat.
-    const pool = EUGENE_LOBBY_GREETINGS;
-    let idx = Math.floor(Math.random() * pool.length);
-    if (pool.length > 1 && idx === lastLobbyGreetingRef.current) idx = (idx + 1) % pool.length;
-    lastLobbyGreetingRef.current = idx;
-    const line = pool[idx];
-    setEugeneLobbyLine(line); // show it in her lobby bubble (in sync with the voice)
+    // His first greeting of the session is always a waving "hello"; after that
+    // he draws from the reflective follow-up lines (avoiding an immediate
+    // repeat). `firstGreeting` gates the wave so it stays in sync with the words.
+    const firstGreeting = !eugeneHasGreetedRef.current;
+    let entry;
+    if (firstGreeting) {
+      const wavePool = EUGENE_WAVE_GREETINGS;
+      entry = wavePool[Math.floor(Math.random() * wavePool.length)];
+    } else {
+      const pool = EUGENE_LOBBY_GREETINGS;
+      let idx = Math.floor(Math.random() * pool.length);
+      if (pool.length > 1 && idx === lastLobbyGreetingRef.current) idx = (idx + 1) % pool.length;
+      lastLobbyGreetingRef.current = idx;
+      entry = pool[idx];
+    }
+    // An entry is a plain string, or { text, spoken } when it carries a
+    // pronunciation override. `spoken` (if any) is what TTS voices; `text` is
+    // the on-screen line.
+    const text = typeof entry === 'string' ? entry : entry.text;
+    const spoken = typeof entry === 'string' ? undefined : entry.spoken;
     const t = setTimeout(() => {
-      playUnicornBeat({ line }, { setGlow: setUnicornGlow });
+      // Latch on delivery (not on focus) so an interrupted greeting still
+      // opens with the wave next time he's actually heard.
+      eugeneHasGreetedRef.current = true;
+      playUnicornBeat({ line: text, spoken }, { setGlow: setUnicornGlow });
+      if (firstGreeting) triggerUnicornWave();
     }, 900);
     return () => {
       clearTimeout(t);
@@ -3708,13 +3736,6 @@ export default function CyborgTemple() {
               externalFocusAgent={revealMode ? 'Stage' : focusedAgent}
               speechActive={speechActive}
               revealMode={revealMode}
-              showEugeneLobbyBubble={tradeMode !== 'game' && focusedAgent === 'RL80'}
-              eugeneLobbyLine={eugeneLobbyLine}
-              eugeneGameBubble={
-                tradeMode === 'game' && !verdict && focusedAgent === 'RL80'
-                  ? eugeneBubble
-                  : null
-              }
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
                 // console.log(`CoinFace ${coinIndex} tapped`)
@@ -4543,9 +4564,8 @@ export default function CyborgTemple() {
                                   onClick={() => {
                                     setActiveAnswer(null);
                                     // CONTINUE counts as "proceeding past the
-                                    // answer," so dismiss Eugene's bubble too.
+                                    // answer," so cut Eugene's voice if he's still speaking.
                                     stopUnicornBeat();
-                                    setEugeneBubble(null);
                                   }}
                                   style={{
                                     background: 'transparent',
@@ -4716,12 +4736,9 @@ export default function CyborgTemple() {
                                   return;
                                 }
                                 setCurrentSpeech(null);
-                                // Continue past the speech beat also clears
-                                // Eugene's bubble — she's the only character
-                                // with a separate persistent display surface
-                                // and we want the dismissal to be unified.
+                                // Continue past the speech beat also cuts
+                                // Eugene's voice if he's still speaking.
                                 stopUnicornBeat();
-                                setEugeneBubble(null);
                               }}
                               style={{
                                 background: 'transparent',
@@ -4966,11 +4983,6 @@ export default function CyborgTemple() {
                   />
                 );
               })()}
-
-              {/* Eugene's in-game dialogue bubble now renders inside the 3D
-                  scene (CyborgTempleScene's `eugeneGameBubble` prop), anchored
-                  to her head bone so it tracks her in world space and stays
-                  out of her head/horn footprint. */}
 
               {/* Reveal ribbon — anchored to the edge that leaves the
                   curtain-call lineup visible: BOTTOM on mobile (lineup keeps

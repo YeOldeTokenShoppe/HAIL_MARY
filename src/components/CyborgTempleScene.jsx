@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, useMemo } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
 import { unicornGlow } from "@/lib/trade/unicornGlow";
+import { registerUnicornWave } from "@/lib/trade/unicornWave";
 import { unicornMouth } from "@/lib/trade/unicornMouth";
 import { Html, SpotLight } from "@react-three/drei";
 import AnnotationSystem from "@/components/AnnotationSystem";
@@ -416,13 +416,56 @@ function FloatingWordCluster({ words = WORD_CLUSTER_WORDS, center = [0, 1.5, 0],
 // SMALLER z sits the mouth closer to her head. rot is [pitchX, yawY, rollZ] deg.
 const RL80_MOUTH_DEFAULTS = {
   offset: [0, 0.012, 0.191],
-  rot: [15, 0, 0], // pitch forward ~12° (rot[0]=pitch; flip to -12 if it tilts back)
+  rot: [15, 0, 0], // pitch forward (rot[0]=pitch; flip sign if it tilts back)
   width: 0.024,
-  minH: 0.0024,
-  maxH: 0.015,
-  color: 0x140a10,
+  maxH: 0.016,           // FIXED mouth height now — the canvas draws the opening
+                         // within it (was the open-scale height before teeth).
+  color: 0x140a10,       // maw interior (dark)
+  teeth: 4,              // number of blocky upper teeth (0 = none)
+  toothColor: 0xefe6d2,  // tooth cream/bone
   gain: 1,
 };
+
+// Hex 0xRRGGBB → "#rrggbb" for canvas fillStyle.
+const _rl80hex = (n) => '#' + ((n >>> 0) & 0xffffff).toString(16).padStart(6, '0');
+
+// Draw Eugene's mouth onto its canvas for a given openness (0..1): a dark maw
+// ellipse whose height grows with `open`, plus `teeth` blocky upper teeth that
+// drop in as he opens (clipped to the maw so they never poke past the lips).
+// Redrawing per-openness (rather than scaling the mesh) keeps the teeth a fixed
+// shape instead of stretching.
+function drawUnicornMouth(ctx, W, H, open, interiorHex, toothHex, teeth) {
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const rx = W * 0.46;
+  const ry = H * (0.06 + 0.42 * open); // thin slit when closed, tall when open
+  // Maw interior.
+  ctx.fillStyle = interiorHex;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Upper teeth — blocky rects hanging from the top lip, clipped to the maw so
+  // they curve with it. Hidden until he opens a bit, then grow in.
+  const reveal = Math.max(0, (open - 0.15) / 0.85);
+  if (teeth > 0 && reveal > 0.01) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+    const span = rx * 2 * 0.9;
+    const gap = Math.max(1, span * 0.04);
+    const tw = (span - gap * (teeth - 1)) / teeth;
+    const th = Math.min(ry * 1.3, H * 0.17) * reveal;
+    const topY = cy - ry;
+    let x = cx - span / 2;
+    ctx.fillStyle = toothHex;
+    for (let i = 0; i < teeth; i++) {
+      ctx.fillRect(x, topY, tw, th);
+      x += tw + gap;
+    }
+    ctx.restore();
+  }
+}
 
 
 const CyborgTempleScene = ({
@@ -450,9 +493,6 @@ const CyborgTempleScene = ({
   externalFocusAgent = null, // When set, sync internal focus to this agentId — lets the parent (e.g. the consultant railway in /trade) fly the camera to a character without an in-scene click. Pass `null` to clear focus.
   speechActive = false, // When true, the focused character cross-fades to idle (speaking to player). When false, they cross-fade to typing (looking up info). Parent flips this when game-flow audio starts/ends.
   revealMode = null, // null | 'aligned' | 'missed' | 'abstained'. When set, hides the StageProps collection, flies the camera to the Stage preset, and plays each character's reaction animation. Parent sets this after the verdict is locked; clear it to restore the gameplay scene for the next case.
-  showEugeneLobbyBubble = false, // When true (lobby + RL80 focused), render Eugene's in-scene intro chat bubble anchored to her head bone. Lets her introduce herself in her own medium (chat bubble) without overlaying her head.
-  eugeneLobbyLine = null, // The specific greeting she's saying in the lobby (from EUGENE_LOBBY_GREETINGS). Shown as the bubble's tagline so it matches her spoken voice. Falls back to a default tagline when null.
-  eugeneGameBubble = null, // String dialogue line for Eugene's in-game speech. When set, renders the same head-anchored chat bubble but with just the dialogue content. Mutually exclusive with the lobby intro variant.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -677,7 +717,6 @@ const CyborgTempleScene = ({
         clearTimeout(unicornWaveStateRef.current.timeoutId);
         unicornWaveStateRef.current.timeoutId = null;
       }
-      unicornWaveStateRef.current.armed = false;
     }
     // Demon's focus sequence (idle → pointing → typing) schedules setTimeouts
     // and a mixer 'finished' listener that settle it back into demon_typing.
@@ -1251,11 +1290,6 @@ const CyborgTempleScene = ({
   const detectiveHeadBoneRef = useRef();
   // Hint marker group refs (positioned each frame from the head bones)
   const rl80HintRef = useRef();
-  // Anchor for Eugene's lobby chat bubble. Position is updated every frame to
-  // track her head bone (plus a small Y offset) so the bubble follows her in
-  // world space, while a CSS transform on the rendered HTML shifts it up-left
-  // of the anchor so her head/horn never gets covered.
-  const eugeneLobbyBubbleRef = useRef();
   const demonHintRef = useRef();
   const monkHintRef = useRef();
   const fluffyHintRef = useRef();
@@ -1350,9 +1384,55 @@ const CyborgTempleScene = ({
     blinkProgress: 0
   });
 
-  // One-shot Unicorn_waving on focus arrival. Armed when user clicks RL80;
-  // fired 2s after the camera lerp converges.
-  const unicornWaveStateRef = useRef({ armed: false, timeoutId: null });
+  // One-shot Unicorn_waving greeting. Fired by the page (via the unicornWave
+  // bridge) when Eugene speaks a "hello" greeting line — so the wave stays tied
+  // to the words, not to every focus click. `timeoutId` tracks the pending
+  // post-wave fade-back so un-focus (or a rapid re-greet) can cancel it.
+  const unicornWaveStateRef = useRef({ timeoutId: null });
+
+  // Play Eugene's one-shot greeting wave. The clip is additive (see the RL80
+  // branch of the clip-loading section), so it layers on top of the running
+  // idle/typing action — the body stays seated while the arm waves. No-op
+  // unless Eugene is focused and his mixer is loaded.
+  const playUnicornWave = useCallback(() => {
+    if (!rl80FocusedRef.current) return;
+    const rl80Actions = actionsRef.current['RL80'];
+    if (!rl80Actions) return;
+    const waveKey = Object.keys(rl80Actions).find(a => /wav/i.test(a));
+    if (!waveKey) return;
+    const wave = rl80Actions[waveKey];
+    const timeScale = 0.75;
+    const clipDurMs = wave.getClip().duration * 1000;
+    const playedDurMs = clipDurMs / timeScale;
+    const fadeInMs = Math.min(200, clipDurMs * 0.25);
+    const fadeOutMs = 500;
+    const fadeInS = fadeInMs / 1000;
+    const fadeOutS = fadeOutMs / 1000;
+
+    // Cancel a still-pending fade-back from a prior wave so rapid re-greets
+    // don't leave the arm stuck mid-wave.
+    if (unicornWaveStateRef.current.timeoutId) {
+      clearTimeout(unicornWaveStateRef.current.timeoutId);
+      unicornWaveStateRef.current.timeoutId = null;
+    }
+
+    wave.reset();
+    wave.setLoop(THREE.LoopOnce, 1);
+    wave.clampWhenFinished = true;
+    wave.setEffectiveTimeScale(timeScale);
+    wave.setEffectiveWeight(10);
+    wave.fadeIn(fadeInS);
+    wave.play();
+
+    unicornWaveStateRef.current.timeoutId = setTimeout(() => {
+      unicornWaveStateRef.current.timeoutId = null;
+      if (!rl80FocusedRef.current) return;
+      wave.fadeOut(fadeOutS);
+    }, Math.max(50, playedDurMs - fadeOutMs));
+  }, []);
+
+  // Register the wave player so the page can fire it in sync with a greeting.
+  useEffect(() => registerUnicornWave(playUnicornWave), [playUnicornWave]);
   
   // Flame shader material refs (multiple flames in scene)
   const flameMaterialsRef = useRef([]);
@@ -1954,11 +2034,21 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           // root, positioned/scaled/oriented each frame in useFrame from the
           // head bone. Guard against re-creation on re-runs.
           if (!rl80MouthMeshRef.current) {
-            const mouthGeo = new THREE.CircleGeometry(1, 32); // unit disc in XY, faces +Z
+            // A flat quad whose texture is a CANVAS we redraw each frame: a dark
+            // maw + a few blocky upper teeth. Drawing the openness on the canvas
+            // (rather than scaling the mesh in Y) keeps the teeth a fixed shape
+            // instead of stretching. The mesh stays a fixed size; drawUnicornMouth
+            // animates the interior. PlaneGeometry(2,2) matches the old disc's
+            // extent so the tuned width/maxH still read about the same.
+            const mouthCanvas = document.createElement('canvas');
+            mouthCanvas.width = 160;
+            mouthCanvas.height = 160;
+            const mouthTex = new THREE.CanvasTexture(mouthCanvas);
+            mouthTex.colorSpace = THREE.SRGBColorSpace;
+            const mouthGeo = new THREE.PlaneGeometry(2, 2); // faces +Z; canvas mapped on
             const mouthMat = new THREE.MeshBasicMaterial({
-              color: 0x140a10,            // dark maw; override live via window.__rl80Mouth.color
+              map: mouthTex,
               transparent: true,
-              opacity: 0.97,
               depthWrite: false,          // an overlay on the snout, don't fight its depth
               side: THREE.DoubleSide,     // visible whichever way it ends up facing
             });
@@ -1967,6 +2057,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             mouthMesh.renderOrder = 6;
             mouthMesh.frustumCulled = false;
             mouthMesh.visible = false;    // shown once positioned in useFrame
+            mouthMesh._canvas = mouthCanvas;
+            mouthMesh._ctx = mouthCanvas.getContext('2d');
+            mouthMesh._tex = mouthTex;
+            mouthMesh._lastDraw = -1;     // last openness drawn (redraw throttle)
             scene.add(mouthMesh);
             rl80MouthMeshRef.current = mouthMesh;
           }
@@ -3462,12 +3556,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     const restoreRL80FromFocus = () => {
       if (!rl80FocusedRef.current) return;
       rl80FocusedRef.current = false;
-      // Cancel any pending Unicorn_waving trigger / its post-wave fade-back.
+      // Cancel any pending post-wave fade-back from the greeting wave.
       if (unicornWaveStateRef.current.timeoutId) {
         clearTimeout(unicornWaveStateRef.current.timeoutId);
         unicornWaveStateRef.current.timeoutId = null;
       }
-      unicornWaveStateRef.current.armed = false;
       const rl80Actions = actionsRef.current['RL80'];
       if (!rl80Actions) return;
       // Fade out the additive wave action if still running — it's not tracked
@@ -4322,12 +4415,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                 console.warn('[RL80] Idle animation not found. Available:', animKeys);
               }
             }
-            // Arm one-shot Unicorn_waving — fires 2s after camera arrival.
-            if (unicornWaveStateRef.current.timeoutId) {
-              clearTimeout(unicornWaveStateRef.current.timeoutId);
-              unicornWaveStateRef.current.timeoutId = null;
-            }
-            unicornWaveStateRef.current.armed = true;
+            // The greeting wave is fired by the page (unicornWave bridge) when
+            // Eugene speaks a "hello" line — not on the focus click itself.
           } else if (object.userData.agentId === 'Fluffy') {
             fluffyFocusedRef.current = true;
             // Pause the animation so the cat sits still — eliminates loop seam glitch
@@ -5816,15 +5905,15 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
     }
 
-    // RL80 code-made mouth overlay (Path A2) — a flat disc anchored at her snout
-    // (head-bone-local offset, so it tracks her head) whose +Z normal is aimed
-    // at the muzzle by `rot` [pitchX, yawY, rollZ] degrees, scaled open in Y by
-    // the smoothed speech amplitude. Live-tunable via
-    //   window.__rl80Mouth = { offset:[x,y,z], rot:[x,y,z], width, minH, maxH,
-    //                          color:0xrrggbb, gain, hideWhenQuiet:true }
-    // offset is HEAD-LOCAL (+Z toward the muzzle tip). `roll` is kept as an alias
-    // for rot[2]. Because the disc is flat, closed (open≈0) reads as a thin line
-    // and it can never look like a chunky round blob.
+    // RL80 code-made mouth overlay (Path A2) — a flat quad anchored at his snout
+    // (head-bone-local offset, so it tracks his head) whose +Z normal is aimed at
+    // the muzzle by `rot` [pitchX, yawY, rollZ] degrees. The quad is a FIXED size;
+    // its texture is a canvas we redraw from the smoothed speech amplitude — a
+    // dark maw + blocky upper teeth (see drawUnicornMouth). Live-tunable via
+    //   window.__rl80Mouth = { offset:[x,y,z], rot:[x,y,z], width, maxH,
+    //                          color:0xrrggbb (maw), teeth, toothColor:0xrrggbb,
+    //                          gain, hideWhenQuiet:true }
+    // offset is HEAD-LOCAL (+Z toward the muzzle tip); `roll` aliases rot[2].
     if (rl80MouthMeshRef.current && rl80HeadBoneRef.current) {
       const mouth = rl80MouthMeshRef.current;
       const head = rl80HeadBoneRef.current;
@@ -5836,12 +5925,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       const rot    = (cfg && Array.isArray(cfg.rot)) ? cfg.rot
                    : [0, 0, (cfg && typeof cfg.roll === 'number') ? cfg.roll : MD.rot[2]];
       const width  = cfg && typeof cfg.width === 'number' ? cfg.width : MD.width;
-      const minH   = cfg && typeof cfg.minH  === 'number' ? cfg.minH  : MD.minH;
       const maxH   = cfg && typeof cfg.maxH  === 'number' ? cfg.maxH  : MD.maxH;
       const gain   = cfg && typeof cfg.gain  === 'number' ? cfg.gain  : MD.gain;
-      if (cfg && typeof cfg.color === 'number' && mouth.material.color.getHex() !== cfg.color) {
-        mouth.material.color.setHex(cfg.color);
-      }
+      const interior   = cfg && typeof cfg.color === 'number' ? cfg.color : MD.color;
+      const teeth      = cfg && typeof cfg.teeth === 'number' ? cfg.teeth : MD.teeth;
+      const toothColor = cfg && typeof cfg.toothColor === 'number' ? cfg.toothColor : MD.toothColor;
 
       head.updateWorldMatrix(true, false);
       if (!mouth._hp) {
@@ -5853,17 +5941,31 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       head.getWorldQuaternion(mouth._hq);
       mouth._off.set(offset[0], offset[1], offset[2]).applyQuaternion(mouth._hq);
       mouth.position.copy(mouth._hp).add(mouth._off);
-      // Orient: head frame, then the tunable local Euler to aim the disc.
+      // Orient: head frame, then the tunable local Euler to aim the quad.
       const D = Math.PI / 180;
       mouth._rotE.set(rot[0] * D, rot[1] * D, rot[2] * D, 'XYZ');
       mouth._rotQ.setFromEuler(mouth._rotE);
       mouth.quaternion.copy(mouth._hq).multiply(mouth._rotQ);
+      mouth.scale.set(width, maxH, 1); // fixed footprint — openness is drawn on the canvas
 
       // Smooth the amplitude so the mouth eases rather than buzzing per-sample.
       const target = Math.min(1, unicornMouth.value * gain);
       mouth._open = (mouth._open || 0) + (target - (mouth._open || 0)) * 0.4;
-      mouth.scale.set(width, minH + (maxH - minH) * mouth._open, 1); // flat: Z scale unused
       mouth.visible = cfg && cfg.hideWhenQuiet ? mouth._open > 0.02 : true;
+
+      // Redraw the maw+teeth only when openness (or a tuned color/teeth count)
+      // changes, so we don't upload a texture every frame while idle.
+      const drawKey = Math.round(mouth._open * 200) / 200;
+      if (mouth._ctx && (drawKey !== mouth._lastDraw || interior !== mouth._lastInterior ||
+          toothColor !== mouth._lastTooth || teeth !== mouth._lastTeeth)) {
+        drawUnicornMouth(mouth._ctx, mouth._canvas.width, mouth._canvas.height,
+          mouth._open, _rl80hex(interior), _rl80hex(toothColor), teeth);
+        mouth._tex.needsUpdate = true;
+        mouth._lastDraw = drawKey;
+        mouth._lastInterior = interior;
+        mouth._lastTooth = toothColor;
+        mouth._lastTeeth = teeth;
+      }
 
       if (!mouth._loggedHint) {
         mouth._loggedHint = true;
@@ -6096,62 +6198,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           true,
         );
 
-        const onArrival = () => {
-          focusTarget._arrived = true;
-
-          // XCandle / Reset paths don't need the RL80 wave handoff.
-          if (focusTarget.agentId === 'XCandle' || focusTarget.agentName === 'Reset') {
-            return;
-          }
-
-          // Fire one-shot Unicorn_waving 2s after the camera settles in
-          // front of him. The wave clip is additive (see clip-loading
-          // section), so it layers on top of the running idle/typing
-          // action without replacing it — the body stays seated while the
-          // arm waves. Idle is NOT faded out here.
-          if (focusTarget.agentId === 'RL80' && unicornWaveStateRef.current.armed) {
-            unicornWaveStateRef.current.armed = false;
-            unicornWaveStateRef.current.timeoutId = setTimeout(() => {
-              unicornWaveStateRef.current.timeoutId = null;
-              if (!rl80FocusedRef.current) return;
-              const rl80Actions = actionsRef.current['RL80'];
-              if (!rl80Actions) return;
-              const waveKey = Object.keys(rl80Actions).find(a => /wav/i.test(a));
-              if (!waveKey) return;
-              const wave = rl80Actions[waveKey];
-              const timeScale = 0.75;
-              const clipDurMs = wave.getClip().duration * 1000;
-              const playedDurMs = clipDurMs / timeScale;
-              const fadeInMs = Math.min(200, clipDurMs * 0.25);
-              const fadeOutMs = 500;
-              const fadeInS = fadeInMs / 1000;
-              const fadeOutS = fadeOutMs / 1000;
-
-              wave.reset();
-              wave.setLoop(THREE.LoopOnce, 1);
-              wave.clampWhenFinished = true;
-              wave.setEffectiveTimeScale(timeScale);
-              wave.setEffectiveWeight(10);
-              wave.fadeIn(fadeInS);
-              wave.play();
-
-              unicornWaveStateRef.current.timeoutId = setTimeout(() => {
-                unicornWaveStateRef.current.timeoutId = null;
-                if (!rl80FocusedRef.current) return;
-                wave.fadeOut(fadeOutS);
-              }, Math.max(50, playedDurMs - fadeOutMs));
-            }, 2000);
-          }
-        };
-
-        if (promise && typeof promise.then === 'function') {
-          // setLookAt's promise rejects if a newer transition supersedes
-          // this one (e.g. the user clicks another character mid-fly-in).
-          // Swallow that — the new transition's onArrival will run instead.
-          promise.then(onArrival).catch(() => {});
-        } else {
-          onArrival();
-        }
+        // setLookAt's promise rejects if a newer transition supersedes this
+        // one (e.g. the user clicks another character mid-fly-in) — swallow it.
+        // (Eugene's greeting wave used to fire here on arrival; it's now driven
+        // by the page in sync with his spoken "hello" line — see unicornWave.)
+        if (promise && typeof promise.then === 'function') promise.catch(() => {});
       }
     }
     
@@ -6223,19 +6274,6 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     //   }
     // }
 
-    // Eugene's lobby chat bubble anchor — track her head bone in world space
-    // so the bubble follows her idle bob. The Y bump puts the anchor just
-    // above her horn so the bubble's bottom-right tail tip lands in clear
-    // space when the CSS transform shifts it up-left of the anchor.
-    if (eugeneLobbyBubbleRef.current && rl80HeadBoneRef.current) {
-      const headWorldPos = new THREE.Vector3();
-      rl80HeadBoneRef.current.getWorldPosition(headWorldPos);
-      eugeneLobbyBubbleRef.current.position.set(
-        headWorldPos.x ,
-        headWorldPos.y ,
-        headWorldPos.z + 0.2,
-      );
-    }
   });
 
   // Always return the group that contains the model
@@ -6331,198 +6369,6 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           );
         })()}
       </group>
-      {/* Mobile bubble — rendered as a position:fixed overlay portaled to
-          document.body. The outer drei <Html> is what R3F's reconciler
-          sees (a registered three.js component); inside it, regular React
-          DOM is allowed, and createPortal hops to document.body where no
-          ancestor transform interferes with position:fixed.
-          Bypasses head-bone tracking entirely, which was unreliable on
-          mobile: Eugene's lobby framing puts her horn near the right edge,
-          so the in-scene bubble's left-extending anchor pushed the body
-          off the viewport. */}
-      {(showEugeneLobbyBubble || eugeneGameBubble) && isOnMobile && (
-        <Html>
-          {typeof document !== 'undefined' && createPortal(
-            <div
-              style={{
-                position: 'fixed',
-                top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 'min(300px, calc(100vw - 24px))',
-                padding: '12px 16px 14px',
-                background:
-                  'linear-gradient(180deg, rgba(255,235,250,0.96), rgba(255,210,240,0.96))',
-                border: '1px solid rgba(255,62,160,0.6)',
-                borderRadius: 16,
-                boxShadow:
-                  '0 6px 24px rgba(255,62,160,0.32), 0 0 0 4px rgba(255,255,255,0.4) inset',
-                color: '#3a0f2b',
-                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                fontSize: 13,
-                lineHeight: 1.45,
-                zIndex: 30,
-                pointerEvents: 'none',
-              }}
-            >
-              {/* Downward-pointing tail centered along the bottom edge. */}
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: -10,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: 0,
-                  height: 0,
-                  borderLeft: '10px solid transparent',
-                  borderRight: '10px solid transparent',
-                  borderTop: '12px solid rgba(255,210,240,0.96)',
-                  filter: 'drop-shadow(0 2px 1px rgba(255,62,160,0.3))',
-                }}
-              />
-              <div
-                style={{
-                  fontSize: 9,
-                  letterSpacing: '0.22em',
-                  color: 'rgba(140,30,90,0.7)',
-                  marginBottom: 4,
-                  textTransform: 'uppercase',
-                }}
-              >
-                @eugene
-              </div>
-              {showEugeneLobbyBubble ? (
-                <>
-                  <div
-                    style={{
-                      fontFamily: "'Pirata One', serif",
-                      fontSize: 22,
-                      color: '#8a0e58',
-                      letterSpacing: 0.5,
-                      lineHeight: 1.05,
-                      marginBottom: 6,
-                    }}
-                  >
-                    Eugene
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: '0.08em',
-                      color: 'rgba(140,30,90,0.6)',
-                      fontStyle: 'italic',
-                      marginBottom: 8,
-                    }}
-                  >
-                    /yoo-JEEN/
-                  </div>
-                  <div style={{ fontStyle: 'italic' }}>
-                    {eugeneLobbyLine || 'Every story wants to be a myth. The rare ones earn it.'}
-                  </div>
-                </>
-              ) : (
-                <div>{eugeneGameBubble}</div>
-              )}
-            </div>,
-            document.body,
-          )}
-        </Html>
-      )}
-
-      {/* Desktop bubble — head-bone-tracked, in-scene via drei <Html>. */}
-      {(showEugeneLobbyBubble || eugeneGameBubble) && !isOnMobile && (
-        <group ref={eugeneLobbyBubbleRef} position={[0, 9999, 0]}>
-          <Html zIndexRange={[100, 0]} style={{ pointerEvents: 'none' }}>
-            <div
-              style={{
-                // Anchor sits just above Eugene's horn (set in useFrame).
-                // Bubble extends UP and to the LEFT from there via this
-                // translate, so the bottom-right tail tip lands at the
-                // anchor and the bubble body stays clear of her head/horn.
-                transform: 'translate(-100%, -50%)',
-                width: 'min(300px, 70vw)',
-                padding: '12px 16px 14px',
-                background:
-                  'linear-gradient(180deg, rgba(255,235,250,0.96), rgba(255,210,240,0.96))',
-                border: '1px solid rgba(255,62,160,0.6)',
-                borderRadius: 16,
-                boxShadow:
-                  '0 6px 24px rgba(255,62,160,0.32), 0 0 0 4px rgba(255,255,255,0.4) inset',
-                color: '#3a0f2b',
-                fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace",
-                fontSize: 13,
-                lineHeight: 1.45,
-                position: 'relative',
-                // Explicit non-blocking. drei's `<Html>` `style` prop sets
-                // pointerEvents on the projection wrapper, but the transform
-                // we apply on this inner div creates a fresh stacking
-                // context that can swallow clicks meant for the character
-                // mesh underneath — specifically the click-on-focused-agent
-                // unfocus toggle in handleClick (around line 3490). Setting
-                // it explicitly here lets every click pass straight through.
-                pointerEvents: 'none',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: -10,
-                  right: 18,
-                  width: 0,
-                  height: 0,
-                  borderLeft: '10px solid transparent',
-                  borderRight: '10px solid transparent',
-                  borderTop: '12px solid rgba(255,210,240,0.96)',
-                  filter: 'drop-shadow(0 2px 1px rgba(255,62,160,0.3))',
-                }}
-              />
-              <div
-                style={{
-                  fontSize: 9,
-                  letterSpacing: '0.22em',
-                  color: 'rgba(140,30,90,0.7)',
-                  marginBottom: 4,
-                  textTransform: 'uppercase',
-                }}
-              >
-                @eugene
-              </div>
-              {showEugeneLobbyBubble ? (
-                <>
-                  <div
-                    style={{
-                      fontFamily: "'Pirata One', serif",
-                      fontSize: 22,
-                      color: '#8a0e58',
-                      letterSpacing: 0.5,
-                      lineHeight: 1.05,
-                      marginBottom: 6,
-                    }}
-                  >
-                    Eugene
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: '0.08em',
-                      color: 'rgba(140,30,90,0.6)',
-                      fontStyle: 'italic',
-                      marginBottom: 8,
-                    }}
-                  >
-                    /yoo-JEEN/
-                  </div>
-                  <div style={{ fontStyle: 'italic' }}>
-                    {eugeneLobbyLine || 'Every story wants to be a myth. The rare ones earn it.'}
-                  </div>
-                </>
-              ) : (
-                <div>{eugeneGameBubble}</div>
-              )}
-            </div>
-          </Html>
-        </group>
-      )}
       {showCharacterHints && [
         { id: 'RL80', ref: rl80HintRef },
         { id: 'Demon', ref: demonHintRef },
