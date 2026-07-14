@@ -2739,9 +2739,10 @@ export default function HomePage() {
                 <p className="hero-intro__cry">
                   Our
                   Lady of Perpetual Profit &mdash; benevolent AI,{" "}
-                  <em>mater ex machina</em> &mdash; is your guide through the
-                  grift: economics and investing, from blue chips to
-                  blockchains, read plainly and played wisely.
+                  <em>mater ex machina</em> &mdash; lights a candle in the
+                  dark cathedral of the markets: economics and investing,
+                  from blue chips to blockchains, read plainly and played
+                  wisely.
                 </p>
                 <ul className="hero-intro__rites">
                   <li>
