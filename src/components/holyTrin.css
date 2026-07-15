@@ -839,3 +839,31 @@
     0 0 8px rgba(212, 175, 55, 0.5),
     0 0 16px rgba(212, 175, 55, 0.25);
 }
+
+/* ───── DIVIDER SPACING: CHART SECTION → TRIN80 ─────
+   The divider's own 4px margins collapse against its neighbours, and the
+   whitespace on either side of it is really .intro-chart-section's 22px
+   margin-bottom above and .holy-trin's much larger hero-gap margin-top below.
+   That left the rule 22px under the chart section and ~280px above the Trin80
+   — flush against the section above rather than sitting between the two.
+   Splitting the sum of those two margins across the divider centres it in the
+   gap; the sections stay exactly as far apart as before, only the rule moves.
+
+   Keyed off .intro-chart-section because the halves are derived from ITS
+   margin-bottom (chart-shrine.css) and the hero gap below — if either number
+   moves, the halves here have to move with it. */
+.intro-chart-section + .section-divider,
+.intro-chart-section + .section-divider + .holy-trin {
+  /* (22px .intro-chart-section margin-bottom + 280px .holy-trin margin-top) / 2 */
+  margin-top: 151px;
+}
+
+@media (max-width: 900px) {
+  /* Same split, against the taller mobile hero gap. Restated because the
+     selectors above outrank the plain .holy-trin rule inside this breakpoint
+     and would otherwise pin the gap to the desktop 151px. */
+  .intro-chart-section + .section-divider,
+  .intro-chart-section + .section-divider + .holy-trin {
+    margin-top: calc((22px + clamp(220px, 75vh, 600px)) / 2);
+  }
+}

@@ -14,7 +14,7 @@ const PILLARS = [
     tagline: "in use",
     color: "#ffd700",
     description:
-      "Get access to the growing ecosystem of games and services built on the RL80 cosmology.",
+      "Get access to the growing ecosystem of games and features built on the RL80 cosmology.",
   },
     {
     id: "integr80",

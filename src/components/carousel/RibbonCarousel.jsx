@@ -1,7 +1,8 @@
 'use client'
 
 import * as THREE from 'three'
-import { useRef, useState, useMemo, useEffect, Suspense } from 'react'
+import { useRef, useState, useMemo, useEffect, useCallback, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Image, Text } from '@react-three/drei'
 import { easing } from 'maath'
@@ -19,6 +20,11 @@ import DropInTitle from '../DropInTitle'
 // /about's Carousel.js and OldsCoolTunnel still reference them.
 const IMAGES = Array.from({ length: 8 }, (_, i) => ({
   url: `/carousel_images/img${i + 1}.webp`,
+  // The 512px WebP is all the polaroid plane can show, but the lightbox blows
+  // one card up to most of the viewport height, where that re-encode goes soft
+  // on a 2x display. The .jpg originals run up to 1024px and are only fetched
+  // by the click that opens the lightbox, so the section's load is unchanged.
+  full: `/carousel_images/img${i + 1}.jpg`,
 }))
 
 const FALLBACK_CAPTIONS = [
@@ -64,13 +70,38 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
   const dragRef = useRef(0)
   const velocityRef = useRef(0)
   const draggingRef = useRef(false)
+  // Set once a press travels past the slop threshold, so the click that ends a
+  // spin-drag can be told apart from a click that opens a card. Read in
+  // handleSelect and only reset on the next press.
+  const movedRef = useRef(false)
   const [grabbing, setGrabbing] = useState(false)
+  const [hoveringCard, setHoveringCard] = useState(false)
+  // Index of the polaroid shown enlarged, or null. Doubles as the lightbox's
+  // open flag.
+  const [selected, setSelected] = useState(null)
   const [inView, setInView] = useState(false)
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 768 : false
   )
   const { is80sMode } = useMusic()
   const { t } = useLanguage()
+  // Read here rather than inside <Carousel>, which sits across the Canvas
+  // boundary, so the lightbox and the cards are captioned from one source.
+  const captions = useCaptions()
+
+  const handleSelect = useCallback((i) => {
+    if (movedRef.current) return
+    // Kill the flick's glide, so the ribbon isn't still coasting when the
+    // lightbox closes and hands the page back.
+    velocityRef.current = 0
+    setSelected(i)
+  }, [])
+
+  const closeLightbox = useCallback(() => setSelected(null), [])
+
+  const stepLightbox = useCallback((dir) => {
+    setSelected((i) => (i === null ? null : (i + dir + IMAGES.length) % IMAGES.length))
+  }, [])
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768)
@@ -166,12 +197,15 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
 
     let lastX = 0
     let lastT = 0
+    let downX = 0
 
     const onDown = (e) => {
       draggingRef.current = true
       setGrabbing(true)
       lastX = e.clientX
       lastT = e.timeStamp
+      downX = e.clientX
+      movedRef.current = false
       velocityRef.current = 0
     }
 
@@ -179,6 +213,10 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
       if (!draggingRef.current) return
       const dx = e.clientX - lastX
       lastX = e.clientX
+      // Measured from the press, not summed per-move: a hand that wanders a
+      // pixel and comes back is still a click. 4px is the usual slop — below
+      // it, a trackpad tap can register a stray move of 1-2px.
+      if (Math.abs(e.clientX - downX) > 4) movedRef.current = true
       // A drag across the full viewport width turns it one revolution.
       const dr = (dx / window.innerWidth) * Math.PI * 2
       dragRef.current += dr
@@ -333,10 +371,26 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
             margin: '1.25rem auto 0',
             maxWidth: '46ch',
             padding: '0 20px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            fontSize: '14px',
-            lineHeight: 1.4,
-            color: 'rgba(241, 215, 122, 0.78)',
+            // Body copy matched to .holy-trin-pillar-desc (holyTrin.css, in its
+            // min-width:901px block) — the prose of the nearest section, and the
+            // same register the intro's .hero-intro__cry reads in. Copied rather
+            // than reusing either class: both are BEM-scoped to their own
+            // section and carry its layout with them. The system-sans 14px this
+            // replaces was the only body text on the page not set in
+            // IoskeleyMono, which is why it read as foreign.
+            fontFamily: '"IoskeleyMono", "IBM Plex Mono", ui-monospace, monospace',
+            fontWeight: 400,
+            fontSize: 'clamp(0.92rem, 1.05vw, 1.12rem)',
+            // The pillars' own 1.2 is set for one-line labels; this sentence
+            // wraps, so it takes the intro cry's 1.24 — the leading that section
+            // uses for running prose.
+            lineHeight: 1.24,
+            letterSpacing: 0,
+            color: '#e9d4a0',
+            opacity: 0.95,
+            // As on the pillars: holds the line legible where it crosses the
+            // starfield showing through the alpha canvas.
+            textShadow: '0 1px 8px rgba(0, 0, 0, 0.6)',
             textAlign: 'center',
           }}
         >
@@ -353,7 +407,9 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
           flex: 1,
           minHeight: 0,
           position: 'relative',
-          cursor: grabbing ? 'grabbing' : 'grab',
+          // zoom-in over a card is the only hint that the polaroids open; the
+          // drag affordance still wins while a drag is actually underway.
+          cursor: grabbing ? 'grabbing' : hoveringCard ? 'zoom-in' : 'grab',
         }}
       >
         {inView && (
@@ -386,13 +442,26 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
               turns={turns}
               rotation={[0, 0, 0.15]}
             >
-              <Carousel />
+              <Carousel
+                captions={captions}
+                onSelect={handleSelect}
+                onHoverChange={setHoveringCard}
+              />
             </Rig>
             <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} progressRef={progressRef} />
           </Suspense>
         </Canvas>
         )}
       </div>
+
+      {selected !== null && (
+        <Lightbox
+          index={selected}
+          captions={captions}
+          onClose={closeLightbox}
+          onStep={stepLightbox}
+        />
+      )}
     </section>
   )
 }
@@ -434,9 +503,7 @@ function Rig({ progressRef, dragRef, velocityRef, draggingRef, turns, ...props }
   return <group ref={ref} {...props} />
 }
 
-function Carousel({ radius = 1.4, count = 8 }) {
-  const captions = useCaptions()
-
+function Carousel({ captions, onSelect, onHoverChange, radius = 1.4, count = 8 }) {
   return (
     <>
       {Array.from({ length: count }, (_, i) => (
@@ -446,13 +513,15 @@ function Carousel({ radius = 1.4, count = 8 }) {
           position={[Math.sin((i / count) * Math.PI * 2) * radius, 0, Math.cos((i / count) * Math.PI * 2) * radius]}
           rotation={[0, (i / count) * Math.PI * 2, 0]}
           caption={captions[i]}
+          onSelect={() => onSelect(i)}
+          onHoverChange={onHoverChange}
         />
       ))}
     </>
   )
 }
 
-function Card({ url, caption, ...props }) {
+function Card({ url, caption, onSelect, onHoverChange, ...props }) {
   const groupRef = useRef()
   const imageRef = useRef()
   const [hovered, hover] = useState(false)
@@ -487,8 +556,20 @@ function Card({ url, caption, ...props }) {
         onPointerOver={(e) => {
           e.stopPropagation()
           hover(true)
+          onHoverChange?.(true)
         }}
-        onPointerOut={() => hover(false)}
+        onPointerOut={() => {
+          hover(false)
+          onHoverChange?.(false)
+        }}
+        // stopPropagation so a click only ever opens the nearest card, not the
+        // one facing away on the far side of the ring behind it. Bound to the
+        // photo rather than the group, keeping the click target identical to
+        // the hover target that advertises it.
+        onClick={(e) => {
+          e.stopPropagation()
+          onSelect?.()
+        }}
         position={[0, 0.05, 0.001]}
       >
         <planeGeometry args={[0.85, 0.85]} />
@@ -546,6 +627,239 @@ function Card({ url, caption, ...props }) {
         <meshBasicMaterial color="#000000" opacity={0.15} transparent side={THREE.DoubleSide} />
       </mesh>
     </group>
+  )
+}
+
+/**
+ * The enlarged view of a single polaroid.
+ *
+ * Portalled to <body> rather than rendered inside the section: the section is
+ * overflow:hidden and the dock is fixed at z-index 10000, so a child here would
+ * be clipped by the former and painted under the latter. 10050 matches
+ * LittleBookOverlay, the page's other full-screen takeover.
+ */
+function Lightbox({ index, captions, onClose, onStep }) {
+  const image = IMAGES[index]
+  const caption = captions[index]
+  // Tracked by url, not a boolean: keyed to the src, it resets itself when the
+  // arrows step to a new photo without needing an effect to clear it.
+  const [loadedUrl, setLoadedUrl] = useState(null)
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowRight') onStep(1)
+      else if (e.key === 'ArrowLeft') onStep(-1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, onStep])
+
+  // Window scroll drives the ribbon's rotation, so an unlocked page would let a
+  // stray wheel spin the carousel behind the scrim and leave it somewhere else
+  // on close. Saved and restored rather than cleared, per LittleBookOverlay.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [])
+
+  return createPortal(
+    <div
+      className="rc-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label={caption ? `${caption.year}, ${caption.location}` : 'Enlarged souvenir'}
+      onClick={onClose}
+    >
+      <style>{`
+        .rc-lightbox {
+          position: fixed;
+          inset: 0;
+          z-index: 10050;
+          display: grid;
+          place-items: center;
+          background: radial-gradient(
+            ellipse at center,
+            rgba(10, 6, 20, 0.72) 0%,
+            rgba(2, 3, 8, 0.93) 100%
+          );
+          animation: rc-lb-fade 0.2s ease both;
+        }
+
+        /* Sized off height as well as width: the frame is a square photo plus a
+           caption, so a wide-but-short window would otherwise push the caption
+           off the bottom. */
+        .rc-lightbox__polaroid {
+          position: relative;
+          width: min(86vw, 460px, 58vh);
+          margin: 0;
+          padding: 14px 14px 0;
+          background: #fdfcf7;
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 0, 0, 0.3);
+          cursor: default;
+          animation: rc-lb-in 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+        }
+
+        /* Holds the WebP the carousel already has cached, so the frame is filled
+           the instant it opens and the .jpg sharpens in over it rather than
+           flashing an empty white square. */
+        .rc-lightbox__frame {
+          position: relative;
+          aspect-ratio: 1;
+          background-size: cover;
+          background-position: center;
+          background-color: #111;
+        }
+
+        .rc-lightbox__img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          opacity: 0;
+          transition: opacity 0.25s ease;
+        }
+        .rc-lightbox__img--loaded { opacity: 1; }
+
+        /* Mirrors the in-canvas caption: same face, same black → #444 → #666
+           ramp down the three lines. */
+        .rc-lightbox__caption {
+          font-family: "Homemade Apple", cursive;
+          text-align: center;
+          padding: 20px 6px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .rc-lightbox__year { font-size: 1.15rem; color: #000; }
+        .rc-lightbox__location { font-size: 0.8rem; color: #444; }
+        .rc-lightbox__desc { font-size: 0.8rem; color: #666; line-height: 1.5; }
+
+        .rc-lightbox__count {
+          position: fixed;
+          top: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font-size: 12px;
+          letter-spacing: 2px;
+          color: rgba(241, 215, 122, 0.7);
+        }
+
+        .rc-lightbox__btn {
+          position: fixed;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          border: 1px solid rgba(42, 214, 238, 0.22);
+          background: rgba(6, 11, 19, 0.72);
+          color: #f1d77a;
+          cursor: pointer;
+          line-height: 1;
+          transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+        }
+        .rc-lightbox__btn:hover {
+          background: rgba(10, 18, 30, 0.92);
+          border-color: rgba(42, 214, 238, 0.5);
+        }
+
+        .rc-lightbox__close {
+          top: 20px;
+          right: max(20px, 3vw);
+          width: 40px;
+          height: 40px;
+          font-size: 20px;
+        }
+        .rc-lightbox__close:hover { transform: scale(1.08); }
+
+        .rc-lightbox__nav {
+          top: 50%;
+          width: 46px;
+          height: 46px;
+          font-size: 24px;
+          /* Own the translate here — the hover rule has to restate it or the
+             button would snap back to centre-on-top as it scales. */
+          transform: translateY(-50%);
+        }
+        .rc-lightbox__nav:hover { transform: translateY(-50%) scale(1.08); }
+        .rc-lightbox__nav--prev { left: max(16px, 4vw); }
+        .rc-lightbox__nav--next { right: max(16px, 4vw); }
+
+        @keyframes rc-lb-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes rc-lb-in {
+          from { opacity: 0; transform: scale(0.92) rotate(-3deg); }
+          to { opacity: 1; transform: scale(1) rotate(-1deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .rc-lightbox, .rc-lightbox__polaroid { animation: none; }
+          .rc-lightbox__polaroid { transform: rotate(-1deg); }
+          .rc-lightbox__img { transition: none; }
+        }
+      `}</style>
+
+      <span className="rc-lightbox__count">
+        {String(index + 1).padStart(2, '0')} / {String(IMAGES.length).padStart(2, '0')}
+      </span>
+
+      <button className="rc-lightbox__btn rc-lightbox__close" onClick={onClose} aria-label="Close">
+        ✕
+      </button>
+
+      <button
+        className="rc-lightbox__btn rc-lightbox__nav rc-lightbox__nav--prev"
+        // Without this the click reaches the backdrop and closes the lightbox
+        // the moment it steps.
+        onClick={(e) => {
+          e.stopPropagation()
+          onStep(-1)
+        }}
+        aria-label="Previous souvenir"
+      >
+        ‹
+      </button>
+
+      {/* Keyed so a step restarts the drop-in rather than swapping the photo
+          inside a frame that never moves. */}
+      <figure
+        key={index}
+        className="rc-lightbox__polaroid"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="rc-lightbox__frame" style={{ backgroundImage: `url(${image.url})` }}>
+          <img
+            key={image.full}
+            className={`rc-lightbox__img${loadedUrl === image.full ? ' rc-lightbox__img--loaded' : ''}`}
+            src={image.full}
+            alt={caption ? `${caption.year}, ${caption.location}. ${caption.description}` : ''}
+            onLoad={() => setLoadedUrl(image.full)}
+          />
+        </div>
+        {caption && (
+          <figcaption className="rc-lightbox__caption">
+            <span className="rc-lightbox__year">{caption.year}</span>
+            <span className="rc-lightbox__location">{caption.location}</span>
+            <span className="rc-lightbox__desc">{caption.description}</span>
+          </figcaption>
+        )}
+      </figure>
+
+      <button
+        className="rc-lightbox__btn rc-lightbox__nav rc-lightbox__nav--next"
+        onClick={(e) => {
+          e.stopPropagation()
+          onStep(1)
+        }}
+        aria-label="Next souvenir"
+      >
+        ›
+      </button>
+    </div>,
+    document.body
   )
 }
 
