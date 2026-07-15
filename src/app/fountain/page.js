@@ -306,7 +306,32 @@ export default function FountainPage() {
         #text, .text__copy {
           font-family: 'UnifrakturMaguntia', serif !important;
         }
-        
+
+        /* Home-link cue on the RL80 wordmark. In CSS rather than JS handlers
+           so a re-render can't wipe it, and so :focus-visible can give the
+           keyboard its own ring without flashing one on every mouse click. */
+        #text {
+          transition: text-shadow 0.3s ease;
+        }
+        #text:hover,
+        #text:focus-visible {
+          text-shadow: 0 0 12px rgba(212, 175, 55, 0.9),
+                       0 0 24px rgba(212, 175, 55, 0.45);
+        }
+        /* !important is load-bearing: globals.css has a site-wide
+           *:focus / *:active rule forcing outline:none !important, which
+           would otherwise strip the keyboard ring off this link. */
+        #text:focus-visible {
+          outline: 2px solid rgba(212, 175, 55, 0.9) !important;
+          outline-offset: 6px;
+          border-radius: 6px;
+        }
+        /* text-shadow inherits — keep the glow on the face copy instead of
+           multiplying it across all 100 blurred echo layers. */
+        .text__copy {
+          text-shadow: none !important;
+        }
+
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -419,8 +444,13 @@ export default function FountainPage() {
         </div>
       )} */}
       
-      {/* RL80 Logo - Mobile Only */}
-      {/* {fontLoaded && isMobileView && ( */}
+      {/* RL80 wordmark — the way back to the candelarium (the root page; the
+          shrine is /illumin80). On this page it's the ONLY exit on phones (the
+          social stack and music button are both desktop-only), so it's a real
+          <Link>, not a div+onClick: reachable by keyboard, cmd/middle-clickable,
+          and announced to screen readers. The glow on hover/focus is what tells
+          you it's a door at all — a corner wordmark over a 3D scene otherwise
+          reads as pure branding. */}
         <div style={{
           position: "fixed",
           top: "20px",
@@ -432,26 +462,31 @@ export default function FountainPage() {
           transition: "opacity 0.3s ease-in-out",
           zIndex: 10001,
         }}>
-          <div
+          <Link
+            href="/"
             id="text"
+            title="Return to the candelarium"
+            aria-label="Return to the candelarium"
             style={{
               position: "relative",
+              display: "inline-block",
               fontFamily: "'UnifrakturMaguntia', serif",
               fontSize: "3rem",
               color: "#ffffff",
+              textDecoration: "none",
               cursor: "pointer",
             }}
-             onClick={() => router.push('/')}
           >
-            {/* <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}> */}
-              RL80
-            {/* </Link> */}
+            RL80
             {Array.from({ length: 100 }).map((_, i) => {
               const index = i + 1;
               return (
                 <div
                   key={index}
                   className="text__copy"
+                  /* Decorative echo — without this the link announces as
+                     "RL80" a hundred times over. */
+                  aria-hidden="true"
                   style={{
                     position: "absolute",
                     pointerEvents: "none",
@@ -468,9 +503,8 @@ export default function FountainPage() {
                 </div>
               );
             })}
-          </div>
+          </Link>
         </div>
-      {/* )} */}
 
       {/* Top-right controls: brand-mark home link + shared music toggle */}
       <div

@@ -24,6 +24,7 @@ import BusinessSection from "@/components/BusinessSection";
 import DropInTitle from "../components/DropInTitle";
 import { useCandles } from "@/hooks/useCandles";
 
+
 import {
   readCandle,
   lightCandle,
@@ -161,6 +162,11 @@ const CANDLE_VARIANTS = {
 
 const StarfieldStatueScene = dynamic(
   () => import("@/components/StarfieldStatueScene"),
+  { ssr: false }
+);
+
+const RibbonCarousel = dynamic(
+  () => import("@/components/carousel/RibbonCarousel"),
   { ssr: false }
 );
 
@@ -2198,13 +2204,13 @@ export default function HomePage() {
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useBuyModal();
   // Shared cyberpunk confirm modal for the MORE-popover destinations
-  // (Ex Libris, Coin Fountain) — same glitch/sound dialog the dock's
-  // Ask RL80/Hail Mary slots use via MobileBottomNav's own confirm.
+  // (Hail Mary, Coin Fountain, Ex Libris) — same glitch/sound dialog the
+  // dock's Ask RL80/Terminal slots use via MobileBottomNav's own confirm.
   const [moreConfirmModal, moreConfirm] = useCyberConfirm();
   const [candleObjectHovered, setCandleObjectHovered] = useState(false);
   // "MORE" nav popover (far-right bottom-nav slot) — holds the secondary
-  // destinations (Ex Libris, Coin Fountain) that don't each warrant a
-  // permanent nav slot.
+  // destinations (Hail Mary, Coin Fountain, Ex Libris) that don't each
+  // warrant a permanent nav slot.
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
@@ -2739,28 +2745,25 @@ export default function HomePage() {
                 <p className="hero-intro__cry">
                   Where empires mint their coins and shadows move beneath the
                   exchange, Our Lady of Perpetual Profit keeps the old signal
-                  alive. <em>Mater ex machina</em>, patron saint of portfolios, she reads the markets from blue
-                  chips to blockchains, revealing what the powerful bury and
-                  what the faithful dare to see.
+                  alive. <em>Mater ex machina</em>, patron saint of portfolios,
+                  she reads the markets from blue chips to blockchains,
+                  revealing what the powerful bury and what the faithful dare to
+                  see.
                 </p>
                 <ul className="hero-intro__rites">
-  <li>
-    <strong>Prospect</strong> &mdash; stake a claim with The Hail Mary
-    Prospecting Co. and vie for escrowed USDC. Fortune favors the bold.
-  </li>
-  <li>
-    <strong>Study</strong> &mdash; sharpen your eye in the Liminal Terminal,
-    where scams get named and signals get separated from the noise.
-  </li>
-  <li>
-    <strong>Ask</strong> &mdash; hold RL80 like a rosary for
-    prosperity. Guidance comes to those who hold.
-  </li>
-<li>
-  <strong>Sacrifice</strong> &mdash; remain vigilant and burn a votive candle to Our Lady. Reducing supply increases value.
-  
-</li>
-</ul>
+                  <li>
+                    <strong>Seek</strong> &mdash; stake a claim with The
+                    Hail Mary Prospecting Co. and vie for escrowed USDC.
+                  </li>
+                  <li>
+                    <strong>Study</strong> &mdash; sharpen your eye in the
+                    Liminal Terminal, where scams get named and signals get
+                    separated from the noise.
+                  </li>
+                  <li>
+                    <strong>Get Guidance</strong> &mdash; burn a votive candle to Our Lady. In return, she will light the way.
+                  </li>
+                </ul>
                 {/* <p className="hero-intro__key">
                   Every rite opens with the same key:{" "}
                   <span className="hero-intro__pop">RL80</span>, the
@@ -2809,6 +2812,8 @@ export default function HomePage() {
         </div>
 
         <HolyTrinSection />
+
+
 
         {/* CTA reprise — the moment after "unruggable" lands is the
             second-best time on the page to offer the key. Same BuyModal
@@ -2994,8 +2999,8 @@ export default function HomePage() {
       />
 
       <MobileBottomNav
-        /* Slots, left to right: BUY (book slot, fixed) | TERMINAL |
-           CANDLE (center FAB, fixed) | HAIL MARY | EX LIBRIS. Music and
+        /* Slots, left to right: BUY (book slot, fixed) | ASK RL80 |
+           CANDLE (center FAB, fixed) | TERMINAL | MORE. Music and
            Wallet slots are suppressed. The dedicated account/LOGIN slot
            is intentionally absent — sign-in surfaces through the
            post-light nudge and the picker's disconnect flow. Buttons
@@ -3059,7 +3064,7 @@ export default function HomePage() {
         centerSubLabel={candleLit ? "MY CANDLE" : "LIGHT CANDLE"}
         centerTitle={candleLit ? "Your candle" : "Light candle"}
         /* Far-right slot is a MORE popover holding the secondary
-           destinations (Ex Libris, Coin Fountain). */
+           destinations (Hail Mary, Coin Fountain, Ex Libris). */
         onMenuClick={() => setShowMoreMenu((v) => !v)}
         menuIcon={
           <svg
@@ -3130,14 +3135,15 @@ export default function HomePage() {
         ]}
         extraRight={[
           {
-            key: 'lode',
-            label: 'Hail Mary',
-            title: 'Hail Mary Prospecting Co',
-              onClick: () => { router.push('/hailmary'); },
-            comingSoon: false,
+            key: 'terminal',
+            /* Label stays short — the dock's slot labels ellipsize past
+               ~88px. The full name lands in the confirm's title. */
+            label: 'Terminal',
+            title: 'The Liminal Terminal',
+            onClick: () => { router.push('/trade'); },
             confirm: {
-              title: 'Hail Mary Prospecting Co',
-              body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+              title: 'The Liminal Terminal',
+              body: 'Read the tape. Four consultants, one verdict — the market confesses to those who listen.',
               accent: 'hsl(189, 84%, 55%)',
               shadow: 'hsl(189, 70%, 38%)',
             },
@@ -3145,17 +3151,21 @@ export default function HomePage() {
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#2ad6ee"
+                stroke="#39ff14"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ width: 24, height: 24, display: 'block' }}
+                style={{
+                  width: 24,
+                  height: 24,
+                  display: 'block',
+                  filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))',
+                }}
                 aria-hidden="true"
               >
-                <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
-                <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
-                <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
-                <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+                <rect width="20" height="14" x="2" y="3" rx="2" />
+                <line x1="8" x2="16" y1="21" y2="21" />
+                <line x1="12" x2="12" y1="17" y2="21" />
               </svg>
             ),
           },
@@ -3199,7 +3209,26 @@ export default function HomePage() {
             }}
           >
             {[
-
+              {
+                path: "/hailmary",
+                label: "Hail Mary",
+                /* Amber/gold — matches the dock's Ask RL80 glyph. */
+                stroke: "#f4b53f",
+                confirm: {
+                  title: "Hail Mary Prospecting Co",
+                  body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
+                },
+                icon: (
+                  <>
+                    <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+                    <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
+                    <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
+                    <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+                  </>
+                ),
+              },
               {
                 path: "/fountain",
                 label: "Coin Fountain",
@@ -3492,6 +3521,8 @@ export default function HomePage() {
           />
         </a>
       </div>
+
+      <RibbonCarousel />
     </main>
   );
 }

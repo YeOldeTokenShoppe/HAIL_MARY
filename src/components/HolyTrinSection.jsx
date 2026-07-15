@@ -67,7 +67,8 @@ export default function HolyTrinSection() {
       className={`holy-trin${inView ? " is-revealed" : ""}`}
       aria-label="The Holy Trin80"
     >
-      <div className="holy-trin-text">
+      <div className="holy-trin-text" >
+        <div style={{ marginBottom: "3rem" }}>
         <DropInTitle
           lines={["The Holy", "Trin80 of", "Digital Assets"]}
       colors={["#00ff00", "#f4e4c1", "#ffd700"]}
@@ -76,6 +77,7 @@ export default function HolyTrinSection() {
           triggerAnimation={inView}
           instanceId="holy-trin-heading"
         />
+        </div>
         {/* <p className="holy-trin-subtitle">
           {PILLARS.map((p, i) => (
             <React.Fragment key={p.id}>

@@ -1,13 +1,19 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useRef } from 'react'
 import { useLanguage } from '../LanguageProvider'
+import DropInTitle from '../DropInTitle'
+import { useInView } from "framer-motion";
 
 const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
   const n = images.length || 8
   const [isPaused, setIsPaused] = useState(false)
   const { t } = useLanguage()
-  
+    const ref = useRef(null);
+    const inView = useInView(ref, {
+      amount: 0.01,
+      margin: "200px 0px",
+    });
   const captions = useMemo(() => {
     // Try to get captions from translations, fallback to hardcoded if not available
     const translatedCaptions = []
@@ -255,6 +261,19 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           font-weight: 400;
         }
       `}} />
+      <div style={{ marginBottom: "3rem" }}>
+       <DropInTitle
+                lines={["Souvenirs", "From the", "Singular80"]}
+            colors={["#00ff00", "#f4e4c1", "#ffd700"]}
+                fontSize={{ mobile: "3rem", desktop: "3.4rem" }}
+                isMobile={typeof window !== "undefined" && window.innerWidth <= 900}
+                triggerAnimation={inView}
+                instanceId="holy-trin-heading"
+              />
+              </div>
+                       <p className="mobile-gallery-description">
+            {t('carousel.subtitle') || 'A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.'}
+          </p>
       
       <div className="polaroid-container">
         <div className={`pause-indicator ${isPaused ? 'visible' : ''}`}>
@@ -280,13 +299,9 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         </div>
         
         <div className="mobile-gallery-info">
-          <h2 className="mobile-gallery-heading">{t('carousel.title') || 'Iconography'}</h2>
-          <p className="mobile-gallery-description">
-            {t('carousel.subtitle') || 'A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.'}
-          </p>
-          <p className="mobile-gallery-description" style={{ marginTop: '10px' }}>
-            Or read the Techno-Mythic Whitepaper <a href="/philosophy" style={{ color: '#ffd700', textDecoration: 'underline' }}>here ↗</a>
-          </p>
+          {/* <h2 className="mobile-gallery-heading">{t('carousel.title') || 'Iconography'}</h2> */}
+ 
+
         </div>
       </div>
     </>

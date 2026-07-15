@@ -914,7 +914,7 @@ export default function MainPage() {
           the portfolio that used to live in the panel. Destination taps run
           through the shared cyberpunk confirm modal (glitch + sounds); Buy
           opens BuyModal directly and the center FAB opens the Confessional.
-          Slots L→R: $ BUY | TERMINAL | SPEAK (center) | HAIL MARY | MORE.
+          Slots L→R: $ BUY | CANDELARIUM | SPEAK (center) | TERMINAL | MORE.
           Hidden on phones while the Confessional is open so the conversation
           reclaims the ~88px the dock (and the drawer's clearance offset) ate —
           the keyboard was leaving only a sliver for the chat. Close via the
@@ -960,7 +960,7 @@ export default function MainPage() {
             </svg>
           )
         }
-        /* Far-right — MORE popover (Market Rally Race + back to Shrine). */
+        /* Far-right — MORE popover (Hail Mary, Coin Fountain, Ex Libris). */
         onMenuClick={() => setShowMoreMenu((v) => !v)}
         menuLabel="MORE"
         menuIcon={
@@ -989,22 +989,23 @@ export default function MainPage() {
         ]}
         extraRight={[
           {
-            key: "lode",
-            label: "Hail Mary",
-            title: "Hail Mary Prospecting Co",
-            onClick: () => { window.location.href = "/hailmary?mode=test"; },
+            key: "terminal",
+            /* Label stays short — the dock's slot labels ellipsize past
+               ~88px. The full name lands in the confirm's title. */
+            label: "Terminal",
+            title: "The Liminal Terminal",
+            onClick: () => { window.location.href = "/trade"; },
             confirm: {
-              title: "Hail Mary Prospecting Co",
-              body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+              title: "The Liminal Terminal",
+              body: "Read the tape. Four consultants, one verdict — the market confesses to those who listen.",
               accent: "hsl(189, 84%, 55%)",
               shadow: "hsl(189, 70%, 38%)",
             },
             icon: (
-              <svg viewBox="0 0 24 24" fill="none" stroke="#f1d77a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(241, 215, 122, 0.6))" }} aria-hidden="true">
-                <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
-                <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
-                <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
-                <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="#39ff14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: "block", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.6))" }} aria-hidden="true">
+                <rect width="20" height="14" x="2" y="3" rx="2" />
+                <line x1="8" x2="16" y1="21" y2="21" />
+                <line x1="12" x2="12" y1="17" y2="21" />
               </svg>
             ),
           },
@@ -1013,7 +1014,8 @@ export default function MainPage() {
       )}
 
       {/* MORE popover — anchored above the far-right dock slot. Holds
-          secondary destinations (Coin Fountain, Ex Libris), confirm-gated. */}
+          secondary destinations (Hail Mary, Coin Fountain, Ex Libris),
+          confirm-gated. */}
       {showMoreMenu && (
         <>
           <div
@@ -1042,6 +1044,26 @@ export default function MainPage() {
             }}
           >
             {[
+              {
+                label: "Hail Mary",
+                /* Amber/gold — matches the Hail Mary entry on the root dock. */
+                stroke: "#f4b53f",
+                onSelect: () => moreConfirm({
+                  title: "Hail Mary Prospecting Co",
+                  body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+                  accent: "hsl(189, 84%, 55%)",
+                  shadow: "hsl(189, 70%, 38%)",
+                  onProceed: () => { window.location.href = "/hailmary?mode=test"; },
+                }),
+                icon: (
+                  <>
+                    <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+                    <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
+                    <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
+                    <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
+                  </>
+                ),
+              },
               {
                 label: "Coin Fountain",
                 stroke: "#2ad6ee",
