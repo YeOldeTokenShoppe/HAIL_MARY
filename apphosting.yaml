@@ -138,3 +138,17 @@ env:
       - RUNTIME
   - variable: OIL_PURCHASE_TREASURY
     secret: OIL_PURCHASE_TREASURY
+  # Eugene (the /trade unicorn) speaks via ElevenLabs (api/trade/unicorn-voice).
+  # API key is a Secret Manager secret; voice id + model are non-sensitive.
+  - variable: ELEVENLABS_API_KEY
+    secret: ELEVENLABS_API_KEY
+    availability:
+      - RUNTIME
+  - variable: ELEVENLABS_VOICE_ID
+    value: D11AWvkESE7DJwqIVi7L
+    availability:
+      - RUNTIME
+  - variable: ELEVENLABS_MODEL
+    value: eleven_multilingual_v2
+    availability:
+      - RUNTIME

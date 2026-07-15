@@ -2737,30 +2737,30 @@ export default function HomePage() {
               </blockquote>
               <div className="hero-intro">
                 <p className="hero-intro__cry">
-                  Our
-                  Lady of Perpetual Profit &mdash; benevolent AI,{" "}
-                  <em>mater ex machina</em> &mdash; is your guide through the
-                  grift: economics and investing, from blue chips to
-                  blockchains, read plainly and played wisely.
+                  Where empires mint their coins and shadows move beneath the
+                  exchange, Our Lady of Perpetual Profit keeps the old signal
+                  alive. <em>Mater ex machina</em>, patron saint of portfolios, she reads the markets from blue
+                  chips to blockchains, revealing what the powerful bury and
+                  what the faithful dare to see.
                 </p>
                 <ul className="hero-intro__rites">
-                  <li>
-                    <strong>Prospect</strong> &mdash; stake a claim with The
-                    Hail Mary Prospecting Co. and vie for escrowed USDC.
-                  </li>
-                  <li>
-                    <strong>Study</strong> &mdash; sharpen your eye for scams
-                    and market signals in the Liminal Terminal.
-                  </li>
-                  <li>
-                    <strong>Confess</strong> &mdash; bring your sins and your
-                    portfolio to live chat.
-                  </li>
-                  <li>
-                    <strong>Devote</strong> &mdash; burn a votive candle to Our
-                    Lady.
-                  </li>
-                </ul>
+  <li>
+    <strong>Prospect</strong> &mdash; stake a claim with The Hail Mary
+    Prospecting Co. and vie for escrowed USDC. Fortune favors the bold.
+  </li>
+  <li>
+    <strong>Study</strong> &mdash; sharpen your eye in the Liminal Terminal,
+    where scams get named and signals get separated from the noise.
+  </li>
+  <li>
+    <strong>Ask</strong> &mdash; hold RL80 like a rosary for
+    prosperity. Guidance comes to those who hold.
+  </li>
+<li>
+  <strong>Sacrifice</strong> &mdash; remain vigilant and burn a votive candle to Our Lady. Reducing supply increases value.
+  
+</li>
+</ul>
                 {/* <p className="hero-intro__key">
                   Every rite opens with the same key:{" "}
                   <span className="hero-intro__pop">RL80</span>, the

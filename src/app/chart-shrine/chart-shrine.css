@@ -940,10 +940,20 @@ body:has(.shrine-page.neon) {
    body copy so it lands as a headline, not a paragraph. */
 .shrine-page.neon .hero-intro__cry {
   margin: 0;
-  font-size: clamp(1.05rem, 2.4vw, 1.28rem);
-  line-height: 1.4;
+  font-size: clamp(0.92rem, 1.85vw, 1.08rem);
+  line-height: 1.24;
   color: #f4e3b6;
   text-wrap: balance;
+}
+
+.shrine-page.neon .hero-intro__cry em {
+  font-family: "Blackletter", "UnifrakturMaguntia", "UnifrakturCook", serif;
+  font-style: normal;
+  letter-spacing: 0.025em;
+  color: #ffd86a;
+  text-shadow:
+    0 0 8px rgba(255, 216, 106, 0.32),
+    0 0 18px rgba(42, 214, 238, 0.16);
 }
 
 /* The dek — states the territory plainly. Dimmer and slightly smaller so it
