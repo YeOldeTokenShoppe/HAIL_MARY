@@ -363,13 +363,21 @@ function makeDrapeBumpTexture() {
 
 // Find SitePal's render canvas: older player creates 2+ (animated one last),
 // current player renders a single canvas — accept a lone one after a grace period.
-function waitForSitePalCanvas(timeout = 30000) {
+// containerId selects WHICH embed to mirror — pages that mount more than one
+// portal (see /main) give each its own container; the default is the single
+// hidden embed every other page uses.
+function waitForSitePalCanvas(timeout = 30000, containerId = "sitepal-container") {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     let firstCanvasAt = 0;
     const check = () => {
-      const container = document.getElementById("sitepal-container");
-      const canvases = container ? container.querySelectorAll("canvas") : [];
+      const container = document.getElementById(containerId);
+      // A container may hold the embed directly (single-portal pages) or an
+      // iframe carrying one isolated character (/main's multi-character
+      // triptych). The frame is same-origin, so its canvas reads normally.
+      const frame = container?.querySelector("iframe");
+      const scope = frame ? frame.contentDocument : container;
+      const canvases = scope ? scope.querySelectorAll("canvas") : [];
       if (canvases.length >= 2) return resolve(canvases[canvases.length - 1]);
       if (canvases.length === 1) {
         if (!firstCanvasAt) firstCanvasAt = Date.now();
@@ -758,7 +766,23 @@ function FramedPortraitModel({ url }) {
       frame's oval slot each frame. No 3D bust, no face projection: the
       comparison version. The page's single portal must have this character's
       scene loaded (page-level loadSceneByID swap). ── */
-function SitePalLivePortrait({ visible = true }) {
+// Halftone = "not yet awake". A dormant character reads as a printed
+// devotional card — desaturated, high-contrast, screened with a dot grid —
+// and drops the treatment the moment they speak, so waking up is visible
+// rather than merely audible. Cosmetic only: the player underneath is live
+// either way, so there's no load pause on the transition.
+// Dimmed reads as "not their turn" far better than heavy contrast does; the
+// dot screen is a whisper on top, not the whole effect. (Cranked too hard it
+// turns the face into noise — especially over the summoning swirl, which is
+// what's underneath before a portal reports ready.)
+const HALFTONE_FILTER = "grayscale(1) contrast(1.05) brightness(0.62)";
+
+function SitePalLivePortrait({
+  visible = true,
+  sourceContainerId = "sitepal-container",
+  stillSrc = "/images/mary.png",
+  halftone = false,
+}) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -770,8 +794,8 @@ function SitePalLivePortrait({ visible = true }) {
     // scene-swap gap after switching characters)
     const stillImg = new Image();
     stillImg.onload = () => { still = stillImg; };
-    stillImg.src = "/images/mary.png";
-    waitForSitePalCanvas()
+    stillImg.src = stillSrc;
+    waitForSitePalCanvas(30000, sourceContainerId)
       .then((el) => { if (!cancelled) src = el; })
       .catch(() => {});
 
@@ -824,27 +848,53 @@ function SitePalLivePortrait({ visible = true }) {
     };
   }, []);
 
+  // Shared box for the portrait and its halftone screen, so the dots sit
+  // exactly over the face.
+  const box = {
+    position: "absolute",
+    left: "23%",
+    top: "22.5%",
+    width: "54%",
+    height: "56%",
+    borderRadius: "50%",
+  };
+
   return (
-    <canvas
-      ref={canvasRef}
-      width={512}
-      height={600}
-      style={{
-        position: "absolute",
-        left: "23%",
-        top: "22.5%",
-        width: "54%",
-        height: "56%",
-        borderRadius: "50%",
-        objectFit: "cover",
-        zIndex: 1,
-        // Held with the frame canvas (same reveal signal) — the swirl that
-        // veils her lives in that canvas, so showing the portrait earlier
-        // means a beat of frameless, unveiled face.
-        opacity: visible ? 1 : 0,
-        transition: "opacity 0.35s ease",
-      }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        width={512}
+        height={600}
+        style={{
+          ...box,
+          objectFit: "cover",
+          zIndex: 1,
+          // Held with the frame canvas (same reveal signal) — the swirl that
+          // veils her lives in that canvas, so showing the portrait earlier
+          // means a beat of frameless, unveiled face.
+          opacity: visible ? 1 : 0,
+          // NOTE: the grey/dim filter lives on the CharacterSelect root so the
+          // neon frame greys with the face — applying it here too would dim the
+          // portrait twice as hard as its own frame.
+          transition: "opacity 0.35s ease",
+        }}
+      />
+      {/* Dot screen — the printed look. Fades out as the character wakes. */}
+      <div
+        aria-hidden="true"
+        style={{
+          ...box,
+          zIndex: 2,
+          pointerEvents: "none",
+          opacity: halftone && visible ? 0.55 : 0,
+          transition: "opacity 0.5s ease",
+          backgroundImage:
+            "radial-gradient(circle at center, rgba(0,0,0,0.42) 0.5px, transparent 0.9px)",
+          backgroundSize: "2.5px 2.5px",
+          mixBlendMode: "multiply",
+        }}
+      />
+    </>
   );
 }
 
@@ -921,6 +971,17 @@ export default function CharacterSelect({
   pageLoading = false,
   greeting = "",
   onReady, // fires once the frame canvas has PRESENTED frames with the GLB mounted
+  // Which SitePal embed this portrait mirrors. Pages with a single hidden
+  // embed leave this alone; /main mounts one portal per panel and points
+  // each panel at its own container.
+  sourceContainerId = "sitepal-container",
+  // Dormant treatment — see SitePalLivePortrait. /main halftones the advisers
+  // until it's their turn to argue.
+  halftone = false,
+  // False when this panel shows a STILL rather than mirroring a live player,
+  // which skips the summoning swirl (there is nothing to summon). Every
+  // single-embed page leaves this true and is unaffected.
+  hasLiveSource = true,
 }) {
   const [index, setIndex] = useState(activeIndex);
   // True once the 3D canvas has PRESENTED real frames (FirstFramesSignal).
@@ -964,14 +1025,24 @@ export default function CharacterSelect({
   // speech and re-prime the audio pipeline with saySilent first, or SitePal can
   // throw "setAudioElementMode of null" (cutting off after a syllable) when the
   // player is still settling from a scene swap.
+  // Which window owns this panel's SitePal player. When the panel mirrors an
+  // iframe portal (/main), that frame has its OWN player and its own sayText,
+  // so speech is aimed by calling INTO the frame — no selectPortal, nothing to
+  // disambiguate. Single-embed pages fall through to the page itself.
+  const portalWindow = () => {
+    const frame = document.getElementById(sourceContainerId)?.querySelector("iframe");
+    return frame?.contentWindow || window;
+  };
+
   const speakPortrait = () => {
-    if (!greeting || typeof window.sayText !== "function") return;
+    const w = portalWindow();
+    if (!greeting || typeof w.sayText !== "function") return;
     try {
-      window.stopSpeech?.();
-      window.saySilent?.(0);
-      window.setPlayerVolume?.(7);
+      w.stopSpeech?.();
+      w.saySilent?.(0);
+      w.setPlayerVolume?.(7);
       const voice = current.voice || ORACLE_VOICE;
-      window.sayText(greeting, voice.id, voice.lang, voice.engine);
+      w.sayText(greeting, voice.id, voice.lang, voice.engine);
     } catch (e) {
       console.warn("[CharacterSelect] speakPortrait failed:", e);
     }
@@ -990,7 +1061,18 @@ export default function CharacterSelect({
   };
 
   return (
-    <div style={{ fontFamily: "'Cyber', 'Geo', sans-serif" }}>
+    <div
+      style={{
+        fontFamily: "'Cyber', 'Geo', sans-serif",
+        // Dormant = the WHOLE widget greys, neon frame included. Filtering here
+        // rather than on the portrait alone is the point: the frame lives in the
+        // R3F canvas, so a portrait-only filter left a full-colour neon ring
+        // around a grey face. Everything inside — frame, face, name — dims as
+        // one object and comes back together when the character speaks.
+        filter: halftone ? HALFTONE_FILTER : "none",
+        transition: "filter 0.5s ease",
+      }}
+    >
       {/* Frame + portrait area */}
       <div
         style={{
@@ -1025,11 +1107,16 @@ export default function CharacterSelect({
           <pointLight position={[0, 2, 3]} intensity={1} color="#ffd36b" />
           {/* All characters share the neon frame; each brings its own hue */}
           <NeonFrame hue={current.frameHue} onLoaded={() => setFrameLoaded(true)} />
-          {/* Magic-mirror summoning veil for EVERY character — the key forces
-              a remount on switch, so each arrival re-plays the summoning.
-              (For cameo characters the canvas sits above their portrait img,
-              so the fluid veils them just the same.) */}
-          <MirrorSwirl key={index} hue={current.frameHue} active={!pageLoading} />
+          {/* Magic-mirror summoning veil — the key forces a remount on switch,
+              so each arrival re-plays the summoning.
+              Only for a character who is actually BEING SUMMONED. The swirl
+              exists to cover the wait while a live SitePal face loads; a panel
+              showing a still (a dormant /main adviser, mirroring no portal)
+              has nothing to wait for, so veiling it just hides the portrait for
+              no reason. */}
+          {hasLiveSource && (
+            <MirrorSwirl key={index} hue={current.frameHue} active={!pageLoading} />
+          )}
           {current.portraitModel && (
             <>
               <StudioEnvironment />
@@ -1058,7 +1145,13 @@ export default function CharacterSelect({
             portrait (rendered in the canvas above), or static cameo image.
             Speaking characters get the click-to-speak overlay. */}
         {current.sitePalScene && (
-          <SitePalLivePortrait key={`live-${index}`} visible={canvasPainted && frameLoaded} />
+          <SitePalLivePortrait
+            key={`live-${index}-${sourceContainerId}`}
+            visible={canvasPainted && frameLoaded}
+            sourceContainerId={sourceContainerId}
+            stillSrc={current.image || "/images/mary.png"}
+            halftone={halftone}
+          />
         )}
         {current.portraitModel || current.sitePalScene ? (
           <div

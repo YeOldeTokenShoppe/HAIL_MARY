@@ -2742,17 +2742,17 @@ export default function HomePage() {
                 ) : null}
               </blockquote>
               <div className="hero-intro">
-                <p className="hero-intro__cry">
+                <p className="hero-intro__cry" style={{ textAlign: "center" }}>
                   Where empires mint their coins and shadows move beneath the
                   exchange, Our Lady of Perpetual Profit keeps the old signal
                   alive. <em>Mater ex machina</em>, patron saint of portfolios,
                   she reads the markets from blue chips to blockchains,
-                  revealing what the powerful bury and what the faithful dare to
+                  revealing what the powerful bury and what the patient learn to
                   see.
                 </p>
                 <ul className="hero-intro__rites">
                   <li>
-                    <strong>Seek</strong> &mdash; stake a claim with The
+                    <strong>Prospect</strong> &mdash; stake a claim with The
                     Hail Mary Prospecting Co. and vie for escrowed USDC.
                   </li>
                   <li>
@@ -2761,7 +2761,7 @@ export default function HomePage() {
                     separated from the noise.
                   </li>
                   <li>
-                    <strong>Get Guidance</strong> &mdash; burn a votive candle to Our Lady. In return, she'll light the way.
+                    <strong>Sacrifice</strong> &mdash; burn a votive candle to Our Lady, and perhaps a few tokens - scarcity creates value for all holders.
                   </li>
                 </ul>
                 {/* <p className="hero-intro__key">

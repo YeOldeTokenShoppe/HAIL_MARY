@@ -30,7 +30,7 @@ import "./Confessional.css";
  *                     line (e.g. "Háblale a Nuestra Señora...") to keep the
  *                     invitation in her tongue.
  */
-export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null, docked = false, presetInput = "", placeholder = "Speak to Our Lady..." }) {
+export default function Confessional({ isOpen, onToggle, characterName = "Our Lady", initialMessage = "", onSendMessage, hideLauncher = false, bottomOffset = null, docked = false, presetInput = "", placeholder = "Speak to Our Lady...", align = "left" }) {
   const [messages, setMessages] = useState([]);
   const [inputVal, setInputVal] = useState("");
   const [pending, setPending] = useState(false);
@@ -248,6 +248,15 @@ export default function Confessional({ isOpen, onToggle, characterName = "Our La
       style={{
         ...(!docked && bottomOffset != null
           ? { bottom: `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px))` }
+          : {}),
+        // align="center" pulls the drawer off the CSS left:1rem anchor — /main
+        // needs that corner for an adviser's argument, and the drawer belongs
+        // under the character whose reply it carries. Centred with auto margins
+        // rather than translateX(-50%): the slide-up/down keyframes animate
+        // `transform`, and would clobber it mid-animation. Skipped when docked
+        // or when the mobile visual-viewport box below takes over.
+        ...(align === "center" && !docked && !vvBox
+          ? { left: 0, right: 0, marginLeft: "auto", marginRight: "auto" }
           : {}),
         // Horizontal box pinned to the visual viewport on mobile (see vvBox
         // effect) so the keyboard show/dismiss can't leave the drawer wider

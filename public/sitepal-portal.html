@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>SitePal portal</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #af9682; overflow: hidden; }
+    #stage { width: 600px; height: 800px; }
+  </style>
+</head>
+<body>
+<!--
+  ONE SitePal character, alone in its own document.
+
+  WHY THIS FILE EXISTS: every SitePal embed in a document fights over the same
+  globals and the same `_html5Player` DOM id, and AC_VHost_Embed remembers a
+  single container after its first init. Mounting several portals in one React
+  tree therefore collapses them ALL into the first container — proven
+  2026-07-15 (distinct refs returned, selectPortal present, yet only one player
+  and one canvas ever existed). An iframe per character sidesteps that at the
+  root: separate document, separate globals, its own uniquely-named player div.
+
+  EMBED TIMING IS LOAD-BEARING. AC_VHost_Embed branches on document.readyState:
+  while the parser is open it uses document.write; once loaded it appends to the
+  DOM. Embedding at PARSE time here is fatal — the write lands after the parser
+  closes, so it implicitly document.open()s and WIPES this document (every
+  <script> vanishes, readyState sticks on "loading" forever, no player). So we
+  wait for window load and embed into #stage, which is exactly the append path
+  the rest of the app already relies on.
+
+  The parent drives a character by reaching into its frame (same-origin):
+    frame.contentWindow.sayText(text, voiceId, lang, engine)
+  No selectPortal needed — one player per document, nothing to disambiguate.
+
+  Query params: ?acc=<account>&scene=<sceneId>&embed=<embedToken>
+-->
+<div id="stage"></div>
+
+<script type="text/javascript">
+  var Q = new URLSearchParams(window.location.search);
+  var ACC = parseInt(Q.get("acc") || "9308752", 10);
+  var SCENE = parseInt(Q.get("scene"), 10);
+  var EMBED = Q.get("embed") || "";
+
+  // Force preserveDrawingBuffer so the parent can drawImage() this canvas every
+  // frame — without it the buffer is cleared after compositing and reads blank.
+  var _origGetContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+    if (type === "webgl" || type === "webgl2" || type === "experimental-webgl") {
+      attrs = Object.assign({}, attrs, { preserveDrawingBuffer: true });
+    }
+    return _origGetContext.call(this, type, attrs);
+  };
+
+  window.__portalReady = false;
+  window.__portalError = null;
+
+  function tell(type, extra) {
+    try {
+      window.parent.postMessage(
+        Object.assign({ type: type, scene: SCENE }, extra || {}),
+        window.location.origin
+      );
+    } catch (e) {}
+  }
+
+  // Which scene this frame is CURRENTLY showing. On phones one frame is
+  // spotlighted and loadSceneByID-swapped between characters (three live
+  // players OOM-crash iOS), so the parent must know who is in the frame right
+  // now — not just which scene it booted with.
+  window.__portalScene = SCENE;
+
+  window.vh_sceneLoaded = function (index, portal, errCode, errMsg) {
+    window.__portalReady = true;
+    if (errCode) window.__portalError = errCode + ": " + errMsg;
+    // Stay silent until the parent explicitly asks this character to speak.
+    try { window.setPlayerVolume(0); } catch (e) {}
+    // setStatus(interruptMode, progressInterval, gazeSpeed, displayControls, enableLog)
+    // gazeSpeed 1 = medium: she turns toward whoever is whispering at a pace
+    // that reads as attention rather than a snap (0=slow is too sluggish to
+    // land inside a single adviser's turn, 2=fast reads as a flinch).
+    // displayControls 0 hides SitePal's on-scene play overlay.
+    try { window.setStatus(1, 0, 1, 0, 0); } catch (e) {}
+    // Fires on the FIRST load AND on every loadSceneByID swap — the parent
+    // awaits this before handing the new character a line.
+    tell("sitepal-portal-ready", { errCode: errCode, scene: window.__portalScene });
+  };
+
+  // Talk events let the parent run a conversation: speak, await the end, hand
+  // off to the next character. Each frame reports only its OWN character.
+  window.vh_talkStarted = function () { tell("sitepal-portal-talk-started"); };
+  window.vh_talkEnded = function () { tell("sitepal-portal-talk-ended"); };
+
+  function embedNow() {
+    if (typeof window.AC_VHost_Embed !== "function") return;
+    // (accountID, height, width, bgcolor, firstscene, controls, sceneId, sl,
+    //  load, context, embedId, version, responsive) — same shape /main uses.
+    window.__portal = window.AC_VHost_Embed(
+      ACC, 600, 800, "", 1, 0, SCENE, 0, 1, 0, EMBED, 0, 1
+    );
+  }
+
+  // Load the embed functions, then embed only once the document is fully
+  // loaded (see the timing note above).
+  var s = document.createElement("script");
+  s.type = "text/javascript";
+  s.src = "//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=9308752&js=0";
+  s.onload = function () {
+    if (document.readyState === "complete") embedNow();
+    else window.addEventListener("load", embedNow);
+  };
+  document.head.appendChild(s);
+</script>
+</body>
+</html>
