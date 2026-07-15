@@ -305,6 +305,14 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
                 top: 50%;
                 margin-top: 0;
                 margin-bottom: 0;
+                /* manipulation rather than the container's pan-x, for two
+                   reasons: it takes iOS's double-tap-to-zoom off the stack so
+                   the second tap reaches the close-up handler instead of the
+                   browser, and unlike pan-x it still lets a vertical swipe
+                   scroll the page — this gallery sits in a scrolling document
+                   here, not in /about's full-page takeover where pan-x was
+                   chosen. Scoped to this section so /about keeps pan-x. */
+                touch-action: manipulation;
               }
 
               /* Still fixed, and now empty since DropInTitle replaced the h2 —
@@ -324,7 +332,20 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
             `,
           }}
         />
-        <MobilePolaroidGallerySimple images={IMAGES} is80sMode={is80sMode} />
+        <MobilePolaroidGallerySimple
+          images={IMAGES}
+          is80sMode={is80sMode}
+          onSelect={setSelected}
+        />
+
+        {selected !== null && (
+          <Lightbox
+            index={selected}
+            captions={captions}
+            onClose={closeLightbox}
+            onStep={stepLightbox}
+          />
+        )}
       </section>
     )
   }
@@ -788,6 +809,21 @@ function Lightbox({ index, captions, onClose, onStep }) {
         .rc-lightbox__nav:hover { transform: translateY(-50%) scale(1.08); }
         .rc-lightbox__nav--prev { left: max(16px, 4vw); }
         .rc-lightbox__nav--next { right: max(16px, 4vw); }
+
+        /* Phones: at 86vw the photo runs under arrows pinned to the side
+           margins, so they drop to a row beneath it and the frame gives back
+           enough height for them to sit in. */
+        @media (max-width: 768px) {
+          .rc-lightbox__polaroid { width: min(84vw, 420px, 52vh); }
+          .rc-lightbox__nav {
+            top: auto;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            transform: none;
+          }
+          .rc-lightbox__nav:hover { transform: none; }
+          .rc-lightbox__nav--prev { left: calc(50% - 74px); }
+          .rc-lightbox__nav--next { right: calc(50% - 74px); }
+        }
 
         @keyframes rc-lb-fade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes rc-lb-in {

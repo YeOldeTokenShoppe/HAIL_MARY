@@ -2761,7 +2761,7 @@ export default function HomePage() {
                     separated from the noise.
                   </li>
                   <li>
-                    <strong>Get Guidance</strong> &mdash; burn a votive candle to Our Lady. In return, she will light the way.
+                    <strong>Get Guidance</strong> &mdash; burn a votive candle to Our Lady. In return, she'll light the way.
                   </li>
                 </ul>
                 {/* <p className="hero-intro__key">
@@ -3107,7 +3107,7 @@ export default function HomePage() {
             onClick: () => { router.push('/main'); },
             confirm: {
               title: 'Ask RL80',
-              body: "Approach Our Lady. Speak your question aloud — she answers those who seek in earnest.",
+              body: "Approach Our Lady. Speak from the heart — she answers those who seek in earnest.",
               accent: 'hsl(189, 84%, 55%)',
               shadow: 'hsl(189, 70%, 38%)',
             },

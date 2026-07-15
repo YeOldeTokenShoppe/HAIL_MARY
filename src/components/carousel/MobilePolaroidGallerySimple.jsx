@@ -5,10 +5,46 @@ import { useLanguage } from '../LanguageProvider'
 import DropInTitle from '../DropInTitle'
 import { useInView } from "framer-motion";
 
-const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
+// How long after a tap a second one still counts as a double tap.
+const DOUBLE_TAP_MS = 300
+
+// `onSelect` is optional and opt-in: /about's Carousel.js mounts this without
+// it and keeps the plain tap-to-pause gallery it has always had. Only the root
+// page passes one, which is what turns a double tap into a close-up.
+const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false, onSelect }) => {
   const n = images.length || 8
   const [isPaused, setIsPaused] = useState(false)
+  const lastTapRef = useRef({ time: 0, index: -1 })
   const { t } = useLanguage()
+
+  // Both taps of a double tap still run the pause toggle, so the two cancel out
+  // and the gallery is left exactly as it was found. That's deliberate: the
+  // alternative — holding the toggle back for DOUBLE_TAP_MS to see whether a
+  // second tap is coming — would put a visible 300ms stall on every single tap,
+  // which is the gesture people actually use.
+  const handleTap = (e) => {
+    setIsPaused((p) => !p)
+    if (!onSelect) return
+
+    // The frame under the finger IS the event target: the browser hit-tests
+    // through the z-order the shuffle animation assigns, so the topmost card
+    // falls out of the event for free. Deriving it from elapsed animation time
+    // would mean re-deriving the whole keyframe schedule in JS.
+    const frame = e.target.closest?.('.polaroid-frame')
+    const index = frame ? Number(frame.dataset.index) : -1
+    if (index < 0) return
+
+    const prev = lastTapRef.current
+    // Same card, not just a second tap anywhere: if the stack shuffled between
+    // the two, opening whatever landed under the finger would be a surprise.
+    // (In practice the first tap's pause freezes it, so it rarely can.)
+    if (e.timeStamp - prev.time < DOUBLE_TAP_MS && prev.index === index) {
+      lastTapRef.current = { time: 0, index: -1 }
+      onSelect(index)
+      return
+    }
+    lastTapRef.current = { time: e.timeStamp, index }
+  }
     const ref = useRef(null);
     const inView = useInView(ref, {
       amount: 0.01,
@@ -279,12 +315,12 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         <div className={`pause-indicator ${isPaused ? 'visible' : ''}`}>
           {isPaused ? 'Paused - Tap to resume' : 'Shuffling...'}
         </div>
-        <div 
+        <div
           className={`polaroid-gallery ${isPaused ? 'paused' : ''}`}
-          onClick={() => setIsPaused(!isPaused)}
+          onClick={handleTap}
         >
           {images.slice(0, 8).map((img, i) => (
-            <div key={i} className="polaroid-frame">
+            <div key={i} className="polaroid-frame" data-index={i}>
               <img 
                 src={img.url || `/carousel_images/img${i + 1}.jpg`}
                 alt={`Polaroid ${i + 1}`}
