@@ -465,7 +465,7 @@ export default function FountainPage() {
           <Link
             href="/"
             id="text"
-            title="Return to the candelarium"
+            title="Sanctum candelarium"
             aria-label="Return to the candelarium"
             style={{
               position: "relative",

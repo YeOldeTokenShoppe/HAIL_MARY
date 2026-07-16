@@ -1857,11 +1857,11 @@ export default function MainPage() {
           {
             key: "candelarium",
             label: "Candelarium",
-            title: "Return to the candelarium",
+            title: "Sanctum candelarium",
             onClick: () => { window.location.href = "/"; },
             confirm: {
-              title: "Return to the Candelarium",
-              body: "Step back into Our Lady's candlelit hall — your vigil keeps burning.",
+              title: "Sanctum Candelarium",
+              body: "Return to the candelarium.",
               accent: "hsl(189, 84%, 55%)",
               shadow: "hsl(189, 70%, 38%)",
             },
@@ -1931,7 +1931,7 @@ export default function MainPage() {
                 stroke: "#f4b53f",
                 onSelect: () => moreConfirm({
                   title: "Hail Mary Prospecting Co",
-                  body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+                  body: "Find your fortune in the digital frontier. Our Lady's prospectors never rest.",
                   accent: "hsl(189, 84%, 55%)",
                   shadow: "hsl(189, 70%, 38%)",
                   onProceed: () => { window.location.href = "/hailmary?mode=test"; },

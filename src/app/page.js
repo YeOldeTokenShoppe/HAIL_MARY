@@ -3216,7 +3216,7 @@ export default function HomePage() {
                 stroke: "#f4b53f",
                 confirm: {
                   title: "Hail Mary Prospecting Co",
-                  body: "Strike gold in the digital frontier. Our Lady's miners never rest.",
+                  body: "Find your fortune in the digital frontier. Our Lady's prospectors never rest.",
                   accent: "hsl(189, 84%, 55%)",
                   shadow: "hsl(189, 70%, 38%)",
                 },

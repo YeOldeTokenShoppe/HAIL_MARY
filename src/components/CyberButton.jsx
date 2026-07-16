@@ -4,6 +4,21 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import "./CyberButton.css";
 
+// ── Confirm-modal SFX levels ── These fire on EVERY dock destination and every
+// portfolio button, so they sit under the page's music rather than over it.
+//
+// PER-SOUND, because the assets carry different headroom and one shared knob
+// can't serve both. proceed/cancel are local files attenuated in the asset
+// itself (mean ≈ -32 / -37 dBFS), so they play at full scale — pulling them down
+// in code on top of that only makes them vanish under the playlist. The slide is
+// still a freesound preview and is level-matched here instead.
+//
+// Trust the ASSET, not this table, when adding a sound: measure it
+// (`ffmpeg -i f.mp3 -af volumedetect -f null -`) rather than assuming a preview
+// is hot. Mean and peak disagree sharply on short SFX — cancel.mp3 has the
+// lowest mean of the three and the highest peak.
+const SFX_VOLUME = { slide: 0.2, accept: 1, reject: 1 };
+
 /* ── Small inline CyberBtn (reused for trigger + modal actions) ── */
 function CyberBtn({ label, shortcut, shortcutIcon, icon, onClick, className = "", autoFocus, ...rest }) {
   const letters = label.split("");
@@ -114,9 +129,12 @@ export default function CyberButton({
   if (typeof window !== "undefined" && !audioRef.current) {
     audioRef.current = {
       slide: new Audio("https://cdn.freesound.org/previews/367/367997_6512973-lq.mp3"),
-      accept: new Audio("https://cdn.freesound.org/previews/220/220166_4100837-lq.mp3"),
-      reject: new Audio("https://cdn.freesound.org/previews/657/657950_6142149-lq.mp3"),
+      accept: new Audio("/audio/proceed.mp3"),
+      reject: new Audio("/audio/cancel.mp3"),
     };
+    // Set on the elements, not per play() — volume persists on the element, and
+    // these are reused for the life of the component.
+    Object.entries(audioRef.current).forEach(([k, snd]) => { snd.volume = SFX_VOLUME[k]; });
   }
 
   const playSound = (name) => {
