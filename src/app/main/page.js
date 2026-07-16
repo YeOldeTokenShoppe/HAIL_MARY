@@ -146,7 +146,7 @@ const RL80_RAYS = 100;
 const STARTER_QUESTIONS = [
   "everyone's buying. am i late?",
   "i bought the top. again.",
-  "how much is too much?",
+  "is money evil?",
 ];
 
 // The one seat that gets a live player on phones. Our Lady holds it: she
@@ -1211,13 +1211,20 @@ export default function MainPage() {
         // off to deep indigo at the edges, so the advisers are silhouetted by
         // light and the neon frames have something to bloom against.
         //
-        // The magenta is the root page's signature colour — but THERE it isn't
-        // painted at all: that scene's background is flat #000 and the crimson
-        // is an illusion thrown by the holographic statue's chromatic ghosting.
-        // /main has no hologram, so the same glow is painted by hand. Layers are
-        // listed TOP-first: gold sits ON the magenta, which is why the aureole
-        // is tighter than it was — spread wide over magenta the two average out
-        // to orange instead of reading as gold on rose.
+        // The bloom is amethyst — the root page's magenta rotated blue-ward. The
+        // root never paints its crimson at all: that scene's background is flat
+        // #000 and the colour is an illusion thrown by the holographic statue's
+        // chromatic ghosting. /main has no hologram, so this glow is painted by
+        // hand and is free to pick its own hue.
+        //
+        // It must stay a VIOLET or a MAGENTA. Cyan was tried and reverted: cyan
+        // spreads its luminance across green and blue, so at the low alphas this
+        // field runs it desaturates to slate-grey over near-black and stops
+        // reading as light — where magenta carries on the red channel alone and
+        // stays saturated all the way down. Worse, the gold below is a near
+        // complement of cyan and the two averaged to olive around her frame.
+        // Layers are listed TOP-first: gold sits ON the bloom, which is why the
+        // aureole is tight — spread wide it averages with the field into mud.
         backgroundColor: "#0a0a0f",
         backgroundImage: [
           // (Structure lives in the perspective floor below — a flat lattice
@@ -1228,15 +1235,19 @@ export default function MainPage() {
           // This is what makes it a glow instead of a wash.
           "radial-gradient(125% 82% at 50% 40%, rgba(0,0,0,0) 38%, rgba(0,0,0,0.62) 100%)",
           // Her aureole — warm, centred on the portrait, not the viewport.
-          "radial-gradient(70% 46% at 50% 24%, rgba(244, 181, 63, 0.15) 0%, rgba(244, 181, 63, 0.04) 40%, rgba(0,0,0,0) 68%)",
-          // The holographic bloom — tighter and hotter than the field it
-          // replaced, so it burns behind her frame and is gone by the edges.
-          "radial-gradient(76% 46% at 50% 40%, rgba(255, 45, 117, 0.32) 0%, rgba(158, 20, 78, 0.10) 50%, rgba(0,0,0,0) 78%)",
-          // Cool counter-light at her feet so the magenta doesn't go uniformly
+          "radial-gradient(70% 46% at 50% 24%, rgba(244, 181, 63, 0.16) 0%, rgba(244, 181, 63, 0.04) 40%, rgba(0,0,0,0) 68%)",
+          // The holographic bloom — tight and hot, so it burns behind her frame
+          // and is gone by the edges. Violet is far enough off gold's complement
+          // that her neon frame reads as its own light against it rather than
+          // averaging into the field; that separation is the whole job here.
+          "radial-gradient(76% 46% at 50% 40%, rgba(150, 72, 255, 0.30) 0%, rgba(58, 20, 122, 0.12) 50%, rgba(0,0,0,0) 78%)",
+          // Cool counter-light at her feet so the violet doesn't go uniformly
           // hot, and the cyan chrome down there has something to sit against.
-          "radial-gradient(90% 60% at 50% 97%, rgba(42, 214, 238, 0.08) 0%, rgba(0,0,0,0) 70%)",
-          // The apse itself: violet shoulders down to near-black.
-          "linear-gradient(180deg, #150a20 0%, #0e0715 45%, #06060a 100%)",
+          "radial-gradient(90% 60% at 50% 97%, rgba(42, 214, 238, 0.07) 0%, rgba(0,0,0,0) 70%)",
+          // The apse itself: violet shoulders down to near-black. The darkness
+          // ramp is what gives the field depth — brightening it so the hue
+          // "reads" more would leave the vignette nothing to drive back to.
+          "linear-gradient(180deg, #160a26 0%, #0c0716 45%, #05060a 100%)",
         ].join(", "),
         height: "100vh",
         width: "100vw",
@@ -1346,7 +1357,17 @@ export default function MainPage() {
           top: 0,
           left: 0,
           right: 0,
-          bottom: 0,
+          // SOLO: end the scroll box ABOVE the ask bar, don't just pad it. The
+          // ask bar is position:fixed and out of flow, so paddingBottom only
+          // buys room at the very bottom of the SCROLL range — it can't hold a
+          // gap above the bar when content is short and pinned flex-start, so
+          // the transcript's last line rolled under the input (same failure the
+          // chips had). Ending the box here makes overflow clip exactly at the
+          // bar's top edge: nothing in the column can render beneath it, at any
+          // frame height or scroll position. TRIPTYCH keeps bottom:0 — its
+          // panels carry their own clearance and the ask bar floats over dead
+          // space between them.
+          bottom: isSolo ? BOTTOM_CLEARANCE : 0,
           zIndex: 100,
           display: "flex",
           // Phones get the triptych STACKED — three ornate frames side by side
@@ -1364,9 +1385,9 @@ export default function MainPage() {
           pointerEvents: isSolo ? "auto" : "none",
           WebkitOverflowScrolling: "touch",
           overscrollBehavior: "contain",
-          // Clearance for the dock AND the ask bar above it (see BOTTOM_CLEARANCE),
-          // which the panels no longer carry.
-          paddingBottom: isSolo ? BOTTOM_CLEARANCE : 0,
+          // Solo already reserves this space via `bottom` above, so no padding
+          // there (it would double the gap). Triptych keeps none.
+          paddingBottom: 0,
         }}
       >
         {isSolo ? (
@@ -1382,72 +1403,6 @@ export default function MainPage() {
             {/* ── Starter petitions ── Only before the first question; the
                 transcript takes this space afterwards, so the column has one
                 job in each state and never a hole. */}
-            {chatLog.length === 0 && (
-              <div
-                style={{
-                  width: "100%",
-                  maxWidth: 440,
-                  margin: "16px 0 0",
-                  padding: "0 14px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                  // Same lesson as the transcript: the column is a flex column,
-                  // and anything that can shrink, will.
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    textAlign: "center",
-                    fontFamily: "'Rajdhani', sans-serif",
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    color: "rgba(255,255,255,0.32)",
-                    marginBottom: 2,
-                  }}
-                >
-                  bring her something
-                </div>
-                {STARTER_QUESTIONS.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => {
-                      // THE TAP IS THE GESTURE. iOS only grants audio inside a
-                      // real one, and this is now the first one the page
-                      // reliably gets — without this the advisers' <audio> is
-                      // never unlocked and their lines are silent all session.
-                      unlockAdviserAudio();
-                      // Deliberately NOT unlockAndGreet: handleAsk stops every
-                      // player as it starts, so the greeting would be cut off
-                      // mid-word by the argument it was introducing. Mark her
-                      // as greeted — they've asked, the room is no longer cold.
-                      hasGreetedRef.current = true;
-                      handleAsk(q);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "9px 14px",
-                      borderRadius: 999,
-                      border: "1px solid rgba(42, 214, 238, 0.22)",
-                      background: "rgba(6, 10, 18, 0.55)",
-                      backdropFilter: "blur(8px)",
-                      WebkitBackdropFilter: "blur(8px)",
-                      color: "rgba(255,255,255,0.78)",
-                      fontFamily: "'Rajdhani', sans-serif",
-                      fontSize: "0.92rem",
-                      letterSpacing: "0.02em",
-                      textAlign: "left",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {/* ── The transcript ── The deliberation as a group text: name,
                 colon, message, in each voice's own colour. This is what the
                 advisers have INSTEAD of a voice on phones, and it doubles as
@@ -1680,6 +1635,84 @@ export default function MainPage() {
         </>
       )}
 
+      {/* ── Starter petitions ── Before the first question, on the solo layout.
+          PINNED above the ask bar, NOT flowed in the column: they began life as
+          the column's last flow items, but the ask bar is position:fixed and
+          lifted out of flow, so a tall frame pushed the chips down INTO the
+          bar's band and the column's paddingBottom couldn't stop it (padding
+          only makes scroll room at the very bottom, it can't hold a gap above a
+          floating element). Fixing them directly on top of the bar — the same
+          way the bar sits on the dock — means no frame height can ever reach
+          them. They vanish the moment there's a transcript. */}
+      {isSolo && chatLog.length === 0 && (
+        <div
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            // Sit exactly on top of the ask bar: dock + bar + gap.
+            bottom: BOTTOM_CLEARANCE,
+            marginLeft: "auto",
+            marginRight: "auto",
+            width: "min(440px, calc(100vw - 28px))",
+            zIndex: 600,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            pointerEvents: "auto",
+          }}
+        >
+          {/* <div
+            style={{
+              textAlign: "center",
+              fontFamily: "'Rajdhani', sans-serif",
+              fontSize: "0.7rem",
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.32)",
+              marginBottom: 2,
+            }}
+          >
+            bring her something
+          </div> */}
+          {STARTER_QUESTIONS.map((q) => (
+            <button
+              key={q}
+              onClick={() => {
+                // THE TAP IS THE GESTURE. iOS only grants audio inside a real
+                // one, and this is the first one the page reliably gets —
+                // without it the advisers' <audio> stays locked and their lines
+                // are silent all session.
+                unlockAdviserAudio();
+                // Deliberately NOT unlockAndGreet: handleAsk stops every player
+                // as it starts, so the greeting would be cut off mid-word by the
+                // argument it was introducing. Mark her as greeted — they've
+                // asked, the room is no longer cold.
+                hasGreetedRef.current = true;
+                handleAsk(q);
+              }}
+              style={{
+                width: "100%",
+                padding: "9px 14px",
+                borderRadius: 999,
+                border: "1px solid rgba(42, 214, 238, 0.22)",
+                background: "rgba(6, 10, 18, 0.72)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                color: "rgba(255,255,255,0.78)",
+                fontFamily: "'Rajdhani', sans-serif",
+                fontSize: "0.92rem",
+                letterSpacing: "0.02em",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── The ask ── Always present, pinned above the dock. This page exists
           to be asked a question, so the input is the page's main affordance
           rather than something hidden behind a FAB. Sits above the panel row
@@ -1729,7 +1762,7 @@ export default function MainPage() {
               ? "the council is deliberating…"
               : chatLog.length
               ? ""
-              : "Ask your investment question...…"
+              : "Inquire or confide...…"
           }
           disabled={busy}
           aria-label="Ask the council"
