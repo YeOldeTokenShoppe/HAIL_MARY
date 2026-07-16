@@ -28,7 +28,6 @@ import {
   COUNSEL_VOICES,
 } from "@/lib/counselSpeech";
 import useCyberConfirm from "@/components/useCyberConfirm";
-import DropInTitle from "@/components/DropInTitle";
 
 // ── /main ── THE INNER STRUGGLE, staged as a triptych.
 //
@@ -54,6 +53,23 @@ import DropInTitle from "@/components/DropInTitle";
 
 // Number of portrait panels when the viewport can carry the full row.
 const PANEL_COUNT = 3;
+
+// ── Bottom furniture ── Two fixed things stack at the foot of the page: the
+// dock, and the ask bar floating just above it. Anything that scrolls has to
+// clear BOTH, so the measurements live here rather than being retyped as magic
+// numbers — the bar's own offset and the clearance reserved for it MUST move
+// together or they drift apart silently.
+const SAFE_B = "env(safe-area-inset-bottom, 0px)";
+const DOCK_H = 96; // MobileBottomNav
+const ASK_BAR_H = 52; // 36px control + 7px padding ×2 + 1px border ×2
+const ASK_BAR_GAP = 12; // breathing room between the bar and the content above
+// The ask bar sits directly on top of the dock.
+const ASK_BAR_BOTTOM = `calc(${DOCK_H}px + ${SAFE_B})`;
+// Scrollable content must clear the dock AND the bar. Reserving only the dock
+// left the last ~52px of the column permanently behind the ask bar — which is
+// exactly where her apparition medallions land, so the roster sat half-hidden
+// under the input and couldn't be scrolled out.
+const BOTTOM_CLEARANCE = `calc(${DOCK_H + ASK_BAR_H + ASK_BAR_GAP}px + ${SAFE_B})`;
 
 // ── THE COUNCIL ── Our Lady centre, an adviser either side. Each is a live
 // SitePal character in its OWN same-origin iframe (`/sitepal-portal.html`).
@@ -103,6 +119,35 @@ const COUNCIL = [
 ];
 
 const portalContainerId = (key) => `sitepal-portal-${key}`;
+
+// Stacked copies behind the RL80 wordmark — the god-ray beams. Taken from
+// /fountain's wordmark, NOT the root hero's: the root drops the per-copy
+// opacity, so all 100 beams land at full strength and the mark reads as an
+// opaque slab. /fountain fades each copy by 1/index, and that falloff is the
+// whole difference — the beam dissolves instead of piling up.
+//
+// The falloff also makes this count mostly self-limiting: by copy ~40 opacity
+// is under 0.04, so the tail is paying GPU for nothing. Every copy is its own
+// blurred layer, and unlike /fountain this page also carries a live SitePal
+// mirror and an R3F canvas on the same GPU. 100 matches /fountain exactly;
+// drop toward ~40 if the phone struggles — it should look near-identical.
+const RL80_RAYS = 100;
+
+// ── Starter petitions ── Shown only before the first question, where the page
+// otherwise sits empty AND silent: her greeting is only ever spoken (never
+// rendered), and on iOS it can't even play until a gesture unlocks audio. So a
+// first-timer met a shrine, a blank field, and nothing else.
+//
+// Written as the seeker, not as a menu — a question or a confession, which is
+// what the counsel prompt expects. Lowercase and unhedged, matching the voices'
+// register. Each is chosen to pull a DIFFERENT argument out of the triptych:
+// appetite, shame, and a real question about limits. Barron has something to
+// say about all three, which is the point.
+const STARTER_QUESTIONS = [
+  "everyone's buying. am i late?",
+  "i bought the top. again.",
+  "how much is too much?",
+];
 
 // The one seat that gets a live player on phones. Our Lady holds it: she
 // presides, so she is the live, speaking face and the advisers are text +
@@ -220,6 +265,20 @@ function SitePalPortals({ portals, onPortalReady }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hidden frames — the visible faces are the panels' mirrored canvases.
+  //
+  // HIDE BY OPACITY, NEVER BY DISTANCE. A subframe parked off-screen has an
+  // empty window clip rect, and WebKit throttles it hard: requestAnimationFrame
+  // drops to one tick per 10s. Measured on an iPhone with left:-9999 — the frame
+  // ran at 0.1fps and her canvas changed 3 times in 34s. The player stays alive
+  // and audible (audio is untouched by rendering throttles), so she speaks with a
+  // frozen face and never lip-syncs. Desktop Chrome doesn't throttle same-origin
+  // frames, which is why this only ever showed on a phone.
+  //
+  // The pre-triptych /main embedded SitePal in THIS document, where left:-9999
+  // was harmless — a visible top document never throttles. An iframe is its own
+  // document: off-screen means asleep. So the frames sit AT the origin, hidden
+  // by opacity and z-order instead. To re-verify after touching this, count rAF
+  // ticks INSIDE the frame: ~60/s means awake, 0.1/s means it's asleep again.
   return (
     <>
       {portals.map((p) => (
@@ -228,7 +287,7 @@ function SitePalPortals({ portals, onPortalReady }) {
           id={portalContainerId(p.key)}
           style={{
             position: "fixed",
-            left: -9999,
+            left: 0,
             top: 0,
             width: 600,
             height: 800,
@@ -254,18 +313,16 @@ function SitePalPortals({ portals, onPortalReady }) {
       this near-black shrine a desaturated figure is just a shadow — the halo
       and the horns barely register, so at rest the composition read as Our
       Lady alone. Presence is the point; they are always in the room. Speaking
-      is carried by the halo of their own hue plus a slight lean-in instead.
-      The wrapper owns the hover animation and the <img> owns the mirror/lean,
-      so the transforms never fight — a keyframe on the same element would
-      clobber the flip on every frame. */
+      is carried by the halo of their own hue plus a slight lean-in instead. */
 function ShoulderFigure({ src, side, lit, hue, mirrored = false, alt, arrived = true }) {
   return (
-    // THREE layers, because three things animate the same property and would
+    // FOUR layers, because four things animate independently and would
     // otherwise clobber each other:
     //   outer — the fly-in (translateX), a one-shot transition
-    //   middle — the endless hover (keyframed translateY/rotate)
-    //   img   — the mirror + lean-in (scaleX/scale)
-    // Collapse any two of these onto one element and the keyframe wins every
+    //   hover — the endless hover (keyframed translateY/rotate)
+    //   lean  — the mirror + lean-in (scaleX/scale)
+    //   glow  — the halo, cross-faded by opacity (see its note below)
+    // Collapse any two transforms onto one element and the keyframe wins every
     // frame, freezing or teleporting the others.
     <div
       style={{
@@ -284,29 +341,67 @@ function ShoulderFigure({ src, side, lit, hue, mirrored = false, alt, arrived = 
         transition:
           "transform 1.15s cubic-bezier(0.16, 1.02, 0.30, 1.16), opacity 0.7s ease",
         transitionDelay: side === "left" ? "0ms" : "170ms",
-        filter: lit
-          ? `drop-shadow(0 0 14px ${hue}) drop-shadow(0 0 30px ${hue}66) drop-shadow(0 6px 10px rgba(0,0,0,0.55))`
-          : "drop-shadow(0 6px 10px rgba(0,0,0,0.55))",
+        // STATIC. Never make this depend on `lit` — see the glow layer below.
+        filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.55))",
       }}
     >
       <div className={`hm2-figure hm2-figure--${side}`}>
-        <img
-          src={src}
-          alt={alt}
+        {/* Mirror (Barron whispers toward her) composed with a small lean-in
+            while speaking. transformOrigin MUST stay centred: an edge origin
+            makes scaleX(-1) mirror the figure across that edge, i.e. bodily
+            outside its own box — it threw Barron a full width leftward, on top
+            of her face. Scale from the centre; the flip happens in place.
+            Lives on its own layer so the hover keyframe above can't clobber it. */}
+        <div
           style={{
-            width: "100%",
-            height: "auto",
-            display: "block",
-            // Mirror (Barron whispers toward her) composed with a small lean-in
-            // while speaking. transformOrigin MUST stay centred: an edge origin
-            // makes scaleX(-1) mirror the figure across that edge, i.e. bodily
-            // outside its own box — it threw Barron a full width leftward, on
-            // top of her face. Scale from the centre; the flip happens in place.
+            position: "relative",
             transform: `${mirrored ? "scaleX(-1)" : ""} scale(${lit ? 1.07 : 1})`.trim(),
             transformOrigin: "center center",
             transition: "transform 0.45s ease",
           }}
-        />
+        >
+          {/* ── The glow, as its own layer ── A copy of the silhouette carrying
+              a STATIC hue filter, cross-faded by OPACITY alone.
+              Do NOT collapse this back into a `lit ? glow : none` filter on an
+              ancestor. That's what it was, and iOS never painted it: measured on
+              an iPhone (2026-07-15) mid-line with Barron audible — React had the
+              speaker right and the element computed all 3 drop-shadows, yet
+              nothing rendered. The hover keyframe promotes this subtree to a
+              composited layer that iOS rasterises once and won't re-raster when
+              an ancestor's filter changes. A filter that never changes rasterises
+              correctly, and opacity is the one thing iOS always recomposites — so
+              the glow fades in instead of switching on. Desktop never showed it:
+              only WebKit rasterises this way. */}
+          <img
+            src={src}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: "100%",
+              height: "auto",
+              display: "block",
+              filter: `drop-shadow(0 0 14px ${hue}) drop-shadow(0 0 30px ${hue}66)`,
+              opacity: lit ? 1 : 0,
+              transition: "opacity 0.35s ease",
+              willChange: "opacity",
+            }}
+          />
+          {/* The figure itself, sitting exactly on top of its own glow so only
+              the halo spills past the silhouette. */}
+          <img
+            src={src}
+            alt={alt}
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "auto",
+              display: "block",
+            }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -317,6 +412,10 @@ function ShoulderFigure({ src, side, lit, hue, mirrored = false, alt, arrived = 
       same greeting, same live SitePal mirror. */
 function PortraitPanel({
   isMobile,
+  // ONE panel on screen, so this is the whole composition rather than a column
+  // of three. Drives layout (stacking, scrolling, panel chrome); isMobile still
+  // drives sizes and the phone-only corner mark. See MainPage's isSolo.
+  isSolo,
   characters,
   activeCharIndex,
   onSelect,
@@ -341,6 +440,15 @@ function PortraitPanel({
   // False until Our Lady is summoned and revealed — then the advisers fly in.
   figuresIn = false,
 }) {
+  // Phones stay at 250. 285 was tried and reverted: the room freed by moving the
+  // title and roster into the corners was NOT spare — the transcript was already
+  // using it. A bigger frame just pushed the transcript under the ask bar, and
+  // flexbox squeezed it to a clipped single line. She and the transcript are in
+  // direct competition for one column; 250 leaves the argument legible.
+  // CEILING if this is ever raised: the shoulder figures hang 28px off each side
+  // of this box (see ShoulderFigure's [side]: -28), so it must stay under
+  // viewportWidth - 56 or the saint and Barron get clipped by the panel's
+  // overflowX — i.e. under ~319 on a 375px phone.
   const frameSize = compact ? 150 : isMobile ? 250 : 340;
   // NOTE: the speaking panel used to scroll itself into view on phones. The
   // transcript now owns that job (it follows its own newest line), and two
@@ -352,34 +460,34 @@ function PortraitPanel({
       style={{
         // compact = one of the two advisers sharing a row; it flexes to half
         // the width instead of claiming a row of its own.
-        flex: compact ? "1 1 0" : isMobile ? "0 0 auto" : "1 1 0",
+        flex: compact ? "1 1 0" : isSolo ? "0 0 auto" : "1 1 0",
         minWidth: 0,
-        width: !compact && isMobile ? "100%" : undefined,
+        width: !compact && isSolo ? "100%" : undefined,
         maxWidth: 440,
-        height: isMobile ? "auto" : "100%",
+        height: isSolo ? "auto" : "100%",
         pointerEvents: "auto",
         display: "flex",
         flexDirection: "column",
         // The stacked column scrolls as ONE list on phones; each panel sizes to
         // its content instead of owning a scroller.
-        overflowY: isMobile ? "visible" : "auto",
+        overflowY: isSolo ? "visible" : "auto",
         // iOS: the rotated/skewed title's transformed bounds extend past the
         // viewport, which Safari treats as pannable overflow ("horizontal
         // play"). Clip it and restrict touch gestures to vertical panning.
         overflowX: "hidden",
         touchAction: "pan-y",
         overscrollBehavior: "contain",
-        // Clearance for the fixed bottom dock: without it the column's last
-        // ~100px can never scroll out from behind the nav. On phones the
-        // stacked column owns that clearance ONCE — repeating it per panel
-        // stacked ~100px of void between every face.
-        paddingBottom: isMobile ? 10 : "calc(96px + env(safe-area-inset-bottom, 0px))",
+        // Clearance for the dock and the ask bar: without it a panel's last
+        // ~150px can never scroll out from behind them. On phones the stacked
+        // column owns that clearance ONCE — repeating it per panel stacked
+        // ~150px of void between every face.
+        paddingBottom: isSolo ? 10 : BOTTOM_CLEARANCE,
         fontFamily: "'Cyber', 'Geo', sans-serif",
         // Panel chrome is a TRIPTYCH device — three columns need seams and a
         // backing to read as separate panels. On a phone there's one
         // composition, and that 50%-black backing would just mute the apse
         // gradient the figures are lit against.
-        ...(isMobile
+        ...(isSolo
           ? { background: "transparent" }
           : {
               background: "rgba(0, 0, 0, 0.5)",
@@ -391,33 +499,99 @@ function PortraitPanel({
             }),
       }}
     >
-      {/* ── Title heading ── DropInTitle "Our Lady of Perpetual Profit".
-          Collapses while the chat drawer is open on phones so the portrait can
-          rise above the conversation. */}
+      {/* ── The page's mark ── The RL80 wordmark, in the corner, on EVERY layout.
+          It renders from HER seat only (`!title`) — the advisers must not each
+          stamp their own copy into the same corner.
+          It was a centred DropInTitle above the frame. On a phone that ate ~110px
+          off the top of a 375px screen and pushed her medallions under the ask
+          bar; across the triptych, three full-size titles read as a headline row
+          competing with the three portraits under them. Out of flow it costs the
+          composition nothing, and it is now the only thing naming the page, since
+          the character names shrank to plates under their frames.
+          SCALED, not re-sized: the letters carry a fixed 6px text-shadow stack
+          and 2px letter-spacing, so dropping fontSize alone leaves the shadow at
+          half the glyph height and turns the type to mud. A transform shrinks
+          the shadow with the letters. */}
+      {!compact && !title && (
       <div
         className="custom-title"
         style={{
-          position: "relative",
           zIndex: 1000,
-          paddingTop: "1.25rem",
-          pointerEvents: "auto",
           // Clip only while collapsed — at rest the rotated/skewed letters
           // render outside their layout box and must not be cut
           overflow: "visible",
-          transition: "max-height 0.35s ease, opacity 0.25s ease",
+          // "fixed" RESOLVES TO TWO DIFFERENT BOXES HERE, and that is
+          // load-bearing rather than sloppy:
+          //   SOLO — the panel is background:transparent with no backdrop-filter,
+          //     so this pins to the VIEWPORT: the phone's top-left corner.
+          //   TRIPTYCH — the panel carries backdropFilter for its chrome, and a
+          //     backdrop-filter makes an element the containing block for its
+          //     position:fixed descendants (the same spec quirk the shared candle
+          //     picker had to portal past). So this pins to HER PANEL, and the
+          //     rays fall from her own corner onto her instead of landing on
+          //     GR80 clear across the screen. That is the look we want — but it
+          //     is a CONSEQUENCE OF THE PANEL CHROME, not of this rule. Strip the
+          //     backdrop-filter and the mark silently jumps to the viewport
+          //     corner; if that happens, anchor it explicitly rather than
+          //     re-tuning `left` until it looks right again.
+          position: "fixed",
+          // Room to breathe under the browser chrome. The inset is 0 in normal
+          // Safari (the toolbar already holds that space) but real if this is
+          // ever added to the home screen and runs standalone, where the mark
+          // would otherwise sit in the status bar.
+          top: "calc(16px + env(safe-area-inset-top, 0px))",
+          // Measured from the viewport on solo, from her panel on the triptych.
+          left: isSolo ? 10 : 18,
+          // Bigger where there's room to be bigger.
+          transform: isSolo ? "scale(0.46)" : "scale(0.6)",
+          transformOrigin: "top left",
+          // A corner mark must never eat taps meant for the scene.
+          pointerEvents: "none",
         }}
       >
-        {/* Her name over the centre seat; an adviser's name over theirs. */}
-        <DropInTitle
-          lines={title ? [title] : ["Our Lady", "of Perpetual", "Profit"]}
-          colors={title ? ["#f4e4c1"] : ["#f4e4c1", "#f4b53f", "#3ad17a"]}
-          fontSize={{
-            mobile: compact ? "1rem" : "1.85rem",
-            desktop: title ? "1.9rem" : "2.4rem",
-          }}
-          isMobile={isMobile}
-        />
+        {
+          /* The RL80 wordmark + god rays, lifted from the root's hero. The root
+             ALTERNATES this with a gothic "Our Lady" face; here it's fixed — a
+             corner mark that swaps identity every few seconds pulls the eye off
+             her, which is the one thing this page is for. fontFamily is inline
+             to match the app's font-loading convention (layout.js keys its
+             reveal off [style*="Unifraktur…"]). */
+          <div
+            className="hm2-rl80"
+            role="img"
+            aria-label="RL80 — Our Lady of Perpetual Profit"
+            style={{ fontFamily: "'UnifrakturMaguntia', serif" }}
+          >
+            RL80
+            {Array.from({ length: RL80_RAYS }).map((_, i) => {
+              const index = i + 1;
+              return (
+                <span
+                  key={index}
+                  className="hm2-rl80-ray"
+                  aria-hidden="true"
+                  style={{
+                    color: `rgb(${Math.max(0, 255 - index * 2)}, ${Math.max(
+                      0,
+                      255 - index * 3,
+                    )}, ${Math.max(0, 255 - index * 2)})`,
+                    // The whole reason this reads softer than the root's: each
+                    // copy fades hyperbolically, so the beam dissolves instead
+                    // of stacking 100 opaque copies into a slab.
+                    opacity: (1 / index) * 1.5,
+                    transform: `translate(${index * 0.1}rem, ${index * 0.1}rem) scale(${
+                      1 + index * 0.01
+                    })`,
+                  }}
+                >
+                  RL80
+                </span>
+              );
+            })}
+          </div>
+        }
       </div>
+      )}
 
       {/* ── Agent Select section ── shrinks toward the top while the chat
           drawer is open on phones, keeping her whole face visible above it */}
@@ -468,6 +642,13 @@ function PortraitPanel({
           halftone={halftone}
           /* No live player behind this seat = no summoning to veil. */
           hasLiveSource={hasLiveSource}
+          /* The block under the frame — arrows, medallions, name — is off on
+             EVERY layout here; the corner gear owns the roster now. It was
+             costing ~66px of a phone column that had none to spare; on the
+             triptych it printed each adviser's name a second time under a frame
+             already titled with it; and mid-size it collided with the SPEAK
+             button. Nothing was left for it to do. */
+          showRoster={false}
           /* Hold the summoning swirl until SitePal's face is actually loaded
              & displayed — not just when the page's asset loader clears. */
           pageLoading={!sitePalReady}
@@ -480,6 +661,33 @@ function PortraitPanel({
         />
         </div>
       </div>
+
+      {/* ── Name plate ── Under the face, small. This replaced a full DropInTitle
+          shouting each adviser's name over their frame: at that size the type
+          competed with the portrait it was labelling, and three of them across
+          the triptych read as a headline row rather than a composition. A name
+          is a label — it should be legible and then get out of the way.
+          Her seat has no plate: the corner wordmark already says whose shrine
+          this is, and she's the one in the middle. Lights in the speaker's own
+          hue as they take the floor, so the name tracks the argument. */}
+      {title && (
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 8,
+            fontFamily: "'Rajdhani', sans-serif",
+            fontSize: "0.8rem",
+            fontWeight: 600,
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            color: speaking ? hue : "rgba(255, 255, 255, 0.46)",
+            textShadow: speaking ? `0 0 12px ${hue}99` : "none",
+            transition: "color 0.3s ease, text-shadow 0.3s ease",
+          }}
+        >
+          {title}
+        </div>
+      )}
 
       {/* ── What this voice just said ── The argument reads under the face
           that's making it. The speaker holding the floor is lit in their own
@@ -510,7 +718,7 @@ function PortraitPanel({
           line to the bottom of a panel that owns the viewport. Stacked on a
           phone each panel sizes to its content, so a spacer would just inject
           dead space between faces and the footer would repeat three times. */}
-      {!isMobile && (
+      {!isSolo && (
         <>
           <div style={{ flex: 1 }} />
           <div
@@ -719,6 +927,7 @@ export default function MainPage() {
       <PortraitPanel
         key={s.key}
         isMobile={isMobile}
+        isSolo={isSolo}
         compact={compact}
         /* The shoulder figures hover at HER frame only, and need the global
            speaker so each knows when it's the one arguing. */
@@ -759,7 +968,7 @@ export default function MainPage() {
         /* Desktop reads the argument under the face making it. Phones read it
            as the group text below, so per-panel captions would just print every
            line twice. */
-        caption={isMobile ? "" : captions[SEAT_VOICE[s.seat]] || ""}
+        caption={isSolo ? "" : captions[SEAT_VOICE[s.seat]] || ""}
         speaking={speakingKey === SEAT_VOICE[s.seat]}
         hue={s.frameHue}
         /* PHONE: she never greys — she presides throughout, and the shoulder
@@ -768,7 +977,7 @@ export default function MainPage() {
            one live avatar, and made no sense once the figures stopped greying.
            DESKTOP: the advisers are full panels, so the old rule still earns its
            keep — inactive seats sit greyed, the speaker goes full colour. */
-        halftone={isMobile ? false : !isLit(s.seat)}
+        halftone={isSolo ? false : !isLit(s.seat)}
       />
     );
 
@@ -788,6 +997,16 @@ export default function MainPage() {
     setActiveCharIndex(i);
     setPickerOpen(false);
   };
+
+  /* ── The roster, hoisted into a corner gear (phones) ──
+     The medallion row under her frame cost ~46px of a column that had none to
+     spare, and the faces are switched rarely. It does NOT reuse the pickerOpen
+     ApparitionTriptych: the portals are gated on !pickerOpen, so opening that
+     would tear down her live player and re-summon her on dismiss, and it offers
+     no cancel — fine for a first-visit choice, wrong for a settings affordance.
+     Choosing routes through handleCharacterSelect, so a swap still reloads with
+     ?char= and her scene embeds fresh. */
+  const [rosterOpen, setRosterOpen] = useState(false);
 
   // ── The inner struggle ── The seeker asks; Barron argues for the appetite,
   // GR80 answers from duty, Our Lady weighs in last and lightest. Each line is
@@ -914,6 +1133,18 @@ export default function MainPage() {
   // Three seats across once the viewport can carry them; below that the
   // stacked phone layout takes over (Our Lady above the paired advisers).
   const panelCount = isWide && !isMobile ? PANEL_COUNT : 1;
+  // ── SOLO vs TRIPTYCH ── The composition question is "how many panels fit?",
+  // NOT "is this a phone". Keying the advisers' representation to isMobile left
+  // 768–1199 with no advisers AT ALL: too narrow for three panels, but the
+  // shoulder figures, the transcript and the chips were all phone-only, so they
+  // argued at you from off-screen with nothing to look at and no scrollback.
+  //
+  // Solo = one panel, so the advisers are the shoulder figures and the argument
+  // is the transcript. Triptych = three panels, so they are their own faces and
+  // the argument is captioned under each. Device still decides how many PLAYERS
+  // to mount (three OOM-crash iOS — see SitePalPortals); that stays on isMobile
+  // and must not be folded into this.
+  const isSolo = panelCount === 1;
 
   // One greeting picked per visit — shared by the drawer's typewriter text
   // and the spoken line so they always match
@@ -979,14 +1210,33 @@ export default function MainPage() {
         // greying them out failed). This puts a warm glow BEHIND her, falling
         // off to deep indigo at the edges, so the advisers are silhouetted by
         // light and the neon frames have something to bloom against.
+        //
+        // The magenta is the root page's signature colour — but THERE it isn't
+        // painted at all: that scene's background is flat #000 and the crimson
+        // is an illusion thrown by the holographic statue's chromatic ghosting.
+        // /main has no hologram, so the same glow is painted by hand. Layers are
+        // listed TOP-first: gold sits ON the magenta, which is why the aureole
+        // is tighter than it was — spread wide over magenta the two average out
+        // to orange instead of reading as gold on rose.
         backgroundColor: "#0a0a0f",
         backgroundImage: [
+          // (Structure lives in the perspective floor below — a flat lattice
+          // here fought it wherever the two met.)
+          // ── Vignette ── Corners driven back to black. The bloom below needs
+          // somewhere to FALL OFF to: spread evenly with no dark left, magenta
+          // stops reading as light and starts reading as a flat mauve field.
+          // This is what makes it a glow instead of a wash.
+          "radial-gradient(125% 82% at 50% 40%, rgba(0,0,0,0) 38%, rgba(0,0,0,0.62) 100%)",
           // Her aureole — warm, centred on the portrait, not the viewport.
-          "radial-gradient(120% 78% at 50% 26%, rgba(244, 181, 63, 0.16) 0%, rgba(244, 181, 63, 0.05) 34%, rgba(0,0,0,0) 62%)",
-          // Cool counter-light so the amber doesn't read as sepia.
-          "radial-gradient(90% 60% at 50% 96%, rgba(42, 214, 238, 0.09) 0%, rgba(0,0,0,0) 70%)",
-          // The apse itself: indigo shoulders down to near-black.
-          "linear-gradient(180deg, #131126 0%, #0d0b18 45%, #08070d 100%)",
+          "radial-gradient(70% 46% at 50% 24%, rgba(244, 181, 63, 0.15) 0%, rgba(244, 181, 63, 0.04) 40%, rgba(0,0,0,0) 68%)",
+          // The holographic bloom — tighter and hotter than the field it
+          // replaced, so it burns behind her frame and is gone by the edges.
+          "radial-gradient(76% 46% at 50% 40%, rgba(255, 45, 117, 0.32) 0%, rgba(158, 20, 78, 0.10) 50%, rgba(0,0,0,0) 78%)",
+          // Cool counter-light at her feet so the magenta doesn't go uniformly
+          // hot, and the cyan chrome down there has something to sit against.
+          "radial-gradient(90% 60% at 50% 97%, rgba(42, 214, 238, 0.08) 0%, rgba(0,0,0,0) 70%)",
+          // The apse itself: violet shoulders down to near-black.
+          "linear-gradient(180deg, #150a20 0%, #0e0715 45%, #06060a 100%)",
         ].join(", "),
         height: "100vh",
         width: "100vw",
@@ -1014,6 +1264,30 @@ export default function MainPage() {
         .hm2-figure--right { animation: hm2-hover-right 6.7s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) {
           .hm2-figure--left, .hm2-figure--right { animation: none; }
+        }
+
+        /* ── RL80 corner mark ── Ported from the root's .rl80-ticker-title
+           rather than reused: those rules are scoped under .shrine-page.neon,
+           and adopting that class here would drag in the rest of that sheet —
+           including its \`> *:not(...)\` child rules — to borrow a font and a
+           skew. Copied deliberately; they are free to drift. */
+        .hm2-rl80 {
+          position: relative;
+          font-size: 3.4rem;
+          line-height: 0.9;
+          color: #ffffff;
+          letter-spacing: 0.02em;
+          white-space: nowrap;
+          transform: rotate(-6deg) skew(-12deg);
+          transform-origin: left center;
+        }
+        .hm2-rl80-ray {
+          position: absolute;
+          top: 0;
+          left: 0;
+          z-index: -1;
+          pointer-events: none;
+          filter: blur(0.1rem);
         }
       `}</style>
 
@@ -1078,23 +1352,24 @@ export default function MainPage() {
           // Phones get the triptych STACKED — three ornate frames side by side
           // at 390px would be ~120px each and the filigree turns to mush. The
           // column scrolls, and the speaking panel scrolls itself into view.
-          flexDirection: isMobile ? "column" : "row",
-          justifyContent: isMobile ? "flex-start" : "center",
-          alignItems: isMobile ? "center" : "stretch",
+          flexDirection: isSolo ? "column" : "row",
+          justifyContent: isSolo ? "flex-start" : "center",
+          alignItems: isSolo ? "center" : "stretch",
           gap: panelCount > 1 ? 16 : 0,
-          overflowY: isMobile ? "auto" : "visible",
+          overflowY: isSolo ? "auto" : "visible",
           // The stacked column IS the scroller on phones, so it must accept
           // touch — pointerEvents:"none" here silently made the page unscrollable
           // (panels 2 and 3 rendered but were unreachable). Desktop keeps none so
           // the gaps between panels stay click-through.
-          pointerEvents: isMobile ? "auto" : "none",
+          pointerEvents: isSolo ? "auto" : "none",
           WebkitOverflowScrolling: "touch",
           overscrollBehavior: "contain",
-          // Clearance for the fixed dock, which the panels no longer carry.
-          paddingBottom: isMobile ? "calc(96px + env(safe-area-inset-bottom, 0px))" : 0,
+          // Clearance for the dock AND the ask bar above it (see BOTTOM_CLEARANCE),
+          // which the panels no longer carry.
+          paddingBottom: isSolo ? BOTTOM_CLEARANCE : 0,
         }}
       >
-        {isMobile ? (
+        {isSolo ? (
           <>
             {/* ONE composition: Our Lady live and framed, with the saint and
                 the devil's advocate hovering at her shoulders. This is the
@@ -1103,6 +1378,75 @@ export default function MainPage() {
                 advisers have no player here anyway. Their words go to the
                 transcript below. */}
             {renderSeat(seats.find((s) => s.seat === "center"), { figures: true })}
+
+            {/* ── Starter petitions ── Only before the first question; the
+                transcript takes this space afterwards, so the column has one
+                job in each state and never a hole. */}
+            {chatLog.length === 0 && (
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: 440,
+                  margin: "16px 0 0",
+                  padding: "0 14px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  // Same lesson as the transcript: the column is a flex column,
+                  // and anything that can shrink, will.
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontSize: "0.7rem",
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.32)",
+                    marginBottom: 2,
+                  }}
+                >
+                  bring her something
+                </div>
+                {STARTER_QUESTIONS.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => {
+                      // THE TAP IS THE GESTURE. iOS only grants audio inside a
+                      // real one, and this is now the first one the page
+                      // reliably gets — without this the advisers' <audio> is
+                      // never unlocked and their lines are silent all session.
+                      unlockAdviserAudio();
+                      // Deliberately NOT unlockAndGreet: handleAsk stops every
+                      // player as it starts, so the greeting would be cut off
+                      // mid-word by the argument it was introducing. Mark her
+                      // as greeted — they've asked, the room is no longer cold.
+                      hasGreetedRef.current = true;
+                      handleAsk(q);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "9px 14px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(42, 214, 238, 0.22)",
+                      background: "rgba(6, 10, 18, 0.55)",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                      color: "rgba(255,255,255,0.78)",
+                      fontFamily: "'Rajdhani', sans-serif",
+                      fontSize: "0.92rem",
+                      letterSpacing: "0.02em",
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* ── The transcript ── The deliberation as a group text: name,
                 colon, message, in each voice's own colour. This is what the
@@ -1119,11 +1463,23 @@ export default function MainPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: 10,
+                  // NEVER let the column squeeze this. The parent is a flex
+                  // column and PortraitPanel is flex:"0 0 auto", so this was the
+                  // only item that would yield: when her frame grew, flexbox
+                  // took the whole difference out of the transcript and crushed
+                  // it to a clipped single line with a scroller ~40px tall.
+                  // It owns its own height, capped below; the column scrolls.
+                  flexShrink: 0,
                   // CONTAINED, and it scrolls itself. Left unbounded the
                   // transcript grows with every exchange and shoves the whole
                   // composition off the top of the screen — the faces are the
                   // page, so the chat gets a window, not the run of it.
-                  maxHeight: "32vh",
+                  // dvh, NOT vh: iOS Safari resolves vh against the
+                  // TOOLBAR-HIDDEN viewport, so 32vh measured ~260px against a
+                  // ~617px visible area — 42% of the screen, not the 32% it
+                  // asks for. Chrome's emulator computes it against the visible
+                  // height and looks right, so this only ever bites on a phone.
+                  maxHeight: "24dvh",
                   overflowY: "auto",
                   overscrollBehavior: "contain",
                   WebkitOverflowScrolling: "touch",
@@ -1171,7 +1527,7 @@ export default function MainPage() {
             {/* The advisers are mute here by necessity (one player per phone —
                 see the portals note). Rather than apologise for it, point at
                 where they DO speak. Written in her register, not as an error. */}
-            <div
+            {/* <div
               style={{
                 margin: "14px 16px 4px",
                 padding: "9px 12px",
@@ -1189,7 +1545,7 @@ export default function MainPage() {
               <span style={{ color: "#2ad6ee" }}>
                 Open the shrine on a desktop to hear the council speak aloud.
               </span>
-            </div>
+            </div> */}
           </>
         ) : (
           (panelCount > 1 ? seats : seats.filter((s) => s.seat === "center")).map((s) =>
@@ -1197,6 +1553,132 @@ export default function MainPage() {
           )
         )}
       </div>
+
+      {/* ── Her faces, behind a gear ── On phones it mirrors the wordmark in the
+          opposite corner; on every layout it is now the ONLY way to reach the
+          roster, since the row under her frame is gone. Out of flow, so the
+          scene keeps the column. */}
+      {!isLoading && !pickerOpen && (
+        <>
+          <button
+            onClick={() => setRosterOpen((o) => !o)}
+            aria-label="Change her apparition"
+            aria-expanded={rosterOpen}
+            style={{
+              position: "fixed",
+              // Sits on the wordmark's line in the opposite corner — keep this
+              // in step with the title's top if either moves.
+              top: "calc(12px + env(safe-area-inset-top, 0px))",
+              right: 8,
+              zIndex: 1401,
+              width: 34,
+              height: 34,
+              display: "grid",
+              placeItems: "center",
+              borderRadius: "50%",
+              border: "1px solid rgba(42, 214, 238, 0.3)",
+              background: "rgba(6, 10, 18, 0.72)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              // Present but never competing with her — it brightens on open.
+              opacity: rosterOpen ? 1 : 0.5,
+              transition: "opacity 0.25s ease",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2ad6ee" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 17, height: 17 }} aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+
+          {rosterOpen && (
+            <>
+              {/* Tap-away layer, UNDER the sheet so the sheet still takes taps. */}
+              <div
+                onClick={() => setRosterOpen(false)}
+                style={{ position: "fixed", inset: 0, zIndex: 1400, background: "transparent" }}
+              />
+              <div
+                role="menu"
+                style={{
+                  position: "fixed",
+                  top: "calc(52px + env(safe-area-inset-top, 0px))",
+                  right: 8,
+                  zIndex: 1402,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  padding: 6,
+                  borderRadius: 12,
+                  background: "rgba(6, 10, 18, 0.94)",
+                  border: "1px solid rgba(42, 214, 238, 0.28)",
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.6)",
+                }}
+              >
+                {CHARACTERS.map((c, i) => {
+                  const active = i === activeCharIndex;
+                  const hue = c.frameHue || "#22ccff";
+                  return (
+                    <button
+                      key={c.key || i}
+                      role="menuitem"
+                      aria-current={active}
+                      onClick={() => {
+                        setRosterOpen(false);
+                        // No-ops when it's already her — handleCharacterSelect
+                        // bails on the same index rather than reloading.
+                        handleCharacterSelect(i);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "5px 10px 5px 5px",
+                        borderRadius: 999,
+                        border: "1px solid transparent",
+                        background: active ? "rgba(42, 214, 238, 0.12)" : "transparent",
+                        cursor: active ? "default" : "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 28,
+                          height: 28,
+                          flexShrink: 0,
+                          borderRadius: "50%",
+                          border: `2px solid ${hue}`,
+                          backgroundImage: `url(${c.image}), radial-gradient(circle at 50% 38%, ${hue}66 0%, #0d0d15 80%)`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center top",
+                          boxShadow: active ? `0 0 8px ${hue}` : "none",
+                          opacity: active ? 1 : 0.65,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontFamily: "'Rajdhani', sans-serif",
+                          fontSize: "0.8rem",
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                          color: active ? "#ffffff" : "rgba(255,255,255,0.68)",
+                        }}
+                      >
+                        {c.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </>
+      )}
 
       {/* ── The ask ── Always present, pinned above the dock. This page exists
           to be asked a question, so the input is the page's main affordance
@@ -1214,7 +1696,7 @@ export default function MainPage() {
           position: "fixed",
           left: 0,
           right: 0,
-          bottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
+          bottom: ASK_BAR_BOTTOM,
           marginLeft: "auto",
           marginRight: "auto",
           width: "min(560px, calc(100vw - 24px))",
@@ -1237,7 +1719,18 @@ export default function MainPage() {
           /* The first focus is a real user gesture — the one moment we're
              allowed to unlock the players' audio, so her greeting rides it. */
           onFocus={unlockAndGreet}
-          placeholder={busy ? "the council is deliberating…" : "Bring them your question…"}
+          /* The invitation is for an empty room. Once the argument is running,
+             the transcript right above says what this field is for, so the
+             prompt is just repetition sitting under her. "Deliberating" stays —
+             that's status, not invitation, and it's the only cue the council is
+             still thinking. */
+          placeholder={
+            busy
+              ? "the council is deliberating…"
+              : chatLog.length
+              ? ""
+              : "Ask your investment question...…"
+          }
           disabled={busy}
           aria-label="Ask the council"
           style={{

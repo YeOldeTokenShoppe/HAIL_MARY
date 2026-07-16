@@ -775,7 +775,13 @@ function FramedPortraitModel({ url }) {
 // dot screen is a whisper on top, not the whole effect. (Cranked too hard it
 // turns the face into noise — especially over the summoning swirl, which is
 // what's underneath before a portal reports ready.)
-const HALFTONE_FILTER = "grayscale(1) contrast(1.05) brightness(0.62)";
+// Dormant, NOT dead. grayscale(1) + brightness(0.62) was tried and it killed the
+// advisers: against a near-black shrine a fully desaturated panel doesn't read as
+// "waiting his turn", it reads as "this panel failed to load" — the same trap
+// ShoulderFigure documents for the phone's shoulder art ("a desaturated figure is
+// just a shadow"). Keep them in the room: enough colour left to be present,
+// enough dimming to cede the floor to whoever is speaking.
+const HALFTONE_FILTER = "grayscale(0.5) contrast(1.02) brightness(0.82)";
 
 function SitePalLivePortrait({
   visible = true,
@@ -982,6 +988,12 @@ export default function CharacterSelect({
   // which skips the summoning swirl (there is nothing to summon). Every
   // single-embed page leaves this true and is unaffected.
   hasLiveSource = true,
+  // Draw the whole block under the frame: arrows, medallion row, and the
+  // character's name. Phones hoist the roster into a corner gear instead — the
+  // block costs ~66px of a column that had none to spare, the faces are
+  // switched rarely, and the name just captions a face you're already looking
+  // at — so /main turns this off there. Every other page leaves it on.
+  showRoster = true,
 }) {
   const [index, setIndex] = useState(activeIndex);
   // True once the 3D canvas has PRESENTED real frames (FirstFramesSignal).
@@ -1187,10 +1199,13 @@ export default function CharacterSelect({
 
       {/* Character nav — arrows flank a medallion per apparition, so all the
           faces are advertised at all times (arrows alone hid the roster: a
-          first-time visitor had no cue that other faces exist). Name below. */}
+          first-time visitor had no cue that other faces exist). Name below.
+          Phones suppress this whole row and hoist the roster into a corner gear
+          — see showRoster. A gear is at least a visible affordance, which the
+          bare arrows never were. */}
       <div
         style={{
-          display: "flex",
+          display: showRoster ? "flex" : "none",
           alignItems: "center",
           justifyContent: "center",
           gap: 10,
@@ -1276,19 +1291,21 @@ export default function CharacterSelect({
           </button>
         )}
       </div>
-      <div
-        style={{
-          textAlign: "center",
-          marginTop: 6,
-          fontSize: "0.9rem",
-          letterSpacing: "0.15em",
-          textTransform: "uppercase",
-          color: "hsl(183 38% 57%)",
-          textShadow: "0 0 8px rgba(0,255,255,0.4)",
-        }}
-      >
-        {current.name}
-      </div>
+      {showRoster && (
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 6,
+            fontSize: "0.9rem",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            color: "hsl(183 38% 57%)",
+            textShadow: "0 0 8px rgba(0,255,255,0.4)",
+          }}
+        >
+          {current.name}
+        </div>
+      )}
     </div>
   );
 }
