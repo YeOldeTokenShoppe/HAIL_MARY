@@ -275,7 +275,11 @@ Phase 1 routes. (Server-side docket validation arrives in Phase 3.)
       export in cards.js, `traderId` join in characterMeta.js)
 - [ ] Genesis revision pass (§3.2a) — actions redesigned kit-first, coins
       gain `caseRef`, markets become docket events; declare art-lock rule
-- [ ] `caseKit.js` + `LENS_BY_TAG`
+- [x] `caseKit.js` + `LENS_BY_TAG` (applied 2026-07-16: First Twelve defs,
+      kit legality, effect resolution extracted from the mock into
+      `caseKit.js`; the docket turn engine / ticket math / settle into
+      `docketRun.js`; behavior pinned by `scripts/verify-docket-run.mjs` —
+      the extraction step of promoting the mock into /trade)
 - [ ] Kit select screen (skippable, legality enforced)
 - [ ] ChannelView deep-entry + locked-question rendering
 - [ ] Author Tier-2 content for cases 001–003 (+ connection for 003)

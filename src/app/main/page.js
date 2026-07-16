@@ -118,6 +118,15 @@ const COUNCIL = [
   },
 ];
 
+const SHOULDER_LAYER_IMAGES = [
+  "/shoulder-layers/angel/body.png",
+  "/shoulder-layers/angel/left-wing.png",
+  "/shoulder-layers/angel/right-wing.png",
+  "/shoulder-layers/demon/body.png",
+  "/shoulder-layers/demon/left-wing.png",
+  "/shoulder-layers/demon/right-wing.png",
+];
+
 const portalContainerId = (key) => `sitepal-portal-${key}`;
 
 // Stacked copies behind the RL80 wordmark — the god-ray beams. Taken from
@@ -314,7 +323,17 @@ function SitePalPortals({ portals, onPortalReady }) {
       and the horns barely register, so at rest the composition read as Our
       Lady alone. Presence is the point; they are always in the room. Speaking
       is carried by the halo of their own hue plus a slight lean-in instead. */
-function ShoulderFigure({ src, side, lit, hue, mirrored = false, alt, arrived = true }) {
+function ShoulderFigure({
+  src,
+  side,
+  lit,
+  hue,
+  mirrored = false,
+  alt,
+  arrived = true,
+  layers = null,
+  wingMotion = "angel",
+}) {
   return (
     // FOUR layers, because four things animate independently and would
     // otherwise clobber each other:
@@ -372,35 +391,110 @@ function ShoulderFigure({ src, side, lit, hue, mirrored = false, alt, arrived = 
               correctly, and opacity is the one thing iOS always recomposites — so
               the glow fades in instead of switching on. Desktop never showed it:
               only WebKit rasterises this way. */}
-          <img
-            src={src}
-            alt=""
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              width: "100%",
-              height: "auto",
-              display: "block",
-              filter: `drop-shadow(0 0 14px ${hue}) drop-shadow(0 0 30px ${hue}66)`,
-              opacity: lit ? 1 : 0,
-              transition: "opacity 0.35s ease",
-              willChange: "opacity",
-            }}
-          />
+          {layers ? (
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: "100%",
+                filter: `drop-shadow(0 0 14px ${hue}) drop-shadow(0 0 30px ${hue}66)`,
+                opacity: lit ? 1 : 0,
+                transition: "opacity 0.35s ease",
+                willChange: "opacity",
+              }}
+            >
+              <img
+                className={`hm2-wing hm2-wing--${wingMotion} hm2-wing--left`}
+                src={layers.left}
+                alt=""
+                aria-hidden="true"
+              />
+              <img
+                className={`hm2-wing hm2-wing--${wingMotion} hm2-wing--right`}
+                src={layers.right}
+                alt=""
+                aria-hidden="true"
+              />
+              <img
+                src={layers.body}
+                alt=""
+                aria-hidden="true"
+                style={{
+                  position: "relative",
+                  zIndex: 2,
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                }}
+              />
+            </div>
+          ) : (
+            <img
+              src={src}
+              alt=""
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: "100%",
+                height: "auto",
+                display: "block",
+                filter: `drop-shadow(0 0 14px ${hue}) drop-shadow(0 0 30px ${hue}66)`,
+                opacity: lit ? 1 : 0,
+                transition: "opacity 0.35s ease",
+                willChange: "opacity",
+              }}
+            />
+          )}
           {/* The figure itself, sitting exactly on top of its own glow so only
-              the halo spills past the silhouette. */}
-          <img
-            src={src}
-            alt={alt}
-            style={{
-              position: "relative",
-              width: "100%",
-              height: "auto",
-              display: "block",
-            }}
-          />
+              the halo spills past the silhouette. When wing layers exist, the
+              body establishes the box and each wing gets its own transform. */}
+          {layers ? (
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+              }}
+            >
+              <img
+                className={`hm2-wing hm2-wing--${wingMotion} hm2-wing--left`}
+                src={layers.left}
+                alt=""
+                aria-hidden="true"
+              />
+              <img
+                className={`hm2-wing hm2-wing--${wingMotion} hm2-wing--right`}
+                src={layers.right}
+                alt=""
+                aria-hidden="true"
+              />
+              <img
+                src={layers.body}
+                alt={alt}
+                style={{
+                  position: "relative",
+                  zIndex: 2,
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                }}
+              />
+            </div>
+          ) : (
+            <img
+              src={src}
+              alt={alt}
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "auto",
+                display: "block",
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -617,6 +711,12 @@ function PortraitPanel({
               hue={SPEAKER.GR.hue}
               alt="Saint GR80"
               arrived={figuresIn}
+              wingMotion="angel"
+              layers={{
+                body: "/shoulder-layers/angel/body.png",
+                left: "/shoulder-layers/angel/left-wing.png",
+                right: "/shoulder-layers/angel/right-wing.png",
+              }}
             />
             <ShoulderFigure
               src="/shoulder_demon.webp"
@@ -626,6 +726,12 @@ function PortraitPanel({
               hue={SPEAKER.JB.hue}
               alt="John Barron"
               arrived={figuresIn}
+              wingMotion="demon"
+              layers={{
+                body: "/shoulder-layers/demon/body.png",
+                left: "/shoulder-layers/demon/left-wing.png",
+                right: "/shoulder-layers/demon/right-wing.png",
+              }}
             />
           </>
         )}
@@ -835,6 +941,9 @@ export default function MainPage() {
       // pops in against the already-revealed page.
       preloadGLBParsed("/models/neonFrame.glb"),
       preloadImage("/images/mary.png"),
+      preloadImage("/shoulder_angel.webp"),
+      preloadImage("/shoulder_demon.webp"),
+      ...SHOULDER_LAYER_IMAGES.map((src) => preloadImage(src)),
       ...CHARACTERS.map((c) => preloadImage(c.image)),
     ]).then(() => {
       assetsReadyRef.current = true;
@@ -1273,8 +1382,56 @@ export default function MainPage() {
         }
         .hm2-figure--left  { animation: hm2-hover-left 5.5s ease-in-out infinite; }
         .hm2-figure--right { animation: hm2-hover-right 6.7s ease-in-out infinite; }
+        .hm2-wing {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          width: 100%;
+          height: auto;
+          display: block;
+          will-change: transform;
+          pointer-events: none;
+          user-select: none;
+          -webkit-user-drag: none;
+        }
+        .hm2-wing--angel.hm2-wing--left {
+          transform-origin: 40% 38%;
+          animation: hm2-angel-left-flap 1.55s ease-in-out infinite;
+        }
+        .hm2-wing--angel.hm2-wing--right {
+          transform-origin: 60% 38%;
+          animation: hm2-angel-right-flap 1.55s ease-in-out infinite;
+        }
+        .hm2-wing--demon.hm2-wing--left {
+          transform-origin: 39% 37%;
+          animation: hm2-demon-left-flap 0.86s ease-in-out infinite;
+        }
+        .hm2-wing--demon.hm2-wing--right {
+          transform-origin: 62% 37%;
+          animation: hm2-demon-right-flap 0.86s ease-in-out infinite;
+        }
+        @keyframes hm2-angel-left-flap {
+          0%, 100% { transform: rotate(-5deg) scaleX(1) translateY(0); }
+          50%      { transform: rotate(9deg) scaleX(0.9) translateY(2%); }
+        }
+        @keyframes hm2-angel-right-flap {
+          0%, 100% { transform: rotate(5deg) scaleX(1) translateY(0); }
+          50%      { transform: rotate(-9deg) scaleX(0.9) translateY(2%); }
+        }
+        @keyframes hm2-demon-left-flap {
+          0%, 100% { transform: rotate(-7deg) skewY(0deg) scaleX(1); }
+          50%      { transform: rotate(14deg) skewY(-3deg) scaleX(0.84); }
+        }
+        @keyframes hm2-demon-right-flap {
+          0%, 100% { transform: rotate(7deg) skewY(0deg) scaleX(1); }
+          50%      { transform: rotate(-14deg) skewY(3deg) scaleX(0.84); }
+        }
         @media (prefers-reduced-motion: reduce) {
-          .hm2-figure--left, .hm2-figure--right { animation: none; }
+          .hm2-figure--left,
+          .hm2-figure--right,
+          .hm2-wing {
+            animation: none;
+          }
         }
 
         /* ── RL80 corner mark ── Ported from the root's .rl80-ticker-title

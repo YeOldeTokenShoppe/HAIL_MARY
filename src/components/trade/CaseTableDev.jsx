@@ -7,7 +7,13 @@ import CASE_001 from "@/components/game/cases/case-001";
 import CASE_002 from "@/components/game/cases/case-002";
 import CASE_003 from "@/components/game/cases/case-003";
 import { CASE_SIGNALS } from "@/game/terminal-traders/caseSignals";
-import { seatBelief, casePnl, mulberry32, SEAT_MODELS, TABLE_RULES } from "@/game/terminal-traders/caseTable";
+import { TABLE_RULES } from "@/game/terminal-traders/caseTable";
+import { KIT_CARDS, KIND_LABEL, resolveKitPlay } from "@/game/terminal-traders/caseKit";
+import {
+  YOU, BASE_ACTIONS, BOT_ROUNDS, MAX_STAKE, HORIZON, HORIZON_HIT, HORIZON_MISS,
+  STOP_LOSS_FLOOR, PATRONS, LEAN_LINES, BOT_SIG, bucket,
+  createBotState, botRound, finalizeCalls, settleCase,
+} from "@/game/terminal-traders/docketRun";
 import { CHARACTER_META, CHARACTER_ORDER } from "@/components/CaseFile/characterMeta";
 
 // CASE TABLE — playable mock v4 (CASE_TABLE.md §4, post-pivot).
@@ -27,121 +33,20 @@ import { CHARACTER_META, CHARACTER_ORDER } from "@/components/CaseFile/character
 // named line in the Ledger. Sizing math stays hidden until the debrief
 // ("felt, not computed"); the side pot's TERMS are public at commit.
 // Mock omissions: Cred costs, crowd odds, voices, persistence.
+//
+// The rules/content live in the engine modules (kit cards + effect
+// resolution in caseKit.js; turn engine, ticket math, patrons, events and
+// settle in docketRun.js) — this file is the mock's UI over them.
 
 const DOCKET = [CASE_001, CASE_002, CASE_003];
-const TRADER_BY_STATION = { monk: "gr80", demon: "john-barron", marisol: "marisol", eugene: "eugene" };
-const YOU = "you";
 const SEATS = [YOU, ...CHARACTER_ORDER];
 const STAKE = TABLE_RULES.stake; // the council's flat benchmark stake
 const START_PF = TABLE_RULES.startPortfolio;
-const BASE_ACTIONS = 3;
-const BOT_ROUNDS = 3;
 const DOCK_H = 240; // tall enough for the card-shaped kit hand
 
-const bucket = (p) => (p < 0.4 ? "believe" : p > 0.6 ? "doubt" : "abstain");
 const VLABEL = { believe: "TRUST", doubt: "DOUBT", abstain: "ABSTAIN" };
 const VCOLOR = { believe: "#4dffaa", doubt: "#ff5454", abstain: "#ffd23a" };
-
-// ---- The three-dial position ticket (v4) ----
-// Every dial gets its own named line in the Ledger — no unscored controls.
-const MAX_STAKE = 50;
-// Sizing debrief: conviction |p-0.5|/0.5 linearly justifies 0..MAX_STAKE.
-// Not shown at commit (felt, not computed) — named at the Ledger.
-const justifiedStake = (p) => Math.round((Math.abs(p - 0.5) / 0.5) * MAX_STAKE);
-const SIZING_TOLERANCE = 8;
-// Horizon side pot: a timing bet conditional on your rug thesis.
-// Terms are public at commit (a bet's terms aren't machinery): hit +10, miss −4.
-const HORIZON = [
-  { key: "none", label: "NO CALL", sub: "sit out the side pot" },
-  { key: "days", label: "DAYS", sub: "unravels inside a week", test: (d) => d <= 7 },
-  { key: "weeks", label: "WEEKS", sub: "unravels inside a month", test: (d) => d > 7 && d <= 30 },
-  { key: "months", label: "MONTHS", sub: "unravels inside a quarter", test: (d) => d > 30 && d <= 90 },
-];
-const HORIZON_HIT = 10;
-const HORIZON_MISS = -4;
-
-// Patron perks (§4.1) — the partner who sponsors your run.
-const PATRONS = {
-  monk: { perk: "Blessed Cold Storage", desc: "One crash shield per docket — the first bad market flip bounces off your book." },
-  demon: { perk: "Devil's Leverage", desc: "Bold calls (80%+ conviction either way) pay ×1.25 — wins AND losses. He would." },
-  marisol: { perk: "Standing Warrant", desc: "Your first question to Marisol each case is free — it costs no action." },
-  eugene: { perk: "Déjà Vu", desc: "Once per docket, Eugene mutters where the crack lives — the case's decisive lenses." },
-};
-
-// In-character pundit leans — vague direction only; exact calls stay sealed
-// until the Ledger (§4.2.3: leans are theater, anti copy-trading).
-const LEAN_LINES = {
-  monk: {
-    believe: "The ledger reads clean. Cautiously, mind you.",
-    abstain: "I will not swear on this one. Not yet.",
-    doubt: "The house of the Lord does not chase this.",
-  },
-  demon: {
-    believe: "I've seen worse get standing ovations. I'm in.",
-    abstain: "Coin flip. And I hate flipping fair coins.",
-    doubt: "Even I can smell the exit from here.",
-  },
-  marisol: {
-    believe: "The chain checks out. That's all you get.",
-    abstain: "No chain data, no conviction. I need more.",
-    doubt: "Follow the wallets. They're already leaving.",
-  },
-  eugene: {
-    believe: "The pattern rhymes with the good ones.",
-    abstain: "The pattern's blurry. Something's off — or nothing is.",
-    doubt: "I've seen this chart before. It ended badly.",
-  },
-};
-
-// Docket events (simplified MARKET_CARDS stand-ins — same odds as the sim).
-// `effect` is the player-facing consequence line — every event states what it
-// did to the books, including "nothing", so the banner is never ambiguous.
-const EVENTS = [
-  { id: "crash", p: 0.3, label: "DEAD CHAIN HOUR", text: "Liquidity evaporates.", effect: "ALL BOOKS −10 · APPLIED ABOVE", portfolioAll: -10 },
-  { id: "boost", p: 0.2, label: "BULL RUN", text: "The tide lifts.", effect: "NEXT CASE PAYS ×1.25", payoutMult: 1.25 },
-  { id: "calm", p: 0.5, label: "STABLECOIN WEATHER", text: "Nothing moves. The desk breathes.", effect: "NO EFFECT ON ANY BOOK" },
-];
-
-function rollEvent(rand) {
-  let roll = rand();
-  for (const event of EVENTS) {
-    roll -= event.p;
-    if (roll <= 0) return event;
-  }
-  return EVENTS[EVENTS.length - 1];
-}
-
-// Your kit — THE FIRST TWELVE (CASE_TABLE.md §3.2b): the art-scope subset.
-// Every kit role, every tier, and every ticket dial has a card that serves
-// it. Playing a card IS an investigation action (§4.2). Once each per case.
-const KIT_CARDS = [
-  { id: "audit-flare", name: "Audit Flare", rarity: "common", kind: "lensKey", station: "monk", text: "GR80 slides you his 2 strongest evidence cards." },
-  { id: "forked-rumor", name: "Forked Rumor", rarity: "common", kind: "lensKey", station: "demon", text: "Barron slides you his 2 strongest evidence cards." },
-  { id: "wallet-seance", name: "Wallet Séance", rarity: "common", kind: "lensKey", station: "marisol", text: "Marisol slides you her 2 strongest evidence cards." },
-  { id: "mempool-prophecy", name: "Mempool Prophecy", rarity: "common", kind: "lensKey", station: "eugene", text: "Eugene slides you his 2 strongest evidence cards." },
-  { id: "cold-wallet", name: "Cold Wallet", rarity: "uncommon", kind: "deepScan", station: "monk", text: "Deep scan — GR80 opens the cold archive: everything he still holds." },
-  { id: "chart-exorcism", name: "Chart Exorcism", rarity: "uncommon", kind: "deepScan", station: "marisol", text: "Deep scan — Marisol drags out everything the chain still hides." },
-  { id: "oracle-crosscheck", name: "Oracle Crosscheck", rarity: "rare", kind: "crossref", text: "Pull the strongest evidence card from every station you haven't visited." },
-  { id: "rug-warning", name: "Rug Warning", rarity: "rare", kind: "trace", text: "Sweep for a fast-exit fingerprint. Finds it only if the rug is days away." },
-  { id: "candle-vigil", name: "Candle Vigil", rarity: "common", kind: "shield", text: "Shield: absorb one negative market flip this docket." },
-  { id: "neon-stop-loss", name: "Neon Stop Loss", rarity: "uncommon", kind: "stoploss", text: "This case's ticket can't lose more than 25, whatever you staked." },
-  { id: "insider-ping", name: "Insider Ping", rarity: "uncommon", kind: "peek", text: "At pundit calls, wiretap one partner and see their exact sealed number." },
-  { id: "terminal-foil-moment", name: "Terminal Foil Moment", rarity: "terminal-foil", kind: "wildcard", text: "The desk stops — take two extra actions this case." },
-];
 const RARITY_COLOR = { common: "#bfeede", uncommon: "#4dffaa", rare: "#8ee9ff", "terminal-foil": "#ffd23a" };
-const KIND_LABEL = {
-  lensKey: "LENS KEY", deepScan: "DEEP SCAN", crossref: "CROSS-REF", trace: "EXIT TRACE",
-  shield: "SHIELD", stoploss: "STOP LOSS", peek: "WIRETAP", wildcard: "WILDCARD",
-};
-const STOP_LOSS_FLOOR = -25;
-
-// Each partner's signature play (round 3, ~70%) — readable tells.
-const BOT_SIG = {
-  monk: { card: "COLD WALLET", line: "GR80 plays COLD WALLET — his book goes to cold storage.", mod: { botShield: true } },
-  demon: { card: "MARKET SERMON", line: "Barron plays MARKET SERMON — he's talking himself into it.", mod: { overconf: 1.5 } },
-  marisol: { card: "WALLET SÉANCE", line: "Marisol plays WALLET SÉANCE — the chain speaks to her.", mod: { lensMult: 1.9 } },
-  eugene: { card: "MEMPOOL PROPHECY", line: "Eugene plays MEMPOOL PROPHECY — the pattern sharpens.", mod: { noise: 0.45 } },
-};
 
 export default function CaseTableDev() {
   const [seed, setSeed] = useState(1337);
@@ -199,7 +104,7 @@ export default function CaseTableDev() {
   const [tableLog, setTableLog] = useState([]);
   const [punditFinal, setPunditFinal] = useState({}); // { stationKey: { p, scanned } }
 
-  const botRef = useRef({ roundsDone: 0, scanned: {}, mods: {}, shield: {} });
+  const botRef = useRef(createBotState());
 
   const caseData = DOCKET[caseIndex];
   const signals = CASE_SIGNALS[caseData.id];
@@ -212,44 +117,14 @@ export default function CaseTableDev() {
   const log = (line) => setTableLog((l) => [...l, line]);
   const shortName = (k) => CHARACTER_META[k].name.split(" ").pop();
 
-  // ---------- turn engine ----------
-  const botRound = () => {
-    const bt = botRef.current;
-    if (bt.roundsDone >= BOT_ROUNDS) return;
-    const round = bt.roundsDone + 1;
-    CHARACTER_ORDER.forEach((k, i) => {
-      const rand = mulberry32(seed * 61 + caseIndex * 101 + round * 13 + i * 7);
-      const scanned = (bt.scanned[k] ||= []);
-      if (round === 1) {
-        scanned.push(k);
-        log(`R${round} · ${shortName(k)} works ${CHARACTER_META[k].role}`);
-      } else if (round === 2) {
-        const rest = CHARACTER_ORDER.filter((s) => !scanned.includes(s));
-        const pick = rest[Math.floor(rand() * rest.length)];
-        scanned.push(pick);
-        log(`R${round} · ${shortName(k)} cross-reads ${CHARACTER_META[pick].role}`);
-      } else if (rand() < 0.7) {
-        const sig = BOT_SIG[k];
-        bt.mods[k] = { ...(bt.mods[k] || {}), ...sig.mod };
-        if (sig.mod.botShield) bt.shield[k] = true;
-        log(`R${round} · ${sig.line}`);
-      } else {
-        log(`R${round} · ${shortName(k)} sits back and watches you work.`);
-      }
-    });
-    bt.roundsDone = round;
+  // ---------- turn engine (docketRun.js) ----------
+  const runBotRound = () => {
+    botRound(botRef.current, { seed, caseIndex, order: CHARACTER_ORDER, meta: CHARACTER_META }).forEach(log);
   };
 
   const enterCalls = () => {
-    const bt = botRef.current;
-    while (bt.roundsDone < BOT_ROUNDS) botRound();
-    const final = {};
-    CHARACTER_ORDER.forEach((k, i) => {
-      const { botShield, ...beliefMods } = bt.mods[k] || {};
-      const model = { ...SEAT_MODELS[TRADER_BY_STATION[k]], ...beliefMods };
-      const rand = mulberry32(seed * 31 + caseIndex * 101 + i * 7 + 1);
-      final[k] = { p: seatBelief(signals, model, bt.scanned[k] || [k], rand), scanned: bt.scanned[k] || [k] };
-    });
+    const { final, logs } = finalizeCalls(botRef.current, { seed, caseIndex, signals, order: CHARACTER_ORDER, meta: CHARACTER_META });
+    logs.forEach(log);
     setPunditFinal(final);
     setScreen("calls");
   };
@@ -272,67 +147,29 @@ export default function CaseTableDev() {
     }
     setActionsUsed((a) => a + 1);
     log(`R${Math.min(actionsUsed + 1, BOT_ROUNDS)} · You press ${shortName(key)} (${CHARACTER_META[key].role})`);
-    botRound();
+    runBotRound();
     if (actionsUsed + 1 >= actionsMax) log("▸ Out of actions — the table is waiting. PUNDIT CALLS ▸");
   };
 
-  // ---------- kit ----------
-  const strongestUnrevealed = (stationKey, current, count) => {
-    const already = new Set(current[stationKey] || []);
-    return [...signals.stations[stationKey]]
-      .filter((e) => !already.has(e.label))
-      .sort((a, b) => b.w - a.w)
-      .slice(0, count)
-      .map((e) => e.label);
-  };
-
+  // ---------- kit (caseKit.js) ----------
   const playKitCard = (card) => {
     if (kitPlayed.includes(card.id) || actionsUsed >= actionsMax) return;
-    if (card.kind === "lensKey") {
-      const labels = strongestUnrevealed(card.station, revealed, 2);
-      if (!labels.length) { log(`⟡ ${card.name}: ${shortName(card.station)} has nothing left to show you.`); return; }
-      setRevealed((r) => ({ ...r, [card.station]: [...(r[card.station] || []), ...labels] }));
-      log(`⟡ You play ${card.name} — ${shortName(card.station)} slides you: ${labels.join(" · ")}`);
-    } else if (card.kind === "crossref") {
-      const targets = CHARACTER_ORDER.filter((k) => !visited.includes(k));
-      if (!targets.length) { log("⟡ Oracle Crosscheck: you've already visited every station."); return; }
-      const next = { ...revealed };
-      const got = [];
-      targets.forEach((k) => {
-        const [label] = strongestUnrevealed(k, next, 1);
-        if (label) { next[k] = [...(next[k] || []), label]; got.push(`${label} (${shortName(k)})`); }
-      });
-      setRevealed(next);
-      log(`⟡ You play ${card.name} — crosscheck pulls: ${got.join(" · ") || "nothing new"}`);
-    } else if (card.kind === "deepScan") {
-      const labels = strongestUnrevealed(card.station, revealed, 99);
-      if (!labels.length) { log(`⟡ ${card.name}: ${shortName(card.station)} has nothing left to show you.`); return; }
-      setRevealed((r) => ({ ...r, [card.station]: [...(r[card.station] || []), ...labels] }));
-      log(`⟡ You play ${card.name} — deep scan: ${shortName(card.station)} opens everything (${labels.length} more entr${labels.length === 1 ? "y" : "ies"})`);
-    } else if (card.kind === "trace") {
-      // Fast-exit fingerprints only: a slow rug and a legit token both read
-      // "no fingerprint" — the trace informs HORIZON, never the verdict.
-      const day = signals.collapseDay;
-      log(day != null && day <= 7
-        ? "⟡ Rug Warning — FAST-EXIT FINGERPRINT FOUND. If this thing blows, it blows in DAYS."
-        : "⟡ Rug Warning — no fast-exit fingerprint. If it dies, it dies slow. Or not at all.");
-    } else if (card.kind === "stoploss") {
-      setStopLossArmed(true);
-      log(`⟡ You play Neon Stop Loss — this case's ticket can't lose more than ${-STOP_LOSS_FLOOR}.`);
-    } else if (card.kind === "shield") {
-      setShields((s) => s + 1);
-      log(`⟡ You play ${card.name} — the next bad market flip bounces off your book.`);
-    } else if (card.kind === "peek") {
-      setPeekArmed(true);
-      log("⟡ You play Insider Ping — wiretap live. Pick a partner at pundit calls.");
-    } else if (card.kind === "wildcard") {
-      setBonusActions((b) => b + 2);
-      log("⟡ You play TERMINAL FOIL MOMENT — the desk stops. Two extra actions.");
-    }
+    const play = resolveKitPlay(card, { signals, revealed, visited, order: CHARACTER_ORDER, shortName });
+    log(play.log);
+    if (!play.ok) return; // whiff — the card (and the action) isn't consumed
+    if (play.reveals) setRevealed((r) => {
+      const next = { ...r };
+      Object.entries(play.reveals).forEach(([k, labels]) => { next[k] = [...(next[k] || []), ...labels]; });
+      return next;
+    });
+    if (play.grants?.shields) setShields((s) => s + play.grants.shields);
+    if (play.grants?.stopLoss) setStopLossArmed(true);
+    if (play.grants?.peek) setPeekArmed(true);
+    if (play.grants?.bonusActions) setBonusActions((b) => b + play.grants.bonusActions);
     setKitPlayed((p) => [...p, card.id]);
     setSelectedCard(null);
     setActionsUsed((a) => a + 1);
-    botRound();
+    runBotRound();
     // wildcard grants +2 actions, so recompute against the post-play max
     const maxAfter = card.kind === "wildcard" ? actionsMax + 2 : actionsMax;
     if (actionsUsed + 1 >= maxAfter) log("▸ Out of actions — the table is waiting. PUNDIT CALLS ▸");
@@ -372,99 +209,24 @@ export default function CaseTableDev() {
     setKitPlayed([]); setSelectedCard(null); setShieldSpent(false); setStopLossArmed(false);
     setPeekArmed(false); setPeekChoice(null); setMarisolFreeUsed(false);
     setTableLog([]); setPunditFinal({});
-    botRef.current = { roundsDone: 0, scanned: {}, mods: {}, shield: {} };
+    botRef.current = createBotState();
   };
 
-  const settleCase = (pHuman, stakeYou, horizonIdx) => {
-    const truth = signals.truth;
-    const rows = [];
-    const nextBooks = { ...books };
-    const nextBusted = { ...busted };
-    const nextBriers = { ...briers };
-
-    SEATS.forEach((k) => {
-      if (busted[k]) { rows.push({ seat: k, out: true }); return; }
-      const isYou = k === YOU;
-      const p = isYou ? pHuman : punditFinal[k].p;
-      const stake = isYou ? stakeYou : STAKE; // the council benchmarks at a flat 25
-      let pnl = casePnl(p, truth, stake) * payoutMult;
-      let bold = false;
-      if (isYou && patron === "demon" && Math.abs(p - 0.5) >= 0.3) {
-        pnl *= 1.25; bold = true; // Devil's Leverage — both ways
-      }
-
-      // Dial 3 — horizon side pot (you only, opt-in): pays only if the token
-      // rugs inside your window. A call on a token that holds always loses.
-      let horizon = null;
-      if (isYou && horizonIdx > 0) {
-        const day = signals.collapseDay;
-        const hit = truth === 1 && day != null && !!HORIZON[horizonIdx].test?.(day);
-        const delta = hit ? HORIZON_HIT : HORIZON_MISS;
-        pnl += delta;
-        horizon = { idx: horizonIdx, hit, delta, day };
-      }
-
-      // Neon Stop Loss — floors the whole ticket (stake P&L + side pot).
-      let stopLoss = null;
-      if (isYou && stopLossArmed && pnl < STOP_LOSS_FLOOR) {
-        stopLoss = { from: Math.round(pnl) };
-        pnl = STOP_LOSS_FLOOR;
-      }
-
-      // Dial 2 — sizing debrief (you only): stake vs conviction-justified.
-      let sizing = null;
-      if (isYou) {
-        const justified = justifiedStake(pHuman);
-        sizing = {
-          justified,
-          verdict: justified === 0
-            ? "centered"
-            : stake > justified + SIZING_TOLERANCE
-              ? "oversized"
-              : stake < justified - SIZING_TOLERANCE
-                ? "undersized"
-                : "sized",
-        };
-      }
-
-      const brier = (p - truth) ** 2;
-      nextBooks[k] = Math.max(0, nextBooks[k] + pnl);
-      nextBriers[k] = [...(nextBriers[k] || []), brier];
-      if (nextBooks[k] <= 0) nextBusted[k] = true;
-      rows.push({
-        seat: k, p, pnl, brier, bold, stake, horizon, sizing, stopLoss,
-        book: nextBooks[k],
-        justBusted: nextBooks[k] <= 0,
-        scanned: isYou
-          ? Object.keys(asked).filter((s) => (asked[s]?.length || 0) > 0)
-          : punditFinal[k].scanned,
-      });
+  const settle = (pHuman, stakeYou, horizonIdx) => {
+    const result = settleCase({
+      signals, order: CHARACTER_ORDER, books, busted, briers, punditFinal,
+      botState: botRef.current, pHuman, stakeYou, horizonIdx, patron,
+      payoutMult, shields, stopLossArmed,
+      youScanned: Object.keys(asked).filter((s) => (asked[s]?.length || 0) > 0),
+      caseIndex, docketLength: DOCKET.length, seed,
     });
-
-    let event = null;
-    let nextMult = 1;
-    if (caseIndex < DOCKET.length - 1) {
-      event = rollEvent(mulberry32(seed * 131 + caseIndex * 17 + 5));
-      if (event.portfolioAll) {
-        SEATS.forEach((k) => {
-          if (nextBusted[k]) return;
-          if (event.portfolioAll < 0) {
-            if (k === YOU && shields > 0) { setShields((s) => s - 1); setShieldSpent(true); return; }
-            if (k !== YOU && botRef.current.shield[k]) return; // GR80's own cold storage
-          }
-          nextBooks[k] = Math.max(0, nextBooks[k] + event.portfolioAll);
-          if (nextBooks[k] <= 0) nextBusted[k] = true;
-        });
-      }
-      if (event.payoutMult) nextMult = event.payoutMult;
-    }
-
-    setBooks(nextBooks);
-    setBusted(nextBusted);
-    setBriers(nextBriers);
-    setPendingEvent(event);
-    setPayoutMult(nextMult);
-    setLedger(rows);
+    setBooks(result.books);
+    setBusted(result.busted);
+    setBriers(result.briers);
+    setPendingEvent(result.event);
+    setPayoutMult(result.payoutMult);
+    if (result.shieldSpent) { setShields((s) => s - 1); setShieldSpent(true); }
+    setLedger(result.rows);
   };
 
   const advance = () => {
@@ -934,7 +696,7 @@ export default function CaseTableDev() {
 
           <button className="ct-cta" onClick={() => {
             setPlayerVerdict(v); setPlayerP(p);
-            settleCase(p, ticketStake, ticketHorizon);
+            settle(p, ticketStake, ticketHorizon);
             setScreen("reveal");
           }}>LOCK THE TICKET ▸</button>
           <button className="ct-ghost" onClick={() => setScreen("calls")}>◀ BACK TO PUNDIT CALLS</button>
