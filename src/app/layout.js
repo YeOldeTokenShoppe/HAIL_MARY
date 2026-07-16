@@ -1,8 +1,35 @@
 import "./globals.css";
 import Providers from "@/components/Providers";
 
+const siteDescription =
+  'Mater ex mahina".';
+
 export const metadata = {
+  // Resolves relative image/URL paths below into absolute URLs for crawlers.
+  metadataBase: new URL('https://rl80.com'),
   title: '𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙',
+  description: siteDescription,
+  openGraph: {
+    title: '𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙',
+    description: siteDescription,
+    url: 'https://rl80.com',
+    siteName: 'Our Lady of Perpetual Profit',
+    type: 'website',
+    images: [
+      {
+        url: 'https://rl80.com/carousel_images/img7.webp',
+        width: 960,
+        height: 540,
+        alt: 'Our Lady of Perpetual Profit',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙',
+    description: siteDescription,
+    images: ['https://rl80.com/carousel_images/img7.webp'],
+  },
   icons: {
     icon: '/favicon.svg',
     apple: '/apple-icon.svg',
