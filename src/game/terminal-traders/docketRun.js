@@ -20,6 +20,15 @@ export const YOU = "you";
 export const BASE_ACTIONS = 3;
 export const BOT_ROUNDS = 3;
 
+// The Daily Docket convention (§4.1, §4.5b tier 1): the seed IS the UTC date
+// as YYYYMMDD, so everyone who sits down today plays the same table and a
+// reward claim can be validated against the calendar. Server verification of
+// the full transcript arrives with §4.10; until then the seed window is the
+// only server-side check.
+export function dateSeed(date = new Date()) {
+  return Number(date.toISOString().slice(0, 10).replace(/-/g, ""));
+}
+
 // Station key → canonical Genesis trader id (SEAT_MODELS key). Station keys
 // stay monk/demon — they're baked into the authored cases and audio slots.
 export const TRADER_BY_STATION = { monk: "gr80", demon: "john-barron", marisol: "marisol", eugene: "eugene" };

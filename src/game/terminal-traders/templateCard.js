@@ -1,4 +1,4 @@
-import { CARD_TYPES, GENESIS_SET } from "./cards.js";
+import { CARD_TYPES, GENESIS_SET, LENS_LABELS } from "./cards.js";
 
 // Single source of truth for finished card art. As the Genesis 80 art run
 // lands, add one entry per card id; everything else renders the framed
@@ -55,7 +55,8 @@ export function toTemplateCard(card) {
     foilStyle: FOIL_BY_RARITY[card.rarity] || "subtle",
     edition: index === -1 ? "promo" : `${index + 1}/${GENESIS_SET.length}`,
     ability: abilityFor(card),
-    flavorText: card.quote || null,
+    // Coins print their solved dossier (§4.6) as flavor when no quote exists.
+    flavorText: card.quote || card.caseRef?.note || null,
     statPair: statPairFor(card),
     startingCred: card.type === CARD_TYPES.TRADER ? card.startingCred : null,
     startingPortfolio: card.type === CARD_TYPES.TRADER ? card.startingPortfolio : null,
@@ -73,6 +74,26 @@ function subtitleFor(card) {
   return styleLabel(card.tag);
 }
 
+// Kit role → the ability-box label printed on the card (§3.2a: card text is
+// written kit-first; the legacy effectText renders only when no kit exists).
+const KIT_ROLE_LABELS = {
+  lensKey: "Lens Key",
+  deepScan: "Deep Scan",
+  crossref: "Cross-Reference",
+  trace: "Exit Trace",
+  peek: "Wiretap",
+  shield: "Shield",
+  stoploss: "Stop Loss",
+  wildcard: "Wildcard",
+};
+
+function kitAbilityName(kit) {
+  const base = KIT_ROLE_LABELS[kit.role] || "Kit";
+  if (kit.lenses) return `${base} · ${kit.lenses.map((l) => LENS_LABELS[l]).join(" + ")}`;
+  if (kit.lens) return `${base} · ${LENS_LABELS[kit.lens]}`;
+  return base;
+}
+
 function abilityFor(card) {
   if (card.type === CARD_TYPES.TRADER) {
     return { name: card.abilityName, text: card.abilityText, badgeImage: "/abilityBadge.png" };
@@ -81,7 +102,14 @@ function abilityFor(card) {
     return { name: "Market Entry", text: card.effectText, badgeImage: "/abilityBadge.png" };
   }
   if (card.type === CARD_TYPES.MARKET) {
+    // Docket-event identity (§4.6): the printed card describes the table flip.
+    if (card.docket) {
+      return { name: "Docket Event", text: `${card.docket.text} ${card.docket.banner}.`, badgeImage: "/abilityBadge.png" };
+    }
     return { name: "Market Event", text: card.effectText, badgeImage: "/abilityBadge.png" };
+  }
+  if (card.kit) {
+    return { name: kitAbilityName(card.kit), text: card.kit.text, badgeImage: "/abilityBadge.png" };
   }
   return { name: styleLabel(card.tag), text: card.effectText, badgeImage: "/abilityBadge.png" };
 }

@@ -22,6 +22,7 @@ import HolyTrinSection from "@/components/HolyTrinSection";
 import MaterExMachinaSection from "@/components/MaterExMachinaSection";
 import BusinessSection from "@/components/BusinessSection";
 import DropInTitle from "../components/DropInTitle";
+import CoinLoader from "@/components/CoinLoader";
 import { useCandles } from "@/hooks/useCandles";
 
 
@@ -169,6 +170,15 @@ const RibbonCarousel = dynamic(
   () => import("@/components/carousel/RibbonCarousel"),
   { ssr: false }
 );
+
+// Preloader timings. The scene's assets are small (statue 371K + votive
+// 111K), so on a warm cache the coin would otherwise flash for a couple
+// hundred milliseconds and read as a glitch rather than a load — hence a
+// minimum on-screen time, same reasoning and same value as /trade. The
+// timeout is the never-strand-the-visitor backstop; /main uses 15s, and
+// the root scene is lighter than its triptych.
+const LOADER_MIN_MS = 2000;
+const LOADER_TIMEOUT_MS = 12000;
 
 // Melt windows — anonymous visitors get a 1-minute preview to sample the
 // ritual; signed-in faithful get 8 hours so the flame lasts across a
@@ -2055,6 +2065,45 @@ function MobileSectionDropInTitle() {
 export default function HomePage() {
   const [timeframeKey, setTimeframeKey] = useState("30m");
   const [heroPullquoteIndex, setHeroPullquoteIndex] = useState(0);
+  // Preloader. Root was the only page rendering its scene raw, so a
+  // first visit showed the mount sequence rather than the composition:
+  // black, then the chart cylinder, then the statue popping in, then the
+  // votive. The coin covers that and hands over a finished frame.
+  const [isLoading, setIsLoading] = useState(true);
+  const [statueLoaded, setStatueLoaded] = useState(false);
+  const loadStartRef = useRef(Date.now());
+
+  // Reveal. `onStatueLoad` fires when the GLB is parsed and added to the
+  // scene, which is a frame or two BEFORE the GPU has actually drawn it —
+  // lifting on that signal alone hands the visitor a half-composited
+  // frame, the thing the loader exists to prevent. Two rAFs (one to
+  // schedule past the current frame, one that runs after its paint) let
+  // the scene settle first. See the same lesson on /main's onPortraitReady.
+  useEffect(() => {
+    if (!statueLoaded) return undefined;
+    let rafSchedule = 0;
+    let rafPaint = 0;
+    const hold = Math.max(0, LOADER_MIN_MS - (Date.now() - loadStartRef.current));
+    const timer = setTimeout(() => {
+      rafSchedule = requestAnimationFrame(() => {
+        rafPaint = requestAnimationFrame(() => setIsLoading(false));
+      });
+    }, hold);
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(rafSchedule);
+      cancelAnimationFrame(rafPaint);
+    };
+  }, [statueLoaded]);
+
+  // Backstop — a rough pop-in beats a permanent black screen. Covers the
+  // cases where the statue's load callback never arrives at all: decode
+  // failure, a refused WebGL context, or the loader's internal
+  // hasLoadedRef guard short-circuiting a remount before onLoad fires.
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), LOADER_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
   // The hero title alternates between the full devotional name and the RL80
   // ticker so the tie between the two reads at a glance. Our Lady holds the
   // frame, then the ticker flashes in (with the /fountain god-ray treatment)
@@ -2062,6 +2111,11 @@ export default function HomePage() {
   // content never reflows.
   const [heroShowTicker, setHeroShowTicker] = useState(false);
   useEffect(() => {
+    // Don't run the crossfade behind the preloader. The cycle's first
+    // face is meant to be the devotional name, and its 5.2s hold is
+    // about the same length as the load — start it on mount and the
+    // visitor can arrive to the coin lifting on a mid-flash RL80.
+    if (isLoading) return undefined;
     let timer;
     let showing = false;
     const tick = () => {
@@ -2071,7 +2125,7 @@ export default function HomePage() {
     };
     timer = setTimeout(tick, 5200);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isLoading]);
   const tfOpt =
     TIMEFRAME_OPTIONS.find((o) => o.key === timeframeKey) ||
     TIMEFRAME_OPTIONS[0];
@@ -2592,6 +2646,11 @@ export default function HomePage() {
         showSignInNudge || showCandlePicker ? " has-overlay" : ""
       }`}
     >
+      {/* Covers the scene's mount sequence. Self-contained fixed overlay at
+          z-10001, which clears the bottom nav's 10000; the only root elements
+          above it are the MORE popover's, and that can't be open on load. */}
+      <CoinLoader loading={isLoading} />
+
       {/* Music control is desktop-only — removed on mobile. */}
       {!isMobileDevice && (
         <MusicButton
@@ -2628,6 +2687,7 @@ export default function HomePage() {
           priceDirection={skyPriceDirection}
           priceChange24h={data.loading ? null : data.priceChange24h}
           litCandleCount={litCandles.length}
+          onStatueLoad={() => setStatueLoaded(true)}
         >
           <HeroAltarObject
             candleLit={candleLit}

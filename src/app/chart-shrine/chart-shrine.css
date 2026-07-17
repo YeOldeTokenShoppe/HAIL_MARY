@@ -320,12 +320,14 @@ body:has(.shrine-page.neon) {
 }
 
 /* Stack inline content above the hero scene-background. Fixed-position
-   overlays (mobile dock, auth slot, sign-in nudge, candle picker) are
-   excluded so they stay pinned to the viewport instead of flowing
-   inline — this selector's specificity otherwise overrides their own
-   `position: fixed`. */
+   overlays (mobile dock, auth slot, sign-in nudge, candle picker, the
+   CoinLoader) are excluded so they stay pinned to the viewport instead of
+   flowing inline — this selector's specificity otherwise overrides their own
+   `position: fixed`. A missing exclusion fails quietly and confusingly: the
+   overlay still paints, just shrink-wrapped inline at z-index 1 with its
+   pointer events dropped, so it looks "half-styled" rather than unstyled. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.vigil-ticker):not(.candle-coachmark) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.vigil-ticker):not(.candle-coachmark):not(.coin-loading-screen) {
   position: relative;
   z-index: 1;
   /* Don't eat pointer events over the canvas — these are decorative
@@ -339,7 +341,7 @@ body:has(.shrine-page.neon) {
 /* Safety net: keep any interactive descendant of those wrappers
    clickable even though the parent is pointer-events:none. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.vigil-ticker):not(.candle-coachmark)
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay):not(.social-stack):not(.below-fold-chamber):not(.holy-trin):not(.mater-section):not(.biz-section):not(.reliquary-rail):not(.vigil-ticker):not(.candle-coachmark):not(.coin-loading-screen)
   :is(a, button, input, select, textarea, label, [role="button"], [tabindex]) {
   pointer-events: auto;
 }

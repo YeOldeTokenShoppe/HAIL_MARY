@@ -268,6 +268,10 @@ export default function TerminalTradersGame({ variant = "page", onExit, cardPool
           <Stat label="Coins" value={collectionStats.coins} />
           <Stat label="Actions" value={collectionStats.actions} />
           <Stat label="Markets" value={collectionStats.markets} />
+          <a className="tt-stat tt-binder-link" href="/binder" aria-label="Open your Genesis 80 binder">
+            <span>Binder</span>
+            <strong>◈</strong>
+          </a>
         </div>
       </section>
 
@@ -743,9 +747,22 @@ const STYLES = `
 
   .tt-stats {
     display: grid;
-    grid-template-columns: repeat(4, minmax(74px, 1fr));
+    grid-template-columns: repeat(5, minmax(74px, 1fr));
     gap: 8px;
-    min-width: 360px;
+    min-width: 430px;
+  }
+
+  .tt-binder-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .tt-binder-link:hover {
+    border-color: rgba(156, 252, 233, 0.6);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 0 14px rgba(156, 252, 233, 0.25);
   }
 
   .tt-stat,

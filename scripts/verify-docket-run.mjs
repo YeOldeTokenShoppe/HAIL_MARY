@@ -9,9 +9,9 @@
 // numbers are asserted against independent arithmetic (§4.3 payout rule).
 //
 // Loads the REAL sources via data: modules (repo convention, see
-// sim-case-table.mjs). docketRun.js imports ./caseTable, which data:
-// modules can't resolve — the import specifier is rewritten to a data: URL
-// of caseTable.js itself.
+// sim-case-table.mjs). docketRun.js imports ./caseTable and caseKit.js
+// imports ./cards — data: modules can't resolve relative specifiers, so
+// each import is rewritten to a data: URL of the imported source.
 import { readFileSync } from "node:fs";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
@@ -19,8 +19,12 @@ const dataUrl = (src) => "data:text/javascript;charset=utf-8," + encodeURICompon
 const load = (src) => import(dataUrl(src));
 
 const caseTableSrc = read("../src/game/terminal-traders/caseTable.js");
+const cardsSrc = read("../src/game/terminal-traders/cards.js");
 const { CASE_SIGNALS } = await load(read("../src/game/terminal-traders/caseSignals.js"));
-const { KIT_CARDS, resolveKitPlay, isKitLegal } = await load(read("../src/game/terminal-traders/caseKit.js"));
+const { KIT_CARDS, resolveKitPlay, isKitLegal } = await load(
+  read("../src/game/terminal-traders/caseKit.js")
+    .replace('from "./cards"', `from ${JSON.stringify(dataUrl(cardsSrc))}`)
+);
 const {
   createBotState, botRound, finalizeCalls, settleCase, bucket, YOU,
 } = await load(

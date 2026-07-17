@@ -510,6 +510,9 @@ function PortraitPanel({
   // of three. Drives layout (stacking, scrolling, panel chrome); isMobile still
   // drives sizes and the phone-only corner mark. See MainPage's isSolo.
   isSolo,
+  // Responsive frame size for the solo layout (see MainPage's soloFrameSize).
+  // Ignored on the triptych, where the centre frame is a flat 340.
+  soloSize = 250,
   characters,
   activeCharIndex,
   onSelect,
@@ -543,7 +546,7 @@ function PortraitPanel({
   // of this box (see ShoulderFigure's [side]: -28), so it must stay under
   // viewportWidth - 56 or the saint and Barron get clipped by the panel's
   // overflowX — i.e. under ~319 on a 375px phone.
-  const frameSize = compact ? 150 : isMobile ? 250 : 340;
+  const frameSize = compact ? 150 : isSolo ? soloSize : 340;
   // NOTE: the speaking panel used to scroll itself into view on phones. The
   // transcript now owns that job (it follows its own newest line), and two
   // things fighting over the scroll position yanks the page mid-argument.
@@ -854,6 +857,12 @@ export default function MainPage() {
   const [isWide, setIsWide] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth >= 1200 : false
   );
+  // Actual viewport dimensions, so the solo frame can size to fill rather than
+  // sit at a fixed 250 in a sea of empty space on a taller phone.
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1200,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
   const [isLoading, setIsLoading] = useState(true);
   const [sceneReady, setSceneReady] = useState(false);
   // True once SitePal's avatar has actually loaded & displayed (vh_sceneLoaded).
@@ -923,6 +932,7 @@ export default function MainPage() {
     const check = () => {
       setIsMobile(window.innerWidth < 768);
       setIsWide(window.innerWidth >= 1200);
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
     };
     check();
     window.addEventListener("resize", check);
@@ -1037,6 +1047,7 @@ export default function MainPage() {
         key={s.key}
         isMobile={isMobile}
         isSolo={isSolo}
+        soloSize={soloFrameSize}
         compact={compact}
         /* The shoulder figures hover at HER frame only, and need the global
            speaker so each knows when it's the one arguing. */
@@ -1254,6 +1265,28 @@ export default function MainPage() {
   // to mount (three OOM-crash iOS — see SitePalPortals); that stays on isMobile
   // and must not be folded into this.
   const isSolo = panelCount === 1;
+
+  // ── Solo frame size ── Fill the column, keep a band for the transcript.
+  // A fixed 250 floated in a void on a tall phone; this grows the scene to the
+  // SMALLER of two ceilings, so it fills whichever axis is tighter:
+  //   • WIDTH — the frame plus its shoulder figures (28px off each side, see
+  //     ShoulderFigure) must fit, so the frame stays under viewport.w - 60.
+  //   • HEIGHT — the solo column runs top:0 → the ask bar (~160 up), and the
+  //     transcript claims a band at the bottom of it (~135), leaving the rest
+  //     for the frame; the frame renders at size × 1.3 tall (CharacterSelect),
+  //     minus ~44 of panel padding.
+  // Floored at 250 so small phones never shrink below the size they were tuned
+  // at (the height ceiling binds there and would otherwise pull it down), and
+  // ceilinged at 440 so a wide solo window doesn't mint an absurd frame. Only
+  // the solo layout uses this — the triptych centre stays a flat 340.
+  const soloFrameSize = useMemo(() => {
+    // The frame is CENTRED and a figure hangs 28px off each side, so the
+    // composition's half-width is frameSize/2 + 28; keeping 8px of margin gives
+    // frameSize ≤ viewport.w - 2*(28+8) = viewport.w - 72.
+    const widthCap = viewport.w - 72;
+    const heightCap = (viewport.h - 160 - 135 - 44) / 1.3;
+    return Math.round(Math.max(250, Math.min(widthCap, heightCap, 440)));
+  }, [viewport]);
 
   // One greeting picked per visit — shared by the drawer's typewriter text
   // and the spoken line so they always match

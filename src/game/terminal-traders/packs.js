@@ -1,4 +1,4 @@
-import { GENESIS_SET, RARITIES } from "./cards.js";
+import { COIN_CARDS, GENESIS_SET, RARITIES } from "./cards.js";
 
 // Genesis booster packs. Opening is DETERMINISTIC: the RNG is seeded from the
 // burn tx hash, so a given burn always yields the same cards — the pull is
@@ -90,6 +90,20 @@ export function openPacks(seedString, count) {
     packs.push(pack);
   }
   return { packs, counts };
+}
+
+// The Daily Docket's dossier coin (CASE_TABLE.md §4.6): completing the day's
+// docket alive grants a coin trophy, and everyone who finishes the same
+// docket gets the SAME coin — the day's solved dossier, a shared collection
+// moment. Deterministic from the docket seed, so it's re-derivable and the
+// reward route can't be steered. Terminal-foil coins are excluded — the
+// 3-foil scarcity story keeps foils in the pack chase.
+const DOCKET_COIN_POOL = COIN_CARDS
+  .filter((coin) => coin.rarity !== RARITIES.FOIL)
+  .map((coin) => coin.id);
+
+export function docketCoin(seed) {
+  return DOCKET_COIN_POOL[hashSeed(`docket-coin:${seed}`) % DOCKET_COIN_POOL.length];
 }
 
 // USD burned → whole packs. 5% tolerance absorbs price movement between the

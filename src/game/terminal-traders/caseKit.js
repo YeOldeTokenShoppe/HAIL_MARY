@@ -1,31 +1,33 @@
 // Case Kit — the card side of the investigation (CASE_TABLE.md §3, §3.2b).
-// Pure and dependency-free, same discipline as engine.js/caseTable.js: case
-// signals are passed IN, nothing is imported, so the scripts/ data:-URL
-// loader can run it headlessly.
+// Pure logic, same discipline as engine.js/caseTable.js: case signals are
+// passed IN. Card identities come from cards.js (the Genesis set is the
+// single source of truth post-§3.2a); the scripts/ data:-URL loader must
+// rewrite the ./cards import (see scripts/verify-docket-run.mjs).
 //
-// Owns: the First Twelve card definitions (§3.2b — the art-scope subset of
-// the §3.2a composition), kit legality (§3.1), and kit-effect resolution.
-// Effects are resolved against caseSignals (evidence strength = `w`), which
-// is what "strongest evidence" means until Tier-2 deepEntries exist (§3.3).
-// LENS_BY_TAG lives in cards.js next to the tag data it maps.
+// Owns: the First Twelve hand order (§3.2b — the art-scope, table-live
+// subset of the §3.2a composition), kit legality (§3.1), and kit-effect
+// resolution. Effects are resolved against caseSignals (evidence strength =
+// `w`), which is what "strongest evidence" means until Tier-2 deepEntries
+// exist (§3.3). LENS_BY_TAG lives in cards.js next to the tag data it maps.
+
+import { ACTION_CARDS } from "./cards";
 
 // THE FIRST TWELVE (§3.2b): every kit role, every rarity tier, and every
 // ticket dial (read / stake / horizon) has a card that serves it. Playing a
-// card IS an investigation action (§4.2). Once each per case.
-export const KIT_CARDS = [
-  { id: "audit-flare", name: "Audit Flare", rarity: "common", kind: "lensKey", station: "monk", text: "GR80 slides you his 2 strongest evidence cards." },
-  { id: "forked-rumor", name: "Forked Rumor", rarity: "common", kind: "lensKey", station: "demon", text: "Barron slides you his 2 strongest evidence cards." },
-  { id: "wallet-seance", name: "Wallet Séance", rarity: "common", kind: "lensKey", station: "marisol", text: "Marisol slides you her 2 strongest evidence cards." },
-  { id: "mempool-prophecy", name: "Mempool Prophecy", rarity: "common", kind: "lensKey", station: "eugene", text: "Eugene slides you his 2 strongest evidence cards." },
-  { id: "cold-wallet", name: "Cold Wallet", rarity: "uncommon", kind: "deepScan", station: "monk", text: "Deep scan — GR80 opens the cold archive: everything he still holds." },
-  { id: "chart-exorcism", name: "Chart Exorcism", rarity: "uncommon", kind: "deepScan", station: "marisol", text: "Deep scan — Marisol drags out everything the chain still hides." },
-  { id: "oracle-crosscheck", name: "Oracle Crosscheck", rarity: "rare", kind: "crossref", text: "Pull the strongest evidence card from every station you haven't visited." },
-  { id: "rug-warning", name: "Rug Warning", rarity: "rare", kind: "trace", text: "Sweep for a fast-exit fingerprint. Finds it only if the rug is days away." },
-  { id: "candle-vigil", name: "Candle Vigil", rarity: "common", kind: "shield", text: "Shield: absorb one negative market flip this docket." },
-  { id: "neon-stop-loss", name: "Neon Stop Loss", rarity: "uncommon", kind: "stoploss", text: "This case's ticket can't lose more than 25, whatever you staked." },
-  { id: "insider-ping", name: "Insider Ping", rarity: "uncommon", kind: "peek", text: "At pundit calls, wiretap one partner and see their exact sealed number." },
-  { id: "terminal-foil-moment", name: "Terminal Foil Moment", rarity: "terminal-foil", kind: "wildcard", text: "The desk stops — take two extra actions this case." },
+// card IS an investigation action (§4.2). Once each per case. The id list
+// fixes the hand's display order; the cards themselves live in cards.js.
+const FIRST_TWELVE = [
+  "audit-flare", "forked-rumor", "wallet-seance", "mempool-prophecy",
+  "cold-wallet", "chart-exorcism", "oracle-crosscheck", "rug-warning",
+  "candle-vigil", "neon-stop-loss", "insider-ping", "terminal-foil-moment",
 ];
+
+const ACTION_BY_ID = Object.fromEntries(ACTION_CARDS.map((c) => [c.id, c]));
+
+export const KIT_CARDS = FIRST_TWELVE.map((id) => {
+  const card = ACTION_BY_ID[id];
+  return { id, name: card.name, rarity: card.rarity, kind: card.kit.role, station: card.kit.lens, text: card.kit.text };
+});
 
 export const KIND_LABEL = {
   lensKey: "LENS KEY", deepScan: "DEEP SCAN", crossref: "CROSS-REF", trace: "EXIT TRACE",

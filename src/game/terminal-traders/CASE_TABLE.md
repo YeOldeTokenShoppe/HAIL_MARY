@@ -155,28 +155,53 @@ cross-reference, Terminal Foil Moment is the wildcard.
 
 Since the set is a live draft (§2.3), the 33 action cards should be
 **designed as investigation tools**, not mapped onto after the fact — their
-current `+N portfolio` effects serve the loop being retired. Target
-composition, which lands on exactly 33:
+current `+N portfolio` effects serve the loop being retired.
+
+**APPLIED 2026-07-16** — final composition (reconciled with the §3.2b v4
+deviations), landing on exactly 33 in `cards.js`:
 
 | Count | Role | Rarity | Shape |
 |---|---|---|---|
 | 16 | Lens keys | common | 4 per lens |
 | 8 | Deep scans | uncommon | 2 per lens |
-| 4 | Cross-references | rare | each names a lens *pair* (4 of the 6 pairs; LOGOS+ETHOS and LOGOS+MYTHOS are the workhorses) |
-| 2 | Table talk | uncommon/rare | the Phase 3 sabotage effects (§4.2) — inert in Phase 2, printed anyway so the set doesn't need reissuing |
-| 2 | Insurance | common/uncommon | grant `shield` (docket-event absorption, §4.6) |
+| 4 | Cross-references | rare | each names a lens *pair* — printed: LOGOS+ETHOS (Oracle Crosscheck), LOGOS+MYTHOS (Ledger vs Legend), ETHOS+PATHOS (Faith Audit), PATHOS+MYTHOS (Choir vs Canon) |
+| 1 | Exit trace | rare | Rug Warning — the HORIZON-dial read (§3.2b) |
+| 1 | Pundit audit | uncommon | Insider Ping — §4.5's sanctioned crack |
+| 2 | Insurance | common/uncommon | shield (Candle Vigil) + ticket floor (Neon Stop Loss) — two fears, two cards (§3.2b) |
 | 1 | Wildcard | terminal-foil | Terminal Foil Moment, unchanged |
 
-Schema: actions gain `kit: { role, lens }` (or `lenses: [a, b]` for
-cross-refs) as the primary rules text. The legacy `effect` fields survive
-only as long as classic mode does (§4.8) — new card text is written kit-first.
+The original draft's **2 table-talk slots were superseded** by Exit Trace +
+Pundit Audit: the v3 pivot shelved sabotage for live PvP (§4.5b tier 3),
+and cards that do something in the shipped solo game beat inert
+placeholders. The "print now so the set doesn't need reissuing" argument is
+answered by seasons (GENESIS.md §1) — sabotage prints in the set that ships
+alongside live tables. Action rarity spread: 17 common / 10 uncommon /
+5 rare / 1 foil. Eight legacy ids retired for the eugene/cross-ref slots
+(botnet-arbitrage, flash-fill, whale-wake, meme-blessing, airdrop-ambush,
+leverage-spiral, tithe-rebate, rug-pull-reversal → pattern-rosary,
+candle-palmistry, origin-story, prophecy-backtest, apocrypha-dive,
+ledger-vs-legend, faith-audit, choir-vs-canon) — sanctioned pre-art-lock,
+no alias maps (§2.3).
+
+Schema (implemented): actions gain `kit: { role, lens, text }` (or
+`lenses: [a, b]` for cross-refs) as the primary rules text; the card
+template prints kit text and role labels. The legacy `cost`/`effectText`/
+`effect` fields survive only as long as classic mode does (§4.8) — new card
+text is written kit-first. `caseKit.js` derives the First Twelve from
+`cards.js`, so the set is the single source of truth.
 
 Coin cards get canonized rather than redesigned: the 28 coins **are past
 cases** (Ponzi Siren, Prophet Margin, and friends retroactively become
-solved dossiers). Each gains an optional `caseRef`, which also gives
-Eugene's `patternRefs` (§4.4) a lore-native vocabulary — "this smells like
-Ponzi Siren" is both a bot mechanic and a collector hook. Market cards are
-authored directly as docket events (§4.6).
+solved dossiers). Each gains `caseRef: { outcome, pattern, note }`
+(implemented — outcome ∈ rug/legit/zombie, pattern from the exported
+`CASE_PATTERNS` archetype vocabulary), which also gives Eugene's
+`patternRefs` (§4.4) a lore-native vocabulary — "this smells like Ponzi
+Siren" is both a bot mechanic and a collector hook, and the dossier note
+prints as the coin's flavor text. Market cards are authored directly as
+docket events (§4.6): each gains `docket: { weight, text, banner, …mech }` —
+portfolioAll/payoutMult resolve at the table today; disableLens /
+silenceLeans / extraAction / grantShield are authored ahead of the Phase 3
+docket-events implementation.
 
 ### 3.2b The First Twelve (art scope, 2026-07-14)
 
@@ -273,13 +298,41 @@ Phase 1 routes. (Server-side docket validation arrives in Phase 3.)
 - [x] Cast reconciliation (§2) — rename ids, retag pass, Eugene rework
       (applied 2026-07-14: cards.js/engine.js ids + tags, `LENS_BY_TAG`
       export in cards.js, `traderId` join in characterMeta.js)
-- [ ] Genesis revision pass (§3.2a) — actions redesigned kit-first, coins
-      gain `caseRef`, markets become docket events; declare art-lock rule
+- [x] Genesis revision pass (§3.2a) — applied 2026-07-16: actions
+      redesigned kit-first (composition table in §3.2a), coins gain
+      `caseRef` dossiers + `CASE_PATTERNS` vocabulary, markets gain
+      authored `docket` events, Genesis Candle demoted to rare (§4.6),
+      starter deck rebuilt around the kit (21 distinct / 23 copies,
+      classic-sim validated), card template prints kit-first text.
+      Art-lock rule stands as declared in GENESIS.md §2 / §2.3 here.
 - [x] `caseKit.js` + `LENS_BY_TAG` (applied 2026-07-16: First Twelve defs,
       kit legality, effect resolution extracted from the mock into
       `caseKit.js`; the docket turn engine / ticket math / settle into
       `docketRun.js`; behavior pinned by `scripts/verify-docket-run.mjs` —
       the extraction step of promoting the mock into /trade)
+- [x] Case Table UI componentized (2026-07-16): the mock's screens now live
+      in `src/components/trade/case-table/` — `CaseTable.jsx` orchestrator
+      + Lobby / DeskGrid / TableDock / PunditCalls / PositionTicket /
+      Ledger / Standings. `CaseTableDev.jsx` is a thin dev wrapper (seed
+      stepper + tips reset are dev-only); `CaseTable` takes `docket`,
+      `initialSeed`, `sitePalScenes` (voices for the /trade mount, null =
+      silent), and `onExit` (back to the terminal hub).
+- [x] Mounted on /trade (2026-07-16): MobileTerminalGame's CASE FILES hub
+      option now launches `CaseTable` with the live SitePal scenes
+      (monk/demon/marisol; Eugene stays text-only), a date-derived Daily
+      Docket placeholder seed (`YYYYMMDD` — server verification still
+      pending, §4.10), and a ◀ TERMINAL exit back to the boot hub. The old
+      single-case flow is retired; `CommsGrid.jsx` / `VerdictScreen.jsx`
+      are parked on disk, unimported. Run state is in-memory only — exiting
+      or unmounting mid-docket abandons the run (persistence is Daily
+      Docket work).
+- [x] Session scoring wired (2026-07-16): each locked ticket on a graded
+      case folds into the GameOverlay session scorecard
+      (`recordCaseResult`, same localStorage key the desktop 3D reveal
+      writes) — brier from the read dial, `correct` null on an abstain
+      band, exactly the desktop semantics. Gated by `CaseTable`'s
+      `recordScores` prop: on for the /trade mount, off for
+      /case-table-dev so sandbox runs don't pollute the calibration trail.
 - [ ] Kit select screen (skippable, legality enforced)
 - [ ] ChannelView deep-entry + locked-question rendering
 - [ ] Author Tier-2 content for cases 001–003 (+ connection for 003)
@@ -424,7 +477,7 @@ cases already gesture at.
 | Patron | The 4 TRADER cards | Pre-docket loadout perk (§4.1). Not played in-case. |
 | Insurance | `shield`-granting defense cards | A shield absorbs one negative docket event (§4.6) — the existing shield mechanic, unmodified. |
 | Trophies | Coin cards | §4.6. Coin cards are **not playable** at the table in v1 — no side positions, no portfolio-printing. Flagged open (§4.9). |
-| PvP shelf | Tabletalk sabotage, rare+ private-intel asymmetry | Printed in Genesis (§3.2a) but inert until live human tables (§4.5b tier 3). |
+| PvP shelf | Tabletalk sabotage, rare+ private-intel asymmetry | NOT printed in Genesis — the §3.2a revision spent those slots on Exit Trace + Pundit Audit; sabotage prints in the season that ships with live human tables (§4.5b tier 3). |
 
 Kit legality from Phase 2 carries over unchanged (5 cards, ≤2 rare+, ≤1
 foil), with plays bounded by the action economy rather than a separate cap.
@@ -463,6 +516,7 @@ foil), with plays bounded by the action economy rather than a separate cap.
   of…", rendered in your holofoil). Related cleanup: GENESIS.md claims 3
   terminal-foils but Genesis Candle (market) is also FOIL rarity — demote it
   to rare pre-art-lock so the 3-foil scarcity story stays true.
+  *(Demoted 2026-07-16 with the §3.2a revision pass — exactly 3 foils now.)*
 - **Winning a case** (best P&L at the table; ties → best Brier) **grants that
   case's coin card.** The Genesis coin roster becomes a record of solved
   cases — Prophet Margin, Ponzi Siren and friends retroactively *are* past
@@ -643,8 +697,10 @@ which is the exact failure this doc exists to prevent.
 - [ ] PvP: human seats with secret positions + private intel (the design
       already supports it — server-refereed per GENESIS.md §8; sequencing
       question only)
-- [ ] Pack-reveal moment (inherited open question from GENESIS.md; the
-      case-win trophy grant may *be* the reveal moment)
+- [x] Pack-reveal moment — resolved 2026-07-16: "Chain of Custody"
+      (PackReveal.jsx, see GENESIS.md roadmap). Both intuitions held: the
+      pack gets the full envelope/flip ceremony, and the trophy grant IS
+      the coin's reveal (the CASE CLOSED stamp beat).
 
 ### 4.10 Phase 3 checklist
 
@@ -656,7 +712,12 @@ which is the exact failure this doc exists to prevent.
       intent via the calibration table in `sim-case-table.mjs`)
 - [ ] Table-talk beat (reuse consensus/reaction UI)
 - [ ] Secret simultaneous positions + 4-seat reveal P&L
-- [ ] Coin trophy grants (server route, same audit trail as pack grants)
+- [x] Coin trophy grants (server route, same audit trail as pack grants) —
+      first form applied 2026-07-16: completing the Daily Docket alive
+      grants the day's dossier coin (`docketCoin(seed)` — same coin for
+      everyone that day, foils excluded) via `/api/tcg-docket-reward`.
+      The §4.6 per-case form (winning a case grants THAT case's coin)
+      activates when future cases mint their own coins.
 - [ ] Docket events + shield absorption
 - [x] Sim suite v1: liquidation/win-spread/kit-edge (`scripts/
       sim-case-table.mjs`, 2,000 dockets/experiment) — findings in §4.7a;
@@ -695,7 +756,10 @@ which is the exact failure this doc exists to prevent.
 1. **Cast reconciliation** (§2) — do first, while collections are empty.
    *(Applied 2026-07-14.)*
 2. **Phase 1** (GENESIS.md roadmap): case wins grant packs. Proves the
-   reward rail.
+   reward rail. *(Applied 2026-07-16: Daily Docket wins grant one sealed
+   pack — `/api/tcg-docket-reward`, client-attested win bounded by
+   one-claim-per-user-per-seed + the UTC docket calendar; hardening to
+   transcript replay is §4.10's server-verified rewards item.)*
 3. **Phase 2** on the existing 3 cases. Proves instrumental card demand
    without touching scoring.
 4. **Phase 3 alpha**: one hand-authored docket vs bots, fixed stakes, local

@@ -34,9 +34,9 @@ almost regardless of scale.
 | Type | Count | Notes |
 |---|---|---|
 | Traders | 4 | The cast: Eugene, Marisol, Saint GR80, John Barron. All Mythic. Playable characters, never in the draw pool. **Cast reconciliation applied 2026-07-14** — `halo-node` → `gr80`, `bullhorn-broker` → `john-barron`, Eugene recharacterized as the Pattern Prophet ("Déjà Vu" ability), `automation` tag → `discipline`, new `pattern` tag, meme lane moved to Barron; see [CASE_TABLE.md](./CASE_TABLE.md) §2. |
-| Coin cards | 28 | Buy-and-hold portfolio entries. `cost` → `baseValue`, plus `volatility` (bot-AI signal today; reserved for future market mechanics). |
-| Action cards | 33 | One-shot effects. Engine-supported effect fields: `portfolio`, `cred`, `shield`, `draw`, `opponentPortfolio`. |
-| Market cards | 15 | Global end-of-round events. Effect fields: `portfolioAll`, `credAll`, `styleBonus`, `stylePenalty`, `styleCred`, `crash`. |
+| Coin cards | 28 | Buy-and-hold portfolio entries — and **solved case dossiers** (§3.2a revision, 2026-07-16): each carries `caseRef: { outcome, pattern, note }` drawing on the `CASE_PATTERNS` archetype vocabulary; the note prints as flavor text. `cost` → `baseValue`, plus `volatility` (bot-AI signal today; reserved for future market mechanics). |
+| Action cards | 33 | **Investigation tools** (§3.2a revision, 2026-07-16): each carries `kit: { role, lens, text }` as its primary rules — 16 lens keys / 8 deep scans / 4 cross-refs / exit trace / pundit audit / 2 insurance / 1 wildcard (composition table in CASE_TABLE.md §3.2a). Legacy classic-mode fields (`cost`, `effectText`, `effect`: `portfolio`, `cred`, `shield`, `draw`, `opponentPortfolio`) survive only as long as classic mode does. |
+| Market cards | 15 | **Docket events** (§3.2a revision, 2026-07-16): each carries `docket: { weight, text, banner, …mech }` — the between-cases table flip. Legacy end-of-round effect fields (`portfolioAll`, `credAll`, `styleBonus`, `stylePenalty`, `styleCred`, `crash`) survive with classic mode. |
 
 **Rarity tiers & foil mapping** (applied automatically by
 [`templateCard.js`](./templateCard.js)):
@@ -47,7 +47,7 @@ almost regardless of scale.
 | uncommon | subtle | |
 | rare | v | |
 | mythic | hero | traders |
-| terminal-foil | radiant | 3 exist: Genesis Terminal, Our Lady RL80 (coins), Terminal Foil Moment (action — the only foil action, keep it unique) |
+| terminal-foil | radiant | Exactly 3 exist: Genesis Terminal, Our Lady RL80 (coins), Terminal Foil Moment (action — the only foil action, keep it unique). Genesis Candle (market) was demoted FOIL → rare 2026-07-16 (CASE_TABLE.md §4.6 cleanup) to keep this true. |
 
 Edition numbers ("n/80") derive from each card's position in `GENESIS_SET` —
 stable as long as new cards are only ever appended. **Pre-art-lock, the set
@@ -111,9 +111,12 @@ audit doc to `cardGrants` (`userId`, `source`, `cards`, `at`) so any owned
 card traces to a recorded grant. Identity always comes from the verified
 Clerk Bearer token (`authedUserId`), never a request body.
 
-**Starter deck**: 18 distinct / 22 copies, commons + two cheap uncommons,
-granted idempotently on first `/api/tcg-collection` fetch. Validated: ~90% of
-simulated starter-deck games reach 100 Portfolio inside 10 rounds. Rares and
+**Starter deck**: 21 distinct / 23 copies, commons + two cheap uncommons,
+granted idempotently on first `/api/tcg-collection` fetch. Rebuilt with the
+§3.2a revision (2026-07-16) so the free grant seeds a playable case kit:
+the First Twelve lens keys for all four lenses plus both insurance cards.
+Re-validated: 200/200 simulated starter-deck games complete, avg final
+portfolio ≈ 103 (the deck reliably reaches 100 inside 10 rounds). Rares and
 foils are pack-exclusive by design.
 
 **Collection-gated play**: `createGame` accepts a `cardPool` built from owned
@@ -141,6 +144,15 @@ a broken collection can never produce a dead table.
 ---
 
 ## 6. Economy design
+
+**POSITIONING DECISION (user, 2026-07-16): Genesis is earned entirely
+through engagement.** The goal of set one is engagement, not revenue — the
+game will evolve, and premium features target future editions. Concretely:
+nothing gameplay-shaped ever requires payment; the earn rail below is the
+primary rail for Genesis (daily dossier coin for completing the docket,
+sealed pack for beating the council, streak escalation to come); the burn
+and USDC rails remain built-and-dormant as optional accelerants/collector
+prestige, and become headline rails only in later sets.
 
 Three rails, deliberately separated:
 
@@ -248,14 +260,47 @@ rule (section 5) is also what keeps assets engine-portable.
 - [x] Deploy updated `firestore.rules` (deployed 2026-07-06)
 - [x] Pack RNG + published odds table (`packs.js` — tx-hash-seeded, deterministic)
 - [x] `tcg-pack-purchase` route: RL80 burn rail (verified burn → atomic claim + grant)
+- [x] Genesis revision pass (CASE_TABLE.md §3.2a) — 2026-07-16: actions
+      kit-first, coins as case dossiers, markets as docket events, starter
+      deck rebuilt around the kit, Genesis Candle → rare (3 foils exactly)
 - [ ] Genesis 80 art run (style bible → batches → `CARD_ART` entries) — IN PROGRESS
 - [ ] Buy-packs UI: wallet burns RL80 via wagmi, POSTs tx hash to
       `tcg-pack-purchase` (route done, nothing calls it yet)
-- [ ] Pack-opening reveal moment (mechanism TBD — /gachapon is archived, not the plan)
-- [ ] Binder/album page (80 slots, owned in holofoil, unowned ghosted, share)
+- [x] Pack-opening reveal moment — "CHAIN OF CUSTODY" (2026-07-16,
+      `src/components/tcg/PackReveal.jsx`; dev sandbox `/pack-reveal-dev`):
+      a pack is a sealed evidence envelope — tear the strip, flip five
+      case-file cards one at a time into the real holofoil template, the
+      card back's edge-glow telegraphs rarity before each flip, mythics and
+      foils stop the desk (CRT flicker + "THE DESK STOPS."), dupes tagged
+      CRAFT LATER, everything files to the binder. The dossier coin gets a
+      CASE CLOSED stamp beat. Published odds render in-flow from packs.js
+      (compliance as flavor). Pure theater over already-granted contents —
+      no art assets needed; finished art drops into the template with no
+      rework. Wired into the Standings reward banner ("OPEN THE EVIDENCE
+      ENVELOPE ▸"). Deferred: shareable pull image (needs og-image gen).
+- [x] Binder/album page — 2026-07-16: `/binder` (own, via useCardCollection;
+      signed-out shows the full set ghosted) + `/binder/[userId]` shared
+      read-only view over the public-read `tcg-binder` API (no side
+      effects — starter grants stay on the owner's own collection fetch).
+      80 slots in edition order, sectioned by type, owned slots lit by
+      rarity accent (foils shimmer), dupes badged ×N, tap → the real
+      holofoil TradingCard inspect. Standings' reward banner links here.
 - [ ] Game results persistence (wins/streaks to Firestore — nothing recorded today)
-- [ ] Reward hooks: game wins / Prophet cases / oil milestones grant packs
-      (= Phase 1 of the Case Table plan)
+- [x] Reward hooks, first rail (= Phase 1 of the Case Table plan) —
+      2026-07-16: beating the council on the Daily Docket grants one sealed
+      pack via `/api/tcg-docket-reward` (contents seeded
+      `docket:<seed>:<userId>` — deterministic, re-derivable; one claim per
+      user per seed, atomic with the audit-trail grant; seed validated
+      against the UTC Daily Docket calendar). The win itself is
+      client-attested until Phase 3's transcript replay — abuse is bounded
+      to one pack + one coin/day, the honest-win envelope. Standings shows
+      the payout (placeholder pack-reveal). Completion reward added same
+      day: finishing the docket alive grants the day's DOSSIER COIN —
+      `docketCoin(seed)` in packs.js picks the same non-foil coin for every
+      player that day (a shared collection moment; foils stay pack-chase);
+      a win stacks the pack on top of the coin. Still open: oil-milestone
+      hooks, streak bonuses (calibration streaks → escalation), the real
+      reveal moment.
 - [ ] **Case Table integration** — merge with the Prophet case-files game:
       cards as investigative kit (Phase 2), then the unified Case Table
       (Phase 3). Full spec: [CASE_TABLE.md](./CASE_TABLE.md). Supersedes the
@@ -263,6 +308,11 @@ rule (section 5) is also what keeps assets engine-portable.
 - [ ] Duplicate crafting sink
 - [ ] USDC premium SKUs via x402
 - [ ] Launch surfaces: /trade dock entry + root ticker events
+      *(Partial 2026-07-16: THE BINDER is a Liminal Terminal hub module on
+      /trade — OwnBinder embedded with ◀ TERMINAL exit — and the
+      /terminal-traders header has a Binder chip alongside the set stats.
+      Still open: the desktop side-dock slot from the /trade revamp plan
+      and root ticker pull events.)*
 - [ ] Balance pass: large-scale sims per trader/card (engine supports it)
 - [ ] Open design question: what does owning a TRADER card unlock? (all four
       traders are free to play as; a pulled Mythic is purely collectible today)

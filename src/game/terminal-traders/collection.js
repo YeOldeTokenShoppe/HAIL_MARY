@@ -5,6 +5,8 @@ import { getCardById } from "./cards.js";
 // pack-exclusive), every trader style gets at least one on-tag card so no
 // starting trader feels dead, enough cred generation to never brick a hand,
 // and a couple of duplicates so the collection UI exercises counts > 1.
+// Post-§3.2a bonus constraint: the starter seeds a playable case kit — one
+// lens key per lens plus both insurance cards (all First Twelve members).
 export const STARTER_SET = {
   // coins
   "goblingas": 2,
@@ -14,18 +16,24 @@ export const STARTER_SET = {
   "votive-chain": 1,
   "ponzi-siren": 1,
   "terminal-eth": 1,
-  // actions
-  "pump-signal": 2,
-  "insider-ping": 2,
-  "flash-fill": 2,
+  // actions — the First Twelve's lens keys (one per lens; audit-flare
+  // doubled for the dupe path)
+  "audit-flare": 2,
+  "forked-rumor": 1,
+  "wallet-seance": 1,
+  "mempool-prophecy": 1,
+  // actions — second keys and economy
+  "compliance-siren": 1,
+  "short-the-noise": 1,
   "liquidity-ladder": 1,
-  "market-sermon": 1,
+  "pattern-rosary": 1,
   "diamond-hands": 1,
-  "tithe-rebate": 1,
-  "airdrop-ambush": 1,
-  "oracle-crosscheck": 1,
-  "neon-stop-loss": 1,
+  "limit-order-prayer": 1,
+  "gasless-miracle": 1,
+  "candle-vigil": 1,
+  // the two cheap uncommons: the kit's insurance pair
   "cold-wallet": 1,
+  "neon-stop-loss": 1,
 };
 
 export const MIN_DECK_SIZE = 12;
