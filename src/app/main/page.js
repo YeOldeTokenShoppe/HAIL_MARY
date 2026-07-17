@@ -53,6 +53,17 @@ import useCyberConfirm from "@/components/useCyberConfirm";
 
 // Number of portrait panels when the viewport can carry the full row.
 const PANEL_COUNT = 3;
+// The triptych row's geometry. These are READ BACK to place the two fixed things
+// that must line up with her column (the gear, the ask bar), so they have to be
+// the same numbers the panels actually lay out with — not copies that drift.
+const PANEL_MAX_W = 440;
+const PANEL_GAP = 16;
+// How much larger Our Lady's frame is than an adviser's. She presides, and with
+// her name plate gone (the RL80 mark right above her already says whose shrine
+// this is) SIZE is what carries the hierarchy — a row of three identical frames
+// reads as a panel of equals. Kept modest: past ~1.25 she stops presiding over
+// the wings and starts crowding them.
+const LADY_FRAME_SCALE = 1.18;
 
 // ── Bottom furniture ── Two fixed things stack at the foot of the page: the
 // dock, and the ask bar floating just above it. Anything that scrolls has to
@@ -511,8 +522,10 @@ function PortraitPanel({
   // drives sizes and the phone-only corner mark. See MainPage's isSolo.
   isSolo,
   // Responsive frame size for the solo layout (see MainPage's soloFrameSize).
-  // Ignored on the triptych, where the centre frame is a flat 340.
   soloSize = 250,
+  // Responsive frame size for the triptych (see MainPage's triptychFrameSize) —
+  // 340 wherever it fits, smaller only on a window too short to hold it.
+  triptychSize = 340,
   characters,
   activeCharIndex,
   onSelect,
@@ -521,6 +534,11 @@ function PortraitPanel({
   onPortraitReady,
   sourceContainerId,
   title = null,
+  // Which seat stamps the RL80 corner mark. This USED to be inferred from
+  // `!title` — the advisers had name plates, she didn't, so "untitled" meant
+  // "hers". Giving her a plate broke that inference and silently deleted the
+  // wordmark from the page, so the mark is now asked for explicitly.
+  showMark = false,
   caption = "",
   speaking = false,
   hue = "#2ad6ee",
@@ -546,7 +564,7 @@ function PortraitPanel({
   // of this box (see ShoulderFigure's [side]: -28), so it must stay under
   // viewportWidth - 56 or the saint and Barron get clipped by the panel's
   // overflowX — i.e. under ~319 on a 375px phone.
-  const frameSize = compact ? 150 : isSolo ? soloSize : 340;
+  const frameSize = compact ? 150 : isSolo ? soloSize : triptychSize;
   // NOTE: the speaking panel used to scroll itself into view on phones. The
   // transcript now owns that job (it follows its own newest line), and two
   // things fighting over the scroll position yanks the page mid-argument.
@@ -560,7 +578,7 @@ function PortraitPanel({
         flex: compact ? "1 1 0" : isSolo ? "0 0 auto" : "1 1 0",
         minWidth: 0,
         width: !compact && isSolo ? "100%" : undefined,
-        maxWidth: 440,
+        maxWidth: PANEL_MAX_W,
         height: isSolo ? "auto" : "100%",
         pointerEvents: "auto",
         display: "flex",
@@ -597,7 +615,7 @@ function PortraitPanel({
       }}
     >
       {/* ── The page's mark ── The RL80 wordmark, in the corner, on EVERY layout.
-          It renders from HER seat only (`!title`) — the advisers must not each
+          It renders from HER seat only (`showMark`) — the advisers must not each
           stamp their own copy into the same corner.
           It was a centred DropInTitle above the frame. On a phone that ate ~110px
           off the top of a 375px screen and pushed her medallions under the ask
@@ -609,7 +627,7 @@ function PortraitPanel({
           and 2px letter-spacing, so dropping fontSize alone leaves the shadow at
           half the glyph height and turns the type to mud. A transform shrinks
           the shadow with the letters. */}
-      {!compact && !title && (
+      {!compact && showMark && (
       <div
         className="custom-title"
         style={{
@@ -689,6 +707,20 @@ function PortraitPanel({
         }
       </div>
       )}
+
+      {/* ── Matting above the frame ── The triptych panel owns the full viewport
+          height but its content is one 340px frame, so pinned to flex-start it
+          put every face in the top ~45% with a half-screen of black under it —
+          the single loudest reason the desktop layout read as broken rather than
+          as composed. This spacer and the caption band below split the slack
+          0.6 : 1, which lands the group a little ABOVE centre: the face is the
+          subject, and matting a portrait dead-centre reads as bottom-heavy.
+          (Both grow values must keep summing to >1 — flexbox hands out only that
+          FRACTION of the free space when the total is under 1, so trimming this
+          to, say, 0.3 without touching the band would strand slack at the foot.)
+          Solo has no slack to split — its column is sized to the frame — so it
+          stays pinned. */}
+      {!isSolo && <div style={{ flex: 0.6 }} />}
 
       {/* ── Agent Select section ── shrinks toward the top while the chat
           drawer is open on phones, keeping her whole face visible above it */}
@@ -776,9 +808,10 @@ function PortraitPanel({
           competed with the portrait it was labelling, and three of them across
           the triptych read as a headline row rather than a composition. A name
           is a label — it should be legible and then get out of the way.
-          Her seat has no plate: the corner wordmark already says whose shrine
-          this is, and she's the one in the middle. Lights in the speaker's own
-          hue as they take the floor, so the name tracks the argument. */}
+          The ADVISERS get one; she does not (see renderSeat's `title`) — the RL80
+          mark hangs directly over her head, so a plate would be the same answer
+          twice. Lights in the speaker's own hue as they take the floor, so the
+          name tracks the argument. */}
       {title && (
         <div
           style={{
@@ -801,35 +834,55 @@ function PortraitPanel({
       {/* ── What this voice just said ── The argument reads under the face
           that's making it. The speaker holding the floor is lit in their own
           hue, so the eye follows the deliberation across the triptych.
-          (Desktop only — phones read the group text instead.) */}
-      {caption && (
+          (Desktop only — phones read the group text instead.)
+          THE BAND IS THE SPACER. It used to be a bare `flex:1` div that pushed
+          the status line to the floor, with the caption box adding its own height
+          above it — so the first answer grew the panel and shoved the whole
+          composition upward as it landed. A fixed minHeight reserve was tried
+          first and is worse: it adds ~92px unconditionally, which tipped a panel
+          that only just fits at ~690px tall (a laptop window) into scrolling and
+          pushed the status line out of view. Making the empty slack itself the
+          caption's container costs zero height, so the line arrives INTO space
+          the panel already had — no reflow, no scrollbar, nothing to reserve.
+          `1 0 auto`, not `1`: an argument longer than the slack must keep its own
+          height (basis auto, no shrink) rather than being crushed into it. */}
+      {!isSolo && (
         <div
           style={{
+            flex: "1 0 auto",
             margin: compact ? "8px 6px 0" : "10px 14px 0",
-            padding: compact ? "8px 9px" : "10px 12px",
-            borderRadius: 10,
-            border: `1px solid ${speaking ? hue : "rgba(255,255,255,0.10)"}`,
-            background: speaking ? `${hue}14` : "rgba(255,255,255,0.03)",
-            boxShadow: speaking ? `0 0 16px ${hue}44` : "none",
-            transition: "border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease",
-            fontFamily: "'Rajdhani', sans-serif",
-            fontSize: compact ? "0.82rem" : "0.95rem",
-            lineHeight: compact ? 1.35 : 1.45,
-            color: speaking ? "#ffffff" : "rgba(255,255,255,0.72)",
           }}
         >
-          {caption}
+          {caption && (
+            <div
+              style={{
+                padding: compact ? "8px 9px" : "10px 12px",
+                borderRadius: 10,
+                border: `1px solid ${speaking ? hue : "rgba(255,255,255,0.10)"}`,
+                background: speaking ? `${hue}14` : "rgba(255,255,255,0.03)",
+                boxShadow: speaking ? `0 0 16px ${hue}44` : "none",
+                transition:
+                  "border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease",
+                fontFamily: "'Rajdhani', sans-serif",
+                fontSize: compact ? "0.82rem" : "0.95rem",
+                lineHeight: compact ? 1.35 : 1.45,
+                color: speaking ? "#ffffff" : "rgba(255,255,255,0.72)",
+              }}
+            >
+              {caption}
+            </div>
+          )}
         </div>
       )}
 
 
-      {/* Spacer + footer are a full-height-column device: they pin the status
-          line to the bottom of a panel that owns the viewport. Stacked on a
-          phone each panel sizes to its content, so a spacer would just inject
-          dead space between faces and the footer would repeat three times. */}
+      {/* ── Status line ── Pinned to the floor of a panel that owns the viewport.
+          The spacer that used to do the pinning is gone: the caption band above
+          is now the growing element, so it holds the status line down by itself.
+          Stacked on a phone each panel sizes to its content, so there is nothing
+          to pin and the footer would just repeat three times. */}
       {!isSolo && (
         <>
-          <div style={{ flex: 1 }} />
           <div
             style={{
               padding: "10px 16px",
@@ -1032,12 +1085,11 @@ export default function MainPage() {
   // not state — nothing renders it, and it must never re-trigger the flow.
   const historyRef = useRef([]);
 
-  // A seat is "lit" (full colour, live) while its voice holds the floor —
-  // and Our Lady is lit at rest, since she presides over an idle triptych.
-  const isLit = useCallback(
-    (seat) => speakingKey === SEAT_VOICE[seat] || (speakingKey === null && seat === "center"),
-    [speakingKey],
-  );
+  // A seat is "lit" (full colour, live) while its voice holds the floor. At rest
+  // NOBODY holds it — the halftone rule in renderSeat greys the other seats only
+  // once an argument is actually running, so an idle triptych has no lit/unlit
+  // distinction to draw.
+  const isLit = useCallback((seat) => speakingKey === SEAT_VOICE[seat], [speakingKey]);
 
   // One seat, rendered. Desktop lays three of these across; phones stack Our
   // Lady above a paired row of half-size advisers (compact).
@@ -1048,6 +1100,14 @@ export default function MainPage() {
         isMobile={isMobile}
         isSolo={isSolo}
         soloSize={soloFrameSize}
+        /* She presides, so her frame runs larger than the wings'. The scale is
+           applied HERE rather than inside the panel so the panel never has to
+           know which seat it is. */
+        triptychSize={
+          s.seat === "center"
+            ? Math.round(triptychFrameSize * LADY_FRAME_SCALE)
+            : triptychFrameSize
+        }
         compact={compact}
         /* The shoulder figures hover at HER frame only, and need the global
            speaker so each knows when it's the one arguing. */
@@ -1084,7 +1144,15 @@ export default function MainPage() {
            counsel lines. */
         oracleGreeting={s.seat === "center" ? oracleGreeting : ""}
         onPortraitReady={handlePortraitReady}
-        title={s.seat === "center" ? null : s.name}
+        /* The ADVISERS are plated; she is not, on either layout. The RL80 mark
+           sits directly above her head and already says whose shrine this is, so
+           a plate under her frame is the same answer twice — and naming the wings
+           while she goes unnamed is itself the hierarchy, not a dropped label.
+           Her larger frame (LADY_FRAME_SCALE) carries what the plate would have.
+           Solo has no plates at all: the shoulder figures aren't panels. */
+        title={isSolo || s.seat === "center" ? null : s.name}
+        /* Hers alone stamps the corner mark, on every layout. */
+        showMark={s.seat === "center"}
         /* Desktop reads the argument under the face making it. Phones read it
            as the group text below, so per-panel captions would just print every
            line twice. */
@@ -1095,9 +1163,15 @@ export default function MainPage() {
            figures' glow alone marks whose turn it is. Dimming her (portrait AND
            gold frame) for the ~10s the advisers argue read as a glitch on the
            one live avatar, and made no sense once the figures stopped greying.
-           DESKTOP: the advisers are full panels, so the old rule still earns its
-           keep — inactive seats sit greyed, the speaker goes full colour. */
-        halftone={isSolo ? false : !isLit(s.seat)}
+           DESKTOP: the advisers are full panels, so following the speaker across
+           the row still earns its keep — but only WHILE SOMEONE IS SPEAKING.
+           Keying this to isLit alone greyed both wings at rest, which is the
+           state every first-time visitor lands in: two dithered faces over an
+           empty caption band read as "failed to load", not as "waiting their
+           turn" (the same glitch the phone rule above was written to avoid, one
+           seat over). At rest all three sit full-colour and dormant; the moment
+           a voice takes the floor, the other two drop back. */
+        halftone={!isSolo && speakingKey !== null && !isLit(s.seat)}
       />
     );
 
@@ -1277,8 +1351,8 @@ export default function MainPage() {
   //     minus ~44 of panel padding.
   // Floored at 250 so small phones never shrink below the size they were tuned
   // at (the height ceiling binds there and would otherwise pull it down), and
-  // ceilinged at 440 so a wide solo window doesn't mint an absurd frame. Only
-  // the solo layout uses this — the triptych centre stays a flat 340.
+  // ceilinged at 440 so a wide solo window doesn't mint an absurd frame. The
+  // triptych has its own ceiling — see triptychFrameSize.
   const soloFrameSize = useMemo(() => {
     // The frame is CENTRED and a figure hangs 28px off each side, so the
     // composition's half-width is frameSize/2 + 28; keeping 8px of margin gives
@@ -1286,6 +1360,57 @@ export default function MainPage() {
     const widthCap = viewport.w - 72;
     const heightCap = (viewport.h - 160 - 135 - 44) / 1.3;
     return Math.round(Math.max(250, Math.min(widthCap, heightCap, 440)));
+  }, [viewport]);
+
+  // ── Triptych frame size ── The ADVISERS' frame: 340 wherever 340 fits, which
+  // is the case on the big monitors this layout is really for. The flat constant
+  // it replaces was right about the common case and simply had no answer for a
+  // SHORT one, where 340 (rendered at size × 1.3, see CharacterSelect) leaves the
+  // panel's content taller than the panel. That overflow is not cosmetic: a
+  // scroll container clips at its PADDING edge, so an overflowing panel renders
+  // its caption straight through the paddingBottom that was supposed to reserve
+  // the ask bar's band — the argument comes out from under the input. (The solo
+  // layout learned the same lesson: padding cannot hold a gap above a fixed
+  // element.) Sizing the frame to the room keeps the content inside the box, so
+  // the reserve holds and nothing has to be clipped or scrolled.
+  //
+  // Floored at 200 so a very short window shrinks the filigree rather than
+  // colliding. The frame's WIDTH never binds (three 340s need ~1100 and the
+  // triptych only exists past 1200), so unlike soloFrameSize there's no width cap.
+  const triptychFrameSize = useMemo(() => {
+    // Everything the frame shares its column with: the bottom furniture the panel
+    // pads for (160), the status line (~30), a name plate (~24), panel padding
+    // (~44), and the band under the plate (~110). That band is sized for the
+    // WORST of its two occupants rather than their sum — the starter chips and a
+    // caption are mutually exclusive (chips show only while chatLog is empty), so
+    // reserving for both would shrink the frame for a state that never happens.
+    // 110 is ~4 lines, not the longest argument seen (~150): the band is `1 0
+    // auto` and takes the panel's leftover slack FIRST, so this only has to cover
+    // what slack doesn't. Reserving the true maximum measurably shrank the wings
+    // at ordinary laptop heights to buy nothing — verified at 689px and 860px
+    // that a 5-line argument still clears the ask bar at 110.
+    const room = viewport.h - 160 - 30 - 24 - 44 - 110;
+    // Cap on an ADVISER's frame, NOT on hers — even though hers is the biggest.
+    // Her frame is ~1.18× taller, but her panel is the one with SLACK: she has no
+    // name plate, and her brief is one short line where the advisers argue for
+    // four or five (see COUNCIL — "never a verdict, never a summary"). Measured,
+    // her column comes out SHORTER than theirs despite the larger frame, so
+    // sizing the row to her made both wings pay for room she wasn't using.
+    // The wings bind; she is derived. This is also why her bigger frame is safe
+    // against the ask bar: the bar sits in HER column alone (see its width), and
+    // hers is the column with height to spare.
+    const heightCap = room / 1.3;
+    return Math.round(Math.max(200, Math.min(340, heightCap)));
+  }, [viewport]);
+
+  // ── Her panel's width ── The three panels are `flex: 1 1 0` under a 440 cap
+  // with 16px gaps, and the row is centred, so the CENTRE panel is centred on the
+  // viewport: its edges are 50% ± half this. Two fixed things need that number —
+  // the gear that belongs in her corner, and the ask bar, which must not grow
+  // wider than her column and reach into the advisers' captions.
+  const ladyPanelWidth = useMemo(() => {
+    const rowW = Math.min(viewport.w, 3 * PANEL_MAX_W + 2 * PANEL_GAP);
+    return Math.min(PANEL_MAX_W, (rowW - 2 * PANEL_GAP) / 3);
   }, [viewport]);
 
   // One greeting picked per visit — shared by the drawer's typewriter text
@@ -1566,7 +1691,7 @@ export default function MainPage() {
           flexDirection: isSolo ? "column" : "row",
           justifyContent: isSolo ? "flex-start" : "center",
           alignItems: isSolo ? "center" : "stretch",
-          gap: panelCount > 1 ? 16 : 0,
+          gap: panelCount > 1 ? PANEL_GAP : 0,
           overflowY: isSolo ? "auto" : "visible",
           // The stacked column IS the scroller on phones, so it must accept
           // touch — pointerEvents:"none" here silently made the page unscrollable
@@ -1702,7 +1827,18 @@ export default function MainPage() {
       {/* ── Her faces, behind a gear ── On phones it mirrors the wordmark in the
           opposite corner; on every layout it is now the ONLY way to reach the
           roster, since the row under her frame is gone. Out of flow, so the
-          scene keeps the column. */}
+          scene keeps the column.
+          On the TRIPTYCH it sits in HER panel's corner, not the viewport's. It
+          changes HER apparition, and parked in the window's top-right it was
+          sitting in John Barron's frame, offering to restyle the one face it
+          can't touch. It is placed by arithmetic rather than by living inside her
+          panel: the wordmark gets away with `position:fixed` in there because the
+          panel's backdrop-filter makes it the containing block, but that same
+          rule also makes the panel a STACKING CONTEXT — the roster sheet's z-1401
+          would collapse to the panel row's z-100 and the tap-away layer would
+          only cover her column. So the sheet stays at page level and the gear is
+          measured to her panel's right edge: the row is centred and she is the
+          middle seat, so her edges are 50% ± half ladyPanelWidth. */}
       {!isLoading && !pickerOpen && (
         <>
           <button
@@ -1714,7 +1850,12 @@ export default function MainPage() {
               // Sits on the wordmark's line in the opposite corner — keep this
               // in step with the title's top if either moves.
               top: "calc(12px + env(safe-area-inset-top, 0px))",
-              right: 8,
+              // Solo: the viewport's corner, opposite the mark. Triptych: 8px
+              // inside HER panel's right edge, which sits at 50% + half her
+              // panel — so the inset from the window is 50% − half her panel + 8.
+              right: isSolo
+                ? 8
+                : `calc(50% - ${Math.round(ladyPanelWidth / 2) - 8}px)`,
               zIndex: 1401,
               width: 34,
               height: 34,
@@ -1750,7 +1891,10 @@ export default function MainPage() {
                 style={{
                   position: "fixed",
                   top: "calc(52px + env(safe-area-inset-top, 0px))",
-                  right: 8,
+                  // Hangs from the gear, so it tracks it onto her panel.
+                  right: isSolo
+                    ? 8
+                    : `calc(50% - ${Math.round(ladyPanelWidth / 2) - 8}px)`,
                   zIndex: 1402,
                   display: "flex",
                   flexDirection: "column",
@@ -1825,7 +1969,7 @@ export default function MainPage() {
         </>
       )}
 
-      {/* ── Starter petitions ── Before the first question, on the solo layout.
+      {/* ── Starter petitions ── Before the first question, on EVERY layout.
           PINNED above the ask bar, NOT flowed in the column: they began life as
           the column's last flow items, but the ask bar is position:fixed and
           lifted out of flow, so a tall frame pushed the chips down INTO the
@@ -1833,8 +1977,15 @@ export default function MainPage() {
           only makes scroll room at the very bottom, it can't hold a gap above a
           floating element). Fixing them directly on top of the bar — the same
           way the bar sits on the dock — means no frame height can ever reach
-          them. They vanish the moment there's a transcript. */}
-      {isSolo && chatLog.length === 0 && (
+          them. They vanish the moment there's a transcript.
+          These were solo-only, which left the triptych's empty state as three
+          faces, a blank field and nothing else — no reason the page is here and
+          nothing to touch. The chips are what SAY what the page is for, and the
+          triptych's void needed that more than the phone did, not less. They
+          stack on solo (a phone column has width for one per row) and run as a
+          single row across the triptych, where they read as a line of offerings
+          laid at the foot of the composition. */}
+      {chatLog.length === 0 && (
         <div
           style={{
             position: "fixed",
@@ -1844,10 +1995,14 @@ export default function MainPage() {
             bottom: BOTTOM_CLEARANCE,
             marginLeft: "auto",
             marginRight: "auto",
-            width: "min(440px, calc(100vw - 28px))",
+            width: isSolo
+              ? "min(440px, calc(100vw - 28px))"
+              : "min(920px, calc(100vw - 48px))",
             zIndex: 600,
             display: "flex",
-            flexDirection: "column",
+            flexDirection: isSolo ? "column" : "row",
+            justifyContent: "center",
+            flexWrap: "wrap",
             gap: 8,
             pointerEvents: "auto",
           }}
@@ -1882,7 +2037,10 @@ export default function MainPage() {
                 handleAsk(q);
               }}
               style={{
-                width: "100%",
+                // Solo: one per row, so each fills the column and reads as a
+                // list. Triptych: sized to its own text so the three sit as a
+                // centred row rather than three equal slabs.
+                width: isSolo ? "100%" : "auto",
                 padding: "9px 14px",
                 borderRadius: 999,
                 border: "1px solid rgba(42, 214, 238, 0.22)",
@@ -1893,7 +2051,8 @@ export default function MainPage() {
                 fontFamily: "'Rajdhani', sans-serif",
                 fontSize: "0.92rem",
                 letterSpacing: "0.02em",
-                textAlign: "left",
+                textAlign: isSolo ? "left" : "center",
+                whiteSpace: isSolo ? "normal" : "nowrap",
                 cursor: "pointer",
               }}
             >
@@ -1922,7 +2081,15 @@ export default function MainPage() {
           bottom: ASK_BAR_BOTTOM,
           marginLeft: "auto",
           marginRight: "auto",
-          width: "min(560px, calc(100vw - 24px))",
+          // TRIPTYCH: never wider than HER COLUMN. At 560 the bar overhung the
+          // centre panel (capped at 440) by 60px a side and reached into both
+          // wings — so an adviser's caption ran under the input, which is the
+          // one thing on this page you must be able to read. It is the centre
+          // column's input in every other sense (she presides, the roster and
+          // the mark are hers), so it should measure like it.
+          width: isSolo
+            ? "min(560px, calc(100vw - 24px))"
+            : `min(${Math.round(ladyPanelWidth)}px, calc(100vw - 24px))`,
           zIndex: 600,
           display: "flex",
           alignItems: "center",
