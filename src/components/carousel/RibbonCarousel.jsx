@@ -455,21 +455,37 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
               would haze them against the page's dark starfield. */}
           <fog attach="fog" args={['#000000', 8.5, 12]} />
           <Suspense fallback={null}>
-            <Rig
-              progressRef={progressRef}
-              dragRef={dragRef}
-              velocityRef={velocityRef}
-              draggingRef={draggingRef}
-              turns={turns}
-              rotation={[0, 0, 0.15]}
-            >
-              <Carousel
-                captions={captions}
-                onSelect={handleSelect}
-                onHoverChange={setHoveringCard}
-              />
-            </Rig>
-            <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} progressRef={progressRef} />
+            {/* Scale the whole scene up ~18%. Applied to a parent of both the
+                card ring and the banner so their threaded relationship (ribbon
+                radius 1.6 vs cards 1.4) is preserved.
+                Lifted +0.2 in Y as well: the camera rests above centre and looks
+                down into the ring, and the polaroids are bottom-heavy (captions
+                hang below each photo), so at this size the ring's bottom clipped
+                the lower frustum edge while the top had empty headroom. The shift
+                spends that headroom to clear the bottom without shrinking. */}
+            <group scale={1.18} position={[0, 0.2, 0]}>
+              <Rig
+                progressRef={progressRef}
+                dragRef={dragRef}
+                velocityRef={velocityRef}
+                draggingRef={draggingRef}
+                turns={turns}
+                // Roll eased from 0.15 → 0.08 to pair with the group scale above.
+                // The vertical fov (15°) is fixed, so the enlarged ring has no
+                // extra top/bottom room; at the old tilt the outer corner of a
+                // side-facing card — now 18% further out — crossed the frustum
+                // edge at the quarter-turn angles. Less roll pulls that corner
+                // back in while keeping a visible tilt and the larger size.
+                rotation={[0, 0, 0.08]}
+              >
+                <Carousel
+                  captions={captions}
+                  onSelect={handleSelect}
+                  onHoverChange={setHoveringCard}
+                />
+              </Rig>
+              <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} progressRef={progressRef} />
+            </group>
           </Suspense>
         </Canvas>
         )}

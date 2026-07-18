@@ -12,6 +12,7 @@ import AnnotationSystem from "@/components/AnnotationSystem";
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
 import HolographicStatue3 from "@/components/HolographicStatue3";
 import BeaconBeam from "@/components/BeaconBeam";
+import HologramCard from "@/components/trade/HologramCard";
 import { createLaptopCrtScreen } from "@/components/laptopCrtScreen";
 
 // Agent camera focus settings — module-level so the dev tuning panel
@@ -137,6 +138,12 @@ export const GEOMETRIC_SHAPE_NUDGE = {
   rotation: [0, 0, 0],
   scale: 1,
 };
+
+// Legacy geometric-beacon toggle. false = the HologramCard (the card in play)
+// replaces the GLB knot at the beacon spot; flip to true to restore the knot
+// instantly while comparing. The hidden knot still anchors beam aim + card
+// position, so nothing else moves when you toggle.
+export const SHOW_LEGACY_BEACON = false;
 
 // XZ nudge applied to Angel_Empty so the angel sits centered on the
 // altar spotlight when viewed top-down. Y is left to the hover animation.
@@ -3037,6 +3044,9 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             rot: child.rotation.clone(),
             scl: child.scale.clone(),
           };
+          // Hide the legacy knot when the hologram card is active. Transforms
+          // still update while invisible, so beam aim + card anchoring hold.
+          child.visible = SHOW_LEGACY_BEACON;
         }
 
         // Give the flat grey desks corner definition. They're MeshStandard but
@@ -6334,6 +6344,17 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                     opacity={0.1}
                   />
                 </>
+              )}
+              {/* The card in play — replaces the legacy geometric beacon.
+                  Back face sways in the beam while the table works the case;
+                  flips to the front when the verdict curtain call fires.
+                  Mounted outside the !revealMode gate so the flipped card is
+                  already showing when the camera returns from the stage. */}
+              {!SHOW_LEGACY_BEACON && (
+                <HologramCard
+                  anchorRef={beaconRef}
+                  mode={revealMode ? 'reveal' : 'delib'}
+                />
               )}
               {/* Curtain-call spotlights — one per character, color keyed to
                   the outcome: green for aligned, red for missed, soft white
