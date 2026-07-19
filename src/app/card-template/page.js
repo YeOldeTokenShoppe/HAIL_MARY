@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import TradingCard from "@/components/TradingCard";
+import { getCardById } from "@/game/terminal-traders/cards";
+import { toTemplateCard } from "@/game/terminal-traders/templateCard";
 
 const EUGENE = {
   name: "Eugene",
@@ -108,6 +110,10 @@ const NO_ART = {
   edition: "demo",
 };
 
+// Real Action card rendered through the game's own converter, so the preview
+// matches what the table shows (uses CARD_ART["audit-flare"] for the art).
+const AUDIT_FLARE = toTemplateCard(getCardById("audit-flare"));
+
 export default function CardTemplatePage() {
   const [scale, setScale] = useState(0.75);
   const [active, setActive] = useState("eugene");
@@ -115,11 +121,13 @@ export default function CardTemplatePage() {
   const [artZoom, setArtZoom] = useState(1.25);
   const [useOverlay, setUseOverlay] = useState(true);
   const [foilStyle, setFoilStyle] = useState("hero");
+  const [templateStyle, setTemplateStyle] = useState("terminal");
   const base =
     active === "eugene" ? EUGENE :
     active === "demon" ? DEMON :
     active === "saint" ? SAINT :
     active === "marisol" ? MARISOL :
+    active === "audit-flare" ? AUDIT_FLARE :
     NO_ART;
   const card = {
     ...base,
@@ -182,6 +190,12 @@ export default function CardTemplatePage() {
             Marisol — Legendary
           </button>
           <button
+            className={active === "audit-flare" ? "is-active" : ""}
+            onClick={() => setActive("audit-flare")}
+          >
+            Audit Flare — Action
+          </button>
+          <button
             className={active === "noart" ? "is-active" : ""}
             onClick={() => setActive("noart")}
           >
@@ -194,6 +208,23 @@ export default function CardTemplatePage() {
           >
             Overlay {useOverlay ? "ON" : "OFF"}
           </button>
+          <div className="ct-foil-group" role="radiogroup" aria-label="Template style">
+            {[
+              { id: "terminal", label: "Terminal" },
+              { id: "classic", label: "Classic" },
+            ].map((t) => (
+              <button
+                key={t.id}
+                role="radio"
+                aria-checked={templateStyle === t.id}
+                className={templateStyle === t.id ? "is-active" : ""}
+                onClick={() => setTemplateStyle(t.id)}
+                title={`Template: ${t.label}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <div className="ct-foil-group" role="radiogroup" aria-label="Foil style">
             {[
               { id: "hero", label: "Holo" },
@@ -253,7 +284,7 @@ export default function CardTemplatePage() {
       </header>
 
       <section className="ct-stage">
-        <TradingCard data={card} scale={scale} />
+        <TradingCard data={card} scale={scale} templateStyle={templateStyle} />
       </section>
 
       <aside className="ct-notes">

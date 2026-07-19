@@ -42,6 +42,7 @@ export default function TradingCard({
   scale = 1,
   interactive = true,
   cornerBadge = null,
+  templateStyle = "terminal",
 }) {
   const cardRef = useRef(null);
   const interactingRef = useRef(false);
@@ -51,6 +52,10 @@ export default function TradingCard({
 
   const rarityAccent = RARITY_ACCENT[data.rarity] || "#ffd166";
   const typeAccent = TYPE_ACCENT[data.cardType] || "#ffd166";
+  // Overlay PNGs have "TRADER" + "MYTHIC" baked into the art, so they only fit
+  // Trader cards. Every other type ignores the overlay and shows the live
+  // cardType/rarity labels instead (which read ACTION / COIN / MARKET).
+  const overlayImage = data.cardType === "Trader" ? data.overlayImage : null;
   const foilTier =
     data.foilStyle ||
     (["Mythic", "Legendary"].includes(data.rarity) ? "hero" : "subtle");
@@ -62,6 +67,15 @@ export default function TradingCard({
           { label: "PV", value: data.startingPortfolio, suffix: "/100", title: "Portfolio Value — first to 100 wins" },
         ]
       : null);
+
+  // Classic template's single headline stat (its "HP" slot): a Trader's Cred
+  // resource, else the primary/gain value from the stat pair.
+  const headline =
+    data.startingCred != null
+      ? { label: "CRED", value: data.startingCred }
+      : statPair?.length
+      ? statPair[statPair.length - 1]
+      : null;
 
   const applyAt = (clientX, clientY) => {
     if (!cardRef.current) return;
@@ -141,10 +155,11 @@ export default function TradingCard({
       }}
     >
       <style>{CARD_STYLES}</style>
+      <style>{CLASSIC_STYLES}</style>
 
       <div
         ref={cardRef}
-        className={`tc-card${data.overlayImage ? " is-overlaid" : ""}`}
+        className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}`}
         data-foil={foilTier}
         onMouseMove={handleMove}
         onMouseLeave={handleLeave}
@@ -163,12 +178,22 @@ export default function TradingCard({
           "--lift": tilt.lift,
         }}
       >
+        {templateStyle === "classic" ? (
+          <ClassicFrame
+            data={data}
+            tilt={tilt}
+            typeAccent={typeAccent}
+            rarityAccent={rarityAccent}
+            headline={headline}
+          />
+        ) : (
+        <>
         <div className="tc-body-fill" />
 
-        {data.overlayImage && (
+        {overlayImage && (
           <img
             className="tc-overlay"
-            src={data.overlayImage}
+            src={overlayImage}
             alt=""
             draggable={false}
             loading="lazy"
@@ -349,6 +374,8 @@ export default function TradingCard({
         </div>
 
         <div className="tc-edge" />
+        </>
+        )}
 
         {cornerBadge && (
           <div className="tc-corner-badge" aria-hidden="true">
@@ -1423,5 +1450,383 @@ const CARD_STYLES = `
   .tc-meta-rarity b {
     color: var(--r) !important;
     text-shadow: 0 0 8px color-mix(in srgb, var(--r) 50%, transparent);
+  }
+`;
+
+/* ─────────────────────────────────────────────────────────────────────
+   CLASSIC TEMPLATE — the framed, metallic "trading-binder" skin.
+   Same card data, classic-TCG structure (stage tag · headline stat +
+   type pip · framed art · Ability box · rule/flavor · weakness /
+   resistance / retreat footer), drawn in the RL80 palette. The body tint
+   and pip follow --type; flair + retreat follow --rarity.
+   ───────────────────────────────────────────────────────────────────── */
+function ClassicFrame({ data, tilt, rarityAccent, headline }) {
+  const pivots = data.pivotCost || 0;
+  const hasBattle = data.weakness || data.resistance || pivots;
+  return (
+    <div className="cc">
+      <div className="cc-body">
+        <header className="cc-top">
+          <span className="cc-stage">{data.cardType}</span>
+          <h1 className="cc-name">
+            {data.name}
+            <em className="cc-flair" style={{ color: rarityAccent }}>◆</em>
+          </h1>
+          {headline && (
+            <div className="cc-hp" title={headline.title}>
+              <small>{headline.label}</small>
+              <b>
+                {headline.value}
+                {headline.suffix && <em>{headline.suffix}</em>}
+              </b>
+              <span className="cc-pip" />
+            </div>
+          )}
+        </header>
+
+        <div className="cc-art">
+          {data.backgroundImage && (
+            <img
+              src={data.backgroundImage}
+              alt={`${data.name} artwork`}
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+              style={{
+                objectPosition: data.artFocus || "center 38%",
+                transform: `scale(${data.artZoom || 1.1}) translate(
+                  ${(50 - (tilt.mx ?? 50)) * 0.05}px,
+                  ${(50 - (tilt.my ?? 50)) * 0.05}px
+                )`,
+              }}
+            />
+          )}
+          <div className="cc-art-sheen" />
+        </div>
+
+        <div className="cc-textzone">
+          {data.ability && (
+            <section className="cc-ability">
+              <span className="cc-ability-pill">Ability</span>
+              <h2>{data.ability.name}</h2>
+              <p>{data.ability.text}</p>
+            </section>
+          )}
+          {data.flavorText && <div className="cc-rule">{data.flavorText}</div>}
+        </div>
+
+        <footer className="cc-footer">
+          {hasBattle ? (
+            <div className="cc-wr">
+              <div>
+                <small>weakness</small>
+                <b>{data.weakness || "—"}</b>
+              </div>
+              <div>
+                <small>resistance</small>
+                <b>{data.resistance || "—"}</b>
+              </div>
+              <div>
+                <small>retreat</small>
+                <b className="cc-retreat">{pivots ? "✦".repeat(pivots) : "—"}</b>
+              </div>
+            </div>
+          ) : (
+            <span />
+          )}
+          <div className="cc-set">
+            {data.edition} · GENESIS
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+const CLASSIC_STYLES = `
+  /* Metallic outer frame — replaces the terminal card's gold-ring chrome. */
+  .tc-card--classic {
+    border-radius: 30px;
+    color: #17110a;
+    background:
+      linear-gradient(148deg,
+        #f5f7f9 0%, #c8cdd5 20%, #eef1f4 38%,
+        #a9afb9 60%, #e7eaef 80%, #b6bcc6 100%);
+    box-shadow:
+      0 calc(28px + 24px * var(--lift, 0)) calc(60px + 50px * var(--lift, 0)) rgba(0,0,0,.55),
+      inset 0 0 0 2px rgba(255,255,255,.55),
+      inset 0 0 0 7px rgba(0,0,0,.28),
+      0 0 55px color-mix(in srgb, var(--type) calc(20% + 16% * var(--lift, 0)), transparent);
+  }
+
+  .cc {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 22px;                /* metallic frame thickness */
+    display: flex;
+  }
+
+  .cc-body {
+    position: relative;
+    flex: 1;
+    border-radius: 16px;
+    padding: 16px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 22% 10%, color-mix(in srgb, var(--type) 40%, #ffffff 12%), transparent 55%),
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--type) 32%, #f4f0e2) 0%,
+        color-mix(in srgb, var(--type) 22%, #e9e3cf) 52%,
+        color-mix(in srgb, var(--type) 30%, #dcd5bd) 100%);
+    box-shadow:
+      inset 0 0 0 2px rgba(255,255,255,.4),
+      inset 0 0 0 4px color-mix(in srgb, var(--type) 55%, #7a6a2a),
+      inset 0 0 70px rgba(0,0,0,.18);
+  }
+
+  /* faint paper grain */
+  .cc-body::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(0,0,0,.05) 1px, transparent 1px);
+    background-size: 4px 4px;
+    mix-blend-mode: multiply;
+    opacity: .5;
+  }
+
+  .cc-top {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cc-stage {
+    font-family: "Anton", Impact, sans-serif;
+    font-size: 20px;
+    letter-spacing: .05em;
+    color: #2b2317;
+    text-transform: uppercase;
+    padding: 3px 11px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,.12));
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.4);
+    white-space: nowrap;
+  }
+
+  .cc-name {
+    margin: 0;
+    font-family: "Anton", Impact, sans-serif;
+    font-size: 42px;
+    line-height: .9;
+    letter-spacing: .01em;
+    color: #191207;
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cc-flair {
+    font-style: normal;
+    margin-left: 8px;
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  .cc-hp {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    white-space: nowrap;
+  }
+
+  .cc-hp small {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: #4a3d22;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  .cc-hp b {
+    font-family: "Anton", Impact, sans-serif;
+    font-size: 34px;
+    color: #171009;
+  }
+
+  .cc-hp b em {
+    font-style: normal;
+    font-size: 15px;
+  }
+
+  .cc-pip {
+    position: relative;
+    flex: none;
+    align-self: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 28%, #fff 0%, transparent 42%),
+      radial-gradient(circle at 50% 55%,
+        color-mix(in srgb, var(--type) 85%, #fff) 0%,
+        color-mix(in srgb, var(--type) 72%, #000 14%) 100%);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.6), 0 1px 3px rgba(0,0,0,.45);
+  }
+
+  .cc-pip::after {
+    content: "";
+    position: absolute;
+    inset: 9px;
+    border-radius: 4px;
+    transform: rotate(45deg);
+    background: rgba(255,255,255,.6);
+  }
+
+  .cc-art {
+    position: relative;
+    height: 340px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0a0d12;
+    box-shadow:
+      inset 0 0 0 2px rgba(255,255,255,.42),
+      inset 0 0 0 5px #b9922f,
+      inset 0 0 0 7px #6c4f16,
+      0 5px 16px rgba(0,0,0,.4);
+  }
+
+  .cc-art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 120ms ease-out;
+  }
+
+  .cc-art-sheen {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      115deg,
+      transparent 40%,
+      rgba(255,255,255,calc(.14 * var(--lift, .3))) 50%,
+      transparent 60%
+    );
+    background-position: calc((var(--mx, 50%) - 50%) * 1.4) 0;
+  }
+
+  .cc-textzone {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .cc-ability {
+    position: relative;
+  }
+
+  .cc-ability-pill {
+    display: inline-block;
+    vertical-align: middle;
+    font-family: "Anton", Impact, sans-serif;
+    font-size: 15px;
+    letter-spacing: .07em;
+    color: #ffe9c7;
+    padding: 3px 15px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, #ff5454 0%, #c40000 55%, #7a0000 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 4px rgba(0,0,0,.35);
+    text-transform: uppercase;
+    margin-right: 9px;
+  }
+
+  .cc-ability h2 {
+    display: inline;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: #1c1508;
+  }
+
+  .cc-ability p {
+    margin: 7px 0 0;
+    font-size: 14px;
+    line-height: 1.42;
+    color: #2c2415;
+  }
+
+  .cc-rule {
+    margin-top: auto;
+    align-self: flex-end;
+    max-width: 66%;
+    font-size: 12.5px;
+    font-style: italic;
+    line-height: 1.35;
+    color: #2a2312;
+    padding: 8px 13px;
+    border-radius: 9px 9px 3px 9px;
+    background: linear-gradient(180deg, #ffe9a8 0%, #f2cf6b 100%);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.28), 0 2px 5px rgba(0,0,0,.28);
+  }
+
+  .cc-footer {
+    position: relative;
+    border-top: 2px solid rgba(0,0,0,.28);
+    padding-top: 11px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .cc-wr {
+    display: flex;
+    gap: 20px;
+  }
+
+  .cc-wr > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .cc-wr small {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #4a3d22;
+  }
+
+  .cc-wr b {
+    font-size: 14px;
+    font-weight: 800;
+    color: #1c1508;
+  }
+
+  .cc-retreat {
+    letter-spacing: 3px;
+    color: color-mix(in srgb, var(--rarity) 55%, #7a5a10);
+  }
+
+  .cc-set {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    color: #3a3018;
+    white-space: nowrap;
   }
 `;

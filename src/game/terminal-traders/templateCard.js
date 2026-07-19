@@ -11,6 +11,8 @@ export const CARD_ART = {
   // Replace with raw artwork during the Genesis 80 art run.
   "moonpony": { src: "/TCG/coinCard_MoonPony.png", artFocus: "center 30%", artZoom: 2.1 },
   "pump-signal": { src: "/TCG/actionCard_PumpSignal.png", artFocus: "center 30%", artZoom: 2.1 },
+  "audit-flare": { src: "/TCG/actionAuditFlare.png", artFocus: "center 28%", artZoom: 1.0 },
+
 };
 
 export function getCardArt(cardId) {
