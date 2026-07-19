@@ -371,7 +371,7 @@
   perspective-origin: 50% 38%;
 }
 
-/* Flipper: rotates between front (TradingCard) and back (cardBack.webp).
+/* Flipper: rotates between front (TradingCard) and back (/TCG/cardBack.png).
    inline-block so it shrinks to the card's natural size — the back face
    absolutely positions inside this box to match. */
 .reliquary-card-flipper {

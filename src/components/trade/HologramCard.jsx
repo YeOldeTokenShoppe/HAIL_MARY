@@ -18,7 +18,7 @@ import { useFrame } from "@react-three/fiber";
 export const HOLOGRAM_CARD_CONFIG = {
   // Placeholder art — wire `front` to the live case/topic card later.
   front: "/TCG/actionCard_PumpSignal.png",
-  back: "/cardBack.webp",
+  back: "/TCG/cardBack.png",
   // The Pump Signal render is a tall legacy asset (824x1578). Genesis
   // template cards are 744x1038 → set 744 / 1038 when those land.
   aspect: 824 / 1578,
