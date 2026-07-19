@@ -18,7 +18,7 @@ import { useFrame } from "@react-three/fiber";
 export const HOLOGRAM_CARD_CONFIG = {
   // Placeholder art — wire `front` to the live case/topic card later.
   front: "/TCG/actionCard_PumpSignal.png",
-  back: "/TCG/cardBack.png",
+  back: "/TCG/cardBack.webp",
   // The Pump Signal render is a tall legacy asset (824x1578). Genesis
   // template cards are 744x1038 → set 744 / 1038 when those land.
   aspect: 824 / 1578,
@@ -28,6 +28,7 @@ export const HOLOGRAM_CARD_CONFIG = {
   scan: 0.5,         // scanline strength
   glitch: 0.35,      // ambient glitch amount
   opacity: 0.96,
+  brightness: 1.4,   // post-tint gain — lifts the dark card art out of the holo dimming
   sway: 0.22,        // deliberation sway amplitude (radians)
   // true: card yaw-tracks the camera so back/front hold from any orbit angle.
   // false: card sits fixed in the world at faceYaw (radians, 0 = +Z), so you
@@ -48,7 +49,7 @@ const VERT = `
 
 const FRAG = `
   uniform sampler2D uMap;
-  uniform float uTime, uHolo, uScan, uGlitch, uBurst, uOpacity, uReady;
+  uniform float uTime, uHolo, uScan, uGlitch, uBurst, uOpacity, uReady, uBright;
   uniform vec3 uHoloColor;
   varying vec2 vUv;
   float hash(float n) { return fract(sin(n) * 43758.5453); }
@@ -85,6 +86,9 @@ const FRAG = `
     float flick = 0.97 + 0.03 * sin(uTime * 61.0) * (0.3 + uHolo);
     col.rgb *= scan * flick * (1.0 + uBurst * 0.6);
 
+    // Lift the card art out of the holo dimming (tunable via config.brightness).
+    col.rgb *= uBright;
+
     // Edge rim so it reads as projected light, not a texture on a plane.
     float edgeD = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
     col.rgb += uHoloColor * (1.0 - smoothstep(0.0, 0.05, edgeD)) * (0.25 + uHolo * 0.6);
@@ -107,6 +111,7 @@ function makeCardMaterial(cfg) {
       uGlitch: { value: cfg.glitch },
       uBurst: { value: 0 },
       uOpacity: { value: cfg.opacity },
+      uBright: { value: cfg.brightness ?? 1 },
       uReady: { value: 0 }, // stays 0 (discard) until the texture arrives
       uHoloColor: { value: new THREE.Color(cfg.holoColor) },
     },

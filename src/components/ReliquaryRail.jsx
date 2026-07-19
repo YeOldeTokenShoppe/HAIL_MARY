@@ -284,7 +284,7 @@ function ReliquaryRailInner() {
                         </div>
                         <div className="reliquary-card-face reliquary-card-face--back">
                           <img
-                            src="/TCG/cardBack.png"
+                            src="/TCG/cardBack.webp"
                             alt=""
                             aria-hidden="true"
                             draggable={false}
