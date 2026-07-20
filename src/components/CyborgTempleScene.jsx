@@ -1291,6 +1291,21 @@ const CyborgTempleScene = ({
     }
   }, [loadedModel]);
 
+  // Guard the picking raycasters (handlePointerMove / handleClick both call
+  // intersectObjects on this whole subtree). Some GLB export nodes ship a
+  // geometry with no `position` attribute (empty/degenerate mesh, or a stray
+  // Points/Line); THREE's raycast then reads `.count` on the missing attribute
+  // and throws "Cannot read properties of undefined (reading 'count')" on hover.
+  // Those nodes aren't pickable anyway, so disable their raycast once at load.
+  useEffect(() => {
+    if (!loadedModel) return;
+    loadedModel.traverse((o) => {
+      if (o.geometry && !o.geometry.attributes?.position) {
+        o.raycast = () => {};
+      }
+    });
+  }, [loadedModel]);
+
   // Verdict-reveal curtain call. When the parent flips revealMode to an
   // outcome, play each character's reaction animation in place. The scene
   // stays as-is (props visible, default camera framing) — the parent gates
@@ -3263,7 +3278,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // lines from each desk's geometry and add them as a child (effectively a
         // clone of the geometry with a different material). Subtle cyan reads as
         // a rim/corner highlight, on-palette with the grid and beam.
-        if (child.isMesh && child.name.startsWith('Desk') && !child.userData.__edged) {
+        if (child.isMesh && child.name.startsWith('Desk') || child.name.startsWith('Central') && !child.userData.__edged) {
           child.userData.__edged = true;
           const deskEdges = new THREE.LineSegments(
             new THREE.EdgesGeometry(child.geometry, 30),
