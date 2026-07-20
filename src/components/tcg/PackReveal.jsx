@@ -129,10 +129,7 @@ export default function PackReveal({ pack = [], coin = null, onClose }) {
         <div className="pr-stage">
           <div className="pr-progress">CARD {idx + 1} / {cards.length}{idx === cards.length - 1 ? " · BONUS SLOT" : ""}</div>
           <div className={`pr-flip${flipped ? " is-flipped" : ""}`} style={{ "--cc": glow, width: backW, height: backH }} onClick={flip}>
-            <div className="pr-face pr-back" style={{ width: backW, height: backH }}>
-              <span className="pr-back-sigil">◈</span>
-              <span className="pr-back-word">GENESIS</span>
-            </div>
+            <div className="pr-face pr-back" style={{ width: backW, height: backH }} />
             <div className="pr-face pr-front">
               {flipped && currentTemplate && <TradingCard data={currentTemplate} scale={scale} />}
             </div>
@@ -146,12 +143,15 @@ export default function PackReveal({ pack = [], coin = null, onClose }) {
             <div className="pr-hint">TAP TO FLIP — the glow knows something you don't.</div>
           )}
           <div className="pr-rail">
-            {cards.map((c, i) => (
-              <span key={i} className={`pr-mini${i < idx || (i === idx && flipped) ? " shown" : ""}`}
-                style={{ "--cc": i < idx || (i === idx && flipped) ? (RARITY_GLOW[c.rarity] || "#2fd6d6") : "#1c3a36" }}>
-                {i < idx || (i === idx && flipped) ? c.name : "◈"}
-              </span>
-            ))}
+            {cards.map((c, i) => {
+              const shown = i < idx || (i === idx && flipped);
+              return (
+                <span key={i} className={`pr-mini${shown ? " shown" : ""}`}
+                  style={{ "--cc": shown ? (RARITY_GLOW[c.rarity] || "#2fd6d6") : "#1c3a36" }}>
+                  {shown ? c.name : <i className="pr-medal" aria-hidden />}
+                </span>
+              );
+            })}
           </div>
           <button className="pr-ghost pr-skip" onClick={() => setStage("filed")}>FILE ALL ▸</button>
         </div>
@@ -220,16 +220,14 @@ export default function PackReveal({ pack = [], coin = null, onClose }) {
         .pr-flip.is-flipped { transform: rotateY(180deg); cursor: default; }
         .pr-face { position: absolute; inset: 0; backface-visibility: hidden; }
         .pr-front { transform: rotateY(180deg); display: flex; align-items: flex-start; justify-content: center; }
-        .pr-back { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-          background: linear-gradient(160deg, #0a221f, #050f0d 75%);
+        .pr-back { background: url("/TCG/cardBack.webp") center / cover no-repeat,
+            linear-gradient(160deg, #0a221f, #050f0d 75%);
           border: 2px solid color-mix(in srgb, var(--cc) 75%, transparent); border-radius: 14px;
           box-shadow: 0 0 26px color-mix(in srgb, var(--cc) 45%, transparent),
             inset 0 0 40px color-mix(in srgb, var(--cc) 14%, transparent);
           animation: prpulse 1.6s ease-in-out infinite; }
         @keyframes prpulse { 50% { box-shadow: 0 0 40px color-mix(in srgb, var(--cc) 65%, transparent),
           inset 0 0 46px color-mix(in srgb, var(--cc) 20%, transparent); } }
-        .pr-back-sigil { font-size: 54px; color: var(--cc); text-shadow: 0 0 22px color-mix(in srgb, var(--cc) 70%, transparent); }
-        .pr-back-word { font-size: 11px; letter-spacing: 0.5em; color: #bfeede; opacity: 0.7; }
         .pr-hint { font-size: 10.5px; color: #bfeede; opacity: 0.75; letter-spacing: 0.06em; }
         .pr-dupe { font-size: 9.5px; letter-spacing: 0.16em; color: #ffd23a; border: 1px dashed rgba(255,210,58,0.5); padding: 4px 9px; }
         .pr-cta { background: rgba(47,214,214,0.12); border: 1.5px solid #2fd6d6; color: #f4fffb; font: inherit;
@@ -245,6 +243,11 @@ export default function PackReveal({ pack = [], coin = null, onClose }) {
         .pr-mini { font-size: 8.5px; letter-spacing: 0.08em; color: #bfeede; opacity: 0.5; padding: 4px 7px;
           border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent); }
         .pr-mini.shown { opacity: 1; color: #f4fffb; background: color-mix(in srgb, var(--cc) 10%, transparent); }
+        /* the card back's corner candle medallion, cropped as the face-down mark */
+        .pr-medal { display: block; width: 15px; height: 15px; border-radius: 50%;
+          background: url("/TCG/cardBack.webp") no-repeat;
+          background-size: 552% auto; background-position: 9.7% 7.2%;
+          filter: saturate(0.9); }
         .pr-summary { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 480px; }
         .pr-chip { display: inline-flex; flex-direction: column; gap: 2px; padding: 8px 11px; color: #f4fffb;
           font-size: 11.5px; font-weight: bold;

@@ -507,6 +507,9 @@ const CyborgTempleScene = ({
   // Store multiple mixers for each animated character
   const mixersRef = useRef({}); // { characterName: mixer }
   const actionsRef = useRef({}); // { characterName: { animationName: action } }
+  const smartPhoneRef = useRef(null); // Demon's SmartPhone prop (Hand_R_1); shown only during demon_phone
+  const smartPhoneGateRef = useRef(null); // { action, showTime, hideTime } while demon_phone plays; drives the phone's per-frame visibility window
+  const monkCouncilSeqRef = useRef({ active: false, timer: null }); // monk council argue↔standPray alternation
   const [loadedModel, setLoadedModel] = useState(null);
   const [detectedMobile, setDetectedMobile] = useState(false);
   const xCandleNodesRef = useRef([]); // Sorted array of XCandle01* root nodes
@@ -665,20 +668,108 @@ const CyborgTempleScene = ({
   // character on idle while speaking; pointing/typing-during-speech is the
   // wrong read.
   // Reaction animation map for the verdict-reveal curtain call. Outcome is
-  // the player's result against ground truth: aligned / missed / abstained.
-  // Where a character is missing a dedicated abstain clip we fall back to
-  // their idle — laconic stillness reads fine for Marisol, and a calm idle
-  // for Eugene (RL80) lets her bubble carry the moment.
-  // Outcome → reaction clip. Curtain-call clips are full-body standing
-  // animations (cheering / clapping / shrug / disappointed / defeat / pray);
-  // the seated idle/typing clips are gameplay-only. For "abstained" we use a
-  // measured standing gesture rather than a seated idle so the whole lineup
-  // is on its feet during the reveal.
+  // the player's result against ground truth: aligned / missed / abstained,
+  // plus 'council' — the paid live-argument lineup, shown BEFORE any outcome,
+  // so it uses each character's neutral standing pose (no spoiler reaction).
+  //
+  // EVERY entry must resolve to a full-body STANDING clip: the reveal hides
+  // StageProps (desks/chairs), so any seated gameplay clip (*_idle / *_typing,
+  // and Detective's seated *_greeting) leaves the character sitting on air.
+  // Curtain-call standing clips: cheering / clapping / shrug / disappointed /
+  // defeat / standPray.
+  //
+  // IMPORTANT: every character has ONLY 3 standing clips (Monk only 2 —
+  // standPray + cheering), all consumed by aligned/missed/abstained. Their
+  // *_pointing/_victory/_fistPump/_greeting/_hail/_beckon/_idle/_typing clips
+  // are all SEATED (authored for the desk gameplay — verified by hip height),
+  // so they can't be used in the standing lineup.
+  //
+  // Blender clips this map depends on (authored 2026-07-19+):
+  //   • detective_stand / unicorn_stand — neutral STANDING clips (the *_idle
+  //     clips are seated gameplay poses). unicorn_stand omits idle/typing/wave
+  //     in its name so it won't hijack the gameplay default (line ~2567) or hit
+  //     the /wav/i arm-only strip, and won't match restoreCharacterIdle's
+  //     /unicorn_idle/i (unicorn drops back to the seated idle after the reveal).
+  //   • *_argue — one STANDING "engaged / arguing" clip per character, used
+  //     ONLY for 'council' (the pre-outcome paid live-argument lineup) so it
+  //     reads distinct from the resigned 'abstained' set. Names omit
+  //     idle/typing/wave/stand for the same collision reasons above.
+  //   • Any unicorn clip bakes its own hips yaw — author unicorn_stand AND
+  //     unicorn_argue facing like unicorn_disappointed/clapping (correct with
+  //     Unicorn_Empty at 180°), or the unicorn faces the wrong way.
+  // A value may be a single regex or an ORDERED array of fallbacks — the first
+  // regex that matches an available clip wins. 'council' lists the (pending)
+  // *_argue clip first, then the abstained standing clip, so council gracefully
+  // uses the neutral standing pose until the argue clips ship — never falling
+  // through to a seated gameplay clip.
   const REACTION_PATTERNS = {
-    Monk:      { aligned: /monk_cheering/i,    missed: /monk_standPray/i,     abstained: /monk_standPray/i },
-    Demon:     { aligned: /demon_clapping/i,    missed: /demon_disappointed/i, abstained: /demon_shrug/i },
-    Detective: { aligned: /detective_clap/i,   missed: /detective_defeat/i,   abstained: /detective_greeting/i },
-    RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i, abstained: /UnicornWaving/i },
+    Monk:      { aligned: /monk_cheering/i,    missed: /monk_standPray/i,      abstained: /monk_standPray/i,   council: [/monk_argue/i, /monk_standPray/i] },
+    Demon:     { aligned: /demon_clapping/i,   missed: /demon_disappointed/i,  abstained: /demon_shrug/i,      council: [/demon_phone/i, /demon_shrug/i] },
+    Detective: { aligned: /detective_clap/i,   missed: /detective_defeat/i,    abstained: /detective_stand/i,  council: [/detective_argue/i, /detective_stand/i] },
+    RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i, abstained: /unicorn_stand/i,    council: [/unicorn_argue/i, /unicorn_stand/i] },
+  };
+
+  // Monk council alternation. monk_argue is a short clip and reads as
+  // repetitive on a plain loop, so during 'council' we cycle
+  //   monk_argue (1×) → monk_standPray (2×) → monk_argue (1×) → …
+  // Both clips loop continuously; a chained setTimeout crossfades between them
+  // after the right number of loops (timing off each clip's duration), so the
+  // fades overlap cleanly. Needs both clips; if either is missing the caller
+  // falls back to a plain looped reaction.
+  const MONK_SEQ_XFADE = 0.6; // crossfade seconds
+  const stopMonkArgueSequence = () => {
+    const seq = monkCouncilSeqRef.current;
+    if (seq.timer) clearTimeout(seq.timer);
+    seq.timer = null;
+    seq.active = false;
+  };
+  const startMonkArgueSequence = () => {
+    const actions = actionsRef.current['Monk'];
+    const state = monkAnimStateRef.current;
+    if (!actions || !state) return false;
+    const argueKey = Object.keys(actions).find((a) => /monk_argue/i.test(a));
+    const prayKey = Object.keys(actions).find((a) => /monk_standPray/i.test(a));
+    if (!argueKey || !prayKey) return false; // need both — let caller plain-loop
+    stopMonkArgueSequence();
+    const argue = actions[argueKey];
+    const pray = actions[prayKey];
+    const seq = monkCouncilSeqRef.current;
+    const XF = MONK_SEQ_XFADE;
+
+    const play = (action, fadeFrom) => {
+      if (fadeFrom && fadeFrom !== action && fadeFrom.isRunning && fadeFrom.isRunning()) {
+        fadeFrom.fadeOut(XF);
+      }
+      action.reset();
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.fadeIn(XF);
+      action.play();
+    };
+
+    seq.active = true;
+    // Switch to `next` for `loops` loops, then chain to `after`. Start the
+    // crossfade XF early so it completes right as the loop count is reached.
+    const holdThenSwitch = (nextAction, nextKey, loops, after) => {
+      const holdMs = Math.max(200, (nextAction.getClip().duration * loops - XF) * 1000);
+      seq.timer = setTimeout(() => {
+        if (!seq.active) return;
+        after();
+      }, holdMs);
+      state.currentAnimation = nextKey;
+    };
+    const toPray = () => { play(pray, argue);  holdThenSwitch(pray, prayKey, 2, toArgue); };
+    const toArgue = () => { play(argue, pray); holdThenSwitch(argue, argueKey, 1, toPray); };
+
+    // Fade out any unrelated monk clip, then open with argue ×1.
+    Object.values(actions).forEach((a) => {
+      if (a !== argue && a !== pray && a.isRunning && a.isRunning()) a.fadeOut(XF);
+    });
+    play(argue, null);
+    holdThenSwitch(argue, argueKey, 1, toPray);
+    state.isPlayingSpecial = true;
+    state.nextSwitchDelay = 999999;
+    state.lastSwitchTime = Date.now();
+    return true;
   };
 
   const applyCharacterReaction = (agentId, outcome) => {
@@ -698,10 +789,36 @@ const CyborgTempleScene = ({
       // console.log('[reaction-debug] missing actions or state', { agentId, hasActions: !!actions, hasState: !!state });
       return;
     }
-    const targetKey = Object.keys(actions).find((a) => pattern.test(a));
+    // pattern is a single regex or an ordered array of fallbacks — first match wins.
+    const patternList = Array.isArray(pattern) ? pattern : [pattern];
+    let targetKey;
+    for (const re of patternList) {
+      targetKey = Object.keys(actions).find((a) => re.test(a));
+      if (targetKey) break;
+    }
     if (!targetKey) {
       console.log('[reaction-debug] pattern not matched for', agentId, outcome, 'available:', Object.keys(actions));
       return;
+    }
+    // Demon's SmartPhone prop only appears while he's actually holding it up.
+    // demon_phone is a long looping clip (30fps) where the phone is raised only
+    // for frames 35–1076; outside that window (and during every other Demon
+    // clip) it's hidden. Arm a per-frame visibility gate (driven in useFrame);
+    // any non-phone clip clears it.
+    if (agentId === 'Demon' && smartPhoneRef.current) {
+      if (/demon_phone/i.test(targetKey)) {
+        const tt = actions[targetKey].getClip().tracks[0]?.times;
+        const fps = (tt && tt.length > 1) ? 1 / (tt[1] - tt[0]) : 30;
+        smartPhoneGateRef.current = {
+          action: actions[targetKey],
+          showTime: 35 / fps,
+          hideTime: 1076 / fps,
+        };
+      } else {
+        smartPhoneGateRef.current = null;
+      }
+      // useFrame drives the actual visibility; hide now to avoid a 1-frame flash.
+      smartPhoneRef.current.visible = false;
     }
     // console.log('[reaction-debug] resolved', {
     //   agentId, outcome, targetKey,
@@ -739,6 +856,14 @@ const CyborgTempleScene = ({
         mixersRef.current['Demon'].removeEventListener('finished', ds.focusSequenceListener);
         ds.focusSequenceListener = null;
       }
+    }
+
+    // Monk in council gets the argue↔standPray alternation instead of a plain
+    // loop. If it can't run (missing a clip), tear down any stale sequence and
+    // fall through to the normal single-clip play below.
+    if (agentId === 'Monk') {
+      if (outcome === 'council' && startMonkArgueSequence()) return;
+      stopMonkArgueSequence();
     }
 
     const targetAction = actions[targetKey];
@@ -790,6 +915,15 @@ const CyborgTempleScene = ({
     RL80:      /unicorn_idle/i,
   };
   const restoreCharacterIdle = (agentId) => {
+    // Leaving the reveal — always stow the Demon's phone (it only shows during
+    // demon_phone). Done before the guards so it hides even if idle can't resolve.
+    if (agentId === 'Demon') {
+      smartPhoneGateRef.current = null;
+      if (smartPhoneRef.current) smartPhoneRef.current.visible = false;
+    }
+    // Tear down the Monk's council argue↔standPray alternation (its mixer
+    // 'finished' listener would otherwise keep flipping clips after the reveal).
+    if (agentId === 'Monk') stopMonkArgueSequence();
     const pattern = IDLE_PATTERNS[agentId];
     const actions = actionsRef.current[agentId];
     const state = (
@@ -1144,6 +1278,19 @@ const CyborgTempleScene = ({
     };
   }, [gameStarted, externalFocusAgent, speechActive]);
 
+  // Cache the Demon's SmartPhone prop and hide it by default. It's parented to
+  // his right hand (Hand_R_1) and always exported visible; we only want it in
+  // frame while he's on the phone (demon_phone, the council reaction), so
+  // applyCharacterReaction/restoreCharacterIdle toggle smartPhoneRef.current.
+  useEffect(() => {
+    if (!loadedModel) return;
+    const phone = loadedModel.getObjectByName('SmartPhone');
+    if (phone) {
+      smartPhoneRef.current = phone;
+      phone.visible = false;
+    }
+  }, [loadedModel]);
+
   // Verdict-reveal curtain call. When the parent flips revealMode to an
   // outcome, play each character's reaction animation in place. The scene
   // stays as-is (props visible, default camera framing) — the parent gates
@@ -1161,6 +1308,21 @@ const CyborgTempleScene = ({
     Unicorn_Empty:   { position: [ 0.75, 0.3,  0], rotation: [0, Math.PI, 0] },
   }), []);
 
+  // Council (pre-outcome live-argument) uses a semi-circle instead of the flat
+  // outcome lineup: a shallow arc opening toward the camera, each character
+  // angled inward toward a focal point (~[0, 1.0] downstage) so they read as a
+  // group in discussion rather than a firing-squad line. Ends (Monk/Unicorn)
+  // sit downstage (z≈0) turned ~40° inward; the middle two sit upstage
+  // (z≈-0.27) turned ~13°. Humanoids face +Z at yaw 0; the unicorn's authored
+  // facing is reversed, so its yaw carries an extra π.
+  const COUNCIL_LINEUP = useMemo(() => ({
+    Monk_empty:      { position: [-0.84, 0.18,  0.00], rotation: [0,  0.70, 0] },
+    Demon_Empty:     { position: [-0.29, 0.18, -0.27], rotation: [0,  0.23, 0] },
+    Detective_Empty: { position: [ 0.29, 0.18, -0.27], rotation: [0, -0.23, 0] },
+    RL80_Empty:      { position: [ 0.84, 0.30,  0.00], rotation: [0, Math.PI - 0.70, 0] },
+    Unicorn_Empty:   { position: [ 0.84, 0.30,  0.00], rotation: [0, Math.PI - 0.70, 0] },
+  }), []);
+
   useEffect(() => {
     if (!loadedModel) return;
     const stageProps = loadedModel.getObjectByName('StageProps');
@@ -1172,11 +1334,14 @@ const CyborgTempleScene = ({
     }
     if (!revealMode) return;
 
+    // Council gets the semi-circle; every outcome reveal gets the flat lineup.
+    const lineup = revealMode === 'council' ? COUNCIL_LINEUP : STAGE_LINEUP;
+
     // Snapshot then override each character's transform to the stage
     // lineup. Saved values live on a Map so cleanup restores them
     // verbatim regardless of any other transform writes during reveal.
     const transformSnapshot = new Map();
-    Object.entries(STAGE_LINEUP).forEach(([name, target]) => {
+    Object.entries(lineup).forEach(([name, target]) => {
       const obj = loadedModel.getObjectByName(name);
       if (!obj) return;
       transformSnapshot.set(obj, {
@@ -1218,7 +1383,7 @@ const CyborgTempleScene = ({
     // aren't worth re-creating; exclude them from deps to avoid spurious
     // re-runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [revealMode, loadedModel, STAGE_LINEUP]);
+  }, [revealMode, loadedModel, STAGE_LINEUP, COUNCIL_LINEUP]);
 
   // Hover state for coins
   const [hoveredCoin, setHoveredCoin] = useState(null);
@@ -1824,8 +1989,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v80_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v80.glb";
+    let modelPath = "/models/RL80_4anims_v86_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v86.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -2405,6 +2570,27 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // - Root_2-based → Monk
         // - Root-based → RL80
 
+        // Monk council foot-lock: monk_argue and monk_standPray share a static
+        // root but pose the legs/feet differently, so crossfading between them
+        // slides the feet. Capture monk_standPray's frame-0 lower body (hips +
+        // legs + feet) and freeze BOTH clips' lower body to that constant pose,
+        // so the crossfade only moves the upper body and the feet stay planted.
+        const MONK_LOWER_RE = /^(Hips|UpperLeg|LowerLeg|Ankle|Ball|Toes)/i;
+        let monkLowerBodyPose = null;
+        const monkStandPrayClip = gltf.animations.find((a) => /monk_standPray/i.test(a.name));
+        if (monkStandPrayClip) {
+          monkLowerBodyPose = {};
+          monkStandPrayClip.tracks.forEach((t) => {
+            if (MONK_LOWER_RE.test(t.name)) {
+              const stride = t.values.length / t.times.length;
+              monkLowerBodyPose[t.name] = {
+                Ctor: t.constructor,
+                values: Array.from(t.values.slice(0, stride)),
+              };
+            }
+          });
+        }
+
         gltf.animations.forEach((animation) => {
           const animName = animation.name;
           const firstTrackBone = animation.tracks[0]?.name.split('.')[0] || '';
@@ -2485,29 +2671,31 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                 );
               }
 
-              // demon_pointing / demon_victory ship without Root.position
-              // and Root.quaternion tracks (the Root bone sits between
-              // Demon_Empty and Pelvis). With no track driving Root, three.js
-              // restores it to the GLB bind pose, which sits a hair off the
-              // idle pose and visibly flips the character beneath the chair.
-              // Borrow idle's Root tracks so Root stays put across clips.
-              // demon_pointing and demon_victory ship without Root tracks
-              // (the Root bone sits between Demon_Empty and Pelvis). With
-              // nothing driving Root, three.js' PropertyMixer falls back to
-              // the bind pose, which sits ~1.6° off idle — small in isolation
-              // but visibly twists the character around when blended into a
-              // crossfade. Borrow the missing tracks from demon_idle.
+              // demon_pointing / demon_victory / demon_phone ship without
+              // Root.position and Root.quaternion tracks (the Root bone sits
+              // between Demon_Empty and Pelvis). With nothing driving Root,
+              // three.js' PropertyMixer falls back to the GLB bind pose. For
+              // the seated clips that's a small (~1.6°) twist, but for the
+              // standing demon_phone the bind Root lays him HORIZONTAL on the
+              // floor (looks fine in Blender, breaks on import). Borrow the
+              // missing Root tracks from demon_idle so Root stays put.
               // GLTFLoader renames duplicate node names by appending _N, so
               // the bone may load as 'Root' or 'Root_1' depending on which
               // skeleton was traversed first (Demon shares Root/Hand_L/Hand_R
               // names with Detective).
-              if (charName === 'Demon' && /demon_(pointing|victory)/i.test(animName)) {
+              if (charName === 'Demon' && /demon_(pointing|victory|phone)/i.test(animName)) {
                 const rootRe = /^Root(_\d+)?\.(position|quaternion)$/;
                 const haveRoot = cleanedAnimation.tracks.some((t) => rootRe.test(t.name));
                 if (!haveRoot) {
-                  const idleClip = gltf.animations.find((a) => /demon_idle/i.test(a.name));
-                  if (idleClip) {
-                    const rootTracks = idleClip.tracks
+                  // Match the donor to the clip's STANCE. demon_idle's Root sits
+                  // at Y≈-0.37 (seated height) — right for the seated pointing/
+                  // victory clips, but it sinks the STANDING demon_phone ~0.37
+                  // into the floor. Borrow demon_phone's Root from a standing
+                  // clip (demon_shrug, Root Y≈0) instead.
+                  const donorRe = /demon_phone/i.test(animName) ? /demon_shrug/i : /demon_idle/i;
+                  const donorClip = gltf.animations.find((a) => donorRe.test(a.name));
+                  if (donorClip) {
+                    const rootTracks = donorClip.tracks
                       .filter((t) => rootRe.test(t.name))
                       .map((t) => t.clone());
                     if (rootTracks.length) {
@@ -2533,6 +2721,21 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                 });
               }
 
+              // Monk council foot-lock: replace the lower-body tracks of
+              // monk_argue AND monk_standPray with a single shared constant pose
+              // (monk_standPray frame 0), so crossfading between them during
+              // 'council' can't slide the feet. Upper body still animates.
+              if (charName === 'Monk' && monkLowerBodyPose &&
+                  /monk_(argue|standPray)/i.test(animName)) {
+                cleanedAnimation = new THREE.AnimationClip(
+                  cleanedAnimation.name,
+                  cleanedAnimation.duration,
+                  cleanedAnimation.tracks.map((t) => {
+                    const frozen = monkLowerBodyPose[t.name];
+                    return frozen ? new frozen.Ctor(t.name, [0], frozen.values) : t;
+                  })
+                );
+              }
 
               const action = mixer.clipAction(cleanedAnimation);
               
@@ -3028,7 +3231,13 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // rises up so the beacon shape floats within the projected cone.
         if (child.isMesh && !projectorRef.current) {
           const mats = Array.isArray(child.material) ? child.material : [child.material];
-          if (mats.some((m) => m && /basewire/i.test(m.name || ''))) {
+          // Match by node name OR material name. The v84 model exports the
+          // projector as node "Object_2.001" (mesh "Object_0") carrying a
+          // "_hologram_basewire" material; matching all three keeps this robust
+          // across re-exports and renames.
+          if (/hologram_basewire/i.test(child.name) ||
+              child.name === 'Object_2.001' ||
+              mats.some((m) => m && /basewire/i.test(m.name || ''))) {
             projectorRef.current = child;
           }
         }
@@ -4270,6 +4479,39 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             break;
           }
 
+          // Hologram card — single click flies the camera in to frame it.
+          // A second click (or clicking empty space / Escape) returns via the
+          // generic toggle-unfocus just below. The card billboards to face the
+          // camera, so approach along the current view direction to keep it square.
+          if (object.userData.agentId === 'HologramCard') {
+            const alreadyFocused = focusTarget && focusTarget.agentId === 'HologramCard';
+            if (!alreadyFocused) {
+              const box = new THREE.Box3().setFromObject(object);
+              if (!box.isEmpty()) {
+                const size = new THREE.Vector3();
+                box.getSize(size);
+                const center = new THREE.Vector3();
+                box.getCenter(center);
+                // Dolly in along the current view so the billboarded card stays
+                // square; distance fits the card to ~viewport height with padding.
+                const fovRad = (camera.fov * Math.PI) / 180;
+                const fitDistance = Math.max(0.35, (size.y * 0.5) / Math.tan(fovRad / 2));
+                const dir = new THREE.Vector3()
+                  .subVectors(camera.position, center)
+                  .normalize();
+                const cameraPos = center.clone().add(dir.multiplyScalar(fitDistance));
+                setFocusTarget({
+                  position: cameraPos,
+                  lookAt: center.clone(),
+                  agentId: 'HologramCard',
+                  agentName: 'HologramCard',
+                });
+                break;
+              }
+            }
+            // Already focused → fall through to the generic toggle-unfocus below.
+          }
+
           // If already focused on this screen, unfocus (toggle behavior)
           if (focusTarget && focusTarget.agentId === object.userData.agentId) {
             restoreAllFromFocus();
@@ -5005,6 +5247,17 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           mixer.update(delta);
         }
       });
+    }
+
+    // Time-gate the Demon's SmartPhone within the looping demon_phone clip —
+    // it's only in-hand for frames 35–1076 (see applyCharacterReaction, which
+    // arms smartPhoneGateRef with the show/hide times). Read after mixer.update
+    // so action.time is current for this frame.
+    if (smartPhoneRef.current && smartPhoneGateRef.current) {
+      const { action, showTime, hideTime } = smartPhoneGateRef.current;
+      const t = action.time;
+      smartPhoneRef.current.visible =
+        !!(action.isRunning && action.isRunning()) && t >= showTime && t <= hideTime;
     }
 
     // Aim the broadcast beam at the geometric beacon's live world position
@@ -5754,9 +6007,22 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // once gameStarted flips true) — without that bypass, GR80 would hail
     // and beckon while staring straight ahead instead of at the player.
     const monkIsPointing = monkWaveStateRef.current.attentionActive;
+    // Outcome-reveal camera-follow: during 'aligned'/'missed' the lineup faces
+    // the player, so heads track the camera for the "they're looking at YOU"
+    // beat. NOT 'abstained' or 'council'. Drives the demon + detective gates
+    // below (which otherwise turn off during any reveal); the monk has its own
+    // gate that already tracks these (and abstained). The unicorn is
+    // intentionally excluded — its head-track reads twitchy on the wide shot.
+    const revealFollowCam =
+      revealModeRef.current === 'aligned' || revealModeRef.current === 'missed';
+    // Track the camera during the outcome reveals (he addresses the player),
+    // but NOT during 'council' — there the argue animation should drive his
+    // head so he faces the group in the semi-circle, not the camera. The other
+    // three characters already gate on !revealModeRef.current, so they don't
+    // track during council either.
     const monkHeadGate =
       monkIsPointing
-      || revealModeRef.current
+      || (revealModeRef.current && revealModeRef.current !== 'council')
       || (monkFocusedRef.current && shouldTrackHeadRef.current);
     if (monkHeadGate && monkHeadBoneRef.current) {
       const head = monkHeadBoneRef.current;
@@ -5988,7 +6254,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // The flip-axis correction below is rig-specific; tune the divisor in
     // `Math.PI / N` (or change the axis) until the head reads as facing
     // the camera.
-    if (detectiveHeadBoneRef.current && detectiveFocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current) {
+    if (detectiveHeadBoneRef.current && (revealFollowCam || (detectiveFocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current))) {
       const head = detectiveHeadBoneRef.current;
 
       if (!detectiveHeadBoneRef._baseQuat) {
@@ -6002,36 +6268,65 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       const headWorldPos = new THREE.Vector3();
       head.getWorldPosition(headWorldPos);
 
-      if (!detectiveHeadBoneRef._dummy) {
-        detectiveHeadBoneRef._dummy = new THREE.Object3D();
+      // Delta-rotation aim (no magic yaw constant). Each frame, apply the
+      // MINIMAL world rotation that swings her FACE axis onto the head→camera
+      // direction, clamped to a max neck angle — measured from rest, so she
+      // never cranks the wrong way like the old lookAt+yaw math.
+      //
+      // Her Head bone's face axis is local +Z — measured from the Eyes bone's
+      // local offset ([0, 0.61, 0.79], dominant +Z). We DON'T infer it from the
+      // camera anymore: that ran during the camera fly-in and locked onto +X
+      // (her side), aiming her side at the camera → face 90° off.
+      if (!detectiveHeadBoneRef._faceDir) {
+        detectiveHeadBoneRef._faceDir = new THREE.Vector3(0, 0, 1)
+          .applyQuaternion(detectiveHeadBoneRef._baseWorldQuat).normalize();
       }
-      const dummy = detectiveHeadBoneRef._dummy;
-      dummy.position.copy(headWorldPos);
-      dummy.lookAt(camera.position);
-      // Rig-specific yaw correction. If the head over-rotates to one side,
-      // adjust the divisor — common values: 1 (180°), 2 (90°), -2 (-90°),
-      // 0.5 (≈ identity, no correction).
-      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI/0.25);
-      dummy.quaternion.multiply(flip);
 
-      const maxHeadAngle = 1.2; // ~70° clamp
-      const angleBetween = detectiveHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
-      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
-      const blendedWorldQuat = detectiveHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+      const toCam = new THREE.Vector3().subVectors(camera.position, headWorldPos).normalize();
+      const face = detectiveHeadBoneRef._faceDir;
+      // Build the aim as YAW (around world-Y) THEN PITCH, rather than a single
+      // setFromUnitVectors shortest-arc. The shortest arc picks a free axis, so
+      // when the rest face is tilted down and the target is up-and-to-a-side it
+      // rotates mostly "up" instead of turning — she could look right but not
+      // left. Splitting the turn guarantees left/right is always a horizontal
+      // yaw and up/down is a separate pitch.
+      const faceFlat = new THREE.Vector3(face.x, 0, face.z);
+      const camFlat = new THREE.Vector3(toCam.x, 0, toCam.z);
+      let delta;
+      if (faceFlat.lengthSq() < 1e-6 || camFlat.lengthSq() < 1e-6) {
+        delta = new THREE.Quaternion().setFromUnitVectors(face, toCam);
+      } else {
+        faceFlat.normalize(); camFlat.normalize();
+        const yawQ = new THREE.Quaternion().setFromUnitVectors(faceFlat, camFlat);
+        const faceYawed = face.clone().applyQuaternion(yawQ);
+        const pitchQ = new THREE.Quaternion().setFromUnitVectors(faceYawed, toCam);
+        delta = pitchQ.multiply(yawQ); // yaw first, then pitch
+      }
+      const maxHeadAngle = (typeof window !== 'undefined' && Number.isFinite(window.__detClamp))
+        ? window.__detClamp : 1.5; // ~70°+
+      const deltaAngle = 2 * Math.acos(Math.min(1, Math.abs(delta.w)));
+      if (deltaAngle > maxHeadAngle) {
+        delta = new THREE.Quaternion().slerp(delta, maxHeadAngle / deltaAngle);
+      }
+      const targetWorldQuat = delta.multiply(detectiveHeadBoneRef._baseWorldQuat);
 
       const parentWorldQuat = new THREE.Quaternion();
       head.parent.getWorldQuaternion(parentWorldQuat);
-      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+      const targetQuat = parentWorldQuat.clone().invert().multiply(targetWorldQuat);
 
       if (!detectiveHeadBoneRef._smoothedQuat) {
         detectiveHeadBoneRef._smoothedQuat = head.quaternion.clone();
       }
-      detectiveHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
+      detectiveHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.00);
 
       head.quaternion.copy(detectiveHeadBoneRef._smoothedQuat);
     } else if (detectiveHeadBoneRef._smoothedQuat) {
       detectiveHeadBoneRef._smoothedQuat = null;
       detectiveHeadBoneRef._dummy = null;
+      // Re-capture rest + face axis fresh on the next engagement.
+      detectiveHeadBoneRef._baseQuat = null;
+      detectiveHeadBoneRef._baseWorldQuat = null;
+      detectiveHeadBoneRef._faceDir = null;
     }
 
     // Fluffy (cat) head look-at-camera override
@@ -6091,7 +6386,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // has drifted off the authored pose (demonHeadTrackingRef, set in the
     // focus sequence) OR the speech-glance scheduler is currently in a
     // glance window (demonGlanceActiveRef). Mirrors the Monk/RL80 pattern.
-    if (demonHeadBoneRef.current && (demonHeadTrackingRef.current || demonGlanceActiveRef.current) && shouldTrackHeadRef.current && !revealModeRef.current) {
+    if (demonHeadBoneRef.current && (revealFollowCam || ((demonHeadTrackingRef.current || demonGlanceActiveRef.current) && shouldTrackHeadRef.current && !revealModeRef.current))) {
       const head = demonHeadBoneRef.current;
 
       if (!demonHeadBoneRef._baseQuat) {
@@ -6338,22 +6633,29 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                   <BeaconBeam
                     anchorRef={projectorRef}
                     color="#35e8ff"
-                    height={0.7}
-                    topRadius={0.20}
+                    height={0.25}
+                    topRadius={0.10}
                     bottomRadius={0.03}
                     opacity={0.1}
                   />
                 </>
               )}
               {/* The card in play — replaces the legacy geometric beacon.
-                  Back face sways in the beam while the table works the case;
-                  flips to the front when the verdict curtain call fires.
-                  Mounted outside the !revealMode gate so the flipped card is
-                  already showing when the camera returns from the stage. */}
-              {!SHOW_LEGACY_BEACON && (
+                  Back face sways in the beam while the table works the case.
+                  Hidden during the reveal / curtain-call states (gated on
+                  !revealMode, same as the beam above) so it doesn't hang in the
+                  air behind the staged characters — only the standard
+                  deliberation scene shows the projected card. */}
+              {!SHOW_LEGACY_BEACON && !revealMode && (
                 <HologramCard
-                  anchorRef={beaconRef}
-                  mode={revealMode ? 'reveal' : 'delib'}
+                  // v84 dropped the Shape* geometric beacon, so anchor to the
+                  // hologram-projector base (same mesh the beam rides). yOffset
+                  // in HOLOGRAM_CARD_CONFIG lifts the card up into the beam.
+                  anchorRef={projectorRef}
+                  mode="delib"
+                  // Tag the card meshes so the Temple raycaster picks clicks on
+                  // it (single-click → camera flies in; see handleClick).
+                  userData={{ clickable: true, agentId: 'HologramCard' }}
                 />
               )}
               {/* Curtain-call spotlights — one per character, color keyed to

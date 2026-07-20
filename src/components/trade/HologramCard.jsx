@@ -23,12 +23,15 @@ export const HOLOGRAM_CARD_CONFIG = {
   // template cards are 744x1038 → set 744 / 1038 when those land.
   aspect: 824 / 1578,
   height: 0.36,      // card height, parent-local units (beam is 0.7 tall)
-  yOffset: 0.02,     // lift above the beacon anchor point
+  yOffset: 0.35,     // lift above the beacon anchor point
   holo: 0.35,        // 0 = full-color print, 1 = pure cyan projection
   scan: 0.5,         // scanline strength
   glitch: 0.35,      // ambient glitch amount
   opacity: 0.96,
-  brightness: 1.4,   // post-tint gain — lifts the dark card art out of the holo dimming
+  brightness: 1.5,   // post-tint gain — lifts the dark card art out of the holo dimming
+  glow: 0.7,         // baked halo strength in the margin around the card (0 = off)
+  glowWidth: 0.18,   // how far the halo spreads past the card edge (card-uv units)
+  glowMargin: 1.55,  // plane enlargement that makes room for the halo (feeds geometry + uMargin)
   sway: 0.22,        // deliberation sway amplitude (radians)
   // true: card yaw-tracks the camera so back/front hold from any orbit angle.
   // false: card sits fixed in the world at faceYaw (radians, 0 = +Z), so you
@@ -49,13 +52,16 @@ const VERT = `
 
 const FRAG = `
   uniform sampler2D uMap;
-  uniform float uTime, uHolo, uScan, uGlitch, uBurst, uOpacity, uReady, uBright;
+  uniform float uTime, uHolo, uScan, uGlitch, uBurst, uOpacity, uReady, uBright, uGlow, uGlowWidth, uMargin;
   uniform vec3 uHoloColor;
   varying vec2 vUv;
   float hash(float n) { return fract(sin(n) * 43758.5453); }
   void main() {
     if (uReady < 0.5) discard;
-    vec2 uv = vUv;
+
+    // The plane is enlarged by uMargin; the card art occupies the central
+    // 1/uMargin, and the ring of margin around it is where the halo lives.
+    vec2 uv = (vUv - 0.5) * uMargin + 0.5;
 
     // Occasional horizontal slice displacement (glitch); bursts on reveal.
     float t7 = floor(uTime * 9.0);
@@ -63,12 +69,12 @@ const FRAG = `
     float g = step(1.0 - (0.02 + uGlitch * 0.03 + uBurst * 0.35), hash(t7 * 13.7 + band * 3.1));
     uv.x += g * (hash(band + t7) * 2.0 - 1.0) * (0.012 + uBurst * 0.05);
 
-    // Rounded-rect mask so the corners read as a die-cut card.
+    // Rounded-rect signed distance (<0 inside the card, >0 out in the margin).
     vec2 p = abs(uv - 0.5) - vec2(0.455, 0.455);
     float rd = length(max(p, 0.0)) - 0.045;
     float mask = 1.0 - smoothstep(-0.004, 0.004, rd);
-    if (mask <= 0.0) discard;
 
+    // ── Card art (only meaningful inside the card) ──
     vec4 col = texture2D(uMap, uv);
 
     // Chromatic fringe, grows with the burst.
@@ -89,11 +95,24 @@ const FRAG = `
     // Lift the card art out of the holo dimming (tunable via config.brightness).
     col.rgb *= uBright;
 
-    // Edge rim so it reads as projected light, not a texture on a plane.
+    // Inner edge rim so it reads as projected light, not a flat texture.
     float edgeD = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
     col.rgb += uHoloColor * (1.0 - smoothstep(0.0, 0.05, edgeD)) * (0.25 + uHolo * 0.6);
 
-    gl_FragColor = vec4(col.rgb, uOpacity * mask * (0.88 + 0.12 * uHolo));
+    // ── Baked halo: cyan glow in the margin, hugging the card edge and fading
+    //    outward. Breathes so the projection reads as alive, not a decal. ──
+    float breathe = 0.82 + 0.18 * sin(uTime * 1.6);
+    float halo = pow(1.0 - smoothstep(0.0, uGlowWidth, max(rd, 0.0)), 1.5) * uGlow * breathe;
+
+    // ── Composite card OVER halo OVER scene as one normal-blended pixel.
+    //    Inside the card (mask≈1) haloA≈0, so this reduces to the original
+    //    output — the card render is unchanged; the halo only adds in the margin.
+    float cardA = uOpacity * mask * (0.88 + 0.12 * uHolo);
+    float haloA = clamp(halo * (1.0 - mask), 0.0, 1.0);
+    float outA = cardA + haloA * (1.0 - cardA);
+    if (outA <= 0.0001) discard;
+    vec3 premult = col.rgb * cardA + uHoloColor * haloA * (1.0 - cardA);
+    gl_FragColor = vec4(premult / outA, outA);
   }
 `;
 
@@ -112,6 +131,9 @@ function makeCardMaterial(cfg) {
       uBurst: { value: 0 },
       uOpacity: { value: cfg.opacity },
       uBright: { value: cfg.brightness ?? 1 },
+      uGlow: { value: cfg.glow ?? 0 },
+      uGlowWidth: { value: cfg.glowWidth ?? 0.15 },
+      uMargin: { value: cfg.glowMargin ?? 1 },
       uReady: { value: 0 }, // stays 0 (discard) until the texture arrives
       uHoloColor: { value: new THREE.Color(cfg.holoColor) },
     },
@@ -120,7 +142,7 @@ function makeCardMaterial(cfg) {
   });
 }
 
-function HologramCard({ anchorRef, mode = "delib", config = HOLOGRAM_CARD_CONFIG }) {
+function HologramCard({ anchorRef, mode = "delib", config = HOLOGRAM_CARD_CONFIG, userData = {} }) {
   const groupRef = useRef();
   const tmp = useRef(new THREE.Vector3());
   const camPos = useRef(new THREE.Vector3());
@@ -130,9 +152,14 @@ function HologramCard({ anchorRef, mode = "delib", config = HOLOGRAM_CARD_CONFIG
   const cfg = config;
   const frontMat = useMemo(() => makeCardMaterial(cfg), []);
   const backMat = useMemo(() => makeCardMaterial(cfg), []);
+  // Plane is enlarged by glowMargin so the baked halo has room past the card
+  // edge; the shader remaps the art back into the central 1/glowMargin.
   const geometry = useMemo(
-    () => new THREE.PlaneGeometry(cfg.height * cfg.aspect, cfg.height),
-    [cfg.height, cfg.aspect]
+    () => new THREE.PlaneGeometry(
+      cfg.height * cfg.aspect * (cfg.glowMargin || 1),
+      cfg.height * (cfg.glowMargin || 1)
+    ),
+    [cfg.height, cfg.aspect, cfg.glowMargin]
   );
 
   // Load card art without suspending the scene; the shader discards (uReady=0)
@@ -215,8 +242,10 @@ function HologramCard({ anchorRef, mode = "delib", config = HOLOGRAM_CARD_CONFIG
 
   return (
     <group ref={groupRef} visible={false} renderOrder={3}>
-      <mesh geometry={geometry} material={frontMat} />
-      <mesh geometry={geometry} material={backMat} rotation={[0, Math.PI, 0]} />
+      {/* userData carries the scene's click tag (clickable + agentId) so the
+          Temple raycaster can pick the card; harmless empty object otherwise. */}
+      <mesh geometry={geometry} material={frontMat} userData={userData} />
+      <mesh geometry={geometry} material={backMat} rotation={[0, Math.PI, 0]} userData={userData} />
     </group>
   );
 }

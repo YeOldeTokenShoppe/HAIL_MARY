@@ -127,6 +127,16 @@ a broken collection can never produce a dead table.
 
 ## 5. Card art pipeline
 
+**Card back (locked 2026-07-19): `/TCG/cardBack.png`** — Our Lady of
+Perpetual Profit as a mirrored court-card (candle-medallion corners, sacred
+heart + up-arrow, coin in hand). This is the **universal, set-agnostic
+back**: it carries no set text by design, and per TCG convention it should
+never change across seasons (differentiate future sets on fronts/borders,
+never the back). Used by PackReveal (face-down cards + the corner medallion
+cropped via CSS as the small face-down mark). Known, accepted: the mirrored
+figure is not strictly 180°-symmetric — irrelevant digitally, a minor tell
+if physical decks are ever printed.
+
 - Template: `TradingCard.jsx`, tuned at `/card-template` (art-Y / zoom / foil
   controls). 744×1038 standard, 1488×2076 retina export.
 - **Generate raw artwork only** — portrait, ≥744×1038, no frames, no text.

@@ -1707,11 +1707,43 @@ export default function CyborgTemple() {
     setFocusedAgent(null);
   };
 
+  // ── DEBUG: resurface the end-scene curtain call for evaluation ──
+  // The redesigned game flow no longer reliably reaches the reveal, so this
+  // stages it on demand while we fix the reaction animations. It overrides
+  // revealMode below regardless of game state.
+  //   • URL:      ?reveal=aligned|missed|abstained|council  forces it on load
+  //   • Keyboard: Shift+R cycles aligned → missed → abstained → council → off
+  // 'off' (null) hands control back to the real game flow.
+  const [debugReveal, setDebugReveal] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const OUTCOMES = ['aligned', 'missed', 'abstained', 'council'];
+    const fromUrl = (new URLSearchParams(window.location.search).get('reveal') || '')
+      .toLowerCase();
+    if (OUTCOMES.includes(fromUrl)) setDebugReveal(fromUrl);
+    const onKey = (e) => {
+      if (!e.shiftKey || (e.key || '').toLowerCase() !== 'r') return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return;
+      setDebugReveal((prev) => {
+        const i = OUTCOMES.indexOf(prev);
+        const next = i === -1 ? OUTCOMES[0]
+          : (i + 1 < OUTCOMES.length ? OUTCOMES[i + 1] : null);
+        console.log('[reveal-debug] curtain call →', next ?? 'off (live game flow)');
+        return next;
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Curtain-call reveal mode for the 3D scene. Engages during the 'reveal'
   // and 'vindicate' phases so the blackout-and-stage transition lands on
   // the dramatic beat (after the focused character's reaction). Maps the
   // verdict against ground truth: aligned / missed / abstained.
   const revealMode = useMemo(() => {
+    // DEBUG override wins over the live game flow (see debugReveal above).
+    if (debugReveal) return debugReveal;
     // Paid live argument: line the four up (props hidden, wide shot) WITHOUT
     // revealing the outcome. 'council' isn't an outcome key, so the reveal
     // effect stages the lineup but plays no spoiler reaction.
@@ -1724,7 +1756,7 @@ export default function CyborgTemple() {
     // phantom right/wrong grading against a non-existent answer key).
     if (caseData.correctVerdict == null) return 'abstained';
     return verdict === caseData.correctVerdict ? 'aligned' : 'missed';
-  }, [councilActive, verdict, revealPhase, caseData.correctVerdict]);
+  }, [debugReveal, councilActive, verdict, revealPhase, caseData.correctVerdict]);
 
   // Forceful stop for SitePal audio. Per the SitePal docs, stopSpeech()
   // only halts audio that's currently speaking — it "does not prevent
@@ -2627,7 +2659,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v80_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v86_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -2824,7 +2856,17 @@ export default function CyborgTemple() {
     // Desktop-only: the mobile lobby is the coin scene (no full diorama to
     // nudge a tap into), so skip the hand-tap prompt there entirely.
     if (!sceneReady || focusedAgent || userHasInteracted || isMobileView) return;
-    const showTimer = setTimeout(() => setShowHandTap(true), 12500);
+    // One-time-only across visits: show the hand-tap hint on the user's very
+    // first /trade load and never again (persisted in localStorage). Without
+    // this it re-fired on every fresh load / whenever focus returned to null
+    // (e.g. during the reveal lineup).
+    try {
+      if (localStorage.getItem('trade_handtap_seen')) return;
+    } catch { /* localStorage unavailable — fall through and show */ }
+    const showTimer = setTimeout(() => {
+      setShowHandTap(true);
+      try { localStorage.setItem('trade_handtap_seen', '1'); } catch { /* ignore */ }
+    }, 12500);
     const hideTimer = setTimeout(() => setShowHandTap(false), 15500);
     const hideOnInteraction = () => {
       clearTimeout(showTimer);
