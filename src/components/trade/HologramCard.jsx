@@ -17,18 +17,23 @@ import { useFrame } from "@react-three/fiber";
 // All knobs live in HOLOGRAM_CARD_CONFIG; edit + save to see it live.
 export const HOLOGRAM_CARD_CONFIG = {
   // Placeholder art — wire `front` to the live case/topic card later.
-  front: "/TCG/actionCard_PumpSignal.png",
+  front: "/TCG/actionCard_PumpSignal.webp",
   back: "/TCG/cardBack.webp",
-  // The Pump Signal render is a tall legacy asset (824x1578). Genesis
-  // template cards are 744x1038 → set 744 / 1038 when those land.
-  aspect: 824 / 1578,
-  height: 0.36,      // card height, parent-local units (beam is 0.7 tall)
+  // Standard TCG / playing-card proportion (matches /card-template's 744×1038
+  // and the cardBack art). The legacy Pump Signal front is 824×1578 — much
+  // taller — but it only shows in 'reveal', which currently hides the card.
+  aspect: 744 / 1038,
+  height: 0.42,      // card height, parent-local units (beam is 0.7 tall)
+  scale: 0.5,          // uniform size multiplier (edit + save to resize the card live)
   yOffset: 0.35,     // lift above the beacon anchor point
   holo: 0.35,        // 0 = full-color print, 1 = pure cyan projection
   scan: 0.5,         // scanline strength
   glitch: 0.35,      // ambient glitch amount
   opacity: 0.96,
   brightness: 1.5,   // post-tint gain — lifts the dark card art out of the holo dimming
+  emissive: 2.0,     // stained-glass glow strength — colored/lit areas emit into the scene Bloom (0 = off)
+  emissiveSat: 1.6,  // saturation of the glow (1 = as-is; higher = richer, more vivid glass colour)
+  emissiveGamma: 0.5,// LOWER = whole card reads backlit (colored fills glow); higher = only the bright leading
   glow: 0.7,         // baked halo strength in the margin around the card (0 = off)
   glowWidth: 0.18,   // how far the halo spreads past the card edge (card-uv units)
   glowMargin: 1.55,  // plane enlargement that makes room for the halo (feeds geometry + uMargin)
@@ -52,7 +57,7 @@ const VERT = `
 
 const FRAG = `
   uniform sampler2D uMap;
-  uniform float uTime, uHolo, uScan, uGlitch, uBurst, uOpacity, uReady, uBright, uGlow, uGlowWidth, uMargin;
+  uniform float uTime, uHolo, uScan, uGlitch, uBurst, uOpacity, uReady, uBright, uGlow, uGlowWidth, uMargin, uEmissive, uEmGamma, uEmSat;
   uniform vec3 uHoloColor;
   varying vec2 vUv;
   float hash(float n) { return fract(sin(n) * 43758.5453); }
@@ -95,6 +100,15 @@ const FRAG = `
     // Lift the card art out of the holo dimming (tunable via config.brightness).
     col.rgb *= uBright;
 
+    // Stained-glass emission: treat the card as a backlit glass panel. Boost
+    // saturation so the "glass" reads as rich colour, then emit it into HDR so
+    // the scene Bloom makes it glow. A luminance floor keeps the darker glass
+    // transmitting light too, so the colored fills glow — not just the leading.
+    float emLum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 glass = max(mix(vec3(emLum), col.rgb, uEmSat), 0.0);
+    float emW = mix(0.4, 1.0, pow(clamp(emLum, 0.0, 1.0), uEmGamma));
+    col.rgb = glass * (1.0 + emW * uEmissive);
+
     // Inner edge rim so it reads as projected light, not a flat texture.
     float edgeD = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
     col.rgb += uHoloColor * (1.0 - smoothstep(0.0, 0.05, edgeD)) * (0.25 + uHolo * 0.6);
@@ -131,6 +145,9 @@ function makeCardMaterial(cfg) {
       uBurst: { value: 0 },
       uOpacity: { value: cfg.opacity },
       uBright: { value: cfg.brightness ?? 1 },
+      uEmissive: { value: cfg.emissive ?? 0 },
+      uEmSat: { value: cfg.emissiveSat ?? 1 },
+      uEmGamma: { value: cfg.emissiveGamma ?? 1 },
       uGlow: { value: cfg.glow ?? 0 },
       uGlowWidth: { value: cfg.glowWidth ?? 0.15 },
       uMargin: { value: cfg.glowMargin ?? 1 },
@@ -209,6 +226,7 @@ function HologramCard({ anchorRef, mode = "delib", config = HOLOGRAM_CARD_CONFIG
         tmp.current.y + cfg.yOffset + Math.sin(t * 1.3) * cfg.bob,
         tmp.current.z
       );
+      g.scale.setScalar(cfg.scale ?? 1);
     } else {
       g.visible = false;
       return;

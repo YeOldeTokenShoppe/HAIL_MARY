@@ -1,0 +1,66 @@
+// Frame + FX overlay compositor sources.
+//
+// Frames are rarity signals, one tier per frame (2026-07-20):
+//   common + uncommon → grey. The foil tier does the separation between them
+//     (subtle vs the uncommon flourish), so they share a frame on purpose.
+//   rare             → silver-etched, pairs with the `v` foil.
+//   mythic           → gold, pairs with `hero`.
+//   terminal-foil    → rainbow. RESERVED for the set's three terminal foils
+//     (genesis-terminal, our-lady-rl80, terminal-foil-moment) — the rainbow
+//     frame IS the rainbow-rare signal, so it must never appear on a lower
+//     tier or the signal is worthless.
+//
+// NOTE: the silver-etched file is named frame_mythic_no_badge_transparent —
+// that is the asset pack's name, not this set's tier. Confirmed silver → rare.
+const FRAME_DIR = "/TCG/frames";
+
+export const FRAMES = [
+  { id: "grey", label: "Grey", src: `${FRAME_DIR}/frame_grey.webp` },
+  { id: "silver", label: "Silver", src: `${FRAME_DIR}/frame_mythic_no_badge_transparent.webp` },
+  { id: "gold", label: "Gold", src: `${FRAME_DIR}/frame_gold.webp` },
+  { id: "rainbow", label: "Rainbow", src: `${FRAME_DIR}/frame_rainbow.webp` },
+];
+
+const FRAME_SRC = Object.fromEntries(FRAMES.map((f) => [f.id, f.src]));
+
+export const FRAME_ID_BY_RARITY = {
+  "common": "grey",
+  "uncommon": "grey",
+  "rare": "silver",
+  "mythic": "gold",
+  "terminal-foil": "rainbow",
+};
+
+export function frameForRarity(rarity) {
+  return FRAME_SRC[FRAME_ID_BY_RARITY[rarity]] || null;
+}
+
+// FX overlays stack over the art AND the frame. Max 3 at once — past that
+// they stop reading as distinct effects and just fog the card.
+export const MAX_FX = 3;
+
+const FX_DIR = "/TCG/fx-overlays";
+const fx = (file, label, group) => ({ id: file, label, group, src: `${FX_DIR}/${file}` });
+
+export const FX_OVERLAYS = [
+  fx("fx-thunder-1-1488.webp", "Thunder 1", "thunder"),
+  fx("fx-thunder-2-1488.webp", "Thunder 2", "thunder"),
+  fx("fx-thunder-3-1488.webp", "Thunder 3", "thunder"),
+  fx("fx-thunder-4-1488.webp", "Thunder 4", "thunder"),
+  fx("fx-rainbow-1-1488.webp", "Rainbow 1", "rainbow"),
+  fx("fx-rainbow-3-1488.webp", "Rainbow 3", "rainbow"),
+  fx("fx-rainbow-4-1488.webp", "Rainbow 4", "rainbow"),
+  fx("fx-abstract-5-1488.webp", "Abstract 5", "abstract"),
+  fx("fx-abstract-7-1488.webp", "Abstract 7", "abstract"),
+  fx("fx-abstract-10-1488.webp", "Abstract 10", "abstract"),
+  fx("fx-abstract-11-1488.webp", "Abstract 11", "abstract"),
+  fx("fx-abstract-16-1488.webp", "Abstract 16", "abstract"),
+  fx("fx-sparkle-2-1488.webp", "Sparkle", "accent"),
+  fx("fx-flame-1_1488.webp", "Flame", "accent"),
+  fx("fx-rock-1-1488.webp", "Rock", "accent"),
+  fx("fx-dark-1-1488.webp", "Dark", "accent"),
+];
+
+// screen/plus-lighter suit the glow-on-dark art; normal is there for the
+// opaque-ish ones (rock, dark) that are meant to sit ON the card, not in it.
+export const FX_BLEND_MODES = ["screen", "plus-lighter", "overlay", "soft-light", "normal"];

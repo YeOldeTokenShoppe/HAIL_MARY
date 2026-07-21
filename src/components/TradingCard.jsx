@@ -50,6 +50,10 @@ export default function TradingCard({
     rx: 0, ry: 0, mx: 50, my: 50, posx: 50, posy: 50, hyp: 0, lift: 0,
   });
 
+  // Hard cap at 3: past that the effects stop reading as distinct and just
+  // fog the card (MAX_FX in cardFrames.js).
+  const fxLayers = (data.fxOverlays || []).filter(Boolean).slice(0, 3);
+
   const rarityAccent = RARITY_ACCENT[data.rarity] || "#ffd166";
   const typeAccent = TYPE_ACCENT[data.cardType] || "#ffd166";
   // Overlay PNGs have "TRADER" + "MYTHIC" baked into the art, so they only fit
@@ -377,6 +381,28 @@ export default function TradingCard({
         </>
         )}
 
+        {/* Rarity frame, then FX on top of it — the frames are borders with a
+            transparent centre, so they sit above the art without hiding text.
+            Both are outside the template branch so Terminal + Classic share
+            them. */}
+        {data.frameImage && (
+          <img className="tc-cardframe" src={data.frameImage} alt="" draggable={false}
+               loading="lazy" decoding="async" />
+        )}
+
+        {fxLayers.map((fx, i) => (
+          <img
+            key={`${fx}-${i}`}
+            className="tc-fx"
+            src={fx}
+            alt=""
+            draggable={false}
+            loading="lazy"
+            decoding="async"
+            style={{ mixBlendMode: data.fxBlend || "screen", opacity: data.fxOpacity ?? 0.55 }}
+          />
+        ))}
+
         {cornerBadge && (
           <div className="tc-corner-badge" aria-hidden="true">
             <span>{cornerBadge}</span>
@@ -452,6 +478,25 @@ const CARD_STYLES = `
       radial-gradient(circle at 84% 88%, color-mix(in srgb, var(--type) 18%, transparent), transparent 42%),
       linear-gradient(180deg, #110a04 0%, #0a0805 38%, #050306 100%);
   }
+
+  /* Rarity frame (z 9) then FX (z 10) — FX composite over the art AND the
+     frame. Both are object-fit: fill like .tc-overlay, since the frame art is
+     1488x2083 against the card's 1488x2076 (a ~7px difference that would
+     otherwise letterbox the border). */
+  .tc-cardframe,
+  .tc-fx {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+    user-select: none;
+    border-radius: inherit;
+  }
+
+  .tc-cardframe { z-index: 9; }
+  .tc-fx { z-index: 10; }
 
   .tc-edge {
     position: absolute;

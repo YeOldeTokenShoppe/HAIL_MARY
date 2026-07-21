@@ -3153,6 +3153,12 @@ export default function HomePage() {
            account slot when the candle lights. */
         onBookClick={() => setShowBuyModal(true)}
         bookLabel="BUY RL80"
+        /* Occasional ring pulse so the BUY slot reads as the primary
+           action without shouting — quiets itself once tapped, and while
+           the modal it opens is already on screen. Green matches the $
+           glyph below. */
+        bookPulse={!showBuyModal}
+        bookPulseColor="#39ff14"
         bookIcon={
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#39ff14", filter: "drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))" }}>
             <line x1="12" y1="1" x2="12" y2="23" />

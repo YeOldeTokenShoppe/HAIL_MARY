@@ -73,6 +73,15 @@ export default function MobileBottomNav({
   // When true, pulse + brighten the book slot. Used by the root page to
   // call attention to the BUY button while the user is hovering the chart.
   bookHighlight = false,
+  // Periodic attention pulse on the book slot (a ring + icon bounce every
+  // `bookPulseIntervalMs`). Deliberately self-limiting: it goes quiet for
+  // good once the user taps the slot, and yields to `bookHighlight` so the
+  // chart-hover morph never fights it. Off under prefers-reduced-motion.
+  bookPulse = false,
+  bookPulseIntervalMs = 12000,
+  // Ring/glow color. Defaults to the themed book-icon color; pass a value
+  // when the caller overrides `bookIcon` with its own palette.
+  bookPulseColor = null,
   // Extra placeholder slots rendered to the left or right of the center
   // FAB. Each slot: { label, iconSrc?, icon?, onClick?, comingSoon? }.
   // When `comingSoon` is set the slot renders dimmed with a SOON badge.
@@ -91,6 +100,9 @@ export default function MobileBottomNav({
   const [isHydrated, setIsHydrated] = useState(false);
   const [showMenuHint, setShowMenuHint] = useState(false);
   const [buyPulse, setBuyPulse] = useState(false);
+  const [bookAttn, setBookAttn] = useState(false);
+  // Once the user taps the book slot they've found it — stop nagging.
+  const [bookPulseDone, setBookPulseDone] = useState(false);
   const pathname = usePathname();
   const { user: clerkUser } = useUser();
   const clerk = useClerk();
@@ -138,6 +150,33 @@ export default function MobileBottomNav({
     }, 8000);
     return () => clearInterval(interval);
   }, []);
+
+  /* Occasional attention pulse on the BUY/book slot. Skipped while the
+     chart-hover morph owns the slot, after the user has tapped it, and for
+     users who've asked for reduced motion. The first pulse is delayed by a
+     full interval so it never fires during page-load churn. */
+  /* NOTE: deps are primitives ONLY. Callers pass `onBookClick` as an inline
+     arrow, so its identity changes every render — including it here would
+     restart the interval on each of the root page's (frequent) re-renders
+     and the pulse would never reach its first tick. */
+  const hasBookSlot = !!onBookClick;
+  useEffect(() => {
+    if (!bookPulse || bookPulseDone || bookHighlight || !hasBookSlot) return;
+    if (typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+    let offTimer;
+    const interval = setInterval(() => {
+      setBookAttn(true);
+      offTimer = setTimeout(() => setBookAttn(false), 1900);
+    }, bookPulseIntervalMs);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(offTimer);
+      setBookAttn(false);
+    };
+  }, [bookPulse, bookPulseDone, bookHighlight, hasBookSlot, bookPulseIntervalMs]);
 
   const handlePlayClick = () => { if (onPlayMusic) onPlayMusic(); };
   const handleStopClick = () => { if (onStopMusic) onStopMusic(); };
@@ -196,8 +235,11 @@ export default function MobileBottomNav({
      LEFT/RIGHT positioning logic stays unchanged. */
   const bookSlot = onBookClick ? (
     <button
-      className={`btm-nav-item btm-nav-book ${bookHighlight ? 'btm-nav-highlight' : ''}`}
-      onClick={onBookClick}
+      className={`btm-nav-item btm-nav-book ${bookHighlight ? 'btm-nav-highlight' : ''} ${bookAttn ? 'btm-nav-book-attn' : ''}`}
+      onClick={() => {
+        setBookPulseDone(true);
+        onBookClick();
+      }}
       title={bookTitle}
     >
       <div className="btm-nav-icon">
@@ -805,6 +847,50 @@ export default function MobileBottomNav({
           color: ${nm ? '#2ad6ee' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#b8922e'};
           transition: color 0.15s ease;
           filter: ${nm ? 'drop-shadow(0 0 6px rgba(42, 214, 238, 0.5))' : 'none'};
+        }
+
+        /* Periodic attention pulse on the BUY/book slot. The ring is drawn
+           on the BUTTON, not .btm-nav-icon — the icon is overflow:hidden and
+           would clip an expanding ring. Sized/positioned to sit exactly over
+           the 32px icon box (6px top padding on .btm-nav-item). */
+        @keyframes btmBookAttnRing {
+          0%   { transform: scale(0.86); opacity: 0; }
+          18%  { opacity: 0.85; }
+          100% { transform: scale(1.95); opacity: 0; }
+        }
+        @keyframes btmBookAttnBounce {
+          0%, 100%  { transform: scale(1); }
+          18%       { transform: scale(1.16); }
+          40%       { transform: scale(1); }
+          58%       { transform: scale(1.12); }
+          80%       { transform: scale(1); }
+        }
+        .btm-nav-book-attn::after {
+          content: '';
+          position: absolute;
+          top: 6px;
+          left: 50%;
+          width: 32px;
+          height: 32px;
+          margin-left: -16px;
+          border-radius: 10px;
+          border: 2px solid ${bookPulseColor || (nm ? '#2ad6ee' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#b8922e')};
+          box-shadow: 0 0 12px ${bookPulseColor || (nm ? '#2ad6ee' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#b8922e')};
+          opacity: 0;
+          pointer-events: none;
+          animation: btmBookAttnRing 0.95s cubic-bezier(0.22, 1, 0.36, 1) 2;
+        }
+        .btm-nav-book-attn .btm-nav-icon {
+          animation: btmBookAttnBounce 1.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .btm-nav-book-attn .btm-nav-label {
+          color: ${bookPulseColor || (nm ? '#d6faff' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#8b6914')};
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .btm-nav-book-attn::after,
+          .btm-nav-book-attn .btm-nav-icon {
+            animation: none;
+          }
         }
 
         .btm-wallet-connected-badge {
