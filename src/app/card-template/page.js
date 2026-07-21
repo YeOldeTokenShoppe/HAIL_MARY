@@ -5,113 +5,15 @@ import TradingCard from "@/components/TradingCard";
 import { getCardById, GENESIS_SET, CARD_TYPES } from "@/game/terminal-traders/cards";
 import { toTemplateCard, CARD_ART } from "@/game/terminal-traders/templateCard";
 import {
-  FRAMES, FRAME_ID_BY_RARITY, FX_OVERLAYS, FX_BLEND_MODES, MAX_FX, frameForRarity,
+  FRAMES, FRAME_ID_BY_RARITY, FX_OVERLAYS, FX_BLEND_MODES, MAX_FX,
 } from "@/game/terminal-traders/cardFrames";
 
-const EUGENE = {
-  name: "Eugene",
-  subtitle: "Rare Finds Researcher",
-  cardType: "Trader",
-  style: "Meme",
-  rarity: "Mythic",
-  edition: "1/80",
-  startingCred: 20,
-  startingPortfolio: 0,
-  ability: {
-    name: "Pattern Recognition",
-    icon: "\u{1F680}",
-    badgeImage: "/abilityBadge.png",
-    text: "The first Coin card you play each game enters with +4 Portfolio. If it is Rare or Terminal Foil, gain +2 Cred.",
-  },
-  weakness: "Noise",
-  resistance: "Panic Selling",
-  pivotCost: 2,
-  flavorText: "Every story wants to be a myth.",
-  backgroundImage: "/TCG/eugeneFractal.webp",
-  artFocus: "center 28%",
-  artZoom: 1.25,
-  overlayImage: "/cardOverlay2.webp",
-};
-
-const SAINT = {
-  name: "Saint GR80",
-  subtitle: "The Holo Roller",
-  cardType: "Trader",
-  style: "Logos",
-  rarity: "Legendary",
-  edition: "3/80",
-  startingCred: 24,
-  startingPortfolio: 0,
-  ability: {
-    name: "Doctrine of Patience",
-    icon: "\u{1F4FF}",
-    badgeImage: "/abilityBadge.png",
-    text: "Skip your draw to convert 1 Loss into +6 Cred. The market rewards the faithful.",
-  },
-  weakness: "Hype Waves",
-  resistance: "FUD",
-  pivotCost: 2,
-  flavorText: "Blessed are the holders, for they shall inherit the bag.",
-  backgroundImage: "/TCG/trader_monk.webp",
-  artFocus: "center 30%",
-  artZoom: 1.2,
-  overlayImage: "/cardOverlay_monk.webp",
-};
-
-const DEMON = {
-  name: "John Barron",
-  subtitle: "Pit Demon",
-  cardType: "Trader",
-  style: "Chaos",
-  rarity: "Mythic",
-  edition: "2/80",
-  startingCred: 18,
-  startingPortfolio: 0,
-  ability: {
-    name: "Liquidation Feast",
-    icon: "\u{1F525}",
-    badgeImage: "/abilityBadge.png",
-    text: "When an opponent gets rugged, gain +4 Cred and draw a Market card.",
-  },
-  weakness: "Diamond Hands",
-  resistance: "Volatility",
-  pivotCost: 3,
-  flavorText: "Every red candle is a whisper from the pit.",
-  backgroundImage: "/TCG/traderDemon.webp",
-  artFocus: "center 32%",
-  artZoom: 1.2,
-  overlayImage: "/cardOverlay_demon.webp",
-};
-
-const MARISOL = {
-  name: "Marisol",
-  subtitle: "Onchain Investigator",
-  cardType: "Trader",
-  style: "Logos",
-  rarity: "Legendary",
-  edition: "12/80",
-  startingCred: 22,
-  startingPortfolio: 0,
-  ability: {
-    name: "Cold Read",
-    icon: "\u{1F50D}",
-    badgeImage: "/abilityBadge.png",
-    text: "Once per round, peek the top of the Market deck and reorder it.",
-  },
-  weakness: "Hype Waves",
-  resistance: "Audits",
-  pivotCost: 3,
-  flavorText: "Every wallet leaves a fingerprint.",
-  backgroundImage: "/TCG/traderMarisol.webp",
-  artFocus: "center 28%",
-  artZoom: 1.25,
-};
-
-const NO_ART = {
-  ...EUGENE,
-  backgroundImage: null,
-  edition: "demo",
-};
+// Traders render straight from the engine, same as every other card. The
+// hand-authored EUGENE/SAINT/DEMON/MARISOL fixtures that used to live here
+// were retired 2026-07-21: they had drifted from cards.js (rarity "Legendary"
+// on two of them, which matches no frame; hand-typed editions; weakness /
+// resistance / pivotCost fields the engine does not carry).
+const TRADER_IDS = ["eugene", "john-barron", "gr80", "marisol"];
 
 // Real Action cards rendered through the game's own converter, so the preview
 // matches what the table shows (art comes from CARD_ART, keyed by card id).
@@ -133,23 +35,22 @@ const ACTION_IDS = [
 
 // The picker column, grouped by card type. `meta` is the small line under the
 // name; traders/actions print their rarity, so it reads the same as the card.
+const pickerItems = (ids) =>
+  ids.map((id) => {
+    const card = toTemplateCard(getCardById(id));
+    return { id, card, meta: card.rarity };
+  });
+
+// The framed no-art variant, for checking layout without artwork.
+const NO_ART = {
+  ...toTemplateCard(getCardById("eugene")),
+  backgroundImage: null,
+  edition: "demo",
+};
+
 const CARD_GROUPS = [
-  {
-    title: "Traders",
-    items: [
-      { id: "eugene", card: EUGENE },
-      { id: "demon", card: DEMON },
-      { id: "saint", card: SAINT },
-      { id: "marisol", card: MARISOL },
-    ].map((entry) => ({ ...entry, meta: entry.card.rarity })),
-  },
-  {
-    title: "Actions",
-    items: ACTION_IDS.map((id) => {
-      const card = toTemplateCard(getCardById(id));
-      return { id, card, meta: card.rarity };
-    }),
-  },
+  { title: "Traders", items: pickerItems(TRADER_IDS) },
+  { title: "Actions", items: pickerItems(ACTION_IDS) },
   {
     title: "Blank",
     items: [{ id: "noart", card: NO_ART, name: "No artwork", meta: "frame only" }],
@@ -157,8 +58,8 @@ const CARD_GROUPS = [
 ];
 
 // Every Genesis card is selectable, not just the ones in the picker — the
-// collection grid can open any of the 80. Hand-authored demo cards win on id
-// collision (eugene/marisol), since they carry the tuned overlay art.
+// collection grid can open any of the 80. CARD_GROUPS adds only the synthetic
+// "noart" entry now that the traders come from the engine.
 const CARD_BY_ID = {
   ...Object.fromEntries(GENESIS_SET.map((card) => [card.id, toTemplateCard(card)])),
   ...Object.fromEntries(
@@ -184,12 +85,7 @@ const COLLECTION = TYPE_ORDER.map(({ type, title }) => {
     art: CARD_ART[card.id] || null,
     // Filled slots render the real TradingCard, so a thumbnail shows the
     // finished card — frame, stats, ability, foil — not just the art crop.
-    // Frame falls back to the engine rarity: the hand-authored demo cards
-    // (eugene/marisol) predate frameImage and would otherwise render frameless.
-    template: {
-      ...CARD_BY_ID[card.id],
-      frameImage: CARD_BY_ID[card.id]?.frameImage || frameForRarity(card.rarity),
-    },
+    template: CARD_BY_ID[card.id],
   }));
   return { title, cards, wired: cards.filter((c) => c.art).length };
 });
@@ -204,7 +100,6 @@ export default function CardTemplatePage() {
   const [active, setActive] = useState("eugene");
   const [artFocusY, setArtFocusY] = useState(28);
   const [artZoom, setArtZoom] = useState(1.25);
-  const [useOverlay, setUseOverlay] = useState(true);
   const [foilStyle, setFoilStyle] = useState("hero");
   const [templateStyle, setTemplateStyle] = useState("terminal");
   const [view, setView] = useState("single");
@@ -246,12 +141,17 @@ export default function CardTemplatePage() {
     ...base,
     artFocus: hasArt ? `center ${artFocusY}%` : null,
     artZoom: hasArt ? artZoom : 1,
-    overlayImage: useOverlay ? (base.overlayImage || "/cardOverlay.webp") : null,
     foilStyle,
     frameImage:
       frameOverride === "none" ? null
       : frameOverride ? FRAMES.find((f) => f.id === frameOverride)?.src
       : base.frameImage || autoFrame?.src || null,
+    // Overriding the frame must carry its divider-slot offset too, or the
+    // meta line lands on a bar (the frames don't share a slot height).
+    frameMetaTop:
+      frameOverride && frameOverride !== "none"
+        ? FRAMES.find((f) => f.id === frameOverride)?.metaTop
+        : base.frameMetaTop || autoFrame?.metaTop,
     fxOverlays: fxPicks,
     fxBlend,
     fxOpacity,
@@ -517,18 +417,6 @@ export default function CardTemplatePage() {
                 </button>
               </>
             )}
-          </div>
-
-          <div className="ct-group">
-            <p className="ct-group-title">Overlay</p>
-            <button
-              className={`ct-toggle${useOverlay ? " is-active" : ""}`}
-              aria-pressed={useOverlay}
-              onClick={() => setUseOverlay(!useOverlay)}
-              title="Toggle cardOverlay.webp"
-            >
-              Overlay {useOverlay ? "ON" : "OFF"}
-            </button>
           </div>
 
           <div className={`ct-group${hasArt ? "" : " is-disabled"}`}>

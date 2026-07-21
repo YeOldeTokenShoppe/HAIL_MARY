@@ -348,7 +348,26 @@ text, upper-weighted composition.*
 
 ---
 
-~## 12. TERMINAL FOIL MOMENT — wildcard · terminal-foil ★
+~**APPROVED.** Brass spider-leg clamp biting the cable (correctly
+face-free — a tool doing a job), amber pulse-dots traveling INTO the tap,
+sealed envelope popping open with the golden "!" at the moment of the
+peek, toy headphones at frame edge. Happy accident kept as canon: of the
+rainbow cable run, the tapped cable is MINT — tonight's wiretap victim is
+GR80. (Alt-art idea, if ever: same scene, pink cable.) Wire at
+`artFocus: "center 30%", artZoom: 1.0`; if the "!" tip clips under the
+name bar, nudge to 32%.
+
+---
+
+## 12. TERMINAL FOIL MOMENT — wildcard · terminal-foil ★
+
+**APPROVED (take 3, 2026-07-21).** Time frozen — suspended coffee pour,
+floating pen, motionless confetti, held-breath crowd with clean faces —
+and all FOUR station beams landed, one per desk: mint, magenta-pink,
+gold, red-salmon. The foil's light touches every station: the set's
+showpiece, as designed. Takes 1 (cheering crowd, runner-up) and 2 (two
+beams) precede it; keep their files. Wire at `artFocus: "center 31%",
+artZoom: 1.0` and preview with the RADIANT foil at /card-template.
 
 **The idea.** The desk stops — in wonder. The whole candy-neon trading
 floor frozen mid-gesture: tickers halted between digits, a thrown pen
@@ -398,9 +417,8 @@ mood, glossy toy-like look, no readable text, upper-weighted composition.*~
 
   ## Art run status (2026-07-21)
 
-Approved 10/12 — the 4 lens keys, both deep scans, both rares, Candle
-Vigil, and Neon Stop Loss. Remaining: Insider Ping and the terminal foil. Wiring values
-(zoom 1.0 unless noted):
+Approved 12/12 — THE FIRST TWELVE ART RUN IS COMPLETE (2026-07-21).
+Wiring values (zoom 1.0 unless noted):
 
 | Card | Status | artFocus |
 |---|---|---|
@@ -414,8 +432,8 @@ Vigil, and Neon Stop Loss. Remaining: Insider Ping and the terminal foil. Wiring
 | Rug Warning | approved (Rugula debut) | center 34% (V foil ↔ rug diagonal) |
 | Candle Vigil | approved (regen 2: red candle-wind, real flame, no face) | center 34% |
 | Neon Stop Loss | approved (face kept per mascot rule) | center 32%; if starburst clips: Art Y 70–80% + zoom ~1.08 |
-| Insider Ping | pending | — |
-| Terminal Foil Moment | pending — save for last, most iterations | — |
+| Insider Ping | approved (mint cable tapped — GR80 is tonight's victim) | center 30%; if the "!" clips under the name bar: 32% |
+| Terminal Foil Moment | approved (take 3: frozen floor, four station beams) | center 31% · RADIANT foil |
 
 ---
 

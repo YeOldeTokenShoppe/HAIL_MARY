@@ -94,7 +94,7 @@ const EUGENE = {
   weakness: "Rug Pulls",
   resistance: "Recycled Scams",
   pivotCost: 2,
-  flavorText: "This chart smells like $ORACL3, day 4.",
+  flavorText: "I don't predict. I remember.",
   backgroundImage: "/TCG/traderUnicorn.webp",
   artFocus: "center 28%",
   artZoom: 1.25,

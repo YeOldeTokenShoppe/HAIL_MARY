@@ -1,5 +1,5 @@
 import { CARD_TYPES, GENESIS_SET, LENS_LABELS } from "./cards.js";
-import { frameForRarity } from "./cardFrames.js";
+import { frameForRarity, metaTopForFrame } from "./cardFrames.js";
 
 // Single source of truth for finished card art. As the Genesis 80 art run
 // lands, add one entry per card id; everything else renders the framed
@@ -7,13 +7,17 @@ import { frameForRarity } from "./cardFrames.js";
 // Every `src` is the .webp (q86, effort 6, encoded from the .png at full
 // source resolution); the .png masters stay in /TCG as the re-export source.
 export const CARD_ART = {
-  "eugene": { src: "/TCG/eugeneFractal.webp", artFocus: "center 28%", artZoom: 1.25, overlayImage: "/cardOverlay.webp" },
+  // Traders carried a legacy `overlayImage` (an all-in-one 500x700 frame +
+  // TRADER badge + holo FX). Retired 2026-07-21: the rarity frames and the FX
+  // compositor cover both jobs at 1488px, and stacking them double-framed the
+  // card. TradingCard still supports overlayImage — ReliquaryRail uses it.
+  "eugene": { src: "/TCG/eugeneFractal.webp", artFocus: "center 28%", artZoom: 1.25 },
   "marisol": { src: "/TCG/traderMarisol.webp", artFocus: "center 28%", artZoom: 1.25 },
   // gr80 + john-barron art shipped long ago but lived only in /card-template's
   // demo constants, so the game rendered both traders art-less. Values carried
   // over from those constants (2026-07-20).
-  "gr80": { src: "/TCG/trader_monk.webp", artFocus: "center 30%", artZoom: 1.2, overlayImage: "/cardOverlay_monk.webp" },
-  "john-barron": { src: "/TCG/traderDemon.webp", artFocus: "center 32%", artZoom: 1.2, overlayImage: "/cardOverlay_demon.webp" },
+  "gr80": { src: "/TCG/trader_monk.webp", artFocus: "center 30%", artZoom: 1.2 },
+  "john-barron": { src: "/TCG/traderDemon.webp", artFocus: "center 32%", artZoom: 1.2 },
   // moonpony + pump-signal assets are legacy pre-rendered full cards (frame
   // and text baked in), so the template crops hard into their art area.
   // Replace with raw artwork during the Genesis 80 art run.
@@ -22,13 +26,16 @@ export const CARD_ART = {
   // artFocus values come from the art-run status table in design_guide.md
   // ("Art run status", §First Twelve) — that table is the source of truth,
   // not the 28% default. artZoom stays 1.0 unless the guide notes otherwise.
-  "audit-flare": { src: "/TCG/actionAuditFlare.webp", artFocus: "center 28%", artZoom: 1.0 },
+  // abilityTone orange: this art is mint/cyan, so the default cyan EFFECT
+  // badge and heading read as low contrast against it.
+  "audit-flare": { src: "/TCG/actionAuditFlare.webp", artFocus: "center 28%", artZoom: 1.0, abilityTone: "orange" },
   // guide: 28% in repo; bump to 30-32 if the arrowheads clip.
   "forked-rumor": { src: "/TCG/actionForkedRumor.webp", artFocus: "center 28%", artZoom: 1.0 },
   "wallet-seance": { src: "/TCG/actionWalletSeance.webp", artFocus: "center 31%", artZoom: 1.0 },
   // guide: protect the ball's crown.
   "mempool-prophecy": { src: "/TCG/actionMempoolProphecy.webp", artFocus: "center 33%", artZoom: 1.0 },
-  "cold-wallet": { src: "/TCG/actionColdWallet.webp", artFocus: "center 34%", artZoom: 1.0 },
+  // abilityTone orange: the ice-vault art is cyan end to end.
+  "cold-wallet": { src: "/TCG/actionColdWallet.webp", artFocus: "center 34%", artZoom: 1.0, abilityTone: "orange" },
   "chart-exorcism": { src: "/TCG/actionChartExorcism.webp", artFocus: "center 30%", artZoom: 1.0 },
   // guide: 36% so the V foil lines up with the beam-X.
   "oracle-crosscheck": { src: "/TCG/actionOracleCrosscheck.webp", artFocus: "center 36%", artZoom: 1.0 },
@@ -43,6 +50,10 @@ export const CARD_ART = {
   // `radiant` foil style, so this is the one card that ships with it.
   "terminal-foil-moment": { src: "/TCG/actionTerminalFoil.webp", artFocus: "center 31%", artZoom: 1.0 },
 };
+
+// Set mark printed on every Genesis card, the way a TCG prints its set logo
+// over the art. Set `setBadge: null` on a card to suppress it.
+export const SET_BADGE = "/TCG/badges/genesis-edition-badge.webp";
 
 export function getCardArt(cardId) {
   return CARD_ART[cardId]?.src || null;
@@ -95,9 +106,14 @@ export function toTemplateCard(card) {
     artFocus: art.artFocus || "center 38%",
     artZoom: art.artZoom || 1.2,
     overlayImage: art.overlayImage || null,
+    // Per-card EFFECT tone — set on cards whose art is cyan enough that the
+    // default cyan badge/heading reads as low contrast.
+    abilityTone: art.abilityTone || null,
     // Rarity frame rides on the card like foilStyle does, so the game, the
     // collection grid and the template all get it without extra wiring.
     frameImage: frameForRarity(card.rarity),
+    frameMetaTop: metaTopForFrame(frameForRarity(card.rarity)),
+    setBadge: art.setBadge === null ? null : SET_BADGE,
   };
 }
 
@@ -130,22 +146,22 @@ function kitAbilityName(kit) {
 
 function abilityFor(card) {
   if (card.type === CARD_TYPES.TRADER) {
-    return { name: card.abilityName, text: card.abilityText, badgeImage: "/abilityBadge.png" };
+    return { name: card.abilityName, text: card.abilityText };
   }
   if (card.type === CARD_TYPES.COIN) {
-    return { name: "Market Entry", text: card.effectText, badgeImage: "/abilityBadge.png" };
+    return { name: "Market Entry", text: card.effectText };
   }
   if (card.type === CARD_TYPES.MARKET) {
     // Docket-event identity (§4.6): the printed card describes the table flip.
     if (card.docket) {
-      return { name: "Docket Event", text: `${card.docket.text} ${card.docket.banner}.`, badgeImage: "/abilityBadge.png" };
+      return { name: "Docket Event", text: `${card.docket.text} ${card.docket.banner}.` };
     }
-    return { name: "Market Event", text: card.effectText, badgeImage: "/abilityBadge.png" };
+    return { name: "Market Event", text: card.effectText };
   }
   if (card.kit) {
-    return { name: kitAbilityName(card.kit), text: card.kit.text, badgeImage: "/abilityBadge.png" };
+    return { name: kitAbilityName(card.kit), text: card.kit.text };
   }
-  return { name: styleLabel(card.tag), text: card.effectText, badgeImage: "/abilityBadge.png" };
+  return { name: styleLabel(card.tag), text: card.effectText };
 }
 
 function statPairFor(card) {

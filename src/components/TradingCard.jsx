@@ -12,6 +12,35 @@ const RARITY_ACCENT = {
   "Terminal Foil": "#ffe27a",
 };
 
+// EFFECT badge + heading tones. Cyan is the RL80 default, seeded on #07ddf0:
+// the base cyan is the gradient's TOP stop so it actually shows, while the mid
+// stop — the one under the white label text — is darkened to 3.84:1, since
+// #07ddf0 itself measures only 1.67:1 against white.
+//
+// `orange` is the escape hatch for cards whose art is itself cyan (Cold
+// Wallet's ice vault), where the default would read as low contrast. Opt a
+// card in with `abilityTone: "orange"` on its CARD_ART entry.
+const EFFECT_TONES = {
+  cyan: {
+    grad: "linear-gradient(180deg, #07ddf0 0%, #05909c 55%, #024248 100%)",
+    ink: "#07ddf0",
+  },
+  orange: {
+    grad: "linear-gradient(180deg, #ffb056 0%, #f07307 55%, #8f3d00 100%)",
+    ink: "#f07307",
+  },
+};
+
+// The type badge follows the frame metal: gold frame → gold badge, everything
+// else → silver. Override per card with `data.badgeTone`.
+const BADGE_TONE = {
+  Common: "silver",
+  Uncommon: "silver",
+  Rare: "silver",
+  Mythic: "gold",
+  "Terminal Foil": "gold",
+};
+
 const TYPE_ACCENT = {
   Trader: "#ffd166",
   Coin: "#f6d365",
@@ -21,7 +50,13 @@ const TYPE_ACCENT = {
 
 const LABEL_GRADIENTS = {
   type:     "linear-gradient(180deg, #ffe27a 0%, #d49b00 55%, #8a5e00 100%)",
-  ability:  "linear-gradient(180deg, #ff5454 0%, #c40000 55%, #780000 100%)",
+  // Silver twin of `type`, for cards whose frame isn't gold. The mid stop
+  // carries the label text, so it is matched to gold's luminance rather than
+  // to the frame's brightness — an earlier #aeb8c4 measured 2.0:1 against the
+  // white text (gold's #d49b00 is 2.5:1) and read as washed out.
+  typeSilver: "linear-gradient(180deg, #f2f5f8 0%, #8b97a5 55%, #3a424d 100%)",
+  // Default EFFECT tone — see EFFECT_TONES below.
+  ability:  "linear-gradient(180deg, #07ddf0 0%, #05909c 55%, #024248 100%)",
   move:     "linear-gradient(180deg, #5fb8ff 0%, #1b6dbe 55%, #0a3a72 100%)",
   rarity:   "linear-gradient(180deg, var(--r-lite) 0%, var(--r-mid) 55%, var(--r-dark) 100%)",
 };
@@ -53,6 +88,9 @@ export default function TradingCard({
   // Hard cap at 3: past that the effects stop reading as distinct and just
   // fog the card (MAX_FX in cardFrames.js).
   const fxLayers = (data.fxOverlays || []).filter(Boolean).slice(0, 3);
+
+  const badgeTone = data.badgeTone || BADGE_TONE[data.rarity] || "gold";
+  const effectTone = EFFECT_TONES[data.abilityTone] || EFFECT_TONES.cyan;
 
   const rarityAccent = RARITY_ACCENT[data.rarity] || "#ffd166";
   const typeAccent = TYPE_ACCENT[data.cardType] || "#ffd166";
@@ -153,9 +191,15 @@ export default function TradingCard({
         "--scale": scale,
         "--rarity": rarityAccent,
         "--type": typeAccent,
-        "--r-lite": shade(rarityAccent, 35),
-        "--r-mid": rarityAccent,
-        "--r-dark": shade(rarityAccent, -45),
+        /* Rarity-badge ramp. The mid stop sits under the white label text, so
+           it is darkened rather than set to the raw accent: the light accents
+           (Common #9cfce9) measured 1.20:1 against white and were unreadable.
+           At -50% every rarity clears 4.5:1 while keeping its hue. */
+        "--meta-top": data.frameMetaTop || "86.6%",
+        "--effect-ink": effectTone.ink,
+        "--r-lite": rarityAccent,
+        "--r-mid": shade(rarityAccent, -50),
+        "--r-dark": shade(rarityAccent, -72),
       }}
     >
       <style>{CARD_STYLES}</style>
@@ -163,7 +207,7 @@ export default function TradingCard({
 
       <div
         ref={cardRef}
-        className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}`}
+        className={`tc-card tc-card--${templateStyle}${overlayImage ? " is-overlaid" : ""}${data.frameImage ? " is-framed" : ""}`}
         data-foil={foilTier}
         onMouseMove={handleMove}
         onMouseLeave={handleLeave}
@@ -246,7 +290,12 @@ export default function TradingCard({
                     draggable={false}
                   />
                 ) : (
-                  <ObliqueLabel variant="type">{data.cardType}</ObliqueLabel>
+                  <ObliqueLabel
+                    variant="type"
+                    style={badgeTone === "silver" ? { "--label-grad": LABEL_GRADIENTS.typeSilver } : undefined}
+                  >
+                    {data.cardType}
+                  </ObliqueLabel>
                 )}
               </div>
 
@@ -292,11 +341,13 @@ export default function TradingCard({
                   <img
                     className="tc-ability-badge-img"
                     src={data.ability.badgeImage}
-                    alt="Ability"
+                    alt="Effect"
                     draggable={false}
                   />
                 ) : (
-                  <ObliqueLabel variant="ability">Ability</ObliqueLabel>
+                  <ObliqueLabel variant="ability" style={{ "--label-grad": effectTone.grad }}>
+                    Effect
+                  </ObliqueLabel>
                 )}
               </div>
               <div className="tc-ability-body">
@@ -366,7 +417,10 @@ export default function TradingCard({
               <em>Style</em>
               <b>{data.style}</b>
             </span>
-            <span className="tc-meta-rarity" style={{ "--r": rarityAccent }}>
+            <span
+              className={`tc-meta-rarity${String(data.rarity || "").length > 8 ? " tc-meta-rarity--long" : ""}`}
+              style={{ "--r": rarityAccent }}
+            >
               <em>Rarity</em>
               <b>{data.rarity}</b>
             </span>
@@ -381,13 +435,23 @@ export default function TradingCard({
         </>
         )}
 
+        {/* Set mark, printed over the art like a TCG set logo. */}
+        {data.setBadge && (
+          <img className="tc-set-badge" src={data.setBadge} alt="" draggable={false} decoding="async" />
+        )}
+
         {/* Rarity frame, then FX on top of it — the frames are borders with a
             transparent centre, so they sit above the art without hiding text.
             Both are outside the template branch so Terminal + Classic share
             them. */}
+        {/* NOT lazy: these are absolutely positioned inside the card's
+            scale() transform, and Chrome's lazy-load intersection check does
+            not fire reliably there — at collection-grid scale the frames
+            simply never loaded. Only 4 frame files exist set-wide, so they
+            cache after the first card and cost nothing to load eagerly. */}
         {data.frameImage && (
           <img className="tc-cardframe" src={data.frameImage} alt="" draggable={false}
-               loading="lazy" decoding="async" />
+               decoding="async" />
         )}
 
         {fxLayers.map((fx, i) => (
@@ -397,7 +461,6 @@ export default function TradingCard({
             src={fx}
             alt=""
             draggable={false}
-            loading="lazy"
             decoding="async"
             style={{ mixBlendMode: data.fxBlend || "screen", opacity: data.fxOpacity ?? 0.55 }}
           />
@@ -495,8 +558,113 @@ const CARD_STYLES = `
     border-radius: inherit;
   }
 
-  .tc-cardframe { z-index: 9; }
-  .tc-fx { z-index: 10; }
+  /* The frame is the OUTERMOST printed layer, above the art window and the
+     content layer — like a real card, where everything lives inside the
+     frame's window. An earlier version put it below .tc-frame, which meant
+     the opaque art window covered all but a ~2px slice of the border band;
+     at small scales rounding erased even that and the frame looked absent.
+       12 .tc-cardframe — rarity border, over art and content
+       13 .tc-fx        — composites over art AND frame, as specced
+     Content never collides with it because .is-framed widens the padding
+     below to clear the band. */
+  .tc-cardframe { z-index: 12; }
+  .tc-fx { z-index: 13; }
+
+  /* Set mark: right-aligned over the art, above the art window (which sits in
+     .tc-frame at z 5) but below the frame border and FX. Width is a % of the
+     card so it holds at thumbnail scale; the asset is 2.40:1, so 34% wide
+     lands it about 10% tall. */
+  .tc-set-badge {
+    position: absolute;
+    right: 2.2%;
+    top: 30%;
+    width: 38%;
+    height: auto;
+    z-index: 8;
+    pointer-events: none;
+    user-select: none;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,.6));
+  }
+
+  /* A framed card draws its border from the frame art, so the template's own
+     edge treatments have to stand down — same idea as .is-overlaid. Critically
+     .tc-art-window's OUTER drop shadow (0 12px 32px) spreads ~13px past the
+     art at render scale and, with .tc-frame above the frame image, blanketed
+     the whole ~11px border band. Inset shadows stay; only the outer one goes. */
+  .tc-card.is-framed .tc-edge { display: none; }
+  .tc-card.is-framed .tc-art-inset { display: none; }
+  /* Corner brackets belong to the frameless template; against a frame the
+     top-right one poked out from behind the stat boxes as a stray fragment. */
+  .tc-card.is-framed .tc-art-corner { display: none; }
+
+  /* The frame art's border band is 55/1488 of the card = ~27.5px at scale 1.
+     Content has to clear it or the frame (z 12) paints over it.
+     .tc-art-top / .tc-art-bottom are absolutely positioned at 22px and do NOT
+     inherit .tc-frame's padding — that 22px sits INSIDE the band, which is
+     what clipped the type and rarity badges. Both need their own offsets. */
+  /* The frame art prints two divider lines at 85.4-86.0% and 89.1-89.8% of
+     card height, with a slot between them. Content is pulled up so the
+     ability box ends above the first line and .tc-meta sits inside the slot —
+     the arrangement the frame was drawn for. The art row is 1fr, so the extra
+     bottom padding is what shrinks it. */
+  .tc-card.is-framed .tc-frame {
+    padding: 34px 40px 166px;
+    /* Only the art row is declared; the rest come from implicit auto rows.
+       The base template declares six rows, so a card using three of them
+       still paid for the gaps of the three empty ones — which is why the
+       effect box ended 1.2% lower on Traders (3 rows) than Actions (2). With
+       implicit rows, the last row always ends at the content bottom, so the
+       effect lands at the same height on every card type. */
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  /* Flavor quote moves above the effect box (2026-07-21) so the effect can
+     bottom-anchor just above the frame's divider bars on Traders and Coins,
+     matching Actions, which carry no quote. */
+  .tc-card.is-framed .tc-ability { order: 1; }
+  /* Pinned, not flowed: trader and action cards have different row stacks, so
+     a flow-based offset lands the meta line in the slot for one and across a
+     divider for the other. Percentage is of the card box (.tc-frame is inset
+     0), so this holds at every scale. */
+  .tc-card.is-framed .tc-meta {
+    position: absolute;
+    /* Per-frame: each frame prints its divider slot at a different height
+       (see FRAMES[].metaTop in cardFrames.js). */
+    top: var(--meta-top, 86.6%);
+    left: 40px;
+    right: 40px;
+    margin: 0;
+  }
+
+  /* The frame prints a decorative seam across the divider at 58.0-59.5% of
+     card width, which the RARITY label ran straight into. space-between put
+     each item at a position that depended on the text widths either side of
+     it, so rarity landed anywhere from 51.7% to 58.5% depending on the card.
+     Fixed columns pin it past the seam for every card instead. */
+  .tc-card.is-framed .tc-meta {
+    display: grid;
+    grid-template-columns: 26% 36.3% 21.6% 16.1%;
+    gap: 0;
+  }
+
+  /* One line, always. "Terminal Foil" is long enough to wrap inside its
+     column, which doubled the row height and pushed it out of the slot. */
+  .tc-card.is-framed .tc-meta > span { white-space: nowrap; }
+
+  /* ...and with wrapping off, that same long name overran into SET. Scoped to
+     long rarity names (only the 3 terminal foils) so the other 77 cards keep
+     a meta line at one consistent size. Absolute px, not em: .tc-meta span
+     sets 13px, but an em here resolves against the card's inherited size and
+     computed UP to 14px. */
+  .tc-card.is-framed .tc-meta > span.tc-meta-rarity--long { font-size: 10px; }
+  .tc-card.is-framed .tc-art-top { top: 36px; left: 40px; right: 40px; }
+  .tc-card.is-framed .tc-art-bottom { bottom: 36px; left: 40px; right: 40px; }
+  .tc-card.is-framed .tc-art-window {
+    box-shadow:
+      inset 0 0 0 2px rgba(0,0,0,.65),
+      inset 0 0 0 3px color-mix(in srgb, var(--rarity) 60%, #d9b44a 40%),
+      inset 0 0 60px rgba(0,0,0,.5);
+  }
 
   .tc-edge {
     position: absolute;
@@ -1231,7 +1399,7 @@ const CARD_STYLES = `
 
   /* Variants — text size tweaks */
   .tc-ob--type .tc-ob__inner    { padding: 11px 38px; font-size: 21px; letter-spacing: .2em; }
-  .tc-ob--ability .tc-ob__inner { padding: 5px 22px; font-size: 13px; letter-spacing: .14em; }
+  .tc-ob--ability .tc-ob__inner { padding: 8px 30px; font-size: 19px; letter-spacing: .14em; }
   .tc-ob--move .tc-ob__inner    { padding: 4px 20px; font-size: 11px; letter-spacing: .16em; }
   .tc-ob--rarity .tc-ob__inner  { padding: 5px 22px; font-size: 13px; letter-spacing: .18em; }
 
@@ -1241,14 +1409,19 @@ const CARD_STYLES = `
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 18px;
-    align-items: center;
+    /* Top-aligned, not centred: centring measured the badge against the whole
+       body column, so a two-line effect text pushed the badge ~7px below its
+       heading while a one-line text sat level. The badge is nudged down by
+       .tc-ability-badge's margin instead, which keys off the heading only. */
+    align-items: start;
     padding: 14px 20px 16px;
-    background: linear-gradient(180deg, rgba(30,6,12,.96), rgba(14,3,6,.98));
+    /* No panel — the ability reads directly on the art (2026-07-21). The
+       h2 already carries a white text-stroke and the p its own scrim, so
+       both stay legible without a box. */
+    background: none;
     border-radius: 14px;
-    border: 1px solid rgba(255,94,196,.28);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,.06),
-      0 10px 24px rgba(0,0,0,.5);
+    border: 0;
+    box-shadow: none;
   }
 
   /* Image badge slot — falls back to parallelogram ObliqueLabel */
@@ -1257,6 +1430,12 @@ const CARD_STYLES = `
     place-items: center;
     min-width: 110px;
     flex-shrink: 0;
+    /* Keyed to .tc-ability-body's 28px padding-top, less half the difference
+       between the heading's 36px line box and the badge's height. Aligns to
+       the heading's FIRST LINE, not its centre — Oracle Crosscheck's
+       "Cross-Reference · LOGOS + ETHOS" wraps to two lines, and centring
+       against the whole heading pushed the badge 5.5px too high there. */
+    margin-top: 27px;
   }
 
   .tc-ability-badge-img {
@@ -1294,7 +1473,10 @@ const CARD_STYLES = `
     font-family: "Lilita One", "Bebas Neue", Impact, sans-serif;
     font-size: 36px;
     line-height: 1;
-    color: #e30005;
+    /* Matched to the EFFECT badge — see EFFECT_TONES. Uses the tone's vivid
+       base rather than the badge's darkened mid stop; the 3.5px white stroke
+       below carries legibility, so the fill can stay bright. */
+    color: var(--effect-ink, #07ddf0);
     letter-spacing: .01em;
     -webkit-text-stroke: 3.5px #ffffff;
     paint-order: stroke fill;
@@ -1394,6 +1576,13 @@ const CARD_STYLES = `
   /* ───── FLAVOR ───── */
   .tc-flavor {
     margin: 0;
+    /* Positioned, like .tc-ability. Without this the quote is in-flow static
+       content, and every full-card absolutely-positioned layer above it —
+       .tc-art (opaque, and it overflows the art window), .tc-art-inner-
+       vignette, .tc-foil, .tc-shine — paints over it, so the text was laid
+       out correctly and then buried. Positioned siblings paint after
+       non-positioned ones in the same stacking context. */
+    position: relative;
     bottom: 20px;
     padding: 6px 14px 16px;
     font-family: "Georgia", "Times New Roman", serif;
@@ -1403,8 +1592,14 @@ const CARD_STYLES = `
     line-height: 1.35;
     color: #ffe9a8;
     text-align: center;
-    background: linear-gradient(90deg, transparent, rgba(0,0,0,.65) 30%, rgba(0,0,0,.65) 70%, transparent);
-    text-shadow: 0 1px 4px rgba(0,0,0,.75);
+    /* Elliptical scrim, not a horizontal band. The old linear-gradient faded
+       only left-to-right, so its flat top and bottom edges showed as a dark
+       line across pale art (Eugene). This fades on every side; the heavier
+       text-shadow carries legibility that the lighter scrim gives up. */
+    background: radial-gradient(ellipse 62% 120% at 50% 50%, rgba(0,0,0,.62), rgba(0,0,0,0) 72%);
+    text-shadow:
+      0 1px 4px rgba(0,0,0,.9),
+      0 0 12px rgba(0,0,0,.75);
   }
 
   /* ───── BATTLE STRIP ───── */

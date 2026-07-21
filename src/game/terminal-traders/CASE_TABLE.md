@@ -43,7 +43,7 @@ games — is the Prophet council:
 |---|---|---|---|---|
 | `gr80` | Saint GR80 | ETHOS · CREDIBILITY | `halo-node` | "Cold Wallet Shield" (ignore first crash) reads as divine protection — keep the ability, keep the name. |
 | `john-barron` | John Barron | PATHOS · HYPE | `bullhorn-broker` | "Megaphone Wick" (+4 pump, crashes hit +3 harder) is exactly a WSB cynic diamond-handing into the dip — keep the ability, rename to **"Double Down"**. |
-| `eugene` | Eugene | MYTHOS · PATTERN | (himself, recharacterized) | Eugene is **not** the meme guy. He's pattern recognition and rare finds — the one who says "this chart smells like $ORACL3, day 4." Memes move to Barron's lane. |
+| `eugene` | Eugene | MYTHOS · PATTERN | (himself, recharacterized) | Eugene is **not** the meme guy. He's pattern recognition and rare finds — the one who says "I don't predict. I remember." Memes move to Barron's lane. |
 | `marisol` | Detective Marisol | LOGOS · ONCHAIN | (herself) | Unchanged. "Follow the Wallets" stays. |
 
 ### 2.1 Eugene's rework

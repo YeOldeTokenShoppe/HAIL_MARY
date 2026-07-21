@@ -63,7 +63,7 @@ export const TRADERS = [
     startingPortfolio: 0,
     abilityName: "Déjà Vu",
     abilityText: "The first coin you buy that shares a tag with a coin already in your holdings enters with +8 value.",
-    quote: "This chart smells like $ORACL3, day 4.",
+    quote: "I don't predict. I remember.",
   },
   {
     id: "marisol",

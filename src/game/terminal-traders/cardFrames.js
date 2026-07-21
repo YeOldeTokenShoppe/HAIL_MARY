@@ -14,14 +14,24 @@
 // that is the asset pack's name, not this set's tier. Confirmed silver → rare.
 const FRAME_DIR = "/TCG/frames";
 
+// `metaTop` is where the card's EDITION/STYLE/RARITY/SET line is pinned so it
+// lands inside the frame's printed divider slot. Each frame draws that slot at
+// a slightly different height — gold sits ~0.75% lower than the other three —
+// so this is per-frame data, not one constant. Values are the slot centre less
+// half the meta row's height; re-derive by scanning the asset for full-width
+// ink bands between 50% and 95% of height if a frame is ever re-exported.
 export const FRAMES = [
-  { id: "grey", label: "Grey", src: `${FRAME_DIR}/frame_grey.webp` },
-  { id: "silver", label: "Silver", src: `${FRAME_DIR}/frame_mythic_no_badge_transparent.webp` },
-  { id: "gold", label: "Gold", src: `${FRAME_DIR}/frame_gold.webp` },
-  { id: "rainbow", label: "Rainbow", src: `${FRAME_DIR}/frame_rainbow.webp` },
+  { id: "grey", label: "Grey", src: `${FRAME_DIR}/frame_grey.webp`, metaTop: "86.55%" },
+  { id: "silver", label: "Silver", src: `${FRAME_DIR}/frame_mythic_no_badge_transparent.webp`, metaTop: "86.45%" },
+  { id: "gold", label: "Gold", src: `${FRAME_DIR}/frame_gold.webp`, metaTop: "87.35%" },
+  { id: "rainbow", label: "Rainbow", src: `${FRAME_DIR}/frame_rainbow.webp`, metaTop: "86.6%" },
 ];
 
 const FRAME_SRC = Object.fromEntries(FRAMES.map((f) => [f.id, f.src]));
+
+export function metaTopForFrame(src) {
+  return FRAMES.find((f) => f.src === src)?.metaTop || "86.6%";
+}
 
 export const FRAME_ID_BY_RARITY = {
   "common": "grey",
