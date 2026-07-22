@@ -495,6 +495,15 @@ in cards.js is a rogues gallery already named and waiting for bodies.*
 
 ## The gallery (one rogue per crooked pattern)
 
+**One starring coin per rogue (ruling, 2026-07-21).** A coin belongs to
+exactly one rogue; co-haunting is reserved for MARKET cards, where two
+rogues sharing a crowd scene is the point. This doc had double-booked
+BlackPalm (Rugula + Forklok) and RugProof (Rugula + Vaporina) — Forklok's
+debut art settled BlackPalm, so the pairs are **Forklok/BlackPalm,
+Rugula/RugProof, Vaporina/VaporwareX**. The Haunts lines below and
+`rogues.js` are corrected to match; keep it that way, so each rogue's
+debut stays the one card that is unmistakably theirs.
+
 ### RUGULA ★ (canon — vampire design; the name was always Rug + Dracula)
 - **Pattern:** the rug-pull itself; patron rogue of the whole gallery.
 - **Body:** a dapper little vampire count whose cape IS the carpet —
@@ -505,8 +514,9 @@ in cards.js is a rogues gallery already named and waiting for bodies.*
 - **Signature move:** the tablecloth trick — yanking a rug out from under
   a teetering tower of coins/chips, everything suspended in the beat
   before the crash. His cards are action shots of the idiom.
-- **Haunts:** Rug Warning (action, debut) · BlackPalm, RugProof coins ·
-  Rug Harvest market (cameo: a field of rolled rugs under a harvest moon).
+- **Haunts:** Rug Warning (action, debut) · RugProof coin (his starring
+  coin) · Rug Harvest market (cameo: a field of rolled rugs under a
+  harvest moon). BlackPalm is Forklok's — released 2026-07-21.
 - **Tell:** glowing fingerprint whorls where he grips the fabric.
 - **Design lineage note:** take 1 (the carpet-ghost with jack-o-lantern
   face) is retired but taught two canon rules: faces are drawn, not
@@ -548,8 +558,8 @@ in cards.js is a rogues gallery already named and waiting for bodies.*
 - **Body:** a dazzling hologram diva, gorgeous rendered front half; walk
   around her and she's unshaded wireframe held up by a single clothespin.
   Signature color: iridescent magenta.
-- **Haunts:** VaporwareX coin ("the demo was a video") · RugProof coin
-  (the actuary was the rug).
+- **Haunts:** VaporwareX coin ("the demo was a video") — hers alone.
+  RugProof is Rugula's; her second appearance should be a market cameo.
 - **Tell:** a play-button that loops the same three seconds.
 
 ### SHILLBIRD
@@ -682,8 +692,9 @@ monocle mid-pop.
 Signature move: the tablecloth trick — yanking a rug out from under
 a teetering tower of coins/chips, everything suspended in the beat
 before the crash. His cards are action shots of the idiom.
-Haunts: Rug Warning (action, debut) · BlackPalm, RugProof coins ·
+Haunts: Rug Warning (action, debut) · RugProof coin (his starring coin) ·
 Rug Harvest market (cameo: a field of rolled rugs under a harvest moon).
+BlackPalm is Forklok's — released 2026-07-21.
 Tell: glowing fingerprint whorls where he grips the fabric.
 Design lineage note: take 1 (the carpet-ghost with jack-o-lantern
 face) is retired but taught two canon rules: faces are drawn, not
@@ -737,8 +748,8 @@ Pattern: slick-but-broken — beautiful pitch, hollow mechanics.
 Body: a dazzling hologram diva, gorgeous rendered front half; walk
 around her and she's unshaded wireframe held up by a single clothespin.
 Signature color: iridescent magenta.
-Haunts: VaporwareX coin ("the demo was a video") · RugProof coin
-(the actuary was the rug).
+Haunts: VaporwareX coin ("the demo was a video") — hers alone. RugProof
+is Rugula's; her second appearance should be a market cameo.
 Tell: a play-button that loops the same three seconds.
 
 
@@ -973,6 +984,23 @@ gold palette on warm plum, bright cheerful lighting, glossy toy-like
 look, comic bittersweet mood, no text, upper-weighted composition,
 original character design.*
 
+**APPROVED — take 1 (2026-07-21).** Wire: coinCard_GoblinGas at
+`artFocus: "center 30%", artZoom: 1.0`, fx `Sparkle` at the default
+`normal` blend (the overlay's confetti-glitter reads as party debris,
+not magic — the one FX that adds to the gag instead of arguing with it;
+`screen` was tried and only washes the plum background out). Canonized from the take: the
+tied-off knot as a little gold-ringed nozzle on his belly with the hiss
+leaving it as a gold sparkle-trail that becomes musical notes (keep the
+sparkle-to-note handoff on every future Gasper), the gold balloon-weight
+sacks, and the ta-da pose played wide-armed and genuinely delighted —
+he does not know. The tell sits ~50–62% frame height, clear of the
+ability box (the Siren's hourglass lesson holds). Deviation to correct
+on any reprint: he reads closer to fully inflated than the brief's 60%,
+and the empty table sits far enough right that "nobody came" lands
+softer than intended — pull the deflation and the emptiness forward if
+Gasper gets a second card. Art is exactly the card's 1488×2076 aspect,
+so artFocus is inert at zoom 1.0 and is recorded for consistency only.
+
 ---
 
 ## 16. BLACKPALM — coin · defi · uncommon · rug (backdoor-fork) · FORKLOK debut
@@ -984,10 +1012,12 @@ his chest (the coin's mark, glyph only). The uncommon flourish is the
 reveal: a mirror on the wall behind him shows his back — a tiny gold
 door slightly ajar, key on a chain he pretends isn't there, a thin
 trickle of coins leaking out. Drained day 40, visible only in the
-mirror. Steel blue + gold on indigo. Mood: trust me / don't. Optional
-easter egg (he shares this coin with Rugula's haunts): one faint glowing
-fingerprint whorl on the vault frame — keep it subtle or drop it.
-Avoid: readable audit text, actual ETH/brand marks, gloom.
+mirror. Steel blue + gold on indigo. Mood: trust me / don't. Easter egg
+(shipped in take 1, canon): one faint glowing fingerprint whorl on the
+mirror frame. It reads as Rugula's tell paying a visit — a wink, not a
+claim; BlackPalm is Forklok's alone under the one-starring-coin ruling.
+Keep it low-glow on any reprint. Avoid: readable audit text, actual
+ETH/brand marks, gloom.
 
 **Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
 and saturated colors: a sturdy trustworthy-looking little vault golem
@@ -998,6 +1028,22 @@ chain and a thin trickle of gold coins leaking out; steel blue and gold
 palette on rich indigo, bright showroom lighting, glossy toy-like look,
 sly caught-in-the-act comedy, no text, upper-weighted composition,
 original character design.*
+
+**APPROVED — take 1 (2026-07-21).** Wire: coinCard_BlackPalm at
+`artFocus: "center 30%", artZoom: 1.0`, fx `Sparkle` (showroom gleam —
+the FX to swap first if the mirror reads busy). The whole gag is legible
+in one read: front-facing product-shot pose with the palm medallion and
+audit shield, and the mirror behind him holding the entire confession —
+back hatch ajar, key on its chain, coins trickling out. Canonized from
+the take: the medallion is a gold disc with the palm as a flat glyph
+(never a rendered tree), the audit shield repeats as showroom wallpaper
+so the room itself is vouching for him, and his face stays warm and
+guileless — the mirror does all the accusing. The fingerprint whorl
+easter egg made it in, low-glow on the mirror frame at ~55% height; it
+survives as a wink at Rugula's tell, not a co-ownership mark (see the
+one-starring-coin ruling). Reveal sits ~40–62% frame height, inside the
+art window. Art is exactly the card's 1488×2076 aspect, so artFocus is
+inert at zoom 1.0 and is recorded for consistency only.
 
 ---
 
@@ -1022,6 +1068,30 @@ circular loop arrow hovers beside her, iridescent magenta and gold
 palette on plum, bright spotlight staging, glossy toy-like look, playful
 showbiz-scam energy, no text, upper-weighted composition, original
 character design.*
+
+**APPROVED — take 1 (2026-07-21).** Wire: coinCard_VaporwareX at
+`artFocus: "center 30%", artZoom: 1.0`, fx `Rainbow 1` (she IS
+refraction — the overlay does character work here, not decoration).
+The reveal needs no caption: one continuous body, rendered-glossy on the
+near side and glowing wireframe on the far side, split straight down her
+midline, with the wooden clothespin at the waist holding the seam shut.
+Canonized from the take: the wireframe half keeps its full silhouette
+(hair spikes, hand, heel) so she reads as *unfinished*, never *damaged*;
+the clothespin stays plain untreated wood — the only non-luxury object
+in the frame, and the whole joke; and the loop-button hovers at her
+gesture height with the circular arrow + three sparkles. She is the
+set's first full-body standing figure: head ~20%, clothespin ~46%,
+button ~28–40% — all safely inside the art window, with only her heels
+running under the ability box. That trade is accepted (the pose needs
+the full body); note it as precedent before approving another
+full-length figure. Art is exactly the card's aspect, so artFocus is
+inert at zoom 1.0 and is recorded for consistency only. **Watch item:**
+the Genesis Edition badge lands on the loop-button tell's lower-left arc
+— the triangle, loop arrow and sparkles still read, so take 1 ships as
+is, but this is the first card where the set mark competes with the
+tell. If it starts to bother, `setBadge: null` on this entry drops the
+badge for this card alone; otherwise keep tells out of the upper-right
+quadrant when composing future art.
 
 ---
 
@@ -1049,6 +1119,23 @@ one tipped-over cup of quarters, candle green and red on a saturated
 violet arcade with pink pops, bright energetic lighting, glossy toy-like
 look, comic unstoppable-momentum mood, no text, upper-weighted
 composition, original character design.*
+
+**APPROVED — take 1 (2026-07-21).** Wire: coinCard_LuckyCapsule at
+`artFocus: "center 30%", artZoom: 1.0`, fx `Abstract 7` on `screen`.
+The card is pure momentum:
+he's mid-air, both feet off the floor, running left-to-right toward the
+one lit machine while the left third of the frame dissolves. Canonized
+from the take: the blocks are chunky beveled candles with gold pin-joints
+(a toy that comes apart — which is the joke), the green→red turn happens
+mid-limb rather than at a seam so the decay looks like it's catching up
+to him, and his face stays delighted with zero awareness of the trail.
+Tells: crumble-trail ~30–72% on the left, tipped quarter cup ~65–72%.
+**Watch item:** the cup rides the flavor-text band, and the lit target
+machine sits under the Genesis badge in the upper right — same collision
+as VaporwareX. Both still read; if either bothers, `setBadge: null` is
+the escape hatch for the badge, and the cup would need an inpaint nudge
+down-left. Art is exactly the card's aspect, so artFocus is inert at
+zoom 1.0 and is recorded for consistency only.
 
 ---
 
@@ -1231,10 +1318,10 @@ redemption mood, no text, upper-weighted composition.*
 |---|---|---|---|
 | Ponzi Siren | The Siren ★ debut | take 1 wired — hourglass inpaint pending | center 33% |
 | Bullish Ink | Shillbird debut | APPROVED take 1 + wired | center 30% |
-| GoblinGas | Gasper debut | queued | — |
-| BlackPalm | Forklok debut | queued | — |
-| VaporwareX | Vaporina debut | queued | — |
-| Lucky Capsule | Fomogre debut | queued | — |
+| GoblinGas | Gasper debut | APPROVED take 1 + wired | center 30% |
+| BlackPalm | Forklok debut | APPROVED take 1 + wired | center 30% |
+| VaporwareX | Vaporina debut | APPROVED take 1 + wired | center 30% |
+| Lucky Capsule | Fomogre debut | APPROVED take 1 + wired | center 30% |
 | TerminalETH | — | queued | — |
 | Candle Index | — | queued | — |
 | Zero Choir | — | queued | — |

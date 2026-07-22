@@ -15,6 +15,14 @@
 // lines; market cameos print last, once the debut look is locked.
 // `signatureColor` is the guide's prose color pinned to a hex for the
 // silhouette-slot glow — tune freely, the prose name is the canon.
+//
+// ONE STARRING COIN PER ROGUE (2026-07-21). A coin belongs to exactly one
+// rogue across every debut/haunt list in this file — co-haunting is reserved
+// for MARKET cards, where two rogues sharing a crowd scene is the point. The
+// guide had double-booked BlackPalm (Rugula + Forklok) and RugProof (Rugula +
+// Vaporina); Forklok's debut art settled BlackPalm, so the pairs are now
+// Forklok/BlackPalm, Rugula/RugProof, Vaporina/VaporwareX. Keep it that way:
+// a rogue's debut should be the one card that is unmistakably theirs.
 
 export const ROGUES = [
   {
@@ -24,7 +32,9 @@ export const ROGUES = [
     signatureColor: "#c71585", // red-violet
     status: "debuted",
     debutCardId: "rug-warning",
-    hauntCardIds: ["blackpalm", "rugproof", "rug-harvest"],
+    // RugProof is his starring coin (the debut card itself is an Action).
+    // BlackPalm released to Forklok when his debut art landed.
+    hauntCardIds: ["rugproof", "rug-harvest"],
   },
   {
     id: "deploydra",
@@ -49,7 +59,7 @@ export const ROGUES = [
     name: "Forklok",
     pattern: "backdoor-fork",
     signatureColor: "#4682b4", // steel blue
-    status: "pending",
+    status: "debuted",
     debutCardId: "blackpalm",
     hauntCardIds: ["protocol-exploit"],
   },
@@ -58,9 +68,11 @@ export const ROGUES = [
     name: "Vaporina",
     pattern: "slick-but-broken",
     signatureColor: "#f052ff", // iridescent magenta
-    status: "pending",
+    status: "debuted",
     debutCardId: "vaporwarex",
-    hauntCardIds: ["rugproof"],
+    // RugProof released to Rugula (his starring coin); VaporwareX is hers
+    // alone. Her second appearance should be a market cameo, not a coin.
+    hauntCardIds: [],
   },
   {
     id: "shillbird",
@@ -76,7 +88,7 @@ export const ROGUES = [
     name: "Gasper",
     pattern: "hype-fizzle",
     signatureColor: "#7a9e3b", // swamp green
-    status: "pending",
+    status: "debuted",
     debutCardId: "goblingas",
     hauntCardIds: ["wick-street", "dead-chain-hour"],
   },
@@ -85,7 +97,7 @@ export const ROGUES = [
     name: "Fomogre",
     pattern: "meme-mania",
     signatureColor: "#3fe07a", // candle green (split with red)
-    status: "pending",
+    status: "debuted",
     debutCardId: "lucky-capsule",
     hauntCardIds: ["meme-season"],
   },

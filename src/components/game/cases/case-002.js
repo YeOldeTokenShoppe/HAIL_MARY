@@ -204,6 +204,11 @@ const CASE_002 = {
           },
         },
       ],
+      // Tier-2: exonerating depth — the mask has a paper trail.
+      deepEntries: [
+        { label: "HANDLE CONTINUITY", value: "harbor-dev's commit style matches 3 years of prior repos — same hands throughout", threat: "green" },
+        { label: "KEY CEREMONY LOG", value: "Multisig signers rotated once — announced 2 weeks ahead, executed on schedule", threat: "green" },
+      ],
       summary: "The team is masked and one funding hop looks ugly. But the handles are old, the prior project is clean, and that hop traces back to an exchange, not a mixer.",
       verdictReaction: {
         believe: { text: "A mask is not a confession. The evidence behind it leans their way. Still, let time test them.", audio: "case002_monk_react_believe" },
@@ -387,6 +392,11 @@ const CASE_002 = {
             metric: { label: "PUMP SPIKES", value: "2" },
           },
         },
+      ],
+      // Tier-2: put numbers on "parasites, not payroll."
+      deepEntries: [
+        { label: "CALLER WALLETS", value: "Both channels bought on the open market post-launch; no allocation, no team transfer", threat: "green" },
+        { label: "HYPE DECAY CURVE", value: "Moon-chatter half-life 6 days; product questions grew through the same window", threat: "green" },
       ],
       summary: "Loud, pumpy room, caller channels screaming hundred-x. Looks like exit liquidity. But the hype is parasitic noise sitting on top of a real, product-talking crowd.",
       verdictReaction: {
@@ -590,6 +600,25 @@ const CASE_002 = {
           },
         },
       ],
+      // Tier-2 (decisive lens): the receipts behind the receipts — and the
+      // sealed question that makes the exoneration constructive: to trust a
+      // token, price what robbing it would cost.
+      deepEntries: [
+        { label: "TREASURY TIMELOCK", value: "Treasury releases in 90-day tranches; next unlock d68, on-chain verifiable", threat: "green" },
+        { label: "VESTING SCHEDULE", value: "Team: 12mo linear with 3mo cliff — zero claimable today", threat: "green" },
+        { label: "EXIT COST MODEL", value: "Earliest coordinated exit: d120+, fully visible; expected haul < the seed round", threat: "green" },
+      ],
+      lockedQuestion: {
+        q: "If they wanted to rug anyway — how would they have to do it?",
+        a: {
+          text:
+            "They'd need the treasury tranches to lapse, the LP lock to expire, and a market to sell into. " +
+            "Earliest coordinated exit is month four, in daylight, with everyone watching — for less than the seed round. " +
+            "There are easier ways to steal. That's the point.",
+          audio: null, // re-record: case002_trinity_q5
+        },
+        reveals: "EXIT COST MODEL",
+      },
       summary: "The scary thirty-eight percent resolves to a locked treasury and a cold wallet. Liquidity's locked a year, no team sells, and the wash-looking volume is a real market maker.",
       verdictReaction: {
         believe: { text: "That's where the receipts point. The chain ignored the hype. Trace the wallets, and so should you. Yes.", audio: "case002_trinity_react_believe" },
@@ -609,19 +638,19 @@ const CASE_002 = {
       tagline: "Every rug wears a story. Find the seams.",
       textOnly: true,
       intro:
-        "Okay so the Telegram is doing the MOST right now, but the actual product? Giving municipal software, in a good way. " +
-        "Less prophecy, more spreadsheets. Question is whether the boring little core matches the loud packaging. 😅",
+        "The Telegram is deafening. The product underneath is municipal software — fees, roles, export limits. " +
+        "I've watched loud crowds wrap emptier cores than this. The question is whether the boring little center matches the packaging.",
       returnLines: [
-        "Back to the brochure 📄",
-        "Reading the story with our glasses on ✨",
-        "Tuning out the moon chants, reading the actual docs 💫",
+        "Back to the brochure. 📄",
+        "The moon chants are still loud. The docs are still quiet.",
+        "One more pass. Patterns repeat when you stop watching.",
       ],
       questions: [
         {
           q: "What problem does this product claim to solve?",
           a:
-            "Creator collectives need shared treasury controls. Narrow, boring, totally believable. " +
-            "Honestly? I love a project that knows it isn't saving civilization, even when the comments are convinced it is. 🤔",
+            "Creator collectives need shared treasury controls. Narrow, boring, believable. " +
+            "Stories that know they aren't saving civilization rarely need an exit — even when the comments are convinced otherwise. 🤔",
           reveals: "POSITIONING",
         },
         {
@@ -635,14 +664,14 @@ const CASE_002 = {
           q: "Can you actually verify the product exists?",
           a:
             "Live dashboard, public GitHub with real commit history, a completed audit you can actually read. " +
-            "Three small collectives named, with public treasury addresses. You can verify all of it without trusting a single vibe. ✨",
+            "Three small collectives named, with public treasury addresses. You can verify all of it without trusting a single vibe. That's rare enough that I re-checked.",
           reveals: "PRODUCT PROOF",
         },
         {
           q: "If it's real, what could still go wrong?",
           a:
-            "Two things, honestly. The roadmap balloons into cross-chain governance and an AI co-pilot, which pattern-matches to vaporware HARD. " +
-            "And revenue depends on creators adopting a niche workflow. Legit isn't the same as inevitable. A real product can still become a very honest ghost town. 😬",
+            "Two things. The roadmap balloons into cross-chain governance and an AI co-pilot, which pattern-matches to vaporware — hard. " +
+            "And revenue depends on creators adopting a niche workflow. Legit isn't the same as inevitable. I've charted real products that became very honest ghost towns. 😬",
           reveals: "ADOPTION RISK",
         },
       ],
@@ -777,22 +806,30 @@ const CASE_002 = {
           },
         },
       ],
+      // Tier-2: live-usage proof plus the roadmap's timeline — ambition
+      // creep after launch is a different animal than launch bait.
+      deepEntries: [
+        { label: "PILOT USAGE PULSE", value: "All 3 pilot safes exported within the last 5 days — live use, not staged screenshots", threat: "green" },
+        { label: "ROADMAP DIFF", value: "The vaporware-shaped promises were added 3 weeks AFTER launch — ambition creep, not bait", threat: "amber" },
+      ],
       summary: "Loud chat, quiet product. The product is real, audited, and verifiable — but the roadmap over-promises and the market's niche. The risk is adoption and ambition, not deception.",
       verdictReaction: {
-        believe: "Yes! We love a boring little use case with receipts, even when the comments are unhinged and the roadmap's doing too much. 🌟",
+        believe: "Right call, if the receipts are why. A boring use case with proof beats a glorious one without — whatever the comments think.",
         abstain: "Fair. The market could still ignore it completely, and that roadmap is writing checks.",
         doubt: "Hmm. Feels like the moon-posters and the over-eager roadmap spooked you. The product itself is the calmest, most checkable thing here. 💭",
       },
       vindication: {
-        aligned: "You ignored the confetti AND the vaporware-shaped roadmap, and read the receipts that were actually there. That's the upgrade. 🌟",
+        aligned: "You ignored the confetti AND the vaporware-shaped roadmap, and read the receipts that were actually there. That's the upgrade.",
         missed: "You let a loud chat and an over-ambitious roadmap drown out a real, audited product. The GitHub and the pilots were right there.",
-        abstained: "Not wrong! But there was a real, verifiable product here to lean on under all that noise.",
+        abstained: "Not wrong. But there was a real, verifiable product under all that noise to lean on.",
       },
     },
   },
   maxScans: 3,
   correctVerdict: "believe",
   decisiveLenses: ["marisol", "eugene"],
+  // No cross-lens connection — the exoneration lives within single lenses.
+  connections: [],
   reveal: {
     summary: "HARBORLIGHT stayed alive. No rug. The pump callers moved on, the concentration stayed locked, and the product shipped v1.1 after 41 days.",
     voices: {

@@ -80,7 +80,7 @@ export function coverageNote(caseData, investigated) {
 const SESSION_KEY = "rl80_terminal_session_v1";
 
 function emptyScore() {
-  return { count: 0, brierSum: 0, hits: 0, calls: 0, streak: 0, bestStreak: 0 };
+  return { count: 0, brierSum: 0, hits: 0, calls: 0, streak: 0, bestStreak: 0, deepReveals: 0 };
 }
 
 export function readSessionScore() {
@@ -95,13 +95,16 @@ export function readSessionScore() {
 }
 
 // Records one graded result and returns the updated scorecard.
-//   brier   — the Brier score for this case (lower is better)
-//   correct — did the player's leaning match ground truth? true / false, or
-//             null when the player abstained (mid-band commit).
-export function recordCaseResult({ brier, correct }) {
+//   brier       — the Brier score for this case (lower is better)
+//   correct     — did the player's leaning match ground truth? true / false,
+//                 or null when the player abstained (mid-band commit).
+//   deepReveals — Tier-2 entries the player's kit surfaced this case
+//                 (CASE_TABLE.md §3.4 — a counter, never part of the score).
+export function recordCaseResult({ brier, correct, deepReveals = 0 }) {
   const s = readSessionScore();
   s.count += 1;
   if (typeof brier === "number") s.brierSum += brier;
+  if (typeof deepReveals === "number" && deepReveals > 0) s.deepReveals += deepReveals;
   // Accuracy is measured over decisive calls only. Abstaining neither helps
   // nor hurts the hit rate; it just resets the streak (a miss does too).
   if (correct === true) {

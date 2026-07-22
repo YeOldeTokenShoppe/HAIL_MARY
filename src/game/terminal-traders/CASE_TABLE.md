@@ -140,12 +140,12 @@ The base budget stays **3 free scans** (no F2P nerf — a cardless player has
 exactly today's game). Kit cards layer on top, each mapped to a lens by
 `LENS_BY_TAG`:
 
-| Tier | Effect (played during investigation, once each) |
+| Tier | Effect — AS SHIPPED 2026-07-21 (this table's draft effects evolved through §3.2b's v4 and the printed card text; printed text is law) |
 |---|---|
-| Common — **Lens Key** | Your next free scan at the matching station *also* reveals one Tier-2 deep entry (see §3.3). |
-| Uncommon — **Deep Scan** | Reveal a Tier-2 entry at the matching station *without* spending a scan, **or** unlock the station's locked 4th question. |
-| Rare — **Cross-Reference** | After you have scanned two different stations, reveals the case's authored *connection* entry (the case-003 "dots connect ACROSS lenses" moment, made mechanical). |
-| Terminal-foil — **Wildcard** | One extra full scan at any station, deep entry included. The table-stopper. |
+| Common — **Lens Key** | The station slides you its 2 strongest unrevealed Tier-1 evidence cards (§3.2b marked this real; the draft's deep-entry rider was dropped — lens keys stay Tier-1). |
+| Uncommon — **Deep Scan** | "Everything he still holds": all remaining Tier-1 entries + ALL the station's Tier-2 deep entries, and the locked 4th question unseals (asking it still costs a scan). |
+| Rare — **Cross-Reference** | With BOTH lenses of the card's printed pair scanned, reveals the case's authored *connection* entry at both stations (the case-003 "dots connect ACROSS lenses" moment, made mechanical); otherwise falls back to a strongest-card sweep of unvisited stations — never a dead card. |
+| Terminal-foil — **Wildcard** | The desk stops — two extra actions this case (the §3.2a revision printed this as the card text; the draft's "extra full scan" wording is superseded). |
 
 Flavor writes itself from existing cards: Wallet Séance is a LOGOS lens key,
 Cold Wallet is an ETHOS deep scan, Oracle Crosscheck is literally a
@@ -290,6 +290,12 @@ src/components/game/cases/*.js         # deepEntries/lockedQuestion/connections
 src/hooks/useCardCollection.js         # already provides the owned pool
 ```
 
+*Map deviations as built (2026-07-21): the kit picker shipped as
+`src/components/trade/case-table/KitSelect.jsx` (the table screens
+componentized into `case-table/` after this map was written), and kit
+state lives in `CaseTable.jsx` (the orchestrator), not
+MobileTerminalGame.*
+
 No new server surface: kit effects are information-only; rewards ride the
 Phase 1 routes. (Server-side docket validation arrives in Phase 3.)
 
@@ -333,11 +339,48 @@ Phase 1 routes. (Server-side docket validation arrives in Phase 3.)
       band, exactly the desktop semantics. Gated by `CaseTable`'s
       `recordScores` prop: on for the /trade mount, off for
       /case-table-dev so sandbox runs don't pollute the calibration trail.
-- [ ] Kit select screen (skippable, legality enforced)
-- [ ] ChannelView deep-entry + locked-question rendering
-- [ ] Author Tier-2 content for cases 001–003 (+ connection for 003)
-- [ ] Extend `_template.js` + `specs/_TEMPLATE.spec.js` + review generator
-- [ ] Reveal-screen kit callouts
+- [x] Kit select screen (skippable, legality enforced) — applied 2026-07-21:
+      `case-table/KitSelect.jsx` between briefing and desk; pool = the owned
+      collection (`kitCardsFromCollection`, signed-out → First Twelve);
+      legality via `isKitLegal` + live counters; one-tap paths "RUN BASIC
+      KIT" (`pickBasicKit`: lens key per station + insurance) and "RUN IT
+      BACK" (a confirmed kit persists across cases/dockets). `KitHand`
+      gained a `cards` prop; the dealt hand is the kit.
+- [x] ChannelView deep-entry + locked-question rendering — applied
+      2026-07-21: tiered label lookup (entries → deepEntries → connections)
+      with ▚ CLASSIFIED and ⧉ CROSS-REF card treatments; the sealed 4th
+      question renders grayed with its real text (sells the demand) until a
+      deep scan unseals it, then costs a scan like any row. The `"locked"`
+      sentinel threads through `ask()` and the caption/audio path. Real
+      Tier-2 effects landed in `caseKit.js` the same pass (deep scan =
+      Tier-1 remainder + deeps + unseal; crossref = connection-first with
+      sweep fallback; `toKitCard` fixed the dropped crossref lens pair) —
+      parity harness extended with fixture pins + a case-file integrity
+      pass; every pre-existing pin unchanged.
+- [x] Author Tier-2 content for cases 001–003 (+ connection for 003) —
+      applied 2026-07-21: 2–3 deepEntries per station per case; locked
+      questions where the lens earns one (monk-001 EXIT HOUR PATTERN,
+      marisol-002 EXIT COST MODEL, monk-003 + marisol-003 the two halves of
+      the crack); case-003 `connections` = THE PREBUILT EXIT
+      (marisol+monk, Oracle Crosscheck's printed pair). Eugene's SOFT-EXIT
+      CHART (case-003) is the set's first chart-literacy evidence card —
+      caption teaches that a pattern is weak evidence until receipts back
+      it. The guardrail-§5.6 Eugene voice audit ran first (cards.js clean;
+      case files + _template re-voiced to §2.1). New audio slots ship
+      `audio: null` re-record markers (q5 per station).
+- [x] Extend `_template.js` + `specs/_TEMPLATE.spec.js` + review generator —
+      applied 2026-07-21: template + spec document the three new fields with
+      the §3.3 authoring rules; `gen-case.mjs` validates them (1–3
+      deepEntries, label collisions, printed-pair connections) and refuses a
+      free-scan question that reveals a deep label (decisive stays Tier-1);
+      emit() writes the new blocks. `generateReviewCase.js` ships empty
+      `deepEntries`/`connections` (richer CDP deep pulls = follow-up).
+- [x] Reveal-screen kit callouts — applied 2026-07-21: Ledger renders one ⟡
+      debrief line per information play (lens key / deep scan / crossref)
+      beside the dial lines, via a parallel `kitPlays` prop (settle rows
+      stay parity-pinned); RevealScreen takes a `kitNote` (§3.4's flavor
+      line — connection caught > deep count); the session scorecard gains
+      `deepReveals` (counter, never score).
 
 ---
 

@@ -133,6 +133,24 @@ rulesIntro: {
         { label: "FUNDING SOURCE", value: "Tornado Cash mixer wallet", threat: "red" },
         { label: "CONTRACT ORIGINALITY", value: "85% match to known rug template", threat: "red" },
       ],
+      // Tier-2 (§3.3): the decisive lens's deeps CORROBORATE — they turn
+      // "pattern" into "case file," and EXIT HOUR PATTERN feeds the horizon
+      // dial the way Rug Warning's trace does.
+      deepEntries: [
+        { label: "WALLET CLUSTER MAP", value: "Deployer + 4 sibling wallets share one funding parent", threat: "red" },
+        { label: "TEMPLATE DIFF", value: "Escape hatch matches $ORACL3 byte-for-byte; only the name strings changed", threat: "red" },
+        { label: "EXIT HOUR PATTERN", value: "$ORACL3 and $DIVINE both pulled 04:00–06:00 UTC, days 5–6", threat: "red" },
+      ],
+      lockedQuestion: {
+        q: "What would he do in the final hour?",
+        a: {
+          text:
+            "If the pattern holds, he will not wait for a peak. His prior exits came on quiet mornings, " +
+            "days five and six, while the faithful still slept. Watch the hour, not only the day.",
+          audio: null, // re-record: case001_monk_q5
+        },
+        reveals: "EXIT HOUR PATTERN",
+      },
       summary: "Fresh wallet, dirty lineage, borrowed contract. Credibility is not low. It is missing.",
       // Plays immediately on verdict commit (before outcome reveal).
       // NOTE on audio names: SitePal's audio-name field caps at 25 chars, so
@@ -243,6 +261,12 @@ rulesIntro: {
         { label: "FUD SUPPRESSION", value: "Skeptic thread pinned; team responds, no deletions", threat: "green" },
         { label: "POST CADENCE", value: "Irregular human cadence; no coordinated bot bursts", threat: "amber" },
       ],
+      // Tier-2: quantify the honest crowd — deepening the trap this lens
+      // sets (the audience really is real; the team really isn't).
+      deepEntries: [
+        { label: "REPLY GRAPH", value: "Reply network spans 41 organic communities; no hub-and-spoke botnet shape", threat: "green" },
+        { label: "PAID PROMO LEDGER", value: "No caller received allocation; zero promo-wallet transfers found", threat: "green" },
+      ],
       summary: "Crowd's aged, the room's messy, the critics are alive. Sentiment reads honest — which only tells you the audience is real, not the team.",
       // SitePal 25-char audio-name cap forces truncation on react_believe /
       // react_abstain / vind_aligned / vind_abstained — "demon" eats one
@@ -346,6 +370,12 @@ rulesIntro: {
         { label: "LP / VESTING", value: "LP locked 30d (third-party locker)", threat: "green" },
         { label: "CONTRACT FLAGS", value: "No mint, no hidden pause function", threat: "green" },
       ],
+      // Tier-2: quantify why the clean chain is only WEAK comfort — the 30d
+      // leash and the one-block sell path put numbers on "fine, for now."
+      deepEntries: [
+        { label: "LOCKER FINE PRINT", value: "Lock expires d30; deployer may migrate LP after — a short leash, not a bond", threat: "amber" },
+        { label: "SELL-PATH SIM", value: "Simulated dump: the 6% clears the pool in one block at open-day depth", threat: "amber" },
+      ],
       summary: "Supply's spread, volume's mostly real, LP's locked. The chain looks fine today — because the rug here isn't in the wiring. It's in whose hands built it.",
       // SitePal 25-char cap on audio names — "trinity" (7 chars) drops one
       // more letter from each multi-syllable slot than "monk" (4 chars) or
@@ -393,11 +423,11 @@ rulesIntro: {
       // version (emoji stripped, $/%/RL80 expanded). For a line that needs exact
       // spoken phrasing, make it an object and add a `spoken:` override.
       textOnly: true,
-      intro: "Okay, Prophet Token actually has a pitch deck and it's... kinda coherent? Mystical branding, but there's real wiring underneath. Let's poke it.",
+      intro: "Prophet Token's deck is... coherent. That's the part that surprised me. Mystical branding, real wiring underneath. I've seen this shape before — let's find out which version this is.",
       returnLines: [
-        "Back! ✨ Whatcha need?",
-        "Hiii again 💫",
-        "Ooh more questions — yes pls",
+        "Back. The charts kept me company.",
+        "You again. Good — I was mid-pattern.",
+        "Ask. I've been re-reading this one anyway.",
       ],
       questions: [
         {
@@ -407,7 +437,7 @@ rulesIntro: {
         },
         {
           q: "Is there a working product?",
-          a: "There's a public GitHub with a working backtest notebook and a live demo endpoint that actually returns scores. It's thin, but it's not vaporware. ✨",
+          a: "There's a public GitHub with a working backtest notebook and a live demo endpoint that actually returns scores. It's thin, but it's not vaporware. I checked twice — vaporware has a smell.",
           reveals: "AI CLAIMS",
         },
         {
@@ -417,7 +447,7 @@ rulesIntro: {
         },
         {
           q: "Is the roadmap realistic?",
-          a: "It's grounded! Beta, then more data sources, then a paid tier. No AGI, no 'cure DeFi.' Boring in a good way. The story behaves itself. 💫",
+          a: "Grounded. Beta, then more data sources, then a paid tier. No AGI, no 'cure DeFi.' Boring in a good way. The story behaves itself — which most stories, in my experience, do not.",
           reveals: "ROADMAP REALISM",
         },
       ],
@@ -428,14 +458,20 @@ rulesIntro: {
         { label: "ROADMAP REALISM", value: "Grounded: beta → data → paid tier", threat: "green" },
         { label: "ORIGIN STORY", value: "Founder bio vague; no named affiliations", threat: "amber" },
       ],
+      // Tier-2: sharpen his one soft spot (the authorless author) while
+      // conceding the product is genuinely alive — the story stays honest.
+      deepEntries: [
+        { label: "BIO ARCHAEOLOGY", value: "Founder handle first appears 9 days ago; no prior writing anywhere", threat: "amber" },
+        { label: "DEMO TELEMETRY", value: "Demo endpoint updated within 48h — the product is genuinely alive", threat: "green" },
+      ],
       summary: "The narrative is coherent and the product artifacts are real. The only soft spot is a founder bio that says almost nothing about who they are.",
       verdictReaction: {
-        believe: "Honestly the story holds up! Just... the story can't tell you who's holding the keys. 💭",
+        believe: "The story holds up. It's everything a story can't tell you that worries me — like whose hand is on the keys. 💭",
         abstain: "Fair. A clean pitch with a faceless founder is a maybe, not a yes.",
-        doubt:   "Bold. The narrative's good, so if you're doubting, you're trusting something outside the brochure. I respect a girl with sources.",
+        doubt:   "Bold. The narrative's good, so if you're doubting, you're trusting something outside the brochure. Which means you found a source I didn't. Respect.",
       },
       vindication: {
-        aligned:   "The story was real and you doubted anyway — because a real story with an anonymous author is still a question mark. Nice. 🌟",
+        aligned:   "The story was real and you doubted anyway — because a real story with an anonymous author is still a question mark. I've seen that chart before.",
         missed:    "The pitch was genuine. The person behind it wasn't. A good story can't vouch for a bad founder. Now you know the shape.",
         abstained: "You felt the faceless-founder gap without naming it. Half the lesson.",
       },
@@ -444,6 +480,8 @@ rulesIntro: {
   maxScans: 3,
   decisiveLenses: ["monk"],
   correctVerdict: "doubt",
+  // Beginner case — no cross-lens connection (§3.3 rule 3).
+  connections: [],
   reveal: {
     summary:
       "PROPHET TOKEN was a serial-deployer rug. Pulled day 6, ~$340K extracted. " +

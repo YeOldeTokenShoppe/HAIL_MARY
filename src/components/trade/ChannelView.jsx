@@ -22,8 +22,11 @@ export default function ChannelView({
   scansUsed = 0,
   scansMax = 3,
   asked = [],         // question indices already asked of THIS station
+                      // (may include the sentinel "locked" — the sealed 4th question)
   revealed = [],      // evidence labels revealed so far for THIS station
-  onAsk,              // (qIndex) => void
+  connections = [],   // caseData.connections — cross-lens entries (§3.3)
+  lockedUnlocked = false, // this station's lockedQuestion has been unsealed
+  onAsk,              // (qIndex | "locked") => void
   onBack,
   onVerdict,
   tts = false,
@@ -37,18 +40,25 @@ export default function ChannelView({
   const color = meta.color || "#37e3e3";
   const scansLeft = scansMax - scansUsed;
 
-  // Current line = the last-asked answer, else the intro.
+  // Current line = the last-asked answer, else the intro. The sentinel
+  // "locked" resolves to the sealed 4th question; answers may be plain
+  // strings (text-only stations) or { text, audio }.
   const lastAsked = asked.length ? asked[asked.length - 1] : null;
+  const askedQ = lastAsked == null ? null
+    : lastAsked === "locked" ? station.lockedQuestion
+    : station.questions[lastAsked];
+  const lineText = (a) => (typeof a === "string" ? a : a?.text) || "";
   const currentLine = lastAsked != null
-    ? station.questions[lastAsked]?.a?.text || ""
+    ? lineText(askedQ?.a)
     : station.intro?.text || "";
 
   // Line payload for the live SitePal feed (pre-recorded sayAudio preferred,
   // live TTS via the station voice as fallback). `key` changes per line so the
   // feed re-speaks on intro → each answer.
   const lineObj = useSitePal ? {
-    key: lastAsked == null ? "intro" : `q${lastAsked}`,
-    audio: lastAsked == null ? station.intro?.audio : station.questions[lastAsked]?.a?.audio,
+    key: lastAsked == null ? "intro" : lastAsked === "locked" ? "qlock" : `q${lastAsked}`,
+    audio: lastAsked == null ? station.intro?.audio
+      : (askedQ?.a && typeof askedQ.a === "object" ? askedQ.a.audio : null),
     text: currentLine,
     voice: station.voice,
   } : null;
@@ -118,10 +128,19 @@ export default function ChannelView({
     ? (feedStatus === "connecting" ? "CONNECTING" : feedStatus === "speaking" ? "TRANSMITTING" : "LISTENING")
     : (speaking ? "TRANSMITTING" : "STANDBY");
 
-  // Evidence entries for the revealed labels, in reveal order.
-  const evidence = revealed
-    .map((label) => station.entries?.find((e) => e.label === label))
-    .filter(Boolean);
+  // Evidence entries for the revealed labels, in reveal order. Labels are
+  // unique per station across tiers (authoring rule), so lookup order fully
+  // resolves each one: Tier-1 → Tier-2 CLASSIFIED → cross-lens connection.
+  const findEntry = (label) => {
+    const t1 = station.entries?.find((e) => e.label === label);
+    if (t1) return { ...t1, tier: 1 };
+    const t2 = station.deepEntries?.find((e) => e.label === label);
+    if (t2) return { ...t2, tier: 2 };
+    const cx = connections.find((c) => c.entry?.label === label);
+    if (cx) return { ...cx.entry, tier: "x" };
+    return null;
+  };
+  const evidence = revealed.map(findEntry).filter(Boolean);
 
   // translate="no": the caption is a live, rapidly-mutating text node that
   // mirrors the avatar's ENGLISH audio. Letting Chrome/Google translate
@@ -196,8 +215,14 @@ export default function ChannelView({
         {evidence.length > 0 && (
           <div className="cv-evidence">
             {evidence.map((e) => (
-              <div key={e.label} className="cv-card" style={{ "--th": THREAT_COLORS[e.threat] || color }}>
-                <span className="cv-card-label">▣ {e.label}</span>
+              <div
+                key={e.label}
+                className={`cv-card${e.tier === 2 ? " cv-card--deep" : e.tier === "x" ? " cv-card--link" : ""}`}
+                style={{ "--th": THREAT_COLORS[e.threat] || color }}
+              >
+                <span className="cv-card-label">
+                  {e.tier === 2 ? "▚ CLASSIFIED · " : e.tier === "x" ? "⧉ CROSS-REF · " : "▣ "}{e.label}
+                </span>
                 <span className="cv-card-value">{e.value}</span>
                 {hasRichVisual(caseId, stationKey, e) && (
                   <button className="cv-card-view" onClick={() => setEvidenceEntry(e)}>▸ VIEW EVIDENCE</button>
@@ -224,6 +249,27 @@ export default function ChannelView({
               </button>
             );
           })}
+          {/* The sealed 4th question (§3.3): shown grayed until a deep scan
+              unseals it — the real question text sells the demand — then it
+              behaves like any other scan-costing row. */}
+          {station.lockedQuestion && (() => {
+            const isAsked = asked.includes("locked");
+            const sealed = !lockedUnlocked;
+            const disabled = sealed || isAsked || scansLeft <= 0;
+            return (
+              <button
+                className={`cv-q${sealed ? " cv-q--locked" : ""}${isAsked ? " cv-q--asked" : ""}`}
+                disabled={disabled}
+                onClick={() => !disabled && onAsk?.("locked")}
+              >
+                <span className="cv-q-mark">{sealed ? "▩" : isAsked ? "▣" : "▸"}</span>
+                <span className="cv-q-text">
+                  {station.lockedQuestion.q}
+                  {sealed && <span className="cv-q-seal">[SEALED] — a deep scan opens this line</span>}
+                </span>
+              </button>
+            );
+          })()}
         </div>
       </div>
 
@@ -325,6 +371,15 @@ export default function ChannelView({
           clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
         }
         .cv-card-view:active { transform: scale(0.98); }
+        /* Tier-2 CLASSIFIED — card-gated evidence gets the dossier-stamp look. */
+        .cv-card--deep { border-style: dashed;
+          background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--th) 5%, transparent) 0 6px, transparent 6px 12px),
+            color-mix(in srgb, var(--th) 9%, #04140f);
+          box-shadow: inset 0 0 14px color-mix(in srgb, var(--th) 18%, transparent); }
+        /* Cross-lens connection — the dots-connect entry, revealed at both stations. */
+        .cv-card--link { border-width: 1.5px;
+          box-shadow: 0 0 12px color-mix(in srgb, var(--th) 40%, transparent),
+            inset 0 0 14px color-mix(in srgb, var(--th) 16%, transparent); }
 
         .cv-qhead { font-size: 10.5px; letter-spacing: 0.12em; color: #ffd23a; opacity: 0.85; margin-bottom: 8px; }
         .cv-questions { display: flex; flex-direction: column; gap: 7px; }
@@ -339,6 +394,10 @@ export default function ChannelView({
         .cv-q--asked { opacity: 0.5; cursor: default; }
         .cv-q--asked .cv-q-mark { color: #4dffaa; }
         .cv-q:disabled { cursor: default; }
+        /* Sealed question — visible but inert until a deep scan unseals it. */
+        .cv-q--locked { opacity: 0.45; border-style: dashed; cursor: default; }
+        .cv-q--locked .cv-q-mark { color: #ffd23a; }
+        .cv-q-seal { display: block; font-size: 9.5px; letter-spacing: 0.1em; color: #ffd23a; margin-top: 3px; }
 
         .cv-verdict {
           margin: 8px 12px calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 6;

@@ -21,7 +21,7 @@ const load = (src) => import(dataUrl(src));
 const caseTableSrc = read("../src/game/terminal-traders/caseTable.js");
 const cardsSrc = read("../src/game/terminal-traders/cards.js");
 const { CASE_SIGNALS } = await load(read("../src/game/terminal-traders/caseSignals.js"));
-const { KIT_CARDS, resolveKitPlay, isKitLegal } = await load(
+const { KIT_CARDS, resolveKitPlay, isKitLegal, pickBasicKit } = await load(
   read("../src/game/terminal-traders/caseKit.js")
     .replace('from "./cards"', `from ${JSON.stringify(dataUrl(cardsSrc))}`)
 );
@@ -118,6 +118,124 @@ for (const k of ORDER) {
 check("event after case 1 is STABLECOIN WEATHER", { id: result.event.id, shieldSpent: result.shieldSpent }, { id: "calm", shieldSpent: false });
 check("kit legality: the First Twelve is not a legal kit (12 > 5)", isKitLegal(KIT_CARDS), false);
 check("kit legality: 4 commons + 1 rare is legal", isKitLegal(["audit-flare", "forked-rumor", "wallet-seance", "mempool-prophecy", "oracle-crosscheck"].map(card)), true);
+
+// ---- Tier-2 effects (Phase 2, §3.2/§3.3) — synthetic fixture so these pins
+// don't churn when the real 001-003 deep content is tuned. Fresh ctx per
+// check: resolveKitPlay is pure but the ctx objects are shared references.
+const FIX_SIGNALS = {
+  truth: 1,
+  collapseDay: 5,
+  stations: {
+    monk: [
+      { label: "M1", dir: "scam", w: 3 },
+      { label: "M2", dir: "scam", w: 2 },
+      { label: "M3", dir: "legit", w: 1 },
+    ],
+    demon: [{ label: "D1", dir: "legit", w: 2 }],
+    marisol: [{ label: "L1", dir: "scam", w: 2 }],
+    eugene: [{ label: "E1", dir: "legit", w: 1 }],
+  },
+};
+const FIX_CASE = {
+  stations: {
+    monk: {
+      entries: [{ label: "M1" }, { label: "M2" }, { label: "M3" }],
+      deepEntries: [
+        { label: "M-DEEP-1", value: "", threat: "red" },
+        { label: "M-DEEP-2", value: "", threat: "amber" },
+      ],
+      lockedQuestion: { q: "Sealed?", a: { text: "Unsealed.", audio: null }, reveals: "M-DEEP-1" },
+    },
+    marisol: { entries: [{ label: "L1" }], deepEntries: [] },
+  },
+  connections: [
+    { lenses: ["marisol", "monk"], entry: { label: "X-LINK", value: "", threat: "red" } },
+  ],
+};
+const fixCtx = (over = {}) => ({
+  signals: FIX_SIGNALS, caseData: FIX_CASE, revealed: {}, unlocked: {},
+  visited: [], order: ORDER, shortName, ...over,
+});
+
+const lensPlay = resolveKitPlay(card("audit-flare"), fixCtx());
+check("lensKey slides the 2 strongest Tier-1, never deep labels",
+  lensPlay.reveals, { monk: ["M1", "M2"] });
+check("lensKey returns no deepReveals", lensPlay.deepReveals, undefined);
+
+const deepPlay = resolveKitPlay(card("cold-wallet"), fixCtx());
+check("deepScan opens remaining Tier-1", deepPlay.reveals, { monk: ["M1", "M2", "M3"] });
+check("deepScan opens the CLASSIFIED entries", deepPlay.deepReveals, { monk: ["M-DEEP-1", "M-DEEP-2"] });
+check("deepScan unseals the locked question", deepPlay.unlocks, { monk: true });
+check("deepScan log counts entries · CLASSIFIED · sealed",
+  deepPlay.log.includes("3 entries · 2 CLASSIFIED · a sealed question unlocks"), true);
+
+const deepWhiff = resolveKitPlay(card("cold-wallet"), fixCtx({
+  revealed: { monk: ["M1", "M2", "M3", "M-DEEP-1", "M-DEEP-2"] },
+  unlocked: { monk: true },
+}));
+check("deepScan whiffs when the station is fully open", deepWhiff.ok, false);
+
+const connPlay = resolveKitPlay(card("oracle-crosscheck"), fixCtx({ visited: ["marisol", "monk"] }));
+check("crossref with both lenses visited reveals the connection at BOTH stations",
+  connPlay.reveals, { marisol: ["X-LINK"], monk: ["X-LINK"] });
+check("crossref reports connection metadata",
+  connPlay.connection, { label: "X-LINK", lenses: ["marisol", "monk"] });
+
+const sweepPlay = resolveKitPlay(card("oracle-crosscheck"), fixCtx({ visited: ["marisol"] }));
+check("crossref before both lenses visited falls back to the sweep",
+  { ok: sweepPlay.ok, connection: sweepPlay.connection, monk: sweepPlay.reveals?.monk },
+  { ok: true, connection: undefined, monk: ["M1"] });
+
+check("KIT_CARDS crossrefs carry their lens pair",
+  card("oracle-crosscheck").lenses, ["marisol", "monk"]);
+
+const basic = pickBasicKit();
+check("pickBasicKit: legal, 4 lens keys + insurance",
+  { legal: isKitLegal(basic), ids: basic.map((c) => c.id) },
+  { legal: true, ids: ["audit-flare", "forked-rumor", "wallet-seance", "mempool-prophecy", "candle-vigil"] });
+
+// ---- Case-file integrity (the repo's stand-in for a content test runner):
+// reveals resolve, Tier-2 labels never collide with Tier-1, locked questions
+// resolve, connections use printed crossref pairs, signals match entries.
+// Tolerates empty deepEntries so this passes between the schema-slot commit
+// and the authoring commit.
+const CROSSREF_PAIRS = KIT_CARDS.filter((c) => c.kind === "crossref").map((c) => c.lenses)
+  .concat([["marisol", "eugene"], ["monk", "demon"], ["demon", "eugene"]]); // full printed set (§3.2a)
+const samePair = (a, b) => a.length === 2 && b.length === 2 && a.every((k) => b.includes(k));
+
+for (const caseId of ["case-001", "case-002", "case-003"]) {
+  const caseFile = (await load(read(`../src/components/game/cases/${caseId}.js`))).default;
+  const problems = [];
+  for (const [key, st] of Object.entries(caseFile.stations)) {
+    const tier1 = new Set(st.entries.map((e) => e.label));
+    const deep = new Set((st.deepEntries || []).map((e) => e.label));
+    for (const q of st.questions) {
+      if (!tier1.has(q.reveals)) problems.push(`${key} question reveals unknown label "${q.reveals}"`);
+    }
+    for (const label of deep) {
+      if (tier1.has(label)) problems.push(`${key} deep label "${label}" collides with Tier-1`);
+    }
+    if (st.lockedQuestion && !tier1.has(st.lockedQuestion.reveals) && !deep.has(st.lockedQuestion.reveals)) {
+      problems.push(`${key} lockedQuestion reveals unknown label "${st.lockedQuestion.reveals}"`);
+    }
+    for (const sig of CASE_SIGNALS[caseId].stations[key]) {
+      if (!tier1.has(sig.label)) problems.push(`${key} signal "${sig.label}" has no Tier-1 entry`);
+    }
+  }
+  for (const conn of caseFile.connections || []) {
+    if (!CROSSREF_PAIRS.some((p) => samePair(p, conn.lenses))) {
+      problems.push(`connection pair [${conn.lenses}] matches no printed crossref`);
+    }
+    for (const k of conn.lenses) {
+      const st = caseFile.stations[k];
+      if (st.entries.some((e) => e.label === conn.entry.label) ||
+          (st.deepEntries || []).some((e) => e.label === conn.entry.label)) {
+        problems.push(`connection label "${conn.entry.label}" collides at ${k}`);
+      }
+    }
+  }
+  check(`${caseId} content integrity`, problems, []);
+}
 
 if (failures) {
   console.error(`\n${failures} check(s) FAILED`);

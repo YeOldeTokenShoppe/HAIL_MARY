@@ -32,7 +32,28 @@ export const CARD_ART = {
   // Shillbird's debut (Batch 2 take 1, 2026-07-21): coin mid-drop into the
   // back slot + squawk mid-burst = pay-in and pay-out in one frame. Invoice
   // tell sits ~40-52% height — safely inside the art window.
-  "bullish-ink": { src: "/TCG/coinCard_BullishInk.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Sparkle"] },
+  "bullish-ink": { src: "/TCG/coinCard_BullishInk.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Abstract 2"] },
+  // Gasper's debut (Batch 2 take 1, 2026-07-21). The art is exactly the card's
+  // 1488x2076 aspect, so at artZoom 1.0 the crop is 1:1 and artFocus is inert —
+  // it stays at 30% for consistency with the batch, and as the value to nudge
+  // if this card ever gets zoomed. Tell (untied knot + escaping notes) lands
+  // ~50-62% height, well clear of the ability box that ate the Siren's hourglass.
+  "goblingas": { src: "/TCG/coinCard_GoblinGas.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Abstract 11"] },
+  // Forklok's debut (Batch 2 take 1, 2026-07-21): golem front-and-center, the
+  // mirror behind him showing the back door ajar. The reveal (door + key on a
+  // chain + coin trickle) sits ~40-62% height, inside the art window; the
+  // fingerprint-whorl easter egg is on the mirror frame at ~55%.
+  "blackpalm": { src: "/TCG/coinCard_BlackPalm.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Abstract 7"], fxBlend: "overlay"  },
+  // Vaporina's debut (Batch 2 take 1, 2026-07-21). The set's first full-body
+  // standing figure: head ~20%, clothespin ~46%, loop-button tell ~28-40% —
+  // all inside the art window; only her heels go under the ability box, which
+  // is the price of the pose and reads fine. Rainbow FX because she IS
+  // refraction — the overlay is doing character work here, not decoration.
+  "vaporwarex": { src: "/TCG/coinCard_VaporwareX.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Rainbow 3"] },
+  // Fomogre's debut (Batch 2 take 1, 2026-07-21). Tells: red crumble-trail
+  // ~30-72% on the left, tipped quarter cup ~65-72% — the cup rides the
+  // flavor-text band, so check it there before calling the crop final.
+  "lucky-capsule": { src: "/TCG/coinCard_LuckyCapsule.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Abstract 7"], fxBlend: "screen"  },
   "pump-signal": { src: "/TCG/actionCard_PumpSignal.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Sparkle"] },
   // artFocus values come from the art-run status table in design_guide.md
   // ("Art run status", §First Twelve) — that table is the source of truth,
@@ -52,7 +73,7 @@ export const CARD_ART = {
   "oracle-crosscheck": { src: "/TCG/actionOracleCrosscheck.webp", artFocus: "center 36%", artZoom: 1.0, fx: ["Thunder 4"], fxBlend: "screen" },
   // guide: 34% so the V foil lines up with the rug diagonal.
   "rug-warning": { src: "/TCG/actionRugWarning.webp", artFocus: "center 34%", artZoom: 1.0, fx: ["Abstract 5"], fxBlend: "screen" },
-  "candle-vigil": { src: "/TCG/actionCandleVigil.webp", artFocus: "center 34%", artZoom: 1.0, fx: ["Sparkle"], fxBlend: "screen" },
+  "candle-vigil": { src: "/TCG/actionCandleVigil.webp", artFocus: "center 34%", artZoom: 1.0, fx: ["Abstract 1"], fxBlend: "plus" },
   // guide: if the starburst clips, try Art Y 70-80% + zoom ~1.08.
   "neon-stop-loss": { src: "/TCG/actionNeonStopLoss.webp", artFocus: "center 32%", artZoom: 1.0, fx: ["Abstract 7"], fxBlend: "plus-lighter" },
   // guide: if the "!" clips under the name bar, go to 32%.

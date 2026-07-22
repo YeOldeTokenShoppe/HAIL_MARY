@@ -90,6 +90,26 @@ const CASE_TEMPLATE = {
         { label: "ENTRY LABEL 4", value: "", threat: "red" },
         { label: "ENTRY LABEL 5", value: "", threat: "amber" },
       ],
+      // Tier-2 deep entries (CASE_TABLE.md §3.3) — card-gated: surfaced by a
+      // Deep Scan (which also unseals `lockedQuestion`), never by free scans.
+      // CLASSIFIED styling in the channel. Authoring rules: they corroborate,
+      // quantify, or exonerate — decisive evidence always stays in `entries`
+      // (a cardless player can crack every case on 3 free scans). ~2 per
+      // station. Labels must not repeat any Tier-1 label. No caseSignals
+      // weights — bots never scan these. `visual` works exactly as on
+      // Tier-1 entries.
+      deepEntries: [
+        { label: "DEEP ENTRY 1", value: "", threat: "amber" },
+        { label: "DEEP ENTRY 2", value: "", threat: "red" },
+      ],
+      // OPTIONAL sealed 4th question — hidden behind a Deep Scan; asking it
+      // still costs a scan. `reveals` may target a Tier-1 OR deep label.
+      // Delete on stations without a sealed line. (audio slot: caseNNN_monk_q5)
+      lockedQuestion: {
+        q: "Sealed question?",
+        a: { text: "", audio: "caseNNN_monk_q5" },
+        reveals: "DEEP ENTRY 1",
+      },
       summary: "One-line takeaway shown when the station closes.",
       // Plays on verdict commit (before the outcome reveal). Audio name budget
       // for monk: 25 chars total. `react_believe` fits as-is.
@@ -175,6 +195,8 @@ const CASE_TEMPLATE = {
           },
         },
       ],
+      // Tier-2 — see the monk station's docs. ~2 per station.
+      deepEntries: [],
       summary: "",
       // "demon" eats one more char than "monk" — `react_believe` and
       // `react_abstain` truncate to `_belie` / `_absta`.
@@ -217,6 +239,8 @@ const CASE_TEMPLATE = {
         { label: "ENTRY LABEL 4", value: "", threat: "amber" },
         { label: "ENTRY LABEL 5", value: "", threat: "green" },
       ],
+      // Tier-2 — see the monk station's docs. ~2 per station.
+      deepEntries: [],
       summary: "",
       // "trinity" is 7 chars — drops more letters than monk/demon. All four
       // react/vind multi-syllable slots truncate.
@@ -243,8 +267,8 @@ const CASE_TEMPLATE = {
       textOnly: true,
       intro: "",
       returnLines: [
-        "Back! ✨ Whatcha need?",
-        "Hiii again 💫",
+        "Back. The charts kept me company.",
+        "Ask. I've been re-reading this one anyway.",
       ],
       questions: [
         { q: "?", a: "", reveals: "ENTRY LABEL 1" },
@@ -259,6 +283,9 @@ const CASE_TEMPLATE = {
         { label: "ENTRY LABEL 4", value: "", threat: "amber" },
         { label: "ENTRY LABEL 5", value: "", threat: "green" },
       ],
+      // Tier-2 — see the monk station's docs. Eugene's lockedQuestion `a`
+      // is a plain string (text-only station).
+      deepEntries: [],
       summary: "",
       verdictReaction: {
         believe: "",
@@ -281,6 +308,17 @@ const CASE_TEMPLATE = {
   // station keys here — the post-game coaching note compares them against the
   // stations the player actually scanned. (e.g. ["marisol"] or ["monk","eugene"])
   decisiveLenses: ["marisol"],
+
+  // Cross-reference payoffs (CASE_TABLE.md §3.3): played crossref card whose
+  // printed lens pair matches `lenses` + BOTH lenses already scanned → the
+  // entry ignites at both stations. `lenses` must be one of the four printed
+  // pairs: marisol+monk (Oracle Crosscheck) · marisol+eugene (Ledger vs
+  // Legend) · monk+demon (Faith Audit) · demon+eugene (Choir vs Canon).
+  // The label must not collide with either station's entries/deepEntries.
+  // Beginner cases may leave this empty.
+  connections: [
+    // { lenses: ["marisol", "monk"], entry: { label: "CONNECTION LABEL", value: "", threat: "red" } },
+  ],
 
   // Played after the player commits their verdict and the case unmasks.
   reveal: {

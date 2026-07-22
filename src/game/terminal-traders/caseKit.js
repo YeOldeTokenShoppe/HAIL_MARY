@@ -24,10 +24,59 @@ const FIRST_TWELVE = [
 
 const ACTION_BY_ID = Object.fromEntries(ACTION_CARDS.map((c) => [c.id, c]));
 
-export const KIT_CARDS = FIRST_TWELVE.map((id) => {
-  const card = ACTION_BY_ID[id];
-  return { id, name: card.name, rarity: card.rarity, kind: card.kit.role, station: card.kit.lens, text: card.kit.text };
-});
+// One table-shaped card from a cards.js action. `lenses` carries the
+// cross-reference pair (kitPair cards have no single `lens`) — dropping it
+// was why the real crossref effect couldn't resolve its connection entry.
+export function toKitCard(card) {
+  return {
+    id: card.id,
+    name: card.name,
+    rarity: card.rarity,
+    kind: card.kit.role,
+    station: card.kit.lens,
+    lenses: card.kit.lenses,
+    text: card.kit.text,
+  };
+}
+
+export const KIT_CARDS = FIRST_TWELVE.map((id) => toKitCard(ACTION_BY_ID[id]));
+
+// The owned action pool as table cards, First Twelve order first (they're
+// the proven shapes), then the rest in cards.js role order. `null` in →
+// `null` out (signed-out player; caller falls back to KIT_CARDS). Cards are
+// a library, not ammo (§3.1) — counts collapse to owned/not-owned.
+export function kitCardsFromCollection(cards) {
+  if (!cards) return null;
+  const rank = (c) => {
+    const i = FIRST_TWELVE.indexOf(c.id);
+    return i === -1 ? FIRST_TWELVE.length : i;
+  };
+  return ACTION_CARDS
+    .filter((c) => c.kit && cards[c.id] > 0)
+    .sort((a, b) => rank(a) - rank(b))
+    .map(toKitCard);
+}
+
+// §3.1's one-tap "RUN BASIC KIT": one lens key per station, then insurance,
+// topped up to the legal maximum. Every addition is legality-checked so a
+// foil-heavy pool can't auto-pick itself into an illegal kit.
+export function pickBasicKit(pool = KIT_CARDS) {
+  const kit = [];
+  const take = (pred) => {
+    const found = pool.find((c) => !kit.includes(c) && pred(c) && isKitLegal([...kit, c]));
+    if (found) kit.push(found);
+    return Boolean(found);
+  };
+  for (const lens of ["monk", "demon", "marisol", "eugene"]) {
+    take((c) => c.kind === "lensKey" && c.station === lens);
+  }
+  if (!take((c) => c.kind === "shield")) take((c) => c.kind === "stoploss");
+  for (const c of pool) {
+    if (kit.length >= KIT_RULES.maxCards) break;
+    if (!kit.includes(c) && isKitLegal([...kit, c])) kit.push(c);
+  }
+  return kit;
+}
 
 export const KIND_LABEL = {
   lensKey: "LENS KEY", deepScan: "DEEP SCAN", crossref: "CROSS-REF", trace: "EXIT TRACE",
@@ -61,6 +110,20 @@ export function strongestUnrevealed(signals, stationKey, revealed, count) {
     .map((e) => e.label);
 }
 
+// The live connection for a crossref card, or null: the case must author a
+// connections[] entry for this card's exact lens pair (§3.3), BOTH lenses
+// must have been visited, and the entry must not already be revealed at
+// either station.
+function findConnection(card, { caseData, visited, revealed }) {
+  if (!card.lenses || !caseData?.connections?.length) return null;
+  return caseData.connections.find((c) =>
+    Array.isArray(c.lenses) && c.lenses.length === 2 && card.lenses.length === 2 &&
+    c.lenses.every((k) => card.lenses.includes(k)) &&
+    c.lenses.every((k) => visited.includes(k)) &&
+    !c.lenses.some((k) => (revealed[k] || []).includes(c.entry.label))
+  ) || null;
+}
+
 /**
  * Resolve one kit-card play. Pure: returns what happened, the caller applies
  * it. A play that whiffs (nothing left to show) returns ok:false and must
@@ -73,11 +136,20 @@ export function strongestUnrevealed(signals, stationKey, revealed, count) {
  *   visited   — [stationKey] stations the player has opened (crossref)
  *   order     — station keys in table order (crossref sweep order)
  *   shortName — (stationKey) => display surname for log lines
- * @returns {{ ok: boolean, log: string, reveals?: object, grants?: object }}
- *   reveals — { stationKey: [label] } labels to ADD to `revealed`
- *   grants  — { shields?, bonusActions?, stopLoss?, peek? } flags/increments
+ *   caseData  — the case FILE (stations[].deepEntries / lockedQuestion,
+ *               case-level connections). Tier-2 lives in content, not in
+ *               signals — bots never scan it (§3.3). Optional: without it
+ *               deep scans and crossrefs fall back to Tier-1-only behavior.
+ *   unlocked  — { stationKey: true } locked questions already unsealed
+ * @returns {{ ok, log, reveals?, deepReveals?, unlocks?, connection?, grants? }}
+ *   reveals     — { stationKey: [label] } Tier-1 labels to ADD to `revealed`
+ *   deepReveals — { stationKey: [label] } Tier-2 labels (same revealed map;
+ *                 label uniqueness is enforced at authoring time)
+ *   unlocks     — { stationKey: true } lockedQuestion now askable
+ *   connection  — { label, lenses } metadata when a crossref connected dots
+ *   grants      — { shields?, bonusActions?, stopLoss?, peek? }
  */
-export function resolveKitPlay(card, { signals, revealed, visited, order, shortName }) {
+export function resolveKitPlay(card, { signals, revealed, visited, order, shortName, caseData = null, unlocked = {} }) {
   if (card.kind === "lensKey") {
     const labels = strongestUnrevealed(signals, card.station, revealed, 2);
     if (!labels.length) return { ok: false, log: `⟡ ${card.name}: ${shortName(card.station)} has nothing left to show you.` };
@@ -88,8 +160,21 @@ export function resolveKitPlay(card, { signals, revealed, visited, order, shortN
     };
   }
   if (card.kind === "crossref") {
+    // The real §3.2 effect: both lenses of the card's printed pair worked →
+    // the case's authored connection entry ignites at BOTH stations. When no
+    // matching connection is live, the sweep below keeps the card honest —
+    // never a dead draw.
+    const conn = findConnection(card, { caseData, visited, revealed });
+    if (conn) {
+      return {
+        ok: true,
+        reveals: Object.fromEntries(conn.lenses.map((k) => [k, [conn.entry.label]])),
+        connection: { label: conn.entry.label, lenses: [...conn.lenses] },
+        log: `⟡ You play ${card.name} — the dots connect across ${conn.lenses.map(shortName).join(" + ")}: ${conn.entry.label}`,
+      };
+    }
     const targets = order.filter((k) => !visited.includes(k));
-    if (!targets.length) return { ok: false, log: "⟡ Oracle Crosscheck: you've already visited every station." };
+    if (!targets.length) return { ok: false, log: `⟡ ${card.name}: you've already visited every station.` };
     const reveals = {};
     const got = [];
     targets.forEach((k) => {
@@ -103,12 +188,27 @@ export function resolveKitPlay(card, { signals, revealed, visited, order, shortN
     };
   }
   if (card.kind === "deepScan") {
-    const labels = strongestUnrevealed(signals, card.station, revealed, 99);
-    if (!labels.length) return { ok: false, log: `⟡ ${card.name}: ${shortName(card.station)} has nothing left to show you.` };
+    // "Everything he still holds": all remaining Tier-1, all the station's
+    // CLASSIFIED deep entries, and the sealed question unseals (asking it
+    // still costs a scan — the scan budget is untouched, §3.2).
+    const tier1 = strongestUnrevealed(signals, card.station, revealed, 99);
+    const st = caseData?.stations?.[card.station];
+    const seen = new Set(revealed[card.station] || []);
+    const deep = (st?.deepEntries || []).map((e) => e.label).filter((l) => !seen.has(l));
+    const canUnlock = Boolean(st?.lockedQuestion) && !unlocked[card.station];
+    if (!tier1.length && !deep.length && !canUnlock) {
+      return { ok: false, log: `⟡ ${card.name}: ${shortName(card.station)} has nothing left to show you.` };
+    }
+    const parts = [];
+    if (tier1.length) parts.push(`${tier1.length} entr${tier1.length === 1 ? "y" : "ies"}`);
+    if (deep.length) parts.push(`${deep.length} CLASSIFIED`);
+    if (canUnlock) parts.push("a sealed question unlocks");
     return {
       ok: true,
-      reveals: { [card.station]: labels },
-      log: `⟡ You play ${card.name} — deep scan: ${shortName(card.station)} opens everything (${labels.length} more entr${labels.length === 1 ? "y" : "ies"})`,
+      ...(tier1.length ? { reveals: { [card.station]: tier1 } } : {}),
+      ...(deep.length ? { deepReveals: { [card.station]: deep } } : {}),
+      ...(canUnlock ? { unlocks: { [card.station]: true } } : {}),
+      log: `⟡ You play ${card.name} — deep scan: ${shortName(card.station)} opens everything (${parts.join(" · ")})`,
     };
   }
   if (card.kind === "trace") {

@@ -25,6 +25,11 @@ const CHARS = {
 };
 const STATION_ORDER = ["monk", "demon", "marisol", "eugene"];
 const VALID_THREAT = new Set(["green", "amber", "red"]);
+// The four printed cross-reference pairs (cards.js kitPair cards) — a
+// connection outside this set can never be revealed by any card.
+const CROSSREF_PAIRS = [
+  ["marisol", "monk"], ["marisol", "eugene"], ["monk", "demon"], ["demon", "eugene"],
+];
 const J = (s) => JSON.stringify(s ?? "");
 
 function fail(msg) { console.error("✗ " + msg); process.exitCode = 1; throw new Error(msg); }
@@ -44,9 +49,43 @@ function validate(spec) {
     if (!Array.isArray(st.questions) || st.questions.length !== 4) errs.push(`${key}: need exactly 4 questions`);
     const labels = new Set((st.entries || []).map((e) => e.label));
     (st.entries || []).forEach((e, i) => { if (!VALID_THREAT.has(e.threat)) errs.push(`${key}.entries[${i}].threat invalid: ${e.threat}`); });
-    (st.questions || []).forEach((q, i) => { if (!labels.has(q.reveals)) errs.push(`${key}.questions[${i}].reveals "${q.reveals}" matches no entry label`); });
+    // Tier-2 (CASE_TABLE.md §3.3): 1-3 deep entries, labels unique vs Tier-1.
+    if (!Array.isArray(st.deepEntries) || st.deepEntries.length < 1 || st.deepEntries.length > 3)
+      errs.push(`${key}: need 1-3 deepEntries (Tier-2, §3.3)`);
+    const deepLabels = new Set((st.deepEntries || []).map((e) => e.label));
+    (st.deepEntries || []).forEach((e, i) => {
+      if (!VALID_THREAT.has(e.threat)) errs.push(`${key}.deepEntries[${i}].threat invalid: ${e.threat}`);
+      if (labels.has(e.label)) errs.push(`${key}.deepEntries[${i}] label "${e.label}" collides with a Tier-1 entry`);
+    });
+    (st.questions || []).forEach((q, i) => {
+      if (!labels.has(q.reveals)) {
+        errs.push(deepLabels.has(q.reveals)
+          ? `${key}.questions[${i}].reveals "${q.reveals}" targets a DEEP entry — free scans reveal Tier-1 only (decisive evidence stays Tier-1, §3.3)`
+          : `${key}.questions[${i}].reveals "${q.reveals}" matches no entry label`);
+      }
+    });
+    if (st.lockedQuestion != null) {
+      if (!st.lockedQuestion.q || !st.lockedQuestion.a) errs.push(`${key}.lockedQuestion needs q and a`);
+      if (!labels.has(st.lockedQuestion.reveals) && !deepLabels.has(st.lockedQuestion.reveals))
+        errs.push(`${key}.lockedQuestion.reveals "${st.lockedQuestion.reveals}" matches no Tier-1 or deep label`);
+    }
     for (const f of ["intro", "summary", "returnLines", "verdictReaction", "vindication"])
       if (st[f] == null) errs.push(`${key}: missing "${f}"`);
+  }
+  for (const [i, conn] of (spec.connections || []).entries()) {
+    const pairOk = Array.isArray(conn.lenses) &&
+      CROSSREF_PAIRS.some((p) => p.length === conn.lenses.length && p.every((k) => conn.lenses.includes(k)));
+    if (!pairOk) errs.push(`connections[${i}].lenses ${JSON.stringify(conn.lenses)} is not one of the four printed crossref pairs`);
+    if (!conn.entry?.label || !VALID_THREAT.has(conn.entry?.threat)) errs.push(`connections[${i}].entry needs a label and a valid threat`);
+    for (const k of conn.lenses || []) {
+      const st = spec.stations?.[k];
+      if (!st) continue;
+      if ((st.entries || []).some((e) => e.label === conn.entry?.label) ||
+          (st.deepEntries || []).some((e) => e.label === conn.entry?.label))
+        errs.push(`connections[${i}] label "${conn.entry?.label}" collides with an entry at ${k}`);
+    }
+    if ((spec.connections || []).some((other, j) => j !== i && other.entry?.label === conn.entry?.label))
+      errs.push(`connections[${i}] label "${conn.entry?.label}" duplicated across connections`);
   }
   if (errs.length) { errs.forEach((e) => console.error("  ✗ " + e)); fail(`${errs.length} spec error(s)`); }
 }
@@ -57,6 +96,9 @@ function emit(spec) {
   const CONST = spec.id.replace(/-/g, "_").toUpperCase(); // case-004 -> CASE_004
 
   const entriesBlock = (st) => st.entries.map((e) =>
+    `        { label: ${J(e.label)}, value: ${J(e.value)}, threat: ${J(e.threat)} },`).join("\n");
+  // Tier-2 block (§3.3) — same row shape as entries, card-gated at the table.
+  const deepBlock = (st) => (st.deepEntries || []).map((e) =>
     `        { label: ${J(e.label)}, value: ${J(e.value)}, threat: ${J(e.threat)} },`).join("\n");
 
   const voicedStation = (key) => {
@@ -72,6 +114,17 @@ function emit(spec) {
           },
           reveals: ${J(q.reveals)},
         },`).join("\n");
+    // The sealed 4th question takes the q5 audio slot (q1-q4 are the free ones).
+    const locked = st.lockedQuestion
+      ? `      lockedQuestion: {
+        q: ${J(st.lockedQuestion.q)},
+        a: {
+          text: ${J(st.lockedQuestion.a)},
+          audio: null, // re-record: ${slot(c.slot, "q5")}
+        },
+        reveals: ${J(st.lockedQuestion.reveals)},
+      },\n`
+      : "";
     const react = (k) => `        ${k}: { text: ${J(st.verdictReaction[k])}, audio: null }, // re-record: ${slot(c.slot, `react_${k}`)}`;
     const vind = (k) => `        ${k}: { text: ${J(st.vindication[k])}, audio: null }, // re-record: ${slot(c.slot, `vind_${k}`)}`;
     return `    ${key}: {
@@ -90,8 +143,11 @@ ${rl}
       questions: [
 ${qs}
       ],
-      entries: [
+${locked}      entries: [
 ${entriesBlock(st)}
+      ],
+      deepEntries: [
+${deepBlock(st)}
       ],
       summary: ${J(st.summary)},
       verdictReaction: {
@@ -111,6 +167,10 @@ ${vind("abstained")}
     const c = CHARS.eugene; const st = spec.stations.eugene;
     const qs = st.questions.map((q) =>
       `        { q: ${J(q.q)}, a: ${J(q.a)}, reveals: ${J(q.reveals)} },`).join("\n");
+    // Text-only station: the sealed question's answer stays a plain string.
+    const locked = st.lockedQuestion
+      ? `      lockedQuestion: { q: ${J(st.lockedQuestion.q)}, a: ${J(st.lockedQuestion.a)}, reveals: ${J(st.lockedQuestion.reveals)} },\n`
+      : "";
     return `    eugene: {
       character: ${J(c.name)},
       role: ${J(c.role)},
@@ -122,8 +182,11 @@ ${vind("abstained")}
       questions: [
 ${qs}
       ],
-      entries: [
+${locked}      entries: [
 ${entriesBlock(st)}
+      ],
+      deepEntries: [
+${deepBlock(st)}
       ],
       summary: ${J(st.summary)},
       verdictReaction: { believe: ${J(st.verdictReaction.believe)}, abstain: ${J(st.verdictReaction.abstain)}, doubt: ${J(st.verdictReaction.doubt)} },
@@ -162,7 +225,13 @@ ${eugeneStation()}
   maxScans: 3,
   correctVerdict: ${J(spec.correctVerdict)},
   decisiveLenses: ${JSON.stringify(spec.decisiveLenses)},
-
+${(spec.connections || []).length ? `
+  // Cross-reference payoffs (§3.3) — both lenses scanned + the matching
+  // printed crossref played -> the entry ignites at both stations.
+  connections: [
+${spec.connections.map((c) => `    { lenses: ${JSON.stringify(c.lenses)}, entry: { label: ${J(c.entry.label)}, value: ${J(c.entry.value)}, threat: ${J(c.entry.threat)} } },`).join("\n")}
+  ],
+` : ""}
   reveal: {
     summary: ${J(spec.reveal.summary)},
     voices: {

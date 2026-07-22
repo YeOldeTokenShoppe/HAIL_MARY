@@ -257,6 +257,9 @@ function buildStation({ character, role, sigil, tagline, voice, ticker, name, ad
       },
     ],
     summary: `Placeholder summary for ${tickerLabel}.`,
+    // Tier-2 slot (CASE_TABLE.md §3.3) — reviews ship none today; richer
+    // CDP pulls that don't fit Marisol's Tier-1 cards are the follow-up.
+    deepEntries: [],
     verdictReaction: {
       believe: { text: 'Noted.',   audio: null },
       abstain: { text: 'Wise.',    audio: null },
@@ -380,6 +383,8 @@ export default function generateReviewCase({
     correctVerdict: null,
     // No ground truth → no decisive-lens coaching for reviews.
     decisiveLenses: [],
+    // No authored cross-lens payoffs for dynamic reviews (§3.3).
+    connections: [],
     reveal: {
       summary: `Review compiled for ${tickerLabel} on ${chainLabel}. This is your team's read — not financial advice.`,
       voices: {

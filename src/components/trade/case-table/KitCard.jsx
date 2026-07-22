@@ -22,7 +22,9 @@ export function KitCard({ color, name, kind, text, footer, state = "idle", small
 
 // The player's hand: Eugene's patron whisper (when unspent) + the kit cards.
 // Owns the two-tap arm/play interaction; effects resolve upstream (caseKit).
-export function KitHand({ small, kitPlayed, selectedCard, noActions, onArm, onPlay, showHint, onHint }) {
+// `cards` is the confirmed kit (KitSelect); the full First Twelve is only
+// the pre-kit dev fallback.
+export function KitHand({ cards = KIT_CARDS, small, kitPlayed, selectedCard, noActions, onArm, onPlay, showHint, onHint }) {
   return (
     <>
       {showHint && (
@@ -39,7 +41,7 @@ export function KitHand({ small, kitPlayed, selectedCard, noActions, onArm, onPl
           onClick={onHint}
         />
       )}
-      {KIT_CARDS.map((card) => {
+      {cards.map((card) => {
         const played = kitPlayed.includes(card.id);
         const sel = selectedCard === card.id;
         return (

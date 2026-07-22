@@ -10,9 +10,20 @@ import SeatStrip from "./SeatStrip";
 export default function Ledger({
   ticker, truth, caseIndex, docketLength,
   books, busted, patron, rows,
+  kitPlays = [], // structured kit plays from CaseTable — information plays get debrief lines
   pendingEvent, shieldSpent, monkShieldHeld,
   onAdvance,
 }) {
+  // One debrief line per INFORMATION play (insurance/trace already have their
+  // own dial lines above). Rides a parallel prop, never settleCase's rows —
+  // those are parity-pinned.
+  const kitLine = (k) => {
+    const st = k.station ? seatMeta(k.station)?.name : null;
+    if (k.connectionLabel) return `connected ${(k.lenses || []).map((l) => seatMeta(l)?.name).join(" + ")}: ${k.connectionLabel}`;
+    if (k.kind === "crossref") return `crosscheck pulled ${k.tier1} card${k.tier1 === 1 ? "" : "s"}`;
+    if (k.kind === "deepScan") return `opened ${st}'s archive: ${k.tier1} entr${k.tier1 === 1 ? "y" : "ies"} · ${k.deep} CLASSIFIED${k.unlockedStation ? " · 1 sealed question" : ""}`;
+    return `${st} slid ${k.tier1} card${k.tier1 === 1 ? "" : "s"}`;
+  };
   return (
     <Shell>
       <div className="ct-talk">
@@ -61,6 +72,13 @@ export default function Ledger({
                     ⟡ NEON STOP LOSS — a {row.stopLoss.from} ticket capped at {STOP_LOSS_FLOOR}
                   </div>
                 )}
+                {row.seat === YOU && kitPlays
+                  .filter((k) => ["lensKey", "deepScan", "crossref"].includes(k.kind))
+                  .map((k) => (
+                    <div key={k.id} className="ct-debrief" style={{ color: "#8ee9ff" }}>
+                      ⟡ {k.name.toUpperCase()} — {kitLine(k)}
+                    </div>
+                  ))}
               </div>
             </div>
           );

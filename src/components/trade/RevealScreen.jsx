@@ -15,7 +15,7 @@ const OUT = {
 // vindication values are sometimes {text,audio}, sometimes a bare string.
 const vtext = (v) => (typeof v === "string" ? v : v?.text || "");
 
-export default function RevealScreen({ caseData, verdict, confidence = 0.5, investigated = [], speakerKey, speakerSceneId, onExit }) {
+export default function RevealScreen({ caseData, verdict, confidence = 0.5, investigated = [], kitNote = null, speakerKey, speakerSceneId, onExit }) {
   const correct = caseData.correctVerdict;
   const outcome = verdict === "abstain" ? "abstained" : verdict === correct ? "aligned" : "missed";
   const o = OUT[outcome];
@@ -76,6 +76,13 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
             style={{ "--dc": lensTone === "affirm" ? "#4dffaa" : "#2fd6d6" }}
           >
             ✦ {lensNote}
+          </div>
+        )}
+
+        {/* Kit callout (§3.4) — flavor, not score: what the cards contributed. */}
+        {kitNote && (
+          <div className="rv-decisive" style={{ "--dc": "#8ee9ff" }}>
+            ⟡ {kitNote}
           </div>
         )}
 

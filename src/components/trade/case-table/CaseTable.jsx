@@ -9,15 +9,17 @@ import CASE_001 from "@/components/game/cases/case-001";
 import CASE_002 from "@/components/game/cases/case-002";
 import CASE_003 from "@/components/game/cases/case-003";
 import { CASE_SIGNALS } from "@/game/terminal-traders/caseSignals";
-import { resolveKitPlay } from "@/game/terminal-traders/caseKit";
+import { resolveKitPlay, KIT_CARDS, kitCardsFromCollection, pickBasicKit } from "@/game/terminal-traders/caseKit";
 import {
   YOU, BASE_ACTIONS, BOT_ROUNDS, bucket,
   createBotState, botRound, finalizeCalls, settleCase,
 } from "@/game/terminal-traders/docketRun";
 import { recordCaseResult } from "@/components/GameOverlay";
 import { CHARACTER_META, CHARACTER_ORDER } from "@/components/CaseFile/characterMeta";
+import { useCardCollection } from "@/hooks/useCardCollection";
 import { SEATS, STAKE, START_PF, DOCK_H } from "./constants";
 import { KitHand } from "./KitCard";
+import KitSelect from "./KitSelect";
 import Lobby from "./Lobby";
 import DeskGrid from "./DeskGrid";
 import TableDock from "./TableDock";
@@ -92,6 +94,12 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   const [ticketHorizon, setTicketHorizon] = useState(0);
 
   // kit + patron + table state
+  // `kit` is the confirmed KitSelect pick — it persists across cases and
+  // dockets ("RUN IT BACK"); everything else here resets per case.
+  const [kit, setKit] = useState(null);
+  const [unlockedQuestions, setUnlockedQuestions] = useState({}); // { stationKey: true }
+  const [deepReveals, setDeepReveals] = useState(0);              // Tier-2 count → scorecard
+  const [kitLog, setKitLog] = useState([]);                       // structured plays → Ledger/Reveal callouts
   const [kitPlayed, setKitPlayed] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [shields, setShields] = useState(0);
@@ -113,6 +121,11 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   const apiFetch = useOilApiFetch();
   const [reward, setReward] = useState(null);
   const rewardSeedRef = useRef(null);
+
+  // The owned action pool as kit cards (§3.1); signed-out / still-loading
+  // falls back to the First Twelve so the table never blocks on the fetch.
+  const { cards: ownedCards } = useCardCollection();
+  const kitPool = kitCardsFromCollection(ownedCards) || KIT_CARDS;
 
   const caseData = docket[caseIndex];
   const signals = CASE_SIGNALS[caseData.id];
@@ -180,7 +193,13 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     const free = patron === "marisol" && key === "marisol" && !marisolFreeUsed;
     if (!free && actionsUsed >= actionsMax) return;
     if ((asked[key] || []).includes(qIndex)) return;
-    const reveal = caseData.stations[key]?.questions[qIndex]?.reveals;
+    // "locked" = the station's sealed 4th question (§3.3) — askable only
+    // after a deep scan unseals it, and it costs a scan like any other.
+    if (qIndex === "locked" && !unlockedQuestions[key]) return;
+    const q = qIndex === "locked"
+      ? caseData.stations[key]?.lockedQuestion
+      : caseData.stations[key]?.questions[qIndex];
+    const reveal = q?.reveals;
     setAsked((a) => ({ ...a, [key]: [...(a[key] || []), qIndex] }));
     if (reveal) setRevealed((r) => ({
       ...r,
@@ -200,14 +219,37 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   // ---------- kit (caseKit.js) ----------
   const playKitCard = (card) => {
     if (kitPlayed.includes(card.id) || actionsUsed >= actionsMax) return;
-    const play = resolveKitPlay(card, { signals, revealed, visited, order: CHARACTER_ORDER, shortName });
+    const play = resolveKitPlay(card, {
+      signals, caseData, revealed, unlocked: unlockedQuestions,
+      visited, order: CHARACTER_ORDER, shortName,
+    });
     log(play.log);
     if (!play.ok) return; // whiff — the card (and the action) isn't consumed
-    if (play.reveals) setRevealed((r) => {
+    // Tier-1 and Tier-2 labels share one revealed map (labels are unique per
+    // station by authoring rule); ChannelView resolves the tier per label.
+    const merged = {};
+    [play.reveals, play.deepReveals].forEach((set) => {
+      Object.entries(set || {}).forEach(([k, labels]) => { merged[k] = [...(merged[k] || []), ...labels]; });
+    });
+    if (Object.keys(merged).length) setRevealed((r) => {
       const next = { ...r };
-      Object.entries(play.reveals).forEach(([k, labels]) => { next[k] = [...(next[k] || []), ...labels]; });
+      Object.entries(merged).forEach(([k, labels]) => {
+        next[k] = [...(next[k] || []), ...labels.filter((l) => !(next[k] || []).includes(l))];
+      });
       return next;
     });
+    if (play.unlocks) setUnlockedQuestions((u) => ({ ...u, ...play.unlocks }));
+    const count = (set) => Object.values(set || {}).reduce((n, labels) => n + labels.length, 0);
+    const deepCount = count(play.deepReveals) + (play.connection ? 1 : 0);
+    if (deepCount) setDeepReveals((n) => n + deepCount);
+    setKitLog((l) => [...l, {
+      id: card.id, name: card.name, kind: card.kind, station: card.station || null,
+      tier1: count(play.reveals) - (play.connection ? play.connection.lenses.length : 0),
+      deep: count(play.deepReveals),
+      unlockedStation: play.unlocks ? Object.keys(play.unlocks)[0] : null,
+      connectionLabel: play.connection?.label || null,
+      lenses: play.connection?.lenses || null,
+    }]);
     if (play.grants?.shields) setShields((s) => s + play.grants.shields);
     if (play.grants?.stopLoss) setStopLossArmed(true);
     if (play.grants?.peek) setPeekArmed(true);
@@ -256,6 +298,8 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     setKitPlayed([]); setSelectedCard(null); setShieldSpent(false); setStopLossArmed(false);
     setPeekArmed(false); setPeekChoice(null); setMarisolFreeUsed(false);
     setTableLog([]); setPunditFinal({});
+    // per-case Tier-2 state (the confirmed `kit` itself persists)
+    setUnlockedQuestions({}); setDeepReveals(0); setKitLog([]);
     botRef.current = createBotState();
   };
 
@@ -283,7 +327,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     if (recordScores && signals?.truth != null) {
       const v = bucket(pHuman);
       const correct = v === "abstain" ? null : (v === "doubt") === (signals.truth === 1);
-      try { recordCaseResult({ brier: (pHuman - signals.truth) ** 2, correct }); } catch {}
+      try { recordCaseResult({ brier: (pHuman - signals.truth) ** 2, correct, deepReveals }); } catch {}
     }
   };
 
@@ -298,9 +342,11 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   };
 
   // The kit hand, both sizes — the desk row and the channel dock render the
-  // same state through the same two-tap flow.
+  // same state through the same two-tap flow. The hand is the confirmed kit;
+  // the First Twelve fallback only shows if the kit screen was somehow skipped.
   const kitHand = (small) => (
     <KitHand
+      cards={kit || KIT_CARDS}
       small={small}
       kitPlayed={kitPlayed}
       selectedCard={selectedCard}
@@ -323,6 +369,21 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
         seed={seed}
         onSeedStep={() => setSeed((s) => s + 1)}
         onResetTips={resetTips}
+      />
+    );
+  }
+
+  if (screen === "kit") {
+    return (
+      <KitSelect
+        pool={kitPool}
+        initial={kit}
+        ticker={caseData.ticker}
+        caseIndex={caseIndex}
+        docketLength={docket.length}
+        onConfirm={(cards) => { setKit(cards); setScreen("grid"); }}
+        onBasic={() => { setKit(pickBasicKit(kitPool)); setScreen("grid"); }}
+        onBack={() => setScreen("menu")}
       />
     );
   }
@@ -368,6 +429,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
         ticker={caseData.ticker} truth={signals.truth}
         caseIndex={caseIndex} docketLength={docket.length}
         books={books} busted={busted} patron={patron} rows={ledger}
+        kitPlays={kitLog}
         pendingEvent={pendingEvent} shieldSpent={shieldSpent}
         monkShieldHeld={!!botRef.current.shield.monk && !busted.monk}
         onAdvance={advance}
@@ -390,16 +452,25 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     ? ([...visited].reverse().find((k) => sitePalScenes[k]) || "monk")
     : ([...visited].reverse()[0] || "monk");
 
+  // §3.4's flavor callout — a connection beats a deep count; never scored.
+  const kitConn = kitLog.find((k) => k.connectionLabel);
+  const kitNote = kitConn
+    ? `Your ${kitConn.name} connected the dots — ${kitConn.connectionLabel}.`
+    : deepReveals > 0
+      ? `${deepReveals} CLASSIFIED entr${deepReveals === 1 ? "y" : "ies"} from your kit informed this call.`
+      : null;
+
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 10050, background: "#02100e" }}>
       {screen === "menu" ? (
-        <TerminalMenu caseData={caseData} onBegin={() => setScreen("grid")} onExit={() => setScreen("lobby")} exitLabel="◀ LOBBY" />
+        <TerminalMenu caseData={caseData} onBegin={() => setScreen("kit")} onExit={() => setScreen("lobby")} exitLabel="◀ LOBBY" />
       ) : screen === "reveal" ? (
         <RevealScreen
           caseData={caseData}
           verdict={playerVerdict}
           confidence={playerP}
           investigated={Object.keys(asked).filter((k) => (asked[k]?.length || 0) > 0)}
+          kitNote={kitNote}
           speakerKey={revealSpeaker}
           speakerSceneId={sitePalScenes?.[revealSpeaker]}
           onExit={() => setScreen("ledger")}
@@ -415,6 +486,8 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
               scansMax={actionsMax}
               asked={asked[activeStation] || []}
               revealed={revealed[activeStation] || []}
+              connections={caseData.connections || []}
+              lockedUnlocked={!!unlockedQuestions[activeStation]}
               onAsk={ask}
               onBack={() => setScreen("grid")}
               onVerdict={callsOpen ? enterCalls : undefined}

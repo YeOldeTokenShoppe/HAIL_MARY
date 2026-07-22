@@ -226,6 +226,24 @@ const CASE_003 = {
           },
         },
       ],
+      // Tier-2 (decisive): the footnote grows receipts — the wound-down
+      // fund's money touches THIS project's ops wallet. Corroboration for
+      // the cross-lens read, never the whole crack (that stays Tier-1).
+      deepEntries: [
+        { label: "OPS PARTNER FUNDING", value: "The wound-down project's exit wallet seeded the ops partner's current hot wallet — 2 hops", threat: "red" },
+        { label: "REFERENCE CHECK", value: "Named references vouch for Founders A and B; nobody vouches for the ops partner directly", threat: "amber" },
+      ],
+      lockedQuestion: {
+        q: "Whose hand signs for the quiet wallet?",
+        a: {
+          text:
+            "The wound-down fund drained to one address in its final week. That address, two hops later, " +
+            "funds the operations partner's wallet here. Two ledgers, one hand. " +
+            "The congregation sees the robes. The back pew keeps its own books.",
+          audio: null, // re-record: case003_monk_q5
+        },
+        reveals: "OPS PARTNER FUNDING",
+      },
       summary: "The names, the audit, the named capital all hold. One founder has a soft prior failure no one examined. A footnote — unless another lens names the door he could reuse.",
       verdictReaction: {
         believe: { text: "Trust offered to the proven is reason. Trust offered to the unexamined is hope wearing reason's robe.", audio: "case003_monk_react_believ" },
@@ -408,6 +426,12 @@ const CASE_003 = {
             metric: { label: "SEEDED BURST", value: "1" },
           },
         },
+      ],
+      // Tier-2: the seeded-launch itch gets receipts — and a chilling link
+      // to the ops partner's PRIOR project. Corroborating, not decisive.
+      deepEntries: [
+        { label: "SEED CREW OVERLAP", value: "4 of the 12 first-movers also boosted the ops partner's PRIOR launch", threat: "amber" },
+        { label: "FRAMING FORENSICS", value: "First-mover posts share three rare phrasings — same brief, different keyboards", threat: "amber" },
       ],
       summary: "The crowd is grown, the discourse is technical, the critics are alive. But the earliest 'organic' fans moved like they were told to. Enthusiasm, or a seeded launch. Can't call it from here alone.",
       verdictReaction: {
@@ -594,6 +618,23 @@ const CASE_003 = {
           },
         },
       ],
+      // Tier-2 (decisive): who FUELS the door — the funding forensics that
+      // tie the admin key to the costumed cluster, and a rehearsal on
+      // testnet. Corroborates the Tier-1 crack; doesn't replace it.
+      deepEntries: [
+        { label: "ADMIN KEY FUNDING", value: "Proxy-admin EOA gas-funded from the same source as the 'community' cluster", threat: "red" },
+        { label: "UPGRADE DRY RUN", value: "A twin proxy on testnet rehearsed an implementation swap 9 days ago", threat: "red" },
+      ],
+      lockedQuestion: {
+        q: "Who fuels the admin key?",
+        a: {
+          text:
+            "Gas for the proxy-admin wallet comes from the same faucet that waters the 'community' cluster. " +
+            "One purse, three costumes. I stopped believing in coincidences with timestamps.",
+          audio: null, // re-record: case003_trinity_q5
+        },
+        reveals: "ADMIN KEY FUNDING",
+      },
       summary: "Lobby's real — LP locked, multisig genuine. But there's a one-key upgrade door the audit skipped, and a costumed cluster behind it. Nothing's been pulled yet. The risk is who holds that key.",
       verdictReaction: {
         believe: { text: "Today the chain backs you, kid. Nothing's been swapped. Just know the basement door's unlocked, and unwatched.", audio: "case003_trinity_react_bel" },
@@ -617,16 +658,16 @@ const CASE_003 = {
         "Meridian's pitch is so well-behaved it's almost a personality test. Audits, multisigs, conservative yield. " +
         "It's the kind of story that says 'I'm too boring to be a scam' really, really often. Which... is also a thing scams have learned to say. 🤔",
       returnLines: [
-        "Back to the brochure ✨",
-        "Hiii — wanna re-read the pitch?",
-        "Okay, one more chapter 💫",
+        "Back to the brochure.",
+        "I keep re-reading this pitch. It reads back.",
+        "One more chapter. I think I know how this genre ends.",
       ],
       questions: [
         {
           q: "What is the product story?",
           a:
             "Auto-rebalancing vault across blue-chip yield strategies — Aave, Compound, Curve. " +
-            "Honestly? Sensible. Boring in a good way. The story isn't trying to sell you a miracle. ✨",
+            "Sensible. Boring in a good way. The story isn't trying to sell you a miracle — and I always read that twice.",
           reveals: "POSITIONING",
         },
         {
@@ -799,16 +840,43 @@ const CASE_003 = {
           },
         },
       ],
+      // Tier-2: Eugene's chart exhibit — the set's first chart-literacy
+      // evidence card. The caption carries the calibration lesson: a chart
+      // pattern is WEAK evidence alone; it earns weight from receipts.
+      deepEntries: [
+        {
+          label: "SOFT-EXIT CHART",
+          value: "Price/volume rhythm overlays the two prior 'sophisticated' exits — drift, thinning volume, day-60 cliff",
+          threat: "amber",
+          visual: {
+            component: "Timeline",
+            props: {
+              startLabel: "launch",
+              endLabel: "d+70",
+              events: [
+                { position: 0.08, label: "Quiet accumulation", sublabel: "d+0–14", tone: "green" },
+                { position: 0.38, label: "Flat drift, volume thins", sublabel: "d+15–45", tone: "amber" },
+                { position: 0.6, label: "MERIDIAN today", sublabel: "d+38", tone: "amber", highlight: true },
+                { position: 0.87, label: "Prior exits' cliff", sublabel: "d+58–61", tone: "red" },
+              ],
+            },
+            caption:
+              "Eugene's overlay: MERIDIAN's price-and-volume rhythm traces the same arc as the two prior 'sophisticated' exits — quiet accumulation, a long flat drift while attention thins, then a day-sixty cliff. A chart pattern is weak evidence on its own; this one earns its weight only because the shape has receipts behind it on the other lenses.",
+            metric: { label: "OVERLAY FIT", value: "d±3" },
+          },
+        },
+        { label: "OMISSION INDEX", value: "47 audit mentions, 0 upgrade-path mentions — the silence is itself authored", threat: "amber" },
+      ],
       summary: "The story behaves perfectly — maybe too perfectly. It mirrors a known soft-exit template and stays silent on the one control that matters: the upgrade path.",
       verdictReaction: {
         believe: "Sure! Clean brochure, receipts check out. Just remember the brochure picks what to print — and this one reads like a brochure that's been printed before. 💭",
         abstain: "Fair. A story this tidy and just a little too on-template isn't proof — but it isn't nothing either.",
-        doubt:   "Bold. The story's good. If you're doubting, you're trusting the template echo and the missing paragraph over the pretty words. I respect a girl with sources. 🌟",
+        doubt:   "Bold. The story's good. If you're doubting, you're trusting the template echo and the missing paragraph over the pretty words. I've learned to trust the echo too.",
       },
       vindication: {
-        aligned:   "You read the absence AND the echo, not just the words. That's the upgrade. 🌟",
+        aligned:   "You read the absence AND the echo, not just the words. That's the upgrade.",
         missed:    "The story was real — and reused. Always ask what the brochure didn't print, and whether you've read this exact brochure before.",
-        abstained: "You smelled the polish without naming the seam. Half the lesson. 💫",
+        abstained: "You smelled the polish without naming the seam. Half the lesson.",
       },
     },
   },
@@ -822,6 +890,21 @@ const CASE_003 = {
   // Sentiment's seeded first-movers and narrative's template echo are
   // corroborating but not load-bearing. Drives the post-game lens-coaching note.
   decisiveLenses: ["marisol", "monk"],
+
+  // The case-003 "dots connect ACROSS lenses" moment, made mechanical (§3.3):
+  // work LOGOS and ETHOS, then play Oracle Crosscheck — the entry ignites at
+  // both stations. The Tier-1 crack stays reachable without it; this is the
+  // payoff that names what the two lenses were separately whispering.
+  connections: [
+    {
+      lenses: ["marisol", "monk"],
+      entry: {
+        label: "THE PREBUILT EXIT",
+        value: "One unaudited key controls the upgrade path — held beside the hand that quietly closed a fund before. A door plus a history is a plan.",
+        threat: "red",
+      },
+    },
+  ],
 
   reveal: {
     summary:
