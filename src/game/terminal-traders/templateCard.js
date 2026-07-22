@@ -1,5 +1,7 @@
 import { CARD_TYPES, GENESIS_SET, LENS_LABELS } from "./cards.js";
-import { frameForRarity, metaTopForFrame } from "./cardFrames.js";
+import {
+  frameForRarity, metaTopForFrame, fxSources, FX_BLEND_DEFAULT, FX_OPACITY_DEFAULT,
+} from "./cardFrames.js";
 
 // Single source of truth for finished card art. As the Genesis 80 art run
 // lands, add one entry per card id; everything else renders the framed
@@ -11,44 +13,44 @@ export const CARD_ART = {
   // TRADER badge + holo FX). Retired 2026-07-21: the rarity frames and the FX
   // compositor cover both jobs at 1488px, and stacking them double-framed the
   // card. TradingCard still supports overlayImage — ReliquaryRail uses it.
-  "eugene": { src: "/TCG/eugeneFractal.webp", artFocus: "center 28%", artZoom: 1.25 },
-  "marisol": { src: "/TCG/traderMarisol.webp", artFocus: "center 28%", artZoom: 1.25 },
+  "eugene": { src: "/TCG/eugeneFractal.webp", artFocus: "center 28%", artZoom: 1.25, fx: ["Rainbow 1"] },
+  "marisol": { src: "/TCG/traderMarisol.webp", artFocus: "center 28%", artZoom: 1.25, fx: ["Abstract 7"] },
   // gr80 + john-barron art shipped long ago but lived only in /card-template's
   // demo constants, so the game rendered both traders art-less. Values carried
   // over from those constants (2026-07-20).
-  "gr80": { src: "/TCG/trader_monk.webp", artFocus: "center 30%", artZoom: 1.2 },
-  "john-barron": { src: "/TCG/traderDemon.webp", artFocus: "center 32%", artZoom: 1.2 },
-  // moonpony + pump-signal assets are legacy pre-rendered full cards (frame
-  // and text baked in), so the template crops hard into their art area.
-  // Replace with raw artwork during the Genesis 80 art run.
-  "moonpony": { src: "/TCG/coinCard_MoonPony.webp", artFocus: "center 30%", artZoom: 2.1 },
-  "pump-signal": { src: "/TCG/actionCard_PumpSignal.webp", artFocus: "center 30%", artZoom: 2.1 },
+  "gr80": { src: "/TCG/trader_monk.webp", artFocus: "center 30%", artZoom: 1.2, fx: ["Abstract 11"] },
+  "john-barron": { src: "/TCG/traderDemon.webp", artFocus: "center 32%", artZoom: 1.2, fx: ["Flame"] },
+  // moonpony + pump-signal reimported 2026-07-21 as full 1488×2077 illustrations
+  // with the old baked-in frame/text removed, so they crop like every other
+  // Genesis card now — artZoom 1.0, no hard zoom into a print card.
+  "moonpony": { src: "/TCG/coinCard_MoonPony.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Rainbow 1", "Rainbow 3", "Rainbow 4"] },
+  "pump-signal": { src: "/TCG/actionCard_PumpSignal.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Sparkle"] },
   // artFocus values come from the art-run status table in design_guide.md
   // ("Art run status", §First Twelve) — that table is the source of truth,
   // not the 28% default. artZoom stays 1.0 unless the guide notes otherwise.
   // abilityTone orange: this art is mint/cyan, so the default cyan EFFECT
   // badge and heading read as low contrast against it.
-  "audit-flare": { src: "/TCG/actionAuditFlare.webp", artFocus: "center 28%", artZoom: 1.0, abilityTone: "orange" },
+  "audit-flare": { src: "/TCG/actionAuditFlare.webp", artFocus: "center 28%", artZoom: 1.0, abilityTone: "orange", fx: ["Thunder 3"] },
   // guide: 28% in repo; bump to 30-32 if the arrowheads clip.
-  "forked-rumor": { src: "/TCG/actionForkedRumor.webp", artFocus: "center 28%", artZoom: 1.0 },
-  "wallet-seance": { src: "/TCG/actionWalletSeance.webp", artFocus: "center 31%", artZoom: 1.0 },
+  "forked-rumor": { src: "/TCG/actionForkedRumor.webp", artFocus: "center 28%", artZoom: 1.0, fx: ["Flame"] },
+  "wallet-seance": { src: "/TCG/actionWalletSeance.webp", artFocus: "center 31%", artZoom: 1.0, fx: ["Abstract 16"] },
   // guide: protect the ball's crown.
-  "mempool-prophecy": { src: "/TCG/actionMempoolProphecy.webp", artFocus: "center 33%", artZoom: 1.0 },
+  "mempool-prophecy": { src: "/TCG/actionMempoolProphecy.webp", artFocus: "center 33%", artZoom: 1.0, fx: ["Abstract 5"], fxBlend: "screen" },
   // abilityTone orange: the ice-vault art is cyan end to end.
-  "cold-wallet": { src: "/TCG/actionColdWallet.webp", artFocus: "center 34%", artZoom: 1.0, abilityTone: "orange" },
-  "chart-exorcism": { src: "/TCG/actionChartExorcism.webp", artFocus: "center 30%", artZoom: 1.0 },
+  "cold-wallet": { src: "/TCG/actionColdWallet.webp", artFocus: "center 34%", artZoom: 1.0, abilityTone: "orange", fx: ["Rainbow 1"] },
+  "chart-exorcism": { src: "/TCG/actionChartExorcism.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Dark"] },
   // guide: 36% so the V foil lines up with the beam-X.
-  "oracle-crosscheck": { src: "/TCG/actionOracleCrosscheck.webp", artFocus: "center 36%", artZoom: 1.0 },
+  "oracle-crosscheck": { src: "/TCG/actionOracleCrosscheck.webp", artFocus: "center 36%", artZoom: 1.0, fx: ["Thunder 4"], fxBlend: "screen" },
   // guide: 34% so the V foil lines up with the rug diagonal.
-  "rug-warning": { src: "/TCG/actionRugWarning.webp", artFocus: "center 34%", artZoom: 1.0 },
-  "candle-vigil": { src: "/TCG/actionCandleVigil.webp", artFocus: "center 34%", artZoom: 1.0 },
+  "rug-warning": { src: "/TCG/actionRugWarning.webp", artFocus: "center 34%", artZoom: 1.0, fx: ["Abstract 5"], fxBlend: "screen" },
+  "candle-vigil": { src: "/TCG/actionCandleVigil.webp", artFocus: "center 34%", artZoom: 1.0, fx: ["Sparkle"], fxBlend: "screen" },
   // guide: if the starburst clips, try Art Y 70-80% + zoom ~1.08.
-  "neon-stop-loss": { src: "/TCG/actionNeonStopLoss.webp", artFocus: "center 32%", artZoom: 1.0 },
+  "neon-stop-loss": { src: "/TCG/actionNeonStopLoss.webp", artFocus: "center 32%", artZoom: 1.0, fx: ["Abstract 7"], fxBlend: "plus-lighter" },
   // guide: if the "!" clips under the name bar, go to 32%.
-  "insider-ping": { src: "/TCG/actionInsiderPing.webp", artFocus: "center 30%", artZoom: 1.0 },
+  "insider-ping": { src: "/TCG/actionInsiderPing.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Thunder 4"] },
   // The set's only Terminal Foil — FOIL_BY_RARITY maps that rarity to the
   // `radiant` foil style, so this is the one card that ships with it.
-  "terminal-foil-moment": { src: "/TCG/actionTerminalFoil.webp", artFocus: "center 31%", artZoom: 1.0 },
+  "terminal-foil-moment": { src: "/TCG/actionTerminalFoil.webp", artFocus: "center 31%", artZoom: 1.0, fx: ["Rainbow 1"] },
 };
 
 // Set mark printed on every Genesis card, the way a TCG prints its set logo
@@ -113,6 +115,12 @@ export function toTemplateCard(card) {
     // collection grid and the template all get it without extra wiring.
     frameImage: frameForRarity(card.rarity),
     frameMetaTop: metaTopForFrame(frameForRarity(card.rarity)),
+    // Per-card FX overlays, wired by label in CARD_ART (`fx: ["Thunder 2"]`).
+    // Max 3, composited over art AND frame. Blend/opacity are per-card because
+    // the same overlay needs a lighter hand on pale art than on dark art.
+    fxOverlays: fxSources(art.fx),
+    fxBlend: art.fxBlend || FX_BLEND_DEFAULT,
+    fxOpacity: art.fxOpacity ?? FX_OPACITY_DEFAULT,
     setBadge: art.setBadge === null ? null : SET_BADGE,
   };
 }

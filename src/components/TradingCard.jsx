@@ -578,7 +578,7 @@ const CARD_STYLES = `
     position: absolute;
     right: 2.2%;
     top: 30%;
-    width: 38%;
+    width: 33%;
     height: auto;
     z-index: 8;
     pointer-events: none;

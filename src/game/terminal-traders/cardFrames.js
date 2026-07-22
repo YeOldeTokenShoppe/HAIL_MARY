@@ -74,3 +74,36 @@ export const FX_OVERLAYS = [
 // screen/plus-lighter suit the glow-on-dark art; normal is there for the
 // opaque-ish ones (rock, dark) that are meant to sit ON the card, not in it.
 export const FX_BLEND_MODES = ["screen", "plus-lighter", "overlay", "soft-light", "normal"];
+
+// FX sit ON the art at normal blend / full opacity by default (2026-07-21):
+// the overlays carry their own alpha, so they composite as painted. A card
+// opts into a lighter glow-blend (screen / plus-lighter) per entry in CARD_ART
+// only where the effect is meant to read *through* the art rather than over it.
+export const FX_BLEND_DEFAULT = "normal";
+export const FX_OPACITY_DEFAULT = 1.0;
+
+// Cards wire their FX by label ("Thunder 2"), not by filename, so CARD_ART
+// reads like the picker in /card-template. Ids stay accepted so a raw
+// filename still resolves.
+const FX_BY_KEY = Object.fromEntries(
+  FX_OVERLAYS.flatMap((f) => [
+    [f.id, f],
+    [f.label.toLowerCase(), f],
+  ])
+);
+
+export function fxSrc(nameOrId) {
+  if (!nameOrId) return null;
+  const hit = FX_BY_KEY[String(nameOrId).trim().toLowerCase()] || FX_BY_KEY[nameOrId];
+  return hit?.src || null;
+}
+
+// Unknown names drop out rather than rendering a 404 layer — a typo in
+// CARD_ART should cost the effect, not break the card.
+export function fxSources(list) {
+  if (!list) return [];
+  return (Array.isArray(list) ? list : [list])
+    .map(fxSrc)
+    .filter(Boolean)
+    .slice(0, MAX_FX);
+}
