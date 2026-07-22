@@ -600,8 +600,8 @@ in cards.js is a rogues gallery already named and waiting for bodies.*
 
 1. **Rugula** — done (Rug Warning). Canon reference for the species.
 2. **The Siren** — next; the coin is already in the set, already named,
-   and it's the textbook (`ponzi-siren`, flavor: "Paid the first pew with
-   the last pew's tithe"). Rare-quality iteration budget.
+   and it's the textbook (`ponzi-siren`, flavor: "Paid from the door,
+   not the vault"). Rare-quality iteration budget.
 3. **Shillbird + Gasper** — attach to existing coins (Bullish Ink,
    GoblinGas) whenever those coins enter the art queue.
 4. Remaining rogues land with their patterns as the coin run progresses;
@@ -802,8 +802,8 @@ Rollout order
 
 Rugula — done (Rug Warning). Canon reference for the species.
 The Siren — next; the coin is already in the set, already named,
-and it's the textbook (ponzi-siren, flavor: "Paid the first pew with
-the last pew's tithe"). Rare-quality iteration budget.
+and it's the textbook (ponzi-siren, flavor: "Paid from the door,
+not the vault"). Rare-quality iteration budget.
 Shillbird + Gasper — attach to existing coins (Bullish Ink,
 GoblinGas) whenever those coins enter the art queue.
 Remaining rogues land with their patterns as the coin run progresses;
@@ -819,3 +819,431 @@ illustration, cel-shaded, bold linework, saturated colors: [BODY-IS-THE-
 CRIME design], huge gold grin, caught mid-[CRIME], [TELL] visible,
 [SIGNATURE COLOR] + gold palette, glossy toy-like look, playful villain
 energy, no text, upper-weighted composition, original character design."
+
+---
+
+# Batch 2 — The Coin Dozen (briefs 13–24)
+
+*Queued 2026-07-21, the day the First Twelve closed. The coin run opens:
+all seven starter-collection coins (the cards every new player actually
+holds), six rogue debuts (executing Rollout steps 2–4 of the addendum
+above), and two legit showpieces. Style bible, template geometry, and
+prompt-craft notes from the First Twelve apply unchanged.*
+
+*Anchor images to feed the generator: `coinCard_MoonPony.webp` for the
+legit coins, `actionRugWarning.webp` for the rogues (add
+`actionCard_PumpSignal.webp` when a brief calls for sticker-bubble
+language). MoonPony and Rugula already ARE the two coin voices — the
+briefs below describe them in words.*
+
+## Coin-card grammar (applies to all twelve)
+
+- **Two species of coin art.** A coin with a crooked `caseRef` is a
+  wanted poster: its rogue caught mid-crime, doing exactly what the
+  dossier note describes. A legit coin is a heroic artifact or landscape
+  of the token's world — no villains ever (scarcity keeps the rogues
+  special; addendum §"Where villains live").
+- **The dossier note is the shot list.** Every coin's one-line `caseRef`
+  note (cards.js) names the image. "Drained day 40" and "the crowd ran
+  out of quarters" are stage directions, not flavor.
+- **What MoonPony teaches** (the legit-coin proof): one adorable subject
+  filling the upper half, mid-action, glossy toy highlights; the
+  background is *populated* cosmos (nebula clouds, star-sparkles, a prop
+  with a joke in it — the moon is cratered like cheese), not a void; the
+  bottom third quiets to gradient for the text boxes.
+- **What Rug Warning teaches** (the rogue proof): the villain acts in a
+  BRIGHT jewel-toned scene, mid-idiom, monocle-popping delight; the tell
+  (fingerprints) glows right where the crime touches the world; the
+  background sells the setting (gem towers, glowing exit door) without
+  crowding the act.
+- **Rarity ladder unchanged:** commons one clear idea · uncommons one
+  idea + one flourish · rares a cinematic-but-bright light moment with a
+  clean diagonal for the "v" foil.
+
+---
+
+## 13. PONZI SIREN — coin · meme · common · rug (yield-mirage) · THE SIREN debut ★
+
+**The idea.** Her card IS her (addendum canon). The Siren mid-performance:
+a glamorous mermaid diva singing into a vintage gold microphone atop an
+open vault door — and her tail is a sparkling waterfall of gold coins
+flowing *upward*, the payout that defies gravity. Behind her, the vault
+she performs on stands wide open and brightly, beautifully EMPTY. Paid
+from the door, not the vault.
+
+**Focal.** Her face and the mic at ~30% from top; the upward coin-tail
+carries the eye down through center; empty vault shelves glow behind.
+Bottom third: stage floor, a few stray coins, calm gradient (text-safe).
+
+**Tell.** The 12-day hourglass, nearly empty, glinting at the stage edge.
+
+**Palette.** Sea-teal + gold (her signature) on warm plum stage light —
+the meme-station ground. Sparkles everywhere; zero gloom.
+
+**Mood.** The best show in town, and the viewer has already spotted the
+trick. Sly wink, huge charming grin — beautiful from the front.
+
+**Avoid.** Disney-mermaid silhouette (original design only), spooky
+darkness, realistic anatomy, readable text on coins or marquee.
+
+**Iteration budget:** rare-grade takes even though the card is common —
+she is the second species anchor; every later rogue leans on her.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold clean
+linework and saturated colors: a glamorous cartoon mermaid siren with a
+sly wink and huge charming grin sings into a vintage gold microphone,
+her tail a glittering waterfall of gold coins flowing impossibly upward;
+she performs atop a big friendly vault door standing wide open to reveal
+brightly lit empty shelves; a nearly empty golden hourglass glints at
+the stage edge, sea-teal and gold palette on warm plum stage lighting,
+star sparkles, glossy toy-like look, playful villain energy, no text,
+upper-weighted composition, original character design.*
+
+**Take 1 wired (2026-07-21) — hourglass inpaint pending.** Wire:
+coinCard_PonziSiren at `artFocus: "center 33%", artZoom: 1.0`. Two
+generator upgrades canonized: the single fang that shows only when she
+winks (the predator tell under the charm), and the outstretched hand
+recruiting the VIEWER — the card seats you in the next pew. The scales-
+becoming-coins transition on the lower tail satisfies body-is-the-crime.
+Pending fix: the hourglass landed at ~83% frame height, inside the text
+zone — inpaint it up onto the vault ledge (~40%) and re-export, keeping
+the sand in the BOTTOM bulb (day 12 nearly up). Happy geometry accident:
+the stage-floor coin pool also sits below the crop, so in the card
+window the coins read as arcing upward, as designed. Her gallery slot at
+/card-template is LIT (rogues.js status flipped). She is now the second
+species anchor — feed her with Rug Warning for every rogue that follows.
+
+---
+
+## 14. BULLISH INK — coin · hype · common · zombie (celeb-shill) · SHILLBIRD debut
+
+**The idea.** "Signed by every influencer of the season. The ink outlived
+the signatures." Shillbird mid-squawk: the gilded parrot in tiny designer
+sunglasses perched on a big megaphone, a gold coin dropping into the
+coin-slot on its back, emoji-style hype stickers spraying from its beak
+(Pump Signal's bubble language — feed that card as reference). Behind it,
+a poster wall of autograph scribble-glyphs *fading to ghosts* — the ink
+outliving the signatures. Tell: one small glowing invoice slip pinned
+among them. Hot pink + gold on plum. Mood: it says whatever was last
+deposited, and it's delighted about it. Avoid: readable words in bubbles
+or autographs, real logos, gloom.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a gilded cartoon parrot wearing tiny designer
+sunglasses perches on a huge megaphone, a gold coin dropping into a
+coin-slot on its back, colorful emoji-style hype sticker speech bubbles
+bursting from its beak; behind it a poster wall of fading autograph
+scribbles with one small glowing invoice slip pinned up, hot pink and
+gold palette on plum, bright bounce lighting, glossy toy-like look,
+mischievous fun mood, no readable text, upper-weighted composition,
+original character design.*
+
+**APPROVED — take 1 (2026-07-21).** Wire: coinCard_BullishInk at
+`artFocus: "center 30%", artZoom: 1.0`. The core gag lands in one frame:
+coin mid-drop into the back slot WHILE the sticker burst leaves the beak
+— pay-in and pay-out simultaneous, no caption needed. Canonized from the
+take: the shades sit cocked so ONE big drawn eye shows (more acting
+range than opaque lenses — keep this on every future appearance), and
+the little gold sparkle-jet where the coin enters the slot. The invoice
+tell pinned at ~40–52% height sits safely inside the art window — the
+Siren's hourglass lesson, learned. His Demon Desk cameo (Barron's
+tuition) is now unblocked for the desk-coin session.
+
+---
+
+## 15. GOBLINGAS — coin · meme · common · zombie (hype-fizzle) · GASPER debut
+
+**The idea.** "The joke got old before the liquidity did." Gasper: a
+goblin-shaped balloon at 60% inflation, proudly holding a ta-da pose on
+a little launch-party stage while visibly deflating from one tiny untied
+knot — the slow hiss drawn as tiny musical notes escaping (his tell).
+Around him: confetti settling on an empty party table, drooping bunting
+(shapes, no letters), one sagging balloon-weight. Nobody came. Swamp
+green + party gold on warm plum. Mood: pride and physics, both funny and
+a little poignant — the set's gentlest villain. Avoid: menace, actual
+sadness-gloom (the scene stays bright), readable banner text.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a cute goblin-shaped balloon character at
+sixty-percent inflation proudly striking a ta-da pose on a small party
+stage while visibly deflating from a tiny untied knot, the escaping hiss
+drawn as tiny musical notes; confetti settling on an empty party table,
+drooping colorful bunting, one sagging balloon weight, swamp green and
+gold palette on warm plum, bright cheerful lighting, glossy toy-like
+look, comic bittersweet mood, no text, upper-weighted composition,
+original character design.*
+
+---
+
+## 16. BLACKPALM — coin · defi · uncommon · rug (backdoor-fork) · FORKLOK debut
+
+**The idea.** "Forked a blue-chip vault and kept one key nobody audited."
+Forklok the vault-golem poses front-and-center like a product shot —
+sturdy, tidy, audit-badge gleaming, a little black palm-tree emblem on
+his chest (the coin's mark, glyph only). The uncommon flourish is the
+reveal: a mirror on the wall behind him shows his back — a tiny gold
+door slightly ajar, key on a chain he pretends isn't there, a thin
+trickle of coins leaking out. Drained day 40, visible only in the
+mirror. Steel blue + gold on indigo. Mood: trust me / don't. Optional
+easter egg (he shares this coin with Rugula's haunts): one faint glowing
+fingerprint whorl on the vault frame — keep it subtle or drop it.
+Avoid: readable audit text, actual ETH/brand marks, gloom.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a sturdy trustworthy-looking little vault golem
+robot with a gleaming tidy front and a small black palm tree emblem
+poses proudly like a product photo; in a decorative mirror behind him
+his back is revealed — a tiny golden door slightly ajar with a key on a
+chain and a thin trickle of gold coins leaking out; steel blue and gold
+palette on rich indigo, bright showroom lighting, glossy toy-like look,
+sly caught-in-the-act comedy, no text, upper-weighted composition,
+original character design.*
+
+---
+
+## 17. VAPORWAREX — coin · hype · common · rug (slick-but-broken) · VAPORINA debut
+
+**The idea.** "The demo was a video. The video was the product." Vaporina
+mid-runway-pose on a demo-day stage: her front half dazzling, fully
+rendered, beaming — and from the stage side the truth reads: her back
+half is unshaded wireframe, propped up by a single wooden clothespin.
+Beside her hovers a big holographic play-button looping the same three
+seconds (her tell — a circular arrow with three tick-sparkles).
+Iridescent magenta + gold on plum, spotlight-bright. Mood: the pitch of
+the century, held together by one clothespin. Avoid: readable UI text,
+idol-mascot lookalikes, darkness backstage (the reveal stays lit).
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a dazzling holographic diva character strikes a
+glamorous pose on a bright demo stage, her front half gorgeously
+rendered while her visible back half is plain glowing wireframe held up
+by a single wooden clothespin; a large holographic play button with a
+circular loop arrow hovers beside her, iridescent magenta and gold
+palette on plum, bright spotlight staging, glossy toy-like look, playful
+showbiz-scam energy, no text, upper-weighted composition, original
+character design.*
+
+---
+
+## 18. LUCKY CAPSULE — coin · pattern · uncommon · zombie (meme-mania) · FOMOGRE debut
+
+**The idea.** "Every capsule a coin flip. The crowd ran out of quarters."
+Fomogre at full sprint: a big friendly ogre built entirely of stacked
+glossy green candlestick blocks, charging with enormous joyful urgency
+through a pastel arcade of gachapon capsule machines toward the next
+glowing machine — while behind him his own trailing blocks have turned
+red and crumble away (his tell: he can never stop running). The machines
+he's passed sit with empty coin trays; one tipped-over quarter cup.
+Candle green/red split on Eugene-violet ground with pink capsule pops.
+Uncommon flourish: the crumbling red trail. Mood: momentum as a
+character. Avoid: menace, exhaustion (he's having a great time), any
+readable machine labels.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a big friendly ogre built entirely of stacked
+glossy green candlestick chart blocks sprints with joyful urgency
+through a pastel arcade of cute capsule-toy machines toward a glowing
+one ahead, while the candle blocks trailing behind him turn red and
+crumble into a fading trail; passed machines with empty coin trays and
+one tipped-over cup of quarters, candle green and red on a saturated
+violet arcade with pink pops, bright energetic lighting, glossy toy-like
+look, comic unstoppable-momentum mood, no text, upper-weighted
+composition, original character design.*
+
+---
+
+## 19. TERMINALETH — coin · bluechip · uncommon · legit (doxxed-clean)
+
+**The idea.** "Dull as scripture, solvent as sin" — monumental boredom
+made holy. The Terminal's reserve chapel: a massive chunky rounded
+gem-ingot (abstract — NOT the Ethereum logo) resting on a stone altar,
+polished daily by one small monk-bot with a cloth, votive candles in
+perfectly tidy rows, chain-link garlands. The uncommon flourish: through
+a round window behind the altar, a candy-neon market storm rages —
+inside, nothing moves. Mint + cream on deep teal. Mood: unshakeable;
+the joke is how uneventful it is. Mascot rule: NO face on the ingot —
+the monk-bot carries all the charm. Avoid: ETH logos, drama inside the
+chapel, black shadows.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a massive smooth rounded mint-glowing gem ingot
+rests on a stone altar in a serene bright chapel, a small cute robed
+robot monk polishing it with a cloth; tidy rows of votive candles and
+chain-link garlands, and through a round window behind the altar a wild
+colorful neon market storm rages outside while the chapel stays
+perfectly calm; mint and cream palette on deep teal, soft sacred
+lighting with bright candle glow, glossy toy-like look, serene steadfast
+mood, no face on the ingot, no text, upper-weighted composition.*
+
+---
+
+## 20. CANDLE INDEX — coin · analysis · common · legit (infra-grind)
+
+**The idea.** "An index of every wick since genesis. Boring, priceless."
+The great wick archive: one wall of a cozy, vast library where the
+shelves hold rows of tiny votive candles — flames alternating green and
+red like an index of every candle ever printed — with a rolling ladder,
+card-catalog drawers labeled in scribble-glyphs, and a librarian's desk
+loupe catching the glow (Marisol's world). One clear idea: the shelf
+wall. Gold on indigo. Mood: cheerful, meticulous, infinite. Mascot rule:
+the candles stay faceless (protected object, same ruling as Candle
+Vigil). Avoid: horror-library gloom, readable labels, wax mess — this
+archive is TIDY.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a cozy vast library wall whose shelves hold
+hundreds of tiny tidy votive candles with small flames alternating green
+and red like a living index, a wooden rolling ladder leaning against the
+shelves, card-catalog drawers with cheerful scribble glyph labels, a
+brass magnifying loupe on a librarian desk catching golden light;
+saturated gold and indigo palette, warm bright candle glow, glossy
+toy-like look, cheerful meticulous mood, no faces on the candles, no
+text, upper-weighted composition.*
+
+---
+
+## 21. ZERO CHOIR — coin · infra · common · legit (stealth-launch)
+
+**The idea.** "Launched silent as a vow; found by archaeologists, priced
+by believers." A just-unearthed crypt-chapel: a semicircle choir of
+small hooded robed figures whose ring-shaped bodies are literal zeros,
+glowing soft mint, singing in perfect silence — their song drawn as
+musical REST symbols floating up like incense (silence, notated). At the
+frame's lower edge: the archaeologist's lantern and brush where the dig
+broke through, dust motes sparkling in the beam. Mint + cream on deep
+teal. Mood: hushed wonder — the discovery moment. Avoid: spooky crypt
+gloom (this is a warm reveal), skeletons, readable inscriptions.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: inside a freshly unearthed glowing crypt chapel, a
+semicircle choir of small hooded robed figures with ring-shaped bodies
+like living zeros sing in silence, their song drawn as delicate musical
+rest symbols floating upward like incense; a warm archaeologist lantern
+and brush at the dig opening in the lower foreground, sparkling dust
+motes in the light beam, mint and cream palette on deep teal, soft
+wondrous lighting, glossy toy-like look, hushed discovery mood, no
+text, upper-weighted composition.*
+
+---
+
+## 22. VOTIVE CHAIN — coin · infra · common · legit (stealth-launch)
+
+**The idea.** "A chain of lit candles — proof-of-prayer, oddly durable."
+Single-object charm, Candle Vigil's calm cousin: a chunky chain whose
+every link cradles a lit votive candle, draped in a gentle curve across
+the frame and receding over a soft hill of the Terminal's landscape —
+every flame steady, one link mid-ignition glowing brighter (the new
+block). Mint + cream with amber flame pops on twilight teal. Mood:
+serene, processional, durable. Differentiation (three candle cards now
+exist): Vigil = one lantern in a red storm · Index = candle shelves
+indoors · Votive Chain = an outdoor chain of candle-links. Keep them
+unmistakable. Mascot rule: no faces on candles. Avoid: wind, drama,
+darkness — nothing threatens this chain.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a chunky golden chain whose every link cradles a
+small lit votive candle drapes in a gentle curve across the frame and
+recedes over a soft rolling hill into a glowing horizon, every flame
+calm and steady, one link glowing brighter as its candle ignites; mint
+and cream palette with warm amber flames on a bright twilight teal
+landscape, soft serene lighting, glossy toy-like look, peaceful durable
+mood, no faces on the candles, no text, upper-weighted composition.*
+
+---
+
+## 23. CHAINSERAPH — coin · infra · rare · legit (infra-grind)
+
+**The idea.** "Six angels of uptime. The bridge that never made headlines
+because it never broke." The rare's cinematic-but-bright moment: a
+glowing light-bridge runs a clean diagonal between two terminal spires
+(that diagonal is the "v" foil's runway — keep it uncluttered), tended
+by six small seraph-bots with chain-link halos and cream wings, each
+calmly maintaining a segment while tiny light-packets stream across
+without incident. Focal: the central seraph where the beams meet, ~30%
+from top, slightly left. Mint beam + cream wings on deep teal sky with
+star-sparkles. Mood: quiet competence as glory. Count check: approve
+only if the seraphs read as SIX (generators miscount — retake, don't
+shrug). Avoid: battle drama, storm clouds, harp-and-toga angel clichés
+(these are bots), readable signage.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a luminous mint light-bridge runs a clean diagonal
+between two colorful terminal spires in a bright starry teal sky, tended
+by six small cute robot seraphs with glowing chain-link halos and chunky
+cream wings, each calmly maintaining its own segment as tiny light
+packets stream safely across; sparkles and soft prism haze, saturated
+mint and cream palette on deep teal, dramatic but bright staging, glossy
+toy-like look, serene heroic mood, no text, upper-weighted composition.*
+
+---
+
+## 24. LIQUID SAINT — coin · bluechip · uncommon · legit (redemption-arc)
+
+**The idea.** "Depegged once in the great cascade; recollateralized and
+canonized." Kintsugi canonization: a chunky stained-glass-style saint
+statue holding a coin-vessel, visibly shattered once and rejoined with
+glowing gold seams — the crack-lines now the most beautiful thing on it.
+The uncommon flourish: the final seam is still flowing, liquid gold
+climbing to complete the repair mid-frame, while a halo ring snaps into
+place above with a sparkle. Cream + gold with mint accents in soft
+indigo chapel light. Mood: the scar is the sanctity. Face note: a serene
+sculpted statue face is sculpture, not a mascot face — allowed; keep the
+eyes gently closed. Avoid: gore-adjacent cracking, gloom, weeping —
+this is triumph, not tragedy; no readable inscriptions.
+
+**Prompt seed.** *Vibrant TCG illustration, cel-shaded with bold linework
+and saturated colors: a chunky stained-glass style saint statue with a
+serene closed-eyed sculpted face holds a rounded coin vessel, its body
+visibly once-shattered and rejoined by glowing golden kintsugi seams;
+the last seam still flowing as bright liquid gold climbs to complete the
+repair, a golden halo ring snapping into place above with a sparkle
+burst; cream and gold palette with soft mint accents in warm indigo
+chapel light, bright reverent staging, glossy toy-like look, triumphant
+redemption mood, no text, upper-weighted composition.*
+
+---
+
+## Batch 2 notes
+
+- **Order of attack.** The Siren FIRST, with rare-grade iteration budget
+  — she joins Rugula as species anchor for every rogue after her. Then
+  the other five rogues in one stretch (anchor each on Rug Warning +
+  Siren + that coin's palette). Then the six legit coins in one session
+  anchored on MoonPony. Same seed/style-reference discipline as the lens
+  key family.
+- **Rogue debuts double as gallery reveals.** When a rogue coin is
+  approved and wired, flip that rogue's `status` to `"debuted"` in
+  rogues.js — their silhouette slot at /card-template lights up. That's
+  the whole ceremony; don't forget it.
+- **No new equines.** MoonPony owns the pony silhouette and Eugene's
+  trader card owns the unicorn. Nothing in this batch grows hooves.
+- **Three candle cards now exist** (Vigil / Index / Votive Chain) — the
+  differentiation note in brief 22 is load-bearing; check the three side
+  by side in the binder before approving either newcomer.
+- **Wiring ritual per approval:** encode webp (q86, effort 6, from the
+  full-res master), add the `CARD_ART` entry (`src`, `artFocus`,
+  `artZoom`, `fx`), preview at /card-template with the rarity's foil,
+  then record the wiring values in the status table below.
+
+## Batch 2 status
+
+| Card | Rogue | Status | artFocus |
+|---|---|---|---|
+| Ponzi Siren | The Siren ★ debut | take 1 wired — hourglass inpaint pending | center 33% |
+| Bullish Ink | Shillbird debut | APPROVED take 1 + wired | center 30% |
+| GoblinGas | Gasper debut | queued | — |
+| BlackPalm | Forklok debut | queued | — |
+| VaporwareX | Vaporina debut | queued | — |
+| Lucky Capsule | Fomogre debut | queued | — |
+| TerminalETH | — | queued | — |
+| Candle Index | — | queued | — |
+| Zero Choir | — | queued | — |
+| Votive Chain | — | queued | — |
+| ChainSeraph | — | queued | — |
+| Liquid Saint | — | queued | — |
+
+*Held for later batches: the four desk-community coins (Halo Protocol,
+MarisolCoin, Demon Desk, Neon Oracle) as their own family session;
+market cameos once each rogue's look is locked; Genesis Terminal and
+Our Lady RL80 — the set's two remaining terminal foils — for the
+finale, same as Terminal Foil Moment closed the First Twelve.*

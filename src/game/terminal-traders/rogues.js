@@ -40,7 +40,7 @@ export const ROGUES = [
     name: "The Siren",
     pattern: "yield-mirage",
     signatureColor: "#1fb8a6", // sea-teal (+ gold)
-    status: "pending",
+    status: "debuted",
     debutCardId: "ponzi-siren",
     hauntCardIds: ["volatility-mass"],
   },
@@ -67,7 +67,7 @@ export const ROGUES = [
     name: "Shillbird",
     pattern: "celeb-shill",
     signatureColor: "#ff69b4", // hot pink (+ gold)
-    status: "pending",
+    status: "debuted",
     debutCardId: "bullish-ink",
     hauntCardIds: ["demon-desk", "influencer-eclipse"],
   },

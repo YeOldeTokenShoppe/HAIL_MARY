@@ -157,7 +157,10 @@ export const COIN_CARDS = [
   coin("zero-choir", "Zero Choir", "ZCHO", "infra", RARITIES.COMMON, 5, 7, 2,
     caseRef("legit", "stealth-launch", "Launched silent as a vow; found by archaeologists, priced by believers.")),
   coin("ponzi-siren", "Ponzi Siren", "SIREN", "meme", RARITIES.COMMON, 3, 6, 7,
-    caseRef("rug", "yield-mirage", "The textbook. Paid the first pew with the last pew's tithe. Day 12.")),
+    // Flavor settled 2026-07-21 (placeholder-grade, revisit welcome): echoes
+    // the yield-mirage pattern line on purpose — it's also literally the
+    // debut art (open empty vault, her beckoning at the door).
+    caseRef("rug", "yield-mirage", "The textbook. Paid from the door, not the vault. Day 12.")),
   coin("altar-swap", "AltarSwap", "ALTAR", "defi", RARITIES.UNCOMMON, 6, 9, 3,
     caseRef("legit", "anon-but-real", "The swap desk of the temple — anonymous priests, immaculate pools.")),
   coin("midnight-base", "Midnight Base", "MBASE", "bluechip", RARITIES.RARE, 9, 12, 1,

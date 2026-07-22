@@ -24,6 +24,15 @@ export const CARD_ART = {
   // with the old baked-in frame/text removed, so they crop like every other
   // Genesis card now — artZoom 1.0, no hard zoom into a print card.
   "moonpony": { src: "/TCG/coinCard_MoonPony.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Rainbow 1", "Rainbow 3", "Rainbow 4"] },
+  // The Siren's debut (Batch 2 take 1, 2026-07-21). Take 1 ships with the
+  // hourglass tell at ~83% frame height (under the ability box) — inpaint
+  // pending; the crop also hides the floor coin pool, so the tail's coins
+  // read as flowing UP, as designed.
+  "ponzi-siren": { src: "/TCG/coinCard_PonziSiren.webp", artFocus: "center 33%", artZoom: 1.0, fx: ["Rainbow 1"] },
+  // Shillbird's debut (Batch 2 take 1, 2026-07-21): coin mid-drop into the
+  // back slot + squawk mid-burst = pay-in and pay-out in one frame. Invoice
+  // tell sits ~40-52% height — safely inside the art window.
+  "bullish-ink": { src: "/TCG/coinCard_BullishInk.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Sparkle"] },
   "pump-signal": { src: "/TCG/actionCard_PumpSignal.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Sparkle"] },
   // artFocus values come from the art-run status table in design_guide.md
   // ("Art run status", §First Twelve) — that table is the source of truth,
@@ -37,7 +46,7 @@ export const CARD_ART = {
   // guide: protect the ball's crown.
   "mempool-prophecy": { src: "/TCG/actionMempoolProphecy.webp", artFocus: "center 33%", artZoom: 1.0, fx: ["Abstract 5"], fxBlend: "screen" },
   // abilityTone orange: the ice-vault art is cyan end to end.
-  "cold-wallet": { src: "/TCG/actionColdWallet.webp", artFocus: "center 34%", artZoom: 1.0, abilityTone: "orange", fx: ["Rainbow 1"] },
+  "cold-wallet": { src: "/TCG/actionColdWallet.webp", artFocus: "center 34%", artZoom: 1.0, abilityTone: "orange", fx: ["Ice"], fxBlend: "screen" },
   "chart-exorcism": { src: "/TCG/actionChartExorcism.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Dark"] },
   // guide: 36% so the V foil lines up with the beam-X.
   "oracle-crosscheck": { src: "/TCG/actionOracleCrosscheck.webp", artFocus: "center 36%", artZoom: 1.0, fx: ["Thunder 4"], fxBlend: "screen" },
