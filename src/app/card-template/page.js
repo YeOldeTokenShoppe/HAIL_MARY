@@ -6,35 +6,14 @@ import { getCardById, GENESIS_SET, CARD_TYPES } from "@/game/terminal-traders/ca
 import { toTemplateCard, CARD_ART } from "@/game/terminal-traders/templateCard";
 import {
   FRAMES, FRAME_ID_BY_RARITY, FX_OVERLAYS, FX_BLEND_MODES, MAX_FX,
+  FX_BLEND_DEFAULT, FX_OPACITY_DEFAULT,
 } from "@/game/terminal-traders/cardFrames";
+import { ROGUES } from "@/game/terminal-traders/rogues";
 
-// Traders render straight from the engine, same as every other card. The
-// hand-authored EUGENE/SAINT/DEMON/MARISOL fixtures that used to live here
-// were retired 2026-07-21: they had drifted from cards.js (rarity "Legendary"
-// on two of them, which matches no frame; hand-typed editions; weakness /
-// resistance / pivotCost fields the engine does not carry).
-const TRADER_IDS = ["eugene", "john-barron", "gr80", "marisol"];
-
-// Real Action cards rendered through the game's own converter, so the preview
-// matches what the table shows (art comes from CARD_ART, keyed by card id).
-// Add a card id here once its art lands and it gets its own preview button.
-const ACTION_IDS = [
-  "audit-flare",
-  "forked-rumor",
-  "wallet-seance",
-  "mempool-prophecy",
-  "cold-wallet",
-  "chart-exorcism",
-  "oracle-crosscheck",
-  "rug-warning",
-  "candle-vigil",
-  "neon-stop-loss",
-  "insider-ping",
-  "terminal-foil-moment",
-];
-
-// The picker column, grouped by card type. `meta` is the small line under the
-// name; traders/actions print their rarity, so it reads the same as the card.
+// Every card renders straight from the engine through the game's own converter,
+// so the preview matches what the table shows (art comes from CARD_ART, keyed
+// by card id). `meta` is the small line under the name — each card prints its
+// rarity, so the picker reads the same as the card face.
 const pickerItems = (ids) =>
   ids.map((id) => {
     const card = toTemplateCard(getCardById(id));
@@ -48,9 +27,23 @@ const NO_ART = {
   edition: "demo",
 };
 
+// Card types in picker/binder order. Shared by the selection list and the
+// collection grid so both stay in the same order.
+const TYPE_ORDER = [
+  { type: CARD_TYPES.TRADER, title: "Traders" },
+  { type: CARD_TYPES.ACTION, title: "Actions" },
+  { type: CARD_TYPES.COIN, title: "Coins" },
+  { type: CARD_TYPES.MARKET, title: "Markets" },
+];
+
+// The picker lists every Genesis card, grouped by type, so any of the 80 can
+// be opened in the template — art-less cards preview frame-only. Art coverage
+// is tracked separately by the collection grid, not by what the picker shows.
 const CARD_GROUPS = [
-  { title: "Traders", items: pickerItems(TRADER_IDS) },
-  { title: "Actions", items: pickerItems(ACTION_IDS) },
+  ...TYPE_ORDER.map(({ type, title }) => ({
+    title,
+    items: pickerItems(GENESIS_SET.filter((card) => card.type === type).map((card) => card.id)),
+  })),
   {
     title: "Blank",
     items: [{ id: "noart", card: NO_ART, name: "No artwork", meta: "frame only" }],
@@ -69,14 +62,8 @@ const CARD_BY_ID = {
 
 // ── Collection grid ────────────────────────────────────────────────────────
 // The whole Genesis 80 as a binder page: art where it exists, an empty slot
-// outline where it doesn't, so art-run coverage reads at a glance.
-const TYPE_ORDER = [
-  { type: CARD_TYPES.TRADER, title: "Traders" },
-  { type: CARD_TYPES.ACTION, title: "Actions" },
-  { type: CARD_TYPES.COIN, title: "Coins" },
-  { type: CARD_TYPES.MARKET, title: "Markets" },
-];
-
+// outline where it doesn't, so art-run coverage reads at a glance. Uses the
+// same TYPE_ORDER as the picker so the two stay in step.
 const COLLECTION = TYPE_ORDER.map(({ type, title }) => {
   const cards = GENESIS_SET.filter((card) => card.type === type).map((card) => ({
     id: card.id,
@@ -95,19 +82,31 @@ const THUMB_SCALE = 0.2;
 
 const TOTAL_WIRED = COLLECTION.reduce((n, g) => n + g.wired, 0);
 
+// ── Rogues gallery ─────────────────────────────────────────────────────────
+// A cross-cutting index by character, never a fifth card type: every rogue's
+// card already lives in a type group above, so this section double-lists but
+// never double-counts — TOTAL_WIRED stays pure type math. A debuted rogue's
+// slot shows their debut card; a pending rogue's slot is a silhouette
+// (dark shape, signature-color glow, "???") waiting for its reveal.
+const ROGUE_ENTRIES = ROGUES.map((rogue) => {
+  const debutCard = rogue.debutCardId ? getCardById(rogue.debutCardId) : null;
+  return { ...rogue, debutCard, template: debutCard ? CARD_BY_ID[rogue.debutCardId] : null };
+});
+
+const ROGUES_DEBUTED = ROGUE_ENTRIES.filter((r) => r.status === "debuted").length;
+
 export default function CardTemplatePage() {
   const [scale, setScale] = useState(0.75);
   const [active, setActive] = useState("eugene");
   const [artFocusY, setArtFocusY] = useState(28);
   const [artZoom, setArtZoom] = useState(1.25);
   const [foilStyle, setFoilStyle] = useState("hero");
-  const [templateStyle, setTemplateStyle] = useState("terminal");
   const [view, setView] = useState("single");
   // null = follow the card's rarity; a frame id pins an override for preview.
   const [frameOverride, setFrameOverride] = useState(null);
   const [fxPicks, setFxPicks] = useState([]);
-  const [fxBlend, setFxBlend] = useState("screen");
-  const [fxOpacity, setFxOpacity] = useState(0.55);
+  const [fxBlend, setFxBlend] = useState(FX_BLEND_DEFAULT);
+  const [fxOpacity, setFxOpacity] = useState(FX_OPACITY_DEFAULT);
 
   const toggleFx = (src) =>
     setFxPicks((picks) =>
@@ -135,6 +134,12 @@ export default function CardTemplatePage() {
     setArtFocusY(focus ? parseFloat(focus[1]) : 28);
     setArtZoom(base.artZoom || 1.2);
     if (base.foilStyle) setFoilStyle(base.foilStyle);
+    // Same reason as foil: the FX picker opens on whatever the card has
+    // wired in CARD_ART, so the preview matches the printed card and the
+    // chips show which overlays are already permanent.
+    setFxPicks(base.fxOverlays || []);
+    setFxBlend(base.fxBlend || FX_BLEND_DEFAULT);
+    setFxOpacity(base.fxOpacity ?? FX_OPACITY_DEFAULT);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
   const card = {
@@ -234,7 +239,7 @@ export default function CardTemplatePage() {
                           data={slot.template}
                           scale={THUMB_SCALE}
                           interactive={false}
-                          templateStyle={templateStyle}
+                          templateStyle="terminal"
                         />
                       ) : (
                         <span className="ct-slot-pending" aria-hidden>+</span>
@@ -247,6 +252,51 @@ export default function CardTemplatePage() {
               </div>
             </div>
           ))}
+
+          <div className="ct-binder-group">
+            <p className="ct-binder-title">
+              Rogues Gallery
+              <span>{ROGUES_DEBUTED}/{ROGUE_ENTRIES.length}</span>
+            </p>
+            <div className="ct-binder">
+              {ROGUE_ENTRIES.map((rogue) =>
+                rogue.status === "debuted" ? (
+                  <button
+                    key={rogue.id}
+                    className="ct-slot"
+                    style={{ "--slot-accent": rogue.signatureColor }}
+                    onClick={() => { setActive(rogue.debutCardId); setView("single"); }}
+                    title={`${rogue.name} — debuts in ${rogue.debutCard.name}`}
+                  >
+                    <span className="ct-slot-art">
+                      <TradingCard
+                        data={rogue.template}
+                        scale={THUMB_SCALE}
+                        interactive={false}
+                        templateStyle="terminal"
+                      />
+                    </span>
+                    <span className="ct-slot-name">{rogue.name}</span>
+                    <span className="ct-slot-rarity">{rogue.debutCard.name}</span>
+                  </button>
+                ) : (
+                  <div
+                    key={rogue.id}
+                    className="ct-slot ct-slot--rogue-pending"
+                    style={{ "--rogue-glow": rogue.signatureColor }}
+                    title={`${rogue.name} — not yet debuted`}
+                  >
+                    <span className="ct-slot-art">
+                      <span className="ct-rogue-shape" aria-hidden />
+                      <span className="ct-rogue-mystery" aria-hidden>???</span>
+                    </span>
+                    <span className="ct-slot-name">???</span>
+                    <span className="ct-slot-rarity">pending</span>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
         </section>
       )}
 
@@ -254,52 +304,67 @@ export default function CardTemplatePage() {
         <aside className="ct-column ct-picker">
           <p className="ct-column-title">Cards</p>
           {CARD_GROUPS.map((group) => (
-            <div className="ct-group" key={group.title}>
-              <p className="ct-group-title">{group.title}</p>
-              <div className="ct-card-list">
-                {group.items.map((item) => (
-                  <button
-                    key={item.id}
-                    className={`ct-card-btn${active === item.id ? " is-active" : ""}`}
-                    aria-pressed={active === item.id}
-                    onClick={() => setActive(item.id)}
-                  >
-                    <span className="ct-card-name">{item.name || item.card.name}</span>
-                    <span className="ct-card-meta">{item.meta}</span>
-                  </button>
-                ))}
+            <React.Fragment key={group.title}>
+              {/* Rogues sit below the type groups, above the Blank utility —
+                  pure navigation into cards the groups above already list. */}
+              {group.title === "Blank" && (
+                <div className="ct-group">
+                  <p className="ct-group-title">Rogues</p>
+                  <div className="ct-card-list">
+                    {ROGUE_ENTRIES.map((rogue) => (
+                      <button
+                        key={rogue.id}
+                        className={`ct-card-btn${rogue.debutCardId && active === rogue.debutCardId ? " is-active" : ""}`}
+                        aria-pressed={Boolean(rogue.debutCardId) && active === rogue.debutCardId}
+                        disabled={!rogue.debutCardId}
+                        onClick={() => rogue.debutCardId && setActive(rogue.debutCardId)}
+                        title={
+                          rogue.debutCardId
+                            ? `${rogue.name} — open ${rogue.debutCard.name}`
+                            : `${rogue.name} — no debut card in the set yet`
+                        }
+                      >
+                        <span className="ct-card-name" style={{ color: rogue.signatureColor }}>
+                          {rogue.name}
+                        </span>
+                        <span className="ct-card-meta">
+                          {rogue.status === "debuted"
+                            ? `debuts in ${rogue.debutCard.name}`
+                            : rogue.debutCard
+                              ? `pending · ${rogue.debutCard.name}`
+                              : "pending"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="ct-group">
+                <p className="ct-group-title">{group.title}</p>
+                <div className="ct-card-list">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      className={`ct-card-btn${active === item.id ? " is-active" : ""}`}
+                      aria-pressed={active === item.id}
+                      onClick={() => setActive(item.id)}
+                    >
+                      <span className="ct-card-name">{item.name || item.card.name}</span>
+                      <span className="ct-card-meta">{item.meta}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            </React.Fragment>
           ))}
         </aside>
 
         <section className="ct-stage">
-          <TradingCard data={card} scale={scale} templateStyle={templateStyle} />
+          <TradingCard data={card} scale={scale} templateStyle="terminal" />
         </section>
 
         <aside className="ct-column ct-effects">
           <p className="ct-column-title">Effects</p>
-
-          <div className="ct-group">
-            <p className="ct-group-title">Template</p>
-            <div className="ct-seg" role="radiogroup" aria-label="Template style">
-              {[
-                { id: "terminal", label: "Terminal" },
-                { id: "classic", label: "Classic" },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  role="radio"
-                  aria-checked={templateStyle === t.id}
-                  className={templateStyle === t.id ? "is-active" : ""}
-                  onClick={() => setTemplateStyle(t.id)}
-                  title={`Template: ${t.label}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div className="ct-group">
             <p className="ct-group-title">Foil</p>
@@ -709,6 +774,51 @@ const PAGE_STYLES = `
 
   .ct-slot.is-empty .ct-slot-rarity { opacity: .4; }
 
+  /* Pending rogue: unfilled-Pokédex slot — dark shape, signature glow, ???.
+     Not a button; the reveal is flipping status in rogues.js, not clicking. */
+  .ct-slot--rogue-pending { cursor: default; }
+
+  .ct-slot--rogue-pending .ct-slot-art {
+    border: 1px solid color-mix(in srgb, var(--rogue-glow) 38%, transparent);
+    background:
+      radial-gradient(ellipse 70% 52% at 50% 40%,
+        color-mix(in srgb, var(--rogue-glow) 26%, transparent), transparent 70%),
+      linear-gradient(160deg, #0a0d14, #05070b);
+    box-shadow:
+      inset 0 0 36px rgba(0,0,0,.72),
+      0 0 16px color-mix(in srgb, var(--rogue-glow) 18%, transparent);
+  }
+
+  .ct-slot--rogue-pending:hover .ct-slot-art {
+    transform: none;
+    filter: drop-shadow(0 0 16px color-mix(in srgb, var(--rogue-glow) 40%, transparent));
+  }
+
+  /* The shadowed figure the glow backlights. */
+  .ct-rogue-shape {
+    position: absolute;
+    left: 24%;
+    right: 24%;
+    top: 20%;
+    bottom: 30%;
+    background:
+      radial-gradient(circle at 50% 16%, #04060a 0 17%, transparent 18%),
+      radial-gradient(ellipse 50% 34% at 50% 72%, #04060a 0 98%, transparent 100%);
+  }
+
+  .ct-rogue-mystery {
+    position: relative;
+    font-family: "Bebas Neue", Impact, sans-serif;
+    font-size: 30px;
+    letter-spacing: .12em;
+    color: var(--rogue-glow);
+    opacity: .8;
+    text-shadow: 0 0 16px var(--rogue-glow);
+  }
+
+  .ct-slot--rogue-pending .ct-slot-name { color: rgba(239,255,249,.42); }
+  .ct-slot--rogue-pending .ct-slot-rarity { --slot-accent: var(--rogue-glow); opacity: .55; }
+
   /* Rarity accents match TradingCard's RARITY_ACCENT map. */
   .ct-slot--common { --slot-accent: #9cfce9; }
   .ct-slot--uncommon { --slot-accent: #53ffd6; }
@@ -773,6 +883,11 @@ const PAGE_STYLES = `
     display: flex;
     flex-direction: column;
     gap: 6px;
+    /* Coins (28) and Actions (33) make a long list — cap each group so the
+       picker stays compact and every category header stays reachable. */
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
   }
 
   .ct-column button {
@@ -822,6 +937,17 @@ const PAGE_STYLES = `
 
   .ct-card-btn.is-active .ct-card-meta {
     color: rgba(255,209,102,.7);
+  }
+
+  /* Rogues with no debut card in the set yet (Deploydra, Emissio). */
+  .ct-card-btn:disabled {
+    opacity: .38;
+    cursor: default;
+  }
+
+  .ct-card-btn:disabled:hover {
+    border-color: rgba(255,255,255,.16);
+    background: rgba(255,255,255,.04);
   }
 
   .ct-seg {
