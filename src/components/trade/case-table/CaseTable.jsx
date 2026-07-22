@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useOilApiFetch } from "@/lib/oilApiClient";
 import ChannelView from "@/components/trade/ChannelView";
@@ -15,6 +15,7 @@ import {
   createBotState, botRound, finalizeCalls, settleCase,
 } from "@/game/terminal-traders/docketRun";
 import { recordCaseResult } from "@/components/GameOverlay";
+import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
 import { CHARACTER_META, CHARACTER_ORDER } from "@/components/CaseFile/characterMeta";
 import { useCardCollection } from "@/hooks/useCardCollection";
 import { SEATS, STAKE, START_PF, DOCK_H } from "./constants";
@@ -137,6 +138,16 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
 
   const log = (line) => setTableLog((l) => [...l, line]);
   const shortName = (k) => CHARACTER_META[k].name.split(" ").pop();
+
+  // Eugene's voice at the table (2026-07-22): MYTHOS has no SitePal scene —
+  // he speaks through his own ElevenLabs pipeline (playUnicornBeat handles
+  // speechify, the shared iOS AudioContext, and self-interruption). Voiced
+  // mounts only: sitePalScenes null (the dev sandbox) stays silent.
+  const speakEugene = useCallback((line) => { playUnicornBeat({ line }); }, []);
+  useEffect(() => {
+    if (screen !== "channel" || activeStation !== "eugene") stopUnicornBeat();
+    return () => stopUnicornBeat();
+  }, [screen, activeStation]);
 
   // Claim the docket reward when the standings open: finishing alive earns
   // the day's dossier coin, and beating the council (rank 1) stacks a sealed
@@ -463,7 +474,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 10050, background: "#02100e" }}>
       {screen === "menu" ? (
-        <TerminalMenu caseData={caseData} onBegin={() => setScreen("kit")} onExit={() => setScreen("lobby")} exitLabel="◀ LOBBY" />
+        <TerminalMenu caseData={caseData} caseIndex={caseIndex} docketLength={docket.length} onBegin={() => setScreen("kit")} onExit={() => setScreen("lobby")} exitLabel="◀ LOBBY" />
       ) : screen === "reveal" ? (
         <RevealScreen
           caseData={caseData}
@@ -488,6 +499,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
               revealed={revealed[activeStation] || []}
               connections={caseData.connections || []}
               lockedUnlocked={!!unlockedQuestions[activeStation]}
+              speakLine={sitePalScenes && activeStation === "eugene" ? speakEugene : undefined}
               onAsk={ask}
               onBack={() => setScreen("grid")}
               onVerdict={callsOpen ? enterCalls : undefined}

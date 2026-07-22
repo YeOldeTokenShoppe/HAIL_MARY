@@ -1,9 +1,10 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import { KIT_RULES, KIND_LABEL, isKitLegal } from "@/game/terminal-traders/caseKit";
-import { RARITY_COLOR } from "./constants";
+import React, { useEffect, useMemo, useState } from "react";
+import { KIT_RULES, isKitLegal } from "@/game/terminal-traders/caseKit";
+import { getCardById } from "@/game/terminal-traders/cards";
+import { toTemplateCard } from "@/game/terminal-traders/templateCard";
+import TradingCard from "@/components/TradingCard";
 import Shell from "./Shell";
-import { KitCard, KC_CSS } from "./KitCard";
 
 // KIT SELECT (CASE_TABLE.md §3.1) — assemble up to 5 action cards from the
 // owned pool before the case opens. One tap "RUN BASIC KIT" auto-picks and
@@ -24,6 +25,10 @@ const ROLE_SECTIONS = [
   { label: "SPECIALISTS", kinds: ["trace", "peek", "shield", "stoploss", "wildcard"] },
 ];
 
+// Whole cards, fully visible — the real TradingCard render, same as the
+// /card-template binder. 744×1038 × 0.27 ≈ 201×280 per thumbnail.
+const KS_THUMB = 0.27;
+
 export default function KitSelect({ pool, initial, ticker, caseIndex, docketLength, onConfirm, onBasic, onBack }) {
   // Seed from the previous confirm, dropping anything no longer in the pool
   // (sign-out mid-docket, collection changes).
@@ -31,6 +36,12 @@ export default function KitSelect({ pool, initial, ticker, caseIndex, docketLeng
     (initial || []).map((c) => c.id).filter((id) => pool.some((p) => p.id === id))
   );
   const byId = useMemo(() => Object.fromEntries(pool.map((c) => [c.id, c])), [pool]);
+  // Full template renders (art, frame, foil, kit text) for every pool card —
+  // art-less cards show the framed no-art variant, so nothing gates on art.
+  const templates = useMemo(
+    () => Object.fromEntries(pool.map((c) => [c.id, toTemplateCard(getCardById(c.id))])),
+    [pool]
+  );
   const kit = selected.map((id) => byId[id]).filter(Boolean);
   const rare = kit.filter((c) => RARE_OR_BETTER.has(c.rarity)).length;
   const foil = kit.filter((c) => c.rarity === "terminal-foil").length;
@@ -42,6 +53,21 @@ export default function KitSelect({ pool, initial, ticker, caseIndex, docketLeng
     if (s.includes(card.id)) return s.filter((id) => id !== card.id);
     return s.length >= KIT_RULES.maxCards ? s : [...s, card.id];
   });
+
+  // Inspect: the full holofoil TradingCard, scaled to the viewport.
+  const [inspectId, setInspectId] = useState(null);
+  const [inspectScale, setInspectScale] = useState(0.5);
+  useEffect(() => {
+    if (!inspectId) return;
+    const fit = () => setInspectScale(Math.min(
+      (window.innerWidth - 48) / 744,
+      (window.innerHeight - 150) / 1038,
+      0.62
+    ));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [inspectId]);
 
   return (
     <Shell>
@@ -73,16 +99,23 @@ export default function KitSelect({ pool, initial, ticker, caseIndex, docketLeng
                 {cards.map((card) => {
                   const inKit = selected.includes(card.id);
                   return (
-                    <KitCard
-                      key={card.id}
-                      color={RARITY_COLOR[card.rarity]}
-                      name={card.name}
-                      kind={`${card.rarity.toUpperCase()} · ${KIND_LABEL[card.kind]}`}
-                      text={card.text}
-                      state={inKit ? "armed" : "idle"}
-                      footer={inKit ? "IN KIT ✓ — TAP TO DROP" : "ADD TO KIT ▸"}
-                      onClick={() => toggle(card)}
-                    />
+                    <div className="ks-slot" key={card.id}>
+                      <button
+                        className={`ks-thumb${inKit ? " is-in" : ""}`}
+                        onClick={() => setInspectId(card.id)}
+                        title={`${card.name} — tap to enlarge`}
+                      >
+                        <TradingCard
+                          data={templates[card.id]}
+                          scale={KS_THUMB}
+                          interactive={false}
+                          templateStyle="terminal"
+                        />
+                      </button>
+                      <button className={`ks-add${inKit ? " is-in" : ""}`} onClick={() => toggle(card)}>
+                        {inKit ? "IN KIT ✓ — TAP TO DROP" : "ADD TO KIT ▸"}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -98,12 +131,42 @@ export default function KitSelect({ pool, initial, ticker, caseIndex, docketLeng
         </button>
         <button className="ct-ghost" onClick={onBasic}>⟡ RUN BASIC KIT — AUTO-PICK &amp; GO ▸</button>
       </div>
-      <style>{KC_CSS}</style>
+
+      {/* Full holofoil inspect — the real TradingCard, same render as the
+          binder. Tap anywhere outside the card to close. */}
+      {inspectId && (
+        <div className="ks-overlay" onClick={() => setInspectId(null)}>
+          <div className="ks-overlay-card" onClick={(e) => e.stopPropagation()}>
+            <TradingCard
+              data={toTemplateCard(getCardById(inspectId))}
+              scale={inspectScale}
+              templateStyle="terminal"
+            />
+          </div>
+          <button className="ct-ghost" onClick={() => setInspectId(null)}>✕ CLOSE</button>
+        </div>
+      )}
+
       <style>{`
         .ks-counters { display: flex; gap: 14px; font-size: 12px; font-weight: bold; letter-spacing: 0.08em; color: #ffd23a; }
         .ks-counters .ks-full { color: #4dffaa; }
         .ks-counters .ks-bad { color: #ff5454; text-shadow: 0 0 8px rgba(255,84,84,0.6); }
-        .ks-row { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; }
+        .ks-row { display: flex; gap: 12px; overflow-x: auto; padding: 2px 2px 10px; }
+        .ks-slot { display: flex; flex-direction: column; gap: 7px; flex: 0 0 auto; }
+        /* The whole card is the tap target for enlarge; the kit state rides
+           a gold halo so the card face stays unobstructed. */
+        .ks-thumb { position: relative; background: none; border: 1.5px solid transparent;
+          border-radius: 12px; padding: 3px; cursor: zoom-in; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+        .ks-thumb:hover { transform: translateY(-3px); }
+        .ks-thumb.is-in { border-color: #ffd23a; box-shadow: 0 0 18px rgba(255,210,58,0.35); }
+        .ks-add { background: rgba(47,214,214,0.08); border: 1px solid rgba(47,214,214,0.5); color: #2fd6d6;
+          font: inherit; font-size: 10px; font-weight: bold; letter-spacing: 0.12em; padding: 9px 6px; cursor: pointer;
+          clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+        .ks-add:hover { background: rgba(47,214,214,0.16); }
+        .ks-add.is-in { border-color: #ffd23a; color: #ffd23a; background: rgba(255,210,58,0.1); }
+        .ks-overlay { position: fixed; inset: 0; z-index: 10060; display: flex; flex-direction: column;
+          gap: 14px; align-items: center; justify-content: center;
+          background: rgba(2,10,9,0.88); backdrop-filter: blur(4px); }
         .ct-cta:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
       `}</style>
     </Shell>

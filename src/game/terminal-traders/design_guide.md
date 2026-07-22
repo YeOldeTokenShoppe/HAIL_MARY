@@ -1130,12 +1130,12 @@ from the take: the blocks are chunky beveled candles with gold pin-joints
 mid-limb rather than at a seam so the decay looks like it's catching up
 to him, and his face stays delighted with zero awareness of the trail.
 Tells: crumble-trail ~30–72% on the left, tipped quarter cup ~65–72%.
-**Watch item:** the cup rides the flavor-text band, and the lit target
-machine sits under the Genesis badge in the upper right — same collision
-as VaporwareX. Both still read; if either bothers, `setBadge: null` is
-the escape hatch for the badge, and the cup would need an inpaint nudge
-down-left. Art is exactly the card's aspect, so artFocus is inert at
-zoom 1.0 and is recorded for consistency only.
+Checked on the rendered card: the cup clears the flavor band and lands
+just left of the EFFECT badge, still legible, and the Genesis badge
+falls on his raised fist rather than on the lit target machine — so
+unlike VaporwareX nothing here needs `setBadge: null`. Art is exactly
+the card's aspect, so artFocus is inert at zoom 1.0 and is recorded for
+consistency only.
 
 ---
 
@@ -1162,6 +1162,30 @@ perfectly calm; mint and cream palette on deep teal, soft sacred
 lighting with bright candle glow, glossy toy-like look, serene steadfast
 mood, no face on the ingot, no text, upper-weighted composition.*
 
+**APPROVED — take 1 (2026-07-21).** Wire: coinCard_TerminalETH at
+`artFocus: "center 30%", artZoom: 1.0`, fx `Sparkle` (candle glow).
+The joke lands by contrast, exactly as briefed: the round window holds a
+full neon candlestick storm — the loudest 30% of art in the set — and
+the chapel in front of it is so still that the only motion is a small
+robot with a cloth. Canonized from the take: the ingot is a faceted
+mint slab on a gold plinth with a single diamond boss, no face, no logo;
+the monk-bot is chest-height to it (scale does the reverence); votives
+sit in glass cylinders in tidy rows; and the chain garlands are
+ornamental swags, not restraints. Server racks flanking the nave are a
+welcome addition — keep them for any future Terminal-interior card.
+**Composition precedent (the inverse of VaporwareX):** everything that
+matters — window, ingot, monk-bot — sits in the upper two-thirds, and
+the bottom third is altar steps, chain swag and empty polished floor.
+Checked on the rendered card: the flavor band crosses the altar front
+and the ability box sits on candles and floor, so both text bands land
+on furniture rather than on the subject. This is the shape to aim for on
+rogue-less coins.
+Filename note: the webp landed as `coinCard_terminalEth.webp` while its
+own PNG master was `coinCard_TerminalETH.png`. Renamed the webp to match
+(2026-07-21) — macOS hides the mismatch, but prod's filesystem is
+case-sensitive, so a case drift like that is a 404 waiting for deploy.
+Encode to the master's exact name.
+
 ---
 
 ## 20. CANDLE INDEX — coin · analysis · common · legit (infra-grind)
@@ -1186,6 +1210,17 @@ brass magnifying loupe on a librarian desk catching golden light;
 saturated gold and indigo palette, warm bright candle glow, glossy
 toy-like look, cheerful meticulous mood, no faces on the candles, no
 text, upper-weighted composition.*
+
+**APPROVED — take 1 (2026-07-22).** Wire: coinCard_CandleIndex at
+`artFocus: "center 30%", artZoom: 1.0` (exact card aspect — the crop is
+the composition). The generator upgraded the loupe: instead of resting
+on the desk, a small archivist-bot on the ladder holds it up to the
+shelves, magnifying one green and one red flame — the "living index"
+made literal, and the set's librarian mascot born in the same stroke.
+Canonize the archivist-bot for any future archive/infra scene. Candles
+stay faceless (mascot rule held), catalog glyphs unreadable, the desk
+ledger and index cards land under the text bands exactly as the
+template wants. The rotunda's scale earns "boring, priceless."
 
 ---
 
@@ -1322,8 +1357,8 @@ redemption mood, no text, upper-weighted composition.*
 | BlackPalm | Forklok debut | APPROVED take 1 + wired | center 30% |
 | VaporwareX | Vaporina debut | APPROVED take 1 + wired | center 30% |
 | Lucky Capsule | Fomogre debut | APPROVED take 1 + wired | center 30% |
-| TerminalETH | — | queued | — |
-| Candle Index | — | queued | — |
+| TerminalETH | — | APPROVED take 1 + wired | center 30% |
+| Candle Index | — | APPROVED take 1 + wired | center 30% |
 | Zero Choir | — | queued | — |
 | Votive Chain | — | queued | — |
 | ChainSeraph | — | queued | — |

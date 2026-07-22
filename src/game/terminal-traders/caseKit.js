@@ -57,8 +57,10 @@ export function kitCardsFromCollection(cards) {
     .map(toKitCard);
 }
 
-// §3.1's one-tap "RUN BASIC KIT": one lens key per station, then insurance,
-// topped up to the legal maximum. Every addition is legality-checked so a
+// §3.1's one-tap "RUN BASIC KIT": a deep scan leads (so the default path
+// actually meets Tier-2 — CLASSIFIED entries and sealed questions are
+// invisible to a lens-keys-only kit), lens keys cover the remaining
+// stations, then insurance. Every addition is legality-checked so a
 // foil-heavy pool can't auto-pick itself into an illegal kit.
 export function pickBasicKit(pool = KIT_CARDS) {
   const kit = [];
@@ -67,8 +69,10 @@ export function pickBasicKit(pool = KIT_CARDS) {
     if (found) kit.push(found);
     return Boolean(found);
   };
+  take((c) => c.kind === "deepScan");
+  const covered = new Set(kit.map((c) => c.station).filter(Boolean));
   for (const lens of ["monk", "demon", "marisol", "eugene"]) {
-    take((c) => c.kind === "lensKey" && c.station === lens);
+    if (!covered.has(lens)) take((c) => c.kind === "lensKey" && c.station === lens);
   }
   if (!take((c) => c.kind === "shield")) take((c) => c.kind === "stoploss");
   for (const c of pool) {

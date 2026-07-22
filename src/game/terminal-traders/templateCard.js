@@ -51,9 +51,19 @@ export const CARD_ART = {
   // refraction — the overlay is doing character work here, not decoration.
   "vaporwarex": { src: "/TCG/coinCard_VaporwareX.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Rainbow 3"] },
   // Fomogre's debut (Batch 2 take 1, 2026-07-21). Tells: red crumble-trail
-  // ~30-72% on the left, tipped quarter cup ~65-72% — the cup rides the
-  // flavor-text band, so check it there before calling the crop final.
+  // ~30-72% on the left, tipped quarter cup ~65-72% — the cup clears the
+  // flavor band and lands beside the EFFECT badge, still legible.
   "lucky-capsule": { src: "/TCG/coinCard_LuckyCapsule.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Abstract 7"], fxBlend: "screen"  },
+  // Batch 2's first rogue-less coin (2026-07-21). Composition inverts the
+  // VaporwareX problem: subject lives in the upper two-thirds (storm window
+  // ~7-36%, ingot ~36-58%, monk-bot ~45-58% right) and the bottom third is
+  // altar steps and floor, so both text bands land on furniture.
+  "terminal-eth": { src: "/TCG/coinCard_TerminalETH.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Abstract 1"], fxBlend: "screen" },
+  // The wick archive (Batch 2 take 1, 2026-07-22). Exact card aspect →
+  // artFocus inert at zoom 1.0: top shelf row clips under the name bar,
+  // desk/ledger sit under the text bands — both by design. The archivist-bot
+  // + loupe land ~13-25%, inside the window.
+  "candle-index": { src: "/TCG/coinCard_CandleIndex.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Sparkle"] },
   "pump-signal": { src: "/TCG/actionCard_PumpSignal.webp", artFocus: "center 30%", artZoom: 1.0, fx: ["Sparkle"] },
   // artFocus values come from the art-run status table in design_guide.md
   // ("Art run status", §First Twelve) — that table is the source of truth,

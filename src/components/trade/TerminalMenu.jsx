@@ -1,17 +1,63 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import TradingCard from "@/components/TradingCard";
+import { frameForRarity, metaTopForFrame } from "@/game/terminal-traders/cardFrames";
 
 // The Liminal Terminal MENU — the entry screen that fronts the COUNCIL grid
-// (replaces the old credo CRT). Presents the incoming case file + entry options.
-// BEGIN → grid; BRIEFING toggles St. GR80's rules inline; EXIT → back to laptop.
-export default function TerminalMenu({ caseData, onBegin, onExit, exitLabel = "◀ EXIT TERMINAL" }) {
+// (replaces the old credo CRT). The incoming case renders as a real
+// TradingCard dossier (frame tier = difficulty ladder) with its surface
+// stats beside it. BEGIN → kit; BRIEFING toggles GR80's rules; EXIT → lobby.
+const DIFFICULTY_TIER = { beginner: "common", intermediate: "rare", advanced: "mythic", review: "uncommon" };
+
+// A synthetic template-card for the case file — cases aren't Genesis cards,
+// so this builds the TradingCard data shape directly (no art → the framed
+// no-art variant; no Genesis set badge).
+function caseDossierCard(caseData, caseIndex, docketLength) {
+  const frame = frameForRarity(DIFFICULTY_TIER[caseData.difficulty] || "common");
+  const difficulty = caseData.difficulty
+    ? caseData.difficulty.charAt(0).toUpperCase() + caseData.difficulty.slice(1)
+    : "Docket";
+  return {
+    name: caseData.projectName,
+    subtitle: `${caseData.ticker} · ${caseData.chain}`,
+    cardType: "Case",
+    style: difficulty,
+    rarity: difficulty,
+    foilStyle: "subtle",
+    edition: docketLength ? `${(caseIndex ?? 0) + 1}/${docketLength}` : "dossier",
+    ability: { name: "Verdict Required", text: caseData.tagline },
+    flavorText: "Scam, or salvation? Work the lenses. Lock the ticket.",
+    statPair: null,
+    backgroundImage: null,
+    artFocus: "center 30%",
+    artZoom: 1,
+    frameImage: frame,
+    frameMetaTop: metaTopForFrame(frame),
+    fxOverlays: [],
+    fxBlend: "normal",
+    fxOpacity: 1,
+    setBadge: null,
+  };
+}
+
+export default function TerminalMenu({ caseData, caseIndex = 0, docketLength = 0, onBegin, onExit, exitLabel = "◀ EXIT TERMINAL" }) {
   const [showBriefing, setShowBriefing] = useState(false);
+  // The dossier card scales down a notch on phones so the stats column
+  // still fits beside it (or stacks cleanly below).
+  const [cardScale, setCardScale] = useState(0.36);
+  useEffect(() => {
+    const fit = () => setCardScale(window.innerWidth < 700 ? 0.3 : 0.36);
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
   const m = caseData.surfaceMetrics || {};
   const up = String(m.change24h || "").trim().startsWith("+");
   const metrics = [
     ["AGE", m.age], ["MCAP", m.mcap], ["HOLDERS", m.holders],
     ["PRICE", m.price], ["24H", m.change24h], ["SOCIAL", m.socialScore],
   ];
+  const caseNo = (caseData.id || "").replace(/\D/g, "") || "—";
 
   return (
     <div className="tm-root">
@@ -21,20 +67,27 @@ export default function TerminalMenu({ caseData, onBegin, onExit, exitLabel = "�
       </div>
 
       <div className="tm-body">
-        <div className="tm-eyebrow">▸ INCOMING CASE FILE · 001</div>
-        <div className="tm-card">
-          <div className="tm-proj">{caseData.projectName}</div>
-          <div className="tm-sub">{caseData.ticker} · {caseData.chain}</div>
-          <div className="tm-tagline">{caseData.tagline}</div>
-          <div className="tm-metrics">
-            {metrics.map(([k, v]) => (
-              <div key={k} className="tm-metric">
-                <span className="tm-mk">{k}</span>
-                <span className={`tm-mv${k === "24H" ? (up ? " tm-up" : " tm-down") : ""}`}>{v || "—"}</span>
-              </div>
-            ))}
+        <div className="tm-eyebrow">▸ INCOMING CASE FILE · {caseNo}</div>
+        <div className="tm-dossier">
+          <div className="tm-cardwrap">
+            <TradingCard
+              data={caseDossierCard(caseData, caseIndex, docketLength)}
+              scale={cardScale}
+              templateStyle="terminal"
+            />
           </div>
-          <div className="tm-charge">VERDICT REQUIRED — scam, or salvation?</div>
+          <div className="tm-stats">
+            {/* tagline lives on the card itself (Verdict Required box) */}
+            <div className="tm-metrics">
+              {metrics.map(([k, v]) => (
+                <div key={k} className="tm-metric">
+                  <span className="tm-mk">{k}</span>
+                  <span className={`tm-mv${k === "24H" ? (up ? " tm-up" : " tm-down") : ""}`}>{v || "—"}</span>
+                </div>
+              ))}
+            </div>
+            <div className="tm-charge">VERDICT REQUIRED — scam, or salvation?</div>
+          </div>
         </div>
 
         <button className="tm-begin" onClick={onBegin}>▸ BEGIN INVESTIGATION</button>
@@ -71,16 +124,13 @@ export default function TerminalMenu({ caseData, onBegin, onExit, exitLabel = "�
 
         .tm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 14px 14px; z-index: 6; }
         .tm-eyebrow { font-size: 11px; letter-spacing: 0.14em; color: #ffd23a; margin-bottom: 10px; }
-        .tm-card {
-          border: 1.5px solid color-mix(in srgb, #2fd6d6 55%, transparent); padding: 14px;
-          background: #061a18; margin-bottom: 18px;
-          clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
-          box-shadow: inset 0 0 26px color-mix(in srgb, #2fd6d6 16%, transparent);
-        }
-        .tm-proj { font-size: 26px; font-weight: bold; color: #f4fffb; letter-spacing: 0.02em; text-shadow: 0 0 10px rgba(47,214,214,0.4); }
-        .tm-sub { font-size: 13px; color: #ffd23a; margin-top: 2px; }
-        .tm-tagline { font-size: 12.5px; color: #bfeede; opacity: 0.9; margin: 8px 0 14px; line-height: 1.4; }
-        .tm-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; }
+        /* Dossier spread: the case's TradingCard beside its stat column;
+           stacks when the viewport can't seat them side by side. */
+        .tm-dossier { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+        .tm-cardwrap { flex: 0 0 auto; margin: 0 auto; }
+        .tm-stats { flex: 1; min-width: 250px; display: flex; flex-direction: column; }
+        .tm-tagline { font-size: 12.5px; color: #bfeede; opacity: 0.9; margin: 0 0 14px; line-height: 1.4; }
+        .tm-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
         .tm-metric {
           border: 1px solid color-mix(in srgb, #2fd6d6 28%, transparent); padding: 7px 8px;
           display: flex; flex-direction: column; gap: 2px; background: #04140f;

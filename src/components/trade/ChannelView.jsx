@@ -26,6 +26,8 @@ export default function ChannelView({
   revealed = [],      // evidence labels revealed so far for THIS station
   connections = [],   // caseData.connections — cross-lens entries (§3.3)
   lockedUnlocked = false, // this station's lockedQuestion has been unsealed
+  speakLine,          // (text) => void — external voice for non-SitePal
+                      // stations (Eugene's ElevenLabs path); fired per line
   onAsk,              // (qIndex | "locked") => void
   onBack,
   onVerdict,
@@ -96,6 +98,14 @@ export default function ChannelView({
       } catch (e) {}
     }
   }, [currentLine, tts, useSitePal]);
+
+  // External voice (Eugene): speak each new line through the caller's
+  // pipeline. Mirrors the SitePal feed's per-line behavior — intro on open,
+  // then each answer. The caller owns interruption/cleanup.
+  useEffect(() => {
+    if (!speakLine || useSitePal || !currentLine) return;
+    speakLine(currentLine);
+  }, [currentLine, speakLine, useSitePal]);
 
   // When SitePal speech ends, snap to the full line so the caption can't trail
   // behind the audio finishing.

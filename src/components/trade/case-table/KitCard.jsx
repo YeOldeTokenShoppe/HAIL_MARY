@@ -3,15 +3,20 @@
 // import KC_CSS into each). Two-tap flow: arm → play.
 import React from "react";
 import { KIT_CARDS, KIND_LABEL } from "@/game/terminal-traders/caseKit";
+import { getCardArt } from "@/game/terminal-traders/templateCard";
 import { RARITY_COLOR } from "./constants";
 
-export function KitCard({ color, name, kind, text, footer, state = "idle", small, onClick }) {
+// `art` (a CARD_ART src) renders as a backdrop behind the terminal text —
+// the finished Genesis art showing through the kit card. Art-less cards
+// keep the plain panel, so the run doesn't gate on artwork.
+export function KitCard({ color, name, kind, text, footer, state = "idle", small, art, onClick }) {
   return (
     <button
       className={`kc-card ${state}${small ? " kc-small" : ""}`}
       style={{ "--cc": color }}
       onClick={onClick}
     >
+      {art && <span className="kc-art" style={{ backgroundImage: `url(${art})` }} aria-hidden />}
       <span className="kc-name">{name}</span>
       <span className="kc-kind">{kind}</span>
       <span className="kc-text">{text}</span>
@@ -52,6 +57,7 @@ export function KitHand({ cards = KIT_CARDS, small, kitPlayed, selectedCard, noA
             name={card.name}
             kind={`${card.rarity.toUpperCase()} · ${KIND_LABEL[card.kind]}`}
             text={card.text}
+            art={getCardArt(card.id)}
             state={played ? "played" : sel ? "armed" : "idle"}
             footer={played ? "PLAYED" : !sel ? "TAP TO ARM" : noActions ? "NO ACTIONS LEFT" : small ? "TAP AGAIN — 1 ACT ▸" : "TAP AGAIN — 1 ACTION ▸"}
             onClick={() => {
@@ -79,7 +85,16 @@ export const KC_CSS = `
     0 0 12px color-mix(in srgb, var(--cc) 40%, transparent); }
   .kc-card:active { transform: scale(0.98); }
   .kc-card.kc-small { width: 136px; padding: 8px 8px 7px; gap: 5px; }
-  .kc-name { font-size: 12.5px; font-weight: bold; line-height: 1.25; }
+  /* Genesis art backdrop: the upper band shows the art through a light
+     scrim, fading to near-solid panel where the rules text and footer
+     live. Text layers sit above it. */
+  .kc-art { position: absolute; inset: 0; z-index: 0;
+    background-size: cover; background-position: center 16%; }
+  .kc-art::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(4,20,15,0.42) 0%, rgba(4,20,15,0.84) 36%, rgba(4,20,15,0.97) 62%); }
+  .kc-name, .kc-kind, .kc-text, .kc-play { position: relative; z-index: 1; }
+  .kc-name { font-size: 12.5px; font-weight: bold; line-height: 1.25; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
+  .kc-kind, .kc-text { text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
   .kc-small .kc-name { font-size: 10.5px; }
   .kc-kind { font-size: 8px; letter-spacing: 0.12em; color: var(--cc); }
   .kc-text { font-size: 10.5px; line-height: 1.45; color: #bfeede; opacity: 0.85; flex: 1; overflow: hidden; }

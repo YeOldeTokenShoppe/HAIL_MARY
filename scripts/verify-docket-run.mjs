@@ -190,9 +190,9 @@ check("KIT_CARDS crossrefs carry their lens pair",
   card("oracle-crosscheck").lenses, ["marisol", "monk"]);
 
 const basic = pickBasicKit();
-check("pickBasicKit: legal, 4 lens keys + insurance",
+check("pickBasicKit: legal — deep scan leads, lenses covered, insurance",
   { legal: isKitLegal(basic), ids: basic.map((c) => c.id) },
-  { legal: true, ids: ["audit-flare", "forked-rumor", "wallet-seance", "mempool-prophecy", "candle-vigil"] });
+  { legal: true, ids: ["cold-wallet", "forked-rumor", "wallet-seance", "mempool-prophecy", "candle-vigil"] });
 
 // ---- Case-file integrity (the repo's stand-in for a content test runner):
 // reveals resolve, Tier-2 labels never collide with Tier-1, locked questions

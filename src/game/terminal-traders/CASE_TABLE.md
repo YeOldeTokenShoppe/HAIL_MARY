@@ -382,6 +382,18 @@ Phase 1 routes. (Server-side docket validation arrives in Phase 3.)
       line — connection caught > deep count); the session scorecard gains
       `deepReveals` (counter, never score).
 
+Post-ship polish (2026-07-22):
+- `pickBasicKit` now LEADS with a deep scan (Cold Wallet in the First
+  Twelve pool) — a lens-keys-only basic kit made Tier-2 invisible on the
+  default path, which playtested as "nothing changed."
+- Kit cards render their Genesis art as a backdrop (`KitCard` `art` prop,
+  wired from CARD_ART via `getCardArt`); KitSelect adds a ◨ VIEW CARD
+  inspect that opens the real holofoil TradingCard. Art-less cards keep
+  the plain terminal panel — the run never gates on artwork.
+- Eugene speaks at the table: his channel lines route through
+  `playUnicornBeat` (ElevenLabs + speechify + shared iOS AudioContext) on
+  voiced mounts only — the dev sandbox stays silent by design.
+
 ---
 
 ## 4. Phase 3 — The Case Table
@@ -723,8 +735,10 @@ which is the exact failure this doc exists to prevent.
 
 ### 4.9 Open questions
 
-- [ ] Coin cards as playable side-positions at the table (v2+; only if it
-      can't reintroduce portfolio-printing)
+- [x] Coin cards as playable side-positions at the table — RESOLVED
+      2026-07-22 as Holdings + Precedent, full proposal in §8. (The
+      founding constraint stands: neither mechanic prints portfolio;
+      coins modulate bounded event deltas or ride a fixed side pot.)
 - [ ] Stake model v2: fixed vs portfolio-proportional (sim first, §4.3 —
       first sims in §4.7a say proportional is viable and gentler)
 - [ ] Cred sink at the table: kit-card plays cost Cred? (§4.7a — today
@@ -903,6 +917,167 @@ dominate luck over 10 rounds, the mode is a lottery and doesn't ship.
 - [ ] `/gauntlet-dev` mock (phase B, CaseTableDev pattern)
 - [ ] Daily Gauntlet seed + leaderboard (post-launch)
 
-Open questions: one bankroll across modes or separate books; telegraph
-Brier's weight in the final grade; whether exposure is one dial or
-per-coin (start with one — three dials max applies to rounds too).
+Open questions: telegraph Brier's weight in the final grade; whether
+exposure is one dial or per-coin (start with one — three dials max
+applies to rounds too). (The bankroll question is RESOLVED — §9:
+per-mode books, one career ledger.)
+
+---
+
+## 8. Holdings & Precedent — coins at the table (PROPOSAL, 2026-07-22)
+
+*Resolves §4.9's coin-playability question. Origin: with classic mode
+retiring (§4.8), 28 of the 80 cards were about to have no rules text
+anywhere — violating GENESIS.md §1's founding principle ("a card whose
+ability demonstrably does something in a game is categorically different
+from art with flavor text"). The design intent was always the Pokémon
+60-card deck, translated: every card type earns its seat. This section
+gives the deck its full anatomy at the Case Table:*
+
+| Pokémon deck | Genesis deck | Where it plays |
+|---|---|---|
+| Your Pokémon | **Trader** (patron) | picked at the lobby, perk rides the docket |
+| Trainers | **Actions** (kit, ≤5) | played during investigation |
+| Bench | **Coins** (holdings, ≤3) | racked for the docket; market weather tests them |
+| — | **Coins** (precedent) | one tabled per case as a pattern claim |
+| Stadium/weather | **Markets** | the docket event deck (§4.6) |
+
+**The founding constraint stands: coins never print portfolio.** The old
+loop died because playing a coin just added its listed value. Here coins
+only (a) modulate the *bounded deltas of docket events* or (b) ride a
+*fixed side pot* shaped like the horizon dial. Brier payouts stay a
+monotonic affine transform (guardrail 2), and no coin ever buys evidence
+(guardrail 1).
+
+### 8.1 Holdings — the bench
+
+Before the docket, the player racks **up to 3 coins** from their
+collection alongside the kit (one "RACK YOUR DECK" screen: kit section +
+holdings section, one confirm; RUN BASIC racks a default spread).
+Legality, mirroring the kit's whale guard: max 3 coins, max 1
+rare-or-better, terminal-foils count as rare-or-better.
+
+Holdings do nothing case-to-case. They matter when the market flips
+between cases: **docket events check the rack** by tag, `caseRef`
+outcome, and printed volatility — finally giving the coin face's orphaned
+stats (VAL/volatility) live meaning:
+
+- A positive event pays a bonus per matching coin (Meme Season: +2 per
+  meme-tag coin; Bull Run: +1 per coin, they're all afloat).
+- A negative event charges matching coins (Rug Harvest: −2 per
+  rug-outcome coin — you chose to hold rug histories in rug season).
+- `volatility` scales the swing: vol ≥5 coins swing ×1.5, vol ≤2 ballast
+  coins reduce a negative event's hit by 1 each. Round half-up.
+- Hard cap: holdings can move one event's effect on your book by at most
+  **±6**. Shields absorb the whole modified event, as today.
+
+Authoring shape: each MARKET_CARDS `docket` block gains an optional
+`holdings` field naming its tag/outcome interactions — authored per
+event, not computed, so every interaction is a designed beat the Ledger
+can narrate ("MEME SEASON — MoonPony rallies: +2").
+
+Demand shape: breadth (different docket seeds → different weather →
+different racks) and identity (ballast infra coins vs volatile meme
+coins are different *strategies*, not different rarities).
+
+### 8.2 Precedent — the active play
+
+Once per case, at the Position Ticket, the player may **table one coin
+from their binder as a precedent**: a claim that this case matches that
+coin's dossier — "I've seen this file before. It smells like Ponzi
+Siren."
+
+- Resolution: the case gains an authored case-level `pattern` (one
+  CASE_PATTERNS id — written in the same §4.4 pass that authors
+  Eugene's patternRefs; 001 = serial-deployer, 002 = anon-but-real,
+  003 = backdoor-fork). Precedent matches when the tabled coin's
+  `caseRef.pattern` equals it.
+- Payout: fixed side pot, horizon-shaped — **+8 on a match, −3 on a
+  miss** (sim before lock). Random guessing across 13 patterns is
+  strongly EV-negative (≈ +8·1/13 − 3·12/13 ≈ −2.2), so the pot pays
+  pattern-recognition skill only — which is the whole teaching goal:
+  the archetype vocabulary becomes something players *use*, not read.
+- The coin is not consumed; one precedent per case; declared before the
+  ticket locks, revealed with the case ("PRECEDENT HOLDS — PONZI SIREN ·
+  YIELD-MIRAGE", Eugene reacts; a miss gets "the chart rhymed, the crime
+  didn't").
+- Demand shape: the **precedent library** — one owned coin per crooked
+  pattern is the collector's type-coverage goal, straight from the
+  Pokémon playbook. (Open sub-question for the sim/playtest: restrict
+  precedents to racked holdings instead of the whole binder — tighter
+  decisions, but it trades away library demand. Start binder-wide.)
+
+### 8.3 Implementation map & sim gates
+
+```
+cards.js                 # no change — caseRef.pattern + volatility already printed
+cases/*.js               # case-level `pattern` field (lands with §4.4 patternRefs)
+cards.js MARKET_CARDS    # optional docket.holdings interaction blocks
+case-table/KitSelect.jsx # becomes RACK YOUR DECK (kit + holdings sections)
+docketRun.js             # settle: holdings modifiers (pure, harness-pinned)
+caseKit.js or docketRun  # resolvePrecedent(coin, casePattern) — pure
+PositionTicket / Ledger  # precedent selector · rack chips · narrated event lines
+```
+
+**Sim gates (§4.7 discipline, run before any UI):** across 2,000 seeded
+dockets — (1) holdings net EV within ±1 of zero for random racks (it's
+texture, not a printer); (2) a weather-aware rack policy beats random
+racks by a visible but single-digit margin (skill, not wallet); (3)
+precedent EV negative for random guessing, positive for a
+pattern-reading policy; (4) combined kit + holdings + precedent edge
+stays inside the single-digit-pp wallet≠win target; (5) liquidation-rate
+shift under 2pp. Ships with the Phase 3 docket-event resolver (holdings)
+and the patternRefs authoring pass (precedent); never preempts §6's
+launch steps.
+
+### 8.4 Parked seed — the Chart Deck (trading variation)
+
+A separate idea recorded 2026-07-22, distinct from §8: a dedicated
+**candle-chart-pattern deck** (head-and-shoulders, wedges, the soft-exit
+arc...) that players draw from at random — a mode where *trading* is the
+mechanic rather than case-solving. That's not a Case Table feature; it's
+a sibling mode in Gauntlet territory (§7) or a Season 2 "Chartist" set
+seed, and it should inherit the calibration-native framing the SOFT-EXIT
+CHART deep entry established: chart patterns are weak priors that earn
+weight from corroboration, never oracles. Park until the Docket and
+Gauntlet ship; revisit alongside the chart-literacy expansion.
+
+---
+
+## 9. The Desk — career architecture (DECISION, 2026-07-22)
+
+**One game, several desks, one career.** The master game the player
+experiences is the trading floor (/trade's terminal hub); each mode is a
+desk with its own clean skill loop and legible feedback: the **Docket**
+teaches viability reading, the **Gauntlet** (§7) teaches market
+conditions and exposure, the **Chart Deck** (§8.4) later teaches pattern
+priors. We do NOT build a single simultaneous everything-sim: composite
+simulation destroys outcome attribution, and attribution is the entire
+teaching mechanism (Brier only works when the player knows which
+decision was scored). Presented to the player as one career, never as a
+menu of minigames.
+
+- **Books:** per-mode books, ONE career ledger (resolves §7.5's open
+  question). Each mode's economy stays independently balanced; the
+  career profile aggregates lifetime P&L, streaks, and per-skill grades
+  (read accuracy · sizing discipline · pattern hit-rate). Season
+  standings span desks. Build the ledger layer when a second mode goes
+  live — mostly presentation over data already recorded.
+- **One collection, many formats** (the Pokémon format model): the
+  Genesis 80 is the set; each desk defines legality and loadout shape
+  (Docket: patron + kit ≤5 + holdings ≤3 + precedents · Gauntlet:
+  exposure over owned coins, insurance actions, market telegraphs ·
+  Chart Deck: instruments + a new pattern deck, Season 2). Not every
+  card is legal everywhere — rules-text gravity is the UNION across
+  modes; every card must matter somewhere (§8 closes that for coins).
+- **Authoring discipline that makes it cheap:** one card definition,
+  mode-agnostic data fields (tags, caseRef, volatility, kit, docket);
+  modes are READERS of those fields. New modes add readers, never card
+  rewrites. Season 2 cards join the same collection under GENESIS.md
+  §1's seasons model.
+- **Framing guardrail:** "maximize profit, avoid ruin" is the career's
+  fiction; every desk's scoring stays skill-attributable and
+  fictionalized (guardrail 5 — never investment anything).
+- **Sequencing unchanged:** §6 order stands (Docket → launch → Gauntlet
+  → variations). The career ledger is the only new commitment, gated on
+  a second live mode.
