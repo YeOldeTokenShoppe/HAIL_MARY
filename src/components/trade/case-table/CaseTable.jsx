@@ -215,6 +215,9 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   };
 
   const enterCalls = () => {
+    // Warm the curtain-call chunk + GLB — the reveal follows within the
+    // minute, and this keeps RevealScreen's dynamic() import instant.
+    import("@/components/trade/CurtainCallStage").then((m) => m.preloadCurtainCall()).catch(() => {});
     const { final, logs } = finalizeCalls(botRef.current, { seed, caseIndex, signals, order: CHARACTER_ORDER, meta: CHARACTER_META });
     logs.forEach(log);
     setPunditFinal(final);
@@ -513,6 +516,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
       <Standings
         books={books} busted={busted} briers={briers}
         reward={reward}
+        seed={seed} apiFetch={apiFetch} liveBoard={recordScores}
         onNewDocket={() => { setSeed((s) => s + 1); setScreen("lobby"); setPatron(null); setLedger(null); setPendingEvent(null); setReward(null); }}
       />
     );

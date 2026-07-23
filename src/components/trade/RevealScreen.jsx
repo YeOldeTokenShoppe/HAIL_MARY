@@ -1,11 +1,18 @@
 "use client";
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import SitePalFeed from "@/components/trade/SitePalFeed";
 import { CHARACTER_META, CHARACTER_ORDER } from "@/components/CaseFile/characterMeta";
 import { coverageNote } from "@/components/GameOverlay";
 
-// Reveal screen — outcome + Brier + the case truth + each consultant's
-// vindication line + the decisive lens. Self-contained off the case data.
+// The curtain call (four characters react on the temple stage) renders behind
+// the result info — client-only, and only fetched once a reveal actually
+// mounts. While the GLB streams in, the green-haze gradient stands in.
+const CurtainCallStage = dynamic(() => import("@/components/trade/CurtainCallStage"), { ssr: false });
+
+// Reveal screen — the curtain call with the outcome overlaid: banner + P&L up
+// top, the case truth + each consultant's vindication in a bottom sheet, the
+// characters reacting in the band between. Self-contained off the case data.
 const OUT = {
   aligned: { label: "PAID", color: "#4dffaa", sub: "you called it" },
   missed: { label: "BURNED", color: "#ff5454", sub: "wrong read" },
@@ -43,21 +50,26 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
 
   return (
     <div className="rv-root">
+      <div className="rv-stage"><CurtainCallStage outcome={outcome} /></div>
+
       <div className="rv-header"><span className="rv-title">POSITION SETTLED · {caseData.ticker}</span></div>
 
-      <div className="rv-body">
-        <div className="rv-banner" style={{ "--c": o.color }}>
-          <span className="rv-out">{o.label}</span>
-          <span className="rv-sub">{o.sub}</span>
-          {/* P&L is the score (DECISION 2026-07-22) — the Brier kernel
-              lives inside casePnl and never surfaces in the UI. */}
-          {pnl != null && (
-            <span className="rv-pnl" style={{ color: pnl >= 0 ? "#4dffaa" : "#ff5454" }}>
-              {pnl >= 0 ? "+" : ""}{Math.round(pnl)} TO YOUR BOOK
-            </span>
-          )}
-        </div>
+      <div className="rv-banner" style={{ "--c": o.color }}>
+        <span className="rv-out">{o.label}</span>
+        <span className="rv-sub">{o.sub}</span>
+        {/* P&L is the score (DECISION 2026-07-22) — the Brier kernel
+            lives inside casePnl and never surfaces in the UI. */}
+        {pnl != null && (
+          <span className="rv-pnl" style={{ color: pnl >= 0 ? "#4dffaa" : "#ff5454" }}>
+            {pnl >= 0 ? "+" : ""}{Math.round(pnl)} TO YOUR BOOK
+          </span>
+        )}
+      </div>
 
+      {/* The open band — the characters take their bow here. */}
+      <div className="rv-spacer" />
+
+      <div className="rv-sheet">
         {speakerSceneId && speakerLine && (
           <div className="rv-feed">
             <div className="rv-feed-frame">
@@ -114,21 +126,29 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
 
       <style>{`
         .rv-root { position: absolute; inset: 0; display: flex; flex-direction: column;
-          background: radial-gradient(120% 80% at 50% 20%, rgba(10,40,38,0.4), transparent), #02100e;
+          background: radial-gradient(120% 90% at 50% 30%, rgba(18,74,58,0.85), rgba(4,33,27,0.95) 55%, #02100e);
           color: #2fd6d6; font-family: 'Courier New', monospace; overflow: hidden; user-select: none; }
         .rv-root::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 9;
           background: repeating-linear-gradient(0deg, rgba(0,0,0,0.2) 0 1px, transparent 1px 3px),
                       radial-gradient(130% 100% at 50% 50%, transparent 60%, rgba(0,0,0,0.55)); mix-blend-mode: multiply; }
-        .rv-header { padding: 14px; font-size: 12px; letter-spacing: 0.06em; }
-        .rv-title { color: #5ff2f2; font-weight: bold; }
-        .rv-body { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 14px; z-index: 6; }
-        .rv-banner { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 16px;
-          border: 1.5px solid var(--c); color: var(--c); margin-bottom: 16px;
+        /* The curtain-call canvas sits under everything; info layers stack above. */
+        .rv-stage { position: absolute; inset: 0; z-index: 0; }
+        .rv-header, .rv-banner, .rv-sheet, .rv-exit { position: relative; z-index: 6; }
+        .rv-header { padding: 14px 14px 6px; font-size: 12px; letter-spacing: 0.06em; }
+        .rv-title { color: #5ff2f2; font-weight: bold; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+        .rv-banner { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 20px;
+          border: 1.5px solid var(--c); color: var(--c); margin: 2px auto 0; width: min(420px, calc(100% - 32px));
+          background: rgba(2,16,14,0.74);
           clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
           box-shadow: inset 0 0 26px color-mix(in srgb, var(--c) 16%, transparent); }
-        .rv-out { font-size: 30px; font-weight: bold; letter-spacing: 0.08em; text-shadow: 0 0 14px var(--c); }
+        .rv-out { font-size: 26px; font-weight: bold; letter-spacing: 0.08em; text-shadow: 0 0 14px var(--c); }
         .rv-sub { font-size: 11px; letter-spacing: 0.1em; opacity: 0.85; }
-        .rv-pnl { font-size: 15px; font-weight: bold; margin-top: 6px; text-shadow: 0 0 10px currentColor; }
+        .rv-pnl { font-size: 14px; font-weight: bold; margin-top: 4px; text-shadow: 0 0 10px currentColor; }
+        /* Stage viewing band — flexes so the sheet never swallows the lineup. */
+        .rv-spacer { flex: 1; min-height: 120px; }
+        .rv-sheet { max-height: 44%; overflow-y: auto; margin: 0 10px;
+          padding: 12px 12px 10px; background: rgba(2,16,14,0.82);
+          border: 1px solid rgba(47,214,214,0.3); border-bottom: none; }
         .rv-truth { font-size: 13px; line-height: 1.55; color: #d6fff6; border-left: 2px solid #2fd6d6; padding: 4px 0 4px 12px; margin-bottom: 12px; }
         .rv-narr { font-size: 12.5px; line-height: 1.55; color: #bfeede; opacity: 0.92; margin-bottom: 14px; }
         .rv-decisive { font-size: 11.5px; letter-spacing: 0.06em; line-height: 1.5; color: var(--dc, #ffd23a); margin-bottom: 16px;
@@ -144,7 +164,7 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
         /* Fluid box: the SitePal embed fills its frame (its wrapper is absolutely
            positioned), so we give the frame a responsive aspect-ratio instead of a
            fixed pixel height — it scales to the card width on any screen. */
-        .rv-feed-frame { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border: 1px solid rgba(47,214,214,0.4);
+        .rv-feed-frame { position: relative; width: min(240px, 60%); aspect-ratio: 1 / 1; overflow: hidden; border: 1px solid rgba(47,214,214,0.4);
           border-radius: 8px; background: #02100e; box-shadow: inset 0 0 30px rgba(0,0,0,0.5); }
         .rv-feed-live { position: absolute; top: 8px; left: 8px; z-index: 5; font-size: 9px; letter-spacing: 0.14em;
           color: var(--c); padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
@@ -155,13 +175,14 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
         @keyframes rv-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes rv-pop { 0% { opacity: 0; transform: scale(0.94); } 60% { transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
         .rv-banner { animation: rv-pop 0.5s both; }
+        .rv-sheet { animation: rv-in 0.5s 0.35s both; }
         .rv-vind { animation: rv-in 0.45s both; }
         .rv-vinds .rv-vind:nth-child(1) { animation-delay: 0.05s; }
         .rv-vinds .rv-vind:nth-child(2) { animation-delay: 0.18s; }
         .rv-vinds .rv-vind:nth-child(3) { animation-delay: 0.31s; }
         .rv-vinds .rv-vind:nth-child(4) { animation-delay: 0.44s; }
-        .rv-exit { margin: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 6;
-          background: none; border: 1px solid color-mix(in srgb, #2fd6d6 50%, transparent); color: #2fd6d6; font: inherit;
+        .rv-exit { margin: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px); z-index: 6;
+          background: rgba(2,16,14,0.82); border: 1px solid color-mix(in srgb, #2fd6d6 50%, transparent); color: #2fd6d6; font: inherit;
           font-size: 12px; letter-spacing: 0.06em; padding: 11px; cursor: pointer;
           clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px)); }
       `}</style>

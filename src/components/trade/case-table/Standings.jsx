@@ -1,7 +1,7 @@
 // Docket closed: final books ranked, average Brier per seat, the run's
 // verdict line (beat the council / partial / liquidated) — and the house's
 // payout when the Daily Docket was won (Phase 1 reward rail).
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CHARACTER_ORDER } from "@/components/CaseFile/characterMeta";
 import { YOU } from "@/game/terminal-traders/docketRun";
 import { getCardById } from "@/game/terminal-traders/cards";
@@ -110,7 +110,75 @@ function RewardBanner({ reward }) {
   );
 }
 
-export default function Standings({ books, busted, briers, reward, onNewDocket, newDocketLabel = "NEW DEAL FLOW ▸" }) {
+// The Daily Deal Flow leaderboard — every desk that finished today's seed,
+// ranked by final book (GET /api/tcg-docket-leaderboard; read side of the
+// docketRewards rail). `liveBoard` only on the real mount: the dev sandbox
+// steps arbitrary seeds, which the endpoint (correctly) refuses.
+function Leaderboard({ seed, apiFetch, liveBoard }) {
+  const [board, setBoard] = useState(null); // null=loading | {entries,you,total} | {error}
+  useEffect(() => {
+    if (!liveBoard || !apiFetch) return;
+    let dead = false;
+    apiFetch(`/api/tcg-docket-leaderboard?seed=${seed}`, { method: "GET" })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (dead) return;
+        // Off-schedule table (replayed seed after NEW DEAL FLOW) — no board
+        // exists for it; vanish like the reward banner's offDocket case.
+        if (!ok && data?.error === "not-a-live-docket") setBoard({ offDocket: true });
+        else setBoard(ok ? data : { error: true });
+      })
+      .catch(() => { if (!dead) setBoard({ error: true }); });
+    return () => { dead = true; };
+  }, [seed, apiFetch, liveBoard]);
+  if (!liveBoard) return null;
+  if (board?.offDocket) return null;
+  return (
+    <div className="ct-board">
+      <div className="ct-board-head">▸ TODAY'S DEAL FLOW — THE BOOKS</div>
+      {board == null ? (
+        <div className="ct-board-note">The desk tallies the day…</div>
+      ) : board.error ? (
+        <div className="ct-board-note">The tally is jammed — check back later.</div>
+      ) : board.entries.length === 0 ? (
+        <div className="ct-board-note">No desk has closed today's deal flow yet. Yours posts once the house settles.</div>
+      ) : (
+        <>
+          {board.entries.map((e) => (
+            <div key={e.rank} className={`ct-board-row${e.you ? " you" : ""}`}>
+              <span className="ct-board-rank">#{e.rank}</span>
+              <span className="ct-board-handle">{e.you ? "YOU" : e.handle}{e.won ? " ◆" : ""}</span>
+              <span className="ct-board-book">{e.finalBook == null ? "—" : Math.round(e.finalBook)}</span>
+            </div>
+          ))}
+          {board.you && !board.entries.some((e) => e.you) && (
+            <div className="ct-board-row you">
+              <span className="ct-board-rank">#{board.you.rank}</span>
+              <span className="ct-board-handle">YOU</span>
+              <span className="ct-board-book">{board.you.finalBook == null ? "—" : Math.round(board.you.finalBook)}</span>
+            </div>
+          )}
+          <div className="ct-board-note">{board.total} desk{board.total === 1 ? "" : "s"} reported · ◆ beat the desk</div>
+        </>
+      )}
+      <style>{`
+        .ct-board { margin-top: 4px; border: 1px solid rgba(47,214,214,0.3); background: rgba(4,20,15,0.55);
+          padding: 10px 12px 9px; }
+        .ct-board-head { font-size: 10.5px; font-weight: bold; letter-spacing: 0.14em; color: #ffd23a; margin-bottom: 7px; }
+        .ct-board-row { display: flex; align-items: baseline; gap: 10px; padding: 3px 2px;
+          font-size: 12px; color: #eafff9; }
+        .ct-board-row.you { background: rgba(47,214,214,0.12); border-left: 2px solid #2fd6d6; padding-left: 6px;
+          font-weight: bold; }
+        .ct-board-rank { flex: 0 0 34px; color: #2fd6d6; opacity: 0.85; }
+        .ct-board-handle { flex: 1; letter-spacing: 0.04em; }
+        .ct-board-book { font-weight: bold; color: #f4fffb; }
+        .ct-board-note { font-size: 10px; letter-spacing: 0.06em; color: #bfeede; opacity: 0.7; margin-top: 6px; }
+      `}</style>
+    </div>
+  );
+}
+
+export default function Standings({ books, busted, briers, reward, seed, apiFetch, liveBoard = false, onNewDocket, newDocketLabel = "NEW DEAL FLOW ▸" }) {
   const ranked = [...SEATS].sort((a, b) => (books[b] ?? 0) - (books[a] ?? 0));
   const yourRank = ranked.indexOf(YOU) + 1;
   const beaten = CHARACTER_ORDER.filter((k) => (books[YOU] ?? 0) > (books[k] ?? 0)).length;
@@ -126,6 +194,7 @@ export default function Standings({ books, busted, briers, reward, onNewDocket, 
               : `YOU BEAT ${beaten} OF 4 PARTNERS`}
         </div>
         <RewardBanner reward={reward} />
+        <Leaderboard seed={seed} apiFetch={apiFetch} liveBoard={liveBoard} />
         {ranked.map((k, i) => {
           const meta = seatMeta(k);
           // P&L is the score (DECISION 2026-07-22): the standings annotate

@@ -780,7 +780,17 @@ which is the exact failure this doc exists to prevent.
       sim-case-table.mjs`, 2,000 dockets/experiment) — findings in §4.7a;
       re-run as cases and models evolve
 - [ ] Server-verified docket rewards (transcript replay)
-- [ ] Daily Docket + leaderboard
+- [~] Daily Docket + leaderboard — READ SIDE SHIPPED 2026-07-23:
+      `GET /api/tcg-docket-leaderboard` ranks the day's `docketRewards`
+      docs by finalBook (equality-only query, in-memory sort — no
+      composite index; pseudonymous TRADER-XXXX handles, caller's row
+      flagged via optional auth; today/yesterday seeds only, mirroring
+      the claim window). Standings renders it ("TODAY'S DEAL FLOW — THE
+      BOOKS") on live mounts (`liveBoard`=recordScores; dev sandbox and
+      off-docket replays hide it). Inherits the reward rail's
+      client-attested trust envelope until transcript replay lands.
+      Remaining for [x]: the daily cadence surface (calendar/streaks,
+      yesterday's board browse) if design wants it.
 - [ ] Retire/park classic mode (§4.8)
 
 ---

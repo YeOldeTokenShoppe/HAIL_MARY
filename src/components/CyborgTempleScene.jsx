@@ -237,8 +237,16 @@ export const DEMON_SITEPAL_CONTAINER_ID = "sitepal-container-host";
 // scene's bound audio. Currently `preferSceneAudio: true` on the
 // Demon config means the scene's auto-loaded track wins when present,
 // so these names act as a fallback unless you flip preferSceneAudio.
+//
+// PLACEHOLDERS — record these in the SitePal account on scene 2774900, save
+// each under the name shown, then uncomment. Names must match EXACTLY.
+// Voice: John Barron (old logs call him H80Z) — smug, market-brained, hostile
+// to new wallets as a bit. Short sentences, one clipped cut per line.
 export const DEMON_SITEPAL_AUDIO_NAMES = [
   '11devil1',
+  // 'barron greeting 2',  → "New wallet. No history. Of course you found me first."
+  // 'barron greeting 3',  → "Let me guess. You want a number. Everybody wants a number."
+  // 'barron greeting 4',  → "Burner. ...Fine. Sit down. I've been wrong once."
 ];
 
 // ── Detective SitePal config (parallel to Demon) ────────────────
@@ -263,7 +271,21 @@ saturate: 210,
 // Empty array = use scene-level audio via replay() (which is what
 // worked for Demon — the published SitePal scene auto-plays its bound
 // track). Add named tracks here once you record them.
-export const DETECTIVE_SITEPAL_AUDIO_NAMES = [];
+//
+// PLACEHOLDERS — record on scene 2774916, save under these exact names, then
+// uncomment. Voice: Marisol, onchain detective — dry, factual, mildly
+// exasperated; cites timestamps, always has a trace running.
+//
+// NOTE: she has no named track today, so her greeting is the scene's bound
+// audio. Uncommenting ANY name switches her to named playback — so either
+// record all four, or include a named copy of her current greeting as #1,
+// otherwise that line stops being reachable.
+export const DETECTIVE_SITEPAL_AUDIO_NAMES = [
+  // 'marisol greeting 1',  → "I already ran your wallet. Fwiw, it's clean. Mostly."
+  // 'marisol greeting 2',  → "Indexer's behind again. Last sync, fourteen twenty-one. Don't quote me on anything before that."
+  // 'marisol greeting 3',  → "Everyone here has a theory. I have receipts. Sit down."
+  // 'marisol greeting 4',  → "I trace, I timestamp, I screenshot. That's the whole job."
+];
 
 // ── Monk / Saint GR80 SitePal config ─────────────────────────────
 // Face2-mapping crop region for Monk_Face2. Tweak via the
@@ -287,8 +309,16 @@ export const MONK_SITEPAL_FILTER = {
 // one at click time (avoiding immediate repeats) so the Monk doesn't say
 // the same line twice in a row. Names must match audio tracks saved in
 // the SitePal account on scene 2774449.
+//
+// PLACEHOLDERS — record on scene 2774449, save under these exact names, then
+// uncomment. Voice: St. GR80, android monk and keeper of logs — terse,
+// reverent, procedural. Reads log entries aloud flatly; courteous to visitors.
+// Never "child" — visitors are seekers, pilgrims, travelers.
 export const MONK_SITEPAL_AUDIO_NAMES = [
   'GR80 greeting 1',
+  // 'GR80 greeting 2',  → "Log. Visitor at station one. Welcome, seeker."
+  // 'GR80 greeting 3',  → "You may look. Everything here is recorded. Nothing here is judged."
+  // 'GR80 greeting 4',  → "I keep the logs. The candles, the prayers, the losses. Especially the losses."
 ];
 
 // Per-character SitePal projection registry. This keeps scene metadata
@@ -305,6 +335,10 @@ export const SITEPAL_PROJECTION_CONFIG = {
     crop: DEMON_SITEPAL_CROP,
     filter: DEMON_SITEPAL_FILTER,
     audioNames: DEMON_SITEPAL_AUDIO_NAMES,
+    // preferSceneAudio:true makes the scene's own bound track WIN over the
+    // random pick from audioNames (see the resolution in page.js
+    // runSpeechRequest). Flip to false once the extra greetings are recorded,
+    // or he'll keep saying the same one no matter how many names are listed.
     speech: { type: 'audio', preferSceneAudio: true },
     preload: true,
   },
@@ -316,6 +350,8 @@ export const SITEPAL_PROJECTION_CONFIG = {
     crop: DETECTIVE_SITEPAL_CROP,
     filter: DETECTIVE_SITEPAL_FILTER,
     audioNames: DETECTIVE_SITEPAL_AUDIO_NAMES,
+    // Same as the Demon: flip to false once her named tracks exist, otherwise
+    // the scene's bound track overrides every pick from audioNames.
     speech: { type: 'audio', preferSceneAudio: true },
     preload: true,
   },
@@ -1269,8 +1305,22 @@ const CyborgTempleScene = ({
         // single source of truth for both desktop click and touch tap;
         // handleClick no longer runs it inline. Pass the authored cameraPos
         // so the sequence skips pointing if the user orbited the camera away.
-        const demonResolved = resolveAgentSettings('Demon', isMobile || detectedMobile);
-        startDemonFocusSequence(demonResolved?.cameraPos || null);
+        //
+        // LOBBY ONLY. The sequence fires demon_pointing on a 2s timer, while
+        // the parent's speakLine starts the spoken line at ~900ms — so in game
+        // mode the point landed squarely in the middle of him talking. It only
+        // showed up "sometimes" because stage 2 skips pointing when the player
+        // has orbited off the authored focus pose, so it fired on the visits
+        // where the camera happened to still be parked there. This restores the
+        // behaviour already documented for applyCharacterFocusAnimation: every
+        // character stays on idle while speaking in game mode.
+        //
+        // Read through gameStartedRef, not the `gameStarted` prop — this effect
+        // doesn't list it in its deps, so the closed-over value goes stale.
+        if (!gameStartedRef.current) {
+          const demonResolved = resolveAgentSettings('Demon', isMobile || detectedMobile);
+          startDemonFocusSequence(demonResolved?.cameraPos || null);
+        }
         break;
       }
       case 'Detective':
