@@ -2296,16 +2296,29 @@ export default function CyborgTemple() {
     // the on-screen line.
     const text = typeof entry === 'string' ? entry : entry.text;
     const spoken = typeof entry === 'string' ? undefined : entry.spoken;
+    let cancelled = false;
     const t = setTimeout(() => {
       // Latch on delivery (not on focus) so an interrupted greeting still
       // opens with the wave next time he's actually heard.
       eugeneHasGreetedRef.current = true;
-      playUnicornBeat({ line: text, spoken }, { setGlow: setUnicornGlow });
+      // Report the greeting's start/end through speechActive the same way
+      // speakLine's eugene branch does. The SitePal consultants get this for
+      // free from vh_audioStarted/vh_audioStopped; without it the scene can't
+      // tell when his lobby line ends, so he'd hold the attentive idle and
+      // keep tracking the camera indefinitely instead of returning to work.
+      setSpeechActive(true);
+      playUnicornBeat({ line: text, spoken }, { setGlow: setUnicornGlow })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setSpeechActive(false);
+        });
       if (firstGreeting) triggerUnicornWave();
     }, 900);
     return () => {
+      cancelled = true;
       clearTimeout(t);
       stopUnicornBeat();
+      setSpeechActive(false);
     };
   }, [focusedAgent, tradeMode]);
 

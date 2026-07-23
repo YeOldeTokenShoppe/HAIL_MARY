@@ -1077,6 +1077,39 @@ const CyborgTempleScene = ({
     }
   };
 
+  // Release the focus latch once a lobby intro line has finished. Reverses
+  // the pinning applied by applyCharacterFocusAnimation (isPlayingSpecial +
+  // nextSwitchDelay 999999): cross-fade back to the working clip, then hand
+  // control to the random typing↔idle alternation so the character goes back
+  // to their station instead of holding an attentive idle at the camera for
+  // as long as they stay focused. The head-track release is separate — see
+  // shouldTrackHeadRef, which reads the same lobbyIntroDone flag.
+  const releaseCharacterFocusAnimation = (agentId) => {
+    focusAnimReleasedRef.current = true;
+    if (agentId === 'Fluffy') {
+      // Fluffy is frozen (not cross-faded) while focused — just let the cat
+      // move again; there's no alternation state to restore.
+      const fluffyActions = actionsRef.current['Fluffy'];
+      if (fluffyActions) {
+        Object.values(fluffyActions).forEach((action) => { action.paused = false; });
+      }
+      return;
+    }
+    applyCharacterFocusAnimation(agentId, 'typing');
+    const state = (
+      agentId === 'Monk'      ? monkAnimStateRef.current      :
+      agentId === 'Demon'     ? demonAnimStateRef.current     :
+      agentId === 'Detective' ? detectiveAnimStateRef.current :
+      agentId === 'RL80'      ? rl80AnimStateRef.current      : null
+    );
+    if (!state) return;
+    // applyCharacterFocusAnimation just re-latched these — undo that so the
+    // per-character alternation blocks in useFrame pick the character back up.
+    state.isPlayingSpecial = false;
+    state.nextSwitchDelay = Math.random() * 8000 + 8000;
+    state.lastSwitchTime = Date.now();
+  };
+
   // Demon's focus sequence: hold idle while the camera flies in (~2s),
   // play demon_pointing once, then settle into demon_typing. Triggered
   // from the externalFocusAgent effect so both the desktop click path
@@ -1274,23 +1307,127 @@ const CyborgTempleScene = ({
     });
   }, [externalFocusAgent, isMobile, detectedMobile]);
 
+  // Lobby intro lifecycle. Clicking a character in the lobby flies the camera
+  // in, holds them in an attentive idle and turns their head to the player
+  // while their meet-line plays. `lobbyIntroDone` marks the moment that line
+  // ends: from then on (until the player picks someone else) they drop back to
+  // their normal working loop and stop tracking the camera.
+  //
+  // The flip is deliberately edge-triggered on a false→true→false round trip
+  // of speechActive rather than just "speechActive is false": before the line
+  // starts — camera fly-in, SitePal scene load, the parent's ~900ms delay —
+  // speechActive is still false, and a character whose audio never reports at
+  // all should keep the old hold-on-camera behaviour rather than snapping away
+  // the moment the camera arrives.
+  //
+  // Requiring the rising edge (not just `speechActive === true`) also filters
+  // out the previous character's line: clicking B while A is still talking
+  // carries speechActive=true into B's focus, and its subsequent drop to false
+  // is A's audio being cut, not B finishing.
+  const [lobbyIntroDone, setLobbyIntroDone] = useState(false);
+  const lobbySpeechSeenRef = useRef(false);
+  const prevSpeechActiveRef = useRef(false);
+  // True while a character is still focused but has been handed back to the
+  // idle alternation. Only consulted by gates that key off *FocusedRef.
+  const focusAnimReleasedRef = useRef(false);
+
+  useEffect(() => {
+    // New focus (or crossing into game mode) arms a fresh intro.
+    lobbySpeechSeenRef.current = false;
+    focusAnimReleasedRef.current = false;
+    setLobbyIntroDone(false);
+  }, [externalFocusAgent, gameStarted]);
+
+  useEffect(() => {
+    const rising = speechActive && !prevSpeechActiveRef.current;
+    prevSpeechActiveRef.current = speechActive;
+    if (gameStarted || !externalFocusAgent) return;
+    if (speechActive) {
+      // A line is under way. Re-engage if we'd already released — covers a
+      // second lobby line for the same character (e.g. re-clicking them).
+      if (rising) {
+        lobbySpeechSeenRef.current = true;
+        setLobbyIntroDone(false);
+      }
+      return;
+    }
+    if (lobbySpeechSeenRef.current) setLobbyIntroDone(true);
+  }, [gameStarted, externalFocusAgent, speechActive]);
+
+  // Second, independent end-detector: SitePal's own audio callbacks.
+  //
+  // `speechActive` only tracks speech the PARENT drives (it flips inside the
+  // parent's `__onSitePalAudioStarted` hook). The lobby meet-lines aren't that
+  // — they're played by the SitePal pipeline itself, and the pipeline's
+  // `vh_audioStarted` bails at `if (!active) return` before ever reaching that
+  // hook when the request wasn't one the parent made. So `speechActive` can
+  // stay false for an entire lobby intro, leaving the round-trip above with no
+  // edge to fire on: she talks, finishes, and stays locked on the camera.
+  //
+  // These end callbacks are wrapped rather than replaced, and every previously
+  // installed handler still runs. The parent installs its own wrappers in a
+  // mount-time effect; as a child our effects run first, so the parent's
+  // wrapper ends up outermost and chains down into ours either way.
+  useEffect(() => {
+    if (gameStarted || !externalFocusAgent || typeof window === 'undefined') return;
+    const armedAt = Date.now();
+    // Ignore end events in the first moment after focus: those are the
+    // OUTGOING character's audio being cut short by the swap, not this intro
+    // finishing. If one slips through anyway, the speechActive rising edge
+    // above un-latches us when the real line starts.
+    const SETTLE_MS = 1500;
+    let released = false;
+    const onEnd = () => {
+      if (released || Date.now() - armedAt < SETTLE_MS) return;
+      released = true;
+      setLobbyIntroDone(true);
+    };
+    const NAMES = ['vh_audioStopped', 'vh_speechEnded', 'vh_audioEnded'];
+    const prev = {};
+    NAMES.forEach((name) => {
+      prev[name] = window[name];
+      window[name] = function (...args) {
+        try { onEnd(); } catch (e) {}
+        if (typeof prev[name] === 'function') return prev[name].apply(this, args);
+      };
+    });
+    // Backstop: if no end event ever arrives (audio blocked by autoplay
+    // policy, callback never wired), don't leave her staring forever.
+    const timer = setTimeout(onEnd, 30000);
+    return () => {
+      clearTimeout(timer);
+      NAMES.forEach((name) => { window[name] = prev[name]; });
+    };
+  }, [gameStarted, externalFocusAgent]);
+
   // Animation mode driver — runs whenever the focused agent OR the speech
   // state changes. Cross-fades the focused character into idle (while
   // speaking) or typing (between speech beats). Without this, characters
   // just stare at the player the whole time instead of appearing to look
   // up information between exchanges.
   //
-  // In lobby (pre-game) the focused character stays in idle regardless of
+  // In lobby (pre-game) the focused character holds idle regardless of
   // speechActive — the player is reviewing character info cards, so they
-  // should be looking up at the camera, not heads-down typing.
+  // should be looking up at the camera, not heads-down typing — until their
+  // intro line finishes, at which point they're released back to their own
+  // animation loop.
   useEffect(() => {
     if (!externalFocusAgent) return;
+    // Set `window.__lobbyAnimDebug = true` to trace the lobby idle→typing
+    // handoff (which agent, whether speech is live, whether the intro latched).
+    if (typeof window !== 'undefined' && window.__lobbyAnimDebug) {
+      console.log('[lobby-anim]', { agent: externalFocusAgent, gameStarted, speechActive, lobbyIntroDone });
+    }
+    if (!gameStarted && lobbyIntroDone) {
+      releaseCharacterFocusAnimation(externalFocusAgent);
+      return;
+    }
     const mode = !gameStarted || speechActive ? 'idle' : 'typing';
     applyCharacterFocusAnimation(externalFocusAgent, mode);
     // applyCharacterFocusAnimation is defined inside the component and reads
     // refs (which are stable), so it doesn't need to be in the dep list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalFocusAgent, speechActive, gameStarted]);
+  }, [externalFocusAgent, speechActive, gameStarted, lobbyIntroDone]);
 
   // Demon periodic head-glance — while the demon is the focused agent and
   // speech is active, occasionally turn his head to look at the viewer for
@@ -1402,6 +1539,11 @@ const CyborgTempleScene = ({
       // the props subtree and reads child.visible independently.
       stageProps.children.forEach((c) => { c.visible = !revealMode; });
     }
+    // The neon sign comes from its own GLB, so it's parented to templeScene
+    // rather than StageProps and won't be caught by the flip above. Hide it on
+    // the same terms — it hangs at scene center, right where the characters
+    // line up for the curtain call.
+    if (neonSignRef.current) neonSignRef.current.visible = !revealMode;
     if (!revealMode) return;
 
     // Council gets the semi-circle; every outcome reveal gets the flat lineup.
@@ -1760,12 +1902,20 @@ const CyborgTempleScene = ({
   // is actively speaking (idle anim) — during the typing anim between
   // speech beats, we let the animation drive the head naturally so the
   // character appears to look down at their station, not at the player.
-  // Lobby clicks (gameStarted=false) always track — that path is unrelated
-  // to the game-flow speech state.
+  // Lobby clicks (gameStarted=false) track from the moment of focus through
+  // the end of the character's intro line; once `lobbyIntroDone` latches they
+  // release along with their animation and go back to looking at their work.
+  //
+  // In the lobby this keys ONLY off `lobbyIntroDone` — deliberately not
+  // `|| speechActive`. The lobby meet-lines are played by the SitePal pipeline
+  // rather than the parent, so `speechActive` is unreliable on that path and
+  // can sit stuck true after the line ends; OR-ing it in pinned the gaze open
+  // forever even though the animation had already been handed back to typing
+  // (the exact split symptom: she resumes typing but keeps staring).
   const shouldTrackHeadRef = useRef(true);
   useEffect(() => {
-    shouldTrackHeadRef.current = !gameStarted || speechActive;
-  }, [gameStarted, speechActive]);
+    shouldTrackHeadRef.current = gameStarted ? speechActive : !lobbyIntroDone;
+  }, [gameStarted, speechActive, lobbyIntroDone]);
 
   // Mirrors revealMode into a ref so per-frame head-tracking gates can flip
   // every character into camera-follow during the curtain call without
@@ -3039,18 +3189,20 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         }
 
         if (!pick) {
-          const roll = () => NEON_SIGNS[Math.floor(Math.random() * NEON_SIGNS.length)].id;
+          const roll = () => NEON_SIGNS[Math.floor(Math.random() * NEON_SIGNS.length)];
           let id = null;
           if (NEON_SIGN_STICKY && forced !== 'random') {
             try {
               id = window.sessionStorage.getItem('neonSignId');
               if (!NEON_SIGNS.some((s) => s.id === id)) id = null; // stale after a rename
-              if (!id) window.sessionStorage.setItem('neonSignId', (id = roll()));
+              if (!id) window.sessionStorage.setItem('neonSignId', (id = roll().id));
             } catch (e) {
               id = null; // private mode / storage disabled
             }
           }
-          pick = NEON_SIGNS.find((s) => s.id === id) || NEON_SIGNS.find((s) => s.id === roll());
+          // roll() must be called ONCE, not inside a find() predicate — a
+          // predicate re-rolls per element and can match nothing at all.
+          pick = NEON_SIGNS.find((s) => s.id === id) || roll();
         }
         // Debug handle — check which sign this load rolled without adding
         // console noise: `__neonSign` in the console.
@@ -3097,6 +3249,14 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             // (the FBX axis conversion), which the per-frame math composes with
             // so the sign's face — not its local -Z — ends up toward the camera.
             sign.userData._restQuat = sign.quaternion.clone();
+
+            // A reveal can already be running by the time this async load
+            // lands — e.g. opening /trade?reveal=aligned directly. The effect
+            // that hides StageProps ran before the sign existed, so seed the
+            // sign's visibility from the current reveal state here; the effect
+            // takes over from the next revealMode change onward.
+            sign.visible = !revealModeRef.current;
+
             neonSignRef.current = sign;
           },
           undefined,
@@ -5576,8 +5736,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // Handle Detective animation alternation — swap detective_typing and
     // detective_idle (both looping) on a randomized interval. Paused
     // entirely during focus so the held idle isn't bumped off by the
-    // alternation timer.
-    if (!detectiveFocusedRef.current && actionsRef.current['Detective']) {
+    // alternation timer — except once her lobby intro has finished and
+    // releaseCharacterFocusAnimation has handed her back, where she keeps
+    // alternating even though the camera is still on her.
+    if ((!detectiveFocusedRef.current || focusAnimReleasedRef.current) && actionsRef.current['Detective']) {
       const currentTime = Date.now();
       const detectiveState = detectiveAnimStateRef.current;
 
@@ -6330,9 +6492,18 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
       rl80HeadBoneRef._smoothedQuat.slerp(targetLocal, 0.15);
       head.quaternion.copy(rl80HeadBoneRef._smoothedQuat);
-    } else if (rl80HeadBoneRef._smoothedQuat) {
-      rl80HeadBoneRef._smoothedQuat = null;
-      rl80HeadBoneRef._dummy = null;
+    } else if (rl80HeadBoneRef._smoothedQuat && rl80HeadBoneRef.current) {
+      // Ease the nudge back out rather than dropping it in one frame — the
+      // gate now closes while the camera is still on him (end of his lobby
+      // greeting), where a snap would read as a flinch.
+      const head = rl80HeadBoneRef.current;
+      const animQuat = head.quaternion.clone();
+      rl80HeadBoneRef._smoothedQuat.slerp(animQuat, 0.15);
+      head.quaternion.copy(rl80HeadBoneRef._smoothedQuat);
+      if (rl80HeadBoneRef._smoothedQuat.angleTo(animQuat) < 0.01) {
+        rl80HeadBoneRef._smoothedQuat = null;
+        rl80HeadBoneRef._dummy = null;
+      }
     }
 
     // RL80 jaw lip-sync (Path A) — open the Jaw bone proportionally to speech
@@ -6438,6 +6609,30 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // The flip-axis correction below is rig-specific; tune the divisor in
     // `Math.PI / N` (or change the axis) until the head reads as facing
     // the camera.
+    //
+    // Rest-pose cache key. The curtain call overwrites Detective_Empty's
+    // rotation (STAGE_LINEUP / COUNCIL_LINEUP), and her authored desk yaw is
+    // -87° while the lineup forces 0° — so her body swings ~87° the moment a
+    // reveal starts. The gate below does NOT close across that transition
+    // (revealFollowCam picks up exactly where the focus clause drops out), so
+    // without this the cached rest + face axis stay measured in her desk
+    // orientation. The aim still lands (face and base are derived from each
+    // other and cancel), but the max-neck-angle clamp is measured from that
+    // stale rest, sliding her whole reachable window ~87° to one side: during
+    // the reveal she could turn right to nearly 180° and not left at all.
+    // Re-key on the frame of reference so the pose is re-measured once the
+    // lineup transform has landed.
+    const detHeadCtx = revealModeRef.current || 'desk';
+    if (detectiveHeadBoneRef._baseCtx !== detHeadCtx) {
+      detectiveHeadBoneRef._baseCtx = detHeadCtx;
+      detectiveHeadBoneRef._baseQuat = null;
+      detectiveHeadBoneRef._baseWorldQuat = null;
+      detectiveHeadBoneRef._faceDir = null;
+      // Drop the in-flight smoothing too — it's in the old body frame. The
+      // next tracking frame re-seeds it from the live animation pose, so the
+      // turn eases in from wherever the reaction clip has her.
+      detectiveHeadBoneRef._smoothedQuat = null;
+    }
     if (detectiveHeadBoneRef.current && (revealFollowCam || (detectiveFocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current))) {
       const head = detectiveHeadBoneRef.current;
 
@@ -6469,30 +6664,112 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       const toCam = new THREE.Vector3().subVectors(camera.position, headWorldPos).normalize();
       const face = detectiveHeadBoneRef._faceDir;
       // Build the aim as YAW (around world-Y) THEN PITCH, rather than a single
-      // setFromUnitVectors shortest-arc. The shortest arc picks a free axis, so
-      // when the rest face is tilted down and the target is up-and-to-a-side it
-      // rotates mostly "up" instead of turning — she could look right but not
-      // left. Splitting the turn guarantees left/right is always a horizontal
-      // yaw and up/down is a separate pitch.
+      // setFromUnitVectors shortest-arc — the shortest arc picks a free axis and
+      // rotates "up" when it should be turning. Then clamp the YAW ANGLE and the
+      // PITCH ANGLE separately, as scalars, and rebuild. Two traps this avoids:
+      //
+      //   • Clamping the COMPOSITE rotation against one budget (what this used
+      //     to do via `2*acos(|delta.w|)`). The curtain-call camera is wide and
+      //     elevated, so merely aiming at it costs a standing ~40° of pitch
+      //     before any turning; that ate most of a single 86° budget, and
+      //     because the pitch demand rises turning one way and falls turning
+      //     the other, the leftover yaw came out wildly lopsided. Measured live
+      //     at mirror-image angles: camera at -80° → head reached -75°
+      //     (unclamped), camera at +78° → head reached only +31° (clamped).
+      //     At the desk the camera sits near her eye line, pitch is small, and
+      //     the composite clamp behaved like a plain yaw clamp — which is why
+      //     this only ever showed up in the reveal.
+      //
+      //   • Decomposing into WORLD-axis Euler angles. The pitch axis is
+      //     perpendicular to whichever way she happens to be facing, which is
+      //     world-X only when that facing is ~+Z. It is during the reveal
+      //     (lineup yaw 0) but NOT at the desk (authored yaw -87°), where a
+      //     'YXZ' decomposition leaks pitch into roll.
+      //
+      // Working in scalar yaw/pitch is exact in any body orientation.
+      const maxYaw = (typeof window !== 'undefined' && Number.isFinite(window.__detClamp))
+        ? window.__detClamp : 1.57;  // 90° each way
+      const maxPitch = (typeof window !== 'undefined' && Number.isFinite(window.__detPitchClamp))
+        ? window.__detPitchClamp : 0.6; // ~34° up/down — she shouldn't crane
+      const UP = new THREE.Vector3(0, 1, 0);
       const faceFlat = new THREE.Vector3(face.x, 0, face.z);
       const camFlat = new THREE.Vector3(toCam.x, 0, toCam.z);
       let delta;
       if (faceFlat.lengthSq() < 1e-6 || camFlat.lengthSq() < 1e-6) {
+        // Degenerate: rest face (or the camera) is straight up/down — no
+        // meaningful azimuth to separate, fall back to the direct swing.
         delta = new THREE.Quaternion().setFromUnitVectors(face, toCam);
       } else {
         faceFlat.normalize(); camFlat.normalize();
-        const yawQ = new THREE.Quaternion().setFromUnitVectors(faceFlat, camFlat);
+        // Signed horizontal turn, measured about world +Y so left and right
+        // get identical budgets.
+        const yawFull = Math.atan2(
+          new THREE.Vector3().crossVectors(faceFlat, camFlat).dot(UP),
+          faceFlat.dot(camFlat),
+        );
+        const yawUsed = THREE.MathUtils.clamp(yawFull, -maxYaw, maxYaw);
+        const yawQ = new THREE.Quaternion().setFromAxisAngle(UP, yawUsed);
+        // Elevation difference, independent of the turn — measured as the
+        // change in altitude angle, so an unreachable yaw can never bleed into
+        // pitch and tip her head over.
+        const pitchFull = Math.asin(THREE.MathUtils.clamp(toCam.y, -1, 1))
+                        - Math.asin(THREE.MathUtils.clamp(face.y, -1, 1));
+        const pitchUsed = THREE.MathUtils.clamp(pitchFull, -maxPitch, maxPitch);
         const faceYawed = face.clone().applyQuaternion(yawQ);
-        const pitchQ = new THREE.Quaternion().setFromUnitVectors(faceYawed, toCam);
+        // Horizontal axis perpendicular to the (yawed) facing; rotating about
+        // faceYawed × UP by a positive angle raises the gaze.
+        const pitchAxis = new THREE.Vector3().crossVectors(faceYawed, UP);
+        const pitchQ = pitchAxis.lengthSq() < 1e-8
+          ? new THREE.Quaternion()
+          : new THREE.Quaternion().setFromAxisAngle(pitchAxis.normalize(), pitchUsed);
         delta = pitchQ.multiply(yawQ); // yaw first, then pitch
       }
-      const maxHeadAngle = (typeof window !== 'undefined' && Number.isFinite(window.__detClamp))
-        ? window.__detClamp : 1.5; // ~70°+
-      const deltaAngle = 2 * Math.acos(Math.min(1, Math.abs(delta.w)));
-      if (deltaAngle > maxHeadAngle) {
-        delta = new THREE.Quaternion().slerp(delta, maxHeadAngle / deltaAngle);
-      }
       const targetWorldQuat = delta.multiply(detectiveHeadBoneRef._baseWorldQuat);
+
+      // Debug helpers for this head aim, since it's awkward to judge by eye:
+      //   window.__detHeadRev            → which revision of the aim is live
+      //   window.__detDebug = true       → installs the sweep below
+      //   window.__detSweep()            → { faceYaw, curve: [[camYaw, headYaw]…] }
+      // The sweep reports the STEADY-STATE head yaw for a full circle of camera
+      // azimuths without having to orbit. A healthy curve ramps 1:1 through the
+      // middle and flattens at ±maxYaw either side of faceYaw. A curve that
+      // flattens much earlier on one side than the other is the old
+      // clamp-the-composite-angle bug.
+      if (typeof window !== 'undefined') {
+        window.__detHeadRev = 'yaw-pitch-split-v3';
+      }
+      if (typeof window !== 'undefined' && window.__detDebug) {
+        const baseWQ = detectiveHeadBoneRef._baseWorldQuat.clone();
+        const faceC = face.clone();
+        const hp = headWorldPos.clone();
+        const camP = camera.position.clone();
+        window.__detSweep = (steps = 24) => {
+          const D = 180 / Math.PI;
+          const dist = Math.hypot(camP.x - hp.x, camP.z - hp.z) || 5;
+          const out = [];
+          for (let i = 0; i <= steps; i++) {
+            const az = -Math.PI + (2 * Math.PI * i) / steps;
+            const p = new THREE.Vector3(hp.x + Math.sin(az) * dist, camP.y, hp.z + Math.cos(az) * dist);
+            const tc = p.sub(hp).normalize();
+            const ff = new THREE.Vector3(faceC.x, 0, faceC.z).normalize();
+            const cf = new THREE.Vector3(tc.x, 0, tc.z).normalize();
+            const yF = Math.atan2(new THREE.Vector3().crossVectors(ff, cf).dot(UP), ff.dot(cf));
+            const yU = THREE.MathUtils.clamp(yF, -maxYaw, maxYaw);
+            const yQ = new THREE.Quaternion().setFromAxisAngle(UP, yU);
+            const pF = Math.asin(THREE.MathUtils.clamp(tc.y, -1, 1))
+                     - Math.asin(THREE.MathUtils.clamp(faceC.y, -1, 1));
+            const pU = THREE.MathUtils.clamp(pF, -maxPitch, maxPitch);
+            const fy = faceC.clone().applyQuaternion(yQ);
+            const pa = new THREE.Vector3().crossVectors(fy, UP);
+            const pQ = pa.lengthSq() < 1e-8 ? new THREE.Quaternion()
+              : new THREE.Quaternion().setFromAxisAngle(pa.normalize(), pU);
+            const tw = pQ.multiply(yQ).multiply(baseWQ);
+            const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(tw);
+            out.push([+(az * D).toFixed(0), +(Math.atan2(fwd.x, fwd.z) * D).toFixed(1)]);
+          }
+          return { faceYaw: +(Math.atan2(faceC.x, faceC.z) * 180 / Math.PI).toFixed(1), curve: out };
+        };
+      }
 
       const parentWorldQuat = new THREE.Quaternion();
       head.parent.getWorldQuaternion(parentWorldQuat);
@@ -6501,16 +6778,31 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       if (!detectiveHeadBoneRef._smoothedQuat) {
         detectiveHeadBoneRef._smoothedQuat = head.quaternion.clone();
       }
-      detectiveHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.00);
+      // Blend rate toward the aim. 0 freezes her head at the pose it held the
+      // frame tracking engaged (she speaks without ever turning) — keep this
+      // non-zero. Tunable at runtime via window.__detTrackLerp.
+      const detTrackLerp = (typeof window !== 'undefined' && Number.isFinite(window.__detTrackLerp))
+        ? window.__detTrackLerp : 0.08;
+      detectiveHeadBoneRef._smoothedQuat.slerp(targetQuat, detTrackLerp);
 
       head.quaternion.copy(detectiveHeadBoneRef._smoothedQuat);
-    } else if (detectiveHeadBoneRef._smoothedQuat) {
-      detectiveHeadBoneRef._smoothedQuat = null;
-      detectiveHeadBoneRef._dummy = null;
-      // Re-capture rest + face axis fresh on the next engagement.
-      detectiveHeadBoneRef._baseQuat = null;
-      detectiveHeadBoneRef._baseWorldQuat = null;
-      detectiveHeadBoneRef._faceDir = null;
+    } else if (detectiveHeadBoneRef._smoothedQuat && detectiveHeadBoneRef.current) {
+      // Symmetric release (same as the demon's) — ease back toward whatever
+      // the animation wants now, then drop the override. Matters now that the
+      // gate closes mid-shot when her lobby intro ends: clearing the override
+      // outright snapped her head back to the typing pose in one frame.
+      const head = detectiveHeadBoneRef.current;
+      const animQuat = head.quaternion.clone();
+      detectiveHeadBoneRef._smoothedQuat.slerp(animQuat, 0.08);
+      head.quaternion.copy(detectiveHeadBoneRef._smoothedQuat);
+      if (detectiveHeadBoneRef._smoothedQuat.angleTo(animQuat) < 0.01) {
+        detectiveHeadBoneRef._smoothedQuat = null;
+        detectiveHeadBoneRef._dummy = null;
+        // Re-capture rest + face axis fresh on the next engagement.
+        detectiveHeadBoneRef._baseQuat = null;
+        detectiveHeadBoneRef._baseWorldQuat = null;
+        detectiveHeadBoneRef._faceDir = null;
+      }
     }
 
     // Fluffy (cat) head look-at-camera override
@@ -6570,6 +6862,18 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // has drifted off the authored pose (demonHeadTrackingRef, set in the
     // focus sequence) OR the speech-glance scheduler is currently in a
     // glance window (demonGlanceActiveRef). Mirrors the Monk/RL80 pattern.
+    // Same stale-rest problem as the detective above, mirrored: Demon_Empty's
+    // authored desk yaw is +90° and the lineup forces 0°, so his clamped
+    // yaw window slides ~90° the other way during a reveal (he can turn left
+    // but not right). Monk (-4.8°) and the unicorn (173° vs the lineup's 180°)
+    // are within a few degrees of their lineup facing, so they don't show it.
+    const demonHeadCtx = revealModeRef.current || 'desk';
+    if (demonHeadBoneRef._baseCtx !== demonHeadCtx) {
+      demonHeadBoneRef._baseCtx = demonHeadCtx;
+      demonHeadBoneRef._baseQuat = null;
+      demonHeadBoneRef._baseWorldQuat = null;
+      demonHeadBoneRef._smoothedQuat = null;
+    }
     if (demonHeadBoneRef.current && (revealFollowCam || ((demonHeadTrackingRef.current || demonGlanceActiveRef.current) && shouldTrackHeadRef.current && !revealModeRef.current))) {
       const head = demonHeadBoneRef.current;
 
