@@ -6627,7 +6627,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       detectiveHeadBoneRef._baseCtx = detHeadCtx;
       detectiveHeadBoneRef._baseQuat = null;
       detectiveHeadBoneRef._baseWorldQuat = null;
-      detectiveHeadBoneRef._faceDir = null;
+      detectiveHeadBoneRef._dummy = null;
       // Drop the in-flight smoothing too — it's in the old body frame. The
       // next tracking frame re-seeds it from the live animation pose, so the
       // turn eases in from wherever the reaction clip has her.
@@ -6647,133 +6647,42 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       const headWorldPos = new THREE.Vector3();
       head.getWorldPosition(headWorldPos);
 
-      // Delta-rotation aim (no magic yaw constant). Each frame, apply the
-      // MINIMAL world rotation that swings her FACE axis onto the head→camera
-      // direction, clamped to a max neck angle — measured from rest, so she
-      // never cranks the wrong way like the old lookAt+yaw math.
+      // Identical formulation to the Demon's block below — she used to be the
+      // one character with a bespoke aim (a cached world-space "face axis",
+      // world yaw/pitch built by hand, clamped as scalars). That version kept
+      // producing a lopsided range in the curtain call no matter how the clamp
+      // was expressed, while the Demon — same scene, same camera, same gate —
+      // was always fine. So she now runs his math rather than her own.
       //
-      // Her Head bone's face axis is local +Z — measured from the Eyes bone's
-      // local offset ([0, 0.61, 0.79], dominant +Z). We DON'T infer it from the
-      // camera anymore: that ran during the camera fly-in and locked onto +X
-      // (her side), aiming her side at the camera → face 90° off.
-      if (!detectiveHeadBoneRef._faceDir) {
-        detectiveHeadBoneRef._faceDir = new THREE.Vector3(0, 0, 1)
-          .applyQuaternion(detectiveHeadBoneRef._baseWorldQuat).normalize();
+      // Aim a dummy at the camera, express that as a delta FROM the rest pose
+      // in the bone's OWN frame, decompose to yaw(Y)/pitch(X)/roll(Z), clamp
+      // yaw and pitch, and hard-zero roll so no ear-to-shoulder tilt leaks in.
+      if (!detectiveHeadBoneRef._dummy) {
+        detectiveHeadBoneRef._dummy = new THREE.Object3D();
       }
-
-      const toCam = new THREE.Vector3().subVectors(camera.position, headWorldPos).normalize();
-      const face = detectiveHeadBoneRef._faceDir;
-      // Build the aim as YAW (around world-Y) THEN PITCH, rather than a single
-      // setFromUnitVectors shortest-arc — the shortest arc picks a free axis and
-      // rotates "up" when it should be turning. Then clamp the YAW ANGLE and the
-      // PITCH ANGLE separately, as scalars, and rebuild. Two traps this avoids:
-      //
-      //   • Clamping the COMPOSITE rotation against one budget (what this used
-      //     to do via `2*acos(|delta.w|)`). The curtain-call camera is wide and
-      //     elevated, so merely aiming at it costs a standing ~40° of pitch
-      //     before any turning; that ate most of a single 86° budget, and
-      //     because the pitch demand rises turning one way and falls turning
-      //     the other, the leftover yaw came out wildly lopsided. Measured live
-      //     at mirror-image angles: camera at -80° → head reached -75°
-      //     (unclamped), camera at +78° → head reached only +31° (clamped).
-      //     At the desk the camera sits near her eye line, pitch is small, and
-      //     the composite clamp behaved like a plain yaw clamp — which is why
-      //     this only ever showed up in the reveal.
-      //
-      //   • Decomposing into WORLD-axis Euler angles. The pitch axis is
-      //     perpendicular to whichever way she happens to be facing, which is
-      //     world-X only when that facing is ~+Z. It is during the reveal
-      //     (lineup yaw 0) but NOT at the desk (authored yaw -87°), where a
-      //     'YXZ' decomposition leaks pitch into roll.
-      //
-      // Working in scalar yaw/pitch is exact in any body orientation.
-      const maxYaw = (typeof window !== 'undefined' && Number.isFinite(window.__detClamp))
-        ? window.__detClamp : 1.57;  // 90° each way
-      const maxPitch = (typeof window !== 'undefined' && Number.isFinite(window.__detPitchClamp))
-        ? window.__detPitchClamp : 0.6; // ~34° up/down — she shouldn't crane
-      const UP = new THREE.Vector3(0, 1, 0);
-      const faceFlat = new THREE.Vector3(face.x, 0, face.z);
-      const camFlat = new THREE.Vector3(toCam.x, 0, toCam.z);
-      let delta;
-      if (faceFlat.lengthSq() < 1e-6 || camFlat.lengthSq() < 1e-6) {
-        // Degenerate: rest face (or the camera) is straight up/down — no
-        // meaningful azimuth to separate, fall back to the direct swing.
-        delta = new THREE.Quaternion().setFromUnitVectors(face, toCam);
-      } else {
-        faceFlat.normalize(); camFlat.normalize();
-        // Signed horizontal turn, measured about world +Y so left and right
-        // get identical budgets.
-        const yawFull = Math.atan2(
-          new THREE.Vector3().crossVectors(faceFlat, camFlat).dot(UP),
-          faceFlat.dot(camFlat),
-        );
-        const yawUsed = THREE.MathUtils.clamp(yawFull, -maxYaw, maxYaw);
-        const yawQ = new THREE.Quaternion().setFromAxisAngle(UP, yawUsed);
-        // Elevation difference, independent of the turn — measured as the
-        // change in altitude angle, so an unreachable yaw can never bleed into
-        // pitch and tip her head over.
-        const pitchFull = Math.asin(THREE.MathUtils.clamp(toCam.y, -1, 1))
-                        - Math.asin(THREE.MathUtils.clamp(face.y, -1, 1));
-        const pitchUsed = THREE.MathUtils.clamp(pitchFull, -maxPitch, maxPitch);
-        const faceYawed = face.clone().applyQuaternion(yawQ);
-        // Horizontal axis perpendicular to the (yawed) facing; rotating about
-        // faceYawed × UP by a positive angle raises the gaze.
-        const pitchAxis = new THREE.Vector3().crossVectors(faceYawed, UP);
-        const pitchQ = pitchAxis.lengthSq() < 1e-8
-          ? new THREE.Quaternion()
-          : new THREE.Quaternion().setFromAxisAngle(pitchAxis.normalize(), pitchUsed);
-        delta = pitchQ.multiply(yawQ); // yaw first, then pitch
-      }
-      const targetWorldQuat = delta.multiply(detectiveHeadBoneRef._baseWorldQuat);
-
-      // Debug helpers for this head aim, since it's awkward to judge by eye:
-      //   window.__detHeadRev            → which revision of the aim is live
-      //   window.__detDebug = true       → installs the sweep below
-      //   window.__detSweep()            → { faceYaw, curve: [[camYaw, headYaw]…] }
-      // The sweep reports the STEADY-STATE head yaw for a full circle of camera
-      // azimuths without having to orbit. A healthy curve ramps 1:1 through the
-      // middle and flattens at ±maxYaw either side of faceYaw. A curve that
-      // flattens much earlier on one side than the other is the old
-      // clamp-the-composite-angle bug.
-      if (typeof window !== 'undefined') {
-        window.__detHeadRev = 'yaw-pitch-split-v3';
-      }
-      if (typeof window !== 'undefined' && window.__detDebug) {
-        const baseWQ = detectiveHeadBoneRef._baseWorldQuat.clone();
-        const faceC = face.clone();
-        const hp = headWorldPos.clone();
-        const camP = camera.position.clone();
-        window.__detSweep = (steps = 24) => {
-          const D = 180 / Math.PI;
-          const dist = Math.hypot(camP.x - hp.x, camP.z - hp.z) || 5;
-          const out = [];
-          for (let i = 0; i <= steps; i++) {
-            const az = -Math.PI + (2 * Math.PI * i) / steps;
-            const p = new THREE.Vector3(hp.x + Math.sin(az) * dist, camP.y, hp.z + Math.cos(az) * dist);
-            const tc = p.sub(hp).normalize();
-            const ff = new THREE.Vector3(faceC.x, 0, faceC.z).normalize();
-            const cf = new THREE.Vector3(tc.x, 0, tc.z).normalize();
-            const yF = Math.atan2(new THREE.Vector3().crossVectors(ff, cf).dot(UP), ff.dot(cf));
-            const yU = THREE.MathUtils.clamp(yF, -maxYaw, maxYaw);
-            const yQ = new THREE.Quaternion().setFromAxisAngle(UP, yU);
-            const pF = Math.asin(THREE.MathUtils.clamp(tc.y, -1, 1))
-                     - Math.asin(THREE.MathUtils.clamp(faceC.y, -1, 1));
-            const pU = THREE.MathUtils.clamp(pF, -maxPitch, maxPitch);
-            const fy = faceC.clone().applyQuaternion(yQ);
-            const pa = new THREE.Vector3().crossVectors(fy, UP);
-            const pQ = pa.lengthSq() < 1e-8 ? new THREE.Quaternion()
-              : new THREE.Quaternion().setFromAxisAngle(pa.normalize(), pU);
-            const tw = pQ.multiply(yQ).multiply(baseWQ);
-            const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(tw);
-            out.push([+(az * D).toFixed(0), +(Math.atan2(fwd.x, fwd.z) * D).toFixed(1)]);
-          }
-          return { faceYaw: +(Math.atan2(faceC.x, faceC.z) * 180 / Math.PI).toFixed(1), curve: out };
-        };
-      }
+      const dummy = detectiveHeadBoneRef._dummy;
+      dummy.position.copy(headWorldPos);
+      dummy.lookAt(camera.position);
 
       const parentWorldQuat = new THREE.Quaternion();
       head.parent.getWorldQuaternion(parentWorldQuat);
-      const targetQuat = parentWorldQuat.clone().invert().multiply(targetWorldQuat);
+      const desiredLocal = parentWorldQuat.clone().invert().multiply(dummy.quaternion);
+
+      const baseLocal = detectiveHeadBoneRef._baseQuat;
+      const delta = baseLocal.clone().invert().multiply(desiredLocal);
+
+      const euler = new THREE.Euler().setFromQuaternion(delta, 'YXZ');
+      // Her limits, not the Demon's: 90° each way as asked, same pitch cap.
+      const MAX_YAW = (typeof window !== 'undefined' && Number.isFinite(window.__detClamp))
+        ? window.__detClamp : 1.57;
+      const MAX_PITCH = (typeof window !== 'undefined' && Number.isFinite(window.__detPitchClamp))
+        ? window.__detPitchClamp : 0.5;
+      euler.y = THREE.MathUtils.clamp(euler.y, -MAX_YAW, MAX_YAW);
+      euler.x = THREE.MathUtils.clamp(euler.x, -MAX_PITCH, MAX_PITCH);
+      euler.z = 0;
+      const clampedDelta = new THREE.Quaternion().setFromEuler(euler);
+
+      const targetQuat = baseLocal.clone().multiply(clampedDelta);
 
       if (!detectiveHeadBoneRef._smoothedQuat) {
         detectiveHeadBoneRef._smoothedQuat = head.quaternion.clone();
@@ -6798,10 +6707,9 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       if (detectiveHeadBoneRef._smoothedQuat.angleTo(animQuat) < 0.01) {
         detectiveHeadBoneRef._smoothedQuat = null;
         detectiveHeadBoneRef._dummy = null;
-        // Re-capture rest + face axis fresh on the next engagement.
+        // Re-capture the rest pose fresh on the next engagement.
         detectiveHeadBoneRef._baseQuat = null;
         detectiveHeadBoneRef._baseWorldQuat = null;
-        detectiveHeadBoneRef._faceDir = null;
       }
     }
 
