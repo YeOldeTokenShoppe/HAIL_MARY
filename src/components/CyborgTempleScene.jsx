@@ -145,6 +145,52 @@ export const GEOMETRIC_SHAPE_NUDGE = {
 // position, so nothing else moves when you toggle.
 export const SHOW_LEGACY_BEACON = false;
 
+// HologramCard (the card in play, projected above the projector base) toggle.
+// Temporarily false — the beam still renders on its own; only the card is
+// hidden. Flip to true to bring the card back. Note that with the card hidden
+// there's nothing at the beacon spot to click, so the card's camera fly-in
+// (handleClick → agentId 'HologramCard') is inert until this is re-enabled.
+export const SHOW_HOLOGRAM_CARD = false;
+
+// ── Neon sign ────────────────────────────────────────────────────────────
+// The sign lives in its own GLB (it was ~40% of the main model's geometry),
+// so only the one variant picked for this load is ever downloaded. Add a
+// variant by adding a line here — nothing else needs to change.
+//
+// Per-entry knobs, since the signs won't all be the same size or face the
+// same way out of Blender:
+//   yOffset — raise/lower the sign (scene units; the temple is ~2 tall)
+//   scale   — multiplier on the sign's authored scale
+//   yaw     — extra spin (radians) if a sign's front isn't its geometry +Z
+// Each sign is exported from its placed position in the main model, so its
+// own file already carries the right transform — offsets below default to 0
+// and only exist for per-sign touch-ups.
+export const NEON_SIGNS = [
+  { id: 'open',  url: '/models/neon_open.glb',  yOffset: 0, scale: 1, yaw: 0 },
+  { id: 'face',  url: '/models/neon_face.glb',  yOffset: 0, scale: 1, yaw: 0 },
+  { id: 'poker', url: '/models/neon_poker.glb', yOffset: 0, scale: 1, yaw: 0 },
+  { id: 'earth', url: '/models/neon_earth.glb', yOffset: 0, scale: 1, yaw: 0 },
+];
+
+// Height/placement offsets applied to every sign on top of its per-entry
+// values. Tune yOffset here to move the sign as a whole — it's the knob to
+// reach for first; the per-entry yOffset is for one sign that sits differently.
+export const NEON_SIGN_CONFIG = { yOffset: 0, xOffset: 0, zOffset: 0 };
+
+// false = re-roll on every page load (the default — a refresh gives you a
+// different sign). true = keep one sign for the whole browser tab, which is
+// steadier while tuning since it stops HMR reshuffling on every save. Note
+// that sessionStorage survives a hard refresh, so with this on you only get a
+// new sign by closing the tab or passing ?sign=random.
+// ?sign=<id> pins one regardless; ?sign=random always re-rolls.
+export const NEON_SIGN_STICKY = false;
+
+// The sign shown on the FIRST load of a browser tab — the flagship, so a
+// visitor's first impression of the temple is a known one. Every load after
+// that in the same tab randomizes normally. Set to null to randomize from the
+// very first load. ?sign=random skips the pin.
+export const NEON_SIGN_FIRST = 'open';
+
 // XZ nudge applied to Angel_Empty so the angel sits centered on the
 // altar spotlight when viewed top-down. Y is left to the hover animation.
 export const ANGEL_POSITION_OFFSET = { x: -0.10, z: 0.01 };
@@ -520,6 +566,15 @@ const CyborgTempleScene = ({
   // Refs for MOBILE.glb animated objects
   const angelEmptyRef = useRef(); // Parent container for angel and coins
   const angelRef = useRef();
+  // Neon sign at scene center, loaded from its own GLB (see NEON_SIGNS) and
+  // billboarded toward the camera each frame. _restQuat holds its authored
+  // local rotation (the FBX axis-conversion correction), which the billboard
+  // math composes with; see the useFrame block.
+  const neonSignRef = useRef(null);
+  // Optional "Neon_Empty" anchor in the main GLB. When present the sign is
+  // parented to it, so its placement stays authorable in Blender; when absent
+  // the sign falls back to the transform baked into its own file.
+  const neonAnchorRef = useRef(null);
   // Broadcast-beam target — tracks the geometric beacon baked into the scene
   // GLB (captured into beaconRef at load). Renamed from angelSpotTarget: the
   // cherub it used to reference is gone as of v76.
@@ -2004,8 +2059,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v86_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v86.glb";
+    let modelPath = "/models/RL80_4anims_v89_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v89.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -2952,6 +3007,106 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         scene.add(anchorGroup);
       }
 
+      // ── Neon sign ──────────────────────────────────────────────────────
+      // Loaded from its own GLB so only the picked variant is downloaded.
+      // Deliberately kicked off AFTER the temple is mounted: on mobile
+      // cellular a parallel fetch competes with the main model's ~3.7 MB and
+      // delays the whole scene appearing for a decorative prop. Reuses the
+      // gltfLoader above, which already has both DRACO (the sign) and Meshopt
+      // (the temple) decoders wired — a fresh loader would re-fetch the WASM.
+      const loadNeonSign = () => {
+        if (!NEON_SIGNS.length) return;
+
+        // Pick client-side only. Choosing at module scope would run during SSR
+        // and mismatch on hydration.
+        const params = new URLSearchParams(window.location.search);
+        const forced = params.get('sign');
+        let pick = NEON_SIGNS.find((s) => s.id === forced);
+
+        // First load of this tab gets the flagship sign; later loads randomize.
+        // setItem runs before `pick` is assigned so that if storage is
+        // unavailable (private mode) the throw drops us into the random path
+        // rather than pinning the flagship on every single load.
+        if (!pick && NEON_SIGN_FIRST && forced !== 'random') {
+          try {
+            if (!window.sessionStorage.getItem('neonSignSeen')) {
+              window.sessionStorage.setItem('neonSignSeen', '1');
+              pick = NEON_SIGNS.find((s) => s.id === NEON_SIGN_FIRST);
+            }
+          } catch (e) {
+            // storage disabled — fall through and roll
+          }
+        }
+
+        if (!pick) {
+          const roll = () => NEON_SIGNS[Math.floor(Math.random() * NEON_SIGNS.length)].id;
+          let id = null;
+          if (NEON_SIGN_STICKY && forced !== 'random') {
+            try {
+              id = window.sessionStorage.getItem('neonSignId');
+              if (!NEON_SIGNS.some((s) => s.id === id)) id = null; // stale after a rename
+              if (!id) window.sessionStorage.setItem('neonSignId', (id = roll()));
+            } catch (e) {
+              id = null; // private mode / storage disabled
+            }
+          }
+          pick = NEON_SIGNS.find((s) => s.id === id) || NEON_SIGNS.find((s) => s.id === roll());
+        }
+        // Debug handle — check which sign this load rolled without adding
+        // console noise: `__neonSign` in the console.
+        window.__neonSign = pick.id;
+
+        gltfLoader.load(
+          pick.url,
+          (signGltf) => {
+            const sign = signGltf.scene;
+            const anchor = neonAnchorRef.current;
+
+            // Signs are exported from their placed position in the main model,
+            // so the transform in each file is already correct — that's the
+            // normal path. An anchor empty, if one is ever added, overrides
+            // POSITION only: the sign's own rotation and scale carry the FBX
+            // axis correction the billboard composes with, and zeroing them
+            // would leave the sign lying flat.
+            templeScene.add(sign);
+            if (anchor) {
+              anchor.updateWorldMatrix(true, false);
+              const anchorPos = new THREE.Vector3();
+              anchor.getWorldPosition(anchorPos);
+              sign.position.copy(templeScene.worldToLocal(anchorPos));
+            }
+
+            const cfg = NEON_SIGN_CONFIG;
+            sign.position.x += cfg.xOffset + (pick.xOffset || 0);
+            sign.position.y += cfg.yOffset + (pick.yOffset || 0);
+            sign.position.z += cfg.zOffset + (pick.zOffset || 0);
+            if (pick.scale && pick.scale !== 1) sign.scale.multiplyScalar(pick.scale);
+            if (pick.yaw) sign.rotateY(pick.yaw);
+
+            // Emissive tubes must not be dimmed by tone mapping, same treatment
+            // the coin rings get above — otherwise the neon reads as grey.
+            sign.traverse((child) => {
+              if (!child.isMesh || !child.material) return;
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              mats.forEach((m) => {
+                if (m.emissive && m.emissive.getHex() !== 0x000000) m.toneMapped = false;
+              });
+            });
+
+            // Hand it to the billboard. _restQuat is the sign's rest rotation
+            // (the FBX axis conversion), which the per-frame math composes with
+            // so the sign's face — not its local -Z — ends up toward the camera.
+            sign.userData._restQuat = sign.quaternion.clone();
+            neonSignRef.current = sign;
+          },
+          undefined,
+          (err) => {
+            // Non-fatal: the temple renders fine without the sign.
+            console.warn(`[CyborgTempleScene] neon sign "${pick.id}" failed to load:`, err);
+          },
+        );
+      };
+
       // Find the specific meshes and add click handlers
       templeScene.traverse((child) => {
 
@@ -3234,6 +3389,15 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           child.position.z += ANGEL_POSITION_OFFSET.z;
         }
 
+        // Capture the neon sign's anchor empty, if the main GLB ships one. The
+        // sign model itself is loaded separately (loadNeonSign below) and gets
+        // parented here, so its placement stays authorable in Blender. Matched
+        // loosely because the empty has been called both Neon_Empty and
+        // Open24Hrs across exports.
+        if (!neonAnchorRef.current && /^(neon_empty|open24hrs)$/i.test(child.name || '')) {
+          neonAnchorRef.current = child;
+        }
+
         // Capture the geometric beacon (the spinning "sacred geometry" shapes
         // baked into the GLB) so the broadcast beam can aim at its real world
         // position. The four Shape* meshes are concentric → first one ≈ center.
@@ -3454,6 +3618,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           child.userData.targetObject = child;
         }
       });
+
+      // Kick off the sign fetch now that the traverse above has had a chance to
+      // capture neonAnchorRef (the sign parents to it when the main GLB ships
+      // an anchor empty).
+      loadNeonSign();
 
       // On mobile, hide the Coin meshes behind CoinFaces (CoinFaces are the visible avatars there)
       if (isOnMobile) {
@@ -6562,6 +6731,40 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
     }
 
+    // Y-axis billboard for the neon sign at scene center. Same approach as the
+    // angel above: aim a dummy at the camera projected onto the sign's
+    // horizontal plane (so it stays upright and never pitches), then convert
+    // the result into the sign's local space.
+    //
+    // Axis correction: the sign's geometry sits inside its root rotated +90°
+    // about X (the FBX import conversion), i.e. geomInNode = restQuat⁻¹. A
+    // dummy lookAt puts +Z on the camera and the sign's face is its geometry
+    // +Z, so the root needs worldQuat = dummyQuat * restQuat.
+    if (neonSignRef.current) {
+      const sign = neonSignRef.current;
+      const signWorldPos = new THREE.Vector3();
+      sign.getWorldPosition(signWorldPos);
+
+      // Horizontal-only target keeps the sign vertical as the camera rises/dips.
+      const targetWorld = new THREE.Vector3(camera.position.x, signWorldPos.y, camera.position.z);
+
+      if (!sign.userData._billboardDummy) {
+        sign.userData._billboardDummy = new THREE.Object3D();
+      }
+      const dummy = sign.userData._billboardDummy;
+      dummy.position.copy(signWorldPos);
+      dummy.lookAt(targetWorld);
+      if (sign.userData._restQuat) dummy.quaternion.multiply(sign.userData._restQuat);
+
+      if (sign.parent) {
+        const parentWorldQuat = new THREE.Quaternion();
+        sign.parent.getWorldQuaternion(parentWorldQuat);
+        sign.quaternion.copy(parentWorldQuat.invert().multiply(dummy.quaternion));
+      } else {
+        sign.quaternion.copy(dummy.quaternion);
+      }
+    }
+
     // Add subtle animations for mobile objects
     if (isOnMobile) {
       // Angel_Empty hover animation - subtle up and down motion for the entire group
@@ -6648,7 +6851,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                   <BeaconBeam
                     anchorRef={projectorRef}
                     color="#35e8ff"
-                    height={0.25}
+                    height={0.55}
                     topRadius={0.10}
                     bottomRadius={0.03}
                     opacity={0.1}
@@ -6661,7 +6864,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                   !revealMode, same as the beam above) so it doesn't hang in the
                   air behind the staged characters — only the standard
                   deliberation scene shows the projected card. */}
-              {!SHOW_LEGACY_BEACON && !revealMode && (
+              {SHOW_HOLOGRAM_CARD && !SHOW_LEGACY_BEACON && !revealMode && (
                 <HologramCard
                   // v84 dropped the Shape* geometric beacon, so anchor to the
                   // hologram-projector base (same mesh the beam rides). yOffset
