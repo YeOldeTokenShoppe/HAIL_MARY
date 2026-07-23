@@ -1,9 +1,15 @@
-// Card-shaped kit card + the kit hand row, shared by the desk grid and the
-// channel table dock (the kc- styles live in both surfaces' style blocks —
-// import KC_CSS into each). Two-tap flow: arm → play.
-import React from "react";
+// The kit hand, shared by the desk grid and the channel table dock (the
+// kc-/kh- styles live in both surfaces' style blocks — import KC_CSS into
+// each). Interaction model (playtest 2026-07-22): tap a card for the
+// close-up — the real TradingCard, large — and PLAY from inside it. One
+// model everywhere: tap to inspect, explicit button to act. (The old
+// two-tap arm→play read as "nothing happens".)
+"use client";
+import React, { useEffect, useMemo, useState } from "react";
 import { KIT_CARDS, KIND_LABEL } from "@/game/terminal-traders/caseKit";
-import { getCardArt } from "@/game/terminal-traders/templateCard";
+import { getCardById } from "@/game/terminal-traders/cards";
+import { getCardArt, toTemplateCard } from "@/game/terminal-traders/templateCard";
+import TradingCard from "@/components/TradingCard";
 import { RARITY_COLOR } from "./constants";
 
 // `art` (a CARD_ART src) renders as a backdrop behind the terminal text —
@@ -25,11 +31,32 @@ export function KitCard({ color, name, kind, text, footer, state = "idle", small
   );
 }
 
-// The player's hand: Eugene's patron whisper (when unspent) + the kit cards.
-// Owns the two-tap arm/play interaction; effects resolve upstream (caseKit).
-// `cards` is the confirmed kit (KitSelect); the full First Twelve is only
-// the pre-kit dev fallback.
-export function KitHand({ cards = KIT_CARDS, small, kitPlayed, selectedCard, noActions, onArm, onPlay, showHint, onHint }) {
+// The player's hand: Eugene's patron whisper (when unspent) + the dealt
+// cards as real TradingCards. Tap a card → close-up overlay → PLAY (the
+// button states the price: free action, overage bill, or book-too-thin).
+// `overageCost` > 0 = the free budget is spent and the next play bills the
+// book; `noActions` = the book can't fund another look.
+export function KitHand({ cards = KIT_CARDS, small, kitPlayed, noActions, overageCost = 0, onPlay, showHint, onHint }) {
+  const [viewId, setViewId] = useState(null);
+  const [viewScale, setViewScale] = useState(0.52);
+  const templates = useMemo(
+    () => Object.fromEntries(cards.map((c) => [c.id, toTemplateCard(getCardById(c.id))])),
+    [cards]
+  );
+  useEffect(() => {
+    if (!viewId) return;
+    const fit = () => setViewScale(Math.min(
+      (window.innerWidth - 48) / 744,
+      (window.innerHeight - 210) / 1038,
+      0.56
+    ));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [viewId]);
+  const scale = small ? 0.175 : 0.24;
+  const view = cards.find((c) => c.id === viewId) || null;
+  const viewPlayed = view ? kitPlayed.includes(view.id) : false;
   return (
     <>
       {showHint && (
@@ -48,26 +75,39 @@ export function KitHand({ cards = KIT_CARDS, small, kitPlayed, selectedCard, noA
       )}
       {cards.map((card) => {
         const played = kitPlayed.includes(card.id);
-        const sel = selectedCard === card.id;
         return (
-          <KitCard
+          <button
             key={card.id}
-            small={small}
-            color={RARITY_COLOR[card.rarity]}
-            name={card.name}
-            kind={`${card.rarity.toUpperCase()} · ${KIND_LABEL[card.kind]}`}
-            text={card.text}
-            art={getCardArt(card.id)}
-            state={played ? "played" : sel ? "armed" : "idle"}
-            footer={played ? "PLAYED" : !sel ? "TAP TO ARM" : noActions ? "NO ACTIONS LEFT" : small ? "TAP AGAIN — 1 ACT ▸" : "TAP AGAIN — 1 ACTION ▸"}
-            onClick={() => {
-              if (played) return;
-              if (!sel) { onArm(card.id); return; }
-              if (!noActions) onPlay(card);
-            }}
-          />
+            className={`kh-thumb${played ? " kh-played" : ""}`}
+            onClick={() => setViewId(card.id)}
+            title={`${card.name} — tap for close-up`}
+          >
+            <TradingCard data={templates[card.id]} scale={scale} interactive={false} templateStyle="terminal" />
+            {played && <span className="kh-badge">PLAYED</span>}
+          </button>
         );
       })}
+      {view && (
+        <div className="kh-overlay" onClick={() => setViewId(null)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <TradingCard data={templates[view.id]} scale={viewScale} templateStyle="terminal" />
+          </div>
+          <div className="kh-overlay-actions" onClick={(e) => e.stopPropagation()}>
+            {viewPlayed ? (
+              <span className="kh-note">ALREADY PLAYED THIS DEAL</span>
+            ) : (
+              <button
+                className="kh-play"
+                disabled={noActions}
+                onClick={() => { onPlay(view); setViewId(null); }}
+              >
+                {noActions ? "BOOK TOO THIN" : overageCost > 0 ? `⟡ PLAY — BILLS −${overageCost} ▸` : "⟡ PLAY — 1 ACTION ▸"}
+              </button>
+            )}
+            <button className="kh-close" onClick={() => setViewId(null)}>✕ CLOSE</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -105,4 +145,27 @@ export const KC_CSS = `
   .kc-card.armed { border-color: var(--cc); box-shadow: 0 0 14px color-mix(in srgb, var(--cc) 45%, transparent); }
   .kc-card.armed .kc-play { background: color-mix(in srgb, var(--cc) 18%, transparent); opacity: 1; }
   .kc-card.played { opacity: 0.35; cursor: default; }
+  /* kh- : the hand as real TradingCards — tap for close-up, PLAY inside it. */
+  .kh-thumb { position: relative; flex: 0 0 auto; background: none; border: none; padding: 2px;
+    cursor: zoom-in; transition: transform 0.12s ease; }
+  .kh-thumb:hover { transform: translateY(-3px); }
+  .kh-thumb.kh-played { opacity: 0.4; }
+  .kh-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-12deg);
+    font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; letter-spacing: 0.2em;
+    color: #ffd23a; border: 1.5px solid #ffd23a; padding: 3px 9px; background: rgba(4,20,15,0.85); }
+  .kh-overlay { position: fixed; inset: 0; z-index: 10060; display: flex; flex-direction: column;
+    gap: 13px; align-items: center; justify-content: center;
+    background: rgba(2,10,9,0.9); backdrop-filter: blur(4px); }
+  .kh-overlay-actions { display: flex; gap: 10px; align-items: center; }
+  .kh-play { background: rgba(47,214,214,0.14); border: 1.5px solid #2fd6d6; color: #f4fffb;
+    font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; letter-spacing: 0.08em;
+    padding: 12px 22px; cursor: pointer;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    box-shadow: 0 0 14px rgba(47,214,214,0.3); }
+  .kh-play:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+  .kh-close { background: none; border: 1px solid rgba(47,214,214,0.4); color: #2fd6d6;
+    font-family: 'Courier New', monospace; font-size: 11.5px; letter-spacing: 0.06em;
+    padding: 11px 16px; cursor: pointer; }
+  .kh-note { font-family: 'Courier New', monospace; font-size: 11.5px; font-weight: bold;
+    letter-spacing: 0.14em; color: #ffd23a; }
 `;

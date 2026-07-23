@@ -57,11 +57,67 @@ export function kitCardsFromCollection(cards) {
     .map(toKitCard);
 }
 
-// §3.1's one-tap "RUN BASIC KIT": a deep scan leads (so the default path
-// actually meets Tier-2 — CLASSIFIED entries and sealed questions are
-// invisible to a lens-keys-only kit), lens keys cover the remaining
-// stations, then insurance. Every addition is legality-checked so a
-// foil-heavy pool can't auto-pick itself into an illegal kit.
+// THE DEAL (investor-primary, 2026-07-22): hands are DEALT, not built.
+// The collection is the deck — a seeded shuffle deals `handSize` cards per
+// prospect, taking cards in shuffled order only while the hand stays legal
+// (isKitLegal), so the dealer enforces the whale guard. Deterministic from
+// (seed, caseIndex): same deal flow, same hand — no reroll fishing, replays
+// stay fair, and the harness can pin it. mulberry32, the house PRNG.
+export function dealKit(pool = KIT_CARDS, seed = 1, caseIndex = 0, handSize = KIT_RULES.maxCards) {
+  let a = (seed * 7919 + caseIndex * 104729 + 0x9e3779b9) >>> 0;
+  const rand = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const hand = [];
+  for (const c of shuffled) {
+    if (hand.length >= handSize) break;
+    if (isKitLegal([...hand, c])) hand.push(c);
+  }
+  return hand;
+}
+
+// Interim replayability patch (2026-07-22, ahead of §10's archetype-
+// instanced prospects): the deal flow's order shuffles per seed, so the
+// first prospect isn't always the same token. Generic over any array —
+// the caller passes case files. Same PRNG discipline as dealKit.
+export function shuffleDocket(cases, seed = 1) {
+  // Avalanche the seed first: with only a handful of cases, adjacent seeds
+  // fed straight into mulberry32 landed in the same coarse shuffle bucket
+  // (1337-1339 all produced one order). Two multiply-xorshift rounds give
+  // day-to-day seeds genuinely different orders.
+  let a = seed >>> 0;
+  a = Math.imul(a ^ (a >>> 16), 0x45d9f3b) >>> 0;
+  a = Math.imul(a ^ (a >>> 16), 0x45d9f3b) >>> 0;
+  a = (a ^ (a >>> 16)) >>> 0;
+  const rand = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const order = [...cases];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+// One-tap auto-pick (kept for fallbacks/tests): a deep scan leads (so the
+// default path actually meets Tier-2 — CLASSIFIED entries and sealed
+// questions are invisible to a lens-keys-only kit), lens keys cover the
+// remaining stations, then insurance. Every addition is legality-checked so
+// a foil-heavy pool can't auto-pick itself into an illegal kit.
 export function pickBasicKit(pool = KIT_CARDS) {
   const kit = [];
   const take = (pred) => {

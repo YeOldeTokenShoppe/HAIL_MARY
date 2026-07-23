@@ -58,16 +58,21 @@ export function coverageNote(caseData, investigated) {
   const inv = investigated instanceof Set ? investigated : new Set(investigated || []);
   const consulted = inv.size;
   const total = caseData?.stations ? Object.keys(caseData.stations).length : 0;
-  if (consulted === 0) return { note: null, tone: null };
+  // The viber path: trading the chart with zero questions asked is allowed —
+  // and the recap names it (sim: research pays ~+4.8/deal, vibes ~breakeven).
+  if (consulted === 0) return {
+    tone: "nudge",
+    note: "You traded the chart without asking a single question. Sometimes that pays. Over a career, the receipts win.",
+  };
   if (consulted === 1) {
     return {
       tone: "nudge",
-      note: "You read this case through a single voice. The strongest calls come from cross-checking angles — one lens can mislead, but consultants who agree independently rarely do.",
+      note: "You ran all your research through a single analyst. The strongest positions come from cross-checking angles — one lens can mislead, but analysts who agree independently rarely do.",
     };
   }
   return {
     tone: "affirm",
-    note: `You triangulated across ${consulted}${total ? ` of ${total}` : ""} voices — that's how you tell a real signal from one loud tell.`,
+    note: `You triangulated across ${consulted}${total ? ` of ${total}` : ""} analysts — that's how you tell a real edge from one loud tell.`,
   };
 }
 
@@ -630,8 +635,10 @@ function RevealView({ caseData, verdict, brier, investigated }) {
         <div className={`lt-reveal-glyph ${isCorrect ? "is-correct" : isAbstain ? "is-abstain" : "is-wrong"}`}>
           {isCorrect ? "✓" : isAbstain ? "◇" : "✗"}
         </div>
-        <div className="lt-reveal-verdict-label">YOU RENDERED</div>
-        <div className="lt-reveal-verdict-name">{verdict.toUpperCase()}</div>
+        <div className="lt-reveal-verdict-label">YOUR POSITION</div>
+        <div className="lt-reveal-verdict-name">
+          {({ believe: "LONG", doubt: "SHORT", abstain: "HOLD" })[verdict] || verdict.toUpperCase()}
+        </div>
       </div>
 
       <div className="lt-reveal-truth">
@@ -640,9 +647,14 @@ function RevealView({ caseData, verdict, brier, investigated }) {
       </div>
 
       <div className="lt-reveal-score">
+        {/* P&L is the score (2026-07-22): the Brier value translates to
+            book points at the council's flat 25 stake — same affine kernel
+            the Case Table pays, never the raw Brier figure. */}
         <div className="lt-score-block">
-          <div className="lt-score-label">BRIER</div>
-          <div className={`lt-score-value ${gradeClass}`}>{brier.toFixed(3)}</div>
+          <div className="lt-score-label">EDGE</div>
+          <div className={`lt-score-value ${gradeClass}`}>
+            {(() => { const e = Math.round((1 - 4 * brier) * 25); return `${e >= 0 ? "+" : ""}${e}`; })()}
+          </div>
         </div>
         <div className="lt-score-block">
           <div className="lt-score-label">GRADE</div>

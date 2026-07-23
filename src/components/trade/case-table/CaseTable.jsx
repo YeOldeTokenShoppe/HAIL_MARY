@@ -9,7 +9,7 @@ import CASE_001 from "@/components/game/cases/case-001";
 import CASE_002 from "@/components/game/cases/case-002";
 import CASE_003 from "@/components/game/cases/case-003";
 import { CASE_SIGNALS } from "@/game/terminal-traders/caseSignals";
-import { resolveKitPlay, KIT_CARDS, kitCardsFromCollection, pickBasicKit } from "@/game/terminal-traders/caseKit";
+import { resolveKitPlay, KIT_CARDS, kitCardsFromCollection, dealKit, shuffleDocket } from "@/game/terminal-traders/caseKit";
 import {
   YOU, BASE_ACTIONS, BOT_ROUNDS, bucket,
   createBotState, botRound, finalizeCalls, settleCase,
@@ -20,7 +20,7 @@ import { CHARACTER_META, CHARACTER_ORDER } from "@/components/CaseFile/character
 import { useCardCollection } from "@/hooks/useCardCollection";
 import { SEATS, STAKE, START_PF, DOCK_H } from "./constants";
 import { KitHand } from "./KitCard";
-import KitSelect from "./KitSelect";
+import DealHand from "./DealHand";
 import Lobby from "./Lobby";
 import DeskGrid from "./DeskGrid";
 import TableDock from "./TableDock";
@@ -102,7 +102,6 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   const [deepReveals, setDeepReveals] = useState(0);              // Tier-2 count → scorecard
   const [kitLog, setKitLog] = useState([]);                       // structured plays → Ledger/Reveal callouts
   const [kitPlayed, setKitPlayed] = useState([]);
-  const [selectedCard, setSelectedCard] = useState(null);
   const [shields, setShields] = useState(0);
   const [shieldSpent, setShieldSpent] = useState(false);
   const [stopLossArmed, setStopLossArmed] = useState(false); // Neon Stop Loss — this case only
@@ -111,6 +110,11 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   const [marisolFreeUsed, setMarisolFreeUsed] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
   const [tableLog, setTableLog] = useState([]);
+  const [overageSpent, setOverageSpent] = useState(0); // per-case research tab
+  // The play-result banner: card effects resolve at OTHER stations and the
+  // table feed is easy to miss, so every play announces itself prominently
+  // ("nothing happens when I use the cards" — playtest 2026-07-22).
+  const [playFlash, setPlayFlash] = useState(null);
   const [punditFinal, setPunditFinal] = useState({}); // { stationKey: { p, scanned } }
 
   const botRef = useRef(createBotState());
@@ -123,21 +127,45 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   const [reward, setReward] = useState(null);
   const rewardSeedRef = useRef(null);
 
-  // The owned action pool as kit cards (§3.1); signed-out / still-loading
-  // falls back to the First Twelve so the table never blocks on the fetch.
+  // The owned action pool (signed-out / still-loading falls back to the
+  // First Twelve), and this prospect's DEALT hand — seeded, legal by
+  // construction, different every case. The collection is the deck.
   const { cards: ownedCards } = useCardCollection();
-  const kitPool = kitCardsFromCollection(ownedCards) || KIT_CARDS;
+  const kitPool = React.useMemo(() => kitCardsFromCollection(ownedCards) || KIT_CARDS, [ownedCards]);
+  const dealtHand = React.useMemo(() => dealKit(kitPool, seed, caseIndex), [kitPool, seed, caseIndex]);
 
-  const caseData = docket[caseIndex];
+  // Seeded flow (interim replayability patch): today's shuffle decides the
+  // prospect spread. The player PLACES their active deal from the remaining
+  // spread each round (§10.1 — the Pokémon active-slot move); the shuffled
+  // order is only the fallback when nothing has been placed.
+  const flow = React.useMemo(() => shuffleDocket(docket, seed), [docket, seed]);
+  const [playedIds, setPlayedIds] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const remaining = React.useMemo(() => flow.filter((c) => !playedIds.includes(c.id)), [flow, playedIds]);
+  const caseData = remaining.find((c) => c.id === activeId) || remaining[0] || flow[flow.length - 1];
   const signals = CASE_SIGNALS[caseData.id];
   const actionsMax = BASE_ACTIONS + bonusActions;
-  // Pundit calls open only after the investigation is spent (§4.2 flow order).
-  // Actions don't bank between cases, so an early call is strictly a loss.
   const actionsLeft = Math.max(0, actionsMax - actionsUsed);
-  const callsOpen = actionsLeft === 0;
+  // RESEARCH OVERAGE (playtest 2026-07-22: "let the user play as many cards
+  // and question as many traders as they want"): the cap is a PRICE, not a
+  // wall — §10's research-costs principle in interim form. The first
+  // actionsMax actions are free; beyond that each action bills the book at
+  // an escalating rate (−2, −3, −4...), floored so research can't bust you.
+  // Sweeping everything is legal and usually worse than selectivity — the
+  // ledger shows the tab.
+  const overageNext = actionsUsed >= actionsMax ? actionsUsed - actionsMax + 2 : 0;
+  const canAffordOverage = overageNext === 0 || (books[YOU] ?? 0) - overageNext >= 5;
+  // The calls are always open — trading anytime is the skip path's promise.
+  const callsOpen = true;
 
   const log = (line) => setTableLog((l) => [...l, line]);
   const shortName = (k) => CHARACTER_META[k].name.split(" ").pop();
+
+  useEffect(() => {
+    if (!playFlash) return;
+    const t = setTimeout(() => setPlayFlash(null), 5500);
+    return () => clearTimeout(t);
+  }, [playFlash]);
 
   // Eugene's voice at the table (2026-07-22): MYTHOS has no SitePal scene —
   // he speaks through his own ElevenLabs pipeline (playUnicornBeat handles
@@ -199,14 +227,29 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     setVisited((v) => (v.includes(key) ? v : [...v, key]));
   };
 
+  // Charge the overage for one more action beyond the free budget. Returns
+  // false (and logs) when the house won't fund it. No-op inside the budget.
+  const billOverage = () => {
+    if (overageNext === 0) return true;
+    if (!canAffordOverage) {
+      log("⟡ The house won't fund more research — your book is too thin.");
+      return false;
+    }
+    setBooks((b) => ({ ...b, [YOU]: (b[YOU] ?? 0) - overageNext }));
+    setOverageSpent((s) => s + overageNext);
+    log(`⟡ Research overage — the desk bills your book −${overageNext}.`);
+    return true;
+  };
+
   const ask = (qIndex) => {
     const key = activeStation;
     const free = patron === "marisol" && key === "marisol" && !marisolFreeUsed;
-    if (!free && actionsUsed >= actionsMax) return;
     if ((asked[key] || []).includes(qIndex)) return;
     // "locked" = the station's sealed 4th question (§3.3) — askable only
     // after a deep scan unseals it, and it costs a scan like any other.
     if (qIndex === "locked" && !unlockedQuestions[key]) return;
+    // Bill LAST, after every no-op check — a duplicate tap must never charge.
+    if (!free && !billOverage()) return;
     const q = qIndex === "locked"
       ? caseData.stations[key]?.lockedQuestion
       : caseData.stations[key]?.questions[qIndex];
@@ -224,18 +267,23 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     setActionsUsed((a) => a + 1);
     log(`R${Math.min(actionsUsed + 1, BOT_ROUNDS)} · You press ${shortName(key)} (${CHARACTER_META[key].role})`);
     runBotRound();
-    if (actionsUsed + 1 >= actionsMax) log("▸ Out of actions — the table is waiting. PUNDIT CALLS ▸");
+    if (actionsUsed + 1 === actionsMax) log("▸ Free actions spent — more research bills your book. The calls are open.");
   };
 
   // ---------- kit (caseKit.js) ----------
   const playKitCard = (card) => {
-    if (kitPlayed.includes(card.id) || actionsUsed >= actionsMax) return;
+    if (kitPlayed.includes(card.id)) return;
     const play = resolveKitPlay(card, {
       signals, caseData, revealed, unlocked: unlockedQuestions,
       visited, order: CHARACTER_ORDER, shortName,
     });
     log(play.log);
-    if (!play.ok) return; // whiff — the card (and the action) isn't consumed
+    if (!play.ok) {
+      // whiff — the card (and the action) isn't consumed, and never billed
+      setPlayFlash({ tone: "whiff", name: card.name, text: play.log.replace(/^⟡\s*/, ""), stations: [] });
+      return;
+    }
+    if (!billOverage()) return; // beyond the free budget and the book's too thin
     // Tier-1 and Tier-2 labels share one revealed map (labels are unique per
     // station by authoring rule); ChannelView resolves the tier per label.
     const merged = {};
@@ -265,13 +313,18 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     if (play.grants?.stopLoss) setStopLossArmed(true);
     if (play.grants?.peek) setPeekArmed(true);
     if (play.grants?.bonusActions) setBonusActions((b) => b + play.grants.bonusActions);
+    setPlayFlash({
+      tone: "ok",
+      name: card.name,
+      text: play.log.replace(new RegExp(`^⟡\\s*(You play\\s+${card.name}\\s*—\\s*)?`), ""),
+      stations: Object.keys(merged),
+    });
     setKitPlayed((p) => [...p, card.id]);
-    setSelectedCard(null);
     setActionsUsed((a) => a + 1);
     runBotRound();
     // wildcard grants +2 actions, so recompute against the post-play max
     const maxAfter = card.kind === "wildcard" ? actionsMax + 2 : actionsMax;
-    if (actionsUsed + 1 >= maxAfter) log("▸ Out of actions — the table is waiting. PUNDIT CALLS ▸");
+    if (actionsUsed + 1 === maxAfter) log("▸ Free actions spent — more research bills your book. The calls are open.");
   };
 
   const useHint = () => {
@@ -297,8 +350,12 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     setShields(patronKey === "monk" ? 1 : 0);
     setMarisolFreeUsed(false);
     setHintUsed(false);
+    setPlayedIds([]);
+    setActiveId(null);
     resetInvestigation();
-    setScreen("menu");
+    // The shuffle leads (playtest 2026-07-22): deal the hand FIRST, then
+    // the prospect briefing — cards in hand before you meet the deal.
+    setScreen("kit");
   };
 
   const resetInvestigation = () => {
@@ -306,11 +363,12 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     setAsked({}); setRevealed({}); setVisited([]);
     setPlayerP(null); setPlayerVerdict(null);
     setTicketP(50); setTicketStake(STAKE); setTicketHorizon(0);
-    setKitPlayed([]); setSelectedCard(null); setShieldSpent(false); setStopLossArmed(false);
+    setKitPlayed([]); setShieldSpent(false); setStopLossArmed(false);
     setPeekArmed(false); setPeekChoice(null); setMarisolFreeUsed(false);
     setTableLog([]); setPunditFinal({});
     // per-case Tier-2 state (the confirmed `kit` itself persists)
     setUnlockedQuestions({}); setDeepReveals(0); setKitLog([]);
+    setOverageSpent(0);
     botRef.current = createBotState();
   };
 
@@ -320,7 +378,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
       botState: botRef.current, pHuman, stakeYou, horizonIdx, patron,
       payoutMult, shields, stopLossArmed,
       youScanned: Object.keys(asked).filter((s) => (asked[s]?.length || 0) > 0),
-      caseIndex, docketLength: docket.length, seed,
+      caseIndex, docketLength: flow.length, seed,
     });
     setBooks(result.books);
     setBusted(result.busted);
@@ -343,13 +401,15 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   };
 
   const advance = () => {
-    if (busted[YOU] || caseIndex >= docket.length - 1) {
+    if (busted[YOU] || caseIndex >= flow.length - 1) {
       setScreen("standings");
       return;
     }
+    setPlayedIds((p) => [...p, caseData.id]);
+    setActiveId(null);
     setCaseIndex((i) => i + 1);
     resetInvestigation();
-    setScreen("menu");
+    setScreen("kit");
   };
 
   // The kit hand, both sizes — the desk row and the channel dock render the
@@ -360,9 +420,8 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
       cards={kit || KIT_CARDS}
       small={small}
       kitPlayed={kitPlayed}
-      selectedCard={selectedCard}
-      noActions={actionsUsed >= actionsMax}
-      onArm={setSelectedCard}
+      noActions={overageNext > 0 && !canAffordOverage}
+      overageCost={canAffordOverage ? overageNext : 0}
       onPlay={playKitCard}
       showHint={patron === "eugene" && !hintUsed}
       onHint={useHint}
@@ -373,7 +432,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   if (screen === "lobby") {
     return (
       <Lobby
-        docketLength={docket.length}
+        docketLength={flow.length}
         onStart={startDocket}
         onExit={onExit}
         dev={dev}
@@ -386,15 +445,16 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
 
   if (screen === "kit") {
     return (
-      <KitSelect
-        pool={kitPool}
-        initial={kit}
-        ticker={caseData.ticker}
+      <DealHand
+        hand={dealtHand}
+        poolSize={kitPool.length}
+        prospects={remaining}
+        activeId={activeId}
+        onPickProspect={setActiveId}
         caseIndex={caseIndex}
-        docketLength={docket.length}
-        onConfirm={(cards) => { setKit(cards); setScreen("grid"); }}
-        onBasic={() => { setKit(pickBasicKit(kitPool)); setScreen("grid"); }}
-        onBack={() => setScreen("menu")}
+        docketLength={flow.length}
+        onConfirm={(cards) => { setKit(cards); setScreen("menu"); }}
+        onBack={() => setScreen("lobby")}
       />
     );
   }
@@ -402,7 +462,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   if (screen === "calls") {
     return (
       <PunditCalls
-        ticker={caseData.ticker} caseIndex={caseIndex} docketLength={docket.length}
+        ticker={caseData.ticker} caseIndex={caseIndex} docketLength={flow.length}
         books={books} busted={busted} ledger={ledger} patron={patron}
         punditFinal={punditFinal} mods={botRef.current.mods}
         peekArmed={peekArmed} peekChoice={peekChoice}
@@ -417,7 +477,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
   if (screen === "verdict") {
     return (
       <PositionTicket
-        ticker={caseData.ticker} caseIndex={caseIndex} docketLength={docket.length}
+        ticker={caseData.ticker} caseIndex={caseIndex} docketLength={flow.length}
         books={books} busted={busted} ledger={ledger} patron={patron}
         ticketP={ticketP} onTicketP={setTicketP}
         ticketStake={ticketStake} onTicketStake={setTicketStake}
@@ -438,9 +498,9 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
     return (
       <Ledger
         ticker={caseData.ticker} truth={signals.truth}
-        caseIndex={caseIndex} docketLength={docket.length}
+        caseIndex={caseIndex} docketLength={flow.length}
         books={books} busted={busted} patron={patron} rows={ledger}
-        kitPlays={kitLog}
+        kitPlays={kitLog} overageSpent={overageSpent}
         pendingEvent={pendingEvent} shieldSpent={shieldSpent}
         monkShieldHeld={!!botRef.current.shield.monk && !busted.monk}
         onAdvance={advance}
@@ -473,14 +533,45 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
 
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 10050, background: "#02100e" }}>
+      {/* Play-result banner — what the card just did, and where the intel
+          landed. Tap to dismiss; auto-clears. */}
+      {playFlash && (screen === "grid" || screen === "channel") && (
+        <button className="ct-playflash" data-tone={playFlash.tone} onClick={() => setPlayFlash(null)}>
+          <span className="ct-pf-name">⟡ {playFlash.name.toUpperCase()}{playFlash.tone === "whiff" ? " — NO EFFECT (NOT SPENT)" : ""}</span>
+          <span className="ct-pf-text">{playFlash.text}</span>
+          {playFlash.stations.length > 0 && (
+            <span className="ct-pf-where">
+              NEW INTEL → {playFlash.stations.map((k) => shortName(k).toUpperCase()).join(" · ")}
+              {playFlash.stations.some((k) => k !== activeStation) ? " — OPEN THEIR CHANNEL TO READ IT" : ""}
+            </span>
+          )}
+        </button>
+      )}
+      <style>{`
+        .ct-playflash { position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+          z-index: 10056; width: min(660px, calc(100% - 28px));
+          display: flex; flex-direction: column; gap: 5px; text-align: left;
+          background: rgba(4,20,15,0.96); border: 1.5px solid #ffd23a; color: #eafff9;
+          font-family: 'Courier New', monospace; padding: 11px 14px; cursor: pointer;
+          clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+          box-shadow: 0 0 26px rgba(255,210,58,0.4), 0 8px 24px rgba(0,0,0,0.6);
+          animation: ctpf-in 0.25s ease both; }
+        .ct-playflash[data-tone="whiff"] { border-color: #bfeede; box-shadow: 0 0 18px rgba(191,238,222,0.25); }
+        .ct-pf-name { font-size: 12px; font-weight: bold; letter-spacing: 0.1em; color: #ffd23a; }
+        .ct-playflash[data-tone="whiff"] .ct-pf-name { color: #bfeede; }
+        .ct-pf-text { font-size: 12.5px; line-height: 1.45; }
+        .ct-pf-where { font-size: 10.5px; font-weight: bold; letter-spacing: 0.1em; color: #4dffaa; }
+        @keyframes ctpf-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+      `}</style>
       {screen === "menu" ? (
-        <TerminalMenu caseData={caseData} caseIndex={caseIndex} docketLength={docket.length} onBegin={() => setScreen("kit")} onExit={() => setScreen("lobby")} exitLabel="◀ LOBBY" />
+        <TerminalMenu caseData={caseData} caseIndex={caseIndex} docketLength={flow.length} onBegin={() => setScreen("grid")} onSkip={enterCalls} onExit={() => setScreen("lobby")} exitLabel="◀ LOBBY" />
       ) : screen === "reveal" ? (
         <RevealScreen
           caseData={caseData}
           verdict={playerVerdict}
           confidence={playerP}
           investigated={Object.keys(asked).filter((k) => (asked[k]?.length || 0) > 0)}
+          pnl={ledger?.find((r) => r.seat === YOU)?.pnl ?? null}
           kitNote={kitNote}
           speakerKey={revealSpeaker}
           speakerSceneId={sitePalScenes?.[revealSpeaker]}
@@ -499,6 +590,7 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
               revealed={revealed[activeStation] || []}
               connections={caseData.connections || []}
               lockedUnlocked={!!unlockedQuestions[activeStation]}
+              overageCost={overageNext === 0 ? 0 : canAffordOverage ? overageNext : null}
               speakLine={sitePalScenes && activeStation === "eugene" ? speakEugene : undefined}
               onAsk={ask}
               onBack={() => setScreen("grid")}
@@ -518,8 +610,8 @@ export default function CaseTable({ docket = DEFAULT_DOCKET, initialSeed = 1337,
         </>
       ) : (
         <DeskGrid
-          caseData={caseData} caseIndex={caseIndex} docketLength={docket.length}
-          visited={visited} tableLog={tableLog}
+          caseData={caseData} caseIndex={caseIndex} docketLength={flow.length}
+          visited={visited} revealed={revealed} tableLog={tableLog}
           tipSeen={tipsSeen.desk} onDismissTip={() => dismissTip("desk")}
           actionsLeft={actionsLeft} actionsMax={actionsMax} book={books[YOU]}
           callsOpen={callsOpen}

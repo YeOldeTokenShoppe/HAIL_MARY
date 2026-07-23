@@ -21,12 +21,12 @@ export default function PunditCalls({
     <Shell>
       <div className="ct-talk">
         <SeatStrip books={books} busted={busted} ledger={ledger} patron={patron} />
-        <div className="ct-eyebrow">▸ PUNDIT CALLS — CASE {caseIndex + 1}/{docketLength} · {ticker}</div>
+        <div className="ct-eyebrow">▸ ANALYST CALLS — DEAL {caseIndex + 1}/{docketLength} · {ticker}</div>
         <div className="ct-talk-note">The partners call their leans. Exact numbers stay sealed until the Ledger — read the room, don't copy it.</div>
         {!tipSeen && (
-          <Tip title="PUNDIT CALLS — FIRST TIME" onDismiss={onDismissTip}>
-            Leans are color, not answers. Each partner only read part of the case, and each has a bias —
-            their exact numbers unseal at the Ledger next to yours. Copying the loudest voice at the table is how books die.
+          <Tip title="ANALYST CALLS — FIRST TIME" onDismiss={onDismissTip}>
+            Leans are color, not answers. Each partner only researched part of the deal, and each has a bias —
+            their exact numbers unseal at the Ledger next to yours. Copying the loudest voice at the desk is how books die.
           </Tip>
         )}
         {CHARACTER_ORDER.map((k) => {

@@ -7,6 +7,8 @@
 // posts its own talk-ended. No selectPortal, nothing to disambiguate.
 // See main2_triple_portrait_panel for why one-frame-per-character exists.
 
+import { setAdviserMouth, resetAdviserMouths } from "./adviserMouth";
+
 // Voices. Engine 7 = SitePal's built-in TTS (numbered voices, optional
 // effect/effLevel: "P" pitch ±3, "T" reverb 3, "W" whisper). Engine 14 =
 // ElevenLabs via the SitePal-connected account; id = the EL voice UUID.
@@ -194,15 +196,84 @@ export function portalScene(containerId) {
 }
 
 // ── Adviser voices, without a player ──
-// The advisers have no SitePal player on phones (three OOM-crash iOS), so they
-// speak straight from ElevenLabs through ONE reused <audio> element.
+// The advisers have no SitePal player on the solo layout (and three OOM-crash
+// iOS), so they speak straight from ElevenLabs.
 //
-// Why one element, reused: iOS only lets audio start inside a user gesture, and
-// that permission attaches to the ELEMENT, not the page. So we unlock a single
-// element during a real tap and every later line plays through that same one.
-// A fresh element per line would be blocked. Plain <audio> also needs no
-// AudioContext, which keeps us clear of iOS's one-context limit.
+// TWO PLAYBACK PATHS, and the choice is about LIP-SYNC, not about audio:
+//
+//   PREFERRED — decode to an AudioBuffer and play it through a Web Audio graph
+//   with an AnalyserNode. This is the only way to get the per-frame amplitude
+//   that drives their 2D mouths (see [[adviserMouth]]); an <audio> element's
+//   signal is unreachable, and createMediaElementSource — the usual way to tap
+//   one — is SILENT on iOS (same gotcha as the fountain and playUnicornBeat).
+//   Reuses the page's single shared context (window.__faCtx) because iOS allows
+//   exactly one live AudioContext.
+//
+//   FALLBACK — the original single reused <audio> element, for anything with no
+//   AudioContext at all. Their voice still plays; only the mouths stay shut.
+//
+// Why ONE reused element in the fallback: iOS only lets audio start inside a
+// user gesture, and that permission attaches to the ELEMENT, not the page. So we
+// unlock a single element during a real tap and every later line plays through
+// that same one. A fresh element per line would be blocked. unlockAdviserAudio
+// spends that same gesture resuming the shared AudioContext, which iOS also
+// requires — one tap, both paths armed.
 let adviserAudio = null;
+
+// The in-flight buffer-source line, so a new question can cut it off. Mirrors
+// playUnicornBeat's _activeBeat: whoever starts a line claims this slot, and
+// every async continuation checks it still holds the slot before touching
+// shared state (the mouth level).
+let activeAdviserLine = null;
+
+// ── Per-line loudness, measured up front ──
+// Returns the level the mouth should treat as "wide open" for this clip.
+//
+// WHY THIS EXISTS: a fixed gain does not work across two voices. Measured on one
+// exchange (2026-07-22) with playUnicornBeat's ×3.8: Barron pinned at the 1.0
+// clamp for his whole line while GR80 peaked at 0.155. Barron's mouth would hang
+// permanently open and GR80's would barely part — the two ElevenLabs voices
+// simply render at different levels, and GR80's settings (stability 0.85, style
+// 0.1) are a flatter delivery by design. Eugene never hit this because he is one
+// voice tuned once.
+//
+// We already hold the entire decoded buffer before playback, so the honest
+// answer is to measure it rather than guess: window the samples at the analyser's
+// own fftSize and take a high PERCENTILE of the window RMS. Percentile, not max —
+// one plosive or click sets a max far above the speaking level and would leave
+// the whole line reading as closed.
+function speakingLevel(audioBuf) {
+  const ch = audioBuf.getChannelData(0);
+  const win = 256; // matches analyser.fftSize below, so both measure alike
+  const levels = [];
+  for (let i = 0; i + win <= ch.length; i += win) {
+    let sum = 0;
+    for (let j = 0; j < win; j++) {
+      const v = ch[i + j];
+      sum += v * v;
+    }
+    const rms = Math.sqrt(sum / win);
+    if (rms > 0.004) levels.push(rms); // ignore the silence between words
+  }
+  if (!levels.length) return 0.12; // all quiet — fall back to something sane
+  levels.sort((a, b) => a - b);
+  const p95 = levels[Math.min(levels.length - 1, Math.floor(levels.length * 0.95))];
+  // Floor it: a whispered line shouldn't be amplified into a screaming mouth.
+  return Math.max(0.03, p95);
+}
+
+function getSharedCtx() {
+  if (typeof window === "undefined") return null;
+  if (window.__faCtx) return window.__faCtx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  try {
+    window.__faCtx = new Ctx();
+  } catch {
+    return null;
+  }
+  return window.__faCtx;
+}
 
 function getAdviserAudio() {
   if (typeof document === "undefined") return null;
@@ -219,6 +290,15 @@ function getAdviserAudio() {
  * tap (the input's first focus, the SPEAK button). Silent and idempotent.
  */
 export function unlockAdviserAudio() {
+  // Spend the gesture on the Web Audio path too — iOS starts its context
+  // "suspended" and only a real user gesture may resume it. Without this the
+  // first adviser line decodes fine and then plays into a suspended graph:
+  // silent, and with a flat analyser the mouths never move either.
+  try {
+    const ctx = getSharedCtx();
+    if (ctx?.state === "suspended") ctx.resume();
+  } catch { /* fall through to the element path */ }
+
   const el = getAdviserAudio();
   if (!el || el.dataset.unlocked === "1") return;
   try {
@@ -239,9 +319,9 @@ export function unlockAdviserAudio() {
  * reading beat instead of stalling.
  */
 export async function speakAdviserLine(speaker, text, { signal } = {}) {
-  const el = getAdviserAudio();
-  if (!el || !text) return false;
-  let url = null;
+  if (!text) return false;
+
+  let bytes;
   try {
     const res = await fetch("/api/counsel-voice", {
       method: "POST",
@@ -249,10 +329,85 @@ export async function speakAdviserLine(speaker, text, { signal } = {}) {
       body: JSON.stringify({ speaker, text }),
       signal,
     });
-    // 409 = this adviser has no ElevenLabs voice configured (GR80, for now).
+    // 409 = this adviser has no ElevenLabs voice configured.
     if (!res.ok) return false;
-    const blob = await res.blob();
-    url = URL.createObjectURL(blob);
+    bytes = await res.arrayBuffer();
+  } catch (err) {
+    console.warn("[counselSpeech] adviser voice failed:", err?.message || err);
+    return false;
+  }
+
+  // ── Preferred: buffer + analyser, so the mouth can follow the voice ──
+  const ctx = getSharedCtx();
+  if (ctx) {
+    try {
+      // decodeAudioData needs its own copy: the fallback below re-reads these
+      // bytes, and some implementations detach the buffer while decoding.
+      const audioBuf = await ctx.decodeAudioData(bytes.slice(0));
+      try { if (ctx.state === "suspended") await ctx.resume(); } catch {}
+
+      const self = {};
+      activeAdviserLine = self;
+      const isCurrent = () => activeAdviserLine === self;
+
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuf;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      analyser.connect(ctx.destination);
+
+      // Drive the mouth from the audio RMS each frame — the same measurement
+      // playUnicornBeat uses for Eugene's jaw, but normalised PER LINE against
+      // this clip's own speaking level (see speakingLevel) instead of a fixed
+      // gain, so both advisers articulate over the same 0..1 range no matter how
+      // hot their voice renders.
+      const level = speakingLevel(audioBuf);
+      const data = new Uint8Array(analyser.fftSize);
+      let raf;
+      const tick = () => {
+        if (!isCurrent()) return;
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) {
+          const v = (data[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / data.length);
+        setAdviserMouth(speaker, Math.min(1, rms / level));
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+
+      await new Promise((resolve) => {
+        // Interruptible: stopAdviserAudio stops the source, which resolves via
+        // the same path as natural end-of-audio.
+        self.stop = () => {
+          try { src.onended = null; src.stop(); } catch {}
+          resolve();
+        };
+        src.onended = resolve;
+        try { src.start(0); } catch { resolve(); }
+      });
+
+      cancelAnimationFrame(raf);
+      setAdviserMouth(speaker, 0);
+      if (isCurrent()) activeAdviserLine = null;
+      return true;
+    } catch (err) {
+      // Decode/playback failed — fall through to the element path rather than
+      // dropping the line. Their voice matters more than their mouth.
+      console.warn("[counselSpeech] adviser buffer path failed:", err?.message || err);
+      setAdviserMouth(speaker, 0);
+    }
+  }
+
+  // ── Fallback: the plain element. Voice plays, mouth stays shut. ──
+  const el = getAdviserAudio();
+  if (!el) return false;
+  let url = null;
+  try {
+    url = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
     el.src = url;
     await el.play();
     await new Promise((resolve) => {
@@ -266,7 +421,7 @@ export async function speakAdviserLine(speaker, text, { signal } = {}) {
     });
     return true;
   } catch (err) {
-    console.warn("[counselSpeech] adviser voice failed:", err?.message || err);
+    console.warn("[counselSpeech] adviser playback failed:", err?.message || err);
     return false;
   } finally {
     if (url) URL.revokeObjectURL(url);
@@ -275,6 +430,11 @@ export async function speakAdviserLine(speaker, text, { signal } = {}) {
 
 /** Cut an adviser off mid-line (a new question interrupts the old one). */
 export function stopAdviserAudio() {
+  // Both paths: the buffer source (if that's what's playing) and the element.
+  const line = activeAdviserLine;
+  activeAdviserLine = null; // drops the analyser loop on its next tick
+  try { line?.stop?.(); } catch { /* already ended */ }
+  resetAdviserMouths(); // never leave a mouth frozen open mid-word
   try {
     adviserAudio?.pause();
   } catch { /* nothing playing */ }

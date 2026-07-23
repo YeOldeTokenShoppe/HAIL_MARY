@@ -28,14 +28,20 @@ import {
   COUNSEL_VOICES,
 } from "@/lib/counselSpeech";
 import useCyberConfirm from "@/components/useCyberConfirm";
+import { adviserMouth } from "@/lib/adviserMouth";
 
 // ── /main ── THE INNER STRUGGLE, staged as a triptych.
 //
-// The seeker asks; the two advisers argue the classic shoulder-devil /
-// shoulder-angel trope and Our Lady closes with a light touch:
-//   John Barron (right) — the devil's advocate. Argues FOR the appetite.
-//   St. GR80 (left)     — the saint. Answers from duty (categorical imperative).
-//   Our Lady (centre)   — one short line. Never a verdict, never a summary.
+// The seeker asks. The advisers do NOT answer them — they whisper at Our Lady's
+// shoulders, each pressing her to answer their way, and she alone turns and
+// speaks to the seeker:
+//   John Barron (right) — the devil's advocate. Lobbies her FOR the appetite.
+//   St. GR80 (left)     — the saint. Petitions her from duty (categorical imperative).
+//   Our Lady (centre)   — one short line, TO THE SEEKER. Never a verdict.
+// The advisers say "they" of the seeker and "you" of her; only her "you" means
+// the seeker. This matches what the page actually DRAWS — two shoulder figures
+// leaning in at her frame (see ShoulderFigure) — where lines aimed straight at
+// the seeker read as talking past the very person they were hovering over.
 // The composition IS the trope: temptation and duty flanking grace. They speak
 // in that order (JB → GR → OL), each awaiting the previous speaker's talk-ended
 // so they never overlap, and each line is captioned under the face making it.
@@ -140,6 +146,152 @@ const SHOULDER_LAYER_IMAGES = [
 
 const portalContainerId = (key) => `sitepal-portal-${key}`;
 
+/* ── The advisers' mouths ── Sprite frames laid over the figure art, swapped by
+      the live amplitude of the voice currently speaking (see lib/adviserMouth).
+
+   ART CONTRACT — each frame MUST be the same pixel size as its character's
+   body.png (angel 600×829, demon 600×901) and otherwise fully transparent. That
+   is what makes registration automatic: every layer is width:100% at inset:0, so
+   a mouth drawn in place on a full-size canvas lands in place at every rendered
+   scale, with no per-character offsets to tune (and nothing to re-tune when the
+   figures resize with her frame).
+
+   Each frame must also PAINT OVER the mouth baked into body.png — include enough
+   surrounding face colour to cover it. `closed` exists for exactly this reason:
+   it is not "no overlay", it is the baked mouth repainted, so the swap in and out
+   of speech is invisible.
+
+   Missing files are not an error. The <img> onError below retires the whole
+   overlay permanently, so until the art lands the figures render exactly as they
+   do today — drop the PNGs in and the mouths start working with no code change. */
+const MOUTH_ART = {
+  GR: {
+    closed: "/shoulder-layers/angel/mouth-closed.png",
+    mid: "/shoulder-layers/angel/mouth-mid.png",
+    open: "/shoulder-layers/angel/mouth-open.png",
+  },
+  JB: {
+    closed: "/shoulder-layers/demon/mouth-closed.png",
+    mid: "/shoulder-layers/demon/mouth-mid.png",
+    open: "/shoulder-layers/demon/mouth-open.png",
+  },
+};
+
+// Where each character's mouth sits, as a fraction of the body image box —
+// x/y are the mouth's CENTRE, not its top-left (the rect is translate(-50%,-50%)).
+//
+// MEASURED off the source art, not guessed:
+//   GR80  angel/body.png 600×829 — the dark slot spans x 290–337, y 265–272,
+//         so centre (313.5, 268), i.e. 47×8 px.
+//   Barron demon/body.png 600×901 — the smirk curve spans x 305–372, y 280–296,
+//         so centre (338.5, 288), i.e. 67×16 px. His is a CURVE, so the box
+//         approximates a region rather than tracing the shape.
+// These same source-pixel figures are what the sprite art should be drawn
+// against — see the art contract above.
+//
+// ONLY used by the ?mouthdebug=1 preview rect; the real sprites are full-canvas
+// overlays and need no coordinates at all.
+const MOUTH_DEBUG_BOX = {
+  GR: { x: 0.5225, y: 0.3233, w: 0.078, h: 0.010 },
+  JB: { x: 0.5620, y: 0.3196, w: 0.100, h: 0.014 },
+};
+
+// Amplitude thresholds for the three frames. RMS×3.8 (the gain playUnicornBeat
+// uses for Eugene's jaw) spends most of a spoken line between ~0.1 and ~0.6.
+const MOUTH_MID_AT = 0.12;
+const MOUTH_OPEN_AT = 0.40;
+
+function FigureMouth({ voice, speaking, debug }) {
+  const frameRefs = useRef({});
+  const debugRef = useRef(null);
+  // One failed load retires the overlay for the session — a broken-image glyph
+  // on her shoulder is far worse than no mouth at all.
+  const [artBroken, setArtBroken] = useState(false);
+
+  // The rAF loop runs ONLY while this adviser holds the floor. At rest there is
+  // nothing to animate and no reason to keep a frame callback alive next to a
+  // live SitePal player and an R3F canvas.
+  useEffect(() => {
+    if (!speaking) return;
+    let raf;
+    let smoothed = 0;
+    const tick = () => {
+      // Smoothed a little past the analyser's own smoothing: at sprite-swap
+      // granularity, raw RMS chatters between frames on sibilants and reads as
+      // a flicker rather than as speech.
+      smoothed += ((adviserMouth[voice] || 0) - smoothed) * 0.45;
+      const level = smoothed < MOUTH_MID_AT ? "closed" : smoothed < MOUTH_OPEN_AT ? "mid" : "open";
+      for (const k of ["closed", "mid", "open"]) {
+        const el = frameRefs.current[k];
+        if (el) el.style.opacity = k === level ? "1" : "0";
+      }
+      const d = debugRef.current;
+      if (d) d.style.transform = `translate(-50%, -50%) scaleY(${(0.35 + smoothed * 2.6).toFixed(3)})`;
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const k of ["closed", "mid", "open"]) {
+        const el = frameRefs.current[k];
+        if (el) el.style.opacity = k === "closed" ? "1" : "0";
+      }
+    };
+  }, [speaking, voice]);
+
+  if (debug) {
+    const b = MOUTH_DEBUG_BOX[voice];
+    return (
+      <div
+        ref={debugRef}
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: `${b.x * 100}%`,
+          top: `${b.y * 100}%`,
+          width: `${b.w * 100}%`,
+          height: `${b.h * 100}%`,
+          zIndex: 3,
+          borderRadius: "40%",
+          background: "#12060a",
+          opacity: speaking ? 1 : 0,
+          transform: "translate(-50%, -50%) scaleY(0.35)",
+          pointerEvents: "none",
+        }}
+      />
+    );
+  }
+
+  if (artBroken) return null;
+
+  return (
+    <>
+      {["closed", "mid", "open"].map((k) => (
+        <img
+          key={k}
+          ref={(el) => { frameRefs.current[k] = el; }}
+          src={MOUTH_ART[voice][k]}
+          alt=""
+          aria-hidden="true"
+          onError={() => setArtBroken(true)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "auto",
+            display: "block",
+            zIndex: 3,
+            // Closed is the resting frame, so an idle figure already reads with
+            // its mouth painted rather than popping one on at the first word.
+            opacity: k === "closed" ? 1 : 0,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 // Stacked copies behind the RL80 wordmark — the god-ray beams. Taken from
 // /fountain's wordmark, NOT the root hero's: the root drops the per-copy
 // opacity, so all 100 beams land at full strength and the mark reads as an
@@ -188,6 +340,13 @@ const SPEAKER = {
   GR: { name: "Saint GR80", hue: "#22ccff" },
   OL: { name: "Our Lady", hue: "#f4b53f" },
 };
+
+// The face beside each line in the wide transcript rail. The advisers no longer
+// hold panels of their own on ANY layout — they're the shoulder figures now, and
+// a figure hovering at her frame is too small to read as a portrait. The rail is
+// where their faces are legible, so the cameo goes there. Our Lady's is not
+// listed: hers is whichever apparition is active, passed in at render.
+const SPEAKER_FACE = { JB: "/cameo_h80z.webp", GR: "/cameo_GR80.webp" };
 
 function preloadImage(src) {
   return new Promise((resolve) => {
@@ -299,6 +458,21 @@ function SitePalPortals({ portals, onPortalReady }) {
   // document: off-screen means asleep. So the frames sit AT the origin, hidden
   // by opacity and z-order instead. To re-verify after touching this, count rAF
   // ticks INSIDE the frame: ~60/s means awake, 0.1/s means it's asleep again.
+  //
+  // ── WHY 0.002 AND NOT 0.01 ── The opacity is not just "hidden enough", it is a
+  // BRIGHTNESS BUDGET. These are three 600×800 boxes stacked at the origin, and
+  // whatever fraction survives is three copies of a brightly-lit SitePal scene
+  // painted over a near-black apse. At 0.01 that is ~3×2.5 = 7 levels of extra
+  // light inside a 600×800 rectangle — plainly visible as a lighter panel whose
+  // right edge lands at x=600: a hard vertical seam straight down the page.
+  // It went unnoticed for as long as it did because nothing used to sit under it.
+  // The triptych covered this corner with her panel's opaque chrome, and a phone
+  // is narrower than 600 so the rectangle spans the whole screen and has no
+  // visible edge — the seam only exists on a WIDE, TRANSPARENT layout, which is
+  // exactly what the desktop stage is. 0.002 puts three stacked copies under one
+  // 8-bit level, so it cannot quantise to a visible step at any backdrop.
+  // Do NOT take it to 0: that is the one value that reads as "not rendered" and
+  // risks the throttling this whole note exists to prevent.
   return (
     <>
       {portals.map((p) => (
@@ -311,7 +485,7 @@ function SitePalPortals({ portals, onPortalReady }) {
             top: 0,
             width: 600,
             height: 800,
-            opacity: 0.01,
+            opacity: 0.002,
             pointerEvents: "none",
             zIndex: -1,
           }}
@@ -344,6 +518,18 @@ function ShoulderFigure({
   arrived = true,
   layers = null,
   wingMotion = "angel",
+  // Sized in PROPORTION to her frame, never flat. These were 112/28 constants,
+  // tuned against the phone's 250px frame — correct there and wrong everywhere
+  // else: on the desktop stage her frame runs to ~520 and the same 112px figures
+  // read as insects perched on the filigree rather than as the two advisers.
+  // PortraitPanel derives both from frameSize, and at 250 the arithmetic returns
+  // these exact numbers, so the phone composition is untouched.
+  size = 112,
+  offset = 28,
+  // Which voice this figure speaks with ("GR" | "JB"), so its mouth can follow
+  // the right analyser. Null = no mouth (the figure is decoration only).
+  voice = null,
+  mouthDebug = false,
 }) {
   return (
     // FOUR layers, because four things animate independently and would
@@ -358,8 +544,8 @@ function ShoulderFigure({
       style={{
         position: "absolute",
         top: "15%",
-        [side]: -28,
-        width: 112,
+        [side]: -offset,
+        width: size,
         zIndex: 3,
         pointerEvents: "none",
         // They fly in from off-screen to attend her once she's summoned. The
@@ -493,6 +679,13 @@ function ShoulderFigure({
                   display: "block",
                 }}
               />
+              {/* The mouth rides ON the body layer (z 3 > the body's z 2) and
+                  inside this same box, so it scales with the figure for free.
+                  Deliberately NOT added to the glow copy above: the halo is a
+                  silhouette, and a mouth inside it would just smear. */}
+              {voice && (
+                <FigureMouth voice={voice} speaking={lit} debug={mouthDebug} />
+              )}
             </div>
           ) : (
             <img
@@ -554,6 +747,14 @@ function PortraitPanel({
   speakingKey = null,
   // False until Our Lady is summoned and revealed — then the advisers fly in.
   figuresIn = false,
+  // ?mouthdebug=1 — draw a plain rect where each mouth will be, so the amplitude
+  // pipeline can be verified before the sprite art exists.
+  mouthDebug = false,
+  // Solo on a WIDE viewport: same composition, but standing on a stage with room
+  // around it rather than filling a phone. Only affects chrome that was sized
+  // for a 375px column (the corner mark); the composition itself scales off
+  // frameSize and needs no flag.
+  wide = false,
 }) {
   // Phones stay at 250. 285 was tried and reverted: the room freed by moving the
   // title and roster into the corners was NOT spare — the transcript was already
@@ -565,6 +766,13 @@ function PortraitPanel({
   // viewportWidth - 56 or the saint and Barron get clipped by the panel's
   // overflowX — i.e. under ~319 on a 375px phone.
   const frameSize = compact ? 150 : isSolo ? soloSize : triptychSize;
+  // The shoulder figures, scaled to whatever frame they're attending. The two
+  // ratios are the phone's tuned 112/28 divided by its 250px frame, so a 250
+  // frame reproduces the original numbers exactly and every larger stage keeps
+  // the same silhouette. Anything that reserves horizontal room for this
+  // composition must use OVERHANG (see MainPage's soloFrameSize).
+  const figureSize = Math.round(frameSize * 0.45);
+  const figureOverhang = Math.round(frameSize * 0.112);
   // NOTE: the speaking panel used to scroll itself into view on phones. The
   // transcript now owns that job (it follows its own newest line), and two
   // things fighting over the scroll position yanks the page mid-argument.
@@ -656,9 +864,11 @@ function PortraitPanel({
           // would otherwise sit in the status bar.
           top: "calc(16px + env(safe-area-inset-top, 0px))",
           // Measured from the viewport on solo, from her panel on the triptych.
-          left: isSolo ? 10 : 18,
-          // Bigger where there's room to be bigger.
-          transform: isSolo ? "scale(0.46)" : "scale(0.6)",
+          left: isSolo && !wide ? 10 : 18,
+          // Bigger where there's room to be bigger. 0.46 is the PHONE's answer —
+          // it exists because the mark competes with a 375px column for width,
+          // which is not a problem a desktop stage has.
+          transform: isSolo && !wide ? "scale(0.46)" : "scale(0.6)",
           transformOrigin: "top left",
           // A corner mark must never eat taps meant for the scene.
           pointerEvents: "none",
@@ -747,6 +957,10 @@ function PortraitPanel({
               alt="Saint GR80"
               arrived={figuresIn}
               wingMotion="angel"
+              size={figureSize}
+              offset={figureOverhang}
+              voice="GR"
+              mouthDebug={mouthDebug}
               layers={{
                 body: "/shoulder-layers/angel/body.png",
                 left: "/shoulder-layers/angel/left-wing.png",
@@ -762,6 +976,10 @@ function PortraitPanel({
               alt="John Barron"
               arrived={figuresIn}
               wingMotion="demon"
+              size={figureSize}
+              offset={figureOverhang}
+              voice="JB"
+              mouthDebug={mouthDebug}
               layers={{
                 body: "/shoulder-layers/demon/body.png",
                 left: "/shoulder-layers/demon/left-wing.png",
@@ -897,6 +1115,212 @@ function PortraitPanel({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/* ── The transcript rail ── What the wide layout does with the room the phone
+      doesn't have. The composition is IDENTICAL at every width — Our Lady framed
+      with the saint and the devil's advocate at her shoulders — so a desktop's
+      spare 400px cannot go to the scene without changing it. It goes to the
+      argument instead: the deliberation as a standing record beside the stage,
+      where a phone can only afford a 24dvh window of it under her.
+
+      This is the same chatLog the phone renders, laid out for a column that runs
+      the full height of the window rather than a band squeezed between her frame
+      and the ask bar. It gets what that band can't afford: the speaker's face,
+      breathing room between turns, and the seeker's own questions set as rules
+      across the column so the exchanges are separable at a glance.
+
+      NOT captions. The triptych captioned each line under the face making it,
+      which is why it needed no scrollback; the solo stage has one face and two
+      figures, so the transcript IS the record and has to hold everything. */
+function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace }) {
+  const faceFor = (who) => (who === "OL" ? ladyFace : SPEAKER_FACE[who]);
+  return (
+    <div
+      style={{
+        width,
+        flexShrink: 0,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        pointerEvents: "auto",
+        // The triptych's panel chrome, kept: this page already says "a bounded
+        // column of its own" with a hairline over a black wash, and the rail is
+        // exactly that. It WANTS a defined edge — the stage is a lit apse and the
+        // rail is a surface set against it, so letting the two blend just makes
+        // the transcript look like text floating on the scene.
+        //
+        // This was briefly a soft transparent-to-black ramp with no border, while
+        // hunting a vertical seam down the purple. That was a misdiagnosis: the
+        // seam was the SitePal portal boxes (see SitePalPortals — three 600×800
+        // layers at the origin, whose right edge lands at x=600), and it survived
+        // this element being stripped entirely. Fixed at the source there, so the
+        // border is free to be a border. NOTE the backdrop-filter is deliberately
+        // NOT restored: saturate(180%) re-tints the apse gradient behind the rail,
+        // which puts a second, softer tonal step alongside this one. The hairline
+        // alone is a cleaner edge.
+        borderLeft: "1px solid rgba(0, 255, 255, 0.18)",
+        background: "rgba(0, 0, 0, 0.42)",
+        fontFamily: "'Rajdhani', sans-serif",
+      }}
+    >
+      <div
+        style={{
+          padding: "16px 18px 12px",
+          borderBottom: "1px solid rgba(0, 255, 255, 0.1)",
+          fontSize: "0.62rem",
+          letterSpacing: "0.28em",
+          textTransform: "uppercase",
+          color: "rgba(42, 214, 238, 0.55)",
+        }}
+      >
+        the deliberation
+      </div>
+
+      <div
+        ref={boxRef}
+        style={{
+          flex: 1,
+          minHeight: 0, // or the list's own height wins and the column never scrolls
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          padding: "18px 18px 22px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        {chatLog.length === 0 ? (
+          // An empty rail must still say what the column is FOR — otherwise the
+          // first-time visitor's widest layout is a stage plus a blank slab.
+          <div
+            style={{
+              margin: "auto 0",
+              textAlign: "center",
+              fontSize: "0.86rem",
+              lineHeight: 1.6,
+              color: "rgba(255,255,255,0.34)",
+            }}
+          >
+            the council is seated and silent.
+            <br />
+            ask, and they will argue it out here.
+          </div>
+        ) : (
+          chatLog.map((m, i) => {
+            const who = SPEAKER[m.who] || SPEAKER.you;
+            const live = speakingKey === m.who && i === chatLog.length - 1;
+
+            // The seeker's own line is not a reply — it's what the replies are
+            // ABOUT. Set as a rule across the column it doubles as the divider
+            // between turns, so a long scrollback stays parseable without any
+            // extra chrome to separate exchanges.
+            if (m.who === "you") {
+              return (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    margin: i === 0 ? "0 0 2px" : "8px 0 2px",
+                  }}
+                >
+                  <span style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.12)" }} />
+                  <span
+                    style={{
+                      flexShrink: 1,
+                      fontSize: "0.82rem",
+                      lineHeight: 1.4,
+                      textAlign: "center",
+                      color: "rgba(255,255,255,0.55)",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    {m.text}
+                  </span>
+                  <span style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.12)" }} />
+                </div>
+              );
+            }
+
+            return (
+              <div key={i} style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    flexShrink: 0,
+                    borderRadius: "50%",
+                    border: `1px solid ${live ? who.hue : `${who.hue}55`}`,
+                    backgroundImage: `url(${faceFor(m.who)})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center top",
+                    // Lights with the voice, the same way the shoulder figures
+                    // and the name plates do — one rule for "who has the floor",
+                    // applied everywhere it shows.
+                    boxShadow: live ? `0 0 12px ${who.hue}aa` : "none",
+                    opacity: live ? 1 : 0.66,
+                    transition: "opacity 0.3s ease, box-shadow 0.3s ease",
+                  }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.16em",
+                      textTransform: "uppercase",
+                      color: who.hue,
+                      textShadow: live ? `0 0 10px ${who.hue}88` : "none",
+                      marginBottom: 3,
+                    }}
+                  >
+                    {who.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.95rem",
+                      lineHeight: 1.5,
+                      color: live ? "#ffffff" : "rgba(255,255,255,0.74)",
+                      transition: "color 0.3s ease",
+                    }}
+                  >
+                    {m.text}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+        {busy && (
+          <div
+            style={{
+              fontSize: "0.78rem",
+              letterSpacing: "0.08em",
+              color: "rgba(255,255,255,0.4)",
+            }}
+          >
+            the council is deliberating…
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          padding: "10px 18px",
+          borderTop: "1px solid rgba(0, 255, 255, 0.1)",
+          fontSize: "0.5rem",
+          letterSpacing: "0.15em",
+          color: "rgba(0, 255, 255, 0.3)",
+          textTransform: "uppercase",
+        }}
+      >
+        sys.status // online
+      </div>
     </div>
   );
 }
@@ -1099,6 +1523,7 @@ export default function MainPage() {
         key={s.key}
         isMobile={isMobile}
         isSolo={isSolo}
+        wide={isWideSolo}
         soloSize={soloFrameSize}
         /* She presides, so her frame runs larger than the wings'. The scale is
            applied HERE rather than inside the panel so the panel never has to
@@ -1114,6 +1539,7 @@ export default function MainPage() {
         figures={figures}
         speakingKey={speakingKey}
         figuresIn={figuresIn}
+        mouthDebug={mouthDebug}
         /* Her seat gets the whole roster, so her carousel (arrows + medallions)
            renders and her face can still be changed — CharacterSelect only
            draws it when there's more than one character. The advisers get a
@@ -1202,6 +1628,53 @@ export default function MainPage() {
      ?char= and her scene embeds fresh. */
   const [rosterOpen, setRosterOpen] = useState(false);
 
+  // NOTE: this block sits ABOVE handleAsk deliberately. handleAsk lists isSolo
+  // in its dependency array, and a dep array is evaluated during render — so a
+  // `const isSolo` declared further down threw "Cannot access 'isSolo' before
+  // initialization" on every mount. Layout mode must be resolved before the
+  // first thing that depends on it.
+  // ── The triptych is now OPT-IN ── `?triptych=1` on a wide window brings back
+  // the three-panel row. It is NOT the default at any width any more: the solo
+  // composition — Our Lady framed, the saint and the devil's advocate hovering
+  // at her shoulders — IS the trope drawn literally, where three equal frames
+  // read as a panel discussion. Desktop gets that same composition on a stage,
+  // and spends its extra width on the transcript rail instead of on two more
+  // frames. Kept rather than deleted so the two can still be compared directly;
+  // everything it needs (panel chrome, captions, name plates) is still here.
+  const [forceTriptych, setForceTriptych] = useState(false);
+  // ?mouthdebug=1 — preview the adviser mouth pipeline with a plain rect before
+  // the sprite art exists. Remove once the PNGs are in and tuned.
+  const [mouthDebug, setMouthDebug] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setForceTriptych(params.get("triptych") === "1");
+    setMouthDebug(params.get("mouthdebug") === "1");
+  }, []);
+  const panelCount = forceTriptych && isWide && !isMobile ? PANEL_COUNT : 1;
+  // ── SOLO vs TRIPTYCH ── The composition question is "how many panels fit?",
+  // NOT "is this a phone". Keying the advisers' representation to isMobile left
+  // 768–1199 with no advisers AT ALL: too narrow for three panels, but the
+  // shoulder figures, the transcript and the chips were all phone-only, so they
+  // argued at you from off-screen with nothing to look at and no scrollback.
+  //
+  // Solo = one panel, so the advisers are the shoulder figures and the argument
+  // is the transcript. Triptych = three panels, so they are their own faces and
+  // the argument is captioned under each. Device still decides how many PLAYERS
+  // to mount (three OOM-crash iOS — see SitePalPortals); that stays on isMobile
+  // and must not be folded into this.
+  const isSolo = panelCount === 1;
+
+  // ── SOLO, WIDE ── The same composition with room around it. A window this
+  // wide can't spend the extra width on the scene (the scene is a centred
+  // portrait — growing it past ~520 just makes a big portrait), so it spends it
+  // on the argument: the stage keeps the middle, and the transcript moves out of
+  // its cramped band under her frame into a full-height rail down the side.
+  //
+  // This is the ONLY thing that splits the layout now. Everything else — the
+  // frame, the figures, the chips, the ask bar — is the phone's composition,
+  // measured against the STAGE instead of against the window.
+  const isWideSolo = isSolo && isWide && !isMobile;
+
   // ── The inner struggle ── The seeker asks; Barron argues for the appetite,
   // GR80 answers from duty, Our Lady weighs in last and lightest. Each line is
   // spoken by its OWN character's portal, awaited in turn, so the argument
@@ -1277,20 +1750,29 @@ export default function MainPage() {
           });
         }
 
-        // Who says this out loud, and how:
-        //  • Desktop — everyone owns a portal, so everyone speaks through it.
-        //  • Phone, Our Lady — her player, never scene-swapped. (Swapping was
-        //    tried 2026-07-15: loadSceneByID nulls the player's audio, so
+        // Who says this out loud, and how. The rule is WHOSE FACE IS ON SCREEN:
+        //  • Our Lady, always — her own player, never scene-swapped. (Swapping
+        //    was tried 2026-07-15: loadSceneByID nulls the player's audio, so
         //    NOBODY spoke, her included, and every turn paid a scene load.)
-        //  • Phone, advisers — no player at all, so they speak straight from
-        //    ElevenLabs through a plain <audio> element: no SitePal, no OOM, no
-        //    AudioContext. Returns false if that adviser has no voice yet
-        //    (GR80), and we fall through to the silent reading beat below.
+        //  • Advisers, TRIPTYCH — their SitePal faces are visible there, so they
+        //    speak through their own players and SitePal lip-syncs them.
+        //  • Advisers, SOLO — they have no face on screen, only the shoulder
+        //    figures, so they speak from ElevenLabs through a Web Audio graph we
+        //    own. That is what makes their 2D mouths possible: an AnalyserNode
+        //    on our own graph yields the per-frame amplitude (see adviserMouth),
+        //    where audio inside a SitePal iframe is unreachable from here.
+        //    Returns false if that adviser has no voice configured, and we fall
+        //    through to the silent reading beat below.
+        //
+        // Side effect worth knowing: this also settles the split noted in
+        // /api/counsel-voice — the advisers used to sound like SitePal "Gilbert"
+        // on desktop and like their ElevenLabs voices on a phone. Solo is now
+        // ElevenLabs at every width, so a character sounds like himself.
         let spoke;
-        if (!isMobile) {
-          spoke = await speakInPortal(portalContainerId(seatFor[s]), t, voiceFor[s]);
-        } else if (s === "OL") {
+        if (s === "OL") {
           spoke = await speakInPortal(portalContainerId(SPOTLIGHT_KEY), t, voiceFor[s]);
+        } else if (!isSolo) {
+          spoke = await speakInPortal(portalContainerId(seatFor[s]), t, voiceFor[s]);
         } else {
           spoke = await speakAdviserLine(s, t);
         }
@@ -1321,46 +1803,59 @@ export default function MainPage() {
       },
     ].slice(-8); // keep the tail; the server truncates anyway
     setBusy(false);
-  }, [activeCharIndex, isMobile, busy]);
+  }, [activeCharIndex, isMobile, isSolo, busy]);
 
 
-  // Three seats across once the viewport can carry them; below that the
-  // stacked phone layout takes over (Our Lady above the paired advisers).
-  const panelCount = isWide && !isMobile ? PANEL_COUNT : 1;
-  // ── SOLO vs TRIPTYCH ── The composition question is "how many panels fit?",
-  // NOT "is this a phone". Keying the advisers' representation to isMobile left
-  // 768–1199 with no advisers AT ALL: too narrow for three panels, but the
-  // shoulder figures, the transcript and the chips were all phone-only, so they
-  // argued at you from off-screen with nothing to look at and no scrollback.
-  //
-  // Solo = one panel, so the advisers are the shoulder figures and the argument
-  // is the transcript. Triptych = three panels, so they are their own faces and
-  // the argument is captioned under each. Device still decides how many PLAYERS
-  // to mount (three OOM-crash iOS — see SitePalPortals); that stays on isMobile
-  // and must not be folded into this.
-  const isSolo = panelCount === 1;
+
+  // ── The rail's width, and what's left for the stage ── Every fixed thing that
+  // must stay centred UNDER HER (the ask bar, the chips, the gear in her corner)
+  // is centred on the window by default, so each one has to be pulled back by
+  // the rail. They all measure from these two numbers rather than each carrying
+  // its own copy of the arithmetic — a rail width that only three of the four
+  // knew about is exactly how the ask bar ends up a few pixels off her axis.
+  // Bounded both ways: under ~330 the argument sets too narrow to read as
+  // paragraphs, over ~440 the rail starts out-weighing the stage it's beside.
+  const railWidth = isWideSolo
+    ? Math.round(Math.min(440, Math.max(330, viewport.w * 0.28)))
+    : 0;
+  const stageWidth = viewport.w - railWidth;
 
   // ── Solo frame size ── Fill the column, keep a band for the transcript.
   // A fixed 250 floated in a void on a tall phone; this grows the scene to the
   // SMALLER of two ceilings, so it fills whichever axis is tighter:
-  //   • WIDTH — the frame plus its shoulder figures (28px off each side, see
-  //     ShoulderFigure) must fit, so the frame stays under viewport.w - 60.
-  //   • HEIGHT — the solo column runs top:0 → the ask bar (~160 up), and the
-  //     transcript claims a band at the bottom of it (~135), leaving the rest
-  //     for the frame; the frame renders at size × 1.3 tall (CharacterSelect),
-  //     minus ~44 of panel padding.
+  //   • WIDTH — the frame plus its shoulder figures (which hang off each side in
+  //     PROPORTION to the frame, see PortraitPanel's figureOverhang) must fit
+  //     inside the STAGE, which is the window minus the rail.
+  //   • HEIGHT — the solo column runs top:0 → the ask bar (~160 up), and on a
+  //     phone the transcript claims a band at the bottom of it (~135), leaving
+  //     the rest for the frame; the frame renders at size × 1.3 tall
+  //     (CharacterSelect), minus ~44 of panel padding.
   // Floored at 250 so small phones never shrink below the size they were tuned
-  // at (the height ceiling binds there and would otherwise pull it down), and
-  // ceilinged at 440 so a wide solo window doesn't mint an absurd frame. The
+  // at (the height ceiling binds there and would otherwise pull it down). The
   // triptych has its own ceiling — see triptychFrameSize.
   const soloFrameSize = useMemo(() => {
-    // The frame is CENTRED and a figure hangs 28px off each side, so the
-    // composition's half-width is frameSize/2 + 28; keeping 8px of margin gives
-    // frameSize ≤ viewport.w - 2*(28+8) = viewport.w - 72.
-    const widthCap = viewport.w - 72;
-    const heightCap = (viewport.h - 160 - 135 - 44) / 1.3;
-    return Math.round(Math.max(250, Math.min(widthCap, heightCap, 440)));
-  }, [viewport]);
+    // The frame is CENTRED and a figure hangs frameSize × 0.112 off each side,
+    // so the composition's half-width is frameSize × 0.612. Keeping 8px of
+    // margin: frameSize × 1.224 + 16 ≤ stageWidth.
+    const widthCap = (stageWidth - 16) / 1.224;
+    // WIDE: the transcript is BESIDE her, not under her, so the 135px band a
+    // phone has to reserve for it is not spent here — that reserve is the whole
+    // reason the phone frame stops where it does, and charging a desktop for it
+    // would leave her small in the middle of an empty stage for no one.
+    // It still owes the STARTER CHIPS their row (~48). They're fixed on top of
+    // the ask bar and the frame is sized to end exactly at that band, so without
+    // this the two land on the same 40px on a short laptop window — measured at
+    // 685px tall, the chips crossing the foot of her frame. Phones never showed
+    // it because their 135 reserve covers the chips incidentally. Only short
+    // windows pay: anything tall enough is bound by the 520 cap below instead.
+    const heightCap = (viewport.h - 160 - (isWideSolo ? 48 : 135) - 44) / 1.3;
+    // 440 was the ceiling when the frame shared a phone column with the
+    // transcript. On a stage of its own she can carry more, but not unbounded:
+    // past ~520 the neon filigree outgrows the shoulder figures attending it and
+    // the composition stops reading as a shrine and starts reading as a poster.
+    const cap = isWideSolo ? 520 : 440;
+    return Math.round(Math.max(250, Math.min(widthCap, heightCap, cap)));
+  }, [viewport, stageWidth, isWideSolo]);
 
   // ── Triptych frame size ── The ADVISERS' frame: 340 wherever 340 fits, which
   // is the case on the big monitors this layout is really for. The flat constant
@@ -1649,9 +2144,16 @@ export default function MainPage() {
           fallback code: SitePalLivePortrait draws stillSrc when its container
           holds no frame. Do NOT mount their portals on phones without a new
           device test. */}
+      {/* SOLO MOUNTS ONE PLAYER — hers — AT EVERY WIDTH. The advisers' players
+          existed to lip-sync faces the solo layout doesn't show; now that they
+          speak from ElevenLabs through our own graph (see handleAsk), keeping
+          their portals mounted bought two hidden iframes, two more live SitePal
+          players and two more 600×800 near-transparent layers (the seam in
+          SitePalPortals' note) for nothing. Only the triptych, where their faces
+          are actually on screen, still mounts all three. */}
       {USE_SITEPAL && sceneReady && !pickerOpen && (
         <SitePalPortals
-          portals={isMobile ? seats.filter((s) => s.seat === "center") : seats}
+          portals={isSolo ? seats.filter((s) => s.seat === "center") : seats}
           onPortalReady={handleSitePalReady}
         />
       )}
@@ -1664,8 +2166,11 @@ export default function MainPage() {
         duration={1000}
       />
 
-      {/* ── Portrait panel row ── the whole triptych is the same panel, three
-          times over. Narrow viewports get the single center panel. */}
+      {/* ── The scene ── One composition at every width: Our Lady framed, the
+          saint and the devil's advocate at her shoulders. Wide windows set it on
+          a stage with the transcript rail beside it; phones get the same thing
+          with the transcript in a band underneath. `?triptych=1` restores the
+          old three-panel row. */}
       <div
         style={{
           position: "fixed",
@@ -1682,21 +2187,30 @@ export default function MainPage() {
           // frame height or scroll position. TRIPTYCH keeps bottom:0 — its
           // panels carry their own clearance and the ask bar floats over dead
           // space between them.
-          bottom: isSolo ? BOTTOM_CLEARANCE : 0,
+          // WIDE SOLO stops at the DOCK, not at the ask bar: the bar is centred
+          // on the stage and never crosses the rail, so ending the whole box
+          // above it would strand ~64px of dead space down the side of the
+          // transcript. The stage column pads for the bar itself instead.
+          bottom: isWideSolo
+            ? `calc(${DOCK_H}px + ${SAFE_B})`
+            : isSolo
+            ? BOTTOM_CLEARANCE
+            : 0,
           zIndex: 100,
           display: "flex",
-          // Phones get the triptych STACKED — three ornate frames side by side
-          // at 390px would be ~120px each and the filigree turns to mush. The
-          // column scrolls, and the speaking panel scrolls itself into view.
-          flexDirection: isSolo ? "column" : "row",
-          justifyContent: isSolo ? "flex-start" : "center",
-          alignItems: isSolo ? "center" : "stretch",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "stretch",
           gap: panelCount > 1 ? PANEL_GAP : 0,
-          overflowY: isSolo ? "auto" : "visible",
-          // The stacked column IS the scroller on phones, so it must accept
-          // touch — pointerEvents:"none" here silently made the page unscrollable
-          // (panels 2 and 3 rendered but were unreachable). Desktop keeps none so
-          // the gaps between panels stay click-through.
+          // SOLO: the STAGE inside is the scroller (and the rail scrolls itself),
+          // so this box never scrolls. Two independently-growing columns cannot
+          // share one scroll position — the argument filling the rail would drag
+          // her frame off the top of the window.
+          overflowY: isSolo ? "hidden" : "visible",
+          // The solo column IS a scroller, so it must accept touch —
+          // pointerEvents:"none" here silently made the page unscrollable (panels
+          // 2 and 3 rendered but were unreachable). Triptych keeps none so the
+          // gaps between panels stay click-through.
           pointerEvents: isSolo ? "auto" : "none",
           WebkitOverflowScrolling: "touch",
           overscrollBehavior: "contain",
@@ -1707,22 +2221,68 @@ export default function MainPage() {
       >
         {isSolo ? (
           <>
-            {/* ONE composition: Our Lady live and framed, with the saint and
-                the devil's advocate hovering at her shoulders. This is the
-                trope drawn literally, and it replaces the stacked adviser
-                panels — three ornate frames never belonged on a phone, and the
-                advisers have no player here anyway. Their words go to the
-                transcript below. */}
-            {renderSeat(seats.find((s) => s.seat === "center"), { figures: true })}
+            {/* ── The stage ── ONE composition at every width: Our Lady live and
+                framed, with the saint and the devil's advocate hovering at her
+                shoulders. This is the trope drawn literally, and it replaces the
+                adviser panels — three ornate frames read as a panel discussion,
+                and on a phone they were never legible anyway.
 
-            {/* ── Starter petitions ── Only before the first question; the
-                transcript takes this space afterwards, so the column has one
-                job in each state and never a hole. */}
-            {/* ── The transcript ── The deliberation as a group text: name,
-                colon, message, in each voice's own colour. This is what the
-                advisers have INSTEAD of a voice on phones, and it doubles as
-                the scrollback — every question and every reply, in order. */}
-            {chatLog.length > 0 && (
+                THE STAGE WRAPPER IS UNCONDITIONAL, and that is load-bearing. It
+                began as the wide layout's own branch, with narrow rendering the
+                panel straight into the row — so crossing 1200px changed the
+                panel's PARENT, React unmounted it, and her frame came back a
+                black rectangle: a remounted R3F canvas loses its WebGL context,
+                and this page has no spare ones (three SitePal players plus the
+                frame). Keeping one wrapper at both widths reconciles the panel in
+                place, so a resize restyles the stage instead of rebuilding her.
+                The conditional siblings around it are `{cond && …}`, which render
+                as holes rather than collapsing — the panel keeps its child index
+                either way. Do not "simplify" this back into two branches. */}
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                WebkitOverflowScrolling: "touch",
+                touchAction: "pan-y",
+                // WIDE: the ask bar and the chips float over the foot of THIS
+                // column (both are measured to the stage, not the window), so the
+                // stage owes them clearance — the outer box stops at the dock so
+                // the rail can run past them. NARROW: the outer box already ends
+                // above the bar, and padding here would double the gap.
+                paddingBottom: isWideSolo ? ASK_BAR_H + ASK_BAR_GAP : 0,
+              }}
+            >
+              {/* ── Matting ── The same 0.6 : 1 split the triptych panels use, and
+                  for the same reason: the stage owns the window's full height but
+                  its content is one frame, so pinned to flex-start she sits in the
+                  top half with a growing void under her — worse the taller the
+                  monitor, since the frame stops growing at its ceiling. Splitting
+                  the slack unevenly lands her a little ABOVE centre, which is how
+                  a portrait is matted; dead-centre reads as bottom-heavy.
+                  `0.6 1 0` / `1 1 0`, not `0.6` / `1`: these must SHRINK to
+                  nothing when the frame is taller than the stage (a short laptop
+                  window), or they'd hold their share and push her under the ask
+                  bar instead of letting the column scroll.
+                  NARROW has no slack to split — the frame is sized to fill the
+                  column and the transcript takes the rest — so it stays pinned. */}
+              {isWideSolo && <div style={{ flex: "0.6 1 0" }} />}
+              {renderSeat(seats.find((s) => s.seat === "center"), { figures: true })}
+              {isWideSolo && <div style={{ flex: "1 1 0" }} />}
+
+            {/* ── The transcript, narrow ── The deliberation as a group text:
+                name, colon, message, in each voice's own colour. This is what the
+                advisers have INSTEAD of a voice on phones, and it doubles as the
+                scrollback — every question and every reply, in order. Wide gets
+                the same log as a standing rail beside her (below); a phone has
+                only one column, so it gets a band of it under her instead. */}
+            {!isWideSolo && chatLog.length > 0 && (
               <div
                 ref={chatBoxRef}
                 style={{
@@ -1816,6 +2376,23 @@ export default function MainPage() {
                 Open the shrine on a desktop to hear the council speak aloud.
               </span>
             </div> */}
+            </div>
+
+            {/* ── The transcript, wide ── The same log, standing full-height
+                beside her. This is what the wide layout buys with the width it
+                can't spend on the scene: the composition is a centred portrait,
+                so growing it past its ceiling just makes a bigger portrait — the
+                argument is the thing that actually wants the room. */}
+            {isWideSolo && (
+              <TranscriptRail
+                width={railWidth}
+                chatLog={chatLog}
+                speakingKey={speakingKey}
+                busy={busy}
+                boxRef={chatBoxRef}
+                ladyFace={CHARACTERS[activeCharIndex]?.image}
+              />
+            )}
           </>
         ) : (
           (panelCount > 1 ? seats : seats.filter((s) => s.seat === "center")).map((s) =>
@@ -1850,11 +2427,13 @@ export default function MainPage() {
               // Sits on the wordmark's line in the opposite corner — keep this
               // in step with the title's top if either moves.
               top: "calc(12px + env(safe-area-inset-top, 0px))",
-              // Solo: the viewport's corner, opposite the mark. Triptych: 8px
-              // inside HER panel's right edge, which sits at 50% + half her
-              // panel — so the inset from the window is 50% − half her panel + 8.
+              // Solo: the STAGE's top-right corner, opposite the mark — which is
+              // the window's on a phone and the rail's edge on a wide window.
+              // Triptych: 8px inside HER panel's right edge, which sits at 50% +
+              // half her panel — so the inset from the window is 50% − half her
+              // panel + 8.
               right: isSolo
-                ? 8
+                ? railWidth + 8
                 : `calc(50% - ${Math.round(ladyPanelWidth / 2) - 8}px)`,
               zIndex: 1401,
               width: 34,
@@ -1893,7 +2472,7 @@ export default function MainPage() {
                   top: "calc(52px + env(safe-area-inset-top, 0px))",
                   // Hangs from the gear, so it tracks it onto her panel.
                   right: isSolo
-                    ? 8
+                    ? railWidth + 8
                     : `calc(50% - ${Math.round(ladyPanelWidth / 2) - 8}px)`,
                   zIndex: 1402,
                   display: "flex",
@@ -1990,17 +2569,26 @@ export default function MainPage() {
           style={{
             position: "fixed",
             left: 0,
-            right: 0,
+            // Centred on the STAGE, not the window: `right` ends the auto-margin
+            // box at the rail's edge, so the chips (and the ask bar below, the
+            // same way) sit on her axis instead of drifting right of it by half
+            // the rail. Every fixed thing that belongs UNDER HER does this.
+            right: railWidth,
             // Sit exactly on top of the ask bar: dock + bar + gap.
             bottom: BOTTOM_CLEARANCE,
             marginLeft: "auto",
             marginRight: "auto",
-            width: isSolo
+            width: isWideSolo
+              ? `min(760px, ${stageWidth - 48}px)`
+              : isSolo
               ? "min(440px, calc(100vw - 28px))"
               : "min(920px, calc(100vw - 48px))",
             zIndex: 600,
             display: "flex",
-            flexDirection: isSolo ? "column" : "row",
+            // A phone column has width for one chip per row. The stage does not
+            // have that problem, so the three lie as a row of offerings at the
+            // foot of the composition — the same thing the triptych did with them.
+            flexDirection: isSolo && !isWideSolo ? "column" : "row",
             justifyContent: "center",
             flexWrap: "wrap",
             gap: 8,
@@ -2037,10 +2625,10 @@ export default function MainPage() {
                 handleAsk(q);
               }}
               style={{
-                // Solo: one per row, so each fills the column and reads as a
-                // list. Triptych: sized to its own text so the three sit as a
-                // centred row rather than three equal slabs.
-                width: isSolo ? "100%" : "auto",
+                // Stacked (phone): one per row, so each fills the column and
+                // reads as a list. In a row: sized to its own text so the three
+                // sit as a centred row rather than three equal slabs.
+                width: isSolo && !isWideSolo ? "100%" : "auto",
                 padding: "9px 14px",
                 borderRadius: 999,
                 border: "1px solid rgba(42, 214, 238, 0.22)",
@@ -2051,8 +2639,8 @@ export default function MainPage() {
                 fontFamily: "'Rajdhani', sans-serif",
                 fontSize: "0.92rem",
                 letterSpacing: "0.02em",
-                textAlign: isSolo ? "left" : "center",
-                whiteSpace: isSolo ? "normal" : "nowrap",
+                textAlign: isSolo && !isWideSolo ? "left" : "center",
+                whiteSpace: isSolo && !isWideSolo ? "normal" : "nowrap",
                 cursor: "pointer",
               }}
             >
@@ -2077,7 +2665,10 @@ export default function MainPage() {
         style={{
           position: "fixed",
           left: 0,
-          right: 0,
+          // Ends at the rail, so the auto margins centre this on the STAGE — the
+          // input belongs under her, and the transcript beside her must stay
+          // readable to its last line. (Same rule as the chips above.)
+          right: railWidth,
           bottom: ASK_BAR_BOTTOM,
           marginLeft: "auto",
           marginRight: "auto",
@@ -2087,7 +2678,9 @@ export default function MainPage() {
           // one thing on this page you must be able to read. It is the centre
           // column's input in every other sense (she presides, the roster and
           // the mark are hers), so it should measure like it.
-          width: isSolo
+          width: isWideSolo
+            ? `min(620px, ${stageWidth - 24}px)`
+            : isSolo
             ? "min(560px, calc(100vw - 24px))"
             : `min(${Math.round(ladyPanelWidth)}px, calc(100vw - 24px))`,
           zIndex: 600,

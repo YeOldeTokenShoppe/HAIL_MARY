@@ -31,7 +31,7 @@ export default function Lobby({ docketLength, onStart, onExit, exitLabel = "◀ 
     <Shell>
       <div className="ct-lobby">
         <div className="ct-lobby-top">
-          <div className="ct-eyebrow">▸ THE CASE TABLE{dev ? " — DEV MOCK v4" : ""}</div>
+          <div className="ct-eyebrow">▸ THE DESK{dev ? " — DEV MOCK v4" : ""}</div>
           <div className="ct-devrow">
             {dev && (
               <>
@@ -46,17 +46,17 @@ export default function Lobby({ docketLength, onStart, onExit, exitLabel = "◀ 
         <div className="ct-title">The Terminal has allocated you a book.<br />Don't lose the house's money.</div>
         <div className="ct-sub">
           You are the fifth seat at Our Lady of Perpetual Profit's trading desk — a book
-          of {START_PF}, a docket of {docketLength} cases, four partners running their own books beside you.
+          of {START_PF}, a deal flow of {docketLength} prospects, four partners running their own books beside you.
         </div>
         <div className="ct-steps">
           <div className="ct-step"><span className="ct-step-n">01</span>
-            <div><b>WORK THE CASE</b> — {BASE_ACTIONS} actions per case. Ask a consultant a question, or play a card from your kit. Same cost.</div></div>
+            <div><b>DO THE RESEARCH</b> — {BASE_ACTIONS} free actions per deal (a question or a card, same cost). Keep digging past that and every extra look bills your book. Or skip it all and trade the chart.</div></div>
           <div className="ct-step"><span className="ct-step-n">02</span>
             <div><b>READ THE ROOM</b> — the partners call vague leans before you commit. Their exact numbers stay sealed until the Ledger.</div></div>
           <div className="ct-step"><span className="ct-step-n">03</span>
             <div><b>LOCK THE TICKET</b> — three dials: your read, your stake (up to {MAX_STAKE}; the council benchmarks a flat {STAKE}), your timing. A max-conviction miss at full stake costs {MAX_STAKE * 3}. That's more than your book. Barron would do it anyway.</div></div>
         </div>
-        <div className="ct-eyebrow" style={{ marginTop: 6 }}>▸ CHOOSE YOUR PATRON — their perk rides the whole docket</div>
+        <div className="ct-eyebrow" style={{ marginTop: 6 }}>▸ CHOOSE YOUR BACKER — one partner stakes your book; their edge rides the whole deal flow</div>
         <div className="ct-cardpicks">
           {CHARACTER_ORDER.map((k) => {
             const meta = CHARACTER_META[k];

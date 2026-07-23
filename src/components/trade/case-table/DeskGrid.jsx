@@ -9,7 +9,7 @@ import { KC_CSS } from "./KitCard";
 import Tip from "./Tip";
 
 export default function DeskGrid({
-  caseData, caseIndex, docketLength, visited, tableLog,
+  caseData, caseIndex, docketLength, visited, revealed = {}, tableLog,
   tipSeen, onDismissTip, actionsLeft, actionsMax, book, callsOpen,
   onOpenChannel, onEnterCalls, kitHand,
 }) {
@@ -17,24 +17,26 @@ export default function DeskGrid({
     <div className="dg-root">
       <div className="dg-inner">
         <div className="dg-header">
-          <span className="dg-title">LIMINAL // COUNCIL</span>
-          <span className="dg-case">{caseData.ticker} · {caseData.chain} — CASE {caseIndex + 1}/{docketLength}</span>
+          <span className="dg-title">LIMINAL // THE DESK</span>
+          <span className="dg-case">{caseData.ticker} · {caseData.chain} — DEAL {caseIndex + 1}/{docketLength}</span>
           <span className="dg-live"><i className="dg-dot" />4 CHANNELS</span>
         </div>
 
         {!tipSeen && (
           <Tip title="THE DESK — FIRST TIME" onDismiss={onDismissTip}>
-            You get {BASE_ACTIONS} ACTIONS a case. Opening a channel and asking a question costs one;
-            playing a kit card costs one. The partners work the case every time you spend one — watch
-            the desk feed. Out of actions, you call the table.
+            You get {BASE_ACTIONS} FREE actions a deal — a question or a card, same cost.
+            Keep researching past that and each extra look bills your book. The partners do
+            their own research every time you spend one, and the calls are open whenever
+            you're ready to trade.
           </Tip>
         )}
 
-        <div className="dg-eyebrow">▸ THE COUNCIL — OPEN A CHANNEL</div>
+        <div className="dg-eyebrow">▸ YOUR ANALYSTS — OPEN A CHANNEL</div>
         <div className="dg-row">
           {CHARACTER_ORDER.map((key, i) => {
             const c = CHARACTER_META[key];
             const isVisited = visited.includes(key);
+            const intel = (revealed[key] || []).length;
             return (
               <button
                 key={key}
@@ -52,6 +54,7 @@ export default function DeskGrid({
                 <span className="dg-plate">
                   <span className="dg-name">{c.name}</span>
                   <span className="dg-role">{c.role} · {c.roleSub}</span>
+                  {intel > 0 && <span className="dg-intel">◈ {intel} INTEL ON FILE</span>}
                 </span>
               </button>
             );
@@ -64,7 +67,7 @@ export default function DeskGrid({
             : tableLog.slice(-3).map((line, i) => <div key={tableLog.length + "-" + i} className="dg-line">{line}</div>)}
         </div>
 
-        <div className="dg-eyebrow">▸ YOUR KIT — A CARD COSTS AN ACTION</div>
+        <div className="dg-eyebrow">▸ YOUR HAND — A CARD COSTS AN ACTION</div>
         <div className="dg-row">{kitHand}</div>
 
         <div className="dg-footer">
@@ -82,8 +85,8 @@ export default function DeskGrid({
             <span className="dg-book-num">{Math.round(book ?? START_PF)}</span>
           </div>
           {callsOpen
-            ? <button className="dg-cta" onClick={onEnterCalls}>PUNDIT CALLS ▸</button>
-            : <span className="dg-wait">THE TABLE CALLS WHEN YOUR ACTIONS ARE SPENT</span>}
+            ? <button className="dg-cta" onClick={onEnterCalls}>ANALYST CALLS ▸</button>
+            : <span className="dg-wait">THE CALLS OPEN WHEN YOUR ACTIONS ARE SPENT</span>}
         </div>
       </div>
       <style>{`
@@ -130,6 +133,8 @@ export default function DeskGrid({
         .dg-name { font-size: 12.5px; font-weight: bold; color: #f4fffb;
           text-shadow: 0 0 8px color-mix(in srgb, var(--cc) 65%, transparent); }
         .dg-role { font-size: 8.5px; letter-spacing: 0.12em; color: var(--cc); }
+        .dg-intel { font-size: 9px; font-weight: bold; letter-spacing: 0.1em; color: #ffd23a;
+          text-shadow: 0 0 6px rgba(255,210,58,0.5); margin-top: 2px; }
         ${KC_CSS}
         .dg-feedstrip { border: 1px solid rgba(255,210,58,0.28); background: rgba(4,20,15,0.6);
           padding: 7px 10px; min-height: 42px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }

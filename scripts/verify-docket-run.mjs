@@ -21,7 +21,7 @@ const load = (src) => import(dataUrl(src));
 const caseTableSrc = read("../src/game/terminal-traders/caseTable.js");
 const cardsSrc = read("../src/game/terminal-traders/cards.js");
 const { CASE_SIGNALS } = await load(read("../src/game/terminal-traders/caseSignals.js"));
-const { KIT_CARDS, resolveKitPlay, isKitLegal, pickBasicKit } = await load(
+const { KIT_CARDS, resolveKitPlay, isKitLegal, pickBasicKit, dealKit, shuffleDocket } = await load(
   read("../src/game/terminal-traders/caseKit.js")
     .replace('from "./cards"', `from ${JSON.stringify(dataUrl(cardsSrc))}`)
 );
@@ -193,6 +193,30 @@ const basic = pickBasicKit();
 check("pickBasicKit: legal — deep scan leads, lenses covered, insurance",
   { legal: isKitLegal(basic), ids: basic.map((c) => c.id) },
   { legal: true, ids: ["cold-wallet", "forked-rumor", "wallet-seance", "mempool-prophecy", "candle-vigil"] });
+
+// THE DEAL: seeded hands — deterministic per (seed, caseIndex), legal by
+// construction, different across cases. Pins the dealer's RNG call sites.
+const deal0 = dealKit(KIT_CARDS, 1337, 0).map((c) => c.id);
+check("dealKit: seed 1337 case 0 fingerprint",
+  deal0, ["forked-rumor", "oracle-crosscheck", "rug-warning", "chart-exorcism", "neon-stop-loss"]);
+check("dealKit: deterministic + legal + varies by case",
+  {
+    same: JSON.stringify(dealKit(KIT_CARDS, 1337, 0).map((c) => c.id)) === JSON.stringify(deal0),
+    legal: isKitLegal(dealKit(KIT_CARDS, 1337, 0)),
+    differs: JSON.stringify(dealKit(KIT_CARDS, 1337, 1).map((c) => c.id)) !== JSON.stringify(deal0),
+  },
+  { same: true, legal: true, differs: true });
+
+// Flow shuffle (interim replayability patch): deterministic per seed, and
+// ADJACENT seeds produce different orders (the avalanche-hash regression —
+// raw mulberry seeding bucketed 1337-1339 into one order).
+check("shuffleDocket: seed 1337 fingerprint", shuffleDocket(["c1", "c2", "c3"], 1337), ["c3", "c2", "c1"]);
+check("shuffleDocket: deterministic + adjacent seeds vary",
+  {
+    same: JSON.stringify(shuffleDocket(["c1", "c2", "c3"], 1337)) === JSON.stringify(["c3", "c2", "c1"]),
+    varies: JSON.stringify(shuffleDocket(["c1", "c2", "c3"], 1338)) !== JSON.stringify(shuffleDocket(["c1", "c2", "c3"], 1337)),
+  },
+  { same: true, varies: true });
 
 // ---- Case-file integrity (the repo's stand-in for a content test runner):
 // reveals resolve, Tier-2 labels never collide with Tier-1, locked questions

@@ -11,7 +11,10 @@ export const STAKE = TABLE_RULES.stake; // the council's flat benchmark stake
 export const START_PF = TABLE_RULES.startPortfolio;
 export const DOCK_H = 240; // table dock height — tall enough for the card-shaped kit hand
 
-export const VLABEL = { believe: "TRUST", doubt: "DOUBT", abstain: "ABSTAIN" };
+// Desk vocabulary (DECISION 2026-07-22): the player is an investor — the
+// mechanical labels are LONG / SHORT / HOLD. Internal ids stay
+// believe/doubt/abstain (engine, case files, recorded character audio).
+export const VLABEL = { believe: "LONG", doubt: "SHORT", abstain: "HOLD" };
 export const VCOLOR = { believe: "#4dffaa", doubt: "#ff5454", abstain: "#ffd23a" };
 export const RARITY_COLOR = { common: "#bfeede", uncommon: "#4dffaa", rare: "#8ee9ff", mythic: "#ff7ad9", "terminal-foil": "#ffd23a" };
 

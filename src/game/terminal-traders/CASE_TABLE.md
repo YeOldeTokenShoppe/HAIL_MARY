@@ -792,7 +792,10 @@ which is the exact failure this doc exists to prevent.
    re-checked whenever the review generator changes.
 2. **Payouts stay proper.** Any scoring/payout change must remain a
    monotonic affine transform of Brier, or honest sliding stops being
-   optimal and the core loop is poisoned.
+   optimal and the core loop is poisoned. Presentation corollary
+   (2026-07-22): the player-visible scoring criterion is P&L — the word
+   "Brier" never appears in UI. The kernel lives inside `casePnl`;
+   dollars on the dashboard, Brier in the engine.
 3. **Wallet ≠ win.** Kit legality caps + the sim-suite kit-edge target
    (single-digit pp) are the enforcement, not a vibe.
 4. **Loot-box posture** (GENESIS.md §6) fully applies: published odds,
@@ -828,7 +831,13 @@ which is the exact failure this doc exists to prevent.
 
 ---
 
-## 7. The Gauntlet — survival mode (PROPOSAL, 2026-07-14)
+## 7. The Gauntlet — survival mode (PROPOSAL, 2026-07-14 — ABSORBED into §10, 2026-07-22)
+
+*Status note: §10 (Hail Mary Venture Capital) absorbs this proposal — the
+user's redesign converged on the Gauntlet's exposure/timing loop and added
+the missing front half (choosing which token to back) plus the VC frame.
+The §7.5 sim-gate discipline and anti-slot-machine invariants carry
+forward verbatim; read this section as design source material for §10.*
 
 **One line:** the Docket trains *judgment under hidden truth*; the Gauntlet
 trains *sizing under randomness*. Same terminal, same cast, same cards —
@@ -1078,6 +1087,220 @@ menu of minigames.
 - **Framing guardrail:** "maximize profit, avoid ruin" is the career's
   fiction; every desk's scoring stays skill-attributable and
   fictionalized (guardrail 5 — never investment anything).
+- **Scoring & vocabulary (DECISION 2026-07-22):** every seat is an
+  INVESTOR — that's the role. The player-visible scoring criterion is
+  P&L on every surface (per-case ticket settle, docket net, career
+  ledger; the non-table case flow shows EDGE = Brier translated to book
+  points at the flat 25 stake). Raw Brier figures never render.
+  Mechanical labels are **LONG / SHORT / HOLD** (`VLABEL`, display
+  layer only) — internal ids stay believe/doubt/abstain (engine, case
+  files, recorded character audio; the council's spoken "trust/doubt"
+  register is their voice, not the UI's).
+- **Investor-primary frame (DECISION 2026-07-22, after the identity
+  playtest — "am I solving a case or trading the book?"):** the trader
+  frame WINS; the detective frame is its flavor. Diligence is the edge,
+  not the goal. Player-visible language: case → **prospect/deal**,
+  docket → **deal flow** (the Daily Docket reward brand becomes the
+  Daily Deal Flow; server routes/ids unchanged), investigation → **do
+  your own research** (the DYOR idiom — playtest killed "run diligence"
+  as finance-insider jargon), the council → **your analysts / the
+  desk**, pundit calls → **analyst calls**, CASE CLOSED → **POSITION
+  SETTLED**, outcomes PAID / BURNED / HELD. Internal ids, engine
+  vocabulary, doc §-names, card names, rogues, and recorded dialogue
+  keep the original register — the fiction's voice survives as texture
+  under the investor UI.
+  **Plain-language guardrail:** every player-facing mechanical term must
+  parse WITHOUT finance literacy — this is a teaching game for people
+  who don't know the vocabulary yet. "Brier" failed it, "diligence"
+  failed it; P&L, research, long/short/hold pass. Industry idioms are
+  welcome only when they're already street-famous (DYOR, rug).
+- **Hands are DEALT (DECISION 2026-07-22):** the KitSelect picker is
+  superseded — `dealKit(pool, seed, caseIndex)` deals a legal 5-card
+  hand from the owned action pool per prospect (seeded: no reroll
+  fishing, fair replays, harness-pinned). The collection IS the deck —
+  deck-building happens in the binder by owning cards, exactly the
+  Pokémon draw model; the DealHand screen's SHUFFLE & DEAL flip is the
+  ceremony. §8's holdings rack should adopt the same dealt model at sim
+  time.
+- **The patron is your BACKER:** the pre-flow character pick stays (it's
+  the one strategic loadout choice left, and the trader cards deserve
+  the moment) but the fiction is now staking, not patronage — one
+  partner stakes your book and lends you their edge for the deal flow.
 - **Sequencing unchanged:** §6 order stands (Docket → launch → Gauntlet
   → variations). The career ledger is the only new commitment, gated on
   a second live mode.
+- **2026-07-22 amendment:** §10 (Hail Mary Venture Capital) is the
+  designed flagship loop — it merges the research desk and the Gauntlet
+  into one game. The current deal flow ships and keeps earning while
+  §10 clears its sim gates; the desks architecture above then describes
+  §10's INTERNAL phases rather than separate modes.
+
+---
+
+## 10. Hail Mary Venture Capital — the unified loop (PROPOSAL, 2026-07-22)
+
+*The flagship redesign, from the 2026-07-22 playtest conversation. Origin
+critique: the deal flow's first prospect was always the same token with a
+memorizable outcome — three authored cases are a puzzle box, not a game.
+The user's sketch (shuffle allocates tokens + actions, player CHOOSES
+which token to back, DYOR optional, ride-the-rug legal, variable holds,
+profit leaderboard) converged on §7's Gauntlet exposure loop plus the
+missing front half. This section unifies them. Maximize for playability
+and engagement; keep the teaching spine intact statistically.*
+
+**You run a fund.** Hail Mary Venture Capital: a seeded daily session of
+deals. Research is your edge, not your obligation.
+
+### 10.1 The loop
+
+1. **THE SHUFFLE (session start, seeded + shared).** One seed per day
+   deals everything: the prospect spread (token cards), your action
+   hand, the chart-action pile order, and the market schedule. Everyone
+   plays the same shuffle — the leaderboard compares decisions on
+   identical luck (poker-tournament fairness; the anti-luckboard rule).
+2. **PICK YOUR DEAL — the active-slot move.** The shuffle REVEALS the
+   prospect spread as face-up token cards; the player PLACES one as the
+   active deal (Pokémon's active-Pokémon beat, made explicit
+   2026-07-22) — or passes the whole spread. Passing is a scored
+   non-position (HOLD at the portfolio level). This is the core VC verb
+   the old rails lacked. **Surface DYOR is free at the spread:** tapping
+   a prospect opens its prospectus (dossier + public stats) before
+   placing — the listing page is public information; only ANALYST time
+   costs (rounds, once placed). *Interim version SHIPPED same day: the
+   deal flow's DealHand shows the remaining prospects as dossier cards —
+   tap to inspect the prospectus, place from inside it, and the flow
+   plays in the order YOU choose.*
+3. **RESEARCH — OPTIONAL, AND IT COSTS ROUNDS.** The full analyst desk
+   (channels, evidence, Tier-2, kit cards) is available per deal — but
+   every research action advances the market: the chart-action pile
+   flips while you read, and your eventual entry moves. Apeing is fast;
+   knowing is slow. The DYOR trade-off is mechanical, not moral.
+   *Interim version SHIPPED 2026-07-22: the briefing offers both paths —
+   "DO YOUR OWN RESEARCH" or "⚡ SKIP IT — TRADE THE CHART ▸" (straight
+   to analyst calls → ticket), and every prospectus carries a
+   PriceGlimpse — a 30-day tape whose SHAPE is keyed to ground truth
+   (§3.3 honesty applied to charts): PROPHET's parabolic ramp is the
+   exit-liquidity silhouette, HARBORLIGHT's ugly chop hides a solid
+   book, and the cleanest grind in the deck belongs to MERIDIAN — the
+   chart can't see a proxy admin. Skipping earns a recap nudge
+   (coverageNote: "the receipts win"), not a lecture.*
+   *RESEARCH OVERAGE (same day — "let the player play as many cards and
+   question as many traders as they want"): the 3-action cap became a
+   PRICE. First 3 actions free; each extra bills the book at an
+   escalating −2, −3, −4... (floored so research can't bust you; whiffs
+   and duplicate taps never charge). Sweeping all evidence is legal and
+   costs ~−65 — certainty priced above its worth, selectivity still the
+   winning play. The calls are open at any time. The Ledger prints the
+   RESEARCH TAB. This is §10's research-costs-rounds principle in
+   book-denominated interim form.*
+4. **TAKE THE POSITION.** Long / short / hold, sized. Entry marks at the
+   current curve price.
+5. **RIDE IT.** Rounds continue: chart-action draws + market cards move
+   the curve around the token's hidden profile. Hold as long as you
+   like (longing a trade means staying in), exit when you choose — or
+   get caught by the collapse. **Ride-the-rug is legal:** a known rug
+   longed and exited in time pays; caught, it devastates. The game
+   scores the habit over the session, not the sermon.
+6. **SETTLE & NEXT DEAL** until the session's rounds run out or the
+   fund is liquidated.
+7. **THE RECAP** splits the session ledger: researched deals vs
+   unresearched deals P&L, entries/exits vs optimal windows, rug rides
+   survived vs caught. The DYOR lesson is DISCOVERED here, not
+   preached: research must out-earn vibes over a session (sim gate),
+   and the recap is where the player sees it in their own numbers.
+8. **LEADERBOARD:** daily seeded session, ranked by fund P&L;
+   liquidation ends the run. The career ledger (§9) aggregates.
+
+### 10.2 Prospects — instanced from the coin archetype deck
+
+The 28 Genesis coins ARE the prospect deck. Each coin's `caseRef`
+(pattern, outcome class) + `volatility` defines an ARCHETYPE; every deal
+instantiates a fresh token FROM an archetype with rolled parameters —
+collapse day, magnitude, evidence mix, and a real legit-exception rate
+(not every yield-mirage-shaped token rugs; the exception rate is what
+keeps pattern-reading probabilistic instead of lookup). Owning coins =
+owning the pattern library: memorization teaches ARCHETYPES (Eugene's
+lens, the teaching goal), never today's answer. Evidence generation
+extends the `generateReviewCase` machinery + the §3.3 authoring rules
+(honest weights; research reveals true profile signals; price is noise
+anchored to profile). The three authored cases survive as rare FEATURED
+DEALS in the flow — handcrafted jewels in a generated stream. Rogue art
+= the wanted posters for the archetypes the player keeps meeting.
+
+### 10.3 What survives (nearly everything)
+
+Analyst desk + channels + evidence + Tier-2 → the research subsystem,
+per deal. Market cards' docket mechanics → the per-round price engine
+(the Phase 3 resolver becomes THE core system). Horizon dial → exit
+timing, generalized. `casePnl`'s honesty kernel → entry/exit curve
+scoring; guardrail 2 evolves: properness is enforced STATISTICALLY (sim
+gates prove honest research + honest sizing dominate over sessions)
+rather than per-deal affine form. Chart pattern cards (§8.4) → the
+chart-action draw pile, promoted from parked variation to core-loop
+content (Season 2 set = more pile). Bots keep running books beside you.
+Dealt hands, backer pick, reward rail, binder, P&L-only presentation,
+plain-language guardrail: unchanged.
+
+### 10.4 Sim gates (run before ANY UI — §7.5 discipline)
+
+Price-curve generator + policy bots — researcher, viber (narrative +
+price action only), rug-rider, coin-flipper — across 2,000 seeded
+sessions:
+
+- [x] Research edge visible: researcher beats viber by a stable,
+      single-to-low-double-digit margin (teaching), not a blowout
+      (viber stays FUN and sometimes right). *Passed 2026-07-22: +15pts,
+      viber ≈ breakeven with a real top decile.*
+- [x] Rug-riding: positive EV in the best-timed decile, ruinous at the
+      tail; session-level EV below the researcher's (the sermon is
+      statistical). *Passed: p90 +34%, 44.6% margin-called, mean −62pts
+      vs researcher.*
+- [x] Skill dominance: researcher + honest sizing beats coin-flip by a
+      wide stable margin; luck's share of leaderboard variance bounded.
+      *Passed: +22pts, ordering stable across all four 500-seed batches.*
+- [x] Ruin rate: liquidation possible (stakes real) but not dominant at
+      honest sizing. *Passed: 0.1% for the researcher — honest sizing
+      almost never busts, which is itself the lesson.*
+- [x] Anti-slot-machine invariants (§7.2) hold: no near-miss
+      manufacturing, no escalating-stake pressure, passing is always a
+      respectable play. *Passed: researcher-with-passing ≥ forced-entry
+      variant (G5).*
+
+#### 10.4a Sim findings (v1, 2026-07-22 — `scripts/sim-hmvc.mjs`)
+
+2,000 sessions/policy · 40 rounds · margin call at 25 · 1.5% entry fee ·
+spread of 3 · research 1 round/signal at 0.78 accuracy · exception rates
+rug .78/.10/.12, zombie .18/.62/.20, legit .10/.20/.70:
+
+```
+policy       mean    p10   p50   p90   ruin%   P&L/researched deal
+researcher   115.7    87   115   150    0.1%   +4.80
+alwaysin     110.5    83   109   142    0.1%   +2.85
+viber        100.7    70   105   127    0.0%   +0.14 (unresearched)
+rugrider      53.8    12    34   134   44.6%   −13.62
+coinflip      93.3    67    95   119    0.0%   −1.13 (unresearched)
+```
+
+Notable v1 lessons: (1) a naive momentum viber UNDERPERFORMED random —
+momentum-chasing is adverse selection straight into pumping rugs; the
+passing viber needed a "parabolic candles are exit liquidity" filter to
+reach breakeven, which is itself a teachable beat for the recap. (2) No
+ruin exists without entry fees + margin call at 25 — stops alone made
+everyone immortal. (3) G2's v1 formalization compared the rider's ceiling
+to the researcher's — stricter than this section's words; re-grounded to
+absolutes (top decile ≥ +30%, ruin ≥ 20%, mean trails by 20+). The
+rider's ceiling needn't rival the grinder's; it needs to be seductive.
+
+### 10.5 Phasing
+
+1. Sim suite (`hmvc-sim` beside `sim-case-table.mjs`) + gates above.
+2. Prospect generator (archetype instancing + evidence gen) — content
+   pipeline validated against §3.3-style honesty checks in the harness.
+3. `/hmvc-dev` loop alpha (CaseTableDev pattern): shuffle → pick →
+   research-costs-rounds → position → ride → recap. Local only.
+4. Daily seeded session + leaderboard + career ledger; the current deal
+   flow's reward rail migrates; the deal flow remains as the research
+   tutorial / featured-deal surface inside HMVC.
+5. Interim (SHIPPED 2026-07-22): `shuffleDocket` seed-shuffles the
+   current three-case flow order, and `dealKit` varies hands — the
+   stopgap for the memorization critique until instancing lands.

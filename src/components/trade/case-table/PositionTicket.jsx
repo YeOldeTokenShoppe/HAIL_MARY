@@ -30,7 +30,7 @@ export default function PositionTicket({
     <Shell>
       <div className="ct-talk">
         <SeatStrip books={books} busted={busted} ledger={ledger} patron={patron} />
-        <div className="ct-eyebrow">▸ POSITION TICKET — CASE {caseIndex + 1}/{docketLength} · {ticker}</div>
+        <div className="ct-eyebrow">▸ POSITION TICKET — DEAL {caseIndex + 1}/{docketLength} · {ticker}</div>
         <div className="ct-talk-note">Three dials, three skills. Every dial gets its own line in the Ledger.</div>
         {!tipSeen && (
           <Tip title="THE TICKET — FIRST TIME" onDismiss={onDismissTip}>
@@ -47,7 +47,7 @@ export default function PositionTicket({
           </div>
           <input type="range" min={0} max={100} step={1} value={ticketP}
             onChange={(e) => onTicketP(+e.target.value)} aria-label="Probability this token is a scam" />
-          <div className="ct-dial-sub">Dead center is Abstain — it pays nothing and costs nothing.</div>
+          <div className="ct-dial-sub">Dead center is HOLD — it pays nothing and costs nothing.</div>
         </div>
 
         <div className="ct-dial" style={{ "--dc": "#2fd6d6" }}>
@@ -79,7 +79,7 @@ export default function PositionTicket({
         </div>
 
         <button className="ct-cta" onClick={() => onLock({ p, v })}>LOCK THE TICKET ▸</button>
-        <button className="ct-ghost" onClick={onBack}>◀ BACK TO PUNDIT CALLS</button>
+        <button className="ct-ghost" onClick={onBack}>◀ BACK TO ANALYST CALLS</button>
       </div>
     </Shell>
   );

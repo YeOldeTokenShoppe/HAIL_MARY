@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import TradingCard from "@/components/TradingCard";
+import PriceGlimpse from "@/components/trade/PriceGlimpse";
 import { frameForRarity, metaTopForFrame } from "@/game/terminal-traders/cardFrames";
 
 // The Liminal Terminal MENU — the entry screen that fronts the COUNCIL grid
@@ -11,8 +12,9 @@ const DIFFICULTY_TIER = { beginner: "common", intermediate: "rare", advanced: "m
 
 // A synthetic template-card for the case file — cases aren't Genesis cards,
 // so this builds the TradingCard data shape directly (no art → the framed
-// no-art variant; no Genesis set badge).
-function caseDossierCard(caseData, caseIndex, docketLength) {
+// no-art variant; no Genesis set badge). Exported: DealHand renders the
+// prospect SPREAD with the same dossier cards.
+export function caseDossierCard(caseData, caseIndex, docketLength) {
   const frame = frameForRarity(DIFFICULTY_TIER[caseData.difficulty] || "common");
   const difficulty = caseData.difficulty
     ? caseData.difficulty.charAt(0).toUpperCase() + caseData.difficulty.slice(1)
@@ -20,13 +22,13 @@ function caseDossierCard(caseData, caseIndex, docketLength) {
   return {
     name: caseData.projectName,
     subtitle: `${caseData.ticker} · ${caseData.chain}`,
-    cardType: "Case",
+    cardType: "Prospect",
     style: difficulty,
     rarity: difficulty,
     foilStyle: "subtle",
     edition: docketLength ? `${(caseIndex ?? 0) + 1}/${docketLength}` : "dossier",
-    ability: { name: "Verdict Required", text: caseData.tagline },
-    flavorText: "Scam, or salvation? Work the lenses. Lock the ticket.",
+    ability: { name: "Position Required", text: caseData.tagline },
+    flavorText: "Long, short, or hold? Work the lenses. Lock the ticket.",
     statPair: null,
     backgroundImage: null,
     artFocus: "center 30%",
@@ -40,7 +42,7 @@ function caseDossierCard(caseData, caseIndex, docketLength) {
   };
 }
 
-export default function TerminalMenu({ caseData, caseIndex = 0, docketLength = 0, onBegin, onExit, exitLabel = "◀ EXIT TERMINAL" }) {
+export default function TerminalMenu({ caseData, caseIndex = 0, docketLength = 0, onBegin, onSkip, onExit, exitLabel = "◀ EXIT TERMINAL" }) {
   const [showBriefing, setShowBriefing] = useState(false);
   // The dossier card scales down a notch on phones so the stats column
   // still fits beside it (or stacks cleanly below).
@@ -67,7 +69,7 @@ export default function TerminalMenu({ caseData, caseIndex = 0, docketLength = 0
       </div>
 
       <div className="tm-body">
-        <div className="tm-eyebrow">▸ INCOMING CASE FILE · {caseNo}</div>
+        <div className="tm-eyebrow">▸ INCOMING PROSPECT · {caseNo}</div>
         <div className="tm-dossier">
           <div className="tm-cardwrap">
             <TradingCard
@@ -86,11 +88,20 @@ export default function TerminalMenu({ caseData, caseIndex = 0, docketLength = 0
                 </div>
               ))}
             </div>
-            <div className="tm-charge">VERDICT REQUIRED — scam, or salvation?</div>
+            <div style={{ marginTop: 9 }}>
+              <PriceGlimpse caseData={caseData} />
+            </div>
+            <div className="tm-charge">POSITION REQUIRED — long, short, or hold?</div>
           </div>
         </div>
 
-        <button className="tm-begin" onClick={onBegin}>▸ BEGIN INVESTIGATION</button>
+        <button className="tm-begin" onClick={onBegin}>▸ DO YOUR OWN RESEARCH</button>
+        {/* The viber path (playtest 2026-07-22): research is optional. The
+            chart and the room are free; the receipts cost actions. Sim says
+            this path roughly breaks even — the recap will say so too. */}
+        {onSkip && (
+          <button className="tm-skip" onClick={onSkip}>⚡ SKIP IT — TRADE THE CHART ▸</button>
+        )}
 
         <button className="tm-brief" onClick={() => setShowBriefing((s) => !s)}>
           {showBriefing ? "▾" : "▸"} BRIEFING · ST. GR80
@@ -148,6 +159,13 @@ export default function TerminalMenu({ caseData, caseIndex = 0, docketLength = 0
           box-shadow: 0 0 16px color-mix(in srgb, #2fd6d6 40%, transparent);
         }
         .tm-begin:active { transform: scale(0.99); }
+        .tm-skip {
+          width: 100%; background: none; border: 1px solid color-mix(in srgb, #ff8a4d 50%, transparent);
+          color: #ff8a4d; font: inherit; font-size: 12.5px; font-weight: bold; letter-spacing: 0.08em;
+          padding: 11px 12px; cursor: pointer; margin-bottom: 12px;
+          clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+        }
+        .tm-skip:hover { background: rgba(255,138,77,0.08); }
         .tm-brief {
           width: 100%; background: none; border: 1px solid color-mix(in srgb, #ffd23a 45%, transparent);
           color: #ffd23a; font: inherit; font-size: 12.5px; letter-spacing: 0.06em; text-align: left;

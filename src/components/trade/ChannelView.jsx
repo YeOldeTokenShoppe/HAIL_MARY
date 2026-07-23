@@ -28,6 +28,9 @@ export default function ChannelView({
   lockedUnlocked = false, // this station's lockedQuestion has been unsealed
   speakLine,          // (text) => void — external voice for non-SitePal
                       // stations (Eugene's ElevenLabs path); fired per line
+  overageCost = 0,    // beyond the free budget: 0 = free scans remain,
+                      // >0 = next question bills the book this much,
+                      // null = the book can't fund more research
   onAsk,              // (qIndex | "locked") => void
   onBack,
   onVerdict,
@@ -194,7 +197,7 @@ export default function ChannelView({
     <div className={`cv-root${compact ? " cv-root--compact" : ""}`} style={{ "--cvc": color }}>
       {/* header */}
       <div className="cv-header">
-        <button className="cv-back" onClick={onBack}>◀ COUNCIL</button>
+        <button className="cv-back" onClick={onBack}>◀ DESK</button>
         <span className="cv-scans">SCANS {Array.from({ length: scansMax }, (_, i) => (
           <i key={i} className={`cv-pip${i < scansLeft ? " cv-pip--on" : ""}`} />
         ))}</span>
@@ -242,11 +245,17 @@ export default function ChannelView({
           </div>
         )}
 
-        <div className="cv-qhead">INTERROGATE {scansLeft > 0 ? `· ${scansLeft} SCANS LEFT` : "· NO SCANS LEFT"}</div>
+        <div className="cv-qhead">
+          {scansLeft > 0
+            ? `ASK YOUR QUESTIONS · ${scansLeft} FREE`
+            : overageCost
+              ? `RESEARCH OVERAGE · NEXT QUESTION BILLS −${overageCost} BOOK`
+              : "THE HOUSE WON'T FUND MORE RESEARCH"}
+        </div>
         <div className="cv-questions">
           {station.questions.map((q, i) => {
             const isAsked = asked.includes(i);
-            const disabled = isAsked || scansLeft <= 0;
+            const disabled = isAsked || (scansLeft <= 0 && !overageCost);
             return (
               <button
                 key={i}
@@ -265,7 +274,7 @@ export default function ChannelView({
           {station.lockedQuestion && (() => {
             const isAsked = asked.includes("locked");
             const sealed = !lockedUnlocked;
-            const disabled = sealed || isAsked || scansLeft <= 0;
+            const disabled = sealed || isAsked || (scansLeft <= 0 && !overageCost);
             return (
               <button
                 className={`cv-q${sealed ? " cv-q--locked" : ""}${isAsked ? " cv-q--asked" : ""}`}
@@ -285,7 +294,7 @@ export default function ChannelView({
 
       {/* footer — hidden when the parent hasn't opened the verdict phase yet
           (the Case Table gates it until all actions are spent) */}
-      {onVerdict && <button className="cv-verdict" onClick={onVerdict}>RENDER VERDICT ▸</button>}
+      {onVerdict && <button className="cv-verdict" onClick={onVerdict}>TAKE YOUR POSITION ▸</button>}
 
       {/* Fullscreen "monitor view" of a revealed evidence card — same overlay
           the desktop VIEW EVIDENCE button opens. position:fixed, so it escapes

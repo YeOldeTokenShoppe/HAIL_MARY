@@ -7,20 +7,18 @@ import { coverageNote } from "@/components/GameOverlay";
 // Reveal screen — outcome + Brier + the case truth + each consultant's
 // vindication line + the decisive lens. Self-contained off the case data.
 const OUT = {
-  aligned: { label: "ALIGNED", color: "#4dffaa", sub: "you called it" },
-  missed: { label: "MISSED", color: "#ff5454", sub: "wrong read" },
-  abstained: { label: "ABSTAINED", color: "#ffd23a", sub: "you held back" },
+  aligned: { label: "PAID", color: "#4dffaa", sub: "you called it" },
+  missed: { label: "BURNED", color: "#ff5454", sub: "wrong read" },
+  abstained: { label: "HELD", color: "#ffd23a", sub: "you stayed flat" },
 };
 
 // vindication values are sometimes {text,audio}, sometimes a bare string.
 const vtext = (v) => (typeof v === "string" ? v : v?.text || "");
 
-export default function RevealScreen({ caseData, verdict, confidence = 0.5, investigated = [], kitNote = null, speakerKey, speakerSceneId, onExit }) {
+export default function RevealScreen({ caseData, verdict, confidence = 0.5, investigated = [], pnl = null, kitNote = null, speakerKey, speakerSceneId, onExit }) {
   const correct = caseData.correctVerdict;
   const outcome = verdict === "abstain" ? "abstained" : verdict === correct ? "aligned" : "missed";
   const o = OUT[outcome];
-  const wasScam = correct === "doubt";
-  const brier = Math.pow(confidence - (wasScam ? 1 : 0), 2);
   // Breadth nudge (shared with desktop) — encourages cross-checking multiple
   // consultants instead of reading the case through one character's lens.
   const { note: lensNote, tone: lensTone } = coverageNote(caseData, investigated);
@@ -45,13 +43,19 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
 
   return (
     <div className="rv-root">
-      <div className="rv-header"><span className="rv-title">CASE CLOSED · {caseData.ticker}</span></div>
+      <div className="rv-header"><span className="rv-title">POSITION SETTLED · {caseData.ticker}</span></div>
 
       <div className="rv-body">
         <div className="rv-banner" style={{ "--c": o.color }}>
           <span className="rv-out">{o.label}</span>
           <span className="rv-sub">{o.sub}</span>
-          <span className="rv-brier">BRIER {brier.toFixed(2)} <i>· 0 = perfect</i></span>
+          {/* P&L is the score (DECISION 2026-07-22) — the Brier kernel
+              lives inside casePnl and never surfaces in the UI. */}
+          {pnl != null && (
+            <span className="rv-pnl" style={{ color: pnl >= 0 ? "#4dffaa" : "#ff5454" }}>
+              {pnl >= 0 ? "+" : ""}{Math.round(pnl)} TO YOUR BOOK
+            </span>
+          )}
         </div>
 
         {speakerSceneId && speakerLine && (
@@ -124,8 +128,7 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
           box-shadow: inset 0 0 26px color-mix(in srgb, var(--c) 16%, transparent); }
         .rv-out { font-size: 30px; font-weight: bold; letter-spacing: 0.08em; text-shadow: 0 0 14px var(--c); }
         .rv-sub { font-size: 11px; letter-spacing: 0.1em; opacity: 0.85; }
-        .rv-brier { font-size: 13px; color: #eafff9; margin-top: 6px; }
-        .rv-brier i { color: #2fd6d6; opacity: 0.7; font-style: normal; font-size: 10px; }
+        .rv-pnl { font-size: 15px; font-weight: bold; margin-top: 6px; text-shadow: 0 0 10px currentColor; }
         .rv-truth { font-size: 13px; line-height: 1.55; color: #d6fff6; border-left: 2px solid #2fd6d6; padding: 4px 0 4px 12px; margin-bottom: 12px; }
         .rv-narr { font-size: 12.5px; line-height: 1.55; color: #bfeede; opacity: 0.92; margin-bottom: 14px; }
         .rv-decisive { font-size: 11.5px; letter-spacing: 0.06em; line-height: 1.5; color: var(--dc, #ffd23a); margin-bottom: 16px;

@@ -5372,14 +5372,17 @@ export default function CyborgTemple() {
                                 ...fadeIn(true),
                               }}>
                                 {confPct != null && statBlock('YOUR CALL', `${confPct}%`, isAbstain ? '#dcdce4' : (isCorrect ? '#8effc4' : '#ff8a8a'), 'P(scam)')}
-                                {statBlock('BRIER', hasBrier ? brier.toFixed(3) : '—', gradeColor, '0 = perfect')}
+                                {/* P&L is the score (2026-07-22): Brier renders as EDGE — book
+                                    points at the flat 25 stake, the same affine kernel the
+                                    Case Table pays. Raw Brier never surfaces. */}
+                                {statBlock('EDGE', hasBrier ? (() => { const e = Math.round((1 - 4 * brier) * 25); return `${e >= 0 ? '+' : ''}${e}`; })() : '—', gradeColor, '+25 = perfect')}
                                 {statBlock('GRADE', grade, gradeColor)}
                                 {statBlock('SCANS', `${investigated.size}/${caseData.maxScans}`)}
                                 {sessionScore && sessionScore.count > 0 && (
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 92, paddingLeft: 14, borderLeft: '1px solid rgba(77,255,170,0.18)' }}>
                                     <div style={{ fontSize: 8, letterSpacing: '0.20em', color: '#3a6b54' }}>SESSION ·{sessionScore.count}</div>
                                     <div style={{ fontFamily: "'IBM Plex Mono','SF Mono',Menlo,monospace", fontSize: 11, color: '#c8ffe0', marginTop: 4, lineHeight: 1.5, textAlign: 'center' }}>
-                                      <div>avg <span style={{ color: '#8effc4' }}>{avgB != null ? avgB.toFixed(3) : '—'}</span>{acc != null ? ` · ${Math.round(acc * 100)}%` : ''}</div>
+                                      <div>avg edge <span style={{ color: '#8effc4' }}>{avgB != null ? (() => { const e = Math.round((1 - 4 * avgB) * 25); return `${e >= 0 ? '+' : ''}${e}`; })() : '—'}</span>{acc != null ? ` · ${Math.round(acc * 100)}%` : ''}</div>
                                       <div style={{ color: '#6db59a' }}>streak {sessionScore.streak}{sessionScore.bestStreak > 0 ? ` (best ${sessionScore.bestStreak})` : ''}</div>
                                     </div>
                                   </div>

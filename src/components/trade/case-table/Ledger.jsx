@@ -11,6 +11,7 @@ export default function Ledger({
   ticker, truth, caseIndex, docketLength,
   books, busted, patron, rows,
   kitPlays = [], // structured kit plays from CaseTable — information plays get debrief lines
+  overageSpent = 0, // the research tab: book points billed beyond the free budget
   pendingEvent, shieldSpent, monkShieldHeld,
   onAdvance,
 }) {
@@ -28,7 +29,7 @@ export default function Ledger({
     <Shell>
       <div className="ct-talk">
         <SeatStrip books={books} busted={busted} ledger={rows} patron={patron} showPnl />
-        <div className="ct-eyebrow">▸ THE LEDGER — CASE {caseIndex + 1}/{docketLength}</div>
+        <div className="ct-eyebrow">▸ THE LEDGER — DEAL {caseIndex + 1}/{docketLength}</div>
         <div className="ct-truth" style={{ color: truth ? "#ff5454" : "#4dffaa" }}>
           {ticker} WAS {truth ? "A RUG" : "LEGIT"}
         </div>
@@ -79,13 +80,18 @@ export default function Ledger({
                       ⟡ {k.name.toUpperCase()} — {kitLine(k)}
                     </div>
                   ))}
+                {row.seat === YOU && overageSpent > 0 && (
+                  <div className="ct-debrief" style={{ color: "#ff8a4d" }}>
+                    ◈ RESEARCH TAB — the desk billed −{overageSpent} for looks beyond the free three
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
         {pendingEvent && (
           <div className={`ct-event${pendingEvent.id === "calm" ? " ct-event--calm" : ""}`}>
-            <div className="ct-event-label">◈ MARKET FLIPS BETWEEN CASES — {pendingEvent.label}</div>
+            <div className="ct-event-label">◈ MARKET FLIPS BETWEEN DEALS — {pendingEvent.label}</div>
             <div className="ct-event-text">{pendingEvent.text}</div>
             <div className="ct-event-effect">EFFECT · {pendingEvent.effect}</div>
             {shieldSpent && pendingEvent.portfolioAll < 0 && (
@@ -97,7 +103,7 @@ export default function Ledger({
           </div>
         )}
         <button className="ct-cta" onClick={onAdvance}>
-          {busted[YOU] ? "OFF THE DESK — SEE STANDINGS ▸" : caseIndex >= docketLength - 1 ? "FINAL STANDINGS ▸" : "NEXT CASE ▸"}
+          {busted[YOU] ? "OFF THE DESK — SEE STANDINGS ▸" : caseIndex >= docketLength - 1 ? "FINAL STANDINGS ▸" : "NEXT DEAL ▸"}
         </button>
       </div>
     </Shell>

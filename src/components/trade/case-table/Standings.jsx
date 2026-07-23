@@ -6,7 +6,7 @@ import { CHARACTER_ORDER } from "@/components/CaseFile/characterMeta";
 import { YOU } from "@/game/terminal-traders/docketRun";
 import { getCardById } from "@/game/terminal-traders/cards";
 import PackReveal from "@/components/tcg/PackReveal";
-import { RARITY_COLOR, SEATS, seatMeta } from "./constants";
+import { RARITY_COLOR, SEATS, START_PF, seatMeta } from "./constants";
 import Shell from "./Shell";
 
 // The docket payout banner (Genesis is earned entirely through play —
@@ -28,7 +28,7 @@ function RewardBanner({ reward }) {
     signin: reward.won
       ? "The house owes you a pack and the day's dossier coin — sign in to collect."
       : "The day's dossier coin awaits — sign in to collect it.",
-    offDocket: "Off-docket table — the house only pays the Daily Docket.",
+    offDocket: "Off-schedule table — the house only pays the Daily Deal Flow.",
     error: "The vault is jammed — your payout is safe, try again later.",
   }[reward.status];
   const label = reward.won
@@ -110,26 +110,27 @@ function RewardBanner({ reward }) {
   );
 }
 
-export default function Standings({ books, busted, briers, reward, onNewDocket, newDocketLabel = "NEW DOCKET ▸" }) {
+export default function Standings({ books, busted, briers, reward, onNewDocket, newDocketLabel = "NEW DEAL FLOW ▸" }) {
   const ranked = [...SEATS].sort((a, b) => (books[b] ?? 0) - (books[a] ?? 0));
   const yourRank = ranked.indexOf(YOU) + 1;
   const beaten = CHARACTER_ORDER.filter((k) => (books[YOU] ?? 0) > (books[k] ?? 0)).length;
   return (
     <Shell>
       <div className="ct-lobby">
-        <div className="ct-eyebrow">▸ DOCKET CLOSED</div>
+        <div className="ct-eyebrow">▸ DEAL FLOW CLOSED</div>
         <div className="ct-title" style={{ color: busted[YOU] ? "#ff5454" : yourRank === 1 ? "#4dffaa" : "#f4fffb" }}>
           {busted[YOU]
             ? "THE ORDER WITHDRAWS ITS BLESSING"
             : yourRank === 1
-              ? "YOU BEAT THE COUNCIL"
+              ? "YOU BEAT THE DESK"
               : `YOU BEAT ${beaten} OF 4 PARTNERS`}
         </div>
         <RewardBanner reward={reward} />
         {ranked.map((k, i) => {
           const meta = seatMeta(k);
-          const bs = briers[k] || [];
-          const avgB = bs.length ? (bs.reduce((x, y) => x + y, 0) / bs.length) : null;
+          // P&L is the score (DECISION 2026-07-22): the standings annotate
+          // each book with its docket net, never a Brier figure.
+          const net = Math.round((books[k] ?? START_PF) - START_PF);
           return (
             <div key={k} className="ct-lean" style={{ "--cc": meta.color }}>
               {meta.portrait ? <img src={meta.portrait} alt={meta.name} /> : <div className="ct-you-badge">◈</div>}
@@ -137,7 +138,9 @@ export default function Standings({ books, busted, briers, reward, onNewDocket, 
                 <div className="ct-lean-name">#{i + 1} {k === YOU ? "YOU" : meta.name}</div>
                 <div className="ct-ledger-nums">
                   {busted[k] ? <span className="ct-rug">{k === YOU ? "OFF THE DESK" : "BOOK GONE"}</span> : <span>{Math.round(books[k])}</span>}
-                  {avgB !== null && <span className="ct-dim"> · brier {avgB.toFixed(2)}</span>}
+                  {!busted[k] && (
+                    <span className="ct-dim"> · <span style={{ color: net >= 0 ? "#4dffaa" : "#ff5454" }}>{net >= 0 ? "+" : ""}{net}</span> this deal flow</span>
+                  )}
                 </div>
               </div>
             </div>
