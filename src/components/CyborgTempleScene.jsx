@@ -1719,6 +1719,21 @@ const CyborgTempleScene = ({
   const rl80HeadBoneRef = useRef();
   const rl80JawBoneRef = useRef(); // Eugene's Jaw bone — amplitude lip-sync (Path A; inert until a jaw bone is added in Blender)
   const rl80MouthMeshRef = useRef(); // Code-made oval "mouth" anchored at her snout, scaled by amplitude (Path A2, no Blender)
+  // The mouth overlay is added to the scene ROOT (scene.add), not this
+  // component's <group>, so React won't reclaim it on unmount — it would
+  // orphan into whatever mounts next (e.g. the TALK SHOW swap) as a stray
+  // floating quad. Remove + dispose it explicitly when the scene tears down.
+  useEffect(() => {
+    return () => {
+      const mouth = rl80MouthMeshRef.current;
+      if (!mouth) return;
+      mouth.removeFromParent();
+      mouth.geometry?.dispose?.();
+      mouth.material?.map?.dispose?.();
+      mouth.material?.dispose?.();
+      rl80MouthMeshRef.current = null;
+    };
+  }, []);
   const rl80FocusedRef = useRef(false); // true when camera is zoomed in on RL80
   const fluffyHeadBoneRef = useRef();
   const detectiveHeadBoneRef = useRef();

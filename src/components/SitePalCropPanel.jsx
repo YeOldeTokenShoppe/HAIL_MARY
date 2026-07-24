@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   SITEPAL_PROJECTION_CONFIG,
 } from "@/components/CyborgTempleScene";
+import { TALKSHOW_PROJECTION_CONFIG } from "@/components/trade/TalkShowScene";
 
 /**
  * Dev-only SitePal crop tuning panel.
@@ -60,7 +61,7 @@ const TUNING_CONST_NAMES = {
 // Per-character tuning targets. Add a new entry to
 // SITEPAL_PROJECTION_CONFIG and, optionally, TUNING_CONST_NAMES to wire
 // up another tab.
-const CHARACTERS = Object.entries(SITEPAL_PROJECTION_CONFIG).map(([id, config]) => ({
+const TEMPLE_CHARACTERS = Object.entries(SITEPAL_PROJECTION_CONFIG).map(([id, config]) => ({
   id,
   label: config.label || id,
   crop: config.crop,
@@ -70,6 +71,27 @@ const CHARACTERS = Object.entries(SITEPAL_PROJECTION_CONFIG).map(([id, config]) 
   cropDefaults: { cropX: 190, cropY: 117, cropW: 125, cropH: 180, rotateZ: 0, rotateX: 0 },
   filterDefaults: { saturate: 145, contrast: 108, brightness: 105, hueRotate: 0, sepia: 10 },
 }));
+
+// Talk-show faces (Face2 / FaceDemon2 on talk_show.glb) — separate crop objects
+// from the temple's since the meshes have their own UVs. Reset restores the
+// seed values captured at load. Prefixed ids ('TS_*') so they don't collide
+// with the temple tabs in localStorage.
+const TALKSHOW_CONST_NAMES = {
+  Monk: { crop: "TALKSHOW_MONK_CROP", filter: "TALKSHOW_MONK_FILTER" },
+  Barron: { crop: "TALKSHOW_BARRON_CROP", filter: "TALKSHOW_BARRON_FILTER" },
+};
+const TALKSHOW_CHARACTERS = Object.entries(TALKSHOW_PROJECTION_CONFIG).map(([id, config]) => ({
+  id: `TS_${id}`,
+  label: config.label || `TS ${id}`,
+  crop: config.crop,
+  filter: config.filter,
+  cropConstName: TALKSHOW_CONST_NAMES[id]?.crop || `TALKSHOW_${id.toUpperCase()}_CROP`,
+  filterConstName: TALKSHOW_CONST_NAMES[id]?.filter || `TALKSHOW_${id.toUpperCase()}_FILTER`,
+  cropDefaults: { ...config.crop },
+  filterDefaults: { ...config.filter },
+}));
+
+const CHARACTERS = [...TEMPLE_CHARACTERS, ...TALKSHOW_CHARACTERS];
 
 export default function SitePalCropPanel() {
   const [enabled, setEnabled] = useState(false);

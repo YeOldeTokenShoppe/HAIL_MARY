@@ -46,7 +46,7 @@ const SERVICE_ICONS = {
   'terminal-traders': svgIcon(<><rect x="8" y="4" width="12" height="16" rx="2" /><path d="M4 8v10a2 2 0 0 0 2 2h7" /></>),
 };
 
-export default function TradeServiceRail({ selectedId = "game", onSelect, onLaunch, open, onOpenChange, sheet = false } = {}) {
+export default function TradeServiceRail({ selectedId = "game", onSelect, onLaunch, open, onOpenChange, sheet = false, showHandle = true } = {}) {
   const activeService = SERVICES.find((s) => s.id === selectedId) ?? SERVICES[0];
   const shellAccent = activeService.accent;
 
@@ -129,18 +129,22 @@ export default function TradeServiceRail({ selectedId = "game", onSelect, onLaun
       <style>{STYLES}</style>
       {/* Desktop-only collapsed edge handle. Hidden by CSS on mobile (the
           pill takes over) and when the drawer is expanded. Clicking it
-          slides the shell in from the right. */}
-      <button
-        type="button"
-        className="tsr-handle"
-        onClick={openRail}
-        aria-expanded={expanded}
-        aria-label="Open services panel"
-      >
-        <span className="tsr-pip" aria-hidden />
-        <span className="tsr-handle-label">SERVICES</span>
-        <span className="tsr-handle-chevron" aria-hidden>‹</span>
-      </button>
+          slides the shell in from the right. Suppressed via showHandle={false}
+          when a host page provides its own SERVICES entry (e.g. /trade's
+          unified feature rail). */}
+      {showHandle && (
+        <button
+          type="button"
+          className="tsr-handle"
+          onClick={openRail}
+          aria-expanded={expanded}
+          aria-label="Open services panel"
+        >
+          <span className="tsr-pip" aria-hidden />
+          <span className="tsr-handle-label">SERVICES</span>
+          <span className="tsr-handle-chevron" aria-hidden>‹</span>
+        </button>
+      )}
       <div className={`tsr-shell tsr-${shellAccent}`}>
         {/* Desktop-only collapse control — retracts the drawer back to the
             edge handle. Hidden on mobile (the pill chevron does this job). */}
@@ -166,7 +170,7 @@ export default function TradeServiceRail({ selectedId = "game", onSelect, onLaun
         </button>
         <div className="tsr-status">
           <span className="tsr-pip" aria-hidden />
-          SERVICES ONLINE
+          TRAINERS · IN SESSION
         </div>
         <div className="tsr-options" role="radiogroup" aria-label="Available services">
           {liveServices.map((service) => {

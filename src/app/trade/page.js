@@ -23,6 +23,7 @@ import CyborgTempleScene, {
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
+import TalkShowScene, { preloadTalkShow } from "@/components/trade/TalkShowScene";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -658,6 +659,9 @@ function CameraControlsRig({
   zoomDuration = 25,
   introStartDistance = null,
   introDuration = 12,
+  // When set ({ position:[x,y,z], target:[x,y,z] }), snap to this fixed pose
+  // and hold it (used by TALK SHOW — a composed static shot, no orbit).
+  focusPose = null,
 }) {
   const ref = useRef(null);
   const startDistanceRef = useRef(null);
@@ -725,6 +729,18 @@ function CameraControlsRig({
     c.addEventListener('controlstart', onControlStart);
     return () => c.removeEventListener('controlstart', onControlStart);
   }, []);
+
+  // Composed static pose (TALK SHOW). When focusPose flips non-null, smoothly
+  // move to it and hold — the per-frame orbit/zoom is already gated off by
+  // autoRotate=false in this mode, so nothing fights the setLookAt.
+  useEffect(() => {
+    const c = ref.current;
+    if (!c || !focusPose) return;
+    introCompleteRef.current = true;
+    const p = focusPose.position;
+    const t = focusPose.target;
+    c.setLookAt(p[0], p[1], p[2], t[0], t[1], t[2], true);
+  }, [focusPose]);
 
   // Manual auto-orbit when no character is focused. The `autoRotate`
   // prop is already gated on focusedAgent, so we don't need an extra
@@ -1143,6 +1159,14 @@ export default function CyborgTemple() {
   // center "START" button can reveal the menu — first-time visitors were
   // missing the slim edge handle.
   const [railExpanded, setRailExpanded] = useState(false);
+  // TALK SHOW tab (desktop lobby): swaps the RL80 temple model for the
+  // talk_show.glb set. Desktop-only — the live 3D scene is desktop-only
+  // (mobile shows a baked backdrop with no model to swap).
+  const [talkShowMode, setTalkShowMode] = useState(false);
+  // Which talk-show character projects the live SitePal face — for fitting the
+  // crop onto Face2/FaceDemon2. 'Monk' | 'Barron' | null. Driven by the dev
+  // fitting control (?tune=sitepal); one at a time (single shared portal).
+  const [talkShowProject, setTalkShowProject] = useState(null);
   // Imperative handle to the mobile TradeLaptop so the START FAB can dive
   // straight into the CRT terminal (same as tapping the laptop screen).
   const laptopRef = useRef(null);
@@ -2557,6 +2581,16 @@ export default function CyborgTemple() {
     [isMobileView],
   );
   const cameraInitialTarget = useMemo(() => [0, -0.5, 0], []);
+  // TALK SHOW composed shot — a fixed front-facing framing of the two seated
+  // characters (Demon left, Monk right) with the neon frame behind them.
+  // Derived from the model's world layout (see TalkShowScene). Null unless the
+  // tab is active, so the rig only snaps when talk show is on.
+  const talkShowPose = useMemo(
+    () => (talkShowMode
+      ? { position: [0.15, 0.15, 3.7], target: [0.15, -0.5, 0.1] }
+      : null),
+    [talkShowMode],
+  );
   // Tightened framing: dolly the resting shot ~15% closer so the workstation
   // fills more of the frame and the empty sky band above the monitors crops
   // down. Angle/target unchanged — same approved composition, just nearer.
@@ -2718,6 +2752,9 @@ export default function CyborgTemple() {
     setCanvasReady(true);
     setLoadingProgress(20);
     setLoadingMessage("Loading 3D Model...");
+
+    // Warm the talk-show GLB so the TALK SHOW tab swaps in without a cold fetch.
+    try { preloadTalkShow(); } catch (e) { /* non-fatal */ }
     
     // Don't set tickerReady here - wait for model to load first
     
@@ -3209,7 +3246,7 @@ export default function CyborgTemple() {
       <CameraTuningPanel />
 
       {/* Dev SitePal crop tuning panel — shows only when ?tune=sitepal */}
-      <SitePalCropPanel />
+      {/* <SitePalCropPanel /> */}
 
       {/* Single host SitePal embed. CyborgTempleScene swaps the
           loaded scene per character via window.loadSceneByID() on
@@ -3771,7 +3808,20 @@ export default function CyborgTemple() {
               />
             )}
             
+            {/* TALK SHOW swap: talk_show.glb set replaces the RL80 temple
+                model while the tab is active. Same transform so it lands in
+                the same volume. */}
+            {talkShowMode && (
+              <TalkShowScene
+                position={isMobileView ? [0, -1.2, 0] : [0, -1.9, 0]}
+                scale={[1.2, 1.2, 1.2]}
+                rotation={[0, 0, 0]}
+                projectCharacter={talkShowProject}
+              />
+            )}
+
             {/* CyborgTempleScene with the RL80 model */}
+            {!talkShowMode && (
             <CyborgTempleScene
               position={isMobileView ? [0, -1.2, 0] : [0, -1.9, 0]}
               scale={[1.2, 1.2, 1.2]}
@@ -3849,6 +3899,7 @@ export default function CyborgTemple() {
                 }
               }}
             />
+            )}
 
             {/* TickerDisplay3 — now rendered on both mobile and desktop since
                 they share the same GLB model. autoRotate props mirror the
@@ -3858,7 +3909,7 @@ export default function CyborgTemple() {
                 modelRef={null}
                 onLoad={handleTickerLoad}
                 isMobile={isMobileView}
-                autoRotate={!focusedAgent && !revealMode}
+                autoRotate={!focusedAgent && !revealMode && !talkShowMode}
                 autoRotateSpeed={0.4}
               />
             )}
@@ -3895,7 +3946,7 @@ export default function CyborgTemple() {
                 running an external tween alongside OrbitControls'
                 damping. Auto-orbit and limits replicated in the rig. */}
             <CameraControlsRig
-              autoRotate={!focusedAgent && !revealMode}
+              autoRotate={!focusedAgent && !revealMode && !talkShowMode}
               autoRotateSpeed={-0.8}
               initialPosition={cameraInitialPosition}
               initialTarget={cameraInitialTarget}
@@ -3903,6 +3954,7 @@ export default function CyborgTemple() {
               zoomDuration={25}
               introStartDistance={isMobileView ? 13 : 11}
               introDuration={12}
+              focusPose={talkShowPose}
             />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
@@ -4122,69 +4174,172 @@ export default function CyborgTemple() {
           </div>
         </div>
 
-        {/* Council-channel edge tab — desktop lobby only. Mirrors the
-            SERVICES edge handle (TradeServiceRail's .tsr-handle) and stacks
-            above it on the right edge; opens the live chat overlay directly.
-            The mobile entry is the dock's COUNCIL slot instead. */}
+        {/* Unified feature rail — desktop lobby only. One consistent right-edge
+            rail replacing the old scattered SERVICES handle + TALK SHOW + TEAM
+            CHAT tabs; each feature is a matching cell and the active one lights
+            up. Hidden while a character is focused, during the reveal, when the
+            chat overlay is open, or when the services drawer is expanded. */}
         {mounted && !isMobileView && !tradeMode && (() => {
-          const ctaHidden = !!focusedAgent || chatOverlay || revealMode || railExpanded;
+          const railHidden = !!focusedAgent || revealMode || chatOverlay || railExpanded;
+          const TABS = [
+            {
+              key: 'services',
+              label: 'TRAINERS',
+              accent: '#2ad6ee',
+              active: railExpanded,
+              onClick: () => { setFocusedAgent(null); setRailExpanded(true); },
+            },
+            {
+              key: 'talkshow',
+              label: talkShowMode ? 'EXIT SHOW' : 'THE SHOW',
+              accent: '#ffcf4d',
+              active: talkShowMode,
+              onClick: () => setTalkShowMode((v) => { if (v) setTalkShowProject(null); return !v; }),
+            },
+            {
+              key: 'teamchat',
+              label: 'TEAM CHAT',
+              accent: '#4dffaa',
+              active: chatOverlay,
+              onClick: () => setChatOverlay(true),
+            },
+          ];
           return (
-            <button
-              type="button"
-              onClick={() => setChatOverlay(true)}
-              aria-label="Open the team chat"
+            <div
               style={{
                 position: 'fixed',
                 right: 0,
-                // Above the SERVICES edge handle (which floats around the
-                // lower third of the right edge) at any window height.
-                top: '36%',
+                top: '50%',
+                transform: 'translateY(-50%)',
                 zIndex: 40,
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '14px 9px',
-                border: '1px solid rgba(77, 255, 170, 0.55)',
-                borderRight: 'none',
-                borderRadius: '8px 0 0 8px',
-                background: 'linear-gradient(180deg, rgba(6, 8, 14, 0.9), rgba(2, 3, 6, 0.82))',
-                boxShadow: '0 0 22px rgba(77, 255, 170, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+                borderTop: '1px solid rgba(150, 170, 200, 0.35)',
+                borderBottom: '1px solid rgba(150, 170, 200, 0.35)',
+                borderLeft: '1px solid rgba(150, 170, 200, 0.35)',
+                borderRadius: '10px 0 0 10px',
+                background: 'linear-gradient(180deg, rgba(6, 8, 14, 0.92), rgba(2, 3, 6, 0.86))',
+                boxShadow: '0 0 26px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
-                color: '#4dffaa',
-                cursor: 'pointer',
-                opacity: ctaHidden ? 0 : 1,
-                pointerEvents: ctaHidden ? 'none' : 'auto',
+                overflow: 'hidden',
+                opacity: railHidden ? 0 : 1,
+                pointerEvents: railHidden ? 'none' : 'auto',
                 transition: 'opacity 0.3s ease',
               }}
             >
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: '#4dffaa',
-                  animation: 'councilCtaPulse 2.2s ease-in-out infinite',
-                }}
-              />
-              <span
-                style={{
-                  writingMode: 'vertical-rl',
-                  textOrientation: 'mixed',
-                  transform: 'rotate(180deg)',
-                  fontFamily: "'Orbitron', 'IBM Plex Mono', monospace",
-                  fontSize: '10px',
-                  fontWeight: 800,
-                  letterSpacing: '0.3em',
-                  textShadow: '0 0 10px rgba(77, 255, 170, 0.35)',
-                }}
-              >
-                TEAM CHAT
-              </span>
-            </button>
+              {TABS.map((tab, i) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={tab.onClick}
+                  aria-pressed={tab.active}
+                  aria-label={tab.label}
+                  title={tab.label}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '9px',
+                    padding: '16px 9px',
+                    border: 'none',
+                    borderTop: i === 0 ? 'none' : '1px solid rgba(150, 170, 200, 0.18)',
+                    background: tab.active
+                      ? `linear-gradient(90deg, ${tab.accent}22, transparent)`
+                      : 'transparent',
+                    color: tab.accent,
+                    cursor: 'pointer',
+                    transition: 'background 0.2s ease',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: tab.accent,
+                      boxShadow: tab.active ? `0 0 8px ${tab.accent}` : 'none',
+                      animation: tab.active ? 'councilCtaPulse 2.2s ease-in-out infinite' : 'none',
+                    }}
+                  />
+                  <span
+                    style={{
+                      writingMode: 'vertical-rl',
+                      textOrientation: 'mixed',
+                      transform: 'rotate(180deg)',
+                      fontFamily: "'Orbitron', 'IBM Plex Mono', monospace",
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      letterSpacing: '0.3em',
+                      textShadow: `0 0 10px ${tab.accent}${tab.active ? '88' : '55'}`,
+                      opacity: tab.active ? 1 : 0.82,
+                    }}
+                  >
+                    {tab.label}
+                  </span>
+                </button>
+              ))}
+            </div>
           );
         })()}
+
+        {/* Talk-show SitePal fitting control — dev only (?tune=sitepal), while
+            the TALK SHOW set is up. One character projects at a time (single
+            shared host portal); pair with the SitePalCropPanel's TS tabs to
+            fit the crop onto Face2 / FaceDemon2. */}
+        {mounted && !isMobileView && talkShowMode &&
+          typeof window !== 'undefined' &&
+          window.location.search.includes('tune=sitepal') && (
+          <div
+            style={{
+              position: 'fixed',
+              left: 12,
+              bottom: 96,
+              zIndex: 10050,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              padding: '10px 12px',
+              borderRadius: 8,
+              border: '1px solid rgba(255, 207, 77, 0.5)',
+              background: 'rgba(6, 8, 14, 0.92)',
+              backdropFilter: 'blur(10px)',
+              fontFamily: "'IBM Plex Mono', monospace",
+              color: '#ffcf4d',
+              fontSize: 11,
+            }}
+          >
+            <div style={{ opacity: 0.8, letterSpacing: '0.15em', marginBottom: 2 }}>
+              TALK SHOW · SITEPAL FIT
+            </div>
+            {[
+              { key: 'Monk', label: 'Project Monk (Face2)' },
+              { key: 'Barron', label: 'Project Barron (FaceDemon2)' },
+              { key: null, label: 'Off (static faces)' },
+            ].map(({ key, label }) => {
+              const active = talkShowProject === key;
+              return (
+                <button
+                  key={String(key)}
+                  type="button"
+                  onClick={() => setTalkShowProject(key)}
+                  style={{
+                    textAlign: 'left',
+                    padding: '5px 8px',
+                    borderRadius: 5,
+                    border: `1px solid rgba(255, 207, 77, ${active ? 0.95 : 0.35})`,
+                    background: active ? 'rgba(255, 207, 77, 0.18)' : 'transparent',
+                    color: '#ffe38a',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                  }}
+                >
+                  {active ? '● ' : '○ '}{label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Top Controls Container - User and Nav.
             No music control here on purpose: /trade is a speaking-avatars page,
@@ -4231,6 +4386,10 @@ export default function CyborgTemple() {
                   open={railExpanded}
                   onOpenChange={setRailExpanded}
                   sheet={isMobileView}
+                  /* Desktop SERVICES lives in the unified feature rail; hide the
+                     built-in edge handle so it isn't duplicated. Mobile keeps
+                     the pill/sheet affordance (handle is CSS-hidden there). */
+                  showHandle={isMobileView}
                   onLaunch={(id) => {
                     if (isMobileView) {
                       setRailExpanded(false);
@@ -5436,34 +5595,24 @@ export default function CyborgTemple() {
               <MobileBottomNav
                   hideWallet
                   accountOnLeft
-                /* Lobby center is the round START FAB — consistent with the
-                   shrine's MY CANDLE FAB. onBuyClick is the FAB's action and
-                   opens the services drawer. In game/review modes the
-                   centerSlot below overrides the FAB with the verdict UI. */
-                onBuyClick={() => {
-                  // Mobile: START dives straight into the CRT terminal (same as
-                  // tapping the laptop screen / green key), skipping the services
-                  // rail. Desktop keeps the rail-drawer toggle.
-                  if (isMobileView) {
-                    setFocusedAgent(null);
-                    laptopRef.current?.enterTerminal();
-                    return;
-                  }
-                  if (railExpanded) {
-                    setRailExpanded(false);
-                  } else {
-                    setFocusedAgent(null);
-                    setRailExpanded(true);
-                  }
-                }}
+                /* Center FAB — MOBILE ONLY now. It dives straight into the CRT
+                   terminal (mobile has no live services rail). On desktop the
+                   FAB is suppressed: onBuyClick is undefined and the lobby
+                   centerSlot is null, so nothing renders — SERVICES lives in the
+                   unified right-edge feature rail instead. Game/review modes
+                   still override the center via centerSlot below. */
+                onBuyClick={
+                  isMobileView
+                    ? () => { setFocusedAgent(null); laptopRef.current?.enterTerminal(); }
+                    : undefined
+                }
                 centerLabel={
                   <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 26, height: 26, display: 'block', color: '#ffffff' }} aria-hidden="true">
                     <path d="M8 5v14l11-7z" />
                   </svg>
                 }
-                centerSubLabel="START"
-                centerTitle="Open services"
-                centerHighlight={railExpanded}
+                centerSubLabel="TERMINAL"
+                centerTitle="Enter terminal"
                 centerSlot={
                   // Once a verdict is committed the verdict control is dropped
                   // and, in the final reveal beat, replaced with the NEXT CASE /
@@ -5599,10 +5748,11 @@ export default function CyborgTemple() {
                   ]
                 }
                 extraRight={
-                  /* Council Channel slot — opens the live chat overlay in
-                     place (action slot, like /main's SPEAK). Hail Mary moved
-                     to the MORE list to free this space. */
-                  tradeMode ? [] : [
+                  /* Council Channel slot — MOBILE ONLY now. On desktop Team
+                     Chat lives in the unified right-edge feature rail, so the
+                     dock slot would be a duplicate. Mobile has no edge rail,
+                     so it keeps the dock slot as its chat entry. */
+                  (tradeMode || !isMobileView) ? [] : [
                     {
                       key: 'teamchat',
                       label: 'Team Chat',

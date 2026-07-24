@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { playSfx, preloadSfx } from "../lib/uiSfx";
 import "./CyberButton.css";
 
 // ── Confirm-modal SFX levels ── These fire on EVERY dock destination and every
@@ -17,7 +18,17 @@ import "./CyberButton.css";
 // (`ffmpeg -i f.mp3 -af volumedetect -f null -`) rather than assuming a preview
 // is hot. Mean and peak disagree sharply on short SFX — cancel.mp3 has the
 // lowest mean of the three and the highest peak.
+//
+// These play through the shared Web Audio context (playSfx) as decoded buffers,
+// so they MIX with the page's music instead of stealing the audio session the
+// way a second HTMLAudioElement does on iOS. The level below is applied as a
+// GainNode value (which iOS honours, unlike HTMLAudioElement.volume).
 const SFX_VOLUME = { slide: 0.2, accept: 1, reject: 1 };
+const SFX_SRC = {
+  slide: "https://cdn.freesound.org/previews/367/367997_6512973-lq.mp3",
+  accept: "/audio/proceed.mp3",
+  reject: "/audio/cancel.mp3",
+};
 
 /* ── Small inline CyberBtn (reused for trigger + modal actions) ── */
 function CyberBtn({ label, shortcut, shortcutIcon, icon, onClick, className = "", autoFocus, ...rest }) {
@@ -110,7 +121,6 @@ export default function CyberButton({
   const [glitchActive, setGlitchActive] = useState(false);
   const glitchTimer = useRef(null);
   const modalRef = useRef(null);
-  const audioRef = useRef(null);
 
   /* Pagination — only active on mobile when modalBodyPages is provided.
      `renderedBody` is computed below the defaultBody declaration. */
@@ -125,24 +135,15 @@ export default function CyberButton({
   /* Reset to first page each time the modal opens */
   useEffect(() => { if (open) setPage(0); }, [open]);
 
-  // Lazily create Audio objects (can't create during SSR)
-  if (typeof window !== "undefined" && !audioRef.current) {
-    audioRef.current = {
-      slide: new Audio("https://cdn.freesound.org/previews/367/367997_6512973-lq.mp3"),
-      accept: new Audio("/audio/proceed.mp3"),
-      reject: new Audio("/audio/cancel.mp3"),
-    };
-    // Set on the elements, not per play() — volume persists on the element, and
-    // these are reused for the life of the component.
-    Object.entries(audioRef.current).forEach(([k, snd]) => { snd.volume = SFX_VOLUME[k]; });
-  }
+  // Warm the decoded buffers once so the first proceed/cancel already mixes
+  // rather than falling back to a (session-stealing) HTMLAudioElement.
+  useEffect(() => {
+    Object.values(SFX_SRC).forEach(preloadSfx);
+  }, []);
 
   const playSound = (name) => {
-    const snd = audioRef.current?.[name];
-    if (snd) {
-      snd.currentTime = 0;
-      snd.play().catch(() => {});
-    }
+    const url = SFX_SRC[name];
+    if (url) playSfx(url, { volume: SFX_VOLUME[name] });
   };
 
   const cssVars = {};
