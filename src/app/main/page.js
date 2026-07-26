@@ -94,10 +94,21 @@ const BOTTOM_CLEARANCE = `calc(${DOCK_H + ASK_BAR_H + ASK_BAR_GAP}px + ${SAFE_B}
 // band's own maxHeight and soloFrameSize's reserve. They were independent (a
 // 24dvh band against a flat 135px reserve) and disagreed by ~75px, which the
 // column paid for by running its foot under the ask bar.
-// THIS IS THE FRAME-VS-WORDS DIAL. Raising it shows more of the argument and
-// shrinks her; lowering it does the reverse. At 0.24 on an 820px phone the band
-// is ~197px — roughly six lines — and her frame lands near 300.
-const TRANSCRIPT_DVH = 0.24;
+// THIS IS THE FRAME-VS-WORDS DIAL, and on a phone the frame wins. On an 820px
+// phone, after the fixed furniture (dock 96 + ask bar 52 + gaps, ~160) there are
+// only ~660px for frame + caption + button, and the frame eats size × 1.3 + 44 —
+// so every pixel here comes off her face:
+//     0.24 → caption ~197px (6 lines), frame ~278  ← tried as a SCROLLBACK; her
+//                                                    mouth stopped reading as
+//                                                    animation, which is the one
+//                                                    thing a live player is for
+//     0.12 → caption  ~98px (3 lines), frame ~355
+//     0.10 → caption  ~82px (2-3 lines), frame ~366 ← here
+// It only got this small once the phone stopped showing a scrollback at all: a
+// caption holds one voice's line and is replaced by the next, so it never needs
+// room to be scanned, and the reveal writes it out as it is spoken. Two to three
+// lines is a subtitle. The full log still lives in the desktop rail.
+const TRANSCRIPT_DVH = 0.1;
 // "keep her words" under the band: 31px tall + 12px margin, measured.
 const SHARE_BUTTON_H = 43;
 
@@ -345,41 +356,156 @@ const RL80_RAYS = 100;
 // never double up, and it is different every visit.
 // Adding a register is better than lengthening one. Each should pull a
 // different argument out of the advisers AND a different move out of her.
+// ── THE TEST EVERY LINE HAS TO PASS: is this the FIRST thing a stranger says? ──
+// Stricter than the "must have a person in it" rule above, and it retired four
+// lines that passed that one:
+//   "i refresh it like it's a prayer."      ← refresh WHAT
+//   "i think this one's different."         ← which one
+//   "why can't i leave it alone?"           ← leave what alone
+//   "i can't stop checking."                ← checking what
+// A pronoun with no referent — "it", "this one", "this" — reads as the middle of
+// a conversation, and a chip is by definition the opening of one. Name the thing:
+// the price, the chart, the mistake.
+// AND THE SAME FAULT HIDES IN VERBS, which is how "when do i get to stop?"
+// survived a pronoun sweep: stop WHAT. An objectless verb presumes a backstory
+// the stranger has not told you yet, exactly as a bare "it" does.
+//
+// ── AND THE DEEPEST VERSION, which no sweep catches: THE LINE ALREADY CONTAINS
+// THE INSIGHT. These all named their subjects and still had to go:
+//   "i keep making the same mistake and calling it experience."
+//   "how many times can i buy the top before it's just who i am?"
+//   "i don't know what i'm chasing anymore."
+//   "i never set a number. that's the problem."
+// Every one is a polished read on oneself — the thing you arrive at AFTER an
+// hour of talking, not the thing you walk in with. Nobody opens with their own
+// diagnosis, and a seeker who turns up already holding it leaves the room
+// nothing to do: the chip has done HER job, and the exchange has nowhere to go.
+// THE DIVISION OF LABOUR IS THE WHOLE PAGE — the seeker brings the situation,
+// she brings the meaning. So write the FACTS and stop: sold last week, bought
+// at the high, told everyone I was done. Let her be the one who says what it
+// means. If a line would sound wise coming from the seeker, it belongs in her
+// mouth, not on a chip.
+// The second half of the test is tone. "our lady, i lit a candle. that's all
+// i've got tonight." named its subject and still failed: it REPORTS IN, like a
+// chore logged, and gives the room nothing to take hold of. A seeker who came
+// this far wants something. Every line must ask, confess, or invoke — never file
+// a status update. When in doubt, read the line aloud cold to someone who has
+// never seen the page; if they say "what is?", it does not belong here.
+//
+// MOOD IS BALANCED WITHIN EACH REGISTER, not across the list. Statements are
+// confessions and belong here — the ask bar says "Inquire or confide" and the
+// counsel prompt takes both — but the chips are also how a first-timer learns
+// what the page accepts, and the mix used to be 5 questions to 11 statements
+// with every question in ONE register. A quarter of visits therefore showed
+// three confessions and never taught that you may simply ask. Each register now
+// carries roughly half and half, so any draw teaches both.
 const STARTER_REGISTERS = [
   // APPETITE — Barron's home ground; she has to rule on whether they may want it.
   [
-    "everyone's buying. am i late?",
-    "i think this one's different.",
-    "i want to go in bigger than i should.",
-    "my whole feed is winning. i'm not.",
+    // "everyone's buying. am i late?",
+    // "why does everyone else look so sure?",
+    // "i've never wanted to buy something this badly.",
+    // "i want to put in more than i planned to.",
   ],
   // REGRET — recognition, and the place she is most often simply delighted.
   [
-    "i bought the top. again.",
-    "i sold too early and i can't look at it.",
-    "i said i'd stop at one.",
-    "i knew better and did it anyway.",
+    "i sold everything last week and the price went up the next day.",
+    "i told everyone i was done and then i bought more.",
+    "why do i always buy right before it drops?",
+    "how do people know when to sell?",
   ],
   // LIMITS — a real question she must take a position on rather than reframe.
   [
-    "how much would be enough?",
-    "what am i actually doing this for?",
-    "when do i get to stop?",
-    "is wanting more a flaw?",
+    // "how much would be enough?",
+    // "what would i do with the money if i actually won?",
+    // "i said i'd cash out at 10k. i'm at 40k and still here.",
+    // "i've never picked a number to stop at.",
   ],
   // COMPULSION — the register a RITE answers, which is the move she reaches for
   // least and the one that gives a seeker something to carry out of the shrine.
   [
-    "i can't stop checking.",
-    "i refresh it like it's a prayer.",
-    "i check it before i'm properly awake.",
-    "it's the first thing i look at and the last.",
+    "i can't stop checking the price.",
+    "i check the chart before i check on anyone i love.",
+    "why can't i put my phone down?",
+    // "why am i checking the price at 3am?",
+  ],
+  // INVOCATION — the only register with NO problem in it, and it earns its place
+  // by breaking the rule above it: a bare prayer names nothing, so by the
+  // "must have a person in it" test it should fail. Tested against the live
+  // endpoint instead of assumed, and it is the strongest chip here — the room
+  // treats the emptiness AS the content (Barron demands the confession, GR80
+  // says a prayer deserves to be heard whole, she says "say the whole thing").
+  // It is also the only chip that OPENS a conversation rather than closing one:
+  // every other gets a complete answer and ends, this one asks for a second turn.
+  [
+    "our lady, hear my prayer.",
+      
+    "our lady, hear my confession.",
+    // "our lady, hear my prayer. i don't know what i'm asking for.",
+    // "our lady, i don't know how to pray for money.",
+    // The one "this" that stays. It points at what the seeker is DOING right
+    // now — standing in a shrine, having come here on purpose — not back at a
+    // conversation that never happened. Deictic, not dangling.
+    // "does this count as praying?",
   ],
 ];
 
-// One line from each of three different registers, in a random order.
+// ── The cold open ── What the room says before anyone asks it anything.
+//
+// The page used to sit silent until the first question, so a first-timer had no
+// way to learn that there are three voices, that the advisers argue TO HER, or
+// that she is the one who answers them. This demonstrates all of it in about ten
+// seconds without the seeker typing a word — the staging is the thing that needs
+// teaching, and it teaches far better than it explains.
+//
+// AUTHORED, NOT GENERATED, on purpose: an LLM call on every page load would cost
+// money for something nobody asked for, add latency to the first impression, and
+// risk breaking her voice rules on the one line most likely to be someone's only
+// line. These are also free to be funnier than a generated line dares to be.
+//
+// Same staging as /api/counsel: JB and GR speak TO HER about the seeker, and only
+// OL addresses the seeker. Keep it that way — this is the seeker's first lesson
+// in how to read the page, so a line that breaks the staging here teaches the
+// wrong thing permanently.
+const COLD_OPENS = [
+  [
+    { s: "JB", t: "another one, my lady. they always come down here at this hour, and it is never because things are going well." },
+    { s: "GR", t: "or they came for company while they think. barron reads arriving as weakness; usually it is just honesty." },
+    { s: "OL", t: "sit down. you don't have to have the question ready." },
+  ],
+  [
+    { s: "JB", t: "look at that face, my lady. that is a face that has already decided and came down here for absolution." },
+    { s: "GR", t: "he says that about everyone who walks in. log it as a guess, not a finding." },
+    { s: "OL", t: "whatever you decided, it's still yours. tell me anyway." },
+  ],
+  [
+    { s: "JB", t: "the room's been loud all week, my lady. they heard it from here. let them ask me first." },
+    { s: "GR", t: "they will ask whoever answers plainly. that has never been you, barron." },
+    { s: "OL", t: "you're not late and you're not early. you're just here." },
+  ],
+  [
+    { s: "JB", t: "my lady, i had the whole afternoon planned and then this one went and lit a candle." },
+    { s: "GR", t: "the candle is not for you, barron." },
+    { s: "OL", t: "ask me something. or don't, and just stay a minute." },
+  ],
+];
+
+const pickColdOpen = () => COLD_OPENS[Math.floor(Math.random() * COLD_OPENS.length)];
+
+// One line from each of up to `count` different registers, in a random order.
 function drawStarters(count = 3) {
-  const registers = [...STARTER_REGISTERS];
+  // EMPTY REGISTERS ARE DROPPED FIRST, and this is not defensive padding — it
+  // is the authoring workflow. Tuning this list means commenting lines out, and
+  // commenting out ALL of a register leaves `[]` behind. Without this filter
+  // that register is still dealt, `lines[Math.floor(Math.random() * 0)]` is
+  // undefined, and the page renders a blank chip: a button with no words that
+  // asks the shrine nothing. Filtering entries too, so a stray hole in an array
+  // can't do the same thing.
+  // Fewer live registers than `count` simply deals fewer chips — which is right.
+  // Three chips is a layout, not a requirement.
+  const registers = STARTER_REGISTERS.map((lines) => lines.filter(Boolean)).filter(
+    (lines) => lines.length > 0,
+  );
   // Fisher-Yates over the REGISTERS, so the three that show are always from
   // different ones — the whole point of the grouping above.
   for (let i = registers.length - 1; i > 0; i--) {
@@ -1250,8 +1376,12 @@ function PortraitPanel({
       NOT captions. The triptych captioned each line under the face making it,
       which is why it needed no scrollback; the solo stage has one face and two
       figures, so the transcript IS the record and has to hold everything. */
-function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace, onShare }) {
+function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace, onShare, reveal }) {
   const faceFor = (who) => (who === "OL" ? ladyFace : SPEAKER_FACE[who]);
+  // The line currently being spoken shows only as far as the voice has got —
+  // see MainPage's `reveal`. Everything else shows whole.
+  const shown = (m, i) =>
+    reveal && reveal.i === i ? m.text.slice(0, reveal.chars) : m.text;
   return (
     <div
       style={{
@@ -1422,7 +1552,7 @@ function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace, o
                       transition: "color 0.3s ease",
                     }}
                   >
-                    {m.text}
+                    {shown(m, i)}
                   </div>
                 </div>
               </div>
@@ -1658,6 +1788,50 @@ export default function MainPage() {
   // the scrollback that went away with the chat drawer.
   const [chatLog, setChatLog] = useState([]); // [{ who: "you"|"JB"|"GR"|"OL", text }]
 
+  // ── Words arriving as they are SPOKEN ── The transcript used to drop each
+  // line in whole the instant its voice took the floor, so a phone showed a
+  // finished paragraph while the audio was still on its first clause — you read
+  // the ending before you heard the middle. This reveals the line across the
+  // length of the utterance instead, which is what makes the band feel like a
+  // transcript of something happening rather than a log of something finished.
+  //
+  // Paced on an ESTIMATE (~62ms/char, the same rate speakInPortal's own watchdog
+  // assumes), not on real audio position: SitePal exposes no playback clock, and
+  // an estimate that self-corrects is better than plumbing a duration out of two
+  // different speech paths. It always ends exactly right because finishReveal()
+  // snaps to the full line the moment the speech promise resolves — so a slow
+  // estimate can lag mid-line but can never truncate or outrun the voice.
+  //
+  // setInterval, NOT requestAnimationFrame: rAF does not fire in a backgrounded
+  // tab (the same trap OracleCard's capture hit), which would freeze a line
+  // half-revealed for as long as the seeker looked away.
+  const [reveal, setReveal] = useState(null); // { i, chars } | null = show all
+  const revealTimer = useRef(null);
+  // Where the NEXT line will land in chatLog. Kept eagerly rather than read off
+  // chatLog.length, because the setState updater hasn't run yet when the reveal
+  // has to start — the two must agree or the wrong line animates.
+  const chatLenRef = useRef(0);
+
+  const startReveal = useCallback((i, text) => {
+    clearInterval(revealTimer.current);
+    const total = text.length;
+    const dur = Math.max(1200, total * 62);
+    const t0 = Date.now();
+    setReveal({ i, chars: 0 });
+    revealTimer.current = setInterval(() => {
+      const p = Math.min(1, (Date.now() - t0) / dur);
+      setReveal({ i, chars: Math.round(total * p) });
+      if (p >= 1) clearInterval(revealTimer.current);
+    }, 50);
+  }, []);
+
+  const finishReveal = useCallback(() => {
+    clearInterval(revealTimer.current);
+    setReveal(null);
+  }, []);
+
+  useEffect(() => () => clearInterval(revealTimer.current), []);
+
   // ── The share card ── HER most recent line, plus the question that drew it.
   // Only OL is offered: the advisers argue TO HER (see /api/counsel's staging),
   // so a Barron line on its own is half a scene and reads as the shrine
@@ -1670,14 +1844,20 @@ export default function MainPage() {
   // gated on sitePalReady anyway, so the empty first frame is never seen.
   const [starters, setStarters] = useState([]);
   useEffect(() => setStarters(drawStarters()), []);
+  const coldOpenRef = useRef(null);
+  useEffect(() => {
+    coldOpenRef.current = pickColdOpen();
+  }, []);
 
   const [cardOpen, setCardOpen] = useState(false);
   const lastOracle = useMemo(() => {
     for (let i = chatLog.length - 1; i >= 0; i--) {
-      // A server-patched line is not hers — see the setChatLog note in handleAsk.
-      // Skipping rather than stopping: if this turn fell back, the last REAL
-      // thing she said is still worth keeping, and the seeker still has one.
-      if (chatLog[i].who !== "OL" || chatLog[i].fellBack) continue;
+      // Skip anything that isn't HER answering THEM: a server-patched fallback
+      // (not her words at all) and the cold open (authored, and identical for
+      // everyone — a card of it is a card of the welcome mat). Skipping rather
+      // than stopping: the last REAL thing she said is still worth keeping.
+      if (chatLog[i].who !== "OL" || chatLog[i].fellBack || chatLog[i].canned)
+        continue;
       let question = "";
       for (let j = i - 1; j >= 0; j--) {
         if (chatLog[j].who === "you") {
@@ -1703,6 +1883,9 @@ export default function MainPage() {
   // on a second question the previous answer's button vanishes the instant the
   // new argument starts, instead of lingering over it.
   const canShare = Boolean(lastOracle) && !speakingKey && !busy;
+  // Has a real question been asked? The cold open fills chatLog on its own, so
+  // "the log is empty" no longer means "nothing has happened yet".
+  const hasAsked = chatLog.some((m) => !m.canned);
 
   // And if a voice takes the floor while the card is open — a queued reply
   // landing, say — get out of the way rather than sitting on top of her.
@@ -1732,6 +1915,23 @@ export default function MainPage() {
       behavior: "smooth",
     });
   }, [chatLog]);
+
+  // ── Then FOLLOW it as it writes ── The jump above puts the new line's first
+  // word at the top; this keeps its growing tail in view once the line gets
+  // longer than the band (~6 lines on a phone, and her answers run past that).
+  // Only ever nudges DOWNWARD by the exact overflow, so it can't fight the
+  // reader: scroll up to re-read an earlier line and it stays put until what is
+  // being spoken actually falls off the bottom. Instant, not smooth — a 0.3s
+  // smooth scroll re-triggered every 50ms never arrives anywhere.
+  useEffect(() => {
+    if (!reveal) return;
+    const box = chatBoxRef.current;
+    const newest = box?.lastElementChild;
+    if (!newest) return;
+    const bottom = newest.offsetTop - box.offsetTop + newest.offsetHeight;
+    const overflow = bottom - (box.scrollTop + box.clientHeight);
+    if (overflow > 0) box.scrollTop += overflow;
+  }, [reveal]);
   // Prior turns, fed back so a follow-up knows what was already argued. A ref,
   // not state — nothing renders it, and it must never re-trigger the flow.
   const historyRef = useRef([]);
@@ -1911,6 +2111,77 @@ export default function MainPage() {
   //
   // The page owns the history (the input bar drives this directly). Prior turns
   // are fed back so a follow-up question knows what was already argued.
+  // Which voice each character speaks with. Not derived from the reply, so both
+  // the consultation and the overture read the same map.
+  const voiceFor = useMemo(
+    () => ({
+      JB: COUNSEL_VOICES.JB,
+      GR: COUNSEL_VOICES.GR,
+      OL: CHARACTERS[activeCharIndex]?.voice || ORACLE_VOICE,
+    }),
+    [activeCharIndex],
+  );
+
+  /* ── Say ONE line as ONE character ── Extracted from handleAsk's loop so the
+        overture below shares it. It was inline, and duplicating it for the
+        greeting would have meant two copies of the portal-wait and the
+        ElevenLabs fallback — exactly the pair that has already broken twice.
+     Who speaks how, by WHOSE FACE IS ON SCREEN:
+       • Our Lady, always — her own player, never scene-swapped. (Swapping was
+         tried 2026-07-15: loadSceneByID nulls the player's audio, so NOBODY
+         spoke, her included, and every turn paid a scene load.)
+       • Advisers, TRIPTYCH — their SitePal faces are visible there, so they
+         speak through their own players and SitePal lip-syncs them.
+       • Advisers, SOLO — no face on screen, only the shoulder figures, so they
+         speak from ElevenLabs through a Web Audio graph we own. That is what
+         makes their 2D mouths possible: an AnalyserNode on our own graph yields
+         the per-frame amplitude (see adviserMouth), where audio inside a SitePal
+         iframe is unreachable from here.
+     Returns false when nothing was spoken, and the caller holds a reading beat.
+     Side effect worth knowing: this also settles the split noted in
+     /api/counsel-voice — the advisers used to sound like SitePal "Gilbert" on
+     desktop and like their ElevenLabs voices on a phone. Solo is now ElevenLabs
+     at every width, so a character sounds like himself. */
+  const speakOne = useCallback(
+    async (s, t) => {
+      const seatFor = { JB: "john", GR: "gr80", OL: "lady" };
+      if (s !== "OL") {
+        return isSolo
+          ? speakAdviserLine(s, t)
+          : speakInPortal(portalContainerId(seatFor[s]), t, voiceFor[s]);
+      }
+      // ── Wait for her frame before handing her the line ──
+      // SHE is the only voice that needs a SitePal player; the advisers go
+      // straight to ElevenLabs. So when the portals are down she is the ONLY one
+      // who goes quiet while the page still looks busy — two voices argue and
+      // her reply lands as text with no sound. Reported from a phone.
+      // The portals unmount whenever the apparition picker opens (see the
+      // `!pickerOpen` gate on <SitePalPortals>) and the replacements take seconds
+      // to register sayText, so a question asked around then lands in the hole.
+      // 3s, not 8: long enough for a portal that is merely remounting, short
+      // enough that a portal which is never coming back doesn't buy silence
+      // before the fallback.
+      await waitForPortal(portalContainerId(SPOTLIGHT_KEY), 3000);
+      const viaPortal = await speakInPortal(
+        portalContainerId(SPOTLIGHT_KEY),
+        t,
+        voiceFor.OL,
+      );
+      if (viaPortal) return true;
+      // ── HER VOICE MUST NOT DEPEND ON HER PLAYER ──
+      // Measured on a phone where the portal never came up at all: her frame
+      // fell back to the still cameo and she answered in silence while both
+      // advisers spoke. She presides — a mute presiding face with two audible
+      // advisers is worse than no advisers at all. Cost of the fallback: no
+      // lip-sync that turn. Silence reads as broken; a still face over a real
+      // voice reads as a portrait.
+      return speakAdviserLine("OL", t, {
+        apparition: CHARACTERS[activeCharIndex]?.key,
+      });
+    },
+    [isSolo, voiceFor, activeCharIndex],
+  );
+
   const handleAsk = useCallback(async (text) => {
     const question = String(text || "").trim();
     if (!question || busy) return;
@@ -1924,6 +2195,10 @@ export default function MainPage() {
     setCaptions({});
     setSpeakingKey(null);
     setBusy(true);
+    // The seeker's own line appears WHOLE — they wrote it, so revealing it back
+    // to them a character at a time would be theatre at their expense.
+    chatLenRef.current += 1;
+    finishReveal();
     setChatLog((l) => [...l, { who: "you", text: question }]);
 
     const messages = [...historyRef.current, { role: "user", content: question }];
@@ -1942,12 +2217,8 @@ export default function MainPage() {
 
     const lineFor = (s) => data.lines?.find((l) => l.s === s);
     const lineOf = (s) => lineFor(s)?.t || "";
-    const seatFor = { JB: "john", GR: "gr80", OL: "lady" };
-    const voiceFor = {
-      JB: COUNSEL_VOICES.JB,
-      GR: COUNSEL_VOICES.GR,
-      OL: CHARACTERS[activeCharIndex]?.voice || ORACLE_VOICE,
-    };
+    // seatFor / voiceFor now live with speakOne above — one copy, so a greeting
+    // and an answer can't end up using different voices for the same character.
 
     // Speak in the trope's order — temptation, duty, then grace.
     (async () => {
@@ -1961,10 +2232,14 @@ export default function MainPage() {
         // `fellBack` marks a line the SERVER patched in because the model's
         // reply didn't parse (see /api/counsel). It still speaks and still shows
         // — but it is not hers, so it must never reach the share card.
+        const lineIndex = chatLenRef.current;
+        chatLenRef.current = lineIndex + 1;
         setChatLog((l) => [
           ...l,
           { who: s, text: t, fellBack: data.fellBack?.includes(s) || false },
         ]);
+        // Start writing it out as the voice starts saying it.
+        startReveal(lineIndex, t);
 
         setSpeakingKey(s);
 
@@ -1983,70 +2258,17 @@ export default function MainPage() {
           });
         }
 
-        // Who says this out loud, and how. The rule is WHOSE FACE IS ON SCREEN:
-        //  • Our Lady, always — her own player, never scene-swapped. (Swapping
-        //    was tried 2026-07-15: loadSceneByID nulls the player's audio, so
-        //    NOBODY spoke, her included, and every turn paid a scene load.)
-        //  • Advisers, TRIPTYCH — their SitePal faces are visible there, so they
-        //    speak through their own players and SitePal lip-syncs them.
-        //  • Advisers, SOLO — they have no face on screen, only the shoulder
-        //    figures, so they speak from ElevenLabs through a Web Audio graph we
-        //    own. That is what makes their 2D mouths possible: an AnalyserNode
-        //    on our own graph yields the per-frame amplitude (see adviserMouth),
-        //    where audio inside a SitePal iframe is unreachable from here.
-        //    Returns false if that adviser has no voice configured, and we fall
-        //    through to the silent reading beat below.
-        //
-        // Side effect worth knowing: this also settles the split noted in
-        // /api/counsel-voice — the advisers used to sound like SitePal "Gilbert"
-        // on desktop and like their ElevenLabs voices on a phone. Solo is now
-        // ElevenLabs at every width, so a character sounds like himself.
-        let spoke;
-        if (s === "OL") {
-          // ── Wait for her frame before handing her the line ──
-          // SHE is the only voice that needs a SitePal player; the advisers go
-          // straight to ElevenLabs. So when the portals are down she is the ONLY
-          // one who goes quiet, and the page still looks busy — two voices argue
-          // and her reply lands as text with no sound. Reported from a phone,
-          // "a couple of instances".
-          // The portals unmount whenever the apparition picker opens (see the
-          // `!pickerOpen` gate on <SitePalPortals>) and the replacements take
-          // seconds to load and register sayText, so a question asked around
-          // that lands squarely in the hole. She speaks LAST, which usually
-          // hides it — the two adviser turns are enough time for the frame to
-          // come up — and that is exactly why it is intermittent rather than
-          // constant. Waiting costs nothing when the frame is already there.
-          // 3s, not 8: long enough to cover a portal that is merely remounting,
-          // short enough that a portal which is never coming back doesn't buy
-          // silence before the fallback below. A phone where SitePal failed
-          // outright would otherwise pay this wait on every single answer.
-          await waitForPortal(portalContainerId(SPOTLIGHT_KEY), 3000);
-          if (run !== counselRunRef.current) return;
-          spoke = await speakInPortal(portalContainerId(SPOTLIGHT_KEY), t, voiceFor[s]);
-          // ── HER VOICE MUST NOT DEPEND ON HER PLAYER ──
-          // The portal is the preferred path because it moves her face. But it
-          // is also the only part of this page that can fail while everything
-          // around it works: measured on a phone where the portal never came up
-          // at all, her frame fell back to the still cameo and she answered in
-          // silence while both advisers spoke. She presides — a mute presiding
-          // face with two audible advisers is worse than no advisers at all.
-          // So on any portal failure she speaks through the same ElevenLabs
-          // path they use, with the voice her player would have used. Cost: no
-          // lip-sync that turn. Worth it; silence reads as broken, a still face
-          // over a real voice reads as a portrait.
-          if (!spoke) {
-            if (run !== counselRunRef.current) return;
-            spoke = await speakAdviserLine("OL", t, {
-              apparition: CHARACTERS[activeCharIndex]?.key,
-            });
-            if (run !== counselRunRef.current) return;
-          }
-        } else if (!isSolo) {
-          spoke = await speakInPortal(portalContainerId(seatFor[s]), t, voiceFor[s]);
-        } else {
-          spoke = await speakAdviserLine(s, t);
-        }
+        // Who says this out loud, and how, lives in speakOne — shared with the
+        // overture so a greeting and an answer can never drift into using
+        // different voices or different fallbacks for the same character.
+        const spoke = await speakOne(s, t);
         if (run !== counselRunRef.current) return;
+
+        // The voice has stopped, so the words stop being a guess: show the whole
+        // line. This is what keeps the estimated pace honest — it may lag behind
+        // a fast delivery mid-line, but it can never end early or leave a line
+        // unfinished, because the truth arrives here.
+        finishReveal();
 
         // No voice for this line — hold the caption roughly as long as it takes
         // to READ, so the argument still paces instead of flashing past.
@@ -2236,6 +2458,73 @@ export default function MainPage() {
     hasGreetedRef.current = true;
     speakGreetingAloud();
   }, [speakGreetingAloud]);
+
+  /* ── The overture ── The cold open, played once, on the first real gesture.
+     NOT ON LOAD, and that is a platform rule rather than a choice: browsers only
+     start audio inside a user gesture, so anything that speaks itself on arrival
+     is silently swallowed — on iOS especially. The first touch is as close to
+     "on load" as this can get.
+     It replaces a greeting that was HER ALONE and wired to the input gaining
+     FOCUS — which is a reasonable first gesture on a desktop and close to
+     unreachable on a phone, where nobody focuses a text field before looking
+     around and doing so throws the keyboard over the whole composition. So in
+     practice the shrine has been introducing itself to almost nobody.
+     Lines go into chatLog like any others, so the caption, the reveal, the rail
+     and the scroll-following all work unchanged — but marked `canned`, because
+     they are not an answer to anything: the share card must not offer them (see
+     lastOracle) and the starter chips must not treat them as a real exchange. */
+  const overtureRef = useRef(false);
+  const runOverture = useCallback(async () => {
+    const set = coldOpenRef.current;
+    if (!set) return;
+    // Belongs to the current run, so a question asked mid-overture kills it at
+    // the next line boundary — handleAsk increments this and also stops every
+    // player outright, which cuts the audio already in flight.
+    const run = counselRunRef.current;
+    for (const { s, t } of set) {
+      if (run !== counselRunRef.current) return;
+      const i = chatLenRef.current;
+      chatLenRef.current = i + 1;
+      setChatLog((l) => [...l, { who: s, text: t, canned: true }]);
+      startReveal(i, t);
+      setSpeakingKey(s);
+      const spoke = await speakOne(s, t);
+      if (run !== counselRunRef.current) return;
+      finishReveal();
+      if (!spoke) {
+        await new Promise((r) => setTimeout(r, Math.min(4600, Math.max(1800, t.length * 28))));
+        if (run !== counselRunRef.current) return;
+      }
+      await new Promise((r) => setTimeout(r, 260));
+    }
+    if (run === counselRunRef.current) setSpeakingKey(null);
+  }, [speakOne, startReveal, finishReveal]);
+
+  // First touch anywhere wakes the room. Capture phase so it still fires for a
+  // tap that lands on a control, and `once` so it can never run twice.
+  useEffect(() => {
+    if (!sitePalReady) return;
+    const onFirstGesture = () => {
+      if (overtureRef.current) return;
+      overtureRef.current = true;
+      // Inside the gesture, or iOS will not grant playback later.
+      unlockAdviserAudio();
+      hasGreetedRef.current = true; // the overture IS the greeting now
+      // A GRACE BEAT, because this same tap may have been a starter chip or the
+      // send button: pointerdown fires before click, so without this the overture
+      // and the answer to the question just asked would start together. If a
+      // consultation began in that window, handleAsk has bumped counselRunRef
+      // and the overture stands down.
+      const before = counselRunRef.current;
+      setTimeout(() => {
+        if (counselRunRef.current !== before) return;
+        runOverture();
+      }, 420);
+    };
+    window.addEventListener("pointerdown", onFirstGesture, { capture: true, once: true });
+    return () =>
+      window.removeEventListener("pointerdown", onFirstGesture, { capture: true });
+  }, [sitePalReady, runOverture]);
 
   const handleGlitchComplete = () => {
     setGlitchActive(false);
@@ -2625,17 +2914,32 @@ export default function MainPage() {
                   fontFamily: "'Rajdhani', sans-serif",
                 }}
               >
-                {chatLog.map((m, i) => {
+                {/* ── ONE LINE AT A TIME ── A caption, not a scrollback. The
+                    phone used to render the whole log here, which is what made
+                    this box fight her frame for height: a transcript wants room
+                    to be scanned, and every pixel it won came off her face until
+                    the mouth stopped reading as animation.
+                    A caption doesn't need that room. It holds exactly what is
+                    being said right now and is replaced by the next voice, so
+                    ~3 lines is sufficient at any argument length and there is
+                    nothing to scroll or discover. The reveal writes it out as it
+                    is spoken; a line longer than the box follows itself (see the
+                    two scroll effects) instead of asking the seeker to chase it.
+                    The FULL scrollback still exists on desktop, in the rail —
+                    that column has room the phone never did. */}
+                {(() => {
+                  const i = chatLog.length - 1;
+                  const m = chatLog[i];
+                  if (!m) return null;
                   const who = SPEAKER[m.who] || SPEAKER.you;
-                  const live = speakingKey === m.who && i === chatLog.length - 1;
+                  const revealing = reveal && reveal.i === i && m.who !== "you";
                   return (
                     <div
                       key={i}
                       style={{
                         fontSize: "0.92rem",
                         lineHeight: 1.5,
-                        color: live ? "#ffffff" : "rgba(255,255,255,0.74)",
-                        transition: "color 0.3s ease",
+                        color: "#ffffff",
                       }}
                     >
                       <span
@@ -2643,15 +2947,15 @@ export default function MainPage() {
                           color: who.hue,
                           fontWeight: 700,
                           letterSpacing: "0.02em",
-                          textShadow: live ? `0 0 10px ${who.hue}88` : "none",
+                          textShadow: `0 0 10px ${who.hue}88`,
                         }}
                       >
                         {who.name}:
                       </span>{" "}
-                      {m.text}
+                      {revealing ? m.text.slice(0, reveal.chars) : m.text}
                     </div>
                   );
-                })}
+                })()}
                 {busy && (
                   <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.4)" }}>
                     considering your question…
@@ -2726,6 +3030,7 @@ export default function MainPage() {
                 boxRef={chatBoxRef}
                 ladyFace={CHARACTERS[activeCharIndex]?.image}
                 onShare={canShare ? () => setCardOpen(true) : null}
+                reveal={reveal}
               />
             )}
           </>
@@ -2899,7 +3204,10 @@ export default function MainPage() {
           stack on solo (a phone column has width for one per row) and run as a
           single row across the triptych, where they read as a line of offerings
           laid at the foot of the composition. */}
-      {chatLog.length === 0 && (
+      {/* `hasAsked`, not chatLog.length: the cold open puts lines in the log
+          without anyone having asked anything, and the chips are the invitation —
+          they must survive the overture and leave only on a real question. */}
+      {!hasAsked && (
         <div
           style={{
             position: "fixed",
