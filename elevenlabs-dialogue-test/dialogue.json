@@ -1,0 +1,55 @@
+{
+  "inputs": [
+    {
+      "text": "[confidently] Good evening. Tonight, one simple question: if you could save humanity with a single trade, would you do it?",
+      "voice_id": "IcFWazAaBzXNwLWpySgF"
+    },
+    {
+      "text": "[dryly] That depends. Are you saving humanity, or opening a position against it?",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+    },
+    {
+      "text": "[slightly offended] I can care about people and recognize an attractive market opportunity.",
+      "voice_id": "IcFWazAaBzXNwLWpySgF"
+    },
+    {
+      "text": "You once shorted optimism.",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+    },
+    {
+      "text": "[matter-of-factly] And I closed the position at a substantial profit.",
+      "voice_id": "IcFWazAaBzXNwLWpySgF"
+    },
+    {
+      "text": "[patiently] Here is the choice. Everyone receives enough, but no one can possess everything.",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+    },
+    {
+      "text": "[suspiciously] Define enough.",
+      "voice_id": "IcFWazAaBzXNwLWpySgF"
+    },
+    {
+      "text": "Food, shelter, medicine, safety, and a little peace.",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+    },
+    {
+      "text": "[horrified] Peace? Do you understand what that would do to quarterly growth?",
+      "voice_id": "IcFWazAaBzXNwLWpySgF"
+    },
+    {
+      "text": "[amused] Perhaps humanity could survive one disappointing quarter.",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+    },
+    {
+      "text": "[reluctantly] Fine. Save humanity. But I want it recorded that I considered the tax implications.",
+      "voice_id": "IcFWazAaBzXNwLWpySgF"
+    },
+    {
+      "text": "Noted. Humanity is a hold.",
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb"
+    }
+  ],
+  "model_id": "eleven_v3",
+  "language_code": "en",
+  "seed": 48127
+}
