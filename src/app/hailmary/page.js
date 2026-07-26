@@ -7082,8 +7082,8 @@ export default function OilPage() {
           accountModalUnlockedItems={unlockedItems}
           extraLeft={[{
             key: "home",
-            label: "HOME",
-            title: "Return to shrine",
+            label: "ex Machina",
+            title: "Return to home",
             onClick: () => router.push("/"),
             icon: <img src="/brand-mark-cyan.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
           }]}

@@ -242,11 +242,11 @@ export default function ModelViewerPage() {
         extraLeft={[
           {
             key: 'candelarium',
-            label: 'Candelarium',
-            title: 'Return to the candelarium',
+            label: 'ex Machina',
+            title: 'Return to home',
             onClick: () => { router.push('/'); },
             // Same brand mark this slot used before, now in the Terminal spot.
-            iconSrc: '/images/flame.svg',
+            iconSrc: '/favicon.svg',
           },
         ]}
         extraRight={[
@@ -327,7 +327,7 @@ export default function ModelViewerPage() {
                 ),
               },
               {
-                label: "Terminal",
+                label: "Terminus",
                 stroke: "#39ff14",
                 onSelect: () => moreConfirm({
                   title: "The Liminal Terminal",

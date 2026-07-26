@@ -974,17 +974,17 @@ export default function VigilPage() {
         extraLeft={[
           {
             key: "candelarium",
-            label: "Candelarium",
-            title: "Sanctum Candelarium",
+            label: "ex Machina",
+            title: "ex Machina",
             onClick: () => { window.location.href = "/"; },
             confirm: {
-              title: "Sanctum Candelarium",
-              body: "Step back into Our Lady's candlelit hall — your vigil keeps burning.",
+              title: "ex Machina",
+              body: "Return to home",
               accent: "hsl(189, 84%, 55%)",
               shadow: "hsl(189, 70%, 38%)",
             },
             // Same flame mark the other pages use for the candelarium slot.
-            iconSrc: "/images/flame.svg",
+            iconSrc: "/favicon.svg",
           },
         ]}
         extraRight={[

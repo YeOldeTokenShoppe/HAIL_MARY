@@ -1167,6 +1167,18 @@ export default function CyborgTemple() {
   // crop onto Face2/FaceDemon2. 'Monk' | 'Barron' | null. Driven by the dev
   // fitting control (?tune=sitepal); one at a time (single shared portal).
   const [talkShowProject, setTalkShowProject] = useState(null);
+  // The talk-show set owns two isolated SitePal iframe portals. These flags
+  // drive the single START/STOP control while both uploaded, equal-length
+  // tracks perform through the live face projections.
+  const [talkShowAudioReady, setTalkShowAudioReady] = useState(false);
+  const [talkShowPlaying, setTalkShowPlaying] = useState(false);
+  const handleTalkShowPlaybackReady = useCallback((ready) => {
+    setTalkShowAudioReady(ready);
+    if (!ready) setTalkShowPlaying(false);
+  }, []);
+  const handleTalkShowPlaybackState = useCallback((playing) => {
+    setTalkShowPlaying(playing);
+  }, []);
   // Imperative handle to the mobile TradeLaptop so the START FAB can dive
   // straight into the CRT terminal (same as tapping the laptop screen).
   const laptopRef = useRef(null);
@@ -3817,6 +3829,8 @@ export default function CyborgTemple() {
                 scale={[1.2, 1.2, 1.2]}
                 rotation={[0, 0, 0]}
                 projectCharacter={talkShowProject}
+                onPlaybackReady={handleTalkShowPlaybackReady}
+                onPlaybackStateChange={handleTalkShowPlaybackState}
               />
             )}
 
@@ -4194,7 +4208,15 @@ export default function CyborgTemple() {
               label: talkShowMode ? 'EXIT SHOW' : 'THE SHOW',
               accent: '#ffcf4d',
               active: talkShowMode,
-              onClick: () => setTalkShowMode((v) => { if (v) setTalkShowProject(null); return !v; }),
+              onClick: () => setTalkShowMode((v) => {
+                if (v) {
+                  try { window.__talkShowStop?.(); } catch (e) {}
+                  setTalkShowProject(null);
+                  setTalkShowAudioReady(false);
+                  setTalkShowPlaying(false);
+                }
+                return !v;
+              }),
             },
             {
               key: 'teamchat',
@@ -4283,6 +4305,59 @@ export default function CyborgTemple() {
           );
         })()}
 
+        {/* One-click live performance. Both SitePal tracks are preloaded inside
+            their isolated portals and started from this same user gesture. */}
+        {mounted && !isMobileView && talkShowMode && (
+          <button
+            type="button"
+            disabled={!talkShowAudioReady}
+            onClick={() => {
+              if (talkShowPlaying) {
+                try { window.__talkShowStop?.(); } catch (e) {}
+                return;
+              }
+              try {
+                const started = window.__talkShowPlay?.();
+                if (!started) setTalkShowPlaying(false);
+              } catch (e) {
+                setTalkShowPlaying(false);
+              }
+            }}
+            style={{
+              position: 'fixed',
+              left: '50%',
+              bottom: 92,
+              transform: 'translateX(-50%)',
+              zIndex: 10040,
+              minWidth: 190,
+              padding: '11px 20px',
+              borderRadius: 999,
+              border: `1px solid rgba(255, 207, 77, ${talkShowAudioReady ? 0.88 : 0.3})`,
+              background: talkShowPlaying
+                ? 'rgba(255, 82, 118, 0.2)'
+                : 'linear-gradient(180deg, rgba(255,207,77,0.2), rgba(8,7,12,0.92))',
+              boxShadow: talkShowAudioReady
+                ? '0 0 22px rgba(255,207,77,0.24), inset 0 1px 0 rgba(255,255,255,0.08)'
+                : 'none',
+              color: talkShowAudioReady ? '#ffe38a' : 'rgba(255,227,138,0.45)',
+              cursor: talkShowAudioReady ? 'pointer' : 'wait',
+              fontFamily: "'Orbitron','IBM Plex Mono',monospace",
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+            }}
+          >
+            {!talkShowAudioReady
+              ? 'Loading voices…'
+              : talkShowPlaying
+                ? 'Stop test'
+                : 'Start talk show'}
+          </button>
+        )}
+
         {/* Talk-show SitePal fitting control — dev only (?tune=sitepal), while
             the TALK SHOW set is up. One character projects at a time (single
             shared host portal); pair with the SitePalCropPanel's TS tabs to
@@ -4315,7 +4390,8 @@ export default function CyborgTemple() {
             {[
               { key: 'Monk', label: 'Project Monk (Face2)' },
               { key: 'Barron', label: 'Project Barron (FaceDemon2)' },
-              { key: null, label: 'Off (static faces)' },
+              { key: null, label: 'Both (live show)' },
+              { key: 'Off', label: 'Off (static faces)' },
             ].map(({ key, label }) => {
               const active = talkShowProject === key;
               return (
@@ -5738,11 +5814,11 @@ export default function CyborgTemple() {
                   tradeMode ? [] : [
                     {
                       key: 'candelarium',
-                      label: 'Candelarium',
+                      label: 'Ex Machina',
                       title: 'Our Lady of Perpetual Profit',
                       onClick: () => router.push('/'),
                       icon: (
-                        <img src="/images/flame.svg" alt="" style={{ width: 24, height: 24, display: 'block' }} />
+                        <img src="/favicon.svg" alt="" style={{ width: 24, height: 24, display: 'block' }} />
                       ),
                     },
                   ]

@@ -25,7 +25,7 @@ import "./CyberButton.css";
 // GainNode value (which iOS honours, unlike HTMLAudioElement.volume).
 const SFX_VOLUME = { slide: 0.2, accept: 1, reject: 1 };
 const SFX_SRC = {
-  slide: "https://cdn.freesound.org/previews/367/367997_6512973-lq.mp3",
+  slide: "/audio/menu.mp3",
   accept: "/audio/proceed.mp3",
   reject: "/audio/cancel.mp3",
 };

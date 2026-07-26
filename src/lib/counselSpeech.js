@@ -14,9 +14,16 @@ import { setAdviserMouth, resetAdviserMouths } from "./adviserMouth";
 // ElevenLabs via the SitePal-connected account; id = the EL voice UUID.
 // TUNE: try voices live in SitePalExpressionPanel (dev-only, mounted on /main).
 export const COUNSEL_VOICES = {
-  // St. GR80 — "Gilbert" + cathedral reverb: the voice the character already
-  // uses on /trade and in the How-to-Play intro. Keep them in sync.
-  GR: { voice: "9", lang: 1, engine: 7, effect: "T", effLevel: 3 },
+  // St. GR80 — his own ElevenLabs voice, the same id /api/counsel-voice serves
+  // him (override there with ELEVENLABS_VOICE_GR80). This map is only read on
+  // the `?triptych=1` layout, which speaks through a SitePal player; solo — the
+  // default at every width — goes through speakAdviserLine and has been on this
+  // voice all along. They were different voices until now: SitePal "Gilbert"
+  // here, ElevenLabs there, so the same character changed voice with the layout.
+  // NOTE this now diverges from /trade and the How-to-Play intro, which still
+  // use Gilbert from their OWN literals (src/components/game/cases/*) — nothing
+  // imports this map but /main, so aligning those is a separate, deliberate call.
+  GR: { id: "JBFqnCBsd6RMkjVDRZzb", lang: 1, engine: 14 },
   // John Barron — his own ElevenLabs voice. (His scripted lines elsewhere are
   // uploaded audio, john_01..06; this is for his live, generated ones.)
   JB: { id: "IcFWazAaBzXNwLWpySgF", lang: 1, engine: 14 },
@@ -44,10 +51,49 @@ export function portalWindow(containerId) {
  * talk-ended (or the watchdog fires, so a stuck line can never wedge the
  * conversation — the same guard HowToPlayDialogue needed).
  */
+/**
+ * Resolve once a portal's player can actually take a line, or false on timeout.
+ *
+ * WHY THIS EXISTS: the portals are mounted behind `!pickerOpen` in /main, so
+ * opening the apparition picker UNMOUNTS every SitePal iframe and closing it
+ * mounts fresh ones that need seconds to load and register sayText. A question
+ * asked in that window used to leave Our Lady MUTE — the advisers still spoke
+ * (they're ElevenLabs and need no portal), she alone had no frame, and
+ * speakInPortal's early return said nothing about it. The seeker saw two voices
+ * argue and her line appear as text with no sound.
+ */
+export function waitForPortal(containerId, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    const ready = () => typeof portalWindow(containerId)?.sayText === "function";
+    if (ready()) return resolve(true);
+    const started = Date.now();
+    const tick = setInterval(() => {
+      if (ready()) {
+        clearInterval(tick);
+        resolve(true);
+      } else if (Date.now() - started > timeoutMs) {
+        clearInterval(tick);
+        console.warn(`[counselSpeech] portal "${containerId}" never came up in ${timeoutMs}ms`);
+        resolve(false);
+      }
+    }, 150);
+  });
+}
+
 export function speakInPortal(containerId, text, voice, { watchdogMs } = {}) {
   return new Promise((resolve) => {
     const w = portalWindow(containerId);
+    // NAME THE REASON. Both of this function's failure exits used to be a bare
+    // `resolve(false)`, so a mute character produced no signal anywhere — the
+    // caller just moved on and the line became text-only. If you are here
+    // debugging silence, this warn and the watchdog's below are the two places
+    // that tell you which kind of silence it was.
     if (!w || typeof w.sayText !== "function" || !text) {
+      console.warn(
+        `[counselSpeech] cannot speak in "${containerId}":`,
+        !text ? "empty text" : !w ? "no portal frame" : "frame has no sayText yet",
+      );
       resolve(false);
       return;
     }
@@ -70,7 +116,15 @@ export function speakInPortal(containerId, text, voice, { watchdogMs } = {}) {
       if (e.data?.type === "sitepal-portal-talk-ended") finish(true);
     };
     window.addEventListener("message", onMessage);
-    const timer = setTimeout(() => finish(false), limit);
+    const timer = setTimeout(() => {
+      // Distinct from the guard above: sayText WAS called, but the frame never
+      // reported talk-ended. Either it produced no audio, or the end event was
+      // lost. Both look identical to a seeker — silence — so say which.
+      console.warn(
+        `[counselSpeech] "${containerId}" never reported talk-ended in ${limit}ms`,
+      );
+      finish(false);
+    }, limit);
 
     try {
       w.stopSpeech?.();
@@ -318,7 +372,7 @@ export function unlockAdviserAudio() {
  * the request fails, or playback is blocked — the caller then holds a silent
  * reading beat instead of stalling.
  */
-export async function speakAdviserLine(speaker, text, { signal } = {}) {
+export async function speakAdviserLine(speaker, text, { signal, apparition } = {}) {
   if (!text) return false;
 
   let bytes;
@@ -326,7 +380,9 @@ export async function speakAdviserLine(speaker, text, { signal } = {}) {
     const res = await fetch("/api/counsel-voice", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ speaker, text }),
+      // `apparition` is only meaningful for OL — the route resolves HER voice
+      // from the key (her voice changes with her face). Advisers ignore it.
+      body: JSON.stringify({ speaker, text, apparition }),
       signal,
     });
     // 409 = this adviser has no ElevenLabs voice configured.

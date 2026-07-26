@@ -3173,7 +3173,7 @@ export default function HomePage() {
             onClick: () => { router.push('/main'); },
             confirm: {
               title: 'Ask RL80',
-              body: "Approach Our Lady. Speak from the heart — she answers those who seek in earnest.",
+              body: "Consult with Our Lady.",
               accent: 'hsl(189, 84%, 55%)',
               shadow: 'hsl(189, 70%, 38%)',
             },
@@ -3204,7 +3204,7 @@ export default function HomePage() {
             key: 'terminal',
             /* Label stays short — the dock's slot labels ellipsize past
                ~88px. The full name lands in the confirm's title. */
-            label: 'Terminal',
+            label: 'Liminal Terminal',
             title: 'The Liminal Terminal',
             onClick: () => { router.push('/trade'); },
             confirm: {

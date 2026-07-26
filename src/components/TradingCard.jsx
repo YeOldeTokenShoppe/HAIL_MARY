@@ -994,6 +994,31 @@ const CARD_STYLES = `
       brightness(calc((var(--hyp, 0) + 0.7) * 0.7))
       contrast(3.2)
       saturate(0.66);
+
+    /* ── centerMask, ported from the diamond-foil shader ──────────────────
+       The shader keeps the middle of the card clean and lets the foil rule
+       the edges: smoothstep(0.12, 0.52, dist) fed through mix(0.4, 1.0, …).
+       Same curve here. The gradient's 0→100% spans 52% of the box, so the
+       shader's 0.12 inner stop lands at 12/52 ≈ 23% along it.
+       Earns more here than it does in the shader: the title, stat pair and
+       rarity tag float directly on the art, so this buys text contrast as
+       well as a look.
+       Centred at 42%, not 50%, because .tc-foil spans the whole .tc-frame —
+       .tc-art-window never became a containing block (its position:relative
+       is commented out below) — so 50% would land in the ability box
+       instead of in the artwork. Applies to every foil tier; the mask is
+       independent of the background stack. */
+    --foil-center: .4;
+    -webkit-mask-image: radial-gradient(
+      ellipse 52% 52% at 50% 42%,
+      rgba(0,0,0,var(--foil-center)) 23%,
+      #000 100%
+    );
+    mask-image: radial-gradient(
+      ellipse 52% 52% at 50% 42%,
+      rgba(0,0,0,var(--foil-center)) 23%,
+      #000 100%
+    );
   }
 
   /* Hero rarities (Mythic / Legendary) — stronger foil */

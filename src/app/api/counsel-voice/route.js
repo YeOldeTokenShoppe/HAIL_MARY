@@ -11,9 +11,23 @@
 // not avatars. A drawing that glows while a voice plays reads as intentional;
 // it's a LIVE AVATAR with a dead mouth that reads as broken.
 //
-// Input  (POST JSON): { text: string, speaker: "JB" | "GR" }
+// OUR LADY IS SERVED HERE TOO, as a FALLBACK ONLY. Her player is still the
+// preferred path — it is the one that moves her face — but her voice must not
+// depend on it. Measured on a real phone (2026-07-25): her SitePal portal never
+// came up at all, so her frame showed the still cameo and she answered in
+// silence while both advisers spoke normally, because they never needed a
+// player. Two voices arguing over a mute presiding face is the worst state this
+// page can be in. Now: if the portal fails, she speaks from here with the same
+// ElevenLabs voice the player would have used, and only her lip-sync is lost.
+// Her voice varies by apparition, so the caller sends the apparition KEY and
+// the id is resolved HERE — never accept a raw voice id from the client, or the
+// endpoint becomes an open bill on someone else's ElevenLabs quota.
+//
+// Input  (POST JSON): { text, speaker: "JB" | "GR" | "OL", apparition? }
 // Output: audio/mpeg bytes, or 4xx/502 — the caller falls back to a silent
 //         reading beat so the argument never stalls.
+import { APPARITIONS } from "@/lib/apparitions";
+import { ORACLE_VOICE } from "@/lib/oracleSpeech";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 // Turbo = low latency, which matters: this is an awaited beat mid-argument.
@@ -31,7 +45,10 @@ const VOICES = {
     settings: { stability: 0.4, similarity_boost: 0.75, style: 0.55 },
   },
   GR: {
-    id: process.env.ELEVENLABS_VOICE_GR80 || "VG7zjqAT7O4FXCR57Wwv",
+    // Kept in lockstep with COUNSEL_VOICES.GR in lib/counselSpeech.js — that
+    // map voices the `?triptych=1` layout, this route voices every other one,
+    // and a mismatch means GR80 changes voice when the layout changes.
+    id: process.env.ELEVENLABS_VOICE_GR80 || "JBFqnCBsd6RMkjVDRZzb",
     // High stability, near-zero style = flat, procedural, unbothered. The
     // saint reports what the maxim yields; he doesn't perform it.
     settings: { stability: 0.85, similarity_boost: 0.6, style: 0.1 },
@@ -56,8 +73,22 @@ export async function POST(request) {
     return Response.json({ error: "bad json" }, { status: 400 });
   }
 
-  const speaker = body?.speaker === "GR" ? "GR" : "JB";
-  const voice = VOICES[speaker];
+  const speaker = ["GR", "OL"].includes(body?.speaker) ? body.speaker : "JB";
+  // Her id is looked up from the apparition KEY the client names — the same
+  // source the SitePal player reads, so the fallback sounds like the same
+  // person. Unknown or missing key falls back to ORACLE_VOICE, which is also
+  // what an apparition with `voice: null` (the classic face) resolves to.
+  const voice =
+    speaker === "OL"
+      ? {
+          id:
+            APPARITIONS.find((a) => a.key === body?.apparition)?.voice?.id ||
+            ORACLE_VOICE.id,
+          // Warmer and freer than GR80's procedural flatness, steadier than
+          // Barron's push: she is unhurried and means it.
+          settings: { stability: 0.6, similarity_boost: 0.75, style: 0.35 },
+        }
+      : VOICES[speaker];
   if (!voice?.id) {
     // Not an error — this adviser simply has no voice yet.
     return Response.json({ error: "no_voice_for_speaker", speaker }, { status: 409 });

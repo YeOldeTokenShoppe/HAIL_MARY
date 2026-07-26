@@ -465,8 +465,8 @@ export default function FountainPage() {
           <Link
             href="/"
             id="text"
-            title="Sanctum candelarium"
-            aria-label="Return to the candelarium"
+            title="ex Machina"
+            aria-label="Return to home"
             style={{
               position: "relative",
               display: "inline-block",

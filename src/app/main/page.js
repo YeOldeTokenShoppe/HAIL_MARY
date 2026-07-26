@@ -12,12 +12,14 @@ import SitePalExpressionPanel from "@/components/SitePalExpressionPanel";
 import { ORACLE_VOICE, pickGreeting } from "@/lib/oracleSpeech";
 import { APPARITIONS as CHARACTERS } from "@/lib/apparitions";
 import ApparitionTriptych from "@/components/ApparitionTriptych";
+import OracleCard from "@/components/OracleCard";
 import { readApparitionKey, writeApparitionKey } from "@/lib/apparitionPrefs";
 import { useMusic } from "@/components/MusicContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import {
   askCounsel,
   speakInPortal,
+  waitForPortal,
   stopAllPortals,
   reactInPortal,
   recenterPortal,
@@ -87,6 +89,17 @@ const ASK_BAR_BOTTOM = `calc(${DOCK_H}px + ${SAFE_B})`;
 // exactly where her apparition medallions land, so the roster sat half-hidden
 // under the input and couldn't be scrolled out.
 const BOTTOM_CLEARANCE = `calc(${DOCK_H + ASK_BAR_H + ASK_BAR_GAP}px + ${SAFE_B})`;
+
+// ── The phone transcript's share of the screen ── ONE number, read by both the
+// band's own maxHeight and soloFrameSize's reserve. They were independent (a
+// 24dvh band against a flat 135px reserve) and disagreed by ~75px, which the
+// column paid for by running its foot under the ask bar.
+// THIS IS THE FRAME-VS-WORDS DIAL. Raising it shows more of the argument and
+// shrinks her; lowering it does the reverse. At 0.24 on an 820px phone the band
+// is ~197px — roughly six lines — and her frame lands near 300.
+const TRANSCRIPT_DVH = 0.24;
+// "keep her words" under the band: 31px tall + 12px margin, measured.
+const SHARE_BUTTON_H = 43;
 
 // ── THE COUNCIL ── Our Lady centre, an adviser either side. Each is a live
 // SitePal character in its OWN same-origin iframe (`/sitepal-portal.html`).
@@ -315,11 +328,68 @@ const RL80_RAYS = 100;
 // register. Each is chosen to pull a DIFFERENT argument out of the triptych:
 // appetite, shame, and a real question about limits. Barron has something to
 // say about all three, which is the point.
-const STARTER_QUESTIONS = [
-  "everyone's buying. am i late?",
-  "i bought the top. again.",
-  "is money evil?",
+//
+// SECOND TEST, added with Our Lady's repertoire (/api/counsel's OL voice): each
+// must also pull a different MOVE out of HER — rule on it, recognise them, take
+// a position on a real question. That is what retired "is money evil?": it is a
+// fine hook and there is no PERSON in it, so all three voices answer it in the
+// abstract, and an abstract question is exactly where an oracle goes vague. Its
+// replacement asks the same thing with a life attached, which she has to answer.
+// A chip that can be answered without knowing who asked it does not belong here.
+//
+// ── WHY THESE ARE GROUPED, AND NOT ONE FLAT LIST ── The trio is a SET, not
+// three questions. Drawing three at random from a single pool regularly deals
+// three variations of the same register, and that visitor meets a one-note
+// shrine — the exact opposite of what variety is for. So the registers below are
+// the unit: shuffle THEM, take three, draw one line from each. The trio can
+// never double up, and it is different every visit.
+// Adding a register is better than lengthening one. Each should pull a
+// different argument out of the advisers AND a different move out of her.
+const STARTER_REGISTERS = [
+  // APPETITE — Barron's home ground; she has to rule on whether they may want it.
+  [
+    "everyone's buying. am i late?",
+    "i think this one's different.",
+    "i want to go in bigger than i should.",
+    "my whole feed is winning. i'm not.",
+  ],
+  // REGRET — recognition, and the place she is most often simply delighted.
+  [
+    "i bought the top. again.",
+    "i sold too early and i can't look at it.",
+    "i said i'd stop at one.",
+    "i knew better and did it anyway.",
+  ],
+  // LIMITS — a real question she must take a position on rather than reframe.
+  [
+    "how much would be enough?",
+    "what am i actually doing this for?",
+    "when do i get to stop?",
+    "is wanting more a flaw?",
+  ],
+  // COMPULSION — the register a RITE answers, which is the move she reaches for
+  // least and the one that gives a seeker something to carry out of the shrine.
+  [
+    "i can't stop checking.",
+    "i refresh it like it's a prayer.",
+    "i check it before i'm properly awake.",
+    "it's the first thing i look at and the last.",
+  ],
 ];
+
+// One line from each of three different registers, in a random order.
+function drawStarters(count = 3) {
+  const registers = [...STARTER_REGISTERS];
+  // Fisher-Yates over the REGISTERS, so the three that show are always from
+  // different ones — the whole point of the grouping above.
+  for (let i = registers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [registers[i], registers[j]] = [registers[j], registers[i]];
+  }
+  return registers
+    .slice(0, count)
+    .map((lines) => lines[Math.floor(Math.random() * lines.length)]);
+}
 
 // The one seat that gets a live player on phones. Our Lady holds it: she
 // presides, so she is the live, speaking face and the advisers are text +
@@ -588,6 +658,28 @@ function ShoulderFigure({
               correctly, and opacity is the one thing iOS always recomposites — so
               the glow fades in instead of switching on. Desktop never showed it:
               only WebKit rasterises this way. */}
+          {/* ── Backglow, and why it carries NO filter ── Light behind the
+              figure, drawn as a plain radial gradient cross-faded by opacity.
+              Nothing here is filtered and nothing inside it animates, which is
+              the entire point: it is the one layer WebKit cannot decline to
+              paint, so the "who is speaking" signal survives even when the
+              halo below it is dropped. On desktop the two simply stack. */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              width: "165%",
+              height: "165%",
+              transform: "translate(-50%, -50%)",
+              background: `radial-gradient(closest-side, ${hue}59 0%, ${hue}24 42%, rgba(0,0,0,0) 70%)`,
+              opacity: lit ? 1 : 0,
+              transition: "opacity 0.35s ease",
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          />
           {layers ? (
             <div
               aria-hidden="true"
@@ -602,18 +694,15 @@ function ShoulderFigure({
                 willChange: "opacity",
               }}
             >
-              <img
-                className={`hm2-wing hm2-wing--${wingMotion} hm2-wing--left`}
-                src={layers.left}
-                alt=""
-                aria-hidden="true"
-              />
-              <img
-                className={`hm2-wing hm2-wing--${wingMotion} hm2-wing--right`}
-                src={layers.right}
-                alt=""
-                aria-hidden="true"
-              />
+              {/* BODY ONLY — the wings are deliberately not copied here.
+                  They were, from 14da623 (2026-07-16) until this, and that is
+                  what silently broke the iOS fix landed the day before in
+                  fe5b38f: the filter value stayed static, but the subtree it
+                  filtered now animated every frame, so WebKit went back to
+                  rasterising once and never repainting the halo. A filter is
+                  only "static" to WebKit if what's UNDER it holds still too.
+                  Cost of the fix: the halo hugs the body and not the wingtips.
+                  Do not re-add the wings here — add light to the backglow above. */}
               <img
                 src={layers.body}
                 alt=""
@@ -786,7 +875,22 @@ function PortraitPanel({
         flex: compact ? "1 1 0" : isSolo ? "0 0 auto" : "1 1 0",
         minWidth: 0,
         width: !compact && isSolo ? "100%" : undefined,
-        maxWidth: PANEL_MAX_W,
+        // PANEL_MAX_W is a TRIPTYCH number — three 440px columns laid across a
+        // monitor. The solo composition is WIDER than one of those columns: the
+        // frame runs to 520 on a desktop stage (soloFrameSize's cap) and a
+        // shoulder figure hangs figureOverhang off each side of it. Capping the
+        // panel at 440 broke the stage two ways, both of them visible:
+        //   • `overflowX:"hidden"` below clipped at the panel's edge, slicing
+        //     the devil's advocate down a hard vertical line ~2/3 of the way
+        //     through him — the "extra div" seam on the right of the scene.
+        //   • `margin:"0 auto"` on the frame box CANNOT centre a box wider than
+        //     its parent — it overflows to the RIGHT — so the whole composition
+        //     drifted ~56px off the stage axis that the ask bar and the starter
+        //     chips are centred on (both do `left:0; right:railWidth`).
+        // Solo sizes the cap to the composition it actually holds. This never
+        // exceeds the stage: soloFrameSize's widthCap already solves
+        // frameSize × 1.224 + 16 ≤ stageWidth for exactly this box.
+        maxWidth: isSolo ? frameSize + 2 * figureOverhang : PANEL_MAX_W,
         height: isSolo ? "auto" : "100%",
         pointerEvents: "auto",
         display: "flex",
@@ -797,7 +901,18 @@ function PortraitPanel({
         // iOS: the rotated/skewed title's transformed bounds extend past the
         // viewport, which Safari treats as pannable overflow ("horizontal
         // play"). Clip it and restrict touch gestures to vertical panning.
-        overflowX: "hidden",
+        // TRIPTYCH ONLY, and that is precisely where the guard applies: the
+        // title is position:fixed, and only the triptych's backdrop-filter makes
+        // this panel its containing block (see the mark's note below). In solo
+        // it pins to the VIEWPORT, so it contributes nothing to this box's
+        // overflow and there is nothing here left to clip — except the scene.
+        // And it did clip the scene: the wings sweep up to frameSize × 0.08 past
+        // the composition at the top of a flap, so even a panel sized exactly to
+        // the composition cuts the devil's advocate's wingtips against a hard
+        // vertical edge. Nothing below this is unbounded — the stage is itself a
+        // scroll container (overflowY:auto ⇒ overflowX:auto) with touchAction
+        // pan-y, so it still backstops the gesture the note above is about.
+        overflowX: isSolo ? "visible" : "hidden",
         touchAction: "pan-y",
         overscrollBehavior: "contain",
         // Clearance for the dock and the ask bar: without it a panel's last
@@ -1135,7 +1250,7 @@ function PortraitPanel({
       NOT captions. The triptych captioned each line under the face making it,
       which is why it needed no scrollback; the solo stage has one face and two
       figures, so the transcript IS the record and has to hold everything. */
-function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace }) {
+function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace, onShare }) {
   const faceFor = (who) => (who === "OL" ? ladyFace : SPEAKER_FACE[who]);
   return (
     <div
@@ -1195,6 +1310,23 @@ function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace })
         {chatLog.length === 0 ? (
           // An empty rail must still say what the column is FOR — otherwise the
           // first-time visitor's widest layout is a stage plus a blank slab.
+          // IT ALSO TEACHES THE STAGING, which is not self-evident from a still
+          // frame: the two advisers argue TO HER, about the seeker's question,
+          // and she is the only one who turns and answers the seeker (see
+          // /api/counsel's SYSTEM_PROMPT). "the council is seated and silent /
+          // ask, and they will argue it out here" promised the opposite — the
+          // wings arguing AT the seeker — so the first reply read as three
+          // voices talking past the person who asked. "hired consultants to help
+          // HER consider" fixes the direction in the joke itself: they are
+          // retained by her, and the seeker simply overhears the meeting.
+          // If the staging over there ever changes, this line changes with it.
+          // The line break is a comic beat, not a wrap — "… and your questions"
+          // is the punchline and has to land alone. The rest wraps naturally to
+          // the rail (~294–404px of content, see railWidth), so don't add breaks
+          // to it: a hand-set break lands mid-clause at some rail widths.
+          // No "ask" instruction any more, deliberately — the ask bar's own
+          // placeholder ("Inquire or confide") is directly under her and says it,
+          // and a shrine that captions its own input twice reads as a form.
           <div
             style={{
               margin: "auto 0",
@@ -1204,9 +1336,10 @@ function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace })
               color: "rgba(255,255,255,0.34)",
             }}
           >
-            the council is seated and silent.
+            Our Lady has hired consultants to help her consider both sides of
+            any coin.
             <br />
-            ask, and they will argue it out here.
+            … and your questions.
           </div>
         ) : (
           chatLog.map((m, i) => {
@@ -1304,11 +1437,16 @@ function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace })
               color: "rgba(255,255,255,0.4)",
             }}
           >
-            the council is deliberating…
+            processing…
           </div>
         )}
       </div>
 
+      {/* ── Status line, and the way an answer leaves the building ── The share
+          affordance lives HERE rather than on each of her lines in the log: the
+          rail is a composed column and a control repeated down it reads as a
+          toolbar. It also appears only once she has actually spoken (onShare is
+          null until then), so the empty state stays a shrine and not a product. */}
       <div
         style={{
           padding: "10px 18px",
@@ -1317,9 +1455,33 @@ function TranscriptRail({ width, chatLog, speakingKey, busy, boxRef, ladyFace })
           letterSpacing: "0.15em",
           color: "rgba(0, 255, 255, 0.3)",
           textTransform: "uppercase",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
         }}
       >
-        sys.status // online
+        <span>sys.status // online</span>
+        {onShare && (
+          <button
+            onClick={onShare}
+            style={{
+              marginLeft: "auto",
+              background: "transparent",
+              border: "1px solid rgba(244, 181, 63, 0.4)",
+              borderRadius: 3,
+              padding: "4px 9px",
+              color: "rgba(244, 181, 63, 0.85)",
+              fontFamily: "'Rajdhani', sans-serif",
+              fontSize: "0.58rem",
+              fontWeight: 600,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            mark her words
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1495,6 +1657,58 @@ export default function MainPage() {
   // order they landed. Phones render this as the group text; it also restores
   // the scrollback that went away with the chat drawer.
   const [chatLog, setChatLog] = useState([]); // [{ who: "you"|"JB"|"GR"|"OL", text }]
+
+  // ── The share card ── HER most recent line, plus the question that drew it.
+  // Only OL is offered: the advisers argue TO HER (see /api/counsel's staging),
+  // so a Barron line on its own is half a scene and reads as the shrine
+  // endorsing him. The question is carried along so the card CAN show it, but
+  // OracleCard keeps it off by default — the confession belongs to the seeker.
+  // ── The three petitions this visit gets ── Drawn AFTER mount, never during
+  // render: Math.random() in a render body gives the server and the client
+  // different answers and React tears the tree down over it. Drawn ONCE and
+  // held, so they can't reshuffle under someone who is mid-read — the chips are
+  // gated on sitePalReady anyway, so the empty first frame is never seen.
+  const [starters, setStarters] = useState([]);
+  useEffect(() => setStarters(drawStarters()), []);
+
+  const [cardOpen, setCardOpen] = useState(false);
+  const lastOracle = useMemo(() => {
+    for (let i = chatLog.length - 1; i >= 0; i--) {
+      // A server-patched line is not hers — see the setChatLog note in handleAsk.
+      // Skipping rather than stopping: if this turn fell back, the last REAL
+      // thing she said is still worth keeping, and the seeker still has one.
+      if (chatLog[i].who !== "OL" || chatLog[i].fellBack) continue;
+      let question = "";
+      for (let j = i - 1; j >= 0; j--) {
+        if (chatLog[j].who === "you") {
+          question = chatLog[j].text;
+          break;
+        }
+      }
+      return { line: chatLog[i].text, question };
+    }
+    return null;
+  }, [chatLog]);
+
+  // ── The card is only offered when THE ROOM IS QUIET ── The scene is a live,
+  // speaking face; the card is a full-screen still. Opening one over the other
+  // covers her mid-sentence with a photograph of herself while her voice keeps
+  // going, which is the single worst thing this feature can do to the page.
+  //
+  // The gate is `speakingKey`, NOT `busy`: busy clears the moment the API
+  // returns, which is BEFORE any of the three have said a word — it tracks the
+  // fetch, not the argument. speakingKey is held for the whole deliberation
+  // (JB → GR → OL) and cleared once at the end, so it is the only thing here
+  // that actually means "someone has the floor". It also fixes the stale case:
+  // on a second question the previous answer's button vanishes the instant the
+  // new argument starts, instead of lingering over it.
+  const canShare = Boolean(lastOracle) && !speakingKey && !busy;
+
+  // And if a voice takes the floor while the card is open — a queued reply
+  // landing, say — get out of the way rather than sitting on top of her.
+  useEffect(() => {
+    if (speakingKey) setCardOpen(false);
+  }, [speakingKey]);
   // Keep the newest line in view as the argument unfolds, the way a group chat
   // follows itself. Scrolls the BOX's own scrollTop rather than calling
   // scrollIntoView on the line: scrollIntoView walks up and moves every
@@ -1503,7 +1717,20 @@ export default function MainPage() {
   useEffect(() => {
     const box = chatBoxRef.current;
     if (!box || !chatLog.length) return;
-    box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+    // ── Follow the SPEAKER, not the bottom ── Each line lands as its voice
+    // takes the floor, so this fires once per turn and is the only thing
+    // syncing the words to the audio. Scrolling to scrollHeight put the newest
+    // line's END at the foot of the box, which on a phone (the band holds ~6
+    // lines of a much longer argument) meant a long reply was already scrolled
+    // past its own opening the moment it arrived — you heard the first sentence
+    // while looking at the last. Aligning the newest line's TOP instead starts
+    // it at its first word and lets it read down as it is spoken. The browser
+    // clamps this to max scroll, so a short line still just sits at the bottom.
+    const newest = box.lastElementChild;
+    box.scrollTo({
+      top: newest ? newest.offsetTop - box.offsetTop : box.scrollHeight,
+      behavior: "smooth",
+    });
   }, [chatLog]);
   // Prior turns, fed back so a follow-up knows what was already argued. A ref,
   // not state — nothing renders it, and it must never re-trigger the flow.
@@ -1731,7 +1958,13 @@ export default function MainPage() {
         setCaptions((c) => ({ ...c, [s]: t }));
         // Lands in the transcript as this voice takes the floor — not all three
         // at once, so the group text unfolds at the pace of the argument.
-        setChatLog((l) => [...l, { who: s, text: t }]);
+        // `fellBack` marks a line the SERVER patched in because the model's
+        // reply didn't parse (see /api/counsel). It still speaks and still shows
+        // — but it is not hers, so it must never reach the share card.
+        setChatLog((l) => [
+          ...l,
+          { who: s, text: t, fellBack: data.fellBack?.includes(s) || false },
+        ]);
 
         setSpeakingKey(s);
 
@@ -1770,7 +2003,44 @@ export default function MainPage() {
         // ElevenLabs at every width, so a character sounds like himself.
         let spoke;
         if (s === "OL") {
+          // ── Wait for her frame before handing her the line ──
+          // SHE is the only voice that needs a SitePal player; the advisers go
+          // straight to ElevenLabs. So when the portals are down she is the ONLY
+          // one who goes quiet, and the page still looks busy — two voices argue
+          // and her reply lands as text with no sound. Reported from a phone,
+          // "a couple of instances".
+          // The portals unmount whenever the apparition picker opens (see the
+          // `!pickerOpen` gate on <SitePalPortals>) and the replacements take
+          // seconds to load and register sayText, so a question asked around
+          // that lands squarely in the hole. She speaks LAST, which usually
+          // hides it — the two adviser turns are enough time for the frame to
+          // come up — and that is exactly why it is intermittent rather than
+          // constant. Waiting costs nothing when the frame is already there.
+          // 3s, not 8: long enough to cover a portal that is merely remounting,
+          // short enough that a portal which is never coming back doesn't buy
+          // silence before the fallback below. A phone where SitePal failed
+          // outright would otherwise pay this wait on every single answer.
+          await waitForPortal(portalContainerId(SPOTLIGHT_KEY), 3000);
+          if (run !== counselRunRef.current) return;
           spoke = await speakInPortal(portalContainerId(SPOTLIGHT_KEY), t, voiceFor[s]);
+          // ── HER VOICE MUST NOT DEPEND ON HER PLAYER ──
+          // The portal is the preferred path because it moves her face. But it
+          // is also the only part of this page that can fail while everything
+          // around it works: measured on a phone where the portal never came up
+          // at all, her frame fell back to the still cameo and she answered in
+          // silence while both advisers spoke. She presides — a mute presiding
+          // face with two audible advisers is worse than no advisers at all.
+          // So on any portal failure she speaks through the same ElevenLabs
+          // path they use, with the voice her player would have used. Cost: no
+          // lip-sync that turn. Worth it; silence reads as broken, a still face
+          // over a real voice reads as a portrait.
+          if (!spoke) {
+            if (run !== counselRunRef.current) return;
+            spoke = await speakAdviserLine("OL", t, {
+              apparition: CHARACTERS[activeCharIndex]?.key,
+            });
+            if (run !== counselRunRef.current) return;
+          }
         } else if (!isSolo) {
           spoke = await speakInPortal(portalContainerId(seatFor[s]), t, voiceFor[s]);
         } else {
@@ -1848,7 +2118,20 @@ export default function MainPage() {
     // 685px tall, the chips crossing the foot of her frame. Phones never showed
     // it because their 135 reserve covers the chips incidentally. Only short
     // windows pay: anything tall enough is bound by the 520 cap below instead.
-    const heightCap = (viewport.h - 160 - (isWideSolo ? 48 : 135) - 44) / 1.3;
+    // ── The phone reserve is DERIVED, not a guess ── It was a flat 135 while
+    // the band it reserves for is capped at TRANSCRIPT_DVH of the viewport
+    // (~197px on an 820px phone) plus its 14px margin — so the column always
+    // asked for ~75px more than it had, and the foot of the transcript sat under
+    // the ask bar. Adding the share button below it pushed that button clean out
+    // of the column and behind the dock: measured at 430×820, the band ran to
+    // y=700 and the button to y=743 in a column that ends at ~666.
+    // Anything added to the bottom of the narrow column from here on MUST be
+    // added to this number too, or it lands underneath the fixed furniture and
+    // is invisible without scrolling to a place the user has no reason to look.
+    const narrowReserve =
+      Math.round(viewport.h * TRANSCRIPT_DVH) + 14 + SHARE_BUTTON_H;
+    const heightCap =
+      (viewport.h - 160 - (isWideSolo ? 48 : narrowReserve) - 44) / 1.3;
     // 440 was the ceiling when the frame shared a phone column with the
     // transcript. On a stage of its own she can carry more, but not unbounded:
     // past ~520 the neon filigree outgrows the shoulder figures attending it and
@@ -2079,6 +2362,13 @@ export default function MainPage() {
           0%, 100% { transform: rotate(7deg) skewY(0deg) scaleX(1); }
           50%      { transform: rotate(-14deg) skewY(3deg) scaleX(0.84); }
         }
+        /* The waiting caption in the ask bar's slot — breathes rather than
+           spins, so it reads as the shrine waking up and not as a progress bar. */
+        @keyframes hm2-summon-pulse {
+          0%, 100% { opacity: 0.55; }
+          50%      { opacity: 1; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .hm2-figure--left,
           .hm2-figure--right,
@@ -2165,6 +2455,22 @@ export default function MainPage() {
         onComplete={handleGlitchComplete}
         duration={1000}
       />
+
+      {/* ── Her answer, as an image ── Portals to document.body from inside
+          OracleCard, so it is never trapped by this page's stacking or by a
+          panel's chrome (the scar the shared candle picker left). Mounted only
+          while open: its captured node holds a full-size portrait, and there is
+          no reason for that to sit in the tree behind a live WebGL scene. */}
+      {cardOpen && lastOracle && (
+        <OracleCard
+          open
+          onClose={() => setCardOpen(false)}
+          line={lastOracle.line}
+          question={lastOracle.question}
+          face={CHARACTERS[activeCharIndex]?.image}
+          apparitionName={CHARACTERS[activeCharIndex]?.name}
+        />
+      )}
 
       {/* ── The scene ── One composition at every width: Our Lady framed, the
           saint and the devil's advocate at her shoulders. Wide windows set it on
@@ -2309,7 +2615,7 @@ export default function MainPage() {
                   // ~617px visible area — 42% of the screen, not the 32% it
                   // asks for. Chrome's emulator computes it against the visible
                   // height and looks right, so this only ever bites on a phone.
-                  maxHeight: "24dvh",
+                  maxHeight: `${TRANSCRIPT_DVH * 100}dvh`,
                   overflowY: "auto",
                   overscrollBehavior: "contain",
                   WebkitOverflowScrolling: "touch",
@@ -2348,10 +2654,38 @@ export default function MainPage() {
                 })}
                 {busy && (
                   <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.4)" }}>
-                    the council is deliberating…
+                    considering your question…
                   </div>
                 )}
               </div>
+            )}
+
+            {/* The narrow layout's share affordance. The wide one lives in the
+                rail's status bar; this column has no such bar, so it sits under
+                the band — INSIDE the scrolling stage column, not fixed, or it
+                would join the ask bar and the dock in competing for the same
+                ~150px of phone screen. */}
+            {!isWideSolo && canShare && (
+              <button
+                onClick={() => setCardOpen(true)}
+                style={{
+                  margin: "12px auto 0",
+                  background: "transparent",
+                  border: "1px solid rgba(244, 181, 63, 0.4)",
+                  borderRadius: 3,
+                  padding: "7px 14px",
+                  color: "rgba(244, 181, 63, 0.85)",
+                  fontFamily: "'Rajdhani', sans-serif",
+                  fontSize: "0.7rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                mark her words
+              </button>
             )}
 
             {/* The advisers are mute here by necessity (one player per phone —
@@ -2391,6 +2725,7 @@ export default function MainPage() {
                 busy={busy}
                 boxRef={chatBoxRef}
                 ladyFace={CHARACTERS[activeCharIndex]?.image}
+                onShare={canShare ? () => setCardOpen(true) : null}
               />
             )}
           </>
@@ -2592,7 +2927,12 @@ export default function MainPage() {
             justifyContent: "center",
             flexWrap: "wrap",
             gap: 8,
-            pointerEvents: "auto",
+            // Held back with the ask bar until she has arrived — a tappable
+            // chip is a louder invitation than the input, and tapping one
+            // before the room exists is how you get an answer with no face.
+            opacity: sitePalReady ? 1 : 0,
+            pointerEvents: sitePalReady ? "auto" : "none",
+            transition: "opacity 0.7s ease",
           }}
         >
           {/* <div
@@ -2608,7 +2948,7 @@ export default function MainPage() {
           >
             bring her something
           </div> */}
-          {STARTER_QUESTIONS.map((q) => (
+          {starters.map((q) => (
             <button
               key={q}
               onClick={() => {
@@ -2650,15 +2990,75 @@ export default function MainPage() {
         </div>
       )}
 
-      {/* ── The ask ── Always present, pinned above the dock. This page exists
-          to be asked a question, so the input is the page's main affordance
-          rather than something hidden behind a FAB. Sits above the panel row
-          (z 100) and below the dock (z 10000). */}
+      {/* ── The ask ── Pinned above the dock. This page exists to be asked a
+          question, so the input is the page's main affordance rather than
+          something hidden behind a FAB. Sits above the panel row (z 100) and
+          below the dock (z 10000).
+          NOT OFFERED UNTIL SHE IS THERE (`sitePalReady`). The bar and the chips
+          used to render instantly while the players and the frame were still
+          loading, so a seeker could ask into an empty shrine and get voices out
+          of a room with nobody in it — the answer arrived before the faces did.
+          It is also the same hole as the mute-Our-Lady bug from the other end:
+          she is the only voice that needs a live portal, so a question asked
+          before hers exists is exactly the one she cannot answer aloud.
+          Kept MOUNTED and merely inert, rather than unmounted: it holds its
+          place in the layout, keeps the input's identity across the transition,
+          and fades in instead of popping.
+          Safe against SitePal never loading — `sitePalReady` is forced true by
+          the 15s timer above (and the portals' own 25s fallback), so the worst
+          case is a late input, never a page that can't be used. */}
+      {/* ── What stands in the ask bar's place while she is summoned ──
+          An input that simply isn't there reads as a broken page, so the slot
+          keeps its shape and says what it is waiting for. Same fixed box and
+          the same width rules as the form below, so the two cross-fade in place
+          with nothing moving. Inert and hidden from assistive tech throughout —
+          it is a status line, not a control.
+          Deliberately NOT a spinner: this page's whole idea is that she is being
+          summoned, and the frame already carries the swirl. This is the caption
+          to that, in the same lowercase register as the transcript. */}
+      {!sitePalReady && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: 0,
+            right: railWidth,
+            bottom: ASK_BAR_BOTTOM,
+            marginLeft: "auto",
+            marginRight: "auto",
+            width: isWideSolo
+              ? `min(620px, ${stageWidth - 24}px)`
+              : isSolo
+              ? "min(560px, calc(100vw - 24px))"
+              : `min(${Math.round(ladyPanelWidth)}px, calc(100vw - 24px))`,
+            zIndex: 600,
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "7px 8px 7px 14px",
+            borderRadius: 999,
+            border: "1px solid rgba(42, 214, 238, 0.14)",
+            background: "rgba(6, 10, 18, 0.55)",
+            minHeight: ASK_BAR_H,
+            boxSizing: "border-box",
+            fontFamily: "'Rajdhani', sans-serif",
+            fontSize: "0.86rem",
+            letterSpacing: "0.08em",
+            color: "rgba(255,255,255,0.42)",
+            animation: "hm2-summon-pulse 2.4s ease-in-out infinite",
+          }}
+        >
+          summoning the spirits…
+        </div>
+      )}
+
       <form
+        aria-hidden={!sitePalReady}
         onSubmit={(e) => {
           e.preventDefault();
           const t = inputText.trim();
-          if (!t || busy) return;
+          if (!t || busy || !sitePalReady) return;
           setInputText("");
           handleAsk(t);
         }}
@@ -2672,6 +3072,10 @@ export default function MainPage() {
           bottom: ASK_BAR_BOTTOM,
           marginLeft: "auto",
           marginRight: "auto",
+          // Inert until she has arrived — see the note above.
+          opacity: sitePalReady ? 1 : 0,
+          pointerEvents: sitePalReady ? "auto" : "none",
+          transition: "opacity 0.7s ease",
           // TRIPTYCH: never wider than HER COLUMN. At 560 the bar overhung the
           // centre panel (capped at 440) by 60px a side and reached into both
           // wings — so an adviser's caption ran under the input, which is the
@@ -2709,7 +3113,7 @@ export default function MainPage() {
              still thinking. */
           placeholder={
             busy
-              ? "the council is deliberating…"
+              ? "considering your question…"
               : chatLog.length
               ? ""
               : "Inquire or confide...…"
@@ -2806,17 +3210,17 @@ export default function MainPage() {
         extraLeft={[
           {
             key: "candelarium",
-            label: "Candelarium",
-            title: "Sanctum candelarium",
+            label: "ex Machina",
+            title: "ex Machina",
             onClick: () => { window.location.href = "/"; },
             confirm: {
-              title: "Sanctum Candelarium",
-              body: "Return to the candelarium.",
+              title: "ex Machina",
+              body: "Return to home.",
               accent: "hsl(189, 84%, 55%)",
               shadow: "hsl(189, 70%, 38%)",
             },
             // Same flame mark the other pages use for the candelarium slot.
-            iconSrc: "/images/flame.svg",
+            iconSrc: "/favicon.svg",
           },
         ]}
         extraRight={[
@@ -2824,7 +3228,7 @@ export default function MainPage() {
             key: "terminal",
             /* Label stays short — the dock's slot labels ellipsize past
                ~88px. The full name lands in the confirm's title. */
-            label: "Terminal",
+            label: "Liminal Terminal",
             title: "The Liminal Terminal",
             onClick: () => { window.location.href = "/trade"; },
             confirm: {
