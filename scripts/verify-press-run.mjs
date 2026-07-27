@@ -11,7 +11,8 @@ import {
   createRun, press, advance, callIt, allocate, toAutopsy,
   resolvePress, sliderToP, callReadout, readScore, currentClaim,
 } from "../src/game/terminal-traders/press/pressRun.js";
-import { HAND } from "../src/game/terminal-traders/press/hand.js";
+import { POOL, HAND, HAND_SIZE, MIN_LIVE, dealHand } from "../src/game/terminal-traders/press/hand.js";
+import { instanceDeal, dailySeed } from "../src/game/terminal-traders/press/instanceDeal.js";
 import { casePnl } from "../src/game/terminal-traders/caseTable.js";
 
 // Convenience: play a card at whatever claim is currently on the floor.
@@ -99,12 +100,34 @@ console.log("\n── double-press and off-phase are no-ops ──────�
   ok("unspent presses are kept, not refunded into anything", budget === 2);
 }
 
-console.log("\n── the hand: cards are questions ────────────────────────────");
+console.log("\n\u2500\u2500 the draw: the hand varies, and that's the point \u2500\u2500\u2500\u2500\u2500\u2500");
+{
+  const shapesOf = (d) => new Set(d.claims.map((c) => c.shape));
+  const handFor = (s) => dealHand(s, shapesOf(instanceDeal(s)));
+
+  ok("pool is bigger than the hand", POOL.length > HAND_SIZE, `${POOL.length} vs ${HAND_SIZE}`);
+  ok("pool covers every question shape",
+    new Set(POOL.map((c) => c.shape)).size === Object.keys(SHAPES).length);
+  ok("same seed always deals the same hand",
+    JSON.stringify(handFor(77).map((c) => c.id)) === JSON.stringify(handFor(77).map((c) => c.id)));
+
+  // The fix for "cards aren't a factor": the hand must actually MOVE.
+  const hands = Array.from({ length: 400 }, (_, i) => handFor(i + 1).map((c) => c.id).sort().join(","));
+  const distinct = new Set(hands).size;
+  ok("the hand varies across sessions", distinct > 6, `${distinct} distinct hands / 400 sessions`);
+  const counts = hands.reduce((m, h) => ({ ...m, [h]: (m[h] || 0) + 1 }), {});
+  ok("no single hand dominates the draw",
+    Math.max(...Object.values(counts)) < hands.length * 0.55);
+  ok("every dealt card is a real pool card",
+    handFor(9).every((c) => POOL.some((p) => p.id === c.id)));
+}
+
+console.log("\n\u2500\u2500 the hand: cards are questions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500");
 {
   // Every card must have a live target in this deal, or it's a dead draw the
   // player can only ever waste — which is a content bug, not a hard choice.
   const shapes = new Set(MRDN.claims.map((c) => c.shape));
-  ok("every card in the hand can hit something in this deal",
+  ok("the starter hand can hit something in this deal",
     HAND.every((c) => shapes.has(c.shape)),
     HAND.filter((c) => !shapes.has(c.shape)).map((c) => c.name).join(", "));
   ok("no two cards ask the same question", new Set(HAND.map((c) => c.shape)).size === HAND.length);
@@ -174,6 +197,127 @@ console.log("\n── card economy: no free lunches ─────────�
     r3 = advance(r3, MRDN);
   }
   ok("a full hand still cannot exceed 3 presses", spent === 3, `spent ${spent}`);
+}
+
+console.log("\n── layer 1: the deal is instanced, not memorised ────────────");
+{
+  const deals = Array.from({ length: 2000 }, (_, i) => instanceDeal(i + 1));
+
+  ok("same seed always yields the same deal",
+    JSON.stringify(instanceDeal(4242)) === JSON.stringify(instanceDeal(4242)));
+  ok("different seeds yield different deals",
+    new Set(deals.map((d) => d.id)).size === deals.length);
+
+  // THE POINT: outcome must vary. If it doesn't, we've rebuilt the puzzle box.
+  const rugs = deals.filter((d) => d.truth === 1).length;
+  const rate = rugs / deals.length;
+  ok("the outcome is not fixed — both rug and legit occur",
+    rugs > 0 && rugs < deals.length, `${rugs}/${deals.length}`);
+  ok("exception rate lands near the authored 74/26", rate > 0.70 && rate < 0.78,
+    `rug rate ${(rate * 100).toFixed(1)}%`);
+  // A perfect reader still shouldn't reach certainty — that's WHY the slider
+  // has a middle. If the archetype were deterministic, calibration would be
+  // a solved binary and the whole scoring kernel would be decoration.
+  ok("archetype is genuinely probabilistic (legit share > 15%)", 1 - rate > 0.15);
+
+  // Ground truth must never be readable off the listing page. If any surface
+  // stat correlated with truth, the optimal strategy would be "skim the stats,
+  // skip the analysts" — which deletes the game.
+  const avg = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const num = (s) => Number(String(s).replace(/[^\d.]/g, ""));
+  for (const key of ["age", "mcap", "holders", "social"]) {
+    const r = avg(deals.filter((d) => d.truth === 1).map((d) => num(d.surface[key])));
+    const l = avg(deals.filter((d) => d.truth === 0).map((d) => num(d.surface[key])));
+    // Within 4% of each other — no readable edge on any listing stat.
+    ok(`surface stat "${key}" carries no signal`,
+      Math.abs(r - l) / Math.max(r, l) < 0.04, `rug ${r.toFixed(2)} vs legit ${l.toFixed(2)}`);
+  }
+  const pumpOf = (d) => Number(String(d.surface.change24h).replace(/\D/g, ""));
+  const rugPump = avg(deals.filter((d) => d.truth === 1).map(pumpOf));
+  const legitPump = avg(deals.filter((d) => d.truth === 0).map(pumpOf));
+  ok("24h change carries no signal (means within 1pt)",
+    Math.abs(rugPump - legitPump) < 1, `${rugPump.toFixed(2)} vs ${legitPump.toFixed(2)}`);
+
+  // Structural invariants must hold on EVERY instance, not just the nice ones.
+  ok("every instance has six claims", deals.every((d) => d.claims.length === 6));
+  // Template lint. An archetype can reference a var the instancer doesn't build
+  // ("paid every day for undefined days straight" shipped for exactly this
+  // reason), and no structural assertion would ever catch it.
+  const textOf = (d) => JSON.stringify([d.resolution, ...d.claims.map((c) => [c.fact, c.spin, c.press])]);
+  ok("no instance renders an unresolved template var",
+    deals.every((d) => !/undefined|\[object Object\]|NaN/.test(textOf(d))),
+    (deals.find((d) => /undefined|NaN/.test(textOf(d))) || {}).archetype || "");
+  ok("both archetypes appear in the rotation",
+    new Set(deals.map((d) => d.archetype)).size === 2);
+  ok("neither archetype dominates the shuffle", (() => {
+    const c = deals.reduce((m, d) => ({ ...m, [d.archetype]: (m[d.archetype] || 0) + 1 }), {});
+    return Math.max(...Object.values(c)) / deals.length < 0.6;
+  })());
+  ok("every instance names its pattern-library exemplar",
+    deals.every((d) => d.exemplar && d.exemplar.art && d.exemplar.name));
+  ok("every instance authors all three press branches",
+    deals.every((d) => d.claims.every((c) => c.press.generic?.line && c.press.sharp?.line && c.press.miss?.line)));
+  ok("A5 holds on every instance — loadBearing implies HARD",
+    deals.every((d) => d.claims.every((c) => !c.loadBearing || c.backing === BACKING.HARD)));
+  ok("every instance is solvable cardless (a loadBearing HARD claim exists)",
+    deals.every((d) => d.claims.some((c) => c.loadBearing && c.backing === BACKING.HARD)));
+  // NOTE: "every card has a target" was DELETED here on purpose. It was the
+  // property that made the hand feel like a menu — if nothing can ever whiff,
+  // holding a card costs you nothing and means nothing. The guarantee is now
+  // MIN_LIVE (below): you always have a play, never a guaranteed sweep.
+  ok("every dealt hand has at least MIN_LIVE usable cards",
+    deals.every((d) => {
+      const live = new Set(d.claims.map((c) => c.shape));
+      const h = dealHand(Number(String(d.id).split(":")[1]), live);
+      return h.filter((c) => live.has(c.shape)).length >= MIN_LIVE;
+    }));
+  ok("...and dead cards genuinely occur (the draw has stakes)",
+    deals.some((d) => {
+      const live = new Set(d.claims.map((c) => c.shape));
+      const h = dealHand(Number(String(d.id).split(":")[1]), live);
+      return h.some((c) => !live.has(c.shape));
+    }));
+  ok("a hand never contains two cards asking the same question",
+    deals.every((d) => {
+      const live = new Set(d.claims.map((c) => c.shape));
+      const h = dealHand(Number(String(d.id).split(":")[1]), live);
+      return new Set(h.map((c) => c.shape)).size === h.length;
+    }));
+
+  // The legit branch must be genuinely winnable, not a trap.
+  // Claim ids are per-archetype, so anything asserting on a specific claim must
+  // PIN the archetype — with two in rotation a random instance may not have it.
+  const legit = deals.find((d) => d.truth === 0);
+  ok("a legit instance rewards a LONG call",
+    allocate(callIt(createRun(legit), legit), legit, 90).call.pnl > 0);
+  ok("a legit instance punishes a confident SHORT",
+    allocate(callIt(createRun(legit), legit), legit, -90).call.pnl < 0);
+  // backdoor-fork's ops claim: black on a rug, a real receipt on a legit run.
+  const bfSeeds = Array.from({ length: 400 }, (_, i) => i + 1);
+  const bfRug = bfSeeds.map((s) => instanceDeal(s, "backdoor-fork")).find((d) => d.truth === 1);
+  const bfLegit = bfSeeds.map((s) => instanceDeal(s, "backdoor-fork")).find((d) => d.truth === 0);
+  const opsOf = (d) => d.claims.find((c) => c.id === "ops");
+  ok("legit backdoor-fork produces a receipt where a rug produces nothing",
+    !!opsOf(bfLegit) && resolvePress(opsOf(bfLegit), ANY).receipt !== null);
+  ok("rug backdoor-fork still leaves the ops monitor black",
+    !!opsOf(bfRug) && resolvePress(opsOf(bfRug), ANY).receipt === null);
+  ok("rug and legit differ in what he can back",
+    JSON.stringify(bfRug.claims.map((c) => c.backing)) !== JSON.stringify(bfLegit.claims.map((c) => c.backing)));
+  // yield-mirage's decisive claim is HARD in BOTH branches — what differs is
+  // the honest answer, which is the harder and better version of the lesson.
+  const ymRug = bfSeeds.map((s) => instanceDeal(s, "yield-mirage")).find((d) => d.truth === 1);
+  const ymLegit = bfSeeds.map((s) => instanceDeal(s, "yield-mirage")).find((d) => d.truth === 0);
+  const srcOf = (d) => d.claims.find((c) => c.id === "source");
+  ok("yield-mirage source claim is answerable in both branches",
+    resolvePress(srcOf(ymRug), ANY).receipt !== null && resolvePress(srcOf(ymLegit), ANY).receipt !== null);
+  ok("...but a rug admits deposits fund the yield",
+    JSON.stringify(resolvePress(srcOf(ymRug), ANY).receipt).includes("New deposits"));
+  ok("...and a legit run publishes a hard zero",
+    JSON.stringify(resolvePress(srcOf(ymLegit), ANY).receipt).includes("0%"));
+
+  ok("dailySeed is a stable YYYYMMDD number",
+    /^\d{8}$/.test(String(dailySeed(new Date(Date.UTC(2026, 6, 26))))) &&
+    dailySeed(new Date(Date.UTC(2026, 6, 26))) === 20260726);
 }
 
 console.log("\n── the call ─────────────────────────────────────────────────");

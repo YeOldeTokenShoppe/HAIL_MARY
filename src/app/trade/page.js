@@ -3997,7 +3997,7 @@ export default function CyborgTemple() {
                 modelRef={null}
                 onLoad={handleTickerLoad}
                 isMobile={isMobileView}
-                autoRotate={!focusedAgent && !revealMode && !talkShowMode}
+                autoRotate={!focusedAgent && !revealMode && !talkShowMode && !(pressMode && pressFocus)}
                 autoRotateSpeed={0.4}
               />
             )}
@@ -4034,7 +4034,7 @@ export default function CyborgTemple() {
                 running an external tween alongside OrbitControls'
                 damping. Auto-orbit and limits replicated in the rig. */}
             <CameraControlsRig
-              autoRotate={!focusedAgent && !revealMode && !talkShowMode}
+              autoRotate={!focusedAgent && !revealMode && !talkShowMode && !(pressMode && pressFocus)}
               autoRotateSpeed={-0.8}
               initialPosition={cameraInitialPosition}
               initialTarget={cameraInitialTarget}
@@ -4272,7 +4272,7 @@ export default function CyborgTemple() {
           const TABS = [
             {
               key: 'services',
-              label: 'TRAINERS',
+              label: 'Venture Capital Partners',
               accent: '#2ad6ee',
               active: railExpanded,
               onClick: () => { setFocusedAgent(null); setRailExpanded(true); },

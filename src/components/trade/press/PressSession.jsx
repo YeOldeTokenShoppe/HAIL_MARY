@@ -1,13 +1,15 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import MRDN from "@/game/terminal-traders/press/deals/mrdn";
+import { instanceDeal, dailySeed } from "@/game/terminal-traders/press/instanceDeal";
 import { ANY, BACKING } from "@/game/terminal-traders/press/questions";
-import { HAND } from "@/game/terminal-traders/press/hand";
+import { dealHand } from "@/game/terminal-traders/press/hand";
 import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
   allocate as doAllocate, toAutopsy, currentClaim, callReadout, readScore,
 } from "@/game/terminal-traders/press/pressRun";
+import { toDealCard, toExemplarCard, toQuestionCard, toCharacterCard } from "@/game/terminal-traders/press/dealCard";
+import TradingCard from "@/components/TradingCard";
 import { createEvidenceScreen } from "./evidenceScreen";
 
 // THE PRESS — slice 1. Barron, six claims, three presses, over the LIVE room.
@@ -27,17 +29,48 @@ import { createEvidenceScreen } from "./evidenceScreen";
 //   onRevealChange(outcome|null)— stage the curtain call on the real scene
 //   onExit()                    — leave the mode
 
+// A card NEVER opens a new subject — it interrogates a claim HE raised, just
+// from a sharper angle. If cards could introduce topics he never mentioned the
+// game would become a hunt for hidden subjects rather than a read on the ones
+// already in front of you. PRESS HIM is the blunt version of the same move.
+
 const SPEAKER_AGENT = "Demon";    // John Barron's agentId in CyborgTempleScene
+const SPEAKER_TRADER  = "john-barron"; // his Genesis card — the CHARACTER type
 const SPEAKER_STATION = "demon";  // -> __screen2Canvas (SCREEN_TARGETS in evidenceScreen.js)
+const CARD_HERO  = 0.40;   // the deal card — the subject, fills the left column
+const CARD_THUMB = 0.115;  // character + questions — context, click to enlarge
 const READ_MS = 4200;           // how long a claim holds the floor before it can land
 
 export default function PressSession({
-  deal = MRDN,
+  // Pass a deal to pin one (tests/sims). Otherwise the DAILY deal is used —
+  // one seeded instance per UTC day, identical for every player, memorisable
+  // by nobody. `?dealseed=N` forces a specific one, which is the only way to
+  // replay a known rug or a known legit while tuning.
+  deal: dealOverride = null,
   onFocusAgent,
   onSpeechActive,
   onRevealChange,
   onExit,
 }) {
+  // Resolve the deal once per mount. Reading the override here (not at module
+  // scope) keeps this SSR-safe and lets a refresh pick up a new ?dealseed.
+  const deal = useMemo(() => {
+    if (dealOverride) return dealOverride;
+    const forced = typeof window !== "undefined"
+      ? Number(new URLSearchParams(window.location.search).get("dealseed"))
+      : NaN;
+    return instanceDeal(Number.isFinite(forced) && forced > 0 ? forced : dailySeed());
+  }, [dealOverride]);
+
+  // Your hand for this deal — dealt from the same seed, so it's the same for
+  // everyone today and can't be rerolled. `liveShapes` guarantees at least
+  // MIN_LIVE of them can hit something here: you can be dealt a question this
+  // deal is immune to, but never a whole hand of them.
+  const hand = useMemo(() => {
+    const live = new Set(deal.claims.map((c) => c.shape));
+    return dealHand(Number(String(deal.id).split(":")[1]) || 1, live);
+  }, [deal]);
+
   const [run, setRun] = useState(() => createRun(deal));
   const [slider, setSlider] = useState(0);
   const [flash, setFlash] = useState(null); // the spoken answer to a press
@@ -48,6 +81,9 @@ export default function PressSession({
   // before that gets clobbered. Gating on a click means the model is always
   // loaded by the time we ask for a camera move — no race, no retry loop.
   const [started, setStarted] = useState(false);
+  // Full-size card inspect. Thumbs stay small so the layout breathes; anything
+  // you actually want to READ (the art, the printed question) is one click away.
+  const [inspect, setInspect] = useState(null);
   const screenRef = useRef(null);
 
   const claim = currentClaim(run, deal);
@@ -126,6 +162,11 @@ export default function PressSession({
   const lockCall = useCallback(() => setRun((r) => doAllocate(r, deal, slider)), [deal, slider]);
   const finish = useCallback(() => setRun((r) => toAutopsy(r)), []);
 
+  const dealCard = useMemo(() => toDealCard(deal), [deal]);
+  const patternCard = useMemo(() => toExemplarCard(deal), [deal]);
+  // All three card types, rendered through the one Genesis renderer.
+  const speakerCard = useMemo(() => toCharacterCard(SPEAKER_TRADER), []);
+  const handCards = useMemo(() => hand.map((q) => ({ q, data: toQuestionCard(q) })), [hand]);
   const readout = useMemo(() => callReadout(slider), [slider]);
   const read = useMemo(() => readScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
@@ -134,6 +175,17 @@ export default function PressSession({
   return (
     <div className="ps-root">
       <style>{CSS}</style>
+
+      {/* Full-size card inspect. Click-anywhere to dismiss, matching the
+          DealHand/binder pattern already in the codebase. */}
+      {inspect && (
+        <div className="ps-inspect" onClick={() => setInspect(null)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <TradingCard data={inspect} scale={0.5} interactive templateStyle="terminal" />
+          </div>
+          <button className="ps-inspect-close" onClick={() => setInspect(null)}>✕ CLOSE</button>
+        </div>
+      )}
 
       {/* ---------- top bar: always visible, never blocks the room ---------- */}
       <div className="ps-bar">
@@ -149,20 +201,65 @@ export default function PressSession({
       {/* ---------- the opening: the room, then the deal ---------- */}
       {!started && (
         <div className="ps-open">
-          <div className="ps-open-eyebrow">ONE DEAL ON THE TABLE</div>
-          <div className="ps-open-name">{deal.name}</div>
-          <div className="ps-open-sub">
-            {deal.ticker} · {deal.chain} · {deal.surface.age} old · {deal.surface.mcap}
+          {/* Deal card fills the left. Copy right. The other four — who's
+              pitching, and the three questions you drew — sit small beneath
+              the copy. Everything is click-to-enlarge. */}
+          <div className="ps-open-hero">
+            {dealCard && (
+              <button className="ps-hero-card" onClick={() => setInspect(dealCard)}
+                      title={`${deal.name} — click for full size`}>
+                <TradingCard data={dealCard} scale={CARD_HERO} interactive templateStyle="terminal" />
+              </button>
+            )}
           </div>
-          <div className="ps-open-body">
-            John Barron brought this one in. It's his deal — if you fund it, he gets paid.
-            He's going to talk for about two minutes.
+
+          <div className="ps-open-copy">
+            <div className="ps-open-eyebrow">ONE DEAL ON THE TABLE</div>
+            <div className="ps-open-name">{deal.name}</div>
+            <div className="ps-open-sub">
+              {deal.ticker} · {deal.chain} · {deal.surface.age} old · {deal.surface.mcap}
+            </div>
+            <div className="ps-open-body">
+              John Barron brought this one in. It's his deal — if you fund it, he gets paid.
+              He's going to talk for about two minutes.
+            </div>
+            <div className="ps-open-rule">
+              You can interrupt him <b>three times</b> and make him put a number on it.
+              Whatever he can actually back lands on his screen. Whatever he can't, doesn't.
+            </div>
+
+            <div className="ps-tools">
+              <div className="ps-tool-group">
+                <div className="ps-draw-label">PITCHING</div>
+                <div className="ps-draw-row">
+                  {speakerCard && (
+                    <button className="ps-draw-card" onClick={() => setInspect(speakerCard)}
+                            title="John Barron — click for full size">
+                      <TradingCard data={speakerCard} scale={CARD_THUMB} interactive={false} templateStyle="terminal" />
+                      <span className="ps-draw-name">BARRON</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="ps-tool-group ps-tool-hand">
+                <div className="ps-draw-label">YOU DREW — three angles, instead of the blunt question</div>
+                <div className="ps-draw-row">
+                  {handCards.map(({ q, data }) => (
+                    <button key={q.id} className="ps-draw-card" onClick={() => setInspect(data)}
+                            title={`${q.name} — click for full size`}>
+                      {data
+                        ? <TradingCard data={data} scale={CARD_THUMB} interactive={false} templateStyle="terminal" />
+                        : <span className="ps-card-name">{q.name}</span>}
+                      <span className="ps-draw-name">{q.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <button className="ps-lock" onClick={() => setStarted(true)}>LET HIM PITCH ▸</button>
           </div>
-          <div className="ps-open-rule">
-            You can interrupt him <b>three times</b> and make him put a number on it.
-            Whatever he can actually back lands on his screen. Whatever he can't, doesn't.
-          </div>
-          <button className="ps-lock" onClick={() => setStarted(true)}>LET HIM PITCH ▸</button>
         </div>
       )}
 
@@ -196,26 +293,39 @@ export default function PressSession({
             </div>
           )}
 
-          {/* The hand. Each card is one sentence you may say instead of the
-              generic press — same cost, sharper aim, and it can miss. */}
-          <div className="ps-hand">
-            {HAND.map((c) => {
-              const spent = run.cardsSpent.includes(c.id);
-              const dead = spent || run.pressesLeft <= 0 || !!pressed;
-              return (
-                <button
-                  key={c.id}
-                  className={`ps-card ${spent ? "spent" : ""}`}
-                  onClick={() => press(c.shape, c)}
-                  disabled={dead}
-                  title={c.hint}
-                >
-                  <span className="ps-card-name">{c.name}</span>
-                  <span className="ps-card-q">“{c.question}”</span>
-                  <span className="ps-card-hint">{spent ? "PLAYED" : c.hint}</span>
-                </button>
-              );
-            })}
+          {/* ONE ROW OF QUESTIONS. Playing a card and "pressing" were always
+              the same action — a card just swaps the sentence you say. The
+              first build split them into a big PRESS button and a separate
+              card rack, which read as two mechanics ("i'm confused about the
+              cards versus the press button" — author, 2026-07-26). They're one
+              row now: the plain question first, always available; the sharper
+              ones after it, one use each. */}
+          {/* The cards live on the RIGHT, clear of the claim panel on the left.
+              The label spells out the relationship the first build left implicit:
+              the button and the cards are the same interruption, the cards just
+              aim it. (Unifying them into one row fixed the confusion but put a
+              card on top of the FACT row — author, 2026-07-26.) */}
+          <div className="ps-hand-wrap">
+            <div className="ps-ask-label">OR ASK SOMETHING SHARPER — same interruption, better aim</div>
+            <div className="ps-hand">
+              {hand.map((c) => {
+                const spent = run.cardsSpent.includes(c.id);
+                const dead = spent || run.pressesLeft <= 0 || !!pressed;
+                return (
+                  <button
+                    key={c.id}
+                    className={`ps-card ${spent ? "spent" : ""}`}
+                    onClick={() => press(c.shape, c)}
+                    disabled={dead}
+                    title={c.hint}
+                  >
+                    <span className="ps-card-name">{c.name}</span>
+                    <span className="ps-card-q">“{c.question}”</span>
+                    <span className="ps-card-hint">{spent ? "USED" : c.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="ps-dock">
@@ -224,19 +334,19 @@ export default function PressSession({
               onClick={() => press(ANY, null)}
               disabled={run.pressesLeft <= 0 || !!pressed}
             >
-              <span className="ps-press-main">PRESS</span>
+              <span className="ps-press-main">PRESS HIM</span>
               <span className="ps-press-sub">
-                {pressed ? "already pressed him on this"
-                  : run.pressesLeft <= 0 ? "out of presses"
+                {pressed ? "you've had your answer on this one"
+                  : run.pressesLeft <= 0 ? "no interruptions left"
                     : "“put a number on it”"}
               </span>
             </button>
 
-            <div className="ps-meter" aria-label={`${run.pressesLeft} presses left`}>
+            <div className="ps-meter" aria-label={`${run.pressesLeft} interruptions left`}>
               {Array.from({ length: PRESSES }).map((_, i) => (
                 <span key={i} className={`ps-pip ${i < run.pressesLeft ? "live" : ""}`} />
               ))}
-              <span className="ps-meter-label">PRESSES LEFT</span>
+              <span className="ps-meter-label">INTERRUPTIONS LEFT</span>
             </div>
 
             <div className="ps-nav">
@@ -275,27 +385,57 @@ export default function PressSession({
         </div>
       )}
 
-      {/* ---------- resolution: the room plays the curtain call under this ---------- */}
+      {/* ---------- resolution ----------
+          A LOWER THIRD, not a centred panel. The four of them stand up and play
+          their real reactions during this beat — putting a box over the middle
+          of the frame hides the entire payoff (and repeats the sin of the CRT
+          overlay this whole mode exists to get rid of). Keep the upper two
+          thirds clear; the copy is short enough to read in a strip. */}
       {run.phase === PHASE.RESOLUTION && (
-        <div className="ps-panel wide">
-          <div className="ps-panel-h">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
-          <div className={`ps-pnl ${run.call.pnl >= 0 ? "up" : "down"}`}>
+        <div className="ps-lower">
+          <div className={`ps-lower-pnl ${run.call.pnl >= 0 ? "up" : "down"}`}>
             {run.call.pnl >= 0 ? "+" : ""}{Math.round(run.call.pnl)}
           </div>
-          <div className="ps-truth">{deal.resolution}</div>
-          <button className="ps-lock" onClick={finish}>WHAT HE ACTUALLY SAID ▸</button>
+          <div className="ps-lower-body">
+            <div className="ps-lower-h">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
+            <div className="ps-lower-truth">{deal.resolution}</div>
+          </div>
+          <button className="ps-lower-go" onClick={finish}>WHAT HE ACTUALLY SAID ▸</button>
         </div>
       )}
 
-      {/* ---------- autopsy ---------- */}
+      {/* ---------- autopsy ----------
+          Anchored RIGHT rather than centred: the four are still standing on the
+          platform through this, and the left half of the frame is where they
+          are. Long content, so it scrolls in its own column. */}
       {run.phase === PHASE.AUTOPSY && (
-        <div className="ps-panel wide scroll">
+        <div className="ps-panel side scroll">
           <div className="ps-panel-h">THE AUTOPSY</div>
           <div className="ps-scores">
             <div><span className="ps-dim">READ</span><b>{read.hit}/{read.spent || 0}</b></div>
             <div><span className="ps-dim">BOOK</span><b>{Math.round(run.book)}</b></div>
           </div>
           <div className="ps-readnote">{read.note}</div>
+
+          {/* THE PATTERN. The single most portable thing the player leaves with
+              — not "MERIDIAN rugged" but "this is what a backdoor-fork looks
+              like". The exemplar coin is the collectible worth earning, because
+              it's the archetype, not one token's answer. */}
+          {patternCard && (
+            <div className="ps-pattern">
+              <div className="ps-pattern-card">
+                <TradingCard data={patternCard} scale={0.34} interactive={false} templateStyle="terminal" />
+              </div>
+              <div className="ps-pattern-copy">
+                <div className="ps-pattern-label">YOU'VE SEEN THIS SHAPE BEFORE</div>
+                <div className="ps-pattern-name">{deal.exemplar.name}</div>
+                <div className="ps-pattern-note">{deal.exemplar.note}</div>
+                <div className="ps-pattern-foot">
+                  Same read, different token. Learn the shape and you get every one of these.
+                </div>
+              </div>
+            </div>
+          )}
           {deal.claims.map((c) => (
             <div key={c.id} className={`ps-au ${run.outcomes[c.id] ? "pressed" : ""}`}>
               <div className="ps-au-fact">{c.fact}</div>
@@ -329,7 +469,9 @@ const CSS = `
 .ps-book b { color:#ffd23a; font-size:15px; margin-left:6px; }
 
 /* the claim — bottom-left, deliberately small so the ROOM stays the picture */
-.ps-claim { position:absolute; left:18px; bottom:150px; width:min(430px, 44vw);
+/* bottom:132 clears the dock (which tops out at ~52+62=114) with margin, so the
+   PRESS button can never sit on the FACT row again. */
+.ps-claim { position:absolute; left:18px; bottom:132px; width:min(430px, 44vw);
   background:rgba(2,16,14,0.82); border-left:2px solid #ff5f9e; padding:12px 14px;
   opacity:0; transform:translateY(8px); transition:opacity .22s ease, transform .22s ease; }
 .ps-claim.in { opacity:1; transform:none; }
@@ -341,7 +483,7 @@ const CSS = `
   padding:2px 5px; font-weight:bold; flex:none; }
 .ps-fact { font-size:12px; line-height:1.4; color:rgba(234,255,249,0.85); }
 
-.ps-answer { position:absolute; left:18px; bottom:calc(150px + 132px);
+.ps-answer { position:absolute; left:18px; bottom:calc(132px + 132px);
   width:min(430px, 44vw); background:rgba(4,20,15,0.94); border:1.5px solid #ffd23a;
   padding:11px 13px; animation:psin .25s ease both; }
 .ps-answer.vibes { border-color:#7a8b86; }
@@ -350,8 +492,12 @@ const CSS = `
 .ps-answer.vibes .ps-answer-note { color:#bfeede; }
 @keyframes psin { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
 
-/* the hand — three questions, sat just above the press dock */
-.ps-hand { position:absolute; right:18px; bottom:124px; display:flex; gap:10px; }
+/* The card rack. Anchored RIGHT so it can never reach the claim panel, which
+   owns the left. Its bottom clears the dock row beneath it. */
+.ps-hand-wrap { position:absolute; right:18px; bottom:122px; }
+.ps-ask-label { font-size:9.5px; letter-spacing:0.13em; color:rgba(255,210,58,0.75);
+  font-weight:bold; margin-bottom:7px; text-align:right; }
+.ps-hand { display:flex; gap:10px; justify-content:flex-end; }
 .ps-card { width:172px; text-align:left; cursor:pointer;
   display:flex; flex-direction:column; gap:5px;
   background:linear-gradient(160deg, rgba(20,8,32,0.96), rgba(6,20,18,0.96));
@@ -373,12 +519,14 @@ const CSS = `
 
 .ps-dock { position:absolute; left:18px; right:18px; bottom:52px;
   display:flex; align-items:center; gap:18px; }
-.ps-press { background:#ff2d6f; border:none; color:#fff; padding:14px 26px; cursor:pointer;
-  display:flex; flex-direction:column; align-items:flex-start; gap:2px;
-  box-shadow:0 0 26px rgba(255,45,111,0.5); clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px)); }
-.ps-press:disabled { background:rgba(120,120,120,0.35); box-shadow:none; cursor:default; color:rgba(255,255,255,0.5); }
-.ps-press-main { font-size:17px; font-weight:bold; letter-spacing:0.16em; }
-.ps-press-sub { font-size:10px; letter-spacing:0.06em; opacity:0.85; }
+.ps-press { background:#ff2d6f; border:none; color:#fff; padding:13px 24px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:flex-start; gap:2px; flex:none;
+  box-shadow:0 0 26px rgba(255,45,111,0.5);
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px)); }
+.ps-press:disabled { background:rgba(120,120,120,0.35); box-shadow:none; cursor:default;
+  color:rgba(255,255,255,0.55); }
+.ps-press-main { font-size:16px; font-weight:bold; letter-spacing:0.16em; }
+.ps-press-sub { font-size:10px; letter-spacing:0.05em; opacity:0.85; }
 .ps-meter { display:flex; align-items:center; gap:6px; }
 .ps-pip { width:11px; height:11px; border:1.5px solid rgba(255,45,111,0.6); border-radius:50%; }
 .ps-pip.live { background:#ff2d6f; box-shadow:0 0 9px rgba(255,45,111,0.8); }
@@ -395,28 +543,99 @@ const CSS = `
 .ps-dot.hit { background:#ffd23a; }
 .ps-dot.black { background:#7a8b86; }
 
-.ps-open { position:absolute; left:50%; bottom:8%; transform:translateX(-50%);
-  width:min(560px, calc(100% - 40px)); background:rgba(2,16,14,0.9);
-  border:1px solid rgba(47,214,214,0.4); border-left:3px solid #ff5f9e; padding:22px 24px; }
+.ps-open { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(900px, calc(100% - 40px)); max-height:90vh; overflow-y:auto;
+  background:rgba(2,16,14,0.93);
+  border:1px solid rgba(47,214,214,0.4); border-left:3px solid #ff5f9e; padding:18px 22px;
+  display:flex; gap:22px; align-items:flex-start; }
+/* align-self keeps the hero from stretching to the copy column's height and
+   vice-versa — an earlier version let one column drive the other and the panel
+   silently grew to 1355px, scrolling the hand out of sight. */
+.ps-open-hero { flex:none; align-self:flex-start; }
+.ps-hero-card { background:none; border:none; padding:0; cursor:zoom-in; display:block;
+  transition:transform .12s ease; }
+.ps-hero-card:hover { transform:translateY(-3px); }
+.ps-open-copy { flex:1; min-width:0; align-self:flex-start; }
 .ps-open-eyebrow { font-size:10px; letter-spacing:0.18em; color:#ff5f9e; font-weight:bold; }
-.ps-open-name { font-size:26px; font-weight:bold; letter-spacing:0.06em; margin-top:8px; }
-.ps-open-sub { font-size:11px; letter-spacing:0.08em; color:rgba(234,255,249,0.5); margin-top:5px; }
-.ps-open-body { font-size:13.5px; line-height:1.55; margin-top:16px; }
-.ps-open-rule { font-size:13.5px; line-height:1.55; margin-top:12px; color:#ffd23a; }
+.ps-open-name { font-size:24px; font-weight:bold; letter-spacing:0.06em; margin-top:6px; }
+.ps-open-sub { font-size:11px; letter-spacing:0.08em; color:rgba(234,255,249,0.5); margin-top:4px; }
+.ps-open-body { font-size:13px; line-height:1.5; margin-top:12px; }
+.ps-open-rule { font-size:13px; line-height:1.5; margin-top:9px; color:#ffd23a; }
 .ps-open-rule b { color:#fff; }
+
+/* the other four, small, beneath the copy */
+.ps-tools { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;
+  margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,210,58,0.22); }
+.ps-tool-group { flex:none; }
+.ps-tool-hand { flex:1; min-width:0; padding-left:16px;
+  border-left:1px solid rgba(47,214,214,0.2); }
+.ps-draw-label { font-size:9px; letter-spacing:0.13em; color:rgba(255,210,58,0.8);
+  font-weight:bold; margin-bottom:7px; }
+.ps-draw-row { display:flex; gap:9px; flex-wrap:wrap; }
+.ps-draw-card { flex:none; background:none; border:none; padding:0; cursor:zoom-in;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  animation:psdeal .34s ease both; transition:transform .12s ease; }
+.ps-draw-card:hover { transform:translateY(-3px); }
+.ps-draw-card:nth-child(2) { animation-delay:.07s; }
+.ps-draw-card:nth-child(3) { animation-delay:.14s; }
+@keyframes psdeal { from { opacity:0; transform:translateY(10px) rotate(-2deg); }
+  to { opacity:1; transform:none; } }
+
+/* full-size inspect */
+.ps-inspect { position:fixed; inset:0; z-index:10060; display:flex; flex-direction:column;
+  gap:14px; align-items:center; justify-content:center; padding:16px; overflow:auto;
+  background:rgba(2,10,9,0.9); backdrop-filter:blur(4px); pointer-events:auto; }
+.ps-inspect-close { background:none; border:1px solid rgba(47,214,214,0.5); color:#2fd6d6;
+  font-size:11px; letter-spacing:0.1em; padding:9px 16px; cursor:pointer; }
+
+.ps-draw-name { font-size:8.5px; letter-spacing:0.1em; font-weight:bold;
+  color:rgba(234,255,249,0.65); }
+
+/* full-size inspect */
+.ps-inspect { position:fixed; inset:0; z-index:10060; display:flex; flex-direction:column;
+  gap:14px; align-items:center; justify-content:center; padding:16px; overflow:auto;
+  background:rgba(2,10,9,0.9); backdrop-filter:blur(4px); pointer-events:auto; }
+.ps-inspect-close { background:none; border:1px solid rgba(47,214,214,0.5); color:#2fd6d6;
+  font-size:11px; letter-spacing:0.1em; padding:9px 16px; cursor:pointer; }
+.ps-draw-card:nth-child(2) { animation-delay:.07s; }
+.ps-draw-card:nth-child(3) { animation-delay:.14s; }
+@keyframes psdeal { from { opacity:0; transform:translateY(10px) rotate(-2deg); }
+  to { opacity:1; transform:none; } }
 
 .ps-panel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   width:min(520px, calc(100% - 40px)); background:rgba(2,16,14,0.95);
   border:1.5px solid rgba(47,214,214,0.55); padding:22px; text-align:center; }
 .ps-panel.wide { width:min(640px, calc(100% - 40px)); text-align:left; }
-.ps-panel.scroll { max-height:76vh; overflow-y:auto; }
+/* right column — leaves the left of the frame to the characters */
+.ps-panel.side { left:auto; right:18px; top:50%; transform:translateY(-50%);
+  width:min(430px, calc(100% - 36px)); text-align:left; }
+.ps-panel.scroll { max-height:78vh; overflow-y:auto; }
+
+/* THE LOWER THIRD — reveal copy that never covers the curtain call. */
+.ps-lower { position:absolute; left:18px; right:18px; bottom:64px;
+  display:flex; align-items:center; gap:20px; padding:16px 20px;
+  background:linear-gradient(180deg, rgba(2,16,14,0.62), rgba(2,16,14,0.92));
+  backdrop-filter:blur(3px); border-top:2px solid rgba(47,214,214,0.55);
+  animation:pslower .32s ease both; }
+@keyframes pslower { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+.ps-lower-pnl { font-size:44px; font-weight:bold; letter-spacing:0.03em; flex:none;
+  min-width:118px; text-align:center; }
+.ps-lower-pnl.up { color:#4dffaa; text-shadow:0 0 22px rgba(77,255,170,0.5); }
+.ps-lower-pnl.down { color:#ff5f6f; text-shadow:0 0 22px rgba(255,95,111,0.5); }
+.ps-lower-body { flex:1; min-width:0; }
+.ps-lower-h { font-size:11px; letter-spacing:0.16em; font-weight:bold; color:#2fd6d6; }
+.ps-lower-truth { font-size:12.5px; line-height:1.5; margin-top:5px;
+  color:rgba(234,255,249,0.9); }
+.ps-lower-go { flex:none; background:none; border:1px solid #ffd23a; color:#ffd23a;
+  font-size:11.5px; letter-spacing:0.1em; padding:12px 18px; cursor:pointer; }
+.ps-lower-go:hover { background:rgba(255,210,58,0.12); }
 .ps-panel-h { font-size:12px; letter-spacing:0.16em; color:#2fd6d6; font-weight:bold; margin-bottom:16px; }
 .ps-slider { width:100%; accent-color:#ff2d6f; }
 .ps-slider-ends { display:flex; justify-content:space-between; font-size:10px;
   letter-spacing:0.12em; color:rgba(234,255,249,0.5); margin-top:4px; }
 .ps-saying { font-size:16px; margin-top:18px; }
 .ps-risk { font-size:12.5px; color:#ffd23a; margin-top:8px; }
-.ps-lock { margin-top:20px; width:100%; background:none; border:1px solid #ffd23a;
+.ps-lock { margin-top:4px; width:100%; background:none; border:1px solid #ffd23a;
   color:#ffd23a; font-size:13px; letter-spacing:0.12em; padding:13px; cursor:pointer; }
 .ps-pnl { font-size:44px; font-weight:bold; letter-spacing:0.04em; }
 .ps-pnl.up { color:#4dffaa; } .ps-pnl.down { color:#ff5f6f; }
@@ -433,7 +652,18 @@ const CSS = `
 
 @media (max-width: 860px) {
   .ps-claim, .ps-answer { width:calc(100% - 36px); }
-  .ps-answer { bottom:calc(150px + 150px); }
+  .ps-open { flex-direction:column; }
+  .ps-open-hero { align-self:center; }
+  .ps-tool-hand { padding-left:0; border-left:none; }
+  .ps-tools { flex-direction:column; gap:12px; }
+  .ps-tool-who { border-right:none; padding-right:0; }
+  .ps-pattern { flex-direction:column; align-items:center; text-align:center; }
+  /* no room for a lower third beside a number — stack it */
+  .ps-lower { flex-direction:column; align-items:stretch; gap:10px; text-align:center; }
+  .ps-lower-pnl { font-size:34px; min-width:0; }
+  .ps-lower-go { width:100%; }
+  .ps-panel.side { left:18px; right:18px; width:auto; max-height:70vh; }
+  .ps-answer { bottom:calc(132px + 150px); }
   .ps-dock { flex-wrap:wrap; gap:10px; }
   .ps-nav { margin-left:0; width:100%; }
 }
