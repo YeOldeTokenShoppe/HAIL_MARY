@@ -1,6 +1,5 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import gsap from "gsap";
 import { instanceDeal, dailySeed } from "@/game/terminal-traders/press/instanceDeal";
 import { ANY, BACKING } from "@/game/terminal-traders/press/questions";
 import { dealHand } from "@/game/terminal-traders/press/hand";
@@ -11,7 +10,10 @@ import {
 } from "@/game/terminal-traders/press/pressRun";
 import { toDealCard, toExemplarCard, toQuestionCard, toCharacterCard } from "@/game/terminal-traders/press/dealCard";
 import TradingCard from "@/components/TradingCard";
-import { playSfx, preloadSfx } from "@/lib/uiSfx";
+import { preloadSfx } from "@/lib/uiSfx";
+import {
+  DealtSlot, DealDeck, runCardDeal, prefersReducedMotion, SFX, DEAL_CSS,
+} from "./cardDeal";
 import { createEvidenceScreen } from "./evidenceScreen";
 
 // THE PRESS — slice 1. Barron, six claims, three presses, over the LIVE room.
@@ -43,39 +45,9 @@ const CARD_HERO  = 0.40;   // the deal card — the subject, fills the left colu
 const CARD_THUMB = 0.115;  // character + questions — context, click to enlarge
 const READ_MS = 4200;           // how long a claim holds the floor before it can land
 
-/* ---- THE DEAL ----
-   The five cards used to materialise with a CSS stagger the moment the panel
-   opened, which read as "the page finished loading" rather than "you were dealt
-   a hand". Now the table starts empty and YOU deal it.
-
-   The flight is a hand-rolled FLIP: every card stays in its real DOM slot (so
-   the layout stays authoritative and responsive) and we animate the measured
-   DELTA from the deck stub to that slot. Nothing is absolutely positioned into
-   place, nothing reflows, and it's pure transform/opacity — which matters,
-   because this whole panel renders over the LIVE temple scene.
-
-   Flight and flip ride the SAME element via transformPerspective, so the card
-   turns identically wherever it is mid-air. (Perspective on the parent instead
-   would skew the flip harder the further the card is from its slot.) */
-// Deal order is the slot index: 0 the deal card, 1 Barron, 2-4 your questions.
-const DEAL_STAGGER = 0.16; // gap between cards leaving the deck
-const DEAL_FLIGHT  = 0.66; // deck -> slot
-const DEAL_FLIP_AT = 0.30; // into the flight, when it starts turning face-up
-const DEAL_FLIP_DUR = 0.46;
-const CARD_W = 744, CARD_H = 1038;   // TradingCard's native box, before --scale
-
-const SFX = {
-  deal: "/audio/card_flip.mp3",       // per card, as it comes off the deck
-  // Optional deck riffle under the button press. playSfx no-ops safely on a
-  // missing file (uiSfx caches the failed fetch, the element fallback swallows
-  // the rest), so this lights up by itself the moment a file lands here.
-  shuffle: "/audio/card_shuffle.mp3",
-};
-// Measured, not guessed: card_flip.mp3 is -26.1 LUFS, ~2dB under
-// /audio/proceed.mp3, which CyberButton plays at 1.0 — so one hit would sit
-// near 1.0. But this fires five times inside 1.3s, so it opens at 0.8 and eases
-// down across the deal: the hand settles instead of machine-gunning.
-const SFX_DEAL_VOL = 0.8, SFX_DEAL_DECAY = 0.07;
+// THE DEAL — choreography lives in ./cardDeal, shared with PressFlat so both
+// presentations deal the same way. Deal order is the slot index: 0 the deal
+// card, 1 Barron, 2-4 your questions.
 
 export default function PressSession({
   // Pass a deal to pin one (tests/sims). Otherwise the DAILY deal is used —
@@ -181,93 +153,27 @@ export default function PressSession({
     return () => onRevealChange(null);
   }, [run.phase, run.call, deal.truth, onRevealChange]);
 
-  /* ---- the deal ----
-     Measure at CLICK time, never at mount: the panel is fully laid out by the
-     time anyone can press the button, so every rect is honest and there is no
-     load-order race to lose. (This is the same reason `started` is a click and
-     not a timer — see the note on that state above.) */
+  /* ---- the deal ---- */
   useEffect(() => { Object.values(SFX).forEach(preloadSfx); }, []);
   useEffect(() => () => tlRef.current?.kill(), []);
 
   const runDeal = useCallback(() => {
     if (dealing || dealt) return;
-    const deck = deckRef.current;
-    const slots = slotRefs.current.filter(Boolean);
-    // No deck or no cards to move: skip straight to the dealt state rather
-    // than stranding the player on a button that does nothing.
-    if (!deck || !slots.length) { setDealt(true); return; }
-
     // Someone who asked not to be moved gets the cards, not the choreography.
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
-      setDealt(true);
-      return;
-    }
+    if (prefersReducedMotion()) { setDealt(true); return; }
 
     setDealing(true);
-    playSfx(SFX.shuffle, { volume: 0.55 });
-
-    const dk = deck.getBoundingClientRect();
-    const tl = gsap.timeline({
-      defaults: { force3D: true },
-      onComplete: () => {
-        setDealing(false);
-        setDealt(true);
-        // Hand the elements back untransformed. Leaving an inline transform
-        // behind would keep five composited layers alive over a live WebGL
-        // scene for the rest of the session.
-        gsap.set(slots.map((s) => s.querySelector(".ps-fly")), {
-          clearProps: "transform,willChange",
-        });
-      },
+    const tl = runCardDeal({
+      deck: deckRef.current,
+      slots: slotRefs.current,
+      captionSelector: ".ps-draw-name",
+      onLanded: (i) => setLanded((n) => Math.max(n, i + 1)),
+      onDone: () => { setDealing(false); setDealt(true); },
     });
+    // Nothing to animate — go straight to the dealt state rather than
+    // stranding the player on a button that does nothing.
+    if (!tl) { setDealing(false); setDealt(true); return; }
     tlRef.current = tl;
-
-    slots.forEach((slot, i) => {
-      const fly = slot.querySelector(".ps-fly");
-      const ghost = slot.querySelector(".ps-slot-ghost");
-      if (!fly) return;
-      const r = slot.getBoundingClientRect();
-      // Centre-to-centre, because the flight also scales and scaling happens
-      // about the centre — matching corners here would drift by half the
-      // size difference, which on the hero card is ~120px.
-      const dx = dk.left + dk.width / 2 - (r.left + r.width / 2);
-      const dy = dk.top + dk.height / 2 - (r.top + r.height / 2);
-      const at = i * DEAL_STAGGER;
-
-      tl.fromTo(fly, {
-        x: dx, y: dy,
-        scale: r.width ? dk.width / r.width : 0.2,
-        rotation: -16 + i * 7,   // fanned, so five cards don't fly in lockstep
-        rotationY: 180,          // face-down off the deck
-        transformPerspective: 1200,
-        opacity: 1,
-        willChange: "transform",
-      }, {
-        x: 0, y: 0, scale: 1, rotation: 0,
-        duration: DEAL_FLIGHT, ease: "power3.out",
-        // One hit per card, on the launch rather than the landing: the launch
-        // is the percussive moment, and firing on both would be ten sounds
-        // inside 1.3s.
-        onStart: () => playSfx(SFX.deal, {
-          volume: Math.max(0.2, SFX_DEAL_VOL - i * SFX_DEAL_DECAY),
-        }),
-      }, at);
-
-      // It turns over as it arrives, not after — a card that lands and then
-      // flips reads as two events instead of one gesture.
-      tl.to(fly, {
-        rotationY: 0,
-        duration: DEAL_FLIP_DUR, ease: "power2.inOut",
-        // A card turning over is what unseals whatever names it. (A skip fires
-        // these too: progress(1) still runs the callbacks it jumps over.)
-        onComplete: () => setLanded((n) => Math.max(n, i + 1)),
-      }, at + DEAL_FLIP_AT);
-
-      if (ghost) tl.to(ghost, { opacity: 0, duration: 0.3 }, at + DEAL_FLIP_AT);
-      // Each caption arrives with its own card, never before it.
-      const cap = slot.parentElement?.querySelector(".ps-draw-name");
-      if (cap) tl.to(cap, { opacity: 1, duration: 0.28 }, at + DEAL_FLIP_AT);
-    });
   }, [dealing, dealt]);
 
   // Impatience is a legitimate input: a click anywhere mid-deal lands the rest
@@ -444,12 +350,7 @@ export default function PressSession({
                 you let him talk. Folding both into one button was the old
                 behaviour and it made the hand feel like page furniture. */}
             <div className="ps-cta-row">
-              <span className={`ps-deck${dealt || dealing ? " is-spent" : ""}`}
-                    ref={deckRef} aria-hidden="true">
-                <span className="ps-deck-card" />
-                <span className="ps-deck-card" />
-                <span className="ps-deck-card" />
-              </span>
+              <DealDeck ref={deckRef} spent={dealt || dealing} />
               <button
                 className="ps-lock"
                 onClick={dealt ? () => setStarted(true) : runDeal}
@@ -649,29 +550,7 @@ export default function PressSession({
   );
 }
 
-/* One dealt card. The slot is a fixed, static box that holds the layout open
-   from the moment the panel appears — so the empty table has the right shape
-   and nothing shifts when the cards land. `.ps-fly` is the ONLY thing GSAP
-   touches: TradingCard drives its own transform on .tc-card (tilt + --scale)
-   and the hover lift lives on the .ps-draw-card button, so all three transform
-   owners stay on separate elements and never fight.
-   Spans, not divs — these render inside <button>, which takes phrasing content. */
-function DealtSlot({ index, scale, register, children }) {
-  const w = Math.round(CARD_W * scale);
-  const h = Math.round(CARD_H * scale);
-  return (
-    <span className="ps-slot" style={{ width: w, height: h }}
-          ref={(el) => register(index, el)}>
-      <span className="ps-slot-ghost" aria-hidden="true" />
-      <span className="ps-fly">
-        <span className="ps-face ps-face-back" aria-hidden="true" />
-        <span className="ps-face ps-face-front">{children}</span>
-      </span>
-    </span>
-  );
-}
-
-const CSS = `
+const CSS = DEAL_CSS + `
 /* FIXED, not absolute: this portals into document.body, which on /trade is
    taller than the viewport — an absolute inset:0 stretched the layer down the
    whole page and pushed the dock off-screen. */
@@ -798,48 +677,19 @@ const CSS = `
   transition:transform .12s ease; }
 .ps-draw-card:hover { transform:translateY(-3px); }
 
-/* ---- THE DEAL ----
-   .ps-slot is static and always occupies the card's exact box, so the table
-   has its final shape while it is still empty and nothing reflows on landing.
-   .ps-fly belongs to GSAP alone. Before the deal it's transparent, which is
-   why the ghost outline underneath is what you actually see. */
-.ps-slot { position:relative; display:block; flex:none; }
-.ps-slot-ghost { position:absolute; inset:0; border:1px dashed rgba(47,214,214,0.32);
-  border-radius:9px; background:
-    repeating-linear-gradient(135deg, rgba(47,214,214,0.05) 0 6px, transparent 6px 12px); }
-.ps-fly { position:absolute; inset:0; display:block; opacity:0;
-  transform-style:preserve-3d; }
-.ps-face { position:absolute; inset:0; display:block; backface-visibility:hidden;
-  -webkit-backface-visibility:hidden; }
-/* Face-UP is the resting state (rotationY 0) so that when the deal ends GSAP
-   can clear the transform outright and leave no composited layer sitting over
-   the live scene for the rest of the session. */
-.ps-face-back { transform:rotateY(180deg);
-  background:url("/TCG/cardBack.webp") center / cover no-repeat,
-    linear-gradient(160deg, #0a221f, #050f0d 75%);
-  border:1px solid rgba(255,210,58,0.45); border-radius:9px;
-  box-shadow:0 0 20px rgba(255,210,58,0.18); }
-/* Landed cards are inspectable. In-flight ones aren't, and neither is an empty
-   table — clicking a slot that holds nothing yet must do nothing. */
+/* THE DEAL — slot/deck/flip styles come from cardDeal's DEAL_CSS, appended at
+   the end of this sheet. What's local to this surface is who may be clicked
+   and where the deck sits. Landed cards are inspectable; in-flight ones aren't,
+   and neither is an empty table — clicking a slot holding nothing must do
+   nothing. */
 .ps-open:not(.is-dealt) .ps-hero-card,
 .ps-open:not(.is-dealt) .ps-draw-card { pointer-events:none; }
-.ps-open.is-dealt .ps-fly { opacity:1; }
-.ps-open.is-dealt .ps-slot-ghost { opacity:0; }
+.ps-open.is-dealt .deal-fly { opacity:1; }
+.ps-open.is-dealt .deal-ghost { opacity:0; }
 .ps-skip-deal { position:absolute; inset:0; z-index:5; background:none; border:none;
   padding:0; cursor:pointer; }
-
-/* the deck it all comes off */
 .ps-cta-row { display:flex; align-items:center; gap:14px; margin-top:6px; }
 .ps-cta-row .ps-lock { flex:1; width:auto; margin-top:0; }
-.ps-deck { position:relative; display:block; flex:none; width:54px; height:75px;
-  transition:opacity .45s ease, transform .45s ease; }
-.ps-deck-card { position:absolute; inset:0; border-radius:5px;
-  background:url("/TCG/cardBack.webp") center / cover no-repeat,
-    linear-gradient(160deg, #0a221f, #050f0d 75%);
-  border:1px solid rgba(255,210,58,0.4); box-shadow:0 2px 10px rgba(0,0,0,0.5); }
-.ps-deck-card:nth-child(1) { transform:translate(-3px,-3px) rotate(-4deg); }
-.ps-deck-card:nth-child(2) { transform:translate(-1px,-1px) rotate(2deg); }
-.ps-deck.is-spent { opacity:0.2; transform:scale(0.94); }
 
 /* full-size inspect */
 .ps-inspect { position:fixed; inset:0; z-index:10060; display:flex; flex-direction:column;

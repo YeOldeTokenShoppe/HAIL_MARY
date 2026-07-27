@@ -21,7 +21,7 @@ const SITEPAL_SCENES = { monk: 2774449, demon: 2775052, marisol: 2774916 };
 // Top-level hub options shown after boot. TODO: confirm full list with design —
 // currently Learning Modules + the live Case Files investigation.
 const HUB_OPTIONS = [
-  { key: "scan", label: "LIMINAL SCAN", sub: "your trading type assessment" },
+  // { key: "scan", label: "LIMINAL SCAN", sub: "your trading type assessment" },
   // THE VC GAME (2026-07-26) — the one game we ship. Renders through PressFlat:
   // same pure controller as desktop, no WebGL, and Barron actually SPEAKS here
   // (ElevenLabs + the amplitude mouth), which the 3D view can't do because it's

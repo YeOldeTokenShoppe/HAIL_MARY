@@ -12,6 +12,11 @@ import { toDealCard, toExemplarCard, toQuestionCard, toCharacterCard } from "@/g
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
 import TradingCard from "@/components/TradingCard";
 import PressFigure from "./PressFigure";
+import { preloadSfx } from "@/lib/uiSfx";
+import gsap from "gsap";
+import {
+  DealtSlot, DealDeck, runCardDeal, prefersReducedMotion, SFX, DEAL_CSS,
+} from "./cardDeal";
 import { createFlatEvidenceScreen } from "./evidenceScreen";
 
 // THE VC GAME — flat presentation. No WebGL, portrait-first.
@@ -97,6 +102,61 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const [hasRecord, setHasRecord] = useState(false);
   const screenRef = useRef(null);
   const gyro = useGyroTilt(true);
+
+  /* ---- the deal ----
+     Same choreography as the 3D view (./cardDeal), with one thing this surface
+     has to solve that the desktop panel doesn't: the briefing is a SCROLLING
+     column taller than a phone, so the hero card and the hand strip are never
+     on screen together. We pin the view to the top before measuring — the deal
+     card landing is what unseals the name, so that's the beat worth seeing —
+     and then slide down to the hand once it's dealt. */
+  const [dealt, setDealt] = useState(false);
+  const [dealing, setDealing] = useState(false);
+  const [landed, setLanded] = useState(0);
+  const identity = dealt || landed >= 1;      // slot 0 — the deal card
+  const speakerNamed = dealt || landed >= 2;  // slot 1 — who's pitching
+  const deckRef = useRef(null);
+  const slotRefs = useRef([]);
+  const scrollRef = useRef(null);
+  const stripRef = useRef(null);
+  const tlRef = useRef(null);
+  const registerSlot = useCallback((i, el) => { slotRefs.current[i] = el; }, []);
+
+  useEffect(() => { Object.values(SFX).forEach(preloadSfx); }, []);
+  useEffect(() => () => tlRef.current?.kill(), []);
+
+  const revealHand = useCallback(() => {
+    const sc = scrollRef.current, strip = stripRef.current;
+    if (!sc || !strip) return;
+    gsap.to(sc, {
+      scrollTop: Math.max(0, strip.offsetTop - 90),
+      duration: 0.7, ease: "power2.inOut",
+    });
+  }, []);
+
+  const runDeal = useCallback(() => {
+    if (dealing || dealt) return;
+    if (prefersReducedMotion()) { setDealt(true); return; }
+
+    // Pin to the top BEFORE measuring: scrollTop is applied synchronously, so
+    // the rects we take next are already the post-scroll ones.
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+
+    setDealing(true);
+    const tl = runCardDeal({
+      deck: deckRef.current,
+      slots: slotRefs.current,
+      captionSelector: ".pf-cap",
+      onLanded: (i) => setLanded((n) => Math.max(n, i + 1)),
+      onDone: () => { setDealing(false); setDealt(true); revealHand(); },
+    });
+    if (!tl) { setDealing(false); setDealt(true); return; }
+    tlRef.current = tl;
+  }, [dealing, dealt, revealHand]);
+
+  const skipDeal = useCallback(() => {
+    if (dealing) tlRef.current?.progress(1);
+  }, [dealing]);
 
   const claim = currentClaim(run, deal);
   const onFloor = started && run.phase === PHASE.FLOOR;
@@ -192,42 +252,75 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
       <div className="pf-bar">
         <button className="pf-exit" onClick={onExit}>◀ EXIT</button>
-        <span className="pf-tick">{deal.ticker}</span>
+        {/* The bar names the deal only once the deal has a face. */}
+        <span className="pf-tick">{identity ? deal.ticker : "· · ·"}</span>
         <span className="pf-book">BOOK <b>{Math.round(run.book)}</b></span>
       </div>
 
-      {/* ---------- the briefing ---------- */}
+      {/* ---------- the briefing ----------
+          NOTHING HERE MAY NAME A CARD THAT ISN'T FACE-UP YET. Printing the
+          deal's name and stats, and "John Barron brought this one in", over an
+          empty table announced both before either had been dealt — which is
+          exactly the reveal this beat exists to stage. */}
       {!started && (
-        <div className="pf-scroll">
+        <div className={`pf-scroll${dealt ? " is-dealt" : ""}`} ref={scrollRef}>
+          {dealing && (
+            <button className="pf-skip-deal" onClick={skipDeal} aria-label="Deal the rest now" />
+          )}
           <div className="pf-eyebrow">ONE DEAL ON THE TABLE</div>
-          <div className="pf-name">{deal.name}</div>
-          <div className="pf-sub">{deal.ticker} · {deal.chain} · {deal.surface.age} old · {deal.surface.mcap}</div>
-          <div className="pf-hero" onClick={() => setInspect(dealCard)}>
-            {dealCard && <TradingCard data={dealCard} scale={0.34} interactive templateStyle="terminal" />}
+          <div className={`pf-name${identity ? "" : " facedown"}`}>
+            {identity ? deal.name : "FACE DOWN"}
           </div>
+          <div className="pf-sub">
+            {identity
+              ? `${deal.ticker} · ${deal.chain} · ${deal.surface.age} old · ${deal.surface.mcap}`
+              : "the house hasn't turned it over yet"}
+          </div>
+          <div className="pf-hero" onClick={() => dealt && setInspect(dealCard)}>
+            <DealtSlot index={0} scale={0.34} register={registerSlot}>
+              {dealCard && <TradingCard data={dealCard} scale={0.34} interactive templateStyle="terminal" />}
+            </DealtSlot>
+          </div>
+          {/* Both versions are the same shape, so the swap reads as the name
+              filling in rather than the paragraph rewriting itself. */}
           <p className="pf-copy">
-            John Barron brought this one in. It's his deal — if you fund it, he gets paid.
+            {speakerNamed
+              ? "John Barron brought this one in. It's his deal — if you fund it, he gets paid."
+              : "Someone at this desk brought this one in. It's their deal — if you fund it, they get paid."}
           </p>
           <p className="pf-copy gold">
-            You can interrupt him <b>three times</b>. Whatever he can back lands on his
-            screen. Whatever he can't, doesn't.
+            You can interrupt {speakerNamed ? "him" : "them"} <b>three times</b>. Whatever{" "}
+            {speakerNamed ? "he" : "they"} can back lands on {speakerNamed ? "his" : "their"}{" "}
+            screen. Whatever {speakerNamed ? "he" : "they"} can't, doesn't.
           </p>
-          <div className="pf-label">YOU DREW</div>
-          <div className="pf-strip">
+          <div className="pf-label">{dealt ? "YOU DREW" : "YOUR HAND"}</div>
+          <div className="pf-strip" ref={stripRef}>
             {speakerCard && (
-              <button className="pf-thumb" onClick={() => setInspect(speakerCard)}>
-                <TradingCard data={speakerCard} scale={0.15} interactive={false} templateStyle="terminal" />
-                <span>PITCHING</span>
+              <button className="pf-thumb" onClick={() => dealt && setInspect(speakerCard)}>
+                <DealtSlot index={1} scale={0.15} register={registerSlot}>
+                  <TradingCard data={speakerCard} scale={0.15} interactive={false} templateStyle="terminal" />
+                </DealtSlot>
+                <span className="pf-cap">PITCHING</span>
               </button>
             )}
-            {handCards.map(({ q, data }) => (
-              <button key={q.id} className="pf-thumb" onClick={() => setInspect(data)}>
-                <TradingCard data={data} scale={0.15} interactive={false} templateStyle="terminal" />
-                <span>{q.name}</span>
+            {handCards.map(({ q, data }, i) => (
+              <button key={q.id} className="pf-thumb" onClick={() => dealt && setInspect(data)}>
+                <DealtSlot index={2 + i} scale={0.15} register={registerSlot}>
+                  <TradingCard data={data} scale={0.15} interactive={false} templateStyle="terminal" />
+                </DealtSlot>
+                <span className="pf-cap">{q.name}</span>
               </button>
             ))}
           </div>
-          <button className="pf-btn primary" onClick={begin}>LET HIM PITCH ▸</button>
+          {/* Sticky: on a phone this column is taller than the screen, and the
+              deck has to stay visible or the cards fly out of nowhere. */}
+          <div className="pf-cta-row">
+            <DealDeck ref={deckRef} spent={dealt || dealing} />
+            <button className="pf-btn primary" disabled={dealing}
+                    onClick={dealt ? begin : runDeal}>
+              {dealt ? "LET HIM PITCH ▸" : dealing ? "DEALING…" : "DEAL ME IN ▸"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -362,7 +455,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   );
 }
 
-const CSS = `
+const CSS = DEAL_CSS + `
 .pf-wrap { position:absolute; inset:0; display:flex; flex-direction:column;
   background:#02100e; color:#eafff9; font-family:'Courier New', monospace;
   overflow:hidden;
@@ -411,6 +504,28 @@ const CSS = `
 .pf-thumb span { font:bold 8px/1.2 'Courier New',monospace; letter-spacing:0.08em;
   color:rgba(234,255,249,0.6); max-width:74px; }
 .pf-thumb.spent, .pf-thumb:disabled { opacity:0.35; }
+
+/* THE DEAL — slot/deck/flip styles come from cardDeal's DEAL_CSS at the end of
+   this sheet. Local to this surface: what may be tapped, and a deck that stays
+   put while the column scrolls. Captions are held back with the cards they
+   name (opacity, not display, so nothing reflows when they arrive). */
+.pf-scroll:not(.is-dealt) .pf-hero,
+.pf-scroll:not(.is-dealt) .pf-thumb { pointer-events:none; }
+.pf-cap { opacity:0; }
+.pf-scroll.is-dealt .pf-cap { opacity:1; }
+.pf-scroll.is-dealt .deal-fly { opacity:1; }
+.pf-scroll.is-dealt .deal-ghost { opacity:0; }
+.pf-name.facedown { color:rgba(234,255,249,0.3); letter-spacing:0.12em; }
+.pf-skip-deal { position:fixed; inset:0; z-index:6; background:none; border:none;
+  padding:0; }
+.pf-hero .deal-slot { margin:0 auto; }
+/* The briefing is taller than a phone, so the deck rides the bottom of the
+   column — otherwise you press DEAL while it's scrolled off and the cards
+   appear to come from nowhere. */
+.pf-cta-row { position:sticky; bottom:0; z-index:4; display:flex; align-items:center;
+  gap:12px; margin-top:14px; padding:10px 0 4px;
+  background:linear-gradient(180deg, rgba(3,18,16,0) 0%, rgba(3,18,16,0.92) 38%); }
+.pf-cta-row .pf-btn.primary { flex:1; margin:0; }
 
 /* the floor — portrait, thumb-first */
 .pf-floor { flex:1; display:flex; flex-direction:column; min-height:0; }
