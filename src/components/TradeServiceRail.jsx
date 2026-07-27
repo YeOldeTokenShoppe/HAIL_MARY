@@ -1,33 +1,49 @@
 import React, { useEffect, useRef, useState } from "react";
 
 const SERVICES = [
-    {
-    id: "quiz",
-    eyebrow: "QUIZ",
-    title: "WHAT KIND OF INVESTOR ARE YOU?",
-    desc: "Find your investor type — and its blind spot.",
-    accent: "amber",
-    disabled: true,
-    cta: "COMING SOON",
-  },
+  //   {
+  //   id: "quiz",
+  //   eyebrow: "QUIZ",
+  //   title: "WHAT KIND OF INVESTOR ARE YOU?",
+  //   desc: "Find your investor type — and its blind spot.",
+  //   accent: "amber",
+  //   disabled: true,
+  //   cta: "COMING SOON",
+  // },
   // Classic single-case flow, parked per CASE_TABLE.md §4.8 — the Case
   // Table absorbed the case game. Reachable via ?classic=1 only (the
   // `classic` prop), so the rail never offers two case games at once.
+  // {
+  //   id: "game",
+  //   eyebrow: "LEARN",
+  //   title: "Crypto Forensic Files",
+  //   desc: "Three questions. One verdict.",
+  //   accent: "phos",
+  //   classicOnly: true,
+  // },
+
+  // THE HEADLINE GAME (2026-07-26). Played in the room itself — no overlay,
+  // the desk stays live. One deal a day, seeded the same for everyone.
   {
-    id: "game",
-    eyebrow: "LEARN",
-    title: "Crypto Forensic Files",
-    desc: "Three questions. One verdict.",
-    accent: "phos",
-    classicOnly: true,
+    id: "vc-game",
+    eyebrow: "PLAY",
+    title: "The VC Game",
+    desc: "One deal. One pitch. Three interruptions.",
+    accent: "magenta",
   },
 
+  // PARKED 2026-07-26: shipping ONE game to start (author's call). Two "PLAY"
+  // tiles is the split-attention failure CASE_TABLE.md §4.8 warns about — "do
+  // not maintain two reward-bearing games". The Case Table is intact on disk
+  // and reachable via ?classic=1 alongside the forensic files; nothing was
+  // deleted, so it can come back as a second mode whenever the VC Game earns it.
   {
     id: "terminal-traders",
     eyebrow: "PLAY",
     title: "The Trading Card Game",
     desc: "The Daily Deal Flow — research it, then trade it.",
     accent: "magenta",
+    classicOnly: true,
   },
 ];
 
@@ -46,9 +62,11 @@ const SERVICE_ICONS = {
   analysis: svgIcon(<><line x1="3" y1="20" x2="21" y2="20" /><line x1="6.5" y1="20" x2="6.5" y2="12" /><line x1="12" y1="20" x2="12" y2="5" /><line x1="17.5" y1="20" x2="17.5" y2="9" /></>),
   // Trading card game → card stack
   'terminal-traders': svgIcon(<><rect x="8" y="4" width="12" height="16" rx="2" /><path d="M4 8v10a2 2 0 0 0 2 2h7" /></>),
+  // The VC Game → a raised hand, interrupting (lucide "hand")
+  'vc-game': svgIcon(<><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2" /><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2" /><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></>),
 };
 
-export default function TradeServiceRail({ selectedId = "terminal-traders", onSelect, onLaunch, open, onOpenChange, sheet = false, showHandle = true, classic = false } = {}) {
+export default function TradeServiceRail({ selectedId = "vc-game", onSelect, onLaunch, open, onOpenChange, sheet = false, showHandle = true, classic = false } = {}) {
   // The offered roster: classicOnly entries (the parked single-case flow)
   // only surface when the host passes classic (the ?classic=1 escape hatch).
   const roster = SERVICES.filter((s) => classic || !s.classicOnly);
@@ -175,7 +193,7 @@ export default function TradeServiceRail({ selectedId = "terminal-traders", onSe
         </button>
         <div className="tsr-status">
           <span className="tsr-pip" aria-hidden />
-          TRAINERS · IN SESSION
+          THE LOBBY
         </div>
         <div className="tsr-options" role="radiogroup" aria-label="Available services">
           {liveServices.map((service) => {

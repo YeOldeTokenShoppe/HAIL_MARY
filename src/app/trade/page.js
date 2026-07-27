@@ -43,6 +43,7 @@ import ConsensusRibbon from '@/components/ConsensusRibbon';
 import TradeServiceRail from '@/components/TradeServiceRail';
 import MobileTerminalGame from '@/components/trade/MobileTerminalGame';
 import PressSession from '@/components/trade/press/PressSession';
+import PressFlat from '@/components/trade/press/PressFlat';
 import ConfidenceVerdict from '@/components/ConfidenceVerdict';
 import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine, lensLabel, coverageNote, recordCaseResult, readSessionScore, sessionAvgBrier, sessionAccuracy } from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
@@ -1156,7 +1157,7 @@ export default function CyborgTemple() {
   // Service-rail selection — drives both the active tile and the bottom
   // Start button's label/action.
   // 'terminal-traders' = the Case Table, 'game' = classic (parked), 'analysis' = Token Review.
-  const [selectedService, setSelectedService] = useState('terminal-traders');
+  const [selectedService, setSelectedService] = useState('vc-game');
   // Desktop Case Table (Phase 0 of the /case-table-dev → /trade migration,
   // CASE_TABLE.md §4.8): the PLAY tile opens the same fullscreen Liminal
   // Terminal overlay mobile uses (MobileTerminalGame → CaseTable), and the
@@ -1173,9 +1174,16 @@ export default function CyborgTemple() {
   const [pressFocus, setPressFocus] = useState(null);
   const [pressSpeaking, setPressSpeaking] = useState(false);
   const [pressReveal, setPressReveal] = useState(null);
+  const [pressFlat, setPressFlat] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (new URLSearchParams(window.location.search).get('press') === '1') setPressMode(true);
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('press') === '1') setPressMode(true);
+    // ?flat=1 — the no-WebGL view, on any width. It's the mobile presentation,
+    // but exposing it on desktop means it can be built and debugged without a
+    // phone AND stands as a permanent fallback: a scene regression (the
+    // white-mass bug cost a rollback once) can't take the game offline.
+    if (q.get('flat') === '1') { setPressMode(true); setPressFlat(true); }
   }, []);
   const [classicMode, setClassicMode] = useState(false);
   useEffect(() => {
@@ -4272,7 +4280,7 @@ export default function CyborgTemple() {
           const TABS = [
             {
               key: 'services',
-              label: 'Venture Capital Partners',
+              label: 'THE VC GAME',
               accent: '#2ad6ee',
               active: railExpanded,
               onClick: () => { setFocusedAgent(null); setRailExpanded(true); },
@@ -4550,6 +4558,16 @@ export default function CyborgTemple() {
                     if (id === 'analysis') { setShowReviewFunnel(true); return; }
                     // Classic in-scene loop only via its ?classic=1 tile.
                     if (id === 'game') { enterGameMode(); return; }
+                    // THE VC GAME — played over the LIVE room, so unlike the
+                    // Case Table below it must not idle the canvas or steal
+                    // focus. PressSession drives the camera itself.
+                    if (id === 'vc-game') {
+                      stopSitePalAudio();
+                      setRailExpanded(false);
+                      setFocusedAgent(null);
+                      setPressMode(true);
+                      return;
+                    }
                     // 'terminal-traders' — the Case Table in the fullscreen
                     // Liminal Terminal (same overlay mobile uses).
                     stopSitePalAudio();
@@ -6361,7 +6379,14 @@ export default function CyborgTemple() {
                 DOM sits over a LIVE canvas and the characters' own monitors
                 are the board. Portaled to body for the same clipping reasons
                 as the Case Table below. Ships beside it, deletes nothing. */}
-            {pressMode && typeof document !== 'undefined' && createPortal(
+            {pressMode && pressFlat && typeof document !== 'undefined' && createPortal(
+              <div style={{ position: 'fixed', inset: 0, zIndex: 10055, background: '#02100e' }}>
+                <PressFlat onExit={() => { setPressMode(false); setPressFlat(false); }} />
+              </div>,
+              document.body
+            )}
+
+            {pressMode && !pressFlat && typeof document !== 'undefined' && createPortal(
               <PressSession
                 onFocusAgent={setPressFocus}
                 onSpeechActive={setPressSpeaking}

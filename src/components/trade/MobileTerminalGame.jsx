@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import TerminalBoot from "./TerminalBoot";
 import CaseTable from "./case-table/CaseTable";
+import PressFlat from "./press/PressFlat";
 import OwnBinder from "@/components/binder/OwnBinder";
 import { dateSeed } from "@/game/terminal-traders/docketRun";
 
@@ -21,7 +22,11 @@ const SITEPAL_SCENES = { monk: 2774449, demon: 2775052, marisol: 2774916 };
 // currently Learning Modules + the live Case Files investigation.
 const HUB_OPTIONS = [
   { key: "scan", label: "LIMINAL SCAN", sub: "your trading type assessment" },
-  { key: "cases", label: "DEAL FLOW", sub: "research it. then trade it." },
+  // THE VC GAME (2026-07-26) — the one game we ship. Renders through PressFlat:
+  // same pure controller as desktop, no WebGL, and Barron actually SPEAKS here
+  // (ElevenLabs + the amplitude mouth), which the 3D view can't do because it's
+  // limited to hand-uploaded SitePal clips.
+  { key: "vc", label: "THE VC GAME", sub: "one deal. one pitch. three interruptions." },
   { key: "binder", label: "THE BINDER", sub: "your Genesis 80 collection" },
 ];
 
@@ -51,6 +56,7 @@ export default function MobileTerminalGame({ active = true, onExit, templeStage 
           instant={bootSeen}
           onSelect={(key) => {
             setBootSeen(true);
+            if (key === "vc") { setScreen("vc"); return; }
             if (key === "cases") { setScreen("cases"); return; }
             if (key === "binder") { setScreen("binder"); return; }
             setPlaceholderLabel(HUB_OPTIONS.find((o) => o.key === key)?.label || "MODULE");
@@ -58,6 +64,8 @@ export default function MobileTerminalGame({ active = true, onExit, templeStage 
           }}
           onExit={onExit}
         />
+      ) : screen === "vc" ? (
+        <PressFlat onExit={() => setScreen("boot")} />
       ) : screen === "binder" ? (
         <OwnBinder embedded onExit={() => setScreen("boot")} />
       ) : screen === "placeholder" ? (

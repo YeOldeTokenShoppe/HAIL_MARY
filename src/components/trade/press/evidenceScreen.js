@@ -38,15 +38,44 @@ function randLine(n = 24) {
   return s;
 }
 
+/**
+ * FLAT variant — paints into a caller-supplied <canvas> instead of borrowing a
+ * seat's shared texture canvas. Same drawing code, same beats; the difference
+ * is only where the pixels land.
+ *
+ * This is what makes the mobile view work without WebGL: on desktop the
+ * "monitor" is a texture on a mesh across the room, here it's a canvas in a
+ * div. The product moment — you press, and the board conspicuously stays
+ * empty — is identical either way, because it was never about the 3D.
+ */
+export function createFlatEvidenceScreen(canvas, { header = "EVIDENCE", fps = 11 } = {}) {
+  return makeScreen({
+    header, fps,
+    getCanvas: () => canvas || null,
+    getTexture: () => null,          // nothing to flag needsUpdate on
+    claim: () => {},                 // no ambient painter to yield here
+    release: () => {},
+  });
+}
+
 export function createEvidenceScreen({ station = "demon", header = "EVIDENCE", fps = 11 } = {}) {
   const target = SCREEN_TARGETS[station];
+  return makeScreen({
+    header, fps,
+    getCanvas: () => (typeof window === "undefined" ? null : window[target.canvas] || null),
+    getTexture: () => (typeof window === "undefined" ? null : window[target.texture] || null),
+    // Take the screen — every ambient painter checks this flag and yields.
+    claim: (c) => { if (c?.dataset) c.dataset.evidenceActive = "true"; },
+    release: (c) => { if (c?.dataset) c.dataset.evidenceActive = ""; },
+  });
+}
+
+function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, release }) {
+  let header = header0;
   let receipt = null;
   let carrier = Array.from({ length: 7 }, () => randLine());
   let tick = 0;
   let live = true;
-
-  const getCanvas = () => (typeof window === "undefined" ? null : window[target.canvas] || null);
-  const getTexture = () => (typeof window === "undefined" ? null : window[target.texture] || null);
 
   function draw() {
     const canvas = getCanvas();
@@ -107,8 +136,7 @@ export function createEvidenceScreen({ station = "demon", header = "EVIDENCE", f
     ctx.fillStyle = "rgba(0,0,0,0.15)";
     for (let sy = 0; sy < h; sy += 3) ctx.fillRect(0, sy, w, 1);
 
-    // Take the screen (ambient painters check this flag and yield) and push.
-    if (canvas.dataset) canvas.dataset.evidenceActive = "true";
+    claim(canvas);
     const tex = getTexture();
     if (tex) tex.needsUpdate = true;
     return true;
@@ -127,11 +155,8 @@ export function createEvidenceScreen({ station = "demon", header = "EVIDENCE", f
     stayBlack() { receipt = null; draw(); },
     setHeader(t) { header = t; draw(); },
     hasReceipt() { return !!receipt; },
-    /** Hand the monitor back to the ambient painters. */
-    release() {
-      const canvas = getCanvas();
-      if (canvas?.dataset) canvas.dataset.evidenceActive = "";
-    },
+    /** Hand the monitor back to the ambient painters (no-op when flat). */
+    release() { release(getCanvas()); },
     dispose() {
       live = false;
       clearInterval(timer);

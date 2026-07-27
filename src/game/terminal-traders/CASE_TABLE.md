@@ -1,3 +1,9 @@
+> **ARCHIVE — SUPERSEDED 2026-07-26.** The shipping game is
+> **[VC_GAME.md](./VC_GAME.md)**. This file is the design history across three
+> pivots (case files → card game → the fifth seat → HMVC) and is kept for the
+> reasoning, the sim findings and the guardrails, several of which carried
+> forward verbatim. Do not build from it. `GENESIS.md` still governs the set.
+
 # The Case Table — Unifying Terminal Traders & the Prophet Case Files
 
 *Working design doc, companion to [GENESIS.md](./GENESIS.md). Status: DESIGN —
