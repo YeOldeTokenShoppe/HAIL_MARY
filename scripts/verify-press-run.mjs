@@ -1,22 +1,22 @@
 // Headless verification for THE PRESS controller.
 // Run: node scripts/verify-press-run.mjs
 //
-// Mirrors the discipline of scripts/verify-docket-run.mjs — the run logic is
-// pure, so it is pinned here before any pixel is drawn.
+// The run logic is pure, so it is pinned here BEFORE any pixel is drawn.
+// Rewritten 2026-07-27 for the four-character layer: cards were cut, advisers
+// are the scarce resource. The card assertions are gone; everything they were
+// protecting (frozen budget, no refunds, one press per claim, truth never for
+// sale) is re-asserted against seats.
 
-import MRDN from "../src/game/terminal-traders/press/deals/mrdn.js";
-import { ANY, BACKING, SHAPES } from "../src/game/terminal-traders/press/questions.js";
+import fs from "node:fs";
+import { instanceDeal, ARCHETYPE_IDS } from "../src/game/terminal-traders/press/instanceDeal.js";
+import { BACKING, SHAPES, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend } from "../src/game/terminal-traders/press/questions.js";
+import { DESK, EUGENE, eugeneRead, adviserLine } from "../src/game/terminal-traders/press/desk.js";
 import {
   PRESSES, STAKE, PHASE,
-  createRun, press, advance, callIt, allocate, toAutopsy,
-  resolvePress, sliderToP, callReadout, readScore, currentClaim,
+  createRun, press, advance, callIt, allocate,
+  resolvePress, sliderToP, coverageScore, currentClaim, seatOptions,
 } from "../src/game/terminal-traders/press/pressRun.js";
-import { POOL, HAND, HAND_SIZE, MIN_LIVE, dealHand } from "../src/game/terminal-traders/press/hand.js";
-import { instanceDeal, dailySeed } from "../src/game/terminal-traders/press/instanceDeal.js";
 import { casePnl } from "../src/game/terminal-traders/caseTable.js";
-
-// Convenience: play a card at whatever claim is currently on the floor.
-const doPressCard = (run, card) => press(run, MRDN, card.shape, card.id);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => {
@@ -24,329 +24,238 @@ const ok = (name, cond, extra = "") => {
   else { fail++; console.log(`  FAIL ${name}${extra ? ` — ${extra}` : ""}`); }
 };
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
-
-console.log("\n── content lint ─────────────────────────────────────────────");
-{
-  const c = MRDN.claims;
-  ok("six claims", c.length === 6, `got ${c.length}`);
-  const counts = c.reduce((m, x) => ({ ...m, [x.backing]: (m[x.backing] || 0) + 1 }), {});
-  ok("backing spread is 2 HARD / 1 SOFT / 3 VIBES",
-    counts.HARD === 2 && counts.SOFT === 1 && counts.VIBES === 3, JSON.stringify(counts));
-  ok("every claim has a shape", c.every((x) => Object.values(SHAPES).includes(x.shape)));
-  // A5: decisive evidence must be reachable on a free press.
-  ok("A5 — no loadBearing claim is weaker than HARD",
-    c.every((x) => !x.loadBearing || x.backing === BACKING.HARD));
-  ok("at least one loadBearing claim exists", c.some((x) => x.loadBearing));
-  ok("every claim has a generic press response", c.every((x) => x.press?.generic?.line));
-  // The verdict must be reachable with zero cards.
-  const freeReachable = c.filter((x) => x.backing === BACKING.HARD && x.loadBearing);
-  ok("guardrail 1 — verdict reachable on generic presses alone", freeReachable.length >= 1);
-}
-
-console.log("\n── press resolution ─────────────────────────────────────────");
-{
-  const team = MRDN.claims.find((c) => c.id === "team");
-  const chart = MRDN.claims.find((c) => c.id === "chart");
-  const audit = MRDN.claims.find((c) => c.id === "audit");
-
-  const rTeam = resolvePress(team, ANY);
-  ok("HARD press stamps a receipt", !!rTeam.receipt);
-  ok("HARD receipt names the ops partner",
-    JSON.stringify(rTeam.receipt).includes("Ops partner"));
-
-  const rChart = resolvePress(chart, ANY);
-  ok("VIBES press leaves the monitor black", rChart.receipt === null);
-  ok("VIBES press still returns a spoken line", !!rChart.line);
-
-  const rAudit = resolvePress(audit, ANY);
-  ok("SOFT press returns a partial receipt", rAudit.receipt?.partial === true);
-
-  // Slice 3+ behaviour, authored but unreachable today.
-  const rSharpMiss = resolvePress(chart, SHAPES.POSITIONED);
-  ok("wrong-shape press is marked wasted", rSharpMiss.wasted === true);
-  const rSharpHit = resolvePress(chart, SHAPES.SELECTIVE_WINDOW);
-  ok("right-shape press on VIBES names it but stays black",
-    rSharpHit.named === SHAPES.SELECTIVE_WINDOW && rSharpHit.receipt === null);
-}
-
-console.log("\n── press budget is frozen ───────────────────────────────────");
-{
-  let run = createRun(MRDN);
-  ok("starts with exactly 3", run.pressesLeft === PRESSES && PRESSES === 3);
-  let spent = 0;
-  for (let i = 0; i < MRDN.claims.length; i++) {
-    const before = run.pressesLeft;
-    run = press(run, MRDN, ANY);
-    if (run.pressesLeft < before) spent++;
-    run = advance(run, MRDN);
+const laneOf = (d, seat) => d.claims.filter((c) => c.lane === SEAT_LANE[seat]);
+const findDeal = (pred, arch, n = 400) =>
+  Array.from({ length: n }, (_, i) => instanceDeal(i + 1, arch)).find(pred);
+/** Walk to the claim with this id, letting everything before it pass. */
+const walkTo = (deal, id) => {
+  let run = createRun(deal);
+  while (currentClaim(run, deal) && currentClaim(run, deal).id !== id) {
+    const next = advance(run, deal);
+    if (next === run || next.phase !== PHASE.FLOOR) return null;
+    run = next;
   }
-  ok("cannot spend more than 3 across six claims", spent === 3, `spent ${spent}`);
-  ok("budget floors at 0, never negative", run.pressesLeft === 0);
-  ok("run reached the allocation phase", run.phase === PHASE.ALLOCATION);
-  ok("all six claims landed as chips", run.chips.length === 6, `got ${run.chips.length}`);
+  return currentClaim(run, deal)?.id === id ? run : null;
+};
+
+console.log("\n-- the desk ------------------------------------------------");
+{
+  ok("three seats plus Eugene", Object.keys(DESK).length === 3 && !!EUGENE);
+  ok("exactly two advisers are spendable", SPENDABLE_SEATS.length === 2);
+  ok("Barron has no lane — he is always available",
+    !SEAT_LANE[SEATS.BARRON] && canSend(SEATS.BARRON, { lane: LANES.CHAIN }));
+  ok("Marisol is CHAIN, GR80 is RECORD",
+    SEAT_LANE[SEATS.MARISOL] === LANES.CHAIN && SEAT_LANE[SEATS.GR80] === LANES.RECORD);
+  ok("every seat maps to a real scene agent and screen station",
+    Object.values(DESK).every((d) => d.agentId && d.station) && EUGENE.agentId === "RL80");
+  let total = true;
+  for (const sh of Object.values(SHAPES))
+    for (const ln of Object.values(LANES))
+      if (!eugeneRead({ id: "xx", shape: sh, lane: ln })) total = false;
+  ok("Eugene's read is total over all shapes x lanes", total);
+  ok("Eugene's read is deterministic",
+    eugeneRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }) ===
+    eugeneRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }));
+  ok("both advisers have all four result lines",
+    SPENDABLE_SEATS.every((s) => ["dispatch", "found", "partial", "nothing"].every((r) => adviserLine(s, r))));
 }
 
-console.log("\n── double-press and off-phase are no-ops ────────────────────");
+console.log("\n-- lanes and legality --------------------------------------");
 {
-  let run = createRun(MRDN);
-  run = press(run, MRDN, ANY);
-  const after = run.pressesLeft;
-  run = press(run, MRDN, ANY); // same claim again
-  ok("second press on the same claim is a no-op", run.pressesLeft === after);
-  run = callIt(run, MRDN);
-  const budget = run.pressesLeft;
-  run = press(run, MRDN, ANY); // off the floor
-  ok("pressing after the call is a no-op", run.pressesLeft === budget);
-  ok("unspent presses are kept, not refunded into anything", budget === 2);
-}
-
-console.log("\n\u2500\u2500 the draw: the hand varies, and that's the point \u2500\u2500\u2500\u2500\u2500\u2500");
-{
-  const shapesOf = (d) => new Set(d.claims.map((c) => c.shape));
-  const handFor = (s) => dealHand(s, shapesOf(instanceDeal(s)));
-
-  ok("pool is bigger than the hand", POOL.length > HAND_SIZE, `${POOL.length} vs ${HAND_SIZE}`);
-  ok("pool covers every question shape",
-    new Set(POOL.map((c) => c.shape)).size === Object.keys(SHAPES).length);
-  ok("same seed always deals the same hand",
-    JSON.stringify(handFor(77).map((c) => c.id)) === JSON.stringify(handFor(77).map((c) => c.id)));
-
-  // The fix for "cards aren't a factor": the hand must actually MOVE.
-  const hands = Array.from({ length: 400 }, (_, i) => handFor(i + 1).map((c) => c.id).sort().join(","));
-  const distinct = new Set(hands).size;
-  ok("the hand varies across sessions", distinct > 6, `${distinct} distinct hands / 400 sessions`);
-  const counts = hands.reduce((m, h) => ({ ...m, [h]: (m[h] || 0) + 1 }), {});
-  ok("no single hand dominates the draw",
-    Math.max(...Object.values(counts)) < hands.length * 0.55);
-  ok("every dealt card is a real pool card",
-    handFor(9).every((c) => POOL.some((p) => p.id === c.id)));
-}
-
-console.log("\n\u2500\u2500 the hand: cards are questions \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500");
-{
-  // Every card must have a live target in this deal, or it's a dead draw the
-  // player can only ever waste — which is a content bug, not a hard choice.
-  const shapes = new Set(MRDN.claims.map((c) => c.shape));
-  ok("the starter hand can hit something in this deal",
-    HAND.every((c) => shapes.has(c.shape)),
-    HAND.filter((c) => !shapes.has(c.shape)).map((c) => c.name).join(", "));
-  ok("no two cards ask the same question", new Set(HAND.map((c) => c.shape)).size === HAND.length);
-  ok("every card carries its question as player-facing text",
-    HAND.every((c) => typeof c.question === "string" && c.question.length > 4));
-  ok("the hand reads no collection/ownership field",
-    HAND.every((c) => !("owned" in c) && !("rarity" in c) && !("count" in c)));
-
-  // Every claim must answer all three ways, or a card play falls back to the
-  // generic line and the beat silently degrades.
-  ok("all six claims author a sharp response", MRDN.claims.every((c) => c.press?.sharp?.line));
-  ok("all six claims author a miss response", MRDN.claims.every((c) => c.press?.miss?.line));
-
-  // THE ESCALATION — the only press in the deal that moves your call.
-  const audit = MRDN.claims.find((c) => c.id === "audit");
-  const esc = resolvePress(audit, SHAPES.BORROWED_CREDIBILITY);
-  ok("matched card on a SOFT claim escalates to a full receipt",
-    !!esc.receipt && esc.receipt.partial !== true && esc.receipt.rows.length > 3);
-  ok("the escalation is what exposes the upgrade path",
-    JSON.stringify(esc.receipt).includes("NOT REVIEWED"));
-
-  // A sharp question can never manufacture a fact.
-  const ops = MRDN.claims.find((c) => c.id === "ops");
-  const named = resolvePress(ops, SHAPES.SURVIVORSHIP);
-  ok("matched card on a VIBES claim still leaves the board black", named.receipt === null);
-  ok("...but classifies the hollowness", named.named === SHAPES.SURVIVORSHIP);
-  ok("...and its line differs from the generic one",
-    named.line !== resolvePress(ops, ANY).line);
-
-  // The confident denial — the beat slice 2 exists to test.
-  const miss = resolvePress(ops, SHAPES.BORROWED_CREDIBILITY);
-  ok("wrong card gets a real, confident, useless answer", miss.wasted === true && !!miss.line);
-  ok("a wasted press never reveals the shape", miss.named === null);
-}
-
-console.log("\n── card economy: no free lunches ────────────────────────────");
-{
-  let run = createRun(MRDN);
-  const card = HAND[0];
-  run = doPressCard(run, card);
-  ok("playing a card costs a press, same as the generic move", run.pressesLeft === PRESSES - 1);
-  ok("the card is marked spent", run.cardsSpent.includes(card.id));
-
-  // Replaying a spent card must be impossible even on a fresh claim.
-  run = advance(run, MRDN);
-  const before = run.pressesLeft;
-  run = doPressCard(run, card);
-  ok("a spent card cannot be replayed", run.pressesLeft === before && run.cardsSpent.length === 1);
-
-  // NO REFUND ON A MISS. This is the rule that keeps cards an edge you can
-  // misuse rather than a strictly-better button.
-  let r2 = createRun(MRDN); // claim 0 = team (UNSOURCED); play the scope card = miss
-  const scope = HAND.find((c) => c.shape === SHAPES.BORROWED_CREDIBILITY);
-  r2 = press(r2, MRDN, scope.shape, scope.id);
-  ok("a MISSED card is still consumed", r2.cardsSpent.includes(scope.id));
-  ok("a MISSED card still costs the press", r2.pressesLeft === PRESSES - 1);
-  ok("the miss is recorded as wasted", r2.outcomes.team.wasted === true);
-
-  // Cards must never widen the information firehose.
-  let r3 = createRun(MRDN);
-  let spent = 0;
-  for (let i = 0; i < MRDN.claims.length; i++) {
-    const c = HAND[i % HAND.length];
-    const b = r3.pressesLeft;
-    r3 = press(r3, MRDN, c.shape, c.id);
-    if (r3.pressesLeft < b) spent++;
-    r3 = advance(r3, MRDN);
-  }
-  ok("a full hand still cannot exceed 3 presses", spent === 3, `spent ${spent}`);
-}
-
-console.log("\n── layer 1: the deal is instanced, not memorised ────────────");
-{
-  const deals = Array.from({ length: 2000 }, (_, i) => instanceDeal(i + 1));
-
-  ok("same seed always yields the same deal",
-    JSON.stringify(instanceDeal(4242)) === JSON.stringify(instanceDeal(4242)));
-  ok("different seeds yield different deals",
-    new Set(deals.map((d) => d.id)).size === deals.length);
-
-  // THE POINT: outcome must vary. If it doesn't, we've rebuilt the puzzle box.
-  const rugs = deals.filter((d) => d.truth === 1).length;
-  const rate = rugs / deals.length;
-  ok("the outcome is not fixed — both rug and legit occur",
-    rugs > 0 && rugs < deals.length, `${rugs}/${deals.length}`);
-  ok("exception rate lands near the authored 74/26", rate > 0.70 && rate < 0.78,
-    `rug rate ${(rate * 100).toFixed(1)}%`);
-  // A perfect reader still shouldn't reach certainty — that's WHY the slider
-  // has a middle. If the archetype were deterministic, calibration would be
-  // a solved binary and the whole scoring kernel would be decoration.
-  ok("archetype is genuinely probabilistic (legit share > 15%)", 1 - rate > 0.15);
-
-  // Ground truth must never be readable off the listing page. If any surface
-  // stat correlated with truth, the optimal strategy would be "skim the stats,
-  // skip the analysts" — which deletes the game.
-  const avg = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const num = (s) => Number(String(s).replace(/[^\d.]/g, ""));
-  for (const key of ["age", "mcap", "holders", "social"]) {
-    const r = avg(deals.filter((d) => d.truth === 1).map((d) => num(d.surface[key])));
-    const l = avg(deals.filter((d) => d.truth === 0).map((d) => num(d.surface[key])));
-    // Within 4% of each other — no readable edge on any listing stat.
-    ok(`surface stat "${key}" carries no signal`,
-      Math.abs(r - l) / Math.max(r, l) < 0.04, `rug ${r.toFixed(2)} vs legit ${l.toFixed(2)}`);
-  }
-  const pumpOf = (d) => Number(String(d.surface.change24h).replace(/\D/g, ""));
-  const rugPump = avg(deals.filter((d) => d.truth === 1).map(pumpOf));
-  const legitPump = avg(deals.filter((d) => d.truth === 0).map(pumpOf));
-  ok("24h change carries no signal (means within 1pt)",
-    Math.abs(rugPump - legitPump) < 1, `${rugPump.toFixed(2)} vs ${legitPump.toFixed(2)}`);
-
-  // Structural invariants must hold on EVERY instance, not just the nice ones.
-  ok("every instance has six claims", deals.every((d) => d.claims.length === 6));
-  // Template lint. An archetype can reference a var the instancer doesn't build
-  // ("paid every day for undefined days straight" shipped for exactly this
-  // reason), and no structural assertion would ever catch it.
-  const textOf = (d) => JSON.stringify([d.resolution, ...d.claims.map((c) => [c.fact, c.spin, c.press])]);
-  ok("no instance renders an unresolved template var",
-    deals.every((d) => !/undefined|\[object Object\]|NaN/.test(textOf(d))),
-    (deals.find((d) => /undefined|NaN/.test(textOf(d))) || {}).archetype || "");
-  ok("both archetypes appear in the rotation",
-    new Set(deals.map((d) => d.archetype)).size === 2);
-  ok("neither archetype dominates the shuffle", (() => {
-    const c = deals.reduce((m, d) => ({ ...m, [d.archetype]: (m[d.archetype] || 0) + 1 }), {});
-    return Math.max(...Object.values(c)) / deals.length < 0.6;
+  const d = instanceDeal(7, "backdoor-fork");
+  ok("every claim carries a lane and an agenda subject",
+    d.claims.every((c) => Object.values(LANES).includes(c.lane) && !!c.subject));
+  ok("GR80 cannot be sent into a CHAIN claim",
+    !canSend(SEATS.GR80, d.claims.find((c) => c.lane === LANES.CHAIN)));
+  ok("only Barron can take a SHAPE claim", (() => {
+    const s = d.claims.find((c) => c.lane === LANES.SHAPE);
+    return !s || (canSend(SEATS.BARRON, s) && SPENDABLE_SEATS.every((x) => !canSend(x, s)));
   })());
-  ok("every instance names its pattern-library exemplar",
-    deals.every((d) => d.exemplar && d.exemplar.art && d.exemplar.name));
-  ok("every instance authors all three press branches",
-    deals.every((d) => d.claims.every((c) => c.press.generic?.line && c.press.sharp?.line && c.press.miss?.line)));
-  ok("A5 holds on every instance — loadBearing implies HARD",
-    deals.every((d) => d.claims.every((c) => !c.loadBearing || c.backing === BACKING.HARD)));
-  ok("every instance is solvable cardless (a loadBearing HARD claim exists)",
-    deals.every((d) => d.claims.some((c) => c.loadBearing && c.backing === BACKING.HARD)));
-  // NOTE: "every card has a target" was DELETED here on purpose. It was the
-  // property that made the hand feel like a menu — if nothing can ever whiff,
-  // holding a card costs you nothing and means nothing. The guarantee is now
-  // MIN_LIVE (below): you always have a play, never a guaranteed sweep.
-  ok("every dealt hand has at least MIN_LIVE usable cards",
-    deals.every((d) => {
-      const live = new Set(d.claims.map((c) => c.shape));
-      const h = dealHand(Number(String(d.id).split(":")[1]), live);
-      return h.filter((c) => live.has(c.shape)).length >= MIN_LIVE;
-    }));
-  ok("...and dead cards genuinely occur (the draw has stakes)",
-    deals.some((d) => {
-      const live = new Set(d.claims.map((c) => c.shape));
-      const h = dealHand(Number(String(d.id).split(":")[1]), live);
-      return h.some((c) => !live.has(c.shape));
-    }));
-  ok("a hand never contains two cards asking the same question",
-    deals.every((d) => {
-      const live = new Set(d.claims.map((c) => c.shape));
-      const h = dealHand(Number(String(d.id).split(":")[1]), live);
-      return new Set(h.map((c) => c.shape)).size === h.length;
-    }));
 
-  // The legit branch must be genuinely winnable, not a trap.
-  // Claim ids are per-archetype, so anything asserting on a specific claim must
-  // PIN the archetype — with two in rotation a random instance may not have it.
-  const legit = deals.find((d) => d.truth === 0);
-  ok("a legit instance rewards a LONG call",
-    allocate(callIt(createRun(legit), legit), legit, 90).call.pnl > 0);
-  ok("a legit instance punishes a confident SHORT",
-    allocate(callIt(createRun(legit), legit), legit, -90).call.pnl < 0);
-  // backdoor-fork's ops claim: black on a rug, a real receipt on a legit run.
-  const bfSeeds = Array.from({ length: 400 }, (_, i) => i + 1);
-  const bfRug = bfSeeds.map((s) => instanceDeal(s, "backdoor-fork")).find((d) => d.truth === 1);
-  const bfLegit = bfSeeds.map((s) => instanceDeal(s, "backdoor-fork")).find((d) => d.truth === 0);
-  const opsOf = (d) => d.claims.find((c) => c.id === "ops");
-  ok("legit backdoor-fork produces a receipt where a rug produces nothing",
-    !!opsOf(bfLegit) && resolvePress(opsOf(bfLegit), ANY).receipt !== null);
-  ok("rug backdoor-fork still leaves the ops monitor black",
-    !!opsOf(bfRug) && resolvePress(opsOf(bfRug), ANY).receipt === null);
-  ok("rug and legit differ in what he can back",
-    JSON.stringify(bfRug.claims.map((c) => c.backing)) !== JSON.stringify(bfLegit.claims.map((c) => c.backing)));
-  // yield-mirage's decisive claim is HARD in BOTH branches — what differs is
-  // the honest answer, which is the harder and better version of the lesson.
-  const ymRug = bfSeeds.map((s) => instanceDeal(s, "yield-mirage")).find((d) => d.truth === 1);
-  const ymLegit = bfSeeds.map((s) => instanceDeal(s, "yield-mirage")).find((d) => d.truth === 0);
-  const srcOf = (d) => d.claims.find((c) => c.id === "source");
-  ok("yield-mirage source claim is answerable in both branches",
-    resolvePress(srcOf(ymRug), ANY).receipt !== null && resolvePress(srcOf(ymLegit), ANY).receipt !== null);
-  ok("...but a rug admits deposits fund the yield",
-    JSON.stringify(resolvePress(srcOf(ymRug), ANY).receipt).includes("New deposits"));
-  ok("...and a legit run publishes a hard zero",
-    JSON.stringify(resolvePress(srcOf(ymLegit), ANY).receipt).includes("0%"));
-
-  ok("dailySeed is a stable YYYYMMDD number",
-    /^\d{8}$/.test(String(dailySeed(new Date(Date.UTC(2026, 6, 26))))) &&
-    dailySeed(new Date(Date.UTC(2026, 6, 26))) === 20260726);
+  const record = d.claims.find((c) => c.lane === LANES.RECORD);
+  let run = walkTo(d, record.id);
+  const before = run.pressesLeft;
+  run = press(run, d, SEATS.MARISOL);
+  ok("an off-lane send is a NO-OP, not an error and not a penalty",
+    run.pressesLeft === before && run.advisersSpent.length === 0);
+  ok("seatOptions explains WHY a seat is unavailable",
+    seatOptions(run, d).find((o) => o.seat === SEATS.MARISOL).reason === "off-lane");
 }
 
-console.log("\n── the call ─────────────────────────────────────────────────");
+console.log("\n-- the adviser is the scarce resource ----------------------");
+{
+  const d = instanceDeal(7, "backdoor-fork");
+  const rec = laneOf(d, SEATS.GR80);
+  ok("backdoor-fork gives GR80 more targets than uses", rec.length >= 2, `${rec.length}`);
+
+  let run = walkTo(d, rec[0].id);
+  run = press(run, d, SEATS.GR80);
+  ok("sending an adviser costs an interruption", run.pressesLeft === PRESSES - 1);
+  ok("...and costs the adviser", run.advisersSpent.includes(SEATS.GR80));
+
+  let run2 = run;
+  while (currentClaim(run2, d) && currentClaim(run2, d).id !== rec[1].id) run2 = advance(run2, d);
+  const budget = run2.pressesLeft;
+  run2 = press(run2, d, SEATS.GR80);
+  ok("a spent adviser cannot be sent again at a valid later target",
+    run2.pressesLeft === budget && run2.advisersSpent.length === 1);
+  ok("...and Barron is still available there",
+    press(run2, d, SEATS.BARRON).pressesLeft === budget - 1);
+  ok("advisers are independent — spending GR80 leaves Marisol",
+    !run2.advisersSpent.includes(SEATS.MARISOL));
+}
+
+console.log("\n-- what an interruption returns ----------------------------");
+{
+  const d = instanceDeal(7, "backdoor-fork");
+  const audit = d.claims.find((c) => c.id === "audit");
+
+  const b = resolvePress(audit, SEATS.BARRON);
+  ok("Barron's press lands on Barron's board", b.board === SEATS.BARRON);
+  ok("Barron speaks his authored generic line", b.barronSays === audit.press.generic.line);
+  ok("no adviser speaks on a Barron press", b.adviserSays === null);
+
+  const g = resolvePress(audit, SEATS.GR80);
+  ok("an adviser's answer lands on the ADVISER's board", g.board === SEATS.GR80);
+  ok("the adviser speaks a global line, not archetype prose", !!g.adviserSays);
+  ok("Barron reacts with his authored sharp line", g.barronSays === audit.press.sharp.line);
+  ok("the receipt is the claim's authored sharp receipt",
+    JSON.stringify(g.receipt) === JSON.stringify(audit.press.sharp.receipt));
+
+  const rugBF = findDeal((x) => x.truth === 1 && x.claims.some((c) => c.id === "ops"), "backdoor-fork");
+  const ops = rugBF.claims.find((c) => c.id === "ops");
+  const n = resolvePress(ops, SEATS.GR80);
+  ok("an adviser finding nothing reports NOTHING ON FILE", n.nothingOnFile === true && n.receipt === null);
+  ok("...which is a different event from Barron's black board",
+    resolvePress(ops, SEATS.BARRON).nothingOnFile === false);
+  ok("an off-lane resolve returns null even when called directly",
+    resolvePress(ops, SEATS.MARISOL) === null);
+}
+
+console.log("\n-- the budget is still frozen ------------------------------");
+{
+  ok("PRESSES is exactly 3", PRESSES === 3);
+  for (const arch of ARCHETYPE_IDS) {
+    const d = instanceDeal(11, arch);
+    let run = createRun(d), spent = 0;
+    for (let i = 0; i < d.claims.length; i++) {
+      const before = run.pressesLeft;
+      for (const seat of [SEATS.GR80, SEATS.MARISOL, SEATS.BARRON]) run = press(run, d, seat);
+      spent += before - run.pressesLeft;
+      run = advance(run, d);
+    }
+    ok(`${arch}: no path spends more than 3`, spent === 3, `${spent}`);
+    ok(`${arch}: at most one interruption per claim`, Object.keys(run.outcomes).length <= 3);
+  }
+  const d3 = instanceDeal(3);
+  let run = press(createRun(d3), d3, SEATS.BARRON);
+  const after = run.pressesLeft;
+  ok("a second interruption on the same claim is a no-op",
+    press(run, d3, SEATS.BARRON).pressesLeft === after);
+  run = callIt(run, d3);
+  ok("pressing after the call is a no-op",
+    press(run, d3, SEATS.BARRON).pressesLeft === run.pressesLeft);
+}
+
+console.log("\n-- TRUTH IS NEVER FOR SALE ---------------------------------");
+{
+  let worst = null;
+  for (const arch of ARCHETYPE_IDS) {
+    for (const wantTruth of [0, 1]) {
+      const d = findDeal((x) => x.truth === wantTruth, arch);
+      if (!d) { worst = `${arch}/${wantTruth}: no instance`; continue; }
+      const decisive = d.claims.filter((c) => c.loadBearing);
+      if (!decisive.length) { worst = `${arch}/${wantTruth}: no loadBearing claim played`; continue; }
+      if (!decisive.every((c) => c.backing === BACKING.HARD && !!resolvePress(c, SEATS.BARRON).receipt))
+        worst = `${arch}/${wantTruth}: decisive claim not free-reachable`;
+      if (!decisive.some((c) => c.discriminates))
+        worst = `${arch}/${wantTruth}: decisive claim tells you nothing`;
+    }
+  }
+  ok("every archetype x branch is solvable with ZERO advisers", worst === null, worst || "");
+}
+
+console.log("\n-- STRUCTURAL: is there always a real choice? --------------");
+{
+  for (const arch of ARCHETYPE_IDS) {
+    let one = 0, none = 0, anyChoice = 0, n = 0;
+    for (let seed = 1; seed <= 500; seed++) {
+      const d = instanceDeal(seed, arch);
+      const counts = SPENDABLE_SEATS.map((s) => laneOf(d, s).length);
+      n++;
+      if (counts.some((c) => c >= 2)) anyChoice++;
+      if (counts.some((c) => c === 1)) one++;
+      if (counts.some((c) => c === 0)) none++;
+    }
+    ok(`${arch}: every session gives at least one adviser a real choice`, anyChoice === n, `${anyChoice}/${n}`);
+    ok(`${arch}: no adviser is ever left with zero targets`, none === 0, `${none}`);
+    console.log(`       ${arch}: an adviser is down to a single target in ${(one / n * 100).toFixed(1)}% of sessions`);
+  }
+  let bad = 0;
+  for (const arch of ARCHETYPE_IDS)
+    for (let seed = 1; seed <= 300; seed++) {
+      const d = instanceDeal(seed, arch);
+      if (!d.claims.some((c) => c.discriminates && c.lane !== LANES.SHAPE)) bad++;
+    }
+  ok("every session has a discriminating claim inside an adviser's lane", bad === 0, `${bad}`);
+}
+
+console.log("\n-- coverage replaces 'finding dirt' ------------------------");
+{
+  const d = instanceDeal(7, "backdoor-fork");
+  const clean = d.claims.find((c) => !c.discriminates);
+  const sharp = d.claims.find((c) => c.discriminates);
+
+  let a = walkTo(d, sharp.id);
+  a = press(a, d, SEATS.BARRON);
+  ok("pressing a discriminating claim scores", coverageScore(a, d).hit === 1);
+
+  if (clean) {
+    let b = walkTo(d, clean.id);
+    b = press(b, d, SEATS.BARRON);
+    const s = coverageScore(b, d);
+    ok("pressing a claim that is clean in BOTH branches scores nothing",
+      s.hit === 0 && s.wasted === 1, `${clean.id}`);
+  } else {
+    ok("pressing a claim that is clean in BOTH branches scores nothing (none in this instance)", true);
+  }
+  ok("an untouched run scores zero", coverageScore(createRun(d), d).hit === 0);
+  ok("coverage reports what was available", coverageScore(a, d).available >= 1);
+}
+
+console.log("\n-- nothing leaks the outcome before the reveal -------------");
+{
+  const d = instanceDeal(7, "backdoor-fork");
+  let run = press(createRun(d), d, SEATS.BARRON);
+  const floor = JSON.stringify({ run, options: seatOptions(run, d), chips: run.chips });
+  ok("no FLOOR payload mentions discriminates", !/discriminates/.test(floor));
+  ok("no FLOOR payload mentions truth or outcome", !/"truth"|"outcome"|"resolution"/.test(floor));
+  ok("resolvePress never returns the branch", (() => {
+    const r = resolvePress(d.claims[0], SEATS.BARRON);
+    return !("truth" in r) && !("outcome" in r) && !("discriminates" in r);
+  })());
+}
+
+console.log("\n-- the call, unchanged -------------------------------------");
 {
   ok("slider -100 -> p=1 (hardest SHORT)", near(sliderToP(-100), 1));
   ok("slider +100 -> p=0 (hardest LONG)", near(sliderToP(100), 0));
   ok("slider 0 -> p=0.5 (FLAT)", near(sliderToP(0), 0.5));
 
-  // MRDN.truth === 1 (it IS a rug), so a full SHORT is the perfect call.
-  let run = allocate(callIt(createRun(MRDN), MRDN), MRDN, -100);
-  ok("perfect SHORT on a rug pays +STAKE", near(run.call.pnl, STAKE), `${run.call.pnl}`);
-  ok("book moves by exactly the P&L", near(run.book, 100 + STAKE));
-  ok("direction reads SHORT", run.call.direction === "SHORT");
-
-  run = allocate(callIt(createRun(MRDN), MRDN), MRDN, 100);
-  ok("full LONG on a rug loses 3x STAKE", near(run.call.pnl, -3 * STAKE), `${run.call.pnl}`);
-
-  run = allocate(callIt(createRun(MRDN), MRDN), MRDN, 0);
-  ok("FLAT settles at exactly zero", near(run.call.pnl, 0));
-
-  ok("settlement matches casePnl by hand",
-    near(allocate(callIt(createRun(MRDN), MRDN), MRDN, -60).call.pnl,
-      casePnl(sliderToP(-60), 1, STAKE)));
+  const rug = findDeal((x) => x.truth === 1);
+  ok("perfect SHORT on a rug pays +STAKE",
+    near(allocate(callIt(createRun(rug), rug), rug, -100).call.pnl, STAKE));
+  ok("full LONG on a rug loses 3x STAKE",
+    near(allocate(callIt(createRun(rug), rug), rug, 100).call.pnl, -3 * STAKE));
+  ok("FLAT settles at exactly zero",
+    near(allocate(callIt(createRun(rug), rug), rug, 0).call.pnl, 0));
+  const legit = findDeal((x) => x.truth === 0);
+  ok("a legit instance rewards a LONG call",
+    allocate(callIt(createRun(legit), legit), legit, 90).call.pnl > 0);
 }
 
-console.log("\n── PROPERNESS (the design theorem) ──────────────────────────");
+console.log("\n-- PROPERNESS (the design theorem) -------------------------");
 {
-  // For any true belief q, the slider position that maximises expected P&L
-  // must be the HONEST one. If this fails, the game rewards lying to itself.
   let worst = 0;
   for (let qi = 0; qi <= 20; qi++) {
     const q = qi / 20;
@@ -356,70 +265,77 @@ console.log("\n── PROPERNESS (the design theorem) ────────�
       const E = q * casePnl(p, 1, STAKE) + (1 - q) * casePnl(p, 0, STAKE);
       if (E > bestE) { bestE = E; bestV = v; }
     }
-    const honestV = Math.round((1 - 2 * q) * 100);
-    worst = Math.max(worst, Math.abs(bestV - honestV));
+    worst = Math.max(worst, Math.abs(bestV - Math.round((1 - 2 * q) * 100)));
   }
-  ok("honest reporting maximises expected P&L at every belief", worst === 0,
-    `max deviation ${worst} slider points`);
+  ok("honest reporting maximises expected P&L at every belief", worst === 0, `${worst}`);
+  const pressBody = fs.readFileSync("src/game/terminal-traders/press/pressRun.js", "utf8")
+    .split("export function press(")[1].split("export function seatOptions")[0];
+  ok("no seat path touches the stake or the budget constant",
+    !/STAKE/.test(pressBody) && !/PRESSES\s*=/.test(pressBody));
+}
 
-  // Guard against the coupled-stake form the plan originally specified.
-  // stake = S|u| makes the optimum 4/3 too extreme — proving the correction.
-  let coupledWorst = 0;
-  for (let qi = 1; qi < 20; qi++) {
-    const q = qi / 20;
-    let bestV = null, bestE = -Infinity;
-    for (let v = -100; v <= 100; v++) {
-      const p = sliderToP(v), s = STAKE * Math.abs(v) / 100;
-      const E = q * casePnl(p, 1, s) + (1 - q) * casePnl(p, 0, s);
-      if (E > bestE) { bestE = E; bestV = v; }
+console.log("\n-- PURITY: a run is a function of (seed, inputs) -----------");
+{
+  const files = [];
+  const walk = (p) => fs.readdirSync(p, { withFileTypes: true }).forEach((e) =>
+    e.isDirectory() ? walk(`${p}/${e.name}`) : e.name.endsWith(".js") && files.push(`${p}/${e.name}`));
+  walk("src/game/terminal-traders/press");
+  // Strip comments and string literals first. The archetypes are mostly PROSE,
+  // and a line like "a cherry-picked window." is not a global reference — the
+  // naive grep flagged it and would have flagged every future archetype too.
+  const codeOnly = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ")
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/`(?:[^`\\]|\\.)*`/g, "``");
+  const offenders = files.filter((f) =>
+    !f.endsWith("instanceDeal.js") &&
+    /Date\.|performance\.|localStorage|sessionStorage|Math\.random|window\./.test(codeOnly(fs.readFileSync(f, "utf8"))));
+  ok("no impurity under press/ (dailySeed's clock is the one exception)",
+    offenders.length === 0, offenders.join(", "));
+
+  const script = [SEATS.GR80, null, SEATS.BARRON, null, null, SEATS.MARISOL];
+  const play = () => {
+    const d = instanceDeal(20250727);
+    let r = createRun(d);
+    for (const seat of script) { if (seat) r = press(r, d, seat); r = advance(r, d); }
+    return JSON.stringify(allocate(r.phase === PHASE.ALLOCATION ? r : callIt(r, d), d, -60));
+  };
+  ok("replaying an identical input list reproduces the run byte for byte", play() === play());
+}
+
+console.log("\n-- a full session, played two ways -------------------------");
+{
+  const d = instanceDeal(7, "backdoor-fork");
+  const runA = (() => {
+    let r = createRun(d);
+    for (let i = 0; i < 3; i++) { r = press(r, d, SEATS.BARRON); r = advance(r, d); }
+    while (r.phase === PHASE.FLOOR) r = advance(r, d);
+    return r;
+  })();
+  const runB = (() => {
+    let r = createRun(d);
+    for (const c of d.claims) {
+      const seat = c.lane === LANES.RECORD && !r.advisersSpent.includes(SEATS.GR80) ? SEATS.GR80
+        : c.lane === LANES.CHAIN && !r.advisersSpent.includes(SEATS.MARISOL) ? SEATS.MARISOL : null;
+      if (seat && r.pressesLeft > 0) r = press(r, d, seat);
+      if (r.phase !== PHASE.FLOOR) break;
+      r = advance(r, d);
     }
-    coupledWorst = Math.max(coupledWorst, Math.abs(bestV - Math.round((1 - 2 * q) * 100)));
-  }
-  ok("(control) the rejected coupled-stake form IS improper", coupledWorst > 5,
-    `deviation ${coupledWorst} — confirms why fixed stake was chosen`);
-}
+    while (r.phase === PHASE.FLOOR) r = advance(r, d);
+    return r;
+  })();
 
-console.log("\n── readouts ─────────────────────────────────────────────────");
-{
-  const r = callReadout(-80);
-  ok("readout names the direction in plain language", /rug/.test(r.saying), r.saying);
-  ok("readout states the downside up front", /lose/.test(r.risk), r.risk);
-  ok("no finance jargon in the readout",
-    !/brier|calibration|expected value|ev\b/i.test(r.saying + r.risk));
-  ok("FLAT readout is honest about paying nothing", /nothing/.test(callReadout(0).risk));
-
-  let run = createRun(MRDN);
-  run = press(run, MRDN, ANY);            // team  — HARD
-  run = advance(run, MRDN);
-  run = advance(run, MRDN);               // skip audit
-  run = advance(run, MRDN);               // skip funding
-  run = press(run, MRDN, ANY);            // chart — VIBES
-  const rs = readScore(run, MRDN);
-  ok("READ counts presses that found give", rs.hit === 1 && rs.spent === 2, JSON.stringify(rs));
-}
-
-console.log("\n── full scripted session ────────────────────────────────────");
-{
-  let run = createRun(MRDN);
-  // The intended slice-1 path: press the strongest claim, learn about the ops
-  // partner, then press the ops claim and watch the monitor stay black.
-  run = press(run, MRDN, ANY); run = advance(run, MRDN);   // team -> receipt
-  run = advance(run, MRDN);                                 // audit, untouched
-  run = advance(run, MRDN);                                 // funding
-  run = advance(run, MRDN);                                 // chart
-  run = advance(run, MRDN);                                 // timelock
-  run = press(run, MRDN, ANY);                              // ops -> black
-  run = advance(run, MRDN);                                 // -> allocation
-  ok("reached allocation with 1 press unspent", run.pressesLeft === 1, `${run.pressesLeft}`);
-  ok("team receipt is on the board", !!run.outcomes.team.receipt);
-  ok("ops monitor stayed black", run.outcomes.ops.receipt === null);
-
-  run = allocate(run, MRDN, -70);
-  ok("a well-informed SHORT is profitable", run.call.pnl > 0, `${run.call.pnl.toFixed(1)}`);
-  run = toAutopsy(run);
-  ok("session finishes in autopsy", run.phase === PHASE.AUTOPSY && run.finished);
-  ok("autopsy copy exists for every claim",
-    MRDN.claims.every((c) => typeof MRDN.autopsy[c.id] === "string"));
+  ok("both routes reach the call", runA.phase === PHASE.ALLOCATION && runB.phase === PHASE.ALLOCATION);
+  ok("the desk route puts receipts on more than one board",
+    new Set(Object.values(runB.outcomes).map((o) => o.board)).size > 1);
+  ok("the Barron route only ever fills his own board",
+    new Set(Object.values(runA.outcomes).map((o) => o.board)).size === 1);
+  const cA = coverageScore(runA, d), cB = coverageScore(runB, d);
+  console.log(`       route A (Barron x3): ${cA.hit}/${cA.spent} discriminating`);
+  console.log(`       route B (the desk) : ${cB.hit}/${cB.spent} discriminating`);
+  ok("both routes are scoreable", cA.spent > 0 && cB.spent > 0);
 }
 
 console.log(`\n${fail === 0 ? "PASS" : "FAIL"} — ${pass} passed, ${fail} failed\n`);

@@ -73,6 +73,12 @@ export function createEvidenceScreen({ station = "demon", header = "EVIDENCE", f
 function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, release }) {
   let header = header0;
   let receipt = null;
+  // An ACTIVE negative: somebody was sent, searched, and came back with an
+  // absence. Deliberately not the same state as `receipt === null`, which is
+  // just a board nobody has put anything on. Proving a negative is the only
+  // thing an adviser can do that Barron structurally cannot, so it needs its
+  // own picture.
+  let empty = null;   // { title, query }
   let carrier = Array.from({ length: 7 }, () => randLine());
   let tick = 0;
   let live = true;
@@ -92,8 +98,8 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
     ctx.fillStyle = CY;
     ctx.fillText(`LIMINAL // ${header}`, 14, 22);
     ctx.textAlign = "right";
-    ctx.fillStyle = receipt ? GOLD : CY_DIM;
-    ctx.fillText(receipt ? "ON RECORD" : "NO RECORD", w - 14, 22);
+    ctx.fillStyle = receipt ? GOLD : empty ? "#ff9b6f" : CY_DIM;
+    ctx.fillText(receipt ? "ON RECORD" : empty ? "SEARCHED" : "NO RECORD", w - 14, 22);
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(47,214,214,0.25)";
     ctx.fillRect(14, 28, w - 28, 1);
@@ -128,6 +134,37 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
         ctx.fillText(String(value), x + bw - 12, ry);
         ctx.textAlign = "left";
       });
+    } else if (empty) {
+      // Same footprint as a receipt so the eye reads "a result arrived", but
+      // dashed, cold, and struck through — a query that returned zero rows,
+      // not a gold fact. The rule under it is what makes the absence mean
+      // something: he did not decline to answer, there is nothing to answer with.
+      const x = 12, y = 44, bw = w - 24, bh = 104;
+      ctx.fillStyle = "rgba(2,16,14,0.94)";
+      ctx.fillRect(x, y, bw, bh);
+      ctx.strokeStyle = "#ff9b6f";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 5]);
+      ctx.strokeRect(x + 1, y + 1, bw - 2, bh - 2);
+      ctx.setLineDash([]);
+
+      ctx.font = "bold 14px 'Courier New', monospace";
+      ctx.fillStyle = "#ff9b6f";
+      ctx.fillText("\u2298 NOTHING ON FILE", x + 12, y + 26);
+
+      ctx.font = "12px 'Courier New', monospace";
+      ctx.fillStyle = "rgba(234,255,249,0.62)";
+      ctx.fillText("SEARCHED", x + 12, y + 52);
+      ctx.fillStyle = WHITE;
+      ctx.textAlign = "right";
+      ctx.fillText(String(empty.query || "\u2014").toUpperCase(), x + bw - 12, y + 52);
+      ctx.textAlign = "left";
+
+      ctx.fillStyle = "rgba(255,155,111,0.35)";
+      ctx.fillRect(x + 12, y + 68, bw - 24, 1);
+      ctx.font = "11px 'Courier New', monospace";
+      ctx.fillStyle = "rgba(255,155,111,0.9)";
+      ctx.fillText("0 RESULTS \u00b7 NOT REDACTED \u2014 ABSENT", x + 12, y + 88);
     } else if (tick % 2 === 0) {
       ctx.fillStyle = CY;
       ctx.fillRect(14, h - 26, 8, 13);
@@ -151,10 +188,13 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
   draw(); // VideoScreens may mount after us; the interval retries until it lands.
 
   return {
-    stamp(next) { receipt = next || null; draw(); },
-    stayBlack() { receipt = null; draw(); },
+    stamp(next) { receipt = next || null; empty = null; draw(); },
+    /** An adviser looked and found nothing. Not the same as a blank board. */
+    stampNothing(query) { receipt = null; empty = { query: query || "" }; draw(); },
+    stayBlack() { receipt = null; empty = null; draw(); },
     setHeader(t) { header = t; draw(); },
     hasReceipt() { return !!receipt; },
+    hasSearched() { return !!empty; },
     /** Hand the monitor back to the ambient painters (no-op when flat). */
     release() { release(getCanvas()); },
     dispose() {

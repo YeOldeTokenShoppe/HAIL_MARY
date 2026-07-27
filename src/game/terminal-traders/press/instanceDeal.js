@@ -19,6 +19,22 @@ export const ARCHETYPES = {
 };
 export const ARCHETYPE_IDS = Object.keys(ARCHETYPES);
 
+/**
+ * Does this slot DISCRIMINATE — i.e. can pressing it tell you which branch
+ * you're in? Compares only what the player can actually observe: the backing
+ * and the two receipts. Not the prose, because the prose can differ in wording
+ * while saying the same thing.
+ *
+ * `funding` in backdoor-fork is the case that makes this worth computing: it's
+ * HARD in both branches with identical receipts, so it's the impressive-sounding
+ * claim that tells you nothing. A salesman disguises materiality on purpose;
+ * scoring coverage of the discriminating claims is what teaches that.
+ */
+function slotDiscriminates(slot) {
+  const obs = (b) => JSON.stringify([b.backing, b.generic?.receipt ?? null, b.sharp?.receipt ?? null]);
+  return obs(slot.rug) !== obs(slot.legit);
+}
+
 const pick = (rand, arr) => arr[Math.floor(rand() * arr.length)];
 const between = (rand, lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));
 
@@ -92,6 +108,15 @@ export function instanceDeal(seed = 1, archetypeId = null) {
       id: slot.id,
       speaker: "demon",
       shape: slot.shape,
+      // Which adviser could settle this, and its agenda-rail label. The lane
+      // is public from second zero — the game is materiality and timing (which
+      // claim inside a lane deserves the one use), not a lane map you memorise.
+      lane: slot.lane,
+      subject: slot.subject,
+      // Does pressing this claim tell you WHICH BRANCH you're in? Derived from
+      // the authored data rather than hand-tagged, so it can never drift out of
+      // sync with the prose. Never sent to the FLOOR — autopsy only.
+      discriminates: slotDiscriminates(slot),
       // loadBearing only means anything when there IS something to find.
       loadBearing: !!slot.loadBearing,
       fact: resolve(slot.fact),

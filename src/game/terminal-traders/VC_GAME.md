@@ -57,13 +57,29 @@ verb. The fixes, in order of importance:
 | **SOFT** | a range and an honest hedge | grey half-receipt |
 | **VIBES** | louder, faster, still no number | **stays black** |
 
-On mobile a press **cuts** to his screen, so the absence is something you went
-and looked at rather than something you failed to notice. The cut lands when he
-**stops talking**, not when you press: he keeps the frame for the whole answer,
-and the board is the punchline after it. Cutting on the press meant hearing the
-reply over a panel that hadn't changed yet, and never watching him deliver it.
-Everything the reveal touches waits with it — the receipt stamps as you arrive,
-and the tab badge no longer announces `ON RECORD` mid-sentence.
+On mobile the absence is something **you go and look at**. Three beats:
+
+1. **He answers, holding the frame.** You watch him deliver it. Nothing on the
+   surface interprets it yet — the panel under his words says only that he's
+   still talking.
+2. **He stops. The board changes silently and the `HIS SCREEN` tab pulses**,
+   with a directive under his answer. The pulse is *cyan* — gold is the
+   receipt colour, and pulsing gold would announce a receipt before you'd been
+   to see one.
+3. **You go.** The verdict, the panel's colour and the tab badge all land at
+   once, when you arrive.
+
+Two earlier shapes were both wrong, and the reasons generalise. Cutting to the
+board **on the press** put it up as he started talking: you heard the reply over
+a panel that hadn't changed and never watched him deliver it. Cutting when he
+**finished** fixed the timing but did the looking for you, which is the one
+thing this beat exists to make you do.
+
+**Nothing may name the outcome before the reveal.** The verdict copy, the
+answer panel's border colour and the tab badge are all derived from data
+available the instant you press, so each one leaks by default and each is
+explicitly gated. Not looking is allowed — it's the same forfeiting choice as
+not pressing.
 
 ---
 

@@ -1,14 +1,14 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, dailySeed } from "@/game/terminal-traders/press/instanceDeal";
-import { ANY, BACKING } from "@/game/terminal-traders/press/questions";
-import { dealHand } from "@/game/terminal-traders/press/hand";
+import { BACKING, SEATS, SEAT_LANE, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
+import { DESK, EUGENE, eugeneRead } from "@/game/terminal-traders/press/desk";
 import {
   PHASE, PRESSES,
-  createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
-  allocate as doAllocate, toAutopsy, currentClaim, callReadout, readScore,
+  createRun, press as doPress, advance as doAdvance, callIt as doCallIt, seatOptions,
+  allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore,
 } from "@/game/terminal-traders/press/pressRun";
-import { toDealCard, toExemplarCard, toQuestionCard, toCharacterCard } from "@/game/terminal-traders/press/dealCard";
+import { toDealCard, toExemplarCard, toCharacterCard } from "@/game/terminal-traders/press/dealCard";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
 import TradingCard from "@/components/TradingCard";
 import PressFigure from "./PressFigure";
@@ -82,10 +82,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     return instanceDeal(Number.isFinite(forced) && forced > 0 ? forced : dailySeed());
   }, [dealOverride]);
 
-  const hand = useMemo(() => {
-    const live = new Set(deal.claims.map((c) => c.shape));
-    return dealHand(Number(String(deal.id).split(":")[1]) || 1, live);
-  }, [deal]);
+  // THE DESK, not a hand. The deal still lays out five cards — the choreography
+  // in ./cardDeal is untouched — but slots 1-4 are now the four people rather
+  // than a speaker plus three questions. You're dealt the room.
+  const DESK_ORDER = useMemo(() => [
+    { ...DESK[SEATS.BARRON], cardId: "john-barron" },
+    { ...DESK[SEATS.MARISOL], cardId: "marisol" },
+    { ...DESK[SEATS.GR80], cardId: "gr80" },
+    { ...EUGENE, cardId: "eugene" },
+  ], []);
 
   const [run, setRun] = useState(() => createRun(deal));
   const [slider, setSlider] = useState(0);
@@ -100,8 +105,17 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // Mirrored into state because the tab label reads it during render — a ref
   // would never re-render and the badge would stay stale after a press.
   const [hasRecord, setHasRecord] = useState(false);
+  const [boardPane, setBoardPane] = useState(SEATS.BARRON);
+  // He's answered and the board has changed, and you HAVEN'T LOOKED YET.
+  // Until you do, nothing on this surface may name the outcome — see the tab
+  // badge and .pf-answer below.
+  const [lookPending, setLookPending] = useState(false);
   const screenRef = useRef(null);
   const readRef = useRef(null);
+  // The deferred reveal fires from a closure that would otherwise capture a
+  // stale `pane`, and it has to know whether you're already looking.
+  const paneRef = useRef("feed");
+  useEffect(() => { paneRef.current = pane; }, [pane]);
   const gyro = useGyroTilt(true);
 
   /* ---- the deal ----
@@ -115,7 +129,12 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const [dealing, setDealing] = useState(false);
   const [landed, setLanded] = useState(0);
   const identity = dealt || landed >= 1;      // slot 0 — the deal card
-  const speakerNamed = dealt || landed >= 2;  // slot 1 — who's pitching
+  // The desk no longer flips. Dealing the four characters was ceremony for a
+  // DRAW, and there is no draw any more — the same four people are at the desk
+  // every session, so turning them face-down and back over was theatre for a
+  // non-event. The one genuinely unknown thing is the deal, so that is the one
+  // card that still lands face-down and turns. (author, 2026-07-27)
+  const speakerNamed = true;
   const deckRef = useRef(null);
   const slotRefs = useRef([]);
   const scrollRef = useRef(null);
@@ -176,26 +195,47 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
   const dealCard = useMemo(() => toDealCard(deal), [deal]);
   const patternCard = useMemo(() => toExemplarCard(deal), [deal]);
-  const speakerCard = useMemo(() => toCharacterCard("john-barron"), []);
-  const handCards = useMemo(() => hand.map((q) => ({ q, data: toQuestionCard(q) })), [hand]);
+  const deskCards = useMemo(
+    () => DESK_ORDER.map((m) => ({ m, data: toCharacterCard(m.cardId, m.role) })), [DESK_ORDER]);
+  const speakerCard = deskCards[0]?.data;
+  // Who can be sent at the claim on the floor, and why not. Straight from the
+  // controller so the button states can never disagree with the rules.
+  const options = useMemo(() => seatOptions(run, deal), [run, deal]);
   const readout = useMemo(() => callReadout(slider), [slider]);
-  const read = useMemo(() => readScore(run, deal), [run, deal]);
+  const read = useMemo(() => coverageScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
   // A press is legal only while he's on a claim you haven't already answered
   // and you still have budget. The dock shows the press affordances ONLY then
   // — see the note on .pf-dock below for why that's structural, not cosmetic.
   const canPress = run.pressesLeft > 0 && !pressed;
   const lastClaim = run.claimIndex >= deal.claims.length - 1;
-  const cardsLeft = hand.length - run.cardsSpent.length;
+  const advisersLeft = SPENDABLE_SEATS.filter((x) => !run.advisersSpent.includes(x)).length;
+  // Eugene is free and automatic — he reads the shape of every claim and points
+  // at whose lane it is. He never stamps a receipt, so he can never carry the
+  // answer; he only tells you who COULD settle it.
+  const eugeneLine = useMemo(() => (claim ? eugeneRead(claim) : ""), [claim]);
 
   /* ---- the evidence screen, as an actual on-screen terminal ---- */
+  // THREE boards, not one. Barron's, Marisol's and GR80's — Eugene never
+  // stamps anything, by design, so he has no board to keep. Only one is on
+  // screen at a time; the strip below is how you move between them.
+  const BOARDS = useMemo(() => [SEATS.BARRON, SEATS.MARISOL, SEATS.GR80], []);
+  const screensRef = useRef({});
   useEffect(() => {
-    const el = document.getElementById("pf-screen-canvas");
-    if (!el) return;
-    const s = createFlatEvidenceScreen(el, { header: "BARRON" });
-    screenRef.current = s;
-    return () => { s.dispose(); screenRef.current = null; };
-  }, [started]);
+    if (!started) return;
+    const made = {};
+    for (const seat of BOARDS) {
+      const el = document.getElementById(`pf-screen-${seat}`);
+      if (!el) continue;
+      made[seat] = createFlatEvidenceScreen(el, { header: DESK[seat].name.toUpperCase() });
+    }
+    screensRef.current = made;
+    screenRef.current = made[SEATS.BARRON] || null;
+    return () => {
+      Object.values(made).forEach((x) => x.dispose());
+      screensRef.current = {}; screenRef.current = null;
+    };
+  }, [started, BOARDS]);
 
   /* ---- he says it out loud ----
      Token-guarded. A press interrupts the claim he's mid-way through, so two
@@ -225,7 +265,8 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   /* ---- the reading column follows the beat ----
      His answer renders BELOW the claim, so on a short screen it lands out of
      view in the one moment it's the whole point. Bring it up when it arrives,
-     and go back to the top when he starts the next claim. */
+     again when the LOOK directive replaces the note under it, and go back to
+     the top when he starts the next claim. */
   useEffect(() => {
     if (!flash) return;
     const el = readRef.current;
@@ -233,7 +274,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     const id = requestAnimationFrame(() =>
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }));
     return () => cancelAnimationFrame(id);
-  }, [flash]);
+  }, [flash, lookPending]);
 
   useEffect(() => { readRef.current?.scrollTo({ top: 0 }); }, [run.claimIndex]);
 
@@ -258,53 +299,85 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const revealFor = useRef(null);
   const MIN_BEAT = 1400;  // if his voice is unavailable, the beat still exists
 
-  const press = useCallback((question = ANY, card = null) => {
-    if (!onFloor || run.pressesLeft <= 0 || !claim || run.outcomes[claim.id]) return;
-    if (card && run.cardsSpent.includes(card.id)) return;
-    const next = doPress(run, deal, question, card?.id ?? null);
-    if (next === run) return;
+  const press = useCallback((seat = SEATS.BARRON) => {
+    if (!onFloor) return;
+    const next = doPress(run, deal, seat);
+    if (next === run) return;   // illegal, spent, or out of budget — a no-op
     const outcome = next.outcomes[claim.id];
     setRun(next);
+    // `revealed:false` — the verdict copy and the panel's colour are both
+    // derived from data we have RIGHT NOW, so without this flag they render
+    // the instant you press and describe a board that hasn't changed yet.
+    // Subtitling his answer is fine; interpreting it before he's finished
+    // saying it is not.
     setFlash({
-      id: claim.id, line: outcome.line, backing: outcome.backing,
-      wasted: outcome.wasted, named: outcome.named,
-      asked: card ? card.question : "Put a number on it.",
+      id: claim.id, backing: outcome.backing, revealed: false,
+      seat: outcome.seat, board: outcome.board,
+      nothingOnFile: outcome.nothingOnFile,
+      adviserSays: outcome.adviserSays,
+      line: outcome.barronSays,
+      asked: outcome.seat === SEATS.BARRON
+        ? "Put a number on it."
+        : `${DESK[outcome.seat].name} — ${DESK[outcome.seat].role}`,
     });
 
     // You INTERRUPTED him — so he stops the sentence he was on and answers.
     // Without this the claim line and the reply play over each other.
     try { stopAdviserAudio(); } catch {}
 
-    // HE KEEPS THE FRAME WHILE HE ANSWERS. The cut used to fire on the press,
-    // which meant the board replaced him at the exact moment he started
-    // talking: you heard the answer over a panel that hadn't changed yet, and
-    // never saw him deliver it. The board is the PUNCHLINE, so it lands when
-    // he stops — and the receipt stamps as you arrive rather than behind your
-    // back. Everything the reveal touches waits with it, including the tab
-    // badge, which otherwise announced ON RECORD while he was mid-sentence.
+    // HE KEEPS THE FRAME WHILE HE ANSWERS, THEN YOU GO AND LOOK.
+    //
+    // Two earlier shapes were both wrong. Cutting on the press put the board
+    // up at the exact moment he started talking — you heard the reply over a
+    // panel that hadn't changed yet and never watched him deliver it. Cutting
+    // when he FINISHED fixed the timing but still did the looking for you,
+    // and the whole point of the beat (VC_GAME.md §2) is that the absence is
+    // something you went and looked at rather than something you were shown.
+    //
+    // So: the board updates silently when he stops, the tab pulses, and the
+    // answer panel points at it. Until you actually go, NOTHING names the
+    // outcome — not the badge, not the panel's colour. Pressing on without
+    // looking is allowed; it's the same forfeiting choice as not pressing.
     const owed = claim.id;
     revealFor.current = owed;
     Promise.all([say(outcome.line), new Promise((r) => setTimeout(r, MIN_BEAT))])
       .then(() => {
         if (revealFor.current !== owed) return;   // you moved on; the beat is void
         revealFor.current = null;
-        if (outcome.receipt) screenRef.current?.stamp(outcome.receipt);
-        else screenRef.current?.stayBlack();
+        // The answer lands on whoever went and got it. An adviser who found
+        // nothing stamps NOTHING ON FILE — an absence somebody independently
+        // looked for, which is a different and stronger thing than Barron's
+        // board simply staying dark.
+        const board = screensRef.current[outcome.board];
+        if (outcome.receipt) board?.stamp(outcome.receipt);
+        else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
+        else board?.stayBlack();
+        setBoardPane(outcome.board);
         setHasRecord(!!outcome.receipt);
-        setPane("screen");   // receipt, or conspicuous nothing
+        setFlash((f) => (f && f.id === owed ? { ...f, revealed: true } : f));
+        // Already sitting on his screen? Then you watched it land and there's
+        // nothing to send you anywhere.
+        setLookPending(paneRef.current !== "screen");
       });
   }, [run, deal, claim, onFloor, say]);
+
+  // The one door to his screen — going there is what marks the reveal seen.
+  const lookAtScreen = useCallback(() => { setPane("screen"); setLookPending(false); }, []);
 
   const advance = useCallback(() => {
     revealFor.current = null;
     setFlash(null);
     setPane("feed");     // new claim, back to his face
+    setBoardPane(SEATS.BARRON);
+    Object.values(screensRef.current).forEach((x) => x.stayBlack());
     setHasRecord(false);
+    setLookPending(false);
     setRun((r) => doAdvance(r, deal));
   }, [deal]);
   const callIt = useCallback(() => {
     revealFor.current = null;
     setFlash(null);
+    setLookPending(false);
     setRun((r) => doCallIt(r, deal));
   }, [deal]);
   const lockCall = useCallback(() => setRun((r) => doAllocate(r, deal, slider)), [deal, slider]);
@@ -380,25 +453,21 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
             {speakerNamed ? "he" : "they"} can back lands on {speakerNamed ? "his" : "their"}{" "}
             screen. Whatever {speakerNamed ? "he" : "they"} can't, doesn't.
           </p>
-          <div className="pf-label">{dealt ? "YOU DREW" : "YOUR HAND"}</div>
+          <div className="pf-label">THE DESK — always these four</div>
           <div className="pf-strip" ref={stripRef}>
-            {speakerCard && (
-              <button className="pf-thumb" onClick={() => dealt && setInspect(speakerCard)}>
-                <DealtSlot index={1} scale={0.15} register={registerSlot}>
-                  <TradingCard data={speakerCard} scale={0.15} interactive={false} templateStyle="terminal" />
-                </DealtSlot>
-                <span className="pf-cap">PITCHING</span>
-              </button>
-            )}
-            {handCards.map(({ q, data }, i) => (
-              <button key={q.id} className="pf-thumb" onClick={() => dealt && setInspect(data)}>
-                <DealtSlot index={2 + i} scale={0.15} register={registerSlot}>
-                  <TradingCard data={data} scale={0.15} interactive={false} templateStyle="terminal" />
-                </DealtSlot>
-                <span className="pf-cap">{q.name}</span>
+            {deskCards.map(({ m, data }) => (
+              <button key={m.id} className="pf-thumb" onClick={() => setInspect(data)}>
+                <TradingCard data={data} scale={0.15} interactive={false} templateStyle="terminal" />
+                <span className="pf-cap">{m.role}</span>
               </button>
             ))}
           </div>
+          {dealt && (
+            <p className="pf-copy sm dim">
+              Marisol and GR80 will each answer <b>one</b> claim, in their own lane.
+              Barron you can press as often as you like. Eugene reads every claim for free.
+            </p>
+          )}
           {/* Sticky: on a phone this column is taller than the screen, and the
               deck has to stay visible or the cards fly out of nowhere. */}
           <div className="pf-cta-row">
@@ -418,9 +487,16 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
             <button className={pane === "feed" ? "on" : ""} onClick={() => setPane("feed")}>
               ◉ BARRON{speaking && <em> · speaking</em>}
             </button>
-            <button className={pane === "screen" ? "on" : ""} onClick={() => setPane("screen")}>
+            {/* THE BADGE MAY NOT ANSWER THE QUESTION THE BOARD IS THERE TO
+                ANSWER. While the look is pending it says only that there IS
+                something — "ON RECORD" here would hand you the outcome from
+                the tab bar and make going to look pointless. */}
+            <button className={`${pane === "screen" ? "on" : ""}${lookPending ? " look" : ""}`}
+                    onClick={lookAtScreen}>
               ▤ HIS SCREEN
-              <em className={hasRecord ? "rec" : ""}>{hasRecord ? " · ON RECORD" : " · no record"}</em>
+              <em className={lookPending ? "" : hasRecord ? "rec" : ""}>
+                {lookPending ? " · LOOK" : hasRecord ? " · ON RECORD" : " · no record"}
+              </em>
             </button>
           </div>
           <div className="pf-stage">
@@ -428,8 +504,45 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               <PressFigure speaking={speaking} />
             </div>
             <div className={`pf-pane wide ${pane === "screen" ? "show" : ""}`}>
-              <div className="pf-screen"><canvas id="pf-screen-canvas" width={512} height={320} /></div>
+              {/* One board full-width — four canvases side by side on a phone
+                  would render ~4.5px type, since evidenceScreen draws at fixed
+                  offsets against 512x320. The strip underneath is the
+                  comparison, in text, and it's how you reach the others. */}
+              <div className="pf-boards">
+                {BOARDS.map((seat) => (
+                  <div key={seat} className={`pf-screen ${boardPane === seat ? "show" : ""}`}>
+                    <canvas id={`pf-screen-${seat}`} width={512} height={320} />
+                  </div>
+                ))}
+                <div className="pf-bstrip">
+                  {BOARDS.map((seat) => {
+                    const sc = screensRef.current[seat];
+                    const state = sc?.hasReceipt?.() ? "rec" : sc?.hasSearched?.() ? "nil" : "";
+                    return (
+                      <button key={seat} className={`pf-bchip ${boardPane === seat ? "on" : ""} ${state}`}
+                              onClick={() => setBoardPane(seat)}>
+                        {DESK[seat].role}
+                        <em>{state === "rec" ? "ON RECORD" : state === "nil" ? "NOTHING" : "—"}</em>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* THE AGENDA. Every subject he'll cover, from second zero — without
+              it, holding an adviser back is a blind bet and everyone spends on
+              the first thing they see. Lane dots say who COULD settle each one;
+              they never say whether it's worth settling. */}
+          <div className="pf-agenda">
+            {deal.claims.map((c, i) => (
+              <span key={c.id}
+                    className={`pf-ag ${i < run.claimIndex ? "past" : ""} ${i === run.claimIndex ? "now" : ""} ${run.outcomes[c.id] ? "done" : ""}`}
+                    data-lane={c.lane}>
+                {c.subject}
+              </span>
+            ))}
           </div>
 
           {/* THE ONLY THING ON THE FLOOR THAT SCROLLS. Tabs, feed and dock are
@@ -446,20 +559,47 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 <span className="pf-count">{run.claimIndex + 1} / {deal.claims.length}</span>
               </div>
               <div className="pf-spin">“{claim.spin}”</div>
+              {/* THE LANE, STATED. The seat row enforces this, but enforcement
+                  without explanation reads as a broken button — the first
+                  playtest note was "can't tell why only GR80 is available".
+                  Say whose question it is, at a size you can actually read. */}
+              <div className="pf-lane" data-lane={claim.lane}>
+                {claim.lane === LANES.SHAPE
+                  ? "NOBODY HERE CAN SETTLE THIS ONE — press him or let it go"
+                  : `${claim.lane} QUESTION — only ${DESK[claim.lane === LANES.CHAIN ? SEATS.MARISOL : SEATS.GR80].name} can settle it`}
+              </div>
               <div className="pf-fact"><span className="pf-tag">FACT</span> {claim.fact}</div>
+              {/* Eugene, free, on every claim. He names the SHAPE of the claim
+                  and whose lane could settle it — never whether it's true. He
+                  has no board and stamps nothing, so he can't carry an answer. */}
+              <div className="pf-eugene">
+                <span className="pf-eu-who">EUGENE</span>
+                <span className="pf-eu-line">{eugeneLine}</span>
+              </div>
             </div>
 
             {flash && flash.id === claim.id && (
-              <div className={`pf-answer ${flash.wasted ? "wasted" : flash.backing === BACKING.VIBES ? "vibes" : ""}`}>
+              /* The panel's COLOUR is a tell too — grey for vibes, grey for a
+                 wasted card. Held back with the verdict, so every answer looks
+                 identical until he's finished and you've been to the board. */
+              <div className={`pf-answer ${!flash.revealed ? "" : flash.wasted ? "wasted" : flash.backing === BACKING.VIBES ? "vibes" : ""}`}>
                 <div className="pf-asked">YOU ASKED — “{flash.asked}”</div>
                 <div className="pf-said">“{flash.line}”</div>
-                <div className="pf-note">
-                  {flash.wasted ? "✕ TRUE, AND NOT WHAT YOU NEEDED."
-                    : flash.named ? "▚ STILL BLACK — but you know what kind of nothing this is."
-                      : flash.backing === BACKING.VIBES ? "▚ HIS SCREEN STAYS BLACK."
-                        : flash.backing === BACKING.SOFT ? "◍ PARTIAL — some of it landed."
-                          : "◼ ON RECORD."}
-                </div>
+                {!flash.revealed ? (
+                  <div className="pf-note waiting">▚ HE'S STILL TALKING…</div>
+                ) : lookPending ? (
+                  <button className="pf-look" onClick={lookAtScreen}>
+                    ▤ HE'S FINISHED — SEE WHAT LANDED ▸
+                  </button>
+                ) : (
+                  <div className="pf-note">
+                    {flash.wasted ? "✕ TRUE, AND NOT WHAT YOU NEEDED."
+                      : flash.named ? "▚ STILL BLACK — but you know what kind of nothing this is."
+                        : flash.backing === BACKING.VIBES ? "▚ HIS SCREEN STAYS BLACK."
+                          : flash.backing === BACKING.SOFT ? "◍ PARTIAL — some of it landed."
+                            : "◼ ON RECORD."}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -470,7 +610,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 <span key={i} className={i < run.pressesLeft ? "on" : ""} />
               ))}
               <em>INTERRUPTIONS LEFT</em>
-              <b>{cardsLeft} CARD{cardsLeft === 1 ? "" : "S"}</b>
+              <b>{advisersLeft} ADVISER{advisersLeft === 1 ? "" : "S"}</b>
             </div>
 
             {/* PRESS HIM and the hand are here only while a press is LEGAL.
@@ -480,23 +620,32 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 keeps the hand accounted for while it's away; it comes back on
                 the next claim. */}
             {canPress ? (
-              <>
-                <button className="pf-btn primary" onClick={() => press(ANY, null)}>
-                  PRESS HIM<small>“put a number on it”</small>
-                </button>
-                <div className="pf-strip tight">
-                  {handCards.map(({ q, data }) => {
-                    const spent = run.cardsSpent.includes(q.id);
-                    return (
-                      <button key={q.id} className={`pf-thumb ${spent ? "spent" : ""}`}
-                              disabled={spent} onClick={() => press(q.shape, q)}>
-                        <TradingCard data={data} scale={0.115} interactive={false} templateStyle="terminal" />
-                        <span>{spent ? "USED" : q.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
+              <div className="pf-seats">
+                {options.map((o) => {
+                  const meta = DESK[o.seat];
+                  const card = deskCards.find((d) => d.m.id === o.seat);
+                  const isBarron = o.seat === SEATS.BARRON;
+                  return (
+                    <button
+                      key={o.seat}
+                      className={`pf-seat ${isBarron ? "boss" : ""} ${o.enabled ? "" : "off"}`}
+                      disabled={!o.enabled}
+                      onClick={() => press(o.seat)}
+                    >
+                      {card && (
+                        <TradingCard data={card.data} scale={0.105} interactive={false} templateStyle="terminal" />
+                      )}
+                      <span className="pf-seat-name">{isBarron ? "PRESS HIM" : meta.role}</span>
+                      <span className="pf-seat-sub">
+                        {isBarron ? "put a number on it"
+                          : o.reason === "spent" ? "already used"
+                            : o.reason === "off-lane" ? "not their lane"
+                              : "send them"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
               <div className="pf-spent">
                 {pressed ? "◼ YOU'VE HAD YOUR ANSWER ON THIS ONE."
@@ -638,7 +787,7 @@ const CSS = DEAL_CSS + `
   overflow:hidden; text-overflow:ellipsis; }
 .pf-thumb { flex:0 0 auto; background:none; border:none; padding:0;
   display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; }
-.pf-thumb span { font:bold 8px/1.2 'Courier New',monospace; letter-spacing:0.08em;
+.pf-thumb span { font:bold 9.5px/1.25 'Courier New',monospace; letter-spacing:0.08em;
   color:rgba(234,255,249,0.6); max-width:74px; }
 .pf-thumb.spent, .pf-thumb:disabled { opacity:0.35; }
 
@@ -687,6 +836,65 @@ const CSS = DEAL_CSS + `
   font-size:9.5px; letter-spacing:0.13em; color:#ff5f9e; font-weight:bold; }
 .pf-count { margin-left:auto; color:rgba(234,255,249,0.4); letter-spacing:0.1em; }
 .pf-spin { font-size:14px; line-height:1.42; margin:6px 0 8px; }
+.pf-eugene { display:flex; gap:8px; align-items:baseline; margin-top:8px;
+  padding-top:7px; border-top:1px dashed rgba(191,238,222,0.22); }
+.pf-eu-who { flex:none; font:bold 10px/1.45 'Courier New',monospace; letter-spacing:0.11em;
+  color:#bfeede; }
+.pf-eu-line { font-size:12.5px; line-height:1.45; color:rgba(191,238,222,0.85); font-style:italic; }
+
+/* the agenda — every subject he'll cover, lane-dotted */
+.pf-agenda { flex:none; display:flex; gap:5px; overflow-x:auto; padding:8px 12px 6px;
+  -webkit-overflow-scrolling:touch; }
+.pf-ag { flex:0 0 auto; font:bold 9.5px/1 'Courier New',monospace; letter-spacing:0.07em;
+  padding:7px 9px; border:1px solid rgba(234,255,249,0.16); color:rgba(234,255,249,0.45);
+  white-space:nowrap; position:relative; }
+.pf-ag::before { content:""; display:inline-block; width:5px; height:5px; border-radius:50%;
+  margin-right:5px; vertical-align:middle; background:rgba(234,255,249,0.3); }
+.pf-ag[data-lane="CHAIN"]::before  { background:#2fd6d6; }
+.pf-ag[data-lane="RECORD"]::before { background:#ffd23a; }
+.pf-ag.past { opacity:0.4; }
+.pf-ag.now  { border-color:#ff5f9e; color:#fff; }
+.pf-ag.done { border-style:dashed; }
+
+/* the seat row — you send a PERSON, not a menu option */
+.pf-seats { display:flex; gap:6px; }
+.pf-seat { flex:1; min-width:0; background:rgba(2,16,14,0.9);
+  border:1px solid rgba(47,214,214,0.35); color:#eafff9; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 4px 6px;
+  font:inherit; transition:transform .12s ease, border-color .12s ease; }
+.pf-seat:hover:not(:disabled) { transform:translateY(-2px); border-color:#2fd6d6; }
+.pf-seat.boss { border-color:rgba(255,45,111,0.6); background:rgba(60,6,28,0.55); }
+.pf-seat.boss:hover:not(:disabled) { border-color:#ff2d6f; }
+.pf-seat.off, .pf-seat:disabled { cursor:default; opacity:0.55; filter:grayscale(0.85);
+  border-color:rgba(234,255,249,0.14); background:rgba(2,16,14,0.55); }
+.pf-seat.off .pf-seat-name, .pf-seat:disabled .pf-seat-name { color:rgba(234,255,249,0.45); }
+.pf-seat.off .pf-seat-sub, .pf-seat:disabled .pf-seat-sub { color:rgba(255,155,111,0.9); }
+
+/* whose question is this — said plainly, above the row that enforces it */
+.pf-lane { margin-top:9px; padding:7px 9px; font:bold 10px/1.4 'Courier New',monospace;
+  letter-spacing:0.07em; border-left:3px solid rgba(234,255,249,0.3);
+  background:rgba(234,255,249,0.04); color:rgba(234,255,249,0.75); }
+.pf-lane[data-lane="CHAIN"]  { border-left-color:#2fd6d6; color:#8ff0f0;
+  background:rgba(47,214,214,0.08); }
+.pf-lane[data-lane="RECORD"] { border-left-color:#ffd23a; color:#ffe487;
+  background:rgba(255,210,58,0.08); }
+.pf-seat-name { font:bold 11px/1.25 'Courier New',monospace; letter-spacing:0.09em; }
+.pf-seat.boss .pf-seat-name { color:#ff5f9e; }
+.pf-seat-sub { font-size:9.5px; line-height:1.3; letter-spacing:0.02em; color:rgba(234,255,249,0.62); }
+
+/* three boards, one visible, plus the text comparison strip */
+.pf-boards { width:100%; display:flex; flex-direction:column; gap:7px; }
+.pf-screen { display:none; }
+.pf-screen.show { display:block; }
+.pf-bstrip { display:flex; gap:4px; }
+.pf-bchip { flex:1; background:rgba(2,16,14,0.85); border:1px solid rgba(47,214,214,0.22);
+  color:rgba(234,255,249,0.6); font:bold 10px/1.35 'Courier New',monospace;
+  letter-spacing:0.07em; padding:7px 4px; cursor:pointer;
+  display:flex; flex-direction:column; gap:2px; }
+.pf-bchip.on { border-color:#2fd6d6; color:#2fd6d6; background:rgba(47,214,214,0.08); }
+.pf-bchip em { font-style:normal; font-weight:normal; font-size:9px; opacity:0.8; }
+.pf-bchip.rec em { color:#ffd23a; opacity:1; }
+.pf-bchip.nil em { color:#ff9b6f; opacity:1; }
 .pf-fact { font-size:11.5px; line-height:1.4; color:rgba(234,255,249,0.85);
   border-top:1px solid rgba(47,214,214,0.2); padding-top:7px; }
 .pf-tag { font-size:8.5px; letter-spacing:0.13em; background:#2fd6d6; color:#02100e;
@@ -700,6 +908,26 @@ const CSS = DEAL_CSS + `
   background:rgba(47,214,214,0.08); }
 .pf-tabs em { font-style:normal; font-weight:normal; opacity:0.7; }
 .pf-tabs em.rec { color:#ffd23a; opacity:1; }
+/* GO AND LOOK. Cyan, deliberately — the tab's own accent, carrying no verdict.
+   Gold is the receipt colour, so pulsing gold would announce a receipt before
+   you'd been to see one, which is the whole thing this beat withholds. */
+.pf-tabs button.look { color:#2fd6d6; border-color:rgba(47,214,214,0.6);
+  animation:pf-look 1.15s ease-in-out infinite; }
+.pf-tabs button.look em { opacity:1; font-weight:bold; }
+@keyframes pf-look {
+  0%, 100% { background:rgba(47,214,214,0.05); box-shadow:0 0 0 rgba(47,214,214,0); }
+  50%      { background:rgba(47,214,214,0.20); box-shadow:0 0 15px rgba(47,214,214,0.45); }
+}
+/* The directive under his answer. Static — the tab does the attracting, and
+   two things pulsing at once reads as an error state rather than a nudge. */
+.pf-look { display:block; width:100%; margin-top:9px; cursor:pointer;
+  background:rgba(47,214,214,0.10); border:1px solid rgba(47,214,214,0.55);
+  color:#2fd6d6; font:bold 10px/1.2 'Courier New',monospace; letter-spacing:0.11em;
+  padding:10px 8px; }
+@media (prefers-reduced-motion:reduce) {
+  .pf-tabs button.look { animation:none; background:rgba(47,214,214,0.20);
+    box-shadow:0 0 15px rgba(47,214,214,0.45); }
+}
 
 .pf-pane { display:none; width:100%; height:100%; justify-content:center; align-items:center; }
 .pf-pane.show { display:flex; }
@@ -727,6 +955,9 @@ const CSS = DEAL_CSS + `
 .pf-asked { font-size:8.5px; letter-spacing:0.11em; color:rgba(234,255,249,0.5); }
 .pf-said { font-size:12.5px; line-height:1.45; font-style:italic; margin-top:5px; }
 .pf-note { font-size:9.5px; letter-spacing:0.09em; font-weight:bold; color:#ffd23a; margin-top:7px; }
+/* holds the verdict's place while he's still saying it, so the panel doesn't
+   jump when the real line arrives */
+.pf-note.waiting { color:rgba(234,255,249,0.35); font-weight:normal; }
 .pf-answer.vibes .pf-note { color:#bfeede; }
 .pf-answer.wasted .pf-note { color:#ff9b6f; }
 
@@ -738,7 +969,7 @@ const CSS = DEAL_CSS + `
 .pf-pips { display:flex; align-items:center; gap:5px; margin-bottom:8px; }
 .pf-pips span { width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,45,111,0.6); }
 .pf-pips span.on { background:#ff2d6f; box-shadow:0 0 8px rgba(255,45,111,0.8); }
-.pf-pips em { font-style:normal; font-size:8.5px; letter-spacing:0.11em;
+.pf-pips em { font-style:normal; font-size:9.5px; letter-spacing:0.11em;
   color:rgba(234,255,249,0.5); margin-left:4px; }
 /* keeps the hand accounted for in the beats where the strip isn't shown */
 .pf-pips b { margin-left:auto; font-size:8.5px; letter-spacing:0.11em;

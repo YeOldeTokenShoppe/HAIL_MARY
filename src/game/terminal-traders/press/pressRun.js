@@ -19,7 +19,8 @@
 // Explicit .js extensions: scripts/verify-press-run.mjs imports this module
 // directly under Node ESM, which will not resolve an extensionless specifier.
 import { casePnl } from "../caseTable.js";
-import { ANY, BACKING } from "./questions.js";
+import { BACKING, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend } from "./questions.js";
+import { adviserLine } from "./desk.js";
 
 export const PRESSES = 3;
 export const START_BOOK = 100;
@@ -33,72 +34,58 @@ export const PHASE = {
 };
 
 /**
- * Resolve one press against the claim currently on the floor. Pure.
+ * Resolve one interruption. Pure.
  *
- * `question` is ANY (the free generic press, three per session, always
- * available) or one of SHAPES.* (a sharper question — slice 3+, sourced from
- * an owned card). A sharper question buys AIM, never a fact:
+ * TWO KINDS OF INTERRUPTION, one budget:
  *
- *   - matched shape + SOFT backing  -> escalates: you get the number he hedged
- *   - matched shape + VIBES backing -> NAMED: monitor still black, but the
- *                                      hollowness is now classified
- *   - wrong shape                   -> a true, narrow, useless answer
+ *   BARRON — always legal, reusable. Returns his authored `generic` block. A
+ *   VIBES claim returns no receipt, so his board stays black: the free press
+ *   is enough to reach every verdict (truth is never for sale) but it only
+ *   ever gets what he'd concede about himself.
  *
- * Slice 1 only ever passes ANY. The rest is authored but unreachable, which
- * is deliberate: it costs nothing today and makes slice 2 a one-day change.
+ *   AN ADVISER — legal only in their own lane, and ONCE PER SESSION. Someone
+ *   who is not him goes and looks, so the answer lands on THEIR board:
+ *     - the claim's authored `sharp` receipt, if there is one
+ *     - NOTHING ON FILE, if there isn't
+ *   Then Barron reacts with his authored `sharp` line. Not one word of
+ *   archetype prose was written for this — the same blocks that used to be a
+ *   card's payoff are now a colleague's.
+ *
+ * NOTHING ON FILE is deliberately not the same event as a black board. A
+ * black board is Barron declining to produce. An empty file is an independent
+ * party having looked and found an absence — strictly stronger, and it is the
+ * only way the game can prove a negative.
  */
-export function resolvePress(claim, question = ANY) {
-  const generic = claim.press?.generic ?? { line: "", receipt: null };
+export function resolvePress(claim, seat = SEATS.BARRON) {
+  if (!claim) return null;
 
-  if (question === ANY) {
+  if (seat === SEATS.BARRON) {
+    const g = claim.press?.generic ?? { line: "", receipt: null };
     return {
-      claimId: claim.id,
-      question,
+      claimId: claim.id, seat, board: SEATS.BARRON,
       backing: claim.backing,
-      line: generic.line,
-      // The product moment: a VIBES claim returns no receipt, so the
-      // character's monitor stays black while he keeps talking.
-      receipt: claim.backing === BACKING.VIBES ? null : generic.receipt ?? null,
-      named: null,
-      wasted: false,
+      adviserSays: null,
+      barronSays: g.line,
+      receipt: claim.backing === BACKING.VIBES ? null : g.receipt ?? null,
+      nothingOnFile: false,
     };
   }
 
-  const matched = question === claim.shape;
+  // Off-lane sends never reach here — press() rejects them as a no-op — but
+  // resolvePress is exported and sim-callable, so it holds the line itself.
+  if (!canSend(seat, claim)) return null;
 
-  if (!matched) {
-    // Confident denial: a real, checkable, completely irrelevant answer.
-    return {
-      claimId: claim.id,
-      question,
-      backing: claim.backing,
-      line: claim.press?.miss?.line ?? "No. Next.",
-      receipt: claim.press?.miss?.receipt ?? null,
-      named: null,
-      wasted: true,
-    };
-  }
-
-  if (claim.backing === BACKING.VIBES) {
-    return {
-      claimId: claim.id,
-      question,
-      backing: claim.backing,
-      line: claim.press?.sharp?.line ?? generic.line,
-      receipt: null, // still black — a sharp question cannot manufacture a fact
-      named: claim.shape,
-      wasted: false,
-    };
-  }
+  const sharp = claim.press?.sharp ?? {};
+  const receipt = sharp.receipt ?? null;
+  const result = receipt ? (receipt.partial ? "partial" : "found") : "nothing";
 
   return {
-    claimId: claim.id,
-    question,
+    claimId: claim.id, seat, board: seat,
     backing: claim.backing,
-    line: claim.press?.sharp?.line ?? generic.line,
-    receipt: claim.press?.sharp?.receipt ?? generic.receipt ?? null,
-    named: null,
-    wasted: false,
+    adviserSays: adviserLine(seat, result),
+    barronSays: sharp.line ?? claim.press?.generic?.line ?? "",
+    receipt,
+    nothingOnFile: !receipt,
   };
 }
 
@@ -114,7 +101,10 @@ export function createRun(deal, { book = START_BOOK } = {}) {
     pressesLeft: PRESSES,
     chips: [],              // claims that have been spoken, in order
     outcomes: {},           // claimId -> resolvePress() result
-    cardsSpent: [],         // card ids already played — one use each, no refunds
+    // Advisers are the scarce resource, not cards. One use each, all session.
+    // This is the whole decision: GR80 has three valid targets in a
+    // backdoor-fork and one use, and the agenda rail tells you what's coming.
+    advisersSpent: [],
     book,
     call: null,             // { p, pnl } once allocated
     finished: false,
@@ -138,27 +128,44 @@ export function landClaim(run, deal) {
  * they're still talking, which is the entire point of the verb.
  * A press with no budget left, or off-floor, is a no-op (never an error).
  */
-export function press(run, deal, question = ANY, cardId = null) {
+export function press(run, deal, seat = SEATS.BARRON) {
   if (run.phase !== PHASE.FLOOR) return run;
   if (run.pressesLeft <= 0) return run;
   const claim = currentClaim(run, deal);
   if (!claim) return run;
-  if (run.outcomes[claim.id]) return run;             // one press per claim
-  if (cardId && run.cardsSpent.includes(cardId)) return run; // one use per card
+  if (run.outcomes[claim.id]) return run;                    // one per claim
+  if (!canSend(seat, claim)) return run;                     // off-lane: no-op
+  if (seat !== SEATS.BARRON && run.advisersSpent.includes(seat)) return run;
 
-  const outcome = resolvePress(claim, question);
+  const outcome = resolvePress(claim, seat);
+  if (!outcome) return run;
+
   return {
     ...run,
     pressesLeft: run.pressesLeft - 1,
-    // NO REFUND ON A MISS — and this is load-bearing, not an oversight.
-    // caseKit.js:187 refunds a whiffed play because there the whiff was the
-    // SHUFFLER's fault: you were dealt a card with no target. Here you chose
-    // both the card and the moment, so a miss is your read being wrong. Refund
-    // it and asking the wrong question becomes free, which collapses the whole
-    // decision. This one rule is what makes cards an edge you can misuse.
-    cardsSpent: cardId ? [...run.cardsSpent, cardId] : run.cardsSpent,
-    outcomes: { ...run.outcomes, [claim.id]: { ...outcome, cardId } },
+    // Sending an adviser costs an interruption AND the adviser. Two resources
+    // for one action is what makes the timing decision real — you can be out
+    // of GR80 long before you're out of interruptions.
+    advisersSpent: seat === SEATS.BARRON ? run.advisersSpent : [...run.advisersSpent, seat],
+    outcomes: { ...run.outcomes, [claim.id]: outcome },
   };
+}
+
+/** Who can legally be sent at the claim on the floor right now, and why not. */
+export function seatOptions(run, deal) {
+  const claim = currentClaim(run, deal);
+  const done = !!(claim && run.outcomes[claim.id]);
+  const broke = run.pressesLeft <= 0;
+  return [SEATS.BARRON, ...SPENDABLE_SEATS].map((seat) => {
+    const spent = seat !== SEATS.BARRON && run.advisersSpent.includes(seat);
+    const offLane = !canSend(seat, claim);
+    return {
+      seat,
+      enabled: !done && !broke && !spent && !offLane,
+      reason: broke ? "out" : done ? "answered" : spent ? "spent" : offLane ? "off-lane" : null,
+      lane: SEAT_LANE[seat] ?? null,
+    };
+  });
 }
 
 /** Let the speaker move on. Not pressing is a real, forfeiting choice. */
@@ -250,21 +257,42 @@ export function callReadout(v) {
   };
 }
 
-// READ — did you spend presses on the claims that were hollow? Scored on the
-// press decisions alone, entirely separately from P&L, so a lucky call can
-// never look like good judgement.
-export function readScore(run, deal) {
-  const spent = Object.keys(run.outcomes);
-  if (spent.length === 0) return { hit: 0, spent: 0, hollow: 0, note: "You took all six on faith." };
-  const hollow = deal.claims.filter((c) => c.backing === BACKING.VIBES).length;
-  const hit = spent.filter((id) => {
-    const c = deal.claims.find((x) => x.id === id);
-    return c && c.backing !== BACKING.HARD; // SOFT or VIBES — you found give
-  }).length;
+// READ — did you spend your interruptions where the answer could have changed
+// your mind?
+//
+// THIS REPLACED A METRIC THAT REWARDED FINDING DIRT. Scoring "how many hollow
+// claims did you catch" teaches that the goal is to catch someone out, which
+// is exactly the bias this game exists to correct: a good analyst who checks a
+// genuinely clean audit has done their job. So the unit is COVERAGE OF
+// DISCRIMINATING CLAIMS — the ones whose answer differs between a rug and an
+// honest run. Pressing a clean-in-both-branches claim like backdoor-fork's
+// `funding` scores nothing, however impressive it sounds; that is the lesson.
+//
+// AUTOPSY ONLY. `discriminates` is on the claim object because it's derived
+// from authored data, but nothing on the FLOOR may read it — a harness
+// assertion pins that no in-play payload exposes it, because showing it would
+// name the outcome before the reveal.
+export function coverageScore(run, deal) {
+  const discriminating = deal.claims.filter((c) => c.discriminates);
+  const covered = discriminating.filter((c) => !!run.outcomes[c.id]);
+  const spent = Object.keys(run.outcomes).length;
+  const wasted = spent - covered.length;
+
+  const note = spent === 0
+    ? "You took all of it on faith."
+    : covered.length === 0
+      ? `You asked ${spent}, and none of them could have changed your mind.`
+      : `${covered.length} of your ${spent} landed where the answer actually differed.`;
+
   return {
-    hit,
-    spent: spent.length,
-    hollow,
-    note: `${hit} of your ${spent.length} press${spent.length === 1 ? "" : "es"} landed on a claim that couldn't be backed.`,
+    hit: covered.length,
+    spent,
+    wasted,
+    available: discriminating.length,
+    note,
   };
 }
+
+// Kept as an alias so the two presentations can be migrated one at a time
+// rather than in the same commit as the controller.
+export const readScore = coverageScore;

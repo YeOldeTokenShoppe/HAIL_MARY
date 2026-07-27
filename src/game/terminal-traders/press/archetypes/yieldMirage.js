@@ -12,7 +12,7 @@
 // only changes what he can PRODUCE when pressed, and the exception rate keeps
 // a perfect read short of certainty.
 
-import { SHAPES, BACKING } from "../questions.js";
+import { SHAPES, BACKING, LANES } from "../questions.js";
 
 export const ARCHETYPE_ID = "yield-mirage";
 export const EXEMPLAR_COIN = "ponzi-siren";
@@ -40,6 +40,8 @@ export const SLOTS = [
     // reach the verdict with a free press. What differs is what the honest
     // answer IS.
     id: "source",
+    lane: LANES.CHAIN,
+    subject: "WHERE IT COMES FROM",
     shape: SHAPES.UNSOURCED,
     loadBearing: true,
     fact: (v) => `Yield's been paid every day for ${v.days} days straight.`,
@@ -72,6 +74,8 @@ export const SLOTS = [
 
   {
     id: "apy",
+    lane: LANES.SHAPE,
+    subject: "THE HEADLINE",
     shape: SHAPES.SELECTIVE_WINDOW,
     loadBearing: false,
     fact: (v) => `${v.apy}% APY, net of fees.`,
@@ -92,6 +96,8 @@ export const SLOTS = [
 
   {
     id: "withdrawals",
+    lane: LANES.CHAIN,
+    subject: "GETTING OUT",
     shape: SHAPES.SURVIVORSHIP,
     loadBearing: false,
     fact: "Deposits are up every month since launch.",
@@ -112,6 +118,8 @@ export const SLOTS = [
 
   {
     id: "audit",
+    lane: LANES.RECORD,
+    subject: "THE AUDIT",
     shape: SHAPES.BORROWED_CREDIBILITY,
     loadBearing: false,
     fact: (v) => `${v.auditor} looked at the contracts.`,
@@ -132,6 +140,8 @@ export const SLOTS = [
 
   {
     id: "sustain",
+    lane: LANES.SHAPE,
+    subject: "WHY IT KEEPS WORKING",
     shape: SHAPES.UNFALSIFIABLE,
     loadBearing: false,
     fact: "The strategy scales with volume, and volume is up.",
@@ -152,6 +162,8 @@ export const SLOTS = [
 
   {
     id: "team",
+    lane: LANES.RECORD,
+    subject: "THE DESK",
     shape: SHAPES.UNSOURCED,
     loadBearing: false,
     fact: (v) => `Desk of four. Two out of ${v.priorA}, one out of ${v.priorB}.`,
@@ -172,6 +184,8 @@ export const SLOTS = [
 
   {
     id: "stake",
+    lane: LANES.CHAIN,
+    subject: "HIS POSITION",
     shape: SHAPES.POSITIONED,
     loadBearing: false,
     fact: "My own money's in the vault.",

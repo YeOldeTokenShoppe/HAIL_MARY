@@ -24,7 +24,7 @@
 //     because the archetype itself is probabilistic. Remove the exception rate
 //     and correct play collapses to binary, and calibration stops being a skill.
 
-import { SHAPES, BACKING } from "../questions.js";
+import { SHAPES, BACKING, LANES } from "../questions.js";
 
 export const ARCHETYPE_ID = "backdoor-fork";
 // The Genesis coin that IS this read — its dossier is the canonical example.
@@ -61,6 +61,8 @@ export const PRIORS = ["ex-Aave", "ex-MakerDAO", "ex-Compound", "ex-Lido"];
 export const SLOTS = [
   {
     id: "team",
+    lane: LANES.RECORD,
+    subject: "THE TEAM",
     shape: SHAPES.UNSOURCED,
     loadBearing: true, // the decisive thread, always free-press reachable
     fact: (v) => `Three named founders. Two with verifiable prior roles — ${v.priorA}, ${v.priorB}.`,
@@ -93,6 +95,8 @@ export const SLOTS = [
 
   {
     id: "audit",
+    lane: LANES.RECORD,
+    subject: "THE AUDIT",
     shape: SHAPES.BORROWED_CREDIBILITY,
     loadBearing: false,
     fact: (v) => `${v.auditor}. The audit came back clean.`,
@@ -126,6 +130,8 @@ export const SLOTS = [
 
   {
     id: "funding",
+    lane: LANES.CHAIN,
+    subject: "THE MONEY",
     shape: SHAPES.UNSOURCED,
     loadBearing: false,
     fact: (v) => `$${v.seed}M seed. Named funds. Multisig treasury. Zero mixer hops.`,
@@ -148,6 +154,8 @@ export const SLOTS = [
 
   {
     id: "chart",
+    lane: LANES.SHAPE,
+    subject: "THE CHART",
     shape: SHAPES.SELECTIVE_WINDOW,
     loadBearing: false,
     fact: (v) => `Up ${v.pump} percent in seven days.`,
@@ -170,6 +178,8 @@ export const SLOTS = [
 
   {
     id: "timelock",
+    lane: LANES.CHAIN,
+    subject: "THE TIMELOCK",
     shape: SHAPES.UNFALSIFIABLE,
     loadBearing: false,
     fact: "Three-of-five multisig on governance. Twenty-four hour timelock on parameter changes.",
@@ -190,6 +200,8 @@ export const SLOTS = [
 
   {
     id: "ops",
+    lane: LANES.RECORD,
+    subject: "TRACK RECORD",
     shape: SHAPES.SURVIVORSHIP,
     loadBearing: false,
     fact: "One of them co-launched something earlier that wound down.",
@@ -218,6 +230,8 @@ export const SLOTS = [
 //   2. It varies the session even when the outcome repeats.
 SLOTS.push({
   id: "stake",
+    lane: LANES.CHAIN,
+    subject: "HIS POSITION",
   shape: SHAPES.POSITIONED,
   loadBearing: false,
   fact: "I'm in this myself. Same terms as you'd get.",

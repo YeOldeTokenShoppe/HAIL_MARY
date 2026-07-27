@@ -39,6 +39,54 @@ export const BACKING = {
 
 export const SHAPE_LIST = Object.values(SHAPES);
 
+/* ------------------------------------------------------------------------ *
+ * SEATS AND LANES — the four-character layer (2026-07-27)
+ *
+ * Cards were cut. The three verbs a card format promised — choose, commit,
+ * forfeit — are supplied by the room instead, at no content cost, and they
+ * make all four characters load-bearing during PLAY rather than only at the
+ * curtain call.
+ *
+ * Barron pitches and can be pressed as often as the budget allows. Marisol
+ * and GR80 each answer ONE claim per session, in their own lane. Eugene is
+ * free and automatic and never stamps a receipt — he names the shape and
+ * whose lane it falls in.
+ *
+ * The decision is materiality and timing: GR80 has three valid targets in a
+ * backdoor-fork and one use, and the agenda rail shows you what's still
+ * coming. Spend him on the audit and you can never have him on the wind-down.
+ * ------------------------------------------------------------------------ */
+
+export const LANES = {
+  CHAIN: "CHAIN",   // money movement, wallet ages, unlocks — Marisol
+  RECORD: "RECORD", // documents: audit scope, references, post-mortems — GR80
+  SHAPE: "SHAPE",   // neither adviser can settle it; Barron and Eugene only
+};
+
+export const SEATS = {
+  BARRON: "barron",
+  MARISOL: "marisol",
+  GR80: "gr80",
+};
+
+/** Which lane each spendable adviser can be sent into. Barron has no lane —
+ *  he's always available, which is what keeps the verdict reachable for free. */
+export const SEAT_LANE = {
+  [SEATS.MARISOL]: LANES.CHAIN,
+  [SEATS.GR80]: LANES.RECORD,
+};
+
+export const SPENDABLE_SEATS = [SEATS.MARISOL, SEATS.GR80];
+
+/** Legal only when the adviser's lane matches the claim's. An illegal send is
+ *  a NO-OP, never an error and never a penalty — you can't misclick away a
+ *  session, you can only fail to spend well. */
+export function canSend(seat, claim) {
+  if (seat === SEATS.BARRON) return true;
+  const lane = SEAT_LANE[seat];
+  return !!lane && !!claim && claim.lane === lane;
+}
+
 export function isShape(v) {
   return v === ANY || SHAPE_LIST.includes(v);
 }
