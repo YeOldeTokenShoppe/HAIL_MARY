@@ -29,7 +29,7 @@ import { adviserMouth } from "@/lib/adviserMouth";
 
 const FRAMES = [
   { key: "closed", src: "/barron-headshot.png" },
-  { key: "open", src: "/images/sitepal-headshots/demon-headshot-upright-mouth.png" },
+  { key: "open", src: "/barron-headshot2.png" },
 ];
 
 // Open at the same level /main opens its mid frame — measured against real
@@ -100,7 +100,7 @@ const CSS = `
      1254x1254; shown whole in a ~200px tile his mouth is a few pixels and the
      talking reads as nothing. Scaling about the face puts the mouth at a size
      you can actually watch, which is the entire point of the rig. */
-  transform:scale(2.05); transform-origin:50% 46%; }
+  transform:scale(1.05); transform-origin:50% 46%; }
 .pf-scan { position:absolute; inset:0; pointer-events:none; z-index:3;
   background:repeating-linear-gradient(180deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px); }
 .pf-lamp { position:absolute; top:7px; right:9px; z-index:4;

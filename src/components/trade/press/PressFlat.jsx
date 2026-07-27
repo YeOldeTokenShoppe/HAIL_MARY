@@ -101,6 +101,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // would never re-render and the badge would stay stale after a press.
   const [hasRecord, setHasRecord] = useState(false);
   const screenRef = useRef(null);
+  const readRef = useRef(null);
   const gyro = useGyroTilt(true);
 
   /* ---- the deal ----
@@ -180,6 +181,12 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const readout = useMemo(() => callReadout(slider), [slider]);
   const read = useMemo(() => readScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
+  // A press is legal only while he's on a claim you haven't already answered
+  // and you still have budget. The dock shows the press affordances ONLY then
+  // — see the note on .pf-dock below for why that's structural, not cosmetic.
+  const canPress = run.pressesLeft > 0 && !pressed;
+  const lastClaim = run.claimIndex >= deal.claims.length - 1;
+  const cardsLeft = hand.length - run.cardsSpent.length;
 
   /* ---- the evidence screen, as an actual on-screen terminal ---- */
   useEffect(() => {
@@ -190,13 +197,20 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     return () => { s.dispose(); screenRef.current = null; };
   }, [started]);
 
-  /* ---- he says it out loud ---- */
+  /* ---- he says it out loud ----
+     Token-guarded. A press interrupts the claim he's mid-way through, so two
+     of these are briefly in flight: the one being cut off resolves through
+     stopAdviserAudio and would otherwise land its finally AFTER the answer
+     started, clearing `speaking` and freezing the mouth for the whole reply.
+     Only the newest utterance may say he's stopped. */
+  const sayToken = useRef(0);
   const say = useCallback(async (text) => {
     if (!text) return;
+    const token = ++sayToken.current;
     setSpeaking(true);
     try { await speakAdviserLine(VOICE, text); }
     catch { /* voice is enrichment, never a gate on play */ }
-    finally { setSpeaking(false); }
+    finally { if (sayToken.current === token) setSpeaking(false); }
   }, []);
 
   useEffect(() => {
@@ -208,7 +222,42 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
   useEffect(() => () => { try { stopAdviserAudio(); } catch {} }, []);
 
+  /* ---- the reading column follows the beat ----
+     His answer renders BELOW the claim, so on a short screen it lands out of
+     view in the one moment it's the whole point. Bring it up when it arrives,
+     and go back to the top when he starts the next claim. */
+  useEffect(() => {
+    if (!flash) return;
+    const el = readRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() =>
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }));
+    return () => cancelAnimationFrame(id);
+  }, [flash]);
+
+  useEffect(() => { readRef.current?.scrollTo({ top: 0 }); }, [run.claimIndex]);
+
+  // Mark the column while there's more of him below the fold. Without it a
+  // claim that overflows just looks truncated — the text stops mid-sentence at
+  // a hard edge and reads as the layout bug this file just stopped having.
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = readRef.current;
+    if (!el) return;
+    const sync = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 6);
+    sync();
+    el.addEventListener("scroll", sync, { passive: true });
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", sync); ro.disconnect(); };
+  }, [onFloor, run.claimIndex, flash]);
+
   /* ---- actions ---- */
+  // The cut to his screen is DEFERRED until he stops talking. Holds the claim
+  // it's owed to, so a cut can never land on a claim you've already left.
+  const revealFor = useRef(null);
+  const MIN_BEAT = 1400;  // if his voice is unavailable, the beat still exists
+
   const press = useCallback((question = ANY, card = null) => {
     if (!onFloor || run.pressesLeft <= 0 || !claim || run.outcomes[claim.id]) return;
     if (card && run.cardsSpent.includes(card.id)) return;
@@ -221,20 +270,43 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       wasted: outcome.wasted, named: outcome.named,
       asked: card ? card.question : "Put a number on it.",
     });
-    if (outcome.receipt) screenRef.current?.stamp(outcome.receipt);
-    else screenRef.current?.stayBlack();
-    setHasRecord(!!outcome.receipt);
-    setPane("screen");   // cut to the board — receipt or conspicuous nothing
-    say(outcome.line);
+
+    // You INTERRUPTED him — so he stops the sentence he was on and answers.
+    // Without this the claim line and the reply play over each other.
+    try { stopAdviserAudio(); } catch {}
+
+    // HE KEEPS THE FRAME WHILE HE ANSWERS. The cut used to fire on the press,
+    // which meant the board replaced him at the exact moment he started
+    // talking: you heard the answer over a panel that hadn't changed yet, and
+    // never saw him deliver it. The board is the PUNCHLINE, so it lands when
+    // he stops — and the receipt stamps as you arrive rather than behind your
+    // back. Everything the reveal touches waits with it, including the tab
+    // badge, which otherwise announced ON RECORD while he was mid-sentence.
+    const owed = claim.id;
+    revealFor.current = owed;
+    Promise.all([say(outcome.line), new Promise((r) => setTimeout(r, MIN_BEAT))])
+      .then(() => {
+        if (revealFor.current !== owed) return;   // you moved on; the beat is void
+        revealFor.current = null;
+        if (outcome.receipt) screenRef.current?.stamp(outcome.receipt);
+        else screenRef.current?.stayBlack();
+        setHasRecord(!!outcome.receipt);
+        setPane("screen");   // receipt, or conspicuous nothing
+      });
   }, [run, deal, claim, onFloor, say]);
 
   const advance = useCallback(() => {
+    revealFor.current = null;
     setFlash(null);
     setPane("feed");     // new claim, back to his face
     setHasRecord(false);
     setRun((r) => doAdvance(r, deal));
   }, [deal]);
-  const callIt = useCallback(() => { setFlash(null); setRun((r) => doCallIt(r, deal)); }, [deal]);
+  const callIt = useCallback(() => {
+    revealFor.current = null;
+    setFlash(null);
+    setRun((r) => doCallIt(r, deal));
+  }, [deal]);
   const lockCall = useCallback(() => setRun((r) => doAllocate(r, deal, slider)), [deal, slider]);
   const finish = useCallback(() => setRun((r) => toAutopsy(r)), []);
 
@@ -360,25 +432,37 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
             </div>
           </div>
 
-          <div className="pf-claim">
-            <div className="pf-claim-who">JOHN BARRON <span className="pf-dim">— his deal</span></div>
-            <div className="pf-spin">“{claim.spin}”</div>
-            <div className="pf-fact"><span className="pf-tag">FACT</span> {claim.fact}</div>
-          </div>
-
-          {flash && flash.id === claim.id && (
-            <div className={`pf-answer ${flash.wasted ? "wasted" : flash.backing === BACKING.VIBES ? "vibes" : ""}`}>
-              <div className="pf-asked">YOU ASKED — “{flash.asked}”</div>
-              <div className="pf-said">“{flash.line}”</div>
-              <div className="pf-note">
-                {flash.wasted ? "✕ TRUE, AND NOT WHAT YOU NEEDED."
-                  : flash.named ? "▚ STILL BLACK — but you know what kind of nothing this is."
-                    : flash.backing === BACKING.VIBES ? "▚ HIS SCREEN STAYS BLACK."
-                      : flash.backing === BACKING.SOFT ? "◍ PARTIAL — some of it landed."
-                        : "◼ ON RECORD."}
+          {/* THE ONLY THING ON THE FLOOR THAT SCROLLS. Tabs, feed and dock are
+              all pinned, so the way out of a claim is never further than a
+              thumb. This region exists because it didn't: the floor was five
+              flex:none rows in an overflow:hidden column, so on any viewport
+              under ~900px tall the dock simply ran off the bottom and LET HIM
+              GO ON / CALL IT were clipped away — measured at 839px in a 700px
+              box. The pitch had no exit. */}
+          <div className={`pf-read${more ? " more" : ""}`} ref={readRef}>
+            <div className="pf-claim">
+              <div className="pf-claim-who">
+                JOHN BARRON <span className="pf-dim">— his deal</span>
+                <span className="pf-count">{run.claimIndex + 1} / {deal.claims.length}</span>
               </div>
+              <div className="pf-spin">“{claim.spin}”</div>
+              <div className="pf-fact"><span className="pf-tag">FACT</span> {claim.fact}</div>
             </div>
-          )}
+
+            {flash && flash.id === claim.id && (
+              <div className={`pf-answer ${flash.wasted ? "wasted" : flash.backing === BACKING.VIBES ? "vibes" : ""}`}>
+                <div className="pf-asked">YOU ASKED — “{flash.asked}”</div>
+                <div className="pf-said">“{flash.line}”</div>
+                <div className="pf-note">
+                  {flash.wasted ? "✕ TRUE, AND NOT WHAT YOU NEEDED."
+                    : flash.named ? "▚ STILL BLACK — but you know what kind of nothing this is."
+                      : flash.backing === BACKING.VIBES ? "▚ HIS SCREEN STAYS BLACK."
+                        : flash.backing === BACKING.SOFT ? "◍ PARTIAL — some of it landed."
+                          : "◼ ON RECORD."}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="pf-dock">
             <div className="pf-pips">
@@ -386,27 +470,56 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 <span key={i} className={i < run.pressesLeft ? "on" : ""} />
               ))}
               <em>INTERRUPTIONS LEFT</em>
+              <b>{cardsLeft} CARD{cardsLeft === 1 ? "" : "S"}</b>
             </div>
-            <button className="pf-btn primary" disabled={run.pressesLeft <= 0 || !!pressed}
-                    onClick={() => press(ANY, null)}>
-              PRESS HIM<small>“put a number on it”</small>
-            </button>
-            <div className="pf-strip tight">
-              {handCards.map(({ q, data }) => {
-                const spent = run.cardsSpent.includes(q.id);
-                return (
-                  <button key={q.id} className={`pf-thumb ${spent ? "spent" : ""}`}
-                          disabled={spent || run.pressesLeft <= 0 || !!pressed}
-                          onClick={() => press(q.shape, q)}>
-                    <TradingCard data={data} scale={0.13} interactive={false} templateStyle="terminal" />
-                    <span>{spent ? "USED" : q.name}</span>
-                  </button>
-                );
-              })}
-            </div>
+
+            {/* PRESS HIM and the hand are here only while a press is LEGAL.
+                Once you've had your answer they are dead controls, and 195px of
+                dead controls pinned to the bottom of a phone is exactly what
+                shoved the one live control off the screen. The counter above
+                keeps the hand accounted for while it's away; it comes back on
+                the next claim. */}
+            {canPress ? (
+              <>
+                <button className="pf-btn primary" onClick={() => press(ANY, null)}>
+                  PRESS HIM<small>“put a number on it”</small>
+                </button>
+                <div className="pf-strip tight">
+                  {handCards.map(({ q, data }) => {
+                    const spent = run.cardsSpent.includes(q.id);
+                    return (
+                      <button key={q.id} className={`pf-thumb ${spent ? "spent" : ""}`}
+                              disabled={spent} onClick={() => press(q.shape, q)}>
+                        <TradingCard data={data} scale={0.115} interactive={false} templateStyle="terminal" />
+                        <span>{spent ? "USED" : q.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="pf-spent">
+                {pressed ? "◼ YOU'VE HAD YOUR ANSWER ON THIS ONE."
+                  : "▚ NO INTERRUPTIONS LEFT — THE REST IS ON FAITH."}
+              </div>
+            )}
+
+            {/* On the last claim `advance` and `callIt` are the SAME
+                transition (pressRun.advance: next >= claims.length -> ALLOCATION),
+                so two buttons there would be two labels for one door. */}
             <div className="pf-nav">
-              <button className="pf-btn" onClick={advance}>LET HIM GO ON ▸</button>
-              <button className="pf-btn amber" onClick={callIt}>CALL IT</button>
+              {lastClaim ? (
+                <button className="pf-btn primary sm" onClick={callIt}>
+                  THAT'S THE PITCH — CALL IT ▸
+                </button>
+              ) : (
+                <>
+                  <button className={`pf-btn${pressed ? " primary sm" : ""}`} onClick={advance}>
+                    LET HIM GO ON ▸
+                  </button>
+                  <button className="pf-btn amber" onClick={callIt}>CALL IT</button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -498,8 +611,13 @@ const CSS = DEAL_CSS + `
 
 .pf-scroll { flex:1; overflow-y:auto; padding:16px 14px 28px;
   -webkit-overflow-scrolling:touch; }
+/* "safe center" centres until the content is taller than the box, then falls
+   back to start alignment. Plain centring overflows in BOTH directions and the
+   top of a long resolution becomes unscrollable-to — the same class of bug as
+   the floor's clipped dock, one phase later. (No backticks in this sheet: it
+   is a template literal.) */
 .pf-scroll.center { display:flex; flex-direction:column; align-items:center;
-  justify-content:center; text-align:center; }
+  justify-content:center; justify-content:safe center; text-align:center; }
 .pf-eyebrow { font-size:9.5px; letter-spacing:0.18em; color:#ff5f9e; font-weight:bold; }
 .pf-name { font-size:23px; font-weight:bold; letter-spacing:0.05em; margin-top:5px; }
 .pf-name.sm { font-size:15px; }
@@ -514,6 +632,10 @@ const CSS = DEAL_CSS + `
 .pf-strip { display:flex; gap:9px; overflow-x:auto; padding-bottom:6px;
   -webkit-overflow-scrolling:touch; }
 .pf-strip.tight { gap:7px; }
+/* One caption wrapping to two lines grows the WHOLE dock row, so in the dock
+   they are single-line and clipped. The full name is one tap away on the card. */
+.pf-strip.tight .pf-thumb span { max-width:86px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
 .pf-thumb { flex:0 0 auto; background:none; border:none; padding:0;
   display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; }
 .pf-thumb span { font:bold 8px/1.2 'Courier New',monospace; letter-spacing:0.08em;
@@ -540,15 +662,30 @@ const CSS = DEAL_CSS + `
   background:linear-gradient(180deg, rgba(3,18,16,0) 0%, rgba(3,18,16,0.92) 38%); }
 .pf-cta-row .pf-btn.primary { flex:1; margin:0; }
 
-/* the floor — portrait, thumb-first */
+/* the floor — portrait, thumb-first.
+   ONE SCROLLER, THREE PINNED ROWS. .pf-read is the only child that may grow or
+   scroll; the tabs, the feed and the dock are fixed furniture. Every row used
+   to be flex:none inside this overflow:hidden column, which meant the column
+   was simply taller than the phone and the bottom of it — the dock's nav — was
+   unreachable. If you add a row here, it goes inside .pf-read or it gets a
+   height budget. */
 .pf-floor { flex:1; display:flex; flex-direction:column; min-height:0; }
-.pf-stage { flex:none; height:32vh; min-height:215px; max-height:330px; padding:10px 0;
+/* flex:0 1 auto — the feed gives up height before the words do. */
+.pf-stage { flex:0 1 auto; height:30vh; min-height:140px; max-height:330px; padding:10px 0;
   display:flex; justify-content:center; align-items:center; overflow:hidden;
   background:radial-gradient(ellipse at 50% 35%, rgba(255,45,111,0.14), transparent 68%); }
 .pf-stage > * { height:100%; }
 
-.pf-claim { flex:none; padding:10px 14px; border-left:2px solid #ff5f9e; margin:0 12px; }
-.pf-claim-who { font-size:9.5px; letter-spacing:0.13em; color:#ff5f9e; font-weight:bold; }
+.pf-read { flex:1 1 auto; min-height:76px; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; padding-bottom:8px; }
+/* only while something IS below — so the last line is never the faded one */
+.pf-read.more { -webkit-mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent);
+  mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent); }
+
+.pf-claim { padding:10px 14px; border-left:2px solid #ff5f9e; margin:0 12px; }
+.pf-claim-who { display:flex; align-items:baseline; gap:6px;
+  font-size:9.5px; letter-spacing:0.13em; color:#ff5f9e; font-weight:bold; }
+.pf-count { margin-left:auto; color:rgba(234,255,249,0.4); letter-spacing:0.1em; }
 .pf-spin { font-size:14px; line-height:1.42; margin:6px 0 8px; }
 .pf-fact { font-size:11.5px; line-height:1.4; color:rgba(234,255,249,0.85);
   border-top:1px solid rgba(47,214,214,0.2); padding-top:7px; }
@@ -567,10 +704,23 @@ const CSS = DEAL_CSS + `
 .pf-pane { display:none; width:100%; height:100%; justify-content:center; align-items:center; }
 .pf-pane.show { display:flex; }
 .pf-pane.wide { padding:0 12px; }
-.pf-screen { width:100%; border:1px solid rgba(47,214,214,0.3); }
-.pf-screen canvas { display:block; width:100%; height:auto; }
+/* SIZED BY HEIGHT, WHICH IS THE AXIS THAT'S SCARCE. width:100% derives the
+   height from the 512x320 bitmap, so on anything wider than ~345px the bottom
+   of the receipt was cropped by the stage's overflow:hidden — the one panel
+   whose emptiness is the product, clipped.
+   Two dead ends on the way here, both of which LOOK correct and silently do
+   nothing: max-height:100% goes indefinite through this parent chain and
+   Chrome drops the constraint (measured 228px tall in a 165px box), and as a
+   GRID item the canvas resolves height:100% against an auto row track, which
+   is circular, so the percentage falls back to auto. Flex parent + height:100%
+   resolves; aspect-ratio re-derives the height if max-width ever bites on a
+   very tall stage. */
+.pf-screen { display:flex; align-items:center; justify-content:center;
+  width:100%; height:100%; }
+.pf-screen canvas { display:block; height:100%; width:auto; max-width:100%;
+  aspect-ratio:512/320; border:1px solid rgba(47,214,214,0.3); }
 
-.pf-answer { flex:none; margin:10px 12px 0; padding:10px 12px;
+.pf-answer { margin:10px 12px 0; padding:10px 12px;
   background:rgba(4,20,15,0.95); border:1.5px solid #ffd23a; }
 .pf-answer.vibes { border-color:#7a8b86; }
 .pf-answer.wasted { border-color:#7a8b86; }
@@ -580,15 +730,23 @@ const CSS = DEAL_CSS + `
 .pf-answer.vibes .pf-note { color:#bfeede; }
 .pf-answer.wasted .pf-note { color:#ff9b6f; }
 
-.pf-dock { margin-top:auto; flex:none; padding:10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+/* PINNED, AND ON A HEIGHT BUDGET. It carries the only controls that move the
+   game forward, so anything added here is taken off the reading column above.
+   Roughly 195px while a press is live, ~95px once it isn't. */
+.pf-dock { flex:none; padding:9px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top:1px solid rgba(47,214,214,0.25); background:rgba(2,16,14,0.96); }
 .pf-pips { display:flex; align-items:center; gap:5px; margin-bottom:8px; }
 .pf-pips span { width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,45,111,0.6); }
 .pf-pips span.on { background:#ff2d6f; box-shadow:0 0 8px rgba(255,45,111,0.8); }
 .pf-pips em { font-style:normal; font-size:8.5px; letter-spacing:0.11em;
   color:rgba(234,255,249,0.5); margin-left:4px; }
+/* keeps the hand accounted for in the beats where the strip isn't shown */
+.pf-pips b { margin-left:auto; font-size:8.5px; letter-spacing:0.11em;
+  color:rgba(47,214,214,0.75); }
+.pf-spent { font-size:9px; letter-spacing:0.11em; color:rgba(234,255,249,0.42);
+  text-align:center; padding:3px 0 1px; }
 .pf-nav { display:flex; gap:8px; margin-top:8px; }
-.pf-nav .pf-btn { flex:1; }
+.pf-nav .pf-btn { flex:1; margin-top:0; }
 
 .pf-btn { background:rgba(2,16,14,0.9); border:1px solid rgba(47,214,214,0.5); color:#2fd6d6;
   font:inherit; font-size:11.5px; letter-spacing:0.09em; padding:12px 14px; cursor:pointer;
@@ -600,6 +758,9 @@ const CSS = DEAL_CSS + `
   box-shadow:0 0 22px rgba(255,45,111,0.45); }
 .pf-btn.primary small { display:block; font-weight:normal; font-size:9.5px;
   letter-spacing:0.05em; opacity:0.85; margin-top:2px; }
+/* the nav-row weight of primary — same signal, a third of the height */
+.pf-btn.primary.sm { font-size:12px; letter-spacing:0.1em; padding:12px 10px;
+  box-shadow:0 0 16px rgba(255,45,111,0.38); }
 .pf-btn.primary:disabled { background:rgba(120,120,120,0.35); box-shadow:none; color:rgba(255,255,255,0.5); }
 .pf-btn:not(.primary) { margin-top:8px; }
 

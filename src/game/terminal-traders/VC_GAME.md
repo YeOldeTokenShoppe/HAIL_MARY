@@ -58,7 +58,12 @@ verb. The fixes, in order of importance:
 | **VIBES** | louder, faster, still no number | **stays black** |
 
 On mobile a press **cuts** to his screen, so the absence is something you went
-and looked at rather than something you failed to notice.
+and looked at rather than something you failed to notice. The cut lands when he
+**stops talking**, not when you press: he keeps the frame for the whole answer,
+and the board is the punchline after it. Cutting on the press meant hearing the
+reply over a panel that hadn't changed yet, and never watching him deliver it.
+Everything the reveal touches waits with it — the receipt stamps as you arrive,
+and the tab badge no longer announces `ON RECORD` mid-sentence.
 
 ---
 
@@ -204,6 +209,17 @@ it. Also carries gyro holofoil — tilt the phone, the card foil moves.
 
 `?flat=1` exposes the flat view at any width: buildable without a phone, and a
 permanent fallback if the scene ever regresses.
+
+**The floor's height contract — one scroller, three pinned rows.** Tabs, the
+feed and the dock are fixed furniture; `.pf-read` (claim + his answer) is the
+only child that may grow. A new row goes inside `.pf-read` or it gets a height
+budget. This is written down because it was learned the hard way: every row was
+`flex:none` inside an `overflow:hidden` column, so under ~900px of viewport the
+dock simply ran off the bottom and `LET HIM GO ON` / `CALL IT` were clipped
+away — at 839px in a 700px box. **The pitch had no exit.** For the same reason
+the dock only shows `PRESS HIM` and the hand while a press is legal: once
+you've had your answer they're dead controls, and ~195px of dead controls
+pinned to the bottom of a phone is what pushed the live one off-screen.
 
 ---
 
