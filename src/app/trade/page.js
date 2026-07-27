@@ -41,6 +41,8 @@ import { useBuyModal } from '@/lib/useBuyModal';
 import ReviewFunnel from '@/components/ReviewFunnel';
 import ConsensusRibbon from '@/components/ConsensusRibbon';
 import TradeServiceRail from '@/components/TradeServiceRail';
+import MobileTerminalGame from '@/components/trade/MobileTerminalGame';
+import PressSession from '@/components/trade/press/PressSession';
 import ConfidenceVerdict from '@/components/ConfidenceVerdict';
 import { CASE_FILES, SAMPLE_CASE, computeBrier, STATION_ORDER, pickReturnLine, pickVindicationKey, resolveLine, lensLabel, coverageNote, recordCaseResult, readSessionScore, sessionAvgBrier, sessionAccuracy } from '@/components/GameOverlay';
 import CameraTuningPanel from '@/components/CameraTuningPanel';
@@ -1153,8 +1155,38 @@ export default function CyborgTemple() {
   const [showReviewFunnel, setShowReviewFunnel] = useState(false);
   // Service-rail selection — drives both the active tile and the bottom
   // Start button's label/action.
-  // 'game' = Token Task Force, 'analysis' = Token Review.
-  const [selectedService, setSelectedService] = useState('game');
+  // 'terminal-traders' = the Case Table, 'game' = classic (parked), 'analysis' = Token Review.
+  const [selectedService, setSelectedService] = useState('terminal-traders');
+  // Desktop Case Table (Phase 0 of the /case-table-dev → /trade migration,
+  // CASE_TABLE.md §4.8): the PLAY tile opens the same fullscreen Liminal
+  // Terminal overlay mobile uses (MobileTerminalGame → CaseTable), and the
+  // classic in-scene loop parks behind ?classic=1. While the overlay is up
+  // the temple canvas idles (frameloop 'never') — same GPU discipline as
+  // TradeLaptop's CRT gate.
+  const [showDeskGame, setShowDeskGame] = useState(false);
+
+  // THE PRESS (?press=1) — the in-room desk game. Ships ALONGSIDE the Case
+  // Table, deleting nothing, so the two can be played head-to-head in one
+  // session. Unlike showDeskGame this never idles the canvas: the room IS the
+  // interface, so the frameloop gate below must not fire while it's up.
+  const [pressMode, setPressMode] = useState(false);
+  const [pressFocus, setPressFocus] = useState(null);
+  const [pressSpeaking, setPressSpeaking] = useState(false);
+  const [pressReveal, setPressReveal] = useState(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('press') === '1') setPressMode(true);
+  }, []);
+  const [classicMode, setClassicMode] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setClassicMode(new URLSearchParams(window.location.search).get('classic') === '1');
+  }, []);
+  // Phase 2 (CASE_TABLE.md §4.8): when the Case Table run hits its reveal,
+  // it reports the outcome here — the CRT overlay goes transparent, the
+  // temple canvas un-idles, and revealMode below stages the REAL curtain
+  // call under the run's result info. Null again when the reveal closes.
+  const [deskReveal, setDeskReveal] = useState(null);
   // Lobby service-drawer open state. Lifted out of TradeServiceRail so the
   // center "START" button can reveal the menu — first-time visitors were
   // missing the slim edge handle.
@@ -1780,6 +1812,15 @@ export default function CyborgTemple() {
   const revealMode = useMemo(() => {
     // DEBUG override wins over the live game flow (see debugReveal above).
     if (debugReveal) return debugReveal;
+    // Case Table reveal (Phase 2): the desk game's settled outcome stages
+    // the real curtain call — the CRT is transparent while this is set.
+    if (deskReveal) return deskReveal;
+    // THE PRESS: same staging, but there was never an overlay to make
+    // transparent — the session has been playing in the room the whole time,
+    // so the curtain call is just the next beat. (Safe as of 2026-07-26: the
+    // white-mass bug was the 80s synthwave sun, now retired above; verified
+    // via ?theme80=1&reveal=aligned, the exact condition that reproduced it.)
+    if (pressReveal) return pressReveal;
     // Paid live argument: line the four up (props hidden, wide shot) WITHOUT
     // revealing the outcome. 'council' isn't an outcome key, so the reveal
     // effect stages the lineup but plays no spoiler reaction.
@@ -1792,7 +1833,7 @@ export default function CyborgTemple() {
     // phantom right/wrong grading against a non-existent answer key).
     if (caseData.correctVerdict == null) return 'abstained';
     return verdict === caseData.correctVerdict ? 'aligned' : 'missed';
-  }, [debugReveal, councilActive, verdict, revealPhase, caseData.correctVerdict]);
+  }, [debugReveal, deskReveal, pressReveal, councilActive, verdict, revealPhase, caseData.correctVerdict]);
 
   // Forceful stop for SitePal audio. Per the SitePal docs, stopSpeech()
   // only halts audio that's currently speaking — it "does not prevent
@@ -2652,6 +2693,16 @@ export default function CyborgTemple() {
     setIs80sMode: setContext80sMode,
     setMusicDucked,
   } = useMusic();
+
+  // Dev: force the 80s visual theme (?theme80=1). The theme normally rides
+  // in from the music player's in-memory state, which makes 80s-only bugs
+  // (like the reveal's sunset white-out) invisible on a fresh profile.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('theme80') === '1') {
+      setContext80sMode(true);
+    }
+  }, [setContext80sMode]);
 
   // Duck the background music while a character is speaking; restore it when
   // they finish (and force-restore on unmount so navigating away mid-sentence
@@ -3632,7 +3683,11 @@ export default function CyborgTemple() {
             (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
           }
           performance={{ min: 0.5 }}
-          frameloop="always"
+          /* Idle the temple while the fullscreen Case Table overlay is up —
+             the overlay is opaque, so every frame under it is wasted GPU.
+             EXCEPT during the desk game's reveal: the overlay goes
+             transparent and the scene plays the real curtain call. */
+          frameloop={showDeskGame && !deskReveal ? "never" : "always"}
           style={{ 
             background: useAurora ? 'transparent' : '#000', 
             position: 'absolute',
@@ -3649,8 +3704,20 @@ export default function CyborgTemple() {
             <GpuMemoryProbe />
             <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} />
             
-            {/* Synthwave sunset for 80s mode - desktop only */}
-            {context80sMode && !isMobileView && (
+            {/* Synthwave sunset for 80s mode — RETIRED ON /trade 2026-07-26.
+                This page's sky is the ConstellationModel starfield, full stop
+                (author decision). The block used to mount whenever
+                context80sMode flipped true — and that flag rides in LIVE from
+                the music player's in-memory state, so a long-lived tab with
+                music playing could grow a giant sun mid-session. During the
+                curtain-call reveal (StageProps hidden, nothing occluding it)
+                that sun + Bloom rendered as a blinding white orb on the
+                horizon — THE white-light bug of 2026-07-26, misdiagnosed
+                against the curtain spotlights for four rounds because fresh
+                loads (debug trigger, test browser) start with the flag off.
+                Code kept for salvage to whichever page the 80s set actually
+                belongs on. */}
+            {false && context80sMode && !isMobileView && (
               <>
                 {/* Gradient skybox sphere */}
                 <mesh scale={[500, 500, 500]}>
@@ -3708,12 +3775,19 @@ export default function CyborgTemple() {
                   />
                 </mesh>
                 
-                {/* Synthwave sun model */}
-                <SynthSunset 
-                  position={[0, 8, -20]}
-                  scale={[8, 8, 8]}
-                  rotation={[0, 0, 0]}
-                />
+                {/* Synthwave sun model. HIDDEN during the curtain call: the
+                    reveal strips StageProps, and without the desk tableau in
+                    front of it the naked sun sits dead-center behind the
+                    lineup and Bloom washes it into a blinding white orb
+                    (2026-07-26 — masqueraded as a spotlight bug for two
+                    rounds; only reproduces with the 80s theme on). */}
+                {/* {!revealMode && (
+                  <SynthSunset
+                    position={[0, 8, -20]}
+                    scale={[8, 8, 8]}
+                    rotation={[0, 0, 0]}
+                  />
+                )} */}
                 
                 {/* Scattered clouds for 80s atmosphere - avoiding SynthSunset area */}
                 <Clouds material={THREE.MeshBasicMaterial} texture="/cloud.png">
@@ -3811,14 +3885,14 @@ export default function CyborgTemple() {
             )}
             
             {/* Starfield background - only show when Aurora is off AND (not in 80s mode OR on mobile) */}
-            {!useAurora && (!context80sMode || isMobileView) && (
+            {/* {!useAurora && (!context80sMode || isMobileView) && (
               <StarField 
                 radius={150} 
                 count1={isMobileView ? 200 : 500} 
                 count2={isMobileView ? 150 : 300} 
                 is80sMode={false} 
               />
-            )}
+            )} */}
             
             {/* TALK SHOW swap: talk_show.glb set replaces the RL80 temple
                 model while the tab is active. Same transform so it lands in
@@ -3852,8 +3926,8 @@ export default function CyborgTemple() {
               useSitePalForDemon={focusedAgent === 'Demon'}
               useSitePalForDetective={focusedAgent === 'Detective'}
               useSitePalForMonk={focusedAgent === 'Monk'}
-              externalFocusAgent={revealMode ? 'Stage' : focusedAgent}
-              speechActive={speechActive}
+              externalFocusAgent={revealMode ? 'Stage' : (pressMode ? pressFocus : focusedAgent)}
+              speechActive={pressMode ? pressSpeaking : speechActive}
               revealMode={revealMode}
               onCoinFaceTap={(coinIndex) => {
                 // TODO: show leaderboard player info for tapped coin
@@ -4188,7 +4262,7 @@ export default function CyborgTemple() {
           </div>
         </div>
 
-        {/* Unified feature rail — desktop lobby only. One consistent right-edge
+        {/* Unified feature rail — desktop lobby onlystran. One consistent right-edge
             rail replacing the old scattered SERVICES handle + TALK SHOW + TEAM
             CHAT tabs; each feature is a matching cell and the active one lights
             up. Hidden while a character is focused, during the reveal, when the
@@ -4205,7 +4279,7 @@ export default function CyborgTemple() {
             },
             {
               key: 'talkshow',
-              label: talkShowMode ? 'EXIT SHOW' : 'THE SHOW',
+              label: talkShowMode ? 'EXIT' : 'LT TV',
               accent: '#ffcf4d',
               active: talkShowMode,
               onClick: () => setTalkShowMode((v) => {
@@ -4462,6 +4536,7 @@ export default function CyborgTemple() {
                   open={railExpanded}
                   onOpenChange={setRailExpanded}
                   sheet={isMobileView}
+                  classic={classicMode}
                   /* Desktop SERVICES lives in the unified feature rail; hide the
                      built-in edge handle so it isn't duplicated. Mobile keeps
                      the pill/sheet affordance (handle is CSS-hidden there). */
@@ -4472,8 +4547,15 @@ export default function CyborgTemple() {
                       setMobileSoon(true);
                       return;
                     }
-                    if (id === 'analysis') setShowReviewFunnel(true);
-                    else enterGameMode();
+                    if (id === 'analysis') { setShowReviewFunnel(true); return; }
+                    // Classic in-scene loop only via its ?classic=1 tile.
+                    if (id === 'game') { enterGameMode(); return; }
+                    // 'terminal-traders' — the Case Table in the fullscreen
+                    // Liminal Terminal (same overlay mobile uses).
+                    stopSitePalAudio();
+                    setRailExpanded(false);
+                    setFocusedAgent(null);
+                    setShowDeskGame(true);
                   }}
                 />
               )}
@@ -6271,6 +6353,49 @@ export default function CyborgTemple() {
                     window.dispatchEvent(new CustomEvent('screenGoBack'));
                   }
                 }}
+              />,
+              document.body
+            )}
+
+            {/* THE PRESS (?press=1) — the in-room desk game. No overlay: the
+                DOM sits over a LIVE canvas and the characters' own monitors
+                are the board. Portaled to body for the same clipping reasons
+                as the Case Table below. Ships beside it, deletes nothing. */}
+            {pressMode && typeof document !== 'undefined' && createPortal(
+              <PressSession
+                onFocusAgent={setPressFocus}
+                onSpeechActive={setPressSpeaking}
+                onRevealChange={setPressReveal}
+                onExit={() => {
+                  setPressMode(false);
+                  setPressFocus(null);
+                  setPressSpeaking(false);
+                  setPressReveal(null);
+                }}
+              />,
+              document.body
+            )}
+
+            {/* Desktop Case Table — the same fullscreen Liminal Terminal
+                mobile opens from the laptop (boot hub → Deal Flow / Binder),
+                launched from the PLAY tile. Portaled to body so no ancestor
+                transform/z-index can clip it; z 10050 covers the dock. The
+                temple canvas idles underneath (frameloop gate above). */}
+            {typeof document !== 'undefined' && createPortal(
+              <MobileTerminalGame
+                active={showDeskGame}
+                onExit={() => { setShowDeskGame(false); setDeskReveal(null); }}
+                /* Phase 2 beat 1 ROLLED BACK 2026-07-26: templeStage +
+                   onRevealChange + transparent staged the reveal on the live
+                   temple scene, but on the author's machine the curtain call
+                   rendered a blinding white mass that four rounds of spotlight
+                   fixes never cured (unreproducible here — suspect per-machine
+                   scene state; their camera also never flew to the Stage).
+                   The CRT reveal (CurtainCallStage inside RevealScreen) is
+                   verified good everywhere, so the desk game uses it on every
+                   surface until this is diagnosed via the ?reveal debug
+                   trigger. Re-land by restoring:
+                     templeStage onRevealChange={setDeskReveal} transparent={!!deskReveal} */
               />,
               document.body
             )}

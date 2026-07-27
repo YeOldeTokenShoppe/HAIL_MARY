@@ -13,6 +13,14 @@ const CurtainCallStage = dynamic(() => import("@/components/trade/CurtainCallSta
 // Reveal screen — the curtain call with the outcome overlaid: banner + P&L up
 // top, the case truth + each consultant's vindication in a bottom sheet, the
 // characters reacting in the band between. Self-contained off the case data.
+//
+// Two stagings of the same information:
+//   default    — CRT surfaces (mobile, /case-table-dev): the CurtainCallStage
+//                canvas renders the characters behind the info.
+//   liveStage  — desktop /trade (Phase 2, CASE_TABLE.md §4.8 applied-notes):
+//                the REAL temple scene is already playing its curtain call
+//                underneath (page.js drives revealMode from this run), so
+//                every background here goes transparent and no canvas mounts.
 const OUT = {
   aligned: { label: "PAID", color: "#4dffaa", sub: "you called it" },
   missed: { label: "BURNED", color: "#ff5454", sub: "wrong read" },
@@ -22,9 +30,13 @@ const OUT = {
 // vindication values are sometimes {text,audio}, sometimes a bare string.
 const vtext = (v) => (typeof v === "string" ? v : v?.text || "");
 
-export default function RevealScreen({ caseData, verdict, confidence = 0.5, investigated = [], pnl = null, kitNote = null, speakerKey, speakerSceneId, onExit }) {
-  const correct = caseData.correctVerdict;
-  const outcome = verdict === "abstain" ? "abstained" : verdict === correct ? "aligned" : "missed";
+// The one outcome mapping (also drives the temple's revealMode on desktop —
+// exported so CaseTable can't drift from what this screen displays).
+export const revealOutcome = (caseData, verdict) =>
+  verdict === "abstain" ? "abstained" : verdict === caseData.correctVerdict ? "aligned" : "missed";
+
+export default function RevealScreen({ caseData, verdict, confidence = 0.5, investigated = [], pnl = null, kitNote = null, speakerKey, speakerSceneId, liveStage = false, onExit }) {
+  const outcome = revealOutcome(caseData, verdict);
   const o = OUT[outcome];
   // Breadth nudge (shared with desktop) — encourages cross-checking multiple
   // consultants instead of reading the case through one character's lens.
@@ -49,8 +61,8 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
     : null;
 
   return (
-    <div className="rv-root">
-      <div className="rv-stage"><CurtainCallStage outcome={outcome} /></div>
+    <div className={`rv-root${liveStage ? " rv-live" : ""}`}>
+      {!liveStage && <div className="rv-stage"><CurtainCallStage outcome={outcome} /></div>}
 
       <div className="rv-header"><span className="rv-title">POSITION SETTLED · {caseData.ticker}</span></div>
 
@@ -131,6 +143,10 @@ export default function RevealScreen({ caseData, verdict, confidence = 0.5, inve
         .rv-root::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 9;
           background: repeating-linear-gradient(0deg, rgba(0,0,0,0.2) 0 1px, transparent 1px 3px),
                       radial-gradient(130% 100% at 50% 50%, transparent 60%, rgba(0,0,0,0.55)); mix-blend-mode: multiply; }
+        /* liveStage: the temple's own curtain call plays beneath — no haze, no
+           scanline vignette, just the info floating over the live scene. */
+        .rv-root.rv-live { background: none; }
+        .rv-root.rv-live::after { content: none; }
         /* The curtain-call canvas sits under everything; info layers stack above. */
         .rv-stage { position: absolute; inset: 0; z-index: 0; }
         .rv-header, .rv-banner, .rv-sheet, .rv-exit { position: relative; z-index: 6; }

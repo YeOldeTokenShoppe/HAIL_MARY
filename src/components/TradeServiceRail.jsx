@@ -10,22 +10,24 @@ const SERVICES = [
     disabled: true,
     cta: "COMING SOON",
   },
+  // Classic single-case flow, parked per CASE_TABLE.md §4.8 — the Case
+  // Table absorbed the case game. Reachable via ?classic=1 only (the
+  // `classic` prop), so the rail never offers two case games at once.
   {
     id: "game",
     eyebrow: "LEARN",
     title: "Crypto Forensic Files",
     desc: "Three questions. One verdict.",
     accent: "phos",
+    classicOnly: true,
   },
 
   {
     id: "terminal-traders",
     eyebrow: "PLAY",
     title: "The Trading Card Game",
-    desc: "The Trading Card Game.",
+    desc: "The Daily Deal Flow — research it, then trade it.",
     accent: "magenta",
-    disabled: true,
-    cta: "COMING SOON",
   },
 ];
 
@@ -46,16 +48,19 @@ const SERVICE_ICONS = {
   'terminal-traders': svgIcon(<><rect x="8" y="4" width="12" height="16" rx="2" /><path d="M4 8v10a2 2 0 0 0 2 2h7" /></>),
 };
 
-export default function TradeServiceRail({ selectedId = "game", onSelect, onLaunch, open, onOpenChange, sheet = false, showHandle = true } = {}) {
-  const activeService = SERVICES.find((s) => s.id === selectedId) ?? SERVICES[0];
+export default function TradeServiceRail({ selectedId = "terminal-traders", onSelect, onLaunch, open, onOpenChange, sheet = false, showHandle = true, classic = false } = {}) {
+  // The offered roster: classicOnly entries (the parked single-case flow)
+  // only surface when the host passes classic (the ?classic=1 escape hatch).
+  const roster = SERVICES.filter((s) => classic || !s.classicOnly);
+  const activeService = roster.find((s) => s.id === selectedId) ?? roster.find((s) => !s.disabled) ?? roster[0];
   const shellAccent = activeService.accent;
 
   // Split the live service(s) from the not-yet-shipped ones. Live services
   // render as full cards; locked ones collapse into slim teaser rows so the
   // one actionable path dominates the rail instead of competing with two
   // greyed-out equals.
-  const liveServices = SERVICES.filter((s) => !s.disabled);
-  const lockedServices = SERVICES.filter((s) => s.disabled);
+  const liveServices = roster.filter((s) => !s.disabled);
+  const lockedServices = roster.filter((s) => s.disabled);
 
   // Mobile collapses the rail into a single pill (active service + chevron)
   // by default; tapping the pill expands a popover above it with the full

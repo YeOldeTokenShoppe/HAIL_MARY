@@ -7171,6 +7171,13 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                     <SpotLight
                       position={[t.x, 3.4, 1.0]}
                       target={t.ref}
+                      /* Author's tuning, restored verbatim after the
+                         2026-07-26 white-orb hunt (see the reveal-debug
+                         memory note: from head-on camera angles the four
+                         volumetric cones overlap and can stack bright —
+                         judge any brightness work from the ?reveal debug
+                         trigger at multiple angles, not just the settled
+                         Stage pose). */
                       angle={0.42}
                       penumbra={0.55}
                       intensity={9}

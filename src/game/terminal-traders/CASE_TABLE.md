@@ -733,7 +733,56 @@ in preference order: (a) sunset it — the table *is* Terminal Traders now;
 reward-bearing games — split liquidity of attention is how both stay so-so,
 which is the exact failure this doc exists to prevent.
 
-### 4.9 Open questions
+APPLIED 2026-07-26 (desktop migration Phase 0): the desktop /trade rail's
+PLAY tile now opens the same fullscreen Liminal Terminal overlay mobile
+uses (MobileTerminalGame → CaseTable, daily seed + recordScores), so ONE
+game structure ships on every surface. The classic in-scene single-case
+loop is PARKED, not deleted: its rail tile ("Crypto Forensic Files") is
+hidden unless `?classic=1` (TradeServiceRail `classic` prop / classicOnly
+flag). The temple canvas idles while the overlay is up (frameloop
+'never') and resumes on EXIT. Next phases (agreed 2026-07-26): extract
+`useDocketRun()` from CaseTable (controller vs presentation), then move
+screens into the room — reveal via real revealMode first, then in-scene
+channels, then the docked hand.
+
+PHASE 1 APPLIED 2026-07-26: `case-table/useDocketRun.js` is the run
+CONTROLLER — all state, transitions, settlement, rewards, tips; renders
+nothing; behavior moved verbatim (billing order, whiff/duplicate no-ops,
+Marisol's free question, wildcard post-play max all preserved and
+re-verified in a full played deal). CaseTable.jsx is now the CRT
+PRESENTATION over it and keeps the presentation-only concerns: Eugene's
+ElevenLabs voice, SitePal scene routing, revealSpeaker/kitNote copy, all
+screen JSX. Its public props are unchanged, so the /trade overlay and
+/case-table-dev mounts didn't move. Phase 2's temple presentation
+consumes the same hook — never fork run logic into a presentation.
+
+PHASE 2 BEAT 1 APPLIED 2026-07-26 (the reveal moves into the room): on
+desktop /trade, when the run hits `screen === "reveal"` the CRT goes
+TRANSPARENT and the temple plays its REAL curtain call under the result
+info. Plumbing: CaseTable's `templeStage` + `onRevealChange(outcome)`
+props (outcome via `revealOutcome`, exported by RevealScreen so display
+and stage can't drift) → MobileTerminalGame passes through + drops its
+background → page.js `deskReveal` state feeds the existing `revealMode`
+memo (below debugReveal, above the classic branches) and un-idles the
+canvas (`frameloop` gate). RevealScreen `liveStage` mode renders no
+CurtainCallStage canvas and no backgrounds — banner/sheet float over the
+live scene; the SitePal hero speaker still delivers the vindication.
+Exit-any-path clears deskReveal (effect cleanup + onExit belt). CRT
+surfaces (mobile, /case-table-dev) keep the CurtainCallStage reveal
+unchanged. Verified end-to-end on the daily seed. Remaining Phase 2
+beats: in-scene channels (click a character = openChannel), then the
+docked hand over the scene.
+
+BEAT 1 ROLLED BACK 2026-07-26 (same day): on the author's machine the
+temple curtain call rendered a blinding white mass that survived four
+rounds of spotlight fixes and never reproduced in this harness's
+browser (their Stage camera flight also didn't run — two anomalies,
+likely one cause, unidentified). The desk game now uses the CRT
+CurtainCallStage reveal on EVERY surface again; the templeStage/
+onRevealChange/transparent props are commented out at the trade/page.js
+portal (plumbing intact, one-line re-land) and the temple reveal stays
+reachable via ?reveal for diagnosis. Before re-landing: capture
+/trade?reveal=aligned on the author's machine to isolate machine-vs-flow.
 
 - [x] Coin cards as playable side-positions at the table — RESOLVED
       2026-07-22 as Holdings + Precedent, full proposal in §8. (The

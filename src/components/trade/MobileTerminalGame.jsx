@@ -28,7 +28,12 @@ const HUB_OPTIONS = [
 // Daily Docket placeholder (CASE_TABLE.md §4.1): the seed is the UTC date
 // (dateSeed in docketRun.js — shared with the reward route, which validates
 // claims against the same calendar window).
-export default function MobileTerminalGame({ active = true, onExit }) {
+// `templeStage` + `onRevealChange` + `transparent` (Phase 2, desktop): the
+// host mounts this over the live temple scene; the Case Table reports its
+// reveal outcome up (the page drives the scene's revealMode from it) and the
+// host flips `transparent` on so the room shows through during the curtain
+// call. Mobile mounts pass none of these and keep the opaque CRT.
+export default function MobileTerminalGame({ active = true, onExit, templeStage = false, onRevealChange = null, transparent = false }) {
   const [screen, setScreen] = useState("boot"); // 'boot' | 'placeholder' | 'cases' | 'binder'
   const [placeholderLabel, setPlaceholderLabel] = useState("");
   // True once the boot intro has played; subsequent returns to the hub skip the
@@ -39,7 +44,7 @@ export default function MobileTerminalGame({ active = true, onExit }) {
   if (!active) return null;
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 10050, background: "#02100e" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: 10050, background: transparent ? "transparent" : "#02100e" }}>
       {screen === "boot" ? (
         <TerminalBoot
           options={HUB_OPTIONS}
@@ -67,6 +72,8 @@ export default function MobileTerminalGame({ active = true, onExit }) {
           sitePalScenes={SITEPAL_SCENES}
           onExit={() => setScreen("boot")}
           recordScores
+          templeStage={templeStage}
+          onRevealChange={onRevealChange}
         />
       )}
     </div>
