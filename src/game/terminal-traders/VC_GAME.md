@@ -42,7 +42,7 @@ verb. The fixes, in order of importance:
 
 | Beat | What happens |
 |---|---|
-| **THE DEAL** | Deal card, the character pitching it, and the three questions you drew. All click-to-enlarge. |
+| **THE DEAL** | An empty table and a deck. You press DEAL ME IN and the five cards come off it face-down — the deal, who's pitching, the three questions you drew — each turning over as it lands. All click-to-enlarge once landed. |
 | **THE FLOOR** | Six claims, one at a time. Each drops a chip: `FACT` (always true) + `SPIN` (the inference). |
 | **THE PRESS** | Three interruptions. Generic — *"put a number on it"* — or a card, which asks something sharper. |
 | **THE CALL** | One slider, `SHORT ← FLAT → LONG`. Plain-English readout including what you lose if wrong. |
@@ -138,6 +138,11 @@ where naming the pattern is the teaching payload and the natural trophy hook.
 6. **Plain language.** Every player-facing term must parse with no finance
    literacy. "Brier" and "diligence" both failed playtest. P&L, research, long /
    short / hold pass.
+7. **Nothing names a card that isn't face-up.** The briefing withholds the
+   deal's name, ticker and stats until its card lands, and the speaker's name
+   until his does — headline, top bar and body copy all included. Printing them
+   over an empty table announces the deal before it exists and spends the
+   reveal the dealing beat is there to stage.
 
 ### The discipline rule
 
@@ -170,6 +175,7 @@ components/trade/press/
   PressSession.jsx    DESKTOP — DOM over the live 3D room
   PressFlat.jsx       MOBILE + ?flat=1 — no WebGL, portrait-first
   PressFigure.jsx     Barron's talking head (2-frame amplitude mouth)
+  cardDeal.jsx        the opening deal — one choreography, both surfaces
   evidenceScreen.js   the receipt board, both surfaces
 
 scripts/verify-press-run.mjs    100 assertions

@@ -125,12 +125,21 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   useEffect(() => { Object.values(SFX).forEach(preloadSfx); }, []);
   useEffect(() => () => tlRef.current?.kill(), []);
 
+  // Slide the hand into view as the DEAL card lands, not after the whole deal:
+  // at rest the strip sits under the sticky deck, so the three questions would
+  // otherwise land behind it and below the fold.
+  //
+  // Scrolling mid-flight is safe. Every `.deal-fly` is absolutely positioned
+  // INSIDE its own slot and tweens to x:0,y:0, so it lands correctly wherever
+  // that slot has moved to; only the apparent flight path shifts. And because
+  // the deck is sticky it doesn't move at all, so the cards simply appear to
+  // fly up out of it as the table rises to meet them.
   const revealHand = useCallback(() => {
     const sc = scrollRef.current, strip = stripRef.current;
     if (!sc || !strip) return;
     gsap.to(sc, {
       scrollTop: Math.max(0, strip.offsetTop - 90),
-      duration: 0.7, ease: "power2.inOut",
+      duration: 0.6, ease: "power2.inOut",
     });
   }, []);
 
@@ -147,8 +156,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       deck: deckRef.current,
       slots: slotRefs.current,
       captionSelector: ".pf-cap",
-      onLanded: (i) => setLanded((n) => Math.max(n, i + 1)),
-      onDone: () => { setDealing(false); setDealt(true); revealHand(); },
+      onLanded: (i) => {
+        setLanded((n) => Math.max(n, i + 1));
+        if (i === 0) revealHand();   // the hand rises while the rest is in the air
+      },
+      onDone: () => { setDealing(false); setDealt(true); },
     });
     if (!tl) { setDealing(false); setDealt(true); return; }
     tlRef.current = tl;
@@ -261,12 +273,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           NOTHING HERE MAY NAME A CARD THAT ISN'T FACE-UP YET. Printing the
           deal's name and stats, and "John Barron brought this one in", over an
           empty table announced both before either had been dealt — which is
-          exactly the reveal this beat exists to stage. */}
+          exactly the reveal this beat exists to stage.
+
+          onClick={skipDeal}: a tap anywhere mid-deal lands the rest —
+          impatience is a legitimate input. No overlay needed on this surface,
+          unlike the 3D view's pointer-events:none root; the handler sits on
+          the column and no-ops once the deal is done. */}
       {!started && (
-        <div className={`pf-scroll${dealt ? " is-dealt" : ""}`} ref={scrollRef}>
-          {dealing && (
-            <button className="pf-skip-deal" onClick={skipDeal} aria-label="Deal the rest now" />
-          )}
+        <div className={`pf-scroll${dealt ? " is-dealt" : ""}`} ref={scrollRef}
+             onClick={skipDeal}>
           <div className="pf-eyebrow">ONE DEAL ON THE TABLE</div>
           <div className={`pf-name${identity ? "" : " facedown"}`}>
             {identity ? deal.name : "FACE DOWN"}
@@ -516,8 +531,6 @@ const CSS = DEAL_CSS + `
 .pf-scroll.is-dealt .deal-fly { opacity:1; }
 .pf-scroll.is-dealt .deal-ghost { opacity:0; }
 .pf-name.facedown { color:rgba(234,255,249,0.3); letter-spacing:0.12em; }
-.pf-skip-deal { position:fixed; inset:0; z-index:6; background:none; border:none;
-  padding:0; }
 .pf-hero .deal-slot { margin:0 auto; }
 /* The briefing is taller than a phone, so the deck rides the bottom of the
    column — otherwise you press DEAL while it's scrolled off and the cards
