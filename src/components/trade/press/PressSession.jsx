@@ -1,20 +1,23 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, dailySeed } from "@/game/terminal-traders/press/instanceDeal";
-import { ANY, BACKING } from "@/game/terminal-traders/press/questions";
-import { dealHand } from "@/game/terminal-traders/press/hand";
+import { BACKING, SEATS, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
+import { DESK, EUGENE, eugeneRead, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
 import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
-  allocate as doAllocate, toAutopsy, currentClaim, callReadout, readScore,
+  allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore, seatOptions, laneOutlook, pressure,
 } from "@/game/terminal-traders/press/pressRun";
-import { toDealCard, toExemplarCard, toQuestionCard, toCharacterCard } from "@/game/terminal-traders/press/dealCard";
+import { toDealCard, toExemplarCard, toCharacterCard } from "@/game/terminal-traders/press/dealCard";
 import TradingCard from "@/components/TradingCard";
 import { preloadSfx } from "@/lib/uiSfx";
 import {
   DealtSlot, DealDeck, runCardDeal, prefersReducedMotion, SFX, DEAL_CSS,
 } from "./cardDeal";
 import { createEvidenceScreen } from "./evidenceScreen";
+import {
+  canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
+} from "./pressUi";
 
 // THE PRESS — slice 1. Barron, six claims, three presses, over the LIVE room.
 //
@@ -74,10 +77,15 @@ export default function PressSession({
   // everyone today and can't be rerolled. `liveShapes` guarantees at least
   // MIN_LIVE of them can hit something here: you can be dealt a question this
   // deal is immune to, but never a whole hand of them.
-  const hand = useMemo(() => {
-    const live = new Set(deal.claims.map((c) => c.shape));
-    return dealHand(Number(String(deal.id).split(":")[1]) || 1, live);
-  }, [deal]);
+  // THE DESK. Four people, always the same four — nothing to deal here, so the
+  // cards are simply present. Only the deal itself is unknown, and that's the
+  // one card that still turns over.
+  const DESK_ORDER = useMemo(() => [
+    { ...DESK[SEATS.BARRON], cardId: "john-barron" },
+    { ...DESK[SEATS.MARISOL], cardId: "marisol" },
+    { ...DESK[SEATS.GR80], cardId: "gr80" },
+    { ...EUGENE, cardId: "eugene" },
+  ], []);
 
   const [run, setRun] = useState(() => createRun(deal));
   const [slider, setSlider] = useState(0);
@@ -93,6 +101,9 @@ export default function PressSession({
   // you actually want to READ (the art, the printed question) is one click away.
   const [inspect, setInspect] = useState(null);
   const screenRef = useRef(null);
+  // One board per seat, each painted onto that character's OWN monitor in the
+  // scene via the evidenceActive handshake. Eugene has none — he never stamps.
+  const screensRef = useRef({});
 
   // The deal. `dealt` gates the panel's CTA: you deal the table, THEN you let
   // him pitch. Two beats, because being handed a hand is the moment the
@@ -125,7 +136,18 @@ export default function PressSession({
   useEffect(() => {
     const s = createEvidenceScreen({ station: SPEAKER_STATION, header: "BARRON" });
     screenRef.current = s;
-    return () => { s.dispose(); screenRef.current = null; };
+    const made = { [SEATS.BARRON]: s };
+    for (const seat of SPENDABLE_SEATS) {
+      made[seat] = createEvidenceScreen({
+        station: DESK[seat].station,
+        header: DESK[seat].name.toUpperCase(),
+      });
+    }
+    screensRef.current = made;
+    return () => {
+      Object.values(screensRef.current).forEach((x) => x.dispose());
+      screensRef.current = {}; screenRef.current = null;
+    };
   }, []);
 
   /* ---- camera + animation: he's talking, so look at him ---- */
@@ -183,34 +205,47 @@ export default function PressSession({
   }, [dealing]);
 
   /* ---- actions ---- */
-  // One press path for both moves — the generic question and a card are the
-  // same action, they just say different words. That's the whole design: a
-  // card never buys you an extra press, only a better-aimed one.
-  const press = useCallback((question = ANY, card = null) => {
-    if (!onFloor || run.pressesLeft <= 0 || !claim || run.outcomes[claim.id]) return;
-    if (card && run.cardsSpent.includes(card.id)) return;
-    const next = doPress(run, deal, question, card?.id ?? null);
+  // One path, three seats. Barron is reusable; the two advisers are one use
+  // each and only in their own lane. The room enforces it — an illegal send is
+  // a no-op, so a misclick can never cost you a session.
+  const press = useCallback((seat = SEATS.BARRON) => {
+    if (!onFloor) return;
+    const next = doPress(run, deal, seat);
     if (next === run) return;
     const outcome = next.outcomes[claim.id];
     setRun(next);
     setFlash({
       id: claim.id,
-      line: outcome.line,
+      seat: outcome.seat,
+      board: outcome.board,
       backing: outcome.backing,
-      wasted: outcome.wasted,
-      named: outcome.named,
-      asked: card ? card.question : "Put a number on it.",
-      cardName: card?.name || null,
+      nothingOnFile: outcome.nothingOnFile,
+      adviserSays: outcome.adviserSays,
+      line: outcome.barronSays,
+      asked: outcome.seat === SEATS.BARRON
+        ? "Put a number on it."
+        : `${DESK[outcome.seat].name} — ${DESK[outcome.seat].role}`,
     });
-    // The board either records something or it conspicuously does not.
-    if (outcome.receipt) screenRef.current?.stamp(outcome.receipt);
-    else screenRef.current?.stayBlack();
-  }, [run, deal, claim, onFloor]);
+
+    // THE ANSWER LANDS ON WHOEVER WENT AND GOT IT — on their own monitor, in
+    // the room. That's the whole reason this design is worth the four seats:
+    // three boards lit differently at the moment you call it is a picture only
+    // this scene can render.
+    const board = screensRef.current[outcome.board];
+    if (outcome.receipt) board?.stamp(outcome.receipt);
+    else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
+    else board?.stayBlack();
+
+    // Fly to whoever answered. An adviser sent is a cut across the desk.
+    onFocusAgent?.(DESK[outcome.seat].agentId);
+  }, [run, deal, claim, onFloor, onFocusAgent]);
 
   const advance = useCallback(() => {
     setFlash(null);
+    Object.values(screensRef.current).forEach((x) => x.stayBlack());
+    onFocusAgent?.(SPEAKER_AGENT);
     setRun((r) => doAdvance(r, deal));
-  }, [deal]);
+  }, [deal, onFocusAgent]);
 
   const callIt = useCallback(() => {
     setFlash(null);
@@ -223,11 +258,35 @@ export default function PressSession({
   const dealCard = useMemo(() => toDealCard(deal), [deal]);
   const patternCard = useMemo(() => toExemplarCard(deal), [deal]);
   // All three card types, rendered through the one Genesis renderer.
-  const speakerCard = useMemo(() => toCharacterCard(SPEAKER_TRADER), []);
-  const handCards = useMemo(() => hand.map((q) => ({ q, data: toQuestionCard(q) })), [hand]);
+  const deskCards = useMemo(
+    () => DESK_ORDER.map((m) => ({ m, data: toCharacterCard(m.cardId, m.role) })), [DESK_ORDER]);
+  const speakerCard = deskCards[0]?.data;
+  const options = useMemo(() => seatOptions(run, deal), [run, deal]);
+  // What's still coming in this lane — the one thing Eugene knows that no other
+  // surface does, and the reason his read stopped being a restatement of the
+  // lane band. Lanes only: it cannot leak the branch.
+  const outlook = useMemo(() => laneOutlook(run, deal), [run, deal]);
+  // How the pitch is going FOR HIM — a summary of outcomes you've already seen,
+  // handed back as posture. The aside is held to the CLAIM so it can't change
+  // mid-read; the mood band is live.
+  const mood = useMemo(() => pressure(run), [run]);
+  const aside = useMemo(
+    () => barronAside(mood.band, claim, run.claimIndex),
+    [mood.band, claim, run.claimIndex]);
+  // Reads the run, not just the claim — once you've spent the lane's owner,
+  // pointing at them is the same wrong instruction the lane band was giving.
+  const eugeneLine = useMemo(
+    () => (claim ? eugeneRead(claim, { spent: run.advisersSpent, remaining: outlook.remaining }) : ""),
+    [claim, run.advisersSpent, outlook.remaining]);
+  const eugeneCard = useMemo(
+    () => deskCards.find((d) => d.m.id === EUGENE.id)?.data ?? null, [deskCards]);
   const readout = useMemo(() => callReadout(slider), [slider]);
-  const read = useMemo(() => readScore(run, deal), [run, deal]);
+  const read = useMemo(() => coverageScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
+  // Both derived from pressUi/pressRun rather than restated here — restating
+  // them per surface is exactly how the two presentations drifted apart.
+  const live = pressIsLegal(run, claim);
+  const lastClaim = run.claimIndex >= deal.claims.length - 1;
 
   /* ------------------------------------------------------------------ */
   return (
@@ -313,42 +372,28 @@ export default function PressSession({
             </div>
 
             <div className="ps-tools">
-              <div className="ps-tool-group">
-                <div className="ps-draw-label">PITCHING</div>
-                <div className="ps-draw-row">
-                  {speakerCard && (
-                    <button className="ps-draw-card" onClick={() => setInspect(speakerCard)}
-                            title="John Barron — click for full size">
-                      <DealtSlot index={1} scale={CARD_THUMB} register={registerSlot}>
-                        <TradingCard data={speakerCard} scale={CARD_THUMB} interactive={false} templateStyle="terminal" />
-                      </DealtSlot>
-                      <span className="ps-draw-name">BARRON</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
               <div className="ps-tool-group ps-tool-hand">
-                <div className="ps-draw-label">YOU DREW — three angles, instead of the blunt question</div>
+                <div className="ps-draw-label">THE DESK — always these four</div>
                 <div className="ps-draw-row">
-                  {handCards.map(({ q, data }, i) => (
-                    <button key={q.id} className="ps-draw-card" onClick={() => setInspect(data)}
-                            title={`${q.name} — click for full size`}>
-                      <DealtSlot index={2 + i} scale={CARD_THUMB} register={registerSlot}>
-                        {data
-                          ? <TradingCard data={data} scale={CARD_THUMB} interactive={false} templateStyle="terminal" />
-                          : <span className="ps-card-name">{q.name}</span>}
-                      </DealtSlot>
-                      <span className="ps-draw-name">{q.name}</span>
+                  {deskCards.map(({ m, data }) => (
+                    <button key={m.id} className="ps-draw-card" onClick={() => setInspect(data)}
+                            title={`${m.name} — click for full size`}>
+                      <TradingCard data={data} scale={CARD_THUMB} interactive={false} templateStyle="terminal" />
+                      <span className="ps-draw-name">{m.role}</span>
                     </button>
                   ))}
+                </div>
+                <div className="ps-open-rule" style={{ marginTop: 10 }}>
+                  Marisol and GR80 each answer <b>one</b> claim, in their own lane.
+                  Barron you can press as often as you like. Eugene reads every claim for free.
                 </div>
               </div>
             </div>
 
-            {/* Two beats. You deal the table, you look at what you got, THEN
-                you let him talk. Folding both into one button was the old
-                behaviour and it made the hand feel like page furniture. */}
+            {/* The deck and the one live control. My seat-row rewrite replaced
+               the whole tools block and took this with it, which left the
+               briefing with nothing to press — "there is no deal specified or
+               buttons to push" (author, 2026-07-27). */}
             <div className="ps-cta-row">
               <DealDeck ref={deckRef} spent={dealt || dealing} />
               <button
@@ -359,6 +404,7 @@ export default function PressSession({
                 {dealt ? "LET HIM PITCH ▸" : dealing ? "DEALING…" : "DEAL ME IN ▸"}
               </button>
             </div>
+
           </div>
         </div>
       )}
@@ -366,95 +412,25 @@ export default function PressSession({
       {/* ---------- the floor ---------- */}
       {onFloor && claim && (
         <>
-          <div className={`ps-claim ${claimVisible ? "in" : ""}`}>
-            <div className="ps-who">JOHN BARRON <span className="ps-dim">— his deal</span></div>
-            <div className="ps-spin">“{claim.spin}”</div>
-            <div className="ps-chiprow">
-              <span className="ps-tag">FACT</span>
-              <span className="ps-fact">{claim.fact}</span>
+          {/* Claim and answer share ONE flow column, so a long answer pushes
+              the claim up instead of covering it. Both bodies come from
+              pressUi — this file owns only WHERE the column sits. */}
+          <div className="ps-readcol">
+            <div className={`ps-fade ${claimVisible ? "in" : ""}`}>
+              <ClaimBody claim={claim} eugeneLine={eugeneLine} eugeneCard={eugeneCard}
+                       pressure={mood} aside={aside}
+                         spent={run.advisersSpent} />
             </div>
+            {flash && flash.id === claim.id && <AnswerBody flash={flash} />}
           </div>
 
-          {flash && flash.id === claim.id && (
-            <div className={`ps-answer ${flash.wasted ? "wasted" : flash.backing === BACKING.VIBES ? "vibes" : ""}`}>
-              <div className="ps-answer-asked">YOU ASKED — “{flash.asked}”</div>
-              <div className="ps-answer-line">“{flash.line}”</div>
-              <div className="ps-answer-note">
-                {flash.wasted
-                  ? "✕ HE ANSWERED IT. It was true, and it wasn't what you needed."
-                  : flash.named
-                    ? "▚ STILL BLACK — but now you know what kind of nothing this is."
-                    : flash.backing === BACKING.VIBES
-                      ? "▚ HIS SCREEN STAYS BLACK. Nothing was recorded."
-                      : flash.backing === BACKING.SOFT
-                        ? "◍ PARTIAL — something landed on his screen, but not all of it."
-                        : "◼ ON RECORD — it's on his screen now. It'll still be there when you call."}
-              </div>
-            </div>
-          )}
-
-          {/* ONE ROW OF QUESTIONS. Playing a card and "pressing" were always
-              the same action — a card just swaps the sentence you say. The
-              first build split them into a big PRESS button and a separate
-              card rack, which read as two mechanics ("i'm confused about the
-              cards versus the press button" — author, 2026-07-26). They're one
-              row now: the plain question first, always available; the sharper
-              ones after it, one use each. */}
-          {/* The cards live on the RIGHT, clear of the claim panel on the left.
-              The label spells out the relationship the first build left implicit:
-              the button and the cards are the same interruption, the cards just
-              aim it. (Unifying them into one row fixed the confusion but put a
-              card on top of the FACT row — author, 2026-07-26.) */}
-          <div className="ps-hand-wrap">
-            <div className="ps-ask-label">OR ASK SOMETHING SHARPER — same interruption, better aim</div>
-            <div className="ps-hand">
-              {hand.map((c) => {
-                const spent = run.cardsSpent.includes(c.id);
-                const dead = spent || run.pressesLeft <= 0 || !!pressed;
-                return (
-                  <button
-                    key={c.id}
-                    className={`ps-card ${spent ? "spent" : ""}`}
-                    onClick={() => press(c.shape, c)}
-                    disabled={dead}
-                    title={c.hint}
-                  >
-                    <span className="ps-card-name">{c.name}</span>
-                    <span className="ps-card-q">“{c.question}”</span>
-                    <span className="ps-card-hint">{spent ? "USED" : c.hint}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
+          {/* The controls, grouped bottom-right and clear of the reading
+              column on the left. */}
           <div className="ps-dock">
-            <button
-              className="ps-press"
-              onClick={() => press(ANY, null)}
-              disabled={run.pressesLeft <= 0 || !!pressed}
-            >
-              <span className="ps-press-main">PRESS HIM</span>
-              <span className="ps-press-sub">
-                {pressed ? "you've had your answer on this one"
-                  : run.pressesLeft <= 0 ? "no interruptions left"
-                    : "“put a number on it”"}
-              </span>
-            </button>
-
-            <div className="ps-meter" aria-label={`${run.pressesLeft} interruptions left`}>
-              {Array.from({ length: PRESSES }).map((_, i) => (
-                <span key={i} className={`ps-pip ${i < run.pressesLeft ? "live" : ""}`} />
-              ))}
-              <span className="ps-meter-label">INTERRUPTIONS LEFT</span>
-            </div>
-
-            <div className="ps-nav">
-              <button className="ps-next" onClick={advance}>
-                {run.claimIndex >= deal.claims.length - 1 ? "HEAR HIM OUT ▸" : "LET HIM GO ON ▸"}
-              </button>
-              <button className="ps-call" onClick={callIt}>CALL IT NOW</button>
-            </div>
+            <SeatRow live={live} pressed={pressed} options={options}
+                     deskCards={deskCards} onPress={press} scale={0.1} />
+            <Meter run={run} presses={PRESSES} />
+            <Nav lastClaim={lastClaim} pressed={pressed} onAdvance={advance} onCallIt={callIt} />
           </div>
 
           <div className="ps-progress">
@@ -509,40 +485,47 @@ export default function PressSession({
           platform through this, and the left half of the frame is where they
           are. Long content, so it scrolls in its own column. */}
       {run.phase === PHASE.AUTOPSY && (
-        <div className="ps-panel side scroll">
+        /* HEADER AND EXIT ARE PINNED; ONLY THE MIDDLE SCROLLS. The whole panel
+           used to be one scrolling box with LEAVE THE DESK as the last child,
+           which put the only way out ~1150px down a 530px-tall panel with
+           nothing on screen saying so — "no action or exit buttons" (author,
+           2026-07-27). A terminal state must never hide its exit below a fold. */
+        <div className="ps-panel side autopsy">
           <div className="ps-panel-h">THE AUTOPSY</div>
-          <div className="ps-scores">
-            <div><span className="ps-dim">READ</span><b>{read.hit}/{read.spent || 0}</b></div>
-            <div><span className="ps-dim">BOOK</span><b>{Math.round(run.book)}</b></div>
-          </div>
-          <div className="ps-readnote">{read.note}</div>
+          <div className="ps-au-body">
+            <div className="ps-scores">
+              <div><span className="ps-dim">READ</span><b>{read.hit}/{read.spent || 0}</b></div>
+              <div><span className="ps-dim">BOOK</span><b>{Math.round(run.book)}</b></div>
+            </div>
+            <div className="ps-readnote">{read.note}</div>
 
-          {/* THE PATTERN. The single most portable thing the player leaves with
-              — not "MERIDIAN rugged" but "this is what a backdoor-fork looks
-              like". The exemplar coin is the collectible worth earning, because
-              it's the archetype, not one token's answer. */}
-          {patternCard && (
-            <div className="ps-pattern">
-              <div className="ps-pattern-card">
-                <TradingCard data={patternCard} scale={0.34} interactive={false} templateStyle="terminal" />
-              </div>
-              <div className="ps-pattern-copy">
-                <div className="ps-pattern-label">YOU'VE SEEN THIS SHAPE BEFORE</div>
-                <div className="ps-pattern-name">{deal.exemplar.name}</div>
-                <div className="ps-pattern-note">{deal.exemplar.note}</div>
-                <div className="ps-pattern-foot">
-                  Same read, different token. Learn the shape and you get every one of these.
+            {/* THE PATTERN. The single most portable thing the player leaves
+                with — not "MERIDIAN rugged" but "this is what a backdoor-fork
+                looks like". The exemplar coin is the collectible worth earning,
+                because it's the archetype, not one token's answer. */}
+            {patternCard && (
+              <div className="ps-pattern">
+                <div className="ps-pattern-card">
+                  <TradingCard data={patternCard} scale={0.22} interactive={false} templateStyle="terminal" />
+                </div>
+                <div className="ps-pattern-copy">
+                  <div className="ps-pattern-label">YOU'VE SEEN THIS SHAPE BEFORE</div>
+                  <div className="ps-pattern-name">{deal.exemplar.name}</div>
+                  <div className="ps-pattern-note">{deal.exemplar.note}</div>
+                  <div className="ps-pattern-foot">
+                    Same read, different token. Learn the shape and you get every one of these.
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          {deal.claims.map((c) => (
-            <div key={c.id} className={`ps-au ${run.outcomes[c.id] ? "pressed" : ""}`}>
-              <div className="ps-au-fact">{c.fact}</div>
-              <div className="ps-au-verdict">{deal.autopsy[c.id]}</div>
-              {run.outcomes[c.id] && <div className="ps-au-you">— you pressed him on this</div>}
-            </div>
-          ))}
+            )}
+            {deal.claims.map((c) => (
+              <div key={c.id} className={`ps-au ${run.outcomes[c.id] ? "pressed" : ""}`}>
+                <div className="ps-au-fact">{c.fact}</div>
+                <div className="ps-au-verdict">{deal.autopsy[c.id]}</div>
+                {run.outcomes[c.id] && <div className="ps-au-you">— you pressed him on this</div>}
+              </div>
+            ))}
+          </div>
           <button className="ps-lock" onClick={onExit}>LEAVE THE DESK</button>
         </div>
       )}
@@ -550,7 +533,7 @@ export default function PressSession({
   );
 }
 
-const CSS = DEAL_CSS + `
+const CSS = DEAL_CSS + PRESS_UI_CSS + `
 /* FIXED, not absolute: this portals into document.body, which on /trade is
    taller than the viewport — an absolute inset:0 stretched the layer down the
    whole page and pushed the dock off-screen. */
@@ -568,73 +551,35 @@ const CSS = DEAL_CSS + `
 .ps-deal { font-weight:bold; letter-spacing:0.1em; }
 .ps-book b { color:#ffd23a; font-size:15px; margin-left:6px; }
 
-/* the claim — bottom-left, deliberately small so the ROOM stays the picture */
-/* bottom:132 clears the dock (which tops out at ~52+62=114) with margin, so the
-   PRESS button can never sit on the FACT row again. */
-.ps-claim { position:absolute; left:18px; bottom:132px; width:min(430px, 44vw);
-  background:rgba(2,16,14,0.82); border-left:2px solid #ff5f9e; padding:12px 14px;
-  opacity:0; transform:translateY(8px); transition:opacity .22s ease, transform .22s ease; }
-.ps-claim.in { opacity:1; transform:none; }
-.ps-who { font-size:10.5px; letter-spacing:0.14em; color:#ff5f9e; font-weight:bold; }
-.ps-spin { font-size:14.5px; line-height:1.45; margin:8px 0 10px; }
-.ps-chiprow { display:flex; gap:8px; align-items:flex-start;
-  border-top:1px solid rgba(47,214,214,0.2); padding-top:8px; }
-.ps-tag { font-size:9.5px; letter-spacing:0.14em; color:#02100e; background:#2fd6d6;
-  padding:2px 5px; font-weight:bold; flex:none; }
-.ps-fact { font-size:12px; line-height:1.4; color:rgba(234,255,249,0.85); }
+/* THE FLOOR MARKUP LIVES IN pressUi.jsx AND IS STYLED THERE.
+   What stays here is only what is TRUE OF THIS SURFACE: where the two blocks
+   sit, and the fact that they float over a live 3D room and so need their own
+   background. The claim/answer/seat/meter/nav rules that used to be duplicated
+   below are gone — keeping a second copy is what let the two presentations
+   drift apart in the first place. */
 
-.ps-answer { position:absolute; left:18px; bottom:calc(132px + 132px);
-  width:min(430px, 44vw); background:rgba(4,20,15,0.94); border:1.5px solid #ffd23a;
-  padding:11px 13px; animation:psin .25s ease both; }
-.ps-answer.vibes { border-color:#7a8b86; }
-.ps-answer-line { font-size:13px; line-height:1.45; font-style:italic; }
-.ps-answer-note { font-size:10px; letter-spacing:0.1em; margin-top:8px; color:#ffd23a; font-weight:bold; }
-.ps-answer.vibes .ps-answer-note { color:#bfeede; }
+/* ONE PANEL, BOTTOM RIGHT. The dock used to span the full width, which put the
+   seat cards on top of the claim text on the left, the pip meter adrift in the
+   middle of the room and the nav stranded far right — "corner UI is a bit
+   messy" (author, 2026-07-27). The claim owns the left, the controls own the
+   right, and they never touch. */
+.ps-readcol { position:absolute; left:18px; bottom:46px; width:min(430px, 38vw);
+  max-height:calc(100vh - 130px); overflow-y:auto;
+  display:flex; flex-direction:column; gap:8px; }
+/* Over the room, so both blocks are opaque enough to read against anything. */
+.ps-readcol .pu-claim { background:rgba(2,16,14,0.86); }
+.ps-readcol .pu-answer { animation:psin .25s ease both; }
 @keyframes psin { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+/* The claim fades in with the camera cut; the answer has its own entrance. */
+.ps-fade { opacity:0; transform:translateY(8px);
+  transition:opacity .22s ease, transform .22s ease; }
+.ps-fade.in { opacity:1; transform:none; }
 
-/* The card rack. Anchored RIGHT so it can never reach the claim panel, which
-   owns the left. Its bottom clears the dock row beneath it. */
-.ps-hand-wrap { position:absolute; right:18px; bottom:122px; }
-.ps-ask-label { font-size:9.5px; letter-spacing:0.13em; color:rgba(255,210,58,0.75);
-  font-weight:bold; margin-bottom:7px; text-align:right; }
-.ps-hand { display:flex; gap:10px; justify-content:flex-end; }
-.ps-card { width:172px; text-align:left; cursor:pointer;
-  display:flex; flex-direction:column; gap:5px;
-  background:linear-gradient(160deg, rgba(20,8,32,0.96), rgba(6,20,18,0.96));
-  border:1px solid rgba(255,210,58,0.55); color:#eafff9; padding:10px 11px;
-  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));
-  transition:transform .12s ease, box-shadow .12s ease; }
-.ps-card:hover:not(:disabled) { transform:translateY(-4px);
-  box-shadow:0 0 20px rgba(255,210,58,0.35); border-color:#ffd23a; }
-.ps-card:disabled { cursor:default; opacity:0.35; }
-.ps-card.spent { border-color:rgba(122,139,134,0.5); }
-.ps-card-name { font-size:10px; letter-spacing:0.14em; font-weight:bold; color:#ffd23a; }
-.ps-card-q { font-size:12.5px; line-height:1.35; font-style:italic; }
-.ps-card-hint { font-size:9.5px; letter-spacing:0.06em; color:rgba(234,255,249,0.45); }
-
-.ps-answer-asked { font-size:9.5px; letter-spacing:0.12em; color:rgba(234,255,249,0.5);
-  margin-bottom:6px; }
-.ps-answer.wasted { border-color:#7a8b86; }
-.ps-answer.wasted .ps-answer-note { color:#ff9b6f; }
-
-.ps-dock { position:absolute; left:18px; right:18px; bottom:52px;
-  display:flex; align-items:center; gap:18px; }
-.ps-press { background:#ff2d6f; border:none; color:#fff; padding:13px 24px; cursor:pointer;
-  display:flex; flex-direction:column; align-items:flex-start; gap:2px; flex:none;
-  box-shadow:0 0 26px rgba(255,45,111,0.5);
-  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px)); }
-.ps-press:disabled { background:rgba(120,120,120,0.35); box-shadow:none; cursor:default;
-  color:rgba(255,255,255,0.55); }
-.ps-press-main { font-size:16px; font-weight:bold; letter-spacing:0.16em; }
-.ps-press-sub { font-size:10px; letter-spacing:0.05em; opacity:0.85; }
-.ps-meter { display:flex; align-items:center; gap:6px; }
-.ps-pip { width:11px; height:11px; border:1.5px solid rgba(255,45,111,0.6); border-radius:50%; }
-.ps-pip.live { background:#ff2d6f; box-shadow:0 0 9px rgba(255,45,111,0.8); }
-.ps-meter-label { font-size:9.5px; letter-spacing:0.12em; color:rgba(234,255,249,0.55); margin-left:4px; }
-.ps-nav { margin-left:auto; display:flex; gap:10px; }
-.ps-next, .ps-call { background:rgba(2,16,14,0.85); border:1px solid rgba(47,214,214,0.5);
-  color:#2fd6d6; font-size:11.5px; letter-spacing:0.08em; padding:11px 16px; cursor:pointer; }
-.ps-call { border-color:rgba(255,210,58,0.55); color:#ffd23a; }
+.ps-dock { position:absolute; right:18px; bottom:46px; left:auto;
+  display:flex; flex-direction:column; align-items:stretch; gap:9px;
+  padding:11px 12px; background:rgba(2,16,14,0.9);
+  border:1px solid rgba(47,214,214,0.25); }
+.ps-dock .pu-meter { justify-content:flex-end; }
 
 .ps-progress { position:absolute; left:18px; bottom:34px; display:flex; gap:6px; }
 .ps-dot { width:22px; height:3px; background:rgba(234,255,249,0.18); }
@@ -644,7 +589,7 @@ const CSS = DEAL_CSS + `
 .ps-dot.black { background:#7a8b86; }
 
 .ps-open { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-  width:min(900px, calc(100% - 40px)); max-height:90vh; overflow-y:auto;
+  width:min(940px, calc(100vw - 40px)); max-height:90vh; overflow:auto;
   background:rgba(2,16,14,0.93);
   border:1px solid rgba(47,214,214,0.4); border-left:3px solid #ff5f9e; padding:18px 22px;
   display:flex; gap:22px; align-items:flex-start; }
@@ -655,7 +600,7 @@ const CSS = DEAL_CSS + `
 .ps-hero-card { background:none; border:none; padding:0; cursor:zoom-in; display:block;
   transition:transform .12s ease; }
 .ps-hero-card:hover { transform:translateY(-3px); }
-.ps-open-copy { flex:1; min-width:0; align-self:flex-start; }
+.ps-open-copy { flex:1; min-width:0; max-width:100%; align-self:flex-start; overflow-wrap:anywhere; }
 .ps-open-eyebrow { font-size:10px; letter-spacing:0.18em; color:#ff5f9e; font-weight:bold; }
 .ps-open-name { font-size:24px; font-weight:bold; letter-spacing:0.06em; margin-top:6px; }
 .ps-open-sub { font-size:11px; letter-spacing:0.08em; color:rgba(234,255,249,0.5); margin-top:4px; }
@@ -667,8 +612,7 @@ const CSS = DEAL_CSS + `
 .ps-tools { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;
   margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,210,58,0.22); }
 .ps-tool-group { flex:none; }
-.ps-tool-hand { flex:1; min-width:0; padding-left:16px;
-  border-left:1px solid rgba(47,214,214,0.2); }
+.ps-tool-hand { flex:1; min-width:0; padding-left:0; border-left:none; }
 .ps-draw-label { font-size:9px; letter-spacing:0.13em; color:rgba(255,210,58,0.8);
   font-weight:bold; margin-bottom:7px; }
 .ps-draw-row { display:flex; gap:9px; flex-wrap:wrap; }
@@ -716,6 +660,29 @@ const CSS = DEAL_CSS + `
 .ps-panel.side { left:auto; right:18px; top:50%; transform:translateY(-50%);
   width:min(430px, calc(100% - 36px)); text-align:left; }
 .ps-panel.scroll { max-height:78vh; overflow-y:auto; }
+/* header / scrolling body / pinned exit */
+.ps-panel.autopsy { max-height:78vh; display:flex; flex-direction:column; gap:0; }
+.ps-au-body { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; padding-right:4px; margin-bottom:12px;
+  /* the last line fades, so it reads as "there is more" rather than "that's all" */
+  -webkit-mask-image:linear-gradient(180deg, #000 calc(100% - 18px), transparent);
+  mask-image:linear-gradient(180deg, #000 calc(100% - 18px), transparent); }
+.ps-panel.autopsy .ps-lock { flex:none; margin-top:0; }
+
+/* THE PATTERN BLOCK HAD NO DESKTOP CSS AT ALL — the only .ps-pattern rule lived
+   inside the 860px media query, so above that width it fell back to display
+   :block: the card stacked on top of unstyled body copy, ~500px of it, which is
+   what pushed the exit off the bottom. Card left, copy right, both sized. */
+.ps-pattern { display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;
+  padding:12px; border:1px solid rgba(255,210,58,0.28); background:rgba(255,210,58,0.05); }
+.ps-pattern-card { flex:none; line-height:0; }
+.ps-pattern-copy { flex:1; min-width:0; }
+.ps-pattern-label { font:bold 9px/1.4 'Courier New',monospace; letter-spacing:0.13em;
+  color:rgba(255,210,58,0.8); }
+.ps-pattern-name { font-size:15px; font-weight:bold; letter-spacing:0.04em; margin:4px 0 6px; }
+.ps-pattern-note { font-size:11.5px; line-height:1.45; color:rgba(234,255,249,0.82); }
+.ps-pattern-foot { font-size:10.5px; line-height:1.4; color:rgba(234,255,249,0.5);
+  margin-top:7px; font-style:italic; }
 
 /* THE LOWER THIRD — reveal copy that never covers the curtain call. */
 .ps-lower { position:absolute; left:18px; right:18px; bottom:64px;
@@ -757,7 +724,8 @@ const CSS = DEAL_CSS + `
 .ps-au-you { font-size:10.5px; color:#ffd23a; margin-top:3px; }
 
 @media (max-width: 860px) {
-  .ps-claim, .ps-answer { width:calc(100% - 36px); }
+  /* The reading column and the dock stop competing for the width and stack. */
+  .ps-readcol { width:calc(100% - 36px); right:18px; max-height:38vh; }
   .ps-open { flex-direction:column; }
   .ps-open-hero { align-self:center; }
   .ps-tool-hand { padding-left:0; border-left:none; }
@@ -769,8 +737,8 @@ const CSS = DEAL_CSS + `
   .ps-lower-pnl { font-size:34px; min-width:0; }
   .ps-lower-go { width:100%; }
   .ps-panel.side { left:18px; right:18px; width:auto; max-height:70vh; }
-  .ps-answer { bottom:calc(132px + 150px); }
-  .ps-dock { flex-wrap:wrap; gap:10px; }
-  .ps-nav { margin-left:0; width:100%; }
+  .ps-panel.autopsy { max-height:70vh; }
+  .ps-dock { left:18px; right:18px; }
+  .ps-dock .pu-seats { justify-content:center; }
 }
 `;

@@ -19,7 +19,7 @@
 // Explicit .js extensions: scripts/verify-press-run.mjs imports this module
 // directly under Node ESM, which will not resolve an extensionless specifier.
 import { casePnl } from "../caseTable.js";
-import { BACKING, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend } from "./questions.js";
+import { BACKING, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend } from "./questions.js";
 import { adviserLine } from "./desk.js";
 
 export const PRESSES = 3;
@@ -149,6 +149,89 @@ export function press(run, deal, seat = SEATS.BARRON) {
     advisersSpent: seat === SEATS.BARRON ? run.advisersSpent : [...run.advisersSpent, seat],
     outcomes: { ...run.outcomes, [claim.id]: outcome },
   };
+}
+
+/**
+ * WHAT IS STILL COMING IN THIS LANE. Eugene's job, and the only piece of
+ * information on the floor that nobody else supplies.
+ *
+ * The core decision this game claims to be about is *which claim inside a lane
+ * deserves the one use* — and until this existed you made it BLIND. Sending
+ * Marisol on the first money question you saw was indistinguishable from
+ * sending her on the best one, because you had no idea whether a better one was
+ * coming. That's not a decision, it's a coin flip with extra steps.
+ *
+ * LEAK-FREE BY CONSTRUCTION. It counts LANES ONLY — never backing, never
+ * `discriminates`, never the branch. Lanes are public from second zero by
+ * design (see VC_GAME.md §3), so this tells you how much runway you have and
+ * nothing whatsoever about who's lying.
+ *
+ * On a SHAPE claim — nobody's lane — it reports how many settleable claims are
+ * left instead, which is the same question one level up.
+ */
+export function laneOutlook(run, deal) {
+  const claim = currentClaim(run, deal);
+  if (!claim) return { lane: null, remaining: 0 };
+  const later = deal.claims.slice(run.claimIndex + 1);
+  const remaining = claim.lane === LANES.SHAPE
+    ? later.filter((c) => c.lane !== LANES.SHAPE).length
+    : later.filter((c) => c.lane === claim.lane).length;
+  return { lane: claim.lane, remaining };
+}
+
+/* ---------------------------------------------------------------------- */
+/* pressure — how the pitch is going FOR HIM                               */
+/* ---------------------------------------------------------------------- */
+
+export const PRESSURE = {
+  COOL: "cool",          // nothing has happened to him yet
+  BACKED: "backed",      // you checked and he held up — he gets to enjoy that
+  RATTLED: "rattled",    // one or two things didn't land
+  CORNERED: "cornered",  // he is selling into a room that has stopped believing him
+};
+
+/**
+ * WHAT THE ROOM HAS DONE TO HIM SO FAR.
+ *
+ * The session used to have no arc: six claims of equal weight, and Barron
+ * delivered the sixth exactly as he delivered the first no matter what you had
+ * caught him doing. He is a rigged, voiced character in a room — a tape
+ * recorder was a waste of the only asset this page has.
+ *
+ * Weighted, because the ways of not-answering are not equal:
+ *
+ *   NOTHING ON FILE  +2  an independent party looked and found an absence.
+ *                        Nothing else on the floor is this bad for him.
+ *   black board      +1  he declined to produce. Damning, but deniable —
+ *                        "I don't have it in front of me" is a real sentence.
+ *   partial          +1  the document says less than he does.
+ *   a real receipt   -1  you checked him and he held up, and he gets to enjoy
+ *                        that. Without this, pressing is pure downside for him
+ *                        and the smart play is to never let you check anything.
+ *
+ * IT CANNOT LEAK. Every input is an outcome you have ALREADY SEEN — it reads
+ * `run.outcomes` and nothing else, never `deal.truth`, never the branch, never
+ * `discriminates`. It is a summary of your own findings handed back to you, in
+ * the same way showing your own score is not a leak. A harness assertion pins
+ * that two deals with opposite outcomes and identical outcome-sets produce
+ * identical pressure.
+ *
+ * (It will still CORRELATE with truth — a legit deal yields fewer catches. That
+ * correlation is information you earned, not information you were given.)
+ */
+export function pressure(run) {
+  let score = 0, caught = 0, backed = 0;
+  for (const o of Object.values(run.outcomes || {})) {
+    if (o.nothingOnFile) { score += 2; caught += 1; }
+    else if (!o.receipt) { score += 1; caught += 1; }
+    else if (o.receipt.partial) { score += 1; caught += 1; }
+    else { score -= 1; backed += 1; }
+  }
+  const band = score >= 3 ? PRESSURE.CORNERED
+    : score >= 1 ? PRESSURE.RATTLED
+      : score < 0 ? PRESSURE.BACKED
+        : PRESSURE.COOL;
+  return { score, band, caught, backed };
 }
 
 /** Who can legally be sent at the claim on the floor right now, and why not. */

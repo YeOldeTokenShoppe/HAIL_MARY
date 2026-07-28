@@ -557,8 +557,19 @@ function drawUnicornMouth(ctx, W, H, open, interiorHex, toothHex, teeth) {
 }
 
 
+// How strongly the camera-follow head aim overrides the ANIMATION's own head
+// motion during a reveal, per outcome. 1 = hard overwrite (the clip's head
+// track is discarded entirely), 0 = animation wins outright.
+//
+// 'aligned' can afford a full overwrite: demon_clapping barely moves the head
+// (0.9° peak), so pinning it at the player costs nothing. 'missed' cannot —
+// a dejected reaction lives in the head drop, and overwriting it leaves him
+// upright and eye-contacting the player, which reads as flat. Outcomes absent
+// from this map default to 1; 'abstained' never triggers the follow at all.
+const REVEAL_HEAD_FOLLOW = { aligned: 1, missed: 0.5 };
+
 const CyborgTempleScene = ({
-  onLoad, 
+  onLoad,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = [1.2, 1.2, 1.2],
@@ -592,6 +603,7 @@ const CyborgTempleScene = ({
   const smartPhoneRef = useRef(null); // Demon's SmartPhone prop (Hand_R_1); shown only during demon_phone
   const smartPhoneGateRef = useRef(null); // { action, showTime, hideTime } while demon_phone plays; drives the phone's per-frame visibility window
   const monkCouncilSeqRef = useRef({ active: false, timer: null }); // monk council argue↔standPray alternation
+  const demonRevealSeqRef = useRef({ active: false, timer: null }); // demon missed/abstained reaction↔stand-idle alternation
   const [loadedModel, setLoadedModel] = useState(null);
   const [detectedMobile, setDetectedMobile] = useState(false);
   const xCandleNodesRef = useRef([]); // Sorted array of XCandle01* root nodes
@@ -800,38 +812,56 @@ const CyborgTempleScene = ({
     RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i, abstained: /unicorn_stand/i,    council: [/unicorn_argue/i, /unicorn_stand/i] },
   };
 
-  // Monk council alternation. monk_argue is a short clip and reads as
-  // repetitive on a plain loop, so during 'council' we cycle
-  //   monk_argue (1×) → monk_standPray (2×) → monk_argue (1×) → …
+  // Two-clip alternation for the curtain call / council lineups. A single
+  // short reaction clip reads as repetitive once it has looped a few times,
+  // so the affected outcomes cycle
+  //   A (aLoops×) → B (bLoops×) → A (aLoops×) → …
   // Both clips loop continuously; a chained setTimeout crossfades between them
   // after the right number of loops (timing off each clip's duration), so the
-  // fades overlap cleanly. Needs both clips; if either is missing the caller
-  // falls back to a plain looped reaction.
-  const MONK_SEQ_XFADE = 0.6; // crossfade seconds
-  const stopMonkArgueSequence = () => {
-    const seq = monkCouncilSeqRef.current;
+  // fades overlap cleanly. Returns false when either clip is missing from the
+  // model — callers fall back to a plain looped reaction.
+  //
+  // TUNING: loop counts are the dwell knob, and they are the RATIO that decides
+  // how much of the cycle each clip owns — so they only work as "1× / 2×" when
+  // the two clips are comparable lengths. They may be FRACTIONAL: use whole
+  // loops for a reaction (cutting a shrug mid-motion looks broken) and a
+  // fraction for a long neutral idle (cyclical and low-amplitude, so the
+  // crossfade hides the cut). To give a reaction more presence, SHORTEN THE
+  // NEUTRAL rather than repeating the reaction — replaying it back-to-back
+  // reads as an unnatural double-take. e.g. demon_shrug 2.6s ×1 vs
+  // demon_stand_idle 8.37s ×0.5 → 2.0s reaction / 3.6s neutral. The same pair
+  // at the inherited ×1 / ×2 gives 2.0s / 16.1s — reaction barely visible.
+  const SEQ_XFADE = 0.6; // crossfade seconds
+  const stopAlternateSequence = (seqRef) => {
+    const seq = seqRef?.current;
+    if (!seq) return;
     if (seq.timer) clearTimeout(seq.timer);
     seq.timer = null;
     seq.active = false;
   };
-  const startMonkArgueSequence = () => {
-    const actions = actionsRef.current['Monk'];
-    const state = monkAnimStateRef.current;
-    if (!actions || !state) return false;
-    const argueKey = Object.keys(actions).find((a) => /monk_argue/i.test(a));
-    const prayKey = Object.keys(actions).find((a) => /monk_standPray/i.test(a));
-    if (!argueKey || !prayKey) return false; // need both — let caller plain-loop
-    stopMonkArgueSequence();
-    const argue = actions[argueKey];
-    const pray = actions[prayKey];
-    const seq = monkCouncilSeqRef.current;
-    const XF = MONK_SEQ_XFADE;
+  const startAlternateSequence = ({
+    actions, state, seqRef, aPattern, bPattern, aLoops = 1, bLoops = 2,
+  }) => {
+    if (!actions || !state || !seqRef?.current) return false;
+    const aKey = Object.keys(actions).find((k) => aPattern.test(k));
+    const bKey = Object.keys(actions).find((k) => bPattern.test(k));
+    // Need two DISTINCT clips; if either is missing (or both patterns resolve
+    // to the same action) let the caller plain-loop instead.
+    if (!aKey || !bKey || aKey === bKey) return false;
+    stopAlternateSequence(seqRef);
+    const a = actions[aKey];
+    const b = actions[bKey];
+    const seq = seqRef.current;
+    const XF = SEQ_XFADE;
 
     const play = (action, fadeFrom) => {
       if (fadeFrom && fadeFrom !== action && fadeFrom.isRunning && fadeFrom.isRunning()) {
         fadeFrom.fadeOut(XF);
       }
       action.reset();
+      // Skip the bind-pose first frame so the crossfade can't flash a T-pose
+      // (same 5% inset applyCharacterReaction uses for single-clip reactions).
+      action.time = action.getClip().duration * 0.05;
       action.setLoop(THREE.LoopRepeat, Infinity);
       action.fadeIn(XF);
       action.play();
@@ -841,26 +871,64 @@ const CyborgTempleScene = ({
     // Switch to `next` for `loops` loops, then chain to `after`. Start the
     // crossfade XF early so it completes right as the loop count is reached.
     const holdThenSwitch = (nextAction, nextKey, loops, after) => {
-      const holdMs = Math.max(200, (nextAction.getClip().duration * loops - XF) * 1000);
+      // Floor at fade-in + a beat at full weight. The old 200ms floor let a
+      // clip shorter than ~0.8s start fading OUT before its 0.6s fade-IN had
+      // finished, so it never reached weight 1 and barely registered.
+      const holdMs = Math.max(
+        XF * 1000 + 250,
+        (nextAction.getClip().duration * loops - XF) * 1000,
+      );
       seq.timer = setTimeout(() => {
         if (!seq.active) return;
         after();
       }, holdMs);
       state.currentAnimation = nextKey;
     };
-    const toPray = () => { play(pray, argue);  holdThenSwitch(pray, prayKey, 2, toArgue); };
-    const toArgue = () => { play(argue, pray); holdThenSwitch(argue, argueKey, 1, toPray); };
+    const toB = () => { play(b, a); holdThenSwitch(b, bKey, bLoops, toA); };
+    const toA = () => { play(a, b); holdThenSwitch(a, aKey, aLoops, toB); };
 
-    // Fade out any unrelated monk clip, then open with argue ×1.
-    Object.values(actions).forEach((a) => {
-      if (a !== argue && a !== pray && a.isRunning && a.isRunning()) a.fadeOut(XF);
+    // Fade out any unrelated clip on this character, then open with A.
+    Object.values(actions).forEach((x) => {
+      if (x !== a && x !== b && x.isRunning && x.isRunning()) x.fadeOut(XF);
     });
-    play(argue, null);
-    holdThenSwitch(argue, argueKey, 1, toPray);
+    play(a, null);
+    holdThenSwitch(a, aKey, aLoops, toB);
     state.isPlayingSpecial = true;
     state.nextSwitchDelay = 999999;
     state.lastSwitchTime = Date.now();
     return true;
+  };
+
+  // Monk council alternation: monk_argue (1×) → monk_standPray (2×) → …
+  const stopMonkArgueSequence = () => stopAlternateSequence(monkCouncilSeqRef);
+  const startMonkArgueSequence = () => startAlternateSequence({
+    actions: actionsRef.current['Monk'],
+    state: monkAnimStateRef.current,
+    seqRef: monkCouncilSeqRef,
+    aPattern: /monk_argue/i,
+    bPattern: /monk_standPray/i,
+    aLoops: 1,
+    bLoops: 2,
+  });
+
+  // Demon curtain-call alternation. demon_disappointed / demon_shrug are short
+  // and read as repetitive looping on their own, so 'missed' and 'abstained'
+  // cycle  reaction (1×) → demon_stand_idle (2×) → reaction (1×) → …
+  // giving him a beat of stillness between reactions.
+  //
+  // The neutral clip is matched as /demon_stand/i so it resolves whether it
+  // exports as demon_stand_idle or demon_stand. It is NOT in the model as of
+  // RL80_4anims_v92 — until it is, startAlternateSequence returns false and
+  // applyCharacterReaction falls through to the existing plain single-clip
+  // loop, so this is a no-op rather than a break.
+  //
+  // NAMING: an "idle" in the name collides with the seated gameplay rotation
+  // (the loop pool filters on /typing|idle/i), so the pool explicitly excludes
+  // /stand/i — see the Demon alternation block in useFrame.
+  const DEMON_STAND_IDLE_RE = /demon_stand/i;
+  const DEMON_SEQ_PATTERNS = {
+    missed:    /demon_disappointed/i,
+    abstained: /demon_shrug/i,
   };
 
   const applyCharacterReaction = (agentId, outcome) => {
@@ -949,12 +1017,32 @@ const CyborgTempleScene = ({
       }
     }
 
-    // Monk in council gets the argue↔standPray alternation instead of a plain
-    // loop. If it can't run (missing a clip), tear down any stale sequence and
-    // fall through to the normal single-clip play below.
+    // Monk in council, and the Demon on missed/abstained, get a two-clip
+    // alternation instead of a plain loop. If it can't run (missing a clip),
+    // tear down any stale sequence and fall through to the normal single-clip
+    // play below.
     if (agentId === 'Monk') {
       if (outcome === 'council' && startMonkArgueSequence()) return;
       stopMonkArgueSequence();
+    }
+    if (agentId === 'Demon') {
+      const seqPattern = DEMON_SEQ_PATTERNS[outcome];
+      if (seqPattern && startAlternateSequence({
+        actions,
+        state,
+        seqRef: demonRevealSeqRef,
+        aPattern: seqPattern,
+        bPattern: DEMON_STAND_IDLE_RE,
+        // demon_shrug / demon_disappointed are 2.6s; demon_stand_idle is 8.37s.
+        // ONE full reaction (2.0s) against half an idle (3.6s) — a 5.6s cycle,
+        // reaction ~36% of it. 2× reaction read as an unnatural double-take,
+        // and the inherited 1×/2× buried it under 16s of idle. Shortening the
+        // NEUTRAL is the knob here, not repeating the reaction — see the
+        // TUNING note on startAlternateSequence.
+        aLoops: 1,
+        bLoops: 0.5,
+      })) return;
+      stopAlternateSequence(demonRevealSeqRef);
     }
 
     const targetAction = actions[targetKey];
@@ -1009,6 +1097,10 @@ const CyborgTempleScene = ({
     // Leaving the reveal — always stow the Demon's phone (it only shows during
     // demon_phone). Done before the guards so it hides even if idle can't resolve.
     if (agentId === 'Demon') {
+      // Also tear down the missed/abstained reaction↔stand-idle alternation —
+      // its chained setTimeout would otherwise keep flipping clips after the
+      // reveal, clobbering the idle restored below.
+      stopAlternateSequence(demonRevealSeqRef);
       smartPhoneGateRef.current = null;
       if (smartPhoneRef.current) smartPhoneRef.current.visible = false;
     }
@@ -1080,7 +1172,9 @@ const CyborgTempleScene = ({
       const pattern = mode === 'idle' ? /idle_monk/i : /typing_monk/i;
       crossfadeTo(actionsRef.current['Monk'], monkAnimStateRef.current, pattern);
     } else if (agentId === 'Demon') {
-      const pattern = mode === 'idle' ? /demon.*idle/i : /demon.*typ/i;
+      // /demon_idle/ not /demon.*idle/ — the latter also matches the standing
+      // curtain-call neutral (demon_stand_idle), which would seat him wrong.
+      const pattern = mode === 'idle' ? /demon_idle/i : /demon.*typ/i;
       crossfadeTo(actionsRef.current['Demon'], demonAnimStateRef.current, pattern);
     } else if (agentId === 'Detective') {
       const pattern = mode === 'idle' ? /detective.*idle/i : /detective.*typ/i;
@@ -1163,7 +1257,7 @@ const CyborgTempleScene = ({
     const demonMixer = mixersRef.current['Demon'];
     if (!demonActions || !demonMixer) return;
 
-    const idleKey = Object.keys(demonActions).find(a => /demon.*idle/i.test(a));
+    const idleKey = Object.keys(demonActions).find(a => /demon_idle/i.test(a));
     const pointingKey = Object.keys(demonActions).find(a => /demon.*pointing/i.test(a));
     const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a));
     const demonState = demonAnimStateRef.current;
@@ -2115,7 +2209,7 @@ const CyborgTempleScene = ({
       const animDuration = fistPump.getClip().duration * 1000;
       setTimeout(() => {
         const loopAnims = Object.keys(demonActions).filter(a =>
-          /typing|idle/i.test(a) && !/sit_idle/i.test(a));
+          /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a));
         const returnAnim = loopAnims.length > 0
           ? loopAnims[Math.floor(Math.random() * loopAnims.length)]
           : Object.keys(demonActions)[0];
@@ -2274,8 +2368,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v89_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v89.glb";
+    let modelPath = "/models/RL80_4anims_v94_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v94.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -3069,7 +3163,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             // Newer export uses demon_typing / demon_idle naming; tolerate
             // the legacy Root.001|* names for older models still in use.
             const demonTyping = availableAnims.find(a => /demon.*typ/i.test(a));
-            const demonIdle = availableAnims.find(a => /demon.*idle/i.test(a));
+            const demonIdle = availableAnims.find(a => /demon_idle/i.test(a));
             if (demonTyping) {
               defaultAnimName = demonTyping;
             } else if (demonIdle) {
@@ -4131,7 +4225,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         demonState.focusSequenceListener = null;
       }
       if (!demonActions) return;
-      const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle/i.test(a));
+      const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
       const prevAction = demonActions[demonState.currentAnimation];
       const returnAction = demonActions[returnAnim];
@@ -5708,8 +5802,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // When `jackpotOnlyFistPump` is on, FistPump is reserved for
         // slot-machine jackpots and excluded from the random rotation —
         // leaving laughing as the only random special.
+        // /stand/ is excluded so the STANDING curtain-call neutral
+        // (demon_stand_idle) can't be drawn into the seated desk rotation
+        // just because its name contains "idle".
         const loopAnimations = availableAnimations.filter(a =>
-          /typing|idle/i.test(a) && !/sit_idle/i.test(a));
+          /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a));
         const specialPattern = jackpotOnlyFistPump
           ? /laughing/i
           : /fistpump|laughing/i;
@@ -6898,7 +6995,16 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         demonHeadBoneRef._smoothedQuat = head.quaternion.clone();
       }
       demonHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
-      head.quaternion.copy(demonHeadBoneRef._smoothedQuat);
+      // Blend the camera aim OVER the animation rather than replacing it.
+      // head.quaternion is still the clip's authored value at this point
+      // (mixer.update ran earlier in this useFrame), so a weight below 1 lets
+      // the clip's own head motion survive the follow — see REVEAL_HEAD_FOLLOW.
+      const headFollowW = REVEAL_HEAD_FOLLOW[revealModeRef.current] ?? 1;
+      if (headFollowW >= 1) {
+        head.quaternion.copy(demonHeadBoneRef._smoothedQuat);
+      } else {
+        head.quaternion.slerp(demonHeadBoneRef._smoothedQuat, headFollowW);
+      }
     } else if (demonHeadBoneRef._smoothedQuat && demonHeadBoneRef.current) {
       // Symmetric release — slerp back toward whatever the animation
       // wants now, then drop the override once close enough.
