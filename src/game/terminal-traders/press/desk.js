@@ -7,13 +7,13 @@
 // ~40 lines of prose, reused forever. That is the whole point of moving the
 // four-character layer here instead of into the archetypes.
 
-import { LANES, SEATS, SHAPES } from "./questions.js";
+import { LANES, SEATS, SHAPES, inLane } from "./questions.js";
 
 export const DESK = {
   [SEATS.BARRON]: {
     id: SEATS.BARRON, agentId: "Demon", station: "demon",
-    name: "John Barron", role: "THE DEAL",
-    blurb: "Brought it in. Gets paid if you fund it.",
+    name: "John Barron", role: "THE TAPE", lane: LANES.CHART,
+    blurb: "Price, windows, momentum. Brought the deal in — gets paid if you fund it.",
   },
   [SEATS.MARISOL]: {
     id: SEATS.MARISOL, agentId: "Detective", station: "marisol",
@@ -25,57 +25,72 @@ export const DESK = {
     name: "Saint GR80", role: "THE PAPERWORK", lane: LANES.RECORD,
     blurb: "What the documents actually say.",
   },
+  [SEATS.EUGENE]: {
+    id: SEATS.EUGENE, agentId: "RL80", station: "eugene",
+    name: "Eugene", role: "THE STORY", lane: LANES.SOCIAL,
+    blurb: "Narrative, reputation, who vouches for whom.",
+  },
 };
 
-// Eugene is not spendable and never stamps a receipt. He reads the shape of
-// the claim and points at whose lane it is — free, on every claim. His whole
-// contribution is generated from the two enums below, so he needs no
-// archetype prose, ever.
 /**
- * What a lane is CALLED on screen. The enum is CHAIN / RECORD / SHAPE in code,
- * but "RECORD QUESTION" reads as an instruction to record something — noun or
- * verb, you can't tell ("is 'Record' a verb or noun here?" — author,
- * 2026-07-27). Player-facing copy uses a plain noun phrase and the band reads
- * as a sentence, so there is nothing to parse.
+ * Eugene is now a full seat (SOCIAL) rather than a fixture. Kept as a named
+ * export because a lot of code refers to him directly, and because he is still
+ * the one seat that does TWO things:
+ *
+ *   RECOGNITION — free, unlimited, every claim: the shape, then the agenda.
+ *                 Costs nothing because nothing is fetched.
+ *   RETRIEVAL   — one use, like the others: sent at a SOCIAL claim he comes
+ *                 back with who actually vouches for whom, and stamps it on
+ *                 his own board (__screen4Canvas, which existed unused all along).
+ *
+ * That split is the answer to "why does Eugene have the special role" — the
+ * others retrieve, he also recognises, and recognition is free by nature.
+ */
+export const EUGENE = DESK[SEATS.EUGENE];
+
+/**
+ * What a lane is CALLED on screen. The enum is CHAIN / RECORD / CHART / SOCIAL
+ * in code, but "RECORD QUESTION" reads as an instruction to record something —
+ * noun or verb, you can't tell ("is 'Record' a verb or noun here?" — author,
+ * 2026-07-27). Player-facing copy uses a plain noun phrase.
  */
 export const LANE_LABEL = {
   [LANES.CHAIN]: "the money",
   [LANES.RECORD]: "the paperwork",
-  [LANES.SHAPE]: "nobody's lane",
+  [LANES.CHART]: "the tape",
+  [LANES.SOCIAL]: "the story",
+  [LANES.SHAPE]: "nobody's specialism",
 };
 
-/** Who could settle this claim, if anyone. Null on a SHAPE claim. */
+/** Who is the SPECIALIST for this claim. Null only on a LANES.SHAPE claim. */
 export function laneOwner(claim) {
-  if (!claim || claim.lane === LANES.SHAPE) return null;
-  return claim.lane === LANES.CHAIN ? DESK[SEATS.MARISOL] : DESK[SEATS.GR80];
+  if (!claim) return null;
+  return Object.values(DESK).find((d) => d.lane === claim.lane) || null;
 }
 
 /**
  * The whole band, as one sentence.
  *
- * IT MUST DESCRIBE THE CURRENT STATE, NOT THE LANE MAP. Naming the lane's owner
- * unconditionally told the player "only Detective Marisol can settle it" while
- * her tile read "already used" — an instruction to do something impossible, on
- * a claim where two interruptions were still in hand ("she's greyed out" —
- * author, 2026-07-27). Once her one use is gone the claim is functionally a
- * SHAPE claim, and the band has to say so, because that changes what you do:
- * press him, or let it go.
+ * IT NO LONGER SAYS "ONLY X CAN SETTLE IT", BECAUSE THAT IS NO LONGER TRUE.
+ * Under the gate model it was accurate and still managed to be wrong twice: it
+ * named a spent adviser as the way through, and it made two of four seats look
+ * like broken buttons. Under the gradient model anyone can be sent at anything,
+ * so the band names who goes DEEP and lets you price the shallow alternative.
+ *
+ * Once the specialist is spent the claim isn't closed, it's capped — every
+ * remaining seat still answers, just shallowly — and the copy has to say
+ * exactly that, or it reproduces the old lie in a new place.
  */
 export function laneSentence(claim, { spent = [] } = {}) {
   if (!claim) return "";
-  if (claim.lane === LANES.SHAPE) return "NOBODY HERE CAN SETTLE THIS ONE — press him, or let it go";
   const who = laneOwner(claim);
+  if (!who) return "NOBODY HERE SPECIALISES IN THIS ONE — anyone you send gets the shallow version";
+  const label = LANE_LABEL[claim.lane].toUpperCase();
   if (spent.includes(who.id)) {
-    return `THIS ONE'S ${LANE_LABEL[claim.lane].toUpperCase()}, AND ${who.name.toUpperCase()} IS SPENT — press him, or let it go`;
+    return `THIS ONE'S ${label}, AND ${who.name.toUpperCase()} IS SPENT — anyone else gets the shallow version`;
   }
-  return `THIS ONE'S ABOUT ${LANE_LABEL[claim.lane].toUpperCase()} — only ${who.name} can settle it`;
+  return `THIS ONE'S ${label} — ${who.name} goes deepest on it`;
 }
-
-export const EUGENE = {
-  id: "eugene", agentId: "RL80", station: "eugene",
-  name: "Eugene", role: "THE READ",
-  blurb: "Names the shape. Never has receipts.",
-};
 
 // What KIND of weakness this claim would have, if it has one. Never states
 // whether it does — that would name the outcome before the reveal.
@@ -125,9 +140,16 @@ const SHAPE_READ = {
 // the floor knows and which changes the decision the game is actually about:
 // spend Marisol on this money question, or hold her for a better one. "Last
 // one you'll get" and "three more coming" are different games.
+// SINGULAR AND PLURAL ARE BOTH AUTHORED, because the plural is not always a
+// trailing "s": "question about the tape" pluralises on the HEAD noun, and
+// appending to the phrase produced "two more question about the tapes". Latent
+// under today's archetypes — CHART and SOCIAL never reach remaining >= 2 — so
+// it would have shipped silently the day a third social slot landed.
 const LANE_NOUN = {
-  [LANES.CHAIN]: "money question",
-  [LANES.RECORD]: "paperwork question",
+  [LANES.CHAIN]: ["money question", "money questions"],
+  [LANES.RECORD]: ["paperwork question", "paperwork questions"],
+  [LANES.CHART]: ["question about the tape", "questions about the tape"],
+  [LANES.SOCIAL]: ["question about the story", "questions about the story"],
 };
 
 const COUNT_WORD = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven"];
@@ -141,26 +163,41 @@ const countWord = (n) => COUNT_WORD[n] ?? String(n);
 export function eugeneAgenda(claim, { spent = [], remaining = 0 } = {}) {
   const owner = laneOwner(claim);
 
-  // Nobody's lane. The useful question moves up a level: how much of the rest
-  // of this pitch can be checked by anyone at all?
+  // A claim nobody specialises in (LANES.SHAPE — unused by today's archetypes,
+  // retained for future ones). Everyone answers it shallowly or not at all.
   if (!owner) {
-    if (remaining === 0) return "Nobody settles that one, and there's nothing checkable left.";
-    return `Nobody settles that one. ${countWord(remaining)} left that anybody could.`;
+    if (remaining === 0) return "Nobody's the expert on that one, and there's nothing left after it.";
+    return `Nobody's the expert on that one. ${countWord(remaining)} left that somebody is.`;
   }
 
-  const noun = LANE_NOUN[claim.lane];
-  const plural = remaining === 1 ? "" : "s";
+  const [one, many] = LANE_NOUN[claim.lane];
+  const noun = remaining === 1 ? one : many;
 
-  // You already burned the only person who could answer this lane. Saying so
-  // is the band's job; Eugene's is to price what that cost you.
+  // BUG 2 — Eugene owns SOCIAL, so on his own lane he is talking about himself,
+  // and the third-person template produced "That was the last one, and me was
+  // already spent." It shipped, in 192 of 400 yield-mirage seeds. The half-done
+  // `${self ? "was" : "was"}` ternary left behind here was the tell: the
+  // self-reference case was started and abandoned. First person, properly.
+  const self = owner.id === SEATS.EUGENE;
+
+  // The specialist for this lane is already spent. Anyone else you send still
+  // ANSWERS — they just answer shallowly — so this is a loss of depth, not a
+  // dead end, and the copy has to say that or it's the old lie in a new place.
   if (spent.includes(owner.id)) {
-    return remaining === 0
-      ? `That was the last one, and ${owner.name} was already gone.`
-      : `${countWord(remaining)} more ${noun}${plural} after this, and nobody left to send.`;
+    if (remaining === 0) {
+      return self
+        ? "That was the last one, and you'd already sent me."
+        : `That was the last one, and ${owner.name} was already spent.`;
+    }
+    return `${countWord(remaining)} more ${noun} after this, and only shallow looks left.`;
   }
 
-  if (remaining === 0) return `Last ${noun} you'll get. Spend ${owner.name} now or don't.`;
-  return `${countWord(remaining)} more ${noun}${plural} after this one.`;
+  if (remaining === 0) {
+    return self
+      ? `Last ${one} you'll get. Send me now, or don't.`
+      : `Last ${one} you'll get. Deep look now, or never.`;
+  }
+  return `${countWord(remaining)} more ${noun} after this one.`;
 }
 
 /**
@@ -226,24 +263,54 @@ export function barronAside(band, claim, index = 0) {
   return bank[((index % bank.length) + bank.length) % bank.length];
 }
 
-// What an adviser says. Four results, two advisers — eight short lines that
-// every archetype reuses. The FACTS come from the claim's authored receipt;
-// these only frame the delivery.
+// WHAT A COLLEAGUE SAYS WHEN THEY COME BACK.
+//
+// Two axes now: WHO went, and whether it was THEIR AREA. Deep lines are the
+// specialist voice; shallow lines are the same person outside their lane —
+// they still went, they still looked, they just can't take it very far. The
+// shallow voice is what stops an off-lane send reading as a punishment: you
+// get a real answer, it's simply capped, and hearing them say so out loud is
+// how the depth gradient becomes legible without a tooltip.
+//
+// Sixteen deep lines + four shallow ones, archetype-agnostic, paid for once.
 const ADVISER_LINES = {
   [SEATS.MARISOL]: {
     dispatch: "Give me a second. I'll pull it.",
     found: "Here. Timestamped, and you can check it yourself.",
     partial: "Partial. That's as far as the chain goes.",
     nothing: "There's nothing to pull. No record of it anywhere.",
+    shallow: "Not my area, so take this for what it is — here's what's visible from outside.",
   },
   [SEATS.GR80]: {
     dispatch: "I have read it. One moment.",
     found: "It is in the document. Section and all.",
     partial: "The document says less than he does.",
     nothing: "Nothing on file. Not redacted — absent.",
+    shallow: "I can read what is in front of me. On this one, that is not much.",
   },
+  [SEATS.EUGENE]: {
+    dispatch: "Let me see who's actually saying this.",
+    found: "Found the source. And who repeated it, and when.",
+    partial: "Half of it traces. The other half is just people agreeing with each other.",
+    nothing: "Nobody's saying it. There's no story here to trace — that's the finding.",
+    shallow: "This isn't really a story question, so all I've got is the surface.",
+  },
+  // Barron answers in his own voice, never in this bank — the answer panel puts
+  // his line under his own name. He's here only so a lookup can't come back
+  // undefined if a caller asks.
+  [SEATS.BARRON]: {},
 };
 
-export function adviserLine(seat, result) {
-  return ADVISER_LINES[seat]?.[result] ?? "";
+/**
+ * @param seat   who you sent
+ * @param result "found" | "partial" | "nothing" | "dispatch"
+ * @param deep   was it their lane? off-lane always returns the shallow line,
+ *               because the point of sending the wrong specialist is that you
+ *               hear them tell you it was the wrong specialist.
+ */
+export function adviserLine(seat, result, deep = true) {
+  const bank = ADVISER_LINES[seat];
+  if (!bank) return "";
+  if (!deep) return bank.shallow ?? "";
+  return bank[result] ?? "";
 }

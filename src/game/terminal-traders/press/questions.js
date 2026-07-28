@@ -40,51 +40,84 @@ export const BACKING = {
 export const SHAPE_LIST = Object.values(SHAPES);
 
 /* ------------------------------------------------------------------------ *
- * SEATS AND LANES — the four-character layer (2026-07-27)
+ * SEATS AND LANES — the four-character layer
  *
- * Cards were cut. The three verbs a card format promised — choose, commit,
- * forfeit — are supplied by the room instead, at no content cost, and they
- * make all four characters load-bearing during PLAY rather than only at the
- * curtain call.
+ * Cards were cut (2026-07-27). The three verbs a card format promised —
+ * choose, commit, forfeit — are supplied by the room instead, at no content
+ * cost, and they make all four characters load-bearing during PLAY rather than
+ * only at the curtain call.
  *
- * Barron pitches and can be pressed as often as the budget allows. Marisol
- * and GR80 each answer ONE claim per session, in their own lane. Eugene is
- * free and automatic and never stamps a receipt — he names the shape and
- * whose lane it falls in.
+ * EXPERTISE IS A GRADIENT, NOT A GATE (2026-07-28). The first cut made a lane
+ * a permission: off-lane sends were rejected as no-ops, so two of the four
+ * seats were greyed out on any given claim and the seat row read as a row of
+ * broken buttons — the single most-reported confusion in playtest. Author's
+ * reframing: *"they each have an area of expertise but can generalize too."*
  *
- * The decision is materiality and timing: GR80 has three valid targets in a
- * backdoor-fork and one use, and the agenda rail shows you what's still
- * coming. Spend him on the audit and you can never have him on the wind-down.
+ * So: ANYONE CAN BE SENT AT ANYTHING. What the lane decides is DEPTH.
+ *
+ *   in-lane   -> the claim's `sharp` block: the specialist finding, with the
+ *                caveat the speaker hadn't volunteered
+ *   off-lane  -> the claim's `generic` block: a true, shallow answer that
+ *                mostly fails to settle anything
+ *
+ * Both blocks already exist on every slot in every branch, so the entire
+ * change cost ZERO new archetype prose. The decision stops being "who is
+ * legal here" (which the UI could answer for you) and becomes "is this claim
+ * worth my one specialist, or will a shallow look do" — which it can't.
+ *
+ * Four lanes, four seats, one each. Barron pitches and is unlimited within the
+ * budget; the other three answer ONE claim per session each, so three
+ * interruptions and three specialists is a genuinely tight allocation.
  * ------------------------------------------------------------------------ */
 
 export const LANES = {
   CHAIN: "CHAIN",   // money movement, wallet ages, unlocks — Marisol
   RECORD: "RECORD", // documents: audit scope, references, post-mortems — GR80
-  SHAPE: "SHAPE",   // neither adviser can settle it; Barron and Eugene only
+  CHART: "CHART",   // price, windows, the tape — Barron, who sells on it
+  SOCIAL: "SOCIAL", // narrative, reputation, who vouches for whom — Eugene
+  // Retained for archetypes that want a claim nobody specialises in. No slot
+  // uses it today: with four lanes the surface is covered, and "nobody can
+  // settle this" is now carried by BACKING.VIBES (no receipt for ANY seat),
+  // which is the honest place for it — it's a property of the claim, not of
+  // who's in the room.
+  SHAPE: "SHAPE",
 };
 
 export const SEATS = {
   BARRON: "barron",
   MARISOL: "marisol",
   GR80: "gr80",
+  EUGENE: "eugene",
 };
 
-/** Which lane each spendable adviser can be sent into. Barron has no lane —
- *  he's always available, which is what keeps the verdict reachable for free. */
+/** Everyone owns exactly one lane now, Barron included. His is CHART: he's a
+ *  tape reader who sells on the tape, so his own specialism is the one subject
+ *  he'll happily go deep on — which is a very salesman thing to be. */
 export const SEAT_LANE = {
+  [SEATS.BARRON]: LANES.CHART,
   [SEATS.MARISOL]: LANES.CHAIN,
   [SEATS.GR80]: LANES.RECORD,
+  [SEATS.EUGENE]: LANES.SOCIAL,
 };
 
-export const SPENDABLE_SEATS = [SEATS.MARISOL, SEATS.GR80];
+/** One use each, all session. Barron is excluded — he's the one pitching, so
+ *  he's always at the table, and his availability is what keeps every verdict
+ *  reachable for free (see "truth is never for sale"). */
+export const SPENDABLE_SEATS = [SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE];
 
-/** Legal only when the adviser's lane matches the claim's. An illegal send is
- *  a NO-OP, never an error and never a penalty — you can't misclick away a
- *  session, you can only fail to spend well. */
-export function canSend(seat, claim) {
-  if (seat === SEATS.BARRON) return true;
-  const lane = SEAT_LANE[seat];
-  return !!lane && !!claim && claim.lane === lane;
+/** Is this seat the specialist for this claim? Decides DEPTH, never legality. */
+export function inLane(seat, claim) {
+  return !!claim && !!SEAT_LANE[seat] && SEAT_LANE[seat] === claim.lane;
+}
+
+/**
+ * Every seat can be sent at every claim. Kept as a named function because the
+ * legality question is still worth asking explicitly at the call sites — it's
+ * just that the answer is now always yes, and the interesting question moved
+ * to inLane(). Budget and one-use-per-adviser are enforced in pressRun.
+ */
+export function canSend() {
+  return true;
 }
 
 export function isShape(v) {

@@ -19,20 +19,38 @@ export const ARCHETYPES = {
 };
 export const ARCHETYPE_IDS = Object.keys(ARCHETYPES);
 
+/** Backing is a property of the CLAIM, not of the branch — see slotBacking. */
+export const backingOf = (slot) => slot.backing ?? slot.rug?.backing ?? null;
+
 /**
- * Does this slot DISCRIMINATE — i.e. can pressing it tell you which branch
- * you're in? Compares only what the player can actually observe: the backing
- * and the two receipts. Not the prose, because the prose can differ in wording
- * while saying the same thing.
+ * Can pressing this slot tell you which branch you're in, and AT WHAT DEPTH?
+ * Compares only what the player can observe — the receipts. Not the prose,
+ * which can differ in wording while saying the same thing.
  *
- * `funding` in backdoor-fork is the case that makes this worth computing: it's
- * HARD in both branches with identical receipts, so it's the impressive-sounding
- * claim that tells you nothing. A salesman disguises materiality on purpose;
- * scoring coverage of the discriminating claims is what teaches that.
+ * TWO DEPTHS, MEASURED SEPARATELY, BECAUSE THE WHOLE DESK RESTS ON THE GAP.
+ * The acceptance test on 2026-07-28 found generic and sharp discriminating
+ * identically on 14 of 14 slots, which made every specialist decorative and let
+ * three presses on the seller weakly dominate the desk. The cause was `backing`
+ * being authored per branch: the engine zeroes every receipt on VIBES, so a
+ * VIBES/HARD slot returned nothing to ANYONE in the rug branch. Backing is now
+ * slot-level and cannot carry the signal; the receipts have to.
+ *
+ * `funding` in backdoor-fork is the deliberate zero on both axes — identical in
+ * both branches at both depths, the impressive-sounding claim that tells you
+ * nothing. A salesman disguises materiality on purpose, and scoring coverage of
+ * the discriminating claims is what teaches that.
  */
-function slotDiscriminates(slot) {
-  const obs = (b) => JSON.stringify([b.backing, b.generic?.receipt ?? null, b.sharp?.receipt ?? null]);
+export function genericDiscriminates(slot) {
+  if (slot.generic) return false;   // hoisted: identical by construction
+  const obs = (b) => JSON.stringify(b.generic?.receipt ?? null);
   return obs(slot.rug) !== obs(slot.legit);
+}
+export function sharpDiscriminates(slot) {
+  const obs = (b) => JSON.stringify(b.sharp?.receipt ?? null);
+  return obs(slot.rug) !== obs(slot.legit);
+}
+function slotDiscriminates(slot) {
+  return genericDiscriminates(slot) || sharpDiscriminates(slot);
 }
 
 const pick = (rand, arr) => arr[Math.floor(rand() * arr.length)];
@@ -90,10 +108,22 @@ export function instanceDeal(seed = 1, archetypeId = null) {
 
   // Play SIX of the archetype's slots. loadBearing slots are always in (a deal
   // must stay solvable cardless); the rest are a seeded pick, so which question
-  // shapes are live shifts day to day and no pool card is permanently dead.
+  // shapes are live shifts day to day.
+  //
+  // EVERY LANE MUST SURVIVE THE CUT. A lane with exactly one slot in the
+  // archetype is protected from being dropped, because dropping it leaves that
+  // specialist with no claim they're deep on all session — measured at 95 of
+  // 200 yield-mirage seeds before this guard, since RECORD and CHART have a
+  // single slot each there. Under the gradient model they'd still be sendable,
+  // so nothing would look broken; their expertise would just be silently
+  // decorative, which is worse than an obvious failure.
   const PLAYED = 6;
-  const forced = A.SLOTS.filter((s) => s.loadBearing);
-  const optional = A.SLOTS.filter((s) => !s.loadBearing);
+  const laneCounts = {};
+  for (const s of A.SLOTS) laneCounts[s.lane] = (laneCounts[s.lane] || 0) + 1;
+  const mustKeep = (s) => s.loadBearing || laneCounts[s.lane] === 1;
+
+  const forced = A.SLOTS.filter(mustKeep);
+  const optional = A.SLOTS.filter((s) => !mustKeep(s));
   for (let i = optional.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [optional[i], optional[j]] = [optional[j], optional[i]];
@@ -121,8 +151,13 @@ export function instanceDeal(seed = 1, archetypeId = null) {
       loadBearing: !!slot.loadBearing,
       fact: resolve(slot.fact),
       spin: resolve(slot.spin),
-      backing: b.backing,
-      press: { generic: b.generic, sharp: b.sharp, miss: b.miss },
+      backing: backingOf(slot) ?? b.backing,
+      // GENERIC IS HOISTED TO THE SLOT on every rewritten claim, so the seller's
+      // shallow answer CANNOT differ by branch — the leak is now impossible by
+      // construction rather than caught by assertion. The per-branch fallback
+      // exists for exactly one case: the loadBearing claim, which invariant 1
+      // requires stay reachable on a free press and therefore MUST discriminate.
+      press: { generic: slot.generic ?? b.generic, sharp: b.sharp },
     };
   });
 

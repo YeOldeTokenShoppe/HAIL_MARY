@@ -8,8 +8,8 @@
 // sale) is re-asserted against seats.
 
 import fs from "node:fs";
-import { instanceDeal, ARCHETYPE_IDS } from "../src/game/terminal-traders/press/instanceDeal.js";
-import { BACKING, SHAPES, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend } from "../src/game/terminal-traders/press/questions.js";
+import { instanceDeal, ARCHETYPE_IDS, backingOf, genericDiscriminates, sharpDiscriminates } from "../src/game/terminal-traders/press/instanceDeal.js";
+import { BACKING, SHAPES, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend, inLane } from "../src/game/terminal-traders/press/questions.js";
 import { DESK, EUGENE, eugeneRead, eugeneAgenda, adviserLine, laneSentence, barronAside } from "../src/game/terminal-traders/press/desk.js";
 import {
   PRESSES, STAKE, PHASE,
@@ -40,12 +40,19 @@ const walkTo = (deal, id) => {
 
 console.log("\n-- the desk ------------------------------------------------");
 {
-  ok("three seats plus Eugene", Object.keys(DESK).length === 3 && !!EUGENE);
-  ok("exactly two advisers are spendable", SPENDABLE_SEATS.length === 2);
-  ok("Barron has no lane — he is always available",
-    !SEAT_LANE[SEATS.BARRON] && canSend(SEATS.BARRON, { lane: LANES.CHAIN }));
-  ok("Marisol is CHAIN, GR80 is RECORD",
-    SEAT_LANE[SEATS.MARISOL] === LANES.CHAIN && SEAT_LANE[SEATS.GR80] === LANES.RECORD);
+  ok("four seats, one specialism each", Object.keys(DESK).length === 4 && !!EUGENE);
+  ok("every seat owns exactly one lane, and no two share",
+    (() => {
+      const lanes = Object.values(DESK).map((d) => d.lane);
+      return lanes.every(Boolean) && new Set(lanes).size === lanes.length;
+    })());
+  ok("three colleagues are spendable; Barron is not",
+    SPENDABLE_SEATS.length === 3 && !SPENDABLE_SEATS.includes(SEATS.BARRON));
+  ok("Barron owns the tape and is still unlimited within the budget",
+    SEAT_LANE[SEATS.BARRON] === LANES.CHART && canSend(SEATS.BARRON, { lane: LANES.CHAIN }));
+  ok("Marisol CHAIN, GR80 RECORD, Eugene SOCIAL",
+    SEAT_LANE[SEATS.MARISOL] === LANES.CHAIN && SEAT_LANE[SEATS.GR80] === LANES.RECORD
+    && SEAT_LANE[SEATS.EUGENE] === LANES.SOCIAL);
   ok("every seat maps to a real scene agent and screen station",
     Object.values(DESK).every((d) => d.agentId && d.station) && EUGENE.agentId === "RL80");
   let total = true;
@@ -66,21 +73,24 @@ console.log("\n-- the desk ------------------------------------------------");
   // instruction to take an action the controller rejects as a no-op.
   const chainClaim = { id: "dep", shape: SHAPES.SELECTIVE_WINDOW, lane: LANES.CHAIN };
   const recClaim = { id: "aud", shape: SHAPES.BORROWED_CREDIBILITY, lane: LANES.RECORD };
-  ok("the lane band names the owner while they are available",
+  ok("the lane band names who goes deepest, not who is permitted",
     laneSentence(chainClaim).includes(DESK[SEATS.MARISOL].name)
+    && /deepest/i.test(laneSentence(chainClaim))
+    && !/only/i.test(laneSentence(chainClaim))
     && laneSentence(recClaim).includes(DESK[SEATS.GR80].name));
   ok("the lane band stops issuing an impossible instruction once they're spent",
     (() => {
+      // Capped, not closed: everyone else still answers, just shallowly.
       const a = laneSentence(chainClaim, { spent: [SEATS.MARISOL] });
       const b = laneSentence(recClaim, { spent: [SEATS.GR80] });
-      return /spent/i.test(a) && /press him/i.test(a)
-        && /spent/i.test(b) && /press him/i.test(b);
+      return /spent/i.test(a) && /shallow/i.test(a)
+        && /spent/i.test(b) && /shallow/i.test(b);
     })());
   ok("Eugene stops pointing at a spent adviser",
     (() => {
       const live = eugeneAgenda(chainClaim, { remaining: 2 });
       const dead = eugeneAgenda(chainClaim, { spent: [SEATS.MARISOL], remaining: 2 });
-      return live !== dead && /nobody left to send/i.test(dead);
+      return live !== dead && /shallow looks left/i.test(dead);
     })());
   ok("spending the OTHER adviser changes nothing about this lane",
     laneSentence(chainClaim, { spent: [SEATS.GR80] }) === laneSentence(chainClaim)
@@ -104,10 +114,42 @@ console.log("\n-- the desk ------------------------------------------------");
   ok("singular and plural both read as English",
     /One more money question after this one\./.test(eugeneAgenda(chainClaim, { remaining: 1 }))
     && /Two more money questions after this one\./.test(eugeneAgenda(chainClaim, { remaining: 2 })));
+  // EVERY LANE, NOT JUST CHAIN. Both agenda bugs found on 2026-07-28 shipped
+  // because every assertion here used `chainClaim` — the one lane whose noun
+  // pluralises with a trailing "s" and whose owner is never Eugene. A per-lane
+  // sweep is the assertion that would have caught them the day they landed.
+  ok("every lane pluralises on its HEAD noun, not its phrase",
+    Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) => {
+      const two = eugeneAgenda({ id: "x", lane }, { remaining: 2 });
+      return !/\bs\b|storys|tapes|questions about the (tape|story)s/.test(two)
+        && /questions?/.test(two) && !/question after/.test(two);
+    }));
+  ok("no lane produces a mangled noun phrase at any count",
+    Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) =>
+      [0, 1, 2, 3].every((remaining) =>
+        [[], [SEATS.MARISOL], [SEATS.GR80], [SEATS.EUGENE], [SEATS.BARRON]].every((spent) => {
+          const line = eugeneAgenda({ id: "x", lane }, { spent, remaining });
+          return line
+            && !/storys|tapes\b|questions question|more question after/.test(line)
+            && /[.!]$/.test(line);
+        }))));
+  // He owns SOCIAL, so on his own lane he is talking about himself. The
+  // third-person template shipped "and me was already spent" in 192/400
+  // yield-mirage seeds.
+  ok("Eugene refers to himself in the first person on his own lane",
+    (() => {
+      const social = { id: "x", lane: LANES.SOCIAL };
+      const lines = [
+        eugeneAgenda(social, { remaining: 0 }),
+        eugeneAgenda(social, { spent: [SEATS.EUGENE], remaining: 0 }),
+      ];
+      return lines.every((l) => !/\bme was\b|\bEugene was\b/.test(l))
+        && lines.some((l) => /\bme\b/.test(l));
+    })());
   ok("a SHAPE claim reports what's checkable at all, not a lane",
     (() => {
       const s = eugeneAgenda({ id: "vibe", shape: SHAPES.UNFALSIFIABLE, lane: LANES.SHAPE }, { remaining: 2 });
-      return /Nobody settles that one/i.test(s) && !/money|paperwork/i.test(s);
+      return /Nobody's the expert/i.test(s) && !/money|paperwork|tape|story/i.test(s);
     })());
 }
 
@@ -231,26 +273,137 @@ console.log("\n-- the agenda is real, and leak-free ------------------------");
     })());
 }
 
-console.log("\n-- lanes and legality --------------------------------------");
+console.log("\n-- THE ACCEPTANCE INVARIANT: the desk must beat the seller ---");
+{
+  // This section exists because the acceptance test FAILED on 2026-07-28.
+  // Measured then: generic and sharp discriminated identically on 14/14 slots,
+  // so sending a specialist told you exactly as much about the branch as
+  // pressing the seller — and since he is unlimited and lane-free while they
+  // are one-use and lane-locked, three presses on him weakly DOMINATED the
+  // entire four-seat desk. The mechanic the whole redesign rests on did nothing.
+  //
+  // The cause was `backing` being authored per branch. resolvePress zeroes the
+  // receipt on VIBES, so a VIBES-in-rug / HARD-in-legit slot returned nothing
+  // to ANYONE in the rug branch: the signal lived in backing, where depth
+  // could not reach it. These four assertions are the ones whose absence let
+  // two days of work be built on sand.
+  for (const [name, mod] of [
+    ["backdoor-fork", await import("../src/game/terminal-traders/press/archetypes/backdoorFork.js")],
+    ["yield-mirage", await import("../src/game/terminal-traders/press/archetypes/yieldMirage.js")],
+  ]) {
+    const S = mod.SLOTS;
+
+    ok(`${name}: backing is a property of the CLAIM, never the branch`,
+      S.every((sl) => sl.backing && sl.rug.backing === undefined && sl.legit.backing === undefined),
+      S.filter((sl) => !sl.backing).map((sl) => sl.id).join(",") || "branch-level backing still present");
+
+    // THE SELLER MAY NOT LEAK. His shallow answer is the same script in both
+    // worlds — that is what selling is. The one exception is the loadBearing
+    // slot, which invariant 1 ("truth is never for sale") requires stay
+    // reachable on a free press.
+    const leaks = S.filter((sl) => !sl.loadBearing && genericDiscriminates(sl));
+    ok(`${name}: no non-loadBearing slot lets the seller give away the branch`,
+      leaks.length === 0, leaks.map((sl) => sl.id).join(", "));
+
+    ok(`${name}: the loadBearing claim IS still reachable on a free press`,
+      S.filter((sl) => sl.loadBearing).every(genericDiscriminates));
+
+    // THE POINT OF THE DESK. Strictly more claims must be settleable by a
+    // specialist than by the seller, or the specialists are decoration.
+    const g = S.filter(genericDiscriminates).length;
+    const sh = S.filter(sharpDiscriminates).length;
+    ok(`${name}: specialists settle strictly more than the seller can`,
+      sh > g, `sharp ${sh} vs generic ${g}`);
+
+    // A SHALLOW ANSWER MUST ALWAYS EXIST on a non-VIBES slot, or the seller has
+    // nothing to say and depth is buying you the whole claim rather than the
+    // last mile of it.
+    const mute = S.filter((sl) => backingOf(sl) !== BACKING.VIBES
+      && !(sl.generic ?? sl.rug.generic)?.receipt);
+    ok(`${name}: the seller always has a shallow receipt to offer`,
+      mute.length === 0, mute.map((sl) => sl.id).join(", "));
+
+    // A null SHARP receipt in ONE branch is not the old bug — it is the
+    // NOTHING ON FILE beat, and it still discriminates because the other branch
+    // returns something. The old bug was null in one branch at BOTH depths,
+    // which hoisting `backing` now makes unrepresentable.
+    const proven = S.filter((sl) => backingOf(sl) !== BACKING.VIBES
+      && (!sl.rug.sharp?.receipt || !sl.legit.sharp?.receipt));
+    ok(`${name}: at least one claim lets a specialist prove a negative`,
+      proven.length >= 1, `slots that can stamp NOTHING ON FILE: ${proven.map((sl) => sl.id).join(", ") || "none"}`);
+  }
+}
+
+console.log("\n-- lanes decide DEPTH, not legality -------------------------");
 {
   const d = instanceDeal(7, "backdoor-fork");
   ok("every claim carries a lane and an agenda subject",
     d.claims.every((c) => Object.values(LANES).includes(c.lane) && !!c.subject));
-  ok("GR80 cannot be sent into a CHAIN claim",
-    !canSend(SEATS.GR80, d.claims.find((c) => c.lane === LANES.CHAIN)));
-  ok("only Barron can take a SHAPE claim", (() => {
-    const s = d.claims.find((c) => c.lane === LANES.SHAPE);
-    return !s || (canSend(SEATS.BARRON, s) && SPENDABLE_SEATS.every((x) => !canSend(x, s)));
-  })());
 
+  // THESE THREE ARE DELIBERATELY THE INVERSE OF WHAT THEY ASSERTED UNTIL
+  // 2026-07-28. Under the gate model an off-lane send was rejected as a no-op,
+  // which greyed out two of four seats on every claim and made the row read as
+  // broken buttons. Expertise is a gradient now: everyone can be sent at
+  // everything, and the lane decides how far they get.
+  const chain = d.claims.find((c) => c.lane === LANES.CHAIN);
   const record = d.claims.find((c) => c.lane === LANES.RECORD);
+  ok("GR80 CAN be sent into a CHAIN claim — it is legal, just shallow",
+    canSend(SEATS.GR80, chain) && !inLane(SEATS.GR80, chain));
+  ok("in-lane returns the sharp block, off-lane returns the generic one",
+    (() => {
+      const deep = resolvePress(record, SEATS.GR80);
+      const shallow = resolvePress(record, SEATS.MARISOL);
+      return deep.deep && !shallow.deep
+        && deep.barronSays === record.press.sharp.line
+        && shallow.barronSays === record.press.generic.line;
+    })());
+  ok("an off-lane resolve returns a real answer, never null",
+    SPENDABLE_SEATS.concat(SEATS.BARRON).every((seat) => {
+      const o = resolvePress(record, seat);
+      return o && typeof o.barronSays === "string";
+    }));
+
   let run = walkTo(d, record.id);
   const before = run.pressesLeft;
   run = press(run, d, SEATS.MARISOL);
-  ok("an off-lane send is a NO-OP, not an error and not a penalty",
-    run.pressesLeft === before && run.advisersSpent.length === 0);
-  ok("seatOptions explains WHY a seat is unavailable",
-    seatOptions(run, d).find((o) => o.seat === SEATS.MARISOL).reason === "off-lane");
+  ok("an off-lane send COSTS a press and spends that colleague",
+    run.pressesLeft === before - 1 && run.advisersSpent.includes(SEATS.MARISOL));
+  ok("seatOptions marks depth per seat, and never reports an off-lane refusal",
+    (() => {
+      // before any press on this RECORD claim: everyone live, GR80 deep
+      const fresh = seatOptions(walkTo(d, record.id), d);
+      const deepOnes = fresh.filter((o) => o.deep).map((o) => o.seat);
+      return fresh.every((o) => o.enabled)
+        && deepOnes.length === 1 && deepOnes[0] === SEATS.GR80
+        && fresh.every((o) => o.reason !== "off-lane");
+    })());
+  ok("a spent colleague is the only seat-level refusal left",
+    (() => {
+      // On the ANSWERED claim every seat reads "answered" — and the row is
+      // hidden there anyway, so that string never renders. The case that does
+      // render is the NEXT claim: she is gone for the session, everyone else
+      // is live, and nobody is refused for being in the wrong lane.
+      const next = advance(run, d);
+      const opts = seatOptions(next, d);
+      const m = opts.find((o) => o.seat === SEATS.MARISOL);
+      return m.reason === "spent" && !m.enabled
+        && opts.filter((o) => o.enabled).length === 3
+        && opts.every((o) => o.reason !== "off-lane");
+    })());
+
+  // A SHALLOW LOOK CANNOT PROVE A NEGATIVE. NOTHING ON FILE means a specialist
+  // went and found an absence; the wrong specialist finding nothing is a fact
+  // about your choice, not about the deal, and must never render as the strong
+  // result — that would let you manufacture the game's most damning outcome by
+  // deliberately sending the wrong person.
+  ok("only a DEEP look by somebody who isn't him can return NOTHING ON FILE",
+    d.claims.every((c) =>
+      [SEATS.BARRON, ...SPENDABLE_SEATS].every((seat) => {
+        const o = resolvePress(c, seat);
+        return !o.nothingOnFile || (o.deep && seat !== SEATS.BARRON);
+      })));
+  ok("Barron never returns NOTHING ON FILE, even in his own lane",
+    d.claims.every((c) => !resolvePress(c, SEATS.BARRON).nothingOnFile));
 }
 
 console.log("\n-- the adviser is the scarce resource ----------------------");
@@ -299,8 +452,11 @@ console.log("\n-- what an interruption returns ----------------------------");
   ok("an adviser finding nothing reports NOTHING ON FILE", n.nothingOnFile === true && n.receipt === null);
   ok("...which is a different event from Barron's black board",
     resolvePress(ops, SEATS.BARRON).nothingOnFile === false);
-  ok("an off-lane resolve returns null even when called directly",
-    resolvePress(ops, SEATS.MARISOL) === null);
+  ok("a shallow look that finds nothing is NOT NOTHING ON FILE",
+    (() => {
+      const shallow = resolvePress(ops, SEATS.MARISOL);  // ops is RECORD, she is CHAIN
+      return shallow !== null && shallow.deep === false && shallow.nothingOnFile === false;
+    })());
 }
 
 console.log("\n-- the budget is still frozen ------------------------------");
@@ -359,7 +515,11 @@ console.log("\n-- STRUCTURAL: is there always a real choice? --------------");
       if (counts.some((c) => c === 0)) none++;
     }
     ok(`${arch}: every session gives at least one adviser a real choice`, anyChoice === n, `${anyChoice}/${n}`);
-    ok(`${arch}: no adviser is ever left with zero targets`, none === 0, `${none}`);
+    // Under the gradient model "zero targets" is impossible — everyone can be
+    // sent anywhere. The constraint that actually matters now is that each
+    // specialist has at least one claim where their depth is worth spending on,
+    // or their lane is decoration for that session.
+    ok(`${arch}: every specialist gets at least one deep target`, none === 0, `sessions with a laneless specialist: ${none}`);
     console.log(`       ${arch}: an adviser is down to a single target in ${(one / n * 100).toFixed(1)}% of sessions`);
   }
   let bad = 0;

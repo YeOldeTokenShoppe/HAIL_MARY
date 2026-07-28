@@ -205,9 +205,10 @@ export default function PressSession({
   }, [dealing]);
 
   /* ---- actions ---- */
-  // One path, three seats. Barron is reusable; the two advisers are one use
-  // each and only in their own lane. The room enforces it — an illegal send is
-  // a no-op, so a misclick can never cost you a session.
+  // One path, four seats. Every seat can be sent at every claim — the lane
+  // decides DEPTH, not permission. Barron is reusable; the other three are one
+  // use each. A send is only ever refused for a reason the player can see: no
+  // budget left, or that colleague is already spent.
   const press = useCallback((seat = SEATS.BARRON) => {
     if (!onFloor) return;
     const next = doPress(run, deal, seat);
@@ -384,8 +385,11 @@ export default function PressSession({
                   ))}
                 </div>
                 <div className="ps-open-rule" style={{ marginTop: 10 }}>
-                  Marisol and GR80 each answer <b>one</b> claim, in their own lane.
-                  Barron you can press as often as you like. Eugene reads every claim for free.
+                  Everyone at this desk will answer anything you ask them. Each has
+                  <b>one</b> subject they go deep on — and Marisol, GR80 and Eugene
+                  answer <b>once each</b>, all session. Ask the wrong one and you
+                  still get an answer; you just get the shallow version, and you've
+                  spent them.
                 </div>
               </div>
             </div>
@@ -427,9 +431,8 @@ export default function PressSession({
           {/* The controls, grouped bottom-right and clear of the reading
               column on the left. */}
           <div className="ps-dock">
-            <SeatRow live={live} pressed={pressed} options={options}
+            <SeatRow run={run} live={live} pressed={pressed} options={options}
                      deskCards={deskCards} onPress={press} scale={0.1} />
-            <Meter run={run} presses={PRESSES} />
             <Nav lastClaim={lastClaim} pressed={pressed} onAdvance={advance} onCallIt={callIt} />
           </div>
 

@@ -57,9 +57,9 @@ export function answerNote(flash) {
 /* ---------------------------------------------------------------------- */
 
 /**
- * The claim: who's talking, the spin, the fact under it, whose lane it is, and
- * Eugene's free read. `count` is optional ("3 / 6") — mobile shows it because
- * there's no progress rail there.
+ * The claim: who's talking, how he's holding up, the spin, the fact under it,
+ * whose specialism it is, and Eugene's free read. `count` is optional ("3 / 6")
+ * — mobile shows it because there's no progress rail there.
  */
 export function ClaimBody({ claim, eugeneLine, eugeneCard = null, spent = [], count = null,
                            pressure = null, aside = "" }) {
@@ -88,29 +88,25 @@ export function ClaimBody({ claim, eugeneLine, eugeneCard = null, spent = [], co
       <div className="pu-spin">“{claim.spin}”</div>
       <div className="pu-fact"><span className="pu-tag">FACT</span> {claim.fact}</div>
 
-      {/* THE LANE, STATED. The seat row enforces it, but enforcement without
-          explanation reads as a broken button — the first playtest note was
-          "can't tell why only GR80 is available". It's a sentence, not a label,
-          because "RECORD QUESTION" parsed as either a noun or a verb. And it
-          reads the run, so it can never name somebody you've already spent. */}
+      {/* WHOSE SPECIALISM THIS IS. Not a permission any more — anyone can be
+          sent at anything — so this names who goes DEEP and lets you price the
+          shallow alternative. A sentence, not a label, because "RECORD
+          QUESTION" parsed as either a noun or a verb. It reads the run, so once
+          the specialist is spent it says the claim is capped, not closed. */}
       <div className="pu-lane" data-lane={stale ? "SPENT" : claim.lane}>
         {laneSentence(claim, { spent })}
       </div>
 
-      {/* EUGENE LIVES HERE, NOT IN THE DOCK. He names the SHAPE and points at a
-          lane — never whether the claim is true — and he has no board, so he
-          can't carry an answer and can't be sent. Parked among the seat buttons
-          he was the brightest thing in a row of controls and did nothing when
-          clicked ("i don't understand his purpose" — author, 2026-07-27). Next
-          to the line he actually delivers, he needs no explanation at all. */}
+      {/* EUGENE'S FREE READ. He is a full seat now (SOCIAL) and appears in the
+          dock like everyone else — but this is his OTHER job, the one nobody
+          else has: recognition, which costs nothing because nothing is fetched.
+          The shape of the claim, then the agenda. Never whether it's true. */}
+      {/* HIS LINE ONLY — no second portrait. He is a full seat now and his card
+          is in the row below; showing it twice made him read as omnipresent
+          ("Eugene is still advising every step of the way" — author). */}
       <div className="pu-eugene">
-        {eugeneCard && (
-          <span className="pu-eu-card" aria-hidden="true">
-            <TradingCard data={eugeneCard} scale={0.062} interactive={false} templateStyle="terminal" />
-          </span>
-        )}
         <span className="pu-eu-text">
-          <span className="pu-eu-who">{EUGENE.name.toUpperCase()} <em>· {EUGENE.role}, free</em></span>
+          <span className="pu-eu-who">{EUGENE.name.toUpperCase()} <em>· reads every claim, free</em></span>
           <span className="pu-eu-line">{eugeneLine}</span>
         </span>
       </div>
@@ -173,7 +169,7 @@ export function AnswerBody({ flash, children }) {
  * it also reclaims ~195px of pinned dock, which is what was shoving the one
  * live control off the bottom of the screen.
  */
-export function SeatRow({ live, pressed, options, deskCards, onPress, scale = 0.1 }) {
+export function SeatRow({ run, live, pressed, options, deskCards, onPress, scale = 0.1 }) {
   if (!live) {
     return (
       <div className="pu-spent">
@@ -183,30 +179,45 @@ export function SeatRow({ live, pressed, options, deskCards, onPress, scale = 0.
     );
   }
   return (
-    <div className="pu-seats">
-      {options.map((o) => {
-        const meta = DESK[o.seat];
-        const card = deskCards.find((d) => d.m.id === o.seat);
-        const boss = o.seat === SEATS.BARRON;
-        return (
-          <button key={o.seat}
-                  className={`pu-seat ${boss ? "boss" : ""} ${o.enabled ? "" : "off"}`}
-                  disabled={!o.enabled}
-                  onClick={() => onPress(o.seat)}>
-            {card && <TradingCard data={card.data} scale={scale} interactive={false} templateStyle="terminal" />}
-            <span className="pu-seat-name">{boss ? "PRESS HIM" : meta.role}</span>
-            <span className="pu-seat-sub">
-              {boss ? "put a number on it"
-                : o.reason === "spent" ? "already used"
-                  : o.reason === "off-lane" ? "not their lane"
-                    : "send them"}
-            </span>
-          </button>
-        );
-      })}
-      {/* NO EUGENE HERE — this row is controls only. He sits beside his read in
-          ClaimBody, because a row of buttons is a promise that everything in it
-          is pressable, and he never is. */}
+    <div className="pu-seatblock">
+      {/* THE ROW NEEDS A VERB AND A QUESTION.
+          Playtest, 2026-07-28: "i can either press him for a screen or let him
+          go on to his next point" — a complete description of the game with the
+          desk left out of it, from someone who had the desk on screen. Cause:
+          the only things that LOOKED like buttons were LET HIM GO ON and CALL
+          IT, so four trading cards read as a cast list. Barron's tile used to
+          say PRESS HIM; when he got a lane it became "THE TAPE / shallow look"
+          and the last verb in the row went with it. */}
+      <div className="pu-seats-h">
+        WHO DO YOU SEND?
+        <em>{run.pressesLeft} interruption{run.pressesLeft === 1 ? "" : "s"} left</em>
+      </div>
+      <div className="pu-seats">
+        {options.map((o) => {
+          const meta = DESK[o.seat];
+          const card = deskCards.find((d) => d.m.id === o.seat);
+          const boss = o.seat === SEATS.BARRON;
+          return (
+            <button key={o.seat}
+                    className={`pu-seat ${boss ? "boss" : ""} ${o.deep ? "deep" : "shallow"} ${o.enabled ? "" : "off"}`}
+                    disabled={!o.enabled}
+                    title={o.deep
+                      ? `Send ${meta.name} — this is what they do`
+                      : `Send ${meta.name} anyway — you'll get the surface answer`}
+                    onClick={() => onPress(o.seat)}>
+              {card && <TradingCard data={card.data} scale={scale} interactive={false} templateStyle="terminal" />}
+              <span className="pu-seat-name">{meta.role}</span>
+              {/* Every live tile carries a VERB, because every one of them is a
+                  legal move. The sub-label prices the move; it never forbids it. */}
+              <span className="pu-seat-sub">
+                {o.reason === "spent" ? "already used"
+                  : o.deep ? "▲ SEND — GOES DEEP"
+                    : "send anyway · surface only"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -280,6 +291,8 @@ export const PRESS_UI_CSS = `
   background:rgba(234,255,249,0.04); color:rgba(234,255,249,0.75); }
 .pu-lane[data-lane="CHAIN"]  { border-left-color:#2fd6d6; color:#8ff0f0; background:rgba(47,214,214,0.08); }
 .pu-lane[data-lane="RECORD"] { border-left-color:#ffd23a; color:#ffe487; background:rgba(255,210,58,0.08); }
+.pu-lane[data-lane="CHART"]  { border-left-color:#ff5f9e; color:#ffa8ca; background:rgba(255,95,158,0.08); }
+.pu-lane[data-lane="SOCIAL"] { border-left-color:#bfeede; color:#d8f7ec; background:rgba(191,238,222,0.08); }
 /* the lane's owner is spent — this claim is now nobody's, and it should not
    look like a live instruction */
 .pu-lane[data-lane="SPENT"]  { border-left-color:#ff9b6f; color:#ffb493; background:rgba(255,155,111,0.07); }
@@ -308,6 +321,13 @@ export const PRESS_UI_CSS = `
 .pu-answer.nil .pu-note { color:#ff9b6f; }
 .pu-note.waiting { color:rgba(234,255,249,0.35); font-weight:normal; }
 
+/* THE SEAT ROW IS THE PRIMARY CONTROL and must out-shout the nav beneath it.
+   It did not, and the game read as "press him or move on". */
+.pu-seatblock { display:flex; flex-direction:column; gap:6px; }
+.pu-seats-h { display:flex; align-items:baseline; gap:8px;
+  font:bold 10.5px/1.3 'Courier New',monospace; letter-spacing:0.14em; color:#ffd23a; }
+.pu-seats-h em { font-style:normal; font-weight:normal; font-size:9.5px;
+  letter-spacing:0.08em; color:rgba(234,255,249,0.55); margin-left:auto; }
 .pu-seats { display:flex; gap:6px; justify-content:flex-end; }
 .pu-seat { background:rgba(2,16,14,0.9); border:1px solid rgba(47,214,214,0.35); color:#eafff9;
   cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px;
@@ -321,6 +341,16 @@ export const PRESS_UI_CSS = `
 .pu-seat.fixture .pu-seat-sub { color:rgba(191,238,222,0.7); }
 .pu-seat.off, .pu-seat:disabled { cursor:default; opacity:0.55; filter:grayscale(0.85);
   border-color:rgba(234,255,249,0.14); background:rgba(2,16,14,0.55); }
+/* The specialist for this claim, lit. Everyone else is still live and still
+   clickable — dimmer, not disabled, because sending the wrong expert is a legal
+   and sometimes correct move. */
+.pu-seat.deep:not(.off):not(:disabled) { border-color:#ffd23a;
+  box-shadow:0 0 0 1px rgba(255,210,58,0.35), 0 0 18px rgba(255,210,58,0.22); }
+.pu-seat.deep .pu-seat-sub { color:#ffd23a; font-weight:bold; }
+.pu-seat.shallow:not(.off):not(:disabled) { opacity:0.9; }
+.pu-seat.shallow .pu-seat-sub { color:rgba(234,255,249,0.62); }
+.pu-seat.deep:not(.off):not(:disabled) { transform:translateY(-3px); }
+.pu-seat.deep:not(.off):not(:disabled):hover { transform:translateY(-6px); }
 .pu-seat-name { font:bold 11px/1.25 'Courier New',monospace; letter-spacing:0.09em; }
 .pu-seat.boss .pu-seat-name { color:#ff5f9e; }
 .pu-seat-sub { font-size:9.5px; color:rgba(234,255,249,0.62); }
@@ -338,8 +368,10 @@ export const PRESS_UI_CSS = `
 
 .pu-nav { display:flex; gap:8px; }
 .pu-nav > * { flex:1; }
-.pu-btn { background:rgba(2,16,14,0.9); border:1px solid rgba(47,214,214,0.5); color:#2fd6d6;
-  font:inherit; font-size:11.5px; letter-spacing:0.09em; padding:12px 14px; cursor:pointer;
+/* The nav is the DECLINE path: what you do when you spend nothing. It used to
+   be the only button-shaped thing on screen, which is why the desk went unread. */
+.pu-btn { background:none; border:1px solid rgba(47,214,214,0.3); color:rgba(47,214,214,0.8);
+  font:inherit; font-size:11px; letter-spacing:0.09em; padding:9px 14px; cursor:pointer;
   text-align:center; }
 .pu-btn.amber { border-color:rgba(255,210,58,0.55); color:#ffd23a; }
 .pu-btn.primary { border-color:#2fd6d6; background:rgba(47,214,214,0.14); color:#eafff9; font-weight:bold; }

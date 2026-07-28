@@ -61,14 +61,15 @@ export const PRIORS = ["ex-Aave", "ex-MakerDAO", "ex-Compound", "ex-Lido"];
 export const SLOTS = [
   {
     id: "team",
-    lane: LANES.RECORD,
+    lane: LANES.SOCIAL,
     subject: "THE TEAM",
     shape: SHAPES.UNSOURCED,
     loadBearing: true, // the decisive thread, always free-press reachable
     fact: (v) => `Three named founders. Two with verifiable prior roles — ${v.priorA}, ${v.priorB}.`,
     spin: "These are real people with real résumés. You can look them up. That isn't nothing, that's the whole ballgame.",
+    // backing is slot-level: identical in both branches by construction.
+    backing: BACKING.HARD,
     rug: {
-      backing: BACKING.HARD,
       generic: {
         line: "Fine — conference talks, public github, eleven unrelated commentators citing them. Founders A and B, verified. The third one's… thinner. Ops partner. Newer, quieter.",
         receipt: { title: "FOUNDERS", rows: [["Founder A", "VERIFIED"], ["Founder B", "VERIFIED"], ["Ops partner", "THIN FOOTPRINT"], ["Direct references", "A, B ONLY"]] },
@@ -80,7 +81,6 @@ export const SLOTS = [
       miss: { line: "Do I know them personally? No. I've never met them. I'm not in this because of a friendship, I'm in it because the résumés check out.", receipt: null },
     },
     legit: {
-      backing: BACKING.HARD,
       generic: {
         line: "Conference talks, public github, eleven unrelated commentators. All three, including the ops partner — he's quieter but he's vouched for by two of the seed funds directly.",
         receipt: { title: "FOUNDERS", rows: [["Founder A", "VERIFIED"], ["Founder B", "VERIFIED"], ["Ops partner", "VERIFIED"], ["Direct references", "ALL THREE"]] },
@@ -101,30 +101,30 @@ export const SLOTS = [
     loadBearing: false,
     fact: (v) => `${v.auditor}. The audit came back clean.`,
     spin: "Gold-standard firm, clean report. What more do you want, a notarised prophecy?",
+    // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
+    // does not; that is a property of the claim, not of whether the deal is
+    // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
+    // receipt on VIBES, so a VIBES-in-rug slot returned nothing to anyone.
+    backing: BACKING.HARD,
+    // THE SELLER'S SCRIPT, hoisted to the slot so it CANNOT differ by branch.
+    // Confident, technically true, and stopping exactly short of the question
+    // that would settle it. Only a loadBearing slot may keep this per-branch.
+    generic: {
+      line: "Clean. Page one, no criticals, no highs, gold-standard firm. Clean within scope — which is what every audit ever written says, it's the standard sentence, don't read a face into it. Scope's section one point three. The finding is the finding.",
+      receipt: { title: "AUDIT REPORT", rows: [["Finding", "CLEAN — IN SCOPE"], ["Criticals / highs", "0 / 0"], ["Report", "PUBLISHED"], ["Scope defined in", "SECTION 1.3"]] },
+    },
     rug: {
-      backing: BACKING.SOFT,
-      generic: {
-        line: "Clean within scope. Scope's in the report, section one point three. I didn't read section one point three.",
-        receipt: { title: "AUDIT", partial: true, rows: [["Finding", "CLEAN — IN SCOPE"], ["Scope boundary", "NOT READ"]] },
-      },
       // THE ESCALATION — the only press that moves your call on a rug.
       sharp: {
-        line: "…Section one point three. Fine. Strategy contracts in. Vault accounting in. Fee router in. Governance in. Proxy admin slot — out of scope. Upgrade path — not reviewed. That's what clean meant.",
-        receipt: { title: "AUDIT SCOPE", rows: [["Strategy contracts", "IN"], ["Vault accounting", "IN"], ["Fee router", "IN"], ["Governance module", "IN"], ["Proxy admin slot", "OUT"], ["Upgrade path", "NOT REVIEWED"]] },
+        line: "…Section one point three. Fine, you read it, congratulations. Strategy contracts in, vault accounting in, fee router in, governance in. Proxy admin slot's out. Upgrade path wasn't reviewed. Clean is still clean. It's clean of what they were asked to look at.",
+        receipt: { title: "AUDIT SCOPE", rows: [["Core contracts", "IN"], ["Proxy admin slot", "OUT"], ["Upgrade path", "NOT REVIEWED"], ["Carve-outs", "2"]] },
       },
-      miss: { line: "It's a real firm. You want the PDF? I'll send you the PDF right now.", receipt: { title: "AUDITOR", rows: [["Report", "PUBLISHED"]] } },
     },
     legit: {
-      backing: BACKING.HARD,
-      generic: {
-        line: "Clean, and I did read the scope this time. Everything's in it — including the upgrade path, which is the bit people forget to check.",
-        receipt: { title: "AUDIT SCOPE", rows: [["Strategy contracts", "IN"], ["Vault accounting", "IN"], ["Governance module", "IN"], ["Proxy admin slot", "IN"], ["Upgrade path", "IN"]] },
-      },
       sharp: {
-        line: "Whole surface. Proxy admin in scope, upgrade path in scope, no carve-outs. That's the part I'd have led with if I were smarter.",
-        receipt: { title: "SCOPE CARVE-OUTS", rows: [["Excluded items", "NONE"]] },
+        line: "Section one point three, since we're all reading together now. Strategy, vault, fee router, governance — in. Proxy admin slot, in. Upgrade path, in. Nothing carved out, not one line. That's the part I'd have led with if I were smarter.",
+        receipt: { title: "AUDIT SCOPE", rows: [["Core contracts", "IN"], ["Proxy admin slot", "IN"], ["Upgrade path", "IN"], ["Carve-outs", "NONE"]] },
       },
-      miss: { line: "It's a real firm. You want the PDF? I'll send you the PDF right now.", receipt: { title: "AUDITOR", rows: [["Report", "PUBLISHED"]] } },
     },
   },
 
@@ -138,14 +138,14 @@ export const SLOTS = [
     spin: "Smart money already did this diligence for you. You're free-riding on their lawyers.",
     // Clean in BOTH branches. Not every press is a gotcha — if pressing always
     // found rot, pressing would stop being a decision worth making.
+    // backing is slot-level: identical in both branches by construction.
+    backing: BACKING.HARD,
     rug: {
-      backing: BACKING.HARD,
       generic: { line: "Three funds, all named, all reachable. Three-of-five treasury multisig. Zero mixer hops, and I did check that one.", receipt: { title: "FUNDING", rows: [["Seed", "3 NAMED FUNDS"], ["Treasury", "3/5 MULTISIG"], ["Mixer hops", "0"]] } },
       sharp: { line: "Traced it myself, which I don't do often. Seed to treasury, treasury to LP. No hops, no bridges. This part is genuinely fine.", receipt: { title: "FUND TRACE", rows: [["Seed → treasury", "DIRECT"], ["Anomalies", "NONE"]] } },
       miss: { line: "Three funds. I can spell all three. That's not the interesting part and you know it.", receipt: null },
     },
     legit: {
-      backing: BACKING.HARD,
       generic: { line: "Three funds, all named, all reachable. Three-of-five treasury multisig. Zero mixer hops, and I did check that one.", receipt: { title: "FUNDING", rows: [["Seed", "3 NAMED FUNDS"], ["Treasury", "3/5 MULTISIG"], ["Mixer hops", "0"]] } },
       sharp: { line: "Traced it myself. Seed to treasury, treasury to LP. No hops, no bridges. This part is genuinely fine.", receipt: { title: "FUND TRACE", rows: [["Seed → treasury", "DIRECT"], ["Anomalies", "NONE"]] } },
       miss: { line: "Three funds. I can spell all three. That's not the interesting part and you know it.", receipt: null },
@@ -154,7 +154,7 @@ export const SLOTS = [
 
   {
     id: "chart",
-    lane: LANES.SHAPE,
+    lane: LANES.CHART,
     subject: "THE CHART",
     shape: SHAPES.SELECTIVE_WINDOW,
     loadBearing: false,
@@ -162,14 +162,14 @@ export const SLOTS = [
     spin: "It's working. The market has already voted and you're still reading.",
     // Hollow either way — a cherry-picked window is a cherry-picked window even
     // when the token is fine. Good tokens are sold badly too.
+    // backing is slot-level: identical in both branches by construction.
+    backing: BACKING.VIBES,
     rug: {
-      backing: BACKING.VIBES,
       generic: { line: "Look at the candles! What do you want me to do, apologise for it?", receipt: null },
       sharp: { line: "Seven days because seven days is the number that looks like something. Don't make me pull thirty.", receipt: null },
       miss: { line: "Am I holding? Obviously I'm holding, it's my deal. That's not a scandal, that's alignment.", receipt: null },
     },
     legit: {
-      backing: BACKING.VIBES,
       generic: { line: "Look at the candles! What do you want me to do, apologise for it?", receipt: null },
       sharp: { line: "Seven days because seven days is the number that looks like something. Thirty's flatter. It's still a good book.", receipt: null },
       miss: { line: "Am I holding? Obviously I'm holding, it's my deal. That's not a scandal, that's alignment.", receipt: null },
@@ -184,17 +184,30 @@ export const SLOTS = [
     loadBearing: false,
     fact: "Three-of-five multisig on governance. Twenty-four hour timelock on parameter changes.",
     spin: "Nobody can pull anything. There's a timelock. You'd see it coming a day out.",
+    // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
+    // does not; that is a property of the claim, not of whether the deal is
+    // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
+    // receipt on VIBES, so a VIBES-in-rug slot returned nothing to anyone.
+    backing: BACKING.HARD,
+    // THE SELLER'S SCRIPT, hoisted to the slot so it CANNOT differ by branch.
+    // Confident, technically true, and stopping exactly short of the question
+    // that would settle it. Only a loadBearing slot may keep this per-branch.
+    generic: {
+      line: "It's timelocked. Twenty-four hours, onchain, and the queue is public — you can sit and watch a pending change age without taking my word for any of it. That's a parameter, not a promise.",
+      receipt: { title: "TIMELOCK", rows: [["Delay", "24H"], ["Contract", "ONCHAIN"], ["Pending queue", "PUBLIC"]] },
+    },
     rug: {
-      backing: BACKING.VIBES,
-      generic: { line: "It's timelocked. Twenty-four hours. That's — look, that's what a timelock is for.", receipt: null },
-      sharp: { line: "What would change my mind? What kind of question is that? Nothing. Nothing would. It's timelocked.", receipt: null },
-      miss: { line: "Twenty-four hours. It's twenty-four. I can read a number off a page.", receipt: { title: "TIMELOCK", rows: [["Delay", "24H"], ["Covers", "—"]] } },
+      // THE ESCALATION — the only press that moves your call on a rug.
+      sharp: {
+        line: "Alright — the delay covers parameter changes. The proxy admin is a separate role, it doesn't queue, it was never built to queue. Twenty-four hours is still twenty-four hours on everything I said it was.",
+        receipt: { title: "TIMELOCK SCOPE", rows: [["Parameter changes", "DELAYED 24H"], ["Proxy admin slot", "NO DELAY"], ["Upgrade call", "EXECUTES SAME BLOCK"]] },
+      },
     },
     legit: {
-      backing: BACKING.HARD,
-      generic: { line: "Twenty-four hours, and it covers the upgrade path as well as parameters. Which is the question you were about to ask.", receipt: { title: "TIMELOCK", rows: [["Delay", "24H"], ["Covers", "PARAMS + UPGRADE"]] } },
-      sharp: { line: "What would change my mind? An upgrade landing without the delay. It can't, and I've watched for it.", receipt: { title: "UPGRADE GUARD", rows: [["Bypass path", "NONE FOUND"]] } },
-      miss: { line: "Twenty-four hours. It's twenty-four. I can read a number off a page.", receipt: { title: "TIMELOCK", rows: [["Delay", "24H"]] } },
+      sharp: {
+        line: "Alright — pull the whole role list, go on. Parameters queue. Upgrades queue. The admin slot is owned by the timelock itself, so there's nothing on that contract that lands same-block. You could have opened with that question.",
+        receipt: { title: "TIMELOCK SCOPE", rows: [["Parameter changes", "DELAYED 24H"], ["Upgrade call", "DELAYED 24H"], ["Proxy admin owner", "TIMELOCK"], ["Bypass roles", "NONE"]] },
+      },
     },
   },
 
@@ -206,19 +219,34 @@ export const SLOTS = [
     loadBearing: false,
     fact: "One of them co-launched something earlier that wound down.",
     spin: "Everybody's got a graveyard behind them. Around here we call that experience.",
+    // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
+    // does not; that is a property of the claim, not of whether the deal is
+    // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
+    // receipt on VIBES, so a VIBES-in-rug slot returned nothing to anyone.
+    backing: BACKING.HARD,
+    // THE SELLER'S SCRIPT, hoisted to the slot so it CANNOT differ by branch.
+    // Confident, technically true, and stopping exactly short of the question
+    // that would settle it. Only a loadBearing slot may keep this per-branch.
+    generic: {
+      line: "The earlier one. Yes — it wound down. Quietly. There's a notice, there's a date, positions closed. No blow-up, no thread, nobody chasing anybody across the internet. If it were a story you'd have heard the story.",
+      receipt: { title: "PRIOR PROJECT", rows: [["Status", "WOUND DOWN"], ["Wind-down notice", "PUBLIC, DATED"], ["Public dispute", "NONE FILED"]] },
+    },
     rug: {
-      backing: BACKING.VIBES,
-      generic: { line: "I don't— it wound down. Quietly. No blow-up, no thread, nobody made noise. That's the whole story as far as anyone's written it.", receipt: null },
-      // The best black monitor in the deck: a matched press proves the absence
-      // is STRUCTURAL. There is no post-mortem, which is why it's still walking.
-      sharp: { line: "The one that wound down. Right. There's no post-mortem. Nobody wrote it up, nobody asked, there is genuinely nothing to read. …Which I'm now hearing out loud.", receipt: null },
-      miss: { line: "He's a real person, if that's what you're asking. Lives in Lisbon. I've had dinner with him.", receipt: null },
+      // THE ESCALATION — the only press that moves your call on a rug.
+      sharp: {
+        line: "The post-mortem. That's what you went digging for. There isn't one — nobody filed it, nobody asked for it, and the depositor side of the ledger just stops mid-page. That's not a finding, that's a gap. …It's a loud gap, I'll give you that.",
+        // NULL ON PURPOSE — this is the NOTHING ON FILE beat. A specialist went
+        // and looked and found a proven absence, which is strictly stronger than
+        // a board staying dark and is the only way this game can prove a negative.
+        // It still discriminates: the legit branch returns a real receipt here.
+        receipt: null,
+      },
     },
     legit: {
-      backing: BACKING.HARD,
-      generic: { line: "It wound down and they wrote it up — full post-mortem, returned what was left to depositors. You can read it. I did.", receipt: { title: "PRIOR OUTCOME", rows: [["Post-mortem", "PUBLISHED"], ["Depositors", "MADE WHOLE"]] } },
-      sharp: { line: "Every project he's touched has an ending you can go read. That's the opposite of the thing you're worried about.", receipt: { title: "PRIOR OUTCOMES", rows: [["Projects", "2"], ["Unexplained exits", "0"]] } },
-      miss: { line: "He's a real person, if that's what you're asking. Lives in Lisbon. I've had dinner with him.", receipt: null },
+      sharp: {
+        line: "The post-mortem, fine — it's published. Nine days after the notice, signed, balances in an appendix, depositors paid out before the wallets closed. Go and read it. It's dull. That's the nicest thing I can say about an ending.",
+        receipt: { title: "PRIOR WIND-DOWN", rows: [["Post-mortem", "PUBLISHED — 9 DAYS"], ["Depositors", "REPAID IN FULL"], ["Final balances", "SIGNED APPENDIX"], ["Unexplained exits", "0"]] },
+      },
     },
   },
 ];
@@ -234,21 +262,35 @@ SLOTS.push({
     subject: "HIS POSITION",
   shape: SHAPES.POSITIONED,
   loadBearing: false,
-  fact: "I'm in this myself. Same terms as you'd get.",
+  // "Same terms as you'd get" pre-answered the question the deep look exists to
+  // settle, and was false in the rug branch. The FACT may only assert what the
+  // seller's shared script asserts; alignment is the INFERENCE being sold.
+  fact: "I'm in this myself. Entered at the seed, at the price the funds paid.",
   spin: "I don't pitch what I don't hold. That should tell you everything.",
+  // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
+  // does not; that is a property of the claim, not of whether the deal is
+  // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
+  // receipt on VIBES, so a VIBES-in-rug slot returned nothing to anyone.
+  backing: BACKING.HARD,
+  // THE SELLER'S SCRIPT, hoisted to the slot so it CANNOT differ by branch.
+  // Confident, technically true, and stopping exactly short of the question
+  // that would settle it. Only a loadBearing slot may keep this per-branch.
+  generic: {
+    line: "I'm in. Since the seed, at the price the funds paid. It's onchain, it's got a name on it, go and pull the entry block yourself — I'll wait. I don't pitch what I'm not standing in.",
+    receipt: { title: "HIS POSITION", rows: [["Entry", "SEED ROUND"], ["Price paid", "SAME AS FUNDS"], ["Wallet", "PUBLIC ONCHAIN"]] },
+  },
   rug: {
-    // He IS positioned — that's true. What he won't tell you is the shape of
-    // it, which is the part that would actually inform you.
-    backing: BACKING.VIBES,
-    generic: { line: "I'm in. Obviously I'm in. You think I'd bring you something I wasn't in?", receipt: null },
-    sharp: { line: "How much and since when? …Enough. Early. Look, my size isn't the story here, the protocol is the story.", receipt: null },
-    miss: { line: "Am I— it's a real position, it's onchain, you could go and look it up yourself if you cared to.", receipt: null },
+    // THE ESCALATION — the only press that moves your call on a rug.
+    sharp: {
+      line: "She pulled the vesting contract. Fine — my allocation sits on its own schedule. Thirty-day cliff on mine, twelve months on the funds'. That is how placement gets paid, that is standard, and it is not the story here.",
+      receipt: { title: "UNLOCK SCHEDULE", rows: [["His tranche", "SEPARATE CONTRACT"], ["His cliff", "DAY 30"], ["Fund lockup", "12 MONTHS"], ["Can exit first", "YES"]] },
+    },
   },
   legit: {
-    backing: BACKING.HARD,
-    generic: { line: "In since the seed, same lockup as the funds, and I can't sell before you can. That's the point of telling you.", receipt: { title: "HIS POSITION", rows: [["Entry", "SEED ROUND"], ["Lockup", "SAME AS FUNDS"], ["Can exit first", "NO"]] } },
-    sharp: { line: "Size, entry, unlock date — all of it's onchain and none of it lets me out ahead of you. Go and check.", receipt: { title: "ALIGNMENT", rows: [["Unlock", "AFTER PUBLIC"], ["Early exit path", "NONE"]] } },
-    miss: { line: "Am I— it's a real position, it's onchain, you could go and look it up yourself if you cared to.", receipt: null },
+    sharp: {
+      line: "She pulled the vesting contract. Good — one schedule, mine sitting inside it with the funds'. Twelve months, no cliff of my own, no side letter. I get out after you or I don't get out. I'd have led with it if I thought you'd take my word for it.",
+      receipt: { title: "UNLOCK SCHEDULE", rows: [["His tranche", "SAME CONTRACT"], ["His cliff", "NONE"], ["Fund lockup", "12 MONTHS"], ["Can exit first", "NO"]] },
+    },
   },
 });
 

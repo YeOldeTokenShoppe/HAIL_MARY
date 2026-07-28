@@ -486,8 +486,10 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           </div>
           {dealt && (
             <p className="pf-copy sm dim">
-              Marisol and GR80 will each answer <b>one</b> claim, in their own lane.
-              Barron you can press as often as you like. Eugene reads every claim for free.
+              Everyone here will answer anything you ask. Each has <b>one</b> subject
+              they go deep on, and Marisol, GR80 and Eugene answer <b>once each</b>.
+              Ask the wrong one and you still get an answer — just the shallow one,
+              and they're spent.
             </p>
           )}
           {/* Sticky: on a phone this column is taller than the screen, and the
@@ -606,7 +608,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 controls pinned to the bottom of a phone is exactly what shoved
                 the one live control off the screen. The counter above keeps
                 the desk accounted for while the row is away. */}
-            <SeatRow live={live} pressed={pressed} options={options}
+            <SeatRow run={run} live={live} pressed={pressed} options={options}
                      deskCards={deskCards} onPress={press} scale={0.105} />
 
             <Nav lastClaim={lastClaim} pressed={pressed} onAdvance={advance} onCallIt={callIt} />

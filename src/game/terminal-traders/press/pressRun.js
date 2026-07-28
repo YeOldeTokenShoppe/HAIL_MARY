@@ -19,7 +19,7 @@
 // Explicit .js extensions: scripts/verify-press-run.mjs imports this module
 // directly under Node ESM, which will not resolve an extensionless specifier.
 import { casePnl } from "../caseTable.js";
-import { BACKING, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend } from "./questions.js";
+import { BACKING, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, inLane } from "./questions.js";
 import { adviserLine } from "./desk.js";
 
 export const PRESSES = 3;
@@ -36,56 +36,51 @@ export const PHASE = {
 /**
  * Resolve one interruption. Pure.
  *
- * TWO KINDS OF INTERRUPTION, one budget:
+ * ONE BUDGET, FOUR SEATS, AND THE LANE DECIDES DEPTH — NOT LEGALITY.
+ * Any seat can be sent at any claim. In their lane you get the specialist
+ * finding; outside it you get a true, shallow answer that mostly settles
+ * nothing. Barron is unlimited within the budget (he's the one pitching, so
+ * he's always at the table); the other three are one use each.
  *
- *   BARRON — always legal, reusable. Returns his authored `generic` block. A
- *   VIBES claim returns no receipt, so his board stays black: the free press
- *   is enough to reach every verdict (truth is never for sale) but it only
- *   ever gets what he'd concede about himself.
- *
- *   AN ADVISER — legal only in their own lane, and ONCE PER SESSION. Someone
- *   who is not him goes and looks, so the answer lands on THEIR board:
- *     - the claim's authored `sharp` receipt, if there is one
- *     - NOTHING ON FILE, if there isn't
- *   Then Barron reacts with his authored `sharp` line. Not one word of
- *   archetype prose was written for this — the same blocks that used to be a
- *   card's payoff are now a colleague's.
- *
- * NOTHING ON FILE is deliberately not the same event as a black board. A
- * black board is Barron declining to produce. An empty file is an independent
- * party having looked and found an absence — strictly stronger, and it is the
- * only way the game can prove a negative.
+ * NOTHING ON FILE is deliberately not the same event as a black board. A black
+ * board is someone declining, or unable, to produce. An empty file is an
+ * independent specialist having LOOKED and found an absence — strictly
+ * stronger, and the only way this game can prove a negative. It therefore
+ * requires both that you sent somebody who isn't him AND that it was their
+ * area; a shallow look finding nothing means only that you asked the wrong
+ * person, which is a fact about your choice, not about the deal.
  */
 export function resolvePress(claim, seat = SEATS.BARRON) {
   if (!claim) return null;
 
-  if (seat === SEATS.BARRON) {
-    const g = claim.press?.generic ?? { line: "", receipt: null };
-    return {
-      claimId: claim.id, seat, board: SEATS.BARRON,
-      backing: claim.backing,
-      adviserSays: null,
-      barronSays: g.line,
-      receipt: claim.backing === BACKING.VIBES ? null : g.receipt ?? null,
-      nothingOnFile: false,
-    };
-  }
+  // DEPTH, NOT PERMISSION. In their lane you get the `sharp` block — the
+  // specialist finding, with the caveat the speaker hadn't volunteered. Outside
+  // it you get `generic`: true, shallow, and mostly unable to settle anything.
+  // Both already existed on every slot, which is why the gradient model cost no
+  // archetype prose at all.
+  const deep = inLane(seat, claim);
+  const block = (deep ? claim.press?.sharp : claim.press?.generic) ?? { line: "", receipt: null };
 
-  // Off-lane sends never reach here — press() rejects them as a no-op — but
-  // resolvePress is exported and sim-callable, so it holds the line itself.
-  if (!canSend(seat, claim)) return null;
-
-  const sharp = claim.press?.sharp ?? {};
-  const receipt = sharp.receipt ?? null;
+  // VIBES means nobody can produce anything on this claim, specialist or not.
+  // That's a property of the CLAIM, not of who you sent, which is why it
+  // survived the lane rework untouched: it's the honest home for "no receipt
+  // exists" now that every lane has an owner.
+  const receipt = claim.backing === BACKING.VIBES ? null : block.receipt ?? null;
   const result = receipt ? (receipt.partial ? "partial" : "found") : "nothing";
 
   return {
-    claimId: claim.id, seat, board: seat,
+    claimId: claim.id, seat, board: seat, deep,
     backing: claim.backing,
-    adviserSays: adviserLine(seat, result),
-    barronSays: sharp.line ?? claim.press?.generic?.line ?? "",
+    // Barron answers under his own name in the panel, so he gets no second
+    // voice. Everyone else reports first — they're the one who went and looked.
+    adviserSays: seat === SEATS.BARRON ? null : adviserLine(seat, result, deep),
+    barronSays: block.line ?? "",
     receipt,
-    nothingOnFile: !receipt,
+    // NOTHING ON FILE is an independent party having LOOKED and found an
+    // absence — strictly stronger than a board simply staying dark, and the
+    // only way this game can prove a negative. It needs someone who actually
+    // went, so it can't be Barron, and it needs the deep look to mean anything.
+    nothingOnFile: seat !== SEATS.BARRON && deep && !receipt,
   };
 }
 
@@ -134,7 +129,8 @@ export function press(run, deal, seat = SEATS.BARRON) {
   const claim = currentClaim(run, deal);
   if (!claim) return run;
   if (run.outcomes[claim.id]) return run;                    // one per claim
-  if (!canSend(seat, claim)) return run;                     // off-lane: no-op
+  // No lane check: every seat can be sent at every claim now. The only refusals
+  // left are the two real resources — the budget, and each colleague's one use.
   if (seat !== SEATS.BARRON && run.advisersSpent.includes(seat)) return run;
 
   const outcome = resolvePress(claim, seat);
@@ -234,18 +230,25 @@ export function pressure(run) {
   return { score, band, caught, backed };
 }
 
-/** Who can legally be sent at the claim on the floor right now, and why not. */
+/**
+ * Who you can send right now, and what you'd get.
+ *
+ * `enabled` no longer encodes the lane — every seat is live until it's spent or
+ * the budget is gone. `deep` is what the UI shows instead: sending the wrong
+ * specialist is a legal, sometimes correct, and always slightly disappointing
+ * move, which is a far better thing for a button to communicate than "no".
+ */
 export function seatOptions(run, deal) {
   const claim = currentClaim(run, deal);
   const done = !!(claim && run.outcomes[claim.id]);
   const broke = run.pressesLeft <= 0;
   return [SEATS.BARRON, ...SPENDABLE_SEATS].map((seat) => {
     const spent = seat !== SEATS.BARRON && run.advisersSpent.includes(seat);
-    const offLane = !canSend(seat, claim);
     return {
       seat,
-      enabled: !done && !broke && !spent && !offLane,
-      reason: broke ? "out" : done ? "answered" : spent ? "spent" : offLane ? "off-lane" : null,
+      enabled: !done && !broke && !spent,
+      deep: inLane(seat, claim),
+      reason: broke ? "out" : done ? "answered" : spent ? "spent" : null,
       lane: SEAT_LANE[seat] ?? null,
     };
   });

@@ -23,16 +23,62 @@ game:
 
 | | | |
 |---|---|---|
-| **John Barron** | THE DEAL | always available, unlimited within the budget. Gets you only what he'd concede about himself. |
-| **Detective Marisol** | THE MONEY | the CHAIN lane. **One use, all session.** |
-| **Saint GR80** | THE PAPERWORK | the RECORD lane. **One use, all session.** |
-| **Eugene** | THE READ | free, every claim, cannot be sent. Names the *shape*, then **the agenda**. |
+| **John Barron** | THE TAPE | price, windows, momentum — and he's the one selling. **Unlimited** within the budget. |
+| **Detective Marisol** | THE MONEY | money movement, wallet ages, unlocks. **One use, all session.** |
+| **Saint GR80** | THE PAPERWORK | what the documents actually say. **One use.** |
+| **Eugene** | THE STORY | narrative, reputation, who vouches for whom. **One use** — plus a free read on every claim. |
 
-An adviser is legal only in their own lane, and sending one costs **both** an
-interruption and the adviser. Two resources for one action is what makes the
-timing real: GR80 has three valid targets in a backdoor-fork and one use, and
-the agenda tells you what's coming. Some claims are `SHAPE` — nobody's lane, so
-they're Barron or nothing.
+**EXPERTISE IS A GRADIENT, NOT A GATE.** Anyone can be sent at anything. The
+lane decides **depth**:
+
+- **in their lane** → the `sharp` block: the specialist finding, with the caveat
+  the speaker hadn't volunteered
+- **outside it** → the `generic` block: a true, shallow answer that mostly
+  settles nothing, and they say so out loud
+
+Both blocks already existed on every slot in every branch, so the change cost
+**zero new archetype prose**.
+
+The first cut made the lane a *permission* — off-lane sends were rejected as
+no-ops, so two of four seats were dead on any claim and the row read as broken
+buttons. That was the most-reported confusion in playtest, and both the lane
+band and Eugene had to be patched twice for telling players to do things the
+controller would refuse. Author's reframing (2026-07-28): *"they each have an
+area of expertise but can generalize too."*
+
+The decision it produces is better. It is no longer "who is legal here", which
+the UI can answer for you — it is **"is this claim worth my one specialist, or
+will a shallow look do"**, which it can't. Three interruptions and three one-use
+colleagues is a tight allocation.
+
+Sending someone costs **both** an interruption and that colleague. A spent
+specialist doesn't close a claim, it **caps** it, and every surface says so.
+
+**A shallow look can never prove a negative.** `NOTHING ON FILE` requires both
+that you sent somebody who isn't him *and* that it was their area. The wrong
+specialist finding nothing is a fact about your choice, not about the deal, and
+rendering it as the strong result would let you manufacture the game's most
+damning outcome deliberately. Pinned by assertion.
+
+**Every lane survives the cut.** A lane holding one slot is protected from the
+6-of-7 shuffle — measured at 95 of 200 yield-mirage seeds leaving a specialist
+with no deep target before this guard. They'd still be sendable, so nothing
+would look broken; their expertise would just be silently decorative, which is
+worse than an obvious failure.
+
+**Why Eugene, specifically?** Asked twice, so it belongs in writing. He is a
+full seat now (SOCIAL, one use, his own board — `__screen4Canvas`, which existed
+unused all along), but he is still the only one who does **two** things:
+
+- **RECOGNITION** — free, unlimited, every claim: the shape, then the agenda.
+  Costs nothing because nothing is fetched.
+- **RETRIEVAL** — one use, like everyone else: sent at a story claim he comes
+  back with who actually vouches for whom, and stamps it.
+
+That split is the answer. The others only retrieve; he also recognises, and
+recognition is free *by nature* rather than by exemption. Giving him a lane also
+fixed the older complaint on its own — he can be in the product moment now,
+because he finally has something to fetch.
 
 **Eugene's job is the agenda, and it took three tries to find it.** He shipped
 saying *"That one's onchain. Marisol can settle it."* — word for word what the
@@ -50,10 +96,10 @@ It is **leak-free by construction** — `laneOutlook` counts lanes only, never
 backing, never `discriminates`, never the branch, and a harness assertion pins
 that two deals with opposite outcomes produce identical agendas.
 
-An adviser goes and *looks*, so the answer lands on **their** board, not his:
-either a receipt, or **NOTHING ON FILE** — an absence somebody independently
-looked for, which is strictly stronger than his board simply staying dark. It is
-the only way this game can prove a negative.
+Whoever you send goes and *looks*, so the answer lands on **their** board, not
+his: a receipt, or **NOTHING ON FILE** — an absence somebody independently
+looked for, strictly stronger than his board simply staying dark, and the only
+way this game can prove a negative.
 
 ### He reacts to being caught
 
@@ -113,8 +159,8 @@ talking**; **nothing is memorisable** (outcomes are rolled, not authored).
 | Beat | What happens |
 |---|---|
 | **THE DEAL** | An empty table and a deck. You press DEAL ME IN and five cards come off it — the deal face-down, then the four people at the desk. Only the deal turns over: the desk is the same four every session, so flipping them was ceremony for a non-event. |
-| **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who could settle it, and **Eugene's free read**. |
-| **THE PRESS** | Three interruptions. Press him, or send the one colleague whose lane this is. |
+| **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who goes deepest on it, and **Eugene's free read**. |
+| **THE PRESS** | Three interruptions. Send anyone at anything — their lane decides how deep they get, not whether they answer. |
 | **THE CALL** | One slider, `SHORT ← FLAT → LONG`. Plain-English readout including what you lose if wrong. |
 | **RESOLUTION** | Truth. On desktop the four stand up and play their real reactions; the summary is a lower third so it never covers them. |
 | **THE AUTOPSY** | Two numbers — READ (did you press the hollow claims) and BOOK (P&L) — every chip flipped, and **the pattern named**. |
@@ -269,7 +315,7 @@ components/trade/press/
   cardDeal.jsx        the opening deal — one choreography, both surfaces
   evidenceScreen.js   the receipt board, both surfaces
 
-scripts/verify-press-run.mjs    87 assertions
+scripts/verify-press-run.mjs    107 assertions
 ```
 
 **`desk.js` is the reason the four-character layer is cheap.** It holds ~40
@@ -327,15 +373,49 @@ in a 700px box. **The pitch had no exit.**
 **Shipped:** both archetypes · seeded instancing · the deal · the four-seat desk
 with lanes and adviser scarcity · `NOTHING ON FILE` · the shared floor · desktop
 in-room play · mobile CRT view with voice + mouth · lower-third reveal · the
-autopsy with the pattern card · 87 assertions green · `The VC Game` tile on the
+autopsy with the pattern card · 107 assertions green · `The VC Game` tile on the
 `/trade` rail (default). The Case Table is parked behind `?classic=1` — intact,
 not deleted; shipping one game was a deliberate call.
 
+**Next, roughly in order** *(dropped from this doc in the seat rewrite and
+restored 2026-07-28 — the roadmap is the point of §7, not just the defect list):*
+
+1. **The rotating pitcher — "will other characters pitch?"** Yes, and it is the
+   biggest content lever there is: it multiplies both archetypes by the number
+   of speakers. `claim.speaker` already exists in `instanceDeal` — hardcoded
+   `"demon"`, read by nothing. **The blocker is not prose, it's lane coverage.**
+   With Barron pitching, Marisol and GR80 cover CHAIN and RECORD. If Marisol
+   pitched, CHAIN would have no adviser at all.
+   The clean fix is to **give Barron a lane of his own** — PEOPLE, the
+   relationships he keeps invoking — so all three own one. Then whoever pitches
+   is excluded, the other two cover their lanes, and **the pitcher's own lane
+   becomes unsettleable**: the only person who could verify it is the one
+   selling you the deal. `SHAPE` stops being an authored tag and becomes
+   emergent, which is better design than what's there now. Solvability
+   survives — `loadBearing` claims are HARD, i.e. answerable by pressing the
+   pitcher directly, so the free press still reaches every verdict.
+   Cost: ~35 lines of `generic`/`sharp` prose per speaker per archetype, plus a
+   PEOPLE lane tagged across both archetypes' slots.
+2. **More archetypes.** Eleven of the thirteen `CASE_PATTERNS` reads are
+   unbuilt. Pure content — no code. `serial-deployer` and `celeb-shill` are the
+   next highest-contrast pair.
+3. **Let Eugene be wrong.** See §1: he is currently an oracle who is never
+   wrong, which makes him a hint system with a face. A pattern-matcher who
+   *misreads* at his archetype's own exception rate is a character. Leak-safe
+   as long as his confidence tracks the base rate and never the branch.
+4. **Trophies.** Read a deal well → mint its exemplar coin into the binder,
+   stamped with your call. Rails exist (`PackReveal`, `OwnBinder`, grant
+   routes). Decoupled by design: trophies never touch the resolver.
+5. **Persist BOOK + the leaderboard.** `dailySeed()` already gives everyone the
+   same deal; the read-side leaderboard API exists. Today BOOK resets to 100
+   every session, so there is no reason to come back on day two.
+
 **Known, unfixed:**
 
-- **The acceptance test has never been run.** Same seed, three presses on Barron
-  vs. GR80 + Marisol + one Barron. *If run B doesn't feel like a different and
-  better decision, the direction is wrong.* This is the gate on everything below.
+- The SUBJECTIVE half of the acceptance test still hasn't been run: same seed,
+  three presses on Barron vs. the desk. *If run B doesn't feel like a different
+  and better decision, the direction is wrong.* The objective half now passes
+  (§8), so it is finally worth running.
 - Desktop end-to-end is unverified past the copy paths: the receipt landing on
   the **adviser's** in-room monitor, `NOTHING ON FILE` in-scene, and the curtain
   call still firing. (Getting to the floor in an automated browser requires
@@ -353,7 +433,67 @@ not deleted; shipping one game was a deliberate call.
 
 ---
 
-## 8. Voice — decided, not yet built
+
+## 8. The acceptance test — failed, then fixed
+
+**2026-07-28. The test the whole redesign rests on, run for the first time, and
+it failed.** Measured across both archetypes: on **14 of 14 slots** the
+`generic` block and the `sharp` block discriminated *identically* between the
+rug and legit branches. Sending a specialist told you exactly as much about
+which branch you were in as pressing the seller — more detail, better drama, no
+better verdict. And because Barron is unlimited and lane-free while the
+specialists are one-use and lane-locked, **three presses on him weakly dominated
+the entire four-seat desk.**
+
+**The cause was one field in the wrong place.** `backing` was authored PER
+BRANCH — `VIBES` when rug, `HARD` when legit — and `resolvePress` zeroes every
+receipt on VIBES. So the rug branch returned nothing to *anyone*, specialist
+included: the whole signal lived one level above where depth could reach it.
+Rewriting the receipts alone would not have touched it.
+
+**The fix, and why it also improves the fiction.** `backing` and `generic` are
+both hoisted to the SLOT. A claim either has a receipt to be had or it doesn't —
+that's a property of the claim, not of whether the deal is rotten — and the
+seller's shallow answer is now one shared script that *cannot* differ by branch,
+because there is only one copy of it. He is confident, technically true, and
+stops exactly short of the question that settles it, which is what selling is.
+Previously he handed you the evidence against his own deal.
+
+Measured after (500 seeds/archetype):
+
+| | seller can settle | specialists can settle | route A lands | route B lands |
+|---|---|---|---|---|
+| backdoor-fork | 4.22 → **1.00** | 4.22 | 3.00 → **1.00** | **2.22** |
+| yield-mirage | 5.28 → **2.00** | 5.28 | 3.00 → **2.00** | **2.28** |
+
+Harness: `scratchpad/acceptance.mjs`. Five assertions now pin it permanently —
+backing is never per-branch; no non-loadBearing slot lets the seller give away
+the branch; the loadBearing claim IS still free (invariant 1); specialists must
+settle *strictly more* than the seller; and at least one claim must let a
+specialist prove a negative.
+
+**One regression the fix caused, and the assertion that caused it.** Replacing
+every null rug receipt with a documented-absence receipt killed `NOTHING ON
+FILE` outright — it fired nowhere in backdoor-fork and in *both* branches of
+yield-mirage, carrying no information. My own assertion ("every non-VIBES slot
+returns a real deep receipt in BOTH branches") had forbidden the very pattern
+that produces it. A null **sharp** receipt in one branch only is legitimate and
+discriminating, because `generic` still supplies the shallow answer. Restored on
+`ops` and `team`, where the absence *is* the finding, and the assertion now
+requires it rather than banning it.
+
+**Three content contradictions caught by adversarial verification**, all in
+fields the authoring pass had been told not to touch: `stake`'s floor FACT
+("same terms as you'd get") pre-answered the question the deep look exists to
+settle; `apy`'s rug finding was arithmetically incompatible with the shared
+generic pinning a realised trailing-30 rate; and `withdrawals`' rug answer key
+described a test nobody had run, which the specialist can now run.
+
+**`miss` blocks are now fully dead** — `instanceDeal` no longer assembles them
+and `resolvePress` never read them. Delete on sight.
+
+---
+## 9. Voice — decided, not yet built
 
 **Decision (author, 2026-07-27): live ElevenLabs, no recorded clips. SitePal on
 desktop for real lip-sync; the amplitude mouth on mobile, which already works.**
