@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { mountPitchBot } from "@/lib/trade/pitchBotScene";
+import { tickPitchBotHolo, disposePitchBotHolo } from "@/lib/trade/pitchBotHolo";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
@@ -45,6 +47,15 @@ export const AGENT_CAMERA_SETTINGS = {
   Fluffy: {
     cameraPos: new THREE.Vector3(0.54, 0.11, -1.65),
     lookAtPos: new THREE.Vector3(1.87, -1.35, 0.745),
+    orbitCenter: null,
+  },
+  // THE PITCH BOT — the VC game's pitcher. PLACEHOLDER POSE: tune with ?tune=1
+  // (CameraTuningPanel) or by editing here. The externalFocusAgent switch needs
+  // no case for it — that switch ends in `default: break` and the pose is
+  // resolved from this table.
+  PitchBot: {
+    cameraPos: new THREE.Vector3(0, -0.3, 1.6),
+    lookAtPos: new THREE.Vector3(0, -0.55, 0),
     orbitCenter: null,
   },
   // Detective — placeholder cameraPos/lookAtPos. Tune via the in-app
@@ -157,6 +168,7 @@ export const SHOW_LEGACY_BEACON = false;
 // (handleClick → agentId 'HologramCard') is inert until this is re-enabled.
 export const SHOW_HOLOGRAM_CARD = false;
 
+
 // ── Neon sign ────────────────────────────────────────────────────────────
 // The sign lives in its own GLB (it was ~40% of the main model's geometry),
 // so only the one variant picked for this load is ever downloaded. Add a
@@ -173,7 +185,7 @@ export const SHOW_HOLOGRAM_CARD = false;
 export const NEON_SIGNS = [
   { id: 'open',  url: '/models/neon_open.glb',  yOffset: 0, scale: 1, yaw: 0 },
   { id: 'face',  url: '/models/neon_face.glb',  yOffset: 0, scale: 1, yaw: 0 },
-  { id: 'poker', url: '/models/neon_poker.glb', yOffset: 0, scale: 1, yaw: 0 },
+  // { id: 'poker', url: '/models/neon_poker.glb', yOffset: 0, scale: 1, yaw: 0 },
   { id: 'earth', url: '/models/neon_earth.glb', yOffset: 0, scale: 1, yaw: 0 },
 ];
 
@@ -672,6 +684,18 @@ const CyborgTempleScene = ({
   templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
   disableCandleInteraction = false, // When true, XCandle nodes are not made clickable (no zoom-to-candle, no inspector)
   jackpotOnlyFistPump = false, // When true, FistPump only fires from slotMachineJackpot — removed from Demon's random alternation and the price-poll trigger
+  // A PITCH IS HAPPENING — latched from HEAR THE PITCH ▸ until the player leaves.
+  // Everything that restages centre stage for the pitcher reads THIS, and reading
+  // one signal is what keeps those dressings in sync with each other.
+  //
+  // Three nearby signals are deliberately NOT used:
+  //   gameStarted  — held until START in GameOverlay, which the VC game never
+  //                  shows, so it is false for the whole pitch. A SILENT no-op.
+  //   pressMode    — true from game SELECTION, so it includes the briefing; the
+  //                  room restaged a screen or two before anyone appeared.
+  //   the raw floor flag — false at CALL IT, so dressings popped back for the
+  //                  slider beat and away again for the reveal.
+  pitchStarted = false,
   gameStarted = false, // When true, the focused character is in game-mode idle/typing handoff (vs lobby head-tracking). Held off until the user clicks START in GameOverlay.
   attractMonk = false, // When true (game started AND first-time player), run the monk_hail/monk_beckon attention-getter loop. Returning players (rules already heard) get this set false so GR80 doesn't loop.
   showCharacterHints = false, // When true, render small "?" badges over each agent's head as a tap affordance
@@ -1384,7 +1408,8 @@ const CyborgTempleScene = ({
       agentId === 'Demon'     ? demonAnimStateRef.current     :
       agentId === 'Detective' ? detectiveAnimStateRef.current :
       agentId === 'RL80'      ? rl80AnimStateRef.current      :
-      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    : null
+      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    :
+      agentId === 'PitchBot'  ? pitchBotAnimStateRef.current  : null
     );
     if (!actions || !state) {
       // console.log('[reaction-debug] missing actions or state', { agentId, hasActions: !!actions, hasState: !!state });
@@ -1582,7 +1607,8 @@ const CyborgTempleScene = ({
       agentId === 'Demon'     ? demonAnimStateRef.current     :
       agentId === 'Detective' ? detectiveAnimStateRef.current :
       agentId === 'RL80'      ? rl80AnimStateRef.current      :
-      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    : null
+      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    :
+      agentId === 'PitchBot'  ? pitchBotAnimStateRef.current  : null
     );
     if (!pattern || !actions || !state) return;
     const idleKey = Object.keys(actions).find((a) => pattern.test(a));
@@ -2172,7 +2198,18 @@ const CyborgTempleScene = ({
     // rather than StageProps and won't be caught by the flip above. Hide it on
     // the same terms — it hangs at scene center, right where the characters
     // line up for the curtain call.
-    if (neonSignRef.current) neonSignRef.current.visible = !revealMode;
+    //
+    // AND WHILE A GAME IS IN PLAY (2026-07-29). The sign floats at scene centre,
+    // which is exactly where the pitch bot now stands, so during a pitch the two
+    // occupy the same air — the sign hangs over the bot's head and reads as part
+    // of it. Same reasoning as the curtain call: this is decor, and decor yields
+    // when something is actually happening at centre stage.
+    //
+    // OWNED BY ITS OWN EFFECT NOW — see NEON VISIBILITY below. It cannot live
+    // here: this effect's deps are [revealMode, loadedModel, ...] with no
+    // gameStarted, so gating on gameStarted from inside it would read a stale
+    // closure and never fire. That is a trap this file already documents
+    // elsewhere ("Read through gameStartedRef, not the `gameStarted` prop").
     if (!revealMode) return;
 
     // Council gets the semi-circle; every outcome reveal gets the flat lineup.
@@ -2230,6 +2267,58 @@ const CyborgTempleScene = ({
     // re-runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealMode, loadedModel, STAGE_LINEUP, COUNCIL_LINEUP]);
+
+  // The holo registry holds shader uniforms for as long as the bot's materials
+  // exist. Clear it on unmount or a remount ticks stale uniforms forever.
+  useEffect(() => disposePitchBotHolo, []);
+
+  /* THE PITCHER IS ONLY IN THE ROOM WHILE THERE IS A PITCH.
+   *
+   * It loaded visible and stood in the beam on the lobby screen with no game
+   * running (author, 2026-07-29) — a closer waiting in an empty office. This is
+   * the mirror of the neon rule below: the sign owns centre stage when nothing is
+   * happening, the pitcher owns it when something is.
+   *
+   * GATED ON THE FLOOR, not on the game being selected: on the broader signal the
+   * agent materialised over the briefing screen, before the player had agreed to
+   * hear anything. It arrives when they click HEAR THE PITCH ▸ (author,
+   * 2026-07-29), which is the beat the arrival choreography is built around.
+   *
+   * Hidden for the curtain call too. The reveal choreographs FOUR characters
+   * into a lineup at centre; a hologram floating over them is not in that plan.
+   */
+  useEffect(() => {
+    if (!pitchBotRef.current) return;
+    pitchBotRef.current.visible = !!pitchStarted && !revealMode;
+  }, [pitchStarted, revealMode, loadedModel]);
+
+  /* NEON VISIBILITY — decor yields to whatever is at centre stage.
+   *
+   * The sign hangs at scene centre from its own GLB (parented to templeScene, so
+   * the StageProps flip never caught it). Two things now occupy that same air:
+   * the curtain-call lineup, and — since 2026-07-29 — the pitch bot, which
+   * stands at centre for the whole pitch with the sign floating over its head.
+   *
+   * Its own effect with its own deps, because the reveal effect lists neither of
+   * these and would read a stale closure.
+   *
+   * DRIVEN BY THE SAME SIGNAL AS THE PITCH BOT, on purpose. The sign going dark
+   * and the agent arriving are ONE handover of centre stage, so they read as a
+   * single event rather than two fades that can drift apart. On the broader
+   * signal the sign cleared at the BRIEFING and left the beam empty for a screen
+   * or two before anyone appeared (author, 2026-07-29).
+   *
+   * NOT gameStarted: that is held until START in GameOverlay, which the VC game
+   * never shows, so it is false for the entire pitch and gating on it was a
+   * silent no-op.
+   *
+   * TO FLIP THE POLARITY (neon only DURING a pitch rather than only outside one)
+   * invert the pitchStarted term — deliberately kept to one clause.
+   */
+  useEffect(() => {
+    if (!neonSignRef.current) return;
+    neonSignRef.current.visible = !revealMode && !pitchStarted;
+  }, [revealMode, pitchStarted, loadedModel]);
 
   // Hover state for coins
   const [hoveredCoin, setHoveredCoin] = useState(null);
@@ -2523,6 +2612,18 @@ const CyborgTempleScene = ({
     currentAnimation: 'detective_typing',
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 8000 + 8000,
+    isPlayingSpecial: false,
+  });
+
+  // THE PITCH BOT. Two clips only — `idle` (8.37s) and `talking` (14.17s) — so
+  // there is no rotation to schedule; `speechActive` picks one. Neither clip
+  // touches the face plate, so a pressure-band texture swap can never fight the
+  // mixer.
+  const pitchBotRef = useRef(null);
+  const pitchBotAnimStateRef = useRef({
+    currentAnimation: 'idle',
+    lastSwitchTime: 0,
+    nextSwitchDelay: 999999,
     isPlayingSpecial: false,
   });
 
@@ -3411,6 +3512,22 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           mixersRef.current['GeometricShape'] = geoMixer;
         }
       }
+
+      // THE PITCH BOT — the VC game's pitcher. Everything about it lives in
+      // lib/trade/pitchBotScene: the load, the transform, the holographic
+      // treatment, the mixer/action registration and the __pitchBotTune handle.
+      //
+      // This is the ONLY VC-game edit to this file's load path. It borrows the
+      // loader above because that one already has the DRACOLoader attached —
+      // pitch-bot.glb lists Draco AND EXT_texture_webp as extensionsRequired, so
+      // a bare loader silently fails on it.
+      mountPitchBot({
+        gltfLoader,
+        parent: templeScene,
+        mixersRef,
+        actionsRef,
+        onReady: (bot) => { pitchBotRef.current = bot; },
+      });
 
       // Helper function to clean animation tracks - only remove truly problematic tracks
       const cleanAnimationTracks = (animation, targetObject) => {
@@ -6309,6 +6426,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         }
       });
     });
+
+    // The pitch bot's holographic scanlines. Its uniforms live in
+    // lib/trade/pitchBotHolo's registry, which is empty until the bot loads, so
+    // this is a no-op on every other /trade mode.
+    tickPitchBotHolo(state.clock.elapsedTime);
 
     // Update all character mixers independently
     if (mixersRef.current) {

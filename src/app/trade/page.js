@@ -1171,6 +1171,20 @@ export default function CyborgTemple() {
   // session. Unlike showDeskGame this never idles the canvas: the room IS the
   // interface, so the frameloop gate below must not fire while it's up.
   const [pressMode, setPressMode] = useState(false);
+  // HAS THE PITCH STARTED, and not yet ended. A LATCH, not a mirror of the floor.
+  //
+  // pressMode covers the whole VC game including the briefing — too early to
+  // stage the room. But the raw floor flag is too NARROW at the other end: it
+  // goes false at CALL IT, so anything driven straight off it popped back for the
+  // slider beat and then away again for the reveal. Latching on the first floor
+  // and clearing on exit gives one stable "a pitch is happening" span.
+  const [pitchStarted, setPitchStarted] = useState(false);
+  // BELT AND BRACES ON THE LATCH. PressSession's onExit clears it, but that is one
+  // of several ways the session can end (?press=1 toggling, PressFlat's own exit,
+  // any future path), and a latch that survives its session leaves the room
+  // permanently restaged — neon dark in an empty lobby. Deriving the reset from
+  // pressMode means no exit path has to remember to do it.
+  useEffect(() => { if (!pressMode) setPitchStarted(false); }, [pressMode]);
   const [pressFocus, setPressFocus] = useState(null);
   const [pressSpeaking, setPressSpeaking] = useState(false);
   const [pressReveal, setPressReveal] = useState(null);
@@ -3928,6 +3942,7 @@ export default function CyborgTemple() {
               is80sMode={context80sMode}
               isMobile={isMobileView}
               disableCandleInteraction
+              pitchStarted={pitchStarted}
               gameStarted={gameStarted}
               attractMonk={gameStarted && !rulesHeard && !focusedAgent}
               showCharacterHints={showCharacterHint && !focusedAgent}
@@ -6391,11 +6406,13 @@ export default function CyborgTemple() {
                 onFocusAgent={setPressFocus}
                 onSpeechActive={setPressSpeaking}
                 onRevealChange={setPressReveal}
+                onFloorChange={(live) => { if (live) setPitchStarted(true); }}
                 onExit={() => {
                   setPressMode(false);
                   setPressFocus(null);
                   setPressSpeaking(false);
                   setPressReveal(null);
+                  setPitchStarted(false);
                 }}
               />,
               document.body

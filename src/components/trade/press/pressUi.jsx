@@ -239,11 +239,15 @@ export function SeatRow({ run, live, pressed, options, onPress }) {
             <button key={o.seat}
                     className={`pu-seat ${boss ? "boss" : ""} ${o.deep ? "deep" : "shallow"} ${o.enabled ? "" : "off"}`}
                     disabled={!o.enabled}
-                    title={o.deep
-                      ? `Ask ${meta.name} — this is what they do`
-                      : `Ask ${meta.name} anyway — you'll get the surface answer`}
+                    title={boss
+                      ? `Press ${meta.name} — costs an interruption, never a specialist`
+                      : o.deep
+                        ? `Ask ${meta.name} — this is what they do`
+                        : `Ask ${meta.name} anyway — you'll get the surface answer`}
                     onClick={() => onPress(o.seat)}>
-              <img className="pu-seat-face" src={meta.portrait} alt="" aria-hidden="true" />
+              {meta.portrait
+                ? <img className="pu-seat-face" src={meta.portrait} alt="" aria-hidden="true" />
+                : <span className="pu-seat-face pu-seat-glyph" aria-hidden="true">▣</span>}
               <span className="pu-seat-who">{meta.name}</span>
               <span className="pu-seat-name">{meta.role}</span>
               {/* Every live tile carries a VERB, because every one of them is a
@@ -266,7 +270,7 @@ export function SeatRow({ run, live, pressed, options, onPress }) {
               <span className="pu-seat-sub">
                 {o.reason === "spent" ? "already used"
                   : boss
-                    ? (o.deep ? "▲ PRESS HIM — GOES DEEP" : "press him anyway · surface only")
+                    ? "press it · always free"      // the pitcher owns no lane, so never deep
                     : (o.deep ? "▲ ASK — GOES DEEP" : "ask anyway · surface only")}
               </span>
             </button>
@@ -351,6 +355,12 @@ export const PRESS_UI_CSS = `
 /* the lane's owner is spent — this claim is now nobody's, and it should not
    look like a live instruction */
 .pu-lane[data-lane="SPENT"]  { border-left-color:#ff9b6f; color:#ffb493; background:rgba(255,155,111,0.07); }
+
+/* The pitcher has no portrait yet, so its tile carries a glyph instead of a
+   borrowed face. Sized to match .pu-seat-face exactly so the row doesn't jump. */
+.pu-seat-glyph { display:flex; align-items:center; justify-content:center;
+  font-size:20px; color:rgba(191,222,255,0.75);
+  background:rgba(120,200,255,0.07); }
 
 /* VIRGIL. Warmer than the desk chrome — he is a companion, not a terminal. */
 .pu-virgil { display:flex; gap:9px; align-items:flex-start; margin-top:9px; padding-top:8px;

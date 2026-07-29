@@ -29,7 +29,12 @@ export const PITCH_BOT = {
   name: "The Agent",
   role: "PITCHING ON COMMISSION",
   model: "/models/pitch-bot.glb",   // 566KB. Draco + EXT_texture_webp required.
-  portrait: "/thumbnail_johnBarron.png",  // TODO: bot portrait render
+  // Its own render, 2026-07-29. This was thumbnail_johnBarron.png as a
+  // placeholder for a few hours, which put THE SAME FACE on the pitcher tile and
+  // on Barron's tile two seats apart in the same row — the cast-legibility
+  // failure this whole refactor exists to fix. SeatRow still falls back to a
+  // glyph if this is ever null; a borrowed face is never an acceptable fallback.
+  portrait: "/pitchBot.webp",
   clips: { idle: "idle", talking: "talking" },
   blurb: "Paid if you fund it. Never met the founders either.",
 };
@@ -62,7 +67,7 @@ export const DESK = {
   },
   [SEATS.GR80]: {
     id: SEATS.GR80, agentId: "Monk", station: "monk",
-    name: "Saint GR80", role: "THE PAPERWORK", lane: LANES.RECORD,
+    name: "Saint GR80", role: "REPUTATION", lane: LANES.RECORD,
     portrait: "/thumbnail_gr80.png",
     blurb: "What the documents actually say.",
   },
@@ -124,7 +129,7 @@ export const EUGENE = DESK[SEATS.EUGENE];
  */
 export const LANE_LABEL = {
   [LANES.CHAIN]: "the money",
-  [LANES.RECORD]: "the paperwork",
+  [LANES.RECORD]: "reputation",
   [LANES.CHART]: "the chart",
   [LANES.SOCIAL]: "the story",
   [LANES.SHAPE]: "nobody's specialism",

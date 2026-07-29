@@ -10,11 +10,9 @@ TCG, not to this game.*
 here, its argument lives in the archive.** The previous edition reached 1,006
 because spec and journal were welded together.
 
-*Ceiling history — the number keeps being wrong in the same direction: 300
-(inherited, unexamined) → 450 → 500 (pitch bot, 2026-07-29). Every raise so far
-was preceded by stripping argument that had been written into both files.*
-**Before raising it again, check whether the new lines are rules or reasons. If
-they are reasons they belong in the archive, and the number stays.**
+**Before raising it, check whether the new lines are rules or reasons. If they are
+reasons they belong in the archive, and the number stays** — see `[A§19]` for why
+that rule exists and how often it has been tested.
 
 **North star (author, 2026-07-28):** *"I am hoping for a nice little engagement
 puzzle."* Not a social product, not a ladder, not a metagame. A fresh deal, four
@@ -41,14 +39,14 @@ OUR LADY        remote, unseen       decides which deal comes down.        DESIG
    ↓                                 You don't get to ask why this one.
 THE FOUNDER     a rolled identity    never appears. Sent an agent.         DESIGNED
    ↓            name / face / bio
-THE PITCH BOT   in the room          pitches on commission. The one        DESIGNED
-                the constant         constant. UNLIMITED presses.
+THE PITCH BOT   in the room,          pitches on commission. The one       PARTIAL
+                projected            constant. UNLIMITED presses.
    ↓
-THE ENIGMA      the holo-projector   the deal ARRIVES through it, then     DESIGNED
-MACHINE         centre of the desks  dims. Transmission, never selection.
+THE ENIGMA      the console          the deal ARRIVES coded and decodes    SHIPPED
+MACHINE         in the briefing      there. Transmission, never selection.
    ↓
-THE CHART       easel beside the bot the pitch surface. One quad, one      DESIGNED
-                                     texture per claim.
+THE PROJECTOR   centre of the desks  casts the bot. Its beam is the only    SHIPPED
+                                     staging the pitcher gets.
    ↓
 FOUR ANALYSTS   at the desk, yours   Barron CHART · Marisol CHAIN          SHIPPED
                 one use each         GR80 RECORD · Eugene SOCIAL
@@ -57,9 +55,6 @@ VIRGIL          on the desk          your guide. Cannot be sent anywhere.  PARTI
    ↓
 YOU             the fifth seat       call it                              SHIPPED
 ```
-
-**Today John Barron is both pitcher and CHART seat.** That special case is what
-the reshape removes — §7 item 2.
 
 **Our Lady is the randomiser, and she is canon** — `council-chat/route.js:16` has
 her *"in the channel but NOT in the room"*; `Lobby.jsx:48` already calls the
@@ -96,15 +91,19 @@ including why the "a rotating pitcher multiplies the content" claim was false �
    appears on legit deals leaks the answer; a founder mapped to an archetype is the
    name-leak again — four appearances in four costumes.
 
-**The easel is the pitch surface; the machine is the arrival** — two objects, two
-jobs, no overlap `[A§17]`. Our Lady decides *which* deal, the deal arrives through
-the projector, the projector dims, and the bot pitches at a physical chart it can
-gesture to. **The monitors host neither** — they are the evidence boards, and a
-receipt landing on a seat's own screen is the payoff of the whole four-seat design.
+**The console is the arrival; the projector is the pitcher** `[A§17]`. Our Lady
+decides *which* deal, the enigma console decodes its name in the briefing, and the
+projector casts the agent into the room for the pitch. **The monitors host
+neither** — they are the evidence boards, and a receipt landing on a seat's own
+screen is the payoff of the whole four-seat design.
 
-**One claim, one page.** `Presentation_Chart_Page` is a 4-vertex quad on a material
-nothing else uses, so the page can change with each of the six claims for the cost
-of one texture assignment.
+**THERE IS NO PITCH SURFACE IN 3D — a live gap** `[A§17]`. Claims live only in the
+reading column, and the pitcher has no board of its own (it aliases Barron's).
+`HologramCard.jsx` is the built, unused shader for exactly that job.
+
+**The pitcher is only in the room while there is a pitch** — visibility gated on
+`pressMode`, the mirror of the neon rule. The sign owns centre stage when nothing
+is happening; the agent owns it when something is.
 
 ---
 
@@ -112,7 +111,7 @@ of one texture assignment.
 
 | Beat | What happens |
 |---|---|
-| **THE ARRIVAL** | Your next appointment is here. `SEND IT IN ▸` — the bot walks in on behalf of a client who didn't come. *(today: a dice roll — §7)* |
+| **THE ARRIVAL** | Your next appointment is here. `SEND IT IN ▸` — the enigma console decodes the deal's name and the agent arrives for a client who didn't come. |
 | **THE DEAL** | The deal sheet: a terminal dossier. Name, ticker, chain, surface stats. |
 | **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who goes deepest, and **Virgil's read**. |
 | **THE PRESS** | Three interruptions. Ask anyone about anything — the lane decides how deep they get, not whether they answer. |
@@ -148,7 +147,7 @@ and each is explicitly gated.
 |---|---|---|---|
 | **John Barron** | `CHART` | THE CHART — price, windows, momentum | *pitcher today: unlimited* |
 | **Detective Marisol** | `CHAIN` | THE MONEY — money movement, wallet ages, unlocks | one use, all session |
-| **Saint GR80** | `RECORD` | THE PAPERWORK — what the documents actually say | one use |
+| **Saint GR80** | `RECORD` | REPUTATION — what the documents actually say | one use |
 | **Eugene** | `SOCIAL` | THE STORY — narrative, reputation, who vouches for whom | one use |
 | **Virgil** | — | THE CAT · YOUR GUIDE | not a seat |
 
@@ -339,7 +338,7 @@ outcome, identity, surface numbers), `questions.js`, `desk.js`, `virgil.js`,
 `identities.js`, `archetypes/`. `components/trade/press/` is presentation —
 `pressUi.jsx` (the shared floor), `PressSession.jsx` (desktop),
 `PressFlat.jsx` (mobile), `PressFigure.jsx`, `evidenceScreen.js`,
-`diceRoll.jsx`. Verified by `scripts/verify-press-run.mjs` — **114 assertions,
+`arrival.jsx`. Verified by `scripts/verify-press-run.mjs` — **118 assertions,
 green.**
 
 *A file tree is not listed here on purpose: the previous edition's went stale and
@@ -352,7 +351,11 @@ is only what `ls` can't tell you.*
   `instanceDeal.js:15` still does, for `deal.exemplar` — the last tie, §7 item 5.
 - **Orphaned, delete on sight:** `press/hand.js` (the cut card pool),
   `press/deals/mrdn.js` (slice 1's hand-authored deal). Nothing imports either.
-- **`diceRoll.jsx` is scheduled for deletion** with the arrival beat (§7 item 2).
+- **`lib/trade/pitchBotScene.js` + `pitchBotHolo.js`** own the bot in the 3D room.
+  `CyborgTempleScene.jsx` holds only a `mountPitchBot()` call, a camera pose, an
+  animState branch and two visibility clauses. **Not derived from
+  `HolographicStatue3`** — that is live on the root page and its raw ShaderMaterial
+  has no skinning chunks, which on this SkinnedMesh renders a frozen bind pose.
 
 **`desk.js` and `virgil.js` are why the character layer is cheap.** Between them:
 the lane band, 14 pressure asides, 15 adviser result lines (3 × dispatch / found
@@ -382,12 +385,17 @@ goes inside it or gets a height budget. 839px of rows in a 700px box once clippe
 
 ## 7. Build order
 
-**`SHIPPED`:** three archetypes · seeded instancing, fresh roll per sitting · the
-deal sheet · four-seat desk with one lane each and adviser scarcity · Virgil's
-two reads and the tip switch · `NOTHING ON FILE` · pressure bands · the shared
-floor · desktop in-room play · mobile CRT with voice + mouth · lower-third reveal
-· post-deal analysis with the pattern named · 114 assertions · `The VC Game` tile
-on the `/trade` rail (default). Case Table parked behind `?classic=1`.
+**`SHIPPED`:** three archetypes · seeded instancing, a fresh deal per sitting ·
+the enigma console and the name decode · four SYMMETRIC seats, one lane and one
+use each · the pitch bot as an outside pitcher, projected into the room with its
+own voice · Virgil's two reads and the tip switch · `NOTHING ON FILE` · pressure
+bands · the shared floor · desktop in-room play · mobile CRT with voice + mouth ·
+lower-third reveal · post-deal analysis with the pattern named · 118 assertions ·
+`The VC Game` tile on the `/trade` rail (default). Case Table behind `?classic=1`.
+
+**Open on the bot specifically:** the face shield's four pressure textures are not
+wired, `AGENT_CAMERA_SETTINGS.PitchBot` is still a placeholder pose that frames the
+wrong thing, and `LET HIM GO ON ▸` still says "him".
 
 1. **Run the subjective acceptance test.** Same seed, three presses on the pitcher
    vs. three across the desk. *If run B doesn't feel like a different and better
@@ -399,20 +407,17 @@ on the `/trade` rail (default). Case Table parked behind `?classic=1`.
      Barron to `SPENDABLE_SEATS`, point `claim.speaker` (hardcoded `"demon"`, read
      by nothing) at the bot, and key four shield textures to `pressure(run)`.
    - **The founder pool.** A sibling of `identities.js`, rolled per deal.
-   - **The chart.** `Presentation_Chart` (easel, 1.16 × 1.82 × 1.20, transforms
-     baked) + `Presentation_Chart_Page` (4-vert quad, `TEXCOORD_0` present,
-     material `lambert1.001` used by nothing else, white base, double-sided). One
-     texture per claim. **They are sibling root nodes, not parent/child** — wrap
-     both in a Group at load or hiding the chart will miss half of it. Set
-     `material.transparent` if a page art ever needs alpha; `alphaMode` is
-     `OPAQUE`.
+   - **A pitch surface.** OPEN. The easel that briefly filled this role was cut
+     from the glb on 2026-07-29 (§1), so the pitcher has no way to show the thing
+     it is selling and no board for its own receipts.
    - **The machine, for THE ARRIVAL only.** The rig exists and is switched off:
      `CyborgTempleScene.jsx:158` `SHOW_HOLOGRAM_CARD = false`, `projectorRef`
      auto-detected at `:4269`, `BeaconBeam` already rising from it, and
      `HologramCard.jsx` a complete projection shader (holo tint, scanlines, glitch,
      halo, sway, billboard-on-yaw, three states) — off because its payload was a
-     trading card. It renders the deal on arrival and dims for the session.
-     Delete `diceRoll.jsx` and the roll beat.
+     trading card. Wiring it to render the deal — and to take the pitcher's
+     receipts, which currently alias Barron's screen — is the open half of §1's
+     "no pitch surface in 3D".
 
    **Asset facts, `/models/pitch-bot.glb` (566KB):** Draco **and**
    `EXT_texture_webp` are `extensionsRequired`, so a loader needs the `DRACOLoader`

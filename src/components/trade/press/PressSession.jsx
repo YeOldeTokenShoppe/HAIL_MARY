@@ -35,7 +35,19 @@ import {
 //   onRevealChange(outcome|null)— stage the curtain call on the real scene
 //   onExit()                    — leave the mode
 
-const SPEAKER_AGENT = "Demon";    // John Barron's agentId in CyborgTempleScene
+// THE PITCHER HAS NO BODY IN THE SCENE YET.
+//
+// This was "Demon" — John Barron's agentId — for as long as he was the one
+// pitching. Since 2026-07-29 he is a plain CHART specialist you can spend, so
+// flying the camera to him when the pitch starts tells the player the wrong
+// thing about the cast: it frames a seat as the adversary.
+//
+// It is 'PitchBot' now — registered in CyborgTempleScene as its own loaded glb
+// with an AGENT_CAMERA_SETTINGS pose, an animState entry and userData.agentId on
+// every mesh. If the model ever fails to load the scene logs and carries on, and
+// resolveAgentSettings still returns the authored pose, so the camera flies to
+// where the bot should be rather than throwing.
+const PITCHER_AGENT = "PitchBot";
 const SPEAKER_STATION = "demon";  // -> __screen2Canvas (SCREEN_TARGETS in evidenceScreen.js)
 const READ_MS = 4200;             // how long a claim holds the floor before it can land
 
@@ -52,6 +64,11 @@ export default function PressSession({
   onFocusAgent,
   onSpeechActive,
   onRevealChange,
+  // TRUE ONLY WHILE THE PITCH IS BEING HEARD — i.e. from HEAR THE PITCH ▸ to the
+  // call, not from the moment the game is selected. `pressMode` in /trade goes
+  // true at the BRIEFING, which is too early for anything that should appear
+  // with the pitcher.
+  onFloorChange,
   onExit,
 }) {
   // A FRESH DEAL EVERY TIME YOU SIT DOWN. Picked once per mount, so the beat
@@ -121,10 +138,12 @@ export default function PressSession({
     screenRef.current = s;
     // THE PITCHER HAS NO MONITOR OF ITS OWN. There are four screens in this room
     // and, since 2026-07-29, four analysts to own them — the agent is an outsider
-    // standing at an easel. Its receipt belongs on Presentation_Chart_Page; until
-    // that is wired, PITCHER and Barron ALIAS one screen (station "demon" ===
-    // SPEAKER_STATION, which was Barron's all along), because creating two
-    // screens for one canvas makes them fight over __screen2Canvas.
+    // projected into the room. It has no evidence surface of its own: the easel it
+    // briefly had was removed from the glb on 2026-07-29, so PITCHER and Barron
+    // ALIAS one screen (station "demon" === SPEAKER_STATION, which was Barron's
+    // all along) because creating two screens for one canvas makes them fight
+    // over __screen2Canvas. A surface for the pitcher's own receipts is still
+    // open — the projector is the obvious candidate.
     const made = { [PITCHER]: s, [SEATS.BARRON]: s };
     for (const seat of SPENDABLE_SEATS) {
       if (seat === SEATS.BARRON) continue;   // aliased above
@@ -140,10 +159,18 @@ export default function PressSession({
     };
   }, []);
 
+  // Report the floor to the host so the room can stage for it (the pitch bot's
+  // visibility hangs off this). Its own effect so the callback identity can't
+  // drag the camera effect's deps around.
+  useEffect(() => {
+    onFloorChange?.(onFloor);
+    return () => onFloorChange?.(false);
+  }, [onFloor, onFloorChange]);
+
   /* ---- camera + animation: he's talking, so look at him ---- */
   useEffect(() => {
     if (!onFloor) return;
-    onFocusAgent?.(SPEAKER_AGENT);
+    onFocusAgent?.(PITCHER_AGENT);
     onSpeechActive?.(true);
     return () => onSpeechActive?.(false);
   }, [onFloor, run.claimIndex, onFocusAgent, onSpeechActive]);
@@ -240,7 +267,7 @@ export default function PressSession({
   const advance = useCallback(() => {
     setFlash(null);
     Object.values(screensRef.current).forEach((x) => x.stayBlack());
-    onFocusAgent?.(SPEAKER_AGENT);
+    onFocusAgent?.(PITCHER_AGENT);
     setRun((r) => doAdvance(r, deal));
   }, [deal, onFocusAgent]);
 

@@ -322,6 +322,16 @@ with the pitcher physically present, the projector should render **the asset**
 rather than the person — a robot inside a projector is two layers of mediation with
 one job between them.
 
+**AND THEN THE EASEL WAS CUT, hours later** (author, 2026-07-29: *"i'm removing
+the whole chart and frame, leaving just the pitch-bot"*). So the paragraph below
+records a decision that lasted an afternoon, and the position it overturned is the
+one that shipped: **the projector casts the pitcher, the console takes the
+arrival.** Kept because the reasoning is still the right test — a physical easel
+WOULD have been the better pitch surface if it existed — and because this is the
+fourth time in this file that a prop was designed around and then removed. The
+lesson is the one §12 already draws about cards: do not let an asset that happens
+to be in a file become the thing the design rests on.
+
 Then the model arrived carrying `Presentation_Chart` — an easel — plus a
 `Presentation_Chart_Page` quad with UVs and its own unused material, and that
 settled it the other way. **The easel takes the pitch; the projector takes the
@@ -336,6 +346,24 @@ survived three cuts `[A§12]`.
 oversized. It wasn't: that was raw mesh-accessor bounds read without the node's
 `scale: 0.01`. **Read the node transform, not the accessor, before calling a prop
 broken.**
+
+## 19. The line ceiling, and why it keeps moving
+
+VC_GAME.md carries a hard line ceiling because its predecessor reached 1,006 lines
+by welding the spec to this journal. The number has been wrong three times, always
+in the same direction:
+
+**300** — inherited from the old doc, set when the game was two archetypes and one
+surface, then carried forward unexamined while the game grew. That is the same
+"outlived its justification" failure this file documents for cards, the daily and
+the exemplar coin. **450** — measured against nine invariants, six authoring rules,
+three archetypes, two presentations. **500** — the pitch-bot decision added five
+rules and a build.
+
+Every raise so far was preceded by stripping argument that had been written into
+BOTH files, which is the rule working: the first response to "it's over" is to look
+for reasons masquerading as rules, and there have always been some. Only raise the
+number when that search comes up empty.
 
 ## 18. Smaller decisions worth not re-making
 
