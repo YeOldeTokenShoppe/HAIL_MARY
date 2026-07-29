@@ -1,7 +1,8 @@
 "use client";
 import React from "react";
 import { BACKING, SEATS } from "@/game/terminal-traders/press/questions";
-import { DESK, EUGENE, laneOwner, laneSentence } from "@/game/terminal-traders/press/desk";
+import { DESK, laneOwner, laneSentence } from "@/game/terminal-traders/press/desk";
+import { VIRGIL } from "@/game/terminal-traders/press/virgil";
 import TradingCard from "@/components/TradingCard";
 
 /*
@@ -61,7 +62,7 @@ export function answerNote(flash) {
  * whose specialism it is, and Eugene's free read. `count` is optional ("3 / 6")
  * — mobile shows it because there's no progress rail there.
  */
-export function ClaimBody({ claim, eugeneLine, eugeneCard = null, spent = [], count = null,
+export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [], count = null,
                            pressure = null, aside = "" }) {
   if (!claim) return null;
   const owner = laneOwner(claim);
@@ -97,19 +98,36 @@ export function ClaimBody({ claim, eugeneLine, eugeneCard = null, spent = [], co
         {laneSentence(claim, { spent })}
       </div>
 
-      {/* EUGENE'S FREE READ. He is a full seat now (SOCIAL) and appears in the
-          dock like everyone else — but this is his OTHER job, the one nobody
-          else has: recognition, which costs nothing because nothing is fetched.
-          The shape of the claim, then the agenda. Never whether it's true. */}
-      {/* HIS LINE ONLY — no second portrait. He is a full seat now and his card
-          is in the row below; showing it twice made him read as omnipresent
-          ("Eugene is still advising every step of the way" — author). */}
-      <div className="pu-eugene">
-        <span className="pu-eu-text">
-          <span className="pu-eu-who">{EUGENE.name.toUpperCase()} <em>· reads every claim, free</em></span>
-          <span className="pu-eu-line">{eugeneLine}</span>
-        </span>
-      </div>
+      {/* VIRGIL — the office cat, and the only voice here who isn't staff.
+          The free read used to be Eugene's, which made him the one seat in four
+          with a permanent extra power; that asymmetry was reported three times
+          through three different implementations. Moving it onto a character
+          who is obviously not a colleague dissolves it instead of justifying
+          it, and gives the tips an off switch that reads as a difficulty
+          setting rather than as disabling a co-worker.
+
+          TWO LINES, NOT ONE SENTENCE. The agenda is a resource readout and the
+          tip is flavour; concatenated they trained the eye to skip the block,
+          and the actionable half was the one being skipped. Agenda first and
+          brighter, and it is the half that never turns off. */}
+      {(virgil?.agenda || virgil?.tip) && (
+        <div className="pu-virgil">
+          <img className="pu-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+          <span className="pu-virgil-text">
+            <span className="pu-virgil-who">
+              {VIRGIL.name.toUpperCase()}
+              {onToggleTips && (
+                <button type="button" className="pu-virgil-mute" onClick={onToggleTips}
+                        title={virgil.tip ? "Stop the tips — keep the running order" : "Turn the tips back on"}>
+                  {virgil.tip ? "tips on" : "tips off"}
+                </button>
+              )}
+            </span>
+            {virgil.agenda && <span className="pu-virgil-agenda">{virgil.agenda}</span>}
+            {virgil.tip && <span className="pu-virgil-tip">{virgil.tip}</span>}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -297,14 +315,23 @@ export const PRESS_UI_CSS = `
    look like a live instruction */
 .pu-lane[data-lane="SPENT"]  { border-left-color:#ff9b6f; color:#ffb493; background:rgba(255,155,111,0.07); }
 
-.pu-eugene { display:flex; gap:9px; align-items:flex-start; margin-top:9px; padding-top:8px;
+/* VIRGIL. Warmer than the desk chrome — he is a companion, not a terminal. */
+.pu-virgil { display:flex; gap:9px; align-items:flex-start; margin-top:9px; padding-top:8px;
   border-top:1px dashed rgba(191,238,222,0.22); }
-.pu-eu-card { flex:none; line-height:0; opacity:0.92; pointer-events:none; }
-.pu-eu-text { display:flex; flex-direction:column; gap:3px; min-width:0; }
-.pu-eu-who { font:bold 10px/1.45 'Courier New',monospace; letter-spacing:0.11em; color:#bfeede; }
-.pu-eu-who em { font-style:normal; font-weight:normal; letter-spacing:0.06em;
-  color:rgba(191,238,222,0.55); }
-.pu-eu-line { font-size:12.5px; line-height:1.45; color:rgba(191,238,222,0.85); font-style:italic; }
+.pu-virgil-pic { flex:none; width:34px; height:34px; border-radius:50%; object-fit:cover;
+  border:1px solid rgba(191,238,222,0.45); background:rgba(2,16,14,0.6); }
+.pu-virgil-text { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+.pu-virgil-who { display:flex; align-items:baseline; gap:8px;
+  font:bold 10px/1.45 'Courier New',monospace; letter-spacing:0.11em; color:#bfeede; }
+.pu-virgil-mute { margin-left:auto; background:none; border:1px solid rgba(191,238,222,0.3);
+  color:rgba(191,238,222,0.6); font:inherit; font-size:8.5px; letter-spacing:0.1em;
+  padding:1px 6px; cursor:pointer; }
+.pu-virgil-mute:hover { color:#bfeede; border-color:rgba(191,238,222,0.6); }
+/* THE AGENDA NEVER TURNS OFF and leads the block — it is the only information
+   on the floor nobody else supplies, and it is what makes holding a specialist
+   a decision rather than a guess. */
+.pu-virgil-agenda { font-size:12.5px; line-height:1.4; color:#d8f7ec; font-weight:bold; }
+.pu-virgil-tip { font-size:12px; line-height:1.4; color:rgba(191,238,222,0.7); font-style:italic; }
 
 .pu-answer { padding:10px 12px; background:rgba(4,20,15,0.97); border:1.5px solid #ffd23a; }
 .pu-answer.vibes { border-color:#7a8b86; }

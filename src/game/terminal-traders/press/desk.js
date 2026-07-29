@@ -94,40 +94,14 @@ export function laneSentence(claim, { spent = [] } = {}) {
 
 // What KIND of weakness this claim would have, if it has one. Never states
 // whether it does — that would name the outcome before the reveal.
-const SHAPE_READ = {
-  [SHAPES.UNSOURCED]: [
-    "Assertion. No origin on it.",
-    "Somebody said this. He isn't saying who.",
-    "That's a claim about a claim.",
-  ],
-  [SHAPES.POSITIONED]: [
-    "He's in it. That's not nothing, it's just not evidence.",
-    "Interested party. Worth remembering.",
-    "He profits from you agreeing.",
-  ],
-  [SHAPES.SELECTIVE_WINDOW]: [
-    "A number inside a window somebody chose.",
-    "True over some period. Which one?",
-    "That's a framing, not a fact.",
-  ],
-  [SHAPES.BORROWED_CREDIBILITY]: [
-    "Somebody else's name is doing the work here.",
-    "He's standing on a document.",
-    "That's borrowed. The question is how far it reaches.",
-  ],
-  [SHAPES.UNFALSIFIABLE]: [
-    "Nothing could count against that.",
-    "Shaped so it can't be wrong.",
-    "There's no version of this he'd take back.",
-  ],
-  [SHAPES.SURVIVORSHIP]: [
-    "That's the ones that worked.",
-    "Survivors only. Where are the rest?",
-    "The sample picked itself.",
-  ],
-};
 
-// EUGENE'S SECOND SENTENCE IS THE AGENDA, NOT THE LANE.
+// THE FREE READ MOVED TO THE CAT (./virgil.js). It was Eugene's, which made him
+// the one seat in four with a permanent extra power — reported three times
+// through three different implementations before the asymmetry itself was
+// recognised as the problem. He is a plain fourth seat now.
+//
+// HISTORICAL NOTE kept because it is a rule, not a story: his second sentence
+// used to be a LANE_READ bank —
 //
 // It used to be a LANE_READ bank — "That one's onchain. Marisol can settle it."
 // — which is word for word what the colour-coded band directly above him
@@ -145,72 +119,7 @@ const SHAPE_READ = {
 // appending to the phrase produced "two more question about the tapes". Latent
 // under today's archetypes — CHART and SOCIAL never reach remaining >= 2 — so
 // it would have shipped silently the day a third social slot landed.
-const LANE_NOUN = {
-  [LANES.CHAIN]: ["money question", "money questions"],
-  [LANES.RECORD]: ["paperwork question", "paperwork questions"],
-  [LANES.CHART]: ["question about the tape", "questions about the tape"],
-  [LANES.SOCIAL]: ["question about the story", "questions about the story"],
-};
 
-const COUNT_WORD = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven"];
-const countWord = (n) => COUNT_WORD[n] ?? String(n);
-
-/**
- * What's still coming, in Eugene's voice. Pure in (claim, spent, remaining) —
- * `remaining` comes from pressRun.laneOutlook, which counts LANES ONLY and so
- * cannot leak the branch.
- */
-export function eugeneAgenda(claim, { spent = [], remaining = 0 } = {}) {
-  const owner = laneOwner(claim);
-
-  // A claim nobody specialises in (LANES.SHAPE — unused by today's archetypes,
-  // retained for future ones). Everyone answers it shallowly or not at all.
-  if (!owner) {
-    if (remaining === 0) return "Nobody's the expert on that one, and there's nothing left after it.";
-    return `Nobody's the expert on that one. ${countWord(remaining)} left that somebody is.`;
-  }
-
-  const [one, many] = LANE_NOUN[claim.lane];
-  const noun = remaining === 1 ? one : many;
-
-  // BUG 2 — Eugene owns SOCIAL, so on his own lane he is talking about himself,
-  // and the third-person template produced "That was the last one, and me was
-  // already spent." It shipped, in 192 of 400 yield-mirage seeds. The half-done
-  // `${self ? "was" : "was"}` ternary left behind here was the tell: the
-  // self-reference case was started and abandoned. First person, properly.
-  const self = owner.id === SEATS.EUGENE;
-
-  // The specialist for this lane is already spent. Anyone else you send still
-  // ANSWERS — they just answer shallowly — so this is a loss of depth, not a
-  // dead end, and the copy has to say that or it's the old lie in a new place.
-  if (spent.includes(owner.id)) {
-    if (remaining === 0) {
-      return self
-        ? "That was the last one, and you'd already sent me."
-        : `That was the last one, and ${owner.name} was already spent.`;
-    }
-    return `${countWord(remaining)} more ${noun} after this, and only shallow looks left.`;
-  }
-
-  if (remaining === 0) {
-    return self
-      ? `Last ${one} you'll get. Send me now, or don't.`
-      : `Last ${one} you'll get. Deep look now, or never.`;
-  }
-  return `${countWord(remaining)} more ${noun} after this one.`;
-}
-
-/**
- * Eugene's free read: the SHAPE of the claim, then the agenda. Deterministic in
- * the claim so a replay is identical. `spent` and `remaining` come from the run
- * — see laneSentence for why state has to be threaded rather than assumed.
- */
-export function eugeneRead(claim, { spent = [], remaining = 0, salt = 0 } = {}) {
-  if (!claim) return "";
-  const shape = SHAPE_READ[claim.shape] || ["Hm."];
-  const pick = shape[(claim.id.length + salt) % shape.length];
-  return `${pick} ${eugeneAgenda(claim, { spent, remaining })}`.trim();
-}
 
 // HOW HE CARRIES IT AFTER YOU'VE HAD A GO AT HIM.
 //

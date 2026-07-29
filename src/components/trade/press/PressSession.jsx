@@ -2,7 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, dailySeed } from "@/game/terminal-traders/press/instanceDeal";
 import { BACKING, SEATS, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
-import { DESK, EUGENE, eugeneRead, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
+import { DESK, EUGENE, laneOwner, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
+import { virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
@@ -276,11 +277,14 @@ export default function PressSession({
     [mood.band, claim, run.claimIndex]);
   // Reads the run, not just the claim — once you've spent the lane's owner,
   // pointing at them is the same wrong instruction the lane band was giving.
-  const eugeneLine = useMemo(
-    () => (claim ? eugeneRead(claim, { spent: run.advisersSpent, remaining: outlook.remaining }) : ""),
-    [claim, run.advisersSpent, outlook.remaining]);
-  const eugeneCard = useMemo(
-    () => deskCards.find((d) => d.m.id === EUGENE.id)?.data ?? null, [deskCards]);
+  // VIRGIL, not a seat. `tips` is the player's — the agenda half ignores it.
+  const [tips, setTips] = useState(true);
+  const virgil = useMemo(
+    () => (claim ? virgilRead(claim, {
+      owner: laneOwner(claim), spent: run.advisersSpent,
+      remaining: outlook.remaining, tips,
+    }) : null),
+    [claim, run.advisersSpent, outlook.remaining, tips]);
   const readout = useMemo(() => callReadout(slider), [slider]);
   const read = useMemo(() => coverageScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
@@ -421,7 +425,7 @@ export default function PressSession({
               pressUi — this file owns only WHERE the column sits. */}
           <div className="ps-readcol">
             <div className={`ps-fade ${claimVisible ? "in" : ""}`}>
-              <ClaimBody claim={claim} eugeneLine={eugeneLine} eugeneCard={eugeneCard}
+              <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
                        pressure={mood} aside={aside}
                          spent={run.advisersSpent} />
             </div>

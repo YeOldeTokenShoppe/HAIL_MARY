@@ -101,11 +101,16 @@ export const AGENT_CAMERA_SETTINGS = {
     lookAtPos: new THREE.Vector3(1.615, -0.305, -1.015),
     orbitCenter: null,
   },
-  // Curtain-call framing for the reveal flow — wide, slightly elevated,
-  // fits all four characters on the platform with StageProps hidden.
-  // Placeholder; tune live with ?tune=1.
+  // Curtain-call framing for the reveal flow — wide, near floor level, fits
+  // all four characters on the platform with StageProps hidden. Consumed via
+  // externalFocusAgent='Stage' (see trade/page.js). Tune live with ?tune=1.
+  //
+  // Camera pitch is driven by cameraPos.y against lookAtPos.y over the 3.2
+  // horizontal distance: y 0.7 = ~17° looking down, 0.3 = ~11°, 0.0 = ~5°,
+  // -0.3 = dead level, -0.6 = ~5° looking up. The stage floor sits at world
+  // y ≈ -1.6 and the characters' heads at ≈ -0.3, so lookAtPos is head height.
   Stage: {
-    cameraPos: new THREE.Vector3(0, 0.7, 3.2),
+    cameraPos: new THREE.Vector3(0, -0.9, 3.5),
     lookAtPos: new THREE.Vector3(0, -0.3, 0),
     orbitCenter: null,
   },
@@ -568,6 +573,17 @@ function drawUnicornMouth(ctx, W, H, open, interiorHex, toothHex, teeth) {
 // from this map default to 1; 'abstained' never triggers the follow at all.
 const REVEAL_HEAD_FOLLOW = { aligned: 1, missed: 0.5 };
 
+// Cat clips during which the head-look-at-camera is allowed to take over.
+// Everything else — cat_cleaning_face, cat_scratching_self, any future
+// behaviour clip — drives the head itself: cleaning_face brings the head DOWN
+// to meet the paw, and pinning it at the camera cancels exactly that motion.
+// Allow-list rather than a block-list so new behaviour clips own their head by
+// default; only the neutral poses cede it.
+const CAT_HEAD_FREE_RE = /^cat_(sitting_idle|loaf)$/i;
+// Per-frame ramp for that hand-off. ~0.05/frame ≈ 0.3s to settle, matching the
+// cycle's 0.6s crossfade, so entering/leaving a groom doesn't pop.
+const CAT_HEAD_FOLLOW_RAMP = 0.05;
+
 const CyborgTempleScene = ({
   onLoad,
   position = [0, 0, 0],
@@ -604,6 +620,8 @@ const CyborgTempleScene = ({
   const smartPhoneGateRef = useRef(null); // { action, showTime, hideTime } while demon_phone plays; drives the phone's per-frame visibility window
   const monkCouncilSeqRef = useRef({ active: false, timer: null }); // monk council argue↔standPray alternation
   const demonRevealSeqRef = useRef({ active: false, timer: null }); // demon missed/abstained reaction↔stand-idle alternation
+  const catRevealSeqRef = useRef({ active: false, timer: null }); // cat curtain-call sit/groom cycle
+  const bridgeTimersRef = useRef({}); // { charName: timeoutId } for the typing↔idle bridge hand-off
   const [loadedModel, setLoadedModel] = useState(null);
   const [detectedMobile, setDetectedMobile] = useState(false);
   const xCandleNodesRef = useRef([]); // Sorted array of XCandle01* root nodes
@@ -810,6 +828,9 @@ const CyborgTempleScene = ({
     Demon:     { aligned: /demon_clapping/i,   missed: /demon_disappointed/i,  abstained: /demon_shrug/i,      council: [/demon_phone/i, /demon_shrug/i] },
     Detective: { aligned: /detective_clap/i,   missed: /detective_defeat/i,    abstained: /detective_stand/i,  council: [/detective_argue/i, /detective_stand/i] },
     RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i, abstained: /unicorn_stand/i,    council: [/unicorn_argue/i, /unicorn_stand/i] },
+    // Virgil sits up out of his loaf for the curtain call — same clip for every
+    // outcome; the cat has no opinion on the verdict.
+    Fluffy:    { aligned: /^cat_sitting_idle$/i, missed: /^cat_sitting_idle$/i, abstained: /^cat_sitting_idle$/i, council: /^cat_sitting_idle$/i },
   };
 
   // Two-clip alternation for the curtain call / council lineups. A single
@@ -839,18 +860,24 @@ const CyborgTempleScene = ({
     seq.timer = null;
     seq.active = false;
   };
-  const startAlternateSequence = ({
-    actions, state, seqRef, aPattern, bPattern, aLoops = 1, bLoops = 2,
-  }) => {
-    if (!actions || !state || !seqRef?.current) return false;
-    const aKey = Object.keys(actions).find((k) => aPattern.test(k));
-    const bKey = Object.keys(actions).find((k) => bPattern.test(k));
-    // Need two DISTINCT clips; if either is missing (or both patterns resolve
-    // to the same action) let the caller plain-loop instead.
-    if (!aKey || !bKey || aKey === bKey) return false;
+  // Generalised to N steps: each step is {pattern, loops} and the cycle runs
+  // step0 -> step1 -> ... -> wrap. Two steps is the common case (Monk council,
+  // Demon reveal); the cat uses three.
+  const startClipCycle = ({ actions, state, seqRef, steps }) => {
+    if (!actions || !state || !seqRef?.current || !steps?.length) return false;
+
+    // Resolve every step up front — if ANY clip is missing, bail entirely so
+    // the caller can plain-loop rather than run a half-broken cycle.
+    const resolved = [];
+    for (const st of steps) {
+      const key = Object.keys(actions).find((k) => st.pattern.test(k));
+      if (!key) return false;
+      resolved.push({ key, action: actions[key], loops: st.loops ?? 1 });
+    }
+    // Fewer than two DISTINCT clips means there is nothing to cycle between.
+    if (new Set(resolved.map((r) => r.key)).size < 2) return false;
+
     stopAlternateSequence(seqRef);
-    const a = actions[aKey];
-    const b = actions[bKey];
     const seq = seqRef.current;
     const XF = SEQ_XFADE;
 
@@ -868,34 +895,133 @@ const CyborgTempleScene = ({
     };
 
     seq.active = true;
-    // Switch to `next` for `loops` loops, then chain to `after`. Start the
-    // crossfade XF early so it completes right as the loop count is reached.
-    const holdThenSwitch = (nextAction, nextKey, loops, after) => {
-      // Floor at fade-in + a beat at full weight. The old 200ms floor let a
-      // clip shorter than ~0.8s start fading OUT before its 0.6s fade-IN had
-      // finished, so it never reached weight 1 and barely registered.
+    // Hold step i for its loop count, then chain to the next. The crossfade
+    // starts XF early so it completes exactly as the loop count is reached.
+    const runStep = (i, prevAction) => {
+      const cur = resolved[i];
+      play(cur.action, prevAction);
+      state.currentAnimation = cur.key;
+      // Floor at fade-in + a beat at full weight. A 200ms floor let a clip
+      // shorter than ~0.8s start fading OUT before its fade-IN had finished,
+      // so it never reached weight 1 and barely registered.
       const holdMs = Math.max(
         XF * 1000 + 250,
-        (nextAction.getClip().duration * loops - XF) * 1000,
+        (cur.action.getClip().duration * cur.loops - XF) * 1000,
       );
       seq.timer = setTimeout(() => {
         if (!seq.active) return;
-        after();
+        runStep((i + 1) % resolved.length, cur.action);
       }, holdMs);
-      state.currentAnimation = nextKey;
     };
-    const toB = () => { play(b, a); holdThenSwitch(b, bKey, bLoops, toA); };
-    const toA = () => { play(a, b); holdThenSwitch(a, aKey, aLoops, toB); };
 
-    // Fade out any unrelated clip on this character, then open with A.
+    // Fade out anything on this character that is not part of the cycle.
+    const inCycle = new Set(resolved.map((r) => r.action));
     Object.values(actions).forEach((x) => {
-      if (x !== a && x !== b && x.isRunning && x.isRunning()) x.fadeOut(XF);
+      if (!inCycle.has(x) && x.isRunning && x.isRunning()) x.fadeOut(XF);
     });
-    play(a, null);
-    holdThenSwitch(a, aKey, aLoops, toB);
+
+    runStep(0, null);
     state.isPlayingSpecial = true;
     state.nextSwitchDelay = 999999;
     state.lastSwitchTime = Date.now();
+    return true;
+  };
+
+  // Back-compat two-clip wrapper — most callers only alternate A/B.
+  const startAlternateSequence = ({
+    actions, state, seqRef, aPattern, bPattern, aLoops = 1, bLoops = 2,
+  }) => startClipCycle({
+    actions, state, seqRef,
+    steps: [{ pattern: aPattern, loops: aLoops }, { pattern: bPattern, loops: bLoops }],
+  });
+
+  // ── Authored typing↔idle bridges ────────────────────────────────────────
+  // Each desk rig ships a 1.03s *_to_idle clip. Crossfading typing→idle
+  // directly drags the hands THROUGH the desk mesh; the bridge carries them
+  // clear. Authored in the typing→idle direction, so idle→typing plays the
+  // same clip time-reversed (timeScale -1, starting at its end).
+  //
+  // NAMING HAZARD: these names contain BOTH "typing" and "idle", so they match
+  // every loop pool and typing/idle lookup in this file — unguarded, a bridge
+  // gets randomly picked AS a loop clip and the character twitches on a 1.03s
+  // cycle forever. `detective_typing_to_idle` matches the Detective's typing
+  // AND idle patterns. Everything that classifies a clip by typing/idle must
+  // exclude TRANSITION_RE. The bind-pose-skip pass in useFrame must skip them
+  // too — it rewrites action.time every frame, which would pin the one-shot
+  // and the bridge would never land.
+  const TRANSITION_RE = /_to_idle$/i;
+  const BRIDGE_PATTERNS = {
+    Monk:      /^typing_monk_to_idle$/i,
+    Demon:     /^demon_typing_to_idle$/i,
+    Detective: /^detective_typing_to_idle$/i,
+    RL80:      /^unicorn_typing_to_idle$/i,
+  };
+  const BRIDGE_XFADE = 0.25;
+  const isTypingClip = (n) => /typ/i.test(n) && !TRANSITION_RE.test(n);
+  const isIdleClip = (n) => /idle/i.test(n) && !TRANSITION_RE.test(n);
+  // A desk swap is exactly typing→idle or idle→typing; anything else (specials,
+  // reactions, the standing curtain-call clips) gets the plain crossfade.
+  const isDeskSwap = (fromKey, toKey) =>
+    !!fromKey && !!toKey &&
+    ((isTypingClip(fromKey) && isIdleClip(toKey)) ||
+     (isIdleClip(fromKey) && isTypingClip(toKey)));
+
+  const stopBridge = (agentId) => {
+    const t = bridgeTimersRef.current[agentId];
+    if (t) clearTimeout(t);
+    bridgeTimersRef.current[agentId] = null;
+  };
+
+  // Play the bridge once, then hand off to the destination loop. Returns true
+  // when it took over (caller must NOT also run its own crossfade); false to
+  // fall back to the direct swap (clip missing, etc.).
+  const playTypingIdleBridge = ({ agentId, actions, state, toKey, onSettled }) => {
+    const pattern = BRIDGE_PATTERNS[agentId];
+    if (!pattern || !actions || !state) return false;
+    const bridgeKey = Object.keys(actions).find((k) => pattern.test(k));
+    const bridge = bridgeKey && actions[bridgeKey];
+    const target = actions[toKey];
+    if (!bridge || !target || bridge === target) return false;
+
+    const XF = BRIDGE_XFADE;
+    const dur = bridge.getClip().duration;
+    const forward = isIdleClip(toKey); // authored typing→idle
+
+    Object.values(actions).forEach((a) => {
+      if (a !== bridge && a.isRunning && a.isRunning()) a.fadeOut(XF);
+    });
+
+    bridge.reset();                       // reset() does NOT touch timeScale
+    bridge.setLoop(THREE.LoopOnce, 1);
+    bridge.clampWhenFinished = true;
+    bridge.setEffectiveTimeScale(forward ? 1 : -1);
+    bridge.time = forward ? 0 : dur;      // reversed starts at the clip's end
+    bridge.setEffectiveWeight(1);
+    bridge.fadeIn(XF);
+    bridge.play();
+
+    // Park the alternation while the bridge runs, so its own timer can't fire
+    // a second switch mid-bridge.
+    state.currentAnimation = bridgeKey;
+    state.isPlayingSpecial = true;
+    state.nextSwitchDelay = 999999;
+    state.lastSwitchTime = Date.now();
+
+    stopBridge(agentId);
+    bridgeTimersRef.current[agentId] = setTimeout(() => {
+      bridgeTimersRef.current[agentId] = null;
+      target.reset();
+      target.setLoop(THREE.LoopRepeat);
+      target.setEffectiveWeight(1);
+      target.fadeIn(XF);
+      target.play();
+      bridge.fadeOut(XF);
+      state.currentAnimation = toKey;
+      state.isPlayingSpecial = false;
+      state.lastSwitchTime = Date.now();
+      if (onSettled) onSettled();
+    }, Math.max(100, (dur - XF) * 1000));
+
     return true;
   };
 
@@ -931,6 +1057,19 @@ const CyborgTempleScene = ({
     abstained: /demon_shrug/i,
   };
 
+  // Virgil's curtain-call loop: he sits, washes his face, has a scratch, and
+  // goes back to sitting. Same cycle for every outcome — the cat has no
+  // opinion on the verdict. Durations are 11.67 / 5.70 / 2.90s, so one pass of
+  // each is a ~20s cycle that's ~58% sitting; grooming reads as punctuation
+  // rather than a busy animal. Falls back to a plain cat_sitting_idle loop if
+  // any clip is missing.
+  const CAT_REVEAL_CYCLE = [
+    { pattern: /^cat_sitting_idle$/i,   loops: 1 },
+    { pattern: /^cat_cleaning_face$/i,  loops: 1 },
+    { pattern: /^cat_sitting_idle$/i,   loops: 1 },
+    { pattern: /^cat_scratching_self$/i, loops: 1 },
+  ];
+
   const applyCharacterReaction = (agentId, outcome) => {
     // console.log('[reaction-debug] entered', { agentId, outcome });
     const pattern = REACTION_PATTERNS[agentId]?.[outcome];
@@ -942,7 +1081,8 @@ const CyborgTempleScene = ({
       agentId === 'Monk'      ? monkAnimStateRef.current      :
       agentId === 'Demon'     ? demonAnimStateRef.current     :
       agentId === 'Detective' ? detectiveAnimStateRef.current :
-      agentId === 'RL80'      ? rl80AnimStateRef.current      : null
+      agentId === 'RL80'      ? rl80AnimStateRef.current      :
+      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    : null
     );
     if (!actions || !state) {
       // console.log('[reaction-debug] missing actions or state', { agentId, hasActions: !!actions, hasState: !!state });
@@ -1017,6 +1157,17 @@ const CyborgTempleScene = ({
       }
     }
 
+    // Focusing the cat pauses every one of his actions (see
+    // applyCharacterFocusAnimation) — a paused action still blends its frozen
+    // pose but never advances, so the reaction would sit dead. Un-pause first.
+    if (agentId === 'Fluffy') {
+      Object.values(actions).forEach((a) => { a.paused = false; });
+    }
+
+    // A typing↔idle bridge may still be mid-flight with a pending hand-off
+    // timer; it would fire during the curtain call and overwrite the reaction.
+    stopBridge(agentId);
+
     // Monk in council, and the Demon on missed/abstained, get a two-clip
     // alternation instead of a plain loop. If it can't run (missing a clip),
     // tear down any stale sequence and fall through to the normal single-clip
@@ -1024,6 +1175,15 @@ const CyborgTempleScene = ({
     if (agentId === 'Monk') {
       if (outcome === 'council' && startMonkArgueSequence()) return;
       stopMonkArgueSequence();
+    }
+    if (agentId === 'Fluffy') {
+      if (startClipCycle({
+        actions,
+        state,
+        seqRef: catRevealSeqRef,
+        steps: CAT_REVEAL_CYCLE,
+      })) return;
+      stopAlternateSequence(catRevealSeqRef);
     }
     if (agentId === 'Demon') {
       const seqPattern = DEMON_SEQ_PATTERNS[outcome];
@@ -1092,8 +1252,13 @@ const CyborgTempleScene = ({
     Demon:     /demon_idle/i,
     Detective: /detective_idle/i,
     RL80:      /unicorn_idle/i,
+    Fluffy:    /^cat_loaf$/i,
   };
   const restoreCharacterIdle = (agentId) => {
+    stopBridge(agentId); // no stale bridge hand-off after the curtain call
+    // Cat sit/groom cycle chains setTimeouts — kill it or it keeps flipping
+    // clips after the reveal and overwrites the restored cat_loaf.
+    if (agentId === 'Fluffy') stopAlternateSequence(catRevealSeqRef);
     // Leaving the reveal — always stow the Demon's phone (it only shows during
     // demon_phone). Done before the guards so it hides even if idle can't resolve.
     if (agentId === 'Demon') {
@@ -1113,7 +1278,8 @@ const CyborgTempleScene = ({
       agentId === 'Monk'      ? monkAnimStateRef.current      :
       agentId === 'Demon'     ? demonAnimStateRef.current     :
       agentId === 'Detective' ? detectiveAnimStateRef.current :
-      agentId === 'RL80'      ? rl80AnimStateRef.current      : null
+      agentId === 'RL80'      ? rl80AnimStateRef.current      :
+      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    : null
     );
     if (!pattern || !actions || !state) return;
     const idleKey = Object.keys(actions).find((a) => pattern.test(a));
@@ -1138,7 +1304,9 @@ const CyborgTempleScene = ({
   const applyCharacterFocusAnimation = (agentId, mode = 'idle') => {
     const crossfadeTo = (actions, state, pattern) => {
       if (!actions || !state) return;
-      const targetKey = Object.keys(actions).find((a) => pattern.test(a));
+      // Never resolve a focus pose to a one-shot bridge (their names contain
+      // both "typing" and "idle", so they match several of these patterns).
+      const targetKey = Object.keys(actions).find((a) => pattern.test(a) && !TRANSITION_RE.test(a));
       if (!targetKey) {
         console.warn('[focus anim] pattern not matched for', agentId, mode, 'available:', Object.keys(actions));
         return;
@@ -1651,12 +1819,25 @@ const CyborgTempleScene = ({
   // x/y/z to taste. Rotation is in radians; 0 means the character keeps
   // their authored facing, π flips them around. The empties' world
   // transforms get overridden during reveal and restored after.
+  // Y that rests Virgil on the stage floor (authored desk-partition y is 0.70).
+  // Tuned by eye against ?reveal=aligned. Do NOT try to derive it from the mesh
+  // bounding box — the cat is skinned and its bind-pose bbox sits ~0.65 ABOVE
+  // the node origin, which yields a wildly-too-low value (-0.32 put him under
+  // the floor). Bone-to-bone measurement against the Monk's lowest bone got
+  // close (0.10); the rest was eyeballed.
+  const CAT_FLOOR_Y = 0.23;
+
   const STAGE_LINEUP = useMemo(() => ({
     Monk_empty:      { position: [-0.75, 0.18, 0], rotation: [0, 0, 0] },
     Demon_Empty:     { position: [-0.25, 0.18, 0], rotation: [0, 0, 0] },
     Detective_Empty: { position: [ 0.25, 0.18, 0], rotation: [0, 0, 0] },
     RL80_Empty:      { position: [ 0.75, 0.3,  0], rotation: [0, Math.PI, 0] },
     Unicorn_Empty:   { position: [ 0.75, 0.3,  0], rotation: [0, Math.PI, 0] },
+    // Virgil sits on the desk partition during gameplay (authored y 0.70);
+    // StageProps are hidden for the reveal, so without this he floats in
+    // mid-air at the right edge. Only y changes — his authored x/z already
+    // put him at the carpet's right edge, beside the unicorn.
+    Cat_Empty:       { position: [ 1.33, CAT_FLOOR_Y, 0.30], rotation: [0, 0, 0] },
   }), []);
 
   // Council (pre-outcome live-argument) uses a semi-circle instead of the flat
@@ -1672,6 +1853,7 @@ const CyborgTempleScene = ({
     Detective_Empty: { position: [ 0.29, 0.18, -0.27], rotation: [0, -0.23, 0] },
     RL80_Empty:      { position: [ 0.84, 0.30,  0.00], rotation: [0, Math.PI - 0.70, 0] },
     Unicorn_Empty:   { position: [ 0.84, 0.30,  0.00], rotation: [0, Math.PI - 0.70, 0] },
+    Cat_Empty:       { position: [ 1.33, CAT_FLOOR_Y, 0.30], rotation: [0, 0, 0] },
   }), []);
 
   useEffect(() => {
@@ -1708,9 +1890,10 @@ const CyborgTempleScene = ({
       obj.rotation.set(...target.rotation);
     });
 
-    ['Monk', 'Demon', 'Detective', 'RL80'].forEach((agentId) => {
+    ['Monk', 'Demon', 'Detective', 'RL80', 'Fluffy'].forEach((agentId) => {
       applyCharacterReaction(agentId, revealMode);
     });
+
 
     return () => {
       transformSnapshot.forEach((orig, obj) => {
@@ -1720,7 +1903,7 @@ const CyborgTempleScene = ({
       // Wind down each character's reaction so the regular animation
       // alternation can resume. Without this, BACK TO SERVICES leaves
       // every character looping their curtain-call clip forever.
-      ['Monk', 'Demon', 'Detective', 'RL80'].forEach((agentId) => {
+      ['Monk', 'Demon', 'Detective', 'RL80', 'Fluffy'].forEach((agentId) => {
         restoreCharacterIdle(agentId);
       });
       // Allow the Monk hail/beckon attract loop to re-engage on the next
@@ -1987,6 +2170,16 @@ const CyborgTempleScene = ({
     nextSwitchDelay: Math.random() * 10000 + 8000,
   });
 
+  // Cat (Virgil) animation state. He has no random alternation — this exists
+  // so applyCharacterReaction / restoreCharacterIdle can track him like the
+  // other characters during the curtain call.
+  const fluffyAnimStateRef = useRef({
+    currentAnimation: 'cat_loaf',
+    lastSwitchTime: 0,
+    nextSwitchDelay: 999999,
+    isPlayingSpecial: false,
+  });
+
   // RL80 animation state
   const rl80AnimStateRef = useRef({
     currentAnimation: 'Typing',
@@ -2209,7 +2402,7 @@ const CyborgTempleScene = ({
       const animDuration = fistPump.getClip().duration * 1000;
       setTimeout(() => {
         const loopAnims = Object.keys(demonActions).filter(a =>
-          /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a));
+          /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a) && !TRANSITION_RE.test(a));
         const returnAnim = loopAnims.length > 0
           ? loopAnims[Math.floor(Math.random() * loopAnims.length)]
           : Object.keys(demonActions)[0];
@@ -2368,8 +2561,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v94_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v94.glb";
+    let modelPath = "/models/RL80_4anims_v96_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v96.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -2769,11 +2962,18 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             null;
           captureHeadRestPose(monkHeadBoneRef);
         }
-        else if (child.name === 'Fluffy_Empty') {
+        // The cat's root empty was 'Virgil_Empty' in older exports and is
+        // 'Cat_Empty' (containing 'Virgil') from v95 on — accept either. The
+        // internal character slot stays 'Fluffy': the focus/click/head-track
+        // plumbing keys off that name throughout this file.
+        else if (child.name === 'Cat_Empty' || child.name === 'Virgil_Empty') {
           animatedCharacters['Fluffy'] = child;
-          // Find head bone in Fluffy skeleton for look-at-camera
+          // Head bone for look-at-camera. GLTFLoader suffixes duplicate node
+          // names, so the cat's 'head' may load as head_1/head_2 depending on
+          // which skeleton was traversed first — match the base name plus any
+          // numeric suffix rather than hard-coding 'head_1'.
           child.traverse((obj) => {
-            if (obj.isBone && obj.name === 'head_1' && !fluffyHeadBoneRef.current) {
+            if (obj.isBone && /^head(_\d+)?$/i.test(obj.name) && !fluffyHeadBoneRef.current) {
               fluffyHeadBoneRef.current = obj;
             }
           });
@@ -3003,8 +3203,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           }
           // Standard Root-based animations for RL80 only
           // (Demon uses Root.001|* / Pelvis animations, Monk uses *_monk animations)
-          // Fluffy animations (sit_idle, or any _fluffy suffixed)
-          else if (animName === 'sit_idle' || animName.endsWith('_fluffy')) {
+          // Cat (Virgil) animations. v95 ships a 16-clip cat_* set rooted at
+          // bone 'spine'; older exports used sit_idle / *_fluffy. Without this
+          // the cat_* clips matched no rule at all and the cat sat in bind pose.
+          else if (/^cat[_ ]/i.test(animName) || animName === 'sit_idle' || animName.endsWith('_fluffy')) {
             targetCharacters = ['Fluffy'];
           }
           // V2 model: unicorn rig clips (Typing_Unicorn, Unicorn_Idle, etc.)
@@ -3146,8 +3348,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             // Prefer any unicorn typing/idle (V2 rig — handles both
             // Typing_Unicorn and Unicorn_Typing naming), then the original
             // Typing/Idle clips, then anything available.
-            const unicornTyping = availableAnims.find(a => /unicorn/i.test(a) && /typing/i.test(a));
-            const unicornIdle = availableAnims.find(a => /unicorn/i.test(a) && /idle/i.test(a));
+            const unicornTyping = availableAnims.find(a => /unicorn/i.test(a) && /typing/i.test(a) && !TRANSITION_RE.test(a));
+            const unicornIdle = availableAnims.find(a => /unicorn/i.test(a) && /idle/i.test(a) && !TRANSITION_RE.test(a));
             if (unicornTyping) {
               defaultAnimName = unicornTyping;
             } else if (unicornIdle) {
@@ -3162,7 +3364,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           } else if (charName === 'Demon') {
             // Newer export uses demon_typing / demon_idle naming; tolerate
             // the legacy Root.001|* names for older models still in use.
-            const demonTyping = availableAnims.find(a => /demon.*typ/i.test(a));
+            const demonTyping = availableAnims.find(a => /demon.*typ/i.test(a) && !TRANSITION_RE.test(a));
             const demonIdle = availableAnims.find(a => /demon_idle/i.test(a));
             if (demonTyping) {
               defaultAnimName = demonTyping;
@@ -3184,14 +3386,18 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               defaultAnimName = availableAnims[0];
             }
           } else if (charName === 'Fluffy') {
-            if (charActions['sit_idle']) {
+            // Virgil sits in the 'loaf' pose by default.
+            const loafKey = availableAnims.find(a => /^cat_loaf$/i.test(a));
+            if (loafKey) {
+              defaultAnimName = loafKey;
+            } else if (charActions['sit_idle']) {
               defaultAnimName = 'sit_idle';
             } else {
               defaultAnimName = availableAnims[0];
             }
           } else if (charName === 'Detective') {
             // Tolerate armature-prefixed names from Blender exports.
-            const typingKey = availableAnims.find(a => /detective.*typ/i.test(a));
+            const typingKey = availableAnims.find(a => /detective.*typ/i.test(a) && !TRANSITION_RE.test(a));
             defaultAnimName = typingKey || availableAnims[0];
           }
           
@@ -3627,7 +3833,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         if (child.name === 'Demon' || child.name === 'Demon_empty' || child.name === 'Demon_Empty' ||
             child.name === 'Devil_empty' || child.name === 'Devil_Empty' ||
             child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01' ||
-            child.name === 'Fluffy_Empty' ||
+            child.name === 'Virgil_Empty' ||
             child.name === 'Detective_Empty') {
 
           // Normalize agentId to consistent names
@@ -3635,7 +3841,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           if (child.name === 'Demon' || child.name === 'Demon_empty' || child.name === 'Demon_Empty' ||
               child.name === 'Devil_empty' || child.name === 'Devil_Empty') agentId = 'Demon';
           else if (child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01') agentId = 'Monk';
-          else if (child.name === 'Fluffy_Empty') agentId = 'Fluffy';
+          else if (child.name === 'Virgil_Empty') agentId = 'Fluffy';
           else if (child.name === 'Detective_Empty') agentId = 'Detective';
 
           const setMechClickableData = (obj) => {
@@ -4225,7 +4431,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         demonState.focusSequenceListener = null;
       }
       if (!demonActions) return;
-      const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a));
+      const loopAnims = Object.keys(demonActions).filter(a => /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a) && !TRANSITION_RE.test(a));
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
       const prevAction = demonActions[demonState.currentAnimation];
       const returnAction = demonActions[returnAnim];
@@ -4387,7 +4593,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               child.getWorldPosition(pos);
             }
             
-            if (child.name === 'Demon' || child.name === 'Monk_empty' || child.name === 'Fluffy_Empty') {
+            if (child.name === 'Demon' || child.name === 'Monk_empty' || child.name === 'Virgil_Empty') {
               const pos = new THREE.Vector3();
               child.getWorldPosition(pos);
             }
@@ -5727,7 +5933,9 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       const charActions = actionsRef.current?.[charName];
       if (!charActions) return;
       Object.keys(charActions).forEach((name) => {
-        if (!/typ|idle|clap/i.test(name) || /wav/i.test(name)) return;
+        // TRANSITION_RE clips are one-shot bridges — rewriting their time here
+        // every frame would pin them and they'd never reach their end.
+        if (!/typ|idle|clap/i.test(name) || /wav/i.test(name) || TRANSITION_RE.test(name)) return;
         const action = charActions[name];
         if (!action.isRunning() || action.paused) return;
         const dur = action.getClip().duration;
@@ -5806,7 +6014,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // (demon_stand_idle) can't be drawn into the seated desk rotation
         // just because its name contains "idle".
         const loopAnimations = availableAnimations.filter(a =>
-          /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a));
+          /typing|idle/i.test(a) && !/sit_idle|stand/i.test(a) && !TRANSITION_RE.test(a));
         const specialPattern = jackpotOnlyFistPump
           ? /laughing/i
           : /fistpump|laughing/i;
@@ -5835,7 +6043,25 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         const currentAction = demonActions[demonState.currentAnimation];
         const nextAction = demonActions[nextAnimation];
 
-        if (nextAction) {
+        // typing↔idle goes through the authored bridge so the hands clear the
+        // desk; every other switch (specials) keeps the plain crossFadeTo.
+        // NB: must not `return` here — this runs inside useFrame, and bailing
+        // would skip the other three characters plus all head-tracking.
+        const demonBridged =
+          isDeskSwap(demonState.currentAnimation, nextAnimation) &&
+          playTypingIdleBridge({
+            agentId: 'Demon',
+            actions: demonActions,
+            state: demonState,
+            toKey: nextAnimation,
+            onSettled: () => {
+              demonState.nextSwitchDelay = /idle/i.test(nextAnimation)
+                ? Math.random() * 3000 + 4000
+                : Math.random() * 10000 + 8000;
+            },
+          });
+
+        if (!demonBridged && nextAction) {
           nextAction.reset();
           if (specialAnimations.includes(nextAnimation)) {
             nextAction.setLoop(THREE.LoopOnce, 1);
@@ -5881,17 +6107,21 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           }
         }
 
-        demonState.currentAnimation = nextAnimation;
+        // Skipped while bridging — playTypingIdleBridge parks these itself and
+        // its hand-off restores them when the bridge lands.
+        if (!demonBridged) {
+          demonState.currentAnimation = nextAnimation;
 
-        if (loopAnimations.includes(nextAnimation)) {
-          demonState.nextSwitchDelay = /idle/i.test(nextAnimation)
-            ? Math.random() * 3000 + 4000
-            : Math.random() * 10000 + 8000;
-        } else {
-          demonState.nextSwitchDelay = 999999;
+          if (loopAnimations.includes(nextAnimation)) {
+            demonState.nextSwitchDelay = /idle/i.test(nextAnimation)
+              ? Math.random() * 3000 + 4000
+              : Math.random() * 10000 + 8000;
+          } else {
+            demonState.nextSwitchDelay = 999999;
+          }
+
+          demonState.lastSwitchTime = currentTime;
         }
-
-        demonState.lastSwitchTime = currentTime;
       }
     }
 
@@ -5916,8 +6146,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         const detectiveActions = actionsRef.current['Detective'];
         // Tolerate Blender's armature-prefixed names (e.g.
         // "Armature.001|detective_typing") by matching on substring.
-        const typingKey = Object.keys(detectiveActions).find(k => /detective.*typ/i.test(k));
-        const idleKey = Object.keys(detectiveActions).find(k => /detective.*idle/i.test(k));
+        const typingKey = Object.keys(detectiveActions).find(k => /detective.*typ/i.test(k) && !TRANSITION_RE.test(k));
+        const idleKey = Object.keys(detectiveActions).find(k => /detective.*idle/i.test(k) && !TRANSITION_RE.test(k));
         const typing = typingKey && detectiveActions[typingKey];
         const idle = idleKey && detectiveActions[idleKey];
 
@@ -5929,16 +6159,29 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           const toAction = isOnTyping ? idle : typing;
           const toKey = isOnTyping ? idleKey : typingKey;
 
-          fromAction.fadeOut(0.5);
-          toAction.reset();
-          toAction.setLoop(THREE.LoopRepeat);
-          toAction.setEffectiveWeight(1);
-          toAction.fadeIn(0.5);
-          toAction.play();
+          // Route through the authored bridge so the hands clear the desk.
+          const bridged = playTypingIdleBridge({
+            agentId: 'Detective',
+            actions: detectiveActions,
+            state: detectiveState,
+            toKey,
+            onSettled: () => {
+              detectiveState.nextSwitchDelay = Math.random() * 8000 + 8000;
+            },
+          });
 
-          detectiveState.currentAnimation = toKey;
-          detectiveState.nextSwitchDelay = Math.random() * 8000 + 8000;
-          detectiveState.lastSwitchTime = currentTime;
+          if (!bridged) {
+            fromAction.fadeOut(0.5);
+            toAction.reset();
+            toAction.setLoop(THREE.LoopRepeat);
+            toAction.setEffectiveWeight(1);
+            toAction.fadeIn(0.5);
+            toAction.play();
+
+            detectiveState.currentAnimation = toKey;
+            detectiveState.nextSwitchDelay = Math.random() * 8000 + 8000;
+            detectiveState.lastSwitchTime = currentTime;
+          }
         } else {
           // Either clip is missing — back off so we don't busy-loop.
           detectiveState.nextSwitchDelay = 30000;
@@ -5968,7 +6211,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // Unicorn rig (V2): supports both Typing_Unicorn and Unicorn_Typing
         // naming styles. Match the keyword at the start or after an
         // underscore so all conventions resolve correctly.
-        const isLoopAnim = (anim) => /(?:^|_)(typing|idle|clap)/i.test(anim);
+        const isLoopAnim = (anim) => /(?:^|_)(typing|idle|clap)/i.test(anim) && !TRANSITION_RE.test(anim);
         const isSpecialAnim = (anim) => /(?:^|_)(disbelief|fistpump)/i.test(anim);
         const loopAnimations = availableAnimations.filter(isLoopAnim);
         const specialAnimations = availableAnimations.filter(isSpecialAnim);
@@ -6047,8 +6290,24 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           return;
         }
 
+        // typing↔idle routes through the authored bridge (hands clear the desk).
+        // No early `return` — this is inside useFrame.
+        const rl80Bridged =
+          isDeskSwap(rl80State.currentAnimation, nextAnimation) &&
+          playTypingIdleBridge({
+            agentId: 'RL80',
+            actions: rl80Actions,
+            state: rl80State,
+            toKey: nextAnimation,
+            onSettled: () => {
+              rl80State.nextSwitchDelay = /(?:^|_)typing/i.test(nextAnimation)
+                ? Math.random() * 8000 + 12000
+                : Math.random() * 5000 + 5000;
+            },
+          });
+
         // Play the next animation
-        if (action) {
+        if (!rl80Bridged && action) {
           const isSpecialAnimation = isSpecialAnim(nextAnimation);
 
           // Fade the outgoing clip — both branches do this.
@@ -6103,20 +6362,24 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           }
         }
         
-        rl80State.currentAnimation = nextAnimation;
-        
-        // Set appropriate delay based on animation type
-        if (/(?:^|_)typing/i.test(nextAnimation)) {
-          rl80State.nextSwitchDelay = Math.random() * 8000 + 12000; // 12-20 seconds for typing
-        } else if (/(?:^|_)(idle|clap)/i.test(nextAnimation)) {
-          // For other loop animations, set reasonable delays
-          rl80State.nextSwitchDelay = Math.random() * 5000 + 5000; // 5-10 seconds
-        } else {
-          // For special animations (Disbelief, FistPump), wait for them to finish
-          rl80State.nextSwitchDelay = 999999; // Large number to prevent switching during animation
+        // Skipped while bridging — the bridge parks these and its hand-off
+        // restores them when it lands.
+        if (!rl80Bridged) {
+          rl80State.currentAnimation = nextAnimation;
+
+          // Set appropriate delay based on animation type
+          if (/(?:^|_)typing/i.test(nextAnimation)) {
+            rl80State.nextSwitchDelay = Math.random() * 8000 + 12000; // 12-20 seconds for typing
+          } else if (/(?:^|_)(idle|clap)/i.test(nextAnimation)) {
+            // For other loop animations, set reasonable delays
+            rl80State.nextSwitchDelay = Math.random() * 5000 + 5000; // 5-10 seconds
+          } else {
+            // For special animations (Disbelief, FistPump), wait for them to finish
+            rl80State.nextSwitchDelay = 999999; // Large number to prevent switching during animation
+          }
+
+          rl80State.lastSwitchTime = currentTime;
         }
-        
-        rl80State.lastSwitchTime = currentTime;
       }
     }
     
@@ -6238,7 +6501,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         const filteredAnimations = availableAnimations.filter(a =>
           !/disapproval/i.test(a));
         const loopAnimations = filteredAnimations.filter(a =>
-          /typing|idle|laughing/i.test(a));
+          /typing|idle|laughing/i.test(a) && !TRANSITION_RE.test(a));
         const specialAnimations = filteredAnimations.filter(a =>
           /disbelief|clap|fistpump/i.test(a));
 
@@ -6261,11 +6524,25 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             : availableAnimations[0];
         }
 
-        if (monkActions[monkState.currentAnimation]) {
+        // typing↔idle routes through the authored bridge (hands clear the desk).
+        // No early `return` — this is inside useFrame.
+        const monkBridged =
+          isDeskSwap(monkState.currentAnimation, nextAnimation) &&
+          playTypingIdleBridge({
+            agentId: 'Monk',
+            actions: monkActions,
+            state: monkState,
+            toKey: nextAnimation,
+            onSettled: () => {
+              monkState.nextSwitchDelay = Math.random() * 10000 + 10000;
+            },
+          });
+
+        if (!monkBridged && monkActions[monkState.currentAnimation]) {
           monkActions[monkState.currentAnimation].fadeOut(0.5);
         }
 
-        if (monkActions[nextAnimation]) {
+        if (!monkBridged && monkActions[nextAnimation]) {
           const nextAction = monkActions[nextAnimation];
           nextAction.reset();
           nextAction.fadeIn(0.5);
@@ -6304,17 +6581,21 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           nextAction.play();
         }
 
-        monkState.currentAnimation = nextAnimation;
+        // Skipped while bridging — the bridge parks these and its hand-off
+        // restores them when it lands.
+        if (!monkBridged) {
+          monkState.currentAnimation = nextAnimation;
 
-        if (loopAnimations.includes(nextAnimation)) {
-          monkState.nextSwitchDelay = /idle/i.test(nextAnimation)
-            ? Math.random() * 3000 + 5000
-            : Math.random() * 10000 + 12000;
-        } else {
-          monkState.nextSwitchDelay = 999999;
+          if (loopAnimations.includes(nextAnimation)) {
+            monkState.nextSwitchDelay = /idle/i.test(nextAnimation)
+              ? Math.random() * 3000 + 5000
+              : Math.random() * 10000 + 12000;
+          } else {
+            monkState.nextSwitchDelay = 999999;
+          }
+
+          monkState.lastSwitchTime = currentTime;
         }
-
-        monkState.lastSwitchTime = currentTime;
       }
     }
     
@@ -6875,15 +7156,37 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
     }
 
-    // Fluffy (cat) head look-at-camera override
-    // Animation is paused, so we use world-space lookAt with no loop-seam concerns
-    if (fluffyHeadBoneRef.current && (revealModeRef.current || (fluffyFocusedRef.current && shouldTrackHeadRef.current))) {
+    // Fluffy (cat) head look-at-camera override.
+    //
+    // This block used to assume "animation is paused, so we can just replace
+    // the head pose" — true when the cat only ever appeared paused-on-focus,
+    // FALSE during the curtain call where he runs a sit/groom cycle. The aim
+    // is now blended over the clip's own head track by a ramped weight:
+    // 1 on neutral clips (pure look-at, the old behaviour), 0 while a grooming
+    // clip owns the head. See CAT_HEAD_FREE_RE.
+    const catClipNow = fluffyAnimStateRef.current?.currentAnimation || '';
+    const catHeadFree = CAT_HEAD_FREE_RE.test(catClipNow);
+    // Base pose for the aim is only ever sampled from a neutral clip — sampling
+    // it mid-groom would anchor the look-at to a head-down pose. Until one has
+    // been captured, skip the override entirely and let the clip drive.
+    const catBaseReady = !!fluffyHeadBoneRef._baseQuat || catHeadFree;
+    if (fluffyHeadBoneRef.current && catBaseReady &&
+        (revealModeRef.current || (fluffyFocusedRef.current && shouldTrackHeadRef.current))) {
       const head = fluffyHeadBoneRef.current;
 
-      // Capture the base local quaternion once
+      // mixer.update ran earlier this frame, so this IS the clip's authored
+      // head pose for this frame — keep it to blend against at the end.
+      const animQuat = head.quaternion.clone();
+
       if (!fluffyHeadBoneRef._baseQuat) {
-        fluffyHeadBoneRef._baseQuat = head.quaternion.clone();
+        fluffyHeadBoneRef._baseQuat = animQuat.clone(); // guarded by catBaseReady
       }
+
+      if (fluffyHeadBoneRef._followW === undefined) {
+        fluffyHeadBoneRef._followW = catHeadFree ? 1 : 0;
+      }
+      fluffyHeadBoneRef._followW +=
+        ((catHeadFree ? 1 : 0) - fluffyHeadBoneRef._followW) * CAT_HEAD_FOLLOW_RAMP;
 
       // Restore base quat before computing world matrices to avoid feedback loop
       head.quaternion.copy(fluffyHeadBoneRef._baseQuat);
@@ -6922,10 +7225,15 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
       fluffyHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.1);
 
-      head.quaternion.copy(fluffyHeadBoneRef._smoothedQuat);
+      // Blend the aim OVER the clip rather than replacing it.
+      head.quaternion.copy(animQuat).slerp(
+        fluffyHeadBoneRef._smoothedQuat,
+        fluffyHeadBoneRef._followW,
+      );
     } else if (fluffyHeadBoneRef._smoothedQuat) {
       fluffyHeadBoneRef._smoothedQuat = null;
       fluffyHeadBoneRef._dummy = null;
+      fluffyHeadBoneRef._followW = undefined;
     }
 
     // Demon head look-at-camera override — fires when EITHER the camera

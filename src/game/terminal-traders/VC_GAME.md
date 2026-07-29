@@ -410,6 +410,32 @@ restored 2026-07-28 — the roadmap is the point of §7, not just the defect lis
    same deal; the read-side leaderboard API exists. Today BOOK resets to 100
    every session, so there is no reason to come back on day two.
 
+**Considered and declined: a live/moving market price** (author, 2026-07-28).
+It has only two possible relationships to the truth and both are bad. Correlated,
+it leaks and the optimal play becomes "watch the number, skip the room" — the
+exact failure invariant 5 exists to prevent. Uncorrelated, it is noise dressed
+as signal, and a ticking number out-competes the argument for attention, which
+is the one thing the session cannot afford. If it ever touched P&L it would also
+end properness: the score is currently a pure function of calibration, and price
+movement makes it calibration plus luck — the defect that got the
+conviction-coupled stake rejected.
+
+The lesson underneath it is worth having and is nearly free: Barron owns THE
+TAPE, and `chart` / `apy` are already unsettleable-by-anyone claims. Naming that
+at the autopsy teaches "price movement is not evidence" as content, with no live
+variable to misfire.
+
+**Worth building, from the same conversation: a FACE-DOWN CLAIM.** One claim per
+session whose LANE is hidden until you spend an interruption on it — you gamble
+a specialist blind. No resolver change. The honest cost: it fights the
+deliberate rule that lanes are public from second zero (§3), which exists so the
+skill is timing rather than a memorised lane map. A real trade, not a freebie.
+
+**And the missing dimension is persistence, not a variable.** Nothing survives a
+session — BOOK resets to 100, `dailySeed()` already gives everyone the same deal,
+the leaderboard API exists unused. That is where "dynamic" pays: across days,
+not inside four minutes. See item 5 above.
+
 **Known, unfixed:**
 
 - The SUBJECTIVE half of the acceptance test still hasn't been run: same seed,

@@ -2,7 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, dailySeed } from "@/game/terminal-traders/press/instanceDeal";
 import { BACKING, SEATS, SEAT_LANE, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
-import { DESK, EUGENE, eugeneRead, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
+import { DESK, EUGENE, laneOwner, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
+import { virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt, seatOptions,
@@ -231,11 +232,14 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // at whose lane it is. He never stamps a receipt, so he can never carry the
   // answer; he only tells you who COULD settle it. Reads the run as well as the
   // claim, so he stops naming an adviser you've already spent.
-  const eugeneLine = useMemo(
-    () => (claim ? eugeneRead(claim, { spent: run.advisersSpent, remaining: outlook.remaining }) : ""),
-    [claim, run.advisersSpent, outlook.remaining]);
-  const eugeneCard = useMemo(
-    () => deskCards.find((d) => d.m.id === EUGENE.id)?.data ?? null, [deskCards]);
+  // VIRGIL, not a seat. `tips` is the player's — the agenda half ignores it.
+  const [tips, setTips] = useState(true);
+  const virgil = useMemo(
+    () => (claim ? virgilRead(claim, {
+      owner: laneOwner(claim), spent: run.advisersSpent,
+      remaining: outlook.remaining, tips,
+    }) : null),
+    [claim, run.advisersSpent, outlook.remaining, tips]);
 
   /* ---- the evidence screen, as an actual on-screen terminal ---- */
   // THREE boards, not one. Barron's, Marisol's and GR80's — Eugene never
@@ -577,7 +581,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               GO ON / CALL IT were clipped away — measured at 839px in a 700px
               box. The pitch had no exit. */}
           <div className={`pf-read${more ? " more" : ""}`} ref={readRef}>
-            <ClaimBody claim={claim} eugeneLine={eugeneLine} eugeneCard={eugeneCard}
+            <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
                        pressure={mood} aside={aside}
                        spent={run.advisersSpent}
                        count={`${run.claimIndex + 1} / ${deal.claims.length}`} />

@@ -10,7 +10,8 @@
 import fs from "node:fs";
 import { instanceDeal, ARCHETYPE_IDS, backingOf, genericDiscriminates, sharpDiscriminates } from "../src/game/terminal-traders/press/instanceDeal.js";
 import { BACKING, SHAPES, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend, inLane } from "../src/game/terminal-traders/press/questions.js";
-import { DESK, EUGENE, eugeneRead, eugeneAgenda, adviserLine, laneSentence, barronAside } from "../src/game/terminal-traders/press/desk.js";
+import { DESK, EUGENE, adviserLine, laneSentence, laneOwner, barronAside } from "../src/game/terminal-traders/press/desk.js";
+import { VIRGIL, virgilRead, agenda as eugeneAgenda, shapeTip } from "../src/game/terminal-traders/press/virgil.js";
 import {
   PRESSES, STAKE, PHASE,
   createRun, press, advance, callIt, allocate,
@@ -58,11 +59,11 @@ console.log("\n-- the desk ------------------------------------------------");
   let total = true;
   for (const sh of Object.values(SHAPES))
     for (const ln of Object.values(LANES))
-      if (!eugeneRead({ id: "xx", shape: sh, lane: ln })) total = false;
+      if (!virgilRead({ id: "xx", shape: sh, lane: ln }, { owner: laneOwner({ lane: ln }) }).agenda) total = false;
   ok("Eugene's read is total over all shapes x lanes", total);
   ok("Eugene's read is deterministic",
-    eugeneRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }) ===
-    eugeneRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }));
+    virgilRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }, { owner: DESK[SEATS.MARISOL] }).tip ===
+    virgilRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }, { owner: DESK[SEATS.MARISOL] }).tip);
   ok("both advisers have all four result lines",
     SPENDABLE_SEATS.every((s) => ["dispatch", "found", "partial", "nothing"].every((r) => adviserLine(s, r))));
 
@@ -88,39 +89,39 @@ console.log("\n-- the desk ------------------------------------------------");
     })());
   ok("Eugene stops pointing at a spent adviser",
     (() => {
-      const live = eugeneAgenda(chainClaim, { remaining: 2 });
-      const dead = eugeneAgenda(chainClaim, { spent: [SEATS.MARISOL], remaining: 2 });
+      const live = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 });
+      const dead = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), spent: [SEATS.MARISOL], remaining: 2 });
       return live !== dead && /shallow looks left/i.test(dead);
     })());
   ok("spending the OTHER adviser changes nothing about this lane",
     laneSentence(chainClaim, { spent: [SEATS.GR80] }) === laneSentence(chainClaim)
-    && eugeneRead(chainClaim, { spent: [SEATS.GR80] }) === eugeneRead(chainClaim));
+    && virgilRead(chainClaim, { owner: laneOwner(chainClaim), spent: [SEATS.GR80] }).agenda === virgilRead(chainClaim, { owner: laneOwner(chainClaim) }).agenda);
 
   // EUGENE'S JOB. His second sentence is the agenda — how much runway is left
   // in this lane — because the lane band already owns "whose is it" and a
   // character who restates the UI reads as having no role at all.
   ok("Eugene's read is the SHAPE plus the agenda, never a restatement of the lane",
     (() => {
-      const r = eugeneRead(chainClaim, { remaining: 2 });
+      const r = virgilRead(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 }).agenda;
       // the band's job — naming the owner — must not appear in his mouth
       return !/Marisol can settle|only .* can settle/i.test(r) && /money question/i.test(r);
     })());
   ok("the agenda distinguishes 'hold' from 'now or never'",
     (() => {
-      const more = eugeneAgenda(chainClaim, { remaining: 3 });
-      const last = eugeneAgenda(chainClaim, { remaining: 0 });
+      const more = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 3 });
+      const last = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 0 });
       return more !== last && /Three more/i.test(more) && /Last money question/i.test(last);
     })());
   ok("singular and plural both read as English",
-    /One more money question after this one\./.test(eugeneAgenda(chainClaim, { remaining: 1 }))
-    && /Two more money questions after this one\./.test(eugeneAgenda(chainClaim, { remaining: 2 })));
+    /One more money question after this one\./.test(eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 1 }))
+    && /Two more money questions after this one\./.test(eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 })));
   // EVERY LANE, NOT JUST CHAIN. Both agenda bugs found on 2026-07-28 shipped
   // because every assertion here used `chainClaim` — the one lane whose noun
   // pluralises with a trailing "s" and whose owner is never Eugene. A per-lane
   // sweep is the assertion that would have caught them the day they landed.
   ok("every lane pluralises on its HEAD noun, not its phrase",
     Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) => {
-      const two = eugeneAgenda({ id: "x", lane }, { remaining: 2 });
+      const two = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  remaining: 2 });
       return !/\bs\b|storys|tapes|questions about the (tape|story)s/.test(two)
         && /questions?/.test(two) && !/question after/.test(two);
     }));
@@ -128,27 +129,33 @@ console.log("\n-- the desk ------------------------------------------------");
     Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) =>
       [0, 1, 2, 3].every((remaining) =>
         [[], [SEATS.MARISOL], [SEATS.GR80], [SEATS.EUGENE], [SEATS.BARRON]].every((spent) => {
-          const line = eugeneAgenda({ id: "x", lane }, { spent, remaining });
+          const line = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  spent, remaining });
           return line
             && !/storys|tapes\b|questions question|more question after/.test(line)
             && /[.!]$/.test(line);
         }))));
-  // He owns SOCIAL, so on his own lane he is talking about himself. The
-  // third-person template shipped "and me was already spent" in 192/400
-  // yield-mirage seeds.
-  ok("Eugene refers to himself in the first person on his own lane",
+  // The free read belongs to VIRGIL now, not to a seat, so the old
+  // self-reference problem ("and me was already spent", shipped in 192/400
+  // yield-mirage seeds) is structurally gone: a cat is never the lane owner.
+  ok("the agenda never refers to the speaker in the first person",
+    Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) =>
+      [0, 1, 2].every((remaining) =>
+        [[], [SEATS.EUGENE], [SEATS.MARISOL]].every((spent) => {
+          const line = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }), spent, remaining });
+          return !/\bme\b|\bI\b|send me/i.test(line);
+        }))));
+  ok("Virgil is not a seat and owns no lane",
+    !DESK[VIRGIL.id] && !Object.values(DESK).some((d) => d.id === VIRGIL.id));
+  ok("the tips can be silenced; the agenda cannot",
     (() => {
-      const social = { id: "x", lane: LANES.SOCIAL };
-      const lines = [
-        eugeneAgenda(social, { remaining: 0 }),
-        eugeneAgenda(social, { spent: [SEATS.EUGENE], remaining: 0 }),
-      ];
-      return lines.every((l) => !/\bme was\b|\bEugene was\b/.test(l))
-        && lines.some((l) => /\bme\b/.test(l));
+      const c = { id: "dep", shape: SHAPES.SELECTIVE_WINDOW, lane: LANES.CHAIN };
+      const on = virgilRead(c, { owner: laneOwner(c), remaining: 2, tips: true });
+      const off = virgilRead(c, { owner: laneOwner(c), remaining: 2, tips: false });
+      return on.tip && !off.tip && on.agenda && off.agenda === on.agenda;
     })());
   ok("a SHAPE claim reports what's checkable at all, not a lane",
     (() => {
-      const s = eugeneAgenda({ id: "vibe", shape: SHAPES.UNFALSIFIABLE, lane: LANES.SHAPE }, { remaining: 2 });
+      const s = eugeneAgenda({ id: "vibe", shape: SHAPES.UNFALSIFIABLE, lane: LANES.SHAPE }, { owner: null, remaining: 2 });
       return /Nobody's the expert/i.test(s) && !/money|paperwork|tape|story/i.test(s);
     })());
 }
