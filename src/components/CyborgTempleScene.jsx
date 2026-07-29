@@ -4946,7 +4946,6 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       
       
       if (event.key === 'Escape' && focusTarget) {
-
         restoreAllFromFocus();
 
         // Notify parent that focus is cleared
@@ -5145,7 +5144,23 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           break;
         }
         // console.log('[touch] unfocus decision', { hitDifferentCharacter });
-        if (!hitDifferentCharacter) {
+        // Tap-anywhere-to-dismiss is a FINGER affordance — it exists because
+        // some focus framings make a character's mesh hard to hit precisely
+        // with a thumb. On anything with a mouse or trackpad it is far too
+        // loose: Chrome fires touch events on touchscreen laptops, so this ran
+        // on ordinary clicks and dropped focus instantly, including mid-orbit.
+        //
+        // Gate on the actual POINTER, not on a device guess. `isOnMobile` is
+        // `userAgent match || innerWidth <= 768`, which says nothing about
+        // whether a mouse is present — it was true on the author's desktop.
+        // Phones have no `pointer: fine`, so they keep tap-anywhere; anything
+        // with a cursor falls through to the mouse rules (click the focused
+        // object / double-click / Escape).
+        const hasFinePointer =
+          typeof window !== 'undefined' &&
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(pointer: fine)').matches;
+        if (!hitDifferentCharacter && !hasFinePointer) {
           if (event.cancelable) {
             event.preventDefault();
           }
@@ -5894,7 +5909,6 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         return;
       }
       if (!focusTarget) return;
-
       restoreDemonFromFocus();
 
       // Hide banner
