@@ -2777,7 +2777,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v96_opt.glb';
+      const modelToPreload = '/models/RL80_4anims_v98_opt.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -4280,7 +4280,7 @@ export default function CyborgTemple() {
           const TABS = [
             {
               key: 'services',
-              label: 'THE VC GAME',
+              label: 'VC PARTNERS',
               accent: '#2ad6ee',
               active: railExpanded,
               onClick: () => { setFocusedAgent(null); setRailExpanded(true); },

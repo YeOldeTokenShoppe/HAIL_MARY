@@ -27,7 +27,7 @@ const SERVICES = [
   {
     id: "vc-game",
     eyebrow: "PLAY",
-    title: "The VC Game",
+    title: "VC PARTNERS",
     desc: "One deal. One pitch. Three interruptions.",
     accent: "magenta",
   },

@@ -180,7 +180,7 @@ export const NEON_SIGNS = [
 // Height/placement offsets applied to every sign on top of its per-entry
 // values. Tune yOffset here to move the sign as a whole — it's the knob to
 // reach for first; the per-entry yOffset is for one sign that sits differently.
-export const NEON_SIGN_CONFIG = { yOffset: 0, xOffset: 0, zOffset: 0 };
+export const NEON_SIGN_CONFIG = { yOffset: 0.0, xOffset: -0.02, zOffset: 0.01 };
 
 // false = re-roll on every page load (the default — a refresh gives you a
 // different sign). true = keep one sign for the whole browser tab, which is
@@ -579,7 +579,79 @@ const REVEAL_HEAD_FOLLOW = { aligned: 1, missed: 0.5 };
 // to meet the paw, and pinning it at the camera cancels exactly that motion.
 // Allow-list rather than a block-list so new behaviour clips own their head by
 // default; only the neutral poses cede it.
-const CAT_HEAD_FREE_RE = /^cat_(sitting_idle|loaf)$/i;
+// Clips that OWN the head — a paw comes up to meet the face, so a camera
+// look-at must yield or the motion is cancelled. Deliberately a BLOCK-list,
+// not an allow-list: the cat has to be able to notice the player from whatever
+// he happens to be doing (loafing, stretching, walking, mid-transition), so
+// head tracking is the default and only these two clips take it back.
+const CAT_HEAD_OWNED_RE = /^cat_(cleaning_face|scratching_self)$/i;
+
+// ── Virgil's idle behaviour graph ────────────────────────────────────────
+// Derived from the GLB, not guessed: comparing each clip's END pose to every
+// other clip's START pose (mean bone-angle delta) shows the cat's clips fall
+// into posture groups, and only certain pairs flow without a visible pop.
+// Within a group the delta is 0–8°; across groups it's 14–28°, which reads as
+// a snap. STANDING is the hub — every other posture is entered and left
+// through it.
+//
+// The transitions are authored ONE WAY only. Nothing flows into cat_loaf
+// (14–28° from everything), and cat_sleeping has no exit at all, so the return
+// legs replay the same clip time-reversed — the same trick the typing↔idle
+// bridges use. `rev: true` means play it backwards.
+//
+// Regexes not string keys: 'cat_sitting_down ' has a TRAILING SPACE in the GLB.
+const CAT_STATES = {
+  loaf:     { idle: /^cat_loaf$/i,        actions: [] },
+  sitting:  { idle: /^cat_sitting_idle$/i, actions: [/^cat_cleaning_face$/i, /^cat_scratching_self$/i] },
+  standing: { idle: /^cat_standing$/i,    actions: [/^cat_stretch$/i, /^cat_meowing$/i] },
+  lying:    { idle: /^cat_lying idle$/i,  actions: [] },
+  sleeping: { idle: /^cat_sleeping$/i,    actions: [] },
+};
+// standing → state, and state → standing.
+const CAT_ENTER = {
+  loaf:     { re: /^cat_loaf_to_stand$/i,   rev: true },
+  sitting:  { re: /^cat_sitting_down\s*$/i, rev: false },
+  lying:    { re: /^cat_lying down$/i,      rev: false },
+  sleeping: { re: /^cat_stand_to_sleep$/i,  rev: false },
+};
+const CAT_EXIT = {
+  loaf:     { re: /^cat_loaf_to_stand$/i,    rev: false },
+  sitting:  { re: /^cat_sitting_to_stand$/i, rev: false },
+  lying:    { re: /^cat_lying down$/i,       rev: true },
+  sleeping: { re: /^cat_stand_to_sleep$/i,   rev: true },
+};
+// A cat is mostly resting; standing is a brief stopover, not a destination.
+const CAT_STATE_WEIGHTS = { loaf: 4, sitting: 4, lying: 2, sleeping: 2, standing: 1 };
+const CAT_DWELL_MS = [7000, 16000];  // how long to hold a posture
+const CAT_ACTION_CHANCE = 0.55;      // chance of a groom/stretch during a dwell
+const CAT_XFADE = 0.35;
+
+// Virgil roams. The four desks sit ~90° apart around the beacon at the model
+// origin (measured: Unicorn 52.0°, Demon 141.7°, Monk 233.3°, Detective 320.2°
+// — gaps of 91.8/89.7/91.5/86.9°), so the other three perches are just his
+// authored transform rotated about Y in quarter turns. Rotating his YAW by the
+// same amount matters: without it he'd face outward at three of the four.
+const CAT_PERCH_AUTHORED = [1.3313975, 0.6985147, 0.3036617];
+const CAT_PERCHES = [0, 1, 2, 3].map((k) => {
+  const a = (k * Math.PI) / 2;
+  const [x, y, z] = CAT_PERCH_AUTHORED;
+  return {
+    desk: ['RL80', 'Detective', 'Monk', 'Demon'][k], // nearest character, verified
+    position: [x * Math.cos(a) + z * Math.sin(a), y, -x * Math.sin(a) + z * Math.cos(a)],
+    rotationY: a,
+  };
+});
+
+// Close-up framing for the cat, derived from his LIVE world transform rather
+// than baked vectors — he moves, so a static preset would fly the camera to
+// wherever he used to be. Camera sits in front of his face (his local +Z,
+// which rotates with the perch) at eye height.
+// dist = camera distance in front of his face; camY / lookY are heights ABOVE
+// Cat_Empty's origin (which sits well below the cat — the node origin is not
+// his feet, so these are not intuitive numbers; tune by eye, don't derive).
+// lookY must exceed camY or the camera pitches DOWN and shoves him to the top
+// of the frame with desk filling the bottom.
+const CAT_FOCUS = { dist: 0.75, camY: 0.25, lookY: 0.48 };
 // Per-frame ramp for that hand-off. ~0.05/frame ≈ 0.3s to settle, matching the
 // cycle's 0.6s crossfade, so entering/leaving a groom doesn't pop.
 const CAT_HEAD_FOLLOW_RAMP = 0.05;
@@ -621,6 +693,9 @@ const CyborgTempleScene = ({
   const monkCouncilSeqRef = useRef({ active: false, timer: null }); // monk council argue↔standPray alternation
   const demonRevealSeqRef = useRef({ active: false, timer: null }); // demon missed/abstained reaction↔stand-idle alternation
   const catRevealSeqRef = useRef({ active: false, timer: null }); // cat curtain-call sit/groom cycle
+  const catBehaviourRef = useRef({ active: false, timer: null, state: 'loaf', goal: null }); // desk-gameplay posture driver
+  const catEmptyRef = useRef(null);   // Cat_Empty node, for perch moves + focus framing
+  const catPerchRef = useRef(0);      // index into CAT_PERCHES
   const bridgeTimersRef = useRef({}); // { charName: timeoutId } for the typing↔idle bridge hand-off
   const [loadedModel, setLoadedModel] = useState(null);
   const [detectedMobile, setDetectedMobile] = useState(false);
@@ -1025,6 +1100,233 @@ const CyborgTempleScene = ({
     return true;
   };
 
+  // Close-up pose. Focusing the cat used to PAUSE every clip ("eliminates
+  // loop-seam glitch" — a workaround from when he was set dressing with a
+  // single sit_idle). He's a guide character now: a frozen body with a
+  // camera-tracking head reads as broken, so sit him up and let him breathe.
+  // cat_sitting_idle is also in CAT_HEAD_FREE_RE, so head tracking is allowed.
+  // Walk the posture graph to `target`, then run `done`. Clicking the cat used
+  // to hard-cut to cat_sitting_idle from whatever posture he was in — measured
+  // 14–25° between posture groups, which reads as a twitch. Guarded against
+  // re-entry because BOTH focus paths fire (the in-scene click sets focus
+  // locally, and the parent's externalFocusAgent round-trip fires it again a
+  // frame later); without the guard the second call restarts the transition.
+  const catTransitionTo = (target, done) => {
+    const b = catBehaviourRef.current;
+    if (b.goal === target) return; // already on the way
+    b.goal = target;
+    if (b.timer) clearTimeout(b.timer);
+    b.timer = null;
+    const later = (ms, fn) => { b.timer = setTimeout(fn, Math.max(60, ms)); };
+    const land = () => { b.goal = null; b.state = target; if (done) done(); };
+    if (b.state === target) return land();
+    const exit = b.state === 'standing' ? null : CAT_EXIT[b.state];
+    const enter = target === 'standing' ? null : CAT_ENTER[target];
+    const doEnter = () => {
+      if (!enter) return land();
+      const ms = playCatClip(enter.re, { rev: enter.rev });
+      if (!ms) return land();
+      later(ms - CAT_XFADE * 1000, land);
+    };
+    if (!exit) return doEnter();
+    const ms = playCatClip(exit.re, { rev: exit.rev });
+    if (!ms) return doEnter();
+    later(ms - CAT_XFADE * 1000, doEnter);
+  };
+
+  // The player clicked the cat. Do NOT interrupt whatever he's doing — the
+  // head-track does the noticing, and he carries on with his life. Two clips
+  // can't express noticing, so those are the only ones that get interrupted:
+  //   • cat_cleaning_face — a paw is over his face; it also OWNS the head
+  //     (CAT_HEAD_OWNED_RE), so he physically cannot look up. Swap to
+  //     cat_sitting_idle: same posture group, 0° apart, so it crossfades with
+  //     no pop.
+  //   • sleeping — he's asleep. Wake him through the authored graph.
+  // Everything else (loaf, sitting, standing, lying, walking, stretching,
+  // mid-transition) is left completely alone.
+  const catNoticeUser = () => {
+    const actions = actionsRef.current['Fluffy'];
+    if (!actions) return;
+    Object.values(actions).forEach((a) => { a.paused = false; });
+    const b = catBehaviourRef.current;
+    const cur = fluffyAnimStateRef.current?.currentAnimation || '';
+
+    if (/^cat_cleaning_face$/i.test(cur)) {
+      playCatClip(CAT_STATES.sitting.idle, { loop: true });
+      return;
+    }
+    if (b.state === 'sleeping') {
+      stopCatBehaviour();
+      catTransitionTo('sitting', () => {
+        playCatClip(CAT_STATES.sitting.idle, { loop: true });
+        if (!revealModeRef.current) startCatBehaviour('sitting');
+      });
+    }
+    // else: no animation change at all.
+  };
+
+  // ── Virgil's desk-gameplay behaviour driver ───────────────────────────
+  // Walks the posture graph above: hold a posture (looping its idle, with an
+  // occasional one-shot groom/stretch), then move to another posture via the
+  // authored transitions, routing through STANDING because that's the only hub
+  // the clips connect through. Runs ONLY during normal gameplay — the curtain
+  // call and the focus close-up each own the cat while they're active.
+  const catActionKey = (re) => {
+    const actions = actionsRef.current['Fluffy'];
+    if (!actions) return null;
+    return Object.keys(actions).find((k) => re.test(k)) || null;
+  };
+
+  // Play one cat clip. `rev` runs it backwards (for the unauthored return
+  // legs). Returns its duration in ms, or 0 if the clip is missing.
+  const playCatClip = (re, { rev = false, loop = false } = {}) => {
+    const actions = actionsRef.current['Fluffy'];
+    const key = catActionKey(re);
+    if (!actions || !key) return 0;
+    const action = actions[key];
+    const dur = action.getClip().duration;
+    // Already looping this exact clip — re-playing it would reset() and hitch.
+    if (loop && fluffyAnimStateRef.current?.currentAnimation === key
+        && action.isRunning && action.isRunning() && !action.paused) {
+      return dur * 1000;
+    }
+    Object.values(actions).forEach((a) => {
+      if (a !== action && a.isRunning && a.isRunning()) a.fadeOut(CAT_XFADE);
+    });
+    action.reset();
+    action.paused = false;
+    if (loop) {
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.time = dur * 0.05; // skip the bind-pose frame
+      action.setEffectiveTimeScale(1);
+    } else {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+      action.setEffectiveTimeScale(rev ? -1 : 1);
+      action.time = rev ? dur : 0;
+    }
+    action.setEffectiveWeight(1);
+    action.fadeIn(CAT_XFADE);
+    action.play();
+    if (fluffyAnimStateRef.current) fluffyAnimStateRef.current.currentAnimation = key;
+    return dur * 1000;
+  };
+
+  const stopCatBehaviour = () => {
+    const b = catBehaviourRef.current;
+    if (b.timer) clearTimeout(b.timer);
+    b.timer = null;
+    b.active = false;
+    b.goal = null;
+  };
+
+  const startCatBehaviour = (fromState = 'loaf') => {
+    const b = catBehaviourRef.current;
+    stopCatBehaviour();
+    if (!actionsRef.current['Fluffy']) return;
+    b.active = true;
+    b.state = fromState;
+    b.goal = null;
+
+    const later = (ms, fn) => {
+      b.timer = setTimeout(() => { if (b.active) fn(); }, Math.max(60, ms));
+    };
+
+    const pickNextState = () => {
+      const pool = Object.entries(CAT_STATE_WEIGHTS).filter(([k]) => k !== b.state);
+      const total = pool.reduce((n, [, w]) => n + w, 0);
+      let r = Math.random() * total;
+      for (const [k, w] of pool) { r -= w; if (r <= 0) return k; }
+      return pool[0][0];
+    };
+
+    // Hold the current posture: loop its idle, maybe insert one action clip,
+    // then transition somewhere else.
+    const dwell = () => {
+      const st = CAT_STATES[b.state];
+      if (!st) { b.state = 'standing'; return dwell(); }
+      playCatClip(st.idle, { loop: true });
+      const hold = CAT_DWELL_MS[0] + Math.random() * (CAT_DWELL_MS[1] - CAT_DWELL_MS[0]);
+      const act = st.actions[Math.floor(Math.random() * st.actions.length)];
+      if (act && Math.random() < CAT_ACTION_CHANCE) {
+        // Idle for a beat, run the action once, settle back to idle, then move.
+        later(hold * 0.45, () => {
+          const ms = playCatClip(act) || 0;
+          later(ms, () => {
+            playCatClip(st.idle, { loop: true });
+            later(hold * 0.45, transition);
+          });
+        });
+      } else {
+        later(hold, transition);
+      }
+    };
+
+    // Route to a new posture through STANDING (the only hub the clips connect
+    // through), skipping legs that aren't needed.
+    const transition = () => {
+      const next = pickNextState();
+      const exit = b.state === 'standing' ? null : CAT_EXIT[b.state];
+      const enter = next === 'standing' ? null : CAT_ENTER[next];
+      const land = () => { b.state = next; dwell(); };
+      const doEnter = () => {
+        if (!enter) return land();
+        const ms = playCatClip(enter.re, { rev: enter.rev });
+        if (!ms) return land();
+        later(ms - CAT_XFADE * 1000, land);
+      };
+      if (!exit) return doEnter();
+      const ms = playCatClip(exit.re, { rev: exit.rev });
+      if (!ms) return doEnter();
+      later(ms - CAT_XFADE * 1000, doEnter);
+    };
+
+    dwell();
+  };
+
+  // Move Virgil to one of the four desks. Pass an index, or omit for a random
+  // desk other than the one he's on (he should visibly relocate, not re-pick
+  // the same spot). Safe to call before the model loads — it no-ops.
+  const applyCatPerch = (index) => {
+    const cat = catEmptyRef.current;
+    if (!cat) return;
+    let k = index;
+    if (k === undefined) {
+      // Random OTHER desk: pick from the 3 remaining so he always moves.
+      const others = CAT_PERCHES.map((_, i) => i).filter((i) => i !== catPerchRef.current);
+      k = others[Math.floor(Math.random() * others.length)];
+    }
+    const perch = CAT_PERCHES[k];
+    if (!perch) return;
+    cat.position.set(...perch.position);
+    cat.rotation.y = perch.rotationY;
+    catPerchRef.current = k;
+  };
+
+  // Camera framing for a cat close-up, computed from where he actually IS.
+  // Used by both focus paths (in-scene click and externalFocusAgent) so the
+  // parent can introduce him without knowing which desk he wandered to.
+  const getCatFocusSettings = () => {
+    const cat = catEmptyRef.current;
+    if (!cat) return null;
+    cat.updateWorldMatrix(true, false);
+    const pos = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    cat.getWorldPosition(pos);
+    cat.getWorldQuaternion(quat);
+    // His face is local +Z (same axis the reveal lineup leaves at yaw 0).
+    // Flatten to horizontal so the camera doesn't pitch with any rig tilt.
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
+    fwd.y = 0;
+    if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, 1);
+    fwd.normalize();
+    return {
+      cameraPos: pos.clone().addScaledVector(fwd, CAT_FOCUS.dist).setY(pos.y + CAT_FOCUS.camY),
+      lookAtPos: pos.clone().setY(pos.y + CAT_FOCUS.lookY),
+      orbitCenter: null,
+    };
+  };
+
   // Monk council alternation: monk_argue (1×) → monk_standPray (2×) → …
   const stopMonkArgueSequence = () => stopAlternateSequence(monkCouncilSeqRef);
   const startMonkArgueSequence = () => startAlternateSequence({
@@ -1177,6 +1479,7 @@ const CyborgTempleScene = ({
       stopMonkArgueSequence();
     }
     if (agentId === 'Fluffy') {
+      stopCatBehaviour(); // curtain call owns the cat while it runs
       if (startClipCycle({
         actions,
         state,
@@ -1299,6 +1602,9 @@ const CyborgTempleScene = ({
     state.isPlayingSpecial = false;
     state.nextSwitchDelay = 0;
     state.lastSwitchTime = Date.now();
+    // Hand the cat back to his roaming behaviour once the curtain call has
+    // put him back in the loaf.
+    if (agentId === 'Fluffy' && !fluffyFocusedRef.current) startCatBehaviour('loaf');
   };
 
   const applyCharacterFocusAnimation = (agentId, mode = 'idle') => {
@@ -1366,12 +1672,7 @@ const CyborgTempleScene = ({
     } else if (agentId === 'Fluffy') {
       // Fluffy has no idle/typing distinction — pause all clips so the cat
       // sits still during the close-up (eliminates loop-seam glitch).
-      const fluffyActions = actionsRef.current['Fluffy'];
-      if (fluffyActions) {
-        Object.values(fluffyActions).forEach((action) => {
-          action.paused = true;
-        });
-      }
+      catNoticeUser(); // head-track does the noticing; his behaviour continues
     }
   };
 
@@ -1606,7 +1907,9 @@ const CyborgTempleScene = ({
     setFocusTarget((prev) => {
       if (prev && prev.agentId === externalFocusAgent) return prev;
       const isOnMobile = isMobile || detectedMobile;
-      const resolved = resolveAgentSettings(externalFocusAgent, isOnMobile);
+      const resolved = externalFocusAgent === 'Fluffy'
+        ? (getCatFocusSettings() || resolveAgentSettings('Fluffy', isOnMobile))
+        : resolveAgentSettings(externalFocusAgent, isOnMobile);
       if (!resolved) return prev;
       return {
         position: resolved.cameraPos,
@@ -1917,6 +2220,10 @@ const CyborgTempleScene = ({
         monkWaveStateRef.current.everInitialized = false;
         monkWaveStateRef.current.nextFireTime = 0;
       }
+      // Virgil relocates between rounds — cats move when you aren't looking.
+      // MUST run after the transformSnapshot restore above, which puts him
+      // back on his pre-reveal desk; re-rolling before it would be undone.
+      applyCatPerch();
     };
     // applyCharacterReaction / restoreCharacterIdle read stable refs and
     // aren't worth re-creating; exclude them from deps to avoid spurious
@@ -1957,6 +2264,9 @@ const CyborgTempleScene = ({
   // even after a drag (OrbitControls' rotate gesture), so the
   // tap-anywhere-to-unfocus path measures pointer movement itself and only
   // dismisses focus when movement is below a small threshold.
+  // Pixels of pointer travel above which a mouse `click` is treated as a
+  // camera drag (orbit) and ignored by the picking handler.
+  const CLICK_DRAG_SLOP = 6;
   const mouseDownPosRef = useRef(null);
 
   // Click animation state for coins
@@ -2155,6 +2465,17 @@ const CyborgTempleScene = ({
       if (!rl80FocusedRef.current) return;
       wave.fadeOut(fadeOutS);
     }, Math.max(50, playedDurMs - fadeOutMs));
+  }, []);
+
+  // Chained setTimeouts in the cat driver / sequences would outlive the
+  // component and poke stale refs. Tear them down on unmount.
+  useEffect(() => () => {
+    stopCatBehaviour();
+    stopAlternateSequence(catRevealSeqRef);
+    stopAlternateSequence(monkCouncilSeqRef);
+    stopAlternateSequence(demonRevealSeqRef);
+    Object.keys(bridgeTimersRef.current || {}).forEach(stopBridge);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Register the wave player so the page can fire it in sync with a greeting.
@@ -2561,8 +2882,8 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v96_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v96.glb";
+    let modelPath = "/models/RL80_4anims_v98_opt.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v98.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -2978,6 +3299,16 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             }
           });
           captureHeadRestPose(fluffyHeadBoneRef);
+          catEmptyRef.current = child;
+          // Start him on a random desk so he isn't always on Eugene's.
+          applyCatPerch(Math.floor(Math.random() * CAT_PERCHES.length));
+          // Start the roaming idle behaviour once his actions exist. Deferred a
+          // tick because actionsRef for 'Fluffy' is populated later in this
+          // same load pass. The curtain call / focus paths stop it if either is
+          // already active.
+          setTimeout(() => {
+            if (!revealModeRef.current && !fluffyFocusedRef.current) startCatBehaviour('loaf');
+          }, 0);
         }
         else if (child.name === 'Detective_Empty') {
           animatedCharacters['Detective'] = child;
@@ -3833,7 +4164,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         if (child.name === 'Demon' || child.name === 'Demon_empty' || child.name === 'Demon_Empty' ||
             child.name === 'Devil_empty' || child.name === 'Devil_Empty' ||
             child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01' ||
-            child.name === 'Virgil_Empty' ||
+            child.name === 'Virgil_Empty' || child.name === 'Cat_Empty' ||
             child.name === 'Detective_Empty') {
 
           // Normalize agentId to consistent names
@@ -3841,7 +4172,9 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           if (child.name === 'Demon' || child.name === 'Demon_empty' || child.name === 'Demon_Empty' ||
               child.name === 'Devil_empty' || child.name === 'Devil_Empty') agentId = 'Demon';
           else if (child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01') agentId = 'Monk';
-          else if (child.name === 'Virgil_Empty') agentId = 'Fluffy';
+          // Cat root is 'Cat_Empty' from v95 on; 'Virgil_Empty' is the legacy
+          // pre-v94 name. Both map to the 'Fluffy' character slot.
+          else if (child.name === 'Virgil_Empty' || child.name === 'Cat_Empty') agentId = 'Fluffy';
           else if (child.name === 'Detective_Empty') agentId = 'Detective';
 
           const setMechClickableData = (obj) => {
@@ -4526,12 +4859,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     const restoreFluffyFromFocus = () => {
       if (!fluffyFocusedRef.current) return;
       fluffyFocusedRef.current = false;
-      // Unpause the animation
-      const fluffyActions = actionsRef.current['Fluffy'];
-      if (fluffyActions) {
-        Object.values(fluffyActions).forEach(action => {
-          action.paused = false;
-        });
+      // Nothing to resume — the close-up never stopped his behaviour. Only
+      // restart if something else (a wake-up, the curtain call) parked it.
+      if (!revealModeRef.current && !catBehaviourRef.current.active) {
+        startCatBehaviour(catBehaviourRef.current.state || 'loaf');
       }
     };
 
@@ -5008,6 +5339,22 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         return;
       }
 
+      // Orbiting is a DRAG, but the browser still fires `click` on release.
+      // If that release happens to land on the object you're focused on, the
+      // toggle-unfocus below fires and you're thrown back to the overview
+      // mid-orbit — which is exactly what "any click de-focuses me" was.
+      // Anything that moved more than a few px is a camera drag, not a click,
+      // so bail before the raycast. This gate belongs to the WHOLE handler;
+      // it used to guard only the (now removed) empty-space unfocus branch,
+      // which is why removing that branch didn't fix the orbit case.
+      {
+        const down = mouseDownPosRef.current;
+        mouseDownPosRef.current = null;
+        if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) >= CLICK_DRAG_SLOP) {
+          return;
+        }
+      }
+
       // Calculate mouse position in normalized device coordinates
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -5250,7 +5597,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           const objectWorldPos = new THREE.Vector3();
           targetObject.getWorldPosition(objectWorldPos);
           
-          const settings = resolveAgentSettings(object.userData.agentId, isOnMobile);
+          // The cat moves between desks, so his framing is computed live rather
+          // than read from the static preset table (see getCatFocusSettings).
+          const settings = object.userData.agentId === 'Fluffy'
+            ? (getCatFocusSettings() || resolveAgentSettings('Fluffy', isOnMobile))
+            : resolveAgentSettings(object.userData.agentId, isOnMobile);
 
           if (!settings) {
             // Fallback: calculate a reasonable position based on object location
@@ -5381,12 +5732,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           } else if (object.userData.agentId === 'Fluffy') {
             fluffyFocusedRef.current = true;
             // Pause the animation so the cat sits still — eliminates loop seam glitch
-            const fluffyActions = actionsRef.current['Fluffy'];
-            if (fluffyActions) {
-              Object.values(fluffyActions).forEach(action => {
-                action.paused = true;
-              });
-            }
+            catNoticeUser(); // head-track does the noticing; behaviour continues
           } else if (object.userData.agentId === 'Detective') {
             detectiveFocusedRef.current = true;
             activateSitePalProjection('Detective');
@@ -5454,18 +5800,17 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       // mode (camera locked to Stage) and when the pointer moved more than
       // ~6px between pointerdown and click, so OrbitControls' rotate
       // gesture doesn't double as a dismiss.
-      if (!clickedOnAgent && focusTarget && !revealMode) {
-        const down = mouseDownPosRef.current;
-        mouseDownPosRef.current = null;
-        const wasTap =
-          down &&
-          Math.hypot(event.clientX - down.x, event.clientY - down.y) < 6;
-        if (wasTap) {
-          window.dispatchEvent(new CustomEvent('screenGoBack'));
-        }
-      } else {
-        mouseDownPosRef.current = null;
-      }
+      // A single click on empty space used to unfocus. That made focus far too
+      // easy to lose — any stray click while orbiting or reading dropped you
+      // back to the overview. Desktop now needs a deliberate gesture, matching
+      // the double-click required to focus IN:
+      //   • double-click anywhere        → handleDblClick
+      //   • click the focused object     → the toggle-unfocus below
+      //   • Escape                       → handleKeyDown
+      // Touch is unaffected: handleTouchStart has its own broader
+      // tap-anywhere-to-dismiss rule (deliberately looser, because some focus
+      // framings make the character's mesh hard to hit with a finger), and its
+      // synthesized clicks are consumed before they reach this handler.
     };
     
     // Listen for screenGoBack event (from on-screen buttons)
@@ -7163,15 +7508,19 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // FALSE during the curtain call where he runs a sit/groom cycle. The aim
     // is now blended over the clip's own head track by a ramped weight:
     // 1 on neutral clips (pure look-at, the old behaviour), 0 while a grooming
-    // clip owns the head. See CAT_HEAD_FREE_RE.
+    // clip owns the head. See CAT_HEAD_OWNED_RE.
     const catClipNow = fluffyAnimStateRef.current?.currentAnimation || '';
-    const catHeadFree = CAT_HEAD_FREE_RE.test(catClipNow);
+    const catHeadFree = !CAT_HEAD_OWNED_RE.test(catClipNow);
     // Base pose for the aim is only ever sampled from a neutral clip — sampling
     // it mid-groom would anchor the look-at to a head-down pose. Until one has
     // been captured, skip the override entirely and let the clip drive.
     const catBaseReady = !!fluffyHeadBoneRef._baseQuat || catHeadFree;
     if (fluffyHeadBoneRef.current && catBaseReady &&
-        (revealModeRef.current || (fluffyFocusedRef.current && shouldTrackHeadRef.current))) {
+        // NOT gated on shouldTrackHeadRef: that resolves to `speechActive` once
+        // the game has started, and the cat doesn't speak — he'd never make eye
+        // contact. He's a guide the player clicks to look at, so he tracks for
+        // the whole close-up.
+        (revealModeRef.current || fluffyFocusedRef.current)) {
       const head = fluffyHeadBoneRef.current;
 
       // mixer.update ran earlier this frame, so this IS the clip's authored
