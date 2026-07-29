@@ -10,6 +10,17 @@ a way a bare assertion does not.*
 *Rules that came out of these episodes and are still in force live in VC_GAME.md
 §4 under "Authoring rules". If the two ever disagree, VC_GAME.md wins.*
 
+**The full 1,006-line predecessor of VC_GAME.md — every argument at its original
+length — is preserved in git:**
+
+```
+git show 039a015:src/game/terminal-traders/VC_GAME.md
+```
+
+*It was rewritten to a ~300-line spec on 2026-07-29 because spec and design
+journal had been welded into one file. What follows is the journal half,
+condensed to the reasoning that would otherwise be re-litigated.*
+
 ---
 
 ## 8. The acceptance test — failed, then fixed
@@ -72,4 +83,275 @@ described a test nobody had run, which the specialist can now run.
 
 **`miss` blocks are now fully dead** — `instanceDeal` no longer assembles them
 and `resolvePress` never read them. Delete on sight.
+
+---
+
+## 9. Why the free read became a cat
+
+The free read used to be Eugene's, which made him the one seat in four with a
+permanent extra power. The asymmetry was reported **three times, through three
+different implementations** — *"nothing happens when i click it"* (an unclickable
+tile), *"I still don't get Eugene's off-sides role"* (moved beside his own line),
+*"why does eugene have the special role?"* (given the agenda, still odd). Each
+fix moved him; none worked, because the problem was never where he sat. **A
+colleague with an exemption needs explaining, and an explanation in a design doc
+is not an explanation at the table.**
+
+Author's proposal, 2026-07-28: *"one option is to have a separate character, like
+a cat, be the special friend that gives tips and advice."* That **dissolves** the
+problem instead of justifying it. A cat is obviously not somebody you dispatch to
+pull chain records, so nobody clicks him expecting a press — the failure that
+started the thread becomes structurally impossible — and the desk goes back to
+four seats, four lanes, one use each, no exceptions. Eugene became a plain fourth
+seat with his own board (`__screen4Canvas`, unused all along), and the older
+complaint resolved itself: he can be in the product moment because he finally has
+something to fetch.
+
+Moving the read off a seat also killed a bug by construction: the agenda used to
+be able to refer to its own speaker (*"and me was already spent"*, in 192 of 400
+yield-mirage seeds). **A cat is never the lane owner.**
+
+## 10. The lane was a gate before it was a gradient
+
+The first cut made a lane a **permission** — off-lane sends were rejected as
+no-ops, so two of four seats were dead on any claim and the row read as broken
+buttons. Most-reported confusion in playtest, and both the lane band and the free
+read had to be patched twice for telling players to do things the controller
+would refuse. Author's reframing: *"they each have an area of expertise but can
+generalize too."*
+
+The resulting decision is better. It is no longer "who is legal here", which the
+UI can answer for you — it is "is this claim worth my one specialist", which it
+can't. And the change cost **zero new archetype prose**, because both blocks
+already existed on every slot in every branch.
+
+## 11. "SEND" was the wrong verb, and the doc taught it
+
+The floor said *WHO DO YOU SEND?* and the doc said colleagues *"go and look"* —
+both describing a thing the game never shows: *"the other analysts don't
+physically leave their desks — that's why 'send' seems weird to me"* (author,
+2026-07-28). The archetype-agnostic prose had agreed all along: Marisol says
+*"Give me a second. I'll pull it."*, GR80 says *"I have read it. One moment."*
+
+`ASK A FOLLOW-UP` fixed two further things a plain *WHO DO YOU ASK?* would not:
+it reads as the alternative to `LET HIM GO ON` (players kept describing the game
+as "press him or let him go on" with the desk left out entirely), and **it
+doesn't demand an answer** — holding is frequently correct.
+
+## 12. The three-step retreat from cards
+
+1. **The mechanic**, cut 2026-07-27 on the author's own critique: *"for cards to
+   be justified, a player should have to choose which to play, swap cards,
+   discard and draw — which the player never does."* A three-card hand where all
+   three are always playable is a menu, not a hand. The scarcity moved onto the
+   **people**, where four rigged characters already dramatised it.
+2. **The visual vocabulary**, cut 2026-07-28: *"no cards in this game at all —
+   they're saved for a 2D TCG."* There was already a playtest failure logged
+   against exactly this (`pressUi.jsx:201`): the seat row rendered four
+   `TradingCard`s and a player described the whole game as *"i can either press
+   him for a screen or let him go on to his next point"* — a complete account
+   with the desk left out, from someone who had the desk on screen. **Four
+   trading cards read as a cast list, not four buttons.**
+3. **The exemplar coin as trophy**, cut in favour of collecting archetypes.
+
+The pattern worth naming: cards kept surviving as **decoration for a game that
+had stopped being about them.** A card face is an expensive thing to look at —
+frame, foil, edition line, art box — and it earns that cost when you own it,
+trade it, and choose it from a hand. None of which happens here.
+
+Two freedoms the cut bought: the hero column stopped being locked to
+`TradingCard`'s 744×1038 portrait box (the briefing's largest object had been an
+empty dashed rectangle waiting for a card), and the copy column is now capped at
+62ch instead of running ~965px of monospace per line.
+
+## 13. The dice, and why the randomiser has to be a person
+
+Cards were replaced with **three dice** (author: *"a roll of the dice is a better
+metaphor than playing cards"*) — three, not two, because a pair invites reading
+the *sum*, and this game's players hunt for meaning in anything the house shows
+them. The pips came from a tick counter, never the run seed; numbered RPG dice
+were rejected because a d20 arrives with meaning pre-attached and a nat 1 in a
+74%-rug game would read as a tell whether or not it was one.
+
+**The roll also had to be real.** The deal originally came from `dailySeed()` —
+the same for everybody until 00:00 UTC — which made the ceremony a lie: *"if the
+deal is already predetermined for the day, then rolling the dice is pointless"*
+(author). **Copy cannot fix a mechanic mismatch**; the first attempt was a caption
+reading "THE HOUSE ROLLS ONCE A DAY", which is just a more honest description of
+the same lie. `rollSeed()` replaced it.
+
+**And then the dice went too.** Every attempt to stage the roll as an OBJECT
+failed — three dice, blank dice, a wheel, a dual wheel — because a VC meeting has
+no randomiser in it. **It needs a person**, and Our Lady was always canon for it.
+This is why the enigma machine must stay *transmission*, never selection: a
+machine that picks deals is this same failure returning in a fifth costume.
+
+## 14. Rejected: a daily leaderboard
+
+*2026-07-28, author: "if this game isn't suited to rankings, let's call that
+out."* It isn't, and the reason is invariant 2 arriving through a side door.
+
+The payout is proper **in expectation**. A daily leaderboard does not rank on
+expectation — it ranks on **one realization**, and those come apart:
+
+| | reports | tops a one-deal board |
+|---|---|---|
+| calibrated player | p = 0.74, their true belief | when the deal rugs *and* nobody went higher |
+| reckless player | p = 0.99 | **whenever the deal rugs — ~74% of days** |
+
+Maximising `E[P&L]` means reporting honestly. Maximising `P(top of today's
+board)` means going to the extreme and hoping. **Roughly three days in four the
+reckless player posts the higher number.** The calibrated player wins on average
+— but a daily board never shows the average, and what players take from a
+leaderboard is "do what the top row did". That is precisely the defect that
+killed the conviction-coupled stake.
+
+The rail exists and is complete — `POST /api/tcg-docket-reward` writes one atomic
+claim per user per seed, `GET /api/tcg-docket-leaderboard` ranks it,
+`Standings.jsx` renders it. **Not wiring it is a choice, not a gap.**
+
+What ranking IS suited to, in order: (1) the archetype collection — completion,
+not competition, no properness problem because it isn't a score; (2) cumulative
+P&L over a season, where the luck term averages out; (3) your own book over time,
+a personal curve needing no comparison to anybody.
+
+**And the daily deal went with it.** Rejecting the ranking removed three of the
+daily's four justifications at a stroke (fairness, anti-reroll-fishing, BOOK
+continuity), leaving only "a shared thing to talk about" — the Wordle property,
+real but **entirely latent until a share hook exists**, which is a bet on
+traction: *"that seems like a build-out for the scenario where the game gets lots
+and lots of traction and buzz — not likely. But I am hoping for a nice little
+engagement puzzle."* A choice that gives the player nothing teaches them that
+choices here don't matter, so the second button went. `dailySeed()` is kept and
+unused — six lines, and the whole restore path.
+
+**This is the shape of that whole session: a subsystem outlives its justification
+and has to be re-audited when the justification goes.** Cards, the exemplar coin
+and the daily all died that way within a few hours of each other.
+
+## 15. Rejected: a live / moving market price
+
+It has only two possible relationships to the truth and both are bad. Correlated,
+it leaks and the optimal play becomes "watch the number, skip the room" — the
+exact failure invariant 5 exists to prevent. Uncorrelated, it is noise dressed as
+signal, and a ticking number out-competes the argument for attention, which is
+the one thing the session cannot afford. If it ever touched P&L it would end
+properness: the score is currently a pure function of calibration, and price
+movement makes it calibration plus luck.
+
+The lesson underneath is worth having and is nearly free: `chart` and `apy` are
+already unsettleable-by-anyone claims. Naming that at the post-deal screen
+teaches "price movement is not evidence" as content, with no live variable to
+misfire.
+
+## 16. The two axes the game had welded together
+
+*Author, 2026-07-28: "we may only have a 1/10 hit rate on projects, but they'll
+fail for different reasons, not just because they're legit or not"* — and *"I was
+going to say 50/50 but that's not realistic. Most projects fail, even if
+well-intentioned."*
+
+**Honesty and success are independent axes.** `truth: 1/0` reads as rug/legit and
+`RESOLUTION` quietly makes `legit` mean *succeeded*, so the only way to lose money
+is to be cheated. That is false about the world, and it is why no single number
+felt right: 50/50 prices honesty, 1/10 prices success, and they are not the same
+question.
+
+**The desk can only answer one of them, and it is already the right one.** Marisol
+can tell you whether the money moved as claimed; GR80 can tell you what the audit
+covered. **Nobody at that desk can tell you whether the market will show up.**
+
+Which makes "most projects fail" free — a fact about the world rather than a
+change to the base rate you're graded against. The full treatment is VC_GAME.md §7
+item 8. If two separate numbers are ever wanted, the shape is READ becoming
+*calibration* (proper, Brier) and BOOK becoming *venture returns* (power-law,
+honest to the fiction) — a scoring-kernel redesign, not an afternoon.
+
+## 17. Who pitches — bot, or a cast of humans
+
+*2026-07-29. Resolved to a single pitch bot with a rolled client. Recorded because
+the rotating-human-cast plan had been the roadmap's headline item for two days and
+its central claim turned out to be false.*
+
+**The claim that failed.** The plan held that a rotating pitcher *"multiplies both
+archetypes by the number of speakers"* — the biggest content lever available. It
+doesn't. The spec **requires** the pitcher to be rolled independently of archetype
+and outcome, or it leaks. **A variable required to carry zero information about
+the puzzle cannot be a lever on the puzzle.** It multiplies sessions that *feel*
+different; it multiplies no decisions. Six speakers × 35 lines of
+`generic`/`sharp` × 3 archetypes ≈ 630 lines, and a 210-line tax on every
+archetype after — levied on flavour, charged against the one thing that measurably
+pays (archetype recognition, worth a +0.10 → +4.08 swing).
+
+**The author's argument, which is stronger than the cost argument** (2026-07-29):
+a bot *"saves complexity, avoids relying on superficial biases, and it could be
+that the future business convention is a pitch bot that founders and companies
+employ as agents."* All three hold:
+
+- **Superficial bias.** A varying human face invites the player to build priors on
+  it — and those priors are pure noise by construction. Teaching face-reading in a
+  game where faces carry no information is teaching a superstition. The bot's
+  expression instead varies with `pressure(run)`, i.e. **with what the player
+  found**, so the one thing that changes is a mirror of their own evidence.
+- **Diegesis.** Founders employing pitch agents makes the founder's absence free
+  to explain, and faintly damning on its own.
+- **Complexity.** One character to model, rig, voice and light.
+
+**The objection that had to be answered, and how.** A bot has no motive, and
+motive is what makes spin readable as spin. `POSITIONED` — *"the speaker benefits
+from you believing it"* — is live in all three archetypes (`stake`, `stake`,
+`funding`), and `pressure()`'s four bands describe a person's composure. **The fix
+is commission**: a closer paid on funding is *structurally* interested, which is
+strictly harder to deny than a founder's *"obviously I'm holding, it's my deal"*.
+
+**The objection that dissolved.** "A bot can't emote" was wrong — the model's face
+shield is a screen and renders arbitrary images (author, with reference art). That
+turned out to be an upgrade rather than a workaround: the four pressure bands
+become four textures where they previously drove only a badge and a border colour;
+invariant 9 becomes *provable*, because a texture keyed to `pressure(run)` is
+auditable where a rigged facial performance is not; and the amplitude mouth stops
+being a fudge hidden behind hologram scanlines.
+
+**The thematic payoff, which no human pitcher could deliver.** A salesman's warmth
+is ambiguous — he might believe it. A shield rendering warmth is unambiguously an
+asset being deployed at you, and it works anyway. *The messenger's disposition is
+not evidence* stops being a lesson the game asserts and becomes one it embodies.
+
+**Consequence for the enigma machine.** With the pitcher physically present, the
+projector renders **the asset** rather than the person — which is also what the
+existing shader is built for: `HologramCard.jsx` is a flat billboarded plane, right
+for an artifact, wrong for a head. It also removes a redundancy — a robot inside a
+projector is two layers of mediation with one job between them.
+
+## 18. Smaller decisions worth not re-making
+
+- **Why this shape at all.** The design before it was an eight-screen CRT overlay
+  that switched the 3D scene off (`frameloop:'never'`) and rendered the four
+  characters as static tiles — twelve subsystems over three authored cases, and
+  no moment-to-moment verb. Three fixes, in order: **play happens in the room**
+  (no overlay, the characters are the interface); **one verb, under your thumb,
+  while they're still talking**; **nothing is memorisable** (outcomes rolled, not
+  authored).
+- **"THE AUTOPSY" was renamed to POST-DEAL ANALYSIS.** An autopsy presumes a
+  corpse, and roughly a third of these deals are legit — so it told a player who
+  called it right that they'd lost. Internal names (`PHASE.AUTOPSY`,
+  `deal.autopsy`) are unchanged.
+- **"THE TAPE" failed invariant 6 on the author**, 2026-07-28: *"what does 'the
+  tape' mean? I never quite got what it meant."* It was the only one of four lane
+  labels that had to be *known* rather than read. Now THE CHART. Barron still
+  says "tape" in his own dialogue, where it's characterisation — the rule binds
+  the UI, not the salesman. **The generalisation: a term can fail this invariant
+  years after shipping, and the person who notices is the one who didn't write
+  it.**
+- **The mobile reveal timing.** Two earlier shapes were wrong. Cutting on the
+  press put the board up as he started talking, so you heard the reply over a
+  panel that hadn't changed. Cutting when he finished fixed the timing but did
+  the looking for you, which is the one thing that beat exists to make you do.
+- **Why the exemplar coin stopped being rendered.** It named a second token the
+  player had never met: *"why reference a different project?"* (author). Replaced
+  by the archetype's own TELL, which is the transferable half.
+- **`ARCHETYPE_LABEL` exists because the code slug was leaking.** `backdoor-fork`
+  was printing kebab-case onto the post-deal screen next to a ticker. Naming the
+  pattern is the teaching payload, so it has to be plain English and has to
+  describe the mechanism.
 
