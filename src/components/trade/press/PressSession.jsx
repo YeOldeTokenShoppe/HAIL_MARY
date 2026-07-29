@@ -1,8 +1,8 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDeal";
-import { BACKING, SEATS, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
-import { DESK, DESK_ORDER, laneOwner, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
+import { BACKING, PITCHER, SEATS, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
+import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES, STAKE,
@@ -11,8 +11,8 @@ import {
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
 import {
-  DiceTray, runDiceRoll, prefersReducedMotion, facesFor, SFX, DICE_CSS,
-} from "./diceRoll";
+  EnigmaConsole, runArrival, prefersReducedMotion, SFX, ARRIVAL_CSS,
+} from "./arrival";
 import { createEvidenceScreen } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
@@ -39,7 +39,7 @@ const SPEAKER_AGENT = "Demon";    // John Barron's agentId in CyborgTempleScene
 const SPEAKER_STATION = "demon";  // -> __screen2Canvas (SCREEN_TARGETS in evidenceScreen.js)
 const READ_MS = 4200;             // how long a claim holds the floor before it can land
 
-// THE ROLL — choreography lives in ./diceRoll, shared with PressFlat so both
+// THE ARRIVAL — choreography lives in ./arrival, shared with PressFlat so both
 // presentations open the same way. Cards were cut from this game on 2026-07-28
 // and reserved for a 2D TCG; the deal is a seeded roll and now looks like one.
 
@@ -54,7 +54,7 @@ export default function PressSession({
   onRevealChange,
   onExit,
 }) {
-  // A FRESH DEAL EVERY TIME YOU SIT DOWN. Rolled once per mount, so the dice
+  // A FRESH DEAL EVERY TIME YOU SIT DOWN. Picked once per mount, so the beat
   // are telling the truth: nobody decided this before you got here.
   //
   // The seed is state rather than a memo dependency because it must be STABLE
@@ -85,9 +85,10 @@ export default function PressSession({
   // scene via the evidenceActive handshake. Eugene has none — he never stamps.
   const screensRef = useRef({});
 
-  // THE ROLL. `rolled` gates the panel's CTA: the house rolls the deal, THEN
-  // you let him pitch. Two beats, because watching the deal get picked is the
-  // moment the session starts belonging to you.
+  // THE ARRIVAL. `rolled` gates the panel's CTA: the message decodes, THEN you
+  // let the agent pitch. Two beats, because watching the appointment land is the
+  // moment the session starts belonging to you. (Named `rolled` from the dice
+  // era; it is the arrival now — renaming it touches both surfaces for nothing.)
   const [rolled, setRolled] = useState(false);
   const [rolling, setRolling] = useState(false);
   // NOTHING ON THIS PANEL MAY NAME THE DEAL BEFORE THE DICE STOP (invariant 7).
@@ -100,17 +101,13 @@ export default function PressSession({
   // settle, so they're now the same instant and the two names arrive together.
   const [settled, setSettled] = useState(false);
   const identity = rolled || settled;
-  const speakerNamed = rolled || settled;
-  // Which faces they come to rest on. Seeded by a tick counter, NEVER by the
-  // run seed — see the note at the top of diceRoll.jsx. This is decoration and
-  // it has to stay decoration.
-  const faces = useMemo(() => facesFor(0), []);
-  const diceRefs = useRef([]);
-  const cubeRefs = useRef([]);
+  const panelRef = useRef(null);
+  const lampRef = useRef(null);
+  const rotorRefs = useRef([]);
+  const nameRef = useRef(null);
   const sheetRef = useRef(null);
   const tlRef = useRef(null);
-  const registerDie = useCallback((i, el) => { diceRefs.current[i] = el; }, []);
-  const registerCube = useCallback((i, el) => { cubeRefs.current[i] = el; }, []);
+  const registerRotor = useCallback((i, el) => { rotorRefs.current[i] = el; }, []);
 
   const claim = currentClaim(run, deal);
   const onFloor = started && run.phase === PHASE.FLOOR;
@@ -120,10 +117,17 @@ export default function PressSession({
      and material; we borrow the canvas through the EvidenceScreens handshake
      and hand it back on unmount. See evidenceScreen.js for why. */
   useEffect(() => {
-    const s = createEvidenceScreen({ station: SPEAKER_STATION, header: "BARRON" });
+    const s = createEvidenceScreen({ station: SPEAKER_STATION, header: "THE AGENT" });
     screenRef.current = s;
-    const made = { [SEATS.BARRON]: s };
+    // THE PITCHER HAS NO MONITOR OF ITS OWN. There are four screens in this room
+    // and, since 2026-07-29, four analysts to own them — the agent is an outsider
+    // standing at an easel. Its receipt belongs on Presentation_Chart_Page; until
+    // that is wired, PITCHER and Barron ALIAS one screen (station "demon" ===
+    // SPEAKER_STATION, which was Barron's all along), because creating two
+    // screens for one canvas makes them fight over __screen2Canvas.
+    const made = { [PITCHER]: s, [SEATS.BARRON]: s };
     for (const seat of SPENDABLE_SEATS) {
+      if (seat === SEATS.BARRON) continue;   // aliased above
       made[seat] = createEvidenceScreen({
         station: DESK[seat].station,
         header: DESK[seat].name.toUpperCase(),
@@ -171,11 +175,13 @@ export default function PressSession({
     if (prefersReducedMotion()) { setSettled(true); setRolled(true); return; }
 
     setRolling(true);
-    const tl = runDiceRoll({
-      dice: diceRefs.current,
-      cubes: cubeRefs.current,
+    const tl = runArrival({
+      panel: panelRef.current,
+      rotors: rotorRefs.current,
+      lamp: lampRef.current,
+      name: nameRef.current,
+      nameText: deal.name,
       sheet: sheetRef.current,
-      faces,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -185,8 +191,8 @@ export default function PressSession({
     tlRef.current = tl;
   }, [rolling, rolled]);
 
-  // Impatience is a legitimate input: a click anywhere mid-roll settles the
-  // dice instantly instead of making you sit through them.
+  // Impatience is a legitimate input: a click anywhere mid-arrival completes it
+  // instantly instead of making you sit through it.
   const skipRoll = useCallback(() => {
     if (rolling) tlRef.current?.progress(1);
   }, [rolling]);
@@ -196,7 +202,7 @@ export default function PressSession({
   // decides DEPTH, not permission. Barron is reusable; the other three are one
   // use each. A send is only ever refused for a reason the player can see: no
   // budget left, or that colleague is already spent.
-  const press = useCallback((seat = SEATS.BARRON) => {
+  const press = useCallback((seat = PITCHER) => {
     if (!onFloor) return;
     const next = doPress(run, deal, seat);
     if (next === run) return;
@@ -210,9 +216,9 @@ export default function PressSession({
       nothingOnFile: outcome.nothingOnFile,
       adviserSays: outcome.adviserSays,
       line: outcome.barronSays,
-      asked: outcome.seat === SEATS.BARRON
+      asked: outcome.seat === PITCHER
         ? "Put a number on it."
-        : `${DESK[outcome.seat].name} — ${DESK[outcome.seat].role}`,
+        : `${seatMeta(outcome.seat).name} — ${seatMeta(outcome.seat).role}`,
     });
 
     // THE ANSWER LANDS ON WHOEVER WENT AND GOT IT — on their own monitor, in
@@ -224,8 +230,11 @@ export default function PressSession({
     else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
     else board?.stayBlack();
 
-    // Fly to whoever answered. An adviser sent is a cut across the desk.
-    onFocusAgent?.(DESK[outcome.seat].agentId);
+    // Fly to whoever answered. Asking a seat is a cut across the desk; pressing
+    // the pitcher is not a cut at all — it has no workstation and no agentId, so
+    // the camera holds where it is rather than throwing on a missing DESK entry.
+    const answeredBy = seatMeta(outcome.seat)?.agentId;
+    if (answeredBy) onFocusAgent?.(answeredBy);
   }, [run, deal, claim, onFloor, onFocusAgent]);
 
   const advance = useCallback(() => {
@@ -253,7 +262,7 @@ export default function PressSession({
   // mid-read; the mood band is live.
   const mood = useMemo(() => pressure(run), [run]);
   const aside = useMemo(
-    () => barronAside(mood.band, claim, run.claimIndex),
+    () => pitcherAside(mood.band, claim, run.claimIndex),
     [mood.band, claim, run.claimIndex]);
   // Reads the run, not just the claim — once you've spent the lane's owner,
   // pointing at them is the same wrong instruction the lane band was giving.
@@ -287,7 +296,7 @@ export default function PressSession({
         <div className="ps-deal">
           {identity
             ? <>{deal.ticker} · {deal.name} <span className="ps-dim">· {deal.chain}</span></>
-            : <span className="ps-dim">ONE DEAL · NOT ROLLED</span>}
+            : <span className="ps-dim">ONE DEAL · NOT IN YET</span>}
         </div>
         <div className="ps-book">
           BOOK <b>{Math.round(run.book)}</b>
@@ -298,38 +307,41 @@ export default function PressSession({
       {!started && (
         <div className={`ps-open${rolled ? " is-rolled" : ""}${rolling ? " is-rolling" : ""}`}>
           {/* The roll and the deal sheet fill the left. Copy right, with the
-              four faces beneath it. Nothing in this panel is clickable except
+              four portraits beneath it. Nothing in this panel is clickable except
               the one CTA — it is a briefing, not a board. */}
 
-          {/* Mid-roll, a click anywhere settles the dice. This has to be a real
+          {/* Mid-arrival, a click anywhere completes it. This has to be a real
               <button> to be clickable at all: .ps-root is pointer-events:none
               and hands input only to buttons and inputs. */}
           {rolling && (
-            <button className="ps-skip-deal" onClick={skipRoll} aria-label="Settle the dice now" />
+            <button className="ps-skip-deal" onClick={skipRoll} aria-label="Show them in now" />
           )}
 
-          {/* THE ROLL, THEN THE SHEET. The deal is rolled fresh for this
-              sitting — nobody decided it before you arrived — and can't be
-              re-rolled without leaving. The tray is never a button.
+          {/* THE ARRIVAL, THEN THE SHEET. The deal is picked fresh for this
+              sitting — nobody decided it before you got here — and you can't
+              ask for a different one without leaving. The plate is a status
+              readout, never a button.
 
               The hero is no longer locked to TradingCard's 744x1038 portrait
               box, which is why this column can finally be the width the copy
               wants instead of the width a card was. */}
           <div className="ps-open-hero">
             <div className="ps-roll">
-              <DiceTray faces={faces} spent={rolled}
-                        register={registerDie} registerCube={registerCube} />
-              {/* The caption tells the truth about whose roll it was. It used
-                  to read "THE HOUSE ROLLS ONCE A DAY", which was accurate when
-                  the deal came from the clock and became a lie the moment it
-                  didn't. */}
-              <div className="ps-roll-cap">
-                {rolled ? "YOUR ROLL · NOBODY ELSE GOT THIS ONE"
-                  : "THE DEAL IS ROLLED, NOT CHOSEN"}
-              </div>
+              <EnigmaConsole arrived={rolled} ref={panelRef}
+                             lampRef={lampRef} registerRotor={registerRotor} />
+              {/* The caption names WHO chose, which is the one thing the old
+                  dice could never say. It read "THE DEAL IS ROLLED, NOT CHOSEN"
+                  — and the deal is in fact chosen, by Our Lady, which is why the
+                  randomiser had to become a person. */}
+              {/* ONLY IN THE ARRIVED STATE — see the note in PressFlat. */}
+              {rolled && (
+                <div className="ps-roll-cap">
+                  SENT DOWN TO YOU · YOU DON&apos;T GET TO ASK WHY THIS ONE
+                </div>
+              )}
             </div>
 
-            {/* Written in only once the dice stop. Every field here is public
+            {/* Written in only once the agent is in. Every field here is public
                 surface data and none of it correlates with the outcome — that's
                 asserted in the suite, because the moment the listing leaks the
                 answer the analysts stop mattering. */}
@@ -351,52 +363,40 @@ export default function PressSession({
                   </div>
                 </>
               ) : (
-                <div className="ps-sheet-blank">NOT ROLLED YET</div>
+                <div className="ps-sheet-blank">NOTHING ON THE TABLE YET</div>
               )}
             </div>
 
-            {/* VIRGIL LIVES IN THIS COLUMN, NOT THE DESK BLOCK. He speaks on
-                every claim, so arriving unannounced made him read as a bug the
-                first time he did — but introducing him among the four made it
-                worse: sitting directly above the CTA, a cat's face over a
-                button about pitching read as the CAT doing the pitching
-                (author, 2026-07-28). He is not a seat, owns no lane and cannot
-                be sent anywhere, so he belongs beside what the house rolled
-                rather than among the people you can spend. */}
-            <div className="ps-virgil-intro">
-              <img className="ps-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
-              <div>
-                <span className="ps-virgil-who">{VIRGIL.name}</span>
-                <span className="ps-virgil-role">{VIRGIL.role}</span>
-                <span className="ps-virgil-blurb">{VIRGIL.blurb}</span>
-              </div>
-            </div>
           </div>
 
           <div className="ps-open-copy">
             <div className="ps-open-eyebrow">ONE DEAL ON THE TABLE</div>
-            <div className={`ps-open-name${identity ? "" : " facedown"}`}>
-              {identity ? deal.name : "NOT ROLLED YET"}
+            {/* THE DECODE LANDS HERE. runArrival writes ciphertext into this
+                node and resolves it to deal.name; React then renders the same
+                string once `identity` flips, so the re-render is a no-op. */}
+            <div className={`ps-open-name${identity ? "" : " facedown"}`} ref={nameRef}>
+              {identity ? deal.name : "\u259a\u259a\u259a\u259a\u259a\u259a\u259a\u259a"}
             </div>
             <div className="ps-open-sub">
               {identity
                 ? `${deal.ticker} · ${deal.chain} · ${deal.surface.age} old · ${deal.surface.mcap}`
-                : "the house hasn't picked it yet"}
+                : "sent down from the desk above, still coded"}
             </div>
-            {/* Unnamed until the dice stop. The two versions are deliberately
+            {/* Unnamed until the agent is in. The two versions are deliberately
                 the same shape so the swap reads as the name filling in, not as
                 the paragraph rewriting itself. */}
+            {/* The pitcher is an outside agent on commission, not a colleague.
+                This copy said "John Barron brought this one in — it's his deal"
+                until 2026-07-29, which stopped being true when the bot took over
+                the selling and Barron joined the desk as a plain specialist. */}
             <div className="ps-open-body">
-              {speakerNamed
-                ? "John Barron brought this one in. It's his deal — if you fund it, he gets paid. He's going to talk for about two minutes."
-                : "Someone at this desk brought this one in. It's their deal — if you fund it, they get paid. They're going to talk for about two minutes."}
+              An agent is here for a client who didn&apos;t come. It gets paid if you
+              fund this, and it&apos;s going to talk for about two minutes.
             </div>
             <div className="ps-open-rule">
-              You can interrupt {speakerNamed ? "him" : "them"} <b>three times</b> and make{" "}
-              {speakerNamed ? "him" : "them"} put a number on it. Whatever{" "}
-              {speakerNamed ? "he" : "they"} can actually back lands on{" "}
-              {speakerNamed ? "his" : "their"} screen. Whatever {speakerNamed ? "he" : "they"} can't,
-              doesn't.
+              You can interrupt <b>three times</b> and make it put a number on
+              things. Whatever it can actually back lands on a screen. Whatever it
+              can&apos;t, doesn&apos;t.
             </div>
 
             {/* THE DESK. Portraits, not card faces — a card is a thing you
@@ -407,7 +407,7 @@ export default function PressSession({
                 seat row on the floor. */}
             <div className="ps-tools">
               <div className="ps-tool-group ps-tool-hand">
-                <div className="ps-draw-label">THE DESK — always these four</div>
+                <div className="ps-draw-label">THE DESK — always these four, and the cat</div>
                 <div className="ps-draw-row">
                   {DESK_ORDER.map((m) => (
                     <div key={m.id} className="ps-face" title={m.blurb}>
@@ -416,13 +416,36 @@ export default function PressSession({
                       <span className="ps-face-role">{m.role}</span>
                     </div>
                   ))}
+                  {/* VIRGIL, AT THE END OF THE ROW AND BEHIND A DIVIDER.
+                      He was here once and it failed: a cat's face above the
+                      pitching CTA read as the CAT doing the pitching (author,
+                      2026-07-28), which is why he was moved into the hero
+                      column. Moving him back is safe now for a reason that
+                      didn't exist then — THE PITCHER IS NO LONGER ONE OF THESE
+                      FACES. It's an outside agent, named in the copy above, so
+                      a fifth portrait can't be mistaken for the one selling.
+
+                      The divider and the NOT A SEAT line are load-bearing, not
+                      decoration: they are what keeps him legible as a companion
+                      rather than a spendable. If he ever reads as pitching
+                      again, he goes back to his own block. */}
+                  <span className="ps-face-div" aria-hidden="true" />
+                  <div className="ps-face ps-face-cat" title={VIRGIL.blurb}>
+                    <img className="ps-face-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+                    <span className="ps-face-who">{VIRGIL.name}</span>
+                    <span className="ps-face-role">{VIRGIL.role}</span>
+                    <span className="ps-face-note">NOT A SEAT</span>
+                  </div>
                 </div>
+                {/* ALL FOUR ARE SCARCE NOW. This read "Marisol, GR80 and Eugene
+                    answer once each" while Barron was the pitcher and therefore
+                    unlimited. He is a seat like the rest since 2026-07-29 — the
+                    desk has no exceptions left. */}
                 <div className="ps-open-rule" style={{ marginTop: 10 }}>
                   Everyone at this desk will answer anything you ask them. Each has{" "}
-                  <b>one</b> subject they go deep on — and Marisol, GR80 and Eugene
-                  answer <b>once each</b>, all session. Ask the wrong one and you
-                  still get an answer; you just get the shallow version, and you&apos;ve
-                  spent them.
+                  <b>one</b> subject they go deep on, and each answers{" "}
+                  <b>once</b>, all session. Ask the wrong one and you still get an
+                  answer; you just get the shallow version, and you&apos;ve spent them.
                 </div>
               </div>
             </div>
@@ -618,7 +641,7 @@ export default function PressSession({
   );
 }
 
-const CSS = DICE_CSS + PRESS_UI_CSS + `
+const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
 /* FIXED, not absolute: this portals into document.body, which on /trade is
    taller than the viewport — an absolute inset:0 stretched the layer down the
    whole page and pushed the dock off-screen. */
@@ -709,10 +732,10 @@ const CSS = DICE_CSS + PRESS_UI_CSS + `
 .ps-roll-cap { font-size:8.5px; letter-spacing:0.14em; font-weight:bold;
   color:rgba(255,210,58,0.75); text-align:center; line-height:1.4; }
 
-/* THE DEAL SHEET — what the roll produced. Held at opacity 0 until the dice
-   settle (runDiceRoll tweens it), so no field can name the deal early. */
+/* THE DEAL SHEET — what the agent brought. Held at opacity 0 until the arrival
+   completes (runArrival tweens it), so no field can name the deal early. */
 /* NOT opacity:0 at rest — that took the pre-roll placeholder with it and left a
-   hole in the column. runDiceRoll's fromTo does the reveal. */
+   hole in the column. runArrival's fromTo does the reveal. */
 .ps-sheet { border:1px solid rgba(47,214,214,0.35); border-top:2px solid #ff5f9e;
   background:rgba(0,0,0,0.35); padding:13px 14px 12px; }
 .ps-sheet-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold; color:#ff5f9e; }
@@ -766,21 +789,18 @@ const CSS = DICE_CSS + PRESS_UI_CSS + `
   display:flex; align-items:center; justify-content:center; }
 .ps-face-role { font-size:8px; letter-spacing:0.11em; color:rgba(255,210,58,0.75); }
 
-/* VIRGIL, set apart from the four on purpose — not a seat, no lane, cannot be
-   sent. Warmer than the desk chrome, matching his block on the floor. */
-.ps-virgil-intro { display:flex; align-items:flex-start; gap:10px;
-  padding:11px 12px; border:1px solid rgba(191,238,222,0.22);
-  background:rgba(191,238,222,0.05); }
-.ps-virgil-pic { width:40px; height:40px; flex:none; object-fit:cover;
-  border-radius:50%; border:1px solid rgba(191,238,222,0.45); }
-.ps-virgil-intro > div { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.ps-virgil-who { font-size:11px; font-weight:bold; letter-spacing:0.06em; color:#bfeede; }
-.ps-virgil-role { font-size:8.5px; letter-spacing:0.13em; font-weight:bold;
-  color:rgba(191,238,222,0.75); }
-.ps-virgil-blurb { font-size:10.5px; line-height:1.4; margin-top:3px;
-  color:rgba(191,238,222,0.72); }
+/* VIRGIL, at the end of the desk row and set apart from it on purpose — not a
+   seat, no lane, cannot be sent. The divider is what carries that, so it is not
+   a decoration to tidy away. */
+.ps-face-div { flex:none; align-self:center; width:1px; height:44px;
+  background:rgba(234,255,249,0.16); margin:0 3px; }
+.ps-face-cat .ps-face-pic { border-color:rgba(191,238,222,0.5); }
+.ps-face-cat .ps-face-who { color:#bfeede; }
+.ps-face-cat .ps-face-role { color:rgba(191,238,222,0.75); }
+.ps-face-note { font-size:7.5px; letter-spacing:0.12em;
+  color:rgba(191,238,222,0.5); margin-top:1px; }
 
-/* THE ROLL — die/pip/tray styles come from diceRoll's DICE_CSS, appended at the
+/* THE ARRIVAL — plate styles come from arrival's ARRIVAL_CSS, appended at the
    end of this sheet. What's local to this surface is the skip target. */
 .ps-skip-deal { position:absolute; inset:0; z-index:5; background:none; border:none;
   padding:0; cursor:pointer; }
@@ -788,7 +808,7 @@ const CSS = DICE_CSS + PRESS_UI_CSS + `
 .ps-cta-row .ps-lock { flex:1; width:auto; margin-top:0; }
 
 
-/* The deal is nameless until the dice stop (invariant 7). Sized the same in
+/* The deal is nameless until the agent is in (invariant 7). Sized the same in
    both states so the reveal doesn't jump. */
 .ps-open-name.facedown { color:rgba(234,255,249,0.3); letter-spacing:0.14em; }
 

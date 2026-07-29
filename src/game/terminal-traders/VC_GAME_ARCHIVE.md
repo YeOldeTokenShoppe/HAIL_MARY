@@ -317,11 +317,25 @@ is ambiguous — he might believe it. A shield rendering warmth is unambiguously
 asset being deployed at you, and it works anyway. *The messenger's disposition is
 not evidence* stops being a lesson the game asserts and becomes one it embodies.
 
-**Consequence for the enigma machine.** With the pitcher physically present, the
-projector renders **the asset** rather than the person — which is also what the
-existing shader is built for: `HologramCard.jsx` is a flat billboarded plane, right
-for an artifact, wrong for a head. It also removes a redundancy — a robot inside a
-projector is two layers of mediation with one job between them.
+**Consequence for the enigma machine, resolved 2026-07-29 in two steps.** First:
+with the pitcher physically present, the projector should render **the asset**
+rather than the person — a robot inside a projector is two layers of mediation with
+one job between them.
+
+Then the model arrived carrying `Presentation_Chart` — an easel — plus a
+`Presentation_Chart_Page` quad with UVs and its own unused material, and that
+settled it the other way. **The easel takes the pitch; the projector takes the
+arrival.** The deciding argument is the same diegetic test that made Our Lady the
+randomiser instead of dice: a VC meeting has no randomiser in it, but it *does*
+have an easel. Two objects with one job each beats one object doing both — and the
+built `HologramCard` shader keeps a real role (the deal arriving, then dimming)
+rather than being kept merely because it already exists, which is exactly how cards
+survived three cuts `[A§12]`.
+
+**One wrong call worth recording.** The first export's chart looked ~90×
+oversized. It wasn't: that was raw mesh-accessor bounds read without the node's
+`scale: 0.01`. **Read the node transform, not the accessor, before calling a prop
+broken.**
 
 ## 18. Smaller decisions worth not re-making
 

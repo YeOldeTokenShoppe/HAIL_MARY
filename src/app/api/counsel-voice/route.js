@@ -53,6 +53,17 @@ const VOICES = {
     // saint reports what the maxim yields; he doesn't perform it.
     settings: { stability: 0.85, similarity_boost: 0.6, style: 0.1 },
   },
+  // THE PITCH BOT — the VC game's pitcher (voice id confirmed by the author
+  // 2026-07-29). It is the thing you press, not a member of the desk; see
+  // PITCHER in game/terminal-traders/press/questions.js.
+  //
+  // Steadier than Barron (0.4) because it is a machine and does not waver, but
+  // far more style than GR80's procedural 0.1 because it is still SELLING — a
+  // closer on commission, not a narrator reading a file.
+  PB: {
+    id: process.env.ELEVENLABS_VOICE_PITCHBOT || "iCVkdoGNYLTCRiLXC3Iu",
+    settings: { stability: 0.6, similarity_boost: 0.75, style: 0.45 },
+  },
 };
 
 // ElevenLabs reads "RL80" as "R-L-eighty"; the shrine says "R-Lady". Spoken
@@ -73,7 +84,7 @@ export async function POST(request) {
     return Response.json({ error: "bad json" }, { status: 400 });
   }
 
-  const speaker = ["GR", "OL"].includes(body?.speaker) ? body.speaker : "JB";
+  const speaker = ["GR", "OL", "PB"].includes(body?.speaker) ? body.speaker : "JB";
   // Her id is looked up from the apparition KEY the client names — the same
   // source the SitePal player reads, so the fallback sounds like the same
   // person. Unknown or missing key falls back to ORACLE_VOICE, which is also

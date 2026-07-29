@@ -9,8 +9,8 @@
 
 import fs from "node:fs";
 import { instanceDeal, ARCHETYPE_IDS, backingOf, genericDiscriminates, sharpDiscriminates } from "../src/game/terminal-traders/press/instanceDeal.js";
-import { BACKING, SHAPES, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend, inLane } from "../src/game/terminal-traders/press/questions.js";
-import { DESK, EUGENE, adviserLine, laneSentence, laneOwner, barronAside } from "../src/game/terminal-traders/press/desk.js";
+import { BACKING, SHAPES, LANES, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend, inLane } from "../src/game/terminal-traders/press/questions.js";
+import { DESK, EUGENE, PITCH_BOT, adviserLine, laneSentence, laneOwner, pitcherAside } from "../src/game/terminal-traders/press/desk.js";
 import { VIRGIL, virgilRead, agenda as eugeneAgenda, shapeTip } from "../src/game/terminal-traders/press/virgil.js";
 import {
   PRESSES, STAKE, PHASE,
@@ -47,9 +47,16 @@ console.log("\n-- the desk ------------------------------------------------");
       const lanes = Object.values(DESK).map((d) => d.lane);
       return lanes.every(Boolean) && new Set(lanes).size === lanes.length;
     })());
-  ok("three colleagues are spendable; Barron is not",
-    SPENDABLE_SEATS.length === 3 && !SPENDABLE_SEATS.includes(SEATS.BARRON));
-  ok("Barron owns the chart and is still unlimited within the budget",
+  // THE DESK HAS NO EXCEPTIONS LEFT (2026-07-29). Barron was excluded here for as
+  // long as he was the pitcher; the bot took that job, so all four seats are
+  // scarce and the special case is gone. The pitcher is not a seat at all.
+  ok("all four seats are spendable — the desk is symmetric",
+    SPENDABLE_SEATS.length === 4
+    && [SEATS.BARRON, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE].every((s) => SPENDABLE_SEATS.includes(s)));
+  ok("the pitcher is not a seat and owns no lane",
+    !Object.values(SEATS).includes(PITCHER) && !SEAT_LANE[PITCHER]
+    && !SPENDABLE_SEATS.includes(PITCHER));
+  ok("Barron owns the chart and can still be asked off-lane",
     SEAT_LANE[SEATS.BARRON] === LANES.CHART && canSend(SEATS.BARRON, { lane: LANES.CHAIN }));
   ok("Marisol CHAIN, GR80 RECORD, Eugene SOCIAL",
     SEAT_LANE[SEATS.MARISOL] === LANES.CHAIN && SEAT_LANE[SEATS.GR80] === LANES.RECORD
@@ -210,17 +217,17 @@ console.log("\n-- pressure: he reacts to being caught ----------------------");
   // The prose may not carry information either.
   const claim = { id: "dep" };
   ok("every band above COOL has an aside, and COOL has none",
-    !barronAside(PRESSURE.COOL, claim, 0)
+    !pitcherAside(PRESSURE.COOL, claim, 0)
     && [PRESSURE.BACKED, PRESSURE.RATTLED, PRESSURE.CORNERED]
-      .every((b) => barronAside(b, claim, 0).length > 0));
+      .every((b) => pitcherAside(b, claim, 0).length > 0));
   ok("asides are deterministic",
-    barronAside(PRESSURE.CORNERED, claim, 2) === barronAside(PRESSURE.CORNERED, claim, 2));
+    pitcherAside(PRESSURE.CORNERED, claim, 2) === pitcherAside(PRESSURE.CORNERED, claim, 2));
   // Repeating a line verbatim on the next claim reads as a stuck component,
   // not a character — which is exactly what keying the pick to claim.id.length
   // produced when two consecutive ids happened to be the same length.
   ok("he never says the same thing twice in a row",
     [PRESSURE.BACKED, PRESSURE.RATTLED, PRESSURE.CORNERED].every((b) =>
-      Array.from({ length: 12 }, (_, i) => barronAside(b, claim, i))
+      Array.from({ length: 12 }, (_, i) => pitcherAside(b, claim, i))
         .every((line, i, all) => i === 0 || line !== all[i - 1])));
   ok("no aside names a lane, a seat or an outcome",
     (() => {
@@ -228,7 +235,7 @@ console.log("\n-- pressure: he reacts to being caught ----------------------");
       // is a role, so either in his mouth reads as him naming whose turn it is.
       const bad = /marisol|gr80|eugene|chain|record|paperwork|receipt|nothing on file|rug|legit/i;
       return [PRESSURE.BACKED, PRESSURE.RATTLED, PRESSURE.CORNERED].every((b) =>
-        Array.from({ length: 40 }, (_, i) => barronAside(b, claim, i))
+        Array.from({ length: 40 }, (_, i) => pitcherAside(b, claim, i))
           .every((line) => !bad.test(line)));
     })());
 }
@@ -285,9 +292,14 @@ console.log("\n-- THE ACCEPTANCE INVARIANT: the desk must beat the seller ---");
   // This section exists because the acceptance test FAILED on 2026-07-28.
   // Measured then: generic and sharp discriminated identically on 14/14 slots,
   // so sending a specialist told you exactly as much about the branch as
-  // pressing the seller — and since he is unlimited and lane-free while they
-  // are one-use and lane-locked, three presses on him weakly DOMINATED the
+  // pressing the seller — and since the seller is unlimited and lane-free while
+  // the seats are one-use, three presses on the seller weakly DOMINATED the
   // entire four-seat desk. The mechanic the whole redesign rests on did nothing.
+  //
+  // The seller was John Barron then and is the pitch bot now (2026-07-29). The
+  // asymmetry this section guards against is UNCHANGED by that swap — if
+  // anything it matters more, because Barron joining the desk means all four
+  // specialists are costed and the free press is the only uncosted move left.
   //
   // The cause was `backing` being authored per branch. resolvePress zeroes the
   // receipt on VIBES, so a VIBES-in-rug / HARD-in-legit slot returned nothing
@@ -365,7 +377,7 @@ console.log("\n-- lanes decide DEPTH, not legality -------------------------");
         && shallow.barronSays === record.press.generic.line;
     })());
   ok("an off-lane resolve returns a real answer, never null",
-    SPENDABLE_SEATS.concat(SEATS.BARRON).every((seat) => {
+    [PITCHER, ...SPENDABLE_SEATS].every((seat) => {
       const o = resolvePress(record, seat);
       return o && typeof o.barronSays === "string";
     }));
@@ -393,8 +405,11 @@ console.log("\n-- lanes decide DEPTH, not legality -------------------------");
       const next = advance(run, d);
       const opts = seatOptions(next, d);
       const m = opts.find((o) => o.seat === SEATS.MARISOL);
+      // FIVE options now, not four: the pitcher plus the four symmetric seats.
+      // One seat spent leaves four live controls.
       return m.reason === "spent" && !m.enabled
-        && opts.filter((o) => o.enabled).length === 3
+        && opts.length === 5
+        && opts.filter((o) => o.enabled).length === 4
         && opts.every((o) => o.reason !== "off-lane");
     })());
 
@@ -403,14 +418,19 @@ console.log("\n-- lanes decide DEPTH, not legality -------------------------");
   // about your choice, not about the deal, and must never render as the strong
   // result — that would let you manufacture the game's most damning outcome by
   // deliberately sending the wrong person.
-  ok("only a DEEP look by somebody who isn't him can return NOTHING ON FILE",
+  ok("only a DEEP look by somebody who isn't the pitcher can return NOTHING ON FILE",
     d.claims.every((c) =>
-      [SEATS.BARRON, ...SPENDABLE_SEATS].every((seat) => {
+      [PITCHER, ...SPENDABLE_SEATS].every((seat) => {
         const o = resolvePress(c, seat);
-        return !o.nothingOnFile || (o.deep && seat !== SEATS.BARRON);
+        return !o.nothingOnFile || (o.deep && seat !== PITCHER);
       })));
-  ok("Barron never returns NOTHING ON FILE, even in his own lane",
-    d.claims.every((c) => !resolvePress(c, SEATS.BARRON).nothingOnFile));
+  // The pitcher owns no lane, so it is never `deep` and can never prove an
+  // absence. Barron CAN now — that is the point of him becoming a specialist.
+  ok("the pitcher never returns NOTHING ON FILE on any claim",
+    d.claims.every((c) => !resolvePress(c, PITCHER).nothingOnFile));
+  ok("the pitcher is never deep, on any claim, in any archetype",
+    ARCHETYPE_IDS.every((id) =>
+      instanceDeal(31, id).claims.every((c) => !resolvePress(c, PITCHER).deep)));
 }
 
 console.log("\n-- the adviser is the scarce resource ----------------------");
@@ -430,8 +450,8 @@ console.log("\n-- the adviser is the scarce resource ----------------------");
   run2 = press(run2, d, SEATS.GR80);
   ok("a spent adviser cannot be sent again at a valid later target",
     run2.pressesLeft === budget && run2.advisersSpent.length === 1);
-  ok("...and Barron is still available there",
-    press(run2, d, SEATS.BARRON).pressesLeft === budget - 1);
+  ok("...and the pitcher is still available there",
+    press(run2, d, PITCHER).pressesLeft === budget - 1);
   ok("advisers are independent — spending GR80 leaves Marisol",
     !run2.advisersSpent.includes(SEATS.MARISOL));
 }
@@ -441,15 +461,23 @@ console.log("\n-- what an interruption returns ----------------------------");
   const d = instanceDeal(7, "backdoor-fork");
   const audit = d.claims.find((c) => c.id === "audit");
 
-  const b = resolvePress(audit, SEATS.BARRON);
-  ok("Barron's press lands on Barron's board", b.board === SEATS.BARRON);
-  ok("Barron speaks his authored generic line", b.barronSays === audit.press.generic.line);
-  ok("no adviser speaks on a Barron press", b.adviserSays === null);
+  const b = resolvePress(audit, PITCHER);
+  ok("the pitcher's press lands on the pitcher's board", b.board === PITCHER);
+  ok("the pitcher speaks the authored generic line", b.barronSays === audit.press.generic.line);
+  ok("no adviser speaks on a pitcher press", b.adviserSays === null);
+
+  // BARRON IS A SEAT NOW, so he behaves like one: his own board, his own
+  // retrieval line, and the pitcher reacting after him.
+  const bar = resolvePress(audit, SEATS.BARRON);
+  ok("Barron lands on Barron's board and speaks a retrieval line",
+    bar.board === SEATS.BARRON && !!bar.adviserSays);
+  ok("Barron off-lane gets the shallow line, not silence",
+    bar.adviserSays === adviserLine(SEATS.BARRON, "found", false));
 
   const g = resolvePress(audit, SEATS.GR80);
   ok("an adviser's answer lands on the ADVISER's board", g.board === SEATS.GR80);
   ok("the adviser speaks a global line, not archetype prose", !!g.adviserSays);
-  ok("Barron reacts with his authored sharp line", g.barronSays === audit.press.sharp.line);
+  ok("the pitcher reacts with the authored sharp line", g.barronSays === audit.press.sharp.line);
   ok("the receipt is the claim's authored sharp receipt",
     JSON.stringify(g.receipt) === JSON.stringify(audit.press.sharp.receipt));
 
@@ -457,8 +485,8 @@ console.log("\n-- what an interruption returns ----------------------------");
   const ops = rugBF.claims.find((c) => c.id === "ops");
   const n = resolvePress(ops, SEATS.GR80);
   ok("an adviser finding nothing reports NOTHING ON FILE", n.nothingOnFile === true && n.receipt === null);
-  ok("...which is a different event from Barron's black board",
-    resolvePress(ops, SEATS.BARRON).nothingOnFile === false);
+  ok("...which is a different event from the pitcher's black board",
+    resolvePress(ops, PITCHER).nothingOnFile === false);
   ok("a shallow look that finds nothing is NOT NOTHING ON FILE",
     (() => {
       const shallow = resolvePress(ops, SEATS.MARISOL);  // ops is RECORD, she is CHAIN
@@ -482,13 +510,13 @@ console.log("\n-- the budget is still frozen ------------------------------");
     ok(`${arch}: at most one interruption per claim`, Object.keys(run.outcomes).length <= 3);
   }
   const d3 = instanceDeal(3);
-  let run = press(createRun(d3), d3, SEATS.BARRON);
+  let run = press(createRun(d3), d3, PITCHER);
   const after = run.pressesLeft;
   ok("a second interruption on the same claim is a no-op",
-    press(run, d3, SEATS.BARRON).pressesLeft === after);
+    press(run, d3, PITCHER).pressesLeft === after);
   run = callIt(run, d3);
   ok("pressing after the call is a no-op",
-    press(run, d3, SEATS.BARRON).pressesLeft === run.pressesLeft);
+    press(run, d3, PITCHER).pressesLeft === run.pressesLeft);
 }
 
 console.log("\n-- TRUTH IS NEVER FOR SALE ---------------------------------");
@@ -500,7 +528,14 @@ console.log("\n-- TRUTH IS NEVER FOR SALE ---------------------------------");
       if (!d) { worst = `${arch}/${wantTruth}: no instance`; continue; }
       const decisive = d.claims.filter((c) => c.loadBearing);
       if (!decisive.length) { worst = `${arch}/${wantTruth}: no loadBearing claim played`; continue; }
-      if (!decisive.every((c) => c.backing === BACKING.HARD && !!resolvePress(c, SEATS.BARRON).receipt))
+      // FREE-REACHABLE MEANS THE PITCHER, NOT BARRON (2026-07-29). Barron is a
+      // costed seat now, so asserting this against him would be asserting that
+      // the decisive claim is reachable for the price of a specialist — which is
+      // the opposite of invariant 1. The free press is the pitcher, and because
+      // the pitcher owns no lane that press returns the `generic` block, which is
+      // exactly why the loadBearing slot is the one slot allowed a per-branch
+      // generic.
+      if (!decisive.every((c) => c.backing === BACKING.HARD && !!resolvePress(c, PITCHER).receipt))
         worst = `${arch}/${wantTruth}: decisive claim not free-reachable`;
       if (!decisive.some((c) => c.discriminates))
         worst = `${arch}/${wantTruth}: decisive claim tells you nothing`;
@@ -545,12 +580,12 @@ console.log("\n-- coverage replaces 'finding dirt' ------------------------");
   const sharp = d.claims.find((c) => c.discriminates);
 
   let a = walkTo(d, sharp.id);
-  a = press(a, d, SEATS.BARRON);
+  a = press(a, d, PITCHER);
   ok("pressing a discriminating claim scores", coverageScore(a, d).hit === 1);
 
   if (clean) {
     let b = walkTo(d, clean.id);
-    b = press(b, d, SEATS.BARRON);
+    b = press(b, d, PITCHER);
     const s = coverageScore(b, d);
     ok("pressing a claim that is clean in BOTH branches scores nothing",
       s.hit === 0 && s.wasted === 1, `${clean.id}`);
@@ -564,12 +599,12 @@ console.log("\n-- coverage replaces 'finding dirt' ------------------------");
 console.log("\n-- nothing leaks the outcome before the reveal -------------");
 {
   const d = instanceDeal(7, "backdoor-fork");
-  let run = press(createRun(d), d, SEATS.BARRON);
+  let run = press(createRun(d), d, PITCHER);
   const floor = JSON.stringify({ run, options: seatOptions(run, d), chips: run.chips });
   ok("no FLOOR payload mentions discriminates", !/discriminates/.test(floor));
   ok("no FLOOR payload mentions truth or outcome", !/"truth"|"outcome"|"resolution"/.test(floor));
   ok("resolvePress never returns the branch", (() => {
-    const r = resolvePress(d.claims[0], SEATS.BARRON);
+    const r = resolvePress(d.claims[0], PITCHER);
     return !("truth" in r) && !("outcome" in r) && !("discriminates" in r);
   })());
 }
@@ -667,7 +702,7 @@ console.log("\n-- a full session, played two ways -------------------------");
   const d = instanceDeal(7, "backdoor-fork");
   const runA = (() => {
     let r = createRun(d);
-    for (let i = 0; i < 3; i++) { r = press(r, d, SEATS.BARRON); r = advance(r, d); }
+    for (let i = 0; i < 3; i++) { r = press(r, d, PITCHER); r = advance(r, d); }
     while (r.phase === PHASE.FLOOR) r = advance(r, d);
     return r;
   })();
@@ -687,10 +722,10 @@ console.log("\n-- a full session, played two ways -------------------------");
   ok("both routes reach the call", runA.phase === PHASE.ALLOCATION && runB.phase === PHASE.ALLOCATION);
   ok("the desk route puts receipts on more than one board",
     new Set(Object.values(runB.outcomes).map((o) => o.board)).size > 1);
-  ok("the Barron route only ever fills his own board",
+  ok("the pitcher route only ever fills the pitcher's own board",
     new Set(Object.values(runA.outcomes).map((o) => o.board)).size === 1);
   const cA = coverageScore(runA, d), cB = coverageScore(runB, d);
-  console.log(`       route A (Barron x3): ${cA.hit}/${cA.spent} discriminating`);
+  console.log(`       route A (pitcher x3): ${cA.hit}/${cA.spent} discriminating`);
   console.log(`       route B (the desk) : ${cB.hit}/${cB.spent} discriminating`);
   ok("both routes are scoreable", cA.spent > 0 && cB.spent > 0);
 }

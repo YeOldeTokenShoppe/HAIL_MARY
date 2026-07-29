@@ -10,15 +10,11 @@ TCG, not to this game.*
 here, its argument lives in the archive.** The previous edition reached 1,006
 because spec and journal were welded together.
 
-*Ceiling history, kept because the number keeps being wrong in the same
-direction: 300 (inherited, set when the game was two archetypes and one surface,
-carried forward unexamined) → 450 (measured against nine invariants, six
-authoring rules, three archetypes, two presentations) → 500 (the pitch-bot
-decision, 2026-07-29, added five rules and a build). Each raise is only legitimate
-after the audit the next sentence demands; the 450 → 500 raise came after stripping
-~40 lines of argument that had been written in both this file and the archive.*
+*Ceiling history — the number keeps being wrong in the same direction: 300
+(inherited, unexamined) → 450 → 500 (pitch bot, 2026-07-29). Every raise so far
+was preceded by stripping argument that had been written into both files.*
 **Before raising it again, check whether the new lines are rules or reasons. If
-they are reasons, they belong in the archive and the number stays.**
+they are reasons they belong in the archive, and the number stays.**
 
 **North star (author, 2026-07-28):** *"I am hoping for a nice little engagement
 puzzle."* Not a social product, not a ladder, not a metagame. A fresh deal, four
@@ -48,8 +44,11 @@ THE FOUNDER     a rolled identity    never appears. Sent an agent.         DESIG
 THE PITCH BOT   in the room          pitches on commission. The one        DESIGNED
                 the constant         constant. UNLIMITED presses.
    ↓
-THE ENIGMA      the holo-projector   renders THE ASSET, not the person.    DESIGNED
-MACHINE         centre of the desks  Never selection.
+THE ENIGMA      the holo-projector   the deal ARRIVES through it, then     DESIGNED
+MACHINE         centre of the desks  dims. Transmission, never selection.
+   ↓
+THE CHART       easel beside the bot the pitch surface. One quad, one      DESIGNED
+                                     texture per claim.
    ↓
 FOUR ANALYSTS   at the desk, yours   Barron CHART · Marisol CHAIN          SHIPPED
                 one use each         GR80 RECORD · Eugene SOCIAL
@@ -86,9 +85,8 @@ including why the "a rotating pitcher multiplies the content" claim was false �
 3. **The face shield is the display for `pressure()`, and may read nothing else.**
    Four bands → four textures. Because `pressure()` reads `run.outcomes` alone, the
    shield shows **what you found, not who you drew** — and a texture keyed to it is
-   *auditable*, which makes invariant 9 provable in a way a rigged facial
-   performance is not. The amplitude mouth is native here, not a fudge hidden
-   behind scanlines.
+   *auditable*, which makes invariant 9 provable where a rigged facial performance
+   never could be.
 4. **The founder is a rolled identity** — `{ name, portrait, bio }`, pooled on the
    `identities.js` pattern, shared across archetypes, **never authored per
    archetype**. Zero marginal prose; the bot says *"my client, ALDERMAN…"*.
@@ -98,13 +96,15 @@ including why the "a rotating pitcher multiplies the content" claim was false �
    appears on legit deals leaks the answer; a founder mapped to an archetype is the
    name-leak again — four appearances in four costumes.
 
-**The enigma machine renders the asset; it never selects.** Our Lady decides
-*which* deal — four attempts to stage that roll as an **object** all failed,
-because a VC meeting has no randomiser in it `[A§13]`. The projector shows the
-thing being sold, with the bot gesturing at it: `HologramCard.jsx` renders a flat
-billboarded plane, right for an artifact and wrong for a head. **The monitors host
-neither** — they are the evidence boards, and a receipt landing on a seat's own
-screen is the payoff of the whole four-seat design.
+**The easel is the pitch surface; the machine is the arrival** — two objects, two
+jobs, no overlap `[A§17]`. Our Lady decides *which* deal, the deal arrives through
+the projector, the projector dims, and the bot pitches at a physical chart it can
+gesture to. **The monitors host neither** — they are the evidence boards, and a
+receipt landing on a seat's own screen is the payoff of the whole four-seat design.
+
+**One claim, one page.** `Presentation_Chart_Page` is a 4-vertex quad on a material
+nothing else uses, so the page can change with each of the six claims for the cost
+of one texture assignment.
 
 ---
 
@@ -255,12 +255,11 @@ seeds:
 | 3 archetypes | 57.3% rug | +0.54 | +4.62 | **+4.08** |
 | *perfect read* | | | **+24.99** | |
 
-At two archetypes, recognising which one you faced was worth a tenth of a point —
-**a game whose stated skill did not pay.** `anon-but-real` inverts the base rate,
-and that inversion is what took it to +4.08. Note the blind column got *worse*: a
-lopsided world is easy to score in once you know it's lopsided. The right
-archetype makes the game harder for the uninformed and more rewarding for the
-informed **at the same time**. That is the test a fourth has to pass.
+At two archetypes, recognition was worth a tenth of a point — **a game whose stated
+skill did not pay.** `anon-but-real` inverts the base rate, which is what took it
+to +4.08 *and* made blind play worse (a lopsided world is easy to score in once you
+know it's lopsided). **Harder for the uninformed and more rewarding for the
+informed, at once — that is the test a fourth has to pass.**
 
 **Never measure hit rate.** `casePnl` is Brier-affine, so always-short-with-
 conviction earns **−16.83** per deal — the worst strategy available, not an
@@ -400,13 +399,32 @@ on the `/trade` rail (default). Case Table parked behind `?classic=1`.
      Barron to `SPENDABLE_SEATS`, point `claim.speaker` (hardcoded `"demon"`, read
      by nothing) at the bot, and key four shield textures to `pressure(run)`.
    - **The founder pool.** A sibling of `identities.js`, rolled per deal.
-   - **The machine.** The rig exists and is switched off:
+   - **The chart.** `Presentation_Chart` (easel, 1.16 × 1.82 × 1.20, transforms
+     baked) + `Presentation_Chart_Page` (4-vert quad, `TEXCOORD_0` present,
+     material `lambert1.001` used by nothing else, white base, double-sided). One
+     texture per claim. **They are sibling root nodes, not parent/child** — wrap
+     both in a Group at load or hiding the chart will miss half of it. Set
+     `material.transparent` if a page art ever needs alpha; `alphaMode` is
+     `OPAQUE`.
+   - **The machine, for THE ARRIVAL only.** The rig exists and is switched off:
      `CyborgTempleScene.jsx:158` `SHOW_HOLOGRAM_CARD = false`, `projectorRef`
      auto-detected at `:4269`, `BeaconBeam` already rising from it, and
      `HologramCard.jsx` a complete projection shader (holo tint, scanlines, glitch,
      halo, sway, billboard-on-yaw, three states) — off because its payload was a
-     trading card. **Swap the payload for the asset, don't build the machine.**
+     trading card. It renders the deal on arrival and dims for the session.
      Delete `diceRoll.jsx` and the roll beat.
+
+   **Asset facts, `/models/pitch-bot.glb` (566KB):** Draco **and**
+   `EXT_texture_webp` are `extensionsRequired`, so a loader needs the `DRACOLoader`
+   block from `CyborgTempleScene.jsx:2853-2862` (WebP needs nothing). Clips:
+   `idle` 8.37s, `talking` 14.17s, 51 nodes each. **The face plate
+   (`SM_Chr_Kid_Robot_Face_01`, material `lambert2.003`) is not skinned and no clip
+   touches it** — expression swaps are mixer-independent. It is fully emissive
+   (`emissiveFactor [1,1,1]`), so it self-lights into the existing Bloom; base
+   colour and emissive share one image, so **set `map` and `emissiveMap` together**
+   or the halves disagree. Both clips animate `head`, so any look-at must use this
+   repo's one shared head-aim formulation applied *after* the mixer — a bespoke
+   version has been the bug before.
 
    **The bill: ~105 lines of prose once** (one voice bank, not one per speaker),
    plus Barron's specialist `sharp` findings, which **do not exist**, plus the

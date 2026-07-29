@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
-import { BACKING, SEATS } from "@/game/terminal-traders/press/questions";
-import { DESK, laneOwner, laneSentence } from "@/game/terminal-traders/press/desk";
+import { BACKING, PITCHER, SEATS } from "@/game/terminal-traders/press/questions";
+import { DESK, PITCH_BOT, laneOwner, laneSentence, seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL } from "@/game/terminal-traders/press/virgil";
 
 /*
@@ -44,11 +44,11 @@ export function canPress(run, claim) {
 export function answerNote(flash) {
   if (!flash) return "";
   if (flash.nothingOnFile) {
-    return `⊘ NOTHING ON FILE — ${DESK[flash.seat]?.name ?? "they"} looked. There is no record.`;
+    return `⊘ NOTHING ON FILE — ${seatMeta(flash.seat)?.name ?? "they"} looked. There is no record.`;
   }
-  if (flash.backing === BACKING.VIBES) return "▚ HIS SCREEN STAYS BLACK.";
+  if (flash.backing === BACKING.VIBES) return "▚ ITS SCREEN STAYS BLACK.";
   if (flash.backing === BACKING.SOFT) return "◍ PARTIAL — some of it landed.";
-  const whose = flash.board === SEATS.BARRON ? "his" : `${DESK[flash.board]?.name}'s`;
+  const whose = flash.board === PITCHER ? "its" : `${seatMeta(flash.board)?.name}'s`;
   return `◼ ON RECORD — on ${whose} screen, and it stays there.`;
 }
 
@@ -70,7 +70,7 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
   return (
     <div className="pu-claim" data-mood={band}>
       <div className="pu-who">
-        {DESK[SEATS.BARRON].name.toUpperCase()} <span className="pu-dim">— his deal</span>
+        {PITCH_BOT.name.toUpperCase()} <span className="pu-dim">— its client's deal</span>
         {band !== "cool" && (
           <span className={`pu-mood ${band}`}>
             {band === "cornered" ? "CORNERED" : band === "rattled" ? "RATTLED" : "UNBOTHERED"}
@@ -153,19 +153,19 @@ export function AnswerBody({ flash, children }) {
 
       {flash.adviserSays && (
         <div className="pu-said">
-          <span className="pu-said-who">{DESK[flash.seat]?.name}</span>
+          <span className="pu-said-who">{seatMeta(flash.seat)?.name}</span>
           <span className="pu-said-line">“{flash.adviserSays}”</span>
         </div>
       )}
       {flash.line && (
         <div className="pu-said barron">
-          <span className="pu-said-who">{DESK[SEATS.BARRON].name}</span>
+          <span className="pu-said-who">{PITCH_BOT.name}</span>
           <span className="pu-said-line">“{flash.line}”</span>
         </div>
       )}
 
       {held ? (
-        <div className="pu-note waiting">▚ HE'S STILL TALKING…</div>
+        <div className="pu-note waiting">▚ IT'S STILL TALKING…</div>
       ) : children ? children : (
         <div className="pu-note">{answerNote(flash)}</div>
       )}
@@ -230,8 +230,11 @@ export function SeatRow({ run, live, pressed, options, onPress }) {
       </div>
       <div className="pu-seats">
         {options.map((o) => {
-          const meta = DESK[o.seat];
-          const boss = o.seat === SEATS.BARRON;
+          // seatMeta, not DESK — the first option is the PITCHER, which is not
+          // staff and has no DESK entry. A bare DESK lookup here threw.
+          const meta = seatMeta(o.seat);
+          if (!meta) return null;
+          const boss = o.seat === PITCHER;
           return (
             <button key={o.seat}
                     className={`pu-seat ${boss ? "boss" : ""} ${o.deep ? "deep" : "shallow"} ${o.enabled ? "" : "off"}`}

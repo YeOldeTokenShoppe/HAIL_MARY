@@ -90,6 +90,28 @@ export const SEATS = {
   EUGENE: "eugene",
 };
 
+/**
+ * THE PITCHER — the pitch bot, and deliberately NOT a member of SEATS.
+ *
+ * It is the thing you press, not somebody you ask. It sits in no chair, owns no
+ * lane (there is no SEAT_LANE entry, so inLane() is always false for it), and is
+ * never spent. Every "is this the pitcher?" branch in pressRun keys on this.
+ *
+ * WHY IT OWNS NO LANE. Pressing the pitcher therefore always returns the claim's
+ * `generic` block — the confident, technically-true, stops-short-of-the-question
+ * answer. Invariant 1 ("truth is never for sale") survives that because the
+ * loadBearing slot is the one slot permitted a PER-BRANCH `generic`, so the
+ * decisive claim still discriminates on a free press. Verified across all three
+ * archetypes: team / source / handles each discriminate on generic.
+ *
+ * WHY IT IS NOT A SEAT. John Barron used to be both pitcher and CHART seat, which
+ * is why he needed a special case everywhere — and it quietly made his own lane
+ * the only one that was deeply answerable for free. An outside agent pitches now,
+ * so the desk is four symmetric seats and Barron is a plain specialist.
+ * See VC_GAME.md §1.
+ */
+export const PITCHER = "pitchbot";
+
 /** Everyone owns exactly one lane now, Barron included. His is CHART: he's a
  *  tape reader who sells on the tape, so his own specialism is the one subject
  *  he'll happily go deep on — which is a very salesman thing to be. */
@@ -100,10 +122,17 @@ export const SEAT_LANE = {
   [SEATS.EUGENE]: LANES.SOCIAL,
 };
 
-/** One use each, all session. Barron is excluded — he's the one pitching, so
- *  he's always at the table, and his availability is what keeps every verdict
- *  reachable for free (see "truth is never for sale"). */
-export const SPENDABLE_SEATS = [SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE];
+/**
+ * One use each, all session — and since 2026-07-29 that is ALL FOUR, in
+ * DESK_ORDER. Barron used to be excluded because he was the one pitching; the
+ * pitch bot took that job (see PITCHER above), so his CHART expertise is now
+ * scarce like everyone else's and the desk has no exceptions left.
+ *
+ * What keeps every verdict reachable for free is no longer "Barron is unlimited"
+ * — it is that pressing the PITCHER costs no seat, and the loadBearing claim
+ * discriminates on the `generic` block the pitcher hands you.
+ */
+export const SPENDABLE_SEATS = [SEATS.BARRON, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE];
 
 /** Is this seat the specialist for this claim? Decides DEPTH, never legality. */
 export function inLane(seat, claim) {

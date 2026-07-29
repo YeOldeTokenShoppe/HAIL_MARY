@@ -19,7 +19,7 @@
 // Explicit .js extensions: scripts/verify-press-run.mjs imports this module
 // directly under Node ESM, which will not resolve an extensionless specifier.
 import { casePnl } from "../caseTable.js";
-import { BACKING, LANES, SEATS, SEAT_LANE, SPENDABLE_SEATS, inLane } from "./questions.js";
+import { BACKING, LANES, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, inLane } from "./questions.js";
 import { adviserLine } from "./desk.js";
 
 export const PRESSES = 3;
@@ -39,18 +39,22 @@ export const PHASE = {
  * ONE BUDGET, FOUR SEATS, AND THE LANE DECIDES DEPTH — NOT LEGALITY.
  * Any seat can be sent at any claim. In their lane you get the specialist
  * finding; outside it you get a true, shallow answer that mostly settles
- * nothing. Barron is unlimited within the budget (he's the one pitching, so
- * he's always at the table); the other three are one use each.
+ * nothing. The PITCHER is unlimited within the budget (it's the one selling, so
+ * it's always in the room); all four seats are one use each.
+ *
+ * THE PITCHER OWNS NO LANE, so pressing it is always the shallow `generic`
+ * block. That is what makes it free: you can always go back to the seller, and
+ * you will always get the version that stops short of the question.
  *
  * NOTHING ON FILE is deliberately not the same event as a black board. A black
  * board is someone declining, or unable, to produce. An empty file is an
  * independent specialist having LOOKED and found an absence — strictly
  * stronger, and the only way this game can prove a negative. It therefore
- * requires both that you sent somebody who isn't him AND that it was their
- * area; a shallow look finding nothing means only that you asked the wrong
+ * requires both that you asked somebody who isn't the pitcher AND that it was
+ * their area; a shallow look finding nothing means only that you asked the wrong
  * person, which is a fact about your choice, not about the deal.
  */
-export function resolvePress(claim, seat = SEATS.BARRON) {
+export function resolvePress(claim, seat = PITCHER) {
   if (!claim) return null;
 
   // DEPTH, NOT PERMISSION. In their lane you get the `sharp` block — the
@@ -71,16 +75,21 @@ export function resolvePress(claim, seat = SEATS.BARRON) {
   return {
     claimId: claim.id, seat, board: seat, deep,
     backing: claim.backing,
-    // Barron answers under his own name in the panel, so he gets no second
-    // voice. Everyone else reports first — they're the one who went and looked.
-    adviserSays: seat === SEATS.BARRON ? null : adviserLine(seat, result, deep),
+    // The pitcher answers under its own name in the panel, so it gets no second
+    // voice. Every SEAT reports first — they're the one who went and looked,
+    // Barron included now that he is a plain specialist.
+    adviserSays: seat === PITCHER ? null : adviserLine(seat, result, deep),
+    // Historical field name: this is whatever the PITCHER says. On a seat press
+    // it is the pitcher's reaction to the finding, which is why it is still
+    // populated for every seat — see the two-voices ordering note in §9.
     barronSays: block.line ?? "",
     receipt,
     // NOTHING ON FILE is an independent party having LOOKED and found an
     // absence — strictly stronger than a board simply staying dark, and the
     // only way this game can prove a negative. It needs someone who actually
-    // went, so it can't be Barron, and it needs the deep look to mean anything.
-    nothingOnFile: seat !== SEATS.BARRON && deep && !receipt,
+    // looked, so it can't be the pitcher (which is also never `deep`), and it
+    // needs the deep look to mean anything.
+    nothingOnFile: seat !== PITCHER && deep && !receipt,
   };
 }
 
@@ -123,15 +132,15 @@ export function landClaim(run, deal) {
  * they're still talking, which is the entire point of the verb.
  * A press with no budget left, or off-floor, is a no-op (never an error).
  */
-export function press(run, deal, seat = SEATS.BARRON) {
+export function press(run, deal, seat = PITCHER) {
   if (run.phase !== PHASE.FLOOR) return run;
   if (run.pressesLeft <= 0) return run;
   const claim = currentClaim(run, deal);
   if (!claim) return run;
   if (run.outcomes[claim.id]) return run;                    // one per claim
-  // No lane check: every seat can be sent at every claim now. The only refusals
+  // No lane check: every seat can be asked about every claim. The only refusals
   // left are the two real resources — the budget, and each colleague's one use.
-  if (seat !== SEATS.BARRON && run.advisersSpent.includes(seat)) return run;
+  if (seat !== PITCHER && run.advisersSpent.includes(seat)) return run;
 
   const outcome = resolvePress(claim, seat);
   if (!outcome) return run;
@@ -139,17 +148,19 @@ export function press(run, deal, seat = SEATS.BARRON) {
   return {
     ...run,
     pressesLeft: run.pressesLeft - 1,
-    // Sending an adviser costs an interruption AND the adviser. Two resources
-    // for one action is what makes the timing decision real — you can be out
-    // of GR80 long before you're out of interruptions.
-    advisersSpent: seat === SEATS.BARRON ? run.advisersSpent : [...run.advisersSpent, seat],
+    // Asking a seat costs an interruption AND that seat. Two resources for one
+    // action is what makes the timing decision real — you can be out of GR80
+    // long before you're out of interruptions. Pressing the pitcher costs only
+    // the interruption, which is what keeps every verdict reachable.
+    advisersSpent: seat === PITCHER ? run.advisersSpent : [...run.advisersSpent, seat],
     outcomes: { ...run.outcomes, [claim.id]: outcome },
   };
 }
 
 /**
- * WHAT IS STILL COMING IN THIS LANE. Eugene's job, and the only piece of
- * information on the floor that nobody else supplies.
+ * WHAT IS STILL COMING IN THIS LANE. Virgil's job (it was Eugene's until the
+ * read moved to the cat), and the only piece of information on the floor that
+ * nobody else supplies.
  *
  * The core decision this game claims to be about is *which claim inside a lane
  * deserves the one use* — and until this existed you made it BLIND. Sending
@@ -242,8 +253,8 @@ export function seatOptions(run, deal) {
   const claim = currentClaim(run, deal);
   const done = !!(claim && run.outcomes[claim.id]);
   const broke = run.pressesLeft <= 0;
-  return [SEATS.BARRON, ...SPENDABLE_SEATS].map((seat) => {
-    const spent = seat !== SEATS.BARRON && run.advisersSpent.includes(seat);
+  return [PITCHER, ...SPENDABLE_SEATS].map((seat) => {
+    const spent = seat !== PITCHER && run.advisersSpent.includes(seat);
     return {
       seat,
       enabled: !done && !broke && !spent,

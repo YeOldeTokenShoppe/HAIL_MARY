@@ -7,7 +7,32 @@
 // ~40 lines of prose, reused forever. That is the whole point of moving the
 // four-character layer here instead of into the archetypes.
 
-import { LANES, SEATS, SHAPES, inLane } from "./questions.js";
+import { LANES, PITCHER, SEATS, SHAPES, inLane } from "./questions.js";
+
+/**
+ * THE PITCH BOT — the thing you press. Not a seat, not staff, not yours.
+ *
+ * Founders employ pitch agents; that is the convention of this world rather than
+ * a production shortcut, which is why the founder never appears and why their
+ * absence needs no explaining. It works on COMMISSION, and that is load-bearing
+ * rather than colour: SHAPES.POSITIONED ("the speaker benefits from you believing
+ * it") is live in all three archetypes, and a paid closer's interest is
+ * structurally undeniable where an owner's is deniable.
+ *
+ * `face` is keyed to the pressure band and to NOTHING ELSE — see PITCHER_ASIDE
+ * below and invariant 9. The plate (SM_Chr_Kid_Robot_Face_01) is unskinned and
+ * untouched by both clips, so a texture swap can never fight the mixer. Base
+ * colour and emissive share one image in the GLB: set `map` AND `emissiveMap`.
+ */
+export const PITCH_BOT = {
+  id: PITCHER,
+  name: "The Agent",
+  role: "PITCHING ON COMMISSION",
+  model: "/models/pitch-bot.glb",   // 566KB. Draco + EXT_texture_webp required.
+  portrait: "/thumbnail_johnBarron.png",  // TODO: bot portrait render
+  clips: { idle: "idle", talking: "talking" },
+  blurb: "Paid if you fund it. Never met the founders either.",
+};
 
 // PORTRAITS ARE DESK DATA, NOT SURFACE DATA. They used to be a `cardId` that
 // each surface resolved into a Genesis card face through dealCard.js. Cards
@@ -22,7 +47,12 @@ export const DESK = {
     id: SEATS.BARRON, agentId: "Demon", station: "demon",
     name: "John Barron", role: "THE CHART", lane: LANES.CHART,
     portrait: "/thumbnail_johnBarron.png",
-    blurb: "Price, windows, momentum. Brought the deal in — gets paid if you fund it.",
+    // HE NO LONGER BRINGS THE DEAL IN. That was the sentence that made him both
+    // adversary and seat, and it is the pitch bot's job now. What he is instead:
+    // a tape reader, short-biased and vice-prone, which is a DISPOSITION the
+    // player will over-discount — the same lesson Marisol teaches from the
+    // opposite side. The messenger's disposition is not evidence.
+    blurb: "Price, windows, momentum. Reads the tape, and reads it short.",
   },
   [SEATS.MARISOL]: {
     id: SEATS.MARISOL, agentId: "Detective", station: "marisol",
@@ -44,8 +74,21 @@ export const DESK = {
   },
 };
 
-/** Seat order for every row that shows the whole desk. Barron first because
- *  he's the one pitching; the three spendables follow in lane order. */
+/**
+ * WHO IS THIS, for anything `seatOptions` hands a surface.
+ *
+ * `seatOptions` returns [PITCHER, ...four seats], and the pitcher is deliberately
+ * not in DESK — it isn't staff. Every render site needs one lookup that covers
+ * both, or each surface grows its own `id === PITCHER ? ... : DESK[id]` ternary
+ * and they drift. That drift is exactly how the seat migration produced four
+ * bugs from one cause; see the note at the top of pressUi.jsx.
+ */
+export function seatMeta(id) {
+  return id === PITCHER ? PITCH_BOT : (DESK[id] ?? null);
+}
+
+/** Seat order for every row that shows the whole desk. Barron first because he
+ *  reads the chart the pitch leans on; the rest follow in lane order. */
 export const DESK_ORDER = [
   DESK[SEATS.BARRON], DESK[SEATS.MARISOL], DESK[SEATS.GR80], DESK[SEATS.EUGENE],
 ];
@@ -143,17 +186,23 @@ export function laneSentence(claim, { spent = [] } = {}) {
 //    lands.
 
 
-// HOW HE CARRIES IT AFTER YOU'VE HAD A GO AT HIM.
+// HOW THE PITCHER CARRIES IT AFTER YOU'VE HAD A GO AT IT.
 //
-// Delivered as an ASIDE before his next claim, so the pitch visibly changes
-// shape as the room turns on him. Eighteen lines, archetype-agnostic, paid for
-// once — a new archetype adds none. None of them names a fact, an outcome or a
-// lane; they are posture only, so no line here can ever carry information the
-// pressure score didn't already give you.
+// Delivered as an ASIDE before the next claim, so the pitch visibly changes shape
+// as the room turns. Fourteen lines, archetype-agnostic, paid for once — a new
+// archetype adds none. None of them names a fact, an outcome or a lane; they are
+// posture only, so no line here can ever carry information the pressure score
+// didn't already give you.
 //
-// He never apologises and never concedes. A salesman who folds is a different
+// THESE WERE BARRON'S UNTIL 2026-07-29 and moved wholesale to the bot, which is
+// what §7 item 2 predicted ("mostly generic enough to survive, worth
+// re-reading"). One line did not survive the move: "Everyone at this table has
+// shipped something" was Barron appealing to the DESK, which an outside agent
+// cannot do — it now appeals to the client instead.
+//
+// It never apologises and never concedes. A closer who folds is a different
 // character, and a much less interesting one to have to read.
-const BARRON_ASIDE = {
+const PITCHER_ASIDE = {
   backed: [
     "Check it again if you like. It'll say the same thing.",
     "Good. Ask me another one.",
@@ -172,7 +221,7 @@ const BARRON_ASIDE = {
   ],
   cornered: [
     "You've made your mind up. Let me finish anyway.",
-    "Everyone at this table has shipped something. Let's not pretend that's nothing.",
+    "My client has shipped something. Let's not pretend that's nothing.",
     "Fine — you want the version with every caveat in it? Here it is.",
     "I've watched people talk themselves out of the best deal of their career.",
     "Ask the next one. I'd rather you asked than sat there deciding quietly.",
@@ -188,11 +237,15 @@ const BARRON_ASIDE = {
  * line verbatim, which reads as a stuck component rather than a character.
  * Index rotation can't collide with itself.
  */
-export function barronAside(band, claim, index = 0) {
-  const bank = BARRON_ASIDE[band];
+export function pitcherAside(band, claim, index = 0) {
+  const bank = PITCHER_ASIDE[band];
   if (!bank || !claim) return "";
   return bank[((index % bank.length) + bank.length) % bank.length];
 }
+
+/** @deprecated Pre-bot name. Kept so both surfaces keep rendering across the
+ *  refactor — drop it once PressSession and PressFlat call pitcherAside. */
+export const barronAside = pitcherAside;
 
 // WHAT A COLLEAGUE SAYS WHEN THEY COME BACK.
 //
@@ -204,6 +257,8 @@ export function barronAside(band, claim, index = 0) {
 // how the depth gradient becomes legible without a tooltip.
 //
 // Sixteen deep lines + four shallow ones, archetype-agnostic, paid for once.
+// (Four seats × dispatch/found/partial/nothing, plus one shallow each. Barron
+// joined the bank on 2026-07-29 when the pitch bot took over the selling.)
 const ADVISER_LINES = {
   [SEATS.MARISOL]: {
     dispatch: "Give me a second. I'll pull it.",
@@ -226,10 +281,22 @@ const ADVISER_LINES = {
     nothing: "Nobody's saying it. There's no story here to trace — that's the finding.",
     shallow: "This isn't really a story question, so all I've got is the surface.",
   },
-  // Barron answers in his own voice, never in this bank — the answer panel puts
-  // his line under his own name. He's here only so a lookup can't come back
-  // undefined if a caller asks.
-  [SEATS.BARRON]: {},
+  // BARRON, AS A SPECIALIST — new on 2026-07-29, and the only prose the pitch-bot
+  // change actually required. This bank was `{}` for as long as he was the
+  // pitcher: he answered in his own voice under his own name, so he never needed
+  // the four retrieval lines every other seat has.
+  //
+  // He keeps his jargon — "tape" is characterisation in a seat's mouth, and
+  // invariant 6 binds the UI, not the people. What he retrieves is the WINDOW,
+  // never the price: the chart lane's whole lesson is that price movement isn't
+  // evidence, so his findings are about what series exists to be looked at.
+  [SEATS.BARRON]: {
+    dispatch: "Hold on. Let me pull the tape.",
+    found: "There. The whole window, not the slice you were shown.",
+    partial: "That's as much tape as exists. It's thin, and thin is all it is.",
+    nothing: "There's no series to pull. Nobody ever published one — that's the finding.",
+    shallow: "This isn't a chart question. I can tell you what the price did, and price isn't evidence.",
+  },
 };
 
 /**

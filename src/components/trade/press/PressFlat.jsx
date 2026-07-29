@@ -1,8 +1,8 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDeal";
-import { BACKING, SEATS, SEAT_LANE, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
-import { DESK, DESK_ORDER, laneOwner, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
+import { BACKING, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
+import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES,
@@ -14,8 +14,8 @@ import PressFigure from "./PressFigure";
 import { preloadSfx } from "@/lib/uiSfx";
 import gsap from "gsap";
 import {
-  DiceTray, runDiceRoll, prefersReducedMotion, facesFor, SFX, DICE_CSS,
-} from "./diceRoll";
+  EnigmaConsole, runArrival, prefersReducedMotion, SFX, ARRIVAL_CSS,
+} from "./arrival";
 import { createFlatEvidenceScreen } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
@@ -33,52 +33,23 @@ import {
 // (the white-mass bug cost a rollback once already) can never take the game
 // offline entirely.
 //
-// Three things it does that the 3D view CAN'T:
+// Two things it does that the 3D view CAN'T:
 //   • Barron SPEAKS. /api/counsel-voice + the amplitude mouth means any
 //     generated line can be voiced. Desktop is stuck with banked SitePal clips.
 //   • The evidence screen is literally the screen. On desktop "his monitor
 //     stays black" is a texture across the room; here the panel IS a terminal.
-//   • Gyro holofoil — tilt the phone, the foil moves. See useGyroTilt below.
 
-const VOICE = "JB";
-
-/**
- * Feed device orientation into --gyro-rx/--gyro-ry, which the dice tray reads
- * to parallax the cubes as you tilt the phone. iOS needs an explicit permission
- * grant from a user gesture; without it we simply never attach and the dice sit
- * still. Never throws, never blocks the game.
- *
- * This drove TradingCard's holofoil until cards were cut on 2026-07-28. Worth
- * knowing: for a while after that it was dead code that still requested the iOS
- * orientation permission, i.e. a system prompt for a feature that no longer
- * existed. If the dice ever go too, this goes with them.
- */
-export function useGyroTilt(enabled) {
-  const [granted, setGranted] = useState(false);
-  useEffect(() => {
-    if (!enabled || !granted || typeof window === "undefined") return;
-    const onOrient = (e) => {
-      // beta = front/back tilt, gamma = left/right. Clamped hard: past ~25° the
-      // foil sweep stops reading as light and starts reading as a glitch.
-      const rx = Math.max(-9, Math.min(9, ((e.beta ?? 0) - 45) * 0.18));
-      const ry = Math.max(-11, Math.min(11, (e.gamma ?? 0) * 0.22));
-      document.documentElement.style.setProperty("--gyro-rx", `${rx.toFixed(2)}deg`);
-      document.documentElement.style.setProperty("--gyro-ry", `${ry.toFixed(2)}deg`);
-    };
-    window.addEventListener("deviceorientation", onOrient);
-    return () => window.removeEventListener("deviceorientation", onOrient);
-  }, [enabled, granted]);
-
-  const request = useCallback(async () => {
-    if (typeof window === "undefined" || !window.DeviceOrientationEvent) return;
-    const need = typeof window.DeviceOrientationEvent.requestPermission === "function";
-    if (!need) { setGranted(true); return; }
-    try { setGranted((await window.DeviceOrientationEvent.requestPermission()) === "granted"); }
-    catch { /* declined or unavailable — pointer tilt still works */ }
-  }, []);
-
-  return { granted, request };
-}
+// THE PITCHER'S VOICE. Both say() calls on this surface are the pitcher's own
+// lines — the claim's spin, and its reaction after a seat reports — so one key
+// covers them. Was "JB" while John Barron did the selling; the pitch bot has its
+// own ElevenLabs voice now (VOICES.PB in api/counsel-voice, override with
+// ELEVENLABS_VOICE_PITCHBOT).
+//
+// The ADVISER half of a press is still silent — `outcome.adviserSays` is
+// rendered but never spoken, so the two-voices-per-press ordering in VC_GAME.md
+// §9 item 4 remains unbuilt. When it lands, the seat speaks FIRST and the
+// pitcher reacts, or the reaction lands under the wrong name.
+const VOICE = "PB";
 
 export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // A FRESH DEAL EVERY TIME YOU SIT DOWN — see the note in instanceDeal.js for
@@ -105,7 +76,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // Mirrored into state because the tab label reads it during render — a ref
   // would never re-render and the badge would stay stale after a press.
   const [hasRecord, setHasRecord] = useState(false);
-  const [boardPane, setBoardPane] = useState(SEATS.BARRON);
+  const [boardPane, setBoardPane] = useState(PITCHER);
   // He's answered and the board has changed, and you HAVEN'T LOOKED YET.
   // Until you do, nothing on this surface may name the outcome — see the tab
   // badge and .pf-answer below.
@@ -116,34 +87,26 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // stale `pane`, and it has to know whether you're already looking.
   const paneRef = useRef("feed");
   useEffect(() => { paneRef.current = pane; }, [pane]);
-  const gyro = useGyroTilt(true);
 
-  /* ---- the roll ----
-     Same choreography as the 3D view (./diceRoll), with one thing this surface
+  /* ---- the arrival ----
+     Same choreography as the 3D view (./arrival), with one thing this surface
      has to solve that the desktop panel doesn't: the briefing is a SCROLLING
-     column taller than a phone, so the dice and the desk strip are never on
-     screen together. We pin the view to the top before rolling — the dice
-     settling is what unseals the name, so that's the beat worth seeing — and
-     then slide down to the desk once they land. */
+     column taller than a phone, so the plate and the desk strip are never on
+     screen together. We pin the view to the top first — the agent arriving is
+     what unseals the name, so that's the beat worth seeing — and then slide down
+     to the desk once it's in the room. */
   const [rolled, setRolled] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [settled, setSettled] = useState(false);
   const identity = rolled || settled;
-  // The desk never had to be revealed. Dealing the four characters was ceremony
-  // for a DRAW, and there is no draw — the same four people are at this desk
-  // every session. The one genuinely unknown thing is the deal, which is what
-  // the dice pick. (author, 2026-07-27)
-  const speakerNamed = true;
-  // Which faces they come to rest on. From a tick counter, NEVER the run seed —
-  // see the note at the top of diceRoll.jsx. Decoration, and it must stay that.
-  const faces = useMemo(() => facesFor(0), []);
-  const diceRefs = useRef([]);
-  const cubeRefs = useRef([]);
+  const panelRef = useRef(null);
+  const lampRef = useRef(null);
+  const rotorRefs = useRef([]);
+  const nameRef = useRef(null);
   const sheetRef = useRef(null);
   const scrollRef = useRef(null);
   const tlRef = useRef(null);
-  const registerDie = useCallback((i, el) => { diceRefs.current[i] = el; }, []);
-  const registerCube = useCallback((i, el) => { cubeRefs.current[i] = el; }, []);
+  const registerRotor = useCallback((i, el) => { rotorRefs.current[i] = el; }, []);
 
   useEffect(() => { Object.values(SFX).forEach(preloadSfx); }, []);
   useEffect(() => () => tlRef.current?.kill(), []);
@@ -154,23 +117,25 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // below is now the DESK — the same four people every session, i.e. nothing to
   // reveal. Keeping the scroll meant that the instant the deal was finally
   // named, the column scrolled away from the name and the sheet to show four
-  // faces that hadn't changed. The reveal is the payoff of the roll; stay on it.
+  // a plate that hadn't changed. The reveal is the payoff; stay on it.
   // The CTA is position:sticky, so nothing goes out of reach by not scrolling.
 
   const runRoll = useCallback(() => {
     if (rolling || rolled) return;
     if (prefersReducedMotion()) { setSettled(true); setRolled(true); return; }
 
-    // Pin to the top before rolling — the dice are up there, and a roll you
+    // Pin to the top first — the plate is up there, and an arrival you
     // scrolled past is a beat that may as well not have played.
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
 
     setRolling(true);
-    const tl = runDiceRoll({
-      dice: diceRefs.current,
-      cubes: cubeRefs.current,
+    const tl = runArrival({
+      panel: panelRef.current,
+      rotors: rotorRefs.current,
+      lamp: lampRef.current,
+      name: nameRef.current,
+      nameText: deal.name,
       sheet: sheetRef.current,
-      faces,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -197,7 +162,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // mid-read; the mood band is live.
   const mood = useMemo(() => pressure(run), [run]);
   const aside = useMemo(
-    () => barronAside(mood.band, claim, run.claimIndex),
+    () => pitcherAside(mood.band, claim, run.claimIndex),
     [mood.band, claim, run.claimIndex]);
   const readout = useMemo(() => callReadout(slider), [slider]);
   const read = useMemo(() => coverageScore(run, deal), [run, deal]);
@@ -228,7 +193,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // THREE boards, not one. Barron's, Marisol's and GR80's — Eugene never
   // stamps anything, by design, so he has no board to keep. Only one is on
   // screen at a time; the strip below is how you move between them.
-  const BOARDS = useMemo(() => [SEATS.BARRON, SEATS.MARISOL, SEATS.GR80], []);
+  // PITCHER, not Barron, holds the first tab now. Barron ALIASES onto it (see
+  // the same note in PressSession): four monitors, four analysts, and the agent
+  // is an outsider whose receipt belongs on the easel page once that is wired.
+  // Eugene still stamps nothing here, by design.
+  const BOARDS = useMemo(() => [PITCHER, SEATS.MARISOL, SEATS.GR80], []);
   const screensRef = useRef({});
   useEffect(() => {
     if (!started) return;
@@ -236,10 +205,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     for (const seat of BOARDS) {
       const el = document.getElementById(`pf-screen-${seat}`);
       if (!el) continue;
-      made[seat] = createFlatEvidenceScreen(el, { header: DESK[seat].name.toUpperCase() });
+      made[seat] = createFlatEvidenceScreen(el, { header: seatMeta(seat).name.toUpperCase() });
     }
     screensRef.current = made;
-    screenRef.current = made[SEATS.BARRON] || null;
+    made[SEATS.BARRON] = made[PITCHER];   // alias — see BOARDS note
+    screenRef.current = made[PITCHER] || null;
     return () => {
       Object.values(made).forEach((x) => x.dispose());
       screensRef.current = {}; screenRef.current = null;
@@ -308,7 +278,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const revealFor = useRef(null);
   const MIN_BEAT = 1400;  // if his voice is unavailable, the beat still exists
 
-  const press = useCallback((seat = SEATS.BARRON) => {
+  const press = useCallback((seat = PITCHER) => {
     if (!onFloor) return;
     const next = doPress(run, deal, seat);
     if (next === run) return;   // illegal, spent, or out of budget — a no-op
@@ -325,9 +295,9 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       nothingOnFile: outcome.nothingOnFile,
       adviserSays: outcome.adviserSays,
       line: outcome.barronSays,
-      asked: outcome.seat === SEATS.BARRON
+      asked: outcome.seat === PITCHER
         ? "Put a number on it."
-        : `${DESK[outcome.seat].name} — ${DESK[outcome.seat].role}`,
+        : `${seatMeta(outcome.seat).name} — ${seatMeta(outcome.seat).role}`,
     });
 
     // You INTERRUPTED him — so he stops the sentence he was on and answers.
@@ -377,7 +347,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     revealFor.current = null;
     setFlash(null);
     setPane("feed");     // new claim, back to his face
-    setBoardPane(SEATS.BARRON);
+    setBoardPane(PITCHER);
     Object.values(screensRef.current).forEach((x) => x.stayBlack());
     setHasRecord(false);
     setLookPending(false);
@@ -392,15 +362,19 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const lockCall = useCallback(() => setRun((r) => doAllocate(r, deal, slider)), [deal, slider]);
   const finish = useCallback(() => setRun((r) => toAutopsy(r)), []);
 
-  // The start tap is the ONLY user gesture we're guaranteed, so it has to do
-  // double duty: unlock the audio context (iOS will not play a decoded buffer
-  // without one) and request the gyro permission (iOS gates that on a gesture
-  // too). Both fail soft — no audio or no tilt still leaves a playable game.
+  // The start tap is the ONLY user gesture we're guaranteed, so it unlocks the
+  // audio context here (iOS will not play a decoded buffer without one). Fails
+  // soft — no audio still leaves a playable game.
+  //
+  // IT USED TO REQUEST DEVICE-ORIENTATION TOO, and that is worth remembering
+  // rather than just deleting: the gyro drove TradingCard's holofoil, then the
+  // dice tray, and each time its consumer was cut the permission prompt outlived
+  // it — an iOS system dialog for a feature that no longer existed, twice. When
+  // you remove a visual, grep for what asked the OS for permission to drive it.
   const begin = useCallback(() => {
     try { unlockAdviserAudio(); } catch {}
-    gyro.request();
     setStarted(true);
-  }, [gyro]);
+  }, []);
 
   /* ------------------------------------------------------------------ */
   return (
@@ -420,7 +394,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           in", over an empty table announced both before either had been picked
           — exactly the reveal this beat exists to stage.
 
-          onClick={skipRoll}: a tap anywhere mid-roll settles the dice —
+          onClick={skipRoll}: a tap anywhere mid-arrival completes it —
           impatience is a legitimate input. No overlay needed on this surface,
           unlike the 3D view's pointer-events:none root; the handler sits on
           the column and no-ops once the roll is done. */}
@@ -428,27 +402,34 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         <div className={`pf-scroll${rolled ? " is-rolled" : ""}`} ref={scrollRef}
              onClick={skipRoll}>
           <div className="pf-eyebrow">ONE DEAL ON THE TABLE</div>
-          <div className={`pf-name${identity ? "" : " facedown"}`}>
-            {identity ? deal.name : "NOT ROLLED YET"}
+          {/* THE DECODE LANDS HERE. runArrival writes ciphertext into this node
+              and resolves it to deal.name; React renders the same string once
+              `identity` flips, so the re-render is a no-op. */}
+          <div className={`pf-name${identity ? "" : " facedown"}`} ref={nameRef}>
+            {identity ? deal.name : "\u259a\u259a\u259a\u259a\u259a\u259a\u259a\u259a"}
           </div>
           <div className="pf-sub">
             {identity
               ? `${deal.ticker} · ${deal.chain} · ${deal.surface.age} old · ${deal.surface.mcap}`
-              : "the house hasn't picked it yet"}
+              : "sent down from the desk above, still coded"}
           </div>
 
-          {/* THE ROLL. Rolled fresh for this sitting; not re-rollable without
-              leaving and coming back. */}
+          {/* THE ARRIVAL. Picked fresh for this sitting; you can't ask for a
+              different one without leaving and coming back. */}
           <div className="pf-roll">
-            <DiceTray faces={faces} spent={rolled}
-                      register={registerDie} registerCube={registerCube} />
-            <div className="pf-roll-cap">
-              {rolled ? "YOUR ROLL · NOBODY ELSE GOT THIS ONE"
-                : "THE DEAL IS ROLLED, NOT CHOSEN"}
-            </div>
+            <EnigmaConsole arrived={rolled} ref={panelRef}
+                           lampRef={lampRef} registerRotor={registerRotor} />
+            {/* ONLY IN THE ARRIVED STATE. While waiting, the console already
+                says AWAITING TRAFFIC — a caption repeating it put four near
+                identical waiting lines on one screen, which reads as stuck. */}
+            {rolled && (
+              <div className="pf-roll-cap">
+                SENT DOWN TO YOU · YOU DON&apos;T GET TO ASK WHY THIS ONE
+              </div>
+            )}
           </div>
 
-          {/* The deal sheet, written in only once the dice settle. Every field
+          {/* The deal sheet, written in only once the agent is in. Every field
               is public surface data and none of it correlates with the outcome
               — asserted in the suite, because the moment the listing leaks the
               answer the analysts stop mattering. */}
@@ -465,41 +446,26 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 </dl>
               </>
             ) : (
-              <div className="pf-sheet-blank">NOT ROLLED YET</div>
+              <div className="pf-sheet-blank">▚▚▚  DECODING PENDING</div>
             )}
           </div>
 
-          {/* VIRGIL SITS WITH THE ROLL, NOT THE DESK. He speaks on every claim,
-              so arriving unannounced made him read as a bug the first time he
-              did — but introducing him among the four was worse: directly above
-              the CTA, a cat's face over a button about pitching read as the CAT
-              doing the pitching (author, 2026-07-28). Not a seat, no lane,
-              cannot be sent. */}
-          <div className="pf-virgil-intro">
-            <img className="pf-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
-            <div>
-              <span className="pf-virgil-who">{VIRGIL.name}</span>
-              <span className="pf-virgil-role">{VIRGIL.role}</span>
-              <span className="pf-virgil-blurb">{VIRGIL.blurb}</span>
-            </div>
-          </div>
 
-          {/* Both versions are the same shape, so the swap reads as the name
-              filling in rather than the paragraph rewriting itself. */}
+          {/* The pitcher is an outside agent on commission. This said "John
+              Barron brought this one in — it's his deal" until 2026-07-29, when
+              the bot took over the selling and Barron joined the desk. */}
           <p className="pf-copy">
-            {speakerNamed
-              ? "John Barron brought this one in. It's his deal — if you fund it, he gets paid."
-              : "Someone at this desk brought this one in. It's their deal — if you fund it, they get paid."}
+            An agent is here for a client who didn&apos;t come. It gets paid if you
+            fund this.
           </p>
           <p className="pf-copy gold">
-            You can interrupt {speakerNamed ? "him" : "them"} <b>three times</b>. Whatever{" "}
-            {speakerNamed ? "he" : "they"} can back lands on {speakerNamed ? "his" : "their"}{" "}
-            screen. Whatever {speakerNamed ? "he" : "they"} can't, doesn't.
+            You can interrupt <b>three times</b>. Whatever it can back lands on a
+            screen. Whatever it can&apos;t, doesn&apos;t.
           </p>
           {/* Portraits, not card faces. Not buttons either: on the briefing
               these introduce the four, and the sendable version of the same
               row is SeatRow on the floor. */}
-          <div className="pf-label">THE DESK — always these four</div>
+          <div className="pf-label">THE DESK — always these four, and the cat</div>
           <div className="pf-strip">
             {DESK_ORDER.map((m) => (
               <div key={m.id} className="pf-face">
@@ -508,12 +474,24 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 <span className="pf-face-role">{m.role}</span>
               </div>
             ))}
+            {/* VIRGIL, END OF THE ROW, BEHIND A DIVIDER. He was here once and it
+                failed — a cat's face above the pitching CTA read as the CAT
+                pitching (author, 2026-07-28). Safe now for a reason that didn't
+                exist then: THE PITCHER IS NOT ONE OF THESE FACES any more. The
+                divider and NOT A SEAT are what keep him legible as a companion;
+                if he reads as pitching again he goes back to his own block. */}
+            <span className="pf-face-div" aria-hidden="true" />
+            <div className="pf-face pf-face-cat">
+              <img className="pf-face-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+              <span className="pf-face-who">{VIRGIL.name}</span>
+              <span className="pf-face-role">{VIRGIL.role}</span>
+              <span className="pf-face-note">NOT A SEAT</span>
+            </div>
           </div>
           <p className="pf-copy sm dim">
             Everyone here will answer anything you ask. Each has <b>one</b> subject
-            they go deep on, and Marisol, GR80 and Eugene answer <b>once each</b>.
-            Ask the wrong one and you still get an answer — just the shallow one,
-            and they&apos;re spent.
+            they go deep on, and each answers <b>once</b>. Ask the wrong one and you
+            still get an answer — just the shallow one, and they&apos;re spent.
           </p>
 
           {/* ONE BUTTON — a LOCAL/DAILY split lived here briefly and was cut.
@@ -521,7 +499,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           <div className="pf-cta-row">
             <button className="pf-btn primary" disabled={rolling}
                     onClick={rolled ? begin : runRoll}>
-              {rolled ? "HEAR THE PITCH ▸" : rolling ? "ROLLING…" : "ROLL THE DEAL ▸"}
+              {rolled ? "HEAR THE PITCH ▸" : rolling ? "DECODING…" : "SEND IT IN ▸"}
             </button>
           </div>
         </div>
@@ -568,7 +546,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                     return (
                       <button key={seat} className={`pf-bchip ${boardPane === seat ? "on" : ""} ${state}`}
                               onClick={() => setBoardPane(seat)}>
-                        {DESK[seat].role}
+                        {seatMeta(seat)?.role}
                         <em>{state === "rec" ? "ON RECORD" : state === "nil" ? "NOTHING" : "—"}</em>
                       </button>
                     );
@@ -721,7 +699,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 // The lesson is the one pressUi.jsx's header already makes about state gating:
 // a surface can go a long way on a stylesheet it never actually included, as
 // long as its children are self-sizing.
-const CSS = DICE_CSS + PRESS_UI_CSS + `
+const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
 .pf-wrap { position:absolute; inset:0; display:flex; flex-direction:column;
   background:#02100e; color:#eafff9; font-family:'Courier New', monospace;
   overflow:hidden;
@@ -734,189 +712,38 @@ const CSS = DICE_CSS + PRESS_UI_CSS + `
   border-right:1px solid rgba(47,214,214,0.16); }
 @media (max-width:560px) { .pf-wrap { border:none; } }
 
-/* GYRO TILT, REPOINTED. It used to drive TradingCard's holofoil through
-   --rx/--ry on .tc-stage. Cards left this game on 2026-07-28, which made the
-   whole mechanism dead code that was still triggering an iOS device-orientation
-   PERMISSION PROMPT for a feature that no longer existed.
-
-   It now tilts the dice tray instead, which is a better home for it: these are
-   real CSS 3D cubes, so tilting the phone parallaxes them like objects on a
-   table. Safe against the roll animation because gsap owns .dice-die (the
-   throw) and .dice-cube (the tumble) — never .dice-tray, which is the group. */
-.pf-roll .dice-tray {
-  transform: rotateX(var(--gyro-rx, 0deg)) rotateY(var(--gyro-ry, 0deg));
-  transition: transform .12s linear; }
-
-
-.pf-bar { flex:none; display:flex; align-items:center; justify-content:space-between;
-  gap:10px; padding:10px 12px; border-bottom:1px solid rgba(47,214,214,0.25);
-  font-size:11px; letter-spacing:0.08em; }
-.pf-exit { background:none; border:1px solid rgba(47,214,214,0.45); color:#2fd6d6;
-  font:inherit; font-size:10px; padding:5px 9px; }
-.pf-tick { font-weight:bold; letter-spacing:0.12em; }
-.pf-book b { color:#ffd23a; margin-left:5px; }
-
-.pf-scroll { flex:1; overflow-y:auto; padding:16px 14px 28px;
-  -webkit-overflow-scrolling:touch; }
-/* "safe center" centres until the content is taller than the box, then falls
-   back to start alignment. Plain centring overflows in BOTH directions and the
-   top of a long resolution becomes unscrollable-to — the same class of bug as
-   the floor's clipped dock, one phase later. (No backticks in this sheet: it
-   is a template literal.) */
-.pf-scroll.center { display:flex; flex-direction:column; align-items:center;
-  justify-content:center; justify-content:safe center; text-align:center; }
-.pf-eyebrow { font-size:9.5px; letter-spacing:0.18em; color:#ff5f9e; font-weight:bold; }
-.pf-name { font-size:23px; font-weight:bold; letter-spacing:0.05em; margin-top:5px; }
-.pf-name.sm { font-size:15px; }
-.pf-sub { font-size:10.5px; letter-spacing:0.07em; color:rgba(234,255,249,0.5); margin-top:3px; }
-.pf-copy { font-size:13px; line-height:1.5; margin:10px 0; }
-.pf-copy.gold { color:#ffd23a; }
-.pf-copy.sm { font-size:11.5px; }
-.pf-label { font-size:9px; letter-spacing:0.14em; font-weight:bold;
-  color:rgba(255,210,58,0.85); margin:14px 0 8px; }
-
-/* THE DESK, as people rather than card faces. Four fit a 520px column without
-   scrolling, so this no longer needs to be a scroller — but it stays one, so a
-   fifth seat or a narrow phone degrades to a swipe instead of a wrap. */
-.pf-strip { display:flex; gap:9px; overflow-x:auto; padding-bottom:6px;
-  -webkit-overflow-scrolling:touch; }
-.pf-strip.tight { gap:7px; }
-.pf-face { flex:0 0 auto; width:86px; display:flex; flex-direction:column;
-  align-items:center; gap:4px; text-align:center; }
-.pf-face-pic { width:54px; height:54px; object-fit:cover; border-radius:50%;
+/* THE DESK STRIP. These had NO CSS AT ALL until 2026-07-29 — .pf-strip and
+   .pf-face existed only as class names, so the four portraits fell back to
+   block layout and stacked. Styling them was forced by giving Virgil a divider
+   at the end of the row: an unstyled 1px span in a block flow is invisible.
+   Five tiles wrap on a narrow phone, which is fine — the cat wrapping onto its
+   own line still reads as "and the cat", never as a fifth seat. */
+/* The ciphertext placeholder is unbreakable glyphs in a column that gets down to
+   ~266px, so it must be allowed to break. */
+.pf-name { overflow-wrap:anywhere; }
+.pf-strip { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 2px; min-width:0; }
+.pf-face { flex:0 1 72px; min-width:0; max-width:72px;
+  display:flex; flex-direction:column;
+  align-items:center; gap:3px; text-align:center; }
+.pf-face-pic { width:44px; height:44px; object-fit:cover; border-radius:50%;
   border:1px solid rgba(47,214,214,0.35); background:#020f0d; }
-/* Two lines reserved for every name, because "Detective Marisol" wraps and the
-   other three don't — without this her role label sat a line lower than the
-   rest and the row read as misaligned rather than as one row. */
-.pf-face-who { font:bold 9.5px/1.2 'Courier New',monospace; letter-spacing:0.04em;
-  color:rgba(234,255,249,0.92); min-height:2.4em; display:flex;
-  align-items:center; justify-content:center; }
-.pf-face-role { font-size:8px; letter-spacing:0.1em; color:rgba(255,210,58,0.75); }
+/* Two lines reserved for every name — "Detective Marisol" wraps and the others
+   don't, which would drop her role label a line below everyone else's. */
+.pf-face-who { font-size:8px; font-weight:bold; letter-spacing:0.03em;
+  color:rgba(234,255,249,0.92); line-height:1.2; min-height:2.4em;
+  display:flex; align-items:center; justify-content:center; }
+.pf-face-role { font-size:7px; letter-spacing:0.1em; color:rgba(255,210,58,0.75); }
 
-/* THE ROLL — die/pip/cube styles come from diceRoll's DICE_CSS at the top of
-   this sheet. Local to this surface: the tray's framing and the sheet. */
-.pf-roll { display:flex; flex-direction:column; align-items:center; gap:10px;
-  margin:16px 0 12px; padding:18px 10px;
-  border:1px solid rgba(47,214,214,0.22); background:rgba(0,0,0,0.25); }
-.pf-roll-cap { font-size:8.5px; letter-spacing:0.14em; font-weight:bold;
-  color:rgba(255,210,58,0.75); text-align:center; line-height:1.4; }
+/* VIRGIL, at the end of the strip and set apart from it on purpose — not a seat,
+   no lane, cannot be sent. The divider carries that; don't tidy it away. */
+.pf-face-div { flex:none; align-self:center; width:1px; height:38px;
+  background:rgba(234,255,249,0.16); margin:0 2px; }
+.pf-face-cat .pf-face-pic { border-color:rgba(191,238,222,0.5); }
+.pf-face-cat .pf-face-who { color:#bfeede; }
+.pf-face-cat .pf-face-role { color:rgba(191,238,222,0.75); }
+.pf-face-note { font-size:7px; letter-spacing:0.11em;
+  color:rgba(191,238,222,0.5); margin-top:1px; }
 
-/* NOT opacity:0 at rest. It was, and the pre-roll placeholder went with it —
-   leaving a ~100px hole between the dice and Virgil where NOT ROLLED YET should
-   have been. runDiceRoll's fromTo does the reveal; the resting state has to
-   stay visible or the panel has a gap in it before anyone presses anything. */
-.pf-sheet { border:1px solid rgba(47,214,214,0.35); border-top:2px solid #ff5f9e;
-  background:rgba(0,0,0,0.3); padding:12px 13px; }
-.pf-sheet-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold;
-  color:#ff5f9e; margin-bottom:8px; }
-.pf-sheet-stats { margin:0; display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; }
-.pf-sheet-stats > div { display:flex; align-items:baseline; gap:7px; }
-.pf-sheet-stats dt { font-size:8.5px; letter-spacing:0.12em;
-  color:rgba(234,255,249,0.45); width:54px; flex:none; }
-.pf-sheet-stats dd { margin:0; font-size:11px; font-weight:bold; color:#eafff9; }
-.pf-sheet-blank { font-size:10px; letter-spacing:0.16em; font-weight:bold;
-  color:rgba(234,255,249,0.28); text-align:center; padding:18px 0; }
-
-/* VIRGIL, set apart from the four on purpose — not a seat, no lane, cannot be
-   sent anywhere. Warmer than the desk chrome, matching his block on the floor. */
-.pf-virgil-intro { display:flex; align-items:flex-start; gap:11px; margin-top:12px;
-  padding:11px 12px; border:1px solid rgba(191,238,222,0.22);
-  background:rgba(191,238,222,0.05); }
-.pf-virgil-pic { width:42px; height:42px; flex:none; object-fit:cover;
-  border-radius:50%; border:1px solid rgba(191,238,222,0.45); }
-.pf-virgil-intro > div { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.pf-virgil-who { font-size:11.5px; font-weight:bold; letter-spacing:0.05em; color:#bfeede; }
-.pf-virgil-role { font-size:8.5px; letter-spacing:0.13em; font-weight:bold;
-  color:rgba(191,238,222,0.75); }
-.pf-virgil-blurb { font-size:11px; line-height:1.4; margin-top:3px;
-  color:rgba(191,238,222,0.72); }
-
-/* The deal is nameless until the dice stop (invariant 7). */
-.pf-name.facedown { color:rgba(234,255,249,0.3); letter-spacing:0.12em; }
-/* The briefing is taller than a phone, so the CTA rides the bottom of the
-   column — otherwise you scroll past the only control there is. */
-/* The fade has to reach opaque FAST now. It was 0 -> 0.92 over 38% of the row,
-   which was fine for one button but the row holds two stacked mode buttons, so
-   38% left the whole top third translucent and the briefing copy showed through
-   between them. Short fade, then solid. */
-.pf-cta-row { position:sticky; bottom:0; z-index:4; display:flex; align-items:center;
-  gap:12px; margin-top:14px; padding:12px 0 4px;
-  background:linear-gradient(180deg, rgba(3,18,16,0) 0%, rgba(3,18,16,0.97) 14%,
-    rgba(3,18,16,0.97) 100%); }
-.pf-cta-row .pf-btn.primary { flex:1; margin:0; }
-
-
-/* the floor — portrait, thumb-first.
-   ONE SCROLLER, THREE PINNED ROWS. .pf-read is the only child that may grow or
-   scroll; the tabs, the feed and the dock are fixed furniture. Every row used
-   to be flex:none inside this overflow:hidden column, which meant the column
-   was simply taller than the phone and the bottom of it — the dock's nav — was
-   unreachable. If you add a row here, it goes inside .pf-read or it gets a
-   height budget. */
-.pf-floor { flex:1; display:flex; flex-direction:column; min-height:0; }
-/* flex:0 1 auto — the feed gives up height before the words do. */
-.pf-stage { flex:0 1 auto; height:30vh; min-height:140px; max-height:330px; padding:10px 0;
-  display:flex; justify-content:center; align-items:center; overflow:hidden;
-  background:radial-gradient(ellipse at 50% 35%, rgba(255,45,111,0.14), transparent 68%); }
-.pf-stage > * { height:100%; }
-
-.pf-read { flex:1 1 auto; min-height:76px; overflow-y:auto; overscroll-behavior:contain;
-  -webkit-overflow-scrolling:touch; padding-bottom:8px; }
-/* only while something IS below — so the last line is never the faded one */
-.pf-read.more { -webkit-mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent);
-  mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent); }
-
-
-/* the agenda — every subject he'll cover, lane-dotted */
-.pf-agenda { flex:none; display:flex; gap:5px; overflow-x:auto; padding:8px 12px 6px;
-  -webkit-overflow-scrolling:touch; }
-.pf-ag { flex:0 0 auto; font:bold 9.5px/1 'Courier New',monospace; letter-spacing:0.07em;
-  padding:7px 9px; border:1px solid rgba(234,255,249,0.16); color:rgba(234,255,249,0.45);
-  white-space:nowrap; position:relative; }
-.pf-ag::before { content:""; display:inline-block; width:5px; height:5px; border-radius:50%;
-  margin-right:5px; vertical-align:middle; background:rgba(234,255,249,0.3); }
-.pf-ag[data-lane="CHAIN"]::before  { background:#2fd6d6; }
-.pf-ag[data-lane="RECORD"]::before { background:#ffd23a; }
-.pf-ag.past { opacity:0.4; }
-.pf-ag.now  { border-color:#ff5f9e; color:#fff; }
-.pf-ag.done { border-style:dashed; }
-
-/* the seat row — you send a PERSON, not a menu option */
-
-/* whose question is this — said plainly, above the row that enforces it */
-
-/* three boards, one visible, plus the text comparison strip */
-.pf-boards { width:100%; display:flex; flex-direction:column; gap:7px; }
-.pf-screen { display:none; }
-.pf-screen.show { display:block; }
-.pf-bstrip { display:flex; gap:4px; }
-.pf-bchip { flex:1; background:rgba(2,16,14,0.85); border:1px solid rgba(47,214,214,0.22);
-  color:rgba(234,255,249,0.6); font:bold 10px/1.35 'Courier New',monospace;
-  letter-spacing:0.07em; padding:7px 4px; cursor:pointer;
-  display:flex; flex-direction:column; gap:2px; }
-.pf-bchip.on { border-color:#2fd6d6; color:#2fd6d6; background:rgba(47,214,214,0.08); }
-.pf-bchip em { font-style:normal; font-weight:normal; font-size:9px; opacity:0.8; }
-.pf-bchip.rec em { color:#ffd23a; opacity:1; }
-.pf-bchip.nil em { color:#ff9b6f; opacity:1; }
-
-.pf-tabs { flex:none; display:flex; gap:1px; margin:0 12px; }
-.pf-tabs button { flex:1; background:rgba(2,16,14,0.9); border:1px solid rgba(47,214,214,0.22);
-  border-bottom:none; color:rgba(234,255,249,0.5); font:bold 9.5px/1 'Courier New',monospace;
-  letter-spacing:0.11em; padding:9px 6px; cursor:pointer; }
-.pf-tabs button.on { color:#2fd6d6; border-color:rgba(47,214,214,0.5);
-  background:rgba(47,214,214,0.08); }
-.pf-tabs em { font-style:normal; font-weight:normal; opacity:0.7; }
-.pf-tabs em.rec { color:#ffd23a; opacity:1; }
-/* GO AND LOOK. Cyan, deliberately — the tab's own accent, carrying no verdict.
-   Gold is the receipt colour, so pulsing gold would announce a receipt before
-   you'd been to see one, which is the whole thing this beat withholds. */
-.pf-tabs button.look { color:#2fd6d6; border-color:rgba(47,214,214,0.6);
-  animation:pf-look 1.15s ease-in-out infinite; }
-.pf-tabs button.look em { opacity:1; font-weight:bold; }
-@keyframes pf-look {
-  0%, 100% { background:rgba(47,214,214,0.05); box-shadow:0 0 0 rgba(47,214,214,0); }
-  50%      { background:rgba(47,214,214,0.20); box-shadow:0 0 15px rgba(47,214,214,0.45); }
-}
 /* The directive under his answer. Static — the tab does the attracting, and
    two things pulsing at once reads as an error state rather than a nudge. */
 .pf-look { display:block; width:100%; margin-top:9px; cursor:pointer;
