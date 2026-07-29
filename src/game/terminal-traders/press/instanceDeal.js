@@ -10,12 +10,15 @@
 import { mulberry32 } from "../caseTable.js";
 import * as BACKDOOR from "./archetypes/backdoorFork.js";
 import * as MIRAGE from "./archetypes/yieldMirage.js";
+import * as ANONREAL from "./archetypes/anonButReal.js";
+import { IDENTITIES, CHAINS } from "./identities.js";
 import { getCardById } from "../cards.js";
 import { getCardArt } from "../templateCard.js";
 
 export const ARCHETYPES = {
   [BACKDOOR.ARCHETYPE_ID]: BACKDOOR,
   [MIRAGE.ARCHETYPE_ID]: MIRAGE,
+  [ANONREAL.ARCHETYPE_ID]: ANONREAL,
 };
 export const ARCHETYPE_IDS = Object.keys(ARCHETYPES);
 
@@ -78,7 +81,11 @@ export function instanceDeal(seed = 1, archetypeId = null) {
 
   const rolled = rollOutcome(rand, A.OUTCOMES);
   const branch = rolled.outcome; // "rug" | "legit"
-  const id = pick(rand, A.IDENTITIES);
+  // THE NAME COMES FROM A SHARED POOL, NEVER FROM THE ARCHETYPE. Per-archetype
+  // identity lists made the deal's name a perfect predictor of its pattern —
+  // and therefore of its base rate — which is the one thing the player is meant
+  // to work out. See identities.js.
+  const id = { ...pick(rand, IDENTITIES), chain: pick(rand, CHAINS) };
   // Two DISTINCT prior roles — "ex-Aave, ex-Aave" reads as a bug, not a founder.
   const priorA = pick(rand, A.PRIORS);
   const priorB = pick(rand, A.PRIORS.filter((p) => p !== priorA));
@@ -164,6 +171,12 @@ export function instanceDeal(seed = 1, archetypeId = null) {
   return {
     id: `${pickedId}:${seed}`,
     archetype: pickedId,
+    // The player-facing name of the pattern. `archetype` is a code slug and was
+    // being printed on the post-deal screen; this is what the UI shows.
+    archetypeLabel: A.ARCHETYPE_LABEL || pickedId,
+    // What would have given it away — the one thing the post-deal screen can
+    // teach that the player's own deal can't, because it generalises.
+    archetypeTell: A.ARCHETYPE_TELL || "",
     // The pattern library entry this deal is an instance of. Art + dossier are
     // shown at the autopsy — that's where the archetype gets NAMED, so the
     // player leaves with a read they can reuse rather than one token's answer.
@@ -189,7 +202,50 @@ export function instanceDeal(seed = 1, archetypeId = null) {
   };
 }
 
-/** UTC date seed — the daily deal, identical for everyone. */
+/* ---------------------------------------------------------------------- *
+ * EVERY DEAL IS A FRESH ROLL.
+ *
+ * `pressRun.js` — the controller — never sees a seed; it takes a deal object.
+ * So which deal you get is purely which number goes into instanceDeal(), which
+ * is why changing this costs nothing and never touches the resolver.
+ *
+ * THE HISTORY, BECAUSE IT'S A RULE AND NOT A STORY. The deal used to always be
+ * dailySeed(), which made the opening dice a lie: you pressed ROLL and received
+ * something decided at midnight for everybody — *"if the deal is already
+ * predetermined for the day, then rolling the dice is pointless"* (author,
+ * 2026-07-28). A LOCAL/DAILY mode split was built to fix it, then cut the same
+ * day once the daily's last justification went with the leaderboard:
+ *
+ *   - leaderboard fairness   -> rejected outright (VC_GAME.md §7)
+ *   - anti-reroll-fishing    -> only matters when there's a rank to protect
+ *   - BOOK continuity        -> local runs bank just as well
+ *   - a shared talking point -> real, but Wordle-shaped, and entirely latent
+ *                               until something is built to exploit it
+ *
+ * The last one is the only live argument and it is a bet on traction:
+ * *"that seems like a build-out for the scenario where the game gets lots and
+ * lots of traction and buzz — not likely. But I am hoping for a nice little
+ * engagement puzzle."* A nice little engagement puzzle wants a fresh deal every
+ * sitting and a collection to fill, not a daily ritual with nowhere to go.
+ *
+ * `dailySeed` is KEPT and unused. It is six lines, it is the whole restore
+ * path, and deleting it would only mean rewriting it if a share hook ever
+ * lands. Nothing calls it.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * A fresh deal, every time you sit down. Genuinely random per call — the one
+ * place in this game where that's correct, because it IS the roll. Everything
+ * downstream stays pure: instanceDeal(seed) is deterministic, so any run can
+ * still be replayed exactly from its seed.
+ */
+export function rollSeed() {
+  // 1..2^31, avoiding 0 because callers treat a falsy seed as "not set".
+  return 1 + Math.floor(Math.random() * 2147483646);
+}
+
+/** UTC date seed. UNUSED — see the note above; kept as the restore path for a
+ *  shared daily, which needs a social hook to be worth anything. */
 export function dailySeed(d = null) {
   const now = d || new Date();
   return Number(

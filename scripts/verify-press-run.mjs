@@ -49,7 +49,7 @@ console.log("\n-- the desk ------------------------------------------------");
     })());
   ok("three colleagues are spendable; Barron is not",
     SPENDABLE_SEATS.length === 3 && !SPENDABLE_SEATS.includes(SEATS.BARRON));
-  ok("Barron owns the tape and is still unlimited within the budget",
+  ok("Barron owns the chart and is still unlimited within the budget",
     SEAT_LANE[SEATS.BARRON] === LANES.CHART && canSend(SEATS.BARRON, { lane: LANES.CHAIN }));
   ok("Marisol CHAIN, GR80 RECORD, Eugene SOCIAL",
     SEAT_LANE[SEATS.MARISOL] === LANES.CHAIN && SEAT_LANE[SEATS.GR80] === LANES.RECORD
@@ -122,7 +122,7 @@ console.log("\n-- the desk ------------------------------------------------");
   ok("every lane pluralises on its HEAD noun, not its phrase",
     Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) => {
       const two = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  remaining: 2 });
-      return !/\bs\b|storys|tapes|questions about the (tape|story)s/.test(two)
+      return !/\bs\b|storys|charts\b|questions about the (chart|story)s/.test(two)
         && /questions?/.test(two) && !/question after/.test(two);
     }));
   ok("no lane produces a mangled noun phrase at any count",
@@ -131,7 +131,7 @@ console.log("\n-- the desk ------------------------------------------------");
         [[], [SEATS.MARISOL], [SEATS.GR80], [SEATS.EUGENE], [SEATS.BARRON]].every((spent) => {
           const line = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  spent, remaining });
           return line
-            && !/storys|tapes\b|questions question|more question after/.test(line)
+            && !/storys|charts\b|questions question|more question after/.test(line)
             && /[.!]$/.test(line);
         }))));
   // The free read belongs to VIRGIL now, not to a seat, so the old
@@ -156,7 +156,7 @@ console.log("\n-- the desk ------------------------------------------------");
   ok("a SHAPE claim reports what's checkable at all, not a lane",
     (() => {
       const s = eugeneAgenda({ id: "vibe", shape: SHAPES.UNFALSIFIABLE, lane: LANES.SHAPE }, { owner: null, remaining: 2 });
-      return /Nobody's the expert/i.test(s) && !/money|paperwork|tape|story/i.test(s);
+      return /Nobody's the expert/i.test(s) && !/money|paperwork|chart|story/i.test(s);
     })());
 }
 
@@ -627,11 +627,30 @@ console.log("\n-- PURITY: a run is a function of (seed, inputs) -----------");
     .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
     .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
     .replace(/`(?:[^`\\]|\\.)*`/g, "``");
+  const IMPURE = /Date\.|performance\.|localStorage|sessionStorage|Math\.random|window\./;
   const offenders = files.filter((f) =>
     !f.endsWith("instanceDeal.js") &&
-    /Date\.|performance\.|localStorage|sessionStorage|Math\.random|window\./.test(codeOnly(fs.readFileSync(f, "utf8"))));
-  ok("no impurity under press/ (dailySeed's clock is the one exception)",
+    IMPURE.test(codeOnly(fs.readFileSync(f, "utf8"))));
+  ok("no impurity under press/ (instanceDeal's rollSeed is the exception)",
     offenders.length === 0, offenders.join(", "));
+
+  // THE FILE-LEVEL EXEMPTION ABOVE IS TOO BLUNT ON ITS OWN, and it hid a real
+  // change: `seedForMode` added Math.random to instanceDeal.js on 2026-07-28
+  // and this suite stayed green without noticing, while its own label still
+  // claimed the clock was "the one exception".
+  //
+  // Both helpers are legitimately impure — dailySeed reads the clock,
+  // seedForMode rolls a local game — because they PRODUCE a seed. What must
+  // stay pure is everything downstream of one: given the same seed,
+  // instanceDeal has to return the same deal forever, or replays, the daily
+  // deal and every assertion in this file stop meaning anything. So assert on
+  // the FUNCTION BODY rather than the file.
+  {
+    const src = codeOnly(fs.readFileSync("src/game/terminal-traders/press/instanceDeal.js", "utf8"));
+    const body = src.split("export function instanceDeal(")[1]?.split("export function rollSeed")[0] ?? "";
+    ok("instanceDeal() itself is pure — only its seed helpers may be impure",
+      body.length > 0 && !IMPURE.test(body));
+  }
 
   const script = [SEATS.GR80, null, SEATS.BARRON, null, null, SEATS.MARISOL];
   const play = () => {

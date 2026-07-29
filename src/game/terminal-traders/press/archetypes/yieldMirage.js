@@ -15,6 +15,15 @@
 import { SHAPES, BACKING, LANES } from "../questions.js";
 
 export const ARCHETYPE_ID = "yield-mirage";
+// The player-facing name. See the note in backdoorFork.js: plain English, and
+// it names the MECHANISM rather than the vibe, because the mechanism is what
+// transfers to the next token.
+export const ARCHETYPE_LABEL = "PAID OUT OF THE INFLOWS";
+// The transferable half. See the note in backdoorFork.js for why this replaced
+// the exemplar coin on the post-deal screen.
+export const ARCHETYPE_TELL =
+  "The yield is real and it is being paid. Ask where the money comes from, and "
+  + "every answer arrives sooner or later at new deposits.";
 export const EXEMPLAR_COIN = "ponzi-siren";
 
 // Slightly kinder than backdoor-fork: a high-yield product CAN be real, and
@@ -24,12 +33,11 @@ export const OUTCOMES = [
   { outcome: "legit", truth: 0, weight: 32 },
 ];
 
-export const IDENTITIES = [
-  { name: "SIREN YIELD", ticker: "$SIRN", chain: "Base", blurb: "delta-neutral yield, paid daily" },
-  { name: "TIDEWATER", ticker: "$TIDE", chain: "Base", blurb: "market-making returns for depositors" },
-  { name: "GOLDEN HOUR", ticker: "$GLDN", chain: "Base", blurb: "structured yield on stablecoin deposits" },
-  { name: "PERPETUAL SPRING", ticker: "$SPRG", chain: "Base", blurb: "auto-compounding basis trade" },
-];
+// IDENTITIES MOVED TO ../identities.js (2026-07-28). They were authored here,
+// per archetype, with zero overlap between the lists — which made the deal's
+// NAME a perfect predictor of its archetype, and therefore of its base rate.
+// Harmless while every archetype was ~70% rug; fatal the moment anon-but-real
+// landed at 70% legit. The pool is shared now and the name tells you nothing.
 
 export const AUDITORS = ["Trail of Bits", "Spearbit", "OpenZeppelin", "Zellic"];
 export const PRIORS = ["ex-Jump", "ex-Alameda", "ex-Cumberland", "ex-GSR"];

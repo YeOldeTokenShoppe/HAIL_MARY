@@ -3,7 +3,6 @@ import React from "react";
 import { BACKING, SEATS } from "@/game/terminal-traders/press/questions";
 import { DESK, laneOwner, laneSentence } from "@/game/terminal-traders/press/desk";
 import { VIRGIL } from "@/game/terminal-traders/press/virgil";
-import TradingCard from "@/components/TradingCard";
 
 /*
  * SHARED FLOOR UI — the reading column and the dock, authored once.
@@ -179,7 +178,7 @@ export function AnswerBody({ flash, children }) {
 /* ---------------------------------------------------------------------- */
 
 /**
- * Who you can send, or why you can't send anyone.
+ * Who you can ask, or why you can't ask anyone.
  *
  * GATED ON `live`. When the claim is settled every real control is dead, and a
  * dead row containing one bright unclickable tile inverts the whole
@@ -187,7 +186,7 @@ export function AnswerBody({ flash, children }) {
  * it also reclaims ~195px of pinned dock, which is what was shoving the one
  * live control off the bottom of the screen.
  */
-export function SeatRow({ run, live, pressed, options, deskCards, onPress, scale = 0.1 }) {
+export function SeatRow({ run, live, pressed, options, onPress }) {
   if (!live) {
     return (
       <div className="pu-spent">
@@ -205,32 +204,67 @@ export function SeatRow({ run, live, pressed, options, deskCards, onPress, scale
           the only things that LOOKED like buttons were LET HIM GO ON and CALL
           IT, so four trading cards read as a cast list. Barron's tile used to
           say PRESS HIM; when he got a lane it became "THE TAPE / shallow look"
-          and the last verb in the row went with it. */}
+          and the last verb in the row went with it.
+
+          THE CARDS THEMSELVES WENT ON 2026-07-28. They were the deeper half of
+          that same cause: a card face is a thing you look AT, and four of them
+          in a row is a cast list no matter what you print underneath. A
+          portrait in a button is a person you can send. The verb header and the
+          per-tile sub-labels stay — they were the right fix, they were just
+          fixing the symptom. */}
+      {/* "ASK A FOLLOW-UP" (author, 2026-07-28), after WHO DO YOU SEND? and
+          WHO DO YOU ASK? both missed. It does two jobs where the others did
+          half of one:
+
+          1. IT NAMES THE MOVE, so the row finally reads as the alternative to
+             LET HIM GO ON — which is the choice the beat is actually about, and
+             which players were not seeing (they described the game as "press
+             him or let him go on", with the desk left out entirely).
+          2. IT ENCODES A RULE THAT WAS ONLY EVER IN THE SOURCE. A press never
+             opens a new subject; it interrogates the claim he JUST made from a
+             sharper angle. "Follow-up" is that constraint in one word, and
+             nothing on screen had ever said it. */}
       <div className="pu-seats-h">
-        WHO DO YOU SEND?
+        ASK A FOLLOW-UP
         <em>{run.pressesLeft} interruption{run.pressesLeft === 1 ? "" : "s"} left</em>
       </div>
       <div className="pu-seats">
         {options.map((o) => {
           const meta = DESK[o.seat];
-          const card = deskCards.find((d) => d.m.id === o.seat);
           const boss = o.seat === SEATS.BARRON;
           return (
             <button key={o.seat}
                     className={`pu-seat ${boss ? "boss" : ""} ${o.deep ? "deep" : "shallow"} ${o.enabled ? "" : "off"}`}
                     disabled={!o.enabled}
                     title={o.deep
-                      ? `Send ${meta.name} — this is what they do`
-                      : `Send ${meta.name} anyway — you'll get the surface answer`}
+                      ? `Ask ${meta.name} — this is what they do`
+                      : `Ask ${meta.name} anyway — you'll get the surface answer`}
                     onClick={() => onPress(o.seat)}>
-              {card && <TradingCard data={card.data} scale={scale} interactive={false} templateStyle="terminal" />}
+              <img className="pu-seat-face" src={meta.portrait} alt="" aria-hidden="true" />
+              <span className="pu-seat-who">{meta.name}</span>
               <span className="pu-seat-name">{meta.role}</span>
               {/* Every live tile carries a VERB, because every one of them is a
-                  legal move. The sub-label prices the move; it never forbids it. */}
+                  legal move. The sub-label prices the move; it never forbids it.
+
+                  TWO VERBS, AND "SEND" WAS NEVER ONE OF THEM. The row said
+                  SEND until 2026-07-28, which described something this game
+                  does not show: *"the other analysts don't physically leave
+                  their desks — that's why 'send' seems weird to me"* (author).
+                  Correct, and the adviser prose already agreed with him —
+                  Marisol says "Give me a second, I'll pull it", GR80 says "I
+                  have read it, one moment". Both are things done AT a desk, and
+                  on a press the CAMERA moves, not the character.
+
+                  What survives is the real distinction: you ASK the three
+                  colleagues, who are neutral and pull the record on their own
+                  machine, and you PRESS Barron, who is selling you the deal.
+                  Challenging the seller is a different act from asking a
+                  colleague, and the row should never have blurred them. */}
               <span className="pu-seat-sub">
                 {o.reason === "spent" ? "already used"
-                  : o.deep ? "▲ SEND — GOES DEEP"
-                    : "send anyway · surface only"}
+                  : boss
+                    ? (o.deep ? "▲ PRESS HIM — GOES DEEP" : "press him anyway · surface only")
+                    : (o.deep ? "▲ ASK — GOES DEEP" : "ask anyway · surface only")}
               </span>
             </button>
           );
@@ -358,13 +392,25 @@ export const PRESS_UI_CSS = `
 .pu-seats { display:flex; gap:6px; justify-content:flex-end; }
 .pu-seat { background:rgba(2,16,14,0.9); border:1px solid rgba(47,214,214,0.35); color:#eafff9;
   cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px;
-  padding:8px 9px 7px; font:inherit; transition:transform .12s ease, border-color .12s ease; }
+  padding:8px 9px 7px; font:inherit; width:104px;
+  transition:transform .12s ease, border-color .12s ease; }
+/* THE PORTRAIT, not a card face (see the note on the row above). Square and
+   small: this is a button with a person on it, and the moment it gets big
+   enough to study it goes back to being a thing you look at instead of press.
+   Never a pointer target itself, so the click always belongs to the button. */
+.pu-seat-face { display:block; width:56px; height:56px; object-fit:cover;
+  border-radius:50%; border:1px solid rgba(47,214,214,0.4); pointer-events:none;
+  background:#020f0d; transition:border-color .12s ease; }
+.pu-seat.boss .pu-seat-face { border-color:rgba(255,45,111,0.55); }
+.pu-seat.deep:not(.off):not(:disabled) .pu-seat-face { border-color:#ffd23a; }
+.pu-seat-who { font:bold 9px/1.2 'Courier New',monospace; letter-spacing:0.06em;
+  color:rgba(234,255,249,0.9); text-align:center; }
 .pu-seat:hover:not(:disabled):not(.fixture) { transform:translateY(-3px); border-color:#2fd6d6; }
 .pu-seat.boss { border-color:rgba(255,45,111,0.6); background:rgba(60,6,28,0.55); }
 .pu-seat.boss:hover:not(:disabled) { border-color:#ff2d6f; }
 .pu-seat.fixture { cursor:default; border-style:dashed; border-color:rgba(191,238,222,0.4);
   background:rgba(2,16,14,0.6); }
-.pu-seat.fixture .pu-seat-name { color:#bfeede; }
+.pu-seat.fixture .pu-seat-who { color:#bfeede; }
 .pu-seat.fixture .pu-seat-sub { color:rgba(191,238,222,0.7); }
 .pu-seat.off, .pu-seat:disabled { cursor:default; opacity:0.55; filter:grayscale(0.85);
   border-color:rgba(234,255,249,0.14); background:rgba(2,16,14,0.55); }
@@ -378,8 +424,14 @@ export const PRESS_UI_CSS = `
 .pu-seat.shallow .pu-seat-sub { color:rgba(234,255,249,0.62); }
 .pu-seat.deep:not(.off):not(:disabled) { transform:translateY(-3px); }
 .pu-seat.deep:not(.off):not(:disabled):hover { transform:translateY(-6px); }
-.pu-seat-name { font:bold 11px/1.25 'Courier New',monospace; letter-spacing:0.09em; }
-.pu-seat.boss .pu-seat-name { color:#ff5f9e; }
+/* THE NAME LEADS, THE ROLE FOLLOWS. The lane band names a PERSON — "Detective
+   Marisol goes deepest on it" — so a tile that shows only a role and a face
+   makes the player do a lookup the UI should have done. Card faces carried the
+   name for free; portraits don't, and dropping it was the near-miss in this
+   swap. */
+.pu-seat-name { font:9px/1.25 'Courier New',monospace; letter-spacing:0.11em;
+  color:rgba(234,255,249,0.6); }
+.pu-seat.boss .pu-seat-who { color:#ff5f9e; }
 .pu-seat-sub { font-size:9.5px; color:rgba(234,255,249,0.62); }
 .pu-seat.off .pu-seat-sub, .pu-seat:disabled .pu-seat-sub { color:rgba(255,155,111,0.9); }
 

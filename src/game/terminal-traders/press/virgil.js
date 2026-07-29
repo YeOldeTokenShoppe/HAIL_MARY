@@ -31,10 +31,17 @@
 
 import { LANES, SEATS } from "./questions.js";
 
+// THE ROLE LINE IS THE WHOLE PITCH FOR HIM (author, 2026-07-28: "Virgil - the
+// cat - your guide"). The four seats get a subject — THE TAPE, THE MONEY, THE
+// PAPERWORK, THE STORY — because what you need to know about them is what they
+// go deep on. He deliberately breaks that pattern: he has no subject, because
+// he isn't someone you send. "Your guide" is the Dante reference paying for
+// itself, and it tells a first-time player the one true thing about him — he
+// is on your side, which not one other person at this desk is.
 export const VIRGIL = {
   id: "virgil",
   name: "Virgil",
-  role: "THE CAT",
+  role: "THE CAT · YOUR GUIDE",
   portrait: "/cameo_kitty.webp",
   model: "/models/fluffyCat.glb",   // 580KB. NOT FR80Cat.glb, which is 15MB and
                                     // would land on top of an already-heavy scene.
@@ -94,13 +101,19 @@ export function shapeTip(claim, salt = 0) {
 /* ---------------------------------------------------------------------- */
 
 // The agenda's noun per lane. Singular and plural are both authored: the plural
-// is not always a trailing "s" — "question about the tape" pluralises on the
+// is not always a trailing "s" — "question about the story" pluralises on the
 // HEAD noun, and appending to the phrase produced "two more question about the
-// tapes".
+// storys".
+//
+// CHART WAS "question about the tape" UNTIL 2026-07-28, when ticker-tape slang
+// failed invariant 6 on the author (see LANE_LABEL in desk.js). It is now a
+// plain compound like CHAIN and RECORD, which also drops it out of the
+// head-noun case — SOCIAL is the only lane still in there, and it is the reason
+// that case still needs its assertion.
 const LANE_NOUN = {
   [LANES.CHAIN]: ["money question", "money questions"],
   [LANES.RECORD]: ["paperwork question", "paperwork questions"],
-  [LANES.CHART]: ["question about the tape", "questions about the tape"],
+  [LANES.CHART]: ["chart question", "chart questions"],
   [LANES.SOCIAL]: ["question about the story", "questions about the story"],
 };
 

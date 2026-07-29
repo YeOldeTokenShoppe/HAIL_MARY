@@ -7,26 +7,35 @@ governs the card set.*
 
 **If this file passes 300 lines, that's the smoke alarm.**
 
+**The north star, in the author's words (2026-07-28):** *"I am hoping for a nice
+little engagement puzzle."* Not a social product, not a competitive ladder, not
+a metagame. That sentence is why the daily deal, the leaderboard and the share
+hook are all rejected below — each is a build-out for traction the game hasn't
+earned, and each costs the player something now for a payoff that only exists at
+scale. **Measure a proposal against it before measuring it against anything
+else.** A fresh deal, four minutes, a pattern you didn't have before.
+
 ---
 
 ## 1. The game
 
-**One deal. One pitch. Three interruptions. Four people at the desk.**
+**One deal. One pitch. Three interruptions. Four people at the desk, and a cat.**
 
 John Barron brings you a deal. It's *his* deal — if you fund it, he gets paid.
 He talks for about two minutes, making six claims. **Every fact he states is
 true.** What you're judging is the inference he's selling on top of it.
 
 You can interrupt him **three times**. Each interruption you either press *him*
-— *"put a number on it"* — or **send a colleague**, and who you send is the
+— *"put a number on it"* — or **ask a colleague**, and who you ask is the
 game:
 
 | | | |
 |---|---|---|
-| **John Barron** | THE TAPE | price, windows, momentum — and he's the one selling. **Unlimited** within the budget. |
+| **John Barron** | THE CHART | price, windows, momentum — and he's the one selling. **Unlimited** within the budget. |
 | **Detective Marisol** | THE MONEY | money movement, wallet ages, unlocks. **One use, all session.** |
 | **Saint GR80** | THE PAPERWORK | what the documents actually say. **One use.** |
-| **Eugene** | THE STORY | narrative, reputation, who vouches for whom. **One use** — plus a free read on every claim. |
+| **Eugene** | THE STORY | narrative, reputation, who vouches for whom. **One use.** |
+| **Virgil** | THE CAT · YOUR GUIDE | sits on the desk, has opinions, **cannot be asked anything**. Not a seat — see below. |
 
 **EXPERTISE IS A GRADIENT, NOT A GATE.** Anyone can be sent at anything. The
 lane decides **depth**:
@@ -42,9 +51,9 @@ Both blocks already existed on every slot in every branch, so the change cost
 The first cut made the lane a *permission* — off-lane sends were rejected as
 no-ops, so two of four seats were dead on any claim and the row read as broken
 buttons. That was the most-reported confusion in playtest, and both the lane
-band and Eugene had to be patched twice for telling players to do things the
-controller would refuse. Author's reframing (2026-07-28): *"they each have an
-area of expertise but can generalize too."*
+band and the free read had to be patched twice for telling players to do things
+the controller would refuse. Author's reframing (2026-07-28): *"they each have
+an area of expertise but can generalize too."*
 
 The decision it produces is better. It is no longer "who is legal here", which
 the UI can answer for you — it is **"is this claim worth my one specialist, or
@@ -66,40 +75,98 @@ with no deep target before this guard. They'd still be sendable, so nothing
 would look broken; their expertise would just be silently decorative, which is
 worse than an obvious failure.
 
-**Why Eugene, specifically?** Asked twice, so it belongs in writing. He is a
-full seat now (SOCIAL, one use, his own board — `__screen4Canvas`, which existed
-unused all along), but he is still the only one who does **two** things:
+### The fifth voice is a cat
 
-- **RECOGNITION** — free, unlimited, every claim: the shape, then the agenda.
-  Costs nothing because nothing is fetched.
-- **RETRIEVAL** — one use, like everyone else: sent at a story claim he comes
-  back with who actually vouches for whom, and stamps it.
+**Virgil sits on the desk and cannot be sent anywhere.** He is not a seat, owns
+no lane, and **never touches the resolver** — `virgil.js` reads run state and
+returns two strings, and nothing in `pressRun` imports it. The game must be
+fully playable and fully scoreable with him muted, which is exactly why muting
+him is offered.
 
-That split is the answer. The others only retrieve; he also recognises, and
-recognition is free *by nature* rather than by exemption. Giving him a lane also
-fixed the older complaint on its own — he can be in the product moment now,
-because he finally has something to fetch.
+The free read used to be Eugene's, and that made him the one seat in four with a
+permanent extra power. The asymmetry was reported three times, through three
+different implementations — *"nothing happens when i click it"* (an unclickable
+tile), *"I still don't get Eugene's off-sides role"* (moved beside his own
+line), *"why does eugene have the special role?"* (given the agenda, still odd).
+Each fix moved him; none worked, because the problem was never where he sat. **A
+colleague with an exemption needs explaining, and an explanation in a design doc
+is not an explanation at the table.**
 
-**Eugene's job is the agenda, and it took three tries to find it.** He shipped
-saying *"That one's onchain. Marisol can settle it."* — word for word what the
-lane band directly above him already said. Half his output restated the UI and
-the other half was an adjective, so he read as a character with no role
-(*"I still don't get Eugene's off-sides role"*, the third complaint in a day;
-moving him twice never had a chance). Now his second sentence reports **how much
-runway is left in this lane** — *"Two more paperwork questions after this one"*
-vs *"Last money question you'll get. Spend Detective Marisol now or don't."*
+Author's proposal, 2026-07-28: *"one option is to have a separate character,
+like a cat, be the special friend that gives tips and advice."* That **dissolves**
+the problem instead of justifying it. A cat is obviously not somebody you
+dispatch to pull chain records, so nobody clicks him expecting a press — the
+failure that started the whole thread becomes structurally impossible — and the
+desk goes back to four seats, four lanes, one use each, **no exceptions**.
+Eugene is a plain fourth seat now (SOCIAL, one use, his own board —
+`__screen4Canvas`, which existed unused all along), and the older complaint
+resolved itself on the way past: he can be in the product moment because he
+finally has something to fetch.
 
-That is the one fact nobody else on the floor supplies, and it converts the
-game's stated core decision from a coin flip into a decision: you were spending
-your one Marisol without knowing whether a better money question was coming.
-It is **leak-free by construction** — `laneOutlook` counts lanes only, never
-backing, never `discriminates`, never the branch, and a harness assertion pins
-that two deals with opposite outcomes produce identical agendas.
+The name was already yours — `fluffyCat.glb` is listed as "Virgil" in the
+commented-out `/vigil` roster. Dante's guide through hell, on a page about
+spotting frauds. Model is the 580KB `fluffyCat.glb`, **not** the 15MB
+`FR80Cat.glb`, which would land on top of an already-heavy scene.
 
-Whoever you send goes and *looks*, so the answer lands on **their** board, not
-his: a receipt, or **NOTHING ON FILE** — an absence somebody independently
-looked for, strictly stronger than his board simply staying dark, and the only
-way this game can prove a negative.
+**He says two things, and only one of them can be switched off.**
+
+- **THE AGENDA — always on.** *"Two more paperwork questions after this one"* vs
+  *"Last money question you'll get. Deep look now, or never."* This is the one
+  fact nobody else on the floor supplies, and it converts the game's stated core
+  decision from a coin flip into a decision: you were spending your one Marisol
+  without knowing whether a better money question was coming. Measured: on
+  backdoor-fork's first claim it reads *"last one you'll get"* in 2000 of 2000
+  seeds, and holding there forfeits the deal's decisive deep look.
+- **THE TIP — off switch, and that is the point.** What *kind* of weak argument
+  this is (*"Survivors only. Where are the rest?"*), never whether the claim is
+  true. As a colleague's line it was either teaching or noise with no way to
+  tell which. As a cat's tip it is training wheels with a legible off switch:
+  *"Virgil stops chiming in"* is a difficulty setting in a way *"turn off
+  Eugene"* never could be.
+
+Returned **separately**, never concatenated into one italic sentence — that is
+what trained the eye to skip the block and miss the actionable half.
+
+The agenda is **leak-free by construction** — `laneOutlook` counts lanes only,
+never backing, never `discriminates`, never the branch, and a harness assertion
+pins that two deals with opposite outcomes produce identical agendas. Three more
+pin that Virgil is not a seat and owns no lane, that the tips can be silenced
+while the agenda cannot, and that a `LANES.SHAPE` claim reports what's checkable
+at all rather than naming a lane.
+
+Moving the read off a seat also killed a bug by construction: the agenda used to
+be able to refer to its own speaker (*"and me was already spent"*, shipped in
+192 of 400 yield-mirage seeds). **A cat is never the lane owner.**
+
+Whoever you ask *pulls the record themselves*, so the answer lands on **their**
+board, not his: a receipt, or **NOTHING ON FILE** — an absence somebody
+independently looked for, strictly stronger than his board simply staying dark,
+and the only way this game can prove a negative.
+
+**"SEND" WAS THE WRONG VERB AND THIS DOC TAUGHT IT.** The floor said *WHO DO
+YOU SEND?* and this section said colleagues *"go and look"*, both describing a
+thing the game never shows: *"the other analysts don't physically leave their
+desks — that's why 'send' seems weird to me"* (author, 2026-07-28). Correct, and
+the archetype-agnostic prose had agreed all along — Marisol says *"Give me a
+second. I'll pull it."*, GR80 says *"I have read it. One moment."* Nobody moves;
+on a press it's the **camera** that crosses the room, not the character.
+
+The row header is now **ASK A FOLLOW-UP**, which fixes two further things a
+straight *WHO DO YOU ASK?* would not have:
+
+- It reads as the **alternative to `LET HIM GO ON`**, which is the choice the
+  beat is actually about. Players kept describing the game as *"press him or
+  let him go on"* with the four-seat desk left out of the account entirely.
+- **It doesn't demand an answer.** *"Who do you ask?"* implies you must pick
+  one (author, same day) — and holding is frequently the *correct* move, since
+  Virgil's whole job is telling you a better money question is still coming.
+  A header that pressures you to spend on the claim in front of you teaches the
+  opposite of the decision this game is built around.
+
+It also encodes, in one word, a rule that had only ever lived in the source: a
+press never opens a new subject, it interrogates the claim he **just made** from
+a sharper angle. Barron keeps his own verb — you **press** the man selling you
+the deal, you **ask** a neutral colleague — because that distinction is real.
 
 ### He reacts to being caught
 
@@ -124,7 +191,7 @@ deal, and one that no aside names a lane, a seat or an outcome. (It will still
 *correlate* with truth, because a legit deal yields fewer catches. That
 correlation is information you earned.)
 
-The 18 lines are archetype-agnostic and live in `desk.js`, so a new archetype
+The 14 lines are archetype-agnostic and live in `desk.js`, so a new archetype
 adds none. He never apologises and never concedes — a salesman who folds is a
 different and much less interesting character to have to read.
 
@@ -159,11 +226,11 @@ talking**; **nothing is memorisable** (outcomes are rolled, not authored).
 | Beat | What happens |
 |---|---|
 | **THE DEAL** | An empty table and a deck. You press DEAL ME IN and five cards come off it — the deal face-down, then the four people at the desk. Only the deal turns over: the desk is the same four every session, so flipping them was ceremony for a non-event. |
-| **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who goes deepest on it, and **Eugene's free read**. |
+| **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who goes deepest on it, and **Virgil's read** — the lane's remaining runway, plus a tip you can switch off. |
 | **THE PRESS** | Three interruptions. Send anyone at anything — their lane decides how deep they get, not whether they answer. |
 | **THE CALL** | One slider, `SHORT ← FLAT → LONG`. Plain-English readout including what you lose if wrong. |
 | **RESOLUTION** | Truth. On desktop the four stand up and play their real reactions; the summary is a lower third so it never covers them. |
-| **THE AUTOPSY** | Two numbers — READ (did you press the hollow claims) and BOOK (P&L) — every chip flipped, and **the pattern named**. |
+| **POST-DEAL ANALYSIS** | Two numbers — READ (did you press the hollow claims) and BOOK (P&L) — every chip flipped, and **the pattern named**. Called THE AUTOPSY until 2026-07-28; an autopsy presumes a corpse, and roughly a third of these deals are legit, so it told a player who called it right that they'd lost. Internal names (`PHASE.AUTOPSY`, `deal.autopsy`) are unchanged. |
 
 ### The three press outcomes
 
@@ -190,28 +257,128 @@ it's the same forfeiting choice as not pressing.
 
 ---
 
-## 3. Cards, after the cut
+## 3. Cards are gone. It's dice now.
 
-Cards are still the **visual vocabulary** — every face renders through the
-existing `TradingCard` — but they are no longer a *mechanic*. Two types survive:
+**Done, 2026-07-28 (author: no cards in this game at all — they're saved for a
+2D TCG).** The mechanic was cut on 2026-07-27; this cut the *visual vocabulary*
+too, which was the half still shipping. `TradingCard`, `dealCard.js` and
+`cardDeal.jsx` are out of this game entirely and the Genesis layer goes to the
+TCG untouched.
 
-**PROJECT/TOKEN cards** — the deal. Instanced from an archetype, so not a
-Genesis card; marked `PROSPECT`, edition reads `live deal`. Deliberately carries
-**no art** — wearing its archetype's face would announce the read before he
-spoke.
+**The replacement metaphor is a roll of the dice** (author: *"a roll of the dice
+is a better metaphor than playing cards"*), and it is what the game was doing
+all along — `instanceDeal(seed)` rolls the archetype, the outcome, the identity,
+the surface numbers and which 6 of 7 slots play. A dealt hand implied cards you
+chose between. Dice imply what is true: something was rolled at you and you play
+it.
 
-**CHARACTER cards** — the four at the desk. They are the seat buttons on the
-floor: you click a person's card to send them.
+**Three dice, not two.** A pair invites reading the *sum* — snake eyes, boxcars,
+seven — and this game's players are already hunting for meaning in anything the
+house shows them. Three has no canonical total.
 
-**QUESTION cards are gone.** The eight-card pool and its seeded draw survive as
+**The pips are decoration and may never come from the run seed.** `facesFor()`
+takes a tick counter; `diceRoll.jsx` does not import `instanceDeal`. If the
+faces came off the PRNG that picks the archetype, the correlation would be found
+long before the game deserved to be beaten — invariant 5, applied to the one
+surface that looks most like it ought to mean something. **Numbered RPG dice
+were considered and rejected for the same reason**: a d20 arrives with meaning
+pre-attached, and a nat 1 in a game that's 74% rug would read as a tell whether
+or not it was one.
+
+**And the roll is real.** The deal is rolled fresh when you sit down —
+`rollSeed()` — so pressing ROLL genuinely determines what you're pitched.
+
+It didn't used to. The deal came from `dailySeed()`, the same one for everybody
+until 00:00 UTC, which made the dice ceremony over a result decided at midnight:
+*"if the deal is already predetermined for the day, then rolling the dice is
+pointless"* (author, 2026-07-28). **Copy cannot fix a mechanic mismatch** — the
+first attempt was a caption reading "THE HOUSE ROLLS ONCE A DAY", which is just
+a more honest description of the same lie.
+
+A LOCAL/DAILY mode split was built, then cut hours later once the daily's
+justifications were audited and all but one belonged to the rejected
+leaderboard (below). The survivor — a shared deal to talk about — is the Wordle
+property and it's real, but it is **entirely latent until a share hook exists**,
+which is a bet on traction: *"that seems like a build-out for the scenario where
+the game gets lots and lots of traction and buzz — not likely. But I am hoping
+for a nice little engagement puzzle."* A choice that gives the player nothing
+teaches them that choices here don't matter, so the second button went.
+
+`dailySeed()` is kept and unused — six lines, and the whole restore path if a
+spoiler-free share ever lands (`OracleCard.jsx` and the Team Chat are the rails).
+The tray is still never a button and has no hover state: one roll per sitting.
+
+Real 3D dice — three.js + cannon-es rigid-body physics — were evaluated and
+declined for now: a second `WebGLRenderer` over the live temple on desktop, a
+second physics engine in a bundle that already vendors Rapier, and on mobile it
+contradicts `PressFlat`'s no-3D premise on a page with a documented iOS GPU
+crash. What was taken instead is the *pip treatment* from the reference pen
+(MIT, Mant0u): red 1 and 4, warm near-black rather than `#000`, oversized single
+pip. The dice are real CSS 3D cubes — six faces, `preserve-3d` — and on mobile
+the gyro that used to drive card holofoil now tilts the tray.
+
+This is the third and last step of the same retreat, and it's worth naming the
+pattern: cards kept surviving as **decoration for a game that had stopped being
+about them**. A card face is an expensive thing to look at — frame, foil,
+edition line, art box — and it earns that cost when you own it, trade it, and
+choose it from a hand. None of which happens here.
+
+There is already a playtest failure logged against exactly this
+(`pressUi.jsx:201`): the seat row rendered four `TradingCard`s and a player
+described the whole game as *"i can either press him for a screen or let him go
+on to his next point"* — a complete account with the desk left out of it, from
+someone who had the desk on screen. **Four trading cards read as a cast list,
+not as four buttons.** It was patched with a verb header and per-tile
+sub-labels; the cards were the cause and stayed.
+
+**What replaced the five render sites:**
+
+| Was | Is |
+|---|---|
+| seat button wrapping a character card | **portrait tile** — `DESK[seat].portrait`, one path per seat |
+| deal card hero in the opening beat | **the deal sheet** — a terminal dossier, sized to its own content |
+| four character cards in the deal choreography | **portrait row**, plus Virgil introduced beside it |
+| exemplar card at the autopsy | **pattern panel** — coin art as a plain framed illustration |
+| the inspect zoom viewer | **gone** — nothing left to enlarge |
+
+Two carried real weight. The **opening beat** was choreography built around
+cards coming off a deck, so it was re-authored rather than deleted. The
+**autopsy** still needs a trophy-shaped object, because naming the archetype is
+the teaching payload — it keeps the coin's artwork, but as an illustration with
+no frame, foil, edition line or rules box.
+
+**Two freedoms the cut bought.** The hero column is no longer locked to
+`TradingCard`'s 744×1038 portrait box, so the briefing's largest object stopped
+being an empty dashed rectangle waiting for a card; and the copy column is now
+capped at 62ch instead of running ~965px of monospace per line.
+
+**What survived, and had to:** the deal's identity (name, ticker, stats,
+`PROSPECT` framing) and the exemplar coin's name and note. Those are content,
+not presentation — `instanceDeal` owns them. Invariant 7 is now a statement
+about the **deal sheet** and reads *nothing names the deal before the dice
+stop*; it still holds.
+
+**The one remaining tie.** `instanceDeal.js` still calls `getCardById` and
+`getCardArt` to build `deal.exemplar`. Three of the four fields it pulls are
+plain data; only `art` is card-specific. Inlining the exemplar's name and note
+into each archetype severs the last dependency — worth doing, not urgent, and
+`questions.js:6` already states the rule it violates (*"nothing in this
+directory may import from cards.js"*).
+
+**QUESTION cards were already gone.** The eight-card pool and its seeded draw survive as
 `press/hand.js`, which **nothing imports** — kept for one more session in case
 the cut needs reversing, and deletable after that. The six shapes it tagged are
 *not* gone: `UNSOURCED · POSITIONED · SELECTIVE_WINDOW · BORROWED_CREDIBILITY ·
-UNFALSIFIABLE · SURVIVORSHIP` still classify every claim and are what Eugene
-reads from.
+UNFALSIFIABLE · SURVIVORSHIP` still classify every claim and are what Virgil's
+tips read from.
 
-The lanes that replaced them: `CHAIN` (Marisol) · `RECORD` (GR80) · `SHAPE`
-(nobody). A claim's lane is **public from second zero** — the skill is
+The lanes that replaced them, one per seat: `CHAIN` (Marisol) · `RECORD` (GR80)
+· `CHART` (Barron, who sells on the chart) · `SOCIAL` (Eugene). `SHAPE` is
+retained for an archetype that wants a claim nobody specialises in, but **no
+slot uses it today** — with four lanes the surface is covered, and "nobody can
+settle this" is now carried by `BACKING.VIBES`, which is the honest place for
+it: a property of the claim, not of who's in the room.
+A claim's lane is **public from second zero** — the skill is
 materiality and timing, *which claim inside a lane deserves the one use*, not a
 lane map you memorise.
 
@@ -266,11 +433,24 @@ the pattern is the teaching payload and the natural trophy hook.
 6. **Plain language.** Every player-facing term must parse with no finance
    literacy. "Brier" and "diligence" both failed playtest. P&L, research, long /
    short / hold pass.
+   **"THE TAPE" FAILED IT ON 2026-07-28**, on the author: *"what does 'the tape'
+   mean? I never quite got what it meant."* Ticker-tape slang — reading the tape
+   is watching price and volume action. It was the only one of four lane labels
+   that had to be *known* rather than read ("the money", "the paperwork", "the
+   story" against "the tape"), and it sat on a seat tile, the lane band and in
+   Virgil's mouth on every chart claim. Now **THE CHART**, matching the
+   `LANES.CHART` enum. Barron still says "tape" in his own dialogue, where it's
+   characterisation and the next sentence glosses it — the rule binds the UI,
+   not the salesman.
+   **The generalisation: a term can fail this invariant years after shipping,
+   and the person who notices is the one who didn't write it.** Both catches
+   this day came from the author reading his own finished screen, not from a
+   playtest.
 7. **Nothing names a card that isn't face-up.** The briefing withholds the
    deal's name, ticker and stats until its card lands — headline, top bar and
    body copy included — or it announces the deal before it exists.
 8. **The floor never issues an instruction the controller would reject.** The
-   lane band and Eugene's read both take `run.advisersSpent`. They shipped
+   lane band and Virgil's agenda both take `run.advisersSpent`. They shipped
    without it and said *"only Detective Marisol can settle it"* on a claim where
    she was spent and two interruptions remained — an instruction `press()`
    discards as a no-op. Four assertions pin it.
@@ -300,11 +480,14 @@ same run. A rule in a presentation is a bug.
 game/terminal-traders/press/
   questions.js        SHAPES + BACKING + LANES + SEATS; canSend() legality
   desk.js             WHO SITS WHERE + every archetype-agnostic line bank
+  virgil.js           THE CAT — shape tips + the lane agenda. Not a seat, and
+                      pressRun does not import it.
   pressRun.js         the controller: turn queue, press budget, resolution, settle
   instanceDeal.js     seed -> archetype, outcome, identity, exemplar coin
-  dealCard.js         card faces for TradingCard
   archetypes/         backdoorFork.js, yieldMirage.js
   hand.js             ORPHANED — the cut card pool. Nothing imports it.
+  deals/mrdn.js       ORPHANED — slice 1's hand-authored MERIDIAN deal,
+                      superseded by archetypes. Nothing imports it.
 
 components/trade/press/
   pressUi.jsx         THE SHARED FLOOR — canPress, ClaimBody, AnswerBody,
@@ -312,17 +495,20 @@ components/trade/press/
   PressSession.jsx    DESKTOP — positions the shared floor over the live room
   PressFlat.jsx       MOBILE + ?flat=1 — positions it in the CRT
   PressFigure.jsx     Barron's talking head (2-frame amplitude mouth)
-  cardDeal.jsx        the opening deal — one choreography, both surfaces
+  diceRoll.jsx        THE ROLL — CSS 3D dice, one choreography, both surfaces.
+                      Pips never come from the run seed.
   evidenceScreen.js   the receipt board, both surfaces
 
-scripts/verify-press-run.mjs    107 assertions
+scripts/verify-press-run.mjs    109 assertions
 ```
 
-**`desk.js` is the reason the four-character layer is cheap.** It holds ~40
-lines of prose — Eugene's shape and lane reads, the eight adviser result lines —
-that every archetype reuses. An archetype authors claims and **never** authors a
-word for Eugene or for an adviser's dispatch, so archetypes 3 through 13 cost
-nothing on this axis.
+**`desk.js` and `virgil.js` are the reason the character layer is cheap.**
+Between them they hold every archetype-agnostic line on the floor: the lane
+band, Barron's 14 pressure asides, the 15 adviser result lines (3 advisers ×
+dispatch / found / partial / nothing / shallow), and Virgil's 18 shape tips and
+agenda phrasings. An archetype authors claims and **never** authors a word for
+Virgil or for an adviser's dispatch, so archetypes 3 through 13 cost nothing on
+this axis.
 
 ### The shared floor — why `pressUi.jsx` exists
 
@@ -370,12 +556,153 @@ in a 700px box. **The pitch had no exit.**
 
 ## 7. State
 
-**Shipped:** both archetypes · seeded instancing · the deal · the four-seat desk
-with lanes and adviser scarcity · `NOTHING ON FILE` · the shared floor · desktop
+**Shipped:** both archetypes · seeded instancing · the dice roll and the deal
+sheet · the four-seat desk
+with one lane each and adviser scarcity · Virgil and the switchable tips ·
+`NOTHING ON FILE` · the shared floor · desktop
 in-room play · mobile CRT view with voice + mouth · lower-third reveal · the
-autopsy with the pattern card · 107 assertions green · `The VC Game` tile on the
+autopsy with the pattern card · 109 assertions green · `The VC Game` tile on the
 `/trade` rail (default). The Case Table is parked behind `?classic=1` — intact,
 not deleted; shipping one game was a deliberate call.
+
+### THE ROOM, RESHAPED — design note, 2026-07-28
+
+*Not built. This is the frame the next build should start from, and it arrived
+by pulling threads rather than by planning, so it is written down before it
+evaporates. It supersedes item 1 below.*
+
+**The problem it solves.** John Barron is currently both the adversary and a
+seat you can use, which is why he needs a special case everywhere:
+`SPENDABLE_SEATS` excludes him, he alone is "unlimited", his tile alone says
+PRESS instead of ASK, and — unnoticed until now — **his own lane is deeply
+answerable for free**, because sending him at a CHART claim is in-lane and
+costs no specialist, while every other lane costs one.
+
+Author's resolution (2026-07-28): *"not sure why Barron would have a different
+role than the other analysts. Barron probably specializes in leverage and
+shorting and technical analysis. He's just another specialist, although somewhat
+vice prone."* So the pitch goes to an **outsider**, and the desk becomes
+symmetric.
+
+```
+OUR LADY      remote, unseen        surfaces the deal. You don't get to ask why this one.
+   ↓
+THE FOUNDER   projected hologram    pitches, gets paid if you fund. UNLIMITED presses.
+   ↓
+FOUR ANALYSTS at the desk, yours    Barron CHART · Marisol CHAIN · GR80 RECORD · Eugene SOCIAL
+              one use each          + Virgil on the desk
+   ↓
+YOU           the fifth seat        call it
+```
+
+**Our Lady is the randomiser, and she was always canon.** Every attempt to stage
+the roll as an OBJECT failed — three dice, blank dice, a wheel, a dual wheel —
+because a VC meeting has no randomiser in it. It needs a **person**.
+`council-chat/route.js:16` already establishes her as *"in the channel but NOT
+in the room — nobody knows where she posts from"*, and `Lobby.jsx:48` already
+tells the player they are *"the fifth seat at Our Lady of Perpetual Profit's
+trading desk"*. The desk is hers, the four are her staff, and she sends work
+down. She costs no model and no portal — a line arriving on the channel is
+exactly the canon. **Her line may never editorialise on the deal**; the moment
+her tone tracks the outcome she is the pitcher-leak wearing a habit. And never
+"child" — seeker or pilgrim.
+
+**The founder is a hologram, and that is what makes rotation affordable.** The
+projector already exists dead-centre of the four workstations, throwing a
+decorative globe above the monitor line. The monitors cannot host the pitch —
+they are the evidence boards, and a receipt landing on a seat's own screen is
+the payoff of the whole four-seat design. Projected also gives the page a
+coherent ladder of presence: Our Lady absent, the founder an image, the analysts
+bodies, Virgil on the desk, you behind the camera. Crucially a new founder is a
+PORTRAIT plus prose, not a rigged character at a workstation — and hologram
+scanline and flicker *hide* low-fidelity lip-sync rather than exposing it, so
+the amplitude mouth `PressFigure` already drives is enough.
+
+**Two biases the cast now teaches, for free.** Marisol is a detective, so players
+will over-trust a deal she likes; Barron is vice-prone and short-biased, so they
+will over-discount one he likes. Same lesson from opposite directions — *the
+messenger's disposition is not evidence* — which is `BORROWED_CREDIBILITY`
+operating across a whole session instead of one claim.
+
+**Rolled independently of everything.** Founder must not correlate with
+archetype OR outcome. If Marisol-only-pitches-legit the pitcher leaks the
+answer; if a founder maps to an archetype it is the name-leak again (see
+`identities.js`). This is the third time this exact bug has appeared today.
+
+**What it costs.** Code is small — the pitcher special-case in `pressRun.js` is
+already *"is this the pitcher?"* wearing Barron's name; rename it and add him to
+`SPENDABLE_SEATS`. Content is the real bill: a founder cast, and **Barron's
+`sharp` findings as a specialist, which do not exist** because archetypes
+currently author his pitch prose instead. The 14 pressure asides are in his
+voice and move to the founder — mostly generic enough to survive, worth
+re-reading.
+
+**Delete on the way through:** `diceRoll.jsx` and the roll beat. The arrival
+replaces it — your next appointment is here, `SEND THEM IN ▸`, which is diegetic,
+implies a queue, and stages nothing false about variety.
+
+### The 1/10 hit rate — half of it is free, half is a trap
+
+*Author, 2026-07-28: "we may only have a 1/10 hit rate on projects, but they'll
+fail for different reasons, not just because they're legit or not."*
+
+**THE REAL INSIGHT IS THAT THERE ARE TWO AXES, AND THE GAME WELDED THEM
+TOGETHER** (author: *"I was going to say 50/50 but that's not realistic. Most
+projects fail, even if well-intentioned."*):
+
+|  | did it work? |
+|---|---|
+| **were they honest?** | independent of it |
+
+`truth: 1 / 0` reads as rug/legit, and `RESOLUTION` quietly makes `legit` mean
+*succeeded* — so the only way to lose money in this game is to be cheated. That
+is false about the world and it is the reason no single number felt right: 50/50
+prices honesty, 1/10 prices success, and they are not the same question.
+
+**The desk can only answer one of them, and it is already the right one.**
+Marisol can tell you whether the money moved as claimed; GR80 can tell you what
+the audit covered. **Nobody at that desk can tell you whether the market will
+show up.** So the player's call is *am I being told the truth* — which means the
+SCORING AXIS IS ALREADY CORRECT and only the narration is wrong.
+
+That makes "most projects fail" free. It becomes a fact about the world rather
+than a change to the base rate you're graded against:
+
+- **`legit` splits into outcomes, not one outcome.** Ran out of runway,
+  out-competed, the team split, the market never showed — and occasionally, it
+  worked. All of them are still a **correct LONG call**, because the claims held
+  up and that is what you were asked to judge.
+- **`rug` keeps its meaning.** Something was hidden behind the claims and the
+  desk could have found it.
+
+**The teaching payload this unlocks is the best one available here: a good
+decision and a bad outcome are not the same mistake.** A player who funds an
+honest project that dies deserves to be told, in as many words, *you read it
+right, it failed anyway, and that is not the error you think it is.* Separating
+process from outcome is the deepest thing a calibration game can teach, and this
+is the only place in the design where it can be said out loud.
+
+**One mismatch to handle deliberately.** If a `legit` deal fails, P&L still pays
+the LONG call — the score says you won while the story says it died. Do not
+paper over it; **say it**. That gap IS the lesson, and the resolution copy
+should name it rather than let the player think the numbers glitched. Anything
+else and BOOK quietly re-teaches outcome-chasing, which is what the proper
+scoring rule exists to prevent.
+
+**The trap: making 1/10 the actual base rate.** A realistic venture hit rate
+makes blind PASS correct 90% of the time — the exact failure just fixed by
+adding `anon-but-real` (blind SHORT went 71% → 57.5%). Real VC survives its hit
+rate only through **asymmetric payoffs**: nine 1x losses against one 100x
+winner. This game has `STAKE = 25`, fixed, and `casePnl` is an affine transform
+of Brier — symmetric by construction. Power-law payoffs would end properness
+(invariant 2) the same way the conviction-coupled stake did.
+
+**If it is ever wanted, the shape is two numbers, which the autopsy already
+has.** READ becomes *calibration* (proper, Brier) and BOOK becomes *venture
+returns* (power-law, honest to the fiction) — so the game can teach both "be
+calibrated" and "venture math means funding things that probably fail" without
+either corrupting the other. That is a scoring-kernel redesign, not an
+afternoon, and it needs its own note before a line of it is written.
 
 **Next, roughly in order** *(dropped from this doc in the seat rewrite and
 restored 2026-07-28 — the roadmap is the point of §7, not just the defect list):*
@@ -383,32 +710,122 @@ restored 2026-07-28 — the roadmap is the point of §7, not just the defect lis
 1. **The rotating pitcher — "will other characters pitch?"** Yes, and it is the
    biggest content lever there is: it multiplies both archetypes by the number
    of speakers. `claim.speaker` already exists in `instanceDeal` — hardcoded
-   `"demon"`, read by nothing. **The blocker is not prose, it's lane coverage.**
-   With Barron pitching, Marisol and GR80 cover CHAIN and RECORD. If Marisol
-   pitched, CHAIN would have no adviser at all.
-   The clean fix is to **give Barron a lane of his own** — PEOPLE, the
-   relationships he keeps invoking — so all three own one. Then whoever pitches
-   is excluded, the other two cover their lanes, and **the pitcher's own lane
-   becomes unsettleable**: the only person who could verify it is the one
-   selling you the deal. `SHAPE` stops being an authored tag and becomes
-   emergent, which is better design than what's there now. Solvability
-   survives — `loadBearing` claims are HARD, i.e. answerable by pressing the
-   pitcher directly, so the free press still reaches every verdict.
-   Cost: ~35 lines of `generic`/`sharp` prose per speaker per archetype, plus a
-   PEOPLE lane tagged across both archetypes' slots.
+   `"demon"`, read by nothing. **The lane-coverage blocker is already gone** —
+   it was the reason this sat behind a redesign, and the 2026-07-28 restructure
+   dissolved it in passing. All four seats now own exactly one lane (Barron
+   CHART, Marisol CHAIN, GR80 RECORD, Eugene SOCIAL), so whoever pitches is
+   simply excluded, the other three still cover theirs, and **the pitcher's own
+   lane becomes unsettleable**: the only person who could verify it is the one
+   selling you the deal. That is emergent rather than authored, which is better
+   than the old `SHAPE` tag. Solvability survives — `loadBearing` claims are
+   HARD, i.e. answerable by pressing the pitcher directly, so the free press
+   still reaches every verdict.
+   What remains is **prose and wiring**: ~35 lines of `generic`/`sharp` per
+   speaker per archetype, plus reading `claim.speaker` on both surfaces
+   (portrait, voice, and the answer panel's byline).
 2. **More archetypes.** Eleven of the thirteen `CASE_PATTERNS` reads are
    unbuilt. Pure content — no code. `serial-deployer` and `celeb-shill` are the
    next highest-contrast pair.
-3. **Let Eugene be wrong.** See §1: he is currently an oracle who is never
-   wrong, which makes him a hint system with a face. A pattern-matcher who
-   *misreads* at his archetype's own exception rate is a character. Leak-safe
+3. **Let Virgil be wrong.** The tips are currently an oracle that never
+   misreads, which makes them a hint system with a face on it. A pattern-matcher
+   who *misreads* at the archetype's own exception rate is a character. Leak-safe
    as long as his confidence tracks the base rate and never the branch.
-4. **Trophies.** Read a deal well → mint its exemplar coin into the binder,
-   stamped with your call. Rails exist (`PackReveal`, `OwnBinder`, grant
-   routes). Decoupled by design: trophies never touch the resolver.
-5. **Persist BOOK + the leaderboard.** `dailySeed()` already gives everyone the
-   same deal; the read-side leaderboard API exists. Today BOOK resets to 100
-   every session, so there is no reason to come back on day two.
+   **The cat makes this cheaper than it was when the read belonged to a
+   colleague** — a specialist you dispatched being wrong undermines the seat
+   economy, whereas a cat being wrong about vibes costs nothing structural, and
+   the tips already have an off switch for anyone who'd rather not gamble on
+   him. Note the ordering constraint: this only reads as character if the tip
+   is *sometimes* wrong; make him wrong on the agenda and you have broken the
+   one number the seat decision rests on. **The agenda must stay exact.**
+4. **Trophies — and the collectible is the ARCHETYPE, not a coin** (author,
+   2026-07-28: *"i like having a collection of archetypes. Maybe these are
+   collectible as trophies."*). Read a deal well → the PATTERN goes into your
+   collection, stamped with your call. Rails exist (`PackReveal`, `OwnBinder`,
+   grant routes). Decoupled by design: trophies never touch the resolver, so
+   this passes the discipline rule.
+
+   This supersedes the previous plan — mint the deal's *exemplar coin* — which
+   was quietly reintroducing the thing §3 just removed: a Genesis card, a
+   different token, pointing at the 2D TCG. **You collect what you've learned to
+   recognise**, which is what this game actually teaches, and the set is the
+   thirteen `CASE_PATTERNS` rather than a parallel coin set.
+
+   Four things fall out of it, and they're why it's the better design:
+
+   - **It gives the thirteen a purpose.** Eleven are unbuilt names today. As a
+     collection they have a visible shape — *2 of 13* — and every new archetype
+     is both content and a collectible for zero extra code.
+   - **It answers "why come back on day two"** (item 5) without persistence of
+     P&L. The collection is the thing that survives the session.
+   - **It kills the last cards.js dependency.** `deal.exemplar` exists *only*
+     for the old trophy plan; nothing renders it since the tell replaced it.
+     Drop it and `instanceDeal.js` stops calling `getCardById`/`getCardArt`,
+     which is the import `questions.js:6` forbids.
+   - **It makes a deleted line true.** The post-deal panel used to open
+     *"YOU'VE SEEN THIS SHAPE BEFORE"*, cut for being false on a first play.
+     Once the archetype is a thing you own, the claim is accurate and *earned* —
+     show it only when the pattern is already in the collection, and it becomes
+     a recognition beat instead of an assumption.
+5. **Persist the collection and your own book — NOT a leaderboard.** Today BOOK
+   resets to 100 every session, so nothing you do survives the tab and there is
+   no reason to come back on day two. What should persist is (a) which
+   archetypes you've collected and (b) your own cumulative book, shown as a
+   personal curve. **A daily leaderboard is explicitly rejected below** — it
+   ranks one realization rather than an expectation, which pays you to
+   overstate. Ranking, if it ever ships, has to be cumulative over a season.
+
+**Considered and declined: a DAILY LEADERBOARD** (2026-07-28, author: *"if this
+game isn't suited to rankings, let's call that out"*). It isn't, and the reason
+is invariant 2 arriving through a side door.
+
+The payout is proper **in expectation** — the harness asserts *honest reporting
+maximises expected P&L at every belief*. A daily leaderboard does not rank on
+expectation. It ranks on **one realization**, and those come apart:
+
+| | reports | tops a one-deal board |
+|---|---|---|
+| calibrated player | p = 0.74, their true belief | when the deal rugs *and* nobody went higher |
+| reckless player | p = 0.99 | **whenever the deal rugs — ~74% of days** |
+
+Maximising `E[P&L]` means reporting honestly. Maximising `P(top of today's
+board)` means going to the extreme and hoping. On a backdoor-fork day the deal
+is a rug 74% of the time, so **roughly three days in four the reckless player
+posts the higher number**. The calibrated player wins on average — but a daily
+board never shows the average, and what players take from a leaderboard is
+"do what the top row did".
+
+That is precisely the defect that killed the conviction-coupled stake
+(*"it pays you to overstate"*), and precisely what disqualified the live price:
+*the score is currently a pure function of calibration, and price movement makes
+it calibration plus luck.* **A one-deal-per-day leaderboard is calibration plus
+luck, ranked on the luck.** It would also collapse fast at two archetypes, where
+the read is memorised within a week and only the luck term is left.
+
+The rail exists and is genuinely complete — `POST /api/tcg-docket-reward` writes
+one atomic claim per user per seed (a day really is one shot),
+`GET /api/tcg-docket-leaderboard` ranks it, `Standings.jsx` renders it. Not
+wiring it is a **choice**, not a gap.
+
+**And the daily deal went with it.** Rejecting the ranking removed three of the
+daily's four justifications at a stroke (fairness, anti-reroll-fishing, BOOK
+continuity), leaving only "a shared thing to talk about" — which needs a share
+hook nobody has built. Rather than keep a mode whose reason had been deleted, it
+was cut the same day; §3 has the detail. **This is the shape of the whole
+session: a subsystem outlives its justification and has to be re-audited when
+the justification goes.** Cards, the exemplar coin and the daily all died that
+way within a few hours of each other.
+
+What ranking IS suited to, if it ever comes back, in order:
+
+1. **The archetype collection** (§7 item 4) — measures what you've learned to
+   recognise, which is what this game teaches. Completion, not competition:
+   nobody loses for you to win, and it has no properness problem because it is
+   not a score.
+2. **Cumulative P&L over a season.** Proper — the luck term averages out and
+   calibration wins over enough deals. Needs real persistence, and it is not
+   worth much until there are more than two reads.
+3. **Your own book over time.** A personal curve, not a ranking. *"Twelve deals
+   in, up 31"* is honest feedback and needs no comparison to anybody.
 
 **Considered and declined: a live/moving market price** (author, 2026-07-28).
 It has only two possible relationships to the truth and both are bad. Correlated,
@@ -432,8 +849,8 @@ deliberate rule that lanes are public from second zero (§3), which exists so th
 skill is timing rather than a memorised lane map. A real trade, not a freebie.
 
 **And the missing dimension is persistence, not a variable.** Nothing survives a
-session — BOOK resets to 100, `dailySeed()` already gives everyone the same deal,
-the leaderboard API exists unused. That is where "dynamic" pays: across days,
+session — BOOK resets to 100 and the archetype you just learned to read is
+forgotten the moment you close the tab. That is where "dynamic" pays: across days,
 not inside four minutes. See item 5 above.
 
 **Known, unfixed:**
@@ -446,7 +863,17 @@ not inside four minutes. See item 5 above.
   the **adviser's** in-room monitor, `NOTHING ON FILE` in-scene, and the curtain
   call still firing. (Getting to the floor in an automated browser requires
   skipping the deal animation — gsap stalls in a background tab.)
-- `press/hand.js` is orphaned. Delete it once the card cut is settled.
+- `press/hand.js` and `press/deals/mrdn.js` are both orphaned — the cut card
+  pool and slice 1's hand-authored MERIDIAN deal. Delete once the card cut is
+  settled.
+- **Virgil has no body yet.** He is a portrait (`/cameo_kitty.webp`) and two
+  lines of text on the floor; `VIRGIL.model` points at `/models/fluffyCat.glb`
+  and nothing loads it. The desk is where he sits — an in-scene cat is the
+  cheapest character on the floor, because he has no lane, no lip-sync and no
+  reaction clip that could leak an outcome (invariant 9).
+- The harness still labels five Virgil assertions as *"Eugene's read …"* and
+  imports `agenda as eugeneAgenda`. Tests pass and test the right thing; the
+  names are pre-cat.
 - 28 authored `miss` blocks in the archetypes are never read by `resolvePress` —
   card-era leftovers. Dead prose, not dead code.
 - `STARTER_SET` grants 21 cards free per userId (`collection.js:10`). Harmless
@@ -492,7 +919,10 @@ Measured after (500 seeds/archetype):
 | backdoor-fork | 4.22 → **1.00** | 4.22 | 3.00 → **1.00** | **2.22** |
 | yield-mirage | 5.28 → **2.00** | 5.28 | 3.00 → **2.00** | **2.28** |
 
-Harness: `scratchpad/acceptance.mjs`. Five assertions now pin it permanently —
+Harness: `scratchpad/acceptance.mjs`, a session-scoped scratch file that is
+**gone** — reconstruct it from the five assertions below if the measurement is
+ever wanted again. Those five now pin the result permanently in
+`verify-press-run.mjs` —
 backing is never per-branch; no non-loadBearing slot lets the seller give away
 the branch; the loadBearing claim IS still free (invariant 1); specialists must
 settle *strictly more* than the seller; and at least one claim must let a
@@ -536,10 +966,16 @@ variables (`auditor`, `name`, `days`, `apy`, `collapseDay`, `priorA/B`, `seed`,
 `pump`). The auditor's name and the headline APY are rolled fresh daily, so
 there is no fixed audio for them.
 
-The only genuinely fixed set is the **8 adviser result lines** in
-`desk.js` `ADVISER_LINES` (2 advisers × dispatch/found/partial/nothing). If a
-human performance is ever wanted, that is the bounded session worth booking —
-nothing else.
+The only genuinely fixed sets are the **15 adviser result lines** in `desk.js`
+`ADVISER_LINES` (3 advisers × dispatch/found/partial/nothing/shallow) and
+Barron's **14 pressure asides**. If a human performance is ever wanted, those 29
+lines are the bounded session worth booking — nothing else.
+
+**Virgil is deliberately not on this list.** His 18 tips and the agenda's
+generated phrasings are the one bank that should probably never be spoken at
+all: he is a cat, the agenda is a *readout* rather than dialogue, and text is
+also what makes the off switch instant. A purr or a chirp on the tip is the
+whole audio budget he needs.
 
 ### What to build
 

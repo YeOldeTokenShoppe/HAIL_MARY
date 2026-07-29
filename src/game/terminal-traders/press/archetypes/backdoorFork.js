@@ -27,6 +27,23 @@
 import { SHAPES, BACKING, LANES } from "../questions.js";
 
 export const ARCHETYPE_ID = "backdoor-fork";
+// WHAT THE PLAYER IS TOLD IT'S CALLED. The id is a code slug — kebab-case,
+// fine in a file, and it was leaking straight onto the post-deal screen next to
+// a ticker. Naming the pattern is the teaching payload of this whole game, so
+// the name has to be plain English and has to describe the MECHANISM, because
+// that is the thing that transfers to the next token. (Invariant 6, same catch
+// as "the tape".)
+export const ARCHETYPE_LABEL = "THE DOOR NOBODY AUDITED";
+// THE TELL — the transferable half, and the whole teaching payload of the
+// post-deal screen. It replaced a reference to the exemplar COIN, which named a
+// second token the player had never met: *"why reference a different project?"*
+// (author, 2026-07-28). They just spent four minutes with a concrete case of
+// their own; a stranger's is redundant and competes with the one they actually
+// have investment in. What they can't get from their own deal is the rule that
+// generalises to the next one, which is this.
+export const ARCHETYPE_TELL =
+  "The audit is real. Ask what it covered, and the answer stops just short of "
+  + "the part that can move the money.";
 // The Genesis coin that IS this read — its dossier is the canonical example.
 // Per CASE_TABLE.md §10.2 the coin defines the ARCHETYPE; a deal is a fresh
 // token instantiated from it, so the coin's own `caseRef.outcome` is lore, NOT
@@ -40,15 +57,11 @@ export const OUTCOMES = [
   { outcome: "legit", truth: 0, weight: 26 },
 ];
 
-// Instances differ by surface identity so the player can't pattern-match on
-// the name. Same archetype, different masks.
-export const IDENTITIES = [
-  { name: "MERIDIAN PROTOCOL", ticker: "$MRDN", chain: "Base", blurb: "institutional-grade onchain yield strategies" },
-  { name: "HARBORLIGHT", ticker: "$HRBR", chain: "Base", blurb: "onchain treasury tools for creator collectives" },
-  { name: "KEYSTONE VAULT", ticker: "$KEYS", chain: "Base", blurb: "a forked blue-chip vault with a fee rebate" },
-  { name: "NORTHWIND FINANCE", ticker: "$NRTH", chain: "Base", blurb: "delta-neutral strategies for treasuries" },
-  { name: "ALDERMAN", ticker: "$ALDR", chain: "Base", blurb: "permissioned lending for onchain funds" },
-];
+// IDENTITIES MOVED TO ../identities.js (2026-07-28). They were authored here,
+// per archetype, with zero overlap between the lists — which made the deal's
+// NAME a perfect predictor of its archetype, and therefore of its base rate.
+// Harmless while every archetype was ~70% rug; fatal the moment anon-but-real
+// landed at 70% legit. The pool is shared now and the name tells you nothing.
 
 export const AUDITORS = ["Trail of Bits", "Spearbit", "OpenZeppelin", "Zellic"];
 export const PRIORS = ["ex-Aave", "ex-MakerDAO", "ex-Compound", "ex-Lido"];

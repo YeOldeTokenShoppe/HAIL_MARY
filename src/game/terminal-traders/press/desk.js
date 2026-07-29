@@ -9,42 +9,58 @@
 
 import { LANES, SEATS, SHAPES, inLane } from "./questions.js";
 
+// PORTRAITS ARE DESK DATA, NOT SURFACE DATA. They used to be a `cardId` that
+// each surface resolved into a Genesis card face through dealCard.js. Cards
+// were cut from this game on 2026-07-28, so what a seat looks like is now just
+// a path, and it belongs next to the name and the lane rather than being
+// re-derived identically on two surfaces.
+//
+// These four are renders of the SAME models that sit in the room, against the
+// same grid backdrop, so the tiles and the scene agree with each other.
 export const DESK = {
   [SEATS.BARRON]: {
     id: SEATS.BARRON, agentId: "Demon", station: "demon",
-    name: "John Barron", role: "THE TAPE", lane: LANES.CHART,
+    name: "John Barron", role: "THE CHART", lane: LANES.CHART,
+    portrait: "/thumbnail_johnBarron.png",
     blurb: "Price, windows, momentum. Brought the deal in — gets paid if you fund it.",
   },
   [SEATS.MARISOL]: {
     id: SEATS.MARISOL, agentId: "Detective", station: "marisol",
     name: "Detective Marisol", role: "THE MONEY", lane: LANES.CHAIN,
+    portrait: "/thumbnail_marisol.png",
     blurb: "Money movement, wallet ages, unlocks.",
   },
   [SEATS.GR80]: {
     id: SEATS.GR80, agentId: "Monk", station: "monk",
     name: "Saint GR80", role: "THE PAPERWORK", lane: LANES.RECORD,
+    portrait: "/thumbnail_gr80.png",
     blurb: "What the documents actually say.",
   },
   [SEATS.EUGENE]: {
     id: SEATS.EUGENE, agentId: "RL80", station: "eugene",
     name: "Eugene", role: "THE STORY", lane: LANES.SOCIAL,
+    portrait: "/thumbnail_eugene.png",
     blurb: "Narrative, reputation, who vouches for whom.",
   },
 };
 
+/** Seat order for every row that shows the whole desk. Barron first because
+ *  he's the one pitching; the three spendables follow in lane order. */
+export const DESK_ORDER = [
+  DESK[SEATS.BARRON], DESK[SEATS.MARISOL], DESK[SEATS.GR80], DESK[SEATS.EUGENE],
+];
+
 /**
- * Eugene is now a full seat (SOCIAL) rather than a fixture. Kept as a named
- * export because a lot of code refers to him directly, and because he is still
- * the one seat that does TWO things:
+ * Eugene is a PLAIN FOURTH SEAT (SOCIAL) — one use, no exemption. Kept as a
+ * named export only because a lot of code refers to him directly.
  *
- *   RECOGNITION — free, unlimited, every claim: the shape, then the agenda.
- *                 Costs nothing because nothing is fetched.
- *   RETRIEVAL   — one use, like the others: sent at a SOCIAL claim he comes
- *                 back with who actually vouches for whom, and stamps it on
- *                 his own board (__screen4Canvas, which existed unused all along).
- *
- * That split is the answer to "why does Eugene have the special role" — the
- * others retrieve, he also recognises, and recognition is free by nature.
+ * He used to do two things: RETRIEVAL like everyone else, plus a free
+ * RECOGNITION read on every claim. That second power is what made him the one
+ * seat in four that needed explaining, and it is now the cat's (./virgil.js).
+ * The answer to "why does Eugene have the special role" is that he no longer
+ * does. What he retrieves: sent at a SOCIAL claim he comes back with who
+ * actually vouches for whom, and stamps it on his own board (__screen4Canvas,
+ * which existed unused all along).
  */
 export const EUGENE = DESK[SEATS.EUGENE];
 
@@ -53,11 +69,20 @@ export const EUGENE = DESK[SEATS.EUGENE];
  * in code, but "RECORD QUESTION" reads as an instruction to record something —
  * noun or verb, you can't tell ("is 'Record' a verb or noun here?" — author,
  * 2026-07-27). Player-facing copy uses a plain noun phrase.
+ *
+ * CHART WAS "THE TAPE" UNTIL 2026-07-28. Ticker-tape slang: reading the tape is
+ * watching price and volume action. It was the only one of the four that needed
+ * to be known rather than read — "the money", "the paperwork" and "the story"
+ * are plain and it wasn't — and it failed on the author, who asked what it
+ * meant. That is invariant 6 (every player-facing term must parse with no
+ * finance literacy) catching a term the same way it caught "Brier" and
+ * "diligence". Barron still SAYS "tape" in his own dialogue, because he's the
+ * one with the jargon; the UI no longer says it back.
  */
 export const LANE_LABEL = {
   [LANES.CHAIN]: "the money",
   [LANES.RECORD]: "the paperwork",
-  [LANES.CHART]: "the tape",
+  [LANES.CHART]: "the chart",
   [LANES.SOCIAL]: "the story",
   [LANES.SHAPE]: "nobody's specialism",
 };
@@ -84,7 +109,7 @@ export function laneOwner(claim) {
 export function laneSentence(claim, { spent = [] } = {}) {
   if (!claim) return "";
   const who = laneOwner(claim);
-  if (!who) return "NOBODY HERE SPECIALISES IN THIS ONE — anyone you send gets the shallow version";
+  if (!who) return "NOBODY HERE SPECIALISES IN THIS ONE — anyone you ask gets the shallow version";
   const label = LANE_LABEL[claim.lane].toUpperCase();
   if (spent.includes(who.id)) {
     return `THIS ONE'S ${label}, AND ${who.name.toUpperCase()} IS SPENT — anyone else gets the shallow version`;
@@ -92,33 +117,30 @@ export function laneSentence(claim, { spent = [] } = {}) {
   return `THIS ONE'S ${label} — ${who.name} goes deepest on it`;
 }
 
-// What KIND of weakness this claim would have, if it has one. Never states
-// whether it does — that would name the outcome before the reveal.
-
 // THE FREE READ MOVED TO THE CAT (./virgil.js). It was Eugene's, which made him
 // the one seat in four with a permanent extra power — reported three times
 // through three different implementations before the asymmetry itself was
 // recognised as the problem. He is a plain fourth seat now.
 //
-// HISTORICAL NOTE kept because it is a rule, not a story: his second sentence
-// used to be a LANE_READ bank —
+// TWO RULES SURVIVE THE MOVE, and they are the reason this note stays here
+// rather than going with him:
 //
-// It used to be a LANE_READ bank — "That one's onchain. Marisol can settle it."
-// — which is word for word what the colour-coded band directly above him
-// already says. Half his output restated the UI and the other half was an
-// adjective, so he read as a character with no job: *"I still don't get
-// Eugene's off-sides role"* (author, 2026-07-27), the third complaint about him
-// in a day. Moving him twice never had a chance of fixing that.
+// 1. THE READ MAY NEVER RESTATE THE LANE BAND. It shipped as a LANE_READ bank —
+//    "That one's onchain. Marisol can settle it." — word for word what the
+//    colour-coded band directly above it already said. Half the output restated
+//    the UI and the other half was an adjective, which is how a voice ends up
+//    reading as having no job. What replaced it is HOW MUCH RUNWAY IS LEFT IN
+//    THIS LANE: nothing else on the floor knows that, and it changes the
+//    decision the game is actually about — spend Marisol on this money
+//    question, or hold her for a better one. "Last one you'll get" and "three
+//    more coming" are different games.
 //
-// Now he reports HOW MUCH RUNWAY IS LEFT IN THIS LANE, which nothing else on
-// the floor knows and which changes the decision the game is actually about:
-// spend Marisol on this money question, or hold her for a better one. "Last
-// one you'll get" and "three more coming" are different games.
-// SINGULAR AND PLURAL ARE BOTH AUTHORED, because the plural is not always a
-// trailing "s": "question about the tape" pluralises on the HEAD noun, and
-// appending to the phrase produced "two more question about the tapes". Latent
-// under today's archetypes — CHART and SOCIAL never reach remaining >= 2 — so
-// it would have shipped silently the day a third social slot landed.
+// 2. SINGULAR AND PLURAL ARE BOTH AUTHORED, because the plural is not always a
+//    trailing "s": "question about the tape" pluralises on the HEAD noun, and
+//    appending to the phrase produced "two more question about the tapes".
+//    Latent under today's archetypes — CHART and SOCIAL never reach
+//    remaining >= 2 — so it would ship silently the day a third social slot
+//    lands.
 
 
 // HOW HE CARRIES IT AFTER YOU'VE HAD A GO AT HIM.

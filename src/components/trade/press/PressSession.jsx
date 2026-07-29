@@ -1,20 +1,18 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { instanceDeal, dailySeed } from "@/game/terminal-traders/press/instanceDeal";
+import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDeal";
 import { BACKING, SEATS, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
-import { DESK, EUGENE, laneOwner, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
-import { virgilRead } from "@/game/terminal-traders/press/virgil";
+import { DESK, DESK_ORDER, laneOwner, laneSentence, barronAside } from "@/game/terminal-traders/press/desk";
+import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
   allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore, seatOptions, laneOutlook, pressure,
 } from "@/game/terminal-traders/press/pressRun";
-import { toDealCard, toExemplarCard, toCharacterCard } from "@/game/terminal-traders/press/dealCard";
-import TradingCard from "@/components/TradingCard";
 import { preloadSfx } from "@/lib/uiSfx";
 import {
-  DealtSlot, DealDeck, runCardDeal, prefersReducedMotion, SFX, DEAL_CSS,
-} from "./cardDeal";
+  DiceTray, runDiceRoll, prefersReducedMotion, facesFor, SFX, DICE_CSS,
+} from "./diceRoll";
 import { createEvidenceScreen } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
@@ -37,21 +35,13 @@ import {
 //   onRevealChange(outcome|null)— stage the curtain call on the real scene
 //   onExit()                    — leave the mode
 
-// A card NEVER opens a new subject — it interrogates a claim HE raised, just
-// from a sharper angle. If cards could introduce topics he never mentioned the
-// game would become a hunt for hidden subjects rather than a read on the ones
-// already in front of you. PRESS HIM is the blunt version of the same move.
-
 const SPEAKER_AGENT = "Demon";    // John Barron's agentId in CyborgTempleScene
-const SPEAKER_TRADER  = "john-barron"; // his Genesis card — the CHARACTER type
 const SPEAKER_STATION = "demon";  // -> __screen2Canvas (SCREEN_TARGETS in evidenceScreen.js)
-const CARD_HERO  = 0.40;   // the deal card — the subject, fills the left column
-const CARD_THUMB = 0.115;  // character + questions — context, click to enlarge
-const READ_MS = 4200;           // how long a claim holds the floor before it can land
+const READ_MS = 4200;             // how long a claim holds the floor before it can land
 
-// THE DEAL — choreography lives in ./cardDeal, shared with PressFlat so both
-// presentations deal the same way. Deal order is the slot index: 0 the deal
-// card, 1 Barron, 2-4 your questions.
+// THE ROLL — choreography lives in ./diceRoll, shared with PressFlat so both
+// presentations open the same way. Cards were cut from this game on 2026-07-28
+// and reserved for a 2D TCG; the deal is a seeded roll and now looks like one.
 
 export default function PressSession({
   // Pass a deal to pin one (tests/sims). Otherwise the DAILY deal is used —
@@ -64,29 +54,21 @@ export default function PressSession({
   onRevealChange,
   onExit,
 }) {
-  // Resolve the deal once per mount. Reading the override here (not at module
-  // scope) keeps this SSR-safe and lets a refresh pick up a new ?dealseed.
-  const deal = useMemo(() => {
-    if (dealOverride) return dealOverride;
+  // A FRESH DEAL EVERY TIME YOU SIT DOWN. Rolled once per mount, so the dice
+  // are telling the truth: nobody decided this before you got here.
+  //
+  // The seed is state rather than a memo dependency because it must be STABLE
+  // for the session — deriving it inside the memo would reroll the deal on
+  // every render. Reading the override here (not at module scope) keeps this
+  // SSR-safe and lets a refresh pick up a new ?dealseed.
+  const [seed] = useState(() => {
     const forced = typeof window !== "undefined"
       ? Number(new URLSearchParams(window.location.search).get("dealseed"))
       : NaN;
-    return instanceDeal(Number.isFinite(forced) && forced > 0 ? forced : dailySeed());
-  }, [dealOverride]);
-
-  // Your hand for this deal — dealt from the same seed, so it's the same for
-  // everyone today and can't be rerolled. `liveShapes` guarantees at least
-  // MIN_LIVE of them can hit something here: you can be dealt a question this
-  // deal is immune to, but never a whole hand of them.
-  // THE DESK. Four people, always the same four — nothing to deal here, so the
-  // cards are simply present. Only the deal itself is unknown, and that's the
-  // one card that still turns over.
-  const DESK_ORDER = useMemo(() => [
-    { ...DESK[SEATS.BARRON], cardId: "john-barron" },
-    { ...DESK[SEATS.MARISOL], cardId: "marisol" },
-    { ...DESK[SEATS.GR80], cardId: "gr80" },
-    { ...EUGENE, cardId: "eugene" },
-  ], []);
+    return Number.isFinite(forced) && forced > 0 ? forced : rollSeed();
+  });
+  const deal = useMemo(
+    () => dealOverride || instanceDeal(seed), [dealOverride, seed]);
 
   const [run, setRun] = useState(() => createRun(deal));
   const [slider, setSlider] = useState(0);
@@ -98,34 +80,37 @@ export default function PressSession({
   // before that gets clobbered. Gating on a click means the model is always
   // loaded by the time we ask for a camera move — no race, no retry loop.
   const [started, setStarted] = useState(false);
-  // Full-size card inspect. Thumbs stay small so the layout breathes; anything
-  // you actually want to READ (the art, the printed question) is one click away.
-  const [inspect, setInspect] = useState(null);
   const screenRef = useRef(null);
   // One board per seat, each painted onto that character's OWN monitor in the
   // scene via the evidenceActive handshake. Eugene has none — he never stamps.
   const screensRef = useRef({});
 
-  // The deal. `dealt` gates the panel's CTA: you deal the table, THEN you let
-  // him pitch. Two beats, because being handed a hand is the moment the
-  // session starts belonging to you.
-  const [dealt, setDealt] = useState(false);
-  const [dealing, setDealing] = useState(false);
-  // NOTHING ON THIS PANEL MAY NAME A CARD THAT ISN'T FACE-UP YET. Printing
-  // "ALDERMAN · $ALDR · $7.5M" and "John Barron brought this one in" over an
-  // empty table announced both the deal and the speaker before either had been
-  // dealt — which is precisely the reveal this beat exists to stage.
+  // THE ROLL. `rolled` gates the panel's CTA: the house rolls the deal, THEN
+  // you let him pitch. Two beats, because watching the deal get picked is the
+  // moment the session starts belonging to you.
+  const [rolled, setRolled] = useState(false);
+  const [rolling, setRolling] = useState(false);
+  // NOTHING ON THIS PANEL MAY NAME THE DEAL BEFORE THE DICE STOP (invariant 7).
+  // Printing "ALDERMAN · $ALDR · $7.5M" and "John Barron brought this one in"
+  // over an empty table announced both the deal and the speaker before either
+  // had been picked — precisely the reveal this beat exists to stage.
   //
-  // `landed` counts cards that have finished turning over, in deal order, so
-  // each name arrives with its own card: the deal's identity when slot 0 lands,
-  // the speaker's when slot 1 does.
-  const [landed, setLanded] = useState(0);
-  const identity = dealt || landed >= 1;      // slot 0 — the deal card
-  const speakerNamed = dealt || landed >= 2;  // slot 1 — who's pitching
-  const deckRef = useRef(null);
-  const slotRefs = useRef([]);
+  // Under the card deal these were two separate gates, because the deal card
+  // and the speaker's card turned over at different moments. One roll has one
+  // settle, so they're now the same instant and the two names arrive together.
+  const [settled, setSettled] = useState(false);
+  const identity = rolled || settled;
+  const speakerNamed = rolled || settled;
+  // Which faces they come to rest on. Seeded by a tick counter, NEVER by the
+  // run seed — see the note at the top of diceRoll.jsx. This is decoration and
+  // it has to stay decoration.
+  const faces = useMemo(() => facesFor(0), []);
+  const diceRefs = useRef([]);
+  const cubeRefs = useRef([]);
+  const sheetRef = useRef(null);
   const tlRef = useRef(null);
-  const registerSlot = useCallback((i, el) => { slotRefs.current[i] = el; }, []);
+  const registerDie = useCallback((i, el) => { diceRefs.current[i] = el; }, []);
+  const registerCube = useCallback((i, el) => { cubeRefs.current[i] = el; }, []);
 
   const claim = currentClaim(run, deal);
   const onFloor = started && run.phase === PHASE.FLOOR;
@@ -180,30 +165,31 @@ export default function PressSession({
   useEffect(() => { Object.values(SFX).forEach(preloadSfx); }, []);
   useEffect(() => () => tlRef.current?.kill(), []);
 
-  const runDeal = useCallback(() => {
-    if (dealing || dealt) return;
-    // Someone who asked not to be moved gets the cards, not the choreography.
-    if (prefersReducedMotion()) { setDealt(true); return; }
+  const runRoll = useCallback(() => {
+    if (rolling || rolled) return;
+    // Someone who asked not to be moved gets the deal, not the choreography.
+    if (prefersReducedMotion()) { setSettled(true); setRolled(true); return; }
 
-    setDealing(true);
-    const tl = runCardDeal({
-      deck: deckRef.current,
-      slots: slotRefs.current,
-      captionSelector: ".ps-draw-name",
-      onLanded: (i) => setLanded((n) => Math.max(n, i + 1)),
-      onDone: () => { setDealing(false); setDealt(true); },
+    setRolling(true);
+    const tl = runDiceRoll({
+      dice: diceRefs.current,
+      cubes: cubeRefs.current,
+      sheet: sheetRef.current,
+      faces,
+      onSettled: () => setSettled(true),
+      onDone: () => { setRolling(false); setRolled(true); },
     });
-    // Nothing to animate — go straight to the dealt state rather than
+    // Nothing to animate — go straight to the rolled state rather than
     // stranding the player on a button that does nothing.
-    if (!tl) { setDealing(false); setDealt(true); return; }
+    if (!tl) { setRolling(false); setSettled(true); setRolled(true); return; }
     tlRef.current = tl;
-  }, [dealing, dealt]);
+  }, [rolling, rolled]);
 
-  // Impatience is a legitimate input: a click anywhere mid-deal lands the rest
-  // of the hand instantly instead of making you sit through it.
-  const skipDeal = useCallback(() => {
-    if (dealing) tlRef.current?.progress(1);
-  }, [dealing]);
+  // Impatience is a legitimate input: a click anywhere mid-roll settles the
+  // dice instantly instead of making you sit through them.
+  const skipRoll = useCallback(() => {
+    if (rolling) tlRef.current?.progress(1);
+  }, [rolling]);
 
   /* ---- actions ---- */
   // One path, four seats. Every seat can be sent at every claim — the lane
@@ -257,12 +243,6 @@ export default function PressSession({
   const lockCall = useCallback(() => setRun((r) => doAllocate(r, deal, slider)), [deal, slider]);
   const finish = useCallback(() => setRun((r) => toAutopsy(r)), []);
 
-  const dealCard = useMemo(() => toDealCard(deal), [deal]);
-  const patternCard = useMemo(() => toExemplarCard(deal), [deal]);
-  // All three card types, rendered through the one Genesis renderer.
-  const deskCards = useMemo(
-    () => DESK_ORDER.map((m) => ({ m, data: toCharacterCard(m.cardId, m.role) })), [DESK_ORDER]);
-  const speakerCard = deskCards[0]?.data;
   const options = useMemo(() => seatOptions(run, deal), [run, deal]);
   // What's still coming in this lane — the one thing Eugene knows that no other
   // surface does, and the reason his read stopped being a restatement of the
@@ -298,17 +278,6 @@ export default function PressSession({
     <div className="ps-root">
       <style>{CSS}</style>
 
-      {/* Full-size card inspect. Click-anywhere to dismiss, matching the
-          DealHand/binder pattern already in the codebase. */}
-      {inspect && (
-        <div className="ps-inspect" onClick={() => setInspect(null)}>
-          <div onClick={(e) => e.stopPropagation()}>
-            <TradingCard data={inspect} scale={0.5} interactive templateStyle="terminal" />
-          </div>
-          <button className="ps-inspect-close" onClick={() => setInspect(null)}>✕ CLOSE</button>
-        </div>
-      )}
-
       {/* ---------- top bar: always visible, never blocks the room ---------- */}
       <div className="ps-bar">
         <button className="ps-exit" onClick={onExit}>◀ LEAVE THE DESK</button>
@@ -318,7 +287,7 @@ export default function PressSession({
         <div className="ps-deal">
           {identity
             ? <>{deal.ticker} · {deal.name} <span className="ps-dim">· {deal.chain}</span></>
-            : <span className="ps-dim">ONE DEAL · FACE DOWN</span>}
+            : <span className="ps-dim">ONE DEAL · NOT ROLLED</span>}
         </div>
         <div className="ps-book">
           BOOK <b>{Math.round(run.book)}</b>
@@ -327,42 +296,96 @@ export default function PressSession({
 
       {/* ---------- the opening: the room, then the deal ---------- */}
       {!started && (
-        <div className={`ps-open${dealt ? " is-dealt" : ""}${dealing ? " is-dealing" : ""}`}>
-          {/* Deal card fills the left. Copy right. The other four — who's
-              pitching, and the three questions you drew — sit small beneath
-              the copy. Everything is click-to-enlarge, once it's landed. */}
+        <div className={`ps-open${rolled ? " is-rolled" : ""}${rolling ? " is-rolling" : ""}`}>
+          {/* The roll and the deal sheet fill the left. Copy right, with the
+              four faces beneath it. Nothing in this panel is clickable except
+              the one CTA — it is a briefing, not a board. */}
 
-          {/* Mid-deal, a click anywhere lands the rest. This has to be a real
+          {/* Mid-roll, a click anywhere settles the dice. This has to be a real
               <button> to be clickable at all: .ps-root is pointer-events:none
               and hands input only to buttons and inputs. */}
-          {dealing && (
-            <button className="ps-skip-deal" onClick={skipDeal} aria-label="Deal the rest now" />
+          {rolling && (
+            <button className="ps-skip-deal" onClick={skipRoll} aria-label="Settle the dice now" />
           )}
 
+          {/* THE ROLL, THEN THE SHEET. The deal is rolled fresh for this
+              sitting — nobody decided it before you arrived — and can't be
+              re-rolled without leaving. The tray is never a button.
+
+              The hero is no longer locked to TradingCard's 744x1038 portrait
+              box, which is why this column can finally be the width the copy
+              wants instead of the width a card was. */}
           <div className="ps-open-hero">
-            {dealCard && (
-              <button className="ps-hero-card" onClick={() => setInspect(dealCard)}
-                      title={`${deal.name} — click for full size`}>
-                <DealtSlot index={0} scale={CARD_HERO} register={registerSlot}>
-                  <TradingCard data={dealCard} scale={CARD_HERO} interactive templateStyle="terminal" />
-                </DealtSlot>
-              </button>
-            )}
+            <div className="ps-roll">
+              <DiceTray faces={faces} spent={rolled}
+                        register={registerDie} registerCube={registerCube} />
+              {/* The caption tells the truth about whose roll it was. It used
+                  to read "THE HOUSE ROLLS ONCE A DAY", which was accurate when
+                  the deal came from the clock and became a lie the moment it
+                  didn't. */}
+              <div className="ps-roll-cap">
+                {rolled ? "YOUR ROLL · NOBODY ELSE GOT THIS ONE"
+                  : "THE DEAL IS ROLLED, NOT CHOSEN"}
+              </div>
+            </div>
+
+            {/* Written in only once the dice stop. Every field here is public
+                surface data and none of it correlates with the outcome — that's
+                asserted in the suite, because the moment the listing leaks the
+                answer the analysts stop mattering. */}
+            <div className={`ps-sheet${identity ? " in" : ""}`} ref={sheetRef}>
+              {identity ? (
+                <>
+                  <div className="ps-sheet-h">PROSPECT</div>
+                  <div className="ps-sheet-name">{deal.name}</div>
+                  <div className="ps-sheet-tick">{deal.ticker} · {deal.chain}</div>
+                  <dl className="ps-sheet-stats">
+                    <div><dt>MCAP</dt><dd>{deal.surface.mcap}</dd></div>
+                    <div><dt>HOLDERS</dt><dd>{deal.surface.holders}</dd></div>
+                    <div><dt>AGE</dt><dd>{deal.surface.age}</dd></div>
+                    <div><dt>24H</dt><dd>{deal.surface.change24h}</dd></div>
+                    <div><dt>SOCIAL</dt><dd>{deal.surface.social}</dd></div>
+                  </dl>
+                  <div className="ps-sheet-foot">
+                    Long, short, or hold? Work the questions. Then commit.
+                  </div>
+                </>
+              ) : (
+                <div className="ps-sheet-blank">NOT ROLLED YET</div>
+              )}
+            </div>
+
+            {/* VIRGIL LIVES IN THIS COLUMN, NOT THE DESK BLOCK. He speaks on
+                every claim, so arriving unannounced made him read as a bug the
+                first time he did — but introducing him among the four made it
+                worse: sitting directly above the CTA, a cat's face over a
+                button about pitching read as the CAT doing the pitching
+                (author, 2026-07-28). He is not a seat, owns no lane and cannot
+                be sent anywhere, so he belongs beside what the house rolled
+                rather than among the people you can spend. */}
+            <div className="ps-virgil-intro">
+              <img className="ps-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+              <div>
+                <span className="ps-virgil-who">{VIRGIL.name}</span>
+                <span className="ps-virgil-role">{VIRGIL.role}</span>
+                <span className="ps-virgil-blurb">{VIRGIL.blurb}</span>
+              </div>
+            </div>
           </div>
 
           <div className="ps-open-copy">
             <div className="ps-open-eyebrow">ONE DEAL ON THE TABLE</div>
             <div className={`ps-open-name${identity ? "" : " facedown"}`}>
-              {identity ? deal.name : "FACE DOWN"}
+              {identity ? deal.name : "NOT ROLLED YET"}
             </div>
             <div className="ps-open-sub">
               {identity
                 ? `${deal.ticker} · ${deal.chain} · ${deal.surface.age} old · ${deal.surface.mcap}`
-                : "the house hasn't turned it over yet"}
+                : "the house hasn't picked it yet"}
             </div>
-            {/* Unnamed until his card is down. The two versions are
-                deliberately the same shape so the swap reads as the name
-                filling in, not as the paragraph rewriting itself. */}
+            {/* Unnamed until the dice stop. The two versions are deliberately
+                the same shape so the swap reads as the name filling in, not as
+                the paragraph rewriting itself. */}
             <div className="ps-open-body">
               {speakerNamed
                 ? "John Barron brought this one in. It's his deal — if you fund it, he gets paid. He's going to talk for about two minutes."
@@ -376,40 +399,49 @@ export default function PressSession({
               doesn't.
             </div>
 
+            {/* THE DESK. Portraits, not card faces — a card is a thing you
+                look at, and four in a row read as a cast list even when they
+                were the controls (see the note on SeatRow in pressUi.jsx).
+                Nothing here is clickable: on the briefing they are an
+                introduction, and the sendable version of the same four is the
+                seat row on the floor. */}
             <div className="ps-tools">
               <div className="ps-tool-group ps-tool-hand">
                 <div className="ps-draw-label">THE DESK — always these four</div>
                 <div className="ps-draw-row">
-                  {deskCards.map(({ m, data }) => (
-                    <button key={m.id} className="ps-draw-card" onClick={() => setInspect(data)}
-                            title={`${m.name} — click for full size`}>
-                      <TradingCard data={data} scale={CARD_THUMB} interactive={false} templateStyle="terminal" />
-                      <span className="ps-draw-name">{m.role}</span>
-                    </button>
+                  {DESK_ORDER.map((m) => (
+                    <div key={m.id} className="ps-face" title={m.blurb}>
+                      <img className="ps-face-pic" src={m.portrait} alt="" aria-hidden="true" />
+                      <span className="ps-face-who">{m.name}</span>
+                      <span className="ps-face-role">{m.role}</span>
+                    </div>
                   ))}
                 </div>
                 <div className="ps-open-rule" style={{ marginTop: 10 }}>
-                  Everyone at this desk will answer anything you ask them. Each has
+                  Everyone at this desk will answer anything you ask them. Each has{" "}
                   <b>one</b> subject they go deep on — and Marisol, GR80 and Eugene
                   answer <b>once each</b>, all session. Ask the wrong one and you
-                  still get an answer; you just get the shallow version, and you've
+                  still get an answer; you just get the shallow version, and you&apos;ve
                   spent them.
                 </div>
               </div>
             </div>
 
-            {/* The deck and the one live control. My seat-row rewrite replaced
-               the whole tools block and took this with it, which left the
-               briefing with nothing to press — "there is no deal specified or
-               buttons to push" (author, 2026-07-27). */}
+            {/* The one live control. My seat-row rewrite replaced the whole
+               tools block and took this with it, which left the briefing with
+               nothing to press — "there is no deal specified or buttons to
+               push" (author, 2026-07-27). */}
+            {/* ONE BUTTON. A LOCAL/DAILY split lived here for part of a day and
+                was cut: the daily's justifications all belonged to a
+                leaderboard that got rejected, and the one that survived — a
+                shared deal to talk about — is latent until a share hook exists,
+                which is a bet on traction rather than a feature. A choice that
+                gives the player nothing teaches them choices here don't
+                matter. See the note in instanceDeal.js. */}
             <div className="ps-cta-row">
-              <DealDeck ref={deckRef} spent={dealt || dealing} />
-              <button
-                className="ps-lock"
-                onClick={dealt ? () => setStarted(true) : runDeal}
-                disabled={dealing}
-              >
-                {dealt ? "LET HIM PITCH ▸" : dealing ? "DEALING…" : "DEAL ME IN ▸"}
+              <button className="ps-lock" onClick={rolled ? () => setStarted(true) : runRoll}
+                      disabled={rolling}>
+                {rolled ? "HEAR THE PITCH ▸" : rolling ? "ROLLING…" : "ROLL THE DEAL ▸"}
               </button>
             </div>
 
@@ -436,7 +468,7 @@ export default function PressSession({
               column on the left. */}
           <div className="ps-dock">
             <SeatRow run={run} live={live} pressed={pressed} options={options}
-                     deskCards={deskCards} onPress={press} scale={0.1} />
+                     onPress={press} />
             <Nav lastClaim={lastClaim} pressed={pressed} onAdvance={advance} onCallIt={callIt} />
           </div>
 
@@ -498,7 +530,18 @@ export default function PressSession({
            nothing on screen saying so — "no action or exit buttons" (author,
            2026-07-27). A terminal state must never hide its exit below a fold. */
         <div className="ps-panel side autopsy">
-          <div className="ps-panel-h">THE AUTOPSY</div>
+          {/* "POST-DEAL ANALYSIS", not THE AUTOPSY (author, 2026-07-28).
+              Invariant 6 again, and the same failure as "the tape": a term
+              chosen for flavour that the player has to translate. "Autopsy"
+              also presumes a corpse — but roughly a third of these deals are
+              LEGIT, and calling the debrief on a good call an autopsy tells the
+              player they lost before they've read a number.
+
+              "Post-mortem" was the other candidate and is the same problem in
+              Latin. The internal names stay — PHASE.AUTOPSY, deal.autopsy,
+              toAutopsy() — because renaming authored content keys and the
+              controller would be churn for no player-visible gain. */}
+          <div className="ps-panel-h">POST-DEAL ANALYSIS</div>
           <div className="ps-au-body">
             <div className="ps-scores">
               <div><span className="ps-dim">READ</span><b>{read.hit}/{read.spent || 0}</b></div>
@@ -510,21 +553,56 @@ export default function PressSession({
                 with — not "MERIDIAN rugged" but "this is what a backdoor-fork
                 looks like". The exemplar coin is the collectible worth earning,
                 because it's the archetype, not one token's answer. */}
-            {patternCard && (
-              <div className="ps-pattern">
-                <div className="ps-pattern-card">
-                  <TradingCard data={patternCard} scale={0.22} interactive={false} templateStyle="terminal" />
+            {/* THE PATTERN — four things wrong with this block, all reported
+                2026-07-28, all from one cause: it led with a DIFFERENT TOKEN'S
+                name and never said what the relationship was.
+
+                  "YOU'VE SEEN THIS SHAPE BEFORE" — *"the player may not have
+                    'seen this shape before'"* (author). Flatly false on a first
+                    play, and it was the headline.
+                  "BlackPalm" — the deal was ALDERMAN. The exemplar's name was
+                    the largest text on a screen summarising a different token.
+                  "PALM · backdoor-fork" — a kebab-case code slug in the UI.
+                  "Drained day 40" — BlackPalm's collapse day, sitting directly
+                    under this deal's result, which collapsed on a different one.
+
+                Now it goes: name the pattern, tie THIS deal to it, then offer
+                the classic case as an explicitly separate, earlier example. */}
+            <div className="ps-pattern">
+              <div className="ps-pattern-copy">
+                <div className="ps-pattern-label">THE PATTERN</div>
+                <div className="ps-pattern-name">{deal.archetypeLabel}</div>
+                <div className="ps-pattern-was">
+                  {deal.name} was one of these.
                 </div>
-                <div className="ps-pattern-copy">
-                  <div className="ps-pattern-label">YOU'VE SEEN THIS SHAPE BEFORE</div>
-                  <div className="ps-pattern-name">{deal.exemplar.name}</div>
-                  <div className="ps-pattern-note">{deal.exemplar.note}</div>
-                  <div className="ps-pattern-foot">
-                    Same read, different token. Learn the shape and you get every one of these.
+
+                {/* THE TELL, NOT A SECOND TOKEN. This block used to print the
+                    exemplar coin — "BlackPalm / $PALM" plus its card art and
+                    its own collapse day. Two objections killed it, both right:
+                    *"as a player, it makes me want to see more about
+                    'Black Palm'"* and *"why reference a different project?"*
+                    (author, 2026-07-28).
+
+                    There is no more to see — BlackPalm is a Genesis card, and
+                    cards left this game for the 2D TCG, so the name pointed at
+                    a product that doesn't exist yet. And the player does not
+                    need a stranger's example: they just spent four minutes with
+                    a concrete case of their own, which they care about far more.
+
+                    What their own deal CAN'T give them is the rule that
+                    survives the token. That's this. */}
+                {deal.archetypeTell && (
+                  <div className="ps-pattern-case">
+                    <div className="ps-pattern-caselabel">THE TELL</div>
+                    <div className="ps-pattern-note">{deal.archetypeTell}</div>
                   </div>
+                )}
+
+                <div className="ps-pattern-foot">
+                  Same shape, different token. Learn it and you get every one of these.
                 </div>
               </div>
-            )}
+            </div>
             {deal.claims.map((c) => (
               <div key={c.id} className={`ps-au ${run.outcomes[c.id] ? "pressed" : ""}`}>
                 <div className="ps-au-fact">{c.fact}</div>
@@ -540,13 +618,28 @@ export default function PressSession({
   );
 }
 
-const CSS = DEAL_CSS + PRESS_UI_CSS + `
+const CSS = DICE_CSS + PRESS_UI_CSS + `
 /* FIXED, not absolute: this portals into document.body, which on /trade is
    taller than the viewport — an absolute inset:0 stretched the layer down the
    whole page and pushed the dock off-screen. */
 .ps-root { position:fixed; inset:0; z-index:10050; pointer-events:none;
   font-family:'Courier New', monospace; color:#eafff9; }
 .ps-root button, .ps-root input { pointer-events:auto; font-family:inherit; }
+
+/* ANYTHING THAT SCROLLS MUST TAKE THE POINTER, OR THE ROOM EATS THE WHEEL.
+   .ps-root is pointer-events:none so the live scene stays draggable around the
+   UI, and only buttons and inputs opted back in. A scroll CONTAINER never did —
+   so a wheel over the autopsy passed straight through to the R3F canvas, which
+   orbited the camera while the panel sat still: "I am unable to scroll further
+   down the summary as the canvas is capturing my mouse to orbit around the
+   scene" (author, 2026-07-28). The summary was unreadable past the fold.
+
+   This is a property of every overflow container in this file, not just the one
+   that was reported — the autopsy is simply the only panel long enough for
+   anyone to hit it. Listed explicitly rather than blanket-enabling .ps-root,
+   because the whole point of the none/auto split is that the room stays
+   reachable between the panels. */
+.ps-readcol, .ps-open, .ps-panel.scroll, .ps-au-body { pointer-events:auto; }
 .ps-dim { color:rgba(234,255,249,0.5); }
 
 .ps-bar { position:absolute; top:0; left:0; right:0; height:44px; display:flex;
@@ -603,11 +696,46 @@ const CSS = DEAL_CSS + PRESS_UI_CSS + `
 /* align-self keeps the hero from stretching to the copy column's height and
    vice-versa — an earlier version let one column drive the other and the panel
    silently grew to 1355px, scrolling the hand out of sight. */
-.ps-open-hero { flex:none; align-self:flex-start; }
-.ps-hero-card { background:none; border:none; padding:0; cursor:zoom-in; display:block;
-  transition:transform .12s ease; }
-.ps-hero-card:hover { transform:translateY(-3px); }
-.ps-open-copy { flex:1; min-width:0; max-width:100%; align-self:flex-start; overflow-wrap:anywhere; }
+/* WIDTH IS NOW A CHOICE. This column used to be whatever TradingCard's
+   744x1038 box came to at CARD_HERO scale (~298px), and the empty slot waiting
+   for that card was the largest object in the briefing — a dashed rectangle
+   holding 40% of the panel and saying nothing. The deal sheet is sized to its
+   own content instead. */
+.ps-open-hero { flex:none; align-self:flex-start; width:250px;
+  display:flex; flex-direction:column; gap:14px; }
+.ps-roll { display:flex; flex-direction:column; align-items:center; gap:9px;
+  padding:16px 10px; border:1px solid rgba(47,214,214,0.22);
+  background:rgba(0,0,0,0.25); }
+.ps-roll-cap { font-size:8.5px; letter-spacing:0.14em; font-weight:bold;
+  color:rgba(255,210,58,0.75); text-align:center; line-height:1.4; }
+
+/* THE DEAL SHEET — what the roll produced. Held at opacity 0 until the dice
+   settle (runDiceRoll tweens it), so no field can name the deal early. */
+/* NOT opacity:0 at rest — that took the pre-roll placeholder with it and left a
+   hole in the column. runDiceRoll's fromTo does the reveal. */
+.ps-sheet { border:1px solid rgba(47,214,214,0.35); border-top:2px solid #ff5f9e;
+  background:rgba(0,0,0,0.35); padding:13px 14px 12px; }
+.ps-sheet-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold; color:#ff5f9e; }
+.ps-sheet-name { font-size:16px; font-weight:bold; letter-spacing:0.04em;
+  margin-top:5px; line-height:1.2; }
+.ps-sheet-tick { font-size:10px; letter-spacing:0.08em;
+  color:rgba(234,255,249,0.55); margin-top:3px; }
+.ps-sheet-stats { margin:11px 0 0; display:flex; flex-direction:column; gap:4px;
+  border-top:1px solid rgba(47,214,214,0.2); padding-top:9px; }
+.ps-sheet-stats > div { display:flex; align-items:baseline; gap:8px; }
+.ps-sheet-stats dt { font-size:9px; letter-spacing:0.13em;
+  color:rgba(234,255,249,0.45); width:62px; flex:none; }
+.ps-sheet-stats dd { margin:0; font-size:11.5px; font-weight:bold; color:#eafff9; }
+.ps-sheet-foot { font-size:10px; line-height:1.45; color:#ffd23a; margin-top:11px;
+  padding-top:9px; border-top:1px solid rgba(255,210,58,0.2); }
+.ps-sheet-blank { font-size:10px; letter-spacing:0.16em; font-weight:bold;
+  color:rgba(234,255,249,0.28); text-align:center; padding:26px 0; }
+
+/* MEASURE. At the panel's 940px this column ran ~965px of monospace per line,
+   which is roughly twice a comfortable read. The hero takes a fixed 250 and
+   this one is capped, so the copy stays in the 60-75ch band at every width. */
+.ps-open-copy { flex:1; min-width:0; max-width:62ch; align-self:flex-start;
+  overflow-wrap:anywhere; }
 .ps-open-eyebrow { font-size:10px; letter-spacing:0.18em; color:#ff5f9e; font-weight:bold; }
 .ps-open-name { font-size:24px; font-weight:bold; letter-spacing:0.06em; margin-top:6px; }
 .ps-open-sub { font-size:11px; letter-spacing:0.08em; color:rgba(234,255,249,0.5); margin-top:4px; }
@@ -623,40 +751,45 @@ const CSS = DEAL_CSS + PRESS_UI_CSS + `
 .ps-draw-label { font-size:9px; letter-spacing:0.13em; color:rgba(255,210,58,0.8);
   font-weight:bold; margin-bottom:7px; }
 .ps-draw-row { display:flex; gap:9px; flex-wrap:wrap; }
-.ps-draw-card { flex:none; background:none; border:none; padding:0; cursor:zoom-in;
-  display:flex; flex-direction:column; align-items:center; gap:4px;
-  transition:transform .12s ease; }
-.ps-draw-card:hover { transform:translateY(-3px); }
 
-/* THE DEAL — slot/deck/flip styles come from cardDeal's DEAL_CSS, appended at
-   the end of this sheet. What's local to this surface is who may be clicked
-   and where the deck sits. Landed cards are inspectable; in-flight ones aren't,
-   and neither is an empty table — clicking a slot holding nothing must do
-   nothing. */
-.ps-open:not(.is-dealt) .ps-hero-card,
-.ps-open:not(.is-dealt) .ps-draw-card { pointer-events:none; }
-.ps-open.is-dealt .deal-fly { opacity:1; }
-.ps-open.is-dealt .deal-ghost { opacity:0; }
+/* THE DESK, as people rather than card faces. Not buttons: on the briefing
+   these introduce the four, and the sendable version is SeatRow on the floor.
+   Fixed width so four tiles hold one row and the names can't ragged-wrap. */
+.ps-face { flex:none; width:84px; display:flex; flex-direction:column;
+  align-items:center; gap:4px; text-align:center; }
+.ps-face-pic { width:52px; height:52px; object-fit:cover; border-radius:50%;
+  border:1px solid rgba(47,214,214,0.35); background:#020f0d; }
+/* Two lines reserved for every name — "Detective Marisol" wraps and the other
+   three don't, which put her role label a line below everyone else's. */
+.ps-face-who { font-size:9px; font-weight:bold; letter-spacing:0.04em;
+  color:rgba(234,255,249,0.92); line-height:1.2; min-height:2.4em;
+  display:flex; align-items:center; justify-content:center; }
+.ps-face-role { font-size:8px; letter-spacing:0.11em; color:rgba(255,210,58,0.75); }
+
+/* VIRGIL, set apart from the four on purpose — not a seat, no lane, cannot be
+   sent. Warmer than the desk chrome, matching his block on the floor. */
+.ps-virgil-intro { display:flex; align-items:flex-start; gap:10px;
+  padding:11px 12px; border:1px solid rgba(191,238,222,0.22);
+  background:rgba(191,238,222,0.05); }
+.ps-virgil-pic { width:40px; height:40px; flex:none; object-fit:cover;
+  border-radius:50%; border:1px solid rgba(191,238,222,0.45); }
+.ps-virgil-intro > div { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.ps-virgil-who { font-size:11px; font-weight:bold; letter-spacing:0.06em; color:#bfeede; }
+.ps-virgil-role { font-size:8.5px; letter-spacing:0.13em; font-weight:bold;
+  color:rgba(191,238,222,0.75); }
+.ps-virgil-blurb { font-size:10.5px; line-height:1.4; margin-top:3px;
+  color:rgba(191,238,222,0.72); }
+
+/* THE ROLL — die/pip/tray styles come from diceRoll's DICE_CSS, appended at the
+   end of this sheet. What's local to this surface is the skip target. */
 .ps-skip-deal { position:absolute; inset:0; z-index:5; background:none; border:none;
   padding:0; cursor:pointer; }
 .ps-cta-row { display:flex; align-items:center; gap:14px; margin-top:6px; }
 .ps-cta-row .ps-lock { flex:1; width:auto; margin-top:0; }
 
-/* full-size inspect */
-.ps-inspect { position:fixed; inset:0; z-index:10060; display:flex; flex-direction:column;
-  gap:14px; align-items:center; justify-content:center; padding:16px; overflow:auto;
-  background:rgba(2,10,9,0.9); backdrop-filter:blur(4px); pointer-events:auto; }
-.ps-inspect-close { background:none; border:1px solid rgba(47,214,214,0.5); color:#2fd6d6;
-  font-size:11px; letter-spacing:0.1em; padding:9px 16px; cursor:pointer; }
 
-/* Captions are held back with the cards they name — a labelled empty slot
-   tells you what you were dealt before you were dealt it. opacity, not
-   display, so nothing reflows when they arrive. */
-.ps-draw-name { font-size:8.5px; letter-spacing:0.1em; font-weight:bold;
-  color:rgba(234,255,249,0.65); opacity:0; }
-.ps-open.is-dealt .ps-draw-name { opacity:1; }
-/* Same withholding for the headline: the deal is nameless until its card is
-   face-up. Sized the same in both states so the reveal doesn't jump. */
+/* The deal is nameless until the dice stop (invariant 7). Sized the same in
+   both states so the reveal doesn't jump. */
 .ps-open-name.facedown { color:rgba(234,255,249,0.3); letter-spacing:0.14em; }
 
 .ps-panel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -682,8 +815,17 @@ const CSS = DEAL_CSS + PRESS_UI_CSS + `
    what pushed the exit off the bottom. Card left, copy right, both sized. */
 .ps-pattern { display:flex; gap:12px; align-items:flex-start; margin-bottom:18px;
   padding:12px; border:1px solid rgba(255,210,58,0.28); background:rgba(255,210,58,0.05); }
-.ps-pattern-card { flex:none; line-height:0; }
 .ps-pattern-copy { flex:1; min-width:0; }
+/* THIS deal, tied to the pattern by name. The line that was missing, and whose
+   absence made the exemplar look like the subject of the screen. */
+.ps-pattern-was { font-size:12px; color:rgba(234,255,249,0.85); margin-bottom:10px; }
+
+/* The tell, boxed so it reads as the portable lesson rather than more prose
+   about this one deal. */
+.ps-pattern-case { padding:9px 11px; margin-bottom:10px;
+  border:1px solid rgba(255,210,58,0.22); background:rgba(0,0,0,0.28); }
+.ps-pattern-caselabel { font:bold 8px/1.4 'Courier New',monospace;
+  letter-spacing:0.13em; color:rgba(255,210,58,0.7); margin-bottom:4px; }
 .ps-pattern-label { font:bold 9px/1.4 'Courier New',monospace; letter-spacing:0.13em;
   color:rgba(255,210,58,0.8); }
 .ps-pattern-name { font-size:15px; font-weight:bold; letter-spacing:0.04em; margin:4px 0 6px; }
