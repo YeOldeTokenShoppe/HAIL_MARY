@@ -409,8 +409,64 @@ an archetype deterministic and correct play collapses to a binary, taking the
 scoring kernel with it.
 
 The exemplar coin defines the **archetype**, never this instance's outcome, or
-the pattern library becomes a lookup table. Shown at the autopsy, where naming
-the pattern is the teaching payload and the natural trophy hook.
+the pattern library becomes a lookup table. It is no longer rendered — the
+post-deal screen shows the archetype's own TELL instead, because naming a second
+token the player never met was a promise the screen couldn't keep.
+
+### The number that justifies a new archetype
+
+**Not the hit rate. The edge from recognition.** Measured in expected P&L per
+deal over 8000 seeds:
+
+| | base rate | blind (reports the base rate) | knows the archetype | **edge** |
+|---|---|---|---|---|
+| 2 archetypes | 71.5% | +4.61 | +4.71 | **+0.10** |
+| 3 archetypes | 57.3% | +0.54 | +4.62 | **+4.08** |
+| *perfect read* | | | **+24.99** | |
+
+With two archetypes, recognising which one you faced was worth a tenth of a
+point — **a game whose stated skill did not pay.** `anon-but-real` runs 70%
+legit against the others' ~70% rug, and that inversion is what took it to 4.08.
+Note the other column too: blind play got *worse* (4.61 → 0.54), because a
+lopsided world is easy to score in once you know it's lopsided. The right third
+archetype made the game harder for the uninformed and more rewarding for the
+informed at the same time. **That is the test a fourth archetype has to pass.**
+
+**A correction kept because it is an easy mistake to make twice.** The original
+argument was *"blind SHORT is correct on 71% of deals"*. That is a **hit rate**,
+and hit rate is not the score. `casePnl` is an affine transform of Brier, so
+always-short-with-conviction earns **−16.83** per deal — the worst strategy
+available, not an exploit. Under a proper scoring rule, being directionally
+right most of the time is worth almost nothing if you can't say how confident to
+be. **Measure expected P&L, never how often a heuristic points the right way.**
+
+### Authoring rules — read before writing archetype #4
+
+*Every one of these is a mistake already made once. The reasoning is in
+[VC_GAME_ARCHIVE.md](./VC_GAME_ARCHIVE.md); the rules are here because this is
+where you'll be looking.*
+
+1. **`backing` is SLOT-LEVEL and never per-branch.** A claim either has a
+   receipt to be had or it doesn't — a property of the claim, not of whether the
+   deal is rotten. Authored per branch it *was* the leak that made the entire
+   four-seat desk decorative: `resolvePress` zeroes every receipt on VIBES, so a
+   VIBES-in-rug slot returned nothing to anyone, specialist included.
+2. **`generic` is hoisted to the slot**, so the seller's shallow answer cannot
+   differ by branch — there is only one copy of it. **Only the `loadBearing`
+   slot may keep a per-branch `generic`**, because invariant 1 requires the
+   decisive claim stay reachable on a free press, which means it must
+   discriminate.
+3. **A null `sharp` receipt in ONE branch only is legitimate and wanted.** It is
+   what produces `NOTHING ON FILE`, the single way this game proves a negative.
+   An assertion once *forbade* the pattern and silently killed the feature.
+4. **Every lane a spendable seat owns needs ≥1 slot, and one needs ≥2.** Six of
+   seven slots play, so a lane with a single slot is pinned by the `mustKeep`
+   guard; get this wrong and a specialist is decoration for that session.
+5. **Nothing visible may correlate with the archetype or the outcome.** Names
+   come from the shared pool in `identities.js` — never author them per
+   archetype. This failure has appeared three times in three costumes.
+6. **`miss` blocks are dead.** `instanceDeal` doesn't assemble them and
+   `resolvePress` never read them. Delete on sight.
 
 ---
 
@@ -690,8 +746,11 @@ else and BOOK quietly re-teaches outcome-chasing, which is what the proper
 scoring rule exists to prevent.
 
 **The trap: making 1/10 the actual base rate.** A realistic venture hit rate
-makes blind PASS correct 90% of the time — the exact failure just fixed by
-adding `anon-but-real` (blind SHORT went 71% → 57.5%). Real VC survives its hit
+makes blind PASS correct 90% of the time — and while hit rate is *not* the score
+(see §4), a base rate that lopsided is one an uninformed player can bank without
+reading: at 71.5% rug, blind base-rate reporting earned **+4.61** per deal
+against a perfect read's +25, and archetype recognition was worth **+0.10**.
+Push it to 90% and the gap the game is built on closes further. Real VC survives its hit
 rate only through **asymmetric payoffs**: nine 1x losses against one 100x
 winner. This game has `STAKE = 25`, fixed, and `casePnl` is an affine transform
 of Brier — symmetric by construction. Power-law payoffs would end properness
@@ -887,68 +946,17 @@ not inside four minutes. See item 5 above.
 ---
 
 
-## 8. The acceptance test — failed, then fixed
+## 8. History lives in the archive
 
-**2026-07-28. The test the whole redesign rests on, run for the first time, and
-it failed.** Measured across both archetypes: on **14 of 14 slots** the
-`generic` block and the `sharp` block discriminated *identically* between the
-rug and legit branches. Sending a specialist told you exactly as much about
-which branch you were in as pressing the seller — more detail, better drama, no
-better verdict. And because Barron is unlimited and lane-free while the
-specialists are one-use and lane-locked, **three presses on him weakly dominated
-the entire four-seat desk.**
-
-**The cause was one field in the wrong place.** `backing` was authored PER
-BRANCH — `VIBES` when rug, `HARD` when legit — and `resolvePress` zeroes every
-receipt on VIBES. So the rug branch returned nothing to *anyone*, specialist
-included: the whole signal lived one level above where depth could reach it.
-Rewriting the receipts alone would not have touched it.
-
-**The fix, and why it also improves the fiction.** `backing` and `generic` are
-both hoisted to the SLOT. A claim either has a receipt to be had or it doesn't —
-that's a property of the claim, not of whether the deal is rotten — and the
-seller's shallow answer is now one shared script that *cannot* differ by branch,
-because there is only one copy of it. He is confident, technically true, and
-stops exactly short of the question that settles it, which is what selling is.
-Previously he handed you the evidence against his own deal.
-
-Measured after (500 seeds/archetype):
-
-| | seller can settle | specialists can settle | route A lands | route B lands |
-|---|---|---|---|---|
-| backdoor-fork | 4.22 → **1.00** | 4.22 | 3.00 → **1.00** | **2.22** |
-| yield-mirage | 5.28 → **2.00** | 5.28 | 3.00 → **2.00** | **2.28** |
-
-Harness: `scratchpad/acceptance.mjs`, a session-scoped scratch file that is
-**gone** — reconstruct it from the five assertions below if the measurement is
-ever wanted again. Those five now pin the result permanently in
-`verify-press-run.mjs` —
-backing is never per-branch; no non-loadBearing slot lets the seller give away
-the branch; the loadBearing claim IS still free (invariant 1); specialists must
-settle *strictly more* than the seller; and at least one claim must let a
-specialist prove a negative.
-
-**One regression the fix caused, and the assertion that caused it.** Replacing
-every null rug receipt with a documented-absence receipt killed `NOTHING ON
-FILE` outright — it fired nowhere in backdoor-fork and in *both* branches of
-yield-mirage, carrying no information. My own assertion ("every non-VIBES slot
-returns a real deep receipt in BOTH branches") had forbidden the very pattern
-that produces it. A null **sharp** receipt in one branch only is legitimate and
-discriminating, because `generic` still supplies the shallow answer. Restored on
-`ops` and `team`, where the absence *is* the finding, and the assertion now
-requires it rather than banning it.
-
-**Three content contradictions caught by adversarial verification**, all in
-fields the authoring pass had been told not to touch: `stake`'s floor FACT
-("same terms as you'd get") pre-answered the question the deep look exists to
-settle; `apy`'s rug finding was arithmetically incompatible with the shared
-generic pinning a realised trailing-30 rate; and `withdrawals`' rug answer key
-described a test nobody had run, which the specialist can now run.
-
-**`miss` blocks are now fully dead** — `instanceDeal` no longer assembles them
-and `resolvePress` never read them. Delete on sight.
+The acceptance-test post-mortem that reshaped `backing` and `generic` moved to
+[VC_GAME_ARCHIVE.md](./VC_GAME_ARCHIVE.md) on 2026-07-28. **The rules it
+produced are not in the archive** — they're in §4 under *Authoring rules*, which
+is where anyone writing an archetype will actually be looking. The archive keeps
+the argument; this file keeps the game.
 
 ---
+
+
 ## 9. Voice — decided, not yet built
 
 **Decision (author, 2026-07-27): live ElevenLabs, no recorded clips. SitePal on

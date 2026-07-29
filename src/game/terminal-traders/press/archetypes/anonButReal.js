@@ -1,21 +1,36 @@
 // ANON-BUT-REAL — the third archetype, and the first one that is USUALLY FINE.
 //
 // WHY THIS ONE, AND WHY NOW. With only backdoor-fork (74% rug) and yield-mirage
-// (68% rug) built, blind SHORT was correct on 71% of all deals — with no
-// reading at all. Three things were wrong with that:
+// (68% rug), RECOGNISING THE ARCHETYPE WAS WORTH ALMOST NOTHING — and that is a
+// game whose stated skill doesn't pay. Measured in expected P&L per deal, over
+// 8000 seeds:
 //
-//   1. The dominant heuristic was "be suspicious", which is a bad lesson and a
-//      boring game.
-//   2. The LONG side of the slider had no archetype where it was confidently
-//      correct.
-//   3. RECOGNISING THE ARCHETYPE WAS BARELY WORTH ANYTHING. 74% against 68%
-//      moves your prior six points. The entire premise is that reading the
-//      shape is the skill, and the shape hardly paid.
+//                       base    blind (reports    knows the      EDGE FROM
+//                       rate    the base rate)    archetype      RECOGNITION
+//     2 archetypes      71.5%       +4.61           +4.71           +0.10
+//     3 archetypes      57.3%       +0.54           +4.62           +4.08
 //
-// This one runs 70% LEGIT, so identifying it swings your prior ~44 points
-// against a backdoor-fork. That is the first time in this game that knowing a
-// pattern is worth real money — and it is what turns the archetype collection
-// from a completion set into a set of PRIORS you actually hold.
+// A fortieth of a point, against four. This one runs 70% LEGIT — the inverse of
+// the other two — so identifying it swings your prior ~44 points instead of the
+// six that separated 74 from 68. It is what turns the archetype collection from
+// a completion set into a set of PRIORS you actually hold.
+//
+// Note the other column: blind play got WORSE, 4.61 -> 0.54. A lopsided world
+// is easy to score in once you know it's lopsided. So this made the game harder
+// for the uninformed and more rewarding for the informed at the same time.
+//
+// A CORRECTION WORTH KEEPING, because it is an easy mistake to make twice: the
+// original argument for this archetype was "blind SHORT is correct on 71% of
+// deals". That is a HIT RATE, and hit rate is not the score. `casePnl` is an
+// affine transform of Brier, so always-short-with-conviction earns **-16.83**
+// per deal — the worst strategy available, not an exploit. Under a proper
+// scoring rule, being directionally right most of the time is worth almost
+// nothing if you can't say how confident to be. Measure expected P&L, never
+// how often a heuristic points the right way.
+//
+// Two things the old argument got right for the wrong reason, and they still
+// hold: the dominant heuristic was "be suspicious", which is a bad lesson; and
+// the LONG side of the slider had no archetype where it was confidently correct.
 //
 // THE SHAPE. Everything alarming about it is on the surface: nobody is named,
 // the founders are handles, the résumés are claimed rather than shown. Every
