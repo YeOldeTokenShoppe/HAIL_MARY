@@ -281,6 +281,75 @@ export function SeatRow({ run, live, pressed, options, onPress }) {
   );
 }
 
+/**
+ * THE TRANSCRIPT — what has actually been said, in order.
+ *
+ * Renders `run.chips`, which the controller has populated since day one and which
+ * NEITHER SURFACE HAS EVER SHOWN. `landClaim` pushes { id, fact, spin } as each
+ * claim finishes, so the record already exists and this is pure presentation — no
+ * controller change, which is what §6 requires.
+ *
+ * IT IS A RECORD OF SPEECH, NOT OF FINDINGS, and that boundary is a leak rule
+ * rather than an editorial preference. `run.outcomes` also holds `receipt`,
+ * `backing` and `nothingOnFile`; replaying those here would re-state the verdict
+ * for a claim the player may not have LOOKED at yet (the flat surface defers the
+ * reveal behind LOOK). Lines were heard out loud, so lines are safe. Verdicts are
+ * the answer panel's job, once.
+ *
+ * `spoken` is optional per-chip supplementary text — the pitcher's reaction and
+ * the adviser's report, both already visible when they landed.
+ */
+export function Transcript({ run, deal, open = true, onToggle = null }) {
+  const chips = run?.chips ?? [];
+  if (!chips.length) return null;
+  return (
+    <div className={`pu-script${open ? " open" : ""}`}>
+      <div className="pu-script-h">
+        ON THE RECORD
+        <em>{chips.length} of {deal?.claims?.length ?? chips.length}</em>
+        {onToggle && (
+          <button type="button" className="pu-script-toggle" onClick={onToggle}
+                  title={open ? "Collapse the transcript" : "Show what has been said"}>
+            {open ? "hide" : "show"}
+          </button>
+        )}
+      </div>
+      {open && (
+        <ol className="pu-script-list">
+          {chips.map((c, i) => {
+            const o = run.outcomes?.[c.id];
+            return (
+              <li key={c.id} className="pu-script-item">
+                <span className="pu-script-n">{i + 1}</span>
+                <span className="pu-script-body">
+                  <span className="pu-script-spin">“{c.spin}”</span>
+                  <span className="pu-script-fact">
+                    <span className="pu-tag">FACT</span> {c.fact}
+                  </span>
+                  {/* Only what was SAID. No receipt, no verdict — see the note
+                      above. `revealed === false` never reaches here because the
+                      chip lands when the claim does, not when the press does. */}
+                  {o?.adviserSays && (
+                    <span className="pu-script-said">
+                      <b>{seatMeta(o.seat)?.name}</b> {o.adviserSays}
+                    </span>
+                  )}
+                  {o?.barronSays && (
+                    <span className="pu-script-said">
+                      <b>{PITCH_BOT.name}</b> {o.barronSays}
+                    </span>
+                  )}
+                  {!o && <span className="pu-script-none">— you let it go on</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 /** Interruptions left. `children` is an extra badge slot — mobile counts the
  *  advisers there too, since it has no agenda rail to show them. */
 export function Meter({ run, presses, children }) {
@@ -355,6 +424,35 @@ export const PRESS_UI_CSS = `
 /* the lane's owner is spent — this claim is now nobody's, and it should not
    look like a live instruction */
 .pu-lane[data-lane="SPENT"]  { border-left-color:#ff9b6f; color:#ffb493; background:rgba(255,155,111,0.07); }
+
+/* THE TRANSCRIPT. Deliberately quiet: it is a reference you consult, never
+   something competing with the claim on the floor. Scrolls inside itself so it can
+   never grow the column it lives in — the flat surface pins three rows around one
+   scroller and a second growing child breaks that contract. */
+.pu-script { border-top:1px solid rgba(47,214,214,0.18); margin-top:10px;
+  padding-top:8px; min-width:0; }
+.pu-script-h { display:flex; align-items:center; gap:8px;
+  font:bold 9px/1.3 'Courier New',monospace; letter-spacing:0.14em;
+  color:rgba(47,214,214,0.8); }
+.pu-script-h em { font-style:normal; font-weight:normal; letter-spacing:0.08em;
+  color:rgba(234,255,249,0.4); }
+.pu-script-toggle { margin-left:auto; background:none; border:none; cursor:pointer;
+  font:9px/1 'Courier New',monospace; letter-spacing:0.1em;
+  color:rgba(47,214,214,0.7); text-decoration:underline; padding:2px 0; }
+.pu-script-list { list-style:none; margin:6px 0 0; padding:0;
+  max-height:190px; overflow-y:auto; overscroll-behavior:contain; }
+.pu-script-item { display:flex; gap:7px; padding:6px 0;
+  border-top:1px dotted rgba(234,255,249,0.1); }
+.pu-script-item:first-child { border-top:none; }
+.pu-script-n { flex:none; width:14px; text-align:right;
+  font:bold 9px/1.5 'Courier New',monospace; color:rgba(255,210,58,0.55); }
+.pu-script-body { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.pu-script-spin { font-size:11px; line-height:1.4; color:rgba(234,255,249,0.82); }
+.pu-script-fact { font-size:10px; line-height:1.4; color:rgba(234,255,249,0.55); }
+.pu-script-said { font-size:10px; line-height:1.4; color:rgba(191,238,222,0.72); }
+.pu-script-said b { color:#bfeede; font-weight:bold; }
+.pu-script-none { font-size:9.5px; font-style:italic;
+  color:rgba(234,255,249,0.32); letter-spacing:0.04em; }
 
 /* The pitcher has no portrait yet, so its tile carries a glyph instead of a
    borrowed face. Sized to match .pu-seat-face exactly so the row doesn't jump. */

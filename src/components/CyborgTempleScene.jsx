@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
-import { mountPitchBot } from "@/lib/trade/pitchBotScene";
+import { mountPitchBot, tickPitchBotBillboard, disposePitchBotBillboard } from "@/lib/trade/pitchBotScene";
 import { tickPitchBotHolo, disposePitchBotHolo } from "@/lib/trade/pitchBotHolo";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
@@ -167,6 +167,33 @@ export const SHOW_LEGACY_BEACON = false;
 // there's nothing at the beacon spot to click, so the card's camera fly-in
 // (handleClick → agentId 'HologramCard') is inert until this is re-enabled.
 export const SHOW_HOLOGRAM_CARD = false;
+
+/* THE PROJECTOR BEAM — the shaft rising from the projector base at the centre of
+   the desks. These were inline props on <BeaconBeam>, which is why nobody could
+   find them: the obvious-looking knob is HOLO_HEIGHT in HoloProjector.jsx, and
+   that component is NOT MOUNTED on /trade (SpaceScene imports it, and even there
+   the mount is commented out). Editing it changes nothing here.
+
+   ONE BEAM, TWO PAYLOADS, TWO HEIGHTS. The shaft is always the same object, but
+   what sits in it swaps with the session: the neon sign hangs in it in the lobby,
+   and the pitch bot is cast into it during a pitch. They are different sizes, so a
+   single height cannot fit both — sizing it to the bot (half its first scale, and
+   floating) left it far short of the sign. Keyed off the same `pitchStarted` latch
+   that swaps the payloads, so the shaft can never be sized for the thing that
+   isn't there.
+
+   Lengths are in the parent group's local units. Tune live, no reload:
+
+       __pitchBeamTune({ height: 0.28 })            // the active preset
+       __pitchBeamTune({ height: 0.6 }, 'neon')     // name one explicitly
+*/
+const BEAM_BASE = { color: "#35e8ff", topRadius: 0.10, bottomRadius: 0.03, opacity: 0.1 };
+export const BEAM_PRESETS = {
+  // Lobby: rises into the neon sign. The original 0.55, which was authored for it.
+  neon: { ...BEAM_BASE, height: 0.55 },
+  // A pitch is on: rises into the bot, which is smaller and floats lower.
+  pitch: { ...BEAM_BASE, height: 0.5 },
+};
 
 
 // ── Neon sign ────────────────────────────────────────────────────────────
@@ -768,6 +795,33 @@ const CyborgTempleScene = ({
 
   // Camera focus state
   const [focusTarget, setFocusTarget] = useState(null);
+  // Beam presets as STATE, not constants, purely so they can be tuned by eye
+  // without a reload — BeaconBeam rebuilds its geometry from these props.
+  const [beamPresets, setBeamPresets] = useState(BEAM_PRESETS);
+  // SAME LATCH AS THE PAYLOADS. pitchStarted is what hides the sign and shows the
+  // bot, so deriving the shaft from it means the beam is never sized for whichever
+  // one isn't currently in it.
+  const beam = pitchStarted ? beamPresets.pitch : beamPresets.neon;
+  // A REF MIRROR, so the tune handle can return the value it just set.
+  // Reading it out of the setState updater looked fine and wasn't: React does not
+  // promise when an updater runs, so the return was full on one call and
+  // `{preset}` only on the next — useless for a handle whose entire job is
+  // handing you numbers to paste back into BEAM_PRESETS.
+  const beamRef = useRef(BEAM_PRESETS);
+  useEffect(() => { beamRef.current = beamPresets; }, [beamPresets]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // No `which` argument -> patch whichever preset is live right now, which is
+    // what you want while looking at it.
+    window.__pitchBeamTune = (patch = {}, which = null) => {
+      const key = which || (pitchStarted ? "pitch" : "neon");
+      const next = { ...beamRef.current[key], ...patch };
+      beamRef.current = { ...beamRef.current, [key]: next };
+      setBeamPresets(beamRef.current);
+      return { preset: key, ...next };
+    };
+    return () => { delete window.__pitchBeamTune; };
+  }, [pitchStarted]);
   const ourLadyRef = useRef(); // Reference to RL80 (OurLady) mesh
   const originalCameraPosition = useRef(null); // Store original camera position
 
@@ -2270,7 +2324,7 @@ const CyborgTempleScene = ({
 
   // The holo registry holds shader uniforms for as long as the bot's materials
   // exist. Clear it on unmount or a remount ticks stale uniforms forever.
-  useEffect(() => disposePitchBotHolo, []);
+  useEffect(() => () => { disposePitchBotHolo(); disposePitchBotBillboard(); }, []);
 
   /* THE PITCHER IS ONLY IN THE ROOM WHILE THERE IS A PITCH.
    *
@@ -6431,6 +6485,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // lib/trade/pitchBotHolo's registry, which is empty until the bot loads, so
     // this is a no-op on every other /trade mode.
     tickPitchBotHolo(state.clock.elapsedTime);
+    // Face the camera, yaw only. No-op until the bot loads.
+    tickPitchBotBillboard(state.camera);
 
     // Update all character mixers independently
     if (mixersRef.current) {
@@ -8026,11 +8082,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                       only want this. */}
                   <BeaconBeam
                     anchorRef={projectorRef}
-                    color="#35e8ff"
-                    height={0.55}
-                    topRadius={0.10}
-                    bottomRadius={0.03}
-                    opacity={0.1}
+                    color={beam.color}
+                    height={beam.height}
+                    topRadius={beam.topRadius}
+                    bottomRadius={beam.bottomRadius}
+                    opacity={beam.opacity}
                   />
                 </>
               )}

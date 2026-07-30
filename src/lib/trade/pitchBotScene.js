@@ -37,18 +37,67 @@ export const PITCH_BOT_CONFIG = {
   // it 1.6 units under the floor, and an intermediate reading during tuning
   // reported the base 1.8 units off, which is what a hand-computed offset would
   // have baked in. `__pitchBotTune({ y })` and re-measure is the reliable loop.
-  position: [-0.05, 1.362, 0.0],
+  position: [-0.04, 1.362, 0.02],
   rotation: [0, 0, 0],
   // "About half size" (author) — halved from the 0.62 that first seated it.
   // Halving needed NO y re-tune: the rig's local origin sits at its feet.
-  scale: 0.41,
+  scale: 0.31,
   // HIDDEN ON ARRIVAL. CyborgTempleScene turns it on when pressMode goes true;
   // loading it visible put the pitcher in the lobby with no game running.
   visible: false,
   /** Project it, rather than stand it in the room. */
   holographic: true,
   holo: PITCH_BOT_HOLO,
+  /**
+   * FACE THE CAMERA. Yaw only — a projection that pitches and rolls to follow the
+   * eye reads as a model being puppeted, not as an image being cast.
+   */
+  billboard: true,
+  /**
+   * MODEL-FORWARD CORRECTION, in radians.
+   *
+   * three's `Object3D.lookAt` points a NON-camera object's **+Z** at the target
+   * (it swaps the eye/target arguments for anything that isn't a camera or a
+   * light — cameras get -Z). Whether that is the rig's front depends entirely on
+   * how it was exported, so this exists rather than being assumed. Dial it live:
+   *
+   *     __pitchBotFacing(180)    // degrees; returns the radian value to paste here
+   */
+  yawOffset: 0,
 };
+
+// Reused across frames — allocating vectors in a render loop is how you get a GC
+// sawtooth on a scene that already runs hot.
+const _botWorld = new THREE.Vector3();
+const _lookTarget = new THREE.Vector3();
+let _billboardState = null;
+
+/**
+ * Point the bot at the camera, yaw only. Call once per frame.
+ *
+ * Safe to call before the model loads and safe to call when billboarding is off —
+ * both are no-ops, so the caller needs no guard of its own.
+ *
+ * WHY lookAt AND NOT atan2 ON THE POSITIONS: the bot is parented into the temple,
+ * which carries its own transform. `lookAt` resolves through the parent's world
+ * matrix; a hand-rolled atan2 on world positions would need the parent's world
+ * yaw subtracted back out, which is the same maths with a bug in it later.
+ */
+export function tickPitchBotBillboard(camera) {
+  const st = _billboardState;
+  if (!st || !st.bot || !camera || !st.enabled) return;
+  const bot = st.bot;
+  bot.getWorldPosition(_botWorld);
+  // Same Y as the bot, so the turn is pure yaw and the figure never tips.
+  _lookTarget.set(camera.position.x, _botWorld.y, camera.position.z);
+  bot.lookAt(_lookTarget);
+  if (st.yawOffset) bot.rotateY(st.yawOffset);
+}
+
+/** Drop the billboard target. Call on unmount alongside disposePitchBotHolo. */
+export function disposePitchBotBillboard() {
+  _billboardState = null;
+}
 
 /**
  * Load the bot, park it, register it for animation and focus.
@@ -111,7 +160,13 @@ export function mountPitchBot({
         action.setLoop(THREE.LoopRepeat, Infinity);
         if (actionsRef) actionsRef.current.PitchBot[clip.name] = action;
       });
-      actionsRef?.current?.PitchBot?.idle?.play();
+      actionsRef?.current?.PitchBot?.talking?.play();
+
+      _billboardState = {
+        bot,
+        enabled: !!c.billboard,
+        yawOffset: c.yawOffset || 0,
+      };
 
       // LIVE TUNING, because the transform is an eyeball job. Relative nudges,
       // so repeated calls stack.
@@ -119,13 +174,32 @@ export function mountPitchBot({
         window.__pitchBot = bot;
         window.__pitchBotTune = ({ x = 0, y = 0, z = 0, yaw = 0, scale = null } = {}) => {
           bot.position.x += x; bot.position.y += y; bot.position.z += z;
-          if (yaw) bot.rotateY(yaw);
+          // A raw yaw nudge is pointless while billboarding — the next frame
+          // overwrites the rotation. Route it to the offset instead, which is the
+          // thing that actually survives.
+          if (yaw) {
+            if (_billboardState?.enabled) _billboardState.yawOffset += yaw;
+            else bot.rotateY(yaw);
+          }
           if (scale != null) bot.scale.setScalar(scale);
           return {
             position: bot.position.toArray().map((v) => +v.toFixed(3)),
-            rotationY: +bot.rotation.y.toFixed(3),
+            yawOffset: +(_billboardState?.yawOffset ?? bot.rotation.y).toFixed(3),
             scale: +bot.scale.x.toFixed(3),
+            billboard: !!_billboardState?.enabled,
           };
+        };
+        /** Set the model-forward correction in DEGREES. Returns the radian value
+         *  to paste into PITCH_BOT_CONFIG.yawOffset. */
+        window.__pitchBotFacing = (deg) => {
+          if (!_billboardState) return null;
+          _billboardState.yawOffset = (Number(deg) || 0) * Math.PI / 180;
+          return { yawOffset: +_billboardState.yawOffset.toFixed(4), deg: Number(deg) || 0 };
+        };
+        /** Toggle billboarding without a reload. */
+        window.__pitchBotBillboard = (on) => {
+          if (_billboardState) _billboardState.enabled = !!on;
+          return { billboard: !!_billboardState?.enabled };
         };
       }
 

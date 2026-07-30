@@ -10,12 +10,14 @@ import {
   allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore, seatOptions, laneOutlook, pressure,
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
+import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
 import {
   EnigmaConsole, runArrival, prefersReducedMotion, SFX, ARRIVAL_CSS,
 } from "./arrival";
 import { createEvidenceScreen } from "./evidenceScreen";
 import {
-  canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
+  canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, Transcript,
+  PRESS_UI_CSS,
 } from "./pressUi";
 
 // THE PRESS — slice 1. Barron, six claims, three presses, over the LIVE room.
@@ -48,6 +50,17 @@ import {
 // resolveAgentSettings still returns the authored pose, so the camera flies to
 // where the bot should be rather than throwing.
 const PITCHER_AGENT = "PitchBot";
+
+// THE PITCHER'S VOICE — same ElevenLabs voice the flat surface uses (VOICES.PB in
+// api/counsel-voice, override with ELEVENLABS_VOICE_PITCHBOT).
+//
+// DESKTOP WAS MUTE UNTIL 2026-07-29, and mute in a specific, misleading way: this
+// surface flipped onSpeechActive(true) for the whole floor and then said nothing,
+// so the room held a speaking idle over silence. The reason it was worth fixing
+// here rather than routing through SitePal: the pitcher is a glTF bot with a
+// screen for a face, not a SitePal mesh, so it takes exactly the audio path the
+// flat surface already proved.
+const VOICE = "PB";
 const SPEAKER_STATION = "demon";  // -> __screen2Canvas (SCREEN_TARGETS in evidenceScreen.js)
 const READ_MS = 4200;             // how long a claim holds the floor before it can land
 
@@ -97,6 +110,11 @@ export default function PressSession({
   // before that gets clobbered. Gating on a click means the model is always
   // loaded by the time we ask for a camera move — no race, no retry loop.
   const [started, setStarted] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  // Transcript open by default: its whole value is being able to re-read claim 2
+  // while claim 5 is on the floor, and a panel you have to discover first mostly
+  // doesn't get discovered.
+  const [script, setScript] = useState(true);
   const screenRef = useRef(null);
   // One board per seat, each painted onto that character's OWN monitor in the
   // scene via the evidenceActive handshake. Eugene has none — he never stamps.
@@ -171,9 +189,15 @@ export default function PressSession({
   useEffect(() => {
     if (!onFloor) return;
     onFocusAgent?.(PITCHER_AGENT);
-    onSpeechActive?.(true);
+  }, [onFloor, run.claimIndex, onFocusAgent]);
+
+  // SPEECH STATE NOW FOLLOWS ACTUAL AUDIO. It used to be pinned true for the
+  // whole floor, which told the room "still talking" through every silence — the
+  // bot's talking clip would have run for four minutes straight.
+  useEffect(() => {
+    onSpeechActive?.(onFloor && speaking);
     return () => onSpeechActive?.(false);
-  }, [onFloor, run.claimIndex, onFocusAgent, onSpeechActive]);
+  }, [onFloor, speaking, onSpeechActive]);
 
   /* ---- a claim takes the floor, then becomes pressable ---- */
   useEffect(() => {
@@ -224,6 +248,33 @@ export default function PressSession({
     if (rolling) tlRef.current?.progress(1);
   }, [rolling]);
 
+  /* ---- it says it out loud ----
+     Token-guarded, and the guard is not optional: a press interrupts the claim
+     mid-sentence, so two utterances are briefly in flight. The one being cut off
+     resolves through stopAdviserAudio and would otherwise land its `finally`
+     AFTER the reply started, reporting "stopped" over live audio and dropping the
+     room back to a non-speaking idle for the whole answer. Only the newest
+     utterance may say it has stopped. (Learned on PressFlat; ported verbatim.) */
+  const sayToken = useRef(0);
+  const say = useCallback(async (text) => {
+    if (!text) return;
+    const token = ++sayToken.current;
+    setSpeaking(true);
+    try { await speakAdviserLine(VOICE, text); }
+    catch { /* voice is enrichment, never a gate on play */ }
+    finally { if (sayToken.current === token) setSpeaking(false); }
+  }, []);
+
+  // A claim takes the floor -> it speaks the spin.
+  useEffect(() => {
+    if (!onFloor || !claim) return;
+    say(claim.spin);
+    return () => { try { stopAdviserAudio(); } catch {} };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onFloor, run.claimIndex]);
+
+  useEffect(() => () => { try { stopAdviserAudio(); } catch {} }, []);
+
   /* ---- actions ---- */
   // One path, four seats. Every seat can be sent at every claim — the lane
   // decides DEPTH, not permission. Barron is reusable; the other three are one
@@ -247,6 +298,12 @@ export default function PressSession({
         ? "Put a number on it."
         : `${seatMeta(outcome.seat).name} — ${seatMeta(outcome.seat).role}`,
     });
+
+    // IT REACTS OUT LOUD. Only the pitcher's line is voiced: the adviser half is
+    // rendered but silent on both surfaces, so the two-voices-per-press ordering
+    // in VC_GAME.md §9 item 4 is still unbuilt. When it lands the SEAT speaks
+    // first and the pitcher answers, or the reaction arrives under the wrong name.
+    say(outcome.barronSays);
 
     // THE ANSWER LANDS ON WHOEVER WENT AND GOT IT — on their own monitor, in
     // the room. That's the whole reason this design is worth the four seats:
@@ -489,9 +546,22 @@ export default function PressSession({
                 gives the player nothing teaches them choices here don't
                 matter. See the note in instanceDeal.js. */}
             <div className="ps-cta-row">
-              <button className="ps-lock" onClick={rolled ? () => setStarted(true) : runRoll}
+              <button className="ps-lock"
+                      onClick={rolled
+                        ? () => {
+                          // The ONLY user gesture we are guaranteed before audio
+                          // has to play. iOS will not play a decoded buffer
+                          // without one; fails soft, so no audio still leaves a
+                          // playable game.
+                          try { unlockAdviserAudio(); } catch {}
+                          setStarted(true);
+                        }
+                        : runRoll}
                       disabled={rolling}>
-                {rolled ? "HEAR THE PITCH ▸" : rolling ? "ROLLING…" : "ROLL THE DEAL ▸"}
+                {/* "ROLL THE DEAL" / "ROLLING…" until 2026-07-29 — stale from the
+                    dice cut. The flat surface was updated at the time and this
+                    one was missed. */}
+                {rolled ? "HEAR THE PITCH ▸" : rolling ? "DECODING…" : "SEND IT IN ▸"}
               </button>
             </div>
 
@@ -512,6 +582,15 @@ export default function PressSession({
                          spent={run.advisersSpent} />
             </div>
             {flash && flash.id === claim.id && <AnswerBody flash={flash} />}
+
+            {/* ON THE RECORD. Claim six is a decision about claims one to five,
+                and until now the only way to hold them was to remember them —
+                the controller has been recording every one in `run.chips` since
+                the first slice and neither surface ever showed it.
+                Collapsible, and it scrolls inside itself so it can't push the
+                claim body around. */}
+            <Transcript run={run} deal={deal} open={script}
+                        onToggle={() => setScript((v) => !v)} />
           </div>
 
           {/* The controls, grouped bottom-right and clear of the reading
