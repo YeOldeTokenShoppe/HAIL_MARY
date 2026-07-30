@@ -26,7 +26,13 @@ import { LANES, PITCHER, SEATS, SHAPES, inLane } from "./questions.js";
  */
 export const PITCH_BOT = {
   id: PITCHER,
-  name: "The Agent",
+  // "The Agent" until 2026-07-29. Renamed on the author's call — "we can call it
+  // 'pitch bot' instead of 'agent'" — and it is the better name for the same
+  // reason the copy stopped calling attention to the absent client: AGENT is a
+  // role that invites the question "agent for whom, and where are they", while
+  // PITCH BOT is just what the thing is. This is desk data, so the rename reaches
+  // the record, the seat row, the transcript and Barron's asides at once.
+  name: "Pitch Bot",
   role: "PITCHING ON COMMISSION",
   model: "/models/pitch-bot.glb",   // 566KB. Draco + EXT_texture_webp required.
   // Its own render, 2026-07-29. This was thumbnail_johnBarron.png as a
@@ -37,7 +43,7 @@ export const PITCH_BOT = {
   portrait: "/pitchBot.webp",
   voice: "PB",
   clips: { idle: "idle", talking: "talking" },
-  blurb: "Paid if you fund it. Never met the founders either.",
+  blurb: "Paid if you fund it. That is the entire relationship.",
 };
 
 // VOICE IS DESK DATA TOO, for the same reason as the portrait: both surfaces need

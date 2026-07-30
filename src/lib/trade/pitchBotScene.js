@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { applyPitchBotHolo, PITCH_BOT_HOLO } from "./pitchBotHolo";
+import {
+  applyPitchBotHolo, PITCH_BOT_HOLO, startPitchBotCast, pitchBotCastState,
+} from "./pitchBotHolo";
 
 // THE PITCH BOT, IN THE ROOM — everything the temple scene needs to host the VC
 // game's pitcher, kept out of CyborgTempleScene.jsx.
@@ -195,6 +197,43 @@ export function mountPitchBot({
           if (!_billboardState) return null;
           _billboardState.yawOffset = (Number(deg) || 0) * Math.PI / 180;
           return { yawOffset: +_billboardState.yawOffset.toFixed(4), deg: Number(deg) || 0 };
+        };
+        /**
+         * REPLAY THE CAST — the beam strike and the figure assembling up it.
+         *
+         * It plays once, on the frame the floor begins, and lasts under a second,
+         * which makes it the hardest thing in this subsystem to look at twice. Slow
+         * it right down to judge the edge and the timing:
+         *
+         *     __pitchBotRecast({ castDuration: 6 })
+         *     __pitchBotRecast({ revealEdge: 0.4, revealEdgeGlow: 4 })
+         *     __pitchBotRecast()               // as shipped
+         *
+         * Overrides are per-call and never persist — paste the ones you like into
+         * PITCH_BOT_HOLO. Bridged to the DOM as well as returned, because the
+         * Chrome extension evaluates in an isolated world where page globals read
+         * back as undefined (see the debugging note in this repo's memory).
+         */
+        window.__pitchBotRecast = (cfg = {}) => {
+          bot.visible = true;
+          const ok = startPitchBotCast(bot, cfg);
+          const out = { started: ok, ...pitchBotCastState() };
+          let el = document.getElementById("__pitchBotCastProbe");
+          if (!el) {
+            el = document.createElement("div");
+            el.id = "__pitchBotCastProbe";
+            el.style.display = "none";
+            document.body.appendChild(el);
+          }
+          el.textContent = JSON.stringify(out);
+          return out;
+        };
+        /** Current cast state, bridged the same way. */
+        window.__pitchBotCastState = () => {
+          const out = pitchBotCastState();
+          const el = document.getElementById("__pitchBotCastProbe");
+          if (el) el.textContent = JSON.stringify(out);
+          return out;
         };
         /** Toggle billboarding without a reload. */
         window.__pitchBotBillboard = (on) => {

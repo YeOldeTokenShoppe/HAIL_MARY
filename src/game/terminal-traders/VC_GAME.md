@@ -37,13 +37,13 @@ whether the venture succeeded.
 ```
 OUR LADY        remote, unseen       decides which deal comes down.        DESIGNED
    ↓                                 You don't get to ask why this one.
-THE FOUNDER     a rolled identity    never appears. Sent an agent.         DESIGNED
-   ↓            name / face / bio
+THE CLIENT      a rolled identity    retains the bot. Never appears, and    DESIGNED
+   ↓            name / ticker        the UI never remarks on it.
 THE PITCH BOT   in the room,          pitches on commission. The one       PARTIAL
                 projected            constant. UNLIMITED presses.
    ↓
-THE ENIGMA      the console          the deal ARRIVES coded and decodes    SHIPPED
-MACHINE         in the briefing      there. Transmission, never selection.
+THE ENGAGEMENT  the record           the bot is RETAINED there and its     SHIPPED
+RECORD          in the briefing      client named. Paperwork, not a draw.
    ↓
 THE PROJECTOR   centre of the desks  casts the bot. Its beam is the only    SHIPPED
                                      staging the pitcher gets.
@@ -55,6 +55,10 @@ VIRGIL          on the desk          your guide. Cannot be sent anywhere.  PARTI
    ↓
 YOU             the fifth seat       call it                              SHIPPED
 ```
+
+**THE UI NEVER REMARKS ON THE CLIENT'S ABSENCE** `[A§20]`. A bot representing an
+absent principal is ordinary business here: the record carries one face and one
+name, and nothing says the client did not come. The commission does the damning.
 
 **Our Lady is the randomiser, and she is canon** — `council-chat/route.js:16` has
 her *"in the channel but NOT in the room"*; `Lobby.jsx:48` already calls the
@@ -91,9 +95,9 @@ including why the "a rotating pitcher multiplies the content" claim was false �
    appears on legit deals leaks the answer; a founder mapped to an archetype is the
    name-leak again — four appearances in four costumes.
 
-**The console is the arrival; the projector is the pitcher** `[A§17]`. Our Lady
-decides *which* deal, the enigma console decodes its name in the briefing, and the
-projector casts the agent into the room for the pitch. **The monitors host
+**The record is the arrival; the projector is the pitcher** `[A§17]`, `[A§20]`.
+Our Lady decides *which* deal, the engagement record names the client who retained
+the bot, and the projector casts the bot into the room for the pitch. **The monitors host
 neither** — they are the evidence boards, and a receipt landing on a seat's own
 screen is the payoff of the whole four-seat design.
 
@@ -111,7 +115,7 @@ is happening; the agent owns it when something is.
 
 | Beat | What happens |
 |---|---|
-| **THE ARRIVAL** | Your next appointment is here. `SEND IT IN ▸` — the enigma console decodes the deal's name and the agent arrives for a client who didn't come. |
+| **THE ARRIVAL** | Your next appointment is here. `TAKE THE MEETING ▸` — the engagement record is signed: the bot's shield wakes, its client's name goes onto the line, `RETAINED` lands, and the dossier writes itself in. |
 | **THE DEAL** | The deal sheet: a terminal dossier. Name, ticker, chain, surface stats. |
 | **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who goes deepest, and **Virgil's read**. |
 | **THE PRESS** | Three interruptions. Ask anyone about anything — the lane decides how deep they get, not whether they answer. |
@@ -386,7 +390,7 @@ goes inside it or gets a height budget. 839px of rows in a 700px box once clippe
 ## 7. Build order
 
 **`SHIPPED`:** three archetypes · seeded instancing, a fresh deal per sitting ·
-the enigma console and the name decode · four SYMMETRIC seats, one lane and one
+the engagement record and the client's name · four SYMMETRIC seats, one lane and one
 use each · the pitch bot as an outside pitcher, projected into the room with its
 own voice · Virgil's two reads and the tip switch · `NOTHING ON FILE` · pressure
 bands · the shared floor · desktop in-room play · mobile CRT with voice + mouth ·
@@ -401,7 +405,7 @@ wrong thing, and `LET HIM GO ON ▸` still says "him".
    vs. three across the desk. *If run B doesn't feel like a different and better
    decision, the direction is wrong.* Free, unrun, and three subsystems have been
    built on top of it. **Do this first.**
-2. **The pitch bot, the founder pool, and the enigma machine** — rules in §1.
+2. **The pitch bot and the client pool** — rules in §1.
    - **The bot.** Model going into `/models`. Rename the pitcher special-case in
      `pressRun.js` (already *"is this the pitcher?"* wearing Barron's name), add
      Barron to `SPENDABLE_SEATS`, point `claim.speaker` (hardcoded `"demon"`, read

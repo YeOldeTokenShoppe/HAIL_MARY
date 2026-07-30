@@ -365,6 +365,112 @@ BOTH files, which is the rule working: the first response to "it's over" is to l
 for reasons masquerading as rules, and there have always been some. Only raise the
 number when that search comes up empty.
 
+## 20. The sixth object in the arrival slot, and the first one that isn't a machine
+
+*2026-07-29, same day as `[A§17]`. The enigma console lasted hours. Recorded
+because the slot has now eaten six designs and the test that kills them has been
+the same test every time.*
+
+**cards → dice → wheel → dual wheel → cipher machine → paperwork.** `[A§12]` and
+`[A§13]` cover the first four. The console was rescued from the dice's fate on the
+argument that **it chooses nothing** — it is only the channel Our Lady's
+instruction arrives on. That answered the charge that killed the dice and left the
+other one standing: **a VC meeting has no cipher machine in it either.**
+
+**The tell that it was never resolved is the shape of the fix.** "Not a museum
+piece", "one low strip", "a hero-sized console advertises a cryptography game" —
+the prop was shrunk until it stopped being noticed. That is not a resolution, and
+it cost twice: a beat too small to carry the moment it exists for, and 40% of the
+briefing column standing empty around it.
+
+**Three more, and the third is the one that generalises:**
+
+- **The fiction had no threat model.** A cipher implies an interceptor. There
+  isn't one, and Our Lady encoding a memo to her own desk is ceremony with nothing
+  at stake. The real reason the name is withheld is that the meeting hasn't
+  started — an *appointment*, not a cryptogram.
+- **The pitcher was the one character with no face on the briefing.** Five
+  portraits, four analysts and a cat explicitly labelled NOT A SEAT, and the thing
+  that talks for two minutes was absent — while `PITCH_BOT.portrait` had been desk
+  data the whole time.
+- **IT TAUGHT NOTHING THAT CAME BACK.** The console appeared once and never
+  returned. The record's first frame wakes the shield, so the first thing the
+  player learns is that the bot's face is a readout — and `pressure()` drives it
+  for the next four minutes. **Ask what a beat teaches that the next four minutes
+  use. An object that answers "nothing" is decoration however well it is drawn.**
+
+**What paperwork buys that no machine could.** `POSITIONED` and the commission are
+called load-bearing in §1 and were, until this, one sentence of body copy. As a
+term on a record that lands before a word is spoken, PAID · ONLY IF YOU FUND IT is
+evidence the player watched arrive. `[A§13]` established that **copy cannot fix a
+mechanic mismatch**; this is the converse and it is worth having both: **staging
+does what copy can't.**
+
+**One word is load-bearing: RETAINED, never ASSIGNED.** Assignment is the house
+acting on screen, which is the randomiser in a seventh costume. The client acted,
+upstairs, before you arrived.
+
+### The absence was not the subject, and the first build got that wrong
+
+*Same day, on the author's read of the shipped record: "i don't like drawing
+attention to the missing nature of the client — no need to point that out. Treat it
+as a normal way of doing business — ai agents are everywhere — we're in the near
+future."*
+
+It had shipped an empty dashed frame with a question mark in it, captioned NO
+CLIENT, stamped DID NOT ATTEND: **three elements narrating one absence**, on a
+record whose job is to make representation look routine. `[A§17]` says the
+founder's absence *"needs no explaining and is itself faintly damning"* — and the
+operative words are NEEDS NO EXPLAINING. **A UI that points at it three times is
+explaining it,** which converts a quiet structural fact into a complaint the
+interface is making on the player's behalf.
+
+The fix was subtraction: one party on the record, because that is the only party a
+document of this kind carries a face for, and the client as a **name on a line**,
+which is how a client appears on every engagement letter ever written. A lone
+centred portrait then read as a placeholder for something missing, so it moved
+left, beside its caption, where it reads as a headshot on a file.
+
+**And the caption went for the same reason, hours later**: SENT DOWN TO YOU · YOU
+DON'T GET TO ASK WHY THIS ONE (author: *"this line seems unnecessary"*). It had been
+load-bearing exactly once — against the dice, where naming *who chose* was the one
+thing a randomiser could never do for itself `[A§13]`. **A form that arrives already
+signed does not raise the question, so the answer stopped being needed**, and what
+was left was the interface rebutting a complaint no player had made. The
+generalisation, three cuts deep in one day: **when a prop goes, grep the copy that
+was defending it.** Captions outlive their arguments silently, because nothing
+breaks.
+
+**And `SEND IT IN` finally went too** (author: *"seems like strange wording to
+me"*). It is: *send it in* is receptionist-speak for a person you can point at, and
+the "it" named nothing the player had met. Now `TAKE THE MEETING`. **`[A§11]`
+rejected "send" for the ANALYSTS because they never leave their desks; the verb has
+now failed on both sides of the table, which is enough to stop proposing it.**
+
+**The particulars were in a second box, and that is the last thing the two-column
+briefing cost.** A 270px record could name a client but had no room to describe one,
+so the surface stats went into their own bordered panel beside it — one deal
+arriving as two objects (author: *"the pitch project is in 2 separate boxes"*).
+Giving the record the full width made it one document with three columns (who is
+pitching · what they signed · the particulars), and that **deleted the swap cell**
+rather than staging around it: stat rows sitting at `——` from the start cover their
+own rest state, so nothing needed cross-fading and the house rules went back to
+being copy. **The empty-box problem was never a staging problem. It was a width
+problem.**
+
+**Two more the author cut on sight, both narrating rather than telling:** *"one deal
+on the table"* (the top bar already reports the count, and "on the table" was a
+card-room idiom left over from `[A§12]`) and *"the desk — always these four, and the
+cat"* (reassurance about a rotating cast that `[A§17]` had already deleted). Now YOUR
+NEXT APPOINTMENT and YOUR ANALYSTS. **"The Trade Agents" was the other candidate and
+was rejected for putting "agent" back on the player's side of the table the same day
+the pitcher stopped being called one.**
+
+**"The Agent" became "Pitch Bot" in the same pass** — desk data, so it reached the
+record, the seat row, the transcript and Barron's asides at once. AGENT is a role
+that invites *"agent for whom, and where are they?"*; PITCH BOT is just what the
+thing is. **The name was asking the question the copy had stopped asking.**
+
 ## 18. Smaller decisions worth not re-making
 
 - **Why this shape at all.** The design before it was an eight-screen CRT overlay

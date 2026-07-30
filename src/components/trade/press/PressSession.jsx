@@ -14,8 +14,9 @@ import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/co
 import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
 import { setUnicornGlow } from "@/lib/trade/unicornGlow";
 import {
-  EnigmaConsole, runArrival, prefersReducedMotion, SFX, ARRIVAL_CSS,
-} from "./arrival";
+  EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
+  ENGAGEMENT_CSS,
+} from "./engagement";
 import { createEvidenceScreen } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, Transcript,
@@ -126,29 +127,30 @@ export default function PressSession({
   // scene via the evidenceActive handshake. Eugene has none — he never stamps.
   const screensRef = useRef({});
 
-  // THE ARRIVAL. `rolled` gates the panel's CTA: the message decodes, THEN you
+  // THE ARRIVAL. `rolled` gates the panel's CTA: the record is signed, THEN you
   // let the agent pitch. Two beats, because watching the appointment land is the
   // moment the session starts belonging to you. (Named `rolled` from the dice
   // era; it is the arrival now — renaming it touches both surfaces for nothing.)
   const [rolled, setRolled] = useState(false);
   const [rolling, setRolling] = useState(false);
-  // NOTHING ON THIS PANEL MAY NAME THE DEAL BEFORE THE DICE STOP (invariant 7).
-  // Printing "ALDERMAN · $ALDR · $7.5M" and "John Barron brought this one in"
-  // over an empty table announced both the deal and the speaker before either
-  // had been picked — precisely the reveal this beat exists to stage.
+  // NOTHING ON THIS PANEL MAY NAME THE DEAL BEFORE THE RECORD IS SIGNED
+  // (invariant 7). Printing "ALDERMAN · $ALDR · $7.5M" and "John Barron brought
+  // this one in" over an empty table announced both the deal and the speaker
+  // before either had been picked — precisely the reveal this beat exists to
+  // stage.
   //
   // Under the card deal these were two separate gates, because the deal card
-  // and the speaker's card turned over at different moments. One roll has one
+  // and the speaker's card turned over at different moments. One arrival has one
   // settle, so they're now the same instant and the two names arrive together.
   const [settled, setSettled] = useState(false);
   const identity = rolled || settled;
-  const panelRef = useRef(null);
-  const lampRef = useRef(null);
-  const rotorRefs = useRef([]);
-  const nameRef = useRef(null);
-  const sheetRef = useRef(null);
+  const recordRef = useRef(null);
+  const shieldRef = useRef(null);
+  const clientRef = useRef(null);
+  const termsRef = useRef(null);
+  const stampRetainedRef = useRef(null);
+  const particularsRef = useRef(null);
   const tlRef = useRef(null);
-  const registerRotor = useCallback((i, el) => { rotorRefs.current[i] = el; }, []);
 
   const claim = currentClaim(run, deal);
   const onFloor = started && run.phase === PHASE.FLOOR;
@@ -158,7 +160,8 @@ export default function PressSession({
      and material; we borrow the canvas through the EvidenceScreens handshake
      and hand it back on unmount. See evidenceScreen.js for why. */
   useEffect(() => {
-    const s = createEvidenceScreen({ station: SPEAKER_STATION, header: "THE AGENT" });
+    const s = createEvidenceScreen({ station: SPEAKER_STATION,
+                                     header: PITCH_BOT.name.toUpperCase() });
     screenRef.current = s;
     // THE PITCHER HAS NO MONITOR OF ITS OWN. There are four screens in this room
     // and, since 2026-07-29, four analysts to own them — the agent is an outsider
@@ -224,7 +227,7 @@ export default function PressSession({
 
   /* ---- the deal ---- */
   useEffect(() => { Object.values(SFX).forEach(preloadSfx); }, []);
-  useEffect(() => () => tlRef.current?.kill(), []);
+  useEffect(() => () => endArrival(tlRef.current), []);
 
   const runRoll = useCallback(() => {
     if (rolling || rolled) return;
@@ -233,12 +236,13 @@ export default function PressSession({
 
     setRolling(true);
     const tl = runArrival({
-      panel: panelRef.current,
-      rotors: rotorRefs.current,
-      lamp: lampRef.current,
-      name: nameRef.current,
-      nameText: deal.name,
-      sheet: sheetRef.current,
+      record: recordRef.current,
+      shield: shieldRef.current,
+      client: clientRef.current,
+      clientText: deal.name,
+      terms: termsRef.current,
+      stampRetained: stampRetainedRef.current,
+      particulars: particularsRef.current,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -478,170 +482,174 @@ export default function PressSession({
             <button className="ps-skip-deal" onClick={skipRoll} aria-label="Show them in now" />
           )}
 
-          {/* THE ARRIVAL, THEN THE SHEET. The deal is picked fresh for this
-              sitting — nobody decided it before you got here — and you can't
-              ask for a different one without leaving. The plate is a status
-              readout, never a button.
+          {/* BAND 1 — THE RECORD, full panel width.
+              It was a 270px column beside the copy, which is how the deal ended up
+              in two boxes: the record could name the client but had no room to
+              describe it, so the particulars went into a second panel on the right
+              (author: "the pitch project is in 2 separate boxes"). Given the whole
+              width it is one document with three columns, and the second box is
+              gone. See engagement.jsx.
 
-              The hero is no longer locked to TradingCard's 744x1038 portrait
-              box, which is why this column can finally be the width the copy
-              wants instead of the width a card was. */}
-          <div className="ps-open-hero">
-            <div className="ps-roll">
-              <EnigmaConsole arrived={rolled} ref={panelRef}
-                             lampRef={lampRef} registerRotor={registerRotor} />
-              {/* The caption names WHO chose, which is the one thing the old
-                  dice could never say. It read "THE DEAL IS ROLLED, NOT CHOSEN"
-                  — and the deal is in fact chosen, by Our Lady, which is why the
-                  randomiser had to become a person. */}
-              {/* ONLY IN THE ARRIVED STATE — see the note in PressFlat. */}
-              {rolled && (
-                <div className="ps-roll-cap">
-                  SENT DOWN TO YOU · YOU DON&apos;T GET TO ASK WHY THIS ONE
-                </div>
-              )}
-            </div>
+              THE CAPTION IS GONE TOO (author: "this line seems unnecessary"). It
+              read SENT DOWN TO YOU · YOU DON'T GET TO ASK WHY THIS ONE, and it was
+              load-bearing exactly once — against the dice, where naming who chose
+              was the one thing a randomiser could not do for itself. A form that
+              arrives already signed never raises the question. Both cuts are
+              [A§20]. */}
+          <EngagementRecord
+            arrived={identity}
+            client={identity ? deal.name : null}
+            surface={identity ? deal.surface : null}
+            ticker={identity ? deal.ticker : null}
+            chain={identity ? deal.chain : null}
+            ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
+            termsRef={termsRef} particularsRef={particularsRef}
+            stampRetainedRef={stampRetainedRef} />
 
-            {/* Written in only once the agent is in. Every field here is public
-                surface data and none of it correlates with the outcome — that's
-                asserted in the suite, because the moment the listing leaks the
-                answer the analysts stop mattering. */}
-            <div className={`ps-sheet${identity ? " in" : ""}`} ref={sheetRef}>
-              {identity ? (
-                <>
-                  <div className="ps-sheet-h">PROSPECT</div>
-                  <div className="ps-sheet-name">{deal.name}</div>
-                  <div className="ps-sheet-tick">{deal.ticker} · {deal.chain}</div>
-                  <dl className="ps-sheet-stats">
-                    <div><dt>MCAP</dt><dd>{deal.surface.mcap}</dd></div>
-                    <div><dt>HOLDERS</dt><dd>{deal.surface.holders}</dd></div>
-                    <div><dt>AGE</dt><dd>{deal.surface.age}</dd></div>
-                    <div><dt>24H</dt><dd>{deal.surface.change24h}</dd></div>
-                    <div><dt>SOCIAL</dt><dd>{deal.surface.social}</dd></div>
-                  </dl>
-                  <div className="ps-sheet-foot">
-                    Long, short, or hold? Work the questions. Then commit.
-                  </div>
-                </>
-              ) : (
-                <div className="ps-sheet-blank">NOTHING ON THE TABLE YET</div>
-              )}
-            </div>
-
-          </div>
-
+          {/* BAND 2 — what is about to happen, and the one rule that governs it. */}
           <div className="ps-open-copy">
-            <div className="ps-open-eyebrow">ONE DEAL ON THE TABLE</div>
-            {/* THE DECODE LANDS HERE. runArrival writes ciphertext into this
-                node and resolves it to deal.name; React then renders the same
-                string once `identity` flips, so the re-render is a no-op. */}
-            <div className={`ps-open-name${identity ? "" : " facedown"}`} ref={nameRef}>
-              {identity ? deal.name : "\u259a\u259a\u259a\u259a\u259a\u259a\u259a\u259a"}
-            </div>
-            <div className="ps-open-sub">
-              {identity
-                ? `${deal.ticker} · ${deal.chain} · ${deal.surface.age} old · ${deal.surface.mcap}`
-                : "sent down from the desk above, still coded"}
-            </div>
-            {/* Unnamed until the agent is in. The two versions are deliberately
-                the same shape so the swap reads as the name filling in, not as
-                the paragraph rewriting itself. */}
-            {/* The pitcher is an outside agent on commission, not a colleague.
-                This copy said "John Barron brought this one in — it's his deal"
-                until 2026-07-29, which stopped being true when the bot took over
-                the selling and Barron joined the desk as a plain specialist. */}
+            {/* "ONE DEAL ON THE TABLE" until 2026-07-29 (author: didn't like it).
+                The top bar already reports the count and the status — ONE DEAL ·
+                NOT IN YET — so the eyebrow was the second place on screen saying
+                "one deal", and "on the table" is a card-room idiom left over from
+                when this beat had cards on a table. YOUR NEXT APPOINTMENT is
+                VC_GAME.md §2's own words for the beat, and it is the register the
+                record and SEND IT IN are already in. */}
+            <div className="ps-open-eyebrow">YOUR NEXT APPOINTMENT</div>
+            {/* The pitcher is an outside contractor on commission, not a colleague.
+                This said "John Barron brought this one in — it's his deal" until
+                2026-07-29, which stopped being true when the bot took over the
+                selling and Barron joined the desk as a plain specialist; then "an
+                agent is here for a client who didn't come", cut the same day for
+                pointing at the absence instead of the incentive. What is worth
+                knowing about a speaker is who pays it, not who isn't here. */}
             <div className="ps-open-body">
-              An agent is here for a client who didn&apos;t come. It gets paid if you
-              fund this, and it&apos;s going to talk for about two minutes.
+              A pitch bot is here to present its client&apos;s deal. It works on
+              commission — it gets paid if you fund this — and it&apos;s going to
+              talk for about two minutes.
             </div>
             <div className="ps-open-rule">
               You can interrupt <b>three times</b> and make it put a number on
               things. Whatever it can actually back lands on a screen. Whatever it
               can&apos;t, doesn&apos;t.
             </div>
+          </div>
 
-            {/* THE DESK. Portraits, not card faces — a card is a thing you
-                look at, and four in a row read as a cast list even when they
-                were the controls (see the note on SeatRow in pressUi.jsx).
-                Nothing here is clickable: on the briefing they are an
-                introduction, and the sendable version of the same four is the
-                seat row on the floor. */}
-            <div className="ps-tools">
-              <div className="ps-tool-group ps-tool-hand">
-                <div className="ps-draw-label">THE DESK — always these four, and the cat</div>
-                <div className="ps-draw-row">
-                  {DESK_ORDER.map((m) => (
-                    <div key={m.id} className="ps-face" title={m.blurb}>
-                      <img className="ps-face-pic" src={m.portrait} alt="" aria-hidden="true" />
-                      <span className="ps-face-who">{m.name}</span>
-                      <span className="ps-face-role">{m.role}</span>
-                    </div>
-                  ))}
-                  {/* VIRGIL, AT THE END OF THE ROW AND BEHIND A DIVIDER.
-                      He was here once and it failed: a cat's face above the
-                      pitching CTA read as the CAT doing the pitching (author,
-                      2026-07-28), which is why he was moved into the hero
-                      column. Moving him back is safe now for a reason that
-                      didn't exist then — THE PITCHER IS NO LONGER ONE OF THESE
-                      FACES. It's an outside agent, named in the copy above, so
-                      a fifth portrait can't be mistaken for the one selling.
+          {/* THE SWAP CELL IS GONE, and it is worth saying why it existed. The
+              dossier used to be a separate panel whose REST state was an empty
+              bordered box (NOTHING ON THE TABLE YET), so it was paired with the
+              house rules in one grid area and cross-faded. Folding the particulars
+              into the record deleted the problem rather than staging it: the stat
+              rows are visible from the start at ——, so nothing has an empty rest
+              state and the rules can just be copy again. */}
+          <div className="ps-open-aside">
+            {/* ALL FOUR ARE SCARCE NOW. This read "Marisol, GR80 and Eugene answer
+                once each" while Barron was the pitcher and therefore unlimited. He
+                is a seat like the rest since 2026-07-29 — no exceptions left. */}
+            <div className="ps-brief-h">HOW YOUR ANALYSTS WORK</div>
+            <div className="ps-open-rule sm">
+              Every analyst will answer anything you ask. Each has <b>one</b>{" "}
+              subject they go deep on, and each answers <b>once</b>, all session.
+              Ask the wrong one and you still get an answer; you just get the
+              shallow version, and you&apos;ve spent them.
+            </div>
+          </div>
 
-                      The divider and the NOT A SEAT line are load-bearing, not
-                      decoration: they are what keeps him legible as a companion
-                      rather than a spendable. If he ever reads as pitching
-                      again, he goes back to his own block. */}
-                  <span className="ps-face-div" aria-hidden="true" />
-                  <div className="ps-face ps-face-cat" title={VIRGIL.blurb}>
-                    <img className="ps-face-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
-                    <span className="ps-face-who">{VIRGIL.name}</span>
-                    <span className="ps-face-role">{VIRGIL.role}</span>
-                    <span className="ps-face-note">NOT A SEAT</span>
+          {/* THE DESK. Portraits, not card faces — a card is a thing you
+              look at, and four in a row read as a cast list even when they
+              were the controls (see the note on SeatRow in pressUi.jsx).
+              Nothing here is clickable: on the briefing they are an
+              introduction, and the sendable version of the same four is the
+              seat row on the floor. */}
+          <div className="ps-tools">
+            <div className="ps-tool-group ps-tool-hand">
+                {/* "THE DESK — always these four, and the cat" until 2026-07-29 (author:
+                    didn't like it). "always these four" was reassurance about a
+                    rotating cast, and the rotating cast was cut in [A§17] — so it
+                    answered a question no player can now think to ask, in the
+                    defensive register of a changelog. YOUR DESK says the one thing
+                    that IS load-bearing: they are the player's, one use each. The
+                    cat needs no mention in the label; he has a divider and a NOT A
+                    SEAT line of his own. */}
+                {/* ANALYSTS, NOT AGENTS. "The Trade Agents" was the other
+                    candidate and it was rejected on the same day the PITCHER
+                    stopped being called "The Agent": one word for both sides of
+                    the table is the cast-legibility failure this file keeps
+                    logging (see the borrowed-portrait note in desk.js, and [A§12]
+                    on four cards reading as a cast list). ANALYST is also what §1
+                    has called them all along. The possessive stays — it is the
+                    half that carries "yours, one use each". Internals keep
+                    DESK/DESK_ORDER; only the label is player-facing. */}
+                <div className="ps-draw-label">YOUR ANALYSTS</div>
+              <div className="ps-draw-row">
+                {DESK_ORDER.map((m) => (
+                  <div key={m.id} className="ps-face" title={m.blurb}>
+                    <img className="ps-face-pic" src={m.portrait} alt="" aria-hidden="true" />
+                    <span className="ps-face-who">{m.name}</span>
+                    <span className="ps-face-role">{m.role}</span>
                   </div>
-                </div>
-                {/* ALL FOUR ARE SCARCE NOW. This read "Marisol, GR80 and Eugene
-                    answer once each" while Barron was the pitcher and therefore
-                    unlimited. He is a seat like the rest since 2026-07-29 — the
-                    desk has no exceptions left. */}
-                <div className="ps-open-rule" style={{ marginTop: 10 }}>
-                  Everyone at this desk will answer anything you ask them. Each has{" "}
-                  <b>one</b> subject they go deep on, and each answers{" "}
-                  <b>once</b>, all session. Ask the wrong one and you still get an
-                  answer; you just get the shallow version, and you&apos;ve spent them.
+                ))}
+                {/* VIRGIL, AT THE END OF THE ROW AND BEHIND A DIVIDER.
+                    He was here once and it failed: a cat's face above the
+                    pitching CTA read as the CAT doing the pitching (author,
+                    2026-07-28), which is why he was moved into the hero
+                    column. Moving him back is safe now for a reason that
+                    didn't exist then — THE PITCHER IS NO LONGER ONE OF THESE
+                    FACES. It's an outside agent, named in the copy above, so
+                    a fifth portrait can't be mistaken for the one selling.
+
+                    The divider and the NOT A SEAT line are load-bearing, not
+                    decoration: they are what keeps him legible as a companion
+                    rather than a spendable. If he ever reads as pitching
+                    again, he goes back to his own block. */}
+                <span className="ps-face-div" aria-hidden="true" />
+                <div className="ps-face ps-face-cat" title={VIRGIL.blurb}>
+                  <img className="ps-face-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+                  <span className="ps-face-who">{VIRGIL.name}</span>
+                  <span className="ps-face-role">{VIRGIL.role}</span>
+                  <span className="ps-face-note">NOT A SEAT</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* The one live control. My seat-row rewrite replaced the whole
-               tools block and took this with it, which left the briefing with
-               nothing to press — "there is no deal specified or buttons to
-               push" (author, 2026-07-27). */}
-            {/* ONE BUTTON. A LOCAL/DAILY split lived here for part of a day and
-                was cut: the daily's justifications all belonged to a
-                leaderboard that got rejected, and the one that survived — a
-                shared deal to talk about — is latent until a share hook exists,
-                which is a bet on traction rather than a feature. A choice that
-                gives the player nothing teaches them choices here don't
-                matter. See the note in instanceDeal.js. */}
-            <div className="ps-cta-row">
-              <button className="ps-lock"
-                      onClick={rolled
-                        ? () => {
-                          // The ONLY user gesture we are guaranteed before audio
-                          // has to play. iOS will not play a decoded buffer
-                          // without one; fails soft, so no audio still leaves a
-                          // playable game.
-                          try { unlockAdviserAudio(); } catch {}
-                          setStarted(true);
-                        }
-                        : runRoll}
-                      disabled={rolling}>
-                {/* "ROLL THE DEAL" / "ROLLING…" until 2026-07-29 — stale from the
-                    dice cut. The flat surface was updated at the time and this
-                    one was missed. */}
-                {rolled ? "HEAR THE PITCH ▸" : rolling ? "DECODING…" : "SEND IT IN ▸"}
-              </button>
-            </div>
-
+          {/* The one live control. My seat-row rewrite replaced the whole
+             tools block and took this with it, which left the briefing with
+             nothing to press — "there is no deal specified or buttons to
+             push" (author, 2026-07-27). */}
+          {/* ONE BUTTON. A LOCAL/DAILY split lived here for part of a day and
+              was cut: the daily's justifications all belonged to a
+              leaderboard that got rejected, and the one that survived — a
+              shared deal to talk about — is latent until a share hook exists,
+              which is a bet on traction rather than a feature. A choice that
+              gives the player nothing teaches them choices here don't
+              matter. See the note in instanceDeal.js. */}
+          <div className="ps-cta-row">
+            <button className="ps-lock"
+                    onClick={rolled
+                      ? () => {
+                        // The ONLY user gesture we are guaranteed before audio
+                        // has to play. iOS will not play a decoded buffer
+                        // without one; fails soft, so no audio still leaves a
+                        // playable game.
+                        try { unlockAdviserAudio(); } catch {}
+                        setStarted(true);
+                      }
+                      : runRoll}
+                    disabled={rolling}>
+              {/* "ROLL THE DEAL" / "ROLLING…" until 2026-07-29 — stale from the
+                  dice cut, then "DECODING…" until the cipher went, then SEND IT IN
+                  until the author read it back: "seems like strange wording to me".
+                  It is — "send it in" is receptionist-speak for a person you can
+                  point at, and the "it" here names nothing the player has met.
+                  TAKE THE MEETING says what pressing it does, in the register YOUR
+                  NEXT APPOINTMENT and the engagement record already set, and it is
+                  the player's decision rather than an instruction to staff. [A§11]
+                  rejected "send" for the ANALYSTS on the neighbouring ground that
+                  they never leave their desks; the verb has now failed on both
+                  sides of the table. */}
+              {rolled ? "HEAR THE PITCH ▸" : rolling ? "SIGNING…" : "TAKE THE MEETING ▸"}
+            </button>
           </div>
         </div>
       )}
@@ -824,7 +832,7 @@ export default function PressSession({
   );
 }
 
-const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
+const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 /* FIXED, not absolute: this portals into document.body, which on /trade is
    taller than the viewport — an absolute inset:0 stretched the layer down the
    whole page and pushed the dock off-screen. */
@@ -894,64 +902,63 @@ const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
 .ps-dot.hit { background:#ffd23a; }
 .ps-dot.black { background:#7a8b86; }
 
+/* WIDTH AND HEIGHT ARE A BUDGET, NOT A CONTAINER. At 940 x ~600 this panel
+   covered the desks, the nameplates and the projector — the room, which is the
+   thing the whole surface exists to play inside of and the first thing the
+   briefing hid. [A§18]'s first fix was "play happens in the room". Two cuts
+   paid for the smaller box: the deal is named once instead of three times, and
+   the house rules moved into the swap cell where they cost no height at all. */
 .ps-open { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-  width:min(940px, calc(100vw - 40px)); max-height:90vh; overflow:auto;
+  width:min(800px, calc(100vw - 40px)); max-height:90vh; overflow:auto; flex-wrap:wrap;
   background:rgba(2,16,14,0.93);
   border:1px solid rgba(47,214,214,0.4); border-left:3px solid #ff5f9e; padding:18px 22px;
   display:flex; gap:22px; align-items:flex-start; }
-/* align-self keeps the hero from stretching to the copy column's height and
-   vice-versa — an earlier version let one column drive the other and the panel
-   silently grew to 1355px, scrolling the hand out of sight. */
-/* WIDTH IS NOW A CHOICE. This column used to be whatever TradingCard's
-   744x1038 box came to at CARD_HERO scale (~298px), and the empty slot waiting
-   for that card was the largest object in the briefing — a dashed rectangle
-   holding 40% of the panel and saying nothing. The deal sheet is sized to its
-   own content instead. */
-.ps-open-hero { flex:none; align-self:flex-start; width:250px;
-  display:flex; flex-direction:column; gap:14px; }
-.ps-roll { display:flex; flex-direction:column; align-items:center; gap:9px;
-  padding:16px 10px; border:1px solid rgba(47,214,214,0.22);
-  background:rgba(0,0,0,0.25); }
-.ps-roll-cap { font-size:8.5px; letter-spacing:0.14em; font-weight:bold;
-  color:rgba(255,210,58,0.75); text-align:center; line-height:1.4; }
+/* FOUR BANDS: the record, the framing, the analysts, the action. .ps-open-hero
+   is gone with the two-column briefing — a 270px column was what forced the deal
+   into two boxes, because a record that narrow can name a client but cannot
+   describe one. Everything is a wrapped flex row now, so each band declares its
+   own basis and the panel has no columns to keep balanced. */
+.eng { flex-basis:100%; }
 
-/* THE DEAL SHEET — what the agent brought. Held at opacity 0 until the arrival
-   completes (runArrival tweens it), so no field can name the deal early. */
-/* NOT opacity:0 at rest — that took the pre-roll placeholder with it and left a
-   hole in the column. runArrival's fromTo does the reveal. */
-.ps-sheet { border:1px solid rgba(47,214,214,0.35); border-top:2px solid #ff5f9e;
-  background:rgba(0,0,0,0.35); padding:13px 14px 12px; }
-.ps-sheet-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold; color:#ff5f9e; }
-.ps-sheet-name { font-size:16px; font-weight:bold; letter-spacing:0.04em;
-  margin-top:5px; line-height:1.2; }
-.ps-sheet-tick { font-size:10px; letter-spacing:0.08em;
-  color:rgba(234,255,249,0.55); margin-top:3px; }
-.ps-sheet-stats { margin:11px 0 0; display:flex; flex-direction:column; gap:4px;
-  border-top:1px solid rgba(47,214,214,0.2); padding-top:9px; }
-.ps-sheet-stats > div { display:flex; align-items:baseline; gap:8px; }
-.ps-sheet-stats dt { font-size:9px; letter-spacing:0.13em;
-  color:rgba(234,255,249,0.45); width:62px; flex:none; }
-.ps-sheet-stats dd { margin:0; font-size:11.5px; font-weight:bold; color:#eafff9; }
-.ps-sheet-foot { font-size:10px; line-height:1.45; color:#ffd23a; margin-top:11px;
-  padding-top:9px; border-top:1px solid rgba(255,210,58,0.2); }
-.ps-sheet-blank { font-size:10px; letter-spacing:0.16em; font-weight:bold;
-  color:rgba(234,255,249,0.28); text-align:center; padding:26px 0; }
+/* The house-rules heading. Its block used to share a grid cell with the dossier;
+   the dossier moved into the record, so this is plain copy in the second column. */
+.ps-brief-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold;
+  color:rgba(255,210,58,0.8); margin-bottom:6px; }
+/* The dossier's own styles are gone with the dossier: the stat rows live inside
+   the record as .eng-stats, and "Long, short, or hold? Work the questions." was
+   advice the floor gives better, in the place it applies. */
 
-/* MEASURE. At the panel's 940px this column ran ~965px of monospace per line,
-   which is roughly twice a comfortable read. The hero takes a fixed 250 and
-   this one is capped, so the copy stays in the 60-75ch band at every width. */
-.ps-open-copy { flex:1; min-width:0; max-width:62ch; align-self:flex-start;
+/* MEASURE. At the panel's full width this ran ~97ch of monospace per line, about
+   three times a comfortable read, which is why the framing copy and the house
+   rules sit side by side rather than one above the other: two ~45ch columns beat
+   one very long one, and they fill a band that a single column would leave half
+   empty. */
+.ps-open-copy { flex:1 1 300px; min-width:0; max-width:52ch; align-self:flex-start;
   overflow-wrap:anywhere; }
+.ps-open-aside { flex:1 1 250px; min-width:0; max-width:46ch; align-self:flex-start;
+  overflow-wrap:anywhere; border-left:2px solid rgba(255,210,58,0.3);
+  padding-left:12px; }
 .ps-open-eyebrow { font-size:10px; letter-spacing:0.18em; color:#ff5f9e; font-weight:bold; }
-.ps-open-name { font-size:24px; font-weight:bold; letter-spacing:0.06em; margin-top:6px; }
-.ps-open-sub { font-size:11px; letter-spacing:0.08em; color:rgba(234,255,249,0.5); margin-top:4px; }
-.ps-open-body { font-size:13px; line-height:1.5; margin-top:12px; }
+.ps-open-body { font-size:13px; line-height:1.5; margin-top:10px; }
 .ps-open-rule { font-size:13px; line-height:1.5; margin-top:9px; color:#ffd23a; }
+.ps-open-rule.sm { font-size:11.5px; line-height:1.5; margin-top:0; }
 .ps-open-rule b { color:#fff; }
 
-/* the other four, small, beneath the copy */
-.ps-tools { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;
-  margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,210,58,0.22); }
+/* THE DESK, FULL PANEL WIDTH — the third of three bands (columns, cast, action).
+   Inside the copy column it was 460px of a 756px panel, which left the five
+   portraits crowded on the right while the space under the record sat empty. Out
+   here it balances the two columns against each other AND gives a cast list the
+   wide row a cast list wants. */
+.ps-tools { flex-basis:100%; display:flex; gap:16px; align-items:flex-start;
+  flex-wrap:wrap;
+  margin-top:16px; padding-top:13px; border-top:1px solid rgba(255,210,58,0.22); }
+/* CENTRED, AND BIGGER (author: "maybe the analyst images could be larger and/or
+   centered"). Both, and they need each other: 52px portraits left-aligned under a
+   two-word label read as a footnote to the copy above them, and the band is not a
+   footnote — it is the cast, and the four of them are the interface for the next
+   four minutes. The label centres with the row so the band reads as one unit. */
+.ps-draw-row { justify-content:center; }
+.ps-draw-label { text-align:center; }
 .ps-tool-group { flex:none; }
 .ps-tool-hand { flex:1; min-width:0; padding-left:0; border-left:none; }
 .ps-draw-label { font-size:9px; letter-spacing:0.13em; color:rgba(255,210,58,0.8);
@@ -961,9 +968,9 @@ const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
 /* THE DESK, as people rather than card faces. Not buttons: on the briefing
    these introduce the four, and the sendable version is SeatRow on the floor.
    Fixed width so four tiles hold one row and the names can't ragged-wrap. */
-.ps-face { flex:none; width:84px; display:flex; flex-direction:column;
+.ps-face { flex:none; width:94px; display:flex; flex-direction:column;
   align-items:center; gap:4px; text-align:center; }
-.ps-face-pic { width:52px; height:52px; object-fit:cover; border-radius:50%;
+.ps-face-pic { width:66px; height:66px; object-fit:cover; border-radius:50%;
   border:1px solid rgba(47,214,214,0.35); background:#020f0d; }
 /* Two lines reserved for every name — "Detective Marisol" wraps and the other
    three don't, which put her role label a line below everyone else's. */
@@ -983,17 +990,37 @@ const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
 .ps-face-note { font-size:7.5px; letter-spacing:0.12em;
   color:rgba(191,238,222,0.5); margin-top:1px; }
 
-/* THE ARRIVAL — plate styles come from arrival's ARRIVAL_CSS, appended at the
-   end of this sheet. What's local to this surface is the skip target. */
+/* THE ARRIVAL — record styles come from engagement.jsx's ENGAGEMENT_CSS,
+   prepended to this sheet. What's local to this surface is the skip target. */
 .ps-skip-deal { position:absolute; inset:0; z-index:5; background:none; border:none;
   padding:0; cursor:pointer; }
-.ps-cta-row { display:flex; align-items:center; gap:14px; margin-top:6px; }
-.ps-cta-row .ps-lock { flex:1; width:auto; margin-top:0; }
+/* THE ONE BUTTON ON THE BRIEFING, and it was the most templated thing on a
+   screen that owns a blackletter sign and a neon window: a full-width hairline
+   rectangle. Scoped to this row so the shared .ps-lock (the call, the autopsy)
+   is untouched. */
+/* FULL PANEL WIDTH, as the third wrapped flex item. Sitting inside the copy
+   column it started 292px in from the panel's left edge, and since the record is
+   shorter than the copy the bottom-left quadrant was empty under it. One action
+   for the whole briefing should span the whole briefing. */
+.ps-cta-row { flex-basis:100%; display:flex; align-items:center; gap:14px;
+  margin-top:16px; }
+.ps-cta-row .ps-lock {
+  flex:1; width:auto; margin-top:0;
+  font-family:'Bebas Neue', Impact, sans-serif;
+  font-size:19px; letter-spacing:0.13em; padding:11px 13px;
+  color:#02100e; border:none;
+  background:linear-gradient(180deg,#ffe27a,#ffd23a 55%,#e8b620);
+  box-shadow:0 0 20px -4px rgba(255,210,58,.5), inset 0 1px 0 rgba(255,255,255,.5);
+  transition:filter .18s ease, box-shadow .18s ease;
+}
+.ps-cta-row .ps-lock:hover:not(:disabled) {
+  filter:brightness(1.09);
+  box-shadow:0 0 28px -2px rgba(255,210,58,.7), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.ps-cta-row .ps-lock:disabled { filter:saturate(.45) brightness(.8); cursor:default; }
 
 
-/* The deal is nameless until the agent is in (invariant 7). Sized the same in
-   both states so the reveal doesn't jump. */
-.ps-open-name.facedown { color:rgba(234,255,249,0.3); letter-spacing:0.14em; }
+/* .ps-open-name/.ps-open-sub are gone — the deal is named on the record, once. */
 
 .ps-panel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   width:min(520px, calc(100% - 40px)); background:rgba(2,16,14,0.95);
@@ -1079,7 +1106,7 @@ const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
   /* The reading column and the dock stop competing for the width and stack. */
   .ps-readcol { width:calc(100% - 36px); right:18px; max-height:38vh; }
   .ps-open { flex-direction:column; }
-  .ps-open-hero { align-self:center; }
+  .ps-open-aside { border-left:none; padding-left:0; }
   .ps-tool-hand { padding-left:0; border-left:none; }
   .ps-tools { flex-direction:column; gap:12px; }
   .ps-tool-who { border-right:none; padding-right:0; }

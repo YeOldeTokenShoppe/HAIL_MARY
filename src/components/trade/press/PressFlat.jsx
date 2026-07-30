@@ -14,8 +14,9 @@ import PressFigure from "./PressFigure";
 import { preloadSfx } from "@/lib/uiSfx";
 import gsap from "gsap";
 import {
-  EnigmaConsole, runArrival, prefersReducedMotion, SFX, ARRIVAL_CSS,
-} from "./arrival";
+  EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
+  ENGAGEMENT_CSS,
+} from "./engagement";
 import { createFlatEvidenceScreen } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
@@ -99,17 +100,17 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const [rolling, setRolling] = useState(false);
   const [settled, setSettled] = useState(false);
   const identity = rolled || settled;
-  const panelRef = useRef(null);
-  const lampRef = useRef(null);
-  const rotorRefs = useRef([]);
-  const nameRef = useRef(null);
-  const sheetRef = useRef(null);
+  const recordRef = useRef(null);
+  const shieldRef = useRef(null);
+  const clientRef = useRef(null);
+  const termsRef = useRef(null);
+  const stampRetainedRef = useRef(null);
+  const particularsRef = useRef(null);
   const scrollRef = useRef(null);
   const tlRef = useRef(null);
-  const registerRotor = useCallback((i, el) => { rotorRefs.current[i] = el; }, []);
 
   useEffect(() => { Object.values(SFX).forEach(preloadSfx); }, []);
-  useEffect(() => () => tlRef.current?.kill(), []);
+  useEffect(() => () => endArrival(tlRef.current), []);
 
   // NO AUTO-SCROLL AFTER THE ROLL. There used to be one: the deal laid out five
   // cards and the three question cards landed below the fold, so the column slid
@@ -124,18 +125,19 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     if (rolling || rolled) return;
     if (prefersReducedMotion()) { setSettled(true); setRolled(true); return; }
 
-    // Pin to the top first — the plate is up there, and an arrival you
+    // Pin to the top first — the record is up there, and an arrival you
     // scrolled past is a beat that may as well not have played.
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
 
     setRolling(true);
     const tl = runArrival({
-      panel: panelRef.current,
-      rotors: rotorRefs.current,
-      lamp: lampRef.current,
-      name: nameRef.current,
-      nameText: deal.name,
-      sheet: sheetRef.current,
+      record: recordRef.current,
+      shield: shieldRef.current,
+      client: clientRef.current,
+      clientText: deal.name,
+      terms: termsRef.current,
+      stampRetained: stampRetainedRef.current,
+      particulars: particularsRef.current,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -437,62 +439,48 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       {!started && (
         <div className={`pf-scroll${rolled ? " is-rolled" : ""}`} ref={scrollRef}
              onClick={skipRoll}>
-          <div className="pf-eyebrow">ONE DEAL ON THE TABLE</div>
-          {/* THE DECODE LANDS HERE. runArrival writes ciphertext into this node
-              and resolves it to deal.name; React renders the same string once
-              `identity` flips, so the re-render is a no-op. */}
-          <div className={`pf-name${identity ? "" : " facedown"}`} ref={nameRef}>
-            {identity ? deal.name : "\u259a\u259a\u259a\u259a\u259a\u259a\u259a\u259a"}
-          </div>
-          <div className="pf-sub">
-            {identity
-              ? `${deal.ticker} · ${deal.chain} · ${deal.surface.age} old · ${deal.surface.mcap}`
-              : "sent down from the desk above, still coded"}
-          </div>
+          {/* See the note on this line in PressSession — the top bar already
+              says "one deal", and "on the table" is left over from the cards. */}
+          <div className="pf-eyebrow">YOUR NEXT APPOINTMENT</div>
+          {/* THE PANEL NO LONGER NAMES THE DEAL HERE. A 20px headline, a subtitle
+              restating the ticker, and the sheet below all printed the same
+              instance — and the headline was the thing that animated, which put
+              the ceremony on the prose and left the object watching. The reveal is
+              the record's CLIENT line now. The block glyphs went with it: they
+              were one of five things on this screen saying "not yet". */}
 
-          {/* THE ARRIVAL. Picked fresh for this sitting; you can't ask for a
-              different one without leaving and coming back. */}
-          <div className="pf-roll">
-            <EnigmaConsole arrived={rolled} ref={panelRef}
-                           lampRef={lampRef} registerRotor={registerRotor} />
-            {/* ONLY IN THE ARRIVED STATE. While waiting, the console already
-                says AWAITING TRAFFIC — a caption repeating it put four near
-                identical waiting lines on one screen, which reads as stuck. */}
-            {rolled && (
-              <div className="pf-roll-cap">
-                SENT DOWN TO YOU · YOU DON&apos;T GET TO ASK WHY THIS ONE
-              </div>
-            )}
-          </div>
-
-          {/* The deal sheet, written in only once the agent is in. Every field
-              is public surface data and none of it correlates with the outcome
-              — asserted in the suite, because the moment the listing leaks the
-              answer the analysts stop mattering. */}
-          <div className={`pf-sheet${identity ? " in" : ""}`} ref={sheetRef}>
-            {identity ? (
-              <>
-                <div className="pf-sheet-h">PROSPECT</div>
-                <dl className="pf-sheet-stats">
-                  <div><dt>MCAP</dt><dd>{deal.surface.mcap}</dd></div>
-                  <div><dt>HOLDERS</dt><dd>{deal.surface.holders}</dd></div>
-                  <div><dt>AGE</dt><dd>{deal.surface.age}</dd></div>
-                  <div><dt>24H</dt><dd>{deal.surface.change24h}</dd></div>
-                  <div><dt>SOCIAL</dt><dd>{deal.surface.social}</dd></div>
-                </dl>
-              </>
-            ) : (
-              <div className="pf-sheet-blank">▚▚▚  DECODING PENDING</div>
-            )}
-          </div>
+          {/* THE RECORD. Picked fresh for this sitting; you can't ask for a
+              different one without leaving and coming back. See engagement.jsx
+              for the five props that held this slot before it, and why the sixth
+              is paperwork rather than another machine. */}
+          <EngagementRecord
+            arrived={identity}
+            client={identity ? deal.name : null}
+            surface={identity ? deal.surface : null}
+            ticker={identity ? deal.ticker : null}
+            chain={identity ? deal.chain : null}
+            ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
+            termsRef={termsRef} particularsRef={particularsRef}
+            stampRetainedRef={stampRetainedRef} />
+          {/* THE CAPTION IS GONE (author, 2026-07-29: "this line seems
+              unnecessary"). It read SENT DOWN TO YOU · YOU DON'T GET TO ASK WHY
+              THIS ONE, and it was load-bearing exactly once — against the dice,
+              where it was the one thing a randomiser could never say for itself:
+              who chose. A form that arrives ALREADY SIGNED does not raise the
+              question, so the answer stopped being needed. What was left was the
+              interface rebutting a complaint no player had made — the same
+              failure as the three elements that used to narrate the client's
+              absence. Both cuts are [A§20]. */}
 
 
-          {/* The pitcher is an outside agent on commission. This said "John
+          {/* The pitcher is an outside contractor on commission. This said "John
               Barron brought this one in — it's his deal" until 2026-07-29, when
-              the bot took over the selling and Barron joined the desk. */}
+              the bot took over the selling and Barron joined the desk; and then
+              "an agent is here for a client who didn't come", cut the same day for
+              pointing at the absence instead of the incentive (engagement.jsx). */}
           <p className="pf-copy">
-            An agent is here for a client who didn&apos;t come. It gets paid if you
-            fund this.
+            A pitch bot is here to present its client&apos;s deal. It works on
+            commission &mdash; it gets paid if you fund this.
           </p>
           <p className="pf-copy gold">
             You can interrupt <b>three times</b>. Whatever it can back lands on a
@@ -501,7 +489,9 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           {/* Portraits, not card faces. Not buttons either: on the briefing
               these introduce the four, and the sendable version of the same
               row is SeatRow on the floor. */}
-          <div className="pf-label">THE DESK — always these four, and the cat</div>
+          {/* See PressSession — "always these four" answered a question the
+              rotating-cast cut [A§17] deleted. */}
+          <div className="pf-label">YOUR ANALYSTS</div>
           <div className="pf-strip">
             {DESK_ORDER.map((m) => (
               <div key={m.id} className="pf-face">
@@ -524,18 +514,30 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               <span className="pf-face-note">NOT A SEAT</span>
             </div>
           </div>
-          <p className="pf-copy sm dim">
-            Everyone here will answer anything you ask. Each has <b>one</b> subject
-            they go deep on, and each answers <b>once</b>. Ask the wrong one and you
-            still get an answer — just the shallow one, and they&apos;re spent.
-          </p>
+          {/* THE SWAP CELL IS GONE. The dossier used to be a separate panel whose
+              REST state was a bordered box reading "DECODING PENDING", so it was
+              paired with the house rules in one grid area and cross-faded. The
+              particulars now live inside the record (author: "the pitch project is
+              in 2 separate boxes"), whose stat rows show —— from the start — so
+              nothing has an empty rest state and the rules are just copy. */}
+          <div className="pf-brief">
+            <div className="pf-brief-h">HOW YOUR ANALYSTS WORK</div>
+            <p className="pf-copy sm dim">
+              Every analyst will answer anything you ask. Each has <b>one</b>{" "}
+              subject they go deep on, and each answers <b>once</b>. Ask the
+              wrong one and you still get an answer &mdash; just the shallow one,
+              and they&apos;re spent.
+            </p>
+          </div>
 
           {/* ONE BUTTON — a LOCAL/DAILY split lived here briefly and was cut.
               See the note in instanceDeal.js. */}
           <div className="pf-cta-row">
             <button className="pf-btn primary" disabled={rolling}
                     onClick={rolled ? begin : runRoll}>
-              {rolled ? "HEAR THE PITCH ▸" : rolling ? "DECODING…" : "SEND IT IN ▸"}
+              {/* See the note on this line in PressSession — SEND IT IN was
+                  strange wording ("it" named nothing), [A§11] and [A§20]. */}
+              {rolled ? "HEAR THE PITCH ▸" : rolling ? "SIGNING…" : "TAKE THE MEETING ▸"}
             </button>
           </div>
         </div>
@@ -735,7 +737,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 // The lesson is the one pressUi.jsx's header already makes about state gating:
 // a surface can go a long way on a stylesheet it never actually included, as
 // long as its children are self-sizing.
-const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
+const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-wrap { position:absolute; inset:0; display:flex; flex-direction:column;
   background:#02100e; color:#eafff9; font-family:'Courier New', monospace;
   overflow:hidden;
@@ -754,9 +756,19 @@ const CSS = ARRIVAL_CSS + PRESS_UI_CSS + `
    at the end of the row: an unstyled 1px span in a block flow is invisible.
    Five tiles wrap on a narrow phone, which is fine — the cat wrapping onto its
    own line still reads as "and the cat", never as a fifth seat. */
-/* The ciphertext placeholder is unbreakable glyphs in a column that gets down to
-   ~266px, so it must be allowed to break. */
+/* Kept for the POST-DEAL pattern label, which is the only .pf-name left — the
+   briefing's headline was cut when the record took the reveal. Archetype labels
+   are long and this column gets down to ~266px. */
 .pf-name { overflow-wrap:anywhere; }
+
+/* The house rules, as plain copy. Their block used to share a grid cell with the
+   dossier; the dossier moved inside the record, so the cell went with it. */
+.pf-brief { border-left:2px solid rgba(255,210,58,0.3); padding-left:10px;
+  margin:12px 0 2px; }
+.pf-brief-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold;
+  color:rgba(255,210,58,0.8); margin-bottom:5px; }
+
+/* .pf-roll-cap went with the caption it styled. */
 .pf-strip { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 2px; min-width:0; }
 .pf-face { flex:0 1 72px; min-width:0; max-width:72px;
   display:flex; flex-direction:column;

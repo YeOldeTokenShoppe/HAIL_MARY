@@ -11,6 +11,18 @@ import { useFrame } from "@react-three/fiber";
 // Tunables (all live-editable as props from CyborgTempleScene):
 //   color, height, topRadius (flare at top), bottomRadius (at the beacon),
 //   opacity. All lengths are in the parent group's local units.
+//
+// opacityBoostRef / heightScaleRef — REFS, NOT PROPS, AND THAT IS THE WHOLE POINT.
+// The beam has to flare and rise on the frames the pitch bot is cast into it, which
+// means per-frame values. Routing them through props would re-render
+// CyborgTempleScene (~8700 lines, the entire room) once per frame for the length of
+// the cast — and `height` is worse than that, because the geometry useMemo is keyed
+// on it, so every frame would also rebuild a 36-segment cylinder. Scaling the mesh
+// costs nothing and rebuilds nothing.
+//
+// The fragment shader fades and flows on `uv.y`, so a Y scale compresses the
+// gradient with the geometry instead of sliding it — which is what a shorter beam
+// should look like. Checked before relying on it.
 function BeaconBeam({
   anchorRef,
   color = "#35e8ff",
@@ -19,6 +31,8 @@ function BeaconBeam({
   bottomRadius = 0.05,
   opacity = 0.5,
   yOffset = 0,
+  opacityBoostRef = null,
+  heightScaleRef = null,
 }) {
   const meshRef = useRef();
   const tmp = useRef(new THREE.Vector3());
@@ -90,15 +104,25 @@ function BeaconBeam({
 
   useFrame((state) => {
     material.uniforms.uTime.value = state.clock.elapsedTime;
+    // Re-applied every frame rather than on change, so it also restores itself
+    // when the boost goes back to 1 — and so the prop-sync effect below and this
+    // can't fight over the uniform.
+    const boost = opacityBoostRef?.current;
+    material.uniforms.uOpacity.value = opacity * (typeof boost === "number" ? boost : 1);
+    const hs = heightScaleRef?.current;
+    const hf = typeof hs === "number" && hs > 0 ? hs : 1;
     const m = meshRef.current;
     if (!m) return;
     if (anchorRef?.current && m.parent) {
       m.visible = true;
+      m.scale.y = hf;
       anchorRef.current.getWorldPosition(tmp.current);
       m.parent.worldToLocal(tmp.current);
-      // Cylinder is centered on its origin, so lift it by height/2 to seat the
-      // narrow (bottom) end on the beacon.
-      m.position.set(tmp.current.x, tmp.current.y + height / 2 + yOffset, tmp.current.z);
+      // Cylinder is centered on its origin, so lift it by half its CURRENT height to
+      // seat the narrow (bottom) end on the beacon. Using the authored height here
+      // would grow the shaft from its middle and sink its base through the
+      // projector — the scale has to be paid for in the position too.
+      m.position.set(tmp.current.x, tmp.current.y + (height * hf) / 2 + yOffset, tmp.current.z);
     } else {
       // Hide until the beacon is captured so it doesn't flash at the origin.
       m.visible = false;

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { mountPitchBot, tickPitchBotBillboard, disposePitchBotBillboard } from "@/lib/trade/pitchBotScene";
-import { tickPitchBotHolo, disposePitchBotHolo } from "@/lib/trade/pitchBotHolo";
+import {
+  tickPitchBotHolo, disposePitchBotHolo,
+  startPitchBotCast, cancelPitchBotCast, tickPitchBotCast,
+} from "@/lib/trade/pitchBotHolo";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
@@ -860,6 +863,12 @@ const CyborgTempleScene = ({
   const pitchStartedRef = useRef(false);
   useEffect(() => { pitchStartedRef.current = !!pitchStarted; }, [pitchStarted]);
   const [beamPresets, setBeamPresets] = useState(BEAM_PRESETS);
+  // Per-frame multipliers on the beam's authored opacity and height, written by the
+  // cast choreography and read inside BeaconBeam's own loop. Refs because props
+  // would re-render this entire component once per frame — and height would rebuild
+  // the cylinder geometry too. See the note on the props.
+  const beamBoostRef = useRef(1);
+  const beamHeightRef = useRef(1);
   // SAME LATCH AS THE PAYLOADS. pitchStarted is what hides the sign and shows the
   // bot, so deriving the shaft from it means the beam is never sized for whichever
   // one isn't currently in it.
@@ -2420,9 +2429,38 @@ const CyborgTempleScene = ({
    * Hidden for the curtain call too. The reveal choreographs FOUR characters
    * into a lineup at centre; a hologram floating over them is not in that plan.
    */
+  /* AND IT IS CAST, NOT SWITCHED ON.
+   *
+   * This was `visible = true` — the figure simply existed, mid-air, on the frame
+   * the floor began, while a projector beam it had no relationship to burned
+   * underneath it. §1 has said since the easel was cut that "the projector casts
+   * the bot, its beam is the only staging the pitcher gets"; the beam was staging
+   * nothing. Now the shaft strikes and the figure assembles up it, base to crown.
+   *
+   * THE ORDER IS THE POINT: beam first, then the body climbing out of it. See
+   * tickPitchBotCast for why cause-then-effect needs its own lead time, and
+   * pitchBotHolo's CAST block for why the wipe rides the bind pose.
+   *
+   * SHOWING IT IS NOT CONDITIONAL ON THE EFFECT WORKING. startPitchBotCast returns
+   * false if it cannot measure the geometry, and then the bot is simply visible —
+   * a projector flourish that fails must not take the pitch with it, which is the
+   * same rule mountPitchBot applies to a failed load. */
   useEffect(() => {
-    if (!pitchBotRef.current) return;
-    pitchBotRef.current.visible = !!pitchStarted && !revealMode;
+    const bot = pitchBotRef.current;
+    if (!bot) return;
+    const show = !!pitchStarted && !revealMode;
+    bot.visible = show;
+    if (!show) {
+      // Snap to fully formed while hidden, so anything that reveals the bot by
+      // another route (the curtain call ending, a future debug handle) never finds
+      // it half-assembled.
+      cancelPitchBotCast();
+      beamBoostRef.current = 1;
+      return;
+    }
+    // Reduced motion is handled inside startPitchBotCast, which returns false and
+    // leaves the bot plainly visible — same path as an unmeasurable rig.
+    startPitchBotCast(bot);
   }, [pitchStarted, revealMode, pitchBotReady]);
 
   /**
@@ -6673,6 +6711,12 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // lib/trade/pitchBotHolo's registry, which is empty until the bot loads, so
     // this is a no-op on every other /trade mode.
     tickPitchBotHolo(state.clock.elapsedTime);
+    // THE CAST rides this same clock rather than gsap's — one clock for the wipe
+    // and the beam flare, so they cannot drift, and no lagSmoothing to stretch a
+    // stalled frame into a crawl. Returns 1 while idle, so this is unconditional.
+    const cast = tickPitchBotCast(delta);
+    beamBoostRef.current = cast.opacity;
+    beamHeightRef.current = cast.height;
     // Face the camera, yaw only. No-op until the bot loads.
     tickPitchBotBillboard(state.camera);
 
@@ -8275,6 +8319,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                     topRadius={beam.topRadius}
                     bottomRadius={beam.bottomRadius}
                     opacity={beam.opacity}
+                    opacityBoostRef={beamBoostRef}
+                    heightScaleRef={beamHeightRef}
                   />
                 </>
               )}
