@@ -19,7 +19,11 @@
 // keying them separately keeps a stale value from one bleeding onto the other's
 // face when a new question interrupts mid-line.
 
-export const adviserMouth = { JB: 0, GR: 0 };
+// PB / MR / EU joined on 2026-07-29 when the VC game's press floor started
+// routing every seat through its own voice. They are inert until something reads
+// them — setAdviserMouth early-returns on an unknown key, so the analyser was
+// silently discarding those writes rather than failing loudly.
+export const adviserMouth = { JB: 0, GR: 0, MR: 0, EU: 0, PB: 0 };
 
 export function setAdviserMouth(who, v) {
   if (!(who in adviserMouth)) return;
@@ -28,6 +32,5 @@ export function setAdviserMouth(who, v) {
 
 /** Drop every mouth shut — used when a line is cut off or finishes. */
 export function resetAdviserMouths() {
-  adviserMouth.JB = 0;
-  adviserMouth.GR = 0;
+  for (const k of Object.keys(adviserMouth)) adviserMouth[k] = 0;
 }

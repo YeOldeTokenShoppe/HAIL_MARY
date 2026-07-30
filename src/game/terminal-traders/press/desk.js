@@ -35,10 +35,17 @@ export const PITCH_BOT = {
   // failure this whole refactor exists to fix. SeatRow still falls back to a
   // glyph if this is ever null; a borrowed face is never an acceptable fallback.
   portrait: "/pitchBot.webp",
+  voice: "PB",
   clips: { idle: "idle", talking: "talking" },
   blurb: "Paid if you fund it. Never met the founders either.",
 };
 
+// VOICE IS DESK DATA TOO, for the same reason as the portrait: both surfaces need
+// it and neither should own it. The key indexes VOICES in api/counsel-voice —
+// JB / MR / GR / EU for the seats, PB for the pitcher. Before this, the press
+// floor voiced EVERY line as the pitcher, so a press on Eugene came back in the
+// bot's voice reading Eugene's finding (author, 2026-07-29).
+//
 // PORTRAITS ARE DESK DATA, NOT SURFACE DATA. They used to be a `cardId` that
 // each surface resolved into a Genesis card face through dealCard.js. Cards
 // were cut from this game on 2026-07-28, so what a seat looks like is now just
@@ -51,7 +58,7 @@ export const DESK = {
   [SEATS.BARRON]: {
     id: SEATS.BARRON, agentId: "Demon", station: "demon",
     name: "John Barron", role: "THE CHART", lane: LANES.CHART,
-    portrait: "/thumbnail_johnBarron.png",
+    portrait: "/thumbnail_johnBarron.png", voice: "JB",
     // HE NO LONGER BRINGS THE DEAL IN. That was the sentence that made him both
     // adversary and seat, and it is the pitch bot's job now. What he is instead:
     // a tape reader, short-biased and vice-prone, which is a DISPOSITION the
@@ -62,19 +69,19 @@ export const DESK = {
   [SEATS.MARISOL]: {
     id: SEATS.MARISOL, agentId: "Detective", station: "marisol",
     name: "Detective Marisol", role: "THE MONEY", lane: LANES.CHAIN,
-    portrait: "/thumbnail_marisol.png",
+    portrait: "/thumbnail_marisol.png", voice: "MR",
     blurb: "Money movement, wallet ages, unlocks.",
   },
   [SEATS.GR80]: {
     id: SEATS.GR80, agentId: "Monk", station: "monk",
     name: "Saint GR80", role: "REPUTATION", lane: LANES.RECORD,
-    portrait: "/thumbnail_gr80.png",
+    portrait: "/thumbnail_gr80.png", voice: "GR",
     blurb: "What the documents actually say.",
   },
   [SEATS.EUGENE]: {
     id: SEATS.EUGENE, agentId: "RL80", station: "eugene",
     name: "Eugene", role: "THE STORY", lane: LANES.SOCIAL,
-    portrait: "/thumbnail_eugene.png",
+    portrait: "/thumbnail_eugene.png", voice: "EU",
     blurb: "Narrative, reputation, who vouches for whom.",
   },
 };

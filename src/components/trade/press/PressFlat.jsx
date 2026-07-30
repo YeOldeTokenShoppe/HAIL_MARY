@@ -232,6 +232,33 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     finally { if (sayToken.current === token) setSpeaking(false); }
   }, []);
 
+  /* ---- TWO VOICES PER PRESS ----
+     The seat that went and looked speaks FIRST, in ITS OWN voice; the pitcher
+     reacts after. VC_GAME.md §9 item 4 called the ordering out and warned what
+     happens if it is wrong — "the reaction lands under the wrong name" — and the
+     wrong version was worse than that: the floor voiced EVERY line as the
+     pitcher, so pressing Eugene came back as the bot reading Eugene's finding
+     (author, 2026-07-29).
+
+     One token spans BOTH utterances. If a press interrupts mid-turn, the guard
+     must cover the whole exchange or the abandoned adviser line clears `speaking`
+     while the new pitcher line is still playing. */
+  const sayTurn = useCallback(async (parts) => {
+    const live = parts.filter((p) => p && p.text);
+    if (!live.length) return;
+    const token = ++sayToken.current;
+    setSpeaking(true);
+    try {
+      for (const p of live) {
+        if (sayToken.current !== token) return;   // superseded — stop the chain
+        try { await speakAdviserLine(p.voice || VOICE, p.text); }
+        catch { /* voice is enrichment, never a gate on play */ }
+      }
+    } finally {
+      if (sayToken.current === token) setSpeaking(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!onFloor || !claim) return;
     say(claim.spin);
@@ -319,7 +346,16 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     // looking is allowed; it's the same forfeiting choice as not pressing.
     const owed = claim.id;
     revealFor.current = owed;
-    Promise.all([say(outcome.line), new Promise((r) => setTimeout(r, MIN_BEAT))])
+    Promise.all([
+      // Seat first in its own voice, then the pitcher reacting. The deferred
+      // reveal waits on the WHOLE exchange, so the board still changes only once
+      // the room has finished talking.
+      sayTurn([
+        { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays },
+        { voice: VOICE, text: outcome.barronSays },
+      ]),
+      new Promise((r) => setTimeout(r, MIN_BEAT)),
+    ])
       .then(() => {
         if (revealFor.current !== owed) return;   // you moved on; the beat is void
         revealFor.current = null;

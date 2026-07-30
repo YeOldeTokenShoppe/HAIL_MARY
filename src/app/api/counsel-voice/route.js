@@ -53,6 +53,26 @@ const VOICES = {
     // saint reports what the maxim yields; he doesn't perform it.
     settings: { stability: 0.85, similarity_boost: 0.6, style: 0.1 },
   },
+  // DETECTIVE MARISOL — voice id confirmed by the author 2026-07-29. This was
+  // VC_GAME.md §9's "one real blocker": the Detective had no voice at all, so any
+  // line of hers fell through to the 409 no_voice_for_speaker path and was silent.
+  MR: {
+    id: process.env.ELEVENLABS_VOICE_MARISOL || "jdWlEMh784XiUSTLzNso",
+    // Steady and unhurried — she reports what the chain says and doesn't sell it.
+    settings: { stability: 0.7, similarity_boost: 0.7, style: 0.25 },
+  },
+  // EUGENE — voice id confirmed by the author 2026-07-29.
+  //
+  // NOTE he already has a SEPARATE path on /trade: the unicorn speaks through
+  // playUnicornBeat with its own jaw-bone mouth (see lib/trade/unicornMouth). That
+  // path is for the in-room unicorn; this entry is for the VC game's press floor,
+  // which routes every seat through speakAdviserLine. If the two ever disagree on
+  // which id he uses, he changes voice depending on which surface you hear him on
+  // — the same trap GR80 hit between /main's layouts.
+  EU: {
+    id: process.env.ELEVENLABS_VOICE_EUGENE || "D11AWvkESE7DJwqIVi7L",
+    settings: { stability: 0.55, similarity_boost: 0.75, style: 0.4 },
+  },
   // THE PITCH BOT — the VC game's pitcher (voice id confirmed by the author
   // 2026-07-29). It is the thing you press, not a member of the desk; see
   // PITCHER in game/terminal-traders/press/questions.js.
@@ -84,7 +104,7 @@ export async function POST(request) {
     return Response.json({ error: "bad json" }, { status: 400 });
   }
 
-  const speaker = ["GR", "OL", "PB"].includes(body?.speaker) ? body.speaker : "JB";
+  const speaker = ["GR", "OL", "PB", "MR", "EU"].includes(body?.speaker) ? body.speaker : "JB";
   // Her id is looked up from the apparition KEY the client names — the same
   // source the SitePal player reads, so the fallback sounds like the same
   // person. Unknown or missing key falls back to ORACLE_VOICE, which is also

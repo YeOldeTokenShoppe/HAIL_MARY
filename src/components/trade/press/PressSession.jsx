@@ -11,6 +11,8 @@ import {
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
+import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
+import { setUnicornGlow } from "@/lib/trade/unicornGlow";
 import {
   EnigmaConsole, runArrival, prefersReducedMotion, SFX, ARRIVAL_CSS,
 } from "./arrival";
@@ -61,6 +63,10 @@ const PITCHER_AGENT = "PitchBot";
 // screen for a face, not a SitePal mesh, so it takes exactly the audio path the
 // flat surface already proved.
 const VOICE = "PB";
+
+// Minimum time any one utterance holds the camera. Only bites when audio is
+// unavailable — see the note in sayTurn.
+const MIN_DWELL_MS = 900;
 const SPEAKER_STATION = "demon";  // -> __screen2Canvas (SCREEN_TARGETS in evidenceScreen.js)
 const READ_MS = 4200;             // how long a claim holds the floor before it can land
 
@@ -256,24 +262,92 @@ export default function PressSession({
      room back to a non-speaking idle for the whole answer. Only the newest
      utterance may say it has stopped. (Learned on PressFlat; ported verbatim.) */
   const sayToken = useRef(0);
-  const say = useCallback(async (text) => {
-    if (!text) return;
-    const token = ++sayToken.current;
-    setSpeaking(true);
-    try { await speakAdviserLine(VOICE, text); }
-    catch { /* voice is enrichment, never a gate on play */ }
-    finally { if (sayToken.current === token) setSpeaking(false); }
-  }, []);
 
-  // A claim takes the floor -> it speaks the spin.
+  // ONE SPEECH PATH. A second helper lived here — a single-utterance `say` calling
+  // speakAdviserLine directly — and it survived the two-voice rewrite as the
+  // claim-spin caller. Two functions both claiming `sayToken` and both flipping
+  // `speaking` is the exact shape the token guard exists to prevent, so the spin
+  // now goes through sayTurn as a one-part turn. It gets the camera handover free.
+
+  // A claim takes the floor -> it speaks the spin, from the pitcher's own frame.
   useEffect(() => {
     if (!onFloor || !claim) return;
-    say(claim.spin);
-    return () => { try { stopAdviserAudio(); } catch {} };
+    sayTurn([{ voice: VOICE, text: claim.spin, agent: PITCHER_AGENT }]);
+    return () => { try { stopAdviserAudio(); } catch {} try { stopUnicornBeat(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onFloor, run.claimIndex]);
 
-  useEffect(() => () => { try { stopAdviserAudio(); } catch {} }, []);
+  useEffect(() => () => {
+    try { stopAdviserAudio(); } catch {}
+    try { stopUnicornBeat(); } catch {}
+  }, []);
+
+  /* ---- TWO VOICES PER PRESS ----
+     The seat that went and looked speaks FIRST, in ITS OWN voice; the pitcher
+     reacts after. VC_GAME.md §9 item 4 called the ordering out and warned what
+     happens if it is wrong — "the reaction lands under the wrong name" — and the
+     wrong version was worse than that: the floor voiced EVERY line as the
+     pitcher, so pressing Eugene came back as the bot reading Eugene's finding
+     (author, 2026-07-29).
+
+     One token spans BOTH utterances. If a press interrupts mid-turn, the guard
+     must cover the whole exchange or the abandoned adviser line clears `speaking`
+     while the new pitcher line is still playing. */
+  /**
+   * ONE LINE, ROUTED TO WHICHEVER MOUTH THAT CHARACTER ACTUALLY HAS.
+   *
+   * EUGENE IS THE EXCEPTION, and it is not an arbitrary one: on this surface he is
+   * the glTF unicorn in the room, and his lip-sync is a JAW BONE driven by
+   * playUnicornBeat's RMS analyser through lib/trade/unicornMouth. Clicking him in
+   * the lobby has always run that path; the press floor was routing him through
+   * speakAdviserLine instead, which writes `adviserMouth.EU` — a channel nothing
+   * in this scene reads. So he spoke in-game with a closed mouth while the very
+   * same character moved his jaw fine one screen earlier (author, 2026-07-29).
+   *
+   * Everyone else has no rig here (the analysts are static in-room and the pitcher
+   * has a screen for a face), so speakAdviserLine is right for them.
+   *
+   * DELIBERATELY DESKTOP-ONLY. PressFlat has no unicorn — no 3D at all — so it
+   * keeps speakAdviserLine for Eugene. This is a presentation difference, not a
+   * rule, which is exactly the kind of thing §6 says belongs in the surface.
+   */
+  const speakLine = useCallback(async (voice, text) => {
+    if (voice === "EU") {
+      // Same hooks the lobby passes, so the horn glow comes along with the jaw.
+      await playUnicornBeat({ line: text }, { setGlow: setUnicornGlow });
+      return;
+    }
+    await speakAdviserLine(voice, text);
+  }, []);
+
+  const sayTurn = useCallback(async (parts) => {
+    const live = parts.filter((p) => p && p.text);
+    if (!live.length) return;
+    const token = ++sayToken.current;
+    setSpeaking(true);
+    try {
+      for (const p of live) {
+        if (sayToken.current !== token) return;   // superseded — stop the chain
+        // THE CAMERA FOLLOWS THE VOICE, NOT THE PRESS. It used to cut to whoever
+        // answered and then sit there while the PITCHER replied — so you watched
+        // Eugene's back through the agent's whole line (author, 2026-07-29). Each
+        // utterance owns the frame while it plays, which is what "on a press it's
+        // the camera that crosses the room" was always supposed to mean.
+        if (p.agent) onFocusAgent?.(p.agent);
+        const startedAt = Date.now();
+        try { await speakLine(p.voice || VOICE, p.text); }
+        catch { /* voice is enrichment, never a gate on play */ }
+        // A DWELL FLOOR, because the camera move is now tied to audio that may
+        // not arrive. With no API key speakLine resolves almost instantly and the
+        // two cuts collapse into one strobe across the desk; the shot has to hold
+        // long enough to read as a shot even in silence.
+        const left = MIN_DWELL_MS - (Date.now() - startedAt);
+        if (left > 0) await new Promise((r) => setTimeout(r, left));
+      }
+    } finally {
+      if (sayToken.current === token) setSpeaking(false);
+    }
+  }, [onFocusAgent, speakLine]);
 
   /* ---- actions ---- */
   // One path, four seats. Every seat can be sent at every claim — the lane
@@ -299,11 +373,16 @@ export default function PressSession({
         : `${seatMeta(outcome.seat).name} — ${seatMeta(outcome.seat).role}`,
     });
 
-    // IT REACTS OUT LOUD. Only the pitcher's line is voiced: the adviser half is
-    // rendered but silent on both surfaces, so the two-voices-per-press ordering
-    // in VC_GAME.md §9 item 4 is still unbuilt. When it lands the SEAT speaks
-    // first and the pitcher answers, or the reaction arrives under the wrong name.
-    say(outcome.barronSays);
+    // The seat reports in its own voice on its own camera, then the pitcher
+    // reacts on his. Order matters, and so does the handover.
+    sayTurn([
+      {
+        voice: seatMeta(outcome.seat)?.voice,
+        text: outcome.adviserSays,
+        agent: seatMeta(outcome.seat)?.agentId,
+      },
+      { voice: VOICE, text: outcome.barronSays, agent: PITCHER_AGENT },
+    ]);
 
     // THE ANSWER LANDS ON WHOEVER WENT AND GOT IT — on their own monitor, in
     // the room. That's the whole reason this design is worth the four seats:
@@ -314,12 +393,10 @@ export default function PressSession({
     else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
     else board?.stayBlack();
 
-    // Fly to whoever answered. Asking a seat is a cut across the desk; pressing
-    // the pitcher is not a cut at all — it has no workstation and no agentId, so
-    // the camera holds where it is rather than throwing on a missing DESK entry.
-    const answeredBy = seatMeta(outcome.seat)?.agentId;
-    if (answeredBy) onFocusAgent?.(answeredBy);
-  }, [run, deal, claim, onFloor, onFocusAgent]);
+    // NO CUT HERE ANY MORE. This fired once, to whoever answered, and then the
+    // camera stayed put for the rest of the exchange. sayTurn owns the frame
+    // during a press because it is the only thing that knows who is talking.
+  }, [run, deal, claim, onFloor, sayTurn]);
 
   const advance = useCallback(() => {
     setFlash(null);

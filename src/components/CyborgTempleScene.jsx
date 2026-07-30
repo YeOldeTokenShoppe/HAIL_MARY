@@ -49,13 +49,32 @@ export const AGENT_CAMERA_SETTINGS = {
     lookAtPos: new THREE.Vector3(1.87, -1.35, 0.745),
     orbitCenter: null,
   },
-  // THE PITCH BOT — the VC game's pitcher. PLACEHOLDER POSE: tune with ?tune=1
-  // (CameraTuningPanel) or by editing here. The externalFocusAgent switch needs
-  // no case for it — that switch ends in `default: break` and the pose is
-  // resolved from this table.
+  // THE PITCH BOT — BOOTSTRAP ONLY. The real pose is derived from the bot's face
+  // plate at focus time (getPitchBotFocusSettings in CyborgTempleScene); this is
+  // just what gets used if focus fires before the model has landed.
+  //
+  // Static coordinates went stale three times on this character because it moves —
+  // rescaled twice, raised once — so do not treat these as the source of truth.
+  //
+  // MEASURED, not guessed. The first pass aimed lookAtPos at y = -0.55 and the
+  // camera flew to a patch of floor about a unit BELOW the bot, because the bot
+  // was raised to float after that pose was written and nothing re-derived it.
+  //
+  // The datum is the FACE PLATE at world y ~= 0.45. Do not use the body's
+  // bounding box: SM_Chr_Kid_Robot_01 is a SkinnedMesh, so geometry.boundingBox
+  // is its BIND POSE and ignores the skeleton entirely — measuring that way
+  // reported the figure as 0.07 units wide. The face plate is unskinned, so its
+  // world position is real. The bot spans roughly y 0.0 -> 0.5.
+  //
+  // Aimed slightly below the face so the head sits in the upper third of frame,
+  // and z kept at 1.6 (a distance already known to clear the monitors — the
+  // desks sit down at y ~= -1.2, so this shot passes well above them).
+  //
+  // Both vectors are plain WORLD coordinates: they go straight into
+  // controls.setLookAt(camX, camY, camZ, targetX, targetY, targetZ).
   PitchBot: {
-    cameraPos: new THREE.Vector3(0, -0.3, 1.6),
-    lookAtPos: new THREE.Vector3(0, -0.55, 0),
+    cameraPos: new THREE.Vector3(0, 0.45, 1.6),
+    lookAtPos: new THREE.Vector3(-0.06, 0.33, 0.06),
     orbitCenter: null,
   },
   // Detective — placeholder cameraPos/lookAtPos. Tune via the in-app
@@ -187,6 +206,28 @@ export const SHOW_HOLOGRAM_CARD = false;
        __pitchBeamTune({ height: 0.28 })            // the active preset
        __pitchBeamTune({ height: 0.6 }, 'neon')     // name one explicitly
 */
+/* HOW THE PITCH BOT IS FRAMED when the camera flies to it.
+ *
+ * The pose itself is DERIVED at focus time from the bot's face plate (see
+ * getPitchBotFocusSettings) rather than authored, because this character moves and
+ * static coordinates went stale on it three times. These are the three numbers
+ * that shape that derivation — the only part worth tuning by hand.
+ *
+ * Dial live and see it immediately (the handle re-fires the focus):
+ *
+ *     __pitchBotFrame({ dist: 1.0, aimDrop: 0.09 })
+ *     __pitchBotFrame()                 // read current + the derived pose
+ */
+export const PITCH_BOT_FRAMING = {
+  // How far back the camera sits, in world units. Smaller = tighter.
+  dist: 0.85,
+  // How far BELOW the face to aim, so the head sits high in frame rather than    
+  // dead centre.
+  aimDrop: 0.2,
+  // Camera lift relative to the face. Near zero = eye level; positive looks down.
+  camLift: -0.1,
+};
+
 const BEAM_BASE = { color: "#35e8ff", topRadius: 0.10, bottomRadius: 0.03, opacity: 0.1 };
 export const BEAM_PRESETS = {
   // Lobby: rises into the neon sign. The original 0.55, which was authored for it.
@@ -797,6 +838,27 @@ const CyborgTempleScene = ({
   const [focusTarget, setFocusTarget] = useState(null);
   // Beam presets as STATE, not constants, purely so they can be tuned by eye
   // without a reload — BeaconBeam rebuilds its geometry from these props.
+  // THE BOT ARRIVES ON ITS OWN GLTF REQUEST, which resolves after the temple's, so
+  // effects that stage it must depend on THIS rather than on loadedModel — a late
+  // arrival would otherwise miss state that was already set (the visibility effect
+  // had exactly that hole: land after pitchStarted flipped and it stayed hidden).
+  //
+  // DECLARED HERE, NOT BESIDE pitchBotRef further down, and the distinction cost a
+  // white screen: a ref read inside an effect BODY is fine at any position because
+  // the body runs after render, but anything named in a DEPS ARRAY is evaluated
+  // DURING render — so a const declared below the effect is in its TDZ and throws
+  // "Cannot access 'pitchBotReady' before initialization". Not a compile error;
+  // only the browser shows it.
+  const [pitchBotReady, setPitchBotReady] = useState(false);
+  // Framing knobs as a REF: read inside the deriver, patched by __pitchBotFrame.
+  // A ref rather than state so a nudge doesn't rebuild the deriver callback and
+  // strand the focus effect on a stale copy of it.
+  const framingRef = useRef(PITCH_BOT_FRAMING);
+  // Mirrored for the externalFocusAgent switch, whose deps are
+  // [externalFocusAgent, isMobile, detectedMobile] — the prop itself would be a
+  // stale closure in there.
+  const pitchStartedRef = useRef(false);
+  useEffect(() => { pitchStartedRef.current = !!pitchStarted; }, [pitchStarted]);
   const [beamPresets, setBeamPresets] = useState(BEAM_PRESETS);
   // SAME LATCH AS THE PAYLOADS. pitchStarted is what hides the sign and shows the
   // bot, so deriving the shaft from it means the beam is never sized for whichever
@@ -1933,17 +1995,30 @@ const CyborgTempleScene = ({
     }
 
     switch (externalFocusAgent) {
+      // THE VC PITCH SUPPRESSES EVERY LOBBY BEHAVIOUR ON THESE THREE SEATS.
+      //
+      // Each of them owns a published SitePal scene, and those scenes AUTO-PLAY a
+      // bound greeting when projected — page.js has had stray-auto-greeting
+      // suppression for exactly that. During a pitch the press floor is already
+      // speaking them through ElevenLabs, so projecting SitePal put TWO streams of
+      // the same character on top of each other: Barron's lobby "Welcome to the
+      // Liminal Terminal…" over his in-game answer (author, 2026-07-29).
+      //
+      // gameStartedRef CANNOT carry this. It is held until START in GameOverlay,
+      // a flow the VC game never shows, so every "lobby only" guard in this file
+      // silently leaks into the pitch. That has now caused three separate bugs;
+      // pitchStartedRef is the signal that actually knows.
       case 'Monk':
         monkFocusedRef.current = true;
         if (monkWaveStateRef.current) {
           monkWaveStateRef.current.hasBeenFocused = true;
           monkWaveStateRef.current.attentionActive = false;
         }
-        activateSitePalProjection('Monk');
+        if (!pitchStartedRef.current) activateSitePalProjection('Monk');
         break;
       case 'Demon': {
         demonFocusedRef.current = true;
-        activateSitePalProjection('Demon');
+        if (!pitchStartedRef.current) activateSitePalProjection('Demon');
         // Kick off the idle → pointing → typing sequence. This path is the
         // single source of truth for both desktop click and touch tap;
         // handleClick no longer runs it inline. Pass the authored cameraPos
@@ -1960,7 +2035,9 @@ const CyborgTempleScene = ({
         //
         // Read through gameStartedRef, not the `gameStarted` prop — this effect
         // doesn't list it in its deps, so the closed-over value goes stale.
-        if (!gameStartedRef.current) {
+        // ...and the pointing sequence is lobby-only for the same reason: during a
+        // pitch he is a specialist reporting a finding, not a host greeting you.
+        if (!gameStartedRef.current && !pitchStartedRef.current) {
           const demonResolved = resolveAgentSettings('Demon', isMobile || detectedMobile);
           startDemonFocusSequence(demonResolved?.cameraPos || null);
         }
@@ -1968,7 +2045,7 @@ const CyborgTempleScene = ({
       }
       case 'Detective':
         detectiveFocusedRef.current = true;
-        activateSitePalProjection('Detective');
+        if (!pitchStartedRef.current) activateSitePalProjection('Detective');
         break;
       case 'RL80':
         rl80FocusedRef.current = true;
@@ -1989,7 +2066,9 @@ const CyborgTempleScene = ({
       const isOnMobile = isMobile || detectedMobile;
       const resolved = externalFocusAgent === 'Fluffy'
         ? (getCatFocusSettings() || resolveAgentSettings('Fluffy', isOnMobile))
-        : resolveAgentSettings(externalFocusAgent, isOnMobile);
+        : externalFocusAgent === 'PitchBot'
+          ? (getPitchBotFocusSettings() || resolveAgentSettings('PitchBot', isOnMobile))
+          : resolveAgentSettings(externalFocusAgent, isOnMobile);
       if (!resolved) return prev;
       return {
         position: resolved.cameraPos,
@@ -2344,7 +2423,116 @@ const CyborgTempleScene = ({
   useEffect(() => {
     if (!pitchBotRef.current) return;
     pitchBotRef.current.visible = !!pitchStarted && !revealMode;
-  }, [pitchStarted, revealMode, loadedModel]);
+  }, [pitchStarted, revealMode, pitchBotReady]);
+
+  /**
+   * THE PITCH BOT'S FOCUS POSE, DERIVED AT FOCUS TIME.
+   *
+   * Authored coordinates kept going stale on this one character, because unlike
+   * the four analysts it MOVES: it has been rescaled twice, raised once and had
+   * its payload cut, and every one of those left the hand-written pose aiming at
+   * the floor where the bot used to be. The last version pointed a full unit
+   * below it.
+   *
+   * So read the bot instead. The datum is the FACE PLATE, not the body: the body
+   * is a SkinnedMesh whose geometry.boundingBox is its BIND POSE and ignores the
+   * skeleton entirely — measuring that way reports the figure as 0.07 units wide.
+   * The plate is unskinned, so its world position is true.
+   *
+   * Approaching straight down +Z is safe rather than arbitrary: the bot is
+   * BILLBOARDED, so it turns to face wherever the camera ends up. There is no
+   * "front" to respect.
+   *
+   * Returns null before the model lands, and the caller falls back to the
+   * authored pose in AGENT_CAMERA_SETTINGS — which is now only a bootstrap.
+   */
+  const getPitchBotFocusSettings = useCallback(() => {
+    const bot = pitchBotRef.current;
+    if (!bot) return null;
+    let face = null;
+    bot.traverse((o) => { if (o.isMesh && /Face/i.test(o.name)) face = o; });
+    if (!face) return null;
+    bot.updateWorldMatrix(true, true);
+    const at = new THREE.Vector3();
+    face.getWorldPosition(at);
+    // Framing numbers come from a REF, not the closure, so __pitchBotFrame can
+    // change them without this callback being rebuilt (and without the focus
+    // effect that captured it going stale).
+    const f = framingRef.current;
+    const dy = (isMobile || detectedMobile) ? (MOBILE_CAMERA_OFFSET.y || 0) : 0;
+    return {
+      cameraPos: new THREE.Vector3(at.x, at.y + f.camLift + dy, at.z + f.dist),
+      lookAtPos: new THREE.Vector3(at.x, at.y - f.aimDrop + dy, at.z),
+      orbitCenter: null,
+    };
+  }, [isMobile, detectedMobile]);
+
+  // Tuning handles. __pitchBotFrame RE-FIRES THE FOCUS, which is the part that
+  // matters: changing the numbers alone does nothing visible, because the camera
+  // only reads them when a focus transition starts.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const readback = () => {
+      const r = getPitchBotFocusSettings();
+      return {
+        ...framingRef.current,
+        cameraPos: r ? r.cameraPos.toArray().map((v) => +v.toFixed(3)) : null,
+        lookAtPos: r ? r.lookAtPos.toArray().map((v) => +v.toFixed(3)) : null,
+      };
+    };
+    window.__pitchBotFocus = readback;
+    window.__pitchBotFrame = (patch = {}) => {
+      framingRef.current = { ...framingRef.current, ...patch };
+      const r = getPitchBotFocusSettings();
+      if (r) {
+        // A fresh object every time, so the fly-to actually re-runs — the focus
+        // effect bails when the agentId is unchanged, and this deliberately does
+        // not.
+        setFocusTarget({
+          position: r.cameraPos,
+          lookAt: r.lookAtPos,
+          orbitCenter: null,
+          fov: (isMobile || detectedMobile) ? 75 : undefined,
+          agentId: 'PitchBot',
+          agentName: 'PitchBot',
+        });
+      }
+      return readback();
+    };
+    return () => { delete window.__pitchBotFocus; delete window.__pitchBotFrame; };
+  }, [getPitchBotFocusSettings, isMobile, detectedMobile]);
+
+  /* TALKING WHILE IT TALKS, IDLE OTHERWISE.
+   *
+   * Two clips, so there is nothing to schedule — `speechActive` picks one.
+   * /trade feeds that from PressSession's real audio state (page.js:3953,
+   * `pressMode ? pressSpeaking : speechActive`), which is why PressSession had to
+   * stop pinning it true for the whole floor: on the old signal this would have
+   * run `talking` for four unbroken minutes.
+   *
+   * ITS OWN EFFECT, not the shared applyCharacterFocusAnimation path. That one
+   * matches clips through per-character regex tables built around this room's
+   * typing/idle vocabulary (`typing_monk`, `detective_idle`, `cat_sitting_idle`);
+   * the bot's clips are plainly `idle` and `talking` and would match none of them.
+   * Twelve explicit lines beat a sixth entry in a table that means something else.
+   *
+   * Crossfaded rather than swapped: an utterance ends every few seconds, and a
+   * hard cut on each one reads as a stutter.
+   */
+  useEffect(() => {
+    const actions = actionsRef.current?.PitchBot;
+    if (!actions) return;
+    const wantTalking = !!speechActive;
+    const to = wantTalking ? actions.talking : actions.idle;
+    const from = wantTalking ? actions.idle : actions.talking;
+    if (!to) return;
+    const FADE = 0.28;
+    to.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(FADE).play();
+    if (from && from !== to) from.fadeOut(FADE);
+    if (pitchBotAnimStateRef.current) {
+      pitchBotAnimStateRef.current.currentAnimation = wantTalking ? "talking" : "idle";
+    }
+  }, [speechActive, pitchBotReady]);
 
   /* NEON VISIBILITY — decor yields to whatever is at centre stage.
    *
@@ -3580,7 +3768,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         parent: templeScene,
         mixersRef,
         actionsRef,
-        onReady: (bot) => { pitchBotRef.current = bot; },
+        onReady: (bot) => { pitchBotRef.current = bot; setPitchBotReady(true); },
       });
 
       // Helper function to clean animation tracks - only remove truly problematic tracks
