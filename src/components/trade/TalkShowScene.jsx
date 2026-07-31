@@ -1036,10 +1036,23 @@ function TalkShowModel({
     const host = document.createElement("div");
     host.id = TALK_SHOW_PORTAL_HOST_ID;
     Object.assign(host.style, {
+      // ONSCREEN at left:0 — NOT off at -10000px, which is what this was and
+      // what broke iPad. WebKit throttles a subframe outside the viewport to
+      // ~0.1fps, so SitePal kept playing audio while its canvas sat on its
+      // last painted frame: face visible, lips still. Chrome is lenient
+      // enough that desktop never showed it. Same rule (and the same
+      // opacity 0.01 + pointerEvents:none + zIndex:-1 cloak) as the temple's
+      // shared host in app/trade/page.js — it sits BEHIND the 3D canvas, so
+      // being onscreen costs nothing visually.
       position: "fixed",
-      left: "-10000px",
+      left: "0",
       top: "0",
-      width: "600px",
+      // Wide enough for BOTH portals side by side. They used to stack
+      // vertically inside a 600×800 box with overflow:hidden, which clipped
+      // the second one out of the layout — the same "not really onscreen"
+      // hazard by a different route. `display:flex` keeps them in a row.
+      display: "flex",
+      width: "1200px",
       height: "800px",
       overflow: "hidden",
       opacity: "0.01",
@@ -1120,6 +1133,9 @@ function TalkShowModel({
       frame.style.border = "0";
       frame.style.width = "600px";
       frame.style.height = "800px";
+      // Don't let a narrow viewport shrink either portal to nothing — the
+      // canvas we sample every frame is the one this iframe paints.
+      frame.style.flex = "0 0 600px";
       frame.src =
         `/sitepal-portal.html?acc=${SITEPAL_ACCOUNT}` +
         `&scene=${cfg.sceneId}` +
