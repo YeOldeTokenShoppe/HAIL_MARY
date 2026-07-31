@@ -22,14 +22,16 @@
 // start back-to-back from one user gesture.
 import React, { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { SITEPAL_PROJECTION_CONFIG } from "@/components/CyborgTempleScene";
 
 // Version the URL when the Blender export changes so drei does not keep an
 // older GLTF from its in-memory cache during hot reloads.
-const MODEL_URL = "/models/talk_show.glb?v=20260725-nla";
+const MODEL_URL = "/models/talk_show.glb?v=20260731-camrig";
+// World up, for the camera prop's pan.
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const SITEPAL_ACCOUNT = "9308752";
 const TALK_SHOW_PORTAL_HOST_ID = "talk-show-sitepal-portals";
 
@@ -39,8 +41,10 @@ const TALK_SHOW_AUDIO = {
   Monk: "talk show test GR80",
 };
 
-// talk_show.glb is Draco-compressed (+ WebP textures); point drei at the
-// bundled decoder instead of the gstatic CDN so it works offline / under CSP.
+// Point drei at the bundled Draco decoder instead of the gstatic CDN so it
+// works offline / under CSP. NOTE: the 2026-07-31 re-export dropped Draco
+// (3.4MB → 7MB; textures are still WebP) — this stays wired so re-enabling
+// compression on the next export needs no code change.
 const DRACO_PATH = "/draco/";
 
 // Each character gets the pose-2 breathing idle plus the pose-2 reaction
@@ -110,6 +114,14 @@ const TEST_LINE_STARTS = [
   31.92, 35.24, 39.6, 44.64, 48.88, 55.84,
 ];
 
+// Seconds between the performance clock starting and the first WORD. Those
+// line starts come from ElevenLabs' voice_segments, but the clock is stamped
+// when sayAudio() is called — and SitePal reports the track as started within
+// ~150ms, so the difference is dead air at the head of the uploaded tracks.
+// Everything on the timeline (camera shots, reaction cues, listener gazes)
+// reads through this, so it stays in sync. Trim by ear via `window.__tsTiming`.
+export const TALK_SHOW_TIMING = { leadIn: 2.5 };
+
 // Procedural listener gaze is applied after the animation mixer, so it layers
 // over breathing and reaction clips without needing separate look-at actions.
 const LISTENER_GAZE_YAW = {
@@ -169,6 +181,54 @@ const TALK_SHOW_CUES = TALK_SHOW_CUE_DEFS
     at: TEST_LINE_STARTS[cue.line] + cue.offset,
   }))
   .sort((a, b) => a.at - b.at);
+
+// ── Camera direction ──────────────────────────────────────────────────────
+// Who holds each line. DIRECT_ADDRESS_GAZES names the LISTENER — the one who
+// turns to face the speaker — so the speaker is the other character. Lines
+// with no listener turn are played to the room; both are Barron's (his intro
+// already aims his head at the viewer camera, and line 5 lays out the choice).
+const AUDIENCE_LINE_SPEAKERS = { 0: "Barron", 5: "Barron" };
+
+const LINE_SPEAKERS = (() => {
+  const opposite = { Barron: "Monk", Monk: "Barron" };
+  const speakers = TEST_LINE_STARTS.map(() => null);
+  DIRECT_ADDRESS_GAZES.forEach((cue) => {
+    speakers[cue.line] = opposite[cue.listener];
+  });
+  Object.entries(AUDIENCE_LINE_SPEAKERS).forEach(([line, actor]) => {
+    speakers[line] = actor;
+  });
+  return speakers;
+})();
+
+// The set has ONE camera, so a "cut" is a physical pan — the director commits
+// to a shot per line rather than chasing every exchange. Singles on the
+// speaker, pulling back to the two-shot for the lines played to the room and
+// whenever the exchange has sat on singles too long. `subject: null` = wide.
+const SHOT_AUDIENCE_LINES = new Set(Object.keys(AUDIENCE_LINE_SPEAKERS).map(Number));
+const SHOT_MAX_SINGLES = 3;
+// An operator reacts to a line instead of anticipating it, and won't whip off
+// a shot they only just landed — short lines play out as reaction shots on
+// whoever the camera is already holding.
+const SHOT_REACTION_DELAY = 0.3;
+const SHOT_MIN_HOLD = 2.6;
+
+const TALK_SHOW_SHOTS = (() => {
+  const shots = [{ at: 0, subject: null }];
+  let singles = 0;
+  TEST_LINE_STARTS.forEach((start, line) => {
+    const speaker = LINE_SPEAKERS[line];
+    const wide =
+      !speaker || SHOT_AUDIENCE_LINES.has(line) || singles >= SHOT_MAX_SINGLES;
+    const subject = wide ? null : speaker;
+    singles = wide ? 0 : singles + 1;
+    const at = start + SHOT_REACTION_DELAY;
+    const prev = shots[shots.length - 1];
+    if (prev.subject === subject || at - prev.at < SHOT_MIN_HOLD) return;
+    shots.push({ at, subject });
+  });
+  return shots;
+})();
 
 // ── SitePal crop / filter for the talk-show faces ──────────────────────────
 // SEPARATE from the temple's DEMON/MONK crops — these are different meshes
@@ -273,6 +333,410 @@ function paintCrop(st, cfg, source) {
   if (st.texture) st.texture.needsUpdate = true;
 }
 
+// ── In-scene camera monitor ───────────────────────────────────────────────
+// `Camera_Screen` is the flip-out monitor on the tripod camera prop. It shows
+// what the lens sees: a second, low-res render of THIS scene from the prop's
+// point of view, drawn into an offscreen target each frame and mapped onto the
+// screen mesh. Live-tunable from the console via `window.__tsMonitor`.
+//
+// Two things shaped the implementation:
+//   • /trade mounts an EffectComposer (PostProcessingEffects) at useFrame
+//     priority 1, and renderer state left behind by an offscreen pass is what
+//     blacks the whole canvas. This pass runs at the default priority — before
+//     the composer — and restores every flag it touches.
+//   • The screen's authored UVs are an unknown island in the prop's texture
+//     atlas, so the feed gets its own planar UV set on a cloned geometry: u
+//     across the panel, v up it, matching the render target's bottom-left
+//     texel origin.
+const MONITOR_SCREEN_MESH = "Camera_Screen";
+// `Camera` is the swivel head (its origin sits at the top of the tripod) and
+// parents `Camera_Screen`; `Tripod` is the legs and stays put. Both are hidden
+// for the offscreen pass, so the feed is a clean lens POV with no feedback.
+const MONITOR_PIVOT_NODE = "Camera";
+const MONITOR_HIDDEN_NODES = ["Camera", "Tripod"];
+
+export const MONITOR_FEED = {
+  enabled: true,
+  // Long edge of the offscreen target. The monitor is ~90px on screen, so this
+  // is already generous; it exists to survive a camera push-in.
+  resolution: 384,
+  // Refresh every Nth frame. A video tap that lags the room slightly reads as
+  // real, and it halves the cost of the second scene pass.
+  everyNthFrame: 2,
+  // Two-shot fitted live: wide enough to hold both guests and the neon frame
+  // between them, with headroom. The single tightens onto one head.
+  wideFov: 50,
+  closeFov: 27,
+  // Where the shot sits relative to its subject. The two-shot rides slightly
+  // above the eyeline; the single aims a touch low so the head aims high.
+  wideLift: 0.02,
+  closeLift: -0.1,
+  // Metres in front of the monitor the virtual lens sits, and how far below it.
+  push: 0.14,
+  lift: -0.02,
+  // Easing rates (per second). The pan is deliberately unhurried — an operator
+  // swinging a tripod head, not a snap.
+  panLambda: 2.4,
+  zoomLambda: 2.2,
+  // Scale on the PHYSICAL swivel only; the virtual lens always aims true. Drop
+  // toward 0.5 if the prop turning its full ~30° reads as too much.
+  panScale: 1,
+  // ── Operator control: grab the prop to take the handle ──────────────────
+  mouseControl: true,
+  // Radians per pixel dragged. Direct manipulation — the part you grabbed
+  // follows the cursor, so the lens swings the other way (the Street View
+  // convention). Flip `dragInvert` for the opposite feel.
+  dragSensitivity: 0.005,
+  dragInvert: false,
+  maxPitch: 0.4,
+  wheelSensitivity: 0.03,
+  minFov: 16,
+  maxFov: 70,
+  // Seconds after letting go before the director takes the shot back.
+  handBackAfter: 4,
+  // How far down the lens axis the manual aim point sits — roughly the
+  // distance to the guests, so a manual zoom stays focused on the set.
+  aimDistance: 2,
+  // Manual overrides for the panel's orientation. The UV build derives both
+  // from the authored normals, so these should stay false — they're here to
+  // flip a feed by hand without a rebuild if a re-export lands upside down or
+  // mirrored.
+  flipY: false,
+  mirrorX: false,
+  // Seconds to shift every shot change, CAMERA ONLY — positive lands the pan
+  // later. The clock itself is stamped on SitePal's talk-started message, so
+  // this should stay near 0; it's here to trim the pans without touching the
+  // reaction cues, which read from the same clock.
+  shotLead: 0,
+  // 'auto' follows the shot list; 'wide' | 'Barron' | 'Monk' holds one shot
+  // (for fitting without running the show).
+  shot: "auto",
+  // Read-only: the shot the director is on, written every frame. Watch it
+  // against the audio to trim `window.__tsTiming.leadIn`.
+  current: null,
+};
+
+// Pan and tilt are applied in the PARENT's frame — `yaw * pitch * base` rather
+// than writing rotation.y/.x — so the head swivels about world up and tilts
+// about its own rest-right axis regardless of how it is authored (this one
+// carries the FBX Z-up conversion plus a slight tilt, so its local Y is NOT up).
+function applyRigOrientation(feed) {
+  feed.yawQuaternion.setFromAxisAngle(WORLD_UP, feed.yaw);
+  feed.pitchQuaternion.setFromAxisAngle(feed.restRight, feed.pitch);
+  feed.pivot.quaternion
+    .copy(feed.yawQuaternion)
+    .multiply(feed.pitchQuaternion)
+    .multiply(feed.baseQuaternion);
+}
+
+// Build the feed once the viewer camera exists (its position picks the side of
+// the panel that faces front). Returns null if the prop is missing.
+function buildMonitorFeed(root, viewerCamera) {
+  const screen = root.getObjectByName(MONITOR_SCREEN_MESH);
+  if (!screen?.geometry?.attributes?.position) return null;
+  const hidden = MONITOR_HIDDEN_NODES.map((n) => root.getObjectByName(n)).filter(
+    Boolean,
+  );
+  const pivot = root.getObjectByName(MONITOR_PIVOT_NODE) || null;
+
+  screen.updateWorldMatrix(true, false);
+
+  const geometry = screen.geometry.clone();
+  geometry.computeBoundingBox();
+  const size = geometry.boundingBox.getSize(new THREE.Vector3());
+  const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+
+  // The panel's thinnest local axis is its normal; the other two are its width
+  // and height. Their world directions decide which reads as "up" and which
+  // face points at the room.
+  const dims = [size.x, size.y, size.z];
+  const normalAxis = dims.indexOf(Math.min(...dims));
+  const planeAxes = [0, 1, 2].filter((a) => a !== normalAxis);
+  const axisVec = (i, s = 1) =>
+    new THREE.Vector3(i === 0 ? s : 0, i === 1 ? s : 0, i === 2 ? s : 0);
+  const worldDir = (v) => v.clone().transformDirection(screen.matrixWorld);
+
+  const upness = planeAxes.map((a) => Math.abs(worldDir(axisVec(a)).dot(WORLD_UP)));
+  const upAxis = upness[0] >= upness[1] ? planeAxes[0] : planeAxes[1];
+
+  // Which face is the display side. Prefer the AUTHORED normals: deciding it
+  // from where the viewer camera happens to be on the first frame depends on
+  // whether the rig had finished flying in, and getting it wrong mirrors the
+  // whole feed. Fall back to the camera only if the normals are inconclusive
+  // (a thick panel whose two faces cancel out).
+  const normals = geometry.attributes.normal;
+  let normalSign = 0;
+  if (normals) {
+    let sum = 0;
+    for (let i = 0; i < normals.count; i += 1) {
+      sum += normals.getComponent(i, normalAxis);
+    }
+    const mean = sum / normals.count;
+    if (Math.abs(mean) > 0.5) normalSign = Math.sign(mean);
+  }
+  if (!normalSign) {
+    const screenWorld = center.clone().applyMatrix4(screen.matrixWorld);
+    const towardViewer = viewerCamera
+      .getWorldPosition(new THREE.Vector3())
+      .sub(screenWorld);
+    normalSign = worldDir(axisVec(normalAxis)).dot(towardViewer) >= 0 ? 1 : -1;
+  }
+
+  const upLocal = axisVec(upAxis, worldDir(axisVec(upAxis)).dot(WORLD_UP) >= 0 ? 1 : -1);
+  const normalLocal = axisVec(normalAxis, normalSign);
+  // With the normal pointing at the viewer and up onscreen-up, up × normal is
+  // the direction that reads as "right" from the front of the panel.
+  const rightLocal = upLocal.clone().cross(normalLocal);
+
+  const rightAxis = rightLocal.x !== 0 ? 0 : rightLocal.y !== 0 ? 1 : 2;
+  const uSpan = dims[rightAxis] || 1;
+  const vSpan = dims[upAxis] || 1;
+
+  // (0,0) = bottom-left of the panel seen from the front, which is also the
+  // render target's first texel, so the feed lands upright and unmirrored.
+  const position = geometry.attributes.position;
+  const uv = new Float32Array(position.count * 2);
+  const vertex = new THREE.Vector3();
+  for (let i = 0; i < position.count; i += 1) {
+    vertex.fromBufferAttribute(position, i).sub(center);
+    uv[i * 2] = THREE.MathUtils.clamp(vertex.dot(rightLocal) / uSpan + 0.5, 0, 1);
+    uv[i * 2 + 1] = THREE.MathUtils.clamp(vertex.dot(upLocal) / vSpan + 0.5, 0, 1);
+  }
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  screen.geometry = geometry;
+
+  const aspect = uSpan / vSpan;
+  const width = Math.round(MONITOR_FEED.resolution);
+  const target = new THREE.WebGLRenderTarget(
+    width,
+    Math.max(2, Math.round(width / aspect)),
+    {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      depthBuffer: true,
+      stencilBuffer: false,
+    },
+  );
+  // Render targets hold linear values (three only applies the output transfer
+  // when drawing to the canvas), so the feed must not be decoded again here.
+  target.texture.colorSpace = THREE.LinearSRGBColorSpace;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: target.texture,
+    toneMapped: false,
+    // The prop's body carries a second, coincident screen quad (material
+    // `Screen.001`); the offset keeps the live feed on top of it.
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  screen.material = material;
+
+  return {
+    root,
+    screen,
+    hidden,
+    pivot,
+    geometry,
+    material,
+    target,
+    center,
+    camera: new THREE.PerspectiveCamera(MONITOR_FEED.wideFov, aspect, 0.05, 200),
+    // Pan state. `restYaw` is the bearing the prop was authored pointing along,
+    // taken on the first frame, so yaw 0 is always the modelled pose, and
+    // `restRight` is the axis it tilts about.
+    baseQuaternion: pivot ? pivot.quaternion.clone() : null,
+    yawQuaternion: new THREE.Quaternion(),
+    pitchQuaternion: new THREE.Quaternion(),
+    restYaw: null,
+    restRight: new THREE.Vector3(1, 0, 0),
+    yaw: 0,
+    pitch: 0,
+    eye: new THREE.Vector3(),
+    aim: new THREE.Vector3(),
+    forward: new THREE.Vector3(),
+    fov: MONITOR_FEED.wideFov,
+    primed: false,
+    tick: 0,
+    // Operator control.
+    dragging: false,
+    releasedAt: 0,
+    manualFov: null,
+    lastX: 0,
+    lastY: 0,
+    tmpA: new THREE.Vector3(),
+    tmpB: new THREE.Vector3(),
+    prevClear: new THREE.Color(),
+  };
+}
+
+// Which shot is live at `elapsed`. `null` subject = the two-shot.
+function currentShotSubject(elapsed, running) {
+  const override = MONITOR_FEED.shot;
+  if (override !== "auto") return override === "wide" ? null : override;
+  if (!running) return null;
+  const cue = elapsed - MONITOR_FEED.shotLead;
+  for (let i = TALK_SHOW_SHOTS.length - 1; i >= 0; i -= 1) {
+    if (TALK_SHOW_SHOTS[i].at <= cue) return TALK_SHOW_SHOTS[i].subject;
+  }
+  return null;
+}
+
+// Runs EVERY frame (the feed itself may render at half rate, but the prop must
+// swivel smoothly): pick the shot, then ease the pan, the zoom and the aim
+// toward it. The physical swivel is cosmetic — the virtual lens aims at the
+// subject directly, so the feed stays framed even if the prop lags or the
+// authored rest pose is a few degrees off.
+function updateCameraRig(feed, headBones, elapsed, running, delta) {
+  const pivot = feed.pivot;
+  const panEase = 1 - Math.exp(-MONITOR_FEED.panLambda * delta);
+
+  // Manual holds through the drag and for a beat after, so letting go doesn't
+  // instantly snatch the camera back.
+  const heldRecently =
+    feed.releasedAt > 0 &&
+    (performance.now() - feed.releasedAt) / 1000 < MONITOR_FEED.handBackAfter;
+  const manual = pivot && (feed.dragging || heldRecently);
+  if (!manual && feed.releasedAt) {
+    feed.releasedAt = 0;
+    feed.manualFov = null;
+  }
+
+  // Where the lens sits: the monitor's own position, nudged forward once the
+  // aim is known. It swings with the swivel because the screen does.
+  feed.screen.updateWorldMatrix(true, false);
+  const eye = feed.eye.copy(feed.center).applyMatrix4(feed.screen.matrixWorld);
+
+  if (manual) {
+    // Hands on: the LENS follows the PROP, so it can be pointed anywhere —
+    // the floor, the neon frame — not just at whoever is talking.
+    MONITOR_FEED.current = "manual";
+    const bearing = feed.restYaw + feed.yaw;
+    const flat = Math.cos(feed.pitch);
+    feed.forward.set(
+      flat * Math.sin(bearing),
+      Math.sin(feed.pitch),
+      flat * Math.cos(bearing),
+    );
+    eye.addScaledVector(feed.forward, MONITOR_FEED.push);
+    eye.y += MONITOR_FEED.lift;
+    feed.aim.copy(eye).addScaledVector(feed.forward, MONITOR_FEED.aimDistance);
+    feed.fov = THREE.MathUtils.lerp(
+      feed.fov,
+      feed.manualFov ?? feed.fov,
+      1 - Math.exp(-MONITOR_FEED.zoomLambda * delta),
+    );
+    applyRigOrientation(feed);
+    return;
+  }
+
+  const subject = currentShotSubject(elapsed, running);
+  MONITOR_FEED.current = subject ?? "wide";
+  const head = subject ? headBones[subject] : null;
+
+  const desired = feed.tmpA.set(0, 0, 0);
+  if (head) {
+    head.getWorldPosition(desired);
+    desired.y += MONITOR_FEED.closeLift;
+  } else {
+    let heads = 0;
+    Object.values(headBones).forEach((bone) => {
+      desired.add(bone.getWorldPosition(feed.tmpB));
+      heads += 1;
+    });
+    if (heads) desired.multiplyScalar(1 / heads);
+    else feed.root.getWorldPosition(desired);
+    desired.y += MONITOR_FEED.wideLift;
+  }
+
+  if (feed.primed) feed.aim.lerp(desired, panEase);
+  else {
+    feed.aim.copy(desired);
+    feed.primed = true;
+  }
+
+  const forward = feed.forward.copy(feed.aim).sub(eye);
+  if (forward.lengthSq() > 1e-8) {
+    forward.normalize();
+    eye.addScaledVector(forward, MONITOR_FEED.push);
+    eye.y += MONITOR_FEED.lift;
+  }
+
+  feed.fov = THREE.MathUtils.lerp(
+    feed.fov,
+    head ? MONITOR_FEED.closeFov : MONITOR_FEED.wideFov,
+    1 - Math.exp(-MONITOR_FEED.zoomLambda * delta),
+  );
+
+  if (!pivot) return;
+  pivot.updateWorldMatrix(true, false);
+  pivot.getWorldPosition(feed.tmpB);
+  const bearing = Math.atan2(
+    desired.x - feed.tmpB.x,
+    desired.z - feed.tmpB.z,
+  );
+  if (feed.restYaw === null) {
+    feed.restYaw = bearing;
+    // The axis the head tilts about at rest — perpendicular to the rest aim.
+    feed.restRight.set(-Math.cos(bearing), 0, Math.sin(bearing));
+  }
+  // Shortest way round, so a bearing that crosses ±π never unwinds the long way.
+  const offset = bearing - feed.restYaw;
+  const target =
+    Math.atan2(Math.sin(offset), Math.cos(offset)) * MONITOR_FEED.panScale;
+  feed.yaw += (target - feed.yaw) * panEase;
+  feed.pitch += (0 - feed.pitch) * panEase;
+  applyRigOrientation(feed);
+}
+
+// One offscreen pass from the prop's point of view. Every renderer flag it
+// touches is restored before the EffectComposer's pass runs.
+function renderMonitorFeed(feed, gl, scene) {
+  const { screen, camera, target } = feed;
+
+  // Orientation overrides ride on the texture transform, so flipping one is
+  // live and never touches the rebuilt UVs.
+  const flipX = MONITOR_FEED.mirrorX ? -1 : 1;
+  const flipY = MONITOR_FEED.flipY ? -1 : 1;
+  const tex = target.texture;
+  if (tex.repeat.x !== flipX || tex.repeat.y !== flipY) {
+    tex.repeat.set(flipX, flipY);
+    tex.offset.set(flipX < 0 ? 1 : 0, flipY < 0 ? 1 : 0);
+  }
+
+  // eye/aim were resolved this frame by updateCameraRig.
+  if (feed.eye.distanceToSquared(feed.aim) < 1e-8) return;
+  camera.position.copy(feed.eye);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(feed.aim);
+  camera.fov = feed.fov;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+
+  const prevTarget = gl.getRenderTarget();
+  const prevXr = gl.xr.enabled;
+  const prevAlpha = gl.getClearAlpha();
+  gl.getClearColor(feed.prevClear);
+  const wasVisible = feed.hidden.map((o) => o.visible);
+  feed.hidden.forEach((o) => { o.visible = false; });
+  screen.visible = false;
+  try {
+    gl.xr.enabled = false;
+    // The canvas is alpha:true — clearing the feed opaque keeps the monitor
+    // from punching a transparent hole in the page behind it.
+    gl.setClearColor(0x000000, 1);
+    gl.setRenderTarget(target);
+    gl.clear();
+    gl.render(scene, camera);
+  } finally {
+    gl.setRenderTarget(prevTarget);
+    gl.setClearColor(feed.prevClear, prevAlpha);
+    gl.xr.enabled = prevXr;
+    feed.hidden.forEach((o, i) => { o.visible = wasVisible[i]; });
+    screen.visible = true;
+  }
+}
+
 function TalkShowModel({
   anchorY,
   projectCharacter,
@@ -302,6 +766,131 @@ function TalkShowModel({
     });
     return c;
   }, [scene]);
+
+  // Camera-monitor feed. Built on the first frame (it needs the viewer camera)
+  // and torn down with the model it was built against; `undefined` means "not
+  // built yet", `null` means the prop wasn't in the GLB.
+  const monitorRef = useRef(undefined);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.__tsMonitor = MONITOR_FEED;
+      window.__tsTiming = TALK_SHOW_TIMING;
+    }
+    return () => {
+      const feed = monitorRef.current;
+      monitorRef.current = undefined;
+      if (!feed) return;
+      feed.target.dispose();
+      feed.material.dispose();
+      feed.geometry.dispose();
+    };
+  }, [cloned]);
+
+  // Operator control. Listeners live on the DOM rather than on the R3F
+  // primitive: attaching pointer handlers to the set would make every mouse
+  // move raycast two skinned characters, and this only ever needs to hit the
+  // four prop meshes. They run in the CAPTURE phase on window so a grab is
+  // swallowed before CameraControlsRig's own listener sees it — otherwise the
+  // same drag would orbit the viewer camera at the same time.
+  const { gl: renderer, camera: viewerCamera } = useThree();
+  useEffect(() => {
+    const el = renderer.domElement;
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let hovering = false;
+
+    const liveFeed = () => {
+      const feed = monitorRef.current;
+      if (!feed?.pivot || !MONITOR_FEED.enabled || !MONITOR_FEED.mouseControl) {
+        return null;
+      }
+      return feed;
+    };
+
+    const hitsProp = (event, feed) => {
+      const rect = el.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, viewerCamera);
+      return raycaster.intersectObjects(feed.hidden, true).length > 0;
+    };
+
+    const onPointerDown = (event) => {
+      // Only a plain left-press that landed on the canvas itself — otherwise a
+      // press on the rail or the dock could be stolen by a prop behind it.
+      if (event.button !== 0 || event.target !== el) return;
+      const feed = liveFeed();
+      if (!feed || !hitsProp(event, feed)) return;
+      event.stopPropagation();
+      feed.dragging = true;
+      feed.releasedAt = 0;
+      feed.manualFov = feed.manualFov ?? feed.fov;
+      feed.lastX = event.clientX;
+      feed.lastY = event.clientY;
+      el.style.cursor = "grabbing";
+    };
+
+    const onPointerMove = (event) => {
+      const feed = liveFeed();
+      if (!feed) return;
+      if (feed.dragging) {
+        event.stopPropagation();
+        const sign = MONITOR_FEED.dragInvert ? -1 : 1;
+        const step = MONITOR_FEED.dragSensitivity * sign;
+        feed.yaw += (event.clientX - feed.lastX) * step;
+        feed.pitch = THREE.MathUtils.clamp(
+          feed.pitch + (event.clientY - feed.lastY) * step,
+          -MONITOR_FEED.maxPitch,
+          MONITOR_FEED.maxPitch,
+        );
+        feed.lastX = event.clientX;
+        feed.lastY = event.clientY;
+        return;
+      }
+      const over = event.target === el && hitsProp(event, feed);
+      if (over !== hovering) {
+        hovering = over;
+        el.style.cursor = over ? "grab" : "";
+      }
+    };
+
+    const onPointerUp = () => {
+      const feed = monitorRef.current;
+      if (!feed?.dragging) return;
+      feed.dragging = false;
+      feed.releasedAt = performance.now();
+      el.style.cursor = hovering ? "grab" : "";
+    };
+
+    const onWheel = (event) => {
+      if (event.target !== el) return;
+      const feed = liveFeed();
+      if (!feed || !hitsProp(event, feed)) return;
+      // Zoom the lens, not the room.
+      event.stopPropagation();
+      event.preventDefault();
+      feed.manualFov = THREE.MathUtils.clamp(
+        (feed.manualFov ?? feed.fov) + event.deltaY * MONITOR_FEED.wheelSensitivity,
+        MONITOR_FEED.minFov,
+        MONITOR_FEED.maxFov,
+      );
+      feed.releasedAt = performance.now();
+    };
+
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("pointermove", onPointerMove, true);
+    window.addEventListener("pointerup", onPointerUp, true);
+    window.addEventListener("pointercancel", onPointerUp, true);
+    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("pointermove", onPointerMove, true);
+      window.removeEventListener("pointerup", onPointerUp, true);
+      window.removeEventListener("pointercancel", onPointerUp, true);
+      window.removeEventListener("wheel", onWheel, { capture: true });
+      el.style.cursor = "";
+    };
+  }, [renderer, viewerCamera]);
 
   // Per-character projection state (face refs + lazily-built canvas/texture/mat).
   const projRef = useRef({});
@@ -579,6 +1168,8 @@ function TalkShowModel({
           running: true,
           startedAt: performance.now(),
           cueIndex: 0,
+          // Provisional clock; the first talk-started message re-stamps it.
+          audioStarted: false,
         };
       }
       onPlaybackStateChange?.(ok);
@@ -602,11 +1193,13 @@ function TalkShowModel({
     };
   }, [onPlaybackReady, onPlaybackStateChange]);
 
-  useFrame(({ camera }, delta) => {
+  useFrame(({ camera, gl, scene }, delta) => {
     const playback = playbackRef.current;
     let elapsed = 0;
     if (playback.running) {
-      elapsed = (performance.now() - playback.startedAt) / 1000;
+      elapsed =
+        (performance.now() - playback.startedAt) / 1000 -
+        TALK_SHOW_TIMING.leadIn;
 
       // Finish reactions at their authored gesture length instead of allowing
       // the pose-2 clip's trailing breathing idle to run to frame 129.
@@ -768,6 +1361,27 @@ function TalkShowModel({
       st.hideExtra.forEach((m) => { m.visible = !show; });
       if (show && st.cropCtx) paintCrop(st, cfg, source);
     });
+
+    // Camera rig last, so the feed sees this frame's poses and faces.
+    if (MONITOR_FEED.enabled) {
+      if (monitorRef.current === undefined) {
+        monitorRef.current = buildMonitorFeed(cloned, camera);
+        if (!monitorRef.current) {
+          console.warn(
+            `[TalkShowScene] "${MONITOR_SCREEN_MESH}" not found — no camera monitor feed`,
+          );
+        }
+      }
+      const feed = monitorRef.current;
+      if (feed) {
+        // The swivel updates every frame even when the feed renders at half
+        // rate, or the prop pans in visible steps.
+        updateCameraRig(feed, headBones, elapsed, playback.running, delta);
+        const every = Math.max(1, Math.round(MONITOR_FEED.everyNthFrame));
+        feed.tick = (feed.tick + 1) % every;
+        if (feed.tick === 0) renderMonitorFeed(feed, gl, scene);
+      }
+    }
   });
 
   // Mirror CyborgTempleScene's internal anchor offset so the set lands at the

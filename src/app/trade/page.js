@@ -4514,7 +4514,7 @@ export default function CyborgTemple() {
               ? 'Loading voices…'
               : talkShowPlaying
                 ? 'Stop test'
-                : 'Start talk show'}
+                : 'Start show'}
           </button>
         )}
 

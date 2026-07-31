@@ -686,7 +686,7 @@ const CAT_HEAD_OWNED_RE = /^cat_(cleaning_face|scratching_self)$/i;
 const CAT_STATES = {
   loaf:     { idle: /^cat_loaf$/i,        actions: [] },
   sitting:  { idle: /^cat_sitting_idle$/i, actions: [/^cat_cleaning_face$/i, /^cat_scratching_self$/i] },
-  standing: { idle: /^cat_standing$/i,    actions: [/^cat_stretch$/i, /^cat_meowing$/i] },
+  standing: { idle: /^cat_standing$/i,    actions: [/^cat_meowing$/i] },
   lying:    { idle: /^cat_lying idle$/i,  actions: [] },
   sleeping: { idle: /^cat_sleeping$/i,    actions: [] },
 };
@@ -705,7 +705,7 @@ const CAT_EXIT = {
 };
 // A cat is mostly resting; standing is a brief stopover, not a destination.
 const CAT_STATE_WEIGHTS = { loaf: 4, sitting: 4, lying: 2, sleeping: 2, standing: 1 };
-const CAT_DWELL_MS = [7000, 16000];  // how long to hold a posture
+const CAT_DWELL_MS = [14000, 32000];  // how long to hold a posture
 const CAT_ACTION_CHANCE = 0.55;      // chance of a groom/stretch during a dwell
 const CAT_XFADE = 0.35;
 
@@ -714,7 +714,7 @@ const CAT_XFADE = 0.35;
 // — gaps of 91.8/89.7/91.5/86.9°), so the other three perches are just his
 // authored transform rotated about Y in quarter turns. Rotating his YAW by the
 // same amount matters: without it he'd face outward at three of the four.
-const CAT_PERCH_AUTHORED = [1.3313975, 0.6985147, 0.3036617];
+const CAT_PERCH_AUTHORED = [1.313975, 0.6785147, 0.4336617];
 const CAT_PERCHES = [0, 1, 2, 3].map((k) => {
   const a = (k * Math.PI) / 2;
   const [x, y, z] = CAT_PERCH_AUTHORED;
@@ -837,6 +837,24 @@ const CyborgTempleScene = ({
   // Per-character spotlight targets for the curtain call. Positioned at
   // each character's stage-lineup x, mid-chest height, so the spotlights
   // converge on their torsos. Created once and reused via primitive refs.
+  // Beam shape for those spotlights. drei's volumetric SpotLight is easy to
+  // misread: `distance` sets only the CONE GEOMETRY's length (and the three.js
+  // light's range). What you SEE fades to nothing at `attenuation` world units
+  // from the light — `vIntensity = 1 - saturate(d / attenuation)` in
+  // SpotLightMaterial — so ATTENUATION IS THE BEAM LENGTH KNOB. At the old
+  // 3 the shaft died in mid-air above the characters' heads while the 6.5-long
+  // cone carried on invisibly. Width comes from `angle`, which also drives
+  // drei's default cone radius (`angle * 7`), so narrowing it tightens both the
+  // lit pool and the visible shaft.
+  const CURTAIN_SPOT = {
+    angle: 0.2,        // was 0.42 — a shaft rather than a flare
+    penumbra: 0.55,
+    intensity: 9,
+    distance: 8,       // cone geometry; keep >= attenuation or the beam is cut
+    attenuation: 6,    // visible length: light at y=3.4 → past the floor
+    anglePower: 6,
+    opacity: 0.3,
+  };
   const curtainSpotTargets = useMemo(() => [
     { name: 'Monk',      x: -0.75, color: '#8effc4', missColor: '#ff6e6e', neutralColor: '#dceede', ref: new THREE.Object3D() },
     { name: 'Demon',     x: -0.25, color: '#8effc4', missColor: '#ff6e6e', neutralColor: '#dceede', ref: new THREE.Object3D() },
@@ -1495,14 +1513,20 @@ const CyborgTempleScene = ({
         && action.isRunning && action.isRunning() && !action.paused) {
       return dur * 1000;
     }
-    Object.values(actions).forEach((a) => {
-      if (a !== action && a.isRunning && a.isRunning()) a.fadeOut(CAT_XFADE);
-    });
+    // Virgil is the character MOST exposed to the clamped-one-shot trap: his
+    // whole behaviour is a graph of one-shot transitions (loaf_to_stand,
+    // sitting_down, stand_to_sleep…) each followed by a looping idle, and every
+    // one of them is LoopOnce + clampWhenFinished below. A finished one is
+    // PAUSED but still weighs 1, so an isRunning()-only fade left it averaging
+    // 50/50 with the idle that followed — the cat half-lying, half-sitting, and
+    // only "sometimes" because it needs a transition to have just run.
+    const catMixer = mixersRef.current?.['Fluffy'];
+    fadeOutOthers(actions, action, CAT_XFADE, catMixer);
     action.reset();
     action.paused = false;
     if (loop) {
       action.setLoop(THREE.LoopRepeat, Infinity);
-      action.time = dur * 0.05; // skip the bind-pose frame
+      action.time = bindSkipTime(action); // skip the bind-pose frame
       action.setEffectiveTimeScale(1);
     } else {
       action.setLoop(THREE.LoopOnce, 1);
@@ -1511,7 +1535,7 @@ const CyborgTempleScene = ({
       action.time = rev ? dur : 0;
     }
     action.setEffectiveWeight(1);
-    action.fadeIn(CAT_XFADE);
+    fadeInOrSnap(action, actions, CAT_XFADE, catMixer);
     action.play();
     if (fluffyAnimStateRef.current) fluffyAnimStateRef.current.currentAnimation = key;
     return dur * 1000;
@@ -6981,7 +7005,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // averaging into the pose. Logs only on change, so the console stays quiet
     // until something actually goes wrong.
     if (animDebugRef.current) {
-      ['Demon', 'Monk', 'Detective', 'RL80'].forEach((charName) => {
+      ['Demon', 'Monk', 'Detective', 'RL80', 'Fluffy'].forEach((charName) => {
         const acts = actionsRef.current?.[charName];
         if (!acts) return;
         let sum = 0;
@@ -6997,7 +7021,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           }
         });
         const gap = sum < 0.999;
-        const sig = `${gap}|${live.join(',')}`;
+        // Signature deliberately drops clip TIME and rounds the weights: with
+        // them in, every frame is "new" and the console fills with thousands of
+        // identical lines. What matters is WHICH clips are contributing.
+        const sig = `${gap}|${live.map((l) => l.replace(/@[\d.]+s$/, '').replace(/=([\d.]+)/, (m, w) => `=${Number(w).toFixed(1)}`)).join(',')}`;
         if (sig === animDebugPrevRef.current[charName]) return;
         animDebugPrevRef.current[charName] = sig;
         if (gap) {
@@ -8689,14 +8716,14 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                          judge any brightness work from the ?reveal debug
                          trigger at multiple angles, not just the settled
                          Stage pose). */
-                      angle={0.42}
-                      penumbra={0.55}
-                      intensity={9}
-                      distance={6.5}
+                      angle={CURTAIN_SPOT.angle}
+                      penumbra={CURTAIN_SPOT.penumbra}
+                      intensity={CURTAIN_SPOT.intensity}
+                      distance={CURTAIN_SPOT.distance}
                       color={color}
-                      opacity={0.6}
-                      attenuation={3}
-                      anglePower={6}
+                      opacity={CURTAIN_SPOT.opacity}
+                      attenuation={CURTAIN_SPOT.attenuation}
+                      anglePower={CURTAIN_SPOT.anglePower}
                     />
                   </group>
                 );
