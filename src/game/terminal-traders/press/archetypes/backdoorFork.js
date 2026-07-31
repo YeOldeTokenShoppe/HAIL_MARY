@@ -91,7 +91,6 @@ export const SLOTS = [
         line: "Named references vouch for A and B. Nobody vouches for the third one directly. I noticed that. I moved on.",
         receipt: { title: "REFERENCE CHECK", rows: [["Founder A", "VOUCHED"], ["Founder B", "VOUCHED"], ["Ops partner", "NOBODY"]] },
       },
-      miss: { line: "Do I know them personally? No. I've never met them. I'm not in this because of a friendship, I'm in it because the résumés check out.", receipt: null },
     },
     legit: {
       generic: {
@@ -102,7 +101,6 @@ export const SLOTS = [
         line: "Every one of them has someone putting their name next to his. That's rarer than you'd think and it's the reason I'm in.",
         receipt: { title: "REFERENCE CHECK", rows: [["Founder A", "VOUCHED"], ["Founder B", "VOUCHED"], ["Ops partner", "VOUCHED ×2"]] },
       },
-      miss: { line: "Do I know them personally? No. I've never met them. That's not how this works.", receipt: null },
     },
   },
 
@@ -156,12 +154,10 @@ export const SLOTS = [
     rug: {
       generic: { line: "Three funds, all named, all reachable. Three-of-five treasury multisig. Zero mixer hops, and I did check that one.", receipt: { title: "FUNDING", rows: [["Seed", "3 NAMED FUNDS"], ["Treasury", "3/5 MULTISIG"], ["Mixer hops", "0"]] } },
       sharp: { line: "Traced it myself, which I don't do often. Seed to treasury, treasury to LP. No hops, no bridges. This part is genuinely fine.", receipt: { title: "FUND TRACE", rows: [["Seed → treasury", "DIRECT"], ["Anomalies", "NONE"]] } },
-      miss: { line: "Three funds. I can spell all three. That's not the interesting part and you know it.", receipt: null },
     },
     legit: {
       generic: { line: "Three funds, all named, all reachable. Three-of-five treasury multisig. Zero mixer hops, and I did check that one.", receipt: { title: "FUNDING", rows: [["Seed", "3 NAMED FUNDS"], ["Treasury", "3/5 MULTISIG"], ["Mixer hops", "0"]] } },
       sharp: { line: "Traced it myself. Seed to treasury, treasury to LP. No hops, no bridges. This part is genuinely fine.", receipt: { title: "FUND TRACE", rows: [["Seed → treasury", "DIRECT"], ["Anomalies", "NONE"]] } },
-      miss: { line: "Three funds. I can spell all three. That's not the interesting part and you know it.", receipt: null },
     },
   },
 
@@ -180,12 +176,10 @@ export const SLOTS = [
     rug: {
       generic: { line: "Look at the candles! What do you want me to do, apologise for it?", receipt: null },
       sharp: { line: "Seven days because seven days is the number that looks like something. Don't make me pull thirty.", receipt: null },
-      miss: { line: "Am I holding? Obviously I'm holding, it's my deal. That's not a scandal, that's alignment.", receipt: null },
     },
     legit: {
       generic: { line: "Look at the candles! What do you want me to do, apologise for it?", receipt: null },
       sharp: { line: "Seven days because seven days is the number that looks like something. Thirty's flatter. It's still a good book.", receipt: null },
-      miss: { line: "Am I holding? Obviously I'm holding, it's my deal. That's not a scandal, that's alignment.", receipt: null },
     },
   },
 

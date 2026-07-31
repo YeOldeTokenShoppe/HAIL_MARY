@@ -1189,6 +1189,18 @@ export default function CyborgTemple() {
   const [pressSpeaking, setPressSpeaking] = useState(false);
   const [pressReveal, setPressReveal] = useState(null);
   const [pressFlat, setPressFlat] = useState(false);
+  // ONE teardown for the VC game, whoever ends it — the session's own exit,
+  // the flat view's, or a rail tab that takes the room away from it. The game
+  // has no covering overlay (the room IS the board), so anything that swaps
+  // the scene has to end the run too or the UI is left with no exit.
+  const exitPressGame = useCallback(() => {
+    setPressMode(false);
+    setPressFlat(false);
+    setPressFocus(null);
+    setPressSpeaking(false);
+    setPressReveal(null);
+    setPitchStarted(false);
+  }, []);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const q = new URLSearchParams(window.location.search);
@@ -1232,6 +1244,18 @@ export default function CyborgTemple() {
   }, []);
   const handleTalkShowPlaybackState = useCallback((playing) => {
     setTalkShowPlaying(playing);
+  }, []);
+  // Tear the talk-show set back down: stop any in-flight portal audio and
+  // clear the playback flags so the temple model remounts clean. Shared by
+  // the tab's own EXIT branch and by any other rail tab that takes over the
+  // scene — VC PARTNERS launches the VC game over the LIVE room, so leaving
+  // talk_show.glb mounted put the game UI over the wrong model.
+  const exitTalkShow = useCallback(() => {
+    try { window.__talkShowStop?.(); } catch (e) {}
+    setTalkShowMode(false);
+    setTalkShowProject(null);
+    setTalkShowAudioReady(false);
+    setTalkShowPlaying(false);
   }, []);
   // Imperative handle to the mobile TradeLaptop so the START FAB can dive
   // straight into the CRT terminal (same as tapping the laptop screen).
@@ -2790,38 +2814,28 @@ export default function CyborgTemple() {
         const isMobile = window.innerWidth <= 768;
         setIsMobileView(isMobile);
         
-        // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v98_opt.glb';
+        // Preload the temple model — DESKTOP ONLY. The 3D canvas is gated on
+        // !isMobileView (see the CleanCanvas block below), so a phone that
+        // preloaded this downloaded 4MB it could never render. Path must track
+        // CyborgTempleScene's modelPath or the page fetches BOTH builds.
+      const modelToPreload = '/models/RL80_4anims_v98_lite.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
-        
-        if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
+
+        if (!isMobile && !document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');
           link.rel = 'preload';
           link.as = 'fetch';
           link.href = modelToPreload;
-          link.crossOrigin = 'anonymous';
+          // NO crossOrigin. The model is same-origin, and requesting it in CORS
+          // mode gave the preload a different cache key from GLTFLoader's plain
+          // same-origin request — so the warm was never reused and the whole
+          // model came down TWICE (measured: 2 x 2,052KB per load). The
+          // companion fetch(mode:'cors', force-cache) that used to sit here had
+          // the same mismatch and only read the body into a discarded blob, so
+          // it's gone: this link is the cache warm.
           link.type = 'model/gltf-binary';
           document.head.appendChild(link);
           // console.log(`[Temple] Preloading ${modelToPreload}`);
-          
-          // Also actively fetch the model to warm up the cache
-          fetch(modelToPreload, { 
-            mode: 'cors',
-            cache: 'force-cache'
-          })
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`Failed to preload: ${response.status}`);
-            }
-            // console.log(`[Temple] Successfully preloaded ${modelToPreload}`);
-            return response.blob();
-          })
-          .then(blob => {
-            // console.log(`[Temple] Model size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
-          })
-          .catch(error => {
-            console.error(`[Temple] Failed to preload model:`, error);
-          });
         }
       }
     };
@@ -2838,8 +2852,20 @@ export default function CyborgTemple() {
     setLoadingProgress(20);
     setLoadingMessage("Loading 3D Model...");
 
-    // Warm the talk-show GLB so the TALK SHOW tab swaps in without a cold fetch.
-    try { preloadTalkShow(); } catch (e) { /* non-fatal */ }
+    // Warm the talk-show GLB so the TALK SHOW tab swaps in without a cold
+    // fetch — but OFF THE CRITICAL PATH, and never on mobile. The LT TV tab
+    // lives in the desktop-only feature rail, so a phone that ran this
+    // downloaded 2.5MB for a tab it can't open; on desktop it was competing
+    // with the temple model for bandwidth during the load everyone sees.
+    // Idle callback (with a timeout so it still happens on a busy tab).
+    if (typeof window !== 'undefined' && window.innerWidth > 768) {
+      const warm = () => { try { preloadTalkShow(); } catch (e) { /* non-fatal */ } };
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(warm, { timeout: 8000 });
+      } else {
+        setTimeout(warm, 4000);
+      }
+    }
     
     // Don't set tickerReady here - wait for model to load first
     
@@ -2874,6 +2900,21 @@ export default function CyborgTemple() {
     checkFont();
   }, []);
 
+  // WHICH TEMPLE ARE THE SCREEN PAINTERS LOOKING AT.
+  //
+  // VideoScreens (Screen1-4 + their small/L/R panels) and CouncilChatScreens
+  // (ScreenA-D) don't own their meshes — they traverse the scene and hang
+  // materials on meshes CyborgTempleScene loaded, once, then latch: VideoScreens
+  // stops retrying the first time it finds a screen, CouncilChat sets
+  // initializedRef. That was safe while the temple mounted once per page.
+  // The talk-show swap unmounts it, and coming back builds a whole new set of
+  // meshes wearing their GLB default materials — every monitor blank, and
+  // EvidenceScreens dead with them (it paints into the window canvas/texture
+  // globals VideoScreens publishes). Bumping this on each load after the first
+  // remounts both painters against the temple that's actually in the scene.
+  const [templeEpoch, setTempleEpoch] = useState(0);
+  const templeLoadCountRef = useRef(0);
+
   // Handle model loading completion
   const handleSceneLoad = () => {
     // console.log('🎨 CyborgTempleScene loaded - GLB model ready');
@@ -2885,6 +2926,11 @@ export default function CyborgTemple() {
     // Mobile and desktop now share the same model, so the ticker mesh exists
     // in both. Enable rendering unconditionally.
     setTickerReady(true);
+
+    // First load is the painters' own mount — they find these meshes on their
+    // own. Only a RE-load means they're holding stale ones.
+    templeLoadCountRef.current += 1;
+    if (templeLoadCountRef.current > 1) setTempleEpoch((n) => n + 1);
   };
 
   // Handle ticker loading completion
@@ -3692,7 +3738,13 @@ export default function CyborgTemple() {
             fov: isMobileView ? 55 : 50
           }}
           gl={{
-            antialias: !isMobileView,
+            // NO MSAA backbuffer. PostProcessingEffects mounts an
+            // EffectComposer with multisampling={0}, and the composer renders
+            // the scene into its OWN targets — the antialiased default
+            // framebuffer this flag allocates was never what you were looking
+            // at. At the DPR below that buffer is several megapixels of GPU
+            // memory for nothing, which is memory an iPad doesn't have.
+            antialias: false,
             alpha: true,
             powerPreference: isMobileView ? "default" : "high-performance",
             precision: isMobileView ? "mediump" : "highp",
@@ -4033,11 +4085,14 @@ export default function CyborgTemple() {
               isVisible={true}
             />
 
-            {/* Liminal Terminal preview — screens render cryptic teasers */}
-            <VideoScreens is80sMode={context80sMode} previewMode={true} />
+            {/* Liminal Terminal preview — screens render cryptic teasers.
+                Keyed on templeEpoch: both painters attach to the temple's
+                meshes once, so a temple reload (talk-show swap) has to remount
+                them or the monitors come back blank. */}
+            <VideoScreens key={`vs-${templeEpoch}`} is80sMode={context80sMode} previewMode={true} />
 
             {/* Council group chat painted onto ScreenA-D */}
-            <CouncilChatScreens />
+            <CouncilChatScreens key={`cc-${templeEpoch}`} />
 
               {/* <NeuralNetworkR3F 
               theme={2}
@@ -4289,31 +4344,39 @@ export default function CyborgTemple() {
             rail replacing the old scattered SERVICES handle + TALK SHOW + TEAM
             CHAT tabs; each feature is a matching cell and the active one lights
             up. Hidden while a character is focused, during the reveal, when the
-            chat overlay is open, or when the services drawer is expanded. */}
+            chat overlay is open, when the services drawer is expanded, or while
+            the VC game is running — that one plays over the live room with no
+            overlay of its own, so a reachable rail sat on top of it and could
+            swap the scene mid-run. */}
         {mounted && !isMobileView && !tradeMode && (() => {
-          const railHidden = !!focusedAgent || revealMode || chatOverlay || railExpanded;
+          const railHidden = !!focusedAgent || revealMode || chatOverlay || railExpanded || pressMode;
           const TABS = [
             {
               key: 'services',
               label: 'VC PARTNERS',
               accent: '#2ad6ee',
               active: railExpanded,
-              onClick: () => { setFocusedAgent(null); setRailExpanded(true); },
+              onClick: () => {
+                // Leave the talk-show set first — everything launched from
+                // this drawer plays over the RL80 temple room.
+                exitTalkShow();
+                setFocusedAgent(null);
+                setRailExpanded(true);
+              },
             },
             {
               key: 'talkshow',
               label: talkShowMode ? 'EXIT' : 'LT TV',
               accent: '#ffcf4d',
               active: talkShowMode,
-              onClick: () => setTalkShowMode((v) => {
-                if (v) {
-                  try { window.__talkShowStop?.(); } catch (e) {}
-                  setTalkShowProject(null);
-                  setTalkShowAudioReady(false);
-                  setTalkShowPlaying(false);
-                }
-                return !v;
-              }),
+              onClick: () => {
+                if (talkShowMode) { exitTalkShow(); return; }
+                // The rail is hidden while the VC game runs, so this is belt
+                // and braces for the ?press=1 entry: never leave a live run
+                // stranded on a set that isn't its room.
+                exitPressGame();
+                setTalkShowMode(true);
+              },
             },
             {
               key: 'teamchat',
@@ -6396,7 +6459,7 @@ export default function CyborgTemple() {
                 as the Case Table below. Ships beside it, deletes nothing. */}
             {pressMode && pressFlat && typeof document !== 'undefined' && createPortal(
               <div style={{ position: 'fixed', inset: 0, zIndex: 10055, background: '#02100e' }}>
-                <PressFlat onExit={() => { setPressMode(false); setPressFlat(false); }} />
+                <PressFlat onExit={exitPressGame} />
               </div>,
               document.body
             )}
@@ -6407,13 +6470,7 @@ export default function CyborgTemple() {
                 onSpeechActive={setPressSpeaking}
                 onRevealChange={setPressReveal}
                 onFloorChange={(live) => { if (live) setPitchStarted(true); }}
-                onExit={() => {
-                  setPressMode(false);
-                  setPressFocus(null);
-                  setPressSpeaking(false);
-                  setPressReveal(null);
-                  setPitchStarted(false);
-                }}
+                onExit={exitPressGame}
               />,
               document.body
             )}

@@ -149,7 +149,7 @@ and each is explicitly gated.
 
 | Seat | Lane | Subject | Budget |
 |---|---|---|---|
-| **John Barron** | `CHART` | THE CHART — price, windows, momentum | *pitcher today: unlimited* |
+| **John Barron** | `CHART` | THE CHART — price, windows, momentum | one use |
 | **Detective Marisol** | `CHAIN` | THE MONEY — money movement, wallet ages, unlocks | one use, all session |
 | **Saint GR80** | `RECORD` | REPUTATION — what the documents actually say | one use |
 | **Eugene** | `SOCIAL` | THE STORY — narrative, reputation, who vouches for whom | one use |
@@ -219,11 +219,11 @@ The 14 asides are archetype-agnostic and live in `desk.js`. They never apologise
 and never concede. No aside may name a fact, a lane or an outcome — "records" and
 "paperwork" are forbidden words there, being a lane and a role label.
 
-**Content debt from the bot:** the asides and the three `POSITIONED` slots
-(`stake` · `stake` · `funding`) are written in Barron's voice as an owner —
-*"obviously I'm holding, it's my deal"*. They must be rewritten as a commissioned
-agent: the interest moves from ownership to the close. Cheaper than it sounds, and
-it makes the shape sharper.
+**Content debt from the bot:** the asides are rewritten (*"My client has shipped
+something"*), but two `POSITIONED` slots still claim a personal stake —
+`backdoorFork` *"I'm in this myself"*, `yieldMirage` *"My own money's in the
+vault"*. A commissioned agent has no money in the vault: move the interest from
+ownership to the close. `anonButReal`'s is about the client's funding and is fine.
 
 ---
 
@@ -288,8 +288,8 @@ you can't say how confident to be.
    the shared pool in `identities.js` — never per archetype. A name must not
    suggest a mechanism, must not suggest a team style, and must be plausible for
    archetypes not yet written.
-6. **`miss` blocks are dead.** Delete on sight. *(10 remain in `backdoorFork` and
-   `yieldMirage`; `anonButReal` has none.)*
+6. **`miss` blocks are dead.** Delete on sight. *(All 10 removed 2026-07-30; no
+   archetype carries one.)*
 
 ---
 
@@ -352,9 +352,7 @@ is only what `ls` can't tell you.*
 - **`pressRun.js` must never import `virgil.js`.** The cat reads run state and
   returns strings; the resolver must not know he exists.
 - **Nothing under `press/` may import `cards.js`** (`questions.js:6`).
-  `instanceDeal.js:15` still does, for `deal.exemplar` — the last tie, §7 item 5.
-- **Orphaned, delete on sight:** `press/hand.js` (the cut card pool),
-  `press/deals/mrdn.js` (slice 1's hand-authored deal). Nothing imports either.
+  `instanceDeal.js:15` still does, for `deal.exemplar` — the last tie, §7 item 4.
 - **`lib/trade/pitchBotScene.js` + `pitchBotHolo.js`** own the bot in the 3D room.
   `CyborgTempleScene.jsx` holds only a `mountPitchBot()` call, a camera pose, an
   animState branch and two visibility clauses. **Not derived from
@@ -393,23 +391,24 @@ goes inside it or gets a height budget. 839px of rows in a 700px box once clippe
 the engagement record and the client's name · four SYMMETRIC seats, one lane and one
 use each · the pitch bot as an outside pitcher, projected into the room with its
 own voice · Virgil's two reads and the tip switch · `NOTHING ON FILE` · pressure
-bands · the shared floor · desktop in-room play · mobile CRT with voice + mouth ·
+bands · the shared floor · desktop in-room play · mobile CRT with voice + mouth · all five
+ElevenLabs voices wired, seat-then-pitcher on both surfaces ·
 lower-third reveal · post-deal analysis with the pattern named · 118 assertions ·
 `The VC Game` tile on the `/trade` rail (default). Case Table behind `?classic=1`.
 
 **Open on the bot specifically:** the face shield's four pressure textures are not
-wired, `AGENT_CAMERA_SETTINGS.PitchBot` is still a placeholder pose that frames the
-wrong thing, and `LET HIM GO ON ▸` still says "him".
+wired, and `LET HIM GO ON ▸` still says "him" (`pressUi.jsx:379`). The camera pose
+is done — derived from the face plate at focus time by `getPitchBotFocusSettings`.
 
 1. **Run the subjective acceptance test.** Same seed, three presses on the pitcher
    vs. three across the desk. *If run B doesn't feel like a different and better
    decision, the direction is wrong.* Free, unrun, and three subsystems have been
    built on top of it. **Do this first.**
 2. **The pitch bot and the client pool** — rules in §1.
-   - **The bot.** Model going into `/models`. Rename the pitcher special-case in
-     `pressRun.js` (already *"is this the pitcher?"* wearing Barron's name), add
-     Barron to `SPENDABLE_SEATS`, point `claim.speaker` (hardcoded `"demon"`, read
-     by nothing) at the bot, and key four shield textures to `pressure(run)`.
+   - **The bot.** The model, the `PITCHER` rename and Barron's seat all landed.
+     Left: point `claim.speaker` (`instanceDeal.js:146`, still hardcoded
+     `"demon"`, read by nothing) at the bot, and key four shield textures to
+     `pressure(run)`.
    - **The founder pool.** A sibling of `identities.js`, rolled per deal.
    - **A pitch surface.** OPEN. The easel that briefly filled this role was cut
      from the glb on 2026-07-29 (§1), so the pitcher has no way to show the thing
@@ -435,34 +434,27 @@ wrong thing, and `LET HIM GO ON ▸` still says "him".
    repo's one shared head-aim formulation applied *after* the mixer — a bespoke
    version has been the bug before.
 
-   **The bill: ~105 lines of prose once** (one voice bank, not one per speaker),
-   plus Barron's specialist `sharp` findings, which **do not exist**, plus the
-   owner→agent rewrite in §3. **Archetype #4 then costs +35 lines, not +210.**
-   **Barron's lane also stops being free** — today sending him at a CHART claim is
-   in-lane and costs no specialist while every other lane costs one, an asymmetry
-   nobody had noticed. Solvability survives: `loadBearing` claims are `HARD`,
-   answerable by pressing the bot directly.
+   **The bill is mostly paid.** The one voice bank, Barron's specialist `sharp`
+   findings and his one-use lane all landed on 2026-07-29; what's left is the two
+   stake slots in §3. **Archetype #4 costs +35 lines, not +210.** Solvability
+   survives: `loadBearing` claims are `HARD`, answerable by pressing the bot
+   directly.
 3. **More archetypes.** Ten of thirteen `CASE_PATTERNS` reads are unbuilt. Pure
    content, no code. `serial-deployer` and `celeb-shill` are the next
    highest-contrast pair — each must pass the §4 edge test, not a vibe check.
-4. **Marisol's voice.** `counsel-voice/route.js:41` `VOICES` has `JB` and `GR`
-   only; needs a voice id + `ELEVENLABS_VOICE_MARISOL`. **Blocked on picking a
-   voice, not on code.** Desktop is mute — `PressSession` flips
-   `onSpeechActive(true)` then says nothing; the SitePal `sayText` engine-14
-   pipeline already exists (`page.js:283`).
-5. **Trophies — the collectible is the ARCHETYPE, not a coin.** Read a deal well →
+4. **Trophies — the collectible is the ARCHETYPE, not a coin.** Read a deal well →
    the **pattern** enters your collection, stamped with your call. Gives the
    thirteen a visible shape (*3 of 13*), answers "why come back on day two", never
    touches the resolver, and kills the last `cards.js` tie: `deal.exemplar` exists
    only for the old coin-trophy plan and nothing renders it, so dropping it stops
    `instanceDeal.js:15` importing `getCardById`, which `questions.js:6` forbids.
-6. **Persist the collection and your own book** as a personal curve. Not a ranking.
-7. **Let Virgil be wrong.** The tips are an oracle today, which makes them a hint
+5. **Persist the collection and your own book** as a personal curve. Not a ranking.
+6. **Let Virgil be wrong.** The tips are an oracle today, which makes them a hint
    system with a face on it. A pattern-matcher who misreads at the archetype's own
    exception rate is a character — leak-safe while his confidence tracks the base
    rate and never the branch. **The agenda must stay exact**; make him wrong there
    and the seat decision has nothing to rest on.
-8. **Split `legit` into outcomes** `[A§16]`. `RESOLUTION` quietly makes `legit`
+7. **Split `legit` into outcomes** `[A§16]`. `RESOLUTION` quietly makes `legit`
    mean *succeeded*, so the only way to lose money is to be cheated — false about
    the world. Ran out of runway, out-competed, team split, market never showed:
    **all still a correct LONG call**, because the claims held up and that is what
@@ -474,9 +466,7 @@ wrong thing, and `LET HIM GO ON ▸` still says "him".
 
 **Smaller, open:** desktop end-to-end unverified past the copy paths (receipt on
 the adviser's in-room monitor, `NOTHING ON FILE` in-scene, the curtain call) ·
-harness still names five Virgil assertions *"Eugene's read"* and imports `agenda
-as eugeneAgenda` · delete `hand.js`, `deals/mrdn.js`, and the 10 dead `miss`
-blocks · `STARTER_SET` grants 21 cards free per userId (`collection.js:10`) —
+`STARTER_SET` grants 21 cards free per userId (`collection.js:10`) —
 harmless for trophies, fatal if trading ships · a stray canvas click on desktop
 can unfocus the camera and it won't re-focus.
 

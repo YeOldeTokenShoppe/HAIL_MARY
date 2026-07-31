@@ -263,7 +263,7 @@ covered. **Nobody at that desk can tell you whether the market will show up.**
 
 Which makes "most projects fail" free — a fact about the world rather than a
 change to the base rate you're graded against. The full treatment is VC_GAME.md §7
-item 8. If two separate numbers are ever wanted, the shape is READ becoming
+item 7. If two separate numbers are ever wanted, the shape is READ becoming
 *calibration* (proper, Brier) and BOOK becoming *venture returns* (power-law,
 honest to the fiction) — a scoring-kernel redesign, not an afternoon.
 

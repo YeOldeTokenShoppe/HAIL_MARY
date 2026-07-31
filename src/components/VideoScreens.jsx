@@ -87,112 +87,89 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
       ? 'https://firebasestorage.googleapis.com/v0/b/hailmary-3ff6c.firebasestorage.app/o/video%2F80s80s80s.mp4?alt=media&token=d6ff1f0a-979f-43f9-838b-5b4bb4fead76'
       : '/videos/23.mp4';
     
+    const makeVideo = (src) => {
+      const v = document.createElement('video');
+      v.src = src;
+      v.loop = true;
+      v.muted = true; // Required for autoplay
+      v.playsInline = true;
+      v.crossOrigin = 'anonymous';
+      return v;
+    };
+
+    // ONE DECODER OUTSIDE 80s MODE.
+    //
+    // Look at the three sources above: outside 80s mode they are all the same
+    // file. This used to build five separate <video> elements pointed at it,
+    // which meant five independent decoders and five downloads of the same
+    // clip (measured: 5 x 572KB on every /trade load). iPadOS caps how many
+    // videos can decode at once, so that was pure cost for zero difference —
+    // every screen was already showing the same footage.
+    //
+    // 80s mode keeps five elements: there the three sources really are three
+    // different files, and Screen1/Screen4 (boombox) must not be pinned to the
+    // same playhead as Screen3 (synthosaur).
+    const sharedVideo = is80sMode ? null : makeVideo(videoSource);
+
     // Create video elements
-    const video1 = document.createElement('video');
-    video1.src = boomboxSource; // Screen1 uses boombox in 80s mode
-    video1.loop = true;
-    video1.muted = true; // Required for autoplay
-    video1.playsInline = true;
-    video1.crossOrigin = 'anonymous';
+    const video1 = sharedVideo || makeVideo(boomboxSource); // Screen1 uses boombox in 80s mode
     video1Ref.current = video1;
 
     // Skip video2 creation since we'll use MacroAgentScreen for Screen2
-    // const video2 = document.createElement('video');
-    // video2.src = videoSource;
-    // video2.loop = true;
-    // video2.muted = true; // Required for autoplay
-    // video2.playsInline = true;
-    // video2.crossOrigin = 'anonymous';
+    // const video2 = makeVideo(videoSource);
     // video2Ref.current = video2;
 
-    const video3 = document.createElement('video');
-    video3.src = videoSource;
-    video3.loop = true;
-    video3.muted = true;
-    video3.playsInline = true;
-    video3.crossOrigin = 'anonymous';
+    const video3 = sharedVideo || makeVideo(videoSource);
     video3Ref.current = video3;
 
-    const video4 = document.createElement('video');
-    video4.src = videoSource;
-    video4.loop = true;
-    video4.muted = true;
-    video4.playsInline = true;
-    video4.crossOrigin = 'anonymous';
+    const video4 = sharedVideo || makeVideo(videoSource);
     video4Ref.current = video4;
 
-    const video5 = document.createElement('video');
-    video5.src = boomboxSource; // Screen4 uses boombox in 80s mode
-    video5.loop = true;
-    video5.muted = true;
-    video5.playsInline = true;
-    video5.crossOrigin = 'anonymous';
+    const video5 = sharedVideo || makeVideo(boomboxSource); // Screen4 uses boombox in 80s mode
     video5Ref.current = video5;
 
     // Create video6 for 80s80s80s video (small screens and L/R screens)
-    const video6 = document.createElement('video');
-    video6.src = eightySource; // Small screens and L/R screens use 80s80s80s in 80s mode
-    video6.loop = true;
-    video6.muted = true;
-    video6.playsInline = true;
-    video6.crossOrigin = 'anonymous';
+    const video6 = sharedVideo || makeVideo(eightySource);
     video6Ref.current = video6;
 
-    // Create video textures
-    const texture1 = new THREE.VideoTexture(video1);
-    texture1.minFilter = THREE.LinearFilter;
-    texture1.magFilter = THREE.LinearFilter;
-    texture1.format = THREE.RGBFormat;
-    texture1.flipY = false; // Flip Y-axis
-    texture1.repeat.x = -1; // Flip X-axis
-    texture1.center.set(0.5, 0.5); // Set center for proper flipping
+    // Create video textures. Settings are byte-for-byte what each texture
+    // carried before: flipY false, center 0.5, and repeat.x -1 (mirrored) on
+    // 1/3/4/5 while 6 stays +1.
+    const makeTexture = (video, mirrored) => {
+      const t = new THREE.VideoTexture(video);
+      t.minFilter = THREE.LinearFilter;
+      t.magFilter = THREE.LinearFilter;
+      t.format = THREE.RGBFormat;
+      t.flipY = false; // Flip Y-axis
+      t.repeat.x = mirrored ? -1 : 1; // Flip X-axis
+      t.center.set(0.5, 0.5); // Set center for proper flipping
+      return t;
+    };
+
+    // 1/3/4/5 are configured identically, so when they're fed by the shared
+    // element they can be ONE texture — one GPU upload per frame instead of
+    // four of the same pixels. texture6 needs repeat.x +1, so it stays its own
+    // texture even when it reads the shared video.
+    const sharedMirrored = sharedVideo ? makeTexture(sharedVideo, true) : null;
+
+    const texture1 = sharedMirrored || makeTexture(video1, true);
     texture1Ref.current = texture1;
 
     // Skip texture2 creation since we'll use MacroAgentScreen for Screen2
-    // const texture2 = new THREE.VideoTexture(video2);
-    // texture2.minFilter = THREE.LinearFilter;
-    // texture2.magFilter = THREE.LinearFilter;
-    // texture2.format = THREE.RGBFormat;
-    // texture2.flipY = false; // Flip Y-axis
-    // texture2.repeat.x = -1; // Flip X-axis
-    // texture2.center.set(0.5, 0.5); // Set center for proper flipping
+    // const texture2 = makeTexture(video2, true);
     // texture2Ref.current = texture2;
 
-    const texture3 = new THREE.VideoTexture(video3);
-    texture3.minFilter = THREE.LinearFilter;
-    texture3.magFilter = THREE.LinearFilter;
-    texture3.format = THREE.RGBFormat;
-    texture3.flipY = false; // Flip Y-axis
-    texture3.repeat.x = -1; // Flip X-axis
-    texture3.center.set(0.5, 0.5); // Set center for proper flipping
+    const texture3 = sharedMirrored || makeTexture(video3, true);
     texture3Ref.current = texture3;
 
-    const texture4 = new THREE.VideoTexture(video4);
-    texture4.minFilter = THREE.LinearFilter;
-    texture4.magFilter = THREE.LinearFilter;
-    texture4.format = THREE.RGBFormat;
-    texture4.flipY = false; // Flip Y-axis - changed to false to match Screen1 and Screen2
-    texture4.repeat.x = -1; // Flip X-axis
-    texture4.center.set(0.5, 0.5); // Set center for proper flipping
+    const texture4 = sharedMirrored || makeTexture(video4, true);
     texture4Ref.current = texture4;
 
-    const texture5 = new THREE.VideoTexture(video5);
-    texture5.minFilter = THREE.LinearFilter;
-    texture5.magFilter = THREE.LinearFilter;
-    texture5.format = THREE.RGBFormat;
-    texture5.flipY = false; // Flip Y-axis - changed to false to match Screen1 and Screen2
-    texture5.repeat.x = -1; // Flip X-axis
-    texture5.center.set(0.5, 0.5); // Set center for proper flipping
+    const texture5 = sharedMirrored || makeTexture(video5, true);
     texture5Ref.current = texture5;
 
     // Create texture6 for 80s80s80s video
-    const texture6 = new THREE.VideoTexture(video6);
-    texture6.minFilter = THREE.LinearFilter;
-    texture6.magFilter = THREE.LinearFilter;
-    texture6.format = THREE.RGBFormat;
-    texture6.flipY = false; // Match other textures
-    texture6.repeat.x = 1; // Flip X-axis
-    texture6.center.set(0.5, 0.5); // Set center for proper flipping
+    const texture6 = makeTexture(video6, false);
     texture6Ref.current = texture6;
 
     // Find screens and apply textures

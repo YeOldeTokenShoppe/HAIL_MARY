@@ -3263,8 +3263,20 @@ const CyborgTempleScene = ({
     // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
     // download before iOS Safari times out. Falls back to the un-optimized
     // V2 if the opt build is missing on the deploy.
-    let modelPath = "/models/RL80_4anims_v98_opt.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v98.glb";
+    // V3 "lite" — same v98 geometry/rig/animations as the _opt build (verified
+    // identical: 64,203 verts, 19 skins, 55 animations, 9,267 anim channels),
+    // with the flat/low-detail maps downscaled. GPU texture memory is driven by
+    // DIMENSIONS, not file size: several of the _opt build's 1024² maps were
+    // 2-8KB on disk (near-flat) yet cost ~5.3MB each in VRAM with mipmaps. The
+    // lite build is ~38MB of decoded textures instead of ~80MB — the difference
+    // between fitting and not fitting on an iPad. Rebuild:
+    //   gltf-transform resize in.glb a.glb --width 256 --height 256 \
+    //     --pattern "@(Image_5|Image_9|Image_13|Image_11|Polygon_Mask_Texture|eyeYellow_512)"
+    //   gltf-transform resize a.glb b.glb --width 512 --height 512 \
+    //     --pattern "@(Image_0|Image_3|PolygonCyberCity_02_C_Emissive|DiffuseColor_Texture_17_002_recover)"
+    //   gltf-transform meshopt b.glb out.glb --level medium
+    let modelPath = "/models/RL80_4anims_v98_lite.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v98_opt.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -5016,18 +5028,35 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           groupRef.current.remove(groupRef.current.children[0]);
         }
 
-        // Dispose of materials and geometries
+        // Dispose of materials, geometries AND the textures the materials
+        // reference. Material.dispose() does not free its maps, and this GLB
+        // carries ~25 of them — mostly 1024², ~80MB decoded with mipmaps.
+        // That was invisible while the temple mounted once per page; the
+        // talk-show swap unmounts it, so without this every LT TV round-trip
+        // strands the whole set on the GPU. Textures are shared between
+        // materials, so dedupe before disposing.
+        const seenMaterials = new Set();
+        const seenTextures = new Set();
         groupRef.current.traverse((child) => {
           if (child.geometry) {
             child.geometry.dispose();
           }
-          if (child.material) {
-            if (Array.isArray(child.material)) {
-              child.material.forEach(material => material.dispose());
-            } else {
-              child.material.dispose();
-            }
-          }
+          if (!child.material) return;
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          materials.forEach((material) => {
+            if (!material || seenMaterials.has(material)) return;
+            seenMaterials.add(material);
+            // Every texture slot, whatever the material type — walking the
+            // material's own values catches map/normalMap/emissiveMap/etc.
+            // without having to keep a list in sync with three's material set.
+            Object.values(material).forEach((value) => {
+              if (value && value.isTexture && !seenTextures.has(value)) {
+                seenTextures.add(value);
+                try { value.dispose(); } catch (e) {}
+              }
+            });
+            material.dispose();
+          });
         });
       }
 

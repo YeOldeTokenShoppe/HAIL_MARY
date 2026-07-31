@@ -1303,6 +1303,12 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
   );
 }
 
-// Preload the models
-useGLTF.preload('/models/ourlady_rider7.glb');
-useGLTF.preload('/models/laptop.glb');
+// Preload the models — ONLY at the widths that actually mount this scene.
+// /trade imports this on every device but renders it under isMobileView
+// (<=768), so desktop/iPad were pulling ourlady_rider7.glb (1.1MB) + laptop
+// for nothing. Skipping the warm never breaks a load; useGLTF still fetches
+// on mount.
+if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+  useGLTF.preload('/models/ourlady_rider7.glb');
+  useGLTF.preload('/models/laptop.glb');
+}

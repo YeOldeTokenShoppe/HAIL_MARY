@@ -288,11 +288,12 @@ export default function PressSession({
 
   /* ---- TWO VOICES PER PRESS ----
      The seat that went and looked speaks FIRST, in ITS OWN voice; the pitcher
-     reacts after. VC_GAME.md §9 item 4 called the ordering out and warned what
-     happens if it is wrong — "the reaction lands under the wrong name" — and the
-     wrong version was worse than that: the floor voiced EVERY line as the
-     pitcher, so pressing Eugene came back as the bot reading Eugene's finding
-     (author, 2026-07-29).
+     reacts after. The build order called this ordering out while it was still
+     unbuilt and warned what happens if it is wrong — "the reaction lands under
+     the wrong name" — and the wrong version was worse than that: the floor
+     voiced EVERY line as the pitcher, so pressing Eugene came back as the bot
+     reading Eugene's finding (author, 2026-07-29). Shipped, so VC_GAME.md no
+     longer carries the item.
 
      One token spans BOTH utterances. If a press interrupts mid-turn, the guard
      must cover the whole exchange or the abandoned adviser line clears `speaking`

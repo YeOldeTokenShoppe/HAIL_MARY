@@ -65,7 +65,6 @@ export const SLOTS = [
         line: "What share is inflows? …I've asked. I get a range. The range moves. Last quarter I'd have said a third, and I'd have been guessing.",
         receipt: { title: "SOURCE SPLIT", rows: [["Disclosed split", "NONE"], ["Estimate stability", "MOVES"], ["Inflow share", "UNKNOWN"]] },
       },
-      miss: { line: "Daily. It's paid daily. You can watch it land, that's not in dispute.", receipt: null },
     },
     legit: {
       generic: {
@@ -76,7 +75,6 @@ export const SLOTS = [
         line: "Published monthly, audited quarterly, and the deposits line is a hard zero. That's the whole reason I'll put my name on it.",
         receipt: { title: "SOURCE SPLIT", rows: [["Disclosed split", "MONTHLY"], ["Deposit-funded", "0%"], ["Independent check", "QUARTERLY"]] },
       },
-      miss: { line: "Daily. It's paid daily. You can watch it land, that's not in dispute.", receipt: null },
     },
   },
 
@@ -198,12 +196,10 @@ export const SLOTS = [
     rug: {
       generic: { line: "It works. It's been working. It works in chop, it works in a rally, I don't know what else to tell you.", receipt: null },
       sharp: { line: "What would make me get out? Nothing— I mean, obviously if it stopped paying. But it hasn't stopped paying.", receipt: null },
-      miss: { line: "Volume's up. That part's just a fact you can go and check.", receipt: null },
     },
     legit: {
       generic: { line: "It works. It's been working. Look, I'm not going to pretend I've stress-tested it myself.", receipt: null },
       sharp: { line: "What would get me out? Reserves slipping below the published floor two quarters running. It's a real number, I watch it.", receipt: null },
-      miss: { line: "Volume's up. That part's just a fact you can go and check.", receipt: null },
     },
   },
 

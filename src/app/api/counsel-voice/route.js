@@ -54,8 +54,9 @@ const VOICES = {
     settings: { stability: 0.85, similarity_boost: 0.6, style: 0.1 },
   },
   // DETECTIVE MARISOL — voice id confirmed by the author 2026-07-29. This was
-  // VC_GAME.md §9's "one real blocker": the Detective had no voice at all, so any
-  // line of hers fell through to the 409 no_voice_for_speaker path and was silent.
+  // the build order's "one real blocker": the Detective had no voice at all, so
+  // any line of hers fell through to the 409 no_voice_for_speaker path and was
+  // silent. Resolved, so VC_GAME.md no longer carries the item.
   MR: {
     id: process.env.ELEVENLABS_VOICE_MARISOL || "jdWlEMh784XiUSTLzNso",
     // Steady and unhurried — she reports what the chain says and doesn't sell it.

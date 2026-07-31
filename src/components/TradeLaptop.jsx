@@ -1767,7 +1767,14 @@ const TradeLaptop = forwardRef(function TradeLaptop({ isMobile = false, isTablet
 
 export default TradeLaptop;
 
-// Preload the models
-useGLTF.preload('/models/laptop.glb');
-useGLTF.preload('/models/CyberpunkMaryHeartRed3.glb');
-useGLTF.preload('/models/Brain.glb');
+// Preload the models — ONLY at the widths that actually mount this scene.
+// These run at import time, and /trade imports this module on every device
+// while only rendering it under isMobileView (<=768). Desktop and iPad were
+// therefore downloading ~635KB of models they never draw. Same 768 threshold
+// the page uses; when it's wrong we just skip a warm, we don't break a load
+// (useGLTF still fetches on mount).
+if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+  useGLTF.preload('/models/laptop.glb');
+  useGLTF.preload('/models/CyberpunkMaryHeartRed3.glb');
+  useGLTF.preload('/models/Brain.glb');
+}

@@ -216,7 +216,7 @@ export function instanceDeal(seed = 1, archetypeId = null) {
  * 2026-07-28). A LOCAL/DAILY mode split was built to fix it, then cut the same
  * day once the daily's last justification went with the leaderboard:
  *
- *   - leaderboard fairness   -> rejected outright (VC_GAME.md §7)
+ *   - leaderboard fairness   -> rejected outright (VC_GAME.md §8)
  *   - anti-reroll-fishing    -> only matters when there's a rank to protect
  *   - BOOK continuity        -> local runs bank just as well
  *   - a shared talking point -> real, but Wordle-shaped, and entirely latent

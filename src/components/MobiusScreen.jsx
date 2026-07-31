@@ -365,6 +365,9 @@ const MobiusScreen = ({
     let lastFrame = 0
     let lastTime = performance.now()
     let elapsed = 0
+    let contextAttempts = 0
+    let retryTimer = 0
+    const MAX_CONTEXT_ATTEMPTS = 10
 
     const FRAME_INTERVAL = 1000 / fps
     let hidden = document.hidden
@@ -404,17 +407,22 @@ const MobiusScreen = ({
     }
 
     const start = () => {
-      const canvas = window[canvasGlobal]
-      const texture = window[textureGlobal]
+      // These are re-read every frame in draw(), not captured for the life of
+      // the effect: VideoScreens rebuilds the screen canvases whenever the
+      // temple model reloads (the talk-show swap unmounts it), and the painter
+      // that keeps pointing at the old canvas is the one that comes back blank.
+      // CRTScreen/DetectiveScreen already work this way — match them.
+      let canvas = window[canvasGlobal]
+      let texture = window[textureGlobal]
       if (!canvas || !texture) {
         if (!disposed) rafRef.current = requestAnimationFrame(start)
         return
       }
 
-      const W = canvas.width
-      const H = canvas.height
-      const rw = Math.max(2, Math.round(W * renderScale))
-      const rh = Math.max(2, Math.round(H * renderScale))
+      let W = canvas.width
+      let H = canvas.height
+      let rw = Math.max(2, Math.round(W * renderScale))
+      let rh = Math.max(2, Math.round(H * renderScale))
 
       glCanvas = document.createElement('canvas')
       glCanvas.width = rw
@@ -428,8 +436,21 @@ const MobiusScreen = ({
           powerPreference: 'low-power',
         })
       } catch (err) {
-        // No spare WebGL context available — leave whatever painter drew last.
-        console.warn('[MobiusScreen] could not create WebGL context:', err)
+        // No spare WebGL context right now. This used to give up for good,
+        // which left the screen dark forever — and a temple reload is exactly
+        // when contexts are most contended (the outgoing scene's may not be
+        // reclaimed yet). Back off and try again instead.
+        glCanvas = null
+        contextAttempts += 1
+        if (contextAttempts === 1) {
+          console.warn('[MobiusScreen] could not create WebGL context, retrying:', err)
+        }
+        if (!disposed && contextAttempts <= MAX_CONTEXT_ATTEMPTS) {
+          retryTimer = setTimeout(() => {
+            retryTimer = 0
+            if (!disposed) rafRef.current = requestAnimationFrame(start)
+          }, 600)
+        }
         return
       }
       renderer.setPixelRatio(1)
@@ -445,7 +466,31 @@ const MobiusScreen = ({
       geometry = new THREE.PlaneGeometry(2, 2)
       scene.add(new THREE.Mesh(geometry, material))
 
-      const ctx = canvas.getContext('2d')
+      let ctx = canvas.getContext('2d')
+
+      // Re-point at the current screen canvas. Returns false while there is
+      // nothing to paint onto (between a temple unmount and VideoScreens
+      // rebuilding the canvases), so draw() just idles that frame.
+      const retarget = () => {
+        const nextCanvas = window[canvasGlobal]
+        const nextTexture = window[textureGlobal]
+        if (!nextCanvas || !nextTexture) return false
+        texture = nextTexture
+        if (nextCanvas === canvas) return true
+
+        canvas = nextCanvas
+        ctx = canvas.getContext('2d')
+        if (canvas.width !== W || canvas.height !== H) {
+          W = canvas.width
+          H = canvas.height
+          rw = Math.max(2, Math.round(W * renderScale))
+          rh = Math.max(2, Math.round(H * renderScale))
+          renderer.setSize(rw, rh, false)
+          uniforms.iResolution.value.set(rw, rh)
+          features = makeFeatures()
+        }
+        return true
+      }
 
       // ---- analysis-HUD state ------------------------------------------------
       const t0 = performance.now() // overlay clock (independent of the slow shader clock)
@@ -635,6 +680,13 @@ const MobiusScreen = ({
         if (ts - lastFrame < FRAME_INTERVAL) return
         lastFrame = ts
 
+        // Follow the canvas the scene is actually showing — it changes under
+        // us whenever the temple model reloads.
+        if (!retarget()) {
+          lastTime = performance.now()
+          return
+        }
+
         // Yield to EvidenceScreens while the player is reading this station's
         // evidence card (it owns the canvas and sets this flag).
         if (canvas.dataset && canvas.dataset.evidenceActive === 'true') {
@@ -674,6 +726,7 @@ const MobiusScreen = ({
     return () => {
       disposed = true
       cancelAnimationFrame(rafRef.current)
+      if (retryTimer) clearTimeout(retryTimer)
       document.removeEventListener('visibilitychange', onVis)
       if (material) material.dispose()
       if (geometry) geometry.dispose()

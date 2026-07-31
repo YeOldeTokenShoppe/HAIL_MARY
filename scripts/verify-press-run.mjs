@@ -11,7 +11,7 @@ import fs from "node:fs";
 import { instanceDeal, ARCHETYPE_IDS, backingOf, genericDiscriminates, sharpDiscriminates } from "../src/game/terminal-traders/press/instanceDeal.js";
 import { BACKING, SHAPES, LANES, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend, inLane } from "../src/game/terminal-traders/press/questions.js";
 import { DESK, EUGENE, PITCH_BOT, adviserLine, laneSentence, laneOwner, pitcherAside } from "../src/game/terminal-traders/press/desk.js";
-import { VIRGIL, virgilRead, agenda as eugeneAgenda, shapeTip } from "../src/game/terminal-traders/press/virgil.js";
+import { VIRGIL, virgilRead, agenda as virgilAgenda, shapeTip } from "../src/game/terminal-traders/press/virgil.js";
 import {
   PRESSES, STAKE, PHASE,
   createRun, press, advance, callIt, allocate,
@@ -67,16 +67,18 @@ console.log("\n-- the desk ------------------------------------------------");
   for (const sh of Object.values(SHAPES))
     for (const ln of Object.values(LANES))
       if (!virgilRead({ id: "xx", shape: sh, lane: ln }, { owner: laneOwner({ lane: ln }) }).agenda) total = false;
-  ok("Eugene's read is total over all shapes x lanes", total);
-  ok("Eugene's read is deterministic",
+  ok("Virgil's read is total over all shapes x lanes", total);
+  ok("Virgil's read is deterministic",
     virgilRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }, { owner: DESK[SEATS.MARISOL] }).tip ===
     virgilRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }, { owner: DESK[SEATS.MARISOL] }).tip);
-  ok("both advisers have all four result lines",
-    SPENDABLE_SEATS.every((s) => ["dispatch", "found", "partial", "nothing"].every((r) => adviserLine(s, r))));
+  ok("all four seats have every result line, deep and shallow",
+    SPENDABLE_SEATS.every((s) => ["dispatch", "found", "partial", "nothing"].every((r) => adviserLine(s, r))
+      && adviserLine(s, "found", false)));
 
   // THE FLOOR MAY NEVER NAME A SPENT ADVISER AS THE WAY THROUGH. Both of these
   // shipped broken: the band read "only Detective Marisol can settle it" and
-  // Eugene said "Marisol can settle it" on a claim where she was already spent
+  // the read (Eugene's at the time) said "Marisol can settle it" on a claim
+  // where she was already spent
   // and two interruptions were still in hand. Neither is cosmetic — it's an
   // instruction to take an action the controller rejects as a no-op.
   const chainClaim = { id: "dep", shape: SHAPES.SELECTIVE_WINDOW, lane: LANES.CHAIN };
@@ -94,10 +96,10 @@ console.log("\n-- the desk ------------------------------------------------");
       return /spent/i.test(a) && /shallow/i.test(a)
         && /spent/i.test(b) && /shallow/i.test(b);
     })());
-  ok("Eugene stops pointing at a spent adviser",
+  ok("Virgil stops pointing at a spent adviser",
     (() => {
-      const live = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 });
-      const dead = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), spent: [SEATS.MARISOL], remaining: 2 });
+      const live = virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 });
+      const dead = virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), spent: [SEATS.MARISOL], remaining: 2 });
       return live !== dead && /shallow looks left/i.test(dead);
     })());
   ok("spending the OTHER adviser changes nothing about this lane",
@@ -107,7 +109,7 @@ console.log("\n-- the desk ------------------------------------------------");
   // EUGENE'S JOB. His second sentence is the agenda — how much runway is left
   // in this lane — because the lane band already owns "whose is it" and a
   // character who restates the UI reads as having no role at all.
-  ok("Eugene's read is the SHAPE plus the agenda, never a restatement of the lane",
+  ok("Virgil's read is the SHAPE plus the agenda, never a restatement of the lane",
     (() => {
       const r = virgilRead(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 }).agenda;
       // the band's job — naming the owner — must not appear in his mouth
@@ -115,20 +117,20 @@ console.log("\n-- the desk ------------------------------------------------");
     })());
   ok("the agenda distinguishes 'hold' from 'now or never'",
     (() => {
-      const more = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 3 });
-      const last = eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 0 });
+      const more = virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 3 });
+      const last = virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 0 });
       return more !== last && /Three more/i.test(more) && /Last money question/i.test(last);
     })());
   ok("singular and plural both read as English",
-    /One more money question after this one\./.test(eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 1 }))
-    && /Two more money questions after this one\./.test(eugeneAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 })));
+    /One more money question after this one\./.test(virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 1 }))
+    && /Two more money questions after this one\./.test(virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 })));
   // EVERY LANE, NOT JUST CHAIN. Both agenda bugs found on 2026-07-28 shipped
   // because every assertion here used `chainClaim` — the one lane whose noun
   // pluralises with a trailing "s" and whose owner is never Eugene. A per-lane
   // sweep is the assertion that would have caught them the day they landed.
   ok("every lane pluralises on its HEAD noun, not its phrase",
     Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) => {
-      const two = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  remaining: 2 });
+      const two = virgilAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  remaining: 2 });
       return !/\bs\b|storys|charts\b|questions about the (chart|story)s/.test(two)
         && /questions?/.test(two) && !/question after/.test(two);
     }));
@@ -136,7 +138,7 @@ console.log("\n-- the desk ------------------------------------------------");
     Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) =>
       [0, 1, 2, 3].every((remaining) =>
         [[], [SEATS.MARISOL], [SEATS.GR80], [SEATS.EUGENE], [SEATS.BARRON]].every((spent) => {
-          const line = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  spent, remaining });
+          const line = virgilAgenda({ id: "x", lane }, { owner: laneOwner({ lane }),  spent, remaining });
           return line
             && !/storys|charts\b|questions question|more question after/.test(line)
             && /[.!]$/.test(line);
@@ -148,7 +150,7 @@ console.log("\n-- the desk ------------------------------------------------");
     Object.values(LANES).filter((l) => l !== LANES.SHAPE).every((lane) =>
       [0, 1, 2].every((remaining) =>
         [[], [SEATS.EUGENE], [SEATS.MARISOL]].every((spent) => {
-          const line = eugeneAgenda({ id: "x", lane }, { owner: laneOwner({ lane }), spent, remaining });
+          const line = virgilAgenda({ id: "x", lane }, { owner: laneOwner({ lane }), spent, remaining });
           return !/\bme\b|\bI\b|send me/i.test(line);
         }))));
   ok("Virgil is not a seat and owns no lane",
@@ -162,7 +164,7 @@ console.log("\n-- the desk ------------------------------------------------");
     })());
   ok("a SHAPE claim reports what's checkable at all, not a lane",
     (() => {
-      const s = eugeneAgenda({ id: "vibe", shape: SHAPES.UNFALSIFIABLE, lane: LANES.SHAPE }, { owner: null, remaining: 2 });
+      const s = virgilAgenda({ id: "vibe", shape: SHAPES.UNFALSIFIABLE, lane: LANES.SHAPE }, { owner: null, remaining: 2 });
       return /Nobody's the expert/i.test(s) && !/money|paperwork|chart|story/i.test(s);
     })());
 }
@@ -268,7 +270,7 @@ console.log("\n-- the agenda is real, and leak-free ------------------------");
       return laneOutlook({ ...createRun(d), claimIndex: idx }, d).remaining === 0;
     })());
   // THE LEAK CHECK. Two deals from the same archetype with OPPOSITE outcomes
-  // must produce identical agendas, or Eugene is telling you the answer.
+  // must produce identical agendas, or Virgil is telling you the answer.
   ok("the agenda is identical across rug and legit — it cannot leak the branch",
     (() => {
       const seeds = [];

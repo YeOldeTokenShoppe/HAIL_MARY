@@ -81,7 +81,8 @@ export function resolvePress(claim, seat = PITCHER) {
     adviserSays: seat === PITCHER ? null : adviserLine(seat, result, deep),
     // Historical field name: this is whatever the PITCHER says. On a seat press
     // it is the pitcher's reaction to the finding, which is why it is still
-    // populated for every seat — see the two-voices ordering note in §9.
+    // populated for every seat — see the TWO VOICES PER PRESS note in
+    // PressSession.jsx / PressFlat.jsx, which own that ordering.
     barronSays: block.line ?? "",
     receipt,
     // NOTHING ON FILE is an independent party having LOOKED and found an

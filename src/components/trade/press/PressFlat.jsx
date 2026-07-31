@@ -40,16 +40,14 @@ import {
 //   • The evidence screen is literally the screen. On desktop "his monitor
 //     stays black" is a texture across the room; here the panel IS a terminal.
 
-// THE PITCHER'S VOICE. Both say() calls on this surface are the pitcher's own
-// lines — the claim's spin, and its reaction after a seat reports — so one key
-// covers them. Was "JB" while John Barron did the selling; the pitch bot has its
-// own ElevenLabs voice now (VOICES.PB in api/counsel-voice, override with
+// THE PITCHER'S VOICE, and the DEFAULT for anything sayTurn isn't given a voice
+// for — the claim's spin, and the pitcher's reaction after a seat reports. Was
+// "JB" while John Barron did the selling; the pitch bot has its own ElevenLabs
+// voice now (VOICES.PB in api/counsel-voice, override with
 // ELEVENLABS_VOICE_PITCHBOT).
 //
-// The ADVISER half of a press is still silent — `outcome.adviserSays` is
-// rendered but never spoken, so the two-voices-per-press ordering in VC_GAME.md
-// §9 item 4 remains unbuilt. When it lands, the seat speaks FIRST and the
-// pitcher reacts, or the reaction lands under the wrong name.
+// The adviser half is NO LONGER silent: `sayTurn` voices the seat first in its
+// own key, then the pitcher — see the TWO VOICES PER PRESS note below.
 const VOICE = "PB";
 
 export default function PressFlat({ deal: dealOverride = null, onExit }) {
@@ -236,11 +234,12 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
   /* ---- TWO VOICES PER PRESS ----
      The seat that went and looked speaks FIRST, in ITS OWN voice; the pitcher
-     reacts after. VC_GAME.md §9 item 4 called the ordering out and warned what
-     happens if it is wrong — "the reaction lands under the wrong name" — and the
-     wrong version was worse than that: the floor voiced EVERY line as the
-     pitcher, so pressing Eugene came back as the bot reading Eugene's finding
-     (author, 2026-07-29).
+     reacts after. The build order called this ordering out while it was still
+     unbuilt and warned what happens if it is wrong — "the reaction lands under
+     the wrong name" — and the wrong version was worse than that: the floor
+     voiced EVERY line as the pitcher, so pressing Eugene came back as the bot
+     reading Eugene's finding (author, 2026-07-29). Shipped, so VC_GAME.md no
+     longer carries the item.
 
      One token spans BOTH utterances. If a press interrupts mid-turn, the guard
      must cover the whole exchange or the abandoned adviser line clears `speaking`
