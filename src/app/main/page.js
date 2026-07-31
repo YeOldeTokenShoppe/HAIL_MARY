@@ -37,7 +37,7 @@ import { adviserMouth } from "@/lib/adviserMouth";
 // The seeker asks. The advisers do NOT answer them — they whisper at Our Lady's
 // shoulders, each pressing her to answer their way, and she alone turns and
 // speaks to the seeker:
-//   John Barron (right) — the devil's advocate. Lobbies her FOR the appetite.
+//   Connor (right) — the devil's advocate. Lobbies her FOR the appetite.
 //   St. GR80 (left)     — the saint. Petitions her from duty (categorical imperative).
 //   Our Lady (centre)   — one short line, TO THE SEEKER. Never a verdict.
 // The advisers say "they" of the seeker and "you" of her; only her "you" means
@@ -126,7 +126,7 @@ const SHARE_BUTTON_H = 43;
 // root: separate globals, its own player, its own sayText. Verified — three
 // distinct faces live at once, all readable by the parent, none tainted.
 //
-// CASTING (confirmed 2026-07-15): Saint GR80 left, Our Lady centre, John Barron
+// CASTING (confirmed 2026-07-15): Saint GR80 left, Our Lady centre, Connor
 // right. Each seat is a SEPARATE published embed token — a seat cannot reuse
 // another's, and a new adviser needs its own token from SitePal's publish flow.
 // The advisers have no lines yet: `oracleGreeting` is centre-only, so tapping
@@ -150,8 +150,8 @@ const COUNCIL = [
   {
     key: "john",
     seat: "right",
-    name: "John Barron",
-    title: "John Barron",
+    name: "Connor",
+    title: "Connor",
     frameHue: "#ff2d75",
     image: "/cameo_h80z.webp",
     sitePalScene: 2775052,
@@ -532,7 +532,7 @@ const SEAT_VOICE = { left: "GR", center: "OL", right: "JB" };
 // faces, so the names carry the identity the portraits carry on desktop.
 const SPEAKER = {
   you: { name: "You", hue: "#8b97a8" },
-  JB: { name: "John Barron", hue: "#ff2d75" },
+  JB: { name: "Connor", hue: "#ff2d75" },
   GR: { name: "Saint GR80", hue: "#22ccff" },
   OL: { name: "Our Lady", hue: "#f4b53f" },
 };
@@ -1214,7 +1214,7 @@ function PortraitPanel({
               mirrored
               lit={speakingKey === "JB"}
               hue={SPEAKER.JB.hue}
-              alt="John Barron"
+              alt="Connor"
               arrived={figuresIn}
               wingMotion="demon"
               size={figureSize}
@@ -3047,7 +3047,7 @@ export default function MainPage() {
           scene keeps the column.
           On the TRIPTYCH it sits in HER panel's corner, not the viewport's. It
           changes HER apparition, and parked in the window's top-right it was
-          sitting in John Barron's frame, offering to restyle the one face it
+          sitting in Connor's frame, offering to restyle the one face it
           can't touch. It is placed by arithmetic rather than by living inside her
           panel: the wordmark gets away with `position:fixed` in there because the
           panel's backdrop-filter makes it the containing block, but that same

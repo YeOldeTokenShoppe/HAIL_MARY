@@ -298,7 +298,7 @@ console.log("\n-- THE ACCEPTANCE INVARIANT: the desk must beat the seller ---");
   // the seats are one-use, three presses on the seller weakly DOMINATED the
   // entire four-seat desk. The mechanic the whole redesign rests on did nothing.
   //
-  // The seller was John Barron then and is the pitch bot now (2026-07-29). The
+  // The seller was Connor then and is the pitch bot now (2026-07-29). The
   // asymmetry this section guards against is UNCHANGED by that swap — if
   // anything it matters more, because Barron joining the desk means all four
   // specialists are costed and the free press is the only uncosted move left.

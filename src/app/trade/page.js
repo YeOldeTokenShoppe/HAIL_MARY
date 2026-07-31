@@ -1047,7 +1047,7 @@ const SCREEN_OVERLAY_STUBS = {
 // agentId on the left is what CyborgTempleScene fires through onAgentClick;
 // station key on the right matches GameOverlay's SAMPLE_CASE.stations.
 //   Monk      → Saint GR80        (Ethos · credibility)
-//   Demon     → John Barron       (Pathos · sentiment)
+//   Demon     → Connor       (Pathos · sentiment)
 //   Detective → Detective Marisol (Logos · onchain)
 //   RL80      → Eugene            (Mythos · narrative — the unicorn)
 const CHARACTER_TO_STATION = {
@@ -2818,7 +2818,7 @@ export default function CyborgTemple() {
         // !isMobileView (see the CleanCanvas block below), so a phone that
         // preloaded this downloaded 4MB it could never render. Path must track
         // CyborgTempleScene's modelPath or the page fetches BOTH builds.
-      const modelToPreload = '/models/RL80_4anims_v98_lite.glb';
+      const modelToPreload = '/models/RL80_4anims_v00_lite.glb';
           // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
 
         if (!isMobile && !document.querySelector(`link[href="${modelToPreload}"]`)) {
@@ -4147,7 +4147,7 @@ export default function CyborgTemple() {
         {(() => {
           const agentInfo = {
             RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Every story wants to be a myth. The rare ones earn it.' },
-            Demon: { name: 'John Barron', pronunciation: '', tagline: 'Devil\'s advocate. Short seller. Insider trader.' },
+            Demon: { name: 'Connor', pronunciation: '', tagline: 'Devil\'s advocate. Loves leverage. Insider trader.' },
             Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android theologian hell-bent on saving humanity from itself.' },
             Detective: { name: 'Detective Marisol', pronunciation: '', tagline: 'Field agent for an interdimensional cyber-crimes task force.' },
           };

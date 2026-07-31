@@ -19,7 +19,7 @@ import { pathToFileURL } from "url";
 // Constant character identities (the spec never supplies these).
 const CHARS = {
   monk:    { name: "Saint GR80",        role: "ETHOS · CREDIBILITY", sigil: "✠", slot: "monk",    tagline: "Trust nothing the team says about itself. Watch what they've already done.", voice: `{ voice: "9", lang: 1, engine: 1, effect: "T", effLevel: 3 }` },
-  demon:   { name: "John Barron",       role: "PATHOS · SENTIMENT",  sigil: "✦", slot: "demon",   tagline: "Sentiment is theater. Strip the script and read the cast.", voice: `{ voice: "2", effect: "T", effLevel: 3 }` },
+  demon:   { name: "Connor",       role: "PATHOS · SENTIMENT",  sigil: "✦", slot: "demon",   tagline: "Sentiment is theater. Strip the script and read the cast.", voice: `{ voice: "2", effect: "T", effLevel: 3 }` },
   marisol: { name: "Detective Trinity", role: "LOGOS · ONCHAIN",     sigil: "✧", slot: "trinity", tagline: "The chain doesn't lie. Read the receipts.", voice: `{ voice: "3", lang: 1, engine: 3, effect: "T", effLevel: 3 }` /* "Kate" + reverb (Time fx) */ },
   eugene:  { name: "Eugene",            role: "MYTHOS · NARRATIVE",  sigil: "❖", slot: "eugene",   tagline: "Every rug wears a story. Find the seams.", textOnly: true },
 };

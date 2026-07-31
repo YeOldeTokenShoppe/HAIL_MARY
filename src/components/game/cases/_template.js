@@ -129,7 +129,7 @@ const CASE_TEMPLATE = {
 
     // PATHOS — sentiment / crowd / promotion
     demon: {
-      character: "John Barron",
+      character: "Connor",
       role: "PATHOS · SENTIMENT",
       sigil: "✦",
       tagline: "Sentiment is theater. Strip the script and read the cast.",

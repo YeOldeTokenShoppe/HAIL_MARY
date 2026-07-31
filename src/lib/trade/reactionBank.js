@@ -18,7 +18,7 @@
 //                           hype-velocity | rug-shape | dormant | clean-legit
 //
 // Voices (from src/lib/review/characterPrompts.js):
-//   Demon = John Barron — hype-critic, loud, staccato, cynical, names the greed.
+//   Demon = Connor — hype-critic, loud, staccato, cynical, names the greed.
 //   Detective = Marisol — cold, agnostic, states evidence, renders NO verdict.
 //
 // Fields: id (director returns this as clipId) · character · audioName (the
@@ -27,7 +27,7 @@
 // Edit freely — these are your characters. Trim or add; keep id/audioName unique.
 
 export const REACTION_BANK = [
-  // ── Demon — John Barron. Cuts against hope; entertained by the con. ──
+  // ── Demon — Connor. Cuts against hope; entertained by the con. ──
   { id: 'd_trust',   character: 'Demon', audioName: 'demon_trust',   tag: 'verdict-trust',
     text: "You leaned Trust. Of course you did. Hope is the cheapest thing they sell." },
   { id: 'd_doubt',   character: 'Demon', audioName: 'demon_doubt',   tag: 'verdict-doubt',

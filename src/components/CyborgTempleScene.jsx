@@ -792,6 +792,18 @@ const CyborgTempleScene = ({
   const catEmptyRef = useRef(null);   // Cat_Empty node, for perch moves + focus framing
   const catPerchRef = useRef(0);      // index into CAT_PERCHES
   const bridgeTimersRef = useRef({}); // { charName: timeoutId } for the typing↔idle bridge hand-off
+  // ?animdebug=1 — watch for the exact condition that produces an armature
+  // flash. If the weights of a character's playing actions sum to less than 1,
+  // three.js fills the remainder with the BIND pose (T-pose, standing, off
+  // axis) — that is the "flips to the side and back". Logs the frame it
+  // happens on and what was playing, so the cause is named rather than guessed.
+  const animDebugRef = useRef(false);
+  const animDebugPrevRef = useRef({});
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    animDebugRef.current = new URLSearchParams(window.location.search).get('animdebug') === '1';
+    if (animDebugRef.current) console.log('[anim] debug on — watching for weight gaps (bind-pose flashes)');
+  }, []);
   const [loadedModel, setLoadedModel] = useState(null);
   const [detectedMobile, setDetectedMobile] = useState(false);
   const xCandleNodesRef = useRef([]); // Sorted array of XCandle01* root nodes
@@ -1112,7 +1124,7 @@ const CyborgTempleScene = ({
       action.reset();
       // Skip the bind-pose first frame so the crossfade can't flash a T-pose
       // (same 5% inset applyCharacterReaction uses for single-clip reactions).
-      action.time = action.getClip().duration * 0.05;
+      action.time = bindSkipTime(action);
       action.setLoop(THREE.LoopRepeat, Infinity);
       action.fadeIn(XF);
       action.play();
@@ -1173,7 +1185,10 @@ const CyborgTempleScene = ({
   // exclude TRANSITION_RE. The bind-pose-skip pass in useFrame must skip them
   // too — it rewrites action.time every frame, which would pin the one-shot
   // and the bridge would never land.
-  const TRANSITION_RE = /_to_idle$/i;
+  // Deliberately NOT a general /_to_\w+$/ — that would swallow the cat's
+  // cat_loaf_to_stand / cat_sitting_to_stand / cat_stand_to_sleep, which ARE
+  // legitimate members of his behaviour pool.
+  const TRANSITION_RE = /_to_(idle|typing)$/i;
   const BRIDGE_PATTERNS = {
     Monk:      /^typing_monk_to_idle$/i,
     Demon:     /^demon_typing_to_idle$/i,
@@ -1181,6 +1196,72 @@ const CyborgTempleScene = ({
     RL80:      /^unicorn_typing_to_idle$/i,
   };
   const BRIDGE_XFADE = 0.25;
+
+  // A PERCENTAGE OF DURATION IS THE WRONG UNIT FOR A BIND-POSE SKIP.
+  // The 5% inset was written for short Mixamo loops. These clips are 1.4s-16.5s
+  // — demon_typing is 16.50s, so 5% seeks 0.825s IN, and measured off the GLB
+  // his arms sit 14.9° lower there (79.5° summed over the arm chain). That is
+  // the "hands land too low after the transition": the bridge lands exactly on
+  // demon_typing frame 0 (verified 0.0°), and then this yanked it forward into
+  // a different pose. 0.06s (~2 frames) still clears the bind frame — 0.6°.
+  const BIND_SKIP_S = 0.06;
+  const bindSkipTime = (action, frac = 0.05) => {
+    if (!action || !action.getClip) return 0;
+    return Math.min(action.getClip().duration * frac, BIND_SKIP_S);
+  };
+
+  // HOW MUCH IS THIS ACTION ACTUALLY CONTRIBUTING TO THE POSE?
+  //
+  // NOT getEffectiveWeight() on its own — that returns the action's INITIAL
+  // weight (1) for a clip that has never been played, so "is anything else
+  // holding weight?" answered yes for all ten of the Demon's clips even when
+  // exactly one was playing. Only actions the mixer has registered contribute;
+  // ask the mixer. (_isActiveAction is private, hence the guarded fallback.)
+  const liveWeight = (mixer, a) => {
+    if (!a) return 0;
+    const active = mixer && typeof mixer._isActiveAction === 'function'
+      ? mixer._isActiveAction(a)
+      : !!(a.isRunning && a.isRunning());
+    if (!active) return 0;
+    return typeof a.getEffectiveWeight === 'function' ? a.getEffectiveWeight() : 0;
+  };
+
+  // A FINISHED ONE-SHOT IS NOT "RUNNING", BUT IT STILL WEIGHS 1.
+  //
+  // LoopOnce + clampWhenFinished is how the one-shots hold their final pose:
+  // three.js PAUSES the action and leaves its weight alone. isRunning() is
+  // false for it, so every `if (isRunning()) fadeOut()` loop in this file walks
+  // straight past it and it keeps blending — at full weight, forever. That is
+  // how demon_pointing ended up averaged into demon_typing (hands low, and low
+  // for the whole focus), and how a stale reaction can lift a seated character.
+  // The weight ramp advances while paused, so fadeOut lands without un-pausing.
+  const fadeOutOthers = (actions, keep, fade, mixer) => {
+    Object.values(actions || {}).forEach((a) => {
+      if (!a || a === keep) return;
+      if (liveWeight(mixer, a) > 0.001 || (a.isRunning && a.isRunning())) a.fadeOut(fade);
+    });
+  };
+
+  // FADING IN AGAINST AN EMPTY STACK IS THE T-POSE FLASH. three.js fills any
+  // weight it is missing with the BIND pose, and for these rigs that pose is
+  // standing, out of the chair, facing off-axis — the "armature rotates 90° out
+  // of the seat" flash. If nothing else is holding weight there is nothing to
+  // cross-fade against, so snap to full weight instead of ramping from zero.
+  // Coverage is measured with liveWeight, NOT getEffectiveWeight: the naive
+  // check reported every unplayed clip as weight 1, so "covered" was always
+  // true and this never actually snapped — the flash survived the fix.
+  const fadeInOrSnap = (action, actions, fade, mixer) => {
+    let covered = 0;
+    Object.values(actions || {}).forEach((a) => {
+      if (a && a !== action) covered += liveWeight(mixer, a);
+    });
+    // fadeIn always ramps from ZERO, so any shortfall in cover is a gap the
+    // bind pose fills. Fully covered → cross-fade normally; otherwise snap to
+    // full weight. Over-weighting is invisible (three.js normalises by
+    // cumulative weight); under-weighting is the T-pose.
+    if (covered >= 0.999) action.fadeIn(fade);
+    else action.setEffectiveWeight(1);
+  };
   const isTypingClip = (n) => /typ/i.test(n) && !TRANSITION_RE.test(n);
   const isIdleClip = (n) => /idle/i.test(n) && !TRANSITION_RE.test(n);
   // A desk swap is exactly typing→idle or idle→typing; anything else (specials,
@@ -1190,30 +1271,96 @@ const CyborgTempleScene = ({
     ((isTypingClip(fromKey) && isIdleClip(toKey)) ||
      (isIdleClip(fromKey) && isTypingClip(toKey)));
 
+  // AUTHORED TRANSITIONS, BY NAMING CONVENTION: `<from>_to_<last segment of
+  // destination>`. Nothing is hard-coded per move — export a clip that follows
+  // the convention and every swap between those two clips picks it up:
+  //   demon_typing   → demon_idle    ⇒ demon_typing_to_idle
+  //   demon_pointing → demon_typing  ⇒ demon_pointing_to_typing
+  // Both are in the model (v00, 56 clips). Anything that doesn't resolve stays
+  // a plain crossfade, so a future export drops in without code changes.
+  // Case-insensitive because the unicorn's clips are Unicorn_Typing /
+  // Unicorn_Idle but the bridge is Unicorn_typing_to_idle. The Monk's inverted
+  // naming (typing_monk → idle_monk) can't resolve — he falls through to
+  // BRIDGE_PATTERNS, same clip and direction as before.
+  const authoredTransitionFor = (actions, fromKey, toKey) => {
+    if (!actions || !fromKey || !toKey) return null;
+    const tail = String(toKey).split('_').pop();
+    if (!tail) return null;
+    const want = `${fromKey}_to_${tail}`.toLowerCase();
+    return Object.keys(actions).find((k) => k.toLowerCase() === want) || null;
+  };
+
   const stopBridge = (agentId) => {
-    const t = bridgeTimersRef.current[agentId];
-    if (t) clearTimeout(t);
+    const rec = bridgeTimersRef.current[agentId];
+    if (rec && rec.timer) clearTimeout(rec.timer);
     bridgeTimersRef.current[agentId] = null;
+  };
+
+  // Gate + play. Bridges ONLY when the move is a real desk swap or has an
+  // authored clip for it; everything else falls through to the caller's plain
+  // crossfade. Every path that poses a character should go through this rather
+  // than repeating the gating — the paths that didn't are why the transitions
+  // never played on click.
+  const tryDeskBridge = ({ agentId, actions, state, toKey, onSettled }) => {
+    if (!actions || !state || !toKey) return false;
+    const fromKey = state.currentAnimation;
+    const useKey = authoredTransitionFor(actions, fromKey, toKey);
+    if (!useKey && !isDeskSwap(fromKey, toKey)) return false;
+    return playTypingIdleBridge({ agentId, actions, state, toKey, useKey, onSettled });
   };
 
   // Play the bridge once, then hand off to the destination loop. Returns true
   // when it took over (caller must NOT also run its own crossfade); false to
   // fall back to the direct swap (clip missing, etc.).
-  const playTypingIdleBridge = ({ agentId, actions, state, toKey, onSettled }) => {
-    const pattern = BRIDGE_PATTERNS[agentId];
-    if (!pattern || !actions || !state) return false;
-    const bridgeKey = Object.keys(actions).find((k) => pattern.test(k));
+  const playTypingIdleBridge = ({ agentId, actions, state, toKey, onSettled, useKey }) => {
+    if (!actions || !state) return false;
+
+    // ADOPT A BRIDGE ALREADY HEADED WHERE WE'RE GOING. A `*_to_*` clip is
+    // neither a typing nor an idle clip, so a caller a beat later can't tell by
+    // name that one is mid-flight — it used to cross-fade straight over a
+    // bridge that had just started. Same destination = let it finish, but take
+    // this caller's settle so the focus latch it wanted still happens.
+    const inFlight = bridgeTimersRef.current[agentId];
+    if (inFlight && inFlight.timer && inFlight.toKey === toKey) {
+      if (onSettled) inFlight.onSettled = onSettled;
+      return true;
+    }
+
+    // An explicitly requested clip that isn't in the model is a caller error,
+    // not a reason to substitute the generic connector — the generic one is
+    // only correct coming FROM idle, so silently swapping it in is how you get
+    // a plausible-but-wrong move.
+    let bridgeKey;
+    let forward;
+    if (useKey) {
+      if (!actions[useKey]) return false;
+      bridgeKey = useKey;
+      forward = true; // authored in the direction we're asking for
+    } else {
+      const pattern = BRIDGE_PATTERNS[agentId];
+      if (!pattern) return false;
+      bridgeKey = Object.keys(actions).find((k) => pattern.test(k));
+      forward = isIdleClip(toKey); // authored typing→idle; reversed for idle→typing
+    }
     const bridge = bridgeKey && actions[bridgeKey];
     const target = actions[toKey];
     if (!bridge || !target || bridge === target) return false;
 
     const XF = BRIDGE_XFADE;
     const dur = bridge.getClip().duration;
-    const forward = isIdleClip(toKey); // authored typing→idle
 
-    Object.values(actions).forEach((a) => {
-      if (a !== bridge && a.isRunning && a.isRunning()) a.fadeOut(XF);
-    });
+    // FADE OUT ANYTHING STILL HOLDING WEIGHT — running or not.
+    //
+    // isRunning() is FALSE for a finished LoopOnce+clampWhenFinished one-shot:
+    // three.js pauses it and keeps its weight at 1 so the clamped final pose
+    // holds. demon_pointing is exactly that. Filtering on isRunning() left it
+    // blending at full weight forever, so the bridge and then demon_typing were
+    // averaged against an outstretched arm — the hands land low and STAY low
+    // for the rest of the focus. The weight ramp still advances while paused
+    // (only the clip's own time is frozen), so fadeOut works without
+    // un-pausing it.
+    const bridgeMixer = mixersRef.current?.[agentId];
+    fadeOutOthers(actions, bridge, XF, bridgeMixer);
 
     bridge.reset();                       // reset() does NOT touch timeScale
     bridge.setLoop(THREE.LoopOnce, 1);
@@ -1221,7 +1368,7 @@ const CyborgTempleScene = ({
     bridge.setEffectiveTimeScale(forward ? 1 : -1);
     bridge.time = forward ? 0 : dur;      // reversed starts at the clip's end
     bridge.setEffectiveWeight(1);
-    bridge.fadeIn(XF);
+    fadeInOrSnap(bridge, actions, XF, bridgeMixer);
     bridge.play();
 
     // Park the alternation while the bridge runs, so its own timer can't fire
@@ -1232,19 +1379,28 @@ const CyborgTempleScene = ({
     state.lastSwitchTime = Date.now();
 
     stopBridge(agentId);
-    bridgeTimersRef.current[agentId] = setTimeout(() => {
+    // HAND-OFF TIMING IS THE WHOLE BALLGAME FOR AN AUTHORED CLIP. The generic
+    // connector hands off at dur-XF so the overlap hides the seam. An authored
+    // transition must play to COMPLETION: demon_pointing_to_typing lands on
+    // demon_typing's frame 0 exactly, but ~97° of arm travel is still left at
+    // dur-XF — cutting there cross-fades a mid-descent arm against the
+    // destination, and a weighted blend of two different arm poses is not a
+    // valid pose (hands sink through the keyboard).
+    const rec = { toKey, onSettled };
+    rec.timer = setTimeout(() => {
       bridgeTimersRef.current[agentId] = null;
       target.reset();
       target.setLoop(THREE.LoopRepeat);
       target.setEffectiveWeight(1);
-      target.fadeIn(XF);
+      fadeInOrSnap(target, actions, XF, bridgeMixer);
       target.play();
       bridge.fadeOut(XF);
       state.currentAnimation = toKey;
       state.isPlayingSpecial = false;
       state.lastSwitchTime = Date.now();
-      if (onSettled) onSettled();
-    }, Math.max(100, (dur - XF) * 1000));
+      if (rec.onSettled) rec.onSettled();
+    }, Math.max(100, (dur - (useKey ? 0 : XF)) * 1000));
+    bridgeTimersRef.current[agentId] = rec;
 
     return true;
   };
@@ -1664,16 +1820,12 @@ const CyborgTempleScene = ({
     // actions running that aren't reflected in state, and those would blend
     // on top of the reaction and dominate (idle's explicit leg rotations
     // beat the cheering animation's near-identity ones).
-    Object.values(actions).forEach((action) => {
-      if (action !== targetAction && action.isRunning && action.isRunning()) {
-        action.fadeOut(0.5);
-      }
-    });
+    fadeOutOthers(actions, targetAction, 0.5, mixersRef.current?.[agentId]);
     targetAction.reset();
-    targetAction.time = targetAction.getClip().duration * 0.05;
+    targetAction.time = bindSkipTime(targetAction);
     targetAction.setLoop(THREE.LoopRepeat);
     targetAction.setEffectiveWeight(1);
-    targetAction.fadeIn(0.5);
+    fadeInOrSnap(targetAction, actions, 0.5, mixersRef.current?.[agentId]);
     targetAction.play();
     state.currentAnimation = targetKey;
     state.isPlayingSpecial = true;
@@ -1739,15 +1891,11 @@ const CyborgTempleScene = ({
     const idleKey = Object.keys(actions).find((a) => pattern.test(a));
     if (!idleKey) return;
     const idleAction = actions[idleKey];
-    Object.values(actions).forEach((action) => {
-      if (action !== idleAction && action.isRunning && action.isRunning()) {
-        action.fadeOut(0.4);
-      }
-    });
+    fadeOutOthers(actions, idleAction, 0.4, mixersRef.current?.[agentId]);
     idleAction.reset();
     idleAction.setLoop(THREE.LoopRepeat);
     idleAction.setEffectiveWeight(1);
-    idleAction.fadeIn(0.4);
+    fadeInOrSnap(idleAction, actions, 0.4, mixersRef.current?.[agentId]);
     idleAction.play();
     state.currentAnimation = idleKey;
     state.isPlayingSpecial = false;
@@ -1758,7 +1906,27 @@ const CyborgTempleScene = ({
     if (agentId === 'Fluffy' && !fluffyFocusedRef.current) startCatBehaviour('loaf');
   };
 
-  const applyCharacterFocusAnimation = (agentId, mode = 'idle') => {
+  // `releaseAfter` — hand the character back to the random alternation once the
+  // swap has SETTLED instead of pinning them. It has to be an option rather
+  // than something the caller does afterwards: when a bridge takes the swap,
+  // "afterwards" is ~1s early, and the bridge parks nextSwitchDelay at 999999
+  // without restoring it — un-pinning synchronously freezes the character on
+  // one clip for 16 minutes.
+  const applyCharacterFocusAnimation = (agentId, mode = 'idle', { releaseAfter = false } = {}) => {
+    const settle = (state) => {
+      if (releaseAfter) {
+        // Back to the per-character alternation blocks in useFrame.
+        state.isPlayingSpecial = false;
+        state.nextSwitchDelay = Math.random() * 8000 + 8000;
+      } else {
+        // Pause the random-rotation alternation while focused so the chosen
+        // clip stays in place (no surprise disbelief/fistpump interruptions).
+        state.isPlayingSpecial = true;
+        state.nextSwitchDelay = 999999;
+      }
+      state.lastSwitchTime = Date.now();
+    };
+
     const crossfadeTo = (actions, state, pattern) => {
       if (!actions || !state) return;
       // Never resolve a focus pose to a one-shot bridge (their names contain
@@ -1774,23 +1942,33 @@ const CyborgTempleScene = ({
         state.currentAnimation === targetKey &&
         targetAction.isRunning && targetAction.isRunning();
       if (!alreadyOn) {
-        if (prevAction && prevAction !== targetAction) {
-          prevAction.fadeOut(0.5);
-        }
+        // THE FOCUSED LOBBY STATE GOES THROUGH HERE. Clicking a character to
+        // hear their intro, and that line ending, both land in this function —
+        // which is why the transitions "played sometimes but never after I
+        // click": the bridges only ran from the idle alternation blocks, and
+        // every focus-driven swap took the plain crossfade below, dragging the
+        // hands through the desk.
+        const bridged = tryDeskBridge({
+          agentId,
+          actions,
+          state,
+          toKey: targetKey,
+          onSettled: () => settle(state),
+        });
+        if (bridged) return; // the bridge owns this swap, settle included
+        // Not just prevAction: anything still weighted has to go, or a
+        // finished one-shot keeps averaging into the pose (see fadeOutOthers).
+        fadeOutOthers(actions, targetAction, 0.5, mixersRef.current?.[agentId]);
         targetAction.reset();
         // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
-        targetAction.time = targetAction.getClip().duration * 0.05;
+        targetAction.time = bindSkipTime(targetAction);
         targetAction.setLoop(THREE.LoopRepeat);
         targetAction.setEffectiveWeight(1);
-        targetAction.fadeIn(0.5);
+        fadeInOrSnap(targetAction, actions, 0.5, mixersRef.current?.[agentId]);
         targetAction.play();
         state.currentAnimation = targetKey;
       }
-      // Pause the random-rotation alternation while focused so the chosen
-      // clip stays in place (no surprise disbelief/fistpump interruptions).
-      state.isPlayingSpecial = true;
-      state.nextSwitchDelay = 999999;
-      state.lastSwitchTime = Date.now();
+      settle(state);
     };
 
     if (agentId === 'Monk') {
@@ -1845,16 +2023,27 @@ const CyborgTempleScene = ({
       }
       return;
     }
-    applyCharacterFocusAnimation(agentId, 'typing');
+    // releaseAfter un-latches inside the settle, so when the idle→typing
+    // bridge takes this swap the character isn't handed back to the
+    // alternation until they've actually reached the keys. Undoing the latch
+    // out here (as this used to) fired ~1s early, while the bridge still had
+    // nextSwitchDelay parked at 999999 — and the bridge's own hand-off then
+    // wrote that stale value back, freezing them on one clip for 16 minutes.
+    applyCharacterFocusAnimation(agentId, 'typing', { releaseAfter: true });
+
+    // SAFETY NET. settle() is what un-pins now, and it doesn't run if the swap
+    // never happened (actions not loaded yet, pattern unmatched) — which would
+    // leave the character pinned with nextSwitchDelay 999999. Skipped while a
+    // bridge is in flight: its hand-off owns the release and firing here would
+    // un-pin ~1s early, exactly the bug this option exists to avoid.
+    if (bridgeTimersRef.current[agentId]) return;
     const state = (
       agentId === 'Monk'      ? monkAnimStateRef.current      :
       agentId === 'Demon'     ? demonAnimStateRef.current     :
       agentId === 'Detective' ? detectiveAnimStateRef.current :
       agentId === 'RL80'      ? rl80AnimStateRef.current      : null
     );
-    if (!state) return;
-    // applyCharacterFocusAnimation just re-latched these — undo that so the
-    // per-character alternation blocks in useFrame pick the character back up.
+    if (!state || !state.isPlayingSpecial) return;
     state.isPlayingSpecial = false;
     state.nextSwitchDelay = Math.random() * 8000 + 8000;
     state.lastSwitchTime = Date.now();
@@ -1877,9 +2066,14 @@ const CyborgTempleScene = ({
     const demonMixer = mixersRef.current['Demon'];
     if (!demonActions || !demonMixer) return;
 
+    // TRANSITION_RE guards are load-bearing: /demon.*pointing/ also matches
+    // demon_pointing_to_typing and /demon.*typ/ matches BOTH that and
+    // demon_typing_to_idle. Today .find() happens to hit the real clips first
+    // because that's the order they sit in the GLB — a re-export that reorders
+    // them would otherwise make him point with a 1s transition clip.
     const idleKey = Object.keys(demonActions).find(a => /demon_idle/i.test(a));
-    const pointingKey = Object.keys(demonActions).find(a => /demon.*pointing/i.test(a));
-    const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a));
+    const pointingKey = Object.keys(demonActions).find(a => /demon.*pointing/i.test(a) && !TRANSITION_RE.test(a));
+    const typingKey = Object.keys(demonActions).find(a => /demon.*typ/i.test(a) && !TRANSITION_RE.test(a));
     const demonState = demonAnimStateRef.current;
 
     if (!idleKey) {
@@ -1909,21 +2103,45 @@ const CyborgTempleScene = ({
         if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
         return action;
       }
-      const prev = demonActions[demonState.currentAnimation];
-      if (prev && prev !== action) {
-        prev.fadeOut(fade);
-      }
+      // Same as above — demon_pointing is a clamped one-shot and would keep
+      // its weight through everything that follows if we only faded `prev`.
+      fadeOutOthers(demonActions, action, fade, demonMixer);
       action.reset();
       // Skip the bind-pose first frame — Mixamo clips anchor a T-pose at
       // time=0, which flashes through the cross-fade.
-      action.time = action.getClip().duration * 0.05;
+      action.time = bindSkipTime(action);
       action.setLoop(loop);
       if (loop === THREE.LoopOnce) action.clampWhenFinished = true;
       action.setEffectiveWeight(1);
-      action.fadeIn(fade);
+      fadeInOrSnap(action, demonActions, fade, demonMixer);
       action.play();
       demonState.currentAnimation = key;
       return action;
+    };
+
+    // The demon's stage 1 and stage 3 are desk swaps like any other, but they
+    // happen HERE rather than in applyCharacterFocusAnimation (which runs a
+    // beat later and finds him already moved). Without this, clicking him
+    // while he's typing yanked his hands up through the desk on the way to
+    // idle, and the settle out of the point was a plain crossfade.
+    const bridgeOrCrossfade = (toKey, opts) => {
+      if (!toKey || !demonActions[toKey]) return null;
+      const bridged = tryDeskBridge({
+        agentId: 'Demon',
+        actions: demonActions,
+        state: demonState,
+        toKey,
+        // Re-pin: the bridge's hand-off clears isPlayingSpecial, but he's
+        // still focused and the rest of this sequence depends on the latch.
+        onSettled: () => {
+          if (!demonFocusedRef.current) return;
+          demonState.isPlayingSpecial = true;
+          demonState.nextSwitchDelay = 999999;
+          demonState.lastSwitchTime = Date.now();
+        },
+      });
+      if (bridged) return demonActions[toKey];
+      return crossfadeTo(toKey, opts);
     };
 
     demonState.isPlayingSpecial = true;
@@ -1932,7 +2150,7 @@ const CyborgTempleScene = ({
     demonState.focusSequenceTimers = demonState.focusSequenceTimers || [];
 
     // Stage 1: fade to idle while camera flies in.
-    crossfadeTo(idleKey, { fade: 0.5 });
+    bridgeOrCrossfade(idleKey, { fade: 0.5 });
 
     if (!pointingKey) return;
 
@@ -1960,8 +2178,10 @@ const CyborgTempleScene = ({
         demonState.focusSequenceListener = null;
         if (!demonFocusedRef.current) return;
         // Stage 3: settle into demon_typing for the rest of focus (or
-        // idle if typing isn't authored).
-        crossfadeTo(typingKey || idleKey, { fade: 0.3 });
+        // idle if typing isn't authored). demon_pointing_to_typing carries
+        // this move — his arm is out over the desk when the point ends, so a
+        // crossfade takes it back through the mesh.
+        bridgeOrCrossfade(typingKey || idleKey, { fade: 0.3 });
       };
       demonMixer.addEventListener('finished', onFinished);
       demonState.focusSequenceListener = onFinished;
@@ -3275,8 +3495,8 @@ const CyborgTempleScene = ({
     //   gltf-transform resize a.glb b.glb --width 512 --height 512 \
     //     --pattern "@(Image_0|Image_3|PolygonCyberCity_02_C_Emissive|DiffuseColor_Texture_17_002_recover)"
     //   gltf-transform meshopt b.glb out.glb --level medium
-    let modelPath = "/models/RL80_4anims_v98_lite.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v98_opt.glb";
+    let modelPath = "/models/RL80_4anims_v00_lite.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v00_opt.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -5200,7 +5420,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         if (prevAction) prevAction.fadeOut(0.5);
         returnAction.reset();
         // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
-        returnAction.time = returnAction.getClip().duration * 0.05;
+        returnAction.time = bindSkipTime(returnAction);
         returnAction.setLoop(THREE.LoopRepeat);
         returnAction.setEffectiveWeight(1);
         returnAction.fadeIn(0.5);
@@ -5227,7 +5447,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         if (prevAction) prevAction.fadeOut(0.5);
         returnAction.reset();
         // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
-        returnAction.time = returnAction.getClip().duration * 0.05;
+        returnAction.time = bindSkipTime(returnAction);
         returnAction.setLoop(THREE.LoopRepeat);
         returnAction.setEffectiveWeight(1);
         returnAction.fadeIn(0.5);
@@ -5268,9 +5488,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         if (prevAction) prevAction.fadeOut(0.5);
         // Skip the bind-pose first frame so the cross-fade doesn't pop the
         // unicorn through neutral on un-zoom.
-        const clipDur = returnAction.getClip().duration;
         returnAction.reset();
-        returnAction.time = clipDur * 0.1;
+        returnAction.time = bindSkipTime(returnAction, 0.1);
         returnAction.setLoop(THREE.LoopRepeat);
         returnAction.fadeIn(0.5);
         returnAction.play();
@@ -5307,14 +5526,15 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // Fade out other running clips, but leave the target clip alone if
         // it's already running — reset()+fadeIn would flash a T-pose frame.
         Object.values(detectiveActions).forEach((action) => {
-          if (action && action !== typingAction && action.isRunning && action.isRunning()) {
-            action.fadeOut(0.5);
+          if (action && action !== typingAction) {
+            const w = typeof action.getEffectiveWeight === 'function' ? action.getEffectiveWeight() : 0;
+            if ((action.isRunning && action.isRunning()) || w > 0.001) action.fadeOut(0.5);
           }
         });
         if (typingAction && typingAction !== prevAction) {
           typingAction.reset();
           // Skip bind-pose first frame so the cross-fade doesn't flash T-pose.
-          typingAction.time = typingAction.getClip().duration * 0.05;
+          typingAction.time = bindSkipTime(typingAction);
           typingAction.setLoop(THREE.LoopRepeat);
           typingAction.setEffectiveWeight(1);
           typingAction.fadeIn(0.5);
@@ -6119,10 +6339,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                   }
                   idleAction.reset();
                   // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
-                  idleAction.time = idleAction.getClip().duration * 0.05;
+                  idleAction.time = bindSkipTime(idleAction);
                   idleAction.setLoop(THREE.LoopRepeat);
                   idleAction.setEffectiveWeight(1);
-                  idleAction.fadeIn(0.5);
+                  fadeInOrSnap(idleAction, monkActions, 0.5, mixersRef.current?.['Monk']);
                   idleAction.play();
                   monkState.currentAnimation = idleKey;
                 }
@@ -6142,22 +6362,39 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               // Prefer an Idle animation; fall back to Typing. Match the
               // keyword at start or after an underscore so both Typing_Unicorn
               // and Unicorn_Typing-style names resolve.
-              const idleKey = animKeys.find(a => /(?:^|_)idle/i.test(a))
-                || animKeys.find(a => /(?:^|_)typing/i.test(a));
+              const idleKey = animKeys.find(a => /(?:^|_)idle/i.test(a) && !TRANSITION_RE.test(a))
+                || animKeys.find(a => /(?:^|_)typing/i.test(a) && !TRANSITION_RE.test(a));
               const prevAction = rl80Actions[rl80State.currentAnimation];
               const idleAction = idleKey ? rl80Actions[idleKey] : null;
 
+              // This click handler poses Eugene ITSELF, before the
+              // externalFocusAgent round-trip reaches
+              // applyCharacterFocusAnimation — so the bridge has to run here
+              // too, or the hands are already through the desk by the time
+              // that path sees him and finds him "already on idle".
+              const bridgedRL80 = tryDeskBridge({
+                agentId: 'RL80',
+                actions: rl80Actions,
+                state: rl80State,
+                toKey: idleKey,
+                onSettled: () => {
+                  if (!rl80FocusedRef.current) return;
+                  rl80State.isPlayingSpecial = true;
+                  rl80State.nextSwitchDelay = 999999;
+                  rl80State.lastSwitchTime = Date.now();
+                },
+              });
+
               // No-op if we'd be transitioning to the same clip (avoids a
               // bind-pose flash from reset()).
-              if (idleAction && idleAction !== prevAction) {
+              if (!bridgedRL80 && idleAction && idleAction !== prevAction) {
                 if (prevAction) prevAction.fadeOut(0.5);
                 // Skip the bind-pose first frame so the cross-fade doesn't
                 // jump the unicorn through neutral.
-                const clipDur = idleAction.getClip().duration;
                 idleAction.reset();
-                idleAction.time = clipDur * 0.1;
+                idleAction.time = bindSkipTime(idleAction, 0.1);
                 idleAction.setLoop(THREE.LoopRepeat);
-                idleAction.fadeIn(0.5);
+                fadeInOrSnap(idleAction, rl80Actions, 0.5, mixersRef.current?.['RL80']);
                 idleAction.play();
                 rl80State.currentAnimation = idleKey;
               }
@@ -6182,33 +6419,54 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             // so the close-up reads as attentive instead of mid-keystroke.
             const detectiveActions = actionsRef.current['Detective'];
             if (detectiveActions) {
-              const idleKey = Object.keys(detectiveActions).find(a => /detective.*idle/i.test(a));
+              const idleKey = Object.keys(detectiveActions).find(a => /detective.*idle/i.test(a) && !TRANSITION_RE.test(a));
               if (idleKey) {
                 const idleAction = detectiveActions[idleKey];
                 const alreadyOn =
                   detectiveState.currentAnimation === idleKey &&
                   idleAction.isRunning && idleAction.isRunning();
-                // Fade out ALL currently-running clips except the target —
-                // fading the target while no replacement fades in pulls its
-                // weight to 0 and the bind pose blends in (T-pose flash).
-                Object.values(detectiveActions).forEach((action) => {
-                  if (action && action !== idleAction && action.isRunning && action.isRunning()) {
-                    action.fadeOut(0.5);
-                  }
+                // Same as Eugene above: this handler poses Marisol inline, so
+                // detective_typing_to_idle has to run from here rather than
+                // waiting for applyCharacterFocusAnimation.
+                const bridgedDetective = tryDeskBridge({
+                  agentId: 'Detective',
+                  actions: detectiveActions,
+                  state: detectiveState,
+                  toKey: idleKey,
+                  onSettled: () => {
+                    if (!detectiveFocusedRef.current) return;
+                    detectiveState.isPlayingSpecial = true;
+                    detectiveState.nextSwitchDelay = 999999;
+                    detectiveState.lastSwitchTime = Date.now();
+                  },
                 });
-                if (!alreadyOn) {
-                  idleAction.reset();
-                  // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
-                  idleAction.time = idleAction.getClip().duration * 0.05;
-                  idleAction.setLoop(THREE.LoopRepeat);
-                  idleAction.setEffectiveWeight(1);
-                  idleAction.fadeIn(0.5);
-                  idleAction.play();
-                  detectiveState.currentAnimation = idleKey;
+                // NO early return in here — onAgentClick fires below this
+                // block and IS the focus. Bailing out would pose her and then
+                // never focus her.
+                if (!bridgedDetective) {
+                  // Fade out ALL currently-running clips except the target —
+                  // fading the target while no replacement fades in pulls its
+                  // weight to 0 and the bind pose blends in (T-pose flash).
+                  Object.values(detectiveActions).forEach((action) => {
+                    if (action && action !== idleAction) {
+                      const w = typeof action.getEffectiveWeight === 'function' ? action.getEffectiveWeight() : 0;
+                      if ((action.isRunning && action.isRunning()) || w > 0.001) action.fadeOut(0.5);
+                    }
+                  });
+                  if (!alreadyOn) {
+                    idleAction.reset();
+                    // Skip bind-pose frame so the cross-fade doesn't flash T-pose.
+                    idleAction.time = bindSkipTime(idleAction);
+                    idleAction.setLoop(THREE.LoopRepeat);
+                    idleAction.setEffectiveWeight(1);
+                    fadeInOrSnap(idleAction, detectiveActions, 0.5, mixersRef.current?.['Detective']);
+                    idleAction.play();
+                    detectiveState.currentAnimation = idleKey;
+                  }
+                  detectiveState.isPlayingSpecial = true;
+                  detectiveState.nextSwitchDelay = 999999;
+                  detectiveState.lastSwitchTime = Date.now();
                 }
-                detectiveState.isPlayingSpecial = true;
-                detectiveState.nextSwitchDelay = 999999;
-                detectiveState.lastSwitchTime = Date.now();
               }
             }
           }
@@ -6713,7 +6971,44 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // those, causing a one-frame T-pose flash. Pre-empting the wrap
     // (and forcing a minimum time at clip start) avoids it without
     // mutating the clip data, so position tracks stay intact.
-    const safeFrac = 0.05; // 5% inset on both ends
+    // Capped in SECONDS, not as a fraction — see BIND_SKIP_S. This pass rewrites
+    // action.time EVERY FRAME, so an over-large inset doesn't just affect the
+    // seek at swap time: it continuously pins the clip past its opening pose,
+    // which is what dropped the hands after a transition landed.
+    // ?animdebug=1 — name the flash instead of guessing at it. A character's
+    // playing weights summing under 1 is precisely when three.js blends the
+    // BIND pose in; anything paused-but-weighted is a stale one-shot still
+    // averaging into the pose. Logs only on change, so the console stays quiet
+    // until something actually goes wrong.
+    if (animDebugRef.current) {
+      ['Demon', 'Monk', 'Detective', 'RL80'].forEach((charName) => {
+        const acts = actionsRef.current?.[charName];
+        if (!acts) return;
+        let sum = 0;
+        const live = [];
+        const mixer = mixersRef.current?.[charName];
+        Object.entries(acts).forEach(([name, a]) => {
+          // liveWeight, not getEffectiveWeight — the latter reports 1 for every
+          // clip that was never played, which drowns the real contributors.
+          const w = liveWeight(mixer, a);
+          if (w > 0.001) {
+            sum += w;
+            live.push(`${name}${a.paused ? '(paused)' : ''}=${w.toFixed(2)}@${a.time.toFixed(2)}s`);
+          }
+        });
+        const gap = sum < 0.999;
+        const sig = `${gap}|${live.join(',')}`;
+        if (sig === animDebugPrevRef.current[charName]) return;
+        animDebugPrevRef.current[charName] = sig;
+        if (gap) {
+          console.warn(`[anim ${charName}] WEIGHT GAP sum=${sum.toFixed(3)} — three.js is filling ${((1 - sum) * 100).toFixed(0)}% with the BIND POSE:`, live.join('  ') || '(nothing playing)');
+        } else {
+          console.log(`[anim ${charName}] sum=${sum.toFixed(2)}`, live.join('  '));
+        }
+      });
+    }
+
+    const safeFrac = 0.05; // 5% inset on both ends, capped at BIND_SKIP_S
     ['RL80', 'Demon', 'Monk', 'Detective'].forEach((charName) => {
       const charActions = actionsRef.current?.[charName];
       if (!charActions) return;
@@ -6724,7 +7019,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         const action = charActions[name];
         if (!action.isRunning() || action.paused) return;
         const dur = action.getClip().duration;
-        const safe = dur * safeFrac;
+        const safe = Math.min(dur * safeFrac, BIND_SKIP_S);
         const advance = delta * (action.getEffectiveTimeScale?.() ?? action.timeScale ?? 1);
         if (action.time < safe) {
           action.time = safe;
@@ -7118,9 +7413,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             // Loop → loop crossfade. Skip the first ~10% of the incoming clip
             // because Mixamo clips frequently start at near-bind-pose, which
             // would briefly leak through during the 0.5s blend.
-            const clipDur = action.getClip().duration;
             action.reset();
-            action.time = clipDur * 0.1;
+            action.time = bindSkipTime(action, 0.1);
             action.setLoop(THREE.LoopRepeat);
             action.fadeIn(0.5);
             action.play();
@@ -7145,9 +7439,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               const loopAction = rl80Actions[returnAnimation];
               if (loopAction) {
                 action.fadeOut(0.5);
-                const clipDur = loopAction.getClip().duration;
                 loopAction.reset();
-                loopAction.time = clipDur * 0.1;
+                loopAction.time = bindSkipTime(loopAction, 0.1);
                 loopAction.setLoop(THREE.LoopRepeat);
                 loopAction.fadeIn(0.5);
                 loopAction.play();

@@ -1,6 +1,6 @@
 # Liminal Terminal talk-show production
 
-This is the repeatable workflow for producing a Saint GR80 and John Barron
+This is the repeatable workflow for producing a Saint GR80 and Connor
 episode with expressive ElevenLabs dialogue, clean SitePal audio tracks, and
 scripted body animation.
 
@@ -47,7 +47,7 @@ Edit `elevenlabs-dialogue-test/dialogue.json`. Each item is one spoken turn:
 
 Current voices:
 
-- John Barron: `IcFWazAaBzXNwLWpySgF`
+- Connor: `IcFWazAaBzXNwLWpySgF`
 - Saint GR80: `JBFqnCBsd6RMkjVDRZzb`
 
 Keep the total request under roughly 2,000 characters for reliable Text to

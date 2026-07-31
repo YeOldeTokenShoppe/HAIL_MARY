@@ -1118,7 +1118,7 @@ deleted (registration + plot-pick is now `OilQualify`; mid-season join is "CLAIM
 ## How-to-Play Intro Video
 
 The first-visit "How to Play" modal (`OilWelcomeModal.jsx`) opens with a short intro: a
-two-character dialogue between **St. GR80** (the monk) and **John Barron** explaining the game.
+two-character dialogue between **St. GR80** (the monk) and **Connor** explaining the game.
 What actually ships is a **pre-recorded MP4**, not a live avatar — see "Why a video" below.
 
 ### What's mounted
@@ -1213,7 +1213,7 @@ the game). Update these only in `HowToPlayDialogue.jsx` and `src/app/hailmary/st
 | Character | Intro scene | Hash | `/trade` scene (do not touch) |
 |-----------|-------------|------|-------------------------------|
 | St. GR80  | `2775053` | `I0s05E8rXxvHYHdJIPmcIU5msqkW6t0A` | `2774449` |
-| John Barron | `2775052` | `IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb` | `2774900` (Demon) |
+| Connor | `2775052` | `IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb` | `2774900` (Demon) |
 
 - **GR80** speaks via SitePal TTS: `sayText(text, "9", 1, 7, "T", 3)` (voice 9 "Gilbert", engine 7
   Acapela, reverb).

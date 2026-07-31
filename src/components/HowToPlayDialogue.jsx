@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 // ── "How to Play" SitePal dialogue (single-portal spotlight) ───────────────
 // Replaces the static greeting video in OilWelcomeModal.
 //
-// St. GR80 (monk, scene 2774449) and John Barron (scene 2774900) trade lines.
+// St. GR80 (monk, scene 2774449) and Connor (scene 2774900) trade lines.
 // To get RELIABLE lip-sync for BOTH, we use ONE SitePal portal and swap which
 // scene is loaded to spotlight the current speaker — the same single-portal +
 // loadSceneByID() pattern /trade uses. (Two independently-addressable portals
@@ -29,7 +29,7 @@ const ACCOUNT = "9308752";
 const MONK = { key: "monk", label: "St. GR80", sceneId: 2775053, hash: "I0s05E8rXxvHYHdJIPmcIU5msqkW6t0A" };
 // Intro-only John scene (a dedicated, better build for the How-to-Play
 // dialogue) — distinct from /trade's Demon scene (2774900), which is unchanged.
-const JOHN = { key: "john", label: "John Barron", sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb" };
+const JOHN = { key: "john", label: "Connor", sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb" };
 
 // St. GR80's SitePal TTS voice — "Gilbert" (UK English male), with the reverb
 // effect the character uses on /trade.
@@ -94,17 +94,17 @@ const SCRIPT = [
 // On-screen captions (John's lines are baked into his MP3s, shown here too).
 const CAPTIONS = [
   "St. GR80: Welcome, prospector. The field is sealed before anyone plays — its riches hidden even from us. Provably fair.",
-  "John Barron: Which means nobody knows where the big strike hides… not even you. Delicious, isn't it?",
+  "Connor: Which means nobody knows where the big strike hides… not even you. Delicious, isn't it?",
   "St. GR80: Hold a little RL80 — that is your key. No spending. Sell whenever you wish.",
-  "John Barron: But why would you leave? Claim your plot, and the hunt begins.",
+  "Connor: But why would you leave? Claim your plot, and the hunt begins.",
   "St. GR80: Your rig drills on its own, day and night. It strikes when the earth decides. Patience.",
-  "John Barron: Random. Unpredictable. You'll check back again… and again… and again.",
+  "Connor: Random. Unpredictable. You'll check back again… and again… and again.",
   "St. GR80: The deeper you go, the richer the ground. Bank what you find, and it is yours — safe, and counted.",
-  "John Barron: Or push deeper for the motherlode… and pray you don't crack a hell pocket. I do love when they crack a hell pocket.",
+  "Connor: Or push deeper for the motherlode… and pray you don't crack a hell pocket. I do love when they crack a hell pocket.",
   "St. GR80: Should one breach, the whole field freezes — and hunters race for the bounty. Keep your cameras watching. Bank often.",
-  "John Barron: Or don't. Greedy hands make the best stories.",
+  "Connor: Or don't. Greedy hands make the best stories.",
   "St. GR80: Drill wisely, prospector.",
-  "John Barron: Push your luck.",
+  "Connor: Push your luck.",
   "St. GR80: Welcome to Hail Mary.",
 ];
 
@@ -484,7 +484,7 @@ export default function HowToPlayDialogue({ darkMode = false, autoPlay = true })
             margin: "8px 0 0", fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase",
             color: c.labelText, fontFamily: "'Share Tech Mono', monospace",
           }}>
-            {playing || started ? sceneFor(speaker).label : "St. GR80 · John Barron"}
+            {playing || started ? sceneFor(speaker).label : "St. GR80 · Connor"}
           </div>
         </div>
       </div>

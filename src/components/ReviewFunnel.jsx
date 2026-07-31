@@ -669,7 +669,7 @@ function CompilingStep({ phase }) {
         ) : (
           <>
             Saint GR80 is reading the deployer&rsquo;s track record.<br />
-            John Barron is reading the launch shape.<br />
+            Connor is reading the launch shape.<br />
             Detective Marisol has the wallets pulled up.<br />
             Eugene is checking the pitch against past patterns.
           </>

@@ -42,7 +42,7 @@ import {
 
 // THE PITCHER HAS NO BODY IN THE SCENE YET.
 //
-// This was "Demon" — John Barron's agentId — for as long as he was the one
+// This was "Demon" — Connor's agentId — for as long as he was the one
 // pitching. Since 2026-07-29 he is a plain CHART specialist you can spend, so
 // flying the camera to him when the pitch starts tells the player the wrong
 // thing about the cast: it frames a seat as the adversary.
@@ -134,7 +134,7 @@ export default function PressSession({
   const [rolled, setRolled] = useState(false);
   const [rolling, setRolling] = useState(false);
   // NOTHING ON THIS PANEL MAY NAME THE DEAL BEFORE THE RECORD IS SIGNED
-  // (invariant 7). Printing "ALDERMAN · $ALDR · $7.5M" and "John Barron brought
+  // (invariant 7). Printing "ALDERMAN · $ALDR · $7.5M" and "Connor brought
   // this one in" over an empty table announced both the deal and the speaker
   // before either had been picked — precisely the reveal this beat exists to
   // stage.
@@ -518,7 +518,7 @@ export default function PressSession({
                 record and SEND IT IN are already in. */}
             <div className="ps-open-eyebrow">YOUR NEXT APPOINTMENT</div>
             {/* The pitcher is an outside contractor on commission, not a colleague.
-                This said "John Barron brought this one in — it's his deal" until
+                This said "Connor brought this one in — it's his deal" until
                 2026-07-29, which stopped being true when the bot took over the
                 selling and Barron joined the desk as a plain specialist; then "an
                 agent is here for a client who didn't come", cut the same day for

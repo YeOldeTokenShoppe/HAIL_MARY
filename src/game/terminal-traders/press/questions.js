@@ -104,7 +104,7 @@ export const SEATS = {
  * decisive claim still discriminates on a free press. Verified across all three
  * archetypes: team / source / handles each discriminate on generic.
  *
- * WHY IT IS NOT A SEAT. John Barron used to be both pitcher and CHART seat, which
+ * WHY IT IS NOT A SEAT. Connor used to be both pitcher and CHART seat, which
  * is why he needed a special case everywhere — and it quietly made his own lane
  * the only one that was deeply answerable for free. An outside agent pitches now,
  * so the desk is four symmetric seats and Barron is a plain specialist.

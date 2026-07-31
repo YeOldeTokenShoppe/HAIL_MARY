@@ -149,7 +149,7 @@ and each is explicitly gated.
 
 | Seat | Lane | Subject | Budget |
 |---|---|---|---|
-| **John Barron** | `CHART` | THE CHART — price, windows, momentum | one use |
+| **Connor** | `CHART` | THE CHART — price, windows, momentum | one use |
 | **Detective Marisol** | `CHAIN` | THE MONEY — money movement, wallet ages, unlocks | one use, all session |
 | **Saint GR80** | `RECORD` | REPUTATION — what the documents actually say | one use |
 | **Eugene** | `SOCIAL` | THE STORY — narrative, reputation, who vouches for whom | one use |

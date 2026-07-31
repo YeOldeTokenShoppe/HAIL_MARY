@@ -8,17 +8,17 @@ import { HOW_TO_PLAY_STEPS } from "./HowToPlayPanel";
 // file would NOT be auto-translated). Keep in sync with the recorded dialogue.
 const INTRO_TRANSCRIPT = [
   { who: "St. GR80", text: "Welcome, prospector. The field is sealed before anyone plays — its riches hidden even from us. Provably fair." },
-  { who: "John Barron", text: "Which means nobody knows where the big strike hides… not even you. Delicious, isn't it?" },
+  { who: "Connor", text: "Which means nobody knows where the big strike hides… not even you. Delicious, isn't it?" },
   { who: "St. GR80", text: "Hold a little RL80 — that is your key. No spending. Sell whenever you wish." },
-  { who: "John Barron", text: "But why would you leave? Claim your plot, and the hunt begins." },
+  { who: "Connor", text: "But why would you leave? Claim your plot, and the hunt begins." },
   { who: "St. GR80", text: "Your rig drills on its own, day and night. It strikes when the earth decides. Patience." },
-  { who: "John Barron", text: "Random. Unpredictable. You'll check back again… and again… and again." },
+  { who: "Connor", text: "Random. Unpredictable. You'll check back again… and again… and again." },
   { who: "St. GR80", text: "The deeper you go, the richer the ground. Bank what you find, and it is yours — safe, and counted." },
-  { who: "John Barron", text: "Or push deeper for the motherlode… and pray you don't crack a hell pocket. I do love when they crack a hell pocket." },
+  { who: "Connor", text: "Or push deeper for the motherlode… and pray you don't crack a hell pocket. I do love when they crack a hell pocket." },
   { who: "St. GR80", text: "Should one breach, the whole field freezes — and hunters race for the bounty. Keep your cameras watching. Bank often." },
-  { who: "John Barron", text: "Or don't. Greedy hands make the best stories." },
+  { who: "Connor", text: "Or don't. Greedy hands make the best stories." },
   { who: "St. GR80", text: "Drill wisely, prospector." },
-  { who: "John Barron", text: "Push your luck." },
+  { who: "Connor", text: "Push your luck." },
   { who: "St. GR80", text: "Welcome to Hail Mary." },
 ];
 
@@ -89,7 +89,7 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
           ×
         </button>
 
-        {/* Character greeting — St. GR80 & John Barron intro video (recorded
+        {/* Character greeting — St. GR80 & Connor intro video (recorded
             from the SitePal dialogue; mobile-safe, no live SitePal at runtime). */}
         <div style={{
           position: "relative", width: "100%",

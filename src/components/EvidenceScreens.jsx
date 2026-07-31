@@ -23,7 +23,7 @@ import { resolveEntryVisual, THREAT_ACCENT } from './EvidenceOverlay';
 //
 // Mapping (station key → screen canvas global):
 //   monk    → Screen1 (Saint GR80)
-//   demon   → Screen2 (John Barron)
+//   demon   → Screen2 (Connor)
 //   marisol → Screen3 (Detective Marisol)
 //   eugene  → Screen4 (Eugene / RL80)
 

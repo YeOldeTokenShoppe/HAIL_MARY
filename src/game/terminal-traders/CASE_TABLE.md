@@ -48,7 +48,7 @@ games — is the Prophet council:
 | Canonical id | Name | Lens | Absorbs | What transfers cleanly |
 |---|---|---|---|---|
 | `gr80` | Saint GR80 | ETHOS · CREDIBILITY | `halo-node` | "Cold Wallet Shield" (ignore first crash) reads as divine protection — keep the ability, keep the name. |
-| `john-barron` | John Barron | PATHOS · HYPE | `bullhorn-broker` | "Megaphone Wick" (+4 pump, crashes hit +3 harder) is exactly a WSB cynic diamond-handing into the dip — keep the ability, rename to **"Double Down"**. |
+| `john-barron` | Connor | PATHOS · HYPE | `bullhorn-broker` | "Megaphone Wick" (+4 pump, crashes hit +3 harder) is exactly a WSB cynic diamond-handing into the dip — keep the ability, rename to **"Double Down"**. |
 | `eugene` | Eugene | MYTHOS · PATTERN | (himself, recharacterized) | Eugene is **not** the meme guy. He's pattern recognition and rare finds — the one who says "I don't predict. I remember." Memes move to Barron's lane. |
 | `marisol` | Detective Marisol | LOGOS · ONCHAIN | (herself) | Unchanged. "Follow the Wallets" stays. |
 
@@ -514,7 +514,7 @@ scans revealed — they play the same information game.
 |---|---|---|---|
 | Saint GR80 | leans doubt | ETHOS ×1.5 | Shrinks reported p toward 0.5 — under-stakes, rarely liquidated, rarely tops the docket. "The house of the Lord does not chase." |
 | Detective Marisol | neutral | LOGOS ×1.5 | Refuses conviction without chain data: if she hasn't scanned LOGOS, she stays near center regardless of other signal. |
-| John Barron | leans believe | PATHOS ×1.5 | Overconfidence ×1.4 away from center. The table's variance engine — wins huge, liquidates huge. |
+| Connor | leans believe | PATHOS ×1.5 | Overconfidence ×1.4 away from center. The table's variance engine — wins huge, liquidates huge. |
 | Eugene | neutral | MYTHOS ×1.5 | Keys off `patternRefs` (below): near-oracular when a case matches a pattern he knows, badly wrong when the pattern is a trap. |
 
 Eugene's mechanism — cases gain an optional field:

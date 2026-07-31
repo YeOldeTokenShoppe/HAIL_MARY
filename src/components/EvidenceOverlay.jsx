@@ -400,7 +400,7 @@ const EVIDENCE_VISUALS = {
     metric: { label: 'AGE', value: '6 DAYS' },
   },
 
-  // ─── John Barron · PATHOS · SENTIMENT ────────────────────────────────
+  // ─── Connor · PATHOS · SENTIMENT ────────────────────────────────
   'case-001:demon:TWITTER FOLLOWERS': {
     component: Pie,
     props: {
@@ -484,7 +484,7 @@ const EVIDENCE_VISUALS = {
     metric: { label: 'MATCH', value: '85%' },
   },
 
-  // ─── Continued — John Barron ────────────────────────────────────────
+  // ─── Continued — Connor ────────────────────────────────────────
   'case-001:demon:TELEGRAM ACTIVITY': {
     component: Checklist,
     props: { items: TELEGRAM_PHRASES, title: 'PHRASE FREQUENCY' },

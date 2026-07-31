@@ -24,7 +24,7 @@ export const COUNSEL_VOICES = {
   // use Gilbert from their OWN literals (src/components/game/cases/*) — nothing
   // imports this map but /main, so aligning those is a separate, deliberate call.
   GR: { id: "JBFqnCBsd6RMkjVDRZzb", lang: 1, engine: 14 },
-  // John Barron — his own ElevenLabs voice. (His scripted lines elsewhere are
+  // Connor — his own ElevenLabs voice. (His scripted lines elsewhere are
   // uploaded audio, john_01..06; this is for his live, generated ones.)
   JB: { id: "IcFWazAaBzXNwLWpySgF", lang: 1, engine: 14 },
   // Our Lady — her ElevenLabs voice, set per-apparition by the caller; see

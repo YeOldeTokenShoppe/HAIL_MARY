@@ -325,7 +325,7 @@ export default function generateReviewCase({
       ),
       demon: applyCharacterPayload(
         buildStation({
-          character: 'John Barron',
+          character: 'Connor',
           role: 'PATHOS · HYPE',
           sigil: '◬',
           tagline: 'The story is loud. Loud means cheap.',

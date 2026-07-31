@@ -23,7 +23,7 @@ export const CHARACTER_META = {
     color: '#daa520',    // treasure gold
   },
   demon: {
-    name: 'John Barron',
+    name: 'Connor',
     traderId: 'john-barron',
     role: 'PATHOS',
     roleSub: 'HYPE',

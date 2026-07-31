@@ -32,7 +32,7 @@ const SCREEN_NAME_RE = /^Screen(_\d+)?$/i;
 // null falls back to the still portrait). `tagline` is an optional caption.
 const CONSULTANTS = [
   { id: "gr80",    name: "GR80",    lens: "ETHOS",  accent: "#4dffaa", img: "/thumbnail_gr80.png",       introVideo: null, tagline: null },
-  { id: "demon",   name: "John Barron",  lens: "PATHOS", accent: "#ff5db1", img: "/thumbnail_johnBarron.png", introVideo: null, tagline: null },
+  { id: "demon",   name: "Connor",  lens: "PATHOS", accent: "#ff5db1", img: "/thumbnail_johnBarron.png", introVideo: null, tagline: null },
   { id: "marisol", name: "Marisol", lens: "LOGOS",  accent: "#38e0d0", img: "/thumbnail_marisol.png",    introVideo: null, tagline: null },
   { id: "eugene",  name: "Eugene",  lens: "MYTHOS", accent: "#c49ff0", img: "/thumbnail_eugene.png",      introVideo: null, tagline: null },
 ];

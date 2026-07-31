@@ -24,7 +24,7 @@ import { Suspense } from "react";
 
 const ACCOUNT = "9308752";
 const MONK = { key: "monk", label: "St. GR80", sceneId: 2775053, hash: "I0s05E8rXxvHYHdJIPmcIU5msqkW6t0A" };
-const JOHN = { key: "john", label: "John Barron", sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb" };
+const JOHN = { key: "john", label: "Connor", sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb" };
 
 const MONK_VOICE = "9";
 const MONK_LANG = 1;

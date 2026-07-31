@@ -128,7 +128,7 @@ const SAINT = {
 };
 
 const BARRON = {
-  name: "John Barron",
+  name: "Connor",
   subtitle: "Pit Demon",
   cardType: "Trader",
   style: "Chaos",

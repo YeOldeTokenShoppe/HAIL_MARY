@@ -37,7 +37,7 @@ const { casePnl } = await load(caseTableSrc);
 // some bundlers) — the engine only needs name + role, so mirror those here.
 const META = {
   monk: { name: "Saint GR80", role: "ETHOS" },
-  demon: { name: "John Barron", role: "PATHOS" },
+  demon: { name: "Connor", role: "PATHOS" },
   marisol: { name: "Detective Marisol", role: "LOGOS" },
   eugene: { name: "Eugene", role: "MYTHOS" },
 };

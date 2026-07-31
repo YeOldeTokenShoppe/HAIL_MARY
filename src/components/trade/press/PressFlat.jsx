@@ -42,7 +42,7 @@ import {
 
 // THE PITCHER'S VOICE, and the DEFAULT for anything sayTurn isn't given a voice
 // for — the claim's spin, and the pitcher's reaction after a seat reports. Was
-// "JB" while John Barron did the selling; the pitch bot has its own ElevenLabs
+// "JB" while Connor did the selling; the pitch bot has its own ElevenLabs
 // voice now (VOICES.PB in api/counsel-voice, override with
 // ELEVENLABS_VOICE_PITCHBOT).
 //
@@ -427,7 +427,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
       {/* ---------- the briefing ----------
           NOTHING HERE MAY NAME THE DEAL BEFORE THE DICE STOP (invariant 7).
-          Printing the deal's name and stats, and "John Barron brought this one
+          Printing the deal's name and stats, and "Connor brought this one
           in", over an empty table announced both before either had been picked
           — exactly the reveal this beat exists to stage.
 

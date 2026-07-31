@@ -63,7 +63,7 @@ export const PITCH_BOT = {
 export const DESK = {
   [SEATS.BARRON]: {
     id: SEATS.BARRON, agentId: "Demon", station: "demon",
-    name: "John Barron", role: "THE CHART", lane: LANES.CHART,
+    name: "Connor", role: "THE CHART", lane: LANES.CHART,
     portrait: "/thumbnail_johnBarron.png", voice: "JB",
     // HE NO LONGER BRINGS THE DEAL IN. That was the sentence that made him both
     // adversary and seat, and it is the pitch bot's job now. What he is instead:

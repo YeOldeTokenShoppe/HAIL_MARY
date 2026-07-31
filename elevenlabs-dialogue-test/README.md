@@ -38,7 +38,7 @@ animation; use the master dialogue file for the audible soundtrack.
 
 ## Voice assignment
 
-- John Barron: `IcFWazAaBzXNwLWpySgF`
+- Connor: `IcFWazAaBzXNwLWpySgF`
 - Saint GR80: `JBFqnCBsd6RMkjVDRZzb`
 
 To change a voice, update its ID in both `dialogue.json` and the `SPEAKERS`

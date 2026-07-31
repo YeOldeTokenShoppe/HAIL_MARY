@@ -81,7 +81,7 @@ export default function PressFigure({ speaking = false, voice = "JB", className 
         <span className="pf-scan" />
       </div>
       <span className="pf-lamp">{speaking ? "● ON AIR" : "○ STANDBY"}</span>
-      <span className="pf-cap">JOHN BARRON · LIVE</span>
+      <span className="pf-cap">Connor · LIVE</span>
     </div>
   );
 }

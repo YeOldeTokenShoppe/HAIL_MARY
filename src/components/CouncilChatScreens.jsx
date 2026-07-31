@@ -39,12 +39,12 @@ import { useFrame, useThree } from "@react-three/fiber";
 
 // ---------- Speaker styling ----------
 
-// The four workstations belong to St. GR80, John Barron, Marisol, and
+// The four workstations belong to St. GR80, Connor, Marisol, and
 // Eugene. Our Lady is the fifth account — in the channel, not in the room
 // (nobody has traced where she posts from; see the beacon arc below).
 export const SPEAKERS = {
   GR: { name: "ST. GR80", color: "#4dffaa" }, // android monk — phosphor green
-  JB: { name: "BARRON",   color: "#ff4d6d" }, // John Barron, devilish trader (ex-H80Z) — adversary red
+  JB: { name: "BARRON",   color: "#ff4d6d" }, // Connor, devilish trader (ex-H80Z) — adversary red
   MS: { name: "MARISOL",  color: "#6bb8ff" }, // onchain detective — cyan
   EU: { name: "EUGENE",   color: "#b58cff" }, // unicorn — violet
   OL: { name: "OUR LADY", color: "#ff7ac4" }, // RL80 — magenta

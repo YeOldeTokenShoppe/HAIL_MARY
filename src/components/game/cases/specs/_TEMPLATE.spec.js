@@ -105,7 +105,7 @@ export default {
       vindication:     { aligned: "...", missed: "...", abstained: "..." },
     },
 
-    // John Barron — brash, streetwise, punchy.
+    // Connor — brash, streetwise, punchy.
     demon: {
       intro: "...",
       returnLines: ["...", "...", "..."],

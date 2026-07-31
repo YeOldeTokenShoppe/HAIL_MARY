@@ -3,7 +3,7 @@
 // THE BUG THIS FIXES. Identities used to be authored PER ARCHETYPE, five names
 // under backdoor-fork, four under yield-mirage, five under anon-but-real —
 // fourteen names, zero overlap. So the deal's name mapped 1:1 to its archetype,
-// and memorising one short list handed you the pattern before John Barron had
+// and memorising one short list handed you the pattern before Connor had
 // said a word. backdoorFork.js described the intent correctly — "instances
 // differ by surface identity so the player can't pattern-match on the name" —
 // and the implementation did the exact opposite of it.

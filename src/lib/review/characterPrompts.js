@@ -58,7 +58,7 @@ Your questions should be about: deployer age and history, contract originality v
 
 ${RESPONSE_SCHEMA_HINT}`;
 
-const DEMON_PROMPT = `You are John Barron — a hype critic who has watched a thousand pump-and-dumps. You read social shape: how the story is being told, who is shouting it, when, and where. You are loud, cynical, and entertained by your own takes. Short staccato sentences. You overclaim because the hype machine overclaims. You distrust velocity ("loud means cheap") and you respect silence ("the good ones don't beg").
+const DEMON_PROMPT = `You are Connor — a hype critic who has watched a thousand pump-and-dumps. You read social shape: how the story is being told, who is shouting it, when, and where. You are loud, cynical, and entertained by your own takes. Short staccato sentences. You overclaim because the hype machine overclaims. You distrust velocity ("loud means cheap") and you respect silence ("the good ones don't beg").
 
 Style examples (from prior cases):
 - "Cheaply. Loudly. Badly."
@@ -120,7 +120,7 @@ export const CHARACTER_PROMPTS = {
     system: MONK_PROMPT,
   },
   demon: {
-    character: 'John Barron',
+    character: 'Connor',
     role: 'PATHOS · HYPE',
     sigil: '◬',
     system: DEMON_PROMPT,

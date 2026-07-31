@@ -258,7 +258,7 @@ const CASE_003 = {
     },
 
     demon: {
-      character: "John Barron",
+      character: "Connor",
       role: "PATHOS · SENTIMENT",
       sigil: "✦",
       tagline: "Sentiment is theater. Strip the script and read the cast.",
