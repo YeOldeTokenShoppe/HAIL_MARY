@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { tierValue } from '@/lib/deviceTier'
 
 // Paints a cryptic "coming soon" teaser to one of the temple's screen canvases.
 // Parameterized so VideoScreens can reuse it for every screen slot in preview mode.
@@ -211,7 +212,7 @@ const LiminalTeaserScreen = ({
     }
 
     draw()
-    const id = setInterval(draw, 120)
+    const id = setInterval(draw, tierValue({ desktop: 120, touch: 220 }))
     return () => clearInterval(id)
   }, [canvasGlobal, textureGlobal, variant, agent, tagline])
 

@@ -10,7 +10,7 @@ import EvidenceOverlay, { hasRichVisual } from '@/components/EvidenceOverlay';
 import ProgressiveText from '@/components/ProgressiveText';
 import LiveCaption from '@/components/LiveCaption';
 import { CameraControls, Stats, Cloud, Clouds } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import ConstellationModel from '@/components/ConstellationModel';
 import Aurora from '@/components/Aurora';
 import StarField from '@/components/StarField';
@@ -649,6 +649,40 @@ function GpuMemoryProbe() {
   return null;
 }
 
+// Compile every material in the scene UP FRONT, once the model is in.
+//
+// three.js compiles a material's shader program the first time that mesh is
+// actually rendered. With an orbiting camera that means new programs compile
+// mid-flight as meshes enter the frustum — each one a 20-50ms stall on a
+// tablet, which is exactly the "not smooth as it rotates" hitch. compileAsync
+// uses KHR_parallel_shader_compile where available, so this doesn't block the
+// frame; it just pays the cost during the load screen instead of during the
+// user's first look around.
+//
+// Re-runs on templeEpoch so a model swap (the LT TV round trip) recompiles for
+// the new meshes rather than re-hitching on the way back.
+function PrecompileScene({ ready, epoch }) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    // A beat after load so it doesn't compete with the GLB parse.
+    const t = setTimeout(() => {
+      if (cancelled) return;
+      try {
+        const done = gl.compileAsync
+          ? gl.compileAsync(scene, camera)
+          : Promise.resolve(gl.compile(scene, camera));
+        Promise.resolve(done).catch(() => {});
+      } catch (e) {
+        /* non-fatal: worst case we compile lazily as before */
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [ready, epoch, gl, scene, camera]);
+  return null;
+}
+
 // Drop-in replacement for the previous <OrbitControls> rig. Uses
 // camera-controls under the hood so fly-to transitions (setLookAt with
 // transition=true in CyborgTempleScene) animate position + target as a
@@ -1216,6 +1250,24 @@ export default function CyborgTemple() {
     if (typeof window === 'undefined') return;
     setClassicMode(new URLSearchParams(window.location.search).get('classic') === '1');
   }, []);
+
+  // TABLET TIER. iPadOS Safari reports a desktop UA and a width well over the
+  // 768 mobile cutoff, so an iPad has been taking the full desktop path —
+  // including an unclamped DPR. Measured on an iPad Pro: 5.37 MP/frame at dpr
+  // 2, which is the fill-rate ceiling once frame times are even. Clamping to
+  // 1.5 is 44% less fragment work for a slight softening of edges.
+  //
+  // Detected by POINTER TYPE, not width or UA: coarse + multi-touch is a
+  // touchscreen device, which is the thing that correlates with the GPU budget.
+  // A desktop with a mouse is untouched and keeps full DPR.
+  const deviceTierRef = useRef(null);
+  if (deviceTierRef.current === null) {
+    const coarse = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false;
+    const touch = typeof navigator !== 'undefined' && (navigator.maxTouchPoints || 0) > 1;
+    deviceTierRef.current = { isTouchDevice: coarse && touch };
+  }
   // Phase 2 (CASE_TABLE.md §4.8): when the Case Table run hits its reveal,
   // it reports the outcome here — the CRT overlay goes transparent, the
   // temple canvas un-idles, and revealMode below stages the REAL curtain
@@ -1238,8 +1290,13 @@ export default function CyborgTemple() {
   // tracks perform through the live face projections.
   const [talkShowAudioReady, setTalkShowAudioReady] = useState(false);
   const [talkShowPlaying, setTalkShowPlaying] = useState(false);
-  const handleTalkShowPlaybackReady = useCallback((ready) => {
+  // 'loading' | 'ready' | 'failed'. A portal that never builds its SitePal
+  // player retries itself a few times and then reports 'failed', so the START
+  // control can offer a retry instead of sitting on "Loading voices…" forever.
+  const [talkShowVoiceStatus, setTalkShowVoiceStatus] = useState('loading');
+  const handleTalkShowPlaybackReady = useCallback((ready, status) => {
     setTalkShowAudioReady(ready);
+    setTalkShowVoiceStatus(status || (ready ? 'ready' : 'loading'));
     if (!ready) setTalkShowPlaying(false);
   }, []);
   const handleTalkShowPlaybackState = useCallback((playing) => {
@@ -1256,6 +1313,7 @@ export default function CyborgTemple() {
     setTalkShowProject(null);
     setTalkShowAudioReady(false);
     setTalkShowPlaying(false);
+    setTalkShowVoiceStatus('loading');
   }, []);
   // Imperative handle to the mobile TradeLaptop so the START FAB can dive
   // straight into the CRT terminal (same as tapping the laptop screen).
@@ -3752,10 +3810,14 @@ export default function CyborgTemple() {
             depth: true,
             preserveDrawingBuffer: false
           }}
-          dpr={isMobileView ? 
-            (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1) : 
-            (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
-          }
+          /* Phones AND tablets clamp to 1.5; a mouse-driven desktop keeps its
+             full ratio. Pixels scale with the SQUARE of this, so it is the
+             biggest single fill-rate lever on a tablet: 5.37 -> 3.02 MP/frame
+             on an iPad Pro. */
+          dpr={typeof window === 'undefined' ? 1 : Math.min(
+            window.devicePixelRatio || 1,
+            (isMobileView || deviceTierRef.current.isTouchDevice) ? 1.5 : Infinity,
+          )}
           performance={{ min: 0.5 }}
           /* Idle the temple while the fullscreen Case Table overlay is up —
              the overlay is opaque, so every frame under it is wasted GPU.
@@ -3776,6 +3838,7 @@ export default function CyborgTemple() {
           <Suspense fallback={null}>
             <ambientLight intensity={1.5} />
             <GpuMemoryProbe />
+            <PrecompileScene ready={modelLoaded} epoch={templeEpoch} />
             <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} />
             
             {/* Synthwave sunset for 80s mode — RETIRED ON /trade 2026-07-26.
@@ -4470,8 +4533,14 @@ export default function CyborgTemple() {
         {mounted && !isMobileView && talkShowMode && (
           <button
             type="button"
-            disabled={!talkShowAudioReady}
+            disabled={!talkShowAudioReady && talkShowVoiceStatus !== 'failed'}
             onClick={() => {
+              // Both portals gave up — this press is the retry.
+              if (talkShowVoiceStatus === 'failed') {
+                setTalkShowVoiceStatus('loading');
+                try { window.__talkShowRetryPortals?.(); } catch (e) {}
+                return;
+              }
               if (talkShowPlaying) {
                 try { window.__talkShowStop?.(); } catch (e) {}
                 return;
@@ -4492,15 +4561,23 @@ export default function CyborgTemple() {
               minWidth: 190,
               padding: '11px 20px',
               borderRadius: 999,
-              border: `1px solid rgba(255, 207, 77, ${talkShowAudioReady ? 0.88 : 0.3})`,
+              // The failed state is pressable (it retries), so it must not wear
+              // the dimmed "still loading" treatment.
+              border: `1px solid rgba(255, 207, 77, ${talkShowAudioReady || talkShowVoiceStatus === 'failed' ? 0.88 : 0.3})`,
               background: talkShowPlaying
                 ? 'rgba(255, 82, 118, 0.2)'
-                : 'linear-gradient(180deg, rgba(255,207,77,0.2), rgba(8,7,12,0.92))',
+                : talkShowVoiceStatus === 'failed'
+                  ? 'linear-gradient(180deg, rgba(255,110,110,0.22), rgba(8,7,12,0.92))'
+                  : 'linear-gradient(180deg, rgba(255,207,77,0.2), rgba(8,7,12,0.92))',
               boxShadow: talkShowAudioReady
                 ? '0 0 22px rgba(255,207,77,0.24), inset 0 1px 0 rgba(255,255,255,0.08)'
                 : 'none',
-              color: talkShowAudioReady ? '#ffe38a' : 'rgba(255,227,138,0.45)',
-              cursor: talkShowAudioReady ? 'pointer' : 'wait',
+              color: talkShowAudioReady
+                ? '#ffe38a'
+                : talkShowVoiceStatus === 'failed'
+                  ? '#ffb4b4'
+                  : 'rgba(255,227,138,0.45)',
+              cursor: talkShowAudioReady || talkShowVoiceStatus === 'failed' ? 'pointer' : 'wait',
               fontFamily: "'Orbitron','IBM Plex Mono',monospace",
               fontSize: 10,
               fontWeight: 800,
@@ -4510,11 +4587,13 @@ export default function CyborgTemple() {
               WebkitBackdropFilter: 'blur(10px)',
             }}
           >
-            {!talkShowAudioReady
-              ? 'Loading voices…'
-              : talkShowPlaying
-                ? 'Stop test'
-                : 'Start show'}
+            {talkShowVoiceStatus === 'failed'
+              ? 'Voices failed · retry'
+              : !talkShowAudioReady
+                ? 'Loading voices…'
+                : talkShowPlaying
+                  ? 'Stop test'
+                  : 'Start show'}
           </button>
         )}
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { tierValue } from '@/lib/deviceTier'
 
 // MobiusScreen — paints an infinitely-morphing Möbius / spiral-cell shader onto
 // one of the trade-scene monitor canvases (the 512x320 canvases wired up by
@@ -341,11 +342,15 @@ const easeInOut = (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t)
 const MobiusScreen = ({
   canvasGlobal = '__screen4Canvas',
   textureGlobal = '__screen4Texture',
-  fps = 30,
+  // Tiered: this is the most expensive painter on the page (its own WebGL
+  // context, raymarched). A tablet gets a third of the frames.
+  fps = tierValue({ desktop: 30, touch: 10 }),
   // Internal render scale — the shader is raymarched, so this is the biggest
   // perf lever. 0.75 (=384x240 on a 512x320 screen) reads crisp on an in-world
   // monitor while leaving headroom for the rest of the trade scene.
-  renderScale = 0.75,
+  // Halving this quarters the raymarch cost — on a monitor this size in
+  // world space, nobody can tell.
+  renderScale = tierValue({ desktop: 0.75, touch: 0.5 }),
   // Paint an "analysis HUD" over the shader so the monitor reads as if it's
   // performing live pattern analysis on the Möbius field (scan sweep, lock-on
   // reticles, feature boxes, telemetry that tracks the morph state).

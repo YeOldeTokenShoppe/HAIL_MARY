@@ -35,6 +35,19 @@ const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const SITEPAL_ACCOUNT = "9308752";
 const TALK_SHOW_PORTAL_HOST_ID = "talk-show-sitepal-portals";
 
+// A portal occasionally comes up with no player at all — SitePal's embed runs
+// (window.__portal is set) but never builds its canvas, so that character never
+// reports ready. Because the START control waits on BOTH portals, one silent
+// failure used to hang the set on "Loading voices…" forever with no way out but
+// a page reload. Reload the offending iframe instead, then give up loudly.
+// Generous first window — a healthy portal is ready well inside it, and
+// reloading one that was merely slow makes things worse. Backs off rather than
+// hammering, because the failure mode this guards against may itself be SitePal
+// refusing loads. Worst case the retry button appears after ~45s.
+const PORTAL_READY_TIMEOUT_MS = 18000;
+const PORTAL_RETRY_BACKOFF = 1.5;
+const PORTAL_MAX_ATTEMPTS = 2;
+
 // Names must match SitePal's Audio Manager exactly.
 const TALK_SHOW_AUDIO = {
   Barron: "talk show test for jb",
@@ -1085,9 +1098,68 @@ function TalkShowModel({
       });
     };
 
+    const timers = {};
+
+    const portalSrc = (key, portal) => {
+      const cfg = TALKSHOW_PROJECTION_CONFIG[key];
+      portal.loads += 1;
+      // `n` only exists to guarantee a fresh document on a retry — assigning an
+      // identical src is not reliably a reload.
+      return (
+        `/sitepal-portal.html?acc=${SITEPAL_ACCOUNT}` +
+        `&scene=${cfg.sceneId}` +
+        `&embed=${encodeURIComponent(cfg.hash || "")}` +
+        `&n=${portal.loads}`
+      );
+    };
+
     const notifyReady = () => {
-      const ready = Object.values(portalsRef.current).every((p) => p.ready);
-      onPlaybackReady?.(ready);
+      const portals = Object.values(portalsRef.current);
+      const ready = portals.every((p) => p.ready);
+      const failed = portals.some((p) => !p.ready && p.exhausted);
+      onPlaybackReady?.(ready, ready ? "ready" : failed ? "failed" : "loading");
+    };
+
+    // One watchdog per portal, re-armed (longer each time) on every attempt.
+    const armWatchdog = (key) => {
+      clearTimeout(timers[key]);
+      const attempt = portalsRef.current[key]?.attempt || 0;
+      const wait =
+        PORTAL_READY_TIMEOUT_MS * Math.pow(PORTAL_RETRY_BACKOFF, attempt);
+      timers[key] = setTimeout(() => {
+        const portal = portalsRef.current[key];
+        if (!portal?.frame || portal.ready) return;
+        if (portal.attempt >= PORTAL_MAX_ATTEMPTS) {
+          portal.exhausted = true;
+          console.warn(
+            `[TalkShowScene] ${key} portal never reported ready after ` +
+              `${PORTAL_MAX_ATTEMPTS} attempts — surfacing as failed`,
+          );
+          notifyReady();
+          return;
+        }
+        portal.attempt += 1;
+        portal.source = null;
+        console.warn(
+          `[TalkShowScene] ${key} portal did not load in ${Math.round(wait)}ms ` +
+            `— reloading (attempt ${portal.attempt}/${PORTAL_MAX_ATTEMPTS})`,
+        );
+        portal.frame.src = portalSrc(key, portal);
+        armWatchdog(key);
+      }, wait);
+    };
+
+    // Manual escape hatch behind the START control once retries are spent.
+    const retryPortals = () => {
+      Object.entries(portalsRef.current).forEach(([key, portal]) => {
+        if (!portal?.frame || portal.ready) return;
+        portal.attempt = 0;
+        portal.exhausted = false;
+        portal.source = null;
+        portal.frame.src = portalSrc(key, portal);
+        armWatchdog(key);
+      });
+      notifyReady();
     };
 
     const portalForSource = (source) =>
@@ -1101,7 +1173,9 @@ function TalkShowModel({
 
       if (event.data?.type === "sitepal-portal-ready") {
         portal.ready = true;
+        portal.exhausted = false;
         portal.source = null;
+        clearTimeout(timers[key]);
         try {
           const w = portal.frame.contentWindow;
           w.setPlayerVolume?.(0);
@@ -1136,12 +1210,18 @@ function TalkShowModel({
       // Don't let a narrow viewport shrink either portal to nothing — the
       // canvas we sample every frame is the one this iframe paints.
       frame.style.flex = "0 0 600px";
-      frame.src =
-        `/sitepal-portal.html?acc=${SITEPAL_ACCOUNT}` +
-        `&scene=${cfg.sceneId}` +
-        `&embed=${encodeURIComponent(cfg.hash || "")}`;
-      portalsRef.current[key] = { frame, ready: false, source: null };
+      const portal = {
+        frame,
+        ready: false,
+        source: null,
+        attempt: 0,
+        exhausted: false,
+        loads: 0,
+      };
+      portalsRef.current[key] = portal;
+      frame.src = portalSrc(key, portal);
       host.appendChild(frame);
+      armWatchdog(key);
     });
 
     const stopShow = () => {
@@ -1194,17 +1274,22 @@ function TalkShowModel({
 
     window.__talkShowPlay = playShow;
     window.__talkShowStop = stopShow;
+    window.__talkShowRetryPortals = retryPortals;
 
     return () => {
       stopShow();
-      onPlaybackReady?.(false);
+      Object.values(timers).forEach(clearTimeout);
+      onPlaybackReady?.(false, "loading");
       window.removeEventListener("message", onMessage);
       if (window.__talkShowPlay === playShow) delete window.__talkShowPlay;
       if (window.__talkShowStop === stopShow) delete window.__talkShowStop;
+      if (window.__talkShowRetryPortals === retryPortals) {
+        delete window.__talkShowRetryPortals;
+      }
       host.remove();
       portalsRef.current = {
-        Monk: { frame: null, ready: false, source: null },
-        Barron: { frame: null, ready: false, source: null },
+        Monk: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
+        Barron: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
       };
     };
   }, [onPlaybackReady, onPlaybackStateChange]);

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { tierValue } from '@/lib/deviceTier'
 
 // DetectiveScreen — paints onto Screen3's canvas (512x320). Themed as a
 // crypto-fraud investigation terminal for the Detective character: rotating
@@ -496,7 +497,7 @@ const DetectiveScreen = () => {
       texture.needsUpdate = true
     }
 
-    const intervalId = setInterval(draw, 80)
+    const intervalId = setInterval(draw, tierValue({ desktop: 80, touch: 170 }))
     return () => {
       clearInterval(intervalId)
       clearInterval(seedInterval)

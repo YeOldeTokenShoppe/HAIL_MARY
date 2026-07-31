@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
+import { tierValue } from "@/lib/deviceTier";
 
 /**
  * CouncilChatScreens
@@ -603,10 +604,16 @@ export default function CouncilChatScreens() {
     }
 
     // -------- Scramble decode (runs in parallel with the scroll state) --
-    // Throttle to ~15fps — without this we'd reupload the full canvas to
+    // Throttle to ~10fps — without this we'd reupload the full canvas to
     // every screen's GPU texture every frame during a scramble (visually
     // identical, just bandwidth).
-    const REDRAW_INTERVAL = 1 / 15;
+    //
+    // THE SIZE OF EACH UPLOAD IS THE REAL COST, NOT THE RATE. This canvas holds
+    // the WHOLE chat: 512 x ~7,200px = ~14MB as RGBA. Four textures read it, so
+    // flagging them together pushed ~56MB to the GPU in ONE frame — measured as
+    // the 90ms stall behind "min 11 fps" on an iPad Pro. The scroll itself is
+    // free (it only moves texture.offset); this is purely the scramble redraw.
+    const REDRAW_INTERVAL = 1 / tierValue({ desktop: 10, touch: 6 });
     if (live.elapsed - live.lastRedrawAt < REDRAW_INTERVAL) return;
 
     if (live.scramble) {
@@ -622,8 +629,15 @@ export default function CouncilChatScreens() {
         const amount = Math.pow(1 - t, 2.2);
         paintMessage(data.ctx, live.scramble.layout, data.totalHeight, amount);
       }
-      for (const { texture } of texturesRef.current) {
-        texture.needsUpdate = true;
+      // ONE texture per redraw, round-robin — not all four. They all read the
+      // same canvas, so each upload is the same ~14MB; doing four together is
+      // what produced the frame spike. Round-robin means a screen can be up to
+      // three redraws (~0.3s) behind on the scramble — invisible on ambience
+      // text, and it cuts the per-frame upload by 4x.
+      const list = texturesRef.current;
+      if (list.length) {
+        live.uploadCursor = ((live.uploadCursor ?? -1) + 1) % list.length;
+        list[live.uploadCursor].texture.needsUpdate = true;
       }
     }
     live.lastRedrawAt = live.elapsed;

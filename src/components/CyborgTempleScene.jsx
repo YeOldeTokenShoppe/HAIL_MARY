@@ -792,18 +792,6 @@ const CyborgTempleScene = ({
   const catEmptyRef = useRef(null);   // Cat_Empty node, for perch moves + focus framing
   const catPerchRef = useRef(0);      // index into CAT_PERCHES
   const bridgeTimersRef = useRef({}); // { charName: timeoutId } for the typing↔idle bridge hand-off
-  // ?animdebug=1 — watch for the exact condition that produces an armature
-  // flash. If the weights of a character's playing actions sum to less than 1,
-  // three.js fills the remainder with the BIND pose (T-pose, standing, off
-  // axis) — that is the "flips to the side and back". Logs the frame it
-  // happens on and what was playing, so the cause is named rather than guessed.
-  const animDebugRef = useRef(false);
-  const animDebugPrevRef = useRef({});
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    animDebugRef.current = new URLSearchParams(window.location.search).get('animdebug') === '1';
-    if (animDebugRef.current) console.log('[anim] debug on — watching for weight gaps (bind-pose flashes)');
-  }, []);
   const [loadedModel, setLoadedModel] = useState(null);
   const [detectedMobile, setDetectedMobile] = useState(false);
   const xCandleNodesRef = useRef([]); // Sorted array of XCandle01* root nodes
@@ -6999,42 +6987,6 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // action.time EVERY FRAME, so an over-large inset doesn't just affect the
     // seek at swap time: it continuously pins the clip past its opening pose,
     // which is what dropped the hands after a transition landed.
-    // ?animdebug=1 — name the flash instead of guessing at it. A character's
-    // playing weights summing under 1 is precisely when three.js blends the
-    // BIND pose in; anything paused-but-weighted is a stale one-shot still
-    // averaging into the pose. Logs only on change, so the console stays quiet
-    // until something actually goes wrong.
-    if (animDebugRef.current) {
-      ['Demon', 'Monk', 'Detective', 'RL80', 'Fluffy'].forEach((charName) => {
-        const acts = actionsRef.current?.[charName];
-        if (!acts) return;
-        let sum = 0;
-        const live = [];
-        const mixer = mixersRef.current?.[charName];
-        Object.entries(acts).forEach(([name, a]) => {
-          // liveWeight, not getEffectiveWeight — the latter reports 1 for every
-          // clip that was never played, which drowns the real contributors.
-          const w = liveWeight(mixer, a);
-          if (w > 0.001) {
-            sum += w;
-            live.push(`${name}${a.paused ? '(paused)' : ''}=${w.toFixed(2)}@${a.time.toFixed(2)}s`);
-          }
-        });
-        const gap = sum < 0.999;
-        // Signature deliberately drops clip TIME and rounds the weights: with
-        // them in, every frame is "new" and the console fills with thousands of
-        // identical lines. What matters is WHICH clips are contributing.
-        const sig = `${gap}|${live.map((l) => l.replace(/@[\d.]+s$/, '').replace(/=([\d.]+)/, (m, w) => `=${Number(w).toFixed(1)}`)).join(',')}`;
-        if (sig === animDebugPrevRef.current[charName]) return;
-        animDebugPrevRef.current[charName] = sig;
-        if (gap) {
-          console.warn(`[anim ${charName}] WEIGHT GAP sum=${sum.toFixed(3)} — three.js is filling ${((1 - sum) * 100).toFixed(0)}% with the BIND POSE:`, live.join('  ') || '(nothing playing)');
-        } else {
-          console.log(`[anim ${charName}] sum=${sum.toFixed(2)}`, live.join('  '));
-        }
-      });
-    }
-
     const safeFrac = 0.05; // 5% inset on both ends, capped at BIND_SKIP_S
     ['RL80', 'Demon', 'Monk', 'Detective'].forEach((charName) => {
       const charActions = actionsRef.current?.[charName];

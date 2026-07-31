@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { tierValue } from '@/lib/deviceTier'
 
 // Mock CRT screens — paints faux-terminal content onto one of the temple
 // screen canvases (set up by VideoScreens.jsx). Variants so the monitors
@@ -15,7 +16,9 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
   const startedAt = useRef(performance.now())
 
   useEffect(() => {
-    const FRAME_INTERVAL = 1000 / 30
+    // Tiny in-world monitors — 30fps of canvas→GPU upload each is desktop
+    // budget. On a tablet the cadence is imperceptible but the uploads are not.
+    const FRAME_INTERVAL = 1000 / tierValue({ desktop: 30, touch: 12 })
     let lastFrame = 0
     let hidden = document.hidden
 
