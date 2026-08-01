@@ -2954,10 +2954,13 @@ export default function CyborgTemple() {
     setLoadingMessage("Loading 3D Model...");
 
     // Warm the talk-show GLB so the TALK SHOW tab swaps in without a cold
-    // fetch — but OFF THE CRITICAL PATH, and never on mobile. The LT TV tab
-    // lives in the desktop-only feature rail, so a phone that ran this
-    // downloaded 2.5MB for a tab it can't open; on desktop it was competing
-    // with the temple model for bandwidth during the load everyone sees.
+    // fetch — but OFF THE CRITICAL PATH, and never on page load on mobile.
+    // Mobile CAN open LT TV now (the terminal hub's own screen), but it's
+    // several taps in, so a phone warms the model when the terminal opens
+    // instead — see MobileTerminalGame. Spending a phone's bandwidth on 3.3MB
+    // up front, for a screen most visitors never reach, is the trade this
+    // guard exists to avoid; on desktop it was also competing with the temple
+    // model during the load everyone sees.
     // Idle callback (with a timeout so it still happens on a busy tab).
     if (typeof window !== 'undefined' && window.innerWidth > 768) {
       const warm = () => { try { preloadTalkShow(); } catch (e) { /* non-fatal */ } };
@@ -5939,24 +5942,12 @@ export default function CyborgTemple() {
               <MobileBottomNav
                   hideWallet
                   accountOnLeft
-                /* Center FAB — MOBILE ONLY now. It dives straight into the CRT
-                   terminal (mobile has no live services rail). On desktop the
-                   FAB is suppressed: onBuyClick is undefined and the lobby
-                   centerSlot is null, so nothing renders — SERVICES lives in the
-                   unified right-edge feature rail instead. Game/review modes
-                   still override the center via centerSlot below. */
-                onBuyClick={
-                  isMobileView
-                    ? () => { setFocusedAgent(null); laptopRef.current?.enterTerminal(); }
-                    : undefined
-                }
-                centerLabel={
-                  <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 26, height: 26, display: 'block', color: '#ffffff' }} aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                }
-                centerSubLabel="TERMINAL"
-                centerTitle="Enter terminal"
+                /* No center FAB in the lobby on any width (2026-08-01): the
+                   mobile TERMINAL FAB was removed — tapping the laptop screen
+                   in the scene already zooms into the CRT, and desktop reaches
+                   SERVICES from the right-edge feature rail. With onBuyClick
+                   undefined and the lobby centerSlot null, the center renders
+                   nothing. Game/review modes still override it via centerSlot. */
                 centerSlot={
                   // Once a verdict is committed the verdict control is dropped
                   // and, in the final reveal beat, replaced with the NEXT CASE /
@@ -6091,28 +6082,9 @@ export default function CyborgTemple() {
                     },
                   ]
                 }
-                extraRight={
-                  /* Council Channel slot — MOBILE ONLY now. On desktop Team
-                     Chat lives in the unified right-edge feature rail, so the
-                     dock slot would be a duplicate. Mobile has no edge rail,
-                     so it keeps the dock slot as its chat entry. */
-                  (tradeMode || !isMobileView) ? [] : [
-                    {
-                      key: 'teamchat',
-                      label: 'Team Chat',
-                      title: 'Team chat — live',
-                      onClick: () => setChatOverlay(true),
-                      icon: (
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#4dffaa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24, display: 'block', filter: 'drop-shadow(0 0 4px rgba(77, 255, 170, 0.6))' }} aria-hidden="true">
-                          <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-                          <path d="M8 12h.01" />
-                          <path d="M12 12h.01" />
-                          <path d="M16 12h.01" />
-                        </svg>
-                      ),
-                    },
-                  ]
-                }
+                /* No extraRight slots — the Team Chat dock slot was removed
+                   (2026-08-01). Desktop still reaches Team Chat from the
+                   right-edge feature rail. */
                 /* Right slot: lobby → MORE popover (matches the shrine);
                    game mode → MENU so the path picker is reachable (verdict
                    buttons have taken the center). Book slot (left) is BUY.

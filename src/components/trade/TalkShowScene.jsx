@@ -214,6 +214,21 @@ const LINE_SPEAKERS = (() => {
   return speakers;
 })();
 
+// Who holds the floor at `elapsed`. Only SOLO PROJECTION uses this (mobile):
+// it paints one face per frame instead of two, because a phone running two
+// SitePal avatar renderers plus two per-frame canvas crops is the load that
+// crashed iOS Safari on this page before. Distinct from currentShotSubject —
+// that one returns null on the two-shot, and a projection has to name someone.
+// Before the first line lands, whoever opens the show holds the face.
+function currentSpeaker(elapsed, running) {
+  if (running) {
+    for (let i = TEST_LINE_STARTS.length - 1; i >= 0; i -= 1) {
+      if (TEST_LINE_STARTS[i] <= elapsed && LINE_SPEAKERS[i]) return LINE_SPEAKERS[i];
+    }
+  }
+  return LINE_SPEAKERS.find(Boolean) ?? null;
+}
+
 // The set has ONE camera, so a "cut" is a physical pan — the director commits
 // to a shot per line rather than chasing every exchange. Singles on the
 // speaker, pulling back to the two-shot for the lines played to the room and
@@ -1110,6 +1125,10 @@ function StudioLights({ fixtures }) {
 function TalkShowModel({
   anchorY,
   projectCharacter,
+  soloProjection,
+  enableMonitorFeed,
+  compactPortalHost,
+  hideCameraRig,
   onPlaybackReady,
   onPlaybackStateChange,
 }) {
@@ -1140,6 +1159,24 @@ function TalkShowModel({
   // Where the overhead bar's four fixtures are and which way they point. Read
   // once per model — nothing on the bar animates.
   const lightFixtures = useMemo(() => readLightFixtures(cloned), [cloned]);
+
+  // The tripod camera prop earns its place on desktop: its flip-out monitor
+  // carries the live lens feed and the head is draggable. With the feed off it
+  // is set dressing standing dead centre between the guests, blocking the neon
+  // frame — so the mobile mount strikes it. Toggled (not culled at clone time)
+  // so flipping the prop back on doesn't need a re-clone.
+  // Node names may carry GLTFLoader's collision suffix, hence the pattern.
+  useEffect(() => {
+    const rig = MONITOR_HIDDEN_NODES.map(
+      (n) => new RegExp(`^${n}(_\\d+)?$`),
+    );
+    const hidden = [];
+    cloned.traverse((o) => {
+      if (rig.some((re) => re.test(o.name))) hidden.push(o);
+    });
+    hidden.forEach((o) => { o.visible = !hideCameraRig; });
+    return () => { hidden.forEach((o) => { o.visible = true; }); };
+  }, [cloned, hideCameraRig]);
 
   // Camera-monitor feed. Built on the first frame (it needs the viewer camera)
   // and torn down with the model it was built against; `undefined` means "not
@@ -1434,6 +1471,21 @@ function TalkShowModel({
       pointerEvents: "none",
       zIndex: "-1",
     });
+    // PHONES: 1200px of portals does not fit beside a 390px viewport, and the
+    // SECOND one lands entirely outside it — which is the exact off-screen
+    // subframe WebKit throttles to ~0.1fps (audio keeps playing, face freezes).
+    // Scale the host down so both stay within the visual viewport. The iframes
+    // still paint at their native 600×800, so the crop source keeps full res —
+    // only the (invisible, opacity 0.01) presentation shrinks.
+    if (compactPortalHost) {
+      const fit = Math.min(
+        1,
+        (window.innerWidth || 1200) / 1200,
+        (window.innerHeight || 800) / 800,
+      );
+      host.style.transformOrigin = "0 0";
+      host.style.transform = `scale(${fit})`;
+    }
     document.body.appendChild(host);
 
     let stopped = false;
@@ -1654,7 +1706,7 @@ function TalkShowModel({
         Barron: { frame: null, ready: false, source: null, attempt: 0, exhausted: false, loads: 0 },
       };
     };
-  }, [onPlaybackReady, onPlaybackStateChange]);
+  }, [onPlaybackReady, onPlaybackStateChange, compactPortalHost]);
 
   useFrame(({ camera, gl, scene }, delta) => {
     const playback = playbackRef.current;
@@ -1801,6 +1853,14 @@ function TalkShowModel({
       head.quaternion.multiply(listenerGazeQuatRef.current);
     });
 
+    // Solo mode paints only whoever is speaking; the OTHER portal keeps running
+    // (both voices still perform) — it just isn't sampled this frame. When the
+    // floor changes hands the dropped face falls back to its static Face1 via
+    // the visibility swap below, so no extra teardown is needed.
+    const soloKey = soloProjection
+      ? currentSpeaker(elapsed, playback.running)
+      : null;
+
     Object.entries(TALKSHOW_PROJECTION_CONFIG).forEach(([key, cfg]) => {
       const st = projRef.current[key];
       if (!st) return;
@@ -1816,7 +1876,8 @@ function TalkShowModel({
       // ?tune=sitepal control can still isolate either face while fitting.
       const selectedForFit =
         projectCharacter !== "Off" &&
-        (!projectCharacter || projectCharacter === key);
+        (!projectCharacter || projectCharacter === key) &&
+        (!soloKey || soloKey === key);
       const show = selectedForFit && portal?.ready && !!source;
       if (show) ensureProjectionMaterial(st);
       if (st.face1) st.face1.visible = !show;
@@ -1825,8 +1886,10 @@ function TalkShowModel({
       if (show && st.cropCtx) paintCrop(st, cfg, source);
     });
 
-    // Camera rig last, so the feed sees this frame's poses and faces.
-    if (MONITOR_FEED.enabled) {
+    // Camera rig last, so the feed sees this frame's poses and faces. The feed
+    // is a SECOND scene render (half rate, 384px) — worth it on desktop, but
+    // the mobile mount turns it off to spend that budget on the SitePal faces.
+    if (MONITOR_FEED.enabled && enableMonitorFeed) {
       if (monitorRef.current === undefined) {
         monitorRef.current = buildMonitorFeed(cloned, camera);
         if (!monitorRef.current) {
@@ -1859,16 +1922,28 @@ function TalkShowModel({
   );
 }
 
-// Mounts inside the existing CleanCanvas (no Canvas of its own). Takes the
-// same position/scale/rotation CyborgTempleScene receives so the swap keeps
-// the model in the same spot. `projectCharacter` ('Monk' | 'Barron' | null)
+// Mounts inside a host Canvas (no Canvas of its own). Takes the same
+// position/scale/rotation CyborgTempleScene receives so the swap keeps the
+// model in the same spot. `projectCharacter` ('Monk' | 'Barron' | null)
 // activates the live SitePal projection on that character's face for fitting.
+//
+// The last four props are the MOBILE switches (see MobileTalkShow):
+// `soloProjection` paints one face per frame instead of two, `enableMonitorFeed`
+// drops the in-scene camera monitor's second scene render, `compactPortalHost`
+// scales the hidden portal host to fit a phone viewport so WebKit doesn't
+// throttle the off-screen half of it, and `hideCameraRig` strikes the tripod
+// prop that the (now inert) monitor feed existed to justify. Desktop leaves all
+// four at their defaults and behaves exactly as before.
 export default function TalkShowScene({
   position = [0, -1.9, 0],
   scale = [1.2, 1.2, 1.2],
   rotation = [0, 0, 0],
   anchorY = 0.3,
   projectCharacter = null,
+  soloProjection = false,
+  enableMonitorFeed = true,
+  compactPortalHost = false,
+  hideCameraRig = false,
   onPlaybackReady,
   onPlaybackStateChange,
 }) {
@@ -1878,6 +1953,10 @@ export default function TalkShowScene({
         <TalkShowModel
           anchorY={anchorY}
           projectCharacter={projectCharacter}
+          soloProjection={soloProjection}
+          enableMonitorFeed={enableMonitorFeed}
+          compactPortalHost={compactPortalHost}
+          hideCameraRig={hideCameraRig}
           onPlaybackReady={onPlaybackReady}
           onPlaybackStateChange={onPlaybackStateChange}
         />

@@ -1,9 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import TerminalBoot from "./TerminalBoot";
 import CaseTable from "./case-table/CaseTable";
 import PressFlat from "./press/PressFlat";
-import OwnBinder from "@/components/binder/OwnBinder";
+import MobileTalkShow from "./MobileTalkShow";
+import { preloadTalkShow } from "./TalkShowScene";
 import { dateSeed } from "@/game/terminal-traders/docketRun";
 
 // The mobile "Liminal Terminal" game shell — what opens when you tap into the
@@ -22,12 +23,15 @@ const SITEPAL_SCENES = { monk: 2774449, demon: 2775052, marisol: 2774916 };
 // currently Learning Modules + the live Case Files investigation.
 const HUB_OPTIONS = [
   // { key: "scan", label: "LIMINAL SCAN", sub: "your trading type assessment" },
+  // LT TV (2026-08-01) — the talk_show2.glb set, live on mobile. Desktop runs
+  // it as a scene swap in the page's canvas; here it plays as a 16:9 broadcast
+  // panel inside the terminal. See MobileTalkShow for why the shapes differ.
+  { key: "lttv", label: "LT TV", sub: "the talk show — GR80 & John Barron" },
   // THE VC GAME (2026-07-26) — the one game we ship. Renders through PressFlat:
   // same pure controller as desktop, no WebGL, and Barron actually SPEAKS here
   // (ElevenLabs + the amplitude mouth), which the 3D view can't do because it's
   // limited to hand-uploaded SitePal clips.
   { key: "vc", label: "THE VC GAME", sub: "one deal. one pitch. three interruptions." },
-  { key: "binder", label: "THE BINDER", sub: "your Genesis 80 collection" },
 ];
 
 // Daily Docket placeholder (CASE_TABLE.md §4.1): the seed is the UTC date
@@ -39,12 +43,21 @@ const HUB_OPTIONS = [
 // host flips `transparent` on so the room shows through during the curtain
 // call. Mobile mounts pass none of these and keep the opaque CRT.
 export default function MobileTerminalGame({ active = true, onExit, templeStage = false, onRevealChange = null, transparent = false }) {
-  const [screen, setScreen] = useState("boot"); // 'boot' | 'placeholder' | 'cases' | 'binder'
+  const [screen, setScreen] = useState("boot"); // 'boot' | 'lttv' | 'vc' | 'placeholder' | 'cases'
   const [placeholderLabel, setPlaceholderLabel] = useState("");
   // True once the boot intro has played; subsequent returns to the hub skip the
   // welcome animation and show the menu options straight away.
   const [bootSeen, setBootSeen] = useState(false);
   const [seed] = useState(dateSeed);
+
+  // Warm the LT TV set once the terminal is actually open. page.js skips this
+  // preload on phones (3.3MB on cellular for a screen most visitors never
+  // reach), so opening the terminal is the first real signal of intent — it
+  // puts the fetch a tap ahead of the hub selection instead of behind it.
+  useEffect(() => {
+    if (!active) return;
+    try { preloadTalkShow(); } catch (e) { /* non-fatal — LT TV fetches on open */ }
+  }, [active]);
 
   if (!active) return null;
 
@@ -56,18 +69,18 @@ export default function MobileTerminalGame({ active = true, onExit, templeStage 
           instant={bootSeen}
           onSelect={(key) => {
             setBootSeen(true);
+            if (key === "lttv") { setScreen("lttv"); return; }
             if (key === "vc") { setScreen("vc"); return; }
             if (key === "cases") { setScreen("cases"); return; }
-            if (key === "binder") { setScreen("binder"); return; }
             setPlaceholderLabel(HUB_OPTIONS.find((o) => o.key === key)?.label || "MODULE");
             setScreen("placeholder");
           }}
           onExit={onExit}
         />
+      ) : screen === "lttv" ? (
+        <MobileTalkShow onExit={() => setScreen("boot")} />
       ) : screen === "vc" ? (
         <PressFlat onExit={() => setScreen("boot")} />
-      ) : screen === "binder" ? (
-        <OwnBinder embedded onExit={() => setScreen("boot")} />
       ) : screen === "placeholder" ? (
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#02100e", color: "#2fd6d6", fontFamily: "'Courier New', monospace", padding: 24, textAlign: "center" }}>
           <div style={{ fontSize: 22, fontWeight: "bold", color: "#f4fffb", letterSpacing: "0.06em" }}>{placeholderLabel}</div>
