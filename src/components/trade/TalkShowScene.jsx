@@ -23,13 +23,13 @@
 import React, { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, SpotLight } from "@react-three/drei";
 import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { SITEPAL_PROJECTION_CONFIG } from "@/components/CyborgTempleScene";
 
 // Version the URL when the Blender export changes so drei does not keep an
 // older GLTF from its in-memory cache during hot reloads.
-const MODEL_URL = "/models/talk_show.glb?v=20260731-camrig";
+const MODEL_URL = "/models/talk_show2.glb";
 // World up, for the camera prop's pan.
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const SITEPAL_ACCOUNT = "9308752";
@@ -750,6 +750,363 @@ function renderMonitorFeed(feed, gl, scene) {
   }
 }
 
+// ── Studio lighting ───────────────────────────────────────────────────────
+// The four fixtures on the overhead bar are GEOMETRY ONLY — the GLB carries no
+// KHR_lights_punctual — so until now the set was lit entirely by the page's
+// ambientLight and the lamps read as dead props. Each one gets a real
+// THREE.SpotLight hung in its aperture, aimed down its own barrel, plus drei's
+// volumetric cone so the shaft is visible against the black stage.
+//
+// THE AIM IS THE MODEL'S, NOT OURS. The fixtures were angled in Blender: the
+// outer pair rakes the two chairs and the inner pair washes the middle of the
+// set, so the plot below just names what was already authored rather than
+// pointing lights at hand-picked coordinates that a re-export would invalidate.
+const LAMP_HEAD_NODES = [
+  // Bar order as modelled, +x first — so 01 is on GR80's side of the set and
+  // 04 is on Barron's.
+  "SM_Prop_Light_Spotlight_02_Light_01",
+  "SM_Prop_Light_Spotlight_02_Light_02",
+  "SM_Prop_Light_Spotlight_02_Light_03",
+  "SM_Prop_Light_Spotlight_02_Light_04",
+];
+
+// Live-tunable from the console via `window.__tsLights`, same contract as
+// `__tsMonitor`: the per-frame sync in StudioLights reads these fields every
+// tick, so edits go live. THE TWO EXCEPTIONS ARE `coneLength` and `radiusTop`,
+// which are baked into the cone geometry at mount — change those and reopen the
+// tab.
+//
+// THREE LENGTH KNOBS, AND THEY ARE NOT THE SAME UNITS. `range` and `beamLength`
+// are consumed in WORLD space (the light's own falloff, and SpotLightMaterial's
+// `distance(worldPosition, spotPosition)`), while the cone MESH is built in the
+// set's local space — which /trade scales by 1.2. `coneLength` is therefore
+// stated in model units and the other two in world units. Keep
+// `coneLength * <the page's scale>` a little longer than `beamLength` so the
+// shaft fades out on its own rather than ending in a cut-off disc.
+export const STUDIO_LIGHTS = {
+  enabled: true,
+  // Beams off leaves the illumination but hides the visible shafts.
+  beams: true,
+  angle: 0.24,
+  penumbra: 0.75,
+  // Real inverse-square (2) drops ~18:1 between the guests and the floor and
+  // loses the pools on the carpet entirely. This is the flattering-studio-rig
+  // cheat, not physics.
+  decay: 1.2,
+  // Where the ILLUMINATION cuts out (world units). Well past the floor: three
+  // rolls the last stretch off hard, so a range that only just reaches kills
+  // the floor pools.
+  range: 9,
+  // Where the VISIBLE SHAFT fades to nothing (world units) — the fixtures hang
+  // ~5.4 world units above the carpet at these rake angles.
+  beamLength: 5.6,
+  // Cone MESH length, in model units. Mount-time only.
+  coneLength: 5.5,
+  // Softness of the shaft's edge. Higher = the rim falls off sooner.
+  anglePower: 5,
+  // Mouth of the cone. Mount-time only.
+  radiusTop: 0.05,
+  // All the lamp geometry shares one material (PolygonClub_MAT), so there is no
+  // lens mesh to make emissive — this is an additive sprite parked in each
+  // aperture instead. Bloom (desktop only, and this tab is desktop only) turns
+  // it into the glare that sells the fixture as switched on.
+  lens: { enabled: true, size: 0.11, opacity: 0.5 },
+  // Per fixture, in LAMP_HEAD_NODES order. `opacity` is the shaft's, and it
+  // stacks where cones overlap — the same trap the curtain-call spotlights hit
+  // on 2026-07-26, so judge brightness from a few camera angles.
+  //
+  // `yaw` / `pitch` are DEGREES OFF THE MODELLED AIM, not absolute angles, so 0
+  // is always whatever Blender authored. Positive yaw swings the beam toward
+  // Barron (−x), positive pitch lifts it. The lamp head itself turns with the
+  // beam, so a re-aim still looks like it is coming out of the fixture.
+  plot: [
+    // key — lands on GR80
+    { intensity: 8, color: "#ffe6c4", opacity: 0.13, yaw: 0, pitch: 0 },
+    // fill — centre right
+    { intensity: 4, color: "#ffd9b0", opacity: 0.085, yaw: 0, pitch: 0 },
+    // fill — neon frame
+    { intensity: 4, color: "#ffd9b0", opacity: 0.085, yaw: 0, pitch: 0 },
+    // key — lands on Barron
+    { intensity: 8, color: "#ffe6c4", opacity: 0.13, yaw: 0, pitch: 0 },
+  ],
+};
+
+// How far down the beam the SpotLight's target is parked. Direction-only, so
+// the value just has to be comfortably clear of the light itself.
+const AIM_THROW = 4;
+const AIM_UP = new THREE.Vector3(0, 1, 0);
+
+// Read each fixture's aperture and barrel direction straight off the model.
+//
+// The lamp head's origin is its YOKE PIVOT, so the housing reaches much further
+// along the barrel than along anything else — the bounding-box face furthest
+// from that pivot IS the aperture, which gives both the beam axis and the point
+// to hang the light at. Deriving it beats hard-coding local +Y (what this
+// export happens to use — the FBX Z-up conversion means the barrel axis is NOT
+// the fixture's visual "down"): a re-export that lands the heads in a different
+// orientation still lights the set.
+//
+// Everything is returned in `root`'s PARENT space, which is where the lights
+// mount as its siblings.
+function readLightFixtures(root) {
+  root.updateWorldMatrix(false, true);
+  const toParent = new THREE.Matrix4()
+    .copy(root.matrixWorld)
+    .invert()
+    .premultiply(root.matrix);
+  const local = new THREE.Matrix4();
+
+  return LAMP_HEAD_NODES.map((name) => {
+    const head = root.getObjectByName(name);
+    if (!head?.geometry) {
+      console.warn(`[TalkShowScene] lamp head "${name}" not found — no spotlight`);
+      return null;
+    }
+    if (!head.geometry.boundingBox) head.geometry.computeBoundingBox();
+    const box = head.geometry.boundingBox;
+    const [axis, reach] = [
+      [new THREE.Vector3(1, 0, 0), box.max.x],
+      [new THREE.Vector3(-1, 0, 0), -box.min.x],
+      [new THREE.Vector3(0, 1, 0), box.max.y],
+      [new THREE.Vector3(0, -1, 0), -box.min.y],
+      [new THREE.Vector3(0, 0, 1), box.max.z],
+      [new THREE.Vector3(0, 0, -1), -box.min.z],
+    ].sort((a, b) => b[1] - a[1])[0];
+
+    local.multiplyMatrices(toParent, head.matrixWorld);
+    const pivot = new THREE.Vector3().setFromMatrixPosition(local);
+    const position = axis.clone().multiplyScalar(reach).applyMatrix4(local);
+    const direction = axis.clone().transformDirection(local).normalize();
+
+    // These hang over the set and rake down onto it. An axis that came back
+    // pointing up means the bounding-box read picked the wrong end, and the
+    // beam would shine off into the starfield with nothing to show for it.
+    if (direction.y > -0.15) {
+      console.warn(
+        `[TalkShowScene] "${name}" barrel axis reads as ` +
+          `${direction.toArray().map((v) => v.toFixed(2)).join(", ")} — not aimed ` +
+          `at the set; check the fixture's pivot in the export`,
+      );
+    }
+
+    // Direction only — the SpotLight looks at this, the distance is irrelevant.
+    const target = new THREE.Object3D();
+    target.position.copy(position).addScaledVector(direction, AIM_THROW);
+    return {
+      name,
+      head,
+      // Yoke pivot and how far past it the aperture sits, so re-aiming can put
+      // the light back in the mouth of the lamp after the head swings.
+      pivot,
+      reach: pivot.distanceTo(position),
+      // The modelled aim, which yaw/pitch are offsets FROM.
+      position,
+      direction,
+      target,
+      restQuaternion: head.quaternion.clone(),
+      aimedYaw: null,
+      aimedPitch: null,
+    };
+  }).filter(Boolean);
+}
+
+// Soft radial disc for the lens glare. Built as a DataTexture rather than a
+// CanvasTexture on purpose — see the iOS CanvasTexture note; a generated
+// texture also can't race the first paint.
+function makeLensTexture() {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const dx = (x + 0.5) / size - 0.5;
+      const dy = (y + 0.5) / size - 0.5;
+      const d = Math.min(1, Math.hypot(dx, dy) * 2);
+      const i = (y * size + x) * 4;
+      data[i] = 255;
+      data[i + 1] = 255;
+      data[i + 2] = 255;
+      // Hot core, long tail — a linear falloff reads as a flat dot.
+      data[i + 3] = Math.round(255 * Math.pow(1 - d, 2.2));
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+// Swing one fixture to `yaw`/`pitch` degrees off its modelled aim: the beam,
+// the light's position in the (now moved) aperture, and the lamp head itself.
+// Called only when a knob actually changes, so the quaternion work is free
+// during normal playback.
+function aimFixture(fixture, yawDeg, pitchDeg, scratch, light, sprite) {
+  const yaw = THREE.MathUtils.degToRad(yawDeg);
+  const pitch = THREE.MathUtils.degToRad(pitchDeg);
+
+  // Swing about world up first, then lift about the horizontal axis square to
+  // the swung aim — so pitch always reads as "raise the beam", whichever way
+  // the fixture is pointing.
+  scratch.yaw.setFromAxisAngle(AIM_UP, yaw);
+  scratch.direction.copy(fixture.direction).applyQuaternion(scratch.yaw);
+  scratch.right.copy(scratch.direction).cross(AIM_UP).normalize();
+  scratch.pitch.setFromAxisAngle(scratch.right, pitch);
+  scratch.delta.copy(scratch.pitch).multiply(scratch.yaw);
+  scratch.direction.copy(fixture.direction).applyQuaternion(scratch.delta);
+
+  const aperture = scratch.aperture
+    .copy(fixture.pivot)
+    .addScaledVector(scratch.direction, fixture.reach);
+  fixture.target.position
+    .copy(aperture)
+    .addScaledVector(scratch.direction, AIM_THROW);
+  if (light) light.position.copy(aperture);
+  if (sprite) sprite.position.copy(aperture);
+
+  // Turn the prop to match. The swing is a WORLD-space rotation and the head
+  // hangs off a bracket under the bar's own Z-up conversion, so it has to be
+  // conjugated into the parent's frame before it can multiply the rest pose —
+  // writing it straight onto the head would rotate it about the wrong axes.
+  const parent = fixture.head.parent;
+  if (parent) {
+    parent.getWorldQuaternion(scratch.parent);
+    scratch.local
+      .copy(scratch.parent)
+      .invert()
+      .multiply(scratch.delta)
+      .multiply(scratch.parent);
+    fixture.head.quaternion.copy(scratch.local).multiply(fixture.restQuaternion);
+  }
+}
+
+function StudioLights({ fixtures }) {
+  const lightsRef = useRef([]);
+  const spritesRef = useRef([]);
+  const colorsRef = useRef([]);
+  const aimScratch = useMemo(
+    () => ({
+      direction: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      aperture: new THREE.Vector3(),
+      yaw: new THREE.Quaternion(),
+      pitch: new THREE.Quaternion(),
+      delta: new THREE.Quaternion(),
+      parent: new THREE.Quaternion(),
+      local: new THREE.Quaternion(),
+    }),
+    [],
+  );
+
+  const lenses = useMemo(() => {
+    const texture = makeLensTexture();
+    const materials = fixtures.map(
+      () =>
+        new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          // Left tone-mapped-out so the lens stays hot enough to drive Bloom.
+          toneMapped: false,
+        }),
+    );
+    return { texture, materials };
+  }, [fixtures]);
+
+  useEffect(
+    () => () => {
+      lenses.materials.forEach((m) => m.dispose());
+      lenses.texture.dispose();
+    },
+    [lenses],
+  );
+
+  // Push the live config every tick. Cheap (four lights), and it means the
+  // console knobs work without re-rendering a component that owns the whole set.
+  useFrame(() => {
+    const on = STUDIO_LIGHTS.enabled;
+    fixtures.forEach((fixture, i) => {
+      const light = lightsRef.current[i];
+      if (!light) return;
+      const plot = STUDIO_LIGHTS.plot[i] || STUDIO_LIGHTS.plot[0];
+
+      // Re-aim only on the frames the knobs move. The first pass always runs
+      // (rest is null), which is what puts the light in the aperture.
+      const yaw = plot.yaw || 0;
+      const pitch = plot.pitch || 0;
+      if (fixture.aimedYaw !== yaw || fixture.aimedPitch !== pitch) {
+        fixture.aimedYaw = yaw;
+        fixture.aimedPitch = pitch;
+        aimFixture(fixture, yaw, pitch, aimScratch, light, spritesRef.current[i]);
+      }
+
+      light.intensity = on ? plot.intensity : 0;
+      light.angle = STUDIO_LIGHTS.angle;
+      light.penumbra = STUDIO_LIGHTS.penumbra;
+      light.distance = STUDIO_LIGHTS.range;
+      light.decay = STUDIO_LIGHTS.decay;
+      // Re-parsing a colour string every frame for four lights is pointless
+      // work; only pay for it when the knob actually moves.
+      if (colorsRef.current[i] !== plot.color) {
+        colorsRef.current[i] = plot.color;
+        light.color.set(plot.color);
+        lenses.materials[i]?.color.set(plot.color);
+      }
+      lenses.materials[i].opacity =
+        on && STUDIO_LIGHTS.lens.enabled ? STUDIO_LIGHTS.lens.opacity : 0;
+      spritesRef.current[i]?.scale.setScalar(STUDIO_LIGHTS.lens.size);
+
+      const cone = light.children.find(
+        (child) => child.isMesh && child.material?.uniforms?.attenuation,
+      );
+      if (!cone) return;
+      cone.visible = on && STUDIO_LIGHTS.beams;
+      const u = cone.material.uniforms;
+      u.attenuation.value = STUDIO_LIGHTS.beamLength;
+      u.anglePower.value = STUDIO_LIGHTS.anglePower;
+      u.opacity.value = plot.opacity;
+      u.lightColor.value.set(plot.color);
+    });
+  });
+
+  return fixtures.map((fixture, i) => (
+    <group key={fixture.name}>
+      <primitive object={fixture.target} />
+      <SpotLight
+        ref={(node) => { lightsRef.current[i] = node; }}
+        position={fixture.position}
+        target={fixture.target}
+        // `distance` shapes the cone MESH; the light's own falloff distance is
+        // set to `range` by the sync above, so the shaft can stay short while
+        // the illumination still carries to the floor.
+        distance={STUDIO_LIGHTS.coneLength}
+        angle={STUDIO_LIGHTS.angle}
+        radiusTop={STUDIO_LIGHTS.radiusTop}
+        // drei's default (`angle * 7`) is fitted to its default 5-unit cone and
+        // flares wider than the light it is meant to draw. This makes the shaft
+        // exactly as wide as the lit pool, at any page scale.
+        radiusBottom={STUDIO_LIGHTS.coneLength * Math.tan(STUDIO_LIGHTS.angle)}
+        attenuation={STUDIO_LIGHTS.beamLength}
+        anglePower={STUDIO_LIGHTS.anglePower}
+        // drei hard-codes castShadow before its prop spread. /trade's Canvas
+        // never enabled shadowMap so it is inert either way, but four shadow
+        // cameras is not something to leave switched on by accident on a page
+        // that also renders the scene a second time for the monitor feed.
+        castShadow={false}
+      />
+      {/* Always mounted — `lens.enabled` rides the material's opacity in the
+          sync above, so toggling it from the console is instant. */}
+      <sprite
+        ref={(node) => { spritesRef.current[i] = node; }}
+        position={fixture.position}
+        scale={[STUDIO_LIGHTS.lens.size, STUDIO_LIGHTS.lens.size, 1]}
+      >
+        <primitive object={lenses.materials[i]} attach="material" />
+      </sprite>
+    </group>
+  ));
+}
+
 function TalkShowModel({
   anchorY,
   projectCharacter,
@@ -780,6 +1137,10 @@ function TalkShowModel({
     return c;
   }, [scene]);
 
+  // Where the overhead bar's four fixtures are and which way they point. Read
+  // once per model — nothing on the bar animates.
+  const lightFixtures = useMemo(() => readLightFixtures(cloned), [cloned]);
+
   // Camera-monitor feed. Built on the first frame (it needs the viewer camera)
   // and torn down with the model it was built against; `undefined` means "not
   // built yet", `null` means the prop wasn't in the GLB.
@@ -788,6 +1149,7 @@ function TalkShowModel({
     if (typeof window !== "undefined") {
       window.__tsMonitor = MONITOR_FEED;
       window.__tsTiming = TALK_SHOW_TIMING;
+      window.__tsLights = STUDIO_LIGHTS;
     }
     return () => {
       const feed = monitorRef.current;
@@ -1490,6 +1852,9 @@ function TalkShowModel({
   return (
     <group position={[0, anchorY, 0]}>
       <primitive object={cloned} />
+      {/* Siblings, not children of the set: readLightFixtures returns model
+          coordinates in `cloned`'s parent space, which is exactly here. */}
+      {lightFixtures.length > 0 && <StudioLights fixtures={lightFixtures} />}
     </group>
   );
 }

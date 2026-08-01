@@ -24,6 +24,7 @@ import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import CouncilChatScreens from "@/components/CouncilChatScreens";
 import TalkShowScene, { preloadTalkShow } from "@/components/trade/TalkShowScene";
+import LTTvBroadcastPanel from "@/components/trade/LTTvBroadcastPanel";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -3668,7 +3669,7 @@ export default function CyborgTemple() {
      
                 // Fade out the title while a character/screen is focused so
                 // the close-up has the visual stage to itself.
-                opacity: focusedAgent ? 0 : 1,
+                opacity: focusedAgent || talkShowMode ? 0 : 1,
                 // The h1 has no click handler — make it pointer-transparent
                 // so its rotated/skewed hit rectangle doesn't swallow clicks
                 // on 3D objects underneath it (notably the Angel, which sits
@@ -4369,7 +4370,7 @@ export default function CyborgTemple() {
               ? { left: '50%', bottom: '6.5rem', transform: 'translateX(-50%)' }
               : { right: '4%', top: '50%', transform: 'translateY(-50%)' }),
             width: isMobileView ? '110px' : '160px',
-            opacity: showHandTap ? 1 : 0,
+            opacity: showHandTap && !talkShowMode ? 1 : 0,
             transition: 'opacity 0.5s ease',
             pointerEvents: 'none',
             zIndex: 25,
@@ -4528,23 +4529,21 @@ export default function CyborgTemple() {
           );
         })()}
 
-        {/* One-click live performance. Both SitePal tracks are preloaded inside
-            their isolated portals and started from this same user gesture. */}
+        {/* LT TV production console. The camera monitor remains part of the GLB
+            set; all episode selection and playback controls live here. */}
         {mounted && !isMobileView && talkShowMode && (
-          <button
-            type="button"
-            disabled={!talkShowAudioReady && talkShowVoiceStatus !== 'failed'}
-            onClick={() => {
-              // Both portals gave up — this press is the retry.
-              if (talkShowVoiceStatus === 'failed') {
-                setTalkShowVoiceStatus('loading');
-                try { window.__talkShowRetryPortals?.(); } catch (e) {}
-                return;
-              }
-              if (talkShowPlaying) {
-                try { window.__talkShowStop?.(); } catch (e) {}
-                return;
-              }
+          <LTTvBroadcastPanel
+            audioReady={talkShowAudioReady}
+            playing={talkShowPlaying}
+            voiceStatus={talkShowVoiceStatus}
+            onRetry={() => {
+              setTalkShowVoiceStatus('loading');
+              try { window.__talkShowRetryPortals?.(); } catch (e) {}
+            }}
+            onStop={() => {
+              try { window.__talkShowStop?.(); } catch (e) {}
+            }}
+            onPlay={() => {
               try {
                 const started = window.__talkShowPlay?.();
                 if (!started) setTalkShowPlaying(false);
@@ -4552,49 +4551,7 @@ export default function CyborgTemple() {
                 setTalkShowPlaying(false);
               }
             }}
-            style={{
-              position: 'fixed',
-              left: '50%',
-              bottom: 92,
-              transform: 'translateX(-50%)',
-              zIndex: 10040,
-              minWidth: 190,
-              padding: '11px 20px',
-              borderRadius: 999,
-              // The failed state is pressable (it retries), so it must not wear
-              // the dimmed "still loading" treatment.
-              border: `1px solid rgba(255, 207, 77, ${talkShowAudioReady || talkShowVoiceStatus === 'failed' ? 0.88 : 0.3})`,
-              background: talkShowPlaying
-                ? 'rgba(255, 82, 118, 0.2)'
-                : talkShowVoiceStatus === 'failed'
-                  ? 'linear-gradient(180deg, rgba(255,110,110,0.22), rgba(8,7,12,0.92))'
-                  : 'linear-gradient(180deg, rgba(255,207,77,0.2), rgba(8,7,12,0.92))',
-              boxShadow: talkShowAudioReady
-                ? '0 0 22px rgba(255,207,77,0.24), inset 0 1px 0 rgba(255,255,255,0.08)'
-                : 'none',
-              color: talkShowAudioReady
-                ? '#ffe38a'
-                : talkShowVoiceStatus === 'failed'
-                  ? '#ffb4b4'
-                  : 'rgba(255,227,138,0.45)',
-              cursor: talkShowAudioReady || talkShowVoiceStatus === 'failed' ? 'pointer' : 'wait',
-              fontFamily: "'Orbitron','IBM Plex Mono',monospace",
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: '0.22em',
-              textTransform: 'uppercase',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-            }}
-          >
-            {talkShowVoiceStatus === 'failed'
-              ? 'Voices failed · retry'
-              : !talkShowAudioReady
-                ? 'Loading voices…'
-                : talkShowPlaying
-                  ? 'Stop test'
-                  : 'Start show'}
-          </button>
+          />
         )}
 
         {/* Talk-show SitePal fitting control — dev only (?tune=sitepal), while
