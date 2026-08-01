@@ -50,9 +50,11 @@ export default function LTTvBroadcastPanel({
   onRetry,
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  // Let the studio set make the first impression. The production controls
-  // expand on demand, and the episode rack opens separately from its selector.
-  const [collapsed, setCollapsed] = useState(true);
+  // Open on arrival: this panel only mounts once the LT TV set is up, and the
+  // production controls ARE the point of switching to it — collapsing first
+  // made you click twice to reach them. Still collapsible to clear the set.
+  // (The episode rack opens separately from its selector.)
+  const [collapsed, setCollapsed] = useState(false);
   const [episodesOpen, setEpisodesOpen] = useState(false);
   const selected = EPISODES[selectedIndex];
   const loading = !audioReady && voiceStatus !== "failed";

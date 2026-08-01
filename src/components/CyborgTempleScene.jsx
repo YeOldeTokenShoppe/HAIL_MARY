@@ -739,6 +739,14 @@ const CAT_FOCUS = { dist: 0.75, camY: 0.25, lookY: 0.48 };
 // cycle's 0.6s crossfade, so entering/leaving a groom doesn't pop.
 const CAT_HEAD_FOLLOW_RAMP = 0.05;
 
+// Name hung on the group that holds the loaded temple. Exported so scene-level
+// companions can tell whether a temple is currently on screen — see
+// TickerDisplay3, whose ring sits in the root scene rather than under the
+// temple and would otherwise render alone whenever the temple is between
+// loads (a Suspense re-suspension tears the temple's effects down and reloads
+// the GLB; the LT TV swap and dev Fast Refresh do the same).
+export const TEMPLE_ANCHOR_NAME = 'TempleAnchor';
+
 const CyborgTempleScene = ({
   onLoad,
   position = [0, 0, 0],
@@ -3610,8 +3618,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       setLoadedModel(templeScene);
       
       // Create an anchor group for positioning — same desktop model on both
-      // mobile and desktop for now.
+      // mobile and desktop for now. Named so companions that live in the scene
+      // but aren't parented to the temple (TickerDisplay3's ring) can check
+      // whether a temple is actually on screen before drawing themselves.
       const anchorGroup = new THREE.Group();
+      anchorGroup.name = TEMPLE_ANCHOR_NAME;
       anchorGroup.position.set(0, 0.3, 0);
       anchorGroup.rotation.set(0, 0, 0);
       anchorGroup.scale.set(1, 1, 1);

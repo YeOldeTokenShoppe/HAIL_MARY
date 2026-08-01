@@ -1,6 +1,44 @@
 import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
+import { TEMPLE_ANCHOR_NAME } from "@/components/CyborgTempleScene";
+
+// How often (in frames) to re-hunt the temple anchor while it's missing.
+// getObjectByName walks the whole graph, so this only runs while there's
+// nothing to find — once resolved, the check below is a couple of pointer
+// hops per frame.
+const TEMPLE_PROBE_INTERVAL = 15;
+
+// Would this anchor actually draw? It must hold a loaded model, have no hidden
+// ancestor (R3F hides a suspended tree by flipping visible=false on its
+// objects), and — the subtle one — still climb all the way to THIS scene.
+// Unmounting the temple detaches its whole group, which leaves the anchor with
+// a perfectly good parent that simply isn't in the scene anymore; checking
+// `parent` alone reads that orphan as present and the ring keeps drawing.
+const isAnchorDrawing = (anchor, scene) => {
+  if (!anchor || anchor.children.length === 0) return false;
+  let node = anchor;
+  let root = anchor;
+  while (node) {
+    if (node.visible === false) return false;
+    root = node;
+    node = node.parent;
+  }
+  return root === scene;
+};
+
+// Is a temple currently on screen? Caches the anchor and re-hunts (throttled —
+// getObjectByName walks the graph) whenever the cached one stops drawing.
+const isTempleShowing = (templeRef, probeRef, scene) => {
+  if (!scene) return false;
+  if (isAnchorDrawing(templeRef.current, scene)) return true;
+  probeRef.current += 1;
+  if (probeRef.current % TEMPLE_PROBE_INTERVAL !== 0) return false;
+  // getObjectByName only searches the live graph, so a detached anchor can't
+  // come back this way — only a freshly mounted temple can.
+  templeRef.current = scene.getObjectByName(TEMPLE_ANCHOR_NAME) || null;
+  return isAnchorDrawing(templeRef.current, scene);
+};
 
 const SUB_DIGITS = ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"];
 const toSubscript = (n) =>
@@ -25,8 +63,17 @@ const TickerDisplay3 = ({
   isMobile = false,
   yPosition = -1.53,
   mobileYPosition = -0.83,
+  // Optional external override. Presence of the temple is checked per frame
+  // below and is the usual reason the ring hides, so callers only need this to
+  // suppress it for reasons of their own; false always wins.
+  visible = true,
 }) => {
   const meshRef = useRef();
+  // Same mesh as meshRef, held in state so <primitive> re-renders when the
+  // init effect rebuilds it.
+  const [meshObject, setMeshObject] = useState(null);
+  const templeRef = useRef(null);
+  const probeRef = useRef(0);
   const canvasRef = useRef();
   const textureRef = useRef();
   const scrollPos = useRef(0);
@@ -227,6 +274,7 @@ const TickerDisplay3 = ({
 
       // Create the mesh
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.visible = visible;
 
       // Use the ticker's position, rotation AND scale
       mesh.position.copy(tickerPosition);
@@ -238,25 +286,41 @@ const TickerDisplay3 = ({
       // Try rotating 180 degrees around Y axis
       mesh.rotation.x += Math.PI;
 
-      // Add it to the main scene - with safety check
-      if (mainScene && typeof mainScene.add === 'function') {
-        mainScene.add(mesh);
-      } else {
-        console.error('[TickerDisplay3] Cannot add mesh to scene - scene not available or invalid');
-        return;
-      }
+      // NOT scene.add(mesh). The mesh is handed to R3F via <primitive> below
+      // so React owns its lifetime: it attaches to the same scene root either
+      // way, but it now unmounts with this component instead of outliving it.
+      // While it was added imperatively it survived everything — a temple
+      // remount (LT TV swap, a dev Fast Refresh) left the ring hanging alone
+      // in an empty room until the new GLB finished parsing.
 
-      // Store reference
+      // Publish through STATE, not just the ref: <primitive> renders whatever
+      // this effect built, and a ref assignment doesn't re-render. This effect
+      // re-runs whenever the position/rotation/scale state objects change
+      // identity, so a ref-only handoff would leave the primitive holding the
+      // first mesh forever while later ones floated free.
       meshRef.current = mesh;
+      setMeshObject(mesh);
 
       setIsInitialized(true);
-      
+
       // Call onLoad callback if provided (only once)
       if (onLoad && !hasCalledOnLoad.current) {
         hasCalledOnLoad.current = true;
         // console.log('TickerDisplay3 loaded');
         onLoad();
       }
+
+      // Dispose the mesh this run created. Also covers unmount, so the ring
+      // never outlives the component (it used to be scene.add()ed and left
+      // behind, which is how it ended up alone on screen during a temple
+      // reload). R3F detaches the primitive itself; this frees the GPU side.
+      return () => {
+        mesh.geometry?.dispose();
+        mesh.material?.map?.dispose();
+        mesh.material?.dispose();
+        if (meshRef.current === mesh) meshRef.current = null;
+        setMeshObject((current) => (current === mesh ? null : current));
+      };
     } catch (error) {
       console.error("Failed to initialize ticker display:", error);
     }
@@ -264,7 +328,18 @@ const TickerDisplay3 = ({
 
   // Animation loop
   useFrame(() => {
-    if (isInitialized) {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    // The ring belongs to the temple but lives in the root scene, so nothing
+    // about React's tree keeps the two in step. Derive visibility from the
+    // temple ITSELF every frame: it can't get stuck on (ring alone in an empty
+    // room while the GLB reloads) or stuck off (a missed "it's back" signal).
+    const showing = visible && isTempleShowing(templeRef, probeRef, sceneRef.current);
+    mesh.visible = showing;
+
+    // Nothing to paint while hidden — skip the canvas redraw + texture upload.
+    if (isInitialized && showing) {
       updateCanvas();
 
       // Check if modelRef exists and update ticker geometry based on model scale
@@ -730,7 +805,14 @@ const TickerDisplay3 = ({
     }
   };
 
-  return null;
+  // Hand the mesh to R3F. Attaching it here rather than with scene.add() ties
+  // it to this component's lifetime and to the Suspense boundary it renders
+  // in, so it can never be the only thing left on screen. `visible` is applied
+  // as a prop (not just imperatively) so R3F restores the right value after it
+  // un-hides a suspended subtree.
+  return meshObject ? (
+    <primitive object={meshObject} visible={visible} />
+  ) : null;
 };
 
 export default TickerDisplay3;
