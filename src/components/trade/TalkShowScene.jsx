@@ -220,6 +220,11 @@ const LINE_SPEAKERS = (() => {
 // crashed iOS Safari on this page before. Distinct from currentShotSubject —
 // that one returns null on the two-shot, and a projection has to name someone.
 // Before the first line lands, whoever opens the show holds the face.
+// How often the LISTENER's face is resampled in solo mode, in frames. They're
+// not talking, so their face only has to carry idle motion and blinks — 1-in-6
+// reads as alive while costing a sixth of a full-rate second face.
+const SOLO_LISTENER_EVERY_NTH = 6;
+
 function currentSpeaker(elapsed, running) {
   if (running) {
     for (let i = TEST_LINE_STARTS.length - 1; i >= 0; i -= 1) {
@@ -1138,6 +1143,8 @@ function TalkShowModel({
     Barron: { frame: null, ready: false, source: null },
   });
   const playbackRef = useRef({ running: false, startedAt: 0, cueIndex: 0 });
+  // Frame counter for solo mode's listener-repaint throttle.
+  const solotickRef = useRef(0);
 
   // Clone so toggling the tab (unmount/remount) and HMR never reuse a mutated
   // tree, and so R3F isn't handed the same cached object twice.
@@ -1853,13 +1860,24 @@ function TalkShowModel({
       head.quaternion.multiply(listenerGazeQuatRef.current);
     });
 
-    // Solo mode paints only whoever is speaking; the OTHER portal keeps running
-    // (both voices still perform) — it just isn't sampled this frame. When the
-    // floor changes hands the dropped face falls back to its static Face1 via
-    // the visibility swap below, so no extra teardown is needed.
+    // SOLO MODE THROTTLES THE REPAINT, IT DOES NOT UNPROJECT.
+    //
+    // Swapping the visible mesh per speaker (Face2 → back to the static Face1)
+    // is what it did first, and the two materials don't tone-match: every
+    // handoff popped a visible shade change on both guests. Desktop never shows
+    // it because it projects both faces continuously and so never swaps.
+    //
+    // So once a face is projected it STAYS projected — no mesh ever swaps
+    // mid-show — and solo mode instead decides who gets REPAINTED this frame.
+    // That keeps the saving that mattered: paintCrop is the drawImage + filter
+    // + 512² texture upload, and it's now skipped for the listener rather than
+    // run for both. The listener still refreshes slowly (they idle and blink
+    // rather than freezing on one frame), which is a fraction of the cost of
+    // painting them every tick.
     const soloKey = soloProjection
       ? currentSpeaker(elapsed, playback.running)
       : null;
+    solotickRef.current = (solotickRef.current + 1) % SOLO_LISTENER_EVERY_NTH;
 
     Object.entries(TALKSHOW_PROJECTION_CONFIG).forEach(([key, cfg]) => {
       const st = projRef.current[key];
@@ -1874,16 +1892,19 @@ function TalkShowModel({
       const source = portal?.source;
       // Default production mode projects both characters. The existing
       // ?tune=sitepal control can still isolate either face while fitting.
+      // NOTE: soloKey is deliberately NOT part of this — see above.
       const selectedForFit =
         projectCharacter !== "Off" &&
-        (!projectCharacter || projectCharacter === key) &&
-        (!soloKey || soloKey === key);
+        (!projectCharacter || projectCharacter === key);
       const show = selectedForFit && portal?.ready && !!source;
       if (show) ensureProjectionMaterial(st);
       if (st.face1) st.face1.visible = !show;
       if (st.face2) st.face2.visible = show;
       st.hideExtra.forEach((m) => { m.visible = !show; });
-      if (show && st.cropCtx) paintCrop(st, cfg, source);
+
+      const isListener = soloKey && soloKey !== key;
+      const repaint = show && (!isListener || solotickRef.current === 0);
+      if (repaint && st.cropCtx) paintCrop(st, cfg, source);
     });
 
     // Camera rig last, so the feed sees this frame's poses and faces. The feed

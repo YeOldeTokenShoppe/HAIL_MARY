@@ -24,6 +24,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import TalkShowScene from "./TalkShowScene";
+import { EPISODES } from "./LTTvBroadcastPanel";
+import usePerfHud from "./PerfHud";
 
 // Camera + aim carried over from the desktop talk-show pose (`talkShowPose` in
 // app/trade/page.js), pushed in for phone-sized real estate: the desktop shot is
@@ -51,8 +53,10 @@ export const MOBILE_TALK_SHOW_CAM = {
   // heads are well inside the bodies — shoulders, knees and the arms of the
   // chairs all sit outside them — so this is comfortably above 1. Fitted by eye
   // against the set: the seated bodies span ~2.2× the head separation on their
-  // own, so anything near 2 clips knees and shoulders at the frame edges.
-  spread: 2.75,
+  // own, so 2.0 clipped knees and shoulders at the frame edges and 2.75 left
+  // the guests small in a lot of carpet. This is the tight end of what holds
+  // both of them — go much below it and the outer knees start going out.
+  spread: 1.3,
   // Drop below the eyeline, as a fraction of the head separation. Centring on
   // the heads themselves buys a lot of empty stage above and cuts the guests
   // off at the waist; a chest-up two-shot wants the frame centre lower. Kept
@@ -191,6 +195,18 @@ export default function MobileTalkShow({ onExit }) {
     return () => ro.disconnect();
   }, []);
 
+  // Episode slate, shared with the desktop panel. NOTE: selection is
+  // PRESENTATIONAL on both platforms — TalkShowScene's TALK_SHOW_AUDIO is a
+  // fixed pair of uploaded tracks, so every episode plays the same recording
+  // today. Mirrored here rather than "fixed" on mobile only, so the two
+  // surfaces don't disagree about what picking an episode means.
+  const [episodeIndex, setEpisodeIndex] = useState(0);
+  const episode = EPISODES[episodeIndex];
+
+  // ?perf=1 only. Worth having on this screen too: the SitePal face crop is a
+  // per-frame texture upload, which shows up as drift rather than as a hitch.
+  const { probe, readout } = usePerfHud();
+
   const handleReady = useCallback((ready, status) => {
     setAudioReady(ready);
     setVoiceStatus(status || (ready ? "ready" : "loading"));
@@ -233,10 +249,12 @@ export default function MobileTalkShow({ onExit }) {
   return (
     <div className={`mts-root ${wide ? "mts-wide" : ""}`} ref={rootRef}>
       <div className="mts-header">
-        <span className="mts-title">LT TV // BROADCAST</span>
+        <span className="mts-title">
+          <span className="mts-mark">LT TV</span> // BROADCAST
+        </span>
         <span className="mts-live">
           <i className={`mts-dot ${playing ? "mts-dot-on" : ""}`} />
-          {playing ? "ON AIR" : "STANDBY"}
+          {playing ? "ON AIR" : `EP ${episode.number}`}
         </span>
       </div>
 
@@ -268,8 +286,10 @@ export default function MobileTalkShow({ onExit }) {
             onPlaybackReady={handleReady}
             onPlaybackStateChange={handlePlayState}
           />
+          {probe}
         </Canvas>
 
+        {readout}
         {/* Scanline/vignette dressing, matched to TerminalBoot's CRT. */}
         <div className="mts-crt" />
 
@@ -304,9 +324,58 @@ export default function MobileTalkShow({ onExit }) {
                 ? "GR80 & John Barron · live"
                 : "one episode. two guests. no edit."}
         </div>
-        {/* Portrait only (hidden by the landscape media query). Rotating is an
-            upgrade, not a requirement — the panel above is already watchable. */}
+        {/* Portrait only (hidden in the wide layout). Rotating is an upgrade,
+            not a requirement — the panel above is already watchable. */}
         <div className="mts-rotate-hint">↻ ROTATE FOR FULL SCREEN</div>
+      </div>
+
+      {/* ── Bottom half ── Portrait left ~40% of the screen empty, so it takes
+          the desktop panel's production block: what's on, the slate you can
+          pick from, and the studio status strip. All hidden in the wide layout,
+          where the broadcast owns the full screen. */}
+      <div className="mts-below">
+        <div className="mts-now">
+          <div className="mts-eyebrow">
+            Current production · weekly roundtable
+          </div>
+          <h3 className="mts-ep-title">
+            <span className="mts-ep-no">EP {episode.number}</span>
+            {episode.title}
+          </h3>
+          <p className="mts-ep-sum">{episode.summary}</p>
+          <div className="mts-facts">
+            <span>◷ {episode.runtime}</span>
+            <span>▣ July 31, 2026</span>
+            <span className="mts-rec">● RECORDED</span>
+          </div>
+        </div>
+
+        <div className="mts-rack" role="list" aria-label="Episodes">
+          {EPISODES.map((ep, i) => (
+            <button
+              key={ep.number}
+              role="listitem"
+              className={`mts-rack-item ${i === episodeIndex ? "is-on" : ""}`}
+              onClick={() => {
+                if (playing) stop();
+                setEpisodeIndex(i);
+              }}
+            >
+              <span className="mts-rack-no">{ep.number}</span>
+              <span className="mts-rack-title">{ep.title}</span>
+              <span className="mts-rack-run">{ep.runtime}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mts-status">
+          <span><i>STUDIO</i>LT TALK SET</span>
+          <span><i>CAM</i>01</span>
+          <span><i>AUDIO</i>LIVE MIX</span>
+          <span className={playing ? "mts-rec" : ""}>
+            <i>STATUS</i>{playing ? "ON AIR" : audioReady ? "READY" : "STANDBY"}
+          </span>
+        </div>
       </div>
 
       <button className="mts-exit" onClick={exit}>◀ TERMINAL</button>
@@ -322,6 +391,16 @@ export default function MobileTalkShow({ onExit }) {
           padding: 14px 14px 10px; font-size: 13px; letter-spacing: 0.05em; flex: 0 0 auto;
         }
         .mts-title { color: #5ff2f2; font-weight: bold; }
+        /* Network mark in the DESKTOP panel's own magenta (--magenta in
+           LTTvBroadcastPanel), so the two surfaces agree on what LT TV's colour
+           is, and the chrome picks up the magenta that's already in the set's
+           carpet. Deliberately the only magenta in this layout, and on the one
+           piece of large type: saturated magenta is the weakest neon on black
+           at the 9-12px the rest of these labels run at. */
+        .mts-mark {
+          color: #ef62dc;
+          text-shadow: 0 0 10px rgba(239, 98, 220, 0.45);
+        }
         .mts-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.1em; }
         .mts-dot { width: 7px; height: 7px; border-radius: 50%; background: #17564a; }
         .mts-dot-on { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
@@ -404,6 +483,82 @@ export default function MobileTalkShow({ onExit }) {
           font-size: 10px; letter-spacing: 0.14em; color: #ffd23a; opacity: 0.65;
           text-align: center; margin-top: 2px;
         }
+
+        /* ---- BOTTOM HALF (portrait only) ---- */
+        /* Scrolls rather than clips when squeezed. Same reasoning as the neuron
+           stage: the body is scroll-locked behind this overlay, so anything
+           that overflows is unreachable, not merely below the fold. On a short
+           phone the stage + controls + this block + EXIT can exceed the visible
+           viewport, and it must be this block that gives — never EXIT. */
+        .mts-below {
+          flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column;
+          gap: 10px; padding: 14px 16px 0;
+          overflow-y: auto; overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+        }
+        .mts-eyebrow {
+          font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+          color: #2fd6d6; opacity: 0.6;
+        }
+        .mts-ep-title {
+          margin: 5px 0 0; font-size: 17px; font-weight: bold; color: #f4fffb;
+          letter-spacing: 0.02em;
+        }
+        .mts-ep-no {
+          color: #ffd23a; font-size: 10px; letter-spacing: 0.14em;
+          margin-right: 8px; vertical-align: middle;
+        }
+        .mts-ep-sum {
+          margin: 4px 0 0; font-size: 11.5px; line-height: 1.5; color: #9fd8d0;
+        }
+        .mts-facts {
+          display: flex; flex-wrap: wrap; gap: 12px; margin-top: 7px;
+          font-size: 10px; letter-spacing: 0.06em; color: #2fd6d6; opacity: 0.75;
+        }
+        .mts-rec { color: #4dffaa; opacity: 1; }
+
+        /* The slate, as a horizontal filmstrip. A vertical list squeezed to one
+           and a half visible rows once the now-playing block and status strip
+           took their share — sideways, all six are reachable with a thumb and
+           the strip costs one fixed row of height instead of competing for it.
+           The selected episode's title is NOT repeated here; the block above
+           already carries it. */
+        .mts-rack {
+          flex: 0 0 auto; display: flex; gap: 6px; overflow-x: auto;
+          -webkit-overflow-scrolling: touch; scrollbar-width: none;
+          border-top: 1px solid color-mix(in srgb, #2fd6d6 22%, transparent);
+          padding-top: 9px;
+        }
+        .mts-rack::-webkit-scrollbar { display: none; }
+        .mts-rack-item {
+          flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+          min-width: 96px; max-width: 128px; text-align: left;
+          background: #061a18; border: 1px solid color-mix(in srgb, #2fd6d6 22%, transparent);
+          color: #cfeee8; font: inherit; padding: 8px 10px; cursor: pointer;
+          clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+        }
+        .mts-rack-item.is-on {
+          border-color: color-mix(in srgb, #4dffaa 70%, transparent);
+          color: #eafff9;
+          box-shadow: inset 0 0 18px color-mix(in srgb, #4dffaa 12%, transparent);
+        }
+        .mts-rack-no { color: #ffd23a; font-size: 10px; letter-spacing: 0.1em; }
+        .mts-rack-item.is-on .mts-rack-no { color: #4dffaa; }
+        .mts-rack-title {
+          font-size: 11px; line-height: 1.25; width: 100%;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .mts-rack-run { font-size: 9.5px; opacity: 0.55; letter-spacing: 0.06em; }
+
+        .mts-status {
+          flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px 14px;
+          padding: 8px 0 2px; font-size: 9px; letter-spacing: 0.08em; color: #cfeee8;
+          border-top: 1px solid color-mix(in srgb, #2fd6d6 22%, transparent);
+        }
+        .mts-status i { font-style: normal; color: #2fd6d6; opacity: 0.55; margin-right: 5px; }
+
+        /* The wide layout gives the whole screen to the broadcast. */
+        .mts-wide .mts-below { display: none; }
 
         .mts-exit {
           /* margin-top:auto takes the leftover height, pinning EXIT to the

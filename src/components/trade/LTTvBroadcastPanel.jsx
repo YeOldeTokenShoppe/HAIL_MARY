@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 
-const EPISODES = [
+// Exported so the mobile LT TV screen (MobileTalkShow) shows the same slate
+// rather than keeping a second copy that drifts from this one.
+export const EPISODES = [
   {
     number: "01",
     title: "The Halo Effect",

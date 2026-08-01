@@ -15,6 +15,12 @@ export default function CommsPreviewPage() {
         position: "relative", width: 390, height: 740, maxHeight: "90vh",
         borderRadius: 28, overflow: "hidden",
         border: "2px solid #1a2a28", boxShadow: "0 0 60px rgba(47,214,214,0.12)",
+        // The overlay is position:fixed (see MobileTerminalGame). A transform
+        // makes this element the containing block for fixed descendants, so the
+        // frame behaves like a viewport and the terminal stays inside it —
+        // rather than the component needing a separate "am I in the harness?"
+        // code path, which would mean the preview no longer tests what ships.
+        transform: "translateZ(0)",
       }}>
         <MobileTerminalGame active onExit={() => {}} />
       </div>
