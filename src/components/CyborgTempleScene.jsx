@@ -21,6 +21,16 @@ import BeaconBeam from "@/components/BeaconBeam";
 import HologramCard from "@/components/trade/HologramCard";
 import { createLaptopCrtScreen } from "@/components/laptopCrtScreen";
 
+// Temple model URLs. The `?v=` suffix is part of the CDN cache key, so bumping
+// it is a guaranteed cache-bust. On 2026-08-01 the App Hosting edge had cached
+// a TRUNCATED copy of the un-versioned lite GLB — every load stalled byte-exact
+// at 2,106,067 of 4,252,240 with the connection held open, so GLTFLoader's
+// fetch neither resolved nor errored and /trade hung on the loader forever.
+// If that ever recurs, bump the version here. page.js's preload <link> imports
+// this so the cache warm stays on the same key as GLTFLoader's request.
+export const TEMPLE_MODEL_URL = "/models/RL80_4anims_v00_lite.glb?v=2";
+export const TEMPLE_MODEL_FALLBACK_URL = "/models/RL80_4anims_v00_opt.glb?v=2";
+
 // Agent camera focus settings — module-level so the dev tuning panel
 // (CameraTuningPanel) can mutate values in place. The click handler reads
 // from this object on every focus, so live edits take effect on the next
@@ -3452,6 +3462,20 @@ const CyborgTempleScene = ({
     // with it.
     let attachedTemple = null;
 
+    // Stall-watchdog state, at effect scope so the cleanup can reach it. A
+    // truncated CDN cache entry stalls the GLB download mid-body with the
+    // connection still open: fetch neither resolves nor rejects, so the
+    // error-path retries below never run and the loader spins forever (this
+    // took /trade down on 2026-08-01). The watchdog tracks byte progress and,
+    // when it stops, abandons the attempt and retries with a cache-busting
+    // query — which bypasses the poisoned edge entry.
+    let attemptId = 0;
+    let loadSettled = false;
+    let lastProgressAt = 0;
+    let stallRetries = 0;
+    const maxStallRetries = 3;
+    let stallWatchdog = null;
+
     // Small delay to ensure the ref is attached after first render
     const timer = setTimeout(async () => {
       if (!groupRef.current) {
@@ -3517,8 +3541,8 @@ const CyborgTempleScene = ({
     //   gltf-transform resize a.glb b.glb --width 512 --height 512 \
     //     --pattern "@(Image_0|Image_3|PolygonCyberCity_02_C_Emissive|DiffuseColor_Texture_17_002_recover)"
     //   gltf-transform meshopt b.glb out.glb --level medium
-    let modelPath = "/models/RL80_4anims_v00_lite.glb";
-    const fallbackModelPath = "/models/RL80_4anims_v00_opt.glb";
+    let modelPath = TEMPLE_MODEL_URL;
+    const fallbackModelPath = TEMPLE_MODEL_FALLBACK_URL;
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -3549,16 +3573,40 @@ const CyborgTempleScene = ({
     let retryCount = 0;
     const maxRetries = 3;
     
-    const loadModel = (attemptFullUrl = false) => {
+    const loadModel = (attemptFullUrl = false, cacheBust = false) => {
       // In production, sometimes relative paths fail, so we try with full URL as fallback
-      const urlToLoad = attemptFullUrl && typeof window !== 'undefined' 
+      let urlToLoad = attemptFullUrl && typeof window !== 'undefined'
         ? `${window.location.origin}${modelPath}`
         : modelPath;
-        
-      
+      if (cacheBust) {
+        urlToLoad += `${urlToLoad.includes('?') ? '&' : '?'}r=${Date.now()}`;
+      }
+
+      // Arm the stall watchdog for this attempt. Callbacks from a superseded
+      // attempt (the hung request lingers — it can't be aborted through
+      // GLTFLoader) are ignored via the attemptId token.
+      const thisAttempt = ++attemptId;
+      lastProgressAt = performance.now();
+      if (stallWatchdog) clearInterval(stallWatchdog);
+      stallWatchdog = setInterval(() => {
+        if (loadSettled || thisAttempt !== attemptId) { clearInterval(stallWatchdog); return; }
+        if (performance.now() - lastProgressAt < 15000) return;
+        clearInterval(stallWatchdog);
+        if (stallRetries >= maxStallRetries) {
+          console.error('[CyborgTempleScene] Model download stalled and cache-busted retries are exhausted.');
+          return;
+        }
+        stallRetries++;
+        console.warn(`[CyborgTempleScene] Model download stalled (no bytes for 15s) — retrying with cache-busting URL (${stallRetries}/${maxStallRetries})...`);
+        loadModel(false, true);
+      }, 5000);
+
       gltfLoader.load(
-      urlToLoad, 
+      urlToLoad,
       (gltf) => {
+        if (loadSettled || thisAttempt !== attemptId) return; // superseded by a stall retry
+        loadSettled = true;
+        clearInterval(stallWatchdog);
         const loadTime = performance.now() - startTime;
         
         // Log successful load
@@ -5164,12 +5212,14 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         }, 100);
       }
     },
-    // Progress callback
+    // Progress callback — feeds the stall watchdog
     () => {
-      // Progress tracking available if needed
+      if (thisAttempt === attemptId) lastProgressAt = performance.now();
     },
     // Error callback
     (error) => {
+      if (loadSettled || thisAttempt !== attemptId) return; // superseded by a stall retry
+      clearInterval(stallWatchdog);
       console.error(`[CyborgTempleScene] Error loading model ${urlToLoad}:`, error);
       console.error(`[CyborgTempleScene] Error details:`, {
         message: error.message,
@@ -5269,6 +5319,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // Cleanup function
     return () => {
       clearTimeout(timer);
+      // Stop the stall watchdog and mark the load settled so callbacks from a
+      // request that outlives the unmount can't spawn retries into nothing.
+      loadSettled = true;
+      if (stallWatchdog) clearInterval(stallWatchdog);
       if (attachedTemple) {
         // Detach from whichever parent took it.
         attachedTemple.parent?.remove(attachedTemple);

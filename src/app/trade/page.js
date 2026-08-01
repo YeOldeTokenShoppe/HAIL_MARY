@@ -19,6 +19,7 @@ import PostProcessingEffects from '@/components/PostProcessingEffects';
 import CyborgTempleScene, {
   DEMON_SITEPAL_CONTAINER_ID,
   SITEPAL_PROJECTION_CONFIG,
+  TEMPLE_MODEL_URL,
 } from '@/components/CyborgTempleScene';
 import VideoScreens from "@/components/VideoScreens";
 // import VideoScreensOptimized from "@/components/VideoScreensOptimized";
@@ -2916,10 +2917,10 @@ export default function CyborgTemple() {
         
         // Preload the temple model — DESKTOP ONLY. The 3D canvas is gated on
         // !isMobileView (see the CleanCanvas block below), so a phone that
-        // preloaded this downloaded 4MB it could never render. Path must track
-        // CyborgTempleScene's modelPath or the page fetches BOTH builds.
-      const modelToPreload = '/models/RL80_4anims_v00_lite.glb';
-          // const modelToPreload = '/models/RL80_4anims_v5_Compact.glb';
+        // preloaded this downloaded 4MB it could never render. Imported from
+        // CyborgTempleScene so the warm and GLTFLoader share one cache key
+        // (a mismatch fetches BOTH builds).
+        const modelToPreload = TEMPLE_MODEL_URL;
 
         if (!isMobile && !document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');
