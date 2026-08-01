@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { mountPitchBot, tickPitchBotBillboard, disposePitchBotBillboard } from "@/lib/trade/pitchBotScene";
+import { TEMPLE_ANCHOR_NAME } from "@/lib/templePresence";
 import {
   tickPitchBotHolo, disposePitchBotHolo,
   startPitchBotCast, cancelPitchBotCast, tickPitchBotCast,
@@ -738,14 +739,6 @@ const CAT_FOCUS = { dist: 0.75, camY: 0.25, lookY: 0.48 };
 // Per-frame ramp for that hand-off. ~0.05/frame ≈ 0.3s to settle, matching the
 // cycle's 0.6s crossfade, so entering/leaving a groom doesn't pop.
 const CAT_HEAD_FOLLOW_RAMP = 0.05;
-
-// Name hung on the group that holds the loaded temple. Exported so scene-level
-// companions can tell whether a temple is currently on screen — see
-// TickerDisplay3, whose ring sits in the root scene rather than under the
-// temple and would otherwise render alone whenever the temple is between
-// loads (a Suspense re-suspension tears the temple's effects down and reloads
-// the GLB; the LT TV swap and dev Fast Refresh do the same).
-export const TEMPLE_ANCHOR_NAME = 'TempleAnchor';
 
 const CyborgTempleScene = ({
   onLoad,
@@ -3449,7 +3442,16 @@ const CyborgTempleScene = ({
 
   useEffect(() => {
     if (hasLoadedRef.current) return;
-    
+
+    // What we actually attached the temple to, held in the effect's own scope.
+    // The cleanup below CANNOT read groupRef.current: React detaches refs
+    // before running effect cleanups, so it was always null there and the
+    // entire disposal block was silently skipped. Every LT TV round trip
+    // stranded a whole temple's worth of GPU memory as a result — measured at
+    // +66 textures and +96 geometries per trip, on top of a JS heap that grew
+    // with it.
+    let attachedTemple = null;
+
     // Small delay to ensure the ref is attached after first render
     const timer = setTimeout(async () => {
       if (!groupRef.current) {
@@ -4495,7 +4497,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // Ensure everything is visible
         anchorGroup.visible = true;
         templeScene.visible = true;
-        
+
         // Force update
         anchorGroup.updateMatrix();
         anchorGroup.updateMatrixWorld(true);
@@ -4504,6 +4506,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         console.error('[CyborgTempleScene] currentGroupRef is null, falling back to scene');
         scene.add(anchorGroup);
       }
+      // Whichever parent took it, this is what cleanup has to dispose.
+      attachedTemple = anchorGroup;
 
       // ── Neon sign ──────────────────────────────────────────────────────
       // Loaded from its own GLB so only the picked variant is downloaded.
@@ -5265,11 +5269,9 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // Cleanup function
     return () => {
       clearTimeout(timer);
-      if (groupRef.current) {
-        // Clear the group's children
-        while (groupRef.current.children.length > 0) {
-          groupRef.current.remove(groupRef.current.children[0]);
-        }
+      if (attachedTemple) {
+        // Detach from whichever parent took it.
+        attachedTemple.parent?.remove(attachedTemple);
 
         // Dispose of materials, geometries AND the textures the materials
         // reference. Material.dispose() does not free its maps, and this GLB
@@ -5280,7 +5282,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         // materials, so dedupe before disposing.
         const seenMaterials = new Set();
         const seenTextures = new Set();
-        groupRef.current.traverse((child) => {
+        attachedTemple.traverse((child) => {
           if (child.geometry) {
             child.geometry.dispose();
           }
@@ -8737,3 +8739,4 @@ CyborgTempleScene.displayName = 'CyborgTempleScene';
 
 export default CyborgTempleScene;
               
+

@@ -1,44 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { TEMPLE_ANCHOR_NAME } from "@/components/CyborgTempleScene";
-
-// How often (in frames) to re-hunt the temple anchor while it's missing.
-// getObjectByName walks the whole graph, so this only runs while there's
-// nothing to find — once resolved, the check below is a couple of pointer
-// hops per frame.
-const TEMPLE_PROBE_INTERVAL = 15;
-
-// Would this anchor actually draw? It must hold a loaded model, have no hidden
-// ancestor (R3F hides a suspended tree by flipping visible=false on its
-// objects), and — the subtle one — still climb all the way to THIS scene.
-// Unmounting the temple detaches its whole group, which leaves the anchor with
-// a perfectly good parent that simply isn't in the scene anymore; checking
-// `parent` alone reads that orphan as present and the ring keeps drawing.
-const isAnchorDrawing = (anchor, scene) => {
-  if (!anchor || anchor.children.length === 0) return false;
-  let node = anchor;
-  let root = anchor;
-  while (node) {
-    if (node.visible === false) return false;
-    root = node;
-    node = node.parent;
-  }
-  return root === scene;
-};
-
-// Is a temple currently on screen? Caches the anchor and re-hunts (throttled —
-// getObjectByName walks the graph) whenever the cached one stops drawing.
-const isTempleShowing = (templeRef, probeRef, scene) => {
-  if (!scene) return false;
-  if (isAnchorDrawing(templeRef.current, scene)) return true;
-  probeRef.current += 1;
-  if (probeRef.current % TEMPLE_PROBE_INTERVAL !== 0) return false;
-  // getObjectByName only searches the live graph, so a detached anchor can't
-  // come back this way — only a freshly mounted temple can.
-  templeRef.current = scene.getObjectByName(TEMPLE_ANCHOR_NAME) || null;
-  return isAnchorDrawing(templeRef.current, scene);
-};
+import { isTempleShowing } from "@/lib/templePresence";
 
 const SUB_DIGITS = ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"];
 const toSubscript = (n) =>
@@ -73,7 +36,6 @@ const TickerDisplay3 = ({
   // init effect rebuilds it.
   const [meshObject, setMeshObject] = useState(null);
   const templeRef = useRef(null);
-  const probeRef = useRef(0);
   const canvasRef = useRef();
   const textureRef = useRef();
   const scrollPos = useRef(0);
@@ -335,7 +297,7 @@ const TickerDisplay3 = ({
     // about React's tree keeps the two in step. Derive visibility from the
     // temple ITSELF every frame: it can't get stuck on (ring alone in an empty
     // room while the GLB reloads) or stuck off (a missed "it's back" signal).
-    const showing = visible && isTempleShowing(templeRef, probeRef, sceneRef.current);
+    const showing = visible && isTempleShowing(templeRef, sceneRef.current);
     mesh.visible = showing;
 
     // Nothing to paint while hidden — skip the canvas redraw + texture upload.

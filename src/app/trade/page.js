@@ -33,6 +33,7 @@ import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import CoinLoader from '@/components/CoinLoader';
+import { isTempleShowing } from '@/lib/templePresence';
 import MobileLobbyScene from '@/components/MobileLobbyScene';
 import HolyGrailPortal from '@/components/HolyGrailPortal';
 import TradeLaptop from '@/components/TradeLaptop';
@@ -684,6 +685,34 @@ function PrecompileScene({ ready, epoch }) {
   return null;
 }
 
+// Reports whether the temple is currently on screen, so the loading screen can
+// cover the gap when it isn't. The GLB is a multi-second parse, and the temple
+// can leave well after the initial load has finished — a Suspense
+// re-suspension tears its effects down and reloads it, and leaving LT TV mounts
+// a fresh one — with nothing but an empty room on screen meanwhile.
+function TempleWatch({ onChange, graceFrames = 12 }) {
+  const { scene } = useThree();
+  const templeRef = useRef(null);
+  const missingRef = useRef(0);
+  const reportedRef = useRef(null);
+  useFrame(() => {
+    const showing = isTempleShowing(templeRef, scene);
+    missingRef.current = showing ? 0 : missingRef.current + 1;
+    // Back on screen: say so immediately. Gone: wait out a short run of frames
+    // first, so a one-frame blip between reparents can't flash the loader.
+    const next = showing
+      ? true
+      : missingRef.current >= graceFrames
+        ? false
+        : reportedRef.current;
+    if (next !== reportedRef.current) {
+      reportedRef.current = next;
+      onChange(next);
+    }
+  });
+  return null;
+}
+
 // Drop-in replacement for the previous <OrbitControls> rig. Uses
 // camera-controls under the hood so fly-to transitions (setLookAt with
 // transition=true in CyborgTempleScene) animate position + target as a
@@ -1172,6 +1201,18 @@ export default function CyborgTemple() {
   const [tickerLoaded, setTickerLoaded] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
   const [tickerReady, setTickerReady] = useState(false);
+  // Live "is the temple on screen" reading from TempleWatch, distinct from
+  // `modelLoaded` (which latches once for the initial sequence). Drives the
+  // loading screen back on when the temple leaves mid-session.
+  //
+  // Starts TRUE — "present until a running watcher says otherwise". TempleWatch
+  // reports from useFrame, and frames stop entirely in a background tab (Chrome
+  // pauses rAF) or when the canvas sets frameloop="never" for the desk game.
+  // Defaulting to false meant a /trade opened in a background tab loaded fine
+  // and then sat under the loading screen, because nothing was ever running to
+  // report the temple's arrival. If no frames are running, nothing is being
+  // drawn for the user to miss, so there's nothing to cover.
+  const [templeShowing, setTempleShowing] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Initializing");
   const [modelLoadStartTime] = useState(Date.now());
@@ -3429,8 +3470,17 @@ export default function CyborgTemple() {
 
   return (
     <>
-      {/* Loading Screen */}
-      <CoinLoader loading={isSceneLoading} />
+      {/* Loading Screen. Also covers the temple going missing AFTER the first
+          load — the GLB takes seconds to parse, and until it's back there's
+          nothing in the room to look at. Desktop only (mobile never mounts the
+          temple canvas, so the watcher never reports), and never over LT TV,
+          whose set legitimately has no temple in it. */}
+      <CoinLoader
+        loading={
+          isSceneLoading ||
+          (sceneReady && !isMobileView && !talkShowMode && !templeShowing)
+        }
+      />
 
       {/* Dev camera-tuning panel — shows only when ?tune=1 is in URL */}
       <CameraTuningPanel />
@@ -3840,6 +3890,7 @@ export default function CyborgTemple() {
             <ambientLight intensity={1.5} />
             <GpuMemoryProbe />
             <PrecompileScene ready={modelLoaded} epoch={templeEpoch} />
+            <TempleWatch onChange={setTempleShowing} />
             <PostProcessingEffects is80sMode={context80sMode} isMobile={isMobileView} />
             
             {/* Synthwave sunset for 80s mode — RETIRED ON /trade 2026-07-26.
@@ -4430,7 +4481,9 @@ export default function CyborgTemple() {
             },
             {
               key: 'talkshow',
-              label: talkShowMode ? 'EXIT' : 'LT TV',
+              // Label stays 'LT TV' like every other tab — the lit dot already
+              // reads as "you're here"; clicking it again toggles back out.
+              label: 'LT TV',
               accent: '#ffcf4d',
               active: talkShowMode,
               onClick: () => {

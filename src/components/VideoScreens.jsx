@@ -865,121 +865,33 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
   const [screen2Rotation, setScreen2Rotation] = useState(null);
   const [screen2Scale, setScreen2Scale] = useState(null);
 
-  // Cleanup effect for screen textures
+  // Cleanup effect for screen textures.
+  //
+  // Every panel this component paints publishes three globals following one
+  // naming convention: __screen{N}{side}{Canvas,Texture,Mesh}, for screens 1-4
+  // with optional L/R side panels. This used to be ~115 lines of hand-copied
+  // per-screen blocks, and it had drifted: 12 texture globals get published but
+  // only 6 were ever disposed — screens 2, 3 and 4's L/R panels were missed, so
+  // each mount stranded 6 CanvasTextures on the GPU.
+  //
+  // That matters because this component is keyed on templeEpoch, so it REMOUNTS
+  // on every LT TV round trip. Looping the convention fixes the six that were
+  // missed and keeps a future panel from silently going unfreed.
   useEffect(() => {
     return () => {
-      // Clean up Screen1
-      // @ts-ignore
-      if (window.__screen1Canvas) {
-        // @ts-ignore
-        delete window.__screen1Canvas;
-      }
-      // @ts-ignore
-      if (window.__screen1Texture) {
-        // @ts-ignore
-        window.__screen1Texture.dispose();
-        // @ts-ignore
-        delete window.__screen1Texture;
-      }
-      // @ts-ignore
-      if (window.__screen1Mesh) {
-        // @ts-ignore
-        delete window.__screen1Mesh;
-      }
-      
-      // Clean up Screen1 Left
-      // @ts-ignore
-      if (window.__screen1LCanvas) {
-        // @ts-ignore
-        delete window.__screen1LCanvas;
-      }
-      // @ts-ignore
-      if (window.__screen1LTexture) {
-        // @ts-ignore
-        window.__screen1LTexture.dispose();
-        // @ts-ignore
-        delete window.__screen1LTexture;
-      }
-      // @ts-ignore
-      if (window.__screen1LMesh) {
-        // @ts-ignore
-        delete window.__screen1LMesh;
-      }
-      
-      // Clean up Screen1 Right
-      // @ts-ignore
-      if (window.__screen1RCanvas) {
-        // @ts-ignore
-        delete window.__screen1RCanvas;
-      }
-      // @ts-ignore
-      if (window.__screen1RTexture) {
-        // @ts-ignore
-        window.__screen1RTexture.dispose();
-        // @ts-ignore
-        delete window.__screen1RTexture;
-      }
-      // @ts-ignore
-      if (window.__screen1RMesh) {
-        // @ts-ignore
-        delete window.__screen1RMesh;
-      }
-      
-      // Clean up Screen2
-      // @ts-ignore
-      if (window.__screen2Canvas) {
-        // @ts-ignore
-        delete window.__screen2Canvas;
-      }
-      // @ts-ignore
-      if (window.__screen2Texture) {
-        // @ts-ignore
-        window.__screen2Texture.dispose();
-        // @ts-ignore
-        delete window.__screen2Texture;
-      }
-      // @ts-ignore
-      if (window.__screen2Mesh) {
-        // @ts-ignore
-        delete window.__screen2Mesh;
-      }
-      
-      // Clean up Screen3
-      // @ts-ignore
-      if (window.__screen3Canvas) {
-        // @ts-ignore
-        delete window.__screen3Canvas;
-      }
-      // @ts-ignore
-      if (window.__screen3Texture) {
-        // @ts-ignore
-        window.__screen3Texture.dispose();
-        // @ts-ignore
-        delete window.__screen3Texture;
-      }
-      // @ts-ignore
-      if (window.__screen3Mesh) {
-        // @ts-ignore
-        delete window.__screen3Mesh;
-      }
-      
-      // Clean up Screen4
-      // @ts-ignore
-      if (window.__screen4Canvas) {
-        // @ts-ignore
-        delete window.__screen4Canvas;
-      }
-      // @ts-ignore
-      if (window.__screen4Texture) {
-        // @ts-ignore
-        window.__screen4Texture.dispose();
-        // @ts-ignore
-        delete window.__screen4Texture;
-      }
-      // @ts-ignore
-      if (window.__screen4Mesh) {
-        // @ts-ignore
-        delete window.__screen4Mesh;
+      for (const n of [1, 2, 3, 4]) {
+        for (const side of ['', 'L', 'R']) {
+          const base = `__screen${n}${side}`;
+          const texture = window[`${base}Texture`];
+          if (texture) {
+            try { texture.dispose(); } catch (e) { /* non-fatal */ }
+            delete window[`${base}Texture`];
+          }
+          // Canvas/mesh hold no GPU memory of their own — dropping the global
+          // is what lets the backing canvas and the mesh be collected.
+          delete window[`${base}Canvas`];
+          delete window[`${base}Mesh`];
+        }
       }
     };
   }, []);
