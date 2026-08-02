@@ -115,10 +115,11 @@ is happening; the agent owns it when something is.
 
 | Beat | What happens |
 |---|---|
-| **THE ARRIVAL** | Your next appointment is here. `TAKE THE MEETING ▸` — the engagement record is signed: the bot's shield wakes, its client's name goes onto the line, `RETAINED` lands, and the dossier writes itself in. |
+| **THE ARRIVAL** | An inbound file, sealed. `REVIEW THIS DEAL ▸` — the engagement record is signed: the bot's shield wakes, its client's name goes onto the line, `MEETING SET` lands, and the dossier writes itself in. |
 | **THE DEAL** | The deal sheet: a terminal dossier. Name, ticker, chain, surface stats. |
+| **THE OPENING** | `HEAR THE PITCH ▸` — the bot takes the frame and introduces itself before it sells anything: who it is here for, **that it is paid only if you fund this**, and how many points are coming. Skippable. The commission line is where the player learns the rule §1 states — nothing it says is false — so the session reads as an offer, not a lie hunt. |
 | **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who goes deepest, and **Virgil's read**. |
-| **THE PRESS** | Three interruptions. Ask anyone about anything — the lane decides how deep they get, not whether they answer. |
+| **THE PRESS** | Three interruptions. Ask anyone about anything — the lane decides how deep they get, not whether they answer. The analyst reports, then **you choose**: `SEE WHAT LANDED` (their screen) or `HEAR ITS RESPONSE` (the seller's spin). Neither is compulsory. |
 | **THE CALL** | One slider, `SHORT ← FLAT → LONG`. Plain-English readout including what you lose if wrong. |
 | **RESOLUTION** | Truth. On desktop the four stand up and play their real reactions; the summary is a lower third so it never covers them. |
 | **POST-DEAL ANALYSIS** | READ (did you press where the answer could have changed your mind) + BOOK (P&L), every chip flipped, **and the pattern named**. |
@@ -133,11 +134,12 @@ is happening; the agent owns it when something is.
 **claim**, and the honest home for "nobody can settle this" now that every lane
 has an owner.
 
-On mobile the absence is something **you go and look at**: the pitcher answers,
-then stops; the board changes silently and the `HIS SCREEN` tab pulses *cyan*
-(gold is the receipt colour — pulsing gold would announce a receipt before you'd
-seen one); the verdict lands only when you arrive. Not looking is allowed — the
-same forfeiting choice as not pressing `[A§18]`.
+The absence is something **you go and look at**, on both surfaces: the reporter
+stops, the board changes silently, and the verdict lands only when you arrive —
+a pane swap on mobile (the `HIS SCREEN` tab pulses *cyan*; gold is the receipt
+colour and pulsing gold would announce a receipt before you'd seen one), a camera
+hold on desktop. Not looking is allowed — the same forfeiting choice as not
+pressing `[A§18]`, and so is never hearing the reply.
 
 **Nothing may name the outcome before the reveal.** Verdict copy, border colour
 and tab badge are all derivable the instant you press, so each leaks by default

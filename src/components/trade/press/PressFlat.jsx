@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDeal";
 import { BACKING, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
-import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
+import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitchOpening, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES,
@@ -19,7 +19,8 @@ import {
 } from "./engagement";
 import { createFlatEvidenceScreen } from "./evidenceScreen";
 import {
-  canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
+  canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
+  Meter, Nav, readDwellMs, PRESS_UI_CSS,
 } from "./pressUi";
 import TerminalModuleHeader from "../TerminalModuleHeader";
 
@@ -151,6 +152,20 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const claim = currentClaim(run, deal);
   const onFloor = started && run.phase === PHASE.FLOOR;
 
+  /* ---- the opening ----
+     HEAR THE PITCH used to cut straight to claim 1, so the bot arrived already
+     mid-argument (author, 2026-08-02). See PITCH_OPENING in desk.js.
+
+     `onFloor` still gates the FIGURE — you want to watch it talk while it
+     introduces itself — and `floorLive` gates everything that presupposes a
+     claim: the claim body, the agenda, the dock. Same split as PressSession, and
+     it has to stay the same split or the two surfaces drift on which beat owns
+     the mouth. */
+  const openingLines = useMemo(() => pitchOpening(deal), [deal]);
+  const [openingAt, setOpeningAt] = useState(-1);
+  const [opened, setOpened] = useState(false);
+  const floorLive = onFloor && opened;
+
   // Who can be sent at the claim on the floor, and why not. Straight from the
   // controller so the button states can never disagree with the rules.
   const options = useMemo(() => seatOptions(run, deal), [run, deal]);
@@ -191,14 +206,25 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     [claim, run.advisersSpent, outlook.remaining, tips]);
 
   /* ---- the evidence screen, as an actual on-screen terminal ---- */
-  // THREE boards, not one. Barron's, Marisol's and GR80's — Eugene never
-  // stamps anything, by design, so he has no board to keep. Only one is on
-  // screen at a time; the strip below is how you move between them.
-  // PITCHER, not Barron, holds the first tab now. Barron ALIASES onto it (see
-  // the same note in PressSession): four monitors, four analysts, and the agent
-  // is an outsider whose receipt belongs on the easel page once that is wired.
-  // Eugene still stamps nothing here, by design.
-  const BOARDS = useMemo(() => [PITCHER, SEATS.MARISOL, SEATS.GR80], []);
+  // One board per seat that can be sent. Only one is on screen at a time; the
+  // strip below is how you move between them.
+  //
+  // PITCHER, not Barron, holds the first tab. Barron ALIASES onto it (see the
+  // same note in PressSession): the agent is an outsider whose receipt belongs
+  // on the easel page once that is wired.
+  //
+  // EUGENE HAD NO BOARD HERE UNTIL 2026-08-02, on a "he never stamps anything,
+  // by design" that stopped being true when he became a spendable seat with a
+  // lane of his own. He produces receipts like any other specialist, and the
+  // desktop surface has always given him a monitor — so pressing him on a phone
+  // stamped into `undefined`, set boardPane to a seat with no panel, and printed
+  // ON RECORD — ON EUGENE'S SCREEN over a screen that did not exist.
+  //
+  // It was invisible while every board rendered stacked (see .pf-screen): you
+  // got somebody else's panel and no reason to doubt it. Fixing the stacking is
+  // what surfaced this, and the two belong together.
+  const BOARDS = useMemo(
+    () => [PITCHER, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE], []);
   const screensRef = useRef({});
   useEffect(() => {
     if (!started) return;
@@ -245,28 +271,71 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      One token spans BOTH utterances. If a press interrupts mid-turn, the guard
      must cover the whole exchange or the abandoned adviser line clears `speaking`
      while the new pitcher line is still playing. */
-  const sayTurn = useCallback(async (parts) => {
+  /**
+   * @param opts.onPart  index of each part AS IT STARTS — the opening reveals its
+   *   lines in step with the voice rather than printing the block up front.
+   * @param opts.dwell   (text) => ms floor per part, for the case where audio
+   *   never arrives: speakAdviserLine resolves in milliseconds without an API
+   *   key, and three un-held sentences are gone before they can be read. Voice is
+   *   enrichment and never a gate, so anything timed off it needs a floor.
+   */
+  const sayTurn = useCallback(async (parts, { onPart = null, dwell = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
     if (!live.length) return;
     const token = ++sayToken.current;
     setSpeaking(true);
     try {
-      for (const p of live) {
+      for (let i = 0; i < live.length; i++) {
+        const p = live[i];
         if (sayToken.current !== token) return;   // superseded — stop the chain
+        onPart?.(i);
+        const startedAt = Date.now();
         try { await speakAdviserLine(p.voice || VOICE, p.text); }
         catch { /* voice is enrichment, never a gate on play */ }
+        if (dwell) {
+          const left = dwell(p.text) - (Date.now() - startedAt);
+          if (left > 0) await new Promise((r) => setTimeout(r, left));
+        }
       }
     } finally {
       if (sayToken.current === token) setSpeaking(false);
     }
   }, []);
 
+  /* ---- it introduces itself ----
+     No audio-stopping cleanup, deliberately: a natural finish leaves nothing
+     playing, and the two early exits (SKIP, unmount) are handled by skipOpening
+     and by the unmount effect below. One here would race the claim effect, which
+     starts speaking in the same commit that `opened` flips. */
   useEffect(() => {
-    if (!onFloor || !claim) return;
+    if (!onFloor || opened || !openingLines.length) return;
+    let alive = true;
+    (async () => {
+      await sayTurn(openingLines.map((text) => ({ voice: VOICE, text })),
+                    { onPart: (i) => { if (alive) setOpeningAt(i); }, dwell: readDwellMs });
+      if (alive) setOpened(true);
+    })();
+    return () => { alive = false; };
+  }, [onFloor, opened, openingLines, sayTurn]);
+
+  // Bumping the token supersedes the chain in flight; its `finally` then declines
+  // to touch `speaking`, so this clears it by hand.
+  const skipOpening = useCallback(() => {
+    sayToken.current++;
+    try { stopAdviserAudio(); } catch {}
+    setSpeaking(false);
+    setOpened(true);
+  }, []);
+
+  // `floorLive`, not `onFloor`: during the opening the pitcher already has the
+  // mouth, and starting claim 1 underneath it would put two of ITS OWN utterances
+  // in flight — the collision sayToken arbitrates, except here both are valid.
+  useEffect(() => {
+    if (!floorLive || !claim) return;
     say(claim.spin);
     return () => { try { stopAdviserAudio(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onFloor, run.claimIndex]);
+  }, [floorLive, run.claimIndex]);
 
   useEffect(() => () => { try { stopAdviserAudio(); } catch {} }, []);
 
@@ -308,22 +377,28 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const MIN_BEAT = 1400;  // if his voice is unavailable, the beat still exists
 
   const press = useCallback((seat = PITCHER) => {
-    if (!onFloor) return;
+    if (!floorLive) return;   // nothing to interrupt until it has made a claim
     const next = doPress(run, deal, seat);
     if (next === run) return;   // illegal, spent, or out of budget — a no-op
     const outcome = next.outcomes[claim.id];
     setRun(next);
-    // `revealed:false` — the verdict copy and the panel's colour are both
-    // derived from data we have RIGHT NOW, so without this flag they render
-    // the instant you press and describe a board that hasn't changed yet.
-    // Subtitling his answer is fine; interpreting it before he's finished
-    // saying it is not.
+    // `stage: "reporting"` — the verdict copy and the panel's colour are both
+    // derived from data we have RIGHT NOW, so without this the answer interprets
+    // itself the instant you press, describing a board that hasn't changed yet.
+    // Subtitling the reply is fine; interpreting it before it is given is not.
+    //
+    // A press on the PITCHER has no third party to react, so its answer IS the
+    // exchange: nothing to choose between, and it plays on the spot.
+    const solo = !outcome.adviserSays;
     setFlash({
-      id: claim.id, backing: outcome.backing, revealed: false,
+      id: claim.id, backing: outcome.backing,
       seat: outcome.seat, board: outcome.board,
       nothingOnFile: outcome.nothingOnFile,
       adviserSays: outcome.adviserSays,
       line: outcome.barronSays,
+      stage: "reporting",
+      heard: solo,
+      looked: false,
       asked: outcome.seat === PITCHER
         ? "Put a number on it."
         : `${seatMeta(outcome.seat).name} — ${seatMeta(outcome.seat).role}`,
@@ -349,13 +424,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     const owed = claim.id;
     revealFor.current = owed;
     Promise.all([
-      // Seat first in its own voice, then the pitcher reacting. The deferred
-      // reveal waits on the WHOLE exchange, so the board still changes only once
-      // the room has finished talking.
-      sayTurn([
-        { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays },
-        { voice: VOICE, text: outcome.barronSays },
-      ]),
+      // ONE VOICE. The seat reports; the pitcher's reaction used to follow in this
+      // same chain and now waits behind a button — see AnswerChoice in pressUi.
+      sayTurn([solo
+        ? { voice: VOICE, text: outcome.barronSays }
+        : { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays }]),
       new Promise((r) => setTimeout(r, MIN_BEAT)),
     ])
       .then(() => {
@@ -371,15 +444,28 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         else board?.stayBlack();
         setBoardPane(outcome.board);
         setHasRecord(!!outcome.receipt);
-        setFlash((f) => (f && f.id === owed ? { ...f, revealed: true } : f));
-        // Already sitting on his screen? Then you watched it land and there's
+        setFlash((f) => (f && f.id === owed ? { ...f, stage: "choice" } : f));
+        // Already sitting on the screen? Then you watched it land and there's
         // nothing to send you anywhere.
         setLookPending(paneRef.current !== "screen");
       });
-  }, [run, deal, claim, onFloor, say]);
+  }, [run, deal, claim, floorLive, say]);
 
-  // The one door to his screen — going there is what marks the reveal seen.
-  const lookAtScreen = useCallback(() => { setPane("screen"); setLookPending(false); }, []);
+  // The one door to the screen — going there is what marks the outcome seen, and
+  // `looked` is the gate on the verdict note and the panel's colour.
+  const lookAtScreen = useCallback(() => {
+    setPane("screen");
+    setLookPending(false);
+    setFlash((f) => (f ? { ...f, looked: true } : f));
+  }, []);
+
+  // LET IT ANSWER. Its own voice, on your say-so — the handover that used to
+  // happen by itself the moment the adviser stopped.
+  const hearReply = useCallback(() => {
+    if (!flash?.line) return;
+    sayTurn([{ voice: VOICE, text: flash.line }]);
+    setFlash((f) => (f ? { ...f, heard: true } : f));
+  }, [flash, sayTurn]);
 
   const advance = useCallback(() => {
     revealFor.current = null;
@@ -533,7 +619,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           {/* See PressSession — "always these four" answered a question the
               rotating-cast cut [A§17] deleted. */}
           <div className="pf-section-line">
-            <span>YOUR ANALYST DESK</span>
+            <span>YOUR ANALYST TEAM</span>
             <i>ONE ANSWER EACH</i>
           </div>
           <div className="pf-strip">
@@ -626,6 +712,12 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               it, holding an adviser back is a blind bet and everyone spends on
               the first thing they see. Lane dots say who COULD settle each one;
               they never say whether it's worth settling. */}
+          {/* THE AGENDA WAITS FOR THE FIRST CLAIM. It is a resource readout about
+              claims — which are coming, which are settled — and there are none yet
+              while the bot is still introducing itself. It also spoils the beat's
+              one job: the opening says how many points there are, and printing all
+              six subjects underneath answers that before it is asked. */}
+          {floorLive && (
           <div className="pf-agenda">
             {deal.claims.map((c, i) => (
               <span key={c.id}
@@ -635,6 +727,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               </span>
             ))}
           </div>
+          )}
 
           {/* THE ONLY THING ON THE FLOOR THAT SCROLLS. Tabs, feed and dock are
               all pinned, so the way out of a claim is never further than a
@@ -644,10 +737,16 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               GO ON / CALL IT were clipped away — measured at 839px in a 700px
               box. The pitch had no exit. */}
           <div className={`pf-read${more ? " more" : ""}`} ref={readRef}>
-            <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
-                       pressure={mood} aside={aside}
-                       spent={run.advisersSpent}
-                       count={`${run.claimIndex + 1} / ${deal.claims.length}`} />
+            {/* Opening, then claims. Same container either way — the block must
+                not move when the first claim replaces the introduction. */}
+            {opened ? (
+              <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
+                         pressure={mood} aside={aside}
+                         spent={run.advisersSpent}
+                         count={`${run.claimIndex + 1} / ${deal.claims.length}`} />
+            ) : (
+              <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening} />
+            )}
 
             {flash && flash.id === claim.id && (
               /* The verdict — and the panel's COLOUR, which is a tell too — are
@@ -655,16 +754,21 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                  identical while he's still talking. Once he stops, the LOOK
                  button takes the verdict's slot: the absence is something you
                  went and looked at, not something you were shown. */
+              /* The LOOK button was the only thing in this slot; it is now one
+                 of the two moves the beat offers, and both live in pressUi so the
+                 surfaces cannot word them differently. */
               <AnswerBody flash={flash}>
-                {lookPending ? (
-                  <button className="pf-look" onClick={lookAtScreen}>
-                    ▤ HE'S FINISHED — SEE WHAT LANDED ▸
-                  </button>
-                ) : null}
+                <AnswerChoice flash={flash} onLook={lookAtScreen} onHear={hearReply} />
               </AnswerBody>
             )}
           </div>{/* /pf-read */}
 
+          {/* THE DOCK WAITS TOO. Every control in it presupposes a claim — the
+              meter counts interruptions, the seat row spends an analyst ON
+              something, and LET HIM GO ON has nothing to go on from. Offering
+              them against an introduction is offering the player a way to waste a
+              one-use analyst on a greeting. */}
+          {floorLive && (
           <div className="pf-dock">
             <Meter run={run} presses={PRESSES}>
               <b>{advisersLeft} ADVISER{advisersLeft === 1 ? "" : "S"}</b>
@@ -680,6 +784,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
             <Nav lastClaim={lastClaim} pressed={pressed} onAdvance={advance} onCallIt={callIt} />
           </div>
+          )}
         </div>
       )}
 
@@ -999,12 +1104,12 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-face-note { font-size:5.5px; letter-spacing:0.08em;
   color:rgba(191,238,222,0.5); margin-top:1px; }
 
-/* The directive under his answer. Static — the tab does the attracting, and
-   two things pulsing at once reads as an error state rather than a nudge. */
-.pf-look { display:block; width:100%; margin-top:9px; cursor:pointer;
-  background:rgba(47,214,214,0.10); border:1px solid rgba(47,214,214,0.55);
-  color:#2fd6d6; font:bold 10px/1.2 'Courier New',monospace; letter-spacing:0.11em;
-  padding:10px 8px; }
+/* .pf-look is GONE. It was this surface's private LOOK button under the answer;
+   it is now one of the two moves in the shared AnswerChoice (.pu-choice-btn), so
+   both surfaces word and style the beat identically. Its rule was still here —
+   the styling for a button no caller renders. The tab still does the attracting,
+   and it is still the only thing that pulses: two at once reads as an error
+   state rather than a nudge. */
 @media (prefers-reduced-motion:reduce) {
   .pf-seal-key i { animation:none; }
   .pf-tabs button.look { animation:none; background:rgba(47,214,214,0.20);
@@ -1025,8 +1130,17 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    is circular, so the percentage falls back to auto. Flex parent + height:100%
    resolves; aspect-ratio re-derives the height if max-width ever bites on a
    very tall stage. */
-.pf-screen { display:flex; align-items:center; justify-content:center;
+/* ONE BOARD AT A TIME, and this was missing. .pf-screen had no hidden state,
+   so all four rendered stacked inside .pf-boards — boardPane has been writing
+   .show since the strip was built and NOTHING WAS READING IT. On a phone the
+   bug is masked: .pf-stage is a short overflow:hidden box, so you see the first
+   one and assume it's the only one. It is plainly wrong anywhere taller (?flat=1
+   on a desktop), and it breaks the beat it exists for — SEE WHAT LANDED sends
+   you to an ANALYST's finding and the top of the stack is the PITCHER's board.
+   Found while wiring that choice, 2026-08-02. */
+.pf-screen { display:none; align-items:center; justify-content:center;
   width:100%; height:100%; }
+.pf-screen.show { display:flex; }
 .pf-screen canvas { display:block; height:100%; width:auto; max-width:100%;
   aspect-ratio:512/320; border:1px solid rgba(47,214,214,0.3); }
 

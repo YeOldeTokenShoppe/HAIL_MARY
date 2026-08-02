@@ -2246,6 +2246,38 @@ const CyborgTempleScene = ({
       return;
     }
 
+    // 'Reset' — PULL BACK TO THE ROOM. Not an agent; a request for the scene's
+    // default pose, and the only way a PARENT can ask for one.
+    //
+    // `null` is not that, and the difference cost a beat. Passing null only
+    // clears focusTarget (see the guard above), which leaves the camera exactly
+    // where the last focus parked it — the internal unfocus paths get their
+    // fly-back from a Reset target they set THEMSELVES, in the same batch.
+    // Nothing outside this file could set one. So the VC game's post-deal panel
+    // opened with the camera still jammed against whoever was pressed last: the
+    // pitch bot's legs, cropped, with the room out of frame (author, 2026-08-02).
+    //
+    // Same shape as the Escape handler at the bottom of this file, MINUS its
+    // restoreAllFromFocus() — that helper and the five restore*FromFocus it calls
+    // are locals inside the keydown effect, so they are not in scope here, and
+    // lifting them out to share would move a large amount of character-animation
+    // state for a camera move. They are also not what this needs: they return the
+    // cast to their lobby loops, and the beat this serves ends with LEAVE THE
+    // DESK unmounting the session anyway. If a caller ever needs the full
+    // restore, hoist them then — don't re-implement them here.
+    if (externalFocusAgent === 'Reset') {
+      setFocusTarget({
+        position: sceneDefaultPose.position.clone(),
+        lookAt: sceneDefaultPose.target.clone(),
+        agentId: null,
+        agentName: 'Reset',
+      });
+      // Clearing after the transition hands the camera back to the user; leaving
+      // the target set would pin it and kill orbit.
+      const t = setTimeout(() => setFocusTarget(null), 1000);
+      return () => clearTimeout(t);
+    }
+
     switch (externalFocusAgent) {
       // THE VC PITCH SUPPRESSES EVERY LOBBY BEHAVIOUR ON THESE THREE SEATS.
       //

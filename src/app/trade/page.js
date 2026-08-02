@@ -6072,8 +6072,8 @@ export default function CyborgTemple() {
                 extraLeft={
                   tradeMode ? [] : [
                     {
-                      key: 'candelarium',
-                      label: 'Ex Machina',
+                      key: 'home',
+                      label: 'Home',
                       title: 'Our Lady of Perpetual Profit',
                       onClick: () => router.push('/'),
                       icon: (

@@ -241,8 +241,8 @@ export default function ModelViewerPage() {
         }
         extraLeft={[
           {
-            key: 'candelarium',
-            label: 'ex Machina',
+            key: 'home',
+            label: 'Home',
             title: 'Return to home',
             onClick: () => { router.push('/'); },
             // Same brand mark this slot used before, now in the Terminal spot.

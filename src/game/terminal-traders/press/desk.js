@@ -265,6 +265,92 @@ export function pitcherAside(band, claim, index = 0) {
  *  refactor — drop it once PressSession and PressFlat call pitcherAside. */
 export const barronAside = pitcherAside;
 
+/* ---------------------------------------------------------------------- *
+ * THE OPENING — what it says before the first claim.
+ *
+ * IT USED TO SAY NOTHING. HEAR THE PITCH cut straight to claim 1, so the bot
+ * arrived already mid-argument: "appears to be speaking in the middle of the
+ * pitch with no intro" (author, 2026-08-02). Every other beat in this game is
+ * staged — the record arrives, the analysts are introduced, the reveal has a
+ * curtain call — and the one moment the antagonist walks into the room had no
+ * staging at all.
+ *
+ * THE SECOND LINE IS THE GAME'S THESIS, IN THE ANTAGONIST'S OWN MOUTH. §1: "Every
+ * fact stated is true. What you judge is the inference sold on top of it." A
+ * player who has not read the design doc has no way to know that unless somebody
+ * says it, and the bot saying it is strictly better than a tooltip: it is in
+ * character (a closer's honesty about being a closer is itself a closing
+ * technique), it cannot be mistaken for instructions, and it makes the whole
+ * session an offer rather than a quiz. It also stops the obvious wrong read —
+ * "find the lie" — before it forms. There is no lie.
+ *
+ * IT MAY NOT SAY ANYTHING THE RECORD HASN'T ALREADY SAID. Name, ticker and chain
+ * are on the engagement record by the time this plays (identity is settled before
+ * HEAR THE PITCH exists), and the claim count is on the agenda rail. Nothing here
+ * touches backing, lane or outcome — invariant 7 binds this bank like everything
+ * else, and the surface numbers are uncorrelated by construction anyway.
+ *
+ * DETERMINISTIC IN THE DEAL, so a replay from a seed is identical. Keyed off
+ * `deal.id` (`archetype:seed`) rather than a counter, because the variant has to
+ * survive a remount — a useState index would re-roll the greeting if the floor
+ * ever re-mounted mid-session.
+ * ---------------------------------------------------------------------- */
+/* MEASURED, NOT ESTIMATED. Voiced end to end, the first draft of this bank ran
+   20.1s from HEAR THE PITCH to claim 1 — 6.4 / 8.8 / 4.8 — against a session
+   that is meant to be about four minutes. Trimmed to land near 15s.
+   Line 2 was NOT cut down as hard as the other two: it is the only one carrying
+   anything the player can't get elsewhere, and "not a liar, but selective" is
+   two halves of one idea rather than the same idea twice. Line 3 is the one that
+   can afford to be short — the counter, the agenda rail and the briefing all say
+   the same thing — but it can't be CUT, or the disclosure runs straight into
+   claim 1 with no hand-off and the beat ends on a jolt.
+   If you edit these, re-measure; the audio dominates and character count is the
+   only lever on it. */
+const PITCH_OPENING = [
+  [
+    (d) => `Thanks for the slot. I'm here for ${d.name} — ${d.ticker}, on ${d.chain}.`,
+    () => "Up front: I'm on commission. I only earn if you fund this. Everything I tell you is true — I just pick which true things.",
+    (d) => `${d.count} points. Stop me whenever.`,
+  ],
+  [
+    (d) => `Appreciate the time. I represent ${d.name} — ${d.ticker}, ${d.chain}.`,
+    () => "I only get paid if this closes. That doesn't make me a liar — it makes me selective. Nothing I say is false.",
+    (d) => `${d.count} things for you. Interrupt when you like.`,
+  ],
+  [
+    (d) => `Good — you took the meeting. ${d.name}. ${d.ticker}, ${d.chain}.`,
+    // THE THREE VARIANTS ARE THE SAME LENGTH ON PURPOSE (~106-115 chars). This
+    // one was 132 and ran ~9.2s against the others' ~7, so which greeting the
+    // seed rolled changed how long the beat took by two seconds.
+    () => "Disclosure: I'm on commission. I won't tell you anything untrue — I'm just not obliged to tell you all of it.",
+    (d) => `The case is ${d.count} parts. Cut in whenever.`,
+  ],
+];
+
+/** Stable small hash — same string always picks the same variant. */
+function variantOf(key, n) {
+  let h = 0;
+  for (let i = 0; i < String(key).length; i++) h = (h * 31 + String(key).charCodeAt(i)) | 0;
+  return ((h % n) + n) % n;
+}
+
+/**
+ * The pitcher's opening remarks, in order. Pure.
+ *
+ * @param deal a deal from instanceDeal()
+ * @returns {string[]} one utterance per line, spoken and shown in that order
+ */
+export function pitchOpening(deal) {
+  if (!deal) return [];
+  const vars = {
+    name: deal.name,
+    ticker: deal.ticker,
+    chain: deal.chain,
+    count: deal.claims?.length ?? 0,
+  };
+  return PITCH_OPENING[variantOf(deal.id ?? "", PITCH_OPENING.length)].map((f) => f(vars));
+}
+
 // WHAT A COLLEAGUE SAYS WHEN THEY COME BACK.
 //
 // Two axes now: WHO went, and whether it was THEIR AREA. Deep lines are the

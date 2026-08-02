@@ -25,11 +25,19 @@ import { VIRGIL } from "@/game/terminal-traders/press/virgil";
  *
  * WHAT DELIBERATELY DID NOT MOVE. The two surfaces are not the same layout and
  * should not pretend to be — desktop is an absolutely-positioned reading column
- * over a live 3D room; mobile is one scroll region above a pinned dock, and it
- * has a deferred-reveal beat (`flash.revealed` + LOOK) that desktop has no need
- * for. Each surface keeps its own containers and positioning CSS and composes
- * these pieces inside. If you add a prop here that only one caller ever passes,
- * check first whether it belongs in that caller's container instead.
+ * over a live 3D room; mobile is one scroll region above a pinned dock. Each
+ * surface keeps its own containers and positioning CSS and composes these pieces
+ * inside. If you add a prop here that only one caller ever passes, check first
+ * whether it belongs in that caller's container instead.
+ *
+ * WHAT STOPPED BEING A SURFACE DIFFERENCE. The deferred reveal — the board
+ * changing only when the room stops talking, and nothing naming the outcome
+ * until you have gone and looked — was mobile-only, on the reasoning that
+ * desktop could show you the monitor in the room instead. It is BOTH surfaces
+ * since 2026-08-02, together with the choice that replaced the automatic
+ * pitcher reaction (see AnswerBody). "I want the same experience on mobile and
+ * desktop" (author) — and a beat that exists on one surface only is how the two
+ * drifted apart the first time.
  *
  * Class names are `pu-*` and shared; PRESS_UI_CSS styles them once.
  */
@@ -37,6 +45,68 @@ import { VIRGIL } from "@/game/terminal-traders/press/virgil";
 /** The one definition of "is an interruption legal right now". */
 export function canPress(run, claim) {
   return run.pressesLeft > 0 && !!claim && !run.outcomes[claim.id];
+}
+
+/**
+ * HOW LONG A LINE MUST STAY UP IF NOBODY SAYS IT.
+ *
+ * VOICE IS ENRICHMENT AND NEVER A GATE — that rule is all over both surfaces —
+ * which means every beat timed off audio needs a floor for the case where audio
+ * never arrives. With no API key speakAdviserLine resolves in milliseconds, so
+ * the opening's three sentences would otherwise flash past in under a second and
+ * land the player in claim 1 having read nothing.
+ *
+ * ~14 chars/second is a deliberately slow read (~170wpm on prose of this
+ * length), because this is being LISTENED to when it works and the silent case
+ * should not feel like a different beat. Clamped so a short line still registers
+ * and a long one can't stall the floor. Shared so the two surfaces cannot drift.
+ */
+export function readDwellMs(text = "") {
+  return Math.min(7000, Math.max(1600, Math.round(String(text).length * 72)));
+}
+
+/**
+ * THE OPENING REMARKS — the beat between HEAR THE PITCH and claim 1.
+ *
+ * Lines arrive ONE AT A TIME, as each is spoken, and that is the whole point:
+ * printed all at once this is a paragraph the player skims and the voice then
+ * reads at them, which is the "already mid-pitch" complaint in a different
+ * costume. Revealed in step with the audio it is someone talking.
+ *
+ * `at` is the index of the line currently being said; everything before it stays
+ * on screen so the thesis line (see PITCH_OPENING in desk.js) is still readable
+ * when the last line lands. -1 means nothing has started yet.
+ *
+ * NO INTERRUPT CONTROLS HERE. There is nothing to press yet — the bot has made no
+ * claim — and offering a seat row against an opening would spend an analyst on a
+ * greeting. The only control is the one that skips it.
+ *
+ * @param onSkip cut to the first claim. Impatience is a legitimate input on this
+ *               surface as much as on the arrival — see skipRoll.
+ */
+export function OpeningBody({ lines = [], at = -1, onSkip = null, done = false }) {
+  if (!lines.length) return null;
+  const shown = done ? lines.length : Math.max(0, at + 1);
+  return (
+    <div className="pu-claim pu-opening" data-mood="cool">
+      <div className="pu-who">
+        {PITCH_BOT.name.toUpperCase()} <span className="pu-dim">— opening remarks</span>
+        {onSkip && (
+          <button type="button" className="pu-skip" onClick={onSkip}>
+            SKIP INTRO ▸
+          </button>
+        )}
+      </div>
+      {lines.slice(0, shown).map((line, i) => (
+        // Keyed by index deliberately: the bank is fixed for the session, so an
+        // index key is stable, and it is what lets the entrance animation fire
+        // per line instead of once for the block.
+        <div key={i} className={`pu-open-line${i === shown - 1 ? " now" : ""}`}>
+          “{line}”
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** What actually landed, in one line. It names WHOSE board the receipt is
@@ -133,20 +203,40 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
 
 /**
  * The answer. TWO VOICES: the adviser went and looked, so the finding is
- * theirs; Barron then reacts to being checked. Rendering only the reaction
+ * theirs; the pitcher then reacts to being checked. Rendering only the reaction
  * under the adviser's name is what made this read as a jumble.
  *
- * `flash.revealed === false` means he is still mid-sentence — the verdict and
- * the panel's colour are both derivable right now, so they're withheld until he
- * stops. Undefined means revealed (desktop doesn't defer).
+ * THE REACTION NO LONGER PLAYS ITSELF (2026-08-02). The two voices used to run
+ * back to back in one chain — "the character speaks and then the pitchbot
+ * automatically resumes" (author) — which spent the most interesting moment in
+ * the game on nobody's decision. The seat has just produced something, or failed
+ * to; the seller is about to explain it away. Which of those you spend the beat
+ * on is a real choice, and it was being made for you.
  *
- * `children`, when present, replaces the verdict line — mobile puts its LOOK
- * button in that slot, which is where the verdict itself will land.
+ * So the exchange now stops at `stage: "choice"` and offers both. See
+ * AnswerChoice. Neither is compulsory — pressing on without doing either is the
+ * same forfeiting choice as not pressing at all `[A§18]`.
+ *
+ * WHAT EACH GATE HIDES, and why it is not just ceremony:
+ *   • `stage === "reporting"` — they are still talking. The verdict and the
+ *     panel's colour are both derivable the instant you press, so they would
+ *     otherwise interpret an answer before it has been given.
+ *   • `!flash.looked` — the tone and the note name the OUTCOME, and the outcome
+ *     is meant to be something you went and looked at (VC_GAME.md §2).
+ *   • `!flash.heard` — the pitcher's line is the thing HEAR buys. Printing it
+ *     while offering to play it makes the button decorative.
+ *
+ * `children` is the choice row; each surface passes its own handlers because
+ * "go and look" means a pane swap on one surface and a camera move on the other.
  */
 export function AnswerBody({ flash, children }) {
   if (!flash) return null;
-  const held = flash.revealed === false;
-  const tone = held ? "" : flash.nothingOnFile ? "nil" : flash.backing === BACKING.VIBES ? "vibes" : "";
+  const held = flash.stage === "reporting";
+  const looked = !!flash.looked;
+  const tone = held || !looked
+    ? ""
+    : flash.nothingOnFile ? "nil" : flash.backing === BACKING.VIBES ? "vibes" : "";
+  const talking = flash.adviserSays ? (seatMeta(flash.seat)?.name ?? "They") : PITCH_BOT.name;
   return (
     <div className={`pu-answer ${tone}`}>
       <div className="pu-asked">YOU SENT — {flash.asked}</div>
@@ -157,7 +247,7 @@ export function AnswerBody({ flash, children }) {
           <span className="pu-said-line">“{flash.adviserSays}”</span>
         </div>
       )}
-      {flash.line && (
+      {flash.heard && flash.line && (
         <div className="pu-said barron">
           <span className="pu-said-who">{PITCH_BOT.name}</span>
           <span className="pu-said-line">“{flash.line}”</span>
@@ -165,9 +255,43 @@ export function AnswerBody({ flash, children }) {
       )}
 
       {held ? (
-        <div className="pu-note waiting">▚ IT'S STILL TALKING…</div>
-      ) : children ? children : (
-        <div className="pu-note">{answerNote(flash)}</div>
+        <div className="pu-note waiting">▚ {talking.toUpperCase()} IS STILL TALKING…</div>
+      ) : (
+        <>
+          {looked && <div className="pu-note">{answerNote(flash)}</div>}
+          {children}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * THE TWO WAYS TO SPEND THE BEAT — the decision that used to be made for you.
+ *
+ * Both stay live after they're taken, and that is deliberate rather than lax:
+ * re-reading a receipt is how you check it against what you're then told, and
+ * replaying the reaction is how you check the reverse. The ✓ says what you have
+ * already done, not what you may no longer do.
+ *
+ * HEAR IS ABSENT WHEN YOU PRESSED THE PITCHER ITSELF. There is no third party to
+ * react to your own question, so its answer plays on the spot and the only thing
+ * left to decide is whether to go and read its screen.
+ */
+export function AnswerChoice({ flash, onLook, onHear }) {
+  if (!flash || flash.stage === "reporting") return null;
+  const canHear = !!flash.line && !!flash.adviserSays;
+  return (
+    <div className="pu-choice">
+      <button type="button" className={`pu-choice-btn${flash.looked ? " done" : ""}`}
+              onClick={onLook}>
+        {flash.looked ? "✓ SEEN — LOOK AGAIN" : "▤ SEE WHAT LANDED ▸"}
+      </button>
+      {canHear && (
+        <button type="button" className={`pu-choice-btn hear${flash.heard ? " done" : ""}`}
+                onClick={onHear}>
+          {flash.heard ? "✓ HEARD — PLAY AGAIN" : "◉ HEAR ITS RESPONSE ▸"}
+        </button>
       )}
     </div>
   );
@@ -327,8 +451,10 @@ export function Transcript({ run, deal, open = true, onToggle = null }) {
                     <span className="pu-tag">FACT</span> {c.fact}
                   </span>
                   {/* Only what was SAID. No receipt, no verdict — see the note
-                      above. `revealed === false` never reaches here because the
-                      chip lands when the claim does, not when the press does. */}
+                      above. The beat's stage never reaches here: the chip lands
+                      when the CLAIM does, not when the press does, and the
+                      transcript is the record of what was said rather than of
+                      which half of the exchange you chose to take. */}
                   {o?.adviserSays && (
                     <span className="pu-script-said">
                       <b>{seatMeta(o.seat)?.name}</b> {o.adviserSays}
@@ -410,6 +536,21 @@ export const PRESS_UI_CSS = `
   color:rgba(234,255,249,0.62); }
 .pu-count { margin-left:auto; color:rgba(234,255,249,0.45); letter-spacing:0.1em; }
 .pu-spin { font-size:14px; line-height:1.42; margin:6px 0 8px; }
+
+/* THE OPENING. Same block as a claim so the transition into claim 1 is a change
+   of CONTENT, not a change of furniture — the border, the name line and the
+   quoted voice all stay put and only what he is saying moves on. */
+.pu-open-line { font-size:14px; line-height:1.45; margin:9px 0 0;
+  color:rgba(234,255,249,0.72); }
+/* The line being spoken is the bright one; the ones already said stay readable
+   but recede, so the eye lands where the voice is without the block flickering. */
+.pu-open-line.now { color:#eafff9; animation:puOpenIn .3s ease both; }
+@keyframes puOpenIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+.pu-skip { margin-left:auto; flex:none; cursor:pointer;
+  background:none; border:1px solid rgba(234,255,249,0.28); color:rgba(234,255,249,0.6);
+  font:bold 8.5px/1 'Courier New',monospace; letter-spacing:0.13em; padding:3px 6px; }
+.pu-skip:hover { border-color:rgba(234,255,249,0.55); color:#eafff9; }
+@media (prefers-reduced-motion:reduce) { .pu-open-line.now { animation:none; } }
 .pu-fact { font-size:11.5px; line-height:1.4; color:rgba(234,255,249,0.85); }
 .pu-tag { font:bold 8.5px/1 'Courier New',monospace; letter-spacing:0.13em;
   background:#2fd6d6; color:#02100e; padding:2px 4px; margin-right:5px; }
@@ -492,6 +633,27 @@ export const PRESS_UI_CSS = `
 .pu-answer.vibes .pu-note { color:#bfeede; }
 .pu-answer.nil .pu-note { color:#ff9b6f; }
 .pu-note.waiting { color:rgba(234,255,249,0.35); font-weight:normal; }
+
+/* THE CHOICE. Two buttons, equal weight — neither is the default and the layout
+   must not imply one. Stacked rather than side by side: on the flat surface's
+   column they would be ~120px each and wrap anyway, and a pair of full-width
+   rows reads as two options where a half-width pair reads as confirm/cancel. */
+.pu-choice { display:flex; flex-direction:column; gap:6px; margin-top:9px; }
+.pu-choice-btn { display:block; width:100%; cursor:pointer; text-align:left;
+  padding:9px 10px; background:rgba(47,214,214,0.10);
+  border:1px solid rgba(47,214,214,0.55); color:#2fd6d6;
+  font:bold 10px/1.2 'Courier New',monospace; letter-spacing:0.11em; }
+.pu-choice-btn:hover { background:rgba(47,214,214,0.18); }
+/* THE SELLER'S HALF IS PINK, the evidence half cyan — the same two colours the
+   claim border and the seat row already use for "the one selling" and "the ones
+   who went and looked". The choice is legible before the words are read. */
+.pu-choice-btn.hear { background:rgba(255,95,158,0.10);
+  border-color:rgba(255,95,158,0.55); color:#ff5f9e; }
+.pu-choice-btn.hear:hover { background:rgba(255,95,158,0.18); }
+/* TAKEN, NOT SPENT. Still live — re-reading the receipt against what you were
+   then told, and replaying the reaction against the receipt, are both real
+   moves. Dimmed only so the untaken one is the one that catches the eye. */
+.pu-choice-btn.done { opacity:0.55; font-weight:normal; }
 
 /* THE SEAT ROW IS THE PRIMARY CONTROL and must out-shout the nav beneath it.
    It did not, and the game read as "press him or move on". */

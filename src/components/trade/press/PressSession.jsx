@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDeal";
 import { BACKING, PITCHER, SEATS, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
-import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
+import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitchOpening, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES, STAKE,
@@ -19,8 +19,8 @@ import {
 } from "./engagement";
 import { createEvidenceScreen } from "./evidenceScreen";
 import {
-  canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, Transcript,
-  PRESS_UI_CSS,
+  canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
+  Meter, Nav, Transcript, readDwellMs, PRESS_UI_CSS,
 } from "./pressUi";
 
 // THE PRESS — slice 1. Barron, six claims, three presses, over the LIVE room.
@@ -155,6 +155,24 @@ export default function PressSession({
   const claim = currentClaim(run, deal);
   const onFloor = started && run.phase === PHASE.FLOOR;
 
+  /* ---- the opening ----
+     HEAR THE PITCH used to cut straight to claim 1, so the bot arrived already
+     mid-argument: "appears to be speaking in the middle of the pitch with no
+     intro" (author, 2026-08-02). It now says who it is here for and how it is
+     paid before it starts selling — see PITCH_OPENING in desk.js for why the
+     commission line in particular is worth the seconds.
+
+     THE ROOM STAGES ON `onFloor`, THE UI ON `floorLive`. Those are deliberately
+     different gates: the bot has to walk in, take the frame and start talking
+     during the opening — that IS the beat — while the claim body, the seat row
+     and the progress rail have nothing to say until it makes its first claim.
+     Gating the room on this too would leave you looking at an empty desk while a
+     voice talked at you. */
+  const openingLines = useMemo(() => pitchOpening(deal), [deal]);
+  const [openingAt, setOpeningAt] = useState(-1);
+  const [opened, setOpened] = useState(false);
+  const floorLive = onFloor && opened;
+
   /* ---- the evidence screen ----
      We don't own a texture. VideoScreens already owns the seat's mesh, canvas
      and material; we borrow the canvas through the EvidenceScreens handshake
@@ -200,6 +218,26 @@ export default function PressSession({
     onFocusAgent?.(PITCHER_AGENT);
   }, [onFloor, run.claimIndex, onFocusAgent]);
 
+  /* ---- the post-deal panel gets the room back ----
+     NOTHING RELEASED THE CAMERA WHEN THE FLOOR ENDED. Focus was only ever SET,
+     by the effect above and by sayTurn's per-utterance handover, so the autopsy
+     opened wherever the last press had parked it — pressed Eugene last, and the
+     summary played over a close-up of Eugene. The screenshot that prompted this
+     was the pitch bot's LEGS, head cropped, the room out of frame entirely
+     (author, 2026-08-02).
+
+     'Reset' rather than null: null clears the target and leaves the camera
+     exactly where it is — see the note on that branch in CyborgTempleScene.
+
+     AUTOPSY ONLY, deliberately. RESOLUTION has its own staging (onRevealChange
+     hands the host a curtain call and the four stand up for it), and pulling
+     back underneath that would fight it; the wide shot belongs to the beat AFTER
+     the reaction, where the panel is the screen and the room is the backdrop. */
+  useEffect(() => {
+    if (run.phase !== PHASE.AUTOPSY) return;
+    onFocusAgent?.('Reset');
+  }, [run.phase, onFocusAgent]);
+
   // SPEECH STATE NOW FOLLOWS ACTUAL AUDIO. It used to be pinned true for the
   // whole floor, which told the room "still talking" through every silence — the
   // bot's talking clip would have run for four minutes straight.
@@ -210,11 +248,11 @@ export default function PressSession({
 
   /* ---- a claim takes the floor, then becomes pressable ---- */
   useEffect(() => {
-    if (!onFloor) return;
+    if (!floorLive) return;
     setClaimVisible(false);
     const t = setTimeout(() => setClaimVisible(true), 260);
     return () => clearTimeout(t);
-  }, [run.claimIndex, onFloor]);
+  }, [run.claimIndex, floorLive]);
 
   /* ---- reveal: hand the outcome to the host so the room plays it ---- */
   useEffect(() => {
@@ -274,12 +312,16 @@ export default function PressSession({
   // now goes through sayTurn as a one-part turn. It gets the camera handover free.
 
   // A claim takes the floor -> it speaks the spin, from the pitcher's own frame.
+  // `floorLive`, not `onFloor`: while the opening is playing the pitcher already
+  // has the mouth, and starting the first claim underneath it would put two
+  // utterances in flight from the same speaker — the exact collision sayToken
+  // exists to arbitrate, except here BOTH would be legitimate.
   useEffect(() => {
-    if (!onFloor || !claim) return;
+    if (!floorLive || !claim) return;
     sayTurn([{ voice: VOICE, text: claim.spin, agent: PITCHER_AGENT }]);
     return () => { try { stopAdviserAudio(); } catch {} try { stopUnicornBeat(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onFloor, run.claimIndex]);
+  }, [floorLive, run.claimIndex]);
 
   useEffect(() => () => {
     try { stopAdviserAudio(); } catch {}
@@ -325,14 +367,27 @@ export default function PressSession({
     await speakAdviserLine(voice, text);
   }, []);
 
-  const sayTurn = useCallback(async (parts) => {
+  /**
+   * @param opts.onPart  called with the index of each part AS IT STARTS. The
+   *   opening reveals its lines in step with the voice; without this it would
+   *   have to print the whole block up front, which is the "already mid-pitch"
+   *   complaint in a different costume.
+   * @param opts.dwell   (text) => ms, overriding MIN_DWELL_MS per part. The
+   *   default 900ms is a CAMERA floor — long enough for a cut to read as a cut.
+   *   The opening needs a READING floor instead: its lines are ~140 characters
+   *   and, with no API key, speakLine resolves instantly, so a 900ms hold would
+   *   flash three sentences past in under three seconds.
+   */
+  const sayTurn = useCallback(async (parts, { onPart = null, dwell = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
     if (!live.length) return;
     const token = ++sayToken.current;
     setSpeaking(true);
     try {
-      for (const p of live) {
+      for (let i = 0; i < live.length; i++) {
+        const p = live[i];
         if (sayToken.current !== token) return;   // superseded — stop the chain
+        onPart?.(i);
         // THE CAMERA FOLLOWS THE VOICE, NOT THE PRESS. It used to cut to whoever
         // answered and then sit there while the PITCHER replied — so you watched
         // Eugene's back through the agent's whole line (author, 2026-07-29). Each
@@ -346,7 +401,7 @@ export default function PressSession({
         // not arrive. With no API key speakLine resolves almost instantly and the
         // two cuts collapse into one strobe across the desk; the shot has to hold
         // long enough to read as a shot even in silence.
-        const left = MIN_DWELL_MS - (Date.now() - startedAt);
+        const left = (dwell ? dwell(p.text) : MIN_DWELL_MS) - (Date.now() - startedAt);
         if (left > 0) await new Promise((r) => setTimeout(r, left));
       }
     } finally {
@@ -354,17 +409,60 @@ export default function PressSession({
     }
   }, [onFocusAgent, speakLine]);
 
+  /* ---- it introduces itself ----
+     Runs once per session, on the first frame of the floor. No cleanup that stops
+     audio: on a natural finish there is nothing left playing, and the two ways it
+     can end early — SKIP and unmount — are handled by skipOpening and by the
+     unmount effect below. Adding one here would race the claim effect, which
+     starts speaking in the same commit that `opened` flips. */
+  useEffect(() => {
+    if (!onFloor || opened || !openingLines.length) return;
+    let alive = true;
+    (async () => {
+      await sayTurn(
+        openingLines.map((text) => ({ voice: VOICE, text, agent: PITCHER_AGENT })),
+        { onPart: (i) => { if (alive) setOpeningAt(i); }, dwell: readDwellMs });
+      if (alive) setOpened(true);
+    })();
+    return () => { alive = false; };
+  }, [onFloor, opened, openingLines, sayTurn]);
+
+  // Impatience is a legitimate input here as much as on the arrival (skipRoll).
+  // Bumping the token is what supersedes the chain in flight — its `finally` then
+  // declines to touch `speaking`, so this has to clear it by hand.
+  const skipOpening = useCallback(() => {
+    sayToken.current++;
+    try { stopAdviserAudio(); } catch {}
+    try { stopUnicornBeat(); } catch {}
+    setSpeaking(false);
+    setOpened(true);
+  }, []);
+
   /* ---- actions ---- */
+  // The board updates when the reporter STOPS, not when you press — so the beat
+  // has to survive you moving on mid-answer. Holds the claim it is owed to, the
+  // same guard the flat surface calls revealFor.
+  const replyFor = useRef(null);
+  // If the voice is unavailable the beat still exists. Identical to PressFlat's
+  // MIN_BEAT on purpose: one exchange, one tempo, on both surfaces.
+  const MIN_BEAT = 1400;
+
   // One path, four seats. Every seat can be sent at every claim — the lane
   // decides DEPTH, not permission. Barron is reusable; the other three are one
   // use each. A send is only ever refused for a reason the player can see: no
   // budget left, or that colleague is already spent.
   const press = useCallback((seat = PITCHER) => {
-    if (!onFloor) return;
+    if (!floorLive) return;   // nothing to interrupt until it has made a claim
     const next = doPress(run, deal, seat);
     if (next === run) return;
     const outcome = next.outcomes[claim.id];
     setRun(next);
+    // THE SEAT REPORTS; THE PITCHER'S REACTION IS NOT PLAYED YET.
+    // `stage: "reporting"` until they stop, then "choice" — see AnswerBody and
+    // AnswerChoice in pressUi for why the reaction stopped being automatic.
+    // A press on the PITCHER has no third party, so there is nothing to choose
+    // between: its answer IS the exchange and it plays on the spot.
+    const solo = !outcome.adviserSays;
     setFlash({
       id: claim.id,
       seat: outcome.seat,
@@ -373,37 +471,76 @@ export default function PressSession({
       nothingOnFile: outcome.nothingOnFile,
       adviserSays: outcome.adviserSays,
       line: outcome.barronSays,
+      stage: "reporting",
+      heard: solo,          // its own answer is the thing you already asked for
+      looked: false,
       asked: outcome.seat === PITCHER
         ? "Put a number on it."
         : `${seatMeta(outcome.seat).name} — ${seatMeta(outcome.seat).role}`,
     });
 
-    // The seat reports in its own voice on its own camera, then the pitcher
-    // reacts on his. Order matters, and so does the handover.
-    sayTurn([
-      {
-        voice: seatMeta(outcome.seat)?.voice,
-        text: outcome.adviserSays,
-        agent: seatMeta(outcome.seat)?.agentId,
-      },
-      { voice: VOICE, text: outcome.barronSays, agent: PITCHER_AGENT },
-    ]);
+    // You INTERRUPTED it — the claim it was mid-way through stops. sayTurn's
+    // token does this for us, but only once the new chain starts; stopping here
+    // means the room never carries two voices across the gap.
+    try { stopAdviserAudio(); } catch {}
 
-    // THE ANSWER LANDS ON WHOEVER WENT AND GOT IT — on their own monitor, in
-    // the room. That's the whole reason this design is worth the four seats:
-    // three boards lit differently at the moment you call it is a picture only
-    // this scene can render.
-    const board = screensRef.current[outcome.board];
-    if (outcome.receipt) board?.stamp(outcome.receipt);
-    else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
-    else board?.stayBlack();
+    const owed = claim.id;
+    replyFor.current = owed;
+    // ONE VOICE, ON ITS OWN CAMERA. The second part of this chain used to be the
+    // pitcher's reaction; it now waits behind a button.
+    Promise.all([
+      sayTurn([solo
+        ? { voice: VOICE, text: outcome.barronSays, agent: PITCHER_AGENT }
+        : {
+          voice: seatMeta(outcome.seat)?.voice,
+          text: outcome.adviserSays,
+          agent: seatMeta(outcome.seat)?.agentId,
+        }]),
+      new Promise((r) => setTimeout(r, MIN_BEAT)),
+    ]).then(() => {
+      if (replyFor.current !== owed) return;   // you moved on; the beat is void
+      replyFor.current = null;
 
-    // NO CUT HERE ANY MORE. This fired once, to whoever answered, and then the
-    // camera stayed put for the rest of the exchange. sayTurn owns the frame
-    // during a press because it is the only thing that knows who is talking.
-  }, [run, deal, claim, onFloor, sayTurn]);
+      // THE ANSWER LANDS ON WHOEVER WENT AND GOT IT — on their own monitor, in
+      // the room. That's the whole reason this design is worth the four seats:
+      // three boards lit differently at the moment you call it is a picture only
+      // this scene can render.
+      //
+      // DEFERRED TO HERE, as it already was on the flat surface: stamped at press
+      // time the receipt appeared on the monitor the camera was moving toward
+      // while its owner was still saying "give me a second" — the board answered
+      // before the person did, and SEE WHAT LANDED had nothing left to show.
+      const board = screensRef.current[outcome.board];
+      if (outcome.receipt) board?.stamp(outcome.receipt);
+      else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
+      else board?.stayBlack();
+
+      setFlash((f) => (f && f.id === owed ? { ...f, stage: "choice" } : f));
+    });
+  }, [run, deal, claim, floorLive, sayTurn]);
+
+  /* ---- the two ways to spend the beat ---- */
+  // GO AND READ IT. The camera is already on whoever reported — this puts it back
+  // if HEAR has since taken it to the pitcher, and it is what marks the outcome
+  // as seen, which is the gate on the verdict note and the panel's colour.
+  const lookAtBoard = useCallback(() => {
+    if (!flash) return;
+    onFocusAgent?.(flash.board === PITCHER ? PITCHER_AGENT : seatMeta(flash.board)?.agentId);
+    setFlash((f) => (f ? { ...f, looked: true } : f));
+  }, [flash, onFocusAgent]);
+
+  // LET IT ANSWER. Its own camera, its own voice — the handover sayTurn used to
+  // make on its own the moment the adviser stopped.
+  const hearReply = useCallback(() => {
+    if (!flash?.line) return;
+    sayTurn([{ voice: VOICE, text: flash.line, agent: PITCHER_AGENT }]);
+    setFlash((f) => (f ? { ...f, heard: true } : f));
+  }, [flash, sayTurn]);
 
   const advance = useCallback(() => {
+    // Voids any beat still owed — see replyFor. Without this a board stamped by
+    // a press you walked out of lands on the NEXT claim.
+    replyFor.current = null;
     setFlash(null);
     Object.values(screensRef.current).forEach((x) => x.stayBlack());
     onFocusAgent?.(PITCHER_AGENT);
@@ -411,6 +548,7 @@ export default function PressSession({
   }, [deal, onFocusAgent]);
 
   const callIt = useCallback(() => {
+    replyFor.current = null;
     setFlash(null);
     setRun((r) => doCallIt(r, deal));
   }, [deal]);
@@ -459,10 +597,20 @@ export default function PressSession({
         {/* The bar names the deal only once the deal has a face. It sits above
             the panel and in bigger type, so leaving it live would spoil the
             reveal more loudly than the headline the panel withholds. */}
+        {/* THE REST STATE IS EMPTY SINCE 2026-08-02, and this is the same rule
+            engagement.jsx states about its status pill: anything that wants to say
+            "not yet" on this surface says it in ONE place. The briefing now carries
+            MANDATE PENDING on the rail, ○ AWAITING REVIEW on the housing, AWAITING
+            REVIEW on the record and CLIENT // SEALED on the seal — a fifth, in the
+            largest type on screen and outside the panel, is what makes a waiting
+            surface read as a hung one. It read ONE DEAL · NOT IN YET.
+
+            The ARRIVED state is untouched: the bar names the deal once the deal has
+            a face, and it is the only place that names it during the floor. */}
         <div className="ps-deal">
-          {identity
-            ? <>{deal.ticker} · {deal.name} <span className="ps-dim">· {deal.chain}</span></>
-            : <span className="ps-dim">ONE DEAL · NOT IN YET</span>}
+          {identity && (
+            <>{deal.ticker} · {deal.name} <span className="ps-dim">· {deal.chain}</span></>
+          )}
         </div>
         <div className="ps-book">
           BOOK <b>{Math.round(run.book)}</b>
@@ -483,105 +631,163 @@ export default function PressSession({
             <button className="ps-skip-deal" onClick={skipRoll} aria-label="Show them in now" />
           )}
 
-          {/* BAND 1 — THE RECORD, full panel width.
-              It was a 270px column beside the copy, which is how the deal ended up
-              in two boxes: the record could name the client but had no room to
-              describe it, so the particulars went into a second panel on the right
-              (author: "the pitch project is in 2 separate boxes"). Given the whole
-              width it is one document with three columns, and the second box is
-              gone. See engagement.jsx.
+          {/* THE BRIEFING IS THE FLAT SURFACE'S, AT DESKTOP SIZE (2026-08-02).
+              PressFlat's start screen was rebuilt as a MANDATE INTAKE TERMINAL —
+              a status rail, a headline, the record inside a bevelled housing with
+              its client sealed, a three-cell protocol readout, and one bevelled
+              gold action — and this panel was still the old briefing underneath the
+              same game. Two presentations of one beat is the drift this file keeps
+              logging (see the note above .ps-readcol), so the bands below mirror
+              .pf-start band for band; only the metrics are desktop's.
 
-              THE CAPTION IS GONE TOO (author: "this line seems unnecessary"). It
+              WHAT WAS CUT TO GET HERE, so it isn't reinstated by accident: the
+              two-column prose band (.ps-open-copy's "A pitch bot is here to present
+              its client's deal…" and .ps-open-aside's HOW YOUR ANALYSTS WORK) is
+              replaced by .ps-protocol + .ps-directive, exactly as on the phone. The
+              scarcity rule those columns spelled out is carried by ONE ANSWER EACH
+              on the section line and by the 04 ANALYSTS cell. If it ever needs the
+              long form back, it belongs under the section line — NOT as a third
+              column, which is what forced the deal into two boxes the last time. */}
+
+          {/* BAND 0 — THE STATUS RAIL. Inside the panel rather than up on .ps-bar:
+              the rail reports the state of THIS INTAKE (mandate, access, mode) and
+              the bar reports the session (leave, book). On the phone the two are
+              stacked instruments; here the panel is the instrument, so the rail is
+              its top edge. It leaves with the briefing, as it does on the phone. */}
+          <div className="ps-market-rail" aria-label="Deal simulation status">
+            <span><i>MANDATE</i>{identity ? deal.ticker : "PENDING"}</span>
+            <span><i>ACCESS</i>GUEST</span>
+            <span><i>MODE</i>LIVE SIM</span>
+          </div>
+
+          {/* BAND 1 — THE HEAD. NOTHING HERE MAY NAME THE DEAL BEFORE THE ARRIVAL
+              LANDS (invariant 7): the headline is about the PLAYER'S JOB, which is
+              true of every deal, so it can be the largest type on the panel without
+              spoiling the one thing the panel withholds. */}
+          <div className="ps-start-head">
+            <div className="ps-open-eyebrow">CH 02 // INCOMING MANDATE</div>
+            <h1>READ THE DEAL.<br /><span>CALL THE BLUFF.</span></h1>
+            <p>One pitch. Three interruptions. Decide whether it deserves your book.</p>
+          </div>
+
+          {/* BAND 2 — THE RECORD, full panel width, inside its housing.
+              The record itself is unchanged: one document with three columns, which
+              is what deleted the second box the particulars used to live in (author:
+              "the pitch project is in 2 separate boxes"). See engagement.jsx.
+
+              THE HOUSING IS NEW AND IS NOT DECORATION. The bevelled shell and the
+              DEAL INTAKE / AWAITING REVIEW readout are what make the record read as
+              something that ARRIVED on a terminal rather than a form the page drew.
+              It is also where the status now lives at rest, which is why the sealed
+              overlay below can take the record's body without leaving the panel
+              with nothing saying "not yet".
+
+              THE CAPTION IS STILL GONE (author: "this line seems unnecessary"). It
               read SENT DOWN TO YOU · YOU DON'T GET TO ASK WHY THIS ONE, and it was
               load-bearing exactly once — against the dice, where naming who chose
               was the one thing a randomiser could not do for itself. A form that
-              arrives already signed never raises the question. Both cuts are
-              [A§20]. */}
-          <EngagementRecord
-            arrived={identity}
-            client={identity ? deal.name : null}
-            surface={identity ? deal.surface : null}
-            ticker={identity ? deal.ticker : null}
-            chain={identity ? deal.chain : null}
-            ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
-            termsRef={termsRef} particularsRef={particularsRef}
-            stampRetainedRef={stampRetainedRef} />
-
-          {/* BAND 2 — what is about to happen, and the one rule that governs it. */}
-          <div className="ps-open-copy">
-            {/* "ONE DEAL ON THE TABLE" until 2026-07-29 (author: didn't like it).
-                The top bar already reports the count and the status — ONE DEAL ·
-                NOT IN YET — so the eyebrow was the second place on screen saying
-                "one deal", and "on the table" is a card-room idiom left over from
-                when this beat had cards on a table. YOUR NEXT APPOINTMENT is
-                VC_GAME.md §2's own words for the beat, and it is the register the
-                record and SEND IT IN are already in. */}
-            <div className="ps-open-eyebrow">YOUR NEXT APPOINTMENT</div>
-            {/* The pitcher is an outside contractor on commission, not a colleague.
-                This said "Connor brought this one in — it's his deal" until
-                2026-07-29, which stopped being true when the bot took over the
-                selling and Barron joined the desk as a plain specialist; then "an
-                agent is here for a client who didn't come", cut the same day for
-                pointing at the absence instead of the incentive. What is worth
-                knowing about a speaker is who pays it, not who isn't here. */}
-            <div className="ps-open-body">
-              A pitch bot is here to present its client&apos;s deal. It works on
-              commission — it gets paid if you fund this — and it&apos;s going to
-              talk for about two minutes.
+              arrives already signed never raises the question. [A§20]. */}
+          <div className="ps-record-shell">
+            <div className="ps-record-readout">
+              <span>DEAL INTAKE</span>
+              <span>{identity ? "● BRIEF RELEASED" : "○ AWAITING REVIEW"}</span>
             </div>
-            <div className="ps-open-rule">
-              You can interrupt <b>three times</b> and make it put a number on
-              things. Whatever it can actually back lands on a screen. Whatever it
-              can&apos;t, doesn&apos;t.
-            </div>
+            <EngagementRecord
+              arrived={identity}
+              title={identity ? "Deal Brief" : "Inbound Deal"}
+              restStatus="AWAITING REVIEW"
+              arrivedStatus="MEETING SET"
+              stampLabel="Meeting Set"
+              client={identity ? deal.name : null}
+              surface={identity ? deal.surface : null}
+              ticker={identity ? deal.ticker : null}
+              chain={identity ? deal.chain : null}
+              ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
+              termsRef={termsRef} particularsRef={particularsRef}
+              stampRetainedRef={stampRetainedRef} />
+            {/* THE SEAL. At rest the record is a SEALED MANDATE, not a completed
+                form with every value blanked to ——. The terms and particulars stay
+                MOUNTED (hidden in CSS, not unmounted) because runArrival animates
+                those exact nodes — dropping them from the tree would hand GSAP a
+                null ref at the settle. It unmounts on `identity`, which is the same
+                instant the record's own reveal lands. */}
+            {!identity && (
+              <div className="ps-sealed-state" aria-label="Client details are sealed">
+                <div className="ps-seal-code" aria-hidden="true">
+                  <span>02</span>
+                  <i />
+                </div>
+                <div className="ps-seal-copy">
+                  <b>CLIENT // SEALED</b>
+                  <span className="ps-seal-source">SOURCE // COMMISSIONED AGENT</span>
+                  <span>Review the file to release terms and particulars.</span>
+                  <div className="ps-seal-key" aria-hidden="true">
+                    <i /><i /><i /><em>INBOUND FILE</em>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* THE SWAP CELL IS GONE, and it is worth saying why it existed. The
-              dossier used to be a separate panel whose REST state was an empty
-              bordered box (NOTHING ON THE TABLE YET), so it was paired with the
-              house rules in one grid area and cross-faded. Folding the particulars
-              into the record deleted the problem rather than staging it: the stat
-              rows are visible from the start at ——, so nothing has an empty rest
-              state and the rules can just be copy again. */}
-          <div className="ps-open-aside">
-            {/* ALL FOUR ARE SCARCE NOW. This read "Marisol, GR80 and Eugene answer
-                once each" while Barron was the pitcher and therefore unlimited. He
-                is a seat like the rest since 2026-07-29 — no exceptions left. */}
-            <div className="ps-brief-h">HOW YOUR ANALYSTS WORK</div>
-            <div className="ps-open-rule sm">
-              Every analyst will answer anything you ask. Each has <b>one</b>{" "}
-              subject they go deep on, and each answers <b>once</b>, all session.
-              Ask the wrong one and you still get an answer; you just get the
-              shallow version, and you&apos;ve spent them.
-            </div>
-          </div>
+          {/* BAND 3 — WHAT IS ABOUT TO HAPPEN, AS THREE NUMBERS.
+              This replaced ~90 words in two columns (.ps-open-copy's "A pitch bot
+              is here to present its client's deal…" and .ps-open-aside's HOW YOUR
+              ANALYSTS WORK). Those columns existed because the panel's full width
+              ran ~97ch of monospace per line and a single column of that much prose
+              was unreadable — but the fix for too much prose on a briefing is less
+              prose, not a second measure to put it in. The shape of the session is
+              three counts; only the INCENTIVE needed a sentence, and it gets one.
 
-          {/* THE DESK. Portraits, not card faces — a card is a thing you
-              look at, and four in a row read as a cast list even when they
-              were the controls (see the note on SeatRow in pressUi.jsx).
-              Nothing here is clickable: on the briefing they are an
-              introduction, and the sendable version of the same four is the
-              seat row on the floor. */}
+              The eyebrow the copy column carried (YOUR NEXT APPOINTMENT) moved up
+              to the head, where it is CH 02 // INCOMING MANDATE. */}
+          <div className="ps-protocol" aria-label="Meeting protocol">
+            <div><b>03</b><span>INTERRUPTS</span></div>
+            <div><b>04</b><span>ANALYSTS</span></div>
+            <div><b>01</b><span>FINAL CALL</span></div>
+          </div>
+          {/* THE ONE THING THE NUMBERS CAN'T SAY: who pays the speaker. The pitcher
+              is an outside contractor on commission, not a colleague. This said
+              "Connor brought this one in — it's his deal" until 2026-07-29, which
+              stopped being true when the bot took over the selling and Barron joined
+              the desk as a plain specialist; then "an agent is here for a client who
+              didn't come", cut the same day for pointing at the absence instead of
+              the incentive. What is worth knowing about a speaker is who pays it. */}
+          <p className="ps-directive">
+            The pitch bot is paid only if you fund the deal. Send one analyst
+            per interruption; anything verifiable lands on-screen.
+          </p>
+
+          {/* BAND 4 — THE DESK. Portraits, not card faces — a card is a thing you
+              look at, and four in a row read as a cast list even when they were the
+              controls (see the note on SeatRow in pressUi.jsx). Nothing here is
+              clickable: on the briefing they are an introduction, and the sendable
+              version of the same four is the seat row on the floor.
+
+              "THE DESK — always these four, and the cat" until 2026-07-29 (author:
+              didn't like it). "always these four" was reassurance about a rotating
+              cast, and the rotating cast was cut in [A§17] — so it answered a
+              question no player can now think to ask, in the defensive register of
+              a changelog. The possessive is the load-bearing half: they are the
+              player's, one use each. The cat needs no mention in the label; he has
+              a divider and a NOT A SEAT line of his own.
+
+              ANALYSTS, NOT AGENTS. "The Trade Agents" was the other candidate and
+              it was rejected on the same day the PITCHER stopped being called "The
+              Agent": one word for both sides of the table is the cast-legibility
+              failure this file keeps logging (see the borrowed-portrait note in
+              desk.js, and [A§12] on four cards reading as a cast list). ANALYST is
+              also what §1 has called them all along. Internals keep DESK/DESK_ORDER;
+              only the label is player-facing.
+
+              THE LABEL IS A RULED SECTION LINE NOW, not a centred caption over the
+              row, and the right half of it is where the scarcity rule went when the
+              prose columns were cut: ONE ANSWER EACH. The rule reads better as a
+              property of the band than as a paragraph two bands above it. */}
+          <div className="ps-section-line">
+            <span>YOUR ANALYST TEAM</span>
+            <i>ONE ANSWER EACH</i>
+          </div>
           <div className="ps-tools">
-            <div className="ps-tool-group ps-tool-hand">
-                {/* "THE DESK — always these four, and the cat" until 2026-07-29 (author:
-                    didn't like it). "always these four" was reassurance about a
-                    rotating cast, and the rotating cast was cut in [A§17] — so it
-                    answered a question no player can now think to ask, in the
-                    defensive register of a changelog. YOUR DESK says the one thing
-                    that IS load-bearing: they are the player's, one use each. The
-                    cat needs no mention in the label; he has a divider and a NOT A
-                    SEAT line of his own. */}
-                {/* ANALYSTS, NOT AGENTS. "The Trade Agents" was the other
-                    candidate and it was rejected on the same day the PITCHER
-                    stopped being called "The Agent": one word for both sides of
-                    the table is the cast-legibility failure this file keeps
-                    logging (see the borrowed-portrait note in desk.js, and [A§12]
-                    on four cards reading as a cast list). ANALYST is also what §1
-                    has called them all along. The possessive stays — it is the
-                    half that carries "yours, one use each". Internals keep
-                    DESK/DESK_ORDER; only the label is player-facing. */}
-                <div className="ps-draw-label">YOUR ANALYSTS</div>
               <div className="ps-draw-row">
                 {DESK_ORDER.map((m) => (
                   <div key={m.id} className="ps-face" title={m.blurb}>
@@ -611,7 +817,6 @@ export default function PressSession({
                   <span className="ps-face-note">NOT A SEAT</span>
                 </div>
               </div>
-            </div>
           </div>
 
           {/* The one live control. My seat-row rewrite replaced the whole
@@ -643,20 +848,36 @@ export default function PressSession({
                   until the author read it back: "seems like strange wording to me".
                   It is — "send it in" is receptionist-speak for a person you can
                   point at, and the "it" here names nothing the player has met.
-                  TAKE THE MEETING says what pressing it does, in the register YOUR
-                  NEXT APPOINTMENT and the engagement record already set, and it is
-                  the player's decision rather than an instruction to staff. [A§11]
-                  rejected "send" for the ANALYSTS on the neighbouring ground that
-                  they never leave their desks; the verb has now failed on both
-                  sides of the table. */}
-              {rolled ? "HEAR THE PITCH ▸" : rolling ? "SIGNING…" : "TAKE THE MEETING ▸"}
+                  [A§11] rejected "send" for the ANALYSTS on the neighbouring ground
+                  that they never leave their desks; the verb failed on both sides
+                  of the table.
+
+                  TAKE THE MEETING / SIGNING… until 2026-08-02, when the panel took
+                  the flat surface's intake framing. The verbs have to agree with
+                  the screen around them: nothing on the panel is an APPOINTMENT any
+                  more — it is an inbound FILE, sealed, awaiting review — so REVIEW
+                  THIS DEAL is the action the rest of the bands describe, and
+                  OPENING… is what happens to a sealed file. Kept identical to
+                  PressFlat's on purpose; one beat, one set of words. */}
+              {rolled ? "HEAR THE PITCH ▸" : rolling ? "OPENING…" : "REVIEW THIS DEAL ▸"}
             </button>
           </div>
         </div>
       )}
 
+      {/* ---------- the opening ----------
+          Same container as the reading column, so the block does not move when
+          the first claim replaces it: only the content inside changes. */}
+      {onFloor && !opened && (
+        <div className="ps-readcol">
+          <div className="ps-fade in">
+            <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening} />
+          </div>
+        </div>
+      )}
+
       {/* ---------- the floor ---------- */}
-      {onFloor && claim && (
+      {floorLive && claim && (
         <>
           {/* Claim and answer share ONE flow column, so a long answer pushes
               the claim up instead of covering it. Both bodies come from
@@ -667,7 +888,11 @@ export default function PressSession({
                        pressure={mood} aside={aside}
                          spent={run.advisersSpent} />
             </div>
-            {flash && flash.id === claim.id && <AnswerBody flash={flash} />}
+            {flash && flash.id === claim.id && (
+              <AnswerBody flash={flash}>
+                <AnswerChoice flash={flash} onLook={lookAtBoard} onHear={hearReply} />
+              </AnswerBody>
+            )}
 
             {/* ON THE RECORD. Claim six is a decision about claims one to five,
                 and until now the only way to hold them was to remember them —
@@ -878,11 +1103,43 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    middle of the room and the nav stranded far right — "corner UI is a bit
    messy" (author, 2026-07-27). The claim owns the left, the controls own the
    right, and they never touch. */
-.ps-readcol { position:absolute; left:18px; bottom:46px; width:min(430px, 38vw);
-  max-height:calc(100vh - 130px); overflow-y:auto;
+/* CLEAR OF THE SITE'S BOTTOM NAV. .btm-nav-dock is 66px tall, fixed, at
+   z-index 10000 — and .ps-root is 10050, so the floor DRAWS OVER the nav instead
+   of being clipped by it. At bottom:46px the reading column, the controls and the
+   progress rail were all inside that band, sitting on top of BUY RL80 / HOME.
+   It read as harmless while the transcript was transparent text; an opaque panel
+   over the nav does not. One inset so the three blocks stay in step, and the
+   column's TOP edge is unchanged — it starts where it always did and gives the
+   38px back at the bottom, where it was never ours. */
+.ps-root { --nav-clear:72px; }
+.ps-readcol { position:absolute; left:18px; bottom:calc(var(--nav-clear) + 12px);
+  width:min(430px, 38vw);
+  max-height:calc(100vh - var(--nav-clear) - 96px); overflow-y:auto;
   display:flex; flex-direction:column; gap:8px; }
-/* Over the room, so both blocks are opaque enough to read against anything. */
+/* Over the room, so every block is opaque enough to read against anything.
+   THE TRANSCRIPT WAS NOT. This rule said "both blocks" and there were two when
+   it was written; ON THE RECORD arrived later with a hairline top rule and no
+   background at all, so on this surface it hung under the answer as loose text
+   with the room showing through — a character's head behind the record of what
+   he said (author, 2026-08-02).
+   It was never a scrolling problem: .pu-script-list has capped itself at 190px
+   and scrolled since it was built. What it lacked was a box.
+   Given one, the top rule that separated it from the answer becomes a left rule
+   like the claim's, so the column reads as three stacked records rather than two
+   panels and a tail. */
 .ps-readcol .pu-claim { background:rgba(2,16,14,0.86); }
+.ps-readcol .pu-script {
+  background:rgba(2,16,14,0.88);
+  border-top:none; border-left:2px solid rgba(47,214,214,0.32);
+  margin-top:0; padding:9px 12px 10px;
+}
+/* The inner scroller needs its own edge once the block has a background, or a
+   clipped transcript ends on a hard cut that reads as the layout truncating it
+   rather than as there being more. */
+.ps-readcol .pu-script-list {
+  -webkit-mask-image:linear-gradient(180deg, #000 calc(100% - 14px), transparent);
+  mask-image:linear-gradient(180deg, #000 calc(100% - 14px), transparent);
+}
 .ps-readcol .pu-answer { animation:psin .25s ease both; }
 @keyframes psin { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
 /* The claim fades in with the camera cut; the answer has its own entrance. */
@@ -890,13 +1147,14 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   transition:opacity .22s ease, transform .22s ease; }
 .ps-fade.in { opacity:1; transform:none; }
 
-.ps-dock { position:absolute; right:18px; bottom:46px; left:auto;
+.ps-dock { position:absolute; right:18px; bottom:calc(var(--nav-clear) + 12px); left:auto;
   display:flex; flex-direction:column; align-items:stretch; gap:9px;
   padding:11px 12px; background:rgba(2,16,14,0.9);
   border:1px solid rgba(47,214,214,0.25); }
 .ps-dock .pu-meter { justify-content:flex-end; }
 
-.ps-progress { position:absolute; left:18px; bottom:34px; display:flex; gap:6px; }
+.ps-progress { position:absolute; left:18px; bottom:calc(var(--nav-clear) - 2px);
+  display:flex; gap:6px; }
 .ps-dot { width:22px; height:3px; background:rgba(234,255,249,0.18); }
 .ps-dot.past { background:rgba(234,255,249,0.4); }
 .ps-dot.now { background:#2fd6d6; }
@@ -911,60 +1169,250 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    the house rules moved into the swap cell where they cost no height at all. */
 .ps-open { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   width:min(800px, calc(100vw - 40px)); max-height:90vh; overflow:auto; flex-wrap:wrap;
-  background:rgba(2,16,14,0.93);
+  /* THE LAMP OVER THE INTAKE, lifted from .pf-wrap. On the phone the whole
+     surface carries a warm radial at the top and it is most of why that screen
+     reads as a lit terminal rather than a dark card. The panel is the surface
+     here, so it carries it — under, not over, the flat base colour the record
+     needs to stay legible against a moving room. */
+  background:
+    radial-gradient(120% 62% at 50% 0%, rgba(68,53,8,0.30), transparent 70%),
+    rgba(2,16,14,0.94);
   border:1px solid rgba(47,214,214,0.4); border-left:3px solid #ff5f9e; padding:18px 22px;
-  display:flex; gap:22px; align-items:flex-start; }
-/* FOUR BANDS: the record, the framing, the analysts, the action. .ps-open-hero
-   is gone with the two-column briefing — a 270px column was what forced the deal
-   into two boxes, because a record that narrow can name a client but cannot
-   describe one. Everything is a wrapped flex row now, so each band declares its
-   own basis and the panel has no columns to keep balanced. */
-.eng { flex-basis:100%; }
+  text-align:left;
+  display:flex; gap:0; align-items:flex-start; }
+/* THE PAGE CENTRES PARAGRAPHS. globals.css carries a bare p{text-align:center},
+   which was invisible on this panel while every band was a div and centred both
+   real paragraphs the moment the briefing grew some. It has to be an ELEMENT
+   rule, not text-align on .ps-open: an inherited value loses to any rule that
+   matches the element directly, however weak, so the panel-level declaration
+   above does nothing for these two on its own.
 
-/* The house-rules heading. Its block used to share a grid cell with the dossier;
-   the dossier moved into the record, so this is plain copy in the second column. */
-.ps-brief-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold;
-  color:rgba(255,210,58,0.8); margin-bottom:6px; }
-/* The dossier's own styles are gone with the dossier: the stat rows live inside
-   the record as .eng-stats, and "Long, short, or hold? Work the questions." was
-   advice the floor gives better, in the place it applies. */
+   THE FLAT SURFACE IS STILL CENTRED HERE — same global, and .pf-directive /
+   .pf-start-head p never opted out. At 330px under a 20px headline that reads as
+   a choice; at this measure, under a 32px one, a centred paragraph between two
+   left-aligned bands reads as a bug. Left is the deliberate version of what the
+   phone is doing by accident. If the phone's centring turns out to be wanted,
+   this is the one rule to delete. */
+.ps-open p { text-align:left; }
+/* SIX BANDS, EACH FULL WIDTH: rail, head, record, protocol, desk, action. It was
+   four, two of which were side-by-side prose columns — see the render site for
+   why those went. There are no columns left to keep balanced, so the flex gap is
+   0 and every band owns its own top margin; a shared gap was making the tighter
+   pairs (protocol → directive, section line → faces) sit as far apart as the
+   loose ones. .ps-open-hero went with the same change, an era earlier: a 270px
+   column was what forced the deal into two boxes, because a record that narrow
+   can name a client but cannot describe one. */
+.ps-open > * { flex-basis:100%; }
 
-/* MEASURE. At the panel's full width this ran ~97ch of monospace per line, about
-   three times a comfortable read, which is why the framing copy and the house
-   rules sit side by side rather than one above the other: two ~45ch columns beat
-   one very long one, and they fill a band that a single column would leave half
-   empty. */
-.ps-open-copy { flex:1 1 300px; min-width:0; max-width:52ch; align-self:flex-start;
-  overflow-wrap:anywhere; }
-.ps-open-aside { flex:1 1 250px; min-width:0; max-width:46ch; align-self:flex-start;
-  overflow-wrap:anywhere; border-left:2px solid rgba(255,210,58,0.3);
-  padding-left:12px; }
-.ps-open-eyebrow { font-size:10px; letter-spacing:0.18em; color:#ff5f9e; font-weight:bold; }
-.ps-open-body { font-size:13px; line-height:1.5; margin-top:10px; }
-.ps-open-rule { font-size:13px; line-height:1.5; margin-top:9px; color:#ffd23a; }
-.ps-open-rule.sm { font-size:11.5px; line-height:1.5; margin-top:0; }
-.ps-open-rule b { color:#fff; }
+/* BAND 0 — THE STATUS RAIL. Three cells, bevelled at opposite corners, in the
+   same register as the rest of the terminal's readouts. MANDATE gets the widest
+   cell because it is the only one whose value changes (PENDING → the ticker). */
+.ps-market-rail {
+  display:grid; grid-template-columns:1.1fr .85fr 1fr;
+  border:1px solid rgba(47,214,214,.18); background:rgba(2,18,17,.72);
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));
+}
+.ps-market-rail span {
+  min-width:0; padding:9px 13px; color:#b9d8d3;
+  font-size:10.5px; letter-spacing:.1em; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis;
+}
+.ps-market-rail span + span { border-left:1px solid rgba(47,214,214,.12); }
+.ps-market-rail i {
+  display:block; margin-bottom:3px; color:rgba(47,214,214,.5);
+  font-style:normal; font-size:8.5px; letter-spacing:.17em;
+}
+.ps-market-rail span:first-child { color:#ffd23a; }
 
-/* THE DESK, FULL PANEL WIDTH — the third of three bands (columns, cast, action).
-   Inside the copy column it was 460px of a 756px panel, which left the five
-   portraits crowded on the right while the space under the record sat empty. Out
-   here it balances the two columns against each other AND gives a cast list the
-   wide row a cast list wants. */
-.ps-tools { flex-basis:100%; display:flex; gap:16px; align-items:flex-start;
-  flex-wrap:wrap;
-  margin-top:16px; padding-top:13px; border-top:1px solid rgba(255,210,58,0.22); }
-/* CENTRED, AND BIGGER (author: "maybe the analyst images could be larger and/or
-   centered"). Both, and they need each other: 52px portraits left-aligned under a
-   two-word label read as a footnote to the copy above them, and the band is not a
-   footnote — it is the cast, and the four of them are the interface for the next
-   four minutes. The label centres with the row so the band reads as one unit. */
-.ps-draw-row { justify-content:center; }
-.ps-draw-label { text-align:center; }
-.ps-tool-group { flex:none; }
-.ps-tool-hand { flex:1; min-width:0; padding-left:0; border-left:none; }
-.ps-draw-label { font-size:9px; letter-spacing:0.13em; color:rgba(255,210,58,0.8);
-  font-weight:bold; margin-bottom:7px; }
-.ps-draw-row { display:flex; gap:9px; flex-wrap:wrap; }
+/* BAND 1 — THE HEAD. The one display face on the panel other than the record's
+   letterhead, and it is Orbitron rather than Bebas because this is the terminal
+   speaking, not the paperwork. Two lines, the second in gold: the instruction
+   splits into what you do and what you do it for, and colouring the second half
+   is what keeps a 34px headline from reading as a single shout. */
+.ps-start-head { margin:12px 0 0; }
+.ps-start-head h1 {
+  margin:7px 0 7px; font-family:'Orbitron','IoskeleyMono',monospace;
+  color:#eafff9; font-size:32px; line-height:1.06; letter-spacing:.04em;
+  font-weight:700;
+}
+.ps-start-head h1 span {
+  color:#ffd23a; text-shadow:0 0 22px rgba(255,210,58,.24);
+}
+/* MEASURE. The panel runs ~97ch of monospace at full width, about three times a
+   comfortable read — which is what the deleted prose band needed two columns to
+   escape. One short line held to ~62ch needs no column at all. */
+.ps-start-head p {
+  margin:0; max-width:62ch; color:#81aaa4; font-size:13px;
+  line-height:1.45; letter-spacing:.035em;
+}
+/* GOLD, NOT PINK. It was #ff5f9e as the copy column's eyebrow, where the pink
+   agreed with the record's left rule two inches away. Above a gold headline it
+   was the third accent in four lines. */
+.ps-open-eyebrow { font-size:11px; letter-spacing:.2em; color:#ffd23a; font-weight:bold; }
+
+/* BAND 2 — THE HOUSING. See the render site for why the record now sits in one.
+   The top padding is the readout's lane: it is absolutely positioned so the
+   record underneath keeps its own box, and 26px is what clears it. */
+.ps-record-shell {
+  position:relative; margin-top:14px; padding:26px 10px 10px;
+  border:1px solid rgba(47,214,214,.3);
+  background:linear-gradient(145deg,#19211f,#08100f 34%,#020504 78%);
+  box-shadow:0 10px 26px rgba(0,0,0,.65),inset 0 0 0 1px rgba(255,255,255,.025);
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));
+}
+.ps-record-shell::before {
+  content:""; position:absolute; inset:4px; pointer-events:none;
+  border:1px solid rgba(255,210,58,.12);
+}
+.ps-record-readout {
+  position:absolute; z-index:2; left:14px; right:14px; top:9px;
+  display:flex; justify-content:space-between; gap:8px;
+  color:#ffd23a; font-size:9px; letter-spacing:.15em;
+}
+.ps-record-readout span:last-child { color:#76aaa3; }
+
+/* The record stays a document, but tinted to the housing it now sits in — the
+   scanline wash is what stops a pale form floating inside a dark instrument. */
+.ps-open .eng {
+  border-color:rgba(255,210,58,.24); border-left-color:rgba(239,98,220,.65);
+  background:
+    repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px),
+    linear-gradient(180deg,rgba(8,26,23,.92),rgba(1,10,9,.94));
+}
+.ps-open .eng.in { border-color:rgba(255,210,58,.48); }
+.ps-open .eng-title { font-family:'Orbitron','IoskeleyMono',monospace; font-size:14px; }
+
+/* THE SEALED REST STATE. Before the file is opened this is a sealed mandate, not
+   a completed form with every value blanked to ——.
+
+   THE HIDDEN NODES ARE HIDDEN, NOT UNMOUNTED, and that is a hard requirement:
+   runArrival animates .eng-terms / .eng-particulars / .eng-idents by ref, so
+   dropping them from the tree hands GSAP nulls at the settle. Taken out of flow
+   with the 1px/visibility:hidden pattern rather than display:none for the same
+   reason — a display:none node has no box to animate to.
+
+   THE BODY HEIGHT IS LOAD-BEARING, and it and the seal's box are THE SAME BAND —
+   both read --seal-band, and the seal's top is the record's own header height, so
+   the two boxes are congruent and align-items:center puts the seal copy on the
+   portrait's centre line without either side guessing. Set them independently and
+   they drift: at 78/100 the seal hung 15px low and its last row (INBOUND FILE)
+   sat on the record's bottom border.
+
+   --seal-top is 27px of shell padding + border plus the 32px .eng-head. If the
+   record's letterhead ever changes size, this is the number that follows it.
+   --seal-band is the 78px frame plus its 12px top padding and a little air, and
+   it must also clear .ps-seal-copy — ~77px at these type sizes. */
+.ps-open { --seal-band:100px; --seal-top:59px; }
+.ps-open .eng:not(.in) { padding-bottom:9px; }
+.ps-open .eng:not(.in) .eng-body {
+  height:var(--seal-band); align-items:center; padding-bottom:0;
+}
+.ps-open .eng:not(.in) .eng-terms,
+.ps-open .eng:not(.in) .eng-particulars,
+.ps-open .eng:not(.in) .eng-idents {
+  position:absolute; width:1px; height:1px; opacity:0; visibility:hidden;
+  overflow:hidden; pointer-events:none;
+}
+/* Anchored off the housing, not the record: left clears the shell's 10px padding
+   + the record's 11px body padding + the 78px frame + a 26px gutter. Height
+   matches .eng-body's so align-items:center lines the seal up with the
+   portrait. pointer-events:none — .ps-skip-deal sits above it and must stay
+   clickable through the whole arrival. */
+.ps-sealed-state {
+  position:absolute; z-index:3; left:125px; right:26px;
+  /* CONGRUENT WITH .eng-body's CONTENT BOX, not its border box: the portrait
+     centres below the record's 12px top padding, so a seal centred on the border
+     box sits ~5px high of it. Subtracting the same 12 from both ends makes the
+     two boxes identical and align-items:center does the rest — no nudge, and
+     nothing to re-tune if --seal-band moves. */
+  top:calc(var(--seal-top) + 12px); height:calc(var(--seal-band) - 12px);
+  display:flex; align-items:center; gap:16px; min-width:0;
+  pointer-events:none;
+}
+.ps-seal-code {
+  position:relative; flex:none; width:46px; height:60px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,210,58,.3);
+  color:#ffd23a; font-family:'Orbitron','IoskeleyMono',monospace;
+  font-size:15px; letter-spacing:.08em;
+  clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,0 100%);
+}
+.ps-seal-code::after {
+  content:""; position:absolute; inset:5px;
+  border:1px solid rgba(239,98,220,.16);
+}
+.ps-seal-code i {
+  position:absolute; left:9px; right:9px; bottom:9px; height:1px;
+  background:#ef62dc; box-shadow:0 0 7px rgba(239,98,220,.5);
+}
+.ps-seal-copy { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.ps-seal-copy > b {
+  color:#ef62dc; font-size:11px; letter-spacing:.15em;
+  text-shadow:0 0 9px rgba(239,98,220,.25);
+}
+.ps-seal-copy > span {
+  max-width:40ch; color:#8db1aa; font-size:11px; line-height:1.35;
+  letter-spacing:.035em;
+}
+.ps-seal-copy > .ps-seal-source {
+  color:rgba(255,210,58,.62); font-size:8.5px; letter-spacing:.12em;
+}
+.ps-seal-key { display:flex; align-items:center; gap:4px; margin-top:3px; overflow:hidden; }
+.ps-seal-key i {
+  flex:0 1 34px; height:2px;
+  background:linear-gradient(90deg,rgba(255,210,58,.12),rgba(255,210,58,.7),rgba(255,210,58,.12));
+  background-size:200% 100%;
+  animation:psSealScan 2.4s linear infinite;
+}
+.ps-seal-key i:nth-child(2) { flex-basis:21px; animation-delay:-.7s; }
+.ps-seal-key i:nth-child(3) { flex-basis:11px; animation-delay:-1.3s; }
+.ps-seal-key em {
+  margin-left:4px; color:rgba(255,210,58,.55); font-style:normal;
+  font-size:7.5px; letter-spacing:.12em; white-space:nowrap;
+}
+@keyframes psSealScan {
+  from { background-position:100% 0; }
+  to { background-position:-100% 0; }
+}
+
+/* BAND 3 — THE PROTOCOL. Three counts, baseline-aligned so the numerals read as
+   a row of values rather than three stacked captions. */
+.ps-protocol {
+  display:grid; grid-template-columns:repeat(3,1fr); margin-top:14px;
+  border:1px solid rgba(255,210,58,.2); background:rgba(42,34,7,.12);
+}
+.ps-protocol div {
+  min-width:0; padding:11px 14px 10px; display:flex; align-items:baseline; gap:8px;
+}
+.ps-protocol div + div { border-left:1px solid rgba(255,210,58,.14); }
+.ps-protocol b {
+  color:#ffd23a; font-family:'Orbitron','IoskeleyMono',monospace;
+  font-size:20px; font-weight:600;
+}
+.ps-protocol span { color:#91b7b0; font-size:9.5px; letter-spacing:.11em; }
+.ps-directive { margin:11px 2px 0; max-width:78ch; color:#b7d5cf; font-size:13px; line-height:1.5; }
+
+/* BAND 4's label — a ruled line with the rule on the right, which is what the
+   band's old centred caption became. The border-top is the band separator the
+   deleted .ps-tools rule used to carry. */
+.ps-section-line {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-top:15px; padding-top:11px; border-top:1px solid rgba(47,214,214,.16);
+  color:#2fd6d6; font-size:11px; letter-spacing:.16em;
+}
+.ps-section-line i {
+  color:rgba(255,210,58,.58); font-style:normal; font-size:9px; letter-spacing:.13em;
+}
+
+/* THE DESK, FULL PANEL WIDTH. Inside the deleted copy column it was 460px of a
+   756px panel, which left the five portraits crowded on the right while the space
+   under the record sat empty; out here a cast list gets the wide row it wants.
+   CENTRED, AND BIGGER (author: "maybe the analyst images could be larger and/or
+   centered") — both, and they need each other: 52px portraits left-aligned read
+   as a footnote to the copy above them, and this band is not a footnote. It is
+   the interface for the next four minutes. */
+.ps-tools { margin-top:10px; }
+.ps-draw-row { display:flex; gap:9px; flex-wrap:wrap; justify-content:center; }
 
 /* THE DESK, as people rather than card faces. Not buttons: on the briefing
    these introduce the four, and the sendable version is SeatRow on the floor.
@@ -1003,22 +1451,53 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    column it started 292px in from the panel's left edge, and since the record is
    shorter than the copy the bottom-left quadrant was empty under it. One action
    for the whole briefing should span the whole briefing. */
+/* THE INGOT. It was a flat top-lit gold slab in Bebas — the same button every
+   site ships — and the flat surface replaced it with a bar that is lit ACROSS
+   rather than down, bevelled at opposite corners like the housing above it, and
+   ruled inside its own edge. Ported verbatim apart from the type size: one beat,
+   one button. Bebas is gone from it because Orbitron is the terminal's voice and
+   the record's letterhead is the only thing on the panel that should be Bebas. */
+/* STICKY TO THE FOOT OF THE PANEL, as .pf-cta-row is on the phone. The briefing
+   is ~660px of bands and 90vh on a 13" laptop is ~630, so the one button was the
+   thing that fell off the bottom — and it gets taller still at the reveal, when
+   the record grows terms and particulars (+19px). A briefing whose only action is
+   below the fold reads as a surface with nothing to press, which is the exact
+   report that put this CTA back (author, 2026-07-27).
+
+   The negative bottom and matching negative margin are what make it sit FLUSH
+   with the panel's padding edge instead of floating 18px above it: sticky offsets
+   are measured from the scrollport, which includes .ps-open's padding. */
 .ps-cta-row { flex-basis:100%; display:flex; align-items:center; gap:14px;
-  margin-top:16px; }
+  position:sticky; z-index:4; bottom:-18px;
+  margin:16px 0 -18px; padding:12px 0 18px;
+  background:linear-gradient(0deg, rgba(2,16,14,0.97) 74%, transparent); }
 .ps-cta-row .ps-lock {
+  position:relative; overflow:hidden;
   flex:1; width:auto; margin-top:0;
-  font-family:'Bebas Neue', Impact, sans-serif;
-  font-size:19px; letter-spacing:0.13em; padding:11px 13px;
-  color:#02100e; border:none;
-  background:linear-gradient(180deg,#ffe27a,#ffd23a 55%,#e8b620);
-  box-shadow:0 0 20px -4px rgba(255,210,58,.5), inset 0 1px 0 rgba(255,255,255,.5);
+  font-family:'Orbitron','IoskeleyMono',monospace;
+  font-size:17px; letter-spacing:0.13em; padding:15px 13px; text-align:center;
+  color:#07100d; border:1px solid rgba(255,210,58,.8);
+  background:linear-gradient(90deg,#3a2d05,#ffd23a 48%,#3a2d05);
+  text-shadow:0 1px rgba(255,255,255,.25);
+  box-shadow:0 0 24px rgba(255,210,58,.22), inset 0 0 22px rgba(255,255,255,.14);
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));
   transition:filter .18s ease, box-shadow .18s ease;
+}
+.ps-cta-row .ps-lock::after {
+  content:""; position:absolute; inset:5px; pointer-events:none;
+  border:1px solid rgba(5,15,12,.23);
 }
 .ps-cta-row .ps-lock:hover:not(:disabled) {
   filter:brightness(1.09);
-  box-shadow:0 0 28px -2px rgba(255,210,58,.7), inset 0 1px 0 rgba(255,255,255,.5);
+  box-shadow:0 0 34px rgba(255,210,58,.4), inset 0 0 22px rgba(255,255,255,.18);
 }
-.ps-cta-row .ps-lock:disabled { filter:saturate(.45) brightness(.8); cursor:default; }
+/* The clip-path eats an outline drawn on the border box, so focus has to be
+   offset clear of it — otherwise the ring is invisible at the four bevels. */
+.ps-cta-row .ps-lock:focus-visible { outline:1px solid #fff; outline-offset:3px; }
+.ps-cta-row .ps-lock:disabled {
+  background:#25312e; border-color:rgba(142,171,165,.28); color:#6d8781;
+  box-shadow:none; cursor:default;
+}
 
 
 /* .ps-open-name/.ps-open-sub are gone — the deal is named on the record, once. */
@@ -1103,14 +1582,57 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .ps-au-verdict { font-size:11.5px; color:#2fd6d6; margin-top:4px; letter-spacing:0.04em; }
 .ps-au-you { font-size:10.5px; color:#ffd23a; margin-top:3px; }
 
+/* SHORT VIEWPORTS — the briefing is ~760px tall at desktop metrics, and 90vh on
+   a 13" laptop is ~630. The panel scrolls, so nothing is unreachable, but the
+   thing that falls off the bottom is the ONE BUTTON, and a briefing whose only
+   action is below the fold reads as the surface having nothing to press — the
+   exact report that put this CTA back in the first place (author, 2026-07-27).
+
+   HEIGHT, NOT WIDTH. The bands are all full-width and fine at 800px; what runs
+   out on a laptop is vertical room, and keying this off max-width would compact
+   a tall narrow window that has no need of it. */
+@media (max-height: 820px) {
+  /* --seal-band can only come down to what .ps-seal-copy needs plus the 12px
+     the seal box gives back to the record's padding — ~78 + 12. The frame shrinks
+     to 62px so the two still centre on each other. --seal-top follows the shell's
+     smaller padding: 9 + 1 border + the same 32px header. */
+  .ps-open { --seal-band:92px; --seal-top:57px; }
+  .ps-market-rail span { padding:5px 13px; }
+  .ps-start-head { margin-top:7px; }
+  .ps-start-head h1 { margin:5px 0 5px; font-size:25px; }
+  .ps-start-head p { font-size:12px; }
+  .ps-record-shell { margin-top:9px; padding:24px 9px 8px; }
+  .ps-open .eng-frame { width:62px; }
+  /* Tracks .eng-frame: 9px shell padding + 11px body padding + 62px + 26px. */
+  .ps-sealed-state { left:108px; }
+  .ps-protocol { margin-top:9px; }
+  .ps-protocol div { padding:8px 14px 7px; }
+  .ps-protocol b { font-size:17px; }
+  .ps-directive { margin-top:9px; font-size:12px; }
+  .ps-section-line { margin-top:9px; padding-top:9px; }
+  .ps-face-pic { width:48px; height:48px; }
+  /* Only the top margin moves — the -18px bottom is the sticky flush offset and
+     tracks .ps-open's padding, not the band rhythm. */
+  .ps-cta-row { margin-top:10px; padding-top:9px; }
+  .ps-cta-row .ps-lock { font-size:15px; padding:11px 13px; }
+}
+
 @media (max-width: 860px) {
   /* The reading column and the dock stop competing for the width and stack. */
   .ps-readcol { width:calc(100% - 36px); right:18px; max-height:38vh; }
-  .ps-open { flex-direction:column; }
-  .ps-open-aside { border-left:none; padding-left:0; }
-  .ps-tool-hand { padding-left:0; border-left:none; }
-  .ps-tools { flex-direction:column; gap:12px; }
-  .ps-tool-who { border-right:none; padding-right:0; }
+  /* .ps-open-aside / .ps-tool-hand / .ps-tool-who went with the prose columns and
+     the tool-group wrappers — every briefing band is full width at every size
+     now, so the panel needs no direction flip here. What it DOES need is the head
+     scaled down: 34px Orbitron over two lines is ~26% of a short viewport. */
+  .ps-start-head h1 { font-size:26px; }
+  .ps-protocol b { font-size:17px; }
+  .ps-cta-row .ps-lock { font-size:15px; }
+  /* THE SEAL STOPS BEING AN OVERLAY. Its absolute box is measured off the record
+     at desktop metrics; below ~560px of panel the copy collides with the portrait.
+     Under the record it is still legible, and the record keeps its natural height
+     back because the body no longer has to reserve room beside it. */
+  .ps-open .eng:not(.in) .eng-body { height:auto; padding-bottom:12px; }
+  .ps-sealed-state { position:static; height:auto; margin:0 4px 10px; }
   .ps-pattern { flex-direction:column; align-items:center; text-align:center; }
   /* no room for a lower third beside a number — stack it */
   .ps-lower { flex-direction:column; align-items:stretch; gap:10px; text-align:center; }
