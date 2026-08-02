@@ -26,6 +26,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import TalkShowScene from "./TalkShowScene";
 import { EPISODES } from "./LTTvBroadcastPanel";
 import usePerfHud from "./PerfHud";
+import TerminalModuleHeader from "./TerminalModuleHeader";
 
 // Camera + aim carried over from the desktop talk-show pose (`talkShowPose` in
 // app/trade/page.js), pushed in for phone-sized real estate: the desktop shot is
@@ -248,17 +249,17 @@ export default function MobileTalkShow({ onExit }) {
 
   return (
     <div className={`mts-root ${wide ? "mts-wide" : ""}`} ref={rootRef}>
-      <div className="mts-header">
-        <span className="mts-title">
-          <span className="mts-mark">LT TV</span> // BROADCAST
-        </span>
-        <span className="mts-live">
-          <i className={`mts-dot ${playing ? "mts-dot-on" : ""}`} />
-          {playing ? "ON AIR" : `EP ${episode.number}`}
-        </span>
-      </div>
+      <TerminalModuleHeader
+        channel="LT TV"
+        mode="BROADCAST"
+        code={playing ? "ON AIR" : `EP ${episode.number}`}
+        accent="#ef62dc"
+        active={audioReady}
+        onBack={exit}
+      />
 
-      <div className="mts-stage">
+      <div className="mts-stage-shell">
+        <div className="mts-stage">
         <Canvas
           dpr={dprRef.current}
           camera={{ position: MOBILE_TALK_SHOW_CAM.position, near: 0.1, far: 100 }}
@@ -293,18 +294,24 @@ export default function MobileTalkShow({ onExit }) {
         {/* Scanline/vignette dressing, matched to TerminalBoot's CRT. */}
         <div className="mts-crt" />
 
-        {!audioReady && (
-          <div className="mts-overlay">
-            {voiceStatus === "failed" ? (
-              <>
-                <span className="mts-overlay-tag">SIGNAL LOST</span>
-                <button className="mts-retry" onClick={retry}>RETRY FEED</button>
-              </>
-            ) : (
-              <span className="mts-overlay-tag mts-blink">TUNING IN…</span>
-            )}
+          <div className="mts-stage-readout">
+            <span>CH 01 // LIVE FEED</span>
+            <span>{playing ? "● TRANSMITTING" : "● SIGNAL LOCKED"}</span>
           </div>
-        )}
+
+          {!audioReady && (
+            <div className="mts-overlay">
+              {voiceStatus === "failed" ? (
+                <>
+                  <span className="mts-overlay-tag">SIGNAL LOST</span>
+                  <button className="mts-retry" onClick={retry}>RETRY FEED</button>
+                </>
+              ) : (
+                <span className="mts-overlay-tag mts-blink">TUNING IN…</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mts-controls">
@@ -350,12 +357,13 @@ export default function MobileTalkShow({ onExit }) {
           </div>
         </div>
 
-        <div className="mts-rack" role="list" aria-label="Episodes">
+        <div className="mts-rack" role="group" aria-label="Episodes">
           {EPISODES.map((ep, i) => (
             <button
               key={ep.number}
-              role="listitem"
               className={`mts-rack-item ${i === episodeIndex ? "is-on" : ""}`}
+              aria-pressed={i === episodeIndex}
+              aria-label={`Episode ${ep.number}: ${ep.title}, ${ep.runtime}`}
               onClick={() => {
                 if (playing) stop();
                 setEpisodeIndex(i);
@@ -378,43 +386,38 @@ export default function MobileTalkShow({ onExit }) {
         </div>
       </div>
 
-      <button className="mts-exit" onClick={exit}>◀ TERMINAL</button>
-
       <style>{`
         .mts-root {
           position: absolute; inset: 0; display: flex; flex-direction: column;
-          background: radial-gradient(120% 80% at 50% 20%, rgba(10,40,38,0.4), transparent), #02100e;
-          color: #2fd6d6; font-family: 'Courier New', monospace; overflow: hidden; user-select: none;
+          background:
+            linear-gradient(90deg, rgba(41,58,65,0.32) 0 8px, transparent 8px calc(100% - 8px), rgba(41,58,65,0.32) calc(100% - 8px)),
+            radial-gradient(100% 65% at 50% 25%, rgba(10,53,49,0.38), transparent 72%),
+            #000706;
+          color: #2fd6d6; font-family: 'IoskeleyMono', 'Courier New', monospace;
+          overflow: hidden; user-select: none;
         }
-        .mts-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 14px 10px; font-size: 13px; letter-spacing: 0.05em; flex: 0 0 auto;
-        }
-        .mts-title { color: #5ff2f2; font-weight: bold; }
-        /* Network mark in the DESKTOP panel's own magenta (--magenta in
-           LTTvBroadcastPanel), so the two surfaces agree on what LT TV's colour
-           is, and the chrome picks up the magenta that's already in the set's
-           carpet. Deliberately the only magenta in this layout, and on the one
-           piece of large type: saturated magenta is the weakest neon on black
-           at the 9-12px the rest of these labels run at. */
-        .mts-mark {
-          color: #ef62dc;
-          text-shadow: 0 0 10px rgba(239, 98, 220, 0.45);
-        }
-        .mts-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.1em; }
-        .mts-dot { width: 7px; height: 7px; border-radius: 50%; background: #17564a; }
-        .mts-dot-on { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
-
         /* The broadcast panel. 4:3 rather than 16:9 — a third more height for
            the guests, while staying landscape enough to hold a two-shot (a
            portrait panel would force the camera so far back the set shrinks
            again). The modest pixel count is what pays for the live SitePal
            face, so this grows deliberately rather than filling the screen. */
+        .mts-stage-shell {
+          position: relative; flex: 0 0 auto; margin: 10px 11px 0;
+          padding: 8px;
+          background: linear-gradient(145deg, #172427, #071010 32%, #020504 78%);
+          border: 1px solid rgba(75,219,210,0.32);
+          box-shadow: 0 9px 22px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.025);
+          clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+        }
+        .mts-stage-shell::before {
+          content: ""; position: absolute; inset: 3px; pointer-events: none;
+          border: 1px solid rgba(239,98,220,0.18);
+        }
         .mts-stage {
           position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto;
-          border-top: 1px solid color-mix(in srgb, #2fd6d6 38%, transparent);
-          border-bottom: 1px solid color-mix(in srgb, #2fd6d6 38%, transparent);
+          border: 1px solid color-mix(in srgb, #ef62dc 62%, transparent);
           background: #000; overflow: hidden;
+          box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 0 16px rgba(239,98,220,0.08);
         }
 
         /* ROTATED (.mts-wide, set from the measured box — see the comment on
@@ -423,11 +426,13 @@ export default function MobileTalkShow({ onExit }) {
            the resize, so this is the same shot at full size, not a crop of it.
            Costs ~2.8× the portrait panel's pixels, which is why it's the
            rotate-to-opt-in state rather than the default. */
-        .mts-wide .mts-header {
+        .mts-wide .tmh-root {
           position: absolute; top: 0; left: 0; right: 0; z-index: 3;
-          background: linear-gradient(180deg, rgba(2,16,14,0.85), transparent);
+          background: linear-gradient(180deg, rgba(0,10,9,0.94), rgba(0,10,9,0.25));
         }
-        .mts-wide .mts-stage { flex: 1 1 auto; aspect-ratio: auto; min-height: 0; border: none; }
+        .mts-wide .mts-stage-shell { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; border: 0; }
+        .mts-wide .mts-stage-shell::before { display: none; }
+        .mts-wide .mts-stage { height: 100%; aspect-ratio: auto; min-height: 0; border: none; }
         .mts-wide .mts-controls {
           position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
           flex: 0 0 auto; flex-direction: row; align-items: center; justify-content: center; gap: 16px;
@@ -437,14 +442,18 @@ export default function MobileTalkShow({ onExit }) {
         .mts-wide .mts-play { width: auto; padding: 11px 22px; font-size: 13px; }
         .mts-wide .mts-caption { max-width: 40%; }
         .mts-wide .mts-rotate-hint { display: none; }
-        .mts-wide .mts-exit {
-          position: absolute; top: 8px; right: 14px; z-index: 4; margin: 0; padding: 8px 12px;
-        }
         .mts-crt {
           position: absolute; inset: 0; pointer-events: none;
           background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px),
                       radial-gradient(130% 100% at 50% 50%, transparent 58%, rgba(0,0,0,0.6));
         }
+        .mts-stage-readout {
+          position: absolute; z-index: 2; left: 9px; right: 9px; top: 8px;
+          display: flex; justify-content: space-between; gap: 10px;
+          color: #b9dcd6; font-size: 7px; letter-spacing: 0.14em;
+          text-shadow: 0 1px 3px #000;
+        }
+        .mts-stage-readout span:first-child { color: #ef62dc; }
         .mts-overlay {
           position: absolute; inset: 0; display: flex; flex-direction: column;
           align-items: center; justify-content: center; gap: 12px;
@@ -462,14 +471,15 @@ export default function MobileTalkShow({ onExit }) {
 
         /* Sits directly under the panel rather than centring itself in the
            leftover height — floating it in the middle of the dead space read
-           as a layout bug. The exit button takes the slack instead. */
+           as a layout bug. */
         .mts-controls {
           flex: 0 0 auto; display: flex; flex-direction: column;
-          align-items: center; justify-content: flex-start; gap: 10px; padding: 20px 16px 0;
+          align-items: center; justify-content: flex-start; gap: 7px; padding: 13px 16px 0;
         }
         .mts-play {
-          width: 100%; max-width: 320px; background: #061a18;
-          border: 1px solid color-mix(in srgb, #2fd6d6 45%, transparent);
+          width: 100%; max-width: none;
+          background: linear-gradient(90deg, #061412, #071b18 50%, #061412);
+          border: 1px solid color-mix(in srgb, #ef62dc 55%, transparent);
           color: #eafff9; font: inherit; font-size: 15px; font-weight: bold;
           letter-spacing: 0.08em; padding: 15px 13px; cursor: pointer;
           clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
@@ -485,14 +495,12 @@ export default function MobileTalkShow({ onExit }) {
         }
 
         /* ---- BOTTOM HALF (portrait only) ---- */
-        /* Scrolls rather than clips when squeezed. Same reasoning as the neuron
-           stage: the body is scroll-locked behind this overlay, so anything
-           that overflows is unreachable, not merely below the fold. On a short
-           phone the stage + controls + this block + EXIT can exceed the visible
-           viewport, and it must be this block that gives — never EXIT. */
+        /* Scrolls rather than clips when squeezed. The body is scroll-locked
+           behind this overlay, so anything that overflows is unreachable, not
+           merely below the fold. */
         .mts-below {
           flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column;
-          gap: 10px; padding: 14px 16px 0;
+          gap: 10px; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
           overflow-y: auto; overscroll-behavior: contain;
           -webkit-overflow-scrolling: touch;
         }
@@ -538,12 +546,12 @@ export default function MobileTalkShow({ onExit }) {
           clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
         }
         .mts-rack-item.is-on {
-          border-color: color-mix(in srgb, #4dffaa 70%, transparent);
+          border-color: color-mix(in srgb, #ef62dc 70%, transparent);
           color: #eafff9;
-          box-shadow: inset 0 0 18px color-mix(in srgb, #4dffaa 12%, transparent);
+          box-shadow: inset 0 0 18px color-mix(in srgb, #ef62dc 12%, transparent);
         }
         .mts-rack-no { color: #ffd23a; font-size: 10px; letter-spacing: 0.1em; }
-        .mts-rack-item.is-on .mts-rack-no { color: #4dffaa; }
+        .mts-rack-item.is-on .mts-rack-no { color: #ef62dc; }
         .mts-rack-title {
           font-size: 11px; line-height: 1.25; width: 100%;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -560,15 +568,11 @@ export default function MobileTalkShow({ onExit }) {
         /* The wide layout gives the whole screen to the broadcast. */
         .mts-wide .mts-below { display: none; }
 
-        .mts-exit {
-          /* margin-top:auto takes the leftover height, pinning EXIT to the
-             bottom instead of leaving a gap under the controls. */
-          flex: 0 0 auto; margin-top: auto;
-          margin-left: 14px; margin-right: 14px;
-          margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
-          background: none; border: 1px solid color-mix(in srgb, #2fd6d6 45%, transparent);
-          color: #2fd6d6; font: inherit; font-size: 12px; letter-spacing: 0.06em; padding: 10px; cursor: pointer;
-          clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+        .mts-play:focus-visible, .mts-retry:focus-visible, .mts-rack-item:focus-visible {
+          outline: 1px solid #effffc; outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mts-blink { animation: none; }
         }
       `}</style>
     </div>

@@ -22,6 +22,7 @@ import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 import NeuronScene from "./neuron/NeuronScene";
 import usePerfHud from "./PerfHud";
+import TerminalModuleHeader from "./TerminalModuleHeader";
 
 // Pulled back and wider than the pen's desktop pose — it ships a compact
 // variant for exactly this and these are those numbers.
@@ -63,12 +64,14 @@ export default function MobileNeuron({ onExit }) {
 
   return (
     <div className="mn-root">
-      <div className="mn-header">
-        <span className="mn-title">
-          <span className="mn-mark">NEURAL CATHEDRAL</span>
-        </span>
-        <span className="mn-id">NC-09</span>
-      </div>
+      <TerminalModuleHeader
+        channel="NEURAL CATHEDRAL"
+        mode="BIOFIELD"
+        code="NC-09"
+        accent="#00e5ff"
+        active
+        onBack={onExit}
+      />
 
       {/* The stage is also the trigger, and now the ONLY one — the pen's
           "Manual Override" button did exactly what tapping the field does, so
@@ -77,8 +80,9 @@ export default function MobileNeuron({ onExit }) {
           The pen bound pointerdown ON WINDOW, which inside the terminal would
           fire on every tap in the app — the tuner dials, TUNE IN, EXIT. Scoped
           to the canvas wrapper instead. */}
-      <div className="mn-stage" onPointerDown={fire}>
-        <Canvas
+      <div className="mn-stage-shell">
+        <div className="mn-stage" onPointerDown={fire}>
+          <Canvas
           dpr={dpr}
           camera={{ position: CAM_POSITION, fov: CAM_FOV, near: 0.1, far: 500 }}
           gl={{
@@ -134,9 +138,14 @@ export default function MobileNeuron({ onExit }) {
           </EffectComposer>
         </Canvas>
 
-        {perfReadout}
-        <div className="mn-scan" aria-hidden="true" />
-        <div className="mn-hint">{hud.firing ? "FIRING SEQUENCE…" : "TAP THE FIELD TO TRIGGER AN IMPULSE"}</div>
+          {perfReadout}
+          <div className="mn-scan" aria-hidden="true" />
+          <div className="mn-field-id">
+            <span>CH 03 // FIELD ARRAY</span>
+            <span>● LINK STABLE</span>
+          </div>
+          <div className="mn-hint">{hud.firing ? "FIRING SEQUENCE…" : "TAP THE FIELD TO TRIGGER AN IMPULSE"}</div>
+        </div>
       </div>
 
       <div className="mn-hud">
@@ -168,35 +177,40 @@ export default function MobileNeuron({ onExit }) {
         </div>
       </div>
 
-      <button className="mn-exit" onClick={onExit}>◀ TERMINAL</button>
-
       <style>{`
         .mn-root {
           position: absolute; inset: 0; display: flex; flex-direction: column;
-          background: #010204; color: #2fd6d6;
-          font-family: 'Courier New', monospace; overflow: hidden; user-select: none;
+          background:
+            linear-gradient(90deg, rgba(41,58,65,0.32) 0 8px, transparent 8px calc(100% - 8px), rgba(41,58,65,0.32) calc(100% - 8px)),
+            radial-gradient(90% 70% at 50% 42%, rgba(0,45,58,0.22), transparent 72%),
+            #000405;
+          color: #2fd6d6; font-family: 'IoskeleyMono', 'Courier New', monospace;
+          overflow: hidden; user-select: none;
         }
-        .mn-header {
-          flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 14px 10px; font-size: 13px; letter-spacing: 0.05em;
-        }
-        .mn-title { font-weight: bold; }
-        /* Same borrowed-accent rule as LT TV's wordmark: one large piece of
-           type carries the colour, none of the small labels do. */
-        .mn-mark { color: #00e5ff; text-shadow: 0 0 10px rgba(0, 229, 255, 0.45); }
-        .mn-id { font-size: 10px; letter-spacing: 0.14em; color: #2fd6d6; opacity: 0.6; }
 
         /* Takes the slack rather than claiming a fixed square. A 1:1 stage plus
-           the readout plus EXIT overflows a short phone (an SE's visible
+           the readout can overflow a short phone (an SE's visible
            viewport is ~500pt once Safari's chrome is up), and with the body
            scroll locked an overflow is unreachable, not merely awkward. Letting
-           the stage shrink means EXIT can never be pushed off. The scene is
-           roughly spherical, so it takes the aspect change without refitting. */
+           the stage shrink keeps the telemetry reachable. The scene is roughly
+           spherical, so it takes the aspect change without refitting. */
+        .mn-stage-shell {
+          position: relative; flex: 1 1 auto; min-height: 140px; margin: 10px 11px 0;
+          padding: 8px;
+          background: linear-gradient(145deg, #132229, #061012 34%, #020405 78%);
+          border: 1px solid rgba(0,229,255,0.3);
+          box-shadow: 0 9px 24px rgba(0,0,0,0.72), inset 0 0 0 1px rgba(255,255,255,0.025);
+          clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+        }
+        .mn-stage-shell::before {
+          content: ""; position: absolute; inset: 3px; z-index: 1; pointer-events: none;
+          border: 1px solid rgba(0,229,255,0.13);
+        }
         .mn-stage {
-          position: relative; width: 100%; flex: 1 1 auto; min-height: 140px;
-          border-top: 1px solid color-mix(in srgb, #00e5ff 30%, transparent);
-          border-bottom: 1px solid color-mix(in srgb, #00e5ff 30%, transparent);
+          position: relative; width: 100%; height: 100%;
+          border: 1px solid color-mix(in srgb, #00e5ff 48%, transparent);
           background: #010204; overflow: hidden; touch-action: pan-y;
+          box-shadow: inset 0 0 35px rgba(0,0,0,0.85), 0 0 18px rgba(0,229,255,0.08);
         }
         .mn-scan {
           position: absolute; inset: 0; pointer-events: none;
@@ -207,26 +221,38 @@ export default function MobileNeuron({ onExit }) {
           font-size: 9px; letter-spacing: 0.16em; color: #00e5ff; opacity: 0.55;
           pointer-events: none;
         }
+        .mn-field-id {
+          position: absolute; z-index: 2; left: 9px; right: 9px; top: 8px;
+          display: flex; justify-content: space-between; gap: 10px;
+          color: #76aaa9; font-size: 7px; letter-spacing: 0.14em;
+          text-shadow: 0 1px 3px #000; pointer-events: none;
+        }
+        .mn-field-id span:first-child { color: #00e5ff; }
 
-        .mn-hud { flex: 0 0 auto; padding: 12px 16px 0; display: flex; flex-direction: column; gap: 7px; }
+        .mn-hud {
+          flex: 0 0 auto; margin: 10px 11px calc(env(safe-area-inset-bottom, 0px) + 11px);
+          padding: 2px 10px 3px; display: grid; grid-template-columns: 1fr 1fr;
+          border: 1px solid rgba(0,229,255,0.18);
+          background: rgba(2,18,18,0.72);
+          clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+        }
         .mn-row {
           display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-          border-bottom: 1px solid rgba(0, 229, 255, 0.08); padding-bottom: 5px;
+          border-bottom: 1px solid rgba(0,229,255,0.08); padding: 7px 7px 6px;
         }
+        .mn-row:nth-child(odd) { border-right: 1px solid rgba(0,229,255,0.08); }
+        .mn-row:last-child { grid-column: 1 / -1; border-bottom: 0; border-right: 0; }
         .mn-label { font-size: 10px; letter-spacing: 0.1em; color: #2fd6d6; opacity: 0.55; }
         .mn-val { font-size: 12px; letter-spacing: 0.06em; color: #cfeee8; }
         .mn-val.is-hot { color: #ffaa00; text-shadow: 0 0 8px rgba(255,170,0,0.4); }
         .mn-val.is-cold { color: #ff0066; text-shadow: 0 0 8px rgba(255,0,102,0.4); }
 
-        .mn-exit {
-          flex: 0 0 auto;
-          margin-top: 12px;
-          margin-left: 14px; margin-right: 14px;
-          margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
-          background: none; border: 1px solid color-mix(in srgb, #2fd6d6 45%, transparent);
-          color: #2fd6d6; font: inherit; font-size: 12px; letter-spacing: 0.06em;
-          padding: 10px; cursor: pointer;
-          clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+        @media (max-height: 620px) {
+          .mn-stage-shell { margin-top: 7px; }
+          .mn-hud { margin-top: 7px; }
+          .mn-row { padding-top: 5px; padding-bottom: 4px; }
+          .mn-label { font-size: 8px; }
+          .mn-val { font-size: 10px; }
         }
       `}</style>
     </div>

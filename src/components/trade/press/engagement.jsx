@@ -118,17 +118,19 @@ const REVEAL = 0.42;  // the dossier
 export const EngagementRecord = React.forwardRef(function EngagementRecord(
   { arrived = false, client = null, surface = null, ticker = null, chain = null,
     shieldRef = null, clientRef = null, termsRef = null, particularsRef = null,
-    stampRetainedRef = null }, ref) {
+    stampRetainedRef = null, title = "Engagement Record",
+    restStatus = "AVAILABLE", arrivedStatus = "RETAINED",
+    stampLabel = "Retained" }, ref) {
   return (
     <div className={`eng${arrived ? " in" : ""}`} ref={ref}>
       <div className="eng-head">
-        <span className="eng-title">Engagement Record</span>
+        <span className="eng-title">{title}</span>
         {/* THE ONE STATUS LABEL. The console shipped alongside four others —
             NOT IN YET, AWAITING TRAFFIC, the block glyphs, "still coded" and
             NOTHING ON THE TABLE YET, all on screen together, which reads as a
             surface that has hung rather than one that is waiting. Anything that
             wants to say "not yet" on this panel says it here or not at all. */}
-        <span className="eng-status">{arrived ? "RETAINED" : "AVAILABLE"}</span>
+        <span className="eng-status">{arrived ? arrivedStatus : restStatus}</span>
       </div>
 
       {/* THREE COLUMNS, ONE DOCUMENT: who is pitching, what they signed, and the
@@ -215,7 +217,7 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
       </div>
 
       <span className="eng-stamp retained" ref={stampRetainedRef} aria-hidden={!arrived}>
-        Retained
+        {stampLabel}
       </span>
     </div>
   );

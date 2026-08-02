@@ -21,6 +21,7 @@ import { createFlatEvidenceScreen } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, SeatRow, Meter, Nav, PRESS_UI_CSS,
 } from "./pressUi";
+import TerminalModuleHeader from "../TerminalModuleHeader";
 
 // THE VC GAME — flat presentation. No WebGL, portrait-first.
 //
@@ -415,15 +416,25 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
   /* ------------------------------------------------------------------ */
   return (
-    <div className="pf-wrap">
+    <div className={`pf-wrap${started ? " is-started" : ""}`}>
       <style>{CSS}</style>
 
-      <div className="pf-bar">
-        <button className="pf-exit" onClick={onExit}>◀ EXIT</button>
-        {/* The bar names the deal only once the deal has a face. */}
-        <span className="pf-tick">{identity ? deal.ticker : "· · ·"}</span>
-        <span className="pf-book">BOOK <b>{Math.round(run.book)}</b></span>
-      </div>
+      <TerminalModuleHeader
+        channel="THE VC GAME"
+        mode="DEAL SIM"
+        code={`BOOK ${Math.round(run.book)}`}
+        accent="#ffd23a"
+        active
+        onBack={onExit}
+      />
+
+      {!started && (
+        <div className="pf-market-rail" aria-label="Deal simulation status">
+          <span><i>MANDATE</i>{identity ? deal.ticker : "PENDING"}</span>
+          <span><i>ACCESS</i>GUEST</span>
+          <span><i>MODE</i>LIVE SIM</span>
+        </div>
+      )}
 
       {/* ---------- the briefing ----------
           NOTHING HERE MAY NAME THE DEAL BEFORE THE DICE STOP (invariant 7).
@@ -436,11 +447,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           unlike the 3D view's pointer-events:none root; the handler sits on
           the column and no-ops once the roll is done. */}
       {!started && (
-        <div className={`pf-scroll${rolled ? " is-rolled" : ""}`} ref={scrollRef}
+        <div className={`pf-scroll pf-start${rolled ? " is-rolled" : ""}`} ref={scrollRef}
              onClick={skipRoll}>
           {/* See the note on this line in PressSession — the top bar already
               says "one deal", and "on the table" is left over from the cards. */}
-          <div className="pf-eyebrow">YOUR NEXT APPOINTMENT</div>
+          <div className="pf-start-head">
+            <div className="pf-eyebrow">CH 02 // INCOMING MANDATE</div>
+            <h1>READ THE DEAL.<br /><span>CALL THE BLUFF.</span></h1>
+            <p>One pitch. Three interruptions. Decide whether it deserves your book.</p>
+          </div>
           {/* THE PANEL NO LONGER NAMES THE DEAL HERE. A 20px headline, a subtitle
               restating the ticker, and the sheet below all printed the same
               instance — and the headline was the thing that animated, which put
@@ -452,15 +467,41 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               different one without leaving and coming back. See engagement.jsx
               for the five props that held this slot before it, and why the sixth
               is paperwork rather than another machine. */}
-          <EngagementRecord
-            arrived={identity}
-            client={identity ? deal.name : null}
-            surface={identity ? deal.surface : null}
-            ticker={identity ? deal.ticker : null}
-            chain={identity ? deal.chain : null}
-            ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
-            termsRef={termsRef} particularsRef={particularsRef}
-            stampRetainedRef={stampRetainedRef} />
+          <div className="pf-record-shell">
+            <div className="pf-record-readout">
+              <span>DEAL INTAKE</span>
+              <span>{identity ? "● BRIEF RELEASED" : "○ AWAITING REVIEW"}</span>
+            </div>
+            <EngagementRecord
+              arrived={identity}
+              title={identity ? "Deal Brief" : "Inbound Deal"}
+              restStatus="AWAITING REVIEW"
+              arrivedStatus="MEETING SET"
+              stampLabel="Meeting Set"
+              client={identity ? deal.name : null}
+              surface={identity ? deal.surface : null}
+              ticker={identity ? deal.ticker : null}
+              chain={identity ? deal.chain : null}
+              ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
+              termsRef={termsRef} particularsRef={particularsRef}
+              stampRetainedRef={stampRetainedRef} />
+            {!identity && (
+              <div className="pf-sealed-state" aria-label="Client details are sealed">
+                <div className="pf-seal-code" aria-hidden="true">
+                  <span>02</span>
+                  <i />
+                </div>
+                <div className="pf-seal-copy">
+                  <b>CLIENT // SEALED</b>
+                  <span className="pf-seal-source">SOURCE // COMMISSIONED AGENT</span>
+                  <span>Review the file to release terms and particulars.</span>
+                  <div className="pf-seal-key" aria-hidden="true">
+                    <i /><i /><i /><em>INBOUND FILE</em>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           {/* THE CAPTION IS GONE (author, 2026-07-29: "this line seems
               unnecessary"). It read SENT DOWN TO YOU · YOU DON'T GET TO ASK WHY
               THIS ONE, and it was load-bearing exactly once — against the dice,
@@ -477,20 +518,24 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               the bot took over the selling and Barron joined the desk; and then
               "an agent is here for a client who didn't come", cut the same day for
               pointing at the absence instead of the incentive (engagement.jsx). */}
-          <p className="pf-copy">
-            A pitch bot is here to present its client&apos;s deal. It works on
-            commission &mdash; it gets paid if you fund this.
-          </p>
-          <p className="pf-copy gold">
-            You can interrupt <b>three times</b>. Whatever it can back lands on a
-            screen. Whatever it can&apos;t, doesn&apos;t.
+          <div className="pf-protocol" aria-label="Meeting protocol">
+            <div><b>03</b><span>INTERRUPTS</span></div>
+            <div><b>04</b><span>ANALYSTS</span></div>
+            <div><b>01</b><span>FINAL CALL</span></div>
+          </div>
+          <p className="pf-directive">
+            The pitch bot is paid only if you fund the deal. Send one analyst
+            per interruption; anything verifiable lands on-screen.
           </p>
           {/* Portraits, not card faces. Not buttons either: on the briefing
               these introduce the four, and the sendable version of the same
               row is SeatRow on the floor. */}
           {/* See PressSession — "always these four" answered a question the
               rotating-cast cut [A§17] deleted. */}
-          <div className="pf-label">YOUR ANALYSTS</div>
+          <div className="pf-section-line">
+            <span>YOUR ANALYST DESK</span>
+            <i>ONE ANSWER EACH</i>
+          </div>
           <div className="pf-strip">
             {DESK_ORDER.map((m) => (
               <div key={m.id} className="pf-face">
@@ -513,22 +558,6 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               <span className="pf-face-note">NOT A SEAT</span>
             </div>
           </div>
-          {/* THE SWAP CELL IS GONE. The dossier used to be a separate panel whose
-              REST state was a bordered box reading "DECODING PENDING", so it was
-              paired with the house rules in one grid area and cross-faded. The
-              particulars now live inside the record (author: "the pitch project is
-              in 2 separate boxes"), whose stat rows show —— from the start — so
-              nothing has an empty rest state and the rules are just copy. */}
-          <div className="pf-brief">
-            <div className="pf-brief-h">HOW YOUR ANALYSTS WORK</div>
-            <p className="pf-copy sm dim">
-              Every analyst will answer anything you ask. Each has <b>one</b>{" "}
-              subject they go deep on, and each answers <b>once</b>. Ask the
-              wrong one and you still get an answer &mdash; just the shallow one,
-              and they&apos;re spent.
-            </p>
-          </div>
-
           {/* ONE BUTTON — a LOCAL/DAILY split lived here briefly and was cut.
               See the note in instanceDeal.js. */}
           <div className="pf-cta-row">
@@ -536,7 +565,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                     onClick={rolled ? begin : runRoll}>
               {/* See the note on this line in PressSession — SEND IT IN was
                   strange wording ("it" named nothing), [A§11] and [A§20]. */}
-              {rolled ? "HEAR THE PITCH ▸" : rolling ? "SIGNING…" : "TAKE THE MEETING ▸"}
+              {rolled ? "HEAR THE PITCH ▸" : rolling ? "OPENING…" : "REVIEW THIS DEAL ▸"}
             </button>
           </div>
         </div>
@@ -738,7 +767,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 // long as its children are self-sizing.
 const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-wrap { position:absolute; inset:0; display:flex; flex-direction:column;
-  background:#02100e; color:#eafff9; font-family:'Courier New', monospace;
+  background:
+    linear-gradient(90deg, rgba(41,58,65,.32) 0 8px, transparent 8px calc(100% - 8px), rgba(41,58,65,.32) calc(100% - 8px)),
+    radial-gradient(100% 60% at 50% 24%, rgba(68,53,8,.18), transparent 72%),
+    #000706;
+  color:#eafff9; font-family:'IoskeleyMono','Courier New',monospace;
   overflow:hidden;
   /* PORTRAIT-FIRST, at any width. On a phone this is the whole screen; on
      desktop (?flat=1) it centres as a phone-shaped column with the room's
@@ -748,6 +781,186 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   border-left:1px solid rgba(47,214,214,0.16);
   border-right:1px solid rgba(47,214,214,0.16); }
 @media (max-width:560px) { .pf-wrap { border:none; } }
+
+.pf-market-rail {
+  flex:none; display:grid; grid-template-columns:1.1fr .85fr 1fr;
+  margin:9px 11px 0; border:1px solid rgba(47,214,214,.18);
+  background:rgba(2,18,17,.72);
+  clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));
+}
+.pf-market-rail span {
+  min-width:0; padding:7px 9px; color:#b9d8d3;
+  font-size:8px; letter-spacing:.1em; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis;
+}
+.pf-market-rail span + span { border-left:1px solid rgba(47,214,214,.12); }
+.pf-market-rail i {
+  display:block; margin-bottom:2px; color:rgba(47,214,214,.5);
+  font-style:normal; font-size:6.5px; letter-spacing:.17em;
+}
+.pf-market-rail span:first-child { color:#ffd23a; }
+
+.pf-scroll {
+  flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; padding:14px 14px calc(18px + env(safe-area-inset-bottom,0px));
+}
+.pf-scroll.center { display:flex; flex-direction:column; justify-content:center; text-align:center; }
+.pf-label { margin:10px 0 7px; color:#2fd6d6; font-size:10px; letter-spacing:.16em; }
+.pf-copy { margin:8px 0; color:#c8e5df; font-size:12px; line-height:1.48; }
+.pf-copy.sm { font-size:10.5px; }
+.pf-copy.dim { color:rgba(200,229,223,.58); }
+.pf-copy.gold { color:#ffd23a; }
+
+/* START SCREEN — a mandate intake terminal, not a document page. */
+.pf-start { padding-top:13px; }
+.pf-start-head { position:relative; margin:0 0 12px; padding:0 2px; }
+.pf-eyebrow {
+  color:#ffd23a; font-size:8px; letter-spacing:.2em;
+}
+.pf-start-head h1 {
+  margin:6px 0 5px; font-family:'Orbitron','IoskeleyMono',monospace;
+  color:#eafff9; font-size:20px; line-height:1.06; letter-spacing:.04em;
+  font-weight:700;
+}
+.pf-start-head h1 span {
+  color:#ffd23a; text-shadow:0 0 15px rgba(255,210,58,.22);
+}
+.pf-start-head p {
+  margin:0; max-width:330px; color:#81aaa4; font-size:9.5px;
+  line-height:1.4; letter-spacing:.035em;
+}
+
+.pf-record-shell {
+  position:relative; padding:22px 8px 8px;
+  border:1px solid rgba(47,214,214,.3);
+  background:linear-gradient(145deg,#19211f,#08100f 34%,#020504 78%);
+  box-shadow:0 9px 22px rgba(0,0,0,.65),inset 0 0 0 1px rgba(255,255,255,.025);
+  clip-path:polygon(0 0,calc(100% - 11px) 0,100% 11px,100% 100%,11px 100%,0 calc(100% - 11px));
+}
+.pf-record-shell::before {
+  content:""; position:absolute; inset:3px; pointer-events:none;
+  border:1px solid rgba(255,210,58,.12);
+}
+.pf-record-readout {
+  position:absolute; z-index:2; left:10px; right:10px; top:7px;
+  display:flex; justify-content:space-between; gap:8px;
+  color:#ffd23a; font-size:6.5px; letter-spacing:.15em;
+}
+.pf-record-readout span:last-child { color:#76aaa3; }
+
+/* The record remains a document, but now sits inside the same spectral glass
+   housing as the other channel displays. */
+.pf-start .eng {
+  border-color:rgba(255,210,58,.24); border-left-color:rgba(239,98,220,.65);
+  background:
+    repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px),
+    linear-gradient(180deg,rgba(8,26,23,.92),rgba(1,10,9,.94));
+}
+.pf-start .eng.in { border-color:rgba(255,210,58,.48); }
+.pf-start .eng-title {
+  font-family:'Orbitron','IoskeleyMono',monospace; font-size:11px;
+}
+.pf-start .eng-body { gap:10px; padding:10px 10px 0; }
+.pf-start .eng-frame { width:62px; }
+.pf-start .eng-terms { flex-basis:145px; }
+.pf-start .eng-client { font-size:14px; }
+.pf-start .eng-stats { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; }
+.pf-start .eng-stats dt { width:45px; }
+.pf-start .eng-particulars { flex-basis:100%; }
+
+/* Before the meeting is accepted, this is a sealed mandate rather than an
+   empty completed form. The real terms and particulars remain mounted for the
+   arrival timeline, but leave the flow until identity is released. */
+.pf-start .eng:not(.in) { min-height:122px; padding-bottom:7px; }
+.pf-start .eng:not(.in) .eng-body {
+  height:80px; align-items:center; padding-bottom:0;
+}
+.pf-start .eng:not(.in) .eng-terms,
+.pf-start .eng:not(.in) .eng-particulars {
+  position:absolute; width:1px; height:1px; opacity:0; visibility:hidden; overflow:hidden;
+  pointer-events:none;
+}
+.pf-start .eng:not(.in) .eng-idents {
+  position:absolute; width:1px; height:1px; opacity:0; visibility:hidden; overflow:hidden;
+}
+.pf-sealed-state {
+  position:absolute; z-index:3; left:104px; right:17px; top:63px;
+  display:flex; align-items:center; gap:10px; min-width:0;
+  pointer-events:none;
+}
+.pf-seal-code {
+  position:relative; flex:none; width:34px; height:44px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,210,58,.3);
+  color:#ffd23a; font-family:'Orbitron','IoskeleyMono',monospace;
+  font-size:10px; letter-spacing:.08em;
+  clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%);
+}
+.pf-seal-code::after {
+  content:""; position:absolute; inset:4px;
+  border:1px solid rgba(239,98,220,.16);
+}
+.pf-seal-code i {
+  position:absolute; left:7px; right:7px; bottom:7px; height:1px;
+  background:#ef62dc; box-shadow:0 0 7px rgba(239,98,220,.5);
+}
+.pf-seal-copy { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.pf-seal-copy > b {
+  color:#ef62dc; font-size:8px; letter-spacing:.15em;
+  text-shadow:0 0 9px rgba(239,98,220,.25);
+}
+.pf-seal-copy > span {
+  max-width:185px; color:#8db1aa; font-size:7.5px; line-height:1.35;
+  letter-spacing:.035em;
+}
+.pf-seal-copy > .pf-seal-source {
+  color:rgba(255,210,58,.62); font-size:6.2px; letter-spacing:.12em;
+}
+.pf-seal-key {
+  display:flex; align-items:center; gap:3px; margin-top:2px; overflow:hidden;
+}
+.pf-seal-key i {
+  flex:0 1 25px; height:2px;
+  background:linear-gradient(90deg,rgba(255,210,58,.12),rgba(255,210,58,.7),rgba(255,210,58,.12));
+  background-size:200% 100%;
+  animation:pfSealScan 2.4s linear infinite;
+}
+.pf-seal-key i:nth-child(2) { flex-basis:15px; animation-delay:-.7s; }
+.pf-seal-key i:nth-child(3) { flex-basis:8px; animation-delay:-1.3s; }
+.pf-seal-key em {
+  margin-left:3px; color:rgba(255,210,58,.55); font-style:normal;
+  font-size:5.5px; letter-spacing:.12em; white-space:nowrap;
+}
+@keyframes pfSealScan {
+  from { background-position:100% 0; }
+  to { background-position:-100% 0; }
+}
+
+.pf-protocol {
+  display:grid; grid-template-columns:repeat(3,1fr); margin-top:10px;
+  border:1px solid rgba(255,210,58,.2); background:rgba(42,34,7,.12);
+}
+.pf-protocol div {
+  min-width:0; padding:8px 7px 7px; display:flex; align-items:baseline;
+  gap:5px;
+}
+.pf-protocol div + div { border-left:1px solid rgba(255,210,58,.14); }
+.pf-protocol b {
+  color:#ffd23a; font-family:'Orbitron','IoskeleyMono',monospace;
+  font-size:12px; font-weight:600;
+}
+.pf-protocol span { color:#91b7b0; font-size:6.5px; letter-spacing:.11em; }
+.pf-directive {
+  margin:8px 2px 11px; color:#b7d5cf; font-size:9.5px; line-height:1.45;
+}
+.pf-section-line {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding-top:8px; border-top:1px solid rgba(47,214,214,.16);
+  color:#2fd6d6; font-size:8px; letter-spacing:.16em;
+}
+.pf-section-line i {
+  color:rgba(255,210,58,.58); font-style:normal; font-size:6.5px;
+}
 
 /* THE DESK STRIP. These had NO CSS AT ALL until 2026-07-29 — .pf-strip and
    .pf-face existed only as class names, so the four portraits fell back to
@@ -762,33 +975,28 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 
 /* The house rules, as plain copy. Their block used to share a grid cell with the
    dossier; the dossier moved inside the record, so the cell went with it. */
-.pf-brief { border-left:2px solid rgba(255,210,58,0.3); padding-left:10px;
-  margin:12px 0 2px; }
-.pf-brief-h { font-size:8.5px; letter-spacing:0.2em; font-weight:bold;
-  color:rgba(255,210,58,0.8); margin-bottom:5px; }
-
 /* .pf-roll-cap went with the caption it styled. */
-.pf-strip { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 2px; min-width:0; }
-.pf-face { flex:0 1 72px; min-width:0; max-width:72px;
+.pf-strip { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; margin:7px 0 0; min-width:0; }
+.pf-face { min-width:0;
   display:flex; flex-direction:column;
   align-items:center; gap:3px; text-align:center; }
-.pf-face-pic { width:44px; height:44px; object-fit:cover; border-radius:50%;
-  border:1px solid rgba(47,214,214,0.35); background:#020f0d; }
+.pf-face-pic { width:40px; height:40px; object-fit:cover; border-radius:50%;
+  border:1px solid rgba(47,214,214,0.35); background:#020f0d;
+  box-shadow:0 0 12px rgba(47,214,214,.08); }
 /* Two lines reserved for every name — "Detective Marisol" wraps and the others
    don't, which would drop her role label a line below everyone else's. */
-.pf-face-who { font-size:8px; font-weight:bold; letter-spacing:0.03em;
+.pf-face-who { font-size:7px; font-weight:bold; letter-spacing:0.02em;
   color:rgba(234,255,249,0.92); line-height:1.2; min-height:2.4em;
   display:flex; align-items:center; justify-content:center; }
-.pf-face-role { font-size:7px; letter-spacing:0.1em; color:rgba(255,210,58,0.75); }
+.pf-face-role { font-size:5.8px; letter-spacing:0.08em; color:rgba(255,210,58,0.75); }
 
 /* VIRGIL, at the end of the strip and set apart from it on purpose — not a seat,
    no lane, cannot be sent. The divider carries that; don't tidy it away. */
-.pf-face-div { flex:none; align-self:center; width:1px; height:38px;
-  background:rgba(234,255,249,0.16); margin:0 2px; }
+.pf-face-div { display:none; }
 .pf-face-cat .pf-face-pic { border-color:rgba(191,238,222,0.5); }
 .pf-face-cat .pf-face-who { color:#bfeede; }
 .pf-face-cat .pf-face-role { color:rgba(191,238,222,0.75); }
-.pf-face-note { font-size:7px; letter-spacing:0.11em;
+.pf-face-note { font-size:5.5px; letter-spacing:0.08em;
   color:rgba(191,238,222,0.5); margin-top:1px; }
 
 /* The directive under his answer. Static — the tab does the attracting, and
@@ -798,6 +1006,7 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   color:#2fd6d6; font:bold 10px/1.2 'Courier New',monospace; letter-spacing:0.11em;
   padding:10px 8px; }
 @media (prefers-reduced-motion:reduce) {
+  .pf-seal-key i { animation:none; }
   .pf-tabs button.look { animation:none; background:rgba(47,214,214,0.20);
     box-shadow:0 0 15px rgba(47,214,214,0.45); }
 }
@@ -842,6 +1051,11 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   border-top:1px solid rgba(47,214,214,0.25); background:rgba(2,16,14,0.96); }
 /* keeps the hand accounted for in the beats where the strip isn't shown */
 
+.pf-cta-row {
+  position:sticky; z-index:4; bottom:calc(-18px - env(safe-area-inset-bottom,0px));
+  margin:4px 0 -18px; padding:12px 0 calc(18px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(0deg,#000706 72%,transparent);
+}
 .pf-btn { background:rgba(2,16,14,0.9); border:1px solid rgba(47,214,214,0.5); color:#2fd6d6;
   font:inherit; font-size:11.5px; letter-spacing:0.09em; padding:12px 14px; cursor:pointer;
   display:block; width:100%; }
@@ -857,6 +1071,25 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   box-shadow:0 0 16px rgba(255,45,111,0.38); }
 .pf-btn.primary:disabled { background:rgba(120,120,120,0.35); box-shadow:none; color:rgba(255,255,255,0.5); }
 .pf-btn:not(.primary) { margin-top:8px; }
+.pf-start .pf-btn.primary {
+  position:relative; overflow:hidden;
+  background:linear-gradient(90deg,#3a2d05,#ffd23a 48%,#3a2d05);
+  border:1px solid rgba(255,210,58,.8); color:#07100d;
+  font-family:'Orbitron','IoskeleyMono',monospace; font-size:12px;
+  text-shadow:0 1px rgba(255,255,255,.25);
+  box-shadow:0 0 20px rgba(255,210,58,.2),inset 0 0 18px rgba(255,255,255,.14);
+  clip-path:polygon(0 0,calc(100% - 11px) 0,100% 11px,100% 100%,11px 100%,0 calc(100% - 11px));
+}
+.pf-start .pf-btn.primary::after {
+  content:""; position:absolute; inset:4px; border:1px solid rgba(5,15,12,.23);
+  pointer-events:none;
+}
+.pf-start .pf-btn.primary:focus-visible {
+  outline:1px solid #fff; outline-offset:2px;
+}
+.pf-start .pf-btn.primary:disabled {
+  background:#25312e; border-color:rgba(142,171,165,.28); color:#6d8781;
+}
 
 .pf-slider { width:100%; max-width:420px; accent-color:#ff2d6f; }
 .pf-ends { display:flex; justify-content:space-between; width:100%; max-width:420px;
