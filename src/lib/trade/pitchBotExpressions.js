@@ -138,6 +138,15 @@ const state = {
   originals: new Map(),
   /** name of the plate every other plate was snapped to. */
   alignedTo: null,
+  /**
+   * Blanket suppression of every plate — the cast's, not the game's.
+   *
+   * SEPARATE FROM THE TIERS on purpose. manual/pressure/clip all answer "which
+   * face"; this answers "any face at all", and it belongs to the arrival rather
+   * than to the character. Folding it into resolveExpression would mean every
+   * tier had to know about a state none of them cause.
+   */
+  suppressed: false,
 };
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : 0);
@@ -603,6 +612,19 @@ function resolveExpression() {
  */
 function renderFace() {
   if (state.layers.size === 0) return;
+
+  if (state.suppressed) {
+    for (const byName of state.layers.values()) {
+      for (const nodes of byName.values()) {
+        for (let i = 0; i < nodes.length; i++) nodes[i].visible = false;
+      }
+    }
+    for (const nodes of state.visemes.values()) {
+      for (let i = 0; i < nodes.length; i++) nodes[i].visible = false;
+    }
+    return;
+  }
+
   const expr = resolveExpression();
   state.current = expr;
 
@@ -786,6 +808,24 @@ export function getPitchBotMouth() {
   };
 }
 
+/**
+ * Hide or show EVERY plate at once — used by the cast while the body is still
+ * fading in, so the LED face does not arrive a beat ahead of the figure it is on.
+ *
+ * Cheap to call every frame: it early-returns unless the flag actually changed,
+ * so the per-frame driver needs no edge detection of its own.
+ */
+export function setPitchBotFaceHidden(hidden) {
+  const next = !!hidden;
+  if (state.suppressed === next) return false;
+  state.suppressed = next;
+  // Force a repaint on the way back: renderFace short-circuits while suppressed,
+  // so `current` is stale and the usual no-change guard would skip the restore.
+  if (!next) state.current = null;
+  renderFace();
+  return true;
+}
+
 /** Fire a blink now, for inspection. */
 export function blinkPitchBot() {
   if (!state.blinkSpec) return false;
@@ -834,6 +874,7 @@ export function disposePitchBotExpressions() {
   state.layerOverrides.clear();
   state.originals.clear();
   state.alignedTo = null;
+  state.suppressed = false;
 }
 
 /**

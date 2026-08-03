@@ -502,7 +502,7 @@ export function Nav({ lastClaim, pressed, onAdvance, onCallIt }) {
         <button className="pu-btn primary" onClick={onCallIt}>THAT'S THE PITCH — CALL IT ▸</button>
       ) : (
         <>
-          <button className={`pu-btn${pressed ? " primary" : ""}`} onClick={onAdvance}>LET HIM GO ON ▸</button>
+          <button className={`pu-btn${pressed ? " primary" : ""}`} onClick={onAdvance}>LET PITCHBOT CONTINUE ▸</button>
           <button className="pu-btn amber" onClick={onCallIt}>CALL IT</button>
         </>
       )}

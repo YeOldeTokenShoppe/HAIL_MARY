@@ -8,6 +8,7 @@
 // four-character layer here instead of into the archetypes.
 
 import { LANES, PITCHER, SEATS, SHAPES, inLane } from "./questions.js";
+import { pitcherPortrait, pitcherVoice } from "./pitchers";
 
 /**
  * THE PITCH BOT — the thing you press. Not a seat, not staff, not yours.
@@ -40,8 +41,19 @@ export const PITCH_BOT = {
   // on Barron's tile two seats apart in the same row — the cast-legibility
   // failure this whole refactor exists to fix. SeatRow still falls back to a
   // glyph if this is ever null; a borrowed face is never an acceptable fallback.
-  portrait: "/pitchBot.webp",
-  voice: "PB",
+  /**
+   * A GETTER, so the four render sites (engagement, PressFlat, PressSession,
+   * pressUi) keep reading `.portrait` and get the STAGED rig's face without any
+   * of them learning about variants.
+   *
+   * Resolved through press/pitchers — the same function lib/trade/pitchBotScene
+   * uses to decide which glb to load, so the tile and the thing in the beam
+   * cannot disagree. That module is deliberately three-free: this file is
+   * imported by PressFlat, which has no WebGL at all.
+   */
+  get portrait() { return pitcherPortrait(); },
+  /** Also per-rig — see the note on `portrait`. */
+  get voice() { return pitcherVoice(); },
   clips: { idle: "idle", talking: "talking" },
   blurb: "Paid if you fund it. That is the entire relationship.",
 };

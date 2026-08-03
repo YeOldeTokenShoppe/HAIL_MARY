@@ -4472,7 +4472,7 @@ export default function CyborgTemple() {
           const TABS = [
             {
               key: 'services',
-              label: 'VC PARTNERS',
+              label: 'PITCH BOT',
               accent: '#2ad6ee',
               active: railExpanded,
               onClick: () => {

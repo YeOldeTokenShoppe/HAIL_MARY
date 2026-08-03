@@ -36,6 +36,104 @@ import { mulberry32 } from "../caseTable.js";
 // must never carry is its own script, because a script is where a tell would
 // hide.
 
+/* ────────────────────────────────────────────────────────────────────────────
+   WHO THE PITCHER IS — identity, as opposed to how it renders.
+
+   THIS FILE IS PURE ON PURPOSE. It is imported by desk.js, which is imported by
+   PressFlat — the flat, no-WebGL surface. lib/trade/pitchBotScene owns the rig
+   configs and imports three; pulling that in here would drag the whole renderer
+   onto a presentation that has no 3D at all, to answer the question "which
+   portrait".
+
+   SO THE SPLIT IS: identity (id, roster, portrait, voice) lives here and is
+   safe anywhere; geometry, materials, clips and framing live next to three. Both
+   sides resolve the SAME id through resolvePitcherId, so they cannot disagree
+   about which bot is on. ────────────────────────────────────────────────────── */
+
+/** Every rig that exists, cast or not. Keys match PITCH_BOT_VARIANTS. */
+export const PITCHER_IDS = ["v1", "v2", "v3"];
+
+/**
+ * Rigs eligible for auto-assignment. A rig can exist without being cast — useful
+ * while one is being re-authored, or to hold a new one back until its voice is
+ * registered (v3 sat out for exactly that reason).
+ */
+export const PITCHER_ROSTER = ["v1", "v2", "v3"];
+
+/**
+ * FORCE ONE RIG from code. `null` = auto-assign from the roster.
+ *
+ * Beaten by `?pitchbot=`, so a pinned build can still be compared in a reload.
+ * This is the knob to reach for while building — the fallback below sits BELOW
+ * the roll and does nothing on a non-empty roster.
+ */
+export const PITCHER_PIN = null;
+
+/** Used only when nothing was asked for and nothing rolled (empty roster). */
+export const PITCHER_FALLBACK = "v2";
+
+/**
+ * WHAT THE PLAYER SEES OF EACH SHELL. Portrait and voice, and deliberately
+ * nothing else: VC_GAME.md §1 rule 6 is one character in several bodies, so a
+ * rig may differ in face and timbre and must never differ in script.
+ *
+ * The portrait matters more than it looks. These tiles sit in a row with the
+ * four analysts, and a pitcher wearing a borrowed face is the cast-legibility
+ * failure that whole row exists to prevent — desk.js records the day the bot
+ * wore Barron's headshot two seats from Barron.
+ */
+export const PITCHER_IDENTITY = {
+  v1: { portrait: "/pitchBot.webp", voice: "PB" },
+  v2: { portrait: "/pitchBot2.webp", voice: "PB2" },
+  v3: { portrait: "/pitchBot3.webp", voice: "PB3" },
+};
+
+/** Cached so identity and geometry cannot roll separately within a page load. */
+let _resolved = null;
+
+/**
+ * Which rig is staged. Precedence: explicit > `?pitchbot=` > PITCHER_PIN > roll.
+ *
+ * ONE RESOLVER FOR BOTH LAYERS. pitchBotScene delegates to this rather than
+ * repeating the precedence, because two copies of "which bot is on" is a bug
+ * that shows up as a portrait disagreeing with the thing in the beam.
+ */
+export function resolvePitcherId(explicit = null) {
+  if (explicit && PITCHER_IDENTITY[explicit]) return explicit;
+  if (typeof window !== "undefined") {
+    try {
+      const q = new URLSearchParams(window.location.search).get("pitchbot");
+      if (q && PITCHER_IDENTITY[q]) return q;
+    } catch { /* a malformed query string is not worth taking the room down for */ }
+  }
+  if (PITCHER_PIN && PITCHER_IDENTITY[PITCHER_PIN]) return PITCHER_PIN;
+  /* NEVER ROLL ON THE SERVER. desk.js exposes the portrait as a GETTER, and that
+   * getter is read during render — so rolling here would draw one rig server-side
+   * and a different one on the client, and hydrate an <img src> that disagrees
+   * with the markup. The renderer only ever runs in a browser, so the server's
+   * answer is a placeholder that is replaced the moment the client resolves. */
+  if (typeof window === "undefined") return PITCHER_FALLBACK;
+  if (!_resolved) _resolved = rollPitcher(PITCHER_ROSTER);
+  return _resolved || PITCHER_FALLBACK;
+}
+
+/** Re-roll the session's pitcher. Debug and tests only. */
+export function assignPitcher(seed = null) {
+  _resolved = rollPitcher(PITCHER_ROSTER, seed);
+  return _resolved;
+}
+
+/** The staged rig's portrait path. */
+export function pitcherPortrait(variant = null) {
+  return PITCHER_IDENTITY[resolvePitcherId(variant)]?.portrait
+    ?? PITCHER_IDENTITY[PITCHER_FALLBACK].portrait;
+}
+
+/** The staged rig's speaker code for api/counsel-voice. */
+export function pitcherVoice(variant = null) {
+  return PITCHER_IDENTITY[resolvePitcherId(variant)]?.voice ?? "PB";
+}
+
 /**
  * Mixed into the seed so the pitcher rides its own stream.
  *

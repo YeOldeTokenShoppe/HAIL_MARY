@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import {
   mountPitchBot, tickPitchBotBillboard, disposePitchBotBillboard, getPitchBotFraming,
 } from "@/lib/trade/pitchBotScene";
-import { tickPitchBotFace } from "@/lib/trade/pitchBotExpressions";
+import { tickPitchBotFace, setPitchBotFaceHidden } from "@/lib/trade/pitchBotExpressions";
 import { TEMPLE_ANCHOR_NAME } from "@/lib/templePresence";
 import {
   tickPitchBotHolo, disposePitchBotHolo,
@@ -896,6 +896,32 @@ const CyborgTempleScene = ({
   // stale closure in there.
   const pitchStartedRef = useRef(false);
   useEffect(() => { pitchStartedRef.current = !!pitchStarted; }, [pitchStarted]);
+  /* THE BOT IS TALKING RIGHT NOW. Same signal that picks his talking clip, mirrored
+   * into a ref so useFrame can read it without re-subscribing every beat. */
+  const speechActiveRef = useRef(false);
+  /** When the last utterance ENDED. 0 = never spoken, which reads as long ago. */
+  const speechEndedAtRef = useRef(0);
+  useEffect(() => {
+    speechActiveRef.current = !!speechActive;
+    if (!speechActive) speechEndedAtRef.current = performance.now();
+  }, [speechActive]);
+
+  /* HOW LONG EACH SEAT KEEPS WATCHING after he stops, in ms.
+   *
+   * TWO JOBS IN ONE TABLE. The floor (~1.5s) stops the heads snapping away the
+   * instant a line ends — attention that releases on the exact frame of silence
+   * reads as four machines being switched off. The SPREAD stops them releasing in
+   * unison, which is the same tell one beat later: people in a room stop paying
+   * attention at slightly different moments.
+   *
+   * NOT IN SEATING ORDER, deliberately. Around a square desk, seating order
+   * releases as a visible wave travelling round the table. This ordering is
+   * scattered so it reads as four independent attention spans.
+   *
+   * Also used to stagger the posture handoff, so a given character's head and body
+   * give up together rather than at two different times.
+   */
+  const ATTENTION_RELEASE_MS = { Demon: 1500, RL80: 2350, Monk: 1850, Detective: 2750 };
   const [beamPresets, setBeamPresets] = useState(BEAM_PRESETS);
   // Per-frame multipliers on the beam's authored opacity and height, written by the
   // cast choreography and read inside BeaconBeam's own loop. Refs because props
@@ -1940,6 +1966,52 @@ const CyborgTempleScene = ({
   // "afterwards" is ~1s early, and the bridge parks nextSwitchDelay at 999999
   // without restoring it — un-pinning synchronously freezes the character on
   // one clip for 16 minutes.
+  /* ── THE ROOM WATCHES THE PITCH ──────────────────────────────────────────
+   *
+   * While a pitch is running, the four analysts turn from the camera to the
+   * pitcher. Everything needed already existed: each character's head is aimed
+   * by ONE shared formulation (dummy.lookAt -> local delta -> YXZ clamp -> zero
+   * roll; see the note on the Detective's block, which records that her bespoke
+   * version was the bug), and every one of those call sites hard-coded
+   * `camera.position` as the target. This swaps the target, and nothing else.
+   *
+   * AIMED AT THE BOT'S HEAD, NOT ITS ORIGIN. The rig's origin sits at its feet
+   * — that is what lets `fitHeight` scale it about the floor — so aiming at the
+   * object would have four characters staring at the projector plate.
+   *
+   * THE HEAD BONE IS FOUND ONCE AND CACHED, by name, tolerating both naming
+   * conventions in the roster: v1 calls it `head`, the Mixamo rigs call it
+   * `mixamorigHead`. `/head$/i` catches both and misses `mixamorigHeadTop_End`.
+   *
+   * FALLS BACK TO THE CAMERA whenever there is no pitch, no bot, or the bot is
+   * hidden — so the lobby behaviour is byte-for-byte what it was.
+   */
+  const _attentionTarget = useRef(new THREE.Vector3());
+  /** Debug force: true = always watch, false = never, null = follow the pitch. */
+  const attentionOverrideRef = useRef(null);
+  const resolveAttentionTarget = useCallback((camera, isFocused = false) => {
+    // A SELECTED SEAT IS BEING ADDRESSED, not listening — they were sent to look
+    // something up and are reporting back, so they face the player. Passed in per
+    // call site rather than read here, because "focused" is a different ref for
+    // each character and the Demon's is a head-tracking flag rather than a focus one.
+    if (isFocused) return camera.position;
+    const on = attentionOverrideRef.current === true
+      || (attentionOverrideRef.current === null && pitchStartedRef.current && speechActiveRef.current);
+    const bot = pitchBotRef.current;
+    if (!on || !bot || !bot.visible) return camera.position;
+
+    let head = bot.userData.__attnHead;
+    if (head === undefined) {
+      head = null;
+      bot.traverse((o) => { if (!head && /head$/i.test(o.name)) head = o; });
+      bot.userData.__attnHead = head;
+    }
+    if (!head) return camera.position;
+
+    head.getWorldPosition(_attentionTarget.current);
+    return _attentionTarget.current;
+  }, []);
+
   const applyCharacterFocusAnimation = (agentId, mode = 'idle', { releaseAfter = false } = {}) => {
     const settle = (state) => {
       if (releaseAfter) {
@@ -2886,6 +2958,118 @@ const CyborgTempleScene = ({
       pitchBotAnimStateRef.current.currentAnimation = wantTalking ? "talking" : "idle";
     }
   }, [speechActive, pitchBotReady]);
+
+  /* THE DESK LISTENS, THEN GOES BACK TO WORK.
+   *
+   * Follows the bot's SPEECH rather than the pitch as a whole: idle (attentive)
+   * while he is talking, typing (working) the moment he stops. The first version
+   * settled them once when the pitch opened and left them there, which held four
+   * people motionless through every silence — technically attentive, and dead.
+   *
+   * `speechActive` is the same signal that picks the bot's own talking clip, so
+   * the desk turns to him on the frame his mouth starts and returns to work on
+   * the frame it stops. Heads and posture move together because both read it.
+   *
+   * THE FOCUSED SEAT IS SKIPPED. If the player has sent someone to look something
+   * up, that character is mid-report and owns their own animation — overwriting it
+   * here would cut them off to make them "pay attention" to a bot they are
+   * currently answering.
+   *
+   * `releaseAfter: true` so they rejoin the normal alternation rather than
+   * freezing in the pose; see the mode's own note. No cleanup: the desk's resting
+   * behaviour IS that alternation, so a pitch ending needs no counter-effect.
+   */
+  const attentionTimersRef = useRef({});
+  useEffect(() => {
+    if (!pitchStarted || !loadedModel) return;
+    const focusedRefs = {
+      Monk: monkFocusedRef,
+      Demon: demonHeadTrackingRef,
+      Detective: detectiveFocusedRef,
+      RL80: rl80FocusedRef,
+    };
+    const timers = attentionTimersRef.current;
+    const apply = (agentId, mode) => {
+      // Re-checked at FIRE time, not schedule time: over a 2.75s delay the player
+      // can easily have selected that seat, and cutting off a character who is
+      // now mid-report to send them back to typing is the exact interruption the
+      // focus exclusion exists to prevent.
+      if (focusedRefs[agentId]?.current) return;
+      /* PIN WHILE LISTENING, RELEASE WHEN BACK AT WORK.
+       *
+       * `releaseAfter: true` hands the character straight back to the random
+       * alternation in useFrame, whose next switch lands 8-16s out. On any
+       * utterance longer than that the alternation would fire mid-listen and start
+       * a typing clip while attention still had the head on the bot — Marisol
+       * typing at her station while watching him speak. Holding the pose for the
+       * duration of the utterance is what "listening" means.
+       *
+       * The old worry that pinning freezes them for four minutes does not apply
+       * any more: posture now follows speech, so they are released on every gap
+       * between beats rather than once at the end of the pitch.
+       */
+      applyCharacterFocusAnimation(agentId, mode, { releaseAfter: mode !== 'idle' });
+    };
+
+    for (const agentId of ['Monk', 'Demon', 'Detective', 'RL80']) {
+      clearTimeout(timers[agentId]);
+      if (speechActive) {
+        // ATTENTION ARRIVES TOGETHER, on the beat the line starts — a staggered
+        // turn TOWARD a speaker reads as a delayed reaction rather than as four
+        // people with their own attention spans. Only the release is spread.
+        apply(agentId, 'idle');
+      } else {
+        // Same table the heads use, so a character's posture and gaze give up at
+        // the same moment instead of at two different ones.
+        timers[agentId] = setTimeout(() => apply(agentId, 'typing'),
+          ATTENTION_RELEASE_MS[agentId] || 0);
+      }
+    }
+    return () => { for (const t of Object.values(timers)) clearTimeout(t); };
+  }, [pitchStarted, speechActive, loadedModel]);
+
+  /* WATCH IT WITHOUT PLAYING A PITCH.
+   *
+   *     __pitchBotAttention(true)    // heads turn now, bot shown if it wasn't
+   *     __pitchBotAttention(false)   // force back to the camera
+   *     __pitchBotAttention(null)    // follow pitchStarted again
+   *
+   * REPORTS THE CLAMPS, because they are the thing most likely to be wrong. The
+   * four sit at desks facing different ways and the bot is at scene centre, so a
+   * character needing more yaw than their cap gets will turn as far as it can and
+   * stare PAST the pitcher — which reads worse than not turning at all. The caps
+   * are per-character and two of them are live-tunable (__detClamp, __detPitchClamp).
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.__pitchBotAttention = (on) => {
+      if (on !== undefined) {
+        attentionOverrideRef.current = on;
+        if (on && pitchBotRef.current) pitchBotRef.current.visible = true;
+        if (on) {
+          for (const agentId of ['Monk', 'Demon', 'Detective', 'RL80']) {
+            applyCharacterFocusAnimation(agentId, 'idle', { releaseAfter: true });
+          }
+        }
+      }
+      const bot = pitchBotRef.current;
+      const out = {
+        override: attentionOverrideRef.current,
+        pitchStarted: pitchStartedRef.current,
+        botVisible: !!bot?.visible,
+        aimingAtHead: bot?.userData?.__attnHead?.name ?? null,
+        yawClampsDeg: {
+          Detective: +((Number.isFinite(window.__detClamp) ? window.__detClamp : 1.57) * 180 / Math.PI).toFixed(0),
+          Demon: 66,
+          note: 'Monk/RL80 clamps are inline in their useFrame blocks',
+        },
+      };
+      const el = document.getElementById('__pitchBotCastProbe');
+      if (el) el.textContent = JSON.stringify(out);
+      return out;
+    };
+    return () => { delete window.__pitchBotAttention; };
+  }, [loadedModel]);
 
   /* NEON VISIBILITY — decor yields to whatever is at centre stage.
    *
@@ -7166,6 +7350,11 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     const cast = tickPitchBotCast(delta);
     beamBoostRef.current = cast.opacity;
     beamHeightRef.current = cast.height;
+    // NO FACE UNTIL THERE IS A BODY. The LED plates are excluded from the
+    // holographic wash and so never get its alpha ramp — without this they hang
+    // in an empty beam a beat before the figure. Driven from here rather than
+    // inside either module because this is the one place that already ticks both.
+    setPitchBotFaceHidden(!cast.bodyDense);
     // Face the camera, yaw only. No-op until the bot loads.
     tickPitchBotBillboard(state.camera);
     // THE LED FACE FOLLOWS THE CLIP — v2's rig only. It reads which action
@@ -8026,6 +8215,53 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // intentionally excluded — its head-track reads twitchy on the wide shot.
     const revealFollowCam =
       revealModeRef.current === 'aligned' || revealModeRef.current === 'missed';
+    /* THE DESK WATCHES THE PITCH — the second half of resolveAttentionTarget.
+     *
+     * Retargeting the four head-aims was necessary and not sufficient: every one
+     * of those blocks is gated on that character being FOCUSED, and during a pitch
+     * nobody is (the pitcher is). So the retarget never ran and four heads stayed
+     * pointed at their monitors.
+     *
+     * This is deliberately the SAME SHAPE as revealFollowCam above, which exists
+     * for the same reason — the curtain call also needs everyone looking somewhere
+     * without anyone being focused. Added as an extra OR term to each gate rather
+     * than by loosening the focus checks, so the lobby's behaviour is untouched.
+     *
+     * Gated on the bot being VISIBLE, not merely on the pitch running: pressMode
+     * goes true at the briefing, before the beam has cast anything, and four
+     * analysts solemnly regarding an empty projector plate is worse than four
+     * analysts working.
+     *
+     * AND ON HIM ACTUALLY TALKING. Attention that persists through every silence
+     * is a room full of mannequins staring at a hologram; attention that arrives
+     * when he speaks and lapses when he stops is a room full of people. Same
+     * signal that drives his talking clip, so the heads turn on exactly the beat
+     * the mouth starts. The debug override forces it on regardless, because
+     * inspecting the pose is easier without having to catch a line. */
+    const _attnOverride = attentionOverrideRef.current;
+    const _attnOpen = !!pitchBotRef.current?.visible
+      && (_attnOverride === true || (_attnOverride === null && pitchStartedRef.current));
+    const _sinceSpeech = performance.now() - speechEndedAtRef.current;
+    /* Per-seat, because each holds attention for its own beat — see
+     * ATTENTION_RELEASE_MS. Forced on by the debug override regardless.
+     *
+     * THIS DOES NOT EXCLUDE THE FOCUSED SEAT, and that was a bug worth recording.
+     * The first version turned the gate OFF for whoever the player had selected,
+     * on the reasoning that they should be addressing the player rather than the
+     * pitcher. But these blocks are the only thing writing the head quaternion —
+     * switch one off and the head does not return to rest, it FREEZES on whatever
+     * it was last aimed at. A selected analyst stayed locked on the bot for the
+     * whole of her own answer.
+     *
+     * The selection is handled where it belongs instead: the block keeps running
+     * and resolveAttentionTarget hands back the CAMERA for a focused seat, so she
+     * turns to the player and tracks them properly. Gate decides WHETHER the head
+     * is driven; the resolver decides WHERE. */
+    const attentionFor = (key) => _attnOpen && (
+      _attnOverride === true
+      || speechActiveRef.current
+      || _sinceSpeech < (ATTENTION_RELEASE_MS[key] || 0)
+    );
     // Track the camera during the outcome reveals (he addresses the player),
     // but NOT during 'council' — there the argue animation should drive his
     // head so he faces the group in the semi-circle, not the camera. The other
@@ -8033,6 +8269,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // track during council either.
     const monkHeadGate =
       monkIsPointing
+      || attentionFor('Monk')
       || (revealModeRef.current && revealModeRef.current !== 'council')
       || (monkFocusedRef.current && shouldTrackHeadRef.current);
     if (monkHeadGate && monkHeadBoneRef.current) {
@@ -8054,7 +8291,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
       const dummy = monkHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
-      dummy.lookAt(camera.position);
+      dummy.lookAt(resolveAttentionTarget(camera, monkFocusedRef.current));
       // Correction rotation — tuned for Monk skeleton orientation
       const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 0.5);
       dummy.quaternion.multiply(flip);
@@ -8094,7 +8331,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     }
 
     // RL80 head look-at-camera override (only when focused on RL80)
-    if (rl80HeadBoneRef.current && rl80FocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current) {
+    if (rl80HeadBoneRef.current && (attentionFor('RL80') || (rl80FocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current))) {
       const head = rl80HeadBoneRef.current;
 
       // Snapshot the head's CURRENT animation pose — what the mixer just
@@ -8113,7 +8350,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
       const dummy = rl80HeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
-      dummy.lookAt(camera.position);
+      dummy.lookAt(resolveAttentionTarget(camera, rl80FocusedRef.current));
 
       // Rig forward-axis correction — unicorn's snout is along the head
       // bone's local +Z, not the Three.js default -Z, so flip 180° around
@@ -8298,7 +8535,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       // turn eases in from wherever the reaction clip has her.
       detectiveHeadBoneRef._smoothedQuat = null;
     }
-    if (detectiveHeadBoneRef.current && (revealFollowCam || (detectiveFocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current))) {
+    if (detectiveHeadBoneRef.current && (attentionFor('Detective') || revealFollowCam || (detectiveFocusedRef.current && shouldTrackHeadRef.current && !revealModeRef.current))) {
       const head = detectiveHeadBoneRef.current;
 
       if (!detectiveHeadBoneRef._baseQuat) {
@@ -8327,7 +8564,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
       const dummy = detectiveHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
-      dummy.lookAt(camera.position);
+      dummy.lookAt(resolveAttentionTarget(camera, detectiveFocusedRef.current));
 
       const parentWorldQuat = new THREE.Quaternion();
       head.parent.getWorldQuaternion(parentWorldQuat);
@@ -8478,7 +8715,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       demonHeadBoneRef._baseWorldQuat = null;
       demonHeadBoneRef._smoothedQuat = null;
     }
-    if (demonHeadBoneRef.current && (revealFollowCam || ((demonHeadTrackingRef.current || demonGlanceActiveRef.current) && shouldTrackHeadRef.current && !revealModeRef.current))) {
+    if (demonHeadBoneRef.current && (attentionFor('Demon') || revealFollowCam || ((demonHeadTrackingRef.current || demonGlanceActiveRef.current) && shouldTrackHeadRef.current && !revealModeRef.current))) {
       const head = demonHeadBoneRef.current;
 
       if (!demonHeadBoneRef._baseQuat) {
@@ -8499,7 +8736,18 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       dummy.position.copy(headWorldPos);
       // Aim a dummy at the camera (bone forward is local -Z, so a plain
       // lookAt orients toward the camera with no correction flip).
-      dummy.lookAt(camera.position);
+      /* demonFocusedRef, NOT demonHeadTrackingRef. The other three have a single
+       * focus flag; the Demon has two, and the one named like head tracking is the
+       * wrong one — it is a narrower override that only turns on ~2s into his focus
+       * sequence (or early, if the camera drifted off the authored pose). Passing it
+       * here meant that while he was actually speaking it was still false, so the
+       * resolver kept handing back the pitcher and he answered a claim without ever
+       * looking away from it — then broke to the player once the sequence finally
+       * flipped the flag, a beat after he had finished.
+       *
+       * It stays in the GATE above, which is what it is for: whether his head is
+       * driven at all. This argument answers a different question — where. */
+      dummy.lookAt(resolveAttentionTarget(camera, demonFocusedRef.current));
 
       // The earlier approach — slerp the head's world quaternion toward this
       // look-at and cap the total angle — couldn't separate roll from

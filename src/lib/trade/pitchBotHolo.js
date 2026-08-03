@@ -186,6 +186,22 @@ const registry = [];
 const materials = [];
 /** Depth-prepass materials, disposed with the rest. */
 const depthMaterials = [];
+/** The depth twins themselves, so the cast can switch them off while it runs. */
+const depthTwins = [];
+/**
+ * Reveal below which the twins are hidden.
+ *
+ * THE BUG THIS FIXES. The twins write depth unconditionally, but the cast ramps
+ * the BODY's alpha from zero (`smoothstep(0.0, 0.4, uHoloReveal)`), so for the
+ * first stretch of the arrival the figure occluded the room while drawing none of
+ * itself — a bot-shaped hole showing the clear colour. The LED face is excluded
+ * from the wash and therefore opaque from frame one, so what you saw was a black
+ * smear with a pair of glowing eyes in it.
+ *
+ * Matched to the shader's own ramp: by 0.4 the body is drawing at full strength
+ * and there is something to occlude WITH.
+ */
+const CAST_DEPTH_ON = 0.4;
 
 /* ────────────────────────────────────────────────────────────────────────────
    THE CAST — the bot assembling up the beam.
@@ -357,10 +373,14 @@ const castState = {
    file already warns about allocating in ("a GC sawtooth on a scene that already
    runs hot"), so the return value is one long-lived object. Callers must read it
    immediately and never retain it. */
-const castOut = { opacity: 1, height: 1 };
+const castOut = { opacity: 1, height: 1, bodyDense: true };
 
 /** Push the current reveal (and bounds) into every patched material. */
 function pushCast() {
+  // Twins off until the body is dense enough to be worth occluding with — see
+  // CAST_DEPTH_ON. Idle reveal is 1, so this is a no-op outside the arrival.
+  const twinsOn = castState.reveal >= CAST_DEPTH_ON;
+  for (let i = 0; i < depthTwins.length; i++) depthTwins[i].visible = twinsOn;
   for (let i = 0; i < registry.length; i++) {
     const u = registry[i];
     if (u.uHoloReveal) u.uHoloReveal.value = castState.reveal;
@@ -441,7 +461,10 @@ export function cancelPitchBotCast() {
  * a frame delta just makes the cast jump, which is the right failure.
  */
 export function tickPitchBotCast(delta) {
-  if (castState.t < 0) { castOut.opacity = 1; castOut.height = 1; return castOut; }
+  if (castState.t < 0) {
+    castOut.opacity = 1; castOut.height = 1; castOut.bodyDense = true;
+    return castOut;
+  }
   castState.t += Math.min(Math.max(delta, 0), 0.25);  // clamp a tab-switch gap
 
   const startAt = castState.delay;            // when the figure begins to build
@@ -462,7 +485,7 @@ export function tickPitchBotCast(delta) {
 
   if (castState.t >= endAt) {
     cancelPitchBotCast();
-    castOut.opacity = 1; castOut.height = 1;
+    castOut.opacity = 1; castOut.height = 1; castOut.bodyDense = true;
     return castOut;
   }
 
@@ -506,6 +529,18 @@ export function tickPitchBotCast(delta) {
     castOut.height = f;
   }
 
+  /* HAS THE BODY ARRIVED YET? Same threshold the depth twins use, so everything
+   * that should wait for the figure waits for the same frame.
+   *
+   * THE LED FACE NEEDS THIS TOO. It is excluded from the holographic wash — that
+   * is what keeps it reading as a screen — which also means it never gets the
+   * body's alpha ramp and is fully opaque from the first frame of the cast. Left
+   * alone it appears as a small bright face hanging in an empty beam, a beat
+   * before the thing it belongs to. Fading it instead is not available: the plate
+   * is opaque on purpose, and turning it transparent would move it into the sorted
+   * pass in front of a body drawing with depthWrite off. */
+  castOut.bodyDense = castState.reveal >= CAST_DEPTH_ON;
+
   pushCast();
   return castOut;
 }
@@ -516,6 +551,7 @@ export function disposePitchBotHolo() {
   materials.length = 0;
   for (const m of depthMaterials) m.dispose();
   depthMaterials.length = 0;
+  depthTwins.length = 0;
   // AND STOP THE CAST. Without this a remount mid-cast leaves the timer running
   // against an empty registry: it advances, writes to nothing, and the next bot to
   // load inherits a clock that is already part-way through a cast it never began.
@@ -679,6 +715,11 @@ function addDepthPrepass(root) {
     // the shell and must still pass the depth test the twin lays down.
     twin.renderOrder = -1;
     twin.userData.holoDepthTwin = true;
+    // Seeded from the CURRENT reveal rather than defaulting to visible: a rig that
+    // mounts mid-cast (a remount, a hot reload) would otherwise flash the hole for
+    // however long it takes the next pushCast to land.
+    twin.visible = castState.reveal >= CAST_DEPTH_ON;
+    depthTwins.push(twin);
     // Invisible to click-to-focus: it draws no colour and must not be a hit.
     twin.raycast = () => {};
     src.parent?.add(twin);

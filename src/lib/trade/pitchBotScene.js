@@ -12,7 +12,7 @@ import {
   getPitchBotMouth, getPitchBotFaceState, blinkPitchBot,
   measurePitchBotHeight, PITCH_BOT_DEFAULT_EXPRESSION,
 } from "./pitchBotExpressions";
-import { rollPitcher } from "@/game/terminal-traders/press/pitchers";
+import { rollPitcher, resolvePitcherId, assignPitcher, PITCHER_ROSTER } from "@/game/terminal-traders/press/pitchers";
 
 // THE PITCH BOT, IN THE ROOM — everything the temple scene needs to host the VC
 // game's pitcher, kept out of CyborgTempleScene.jsx.
@@ -73,6 +73,23 @@ import { rollPitcher } from "@/game/terminal-traders/press/pitchers";
  * PER-VARIANT CAPABLE, but as of 2026-08-02 ALL THREE RIGS SHARE THIS ONE BLOCK —
  * add a `framing` to a variant only when it genuinely needs its own.
  *
+ * RE-CENTRED 2026-08-02, after the previous set (0.42 / 0.6 / -0.5) stopped
+ * working. They were dialled when the figure was larger and survived by accident:
+ * `aimDrop` and `camLift` are ABSOLUTE world offsets, and once every rig was
+ * fitted to a common 0.3 height they were roughly 1.5x the subject's ENTIRE
+ * height. The camera ended up 0.15 BELOW the bot's feet — inside the desks — and
+ * aimed low enough that the head sat ~50 degrees off the view axis, outside a
+ * ~25 degree half-FOV. Not mis-framed: absent, with a cubicle wall filling the shot.
+ *
+ * The values now describe what their names say. The figure is ~0.35 world units
+ * tall, so a 0.05 lift is a small fraction of it rather than a multiple, and
+ * nudging one does something proportionate to the nudge.
+ *
+ * THE REAL FIX IS A REPARAMETERISATION, still not done: `dist` in multiples of
+ * subject height, vertical framing as a fraction of the frame, pitch in degrees.
+ * Then a rig's size could change without silently invalidating the camera, which
+ * is now the second time it has.
+ *
  * THESE NUMBERS ONLY MEAN THE SAME THING ON RIGS OF THE SAME HEIGHT. `aimDrop`
  * and `camLift` are absolute world offsets, not fractions of the figure, so a rig
  * staged taller is framed lower on its body by exactly the ratio of the two
@@ -85,12 +102,12 @@ import { rollPitcher } from "@/game/terminal-traders/press/pitchers";
  */
 export const PITCH_BOT_FRAMING_DEFAULT = {
   /** How far back the camera sits, in world units. Smaller = tighter. */
-  dist: 0.42,
+  dist: 0.5,
   /** How far BELOW the face to aim, so the head sits high in frame rather than
    *  dead centre. Raise this to lift the subject without tilting the camera. */
-  aimDrop: 0.6,
+  aimDrop: 0.18,
   /** Camera lift relative to the face. Near zero = eye level; positive looks down. */
-  camLift: -0.5,
+  camLift: -0.05,
 };
 
 /** Resolve the framing for a variant, falling back to the shared default. */
@@ -528,22 +545,10 @@ export const PITCH_BOT_VARIANTS = {
  */
 export const PITCH_BOT_FALLBACK_VARIANT = "v3";
 
-/**
- * FORCE ONE RIG, from code. `null` = auto-assign from the roster.
- *
- *     export const PITCH_BOT_PIN = "v2";   // always the LED-face bot
- *     export const PITCH_BOT_PIN = null;   // back to the roll
- *
- * THIS IS THE KNOB YOU WANT while building. Setting the fallback above does
- * nothing on a non-empty roster — it sits BELOW the roll, not above it — which
- * is a genuinely confusing thing to discover by editing it and getting the other
- * bot anyway (author hit exactly this, 2026-08-02). The fallback answers "what if
- * there is no cast at all"; this answers "I want to look at that one".
- *
- * Beaten by `?pitchbot=`, so a pinned build can still be compared in a reload
- * without a code edit. Ship it as null unless the cast is deliberately one rig.
- */
-export const PITCH_BOT_PIN = null;
+/* THE PIN MOVED to press/pitchers as PITCHER_PIN, with the rest of variant
+   identity. It has to live beside the resolver that reads it, and that resolver
+   had to become three-free so the flat surface could share it. A copy here would
+   be a second answer to "which bot is on" that nothing consults. */
 
 /**
  * THE CAST — rigs eligible to be auto-assigned to a deal.
@@ -557,20 +562,12 @@ export const PITCH_BOT_PIN = null;
  * or the outcome — is written out in full there. Read that before changing how
  * this is picked; it is the difference between art direction and a leak.
  */
-export const PITCH_BOT_ROSTER = Object.keys(PITCH_BOT_VARIANTS)
-  .filter((k) => PITCH_BOT_VARIANTS[k].inRoster);
+/* IMPORTED AND RE-EXPORTED, not `export ... from`. That form creates no LOCAL
+   binding, so the two debug handles below that reference PITCH_BOT_ROSTER would
+   throw ReferenceError the first time they were called — a bug that hides until
+   someone opens the console. */
+export const PITCH_BOT_ROSTER = PITCHER_ROSTER;
 
-/**
- * The rig for THIS session, rolled once and remembered.
- *
- * ONE ROLL PER PAGE LOAD, which is one roll per deal — the game is "one deal, one
- * pitch", and the bot is mounted at temple load, long before PressSession has
- * rolled a seed. Rolling here rather than threading the deal backwards is what
- * makes the assignment independent of the deal BY CONSTRUCTION: it happens before
- * the archetype exists, so it cannot see it. That is a stronger guarantee than
- * any amount of care at a call site that DOES have the deal in scope.
- */
-let _rolledVariant = null;
 
 /**
  * Which rig to stage.
@@ -581,16 +578,16 @@ let _rolledVariant = null;
  * bots in a reload and comparing them in a rebuild.
  */
 export function resolvePitchBotVariant(explicit = null) {
-  if (explicit && PITCH_BOT_VARIANTS[explicit]) return explicit;
-  if (typeof window !== "undefined") {
-    try {
-      const q = new URLSearchParams(window.location.search).get("pitchbot");
-      if (q && PITCH_BOT_VARIANTS[q]) return q;
-    } catch { /* malformed query string is not worth taking the room down for */ }
-  }
-  if (PITCH_BOT_PIN && PITCH_BOT_VARIANTS[PITCH_BOT_PIN]) return PITCH_BOT_PIN;
-  if (!_rolledVariant) _rolledVariant = rollPitcher(PITCH_BOT_ROSTER);
-  return _rolledVariant || PITCH_BOT_FALLBACK_VARIANT;
+  /* DELEGATED, NOT REIMPLEMENTED. The precedence (explicit > ?pitchbot= > pin >
+   * roll) lives in press/pitchers, which is three-free and therefore reachable
+   * from the flat surface too. Two copies of "which bot is on" is a bug that
+   * surfaces as a portrait disagreeing with the thing in the beam.
+   *
+   * Guarded against a roster that names a rig this file has no config for — the
+   * identity list and the variant table are separate on purpose, so they can
+   * drift by one entry during a re-author. */
+  const id = resolvePitcherId(explicit);
+  return PITCH_BOT_VARIANTS[id] ? id : PITCH_BOT_FALLBACK_VARIANT;
 }
 
 /**
@@ -599,10 +596,7 @@ export function resolvePitchBotVariant(explicit = null) {
  * @param seed  optional; a seeded roll reproduces, so a pinned run brings back
  *              the same bot. Omit for a plain draw.
  */
-export function assignPitchBot(seed = null) {
-  _rolledVariant = rollPitcher(PITCH_BOT_ROSTER, seed);
-  return _rolledVariant;
-}
+export const assignPitchBot = assignPitcher;
 
 /**
  * Which ElevenLabs voice the staged rig speaks in — a speaker code for
