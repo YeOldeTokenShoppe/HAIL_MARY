@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDeal";
 import { BACKING, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
 import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitchOpening, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
+import { pitcherVoice } from "@/game/terminal-traders/press/pitchers";
 import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
 import {
   PHASE, PRESSES,
@@ -36,21 +37,43 @@ import TerminalModuleHeader from "../TerminalModuleHeader";
 // (the white-mass bug cost a rollback once already) can never take the game
 // offline entirely.
 //
-// Two things it does that the 3D view CAN'T:
-//   • Barron SPEAKS. /api/counsel-voice + the amplitude mouth means any
-//     generated line can be voiced. Desktop is stuck with banked SitePal clips.
-//   • The evidence screen is literally the screen. On desktop "his monitor
-//     stays black" is a texture across the room; here the panel IS a terminal.
+// What it does that the 3D view can't: THE EVIDENCE SCREEN IS LITERALLY THE
+// SCREEN. On desktop "its monitor stays black" is a texture across the room;
+// here the panel IS a terminal, and the strip under it puts all four boards a
+// tap apart.
+//
+// THE VOICE IS NO LONGER THIS SURFACE'S EXCLUSIVE. It used to be — "Barron
+// SPEAKS, desktop is stuck with banked SitePal clips" stood here — and it
+// stopped being true on 2026-07-29, when PressSession took the same
+// /api/counsel-voice path this surface proved (see its own note: the pitcher is
+// a glTF bot with a screen for a face, so SitePal was never the route for it).
+// Both surfaces voice any generated line now. What differs is what the sound
+// DRIVES: desktop has LED viseme plates inside the rig, and here the same
+// amplitude runs the projection — see PressFigure.
 
 // THE PITCHER'S VOICE, and the DEFAULT for anything sayTurn isn't given a voice
 // for — the claim's spin, and the pitcher's reaction after a seat reports. Was
 // "JB" while Connor did the selling; the pitch bot has its own ElevenLabs
-// voice now (VOICES.PB in api/counsel-voice, override with
-// ELEVENLABS_VOICE_PITCHBOT).
+// voice now (VOICES.PB / PB2 / PB3 in api/counsel-voice, overridable with
+// ELEVENLABS_VOICE_PITCHBOT*).
+//
+// WHICH VOICE DEPENDS ON WHICH RIG IS STAGED, as of 2026-08-02. It was pinned to
+// "PB" and had to be while `getPitchBotVoice` was the only answer, because that
+// lives in lib/trade/pitchBotScene and importing it would drag three.js onto a
+// surface with no WebGL at all. press/pitchers exists precisely to break that
+// tie: it is three-free, it holds the SAME roll desktop reads, and it answers
+// the same question. A pinned code here put the second and third bots' faces —
+// on the record, on the seat tile, on the feed — over the first bot's throat.
+//
+// MODULE SCOPE IS DELIBERATE AND SAFE, same as PressSession's copy: the rig is
+// resolved once per page load and swapping one already requires a reload, so
+// this has exactly the lifetime of the thing it names. Under SSR there is no
+// `window`, the resolver returns the fallback without rolling, and the browser
+// copy of the module — the only one that ever plays audio — resolves properly.
 //
 // The adviser half is NO LONGER silent: `sayTurn` voices the seat first in its
 // own key, then the pitcher — see the TWO VOICES PER PRESS note below.
-const VOICE = "PB";
+const VOICE = pitcherVoice();
 
 export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // A FRESH DEAL EVERY TIME YOU SIT DOWN — see the note in instanceDeal.js for
@@ -70,6 +93,22 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const [flash, setFlash] = useState(null);
   const [started, setStarted] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  /* WHOSE VOICE IS IN FLIGHT. "Somebody is talking" and "WHO is talking" are
+     different questions, and the feed needs the second one: it reads its
+     amplitude out of adviserMouth BY KEY, so a panel told the wrong speaker
+     shows a face that never moves — no error, no warning, just a still.
+     A press puts an ADVISER on the audio for a beat (see TWO VOICES PER PRESS),
+     so under a bare `speaking` the panel lit its ON AIR lamp and ran a dead
+     level meter every time a seat reported, under the pitcher's face. */
+  const [speakingAs, setSpeakingAs] = useState(null);
+  /* WHO THE FEED IS POINTED AT. Desktop cuts the camera to whoever is talking
+     (PressSession's "THE CAMERA FOLLOWS THE VOICE, NOT THE PRESS"); this surface
+     had one fixed shot of the pitcher, so an adviser you had just spent went and
+     looked, reported, and never appeared. It follows the voice for the same
+     reason desktop does, and it HOLDS on the reporter afterwards rather than
+     snapping back — their finding is what you are reading at that moment. Back
+     to the pitcher when the next claim starts. */
+  const [onCamera, setOnCamera] = useState(PITCHER);
   // FEED | SCREEN. Not just a space-saver on a phone: a press CUTS to his
   // screen, so "nothing landed" is something you went and looked at rather
   // than something you passively failed to notice.
@@ -253,6 +292,8 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const say = useCallback(async (text) => {
     if (!text) return;
     const token = ++sayToken.current;
+    setSpeakingAs(VOICE);
+    setOnCamera(PITCHER);
     setSpeaking(true);
     try { await speakAdviserLine(VOICE, text); }
     catch { /* voice is enrichment, never a gate on play */ }
@@ -289,6 +330,10 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         const p = live[i];
         if (sayToken.current !== token) return;   // superseded — stop the chain
         onPart?.(i);
+        setSpeakingAs(p.voice || VOICE);
+        // `seat` is optional and defaults to the pitcher, so the opening and the
+        // claim spins need no change — only a press names somebody else.
+        setOnCamera(p.seat || PITCHER);
         const startedAt = Date.now();
         try { await speakAdviserLine(p.voice || VOICE, p.text); }
         catch { /* voice is enrichment, never a gate on play */ }
@@ -426,9 +471,13 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     Promise.all([
       // ONE VOICE. The seat reports; the pitcher's reaction used to follow in this
       // same chain and now waits behind a button — see AnswerChoice in pressUi.
+      // `seat` puts the reporter ON CAMERA for the length of their line. It is
+      // the only thing that names anyone but the pitcher, which is why the shot
+      // needs no reset logic anywhere else.
       sayTurn([solo
-        ? { voice: VOICE, text: outcome.barronSays }
-        : { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays }]),
+        ? { voice: VOICE, text: outcome.barronSays, seat: PITCHER }
+        : { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays,
+            seat: outcome.seat }]),
       new Promise((r) => setTimeout(r, MIN_BEAT)),
     ])
       .then(() => {
@@ -470,7 +519,8 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const advance = useCallback(() => {
     revealFor.current = null;
     setFlash(null);
-    setPane("feed");     // new claim, back to his face
+    setPane("feed");     // new claim, back to its face
+    setOnCamera(PITCHER);  // ...and off the analyst who reported on the last one
     setBoardPane(PITCHER);
     Object.values(screensRef.current).forEach((x) => x.stayBlack());
     setHasRecord(false);
@@ -506,7 +556,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       <style>{CSS}</style>
 
       <TerminalModuleHeader
-        channel="THE VC GAME"
+        channel="PITCH BOT"
         mode="DEAL SIM"
         code={`BOOK ${Math.round(run.book)}`}
         accent="#ffd23a"
@@ -661,8 +711,16 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       {onFloor && claim && (
         <div className="pf-floor">
           <div className="pf-tabs">
+            {/* NAMED FROM THE DESK, not typed in — and now named after WHOEVER
+                THE FEED IS ON, which is the same fix twice over. It said BARRON,
+                left over from when he did the selling, so the tab back to the
+                PITCHER carried an ANALYST's name two rows above a seat row where
+                that analyst is one of the four you can send. Hard-coding the
+                pitcher instead would have reintroduced the same lie the moment
+                the feed started cutting to the reporter. */}
             <button className={pane === "feed" ? "on" : ""} onClick={() => setPane("feed")}>
-              ◉ BARRON{speaking && <em> · speaking</em>}
+              ◉ {(seatMeta(onCamera)?.name || PITCH_BOT.name).toUpperCase()}
+              {speaking && <em> · speaking</em>}
             </button>
             {/* THE BADGE MAY NOT ANSWER THE QUESTION THE BOARD IS THERE TO
                 ANSWER. While the look is pending it says only that there IS
@@ -670,7 +728,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 the tab bar and make going to look pointless. */}
             <button className={`${pane === "screen" ? "on" : ""}${lookPending ? " look" : ""}`}
                     onClick={lookAtScreen}>
-              ▤ HIS SCREEN
+              {/* ITS, not HIS. The bot is an "it" in every other line of copy
+                  the desk owns — "its client's deal", "ITS SCREEN STAYS BLACK",
+                  "on its screen, and it stays there" — and this tab was the last
+                  place still speaking about the pitcher as a man. */}
+              ▤ ITS SCREEN
               <em className={lookPending ? "" : hasRecord ? "rec" : ""}>
                 {lookPending ? " · LOOK" : hasRecord ? " · ON RECORD" : " · no record"}
               </em>
@@ -678,7 +740,17 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           </div>
           <div className="pf-stage">
             <div className={`pf-pane ${pane === "feed" ? "show" : ""}`}>
-              <PressFigure speaking={speaking} />
+              {/* `voice` AND `who` HAVE TO AGREE, and they come from the same
+                  place for that reason: the panel reads its amplitude out of
+                  adviserMouth BY KEY, so pointing the camera at Marisol while
+                  passing the pitcher's code is not a mismatched label, it is a
+                  face that never moves — no error, no warning. `speakingAs` is
+                  set on the same part of the turn that sets `onCamera`.
+                  `band` is the ONLY thing about how the pitch is going that may
+                  reach the face — the same rule desktop's LED expressions are
+                  under (VC_GAME.md §1 rule 3). */}
+              <PressFigure speaking={speaking} voice={speakingAs || VOICE}
+                           who={onCamera} band={mood.band} />
             </div>
             <div className={`pf-pane wide ${pane === "screen" ? "show" : ""}`}>
               {/* One board full-width — four canvases side by side on a phone
@@ -1104,6 +1176,95 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-face-note { font-size:5.5px; letter-spacing:0.08em;
   color:rgba(191,238,222,0.5); margin-top:1px; }
 
+/* ------------------------------------------------------------------------
+   THE FLOOR. RESTORED 2026-08-02 — every rule from here to the pf-look
+   keyframes went missing in one edit (bce2850, "enigma game updates", which
+   rewrote this file's markup and took 447 lines with it) and nothing has
+   styled the floor since. It is the same class of failure the header note
+   records about PRESS_UI_CSS never being concatenated, with the opposite
+   symptom: there, self-sizing children hid the absence for weeks; here the
+   floor is four flex children of a column that was no longer a column, so it
+   collapsed to 147px inside a 698px wrap — the figure at 2px tall, the tabs
+   as raw browser buttons, no dock on screen at all.
+
+   IT ALSO SILENTLY REVIVED A DOCUMENTED BUG. .pf-read carries the note above
+   about being the only thing on the floor that scrolls, and about the dock
+   running off the bottom when it wasn't; with .pf-read having no overflow
+   that was true again. If you ever delete from this block, check the prose
+   upstairs still describes what the CSS does.
+   ------------------------------------------------------------------------ */
+.pf-floor { flex:1; display:flex; flex-direction:column; min-height:0; }
+
+/* flex:0 1 auto — the feed gives up height before the words do. */
+.pf-stage { flex:0 1 auto; height:30vh; min-height:140px; max-height:330px; padding:10px 0;
+  display:flex; justify-content:center; align-items:center; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 35%, rgba(255,45,111,0.14), transparent 68%); }
+.pf-stage > * { height:100%; }
+
+.pf-read { flex:1 1 auto; min-height:76px; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; padding-bottom:8px; }
+/* only while something IS below — so the last line is never the faded one */
+.pf-read.more { -webkit-mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent);
+  mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent); }
+
+.pf-agenda { flex:none; display:flex; gap:5px; overflow-x:auto; padding:8px 12px 6px;
+  -webkit-overflow-scrolling:touch; }
+.pf-ag { flex:0 0 auto; font:bold 9.5px/1 'Courier New',monospace; letter-spacing:0.07em;
+  padding:7px 9px; border:1px solid rgba(234,255,249,0.16); color:rgba(234,255,249,0.45);
+  white-space:nowrap; position:relative; }
+.pf-ag::before { content:""; display:inline-block; width:5px; height:5px; border-radius:50%;
+  margin-right:5px; vertical-align:middle; background:rgba(234,255,249,0.3); }
+/* THE LANE DOTS. They say who COULD settle each subject, never whether it is
+   worth settling — same colours as .pu-lane in pressUi, so a dot on the rail
+   and the band under the claim are obviously the same fact. CHART and SOCIAL
+   were missing here and fell back to the neutral dot; the rail was quietly
+   answering "whose is this" for two lanes out of four. */
+.pf-ag[data-lane="CHAIN"]::before  { background:#2fd6d6; }
+.pf-ag[data-lane="RECORD"]::before { background:#ffd23a; }
+.pf-ag[data-lane="CHART"]::before  { background:#ff5f9e; }
+.pf-ag[data-lane="SOCIAL"]::before { background:#bfeede; }
+.pf-ag.past { opacity:0.4; }
+.pf-ag.now  { border-color:#ff5f9e; color:#fff; }
+.pf-ag.done { border-style:dashed; }
+
+/* THE BOARD COLUMN: one panel, then the strip that switches between them. It
+   takes the stage's whole height so the panel can be sized against something
+   definite — see the canvas note below. min-height:0 because a flex item's
+   default min-height:auto would let the canvas push the strip out of the
+   clipped stage rather than shrink. */
+.pf-boards { width:100%; height:100%; min-height:0;
+  display:flex; flex-direction:column; gap:7px; }
+.pf-bstrip { flex:none; display:flex; gap:4px; }
+.pf-bchip { flex:1; min-width:0; background:rgba(2,16,14,0.85);
+  border:1px solid rgba(47,214,214,0.22);
+  color:rgba(234,255,249,0.6); font:bold 10px/1.35 'Courier New',monospace;
+  letter-spacing:0.07em; padding:7px 4px; cursor:pointer;
+  display:flex; flex-direction:column; gap:2px; }
+.pf-bchip.on { border-color:#2fd6d6; color:#2fd6d6; background:rgba(47,214,214,0.08); }
+.pf-bchip em { font-style:normal; font-weight:normal; font-size:9px; opacity:0.8; }
+.pf-bchip.rec em { color:#ffd23a; opacity:1; }
+.pf-bchip.nil em { color:#ff9b6f; opacity:1; }
+
+.pf-tabs { flex:none; display:flex; gap:1px; margin:0 12px; }
+.pf-tabs button { flex:1; min-width:0; background:rgba(2,16,14,0.9);
+  border:1px solid rgba(47,214,214,0.22);
+  border-bottom:none; color:rgba(234,255,249,0.5); font:bold 9.5px/1 'Courier New',monospace;
+  letter-spacing:0.11em; padding:9px 6px; cursor:pointer; }
+.pf-tabs button.on { color:#2fd6d6; border-color:rgba(47,214,214,0.5);
+  background:rgba(47,214,214,0.08); }
+.pf-tabs em { font-style:normal; font-weight:normal; opacity:0.7; }
+.pf-tabs em.rec { color:#ffd23a; opacity:1; }
+/* GO AND LOOK. Cyan, deliberately — the tab's own accent, carrying no verdict.
+   Gold is the receipt colour, so pulsing gold would announce a receipt before
+   you'd been to see one, which is the whole thing this beat withholds. */
+.pf-tabs button.look { color:#2fd6d6; border-color:rgba(47,214,214,0.6);
+  animation:pf-look 1.15s ease-in-out infinite; }
+.pf-tabs button.look em { opacity:1; font-weight:bold; }
+@keyframes pf-look {
+  0%, 100% { background:rgba(47,214,214,0.05); box-shadow:0 0 0 rgba(47,214,214,0); }
+  50%      { background:rgba(47,214,214,0.20); box-shadow:0 0 15px rgba(47,214,214,0.45); }
+}
+
 /* .pf-look is GONE. It was this surface's private LOOK button under the answer;
    it is now one of the two moves in the shared AnswerChoice (.pu-choice-btn), so
    both surfaces word and style the beat identically. Its rule was still here —
@@ -1127,9 +1288,9 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    nothing: max-height:100% goes indefinite through this parent chain and
    Chrome drops the constraint (measured 228px tall in a 165px box), and as a
    GRID item the canvas resolves height:100% against an auto row track, which
-   is circular, so the percentage falls back to auto. Flex parent + height:100%
-   resolves; aspect-ratio re-derives the height if max-width ever bites on a
-   very tall stage. */
+   is circular, so the percentage falls back to auto. BOTH ARE THE SAME BUG —
+   a percentage against an indefinite ancestor — and the fix below is to stop
+   asking for one. */
 /* ONE BOARD AT A TIME, and this was missing. .pf-screen had no hidden state,
    so all four rendered stacked inside .pf-boards — boardPane has been writing
    .show since the strip was built and NOTHING WAS READING IT. On a phone the
@@ -1138,10 +1299,20 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    on a desktop), and it breaks the beat it exists for — SEE WHAT LANDED sends
    you to an ANALYST's finding and the top of the stack is the PITCHER's board.
    Found while wiring that choice, 2026-08-02. */
-.pf-screen { display:none; align-items:center; justify-content:center;
-  width:100%; height:100%; }
-.pf-screen.show { display:flex; }
-.pf-screen canvas { display:block; height:100%; width:auto; max-width:100%;
+.pf-screen { display:none; }
+/* THE PANEL TAKES WHAT'S LEFT after the strip, and is POSITIONED so the canvas
+   inside it has a definite box to measure against. That last part is the whole
+   trick: height:100% on the canvas needs a definite ancestor height, and a flex
+   item sized by flex:1 is definite only AFTER layout — which is exactly the
+   indefinite-chain failure the note above records. An absolutely positioned
+   child resolves its percentages against the padding box of its positioned
+   ancestor, which IS definite, so max-width/max-height:100% plus margin:auto
+   fits the receipt to whichever axis is scarce and centres it in the other.
+   (NO BACKTICKS IN THIS BLOCK — it is inside a template literal, and one in a
+   comment ends the stylesheet mid-rule. It took the page down once.) */
+.pf-screen.show { display:block; position:relative; flex:1 1 auto; min-height:0; }
+.pf-screen canvas { position:absolute; inset:0; margin:auto;
+  width:auto; height:auto; max-width:100%; max-height:100%;
   aspect-ratio:512/320; border:1px solid rgba(47,214,214,0.3); }
 
 /* holds the verdict's place while he's still saying it, so the panel doesn't

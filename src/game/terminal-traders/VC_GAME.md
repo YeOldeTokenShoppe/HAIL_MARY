@@ -152,7 +152,7 @@ has an owner.
 
 The absence is something **you go and look at**, on both surfaces: the reporter
 stops, the board changes silently, and the verdict lands only when you arrive —
-a pane swap on mobile (the `HIS SCREEN` tab pulses *cyan*; gold is the receipt
+a pane swap on mobile (the `ITS SCREEN` tab pulses *cyan*; gold is the receipt
 colour and pulsing gold would announce a receipt before you'd seen one), a camera
 hold on desktop. Not looking is allowed — the same forfeiting choice as not
 pressing `[A§18]`, and so is never hearing the reply.
@@ -401,6 +401,54 @@ dock are fixed furniture; `.pf-read` is the only child that may grow. A new row
 goes inside it or gets a height budget. 839px of rows in a 700px box once clipped
 `LET HIM GO ON` and `CALL IT` — **the pitch had no exit.**
 
+**The contract is CSS, and CSS can go missing without erroring** *(2026-08-02)*.
+Every rule for the floor — `.pf-floor`, `.pf-tabs`, `.pf-stage`, `.pf-read`, the
+agenda rail and the board strip — was deleted in one commit on 2026-07-29 and
+nothing had styled the floor since: `.pf-floor` computed `display:block`, the
+four rows collapsed to 147px inside a 698px wrap, the figure rendered 2px tall
+and `.pf-read` had no `overflow`, which quietly reinstated the exact clipping
+above. **A missing stylesheet fails silently and looks like a layout bug**, so
+when this surface looks wrong, check the rules exist before debugging the markup.
+
+**THE PITCHER IS THE REAL RIG HERE TOO** *(`PressBotStage`, 2026-08-02)*. This
+surface loads the staged glb — one at a time, 560–925KB Draco — and drives its
+own LED viseme plates from the audio, so the mouth is the authored one rather
+than a bar drawn over a still. That breaks the no-WebGL premise on purpose: a
+still with a painted mouth reads as weak, and **SitePal can never speak for this
+character**, because `sayAudio` resolves *names in the account, never URLs* and
+the bot's lines name the deal it is pitching. There is no clip to upload. Its own
+rig is the only mouth it can ever have.
+
+*One at a time is a constraint, not a preference* — `pitchBotExpressions` keeps
+its plate maps in a module singleton, so a second live rig silently steals the
+first one's face. The stage stays **mounted and hidden** while the camera is on
+an analyst (unmounting would re-parse ~900KB and re-align 19 plates on every
+press); its loop idles because `display:none` takes `offsetParent` to null, which
+is the gate it checks. `press/pitchers` carries a `stage` flag so the flat path
+can ask what a rig can do without importing three, and the stage itself is
+`dynamic`-split so the renderer only arrives when a rig that uses it is cast.
+
+**v1 is not staged yet** — its face is a texture, not plates, so a 3D v1 would
+move its body and hold a painted smile. It keeps the flat panel and a drawn LED
+mouth until its texture-swap face exists; flip `stage` in `press/pitchers` then.
+
+**Around the rig, the panel is still a feed**: the border carries the pressure
+band exactly as the LED face does on desktop (`§1 rule 3`; nothing else about the
+pitch may reach it), a level meter reads the same amplitude, and it **cuts to
+whoever is speaking** — an analyst who went and looked now appears while they
+report, which is the flat equivalent of desktop's "the camera follows the voice,
+not the press". Everything per-frame outside the canvas is `opacity`/`transform`:
+a `filter` mutated beside an animated subtree computes and never paints on iOS.
+
+**The analysts are the SitePal slot, deliberately unfilled.** Their press lines
+are a fixed bank of twenty (`ADVISER_LINES`), which is exactly what SitePal *can*
+lip-sync, and three of them already have scenes — Monk `2774449` (speaks any text
+via TTS), Demon `2774900` and Detective `2774916` (banked clips only). Eugene has
+none; an equine head needed a custom build. `SitePalFeed` is already the
+one-character-at-a-time 2D feed that slot wants, so the remaining work is an
+upload pass — generate the twenty lines in each seat's own ElevenLabs voice, name
+them in the Audio Manager — not code.
+
 ---
 
 ## 7. Build order
@@ -409,7 +457,9 @@ goes inside it or gets a height budget. 839px of rows in a 700px box once clippe
 the engagement record and the client's name · four SYMMETRIC seats, one lane and one
 use each · the pitch bot as an outside pitcher, projected into the room with its
 own voice · Virgil's two reads and the tip switch · `NOTHING ON FILE` · pressure
-bands · the shared floor · desktop in-room play · mobile CRT with voice + mouth · all five
+bands · the shared floor · desktop in-room play · mobile CRT with voice, the
+pitcher's projection panel and per-rig faces · **three rigs, rolled blind to the
+deal, with their own throats on both surfaces** · all seven
 ElevenLabs voices wired, seat-then-pitcher on both surfaces ·
 lower-third reveal · post-deal analysis with the pattern named · 118 assertions ·
 `The VC Game` tile on the `/trade` rail (default). Case Table behind `?classic=1`.

@@ -46,10 +46,17 @@ const HUB_OPTIONS = [
   // panel inside the terminal. See MobileTalkShow for why the shapes differ.
   { key: "lttv", label: "LT TV", sub: "the talk show — GR80 & John Barron" },
   // THE VC GAME (2026-07-26) — the one game we ship. Renders through PressFlat:
-  // same pure controller as desktop, no WebGL, and Barron actually SPEAKS here
-  // (ElevenLabs + the amplitude mouth), which the 3D view can't do because it's
-  // limited to hand-uploaded SitePal clips.
-  { key: "vc", label: "THE VC GAME", sub: "one deal. one pitch. three interruptions." },
+  // same pure controller as desktop, no WebGL. The pitch bot speaks here through
+  // ElevenLabs and the amplitude drives the projection panel rather than a
+  // mouth, because the rigs' mouths are LED plates that only exist inside the
+  // glb this surface deliberately never loads. (This said "Barron SPEAKS, which
+  // the 3D view can't do" — wrong twice since 2026-07-29: the pitch bot took the
+  // selling, and desktop took the same audio path.)
+  // "THE VC GAME" until 2026-08-02. Renamed to follow the /trade rail and the
+  // module header, which both became PITCH BOT — the hub was the last place
+  // still calling it by the internal name. (Code still says "the VC game"
+  // everywhere; that is the SUBSYSTEM, and it keeps its name.)
+  { key: "vc", label: "PITCH BOT", sub: "one deal. one pitch. three interruptions." },
   // NEURAL CATHEDRAL (2026-08-01) — ported from a CodePen by Techartist (MIT).
   // See MobileNeuron for the mobile changes and why it's affordable here.
   { key: "neuron", label: "NEURAL CATHEDRAL", sub: "bioelectric engine — tap to fire" },

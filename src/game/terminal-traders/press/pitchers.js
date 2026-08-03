@@ -82,10 +82,27 @@ export const PITCHER_FALLBACK = "v2";
  * failure that whole row exists to prevent — desk.js records the day the bot
  * wore Barron's headshot two seats from Barron.
  */
+/**
+ * `stage` — CAN THIS RIG BE SHOWN LIVE RATHER THAN AS A PICTURE?
+ *
+ * The flat surface renders the staged rig's actual glb when this is true, so its
+ * mouth is the one the artist authored instead of one drawn over a still (see
+ * PressBotStage). It is a plain flag rather than a test for viseme meshes on
+ * purpose: v2 and v3 drive their faces with PLATES, and v1's face is a texture,
+ * so "has visemes" is the mechanism of two rigs and not the question being
+ * asked. Flip v1 when its texture-swap face exists.
+ *
+ * IT LIVES HERE, WITH IDENTITY, so PressFigure can ask without importing
+ * lib/trade/pitchBotScene — that module imports three, and the whole reason this
+ * file exists is that the flat surface must be able to answer "which bot, and
+ * what can it do" without dragging a renderer onto a page that has none. The
+ * stage itself is loaded dynamically, so three arrives only when a rig that can
+ * use it is actually cast.
+ */
 export const PITCHER_IDENTITY = {
-  v1: { portrait: "/pitchBot.webp", voice: "PB" },
-  v2: { portrait: "/pitchBot2.webp", voice: "PB2" },
-  v3: { portrait: "/pitchBot3.webp", voice: "PB3" },
+  v1: { portrait: "/pitchBot.webp", voice: "PB", stage: false },
+  v2: { portrait: "/pitchBot2.webp", voice: "PB2", stage: true },
+  v3: { portrait: "/pitchBot3.webp", voice: "PB3", stage: true },
 };
 
 /** Cached so identity and geometry cannot roll separately within a page load. */
@@ -132,6 +149,11 @@ export function pitcherPortrait(variant = null) {
 /** The staged rig's speaker code for api/counsel-voice. */
 export function pitcherVoice(variant = null) {
   return PITCHER_IDENTITY[resolvePitcherId(variant)]?.voice ?? "PB";
+}
+
+/** Can the staged rig be rendered live? See `stage` on PITCHER_IDENTITY. */
+export function pitcherHasStage(variant = null) {
+  return !!PITCHER_IDENTITY[resolvePitcherId(variant)]?.stage;
 }
 
 /**
