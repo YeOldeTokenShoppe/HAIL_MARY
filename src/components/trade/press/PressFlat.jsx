@@ -16,7 +16,7 @@ import { preloadSfx } from "@/lib/uiSfx";
 import gsap from "gsap";
 import {
   EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
-  ENGAGEMENT_CSS,
+  ENGAGEMENT_CSS, peekFileNo, commitFileNo,
 } from "./engagement";
 import { createFlatEvidenceScreen } from "./evidenceScreen";
 import {
@@ -139,12 +139,19 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const [rolling, setRolling] = useState(false);
   const [settled, setSettled] = useState(false);
   const identity = rolled || settled;
+  // The desk's caseload, not a roll — peeked here, committed when the file is
+  // opened. See peekFileNo in engagement.jsx. The ref is the once-per-sitting
+  // commit guard: rolling/rolled are React state and can double-pass in one
+  // event batch.
+  const [fileNo] = useState(() => peekFileNo());
+  const fileCommitted = useRef(false);
   const recordRef = useRef(null);
   const shieldRef = useRef(null);
   const clientRef = useRef(null);
   const termsRef = useRef(null);
   const stampRetainedRef = useRef(null);
   const particularsRef = useRef(null);
+  const coverRef = useRef(null);
   const scrollRef = useRef(null);
   const tlRef = useRef(null);
 
@@ -162,6 +169,8 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
   const runRoll = useCallback(() => {
     if (rolling || rolled) return;
+    // The file is being opened either way — the caseload counts it either way.
+    if (!fileCommitted.current) { fileCommitted.current = true; commitFileNo(); }
     if (prefersReducedMotion()) { setSettled(true); setRolled(true); return; }
 
     // Pin to the top first — the record is up there, and an arrival you
@@ -177,6 +186,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       terms: termsRef.current,
       stampRetained: stampRetainedRef.current,
       particulars: particularsRef.current,
+      cover: coverRef.current,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -566,7 +576,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
       {!started && (
         <div className="pf-market-rail" aria-label="Deal simulation status">
-          <span><i>MANDATE</i>{identity ? deal.ticker : "PENDING"}</span>
+          {/* —— at rest, not PENDING: the rail cell is a blank field the settle
+              fills, same idiom as the record's own —— rows. PENDING was status
+              vocabulary — a fifth "not yet" the one-signal count (see the deal
+              file in engagement.jsx) couldn't carry. */}
+          <span><i>MANDATE</i>{identity ? deal.ticker : "——"}</span>
           <span><i>ACCESS</i>GUEST</span>
           <span><i>MODE</i>LIVE SIM</span>
         </div>
@@ -599,44 +613,37 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               the record's CLIENT line now. The block glyphs went with it: they
               were one of five things on this screen saying "not yet". */}
 
-          {/* THE RECORD. Picked fresh for this sitting; you can't ask for a
-              different one without leaving and coming back. See engagement.jsx
-              for the five props that held this slot before it, and why the sixth
-              is paperwork rather than another machine. */}
+          {/* THE RECORD, INSIDE ITS DEAL FILE. Picked fresh for this sitting;
+              you can't ask for a different one without leaving and coming back.
+              See engagement.jsx for the five props that held this slot before
+              it, and why the sixth is paperwork rather than another machine.
+
+              THE SEALED OVERLAY IS GONE (2026-08-03) and the folder cover is
+              what replaced it — closed geometry instead of CLIENT // SEALED
+              captions, so the blank form beneath is mounted, visible-shaped, and
+              covering its own rest state again ([A§20]'s "the empty-box problem
+              was never a staging problem"). The readout went with it: its
+              ○ AWAITING REVIEW doubled the record's pill 20px apart, and its
+              DEAL INTAKE label was retired — the cover's letterhead names the
+              document instead, PROSPECTUS (author's word). The shell is
+              the housing, the cover is the file, and the record's own pill is
+              the one place this surface says "not yet". */}
           <div className="pf-record-shell">
-            <div className="pf-record-readout">
-              <span>DEAL INTAKE</span>
-              <span>{identity ? "● BRIEF RELEASED" : "○ AWAITING REVIEW"}</span>
-            </div>
             <EngagementRecord
               arrived={identity}
               title={identity ? "Deal Brief" : "Inbound Deal"}
               restStatus="AWAITING REVIEW"
               arrivedStatus="MEETING SET"
               stampLabel="Meeting Set"
+              fileNo={fileNo}
               client={identity ? deal.name : null}
               surface={identity ? deal.surface : null}
               ticker={identity ? deal.ticker : null}
               chain={identity ? deal.chain : null}
               ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
               termsRef={termsRef} particularsRef={particularsRef}
-              stampRetainedRef={stampRetainedRef} />
-            {!identity && (
-              <div className="pf-sealed-state" aria-label="Client details are sealed">
-                <div className="pf-seal-code" aria-hidden="true">
-                  <span>02</span>
-                  <i />
-                </div>
-                <div className="pf-seal-copy">
-                  <b>CLIENT // SEALED</b>
-                  <span className="pf-seal-source">SOURCE // COMMISSIONED AGENT</span>
-                  <span>Review the file to release terms and particulars.</span>
-                  <div className="pf-seal-key" aria-hidden="true">
-                    <i /><i /><i /><em>INBOUND FILE</em>
-                  </div>
-                </div>
-              </div>
-            )}
+              stampRetainedRef={stampRetainedRef}
+              coverRef={coverRef} />
           </div>
           {/* THE CAPTION IS GONE (author, 2026-07-29: "this line seems
               unnecessary"). It read SENT DOWN TO YOU · YOU DON'T GET TO ASK WHY
@@ -1007,8 +1014,15 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   line-height:1.4; letter-spacing:.035em;
 }
 
+/* The top padding is the TAB BAND now, not readout clearance: the deal file's
+   tab rides the record's top edge at -17px and lives in this padding, and the
+   polaroid's paperclip reaches higher still — the inner comment documents the
+   exact value. The readout that used to sit here is gone — see the render
+   site. */
 .pf-record-shell {
-  position:relative; padding:22px 8px 8px;
+  /* 28px, not 22: the paperclip reaches ~25px above the record's top edge and
+     the shell's clip-path would shear it at the old padding. */
+  position:relative; padding:28px 8px 8px;
   border:1px solid rgba(47,214,214,.3);
   background:linear-gradient(145deg,#19211f,#08100f 34%,#020504 78%);
   box-shadow:0 9px 22px rgba(0,0,0,.65),inset 0 0 0 1px rgba(255,255,255,.025);
@@ -1018,12 +1032,6 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   content:""; position:absolute; inset:3px; pointer-events:none;
   border:1px solid rgba(255,210,58,.12);
 }
-.pf-record-readout {
-  position:absolute; z-index:2; left:10px; right:10px; top:7px;
-  display:flex; justify-content:space-between; gap:8px;
-  color:#ffd23a; font-size:6.5px; letter-spacing:.15em;
-}
-.pf-record-readout span:last-child { color:#76aaa3; }
 
 /* The record remains a document, but now sits inside the same spectral glass
    housing as the other channel displays. */
@@ -1045,73 +1053,12 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-start .eng-stats dt { width:45px; }
 .pf-start .eng-particulars { flex-basis:100%; }
 
-/* Before the meeting is accepted, this is a sealed mandate rather than an
-   empty completed form. The real terms and particulars remain mounted for the
-   arrival timeline, but leave the flow until identity is released. */
-.pf-start .eng:not(.in) { min-height:122px; padding-bottom:7px; }
-.pf-start .eng:not(.in) .eng-body {
-  height:80px; align-items:center; padding-bottom:0;
-}
-.pf-start .eng:not(.in) .eng-terms,
-.pf-start .eng:not(.in) .eng-particulars {
-  position:absolute; width:1px; height:1px; opacity:0; visibility:hidden; overflow:hidden;
-  pointer-events:none;
-}
-.pf-start .eng:not(.in) .eng-idents {
-  position:absolute; width:1px; height:1px; opacity:0; visibility:hidden; overflow:hidden;
-}
-.pf-sealed-state {
-  position:absolute; z-index:3; left:104px; right:17px; top:63px;
-  display:flex; align-items:center; gap:10px; min-width:0;
-  pointer-events:none;
-}
-.pf-seal-code {
-  position:relative; flex:none; width:34px; height:44px;
-  display:flex; align-items:center; justify-content:center;
-  border:1px solid rgba(255,210,58,.3);
-  color:#ffd23a; font-family:'Orbitron','IoskeleyMono',monospace;
-  font-size:10px; letter-spacing:.08em;
-  clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%);
-}
-.pf-seal-code::after {
-  content:""; position:absolute; inset:4px;
-  border:1px solid rgba(239,98,220,.16);
-}
-.pf-seal-code i {
-  position:absolute; left:7px; right:7px; bottom:7px; height:1px;
-  background:#ef62dc; box-shadow:0 0 7px rgba(239,98,220,.5);
-}
-.pf-seal-copy { min-width:0; display:flex; flex-direction:column; gap:4px; }
-.pf-seal-copy > b {
-  color:#ef62dc; font-size:8px; letter-spacing:.15em;
-  text-shadow:0 0 9px rgba(239,98,220,.25);
-}
-.pf-seal-copy > span {
-  max-width:185px; color:#8db1aa; font-size:7.5px; line-height:1.35;
-  letter-spacing:.035em;
-}
-.pf-seal-copy > .pf-seal-source {
-  color:rgba(255,210,58,.62); font-size:6.2px; letter-spacing:.12em;
-}
-.pf-seal-key {
-  display:flex; align-items:center; gap:3px; margin-top:2px; overflow:hidden;
-}
-.pf-seal-key i {
-  flex:0 1 25px; height:2px;
-  background:linear-gradient(90deg,rgba(255,210,58,.12),rgba(255,210,58,.7),rgba(255,210,58,.12));
-  background-size:200% 100%;
-  animation:pfSealScan 2.4s linear infinite;
-}
-.pf-seal-key i:nth-child(2) { flex-basis:15px; animation-delay:-.7s; }
-.pf-seal-key i:nth-child(3) { flex-basis:8px; animation-delay:-1.3s; }
-.pf-seal-key em {
-  margin-left:3px; color:rgba(255,210,58,.55); font-style:normal;
-  font-size:5.5px; letter-spacing:.12em; white-space:nowrap;
-}
-@keyframes pfSealScan {
-  from { background-position:100% 0; }
-  to { background-position:-100% 0; }
-}
+/* THE SEALED-STATE CSS IS GONE WITH ITS MARKUP (2026-08-03). The collapse hacks
+   went with it: the record renders its full blank form at rest — mounted,
+   in flow, covering its own rest state — and the deal file's cover (see
+   ENGAGEMENT_CSS) is what withholds it. Do not reintroduce a rest-state
+   overlay here; anything the rest state wants to say belongs on the cover,
+   and the cover already says everything a closed file needs to. */
 
 .pf-protocol {
   display:grid; grid-template-columns:repeat(3,1fr); margin-top:10px;
@@ -1165,7 +1112,17 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-face-who { font-size:7px; font-weight:bold; letter-spacing:0.02em;
   color:rgba(234,255,249,0.92); line-height:1.2; min-height:2.4em;
   display:flex; align-items:center; justify-content:center; }
-.pf-face-role { font-size:5.8px; letter-spacing:0.08em; color:rgba(255,210,58,0.75); }
+/* THE LANE IS THE POINT of this strip — it is the one fact a new player needs
+   from it (author, 2026-08-03: the SME labels were "low contrast and small").
+   Readable at REST, because touch has no hover; hover adds the zoom, gated on
+   (hover:hover) so phones never get a stuck-hover state. Not a button — the
+   zoom is a reading aid, and nothing here gains a click. */
+.pf-face-role { font-size:7px; letter-spacing:0.08em; color:#ffd23a; }
+@media (hover:hover) {
+  .pf-face-pic { transition:transform .18s ease; }
+  .pf-face:hover .pf-face-pic { transform:scale(1.22); }
+  .pf-face:hover .pf-face-role { color:#ffe27a; }
+}
 
 /* VIRGIL, at the end of the strip and set apart from it on purpose — not a seat,
    no lane, cannot be sent. The divider carries that; don't tidy it away. */
@@ -1272,7 +1229,6 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    and it is still the only thing that pulses: two at once reads as an error
    state rather than a nudge. */
 @media (prefers-reduced-motion:reduce) {
-  .pf-seal-key i { animation:none; }
   .pf-tabs button.look { animation:none; background:rgba(47,214,214,0.20);
     box-shadow:0 0 15px rgba(47,214,214,0.45); }
 }

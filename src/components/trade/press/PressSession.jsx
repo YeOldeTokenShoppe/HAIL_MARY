@@ -16,7 +16,7 @@ import { setPitchBotPressure, getPitchBotVoice } from "@/lib/trade/pitchBotScene
 import { setUnicornGlow } from "@/lib/trade/unicornGlow";
 import {
   EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
-  ENGAGEMENT_CSS,
+  ENGAGEMENT_CSS, peekFileNo, commitFileNo,
 } from "./engagement";
 import { createEvidenceScreen, SCREEN_AGENTS } from "./evidenceScreen";
 import {
@@ -159,12 +159,19 @@ export default function PressSession({
   // settle, so they're now the same instant and the two names arrive together.
   const [settled, setSettled] = useState(false);
   const identity = rolled || settled;
+  // The desk's caseload, not a roll — peeked here, committed when the file is
+  // opened. See peekFileNo in engagement.jsx. The ref is the once-per-sitting
+  // commit guard: rolling/rolled are React state and can double-pass in one
+  // event batch.
+  const [fileNo] = useState(() => peekFileNo());
+  const fileCommitted = useRef(false);
   const recordRef = useRef(null);
   const shieldRef = useRef(null);
   const clientRef = useRef(null);
   const termsRef = useRef(null);
   const stampRetainedRef = useRef(null);
   const particularsRef = useRef(null);
+  const coverRef = useRef(null);
   const tlRef = useRef(null);
 
   const claim = currentClaim(run, deal);
@@ -284,6 +291,8 @@ export default function PressSession({
 
   const runRoll = useCallback(() => {
     if (rolling || rolled) return;
+    // The file is being opened either way — the caseload counts it either way.
+    if (!fileCommitted.current) { fileCommitted.current = true; commitFileNo(); }
     // Someone who asked not to be moved gets the deal, not the choreography.
     if (prefersReducedMotion()) { setSettled(true); setRolled(true); return; }
 
@@ -296,6 +305,7 @@ export default function PressSession({
       terms: termsRef.current,
       stampRetained: stampRetainedRef.current,
       particulars: particularsRef.current,
+      cover: coverRef.current,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -659,11 +669,13 @@ export default function PressSession({
             reveal more loudly than the headline the panel withholds. */}
         {/* THE REST STATE IS EMPTY SINCE 2026-08-02, and this is the same rule
             engagement.jsx states about its status pill: anything that wants to say
-            "not yet" on this surface says it in ONE place. The briefing now carries
-            MANDATE PENDING on the rail, ○ AWAITING REVIEW on the housing, AWAITING
-            REVIEW on the record and CLIENT // SEALED on the seal — a fifth, in the
-            largest type on screen and outside the panel, is what makes a waiting
-            surface read as a hung one. It read ONE DEAL · NOT IN YET.
+            "not yet" on this surface says it in ONE place. That place is the
+            record's pill (under the deal file's cover, whose STATUS line stands
+            in for it while the file is closed) — since 2026-08-03 the rail, the
+            housing readout and the seal copy no longer carry their copies of it.
+            A fifth signal here, in the largest type on screen and outside the
+            panel, is what made a waiting surface read as a hung one. It read
+            ONE DEAL · NOT IN YET.
 
             The ARRIVED state is untouched: the bar names the deal once the deal has
             a face, and it is the only place that names it during the floor. */}
@@ -694,7 +706,7 @@ export default function PressSession({
           {/* THE BRIEFING IS THE FLAT SURFACE'S, AT DESKTOP SIZE (2026-08-02).
               PressFlat's start screen was rebuilt as a MANDATE INTAKE TERMINAL —
               a status rail, a headline, the record inside a bevelled housing with
-              its client sealed, a three-cell protocol readout, and one bevelled
+              its closed deal-file cover, a three-cell protocol readout, and one bevelled
               gold action — and this panel was still the old briefing underneath the
               same game. Two presentations of one beat is the drift this file keeps
               logging (see the note above .ps-readcol), so the bands below mirror
@@ -715,7 +727,10 @@ export default function PressSession({
               stacked instruments; here the panel is the instrument, so the rail is
               its top edge. It leaves with the briefing, as it does on the phone. */}
           <div className="ps-market-rail" aria-label="Deal simulation status">
-            <span><i>MANDATE</i>{identity ? deal.ticker : "PENDING"}</span>
+            {/* —— at rest, not PENDING — same fix as the flat surface: the rail
+                cell is a blank field the settle fills, and PENDING was a second
+                "not yet" the one-signal count couldn't carry. */}
+            <span><i>MANDATE</i>{identity ? deal.ticker : "——"}</span>
             <span><i>ACCESS</i>GUEST</span>
             <span><i>MODE</i>LIVE SIM</span>
           </div>
@@ -726,67 +741,53 @@ export default function PressSession({
               spoiling the one thing the panel withholds. */}
           <div className="ps-start-head">
             <div className="ps-open-eyebrow">CH 02 // INCOMING MANDATE</div>
-            <h1>READ THE DEAL.<br /><span>CALL THE BLUFF.</span></h1>
+            <h1>HEAR THE PITCH.<br /><span>CALL THE BLUFF.</span></h1>
             <p>One pitch. Three interruptions. Decide whether it deserves your book.</p>
           </div>
 
-          {/* BAND 2 — THE RECORD, full panel width, inside its housing.
-              The record itself is unchanged: one document with three columns, which
-              is what deleted the second box the particulars used to live in (author:
-              "the pitch project is in 2 separate boxes"). See engagement.jsx.
+          {/* BAND 2 — THE RECORD, full panel width, inside its housing, inside
+              its DEAL FILE. The record itself is unchanged: one document with
+              three columns, which is what deleted the second box the particulars
+              used to live in (author: "the pitch project is in 2 separate
+              boxes"). See engagement.jsx — the folder cover, tab and routing
+              block all live there so both surfaces get one file.
 
-              THE HOUSING IS NEW AND IS NOT DECORATION. The bevelled shell and the
-              DEAL INTAKE / AWAITING REVIEW readout are what make the record read as
-              something that ARRIVED on a terminal rather than a form the page drew.
-              It is also where the status now lives at rest, which is why the sealed
-              overlay below can take the record's body without leaving the panel
-              with nothing saying "not yet".
+              THE HOUSING IS NOT DECORATION: the bevelled shell is what makes the
+              file read as something that ARRIVED on a terminal rather than a
+              form the page drew. Its readout is gone — the cover's letterhead
+              names the document instead, PROSPECTUS (author's word), and the
+              status lives in exactly one place, the record's own pill.
 
               THE CAPTION IS STILL GONE (author: "this line seems unnecessary"). It
               read SENT DOWN TO YOU · YOU DON'T GET TO ASK WHY THIS ONE, and it was
               load-bearing exactly once — against the dice, where naming who chose
               was the one thing a randomiser could not do for itself. A form that
               arrives already signed never raises the question. [A§20]. */}
+          {/* THE SEALED OVERLAY IS GONE (2026-08-03), same change as the flat
+              surface and for the same reasons: its CLIENT // SEALED narration,
+              02 glyph and scan bars had crept back to the five-signal count
+              [A§20] records this briefing dying of, and its 1px/visibility
+              collapse hacks hid the blank form the record is supposed to BE.
+              The deal file's cover (see engagement.jsx) withholds the record by
+              geometry instead; the readout's DEAL INTAKE label was retired for
+              the cover's PROSPECTUS letterhead, and the record's own pill is
+              the one place this panel says "not yet". */}
           <div className="ps-record-shell">
-            <div className="ps-record-readout">
-              <span>DEAL INTAKE</span>
-              <span>{identity ? "● BRIEF RELEASED" : "○ AWAITING REVIEW"}</span>
-            </div>
             <EngagementRecord
               arrived={identity}
               title={identity ? "Deal Brief" : "Inbound Deal"}
               restStatus="AWAITING REVIEW"
               arrivedStatus="MEETING SET"
               stampLabel="Meeting Set"
+              fileNo={fileNo}
               client={identity ? deal.name : null}
               surface={identity ? deal.surface : null}
               ticker={identity ? deal.ticker : null}
               chain={identity ? deal.chain : null}
               ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
               termsRef={termsRef} particularsRef={particularsRef}
-              stampRetainedRef={stampRetainedRef} />
-            {/* THE SEAL. At rest the record is a SEALED MANDATE, not a completed
-                form with every value blanked to ——. The terms and particulars stay
-                MOUNTED (hidden in CSS, not unmounted) because runArrival animates
-                those exact nodes — dropping them from the tree would hand GSAP a
-                null ref at the settle. It unmounts on `identity`, which is the same
-                instant the record's own reveal lands. */}
-            {!identity && (
-              <div className="ps-sealed-state" aria-label="Client details are sealed">
-                <div className="ps-seal-code" aria-hidden="true">
-                  <span>02</span>
-                  <i />
-                </div>
-                <div className="ps-seal-copy">
-                  <b>CLIENT // SEALED</b>
-                  <span className="ps-seal-source">SOURCE // COMMISSIONED AGENT</span>
-                  <span>Review the file to release terms and particulars.</span>
-                  <div className="ps-seal-key" aria-hidden="true">
-                    <i /><i /><i /><em>INBOUND FILE</em>
-                  </div>
-                </div>
-              </div>
-            )}
+              stampRetainedRef={stampRetainedRef}
+              coverRef={coverRef} />
           </div>
 
           {/* BAND 3 — WHAT IS ABOUT TO HAPPEN, AS THREE NUMBERS.
@@ -1266,7 +1267,8 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 
 /* BAND 0 — THE STATUS RAIL. Three cells, bevelled at opposite corners, in the
    same register as the rest of the terminal's readouts. MANDATE gets the widest
-   cell because it is the only one whose value changes (PENDING → the ticker). */
+   cell because it is the only one whose value changes (—— at rest → the ticker
+   at the settle). */
 .ps-market-rail {
   display:grid; grid-template-columns:1.1fr .85fr 1fr;
   border:1px solid rgba(47,214,214,.18); background:rgba(2,18,17,.72);
@@ -1311,10 +1313,21 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .ps-open-eyebrow { font-size:11px; letter-spacing:.2em; color:#ffd23a; font-weight:bold; }
 
 /* BAND 2 — THE HOUSING. See the render site for why the record now sits in one.
-   The top padding is the readout's lane: it is absolutely positioned so the
-   record underneath keeps its own box, and 26px is what clears it. */
+   The 28px top padding is the TAB BAND and the paperclip's headroom: the deal
+   file's tab rides the record's top edge at -17px and the polaroid's clip
+   reaches ~27px above it — the shell's clip-path would shear the loop at
+   anything shallower (PressFlat carries the same 28 for the same reason). The
+   readout that used to occupy this padding is gone — see the render site.
+   CAPPED AND CENTERED (author, 2026-08-03: "folder looks too wide"): a folder
+   has folder proportions, and at the panel's full ~940px it read as a banner.
+   640px keeps the open record's three columns comfortable, with flex-wrap's
+   particulars-drop as the designed degradation a few px below that — and the
+   flat surface runs the same record at 520, stacked, so every narrower shape
+   is already proven. The folder reads as an object on the desk rather than a
+   stripe across it. */
 .ps-record-shell {
-  position:relative; margin-top:14px; padding:26px 10px 10px;
+  position:relative; margin-top:14px; padding:28px 10px 10px;
+  max-width:640px; margin-left:auto; margin-right:auto;
   border:1px solid rgba(47,214,214,.3);
   background:linear-gradient(145deg,#19211f,#08100f 34%,#020504 78%);
   box-shadow:0 10px 26px rgba(0,0,0,.65),inset 0 0 0 1px rgba(255,255,255,.025);
@@ -1324,12 +1337,6 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   content:""; position:absolute; inset:4px; pointer-events:none;
   border:1px solid rgba(255,210,58,.12);
 }
-.ps-record-readout {
-  position:absolute; z-index:2; left:14px; right:14px; top:9px;
-  display:flex; justify-content:space-between; gap:8px;
-  color:#ffd23a; font-size:9px; letter-spacing:.15em;
-}
-.ps-record-readout span:last-child { color:#76aaa3; }
 
 /* The record stays a document, but tinted to the housing it now sits in — the
    scanline wash is what stops a pale form floating inside a dark instrument. */
@@ -1342,98 +1349,14 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .ps-open .eng.in { border-color:rgba(255,210,58,.48); }
 .ps-open .eng-title { font-family:'Orbitron','IoskeleyMono',monospace; font-size:14px; }
 
-/* THE SEALED REST STATE. Before the file is opened this is a sealed mandate, not
-   a completed form with every value blanked to ——.
-
-   THE HIDDEN NODES ARE HIDDEN, NOT UNMOUNTED, and that is a hard requirement:
-   runArrival animates .eng-terms / .eng-particulars / .eng-idents by ref, so
-   dropping them from the tree hands GSAP nulls at the settle. Taken out of flow
-   with the 1px/visibility:hidden pattern rather than display:none for the same
-   reason — a display:none node has no box to animate to.
-
-   THE BODY HEIGHT IS LOAD-BEARING, and it and the seal's box are THE SAME BAND —
-   both read --seal-band, and the seal's top is the record's own header height, so
-   the two boxes are congruent and align-items:center puts the seal copy on the
-   portrait's centre line without either side guessing. Set them independently and
-   they drift: at 78/100 the seal hung 15px low and its last row (INBOUND FILE)
-   sat on the record's bottom border.
-
-   --seal-top is 27px of shell padding + border plus the 32px .eng-head. If the
-   record's letterhead ever changes size, this is the number that follows it.
-   --seal-band is the 78px frame plus its 12px top padding and a little air, and
-   it must also clear .ps-seal-copy — ~77px at these type sizes. */
-.ps-open { --seal-band:100px; --seal-top:59px; }
-.ps-open .eng:not(.in) { padding-bottom:9px; }
-.ps-open .eng:not(.in) .eng-body {
-  height:var(--seal-band); align-items:center; padding-bottom:0;
-}
-.ps-open .eng:not(.in) .eng-terms,
-.ps-open .eng:not(.in) .eng-particulars,
-.ps-open .eng:not(.in) .eng-idents {
-  position:absolute; width:1px; height:1px; opacity:0; visibility:hidden;
-  overflow:hidden; pointer-events:none;
-}
-/* Anchored off the housing, not the record: left clears the shell's 10px padding
-   + the record's 11px body padding + the 78px frame + a 26px gutter. Height
-   matches .eng-body's so align-items:center lines the seal up with the
-   portrait. pointer-events:none — .ps-skip-deal sits above it and must stay
-   clickable through the whole arrival. */
-.ps-sealed-state {
-  position:absolute; z-index:3; left:125px; right:26px;
-  /* CONGRUENT WITH .eng-body's CONTENT BOX, not its border box: the portrait
-     centres below the record's 12px top padding, so a seal centred on the border
-     box sits ~5px high of it. Subtracting the same 12 from both ends makes the
-     two boxes identical and align-items:center does the rest — no nudge, and
-     nothing to re-tune if --seal-band moves. */
-  top:calc(var(--seal-top) + 12px); height:calc(var(--seal-band) - 12px);
-  display:flex; align-items:center; gap:16px; min-width:0;
-  pointer-events:none;
-}
-.ps-seal-code {
-  position:relative; flex:none; width:46px; height:60px;
-  display:flex; align-items:center; justify-content:center;
-  border:1px solid rgba(255,210,58,.3);
-  color:#ffd23a; font-family:'Orbitron','IoskeleyMono',monospace;
-  font-size:15px; letter-spacing:.08em;
-  clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,0 100%);
-}
-.ps-seal-code::after {
-  content:""; position:absolute; inset:5px;
-  border:1px solid rgba(239,98,220,.16);
-}
-.ps-seal-code i {
-  position:absolute; left:9px; right:9px; bottom:9px; height:1px;
-  background:#ef62dc; box-shadow:0 0 7px rgba(239,98,220,.5);
-}
-.ps-seal-copy { min-width:0; display:flex; flex-direction:column; gap:5px; }
-.ps-seal-copy > b {
-  color:#ef62dc; font-size:11px; letter-spacing:.15em;
-  text-shadow:0 0 9px rgba(239,98,220,.25);
-}
-.ps-seal-copy > span {
-  max-width:40ch; color:#8db1aa; font-size:11px; line-height:1.35;
-  letter-spacing:.035em;
-}
-.ps-seal-copy > .ps-seal-source {
-  color:rgba(255,210,58,.62); font-size:8.5px; letter-spacing:.12em;
-}
-.ps-seal-key { display:flex; align-items:center; gap:4px; margin-top:3px; overflow:hidden; }
-.ps-seal-key i {
-  flex:0 1 34px; height:2px;
-  background:linear-gradient(90deg,rgba(255,210,58,.12),rgba(255,210,58,.7),rgba(255,210,58,.12));
-  background-size:200% 100%;
-  animation:psSealScan 2.4s linear infinite;
-}
-.ps-seal-key i:nth-child(2) { flex-basis:21px; animation-delay:-.7s; }
-.ps-seal-key i:nth-child(3) { flex-basis:11px; animation-delay:-1.3s; }
-.ps-seal-key em {
-  margin-left:4px; color:rgba(255,210,58,.55); font-style:normal;
-  font-size:7.5px; letter-spacing:.12em; white-space:nowrap;
-}
-@keyframes psSealScan {
-  from { background-position:100% 0; }
-  to { background-position:-100% 0; }
-}
+/* THE SEALED-STATE CSS IS GONE WITH ITS MARKUP (2026-08-03), and the collapse
+   hacks (--seal-band, the :not(.in) 1px/visibility pattern) went with it: the
+   record renders its full blank form at rest — mounted, in flow, covering its
+   own rest state — and the deal file's cover (see ENGAGEMENT_CSS) is what
+   withholds it. Do not reintroduce a rest-state overlay here; anything the rest
+   state wants to say belongs on the cover, and the cover already says
+   everything a closed file needs to. The desktop record wears the cover at its
+   own width — the cover is inset over the record, so no per-surface geometry. */
 
 /* BAND 3 — THE PROTOCOL. Three counts, baseline-aligned so the numerals read as
    a row of values rather than three stacked captions. */
@@ -1486,7 +1409,14 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .ps-face-who { font-size:9px; font-weight:bold; letter-spacing:0.04em;
   color:rgba(234,255,249,0.92); line-height:1.2; min-height:2.4em;
   display:flex; align-items:center; justify-content:center; }
-.ps-face-role { font-size:8px; letter-spacing:0.11em; color:rgba(255,210,58,0.75); }
+/* THE LANE IS THE POINT — readable at rest, hover zoom as a reading aid; see
+   the note on .pf-face-role, which this mirrors band for band. */
+.ps-face-role { font-size:9.5px; letter-spacing:0.11em; color:#ffd23a; }
+@media (hover:hover) {
+  .ps-face-pic { transition:transform .18s ease; }
+  .ps-face:hover .ps-face-pic { transform:scale(1.22); }
+  .ps-face:hover .ps-face-role { color:#ffe27a; }
+}
 
 /* VIRGIL, at the end of the desk row and set apart from it on purpose — not a
    seat, no lane, cannot be sent. The divider is what carries that, so it is not
@@ -1519,10 +1449,11 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    the record's letterhead is the only thing on the panel that should be Bebas. */
 /* STICKY TO THE FOOT OF THE PANEL, as .pf-cta-row is on the phone. The briefing
    is ~660px of bands and 90vh on a 13" laptop is ~630, so the one button was the
-   thing that fell off the bottom — and it gets taller still at the reveal, when
-   the record grows terms and particulars (+19px). A briefing whose only action is
-   below the fold reads as a surface with nothing to press, which is the exact
-   report that put this CTA back (author, 2026-07-27).
+   thing that fell off the bottom. (The record no longer grows at the reveal —
+   the blank form under the deal file's cover locks its height from rest — but
+   the briefing was already taller than a short laptop without it.) A briefing
+   whose only action is below the fold reads as a surface with nothing to press,
+   which is the exact report that put this CTA back (author, 2026-07-27).
 
    The negative bottom and matching negative margin are what make it sit FLUSH
    with the panel's padding edge instead of floating 18px above it: sticky offsets
@@ -1652,19 +1583,12 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    out on a laptop is vertical room, and keying this off max-width would compact
    a tall narrow window that has no need of it. */
 @media (max-height: 820px) {
-  /* --seal-band can only come down to what .ps-seal-copy needs plus the 12px
-     the seal box gives back to the record's padding — ~78 + 12. The frame shrinks
-     to 62px so the two still centre on each other. --seal-top follows the shell's
-     smaller padding: 9 + 1 border + the same 32px header. */
-  .ps-open { --seal-band:92px; --seal-top:57px; }
   .ps-market-rail span { padding:5px 13px; }
   .ps-start-head { margin-top:7px; }
   .ps-start-head h1 { margin:5px 0 5px; font-size:25px; }
   .ps-start-head p { font-size:12px; }
-  .ps-record-shell { margin-top:9px; padding:24px 9px 8px; }
+  .ps-record-shell { margin-top:9px; padding:28px 9px 8px; }
   .ps-open .eng-frame { width:62px; }
-  /* Tracks .eng-frame: 9px shell padding + 11px body padding + 62px + 26px. */
-  .ps-sealed-state { left:108px; }
   .ps-protocol { margin-top:9px; }
   .ps-protocol div { padding:8px 14px 7px; }
   .ps-protocol b { font-size:17px; }
@@ -1687,12 +1611,6 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   .ps-start-head h1 { font-size:26px; }
   .ps-protocol b { font-size:17px; }
   .ps-cta-row .ps-lock { font-size:15px; }
-  /* THE SEAL STOPS BEING AN OVERLAY. Its absolute box is measured off the record
-     at desktop metrics; below ~560px of panel the copy collides with the portrait.
-     Under the record it is still legible, and the record keeps its natural height
-     back because the body no longer has to reserve room beside it. */
-  .ps-open .eng:not(.in) .eng-body { height:auto; padding-bottom:12px; }
-  .ps-sealed-state { position:static; height:auto; margin:0 4px 10px; }
   .ps-pattern { flex-direction:column; align-items:center; text-align:center; }
   /* no room for a lower third beside a number — stack it */
   .ps-lower { flex-direction:column; align-items:stretch; gap:10px; text-align:center; }
