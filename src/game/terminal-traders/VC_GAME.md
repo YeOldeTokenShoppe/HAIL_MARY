@@ -94,6 +94,22 @@ including why the "a rotating pitcher multiplies the content" claim was false �
 5. **Roll the founder independently of archetype AND outcome.** A founder who only
    appears on legit deals leaks the answer; a founder mapped to an archetype is the
    name-leak again — four appearances in four costumes.
+6. **The RIG is rolled on the same terms, and for the same reason** *(2026-08-02)*.
+   There are several pitch-bot meshes now (`PITCH_BOT_ROSTER`); which one the beam
+   casts is drawn in `press/pitchers.js` from a roster and a seed, and **nothing
+   about the deal is passed in** — so the roll cannot see the archetype or the
+   branch even by accident. With three or four rigs against three archetypes, a
+   bot keyed to the case pattern would not be a partial leak but close to a lookup
+   table, read before a word is spoken and looking for all the world like art
+   direction. It is rolled at temple load, *before the deal exists*, which makes
+   the independence structural rather than a promise.
+   **One character, several shells:** the rigs are bodies for one role — one voice
+   bank, one set of asides, one commission rule, **no per-rig prose**. §1's "one
+   voice, many clients" is intact, and `[A§17]`'s objection to a rotating cast does
+   not apply: that argument was about authored content multiplying, and swapping a
+   mesh multiplies nothing. A shell may carry its own vocal timbre (`voice` on the
+   variant); it must never carry its own script, because a script is where a tell
+   would hide.
 
 **The record is the arrival; the projector is the pitcher** `[A§17]`, `[A§20]`.
 Our Lady decides *which* deal, the engagement record names the client who retained
@@ -435,6 +451,25 @@ is done — derived from the face plate at focus time by `getPitchBotFocusSettin
    or the halves disagree. Both clips animate `head`, so any look-at must use this
    repo's one shared head-aim formulation applied *after* the mixer — a bespoke
    version has been the bug before.
+
+   **An alternate rig, `/models/pitchbot2.glb` (896KB), added 2026-08-02.** Not a
+   replacement: both live in `PITCH_BOT_VARIANTS` and v1 is still the default.
+   Stage the other one with `?pitchbot=v2` — no rebuild, no edit to
+   `CyborgTempleScene`. Draco only (no WebP). Clips `Stand_Idle` 13.97s, `Talking`
+   10.30s, `Formal_Bow` 2.77s, 65 nodes each; they are registered under **canonical
+   aliases** (`idle`/`talking`/`bow`) as well as their own names, because the speech
+   effect at `CyborgTempleScene.jsx` reads `actions.idle`/`actions.talking`
+   literally and a bare registration stages a bot that never moves without erroring.
+   **Its face is eight meshes, not a texture:** `Adult_Male_Face_<Happy|Neutral|Sad|
+   Angry|Confuse|Impatience|Usual|Frustrated>`, bone-parented to `mixamorig:Head`,
+   all sharing the emissive `Expression_LED_MAT` (cyan, `emissiveStrength` 4 — it
+   self-lights into the existing Bloom, whose threshold is 0.3, and it is held out
+   of the holographic wash so it keeps reading as a screen). glTF has no visibility
+   channel, so **all eight arrive visible and coincident** and `pitchBotExpressions`
+   has to switch seven off before the rig is looked at; no clip touches them, so
+   expression swaps stay mixer-independent exactly as on v1. Sized by
+   `fitHeight`, not by a scale — see that field for why the two rigs are
+   deliberately *not* staged at the same height.
 
    **The bill is mostly paid.** The one voice bank, Barron's specialist `sharp`
    findings and his one-use lane all landed on 2026-07-29; what's left is the two

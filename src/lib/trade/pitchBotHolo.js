@@ -36,6 +36,77 @@ export const PITCH_BOT_HOLO = {
   scanSpeed: 0.35,   // scanline drift
   opacity: 0.88,
   floor: 0.22,       // minimum alpha, so the silhouette never fully vanishes
+  /**
+   * WHICH FACINGS RENDER. DoubleSide is the original and it is what lets you see
+   * THROUGH the front of a head to the hair on the back of it: every triangle
+   * draws regardless of facing, and with depthWrite off (below) nothing occludes
+   * anything, so the far hemisphere is superimposed on the near one. On a plain
+   * cyan wash that reads as depth; on a head with hair it reads as a mess.
+   *
+   * THREE.FrontSide culls the far hemisphere outright — the most surgical fix,
+   * because it changes what is DRAWN rather than how it is composited, so the
+   * scanlines, fresnel and beam interaction are all untouched.
+   *
+   * THE CAVEAT IS FLAT GEOMETRY. Anything modelled as a single-sided card — hair
+   * planes, a cape, a skirt — disappears from whichever angle shows its back.
+   * Solid shells are safe. If the hair thins out at certain angles, that is this.
+   */
+  side: THREE.DoubleSide,
+  /**
+   * WHETHER THE HOLOGRAM OCCLUDES ITSELF.
+   *
+   * false (original): transparent surfaces don't write depth, so the figure
+   * composites as one translucent volume — correct for a projection, and the
+   * reason the desks show through it properly.
+   *
+   * true: near surfaces hide far ones, which fixes see-through more aggressively
+   * than FrontSide does — but a fragment the scanlines have taken down to alpha
+   * 0.22 still writes full depth, so it punches an invisible hole in the BEAM
+   * behind the bot. Reach for FrontSide first; this second.
+   */
+  depthWrite: false,
+  /**
+   * PER-MATERIAL OVERRIDES, keyed by source material name:
+   *
+   *     perMaterial: { "MAT_01A.005": { side: THREE.FrontSide, depthWrite: true } }
+   *
+   * WHY THIS EXISTS. `side` and `depthWrite` are the right knobs for self-overlap,
+   * but the right VALUE differs by part. A body shell wants to stay double-sided
+   * and translucent — that is the projection reading correctly. Hair is a pile of
+   * intersecting shells and wants backfaces gone and depth on, or it renders as a
+   * lattice of its own interior. Setting either globally means picking which part
+   * looks wrong.
+   *
+   * Only meaningful once the exporter gives the part its own material. v3's hair
+   * arrived as MAT_01A.005 on 2026-08-02; before that it was inside the body
+   * material and there was nothing to aim at.
+   */
+  perMaterial: null,
+  /**
+   * DRAW ONLY THE NEAREST SURFACE — the fix for a figure showing its own insides.
+   *
+   * THE PROBLEM IT SOLVES, precisely. A translucent surface shows what is behind
+   * it; that is what translucent means. So a hologram body shows its own far side,
+   * and on these rigs it also shows the ball-joint articulation — the neck through
+   * the chin, the waist sphere through the chest. Neither `depthWrite` nor
+   * `FrontSide` fixes that properly: depth only arbitrates between fragments
+   * competing for a pixel, and within ONE mesh three does not sort triangles at
+   * all, so which of two overlapping surfaces wins is index order and therefore
+   * luck. HIDING the offending mesh is not available either — the joints are the
+   * articulation, and hiding them deletes the midsection.
+   *
+   * THE PREPASS. Every washed mesh gets a colour-less twin drawn first that writes
+   * depth and nothing else. The real pass then runs with depthTest on and
+   * depthWrite off, so at each pixel only the nearest surface survives. The figure
+   * becomes a shell: fresnel, scanlines and 0.88 opacity against the BACKGROUND
+   * all still read, but it no longer shows its own interior.
+   *
+   * WHAT IT COSTS. One extra draw call per washed mesh, and the bot now occludes
+   * what is behind it — including the projector beam it stands in, which will stop
+   * shining through the figure. If the beam through the body was doing useful
+   * work, this is the trade.
+   */
+  depthPrepass: false,
   /** Material names that keep their own look. The face plate is the pressure
    *  display; see the note above. */
   exclude: ["lambert2.003"],
@@ -110,6 +181,11 @@ export const PITCH_BOT_HOLO = {
 };
 
 const registry = [];
+/** Every material the holo wash patched, for live tuning. Excluded (face)
+ *  materials are deliberately absent — they are not part of the wash. */
+const materials = [];
+/** Depth-prepass materials, disposed with the rest. */
+const depthMaterials = [];
 
 /* ────────────────────────────────────────────────────────────────────────────
    THE CAST — the bot assembling up the beam.
@@ -437,6 +513,9 @@ export function tickPitchBotCast(delta) {
 /** Clear the registry. Call on unmount, or stale uniforms tick forever. */
 export function disposePitchBotHolo() {
   registry.length = 0;
+  materials.length = 0;
+  for (const m of depthMaterials) m.dispose();
+  depthMaterials.length = 0;
   // AND STOP THE CAST. Without this a remount mid-cast leaves the timer running
   // against an empty registry: it advances, writes to nothing, and the next bot to
   // load inherits a clock that is already part-way through a cast it never began.
@@ -472,10 +551,17 @@ export function applyPitchBotHolo(root, cfg = {}) {
       m.userData = {};
 
       m.transparent = true;
-      m.depthWrite = false;   // transparent additive-ish surfaces shouldn't occlude
-      m.depthTest = true;     // ...but they must still be occluded BY the desks
-      m.side = THREE.DoubleSide;
-      m.opacity = o.opacity;
+      // Both configurable since 2026-08-02 — see the notes on PITCH_BOT_HOLO.
+      // Defaults are the original values, so a variant that says nothing is
+      // unchanged.
+      const per = o.perMaterial?.[src.name] || null;
+      m.depthWrite = per?.depthWrite ?? o.depthWrite ?? false;
+      m.depthTest = true;     // ...they must still be occluded BY the desks
+      m.side = per?.side ?? o.side ?? THREE.DoubleSide;
+      m.opacity = per?.opacity ?? o.opacity;
+      // Name preserved through the clone so tunePitchBotHolo can target it.
+      m.name = src.name;
+      materials.push(m);
 
       m.onBeforeCompile = (shader) => {
         shader.uniforms.uHoloTime = { value: 0 };
@@ -526,7 +612,13 @@ export function applyPitchBotHolo(root, cfg = {}) {
         registry.push(shader.uniforms);
       };
 
+      // WITH A PREPASS THE COLOUR PASS MUST NOT WRITE DEPTH. The twin has already
+      // laid down the nearest surface; writing again here would be redundant at
+      // best, and at worst a far triangle that happens to rasterise first would
+      // claim the pixel before the near one is tested.
+      if (o.depthPrepass) m.depthWrite = false;
       m.needsUpdate = true;
+      node.userData.holoWashed = true;
       patched += 1;
       return m;
     });
@@ -534,7 +626,95 @@ export function applyPitchBotHolo(root, cfg = {}) {
     node.material = Array.isArray(node.material) ? next : next[0];
   });
 
+  if (o.depthPrepass) addDepthPrepass(root);
+
   return patched;
+}
+
+/**
+ * Give every washed mesh a depth-only twin, drawn first.
+ *
+ * COLLECTED BEFORE ANYTHING IS ADDED, because adding children inside a traverse
+ * walks into what you just added.
+ *
+ * ONE SHARED MATERIAL across all twins — they differ only in geometry, and a
+ * material per mesh would be as many extra shader compiles as the rig has parts.
+ *
+ * The twins share GEOMETRY and SKELETON with their originals rather than copying:
+ * a SkinnedMesh bound to the same skeleton and bindMatrix deforms identically for
+ * free, and the alternative — a second skeleton to keep in step — is a whole class
+ * of bug for no gain.
+ */
+function addDepthPrepass(root) {
+  const targets = [];
+  root.traverse((n) => {
+    if (n.isMesh && n.userData.holoWashed && !n.userData.holoDepthTwin) targets.push(n);
+  });
+  if (!targets.length) return 0;
+
+  const depthMat = new THREE.MeshBasicMaterial({
+    colorWrite: false,
+    depthWrite: true,
+    depthTest: true,
+    // DOUBLE-SIDED so the nearest surface is captured whichever way it faces —
+    // culling here could let a back-facing near surface through and defeat the
+    // whole point.
+    side: THREE.DoubleSide,
+  });
+  depthMaterials.push(depthMat);
+
+  for (const src of targets) {
+    const twin = src.isSkinnedMesh
+      ? new THREE.SkinnedMesh(src.geometry, depthMat)
+      : new THREE.Mesh(src.geometry, depthMat);
+    if (src.isSkinnedMesh) twin.bind(src.skeleton, src.bindMatrix);
+    twin.name = `${src.name}__depth`;
+    twin.position.copy(src.position);
+    twin.quaternion.copy(src.quaternion);
+    twin.scale.copy(src.scale);
+    // Skinned bounds are bind-pose and don't describe the animated figure, so the
+    // twin can be culled while the thing it is masking is still on screen.
+    twin.frustumCulled = false;
+    // Before everything, including the opaque LED plates — they are nearer than
+    // the shell and must still pass the depth test the twin lays down.
+    twin.renderOrder = -1;
+    twin.userData.holoDepthTwin = true;
+    // Invisible to click-to-focus: it draws no colour and must not be a hit.
+    twin.raycast = () => {};
+    src.parent?.add(twin);
+  }
+  return targets.length;
+}
+
+/**
+ * Retune the wash without a reload — the see-through knobs especially, since
+ * whether a translucent head reads as a projection or as a mess is an eyeball
+ * call at one particular camera distance.
+ *
+ *     tunePitchBotHolo({ side: "front" })            // cull the far hemisphere
+ *     tunePitchBotHolo({ depthWrite: true })         // occlude self, may dim the beam
+ *     tunePitchBotHolo({ side: "double", depthWrite: false })   // as originally shipped
+ *
+ * @returns what is now in force, and how many materials it reached.
+ */
+export function tunePitchBotHolo({ side, depthWrite, opacity, material } = {}) {
+  const SIDES = { front: THREE.FrontSide, back: THREE.BackSide, double: THREE.DoubleSide };
+  const resolved = typeof side === "string" ? SIDES[side] : side;
+  const hit = material ? materials.filter((m) => m.name === material) : materials;
+  for (const m of hit) {
+    if (resolved !== undefined) m.side = resolved;
+    if (depthWrite !== undefined) m.depthWrite = !!depthWrite;
+    if (opacity !== undefined) m.opacity = opacity;
+    m.needsUpdate = true;
+  }
+  const first = hit[0];
+  return {
+    matched: hit.length,
+    available: [...new Set(materials.map((m) => m.name))],
+    side: first ? Object.keys(SIDES).find((k) => SIDES[k] === first.side) ?? first.side : null,
+    depthWrite: first ? first.depthWrite : null,
+    opacity: first ? +first.opacity.toFixed(3) : null,
+  };
 }
 
 /** Read the cast's live state. For probes and the tuning handles; see

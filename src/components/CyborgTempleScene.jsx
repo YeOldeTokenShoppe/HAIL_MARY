@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
-import { mountPitchBot, tickPitchBotBillboard, disposePitchBotBillboard } from "@/lib/trade/pitchBotScene";
+import {
+  mountPitchBot, tickPitchBotBillboard, disposePitchBotBillboard, getPitchBotFraming,
+} from "@/lib/trade/pitchBotScene";
+import { tickPitchBotFace } from "@/lib/trade/pitchBotExpressions";
 import { TEMPLE_ANCHOR_NAME } from "@/lib/templePresence";
 import {
   tickPitchBotHolo, disposePitchBotHolo,
@@ -232,15 +235,12 @@ export const SHOW_HOLOGRAM_CARD = false;
  *     __pitchBotFrame({ dist: 1.0, aimDrop: 0.09 })
  *     __pitchBotFrame()                 // read current + the derived pose
  */
-export const PITCH_BOT_FRAMING = {
-  // How far back the camera sits, in world units. Smaller = tighter.
-  dist: 0.85,
-  // How far BELOW the face to aim, so the head sits high in frame rather than    
-  // dead centre.
-  aimDrop: 0.2,
-  // Camera lift relative to the face. Near zero = eye level; positive looks down.
-  camLift: -0.1,
-};
+// MOVED to lib/trade/pitchBotScene, where it became per-variant — a rig swap
+// changes what the camera should do, so the numbers belong next to the rigs.
+// Re-exported under the old name so nothing that imported it has to care; it is
+// the DEFAULT now, not the setting. Use getPitchBotFraming() to resolve the
+// active rig's values.
+export { PITCH_BOT_FRAMING_DEFAULT as PITCH_BOT_FRAMING } from "@/lib/trade/pitchBotScene";
 
 const BEAM_BASE = { color: "#35e8ff", topRadius: 0.10, bottomRadius: 0.03, opacity: 0.1 };
 export const BEAM_PRESETS = {
@@ -885,7 +885,12 @@ const CyborgTempleScene = ({
   // Framing knobs as a REF: read inside the deriver, patched by __pitchBotFrame.
   // A ref rather than state so a nudge doesn't rebuild the deriver callback and
   // strand the focus effect on a stale copy of it.
-  const framingRef = useRef(PITCH_BOT_FRAMING);
+  /* PER-VARIANT SINCE 2026-08-02. Resolved from the rig that is about to be
+   * staged, not from a shared constant — v1 is a chibi bot and v2/v3 are lanky
+   * humanoids, and one camera cannot frame both. Safe to read at init: the
+   * variant is decided by query/pin/roll synchronously, long before the glb
+   * lands. PITCH_BOT_FRAMING below stays as the re-export of the default. */
+  const framingRef = useRef(getPitchBotFraming());
   // Mirrored for the externalFocusAgent switch, whose deps are
   // [externalFocusAgent, isMobile, detectedMobile] — the prop itself would be a
   // stale closure in there.
@@ -2762,8 +2767,31 @@ const CyborgTempleScene = ({
   const getPitchBotFocusSettings = useCallback(() => {
     const bot = pitchBotRef.current;
     if (!bot) return null;
+    /* WHERE TO AIM. Prefer an EYES plate, fall back to anything face-ish.
+     *
+     * TWO TRAPS HERE, both found the hard way on 2026-08-02:
+     *
+     *   `/Face/i` MATCHES "Beta_Surface". Sur-FACE. The body shell has always
+     *   matched this test; it only stayed harmless because the shell is traversed
+     *   before the bone hierarchy and this loop keeps the LAST match. The moment
+     *   anything face-ish was appended after the bones — the holo depth-prepass
+     *   twins, added to the Armature — the aim point silently became the whole
+     *   body and the camera framed the bot's feet.
+     *
+     *   THE DEPTH TWINS ARE NOT GEOMETRY ANYONE CAN SEE. They write depth and no
+     *   colour, so aiming at one is aiming at nothing.
+     *
+     * Eyes first because it is also the better shot: the split rigs carry three
+     * plates per expression and a mouth plate is a few centimetres low, which on a
+     * 0.85-unit framing is a visibly different composition. */
     let face = null;
-    bot.traverse((o) => { if (o.isMesh && /Face/i.test(o.name)) face = o; });
+    let eyes = null;
+    bot.traverse((o) => {
+      if (!o.isMesh || o.userData?.holoDepthTwin) return;
+      if (/_Eyes(_\d+)?$/.test(o.name)) { if (!eyes) eyes = o; return; }
+      if (/Face/i.test(o.name)) face = o;
+    });
+    face = eyes || face;
     if (!face) return null;
     bot.updateWorldMatrix(true, true);
     const at = new THREE.Vector3();
@@ -2794,6 +2822,11 @@ const CyborgTempleScene = ({
       };
     };
     window.__pitchBotFocus = readback;
+    /* PASTE WHAT YOU LAND ON INTO THE ACTIVE VARIANT'S `framing`, not the shared
+     * default — the readback reports which rig is staged so there is no guessing.
+     * Copying a tuned number into PITCH_BOT_FRAMING_DEFAULT retunes every rig that
+     * has no override of its own, which today is none of them and tomorrow is
+     * whichever one someone adds. */
     window.__pitchBotFrame = (patch = {}) => {
       framingRef.current = { ...framingRef.current, ...patch };
       const r = getPitchBotFocusSettings();
@@ -2828,6 +2861,13 @@ const CyborgTempleScene = ({
    * typing/idle vocabulary (`typing_monk`, `detective_idle`, `cat_sitting_idle`);
    * the bot's clips are plainly `idle` and `talking` and would match none of them.
    * Twelve explicit lines beat a sixth entry in a table that means something else.
+   *
+   * `idle` AND `talking` ARE NOW ALIASES, not clip names. The v2 rig calls its
+   * clips `Stand_Idle` / `Talking`, so pitchBotScene registers every variant's
+   * clips under those two canonical keys as well as their own — which is what
+   * keeps this effect correct for both rigs without knowing either one's
+   * vocabulary. Read the actions bag, not the glb, if you are ever unsure what
+   * these resolve to: `__pitchBotPlay()` lists them.
    *
    * Crossfaded rather than swapped: an utterance ends every few seconds, and a
    * hard cut on each one reads as a stutter.
@@ -4136,8 +4176,15 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       //
       // This is the ONLY VC-game edit to this file's load path. It borrows the
       // loader above because that one already has the DRACOLoader attached —
-      // pitch-bot.glb lists Draco AND EXT_texture_webp as extensionsRequired, so
-      // a bare loader silently fails on it.
+      // BOTH rigs list Draco as extensionsRequired (v1 also requires
+      // EXT_texture_webp), so a bare loader silently fails on either.
+      //
+      // NO `variant` PASSED, on purpose. The module resolves it itself, in this
+      // order: `?pitchbot=` > PITCH_BOT_PIN > the per-deal roll from
+      // PITCH_BOT_ROSTER. So the cast is decided in one place instead of being
+      // half-stated here, and comparing rigs is a reload rather than an edit to
+      // this file. To force one rig while building, set PITCH_BOT_PIN — passing
+      // `variant` here would silently outrank both the query and the pin.
       mountPitchBot({
         gltfLoader,
         parent: templeScene,
@@ -7121,6 +7168,12 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     beamHeightRef.current = cast.height;
     // Face the camera, yaw only. No-op until the bot loads.
     tickPitchBotBillboard(state.camera);
+    // THE LED FACE FOLLOWS THE CLIP — v2's rig only. It reads which action
+    // currently carries the most weight and swaps the visible face mesh to match,
+    // which is why the speech effect below needed no edit: anything that drives
+    // `actions.talking` / `actions.idle` moves the face for free. No-op on v1
+    // (no face meshes) and while an expression is pinned via __pitchBotFace.
+    tickPitchBotFace();
 
     // Update all character mixers independently
     if (mixersRef.current) {

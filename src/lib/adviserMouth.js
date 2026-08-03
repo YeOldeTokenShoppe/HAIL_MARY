@@ -23,7 +23,17 @@
 // routing every seat through its own voice. They are inert until something reads
 // them — setAdviserMouth early-returns on an unknown key, so the analyser was
 // silently discarding those writes rather than failing loudly.
-export const adviserMouth = { JB: 0, GR: 0, MR: 0, EU: 0, PB: 0 };
+// PB2 joined on 2026-08-02 with the second pitch-bot rig. IT HAS TO BE LISTED
+// HERE OR IT DOES NOT EXIST: setAdviserMouth early-returns on an unknown key, so
+// PressSession voicing the pitcher as "PB2" would run the analyser, compute a
+// level every frame, and throw all of it away without a warning — the exact trap
+// the note above records PB/MR/EU falling into. Adding a voice to
+// api/counsel-voice is therefore never a one-file change.
+// PB3 matters MORE than the others: it is the only rig whose mouth is actually
+// drawn from this value (the split-face viseme group in lib/trade/pitchBotExpressions).
+// For every other speaker a missing key is a silent no-op nobody would notice;
+// here it is a bot that talks with a shut mouth.
+export const adviserMouth = { JB: 0, GR: 0, MR: 0, EU: 0, PB: 0, PB2: 0, PB3: 0 };
 
 export function setAdviserMouth(who, v) {
   if (!(who in adviserMouth)) return;

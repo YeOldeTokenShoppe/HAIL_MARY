@@ -12,6 +12,7 @@ import {
 import { preloadSfx } from "@/lib/uiSfx";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
 import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
+import { setPitchBotPressure, getPitchBotVoice } from "@/lib/trade/pitchBotScene";
 import { setUnicornGlow } from "@/lib/trade/unicornGlow";
 import {
   EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
@@ -63,7 +64,21 @@ const PITCHER_AGENT = "PitchBot";
 // here rather than routing through SitePal: the pitcher is a glTF bot with a
 // screen for a face, not a SitePal mesh, so it takes exactly the audio path the
 // flat surface already proved.
-const VOICE = "PB";
+/* WHICH VOICE depends on WHICH RIG is in the beam — v1 speaks PB, v2 speaks PB2
+ * (eNTStk21PJptqo0CKZTG). Read from the variant config rather than pinned here,
+ * so `?pitchbot=v2` swaps the body and the throat together; a hard-coded code
+ * would have put the second bot's face on the first bot's voice.
+ *
+ * MODULE SCOPE IS DELIBERATE AND SAFE. The variant is resolved from the query
+ * string once per page load, and swapping rigs already requires a reload, so
+ * this has exactly the lifetime the thing it describes does. Under SSR there is
+ * no `window`, resolvePitchBotVariant returns the default, and the browser copy
+ * of the module — the only one that ever plays audio — resolves it properly.
+ *
+ * PressFlat stays on "PB" and does NOT import this: that surface has no 3D and
+ * no rig, so pulling lib/trade/pitchBotScene in would drag three.js onto the
+ * mobile path to answer a question it never asks. */
+const VOICE = getPitchBotVoice();
 
 // Minimum time any one utterance holds the camera. Only bites when audio is
 // unavailable — see the note in sayTurn.
@@ -568,6 +583,28 @@ export default function PressSession({
   const aside = useMemo(
     () => pitcherAside(mood.band, claim, run.claimIndex),
     [mood.band, claim, run.claimIndex]);
+
+  /* THE SAME BAND, ON THE BOT'S FACE.
+   *
+   * `aside` already turns mood.band into what the pitcher SAYS; this turns the
+   * identical value into what he LOOKS like, so the two can never disagree. One
+   * source, two surfaces — a face driven from anything else would be a second
+   * opinion about the same run, and the one that isn't auditable.
+   *
+   * `mood.band` and nothing else. Not the claim, not the branch, not
+   * `discriminates` — see the tier note in lib/trade/pitchBotExpressions for why
+   * that constraint is the whole design and not caution.
+   *
+   * No-ops until the 3D pitcher is loaded, and on rigs whose face is a texture
+   * rather than a mesh set, so this needs no guard for the flat surface.
+   *
+   * CLEARED ON UNMOUNT so the face doesn't keep last session's posture into the
+   * lobby — the bot is hidden there, but it is the same rig and it would be
+   * wearing `cornered` the next time the beam came up. */
+  useEffect(() => {
+    setPitchBotPressure(mood.band);
+    return () => setPitchBotPressure(null);
+  }, [mood.band]);
   // Reads the run, not just the claim — once you've spent the lane's owner,
   // pointing at them is the same wrong instruction the lane band was giving.
   // VIRGIL, not a seat. `tips` is the player's — the agenda half ignores it.

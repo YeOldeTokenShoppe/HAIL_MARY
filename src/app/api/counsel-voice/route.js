@@ -85,6 +85,48 @@ const VOICES = {
     id: process.env.ELEVENLABS_VOICE_PITCHBOT || "iCVkdoGNYLTCRiLXC3Iu",
     settings: { stability: 0.6, similarity_boost: 0.75, style: 0.45 },
   },
+  // THE SECOND RIG'S VOICE (pitchbot2, 2026-08-02).
+  //
+  // A SEPARATE ENTRY RATHER THAN A SWAP, because the voice belongs to the rig:
+  // PITCH_BOT_VARIANTS carries `voice` alongside `clips` and `expressions`, so
+  // whichever bot the beam casts speaks in its own register and nothing has to
+  // be kept in sync by hand. Overriding PB would have made the two rigs share a
+  // throat and silently changed the shipped pitcher.
+  //
+  // STYLE IS LOWER THAN PB's 0.45, AND THAT IS NOT A CHARACTER CHANGE. Both rigs
+  // play the same commission-paid closer, and the direction is a property of the
+  // ROLE, not of the model — VC_GAME.md §1 rule 6, one character, several shells.
+  // But `style` is an exaggeration knob applied to a SPECIFIC voice, so the same
+  // number does not buy the same performance across two of them — this entry has
+  // been dialled by ear against the model actually in `id`, and the number here
+  // is the one that was kept. Re-tune it whenever that id changes; a style
+  // inherited from a previous voice is the reason to distrust it.
+  //
+  // THE TWO DIRECTIONS ARE NOT SYMMETRICAL:
+  //   DOWN toward 0.1  flatter, more machine — but that is GR80's procedural
+  //                    setting, and a closer who sounds like a narrator has
+  //                    stopped selling, which costs the scene its whole premise.
+  //   UP toward 0.5    pushes harder, and by 0.55 it is Barron's seduction — a
+  //                    different character, not a louder version of this one.
+  // The target is a machine that never wavers and is unmistakably still selling.
+  PB2: {
+    id: process.env.ELEVENLABS_VOICE_PITCHBOT2 || "eNTStk21PJptqo0CKZTG",
+    settings: { stability: 0.6, similarity_boost: 0.75, style: 0.6 },
+  },
+  // THE THIRD RIG'S VOICE (pitchbot3, the split-face rig with visemes).
+  //
+  // SETTINGS ARE THE ROLE BASELINE AND ARE UNTUNED. They are PB's numbers, which
+  // is the right STARTING point — same commission-paid closer — but explicitly
+  // not a finished read: `style` behaves differently on every model, which is the
+  // whole lesson of the PB2 entry above. Judge this one by ear and move it.
+  //
+  // ONE EXTRA REASON TO GET IT RIGHT HERE: v3 is the only rig with a viseme
+  // mouth, so its delivery is the only one you also SEE. A voice that pushes hard
+  // drives a mouth that flaps hard, because both come off the same amplitude.
+  PB3: {
+    id: process.env.ELEVENLABS_VOICE_PITCHBOT3 || "VYtAZPRhkK9OruILpVBz",
+    settings: { stability: 0.6, similarity_boost: 0.75, style: 0.45 },
+  },
 };
 
 // ElevenLabs reads "RL80" as "R-L-eighty"; the shrine says "R-Lady". Spoken
@@ -105,7 +147,11 @@ export async function POST(request) {
     return Response.json({ error: "bad json" }, { status: 400 });
   }
 
-  const speaker = ["GR", "OL", "PB", "MR", "EU"].includes(body?.speaker) ? body.speaker : "JB";
+  // ALLOW-LIST, so an unknown speaker falls back to Barron rather than reaching
+  // ElevenLabs with a voice id this route never chose. PB2 has to be added here
+  // as well as to VOICES — a voice missing from this line is accepted nowhere,
+  // and the symptom is the wrong character speaking, not an error.
+  const speaker = ["GR", "OL", "PB", "PB2", "PB3", "MR", "EU"].includes(body?.speaker) ? body.speaker : "JB";
   // Her id is looked up from the apparition KEY the client names — the same
   // source the SitePal player reads, so the fallback sounds like the same
   // person. Unknown or missing key falls back to ORACLE_VOICE, which is also
