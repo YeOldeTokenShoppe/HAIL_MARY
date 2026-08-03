@@ -809,7 +809,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           </div>
           <div className="pf-label">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
           <p className="pf-copy">{deal.resolution}</p>
-          <button className="pf-btn primary" onClick={finish}>WHAT HE ACTUALLY SAID ▸</button>
+          <button className="pf-btn primary" onClick={finish}>WHAT WAS ACTUALLY SAID ▸</button>
         </div>
       )}
 

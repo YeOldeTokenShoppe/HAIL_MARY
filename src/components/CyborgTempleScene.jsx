@@ -51,12 +51,17 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
   Demon: {
- cameraPos: new THREE.Vector3(-0.375, -0.56, 2.215),
+    // Retuned in-app 2026-08-02 (?tune=1): brought in from z 2.215 and dropped
+    // 0.015, which is the difference between watching him from across the room
+    // and sitting at the desk with him. lookAtPos unchanged.
+    cameraPos: new THREE.Vector3(-0.375, -0.575, 1.565),
     lookAtPos: new THREE.Vector3(1.785, -0.485, -0.22),
     orbitCenter: null,
   },
   Monk: {
-    cameraPos: new THREE.Vector3(-1.79, -0.325, -0.335),
+    // Retuned in-app 2026-08-02 (?tune=1). Same story as the Demon's: almost all
+    // of the move is distance (x -1.79 -> -1.555), a little z, no height change.
+    cameraPos: new THREE.Vector3(-1.555, -0.325, -0.38),
     lookAtPos: new THREE.Vector3(0.125, -0.215, -1.325),
     orbitCenter: null,
   },
@@ -2866,6 +2871,21 @@ const CyborgTempleScene = ({
     face = eyes || face;
     if (!face) return null;
     bot.updateWorldMatrix(true, true);
+    /* NODE ORIGIN, and deliberately so.
+     *
+     * This is NOT the face's visible position — the plate's mesh sits ~158 local
+     * units from its own origin, which the head bone's rotation turns into about a
+     * third of the figure's height. Measured on v2: this point lands 4% up the
+     * bot, near its feet, where the geometry centre lands at 92%.
+     *
+     * It stays because the FRAMING NUMBERS ARE CALIBRATED TO IT. dist/aimDrop/
+     * camLift in PITCH_BOT_FRAMING_DEFAULT were dialled in-browser against this
+     * datum and produce the shot the author signed off. Switching to the geometry
+     * centre moved the anchor by a third of the figure under values tuned for the
+     * old one, and every attempt to retune around it made the shot worse.
+     *
+     * SO IF YOU 'FIX' THIS, RETUNE ALL THREE NUMBERS IN THE SAME CHANGE. They are
+     * a matched pair; correcting either alone breaks a working camera. */
     const at = new THREE.Vector3();
     face.getWorldPosition(at);
     // Framing numbers come from a REF, not the closure, so __pitchBotFrame can
@@ -2900,7 +2920,29 @@ const CyborgTempleScene = ({
      * has no override of its own, which today is none of them and tomorrow is
      * whichever one someone adds. */
     window.__pitchBotFrame = (patch = {}) => {
-      framingRef.current = { ...framingRef.current, ...patch };
+      /* `lift` MOVES THE WHOLE SHOT VERTICALLY WITHOUT TILTING IT.
+       *
+       * The camera sits at `anchor + camLift` and the target at `anchor - aimDrop`,
+       * so raising the shot means camLift += d AND aimDrop -= d. Nudging camLift
+       * alone lifts the camera and leaves the target behind, which steepens the
+       * pitch — a different shot that happens to be higher. That distinction cost
+       * most of an afternoon on 2026-08-02, so it is a knob rather than a thing to
+       * remember.
+       *
+       *     __pitchBotFrame({ lift: 0.05 })    // whole shot up 0.05, same angle
+       *     __pitchBotFrame({ lift: -0.03 })   // and down
+       *
+       * Composes with the raw three: `{ lift, dist }` is a common pair.
+       */
+      const { lift, ...rest } = patch;
+      framingRef.current = { ...framingRef.current, ...rest };
+      if (lift) {
+        framingRef.current = {
+          ...framingRef.current,
+          camLift: +(framingRef.current.camLift + lift).toFixed(4),
+          aimDrop: +(framingRef.current.aimDrop - lift).toFixed(4),
+        };
+      }
       const r = getPitchBotFocusSettings();
       if (r) {
         // A fresh object every time, so the fly-to actually re-runs — the focus
@@ -3426,13 +3468,29 @@ const CyborgTempleScene = ({
   const palmTreeRefs = useRef([]);
   
   
-  // Detect mobile device on mount
+  /* WIDTH ONLY — the UA sniff was removed 2026-08-02, and it was causing a real bug.
+   *
+   * `detectedMobile` feeds exactly two things (MOBILE_CAMERA_OFFSET.y and the
+   * focus FOV), and that offset exists to compensate for the workstation model's
+   * MOBILE-LAYOUT vertical shift. The layout is chosen by VIEWPORT WIDTH — that is
+   * what page.js's `isMobileView` uses — so keying the compensation off a device
+   * string could and did disagree with the thing it compensates for.
+   *
+   * THE SYMPTOM was a 0.7 discrepancy nobody could place: the camera tuning panel
+   * previews with the offset explicitly off and looked correct, while clicking the
+   * same character in the scene landed 0.7 units high. `isOnMobile` is
+   * `isMobile || detectedMobile`, so the UA arm flipped it true at ANY window size
+   * — and the regex matched `ipad`, which this repo already knows reports a
+   * DESKTOP user agent (see the /trade perf-tier work, which switched to pointer
+   * type for the same reason).
+   *
+   * If a real touch-device case needs this back, use `(pointer: coarse)` rather
+   * than a UA string, and gate it on width as well so a wide window never gets a
+   * layout compensation it has no layout for.
+   */
   useEffect(() => {
     const checkMobile = () => {
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase()) ||
-                             (window.innerWidth <= 768);
-      setDetectedMobile(isMobileDevice);
+      setDetectedMobile(window.innerWidth <= 768);
     };
 
     checkMobile();

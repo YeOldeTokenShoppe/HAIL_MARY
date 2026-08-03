@@ -73,22 +73,34 @@ import { rollPitcher, resolvePitcherId, assignPitcher, PITCHER_ROSTER } from "@/
  * PER-VARIANT CAPABLE, but as of 2026-08-02 ALL THREE RIGS SHARE THIS ONE BLOCK —
  * add a `framing` to a variant only when it genuinely needs its own.
  *
- * RE-CENTRED 2026-08-02, after the previous set (0.42 / 0.6 / -0.5) stopped
- * working. They were dialled when the figure was larger and survived by accident:
- * `aimDrop` and `camLift` are ABSOLUTE world offsets, and once every rig was
- * fitted to a common 0.3 height they were roughly 1.5x the subject's ENTIRE
- * height. The camera ended up 0.15 BELOW the bot's feet — inside the desks — and
- * aimed low enough that the head sat ~50 degrees off the view axis, outside a
- * ~25 degree half-FOV. Not mis-framed: absent, with a cubicle wall filling the shot.
+ * FINAL VALUES dialled in-browser 2026-08-02 with __pitchBotFrame. The step
+ * before them was a mechanical +0.7 lift, described next; these are that shot
+ * refined by eye — slightly further back and a touch higher.
  *
- * The values now describe what their names say. The figure is ~0.35 world units
- * tall, so a 0.05 lift is a small fraction of it rather than a multiple, and
- * nudging one does something proportionate to the nudge.
+ * LIFTED 0.7 ON 2026-08-02 (camLift -0.5 -> 0.2, aimDrop 0.6 -> -0.1) when the
+ * bogus mobile-camera offset was removed from CyborgTempleScene. These had been
+ * dialled by eye WHILE getPitchBotFocusSettings was silently adding
+ * MOBILE_CAMERA_OFFSET.y to both vectors — a UA sniff was matching on a desktop
+ * browser — so they encoded a 0.7 downward correction for a shift that no longer
+ * happens. Removing the offset dropped the shot by exactly that.
  *
- * THE REAL FIX IS A REPARAMETERISATION, still not done: `dist` in multiples of
- * subject height, vertical framing as a fraction of the frame, pitch in degrees.
- * Then a rig's size could change without silently invalidating the camera, which
- * is now the second time it has.
+ * BOTH ENDS MOVED, not just the camera. Camera sits at `anchor + camLift` and the
+ * target at `anchor - aimDrop`, so lifting the shot without tilting it means
+ * camLift += 0.7 AND aimDrop -= 0.7. Raising camLift alone would have lifted the
+ * camera while leaving the target behind, steepening the pitch — a different shot
+ * that happens to be higher, rather than the same shot higher up.
+ *
+ * aimDrop is NEGATIVE now, which is legal and means "aim above the anchor". The
+ * anchor is the face plate's node origin, which sits near the bot's FEET, so
+ * aiming above it is exactly right — see the note below.
+ *
+ * THE VALUES AND THE AIM ANCHOR ARE A MATCHED PAIR. These were dialled by eye
+ * against getPitchBotFocusSettings' anchor, which is the face plate's NODE ORIGIN
+ * and sits near the bot's FEET rather than its head. They look wrong on paper for
+ * that reason — camLift is larger than the whole figure — and they are correct in
+ * the room. An attempt to "fix" the anchor to the geometry centre on 2026-08-02
+ * moved the datum by a third of the figure and cost several rounds of retuning
+ * before being reverted. Change one, change both, and check it in the browser.
  *
  * THESE NUMBERS ONLY MEAN THE SAME THING ON RIGS OF THE SAME HEIGHT. `aimDrop`
  * and `camLift` are absolute world offsets, not fractions of the figure, so a rig
@@ -102,12 +114,12 @@ import { rollPitcher, resolvePitcherId, assignPitcher, PITCHER_ROSTER } from "@/
  */
 export const PITCH_BOT_FRAMING_DEFAULT = {
   /** How far back the camera sits, in world units. Smaller = tighter. */
-  dist: 0.5,
+  dist: 0.55,
   /** How far BELOW the face to aim, so the head sits high in frame rather than
    *  dead centre. Raise this to lift the subject without tilting the camera. */
-  aimDrop: 0.18,
+  aimDrop: -0.15,
   /** Camera lift relative to the face. Near zero = eye level; positive looks down. */
-  camLift: -0.05,
+  camLift: 0.25,
 };
 
 /** Resolve the framing for a variant, falling back to the shared default. */

@@ -26,6 +26,25 @@ export const SCREEN_TARGETS = {
   eugene: { canvas: "__screen4Canvas", texture: "__screen4Texture" },
 };
 
+/**
+ * STATION -> the camera pose that FRAMES that monitor.
+ *
+ * Screen1..4 are authored in CyborgTempleScene's AGENT_CAMERA_SETTINGS and were
+ * already there for the in-scene click path — the desks' primary monitors have
+ * been clickable since long before this game. SEE WHAT LANDED needs exactly that
+ * shot, so this is a lookup rather than four new poses.
+ *
+ * KEPT NEXT TO SCREEN_TARGETS on purpose: both answer "where is this station's
+ * screen", one in canvas terms and one in camera terms, and a station added to
+ * one and not the other is a board that stamps evidence nobody can go and read.
+ */
+export const SCREEN_AGENTS = {
+  monk: "Screen1",
+  demon: "Screen2",
+  marisol: "Screen3",
+  eugene: "Screen4",
+};
+
 const CY = "#2fd6d6";
 const CY_DIM = "rgba(47,214,214,0.30)";
 const GOLD = "#ffd23a";

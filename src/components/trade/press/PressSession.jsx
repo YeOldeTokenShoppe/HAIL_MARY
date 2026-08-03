@@ -18,7 +18,7 @@ import {
   EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
   ENGAGEMENT_CSS,
 } from "./engagement";
-import { createEvidenceScreen } from "./evidenceScreen";
+import { createEvidenceScreen, SCREEN_AGENTS } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
   Meter, Nav, Transcript, readDwellMs, PRESS_UI_CSS,
@@ -540,7 +540,30 @@ export default function PressSession({
   // as seen, which is the gate on the verdict note and the panel's colour.
   const lookAtBoard = useCallback(() => {
     if (!flash) return;
-    onFocusAgent?.(flash.board === PITCHER ? PITCHER_AGENT : seatMeta(flash.board)?.agentId);
+    /* FLY TO THE SCREEN, NOT TO THE PERSON.
+     *
+     * This used to focus the reporting seat's own agent — which is where the
+     * camera already was, because the press put it there to watch them answer. So
+     * the button moved nothing and read as inert, even though the evidence had
+     * been stamped onto their monitor a moment earlier by the block above.
+     *
+     * Screen1..4 are authored poses that frame each desk's primary monitor; they
+     * have existed since the monitors became clickable, long before this game.
+     * SEE WHAT LANDED wants precisely that shot, so this is a lookup rather than
+     * new camera work — see SCREEN_AGENTS.
+     *
+     * THE PITCHER HAS NO SCREEN OF ITS OWN. Its board aliases Barron's (see the
+     * shared `made` map where the screens are created), so a press on the pitcher
+     * sends you to the Demon's monitor — which is where its receipt actually is.
+     *
+     * Falls back to the seat's agent if a station ever has no pose, because
+     * flying to the person is a worse shot but not a broken one. */
+    const station = flash.board === PITCHER
+      ? SPEAKER_STATION
+      : seatMeta(flash.board)?.station;
+    const screenAgent = station ? SCREEN_AGENTS[station] : null;
+    onFocusAgent?.(screenAgent
+      || (flash.board === PITCHER ? PITCHER_AGENT : seatMeta(flash.board)?.agentId));
     setFlash((f) => (f ? { ...f, looked: true } : f));
   }, [flash, onFocusAgent]);
 
@@ -992,7 +1015,7 @@ export default function PressSession({
             <div className="ps-lower-h">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
             <div className="ps-lower-truth">{deal.resolution}</div>
           </div>
-          <button className="ps-lower-go" onClick={finish}>WHAT HE ACTUALLY SAID ▸</button>
+          <button className="ps-lower-go" onClick={finish}>WHAT WAS ACTUALLY SAID ▸</button>
         </div>
       )}
 
