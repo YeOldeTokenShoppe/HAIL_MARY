@@ -72,6 +72,39 @@ console.log("\n-- the desk ------------------------------------------------");
   ok("Virgil's read is deterministic",
     virgilRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }, { owner: DESK[SEATS.MARISOL] }).tip ===
     virgilRead({ id: "audit", shape: SHAPES.UNSOURCED, lane: LANES.CHAIN }, { owner: DESK[SEATS.MARISOL] }).tip);
+  /* A SEAT MUST NOT CHANGE VOICE DEPENDING ON WHETHER ITS PLAYER LOADED.
+     Each seat with a SitePal portal reaches the SAME ElevenLabs voice two ways:
+     api/counsel-voice when we play the audio ourselves, and engine 14 when the
+     portal plays it and lip-syncs. Which one runs is a RUNTIME accident — did
+     the iframe register sayText in time — so if the two ids drift, the
+     character sounds like a different person for reasons the player cannot see.
+     That is not hypothetical: GR80 shipped as SitePal Gilbert on one /main
+     layout and ElevenLabs on the other, and it took a while to notice because
+     each layout was self-consistent. Read the route's source rather than
+     importing it — it is a server route with env fallbacks, and the literal is
+     what a human would edit. */
+  {
+    const route = fs.readFileSync(
+      new URL("../src/app/api/counsel-voice/route.js", import.meta.url), "utf8");
+    const routeIds = Object.fromEntries(
+      [...route.matchAll(/(\w+):\s*\{\s*(?:\/\/[^\n]*\n\s*)*id:\s*process\.env\.\w+\s*\|\|\s*"([^"]+)"/g)]
+        .map((m) => [m[1], m[2]]));
+    let lockstep = true;
+    const drift = [];
+    for (const seat of Object.keys(DESK)) {
+      const cfg = DESK[seat].sitepal;
+      if (!cfg) continue;                       // Eugene has a drawn mouth, no portal
+      const want = routeIds[DESK[seat].voice];
+      if (!want || want !== cfg.voice.voice) {
+        lockstep = false;
+        drift.push(`${DESK[seat].name}: route=${want} portal=${cfg.voice.voice}`);
+      }
+      // Engine 14 is what makes it ElevenLabs rather than a SitePal built-in.
+      if (cfg.voice.engine !== 14) { lockstep = false; drift.push(`${DESK[seat].name}: engine ${cfg.voice.engine}`); }
+    }
+    ok("a seat's portal voice matches its api/counsel-voice id", lockstep);
+    if (drift.length) console.log("       " + drift.join("\n       "));
+  }
   ok("all four seats have every result line, deep and shallow",
     SPENDABLE_SEATS.every((s) => ["dispatch", "found", "partial", "nothing"].every((r) => adviserLine(s, r))
       && adviserLine(s, "found", false)));
@@ -84,10 +117,20 @@ console.log("\n-- the desk ------------------------------------------------");
   // instruction to take an action the controller rejects as a no-op.
   const chainClaim = { id: "dep", shape: SHAPES.SELECTIVE_WINDOW, lane: LANES.CHAIN };
   const recClaim = { id: "aud", shape: SHAPES.BORROWED_CREDIBILITY, lane: LANES.RECORD };
+  // TESTS THE PROPERTY, NOT THE WORDING. This used to require the literal
+  // "deepest", which is a phrasing rather than a rule — and it failed the day
+  // the sentence moved into Virgil's voice and became "this is Marisol's
+  // specialty" (2026-08-04), which satisfies the rule completely. What the
+  // assertion is actually protecting is that the line describes a CAPABILITY
+  // and never a PERMISSION, because the permission version ("only Marisol can
+  // settle it") is an instruction the controller rejects — anyone may be asked
+  // anything, the lane only decides depth. So: it must name the owner, and it
+  // must contain no permission language, whatever verb it reaches for.
+  const permissionish = /\bonly\b|\bcan settle\b|\bmust ask\b|\bnot allowed\b|\bpermitted\b/i;
   ok("the lane band names who goes deepest, not who is permitted",
     laneSentence(chainClaim).includes(DESK[SEATS.MARISOL].name)
-    && /deepest/i.test(laneSentence(chainClaim))
-    && !/only/i.test(laneSentence(chainClaim))
+    && !permissionish.test(laneSentence(chainClaim))
+    && !permissionish.test(laneSentence(chainClaim, { spent: [SEATS.MARISOL] }))
     && laneSentence(recClaim).includes(DESK[SEATS.GR80].name));
   ok("the lane band stops issuing an impossible instruction once they're spent",
     (() => {

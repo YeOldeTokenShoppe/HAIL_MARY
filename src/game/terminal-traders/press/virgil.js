@@ -129,16 +129,29 @@ export const VIRGIL = {
  * it is training wheels with a legible off switch — "Virgil stops chiming in"
  * is a difficulty setting in a way "turn off Eugene" never could be.
  */
+/* NO GENDERED PRONOUN FOR THE PITCHER, ANYWHERE IN HERE (author, 2026-08-04:
+   "Virgil says 'He isn't saying who' but i have a female-coded pitchbot").
+   It is not a slip in one line, it is a category error: the RIG IS ROLLED, from
+   PITCH_BOT_ROSTER, blind and at page load (§1 rule 6) — so any copy that
+   genders the speaker is wrong for whichever bot the beam happens to cast, and
+   nothing here can know which one that is. The desk settled on "it" long ago
+   ("its client's deal", "ITS SCREEN STAYS BLACK", "on its screen"); this bank
+   is where that rule never reached. Use "it", or name it "the pitch bot". */
 const SHAPE_TIP = {
   UNSOURCED: [
     "Assertion. No origin on it.",
-    "Somebody said this. He isn't saying who.",
+    "Somebody said this. The pitch bot isn't saying who.",
     "That's a claim about a claim.",
   ],
   POSITIONED: [
-    "He's in it. That's not nothing, it's just not evidence.",
+    /* PAID ON THE CLOSE, NOT "IN IT". The old line was "He's in it", which
+       gendered the bot and also gave it a HOLDING — and a commissioned agent
+       has no money in the vault. §3 files that exact confusion as content debt
+       on two archetype slots; the bot's interest is the close, which is the
+       version that is both true and structurally undeniable. */
+    "Paid on the close. That's not nothing, it's just not evidence.",
     "Interested party. Worth remembering.",
-    "He profits from you agreeing.",
+    "It profits from you agreeing.",
   ],
   SELECTIVE_WINDOW: [
     "A number inside a window somebody chose.",
@@ -147,13 +160,13 @@ const SHAPE_TIP = {
   ],
   BORROWED_CREDIBILITY: [
     "Somebody else's name is doing the work here.",
-    "He's standing on a document.",
+    "It's standing on a document.",
     "That's borrowed. The question is how far it reaches.",
   ],
   UNFALSIFIABLE: [
     "Nothing could count against that.",
     "Shaped so it can't be wrong.",
-    "There's no version of this he'd take back.",
+    "There's no version of this it'd take back.",
   ],
   SURVIVORSHIP: [
     "That's the ones that worked.",
@@ -224,7 +237,18 @@ export function agenda(claim, { owner = null, spent = [], remaining = 0 } = {}) 
       : `${countWord(remaining)} more ${noun} after this, and only shallow looks left.`;
   }
   if (remaining === 0) return `Last ${one} you'll get. Deep look now, or never.`;
-  return `${countWord(remaining)} more ${noun} after this one.`;
+  /* EVERY AGENDA LINE NAMES THE DECISION, NOT JUST THE COUNT.
+     This branch used to return the count alone — "One more question about the
+     story after this one." — and the author called it pointless twice, which
+     it was: it is the only one of the four that states a fact without saying
+     what the fact costs you. Its three siblings all finish the thought ("Deep
+     look now, or never", "only shallow looks left", "was already spent"), and
+     that second clause is the entire reason §3 calls the agenda the half that
+     converts the seat choice "from a coin flip into a decision".
+     What this case means is the opposite of the remaining === 0 one: there IS
+     another shot at this lane, so holding the specialist is not a forfeit —
+     which is precisely the thing a player cannot work out from the rail. */
+  return `${countWord(remaining)} more ${noun} after this one. ${owner.name} will keep, if you'd rather wait.`;
 }
 
 /**

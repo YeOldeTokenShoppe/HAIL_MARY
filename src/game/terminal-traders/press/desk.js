@@ -78,11 +78,47 @@ export const PITCH_BOT = {
 //
 // These four are renders of the SAME models that sit in the room, against the
 // same grid backdrop, so the tiles and the scene agree with each other.
+/* THE SEATS' LIVE PLAYERS — the same shape VIRGIL.sitepal carries, and here for
+ * the same reason: a still cannot lip-sync, and the amplitude path this surface
+ * used instead was driving nothing on the three seats with no mouth art. See
+ * lib/trade/seatVoice.js.
+ *
+ * ENGINE 14 IS THE WHOLE POINT AND IT IS NOT SITEPAL'S OWN TTS. It is
+ * ElevenLabs through the SitePal-connected account, so `voice` is the EL voice
+ * UUID rather than one of the numbered built-ins — the player fetches the SAME
+ * voice our API would have, and lip-syncs the audio it just made. That is what
+ * makes clip uploads unnecessary: `sayAudio` resolves names in the account and
+ * never URLs, but `sayText` on engine 14 takes arbitrary text.
+ *
+ * THE IDS MUST STAY IN LOCKSTEP WITH api/counsel-voice. Each `voice.voice`
+ * below is that seat's entry in that route's VOICES map, and it has to be,
+ * because the two paths are chosen at RUNTIME by whether a portal happened to
+ * load. If they diverge, the character changes voice depending on that — which
+ * is the exact bug GR80 hit across /main's two layouts (SitePal Gilbert on one,
+ * ElevenLabs on the other). If an id moves in that route, move it here in the
+ * same commit; the harness asserts they match.
+ *
+ * `embedContext: 1` DELIBERATELY DISAGREES WITH THE EMBED SNIPPET, which prints
+ * 0 — SitePal's docs require 1 under a JS framework, and Virgil's config
+ * records the same override for the same reason. Only account, sceneId, hash
+ * and voice are load-bearing.
+ *
+ * EUGENE IS ABSENT ON PURPOSE. He has no scene (an equine head needed a custom
+ * build) and he does not need one: his mouth is drawn, and measured — see
+ * MOUTH_SEATS in PressFigure. */
+const SITEPAL_ACCOUNT = "9308752";
+
 export const DESK = {
   [SEATS.BARRON]: {
     id: SEATS.BARRON, agentId: "Demon", station: "demon",
     name: "Connor", role: "THE CHART", lane: LANES.CHART,
     portrait: "/thumbnail_johnBarron.png", voice: "JB",
+    sitepal: {
+      label: "Connor", account: SITEPAL_ACCOUNT,
+      sceneId: 2775052, hash: "IMtOuXOufh3OnQ9ZYUXc2DoYe39vRePb",
+      embedContext: 1,
+      voice: { voice: "IcFWazAaBzXNwLWpySgF", lang: 1, engine: 14 },
+    },
     // HE NO LONGER BRINGS THE DEAL IN. That was the sentence that made him both
     // adversary and seat, and it is the pitch bot's job now. What he is instead:
     // a tape reader, short-biased and vice-prone, which is a DISPOSITION the
@@ -94,12 +130,24 @@ export const DESK = {
     id: SEATS.MARISOL, agentId: "Detective", station: "marisol",
     name: "Detective Marisol", role: "THE MONEY", lane: LANES.CHAIN,
     portrait: "/thumbnail_marisol.png", voice: "MR",
+    sitepal: {
+      label: "Detective Marisol", account: SITEPAL_ACCOUNT,
+      sceneId: 2774916, hash: "R87HgVkKE6AFibw6Ih3VPGVc5eRGMY63",
+      embedContext: 1,
+      voice: { voice: "jdWlEMh784XiUSTLzNso", lang: 1, engine: 14 },
+    },
     blurb: "Money movement, wallet ages, unlocks.",
   },
   [SEATS.GR80]: {
     id: SEATS.GR80, agentId: "Monk", station: "monk",
     name: "Saint GR80", role: "REPUTATION", lane: LANES.RECORD,
     portrait: "/thumbnail_gr80.png", voice: "GR",
+    sitepal: {
+      label: "Saint GR80", account: SITEPAL_ACCOUNT,
+      sceneId: 2775053, hash: "I0s05E8rXxvHYHdJIPmcIU5msqkW6t0A",
+      embedContext: 1,
+      voice: { voice: "JBFqnCBsd6RMkjVDRZzb", lang: 1, engine: 14 },
+    },
     blurb: "What the documents actually say.",
   },
   [SEATS.EUGENE]: {
@@ -188,12 +236,27 @@ export function laneOwner(claim) {
 export function laneSentence(claim, { spent = [] } = {}) {
   if (!claim) return "";
   const who = laneOwner(claim);
-  if (!who) return "NOBODY HERE SPECIALISES IN THIS ONE — anyone you ask gets the shallow version";
-  const label = LANE_LABEL[claim.lane].toUpperCase();
+  /* IT IS THE CAT SAYING IT NOW (author, 2026-08-04), so it is sentence case
+     and it is addressed to you. It used to be a shouty colour-coded BAND in its
+     own box directly above Virgil — two panels, stacked, both answering "who
+     should look at this", which is what made the column read as a stack of
+     labels. The band is gone; this string moved into Virgil's block.
+
+     THE SPENT BRANCH IS NOT DECORATION — invariant 8: the floor may never issue
+     an instruction the controller would reject, and this shipped once without
+     the check and named an already-spent adviser as the way through. It stays,
+     whoever is speaking it.
+
+     IT ALSO STILL MAY NOT BE RESTATED BY THE TIP. The rule directly below this
+     function ("THE READ MAY NEVER RESTATE THE LANE BAND") survives the move and
+     matters more now that both lines are in one voice: the tip names the SHAPE
+     of the argument, this names WHOSE it is, and they must not converge. */
+  if (!who) return "Nobody here specialises in this one — anyone you ask gets the shallow version.";
+  const label = LANE_LABEL[claim.lane].toLowerCase();
   if (spent.includes(who.id)) {
-    return `THIS ONE'S ${label}, AND ${who.name.toUpperCase()} IS SPENT — anyone else gets the shallow version`;
+    return `This one's about ${label} — ${who.name}'s specialty, and ${who.name} is spent. Anyone else gets the shallow version.`;
   }
-  return `THIS ONE'S ${label} — ${who.name} goes deepest on it`;
+  return `This one's about ${label} — this is ${who.name}'s specialty.`;
 }
 
 // THE FREE READ MOVED TO THE CAT (./virgil.js). It was Eugene's, which made him
@@ -392,7 +455,9 @@ const ADVISER_LINES = {
   [SEATS.GR80]: {
     dispatch: "I have read it. One moment.",
     found: "It is in the document. Section and all.",
-    partial: "The document says less than he does.",
+    // "less than he does" — same category error as the tip bank; the rig is
+    // rolled, so the pitcher has no gender this copy can know. See SHAPE_TIP.
+    partial: "The document says less than the pitch bot does.",
     nothing: "Nothing on file. Not redacted — absent.",
     shallow: "I can read what is in front of me. On this one, that is not much.",
   },

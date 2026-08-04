@@ -13,14 +13,16 @@ import {
 } from "@/game/terminal-traders/press/pressRun";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
 import { speakVirgilLine, stopVirgilLine } from "@/lib/trade/virgilVoice";
+import { seatHasPortal, speakSeatLine, warmSeatPortal } from "@/lib/trade/seatVoice";
 import PressFigure from "./PressFigure";
 import { preloadSfx } from "@/lib/uiSfx";
 import gsap from "gsap";
 import {
-  EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
+  EngagementRecord, runArrival, endArrival, skipArrival, prefersReducedMotion, SFX,
   ENGAGEMENT_CSS, peekFileNo, commitFileNo,
 } from "./engagement";
 import { createFlatEvidenceScreen } from "./evidenceScreen";
+import { createPitchDeck } from "./pitchDeck";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
   Meter, Nav, readDwellMs, PRESS_UI_CSS,
@@ -77,6 +79,13 @@ import TerminalModuleHeader from "../TerminalModuleHeader";
 // own key, then the pitcher — see the TWO VOICES PER PRESS note below.
 const VOICE = pitcherVoice();
 
+/* WHO HAS A SCREEN. Module scope because it is a fixed fact about the room, not
+   a per-render value — it was a useMemo with an empty dep list, which is the
+   same constant with a hook around it, and `screenOwner` is derived above the
+   line the memo used to sit on. */
+const BOARDS = [PITCHER, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE];
+const BOARDS_SET = new Set(BOARDS);
+
 export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // A FRESH DEAL EVERY TIME YOU SIT DOWN — see the note in instanceDeal.js for
   // why the daily was built and cut. State, not a memo dependency, so the seed
@@ -111,14 +120,28 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      snapping back — their finding is what you are reading at that moment. Back
      to the pitcher when the next claim starts. */
   const [onCamera, setOnCamera] = useState(PITCHER);
-  // FEED | SCREEN. Not just a space-saver on a phone: a press CUTS to his
-  // screen, so "nothing landed" is something you went and looked at rather
-  // than something you passively failed to notice.
+  /* FEED | BOARD | DECK. Not just a space-saver on a phone: a press CUTS to a
+     screen, so "nothing landed" is something you went and looked at rather
+     than something you passively failed to notice.
+     THREE, NOT TWO, since 2026-08-04. The old pair was feed | screen, where
+     "screen" was a switcher over four boards with different owners. They are
+     separated now because ownership is the thing this surface kept getting
+     wrong: BOARD is an analyst's finding and belongs with that analyst, DECK
+     is the bot's own presentation and belongs to the bot. `board` has no tab —
+     it is reached by going to look at what you sent someone for, and it comes
+     down when the claim does. */
   const [pane, setPane] = useState("feed");
   // Mirrored into state because the tab label reads it during render — a ref
   // would never re-render and the badge would stay stale after a press.
   const [hasRecord, setHasRecord] = useState(false);
-  const [boardPane, setBoardPane] = useState(PITCHER);
+  /* WHOSE SCREEN THE SECOND PANE IS SHOWING, and it is not state — it is the
+     camera, read. `onCamera` already holds on whoever last spoke (the pitcher
+     between presses, the analyst who reported through the beat that follows
+     one), so a separate selection could only ever agree with it or be a bug.
+     Virgil takes the camera to say the agenda and has no screen, so anyone
+     without a board falls back to the deck: the bot's slides are what is on
+     screen whenever nobody's own findings are. */
+  const screenOwner = BOARDS_SET.has(onCamera) ? onCamera : PITCHER;
   // He's answered and the board has changed, and you HAVEN'T LOOKED YET.
   // Until you do, nothing on this surface may name the outcome — see the tab
   // badge and .pf-answer below.
@@ -192,7 +215,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   }, [rolling, rolled]);
 
   const skipRoll = useCallback(() => {
-    if (rolling) tlRef.current?.progress(1);
+    if (rolling) skipArrival(tlRef.current);
   }, [rolling]);
 
   const claim = currentClaim(run, deal);
@@ -238,6 +261,26 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // this file having its own copy is how desktop ended up referencing a
   // `canPress` that was never declared there.
   const live = pressIsLegal(run, claim);
+  // A REPORT IS ON SCREEN FOR THIS CLAIM. Gates the column swap below — the
+  // claim body stands down for the length of the answer — and it is `flash`
+  // rather than `pressed` on purpose: `pressed` stays true once you have had
+  // your answer, so keying on it would hide the claim for the rest of the beat
+  // including after the answer panel has been dismissed by moving on.
+  const answering = !!flash && !!claim && flash.id === claim.id;
+  /* WHOSE PLAYER TO KEEP WARM — the lane owner of the claim being made now.
+     A SitePal portal needs several seconds to register sayText, and a press
+     produces its one adviser line a beat later, so mounting on the press is the
+     cold-start failure PressFigure's Virgil note already records having made
+     once. Mounting on the CLAIM buys the bot's spin plus the cat's line, and
+     the seat row does not appear until that speech ends — so the earliest legal
+     press is already past the boot window.
+     The lane owner rather than all four because it is the seat the lane band is
+     pointing at and by far the likeliest spend; press somebody else and they
+     take the voice-only path, which is the same fallback a failed boot takes. */
+  const portalSeat = useMemo(() => {
+    const owner = claim ? laneOwner(claim) : null;
+    return owner && seatHasPortal(owner.id) ? owner.id : null;
+  }, [claim]);
   const lastClaim = run.claimIndex >= deal.claims.length - 1;
   const advisersLeft = SPENDABLE_SEATS.filter((x) => !run.advisersSpent.includes(x)).length;
   // VIRGIL, NOT A SEAT. The guidance is the cat's: free, automatic, and never a
@@ -274,8 +317,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // It was invisible while every board rendered stacked (see .pf-screen): you
   // got somebody else's panel and no reason to doubt it. Fixing the stacking is
   // what surfaced this, and the two belong together.
-  const BOARDS = useMemo(
-    () => [PITCHER, SEATS.MARISOL, SEATS.GR80, SEATS.EUGENE], []);
+  // BOARDS moved to module scope — see the note there.
   const screensRef = useRef({});
   useEffect(() => {
     if (!started) return;
@@ -283,7 +325,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     for (const seat of BOARDS) {
       const el = document.getElementById(`pf-screen-${seat}`);
       if (!el) continue;
-      made[seat] = createFlatEvidenceScreen(el, { header: seatMeta(seat).name.toUpperCase() });
+      // THE PITCHER'S BOARD IS NOT AN EVIDENCE TERMINAL ANY MORE. It used to be
+      // one — the same cyan receipt screen the three analysts have — which made
+      // the one surface in the room that is SELLING you something look exactly
+      // like the three that are checking it. See pitchDeck.js: it takes the
+      // same contract (setClaim/stamp/stayBlack/dispose) so nothing else here
+      // has to know which kind of board it is holding.
+      made[seat] = seat === PITCHER
+        ? createPitchDeck(el, { ticker: deal.ticker })
+        : createFlatEvidenceScreen(el, { header: seatMeta(seat).name.toUpperCase() });
     }
     screensRef.current = made;
     made[SEATS.BARRON] = made[PITCHER];   // alias — see BOARDS note
@@ -292,7 +342,19 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       Object.values(made).forEach((x) => x.dispose());
       screensRef.current = {}; screenRef.current = null;
     };
-  }, [started, BOARDS]);
+  }, [started, deal.ticker]);
+
+  /* THE DECK FOLLOWS THE RUNNING ORDER. One slide per claim, swapped when the
+     claim does — the deck is what the bot is presenting FROM, so it cannot sit
+     on the previous point while it argues the next one.
+     It reads `claim` and nothing else: no outcome, no branch, no pressure. The
+     leak argument is pitchDeck.js's header, and it is the shield's (§1 rule 3)
+     — a surface keyed only to slot-level fields is auditable, and every field
+     it touches is already on screen in the agenda rail. */
+  useEffect(() => {
+    if (!started || !claim) return;
+    screensRef.current[PITCHER]?.setClaim?.(claim, deal.surface);
+  }, [started, claim, deal.surface]);
 
   /* ---- he says it out loud ----
      Token-guarded. A press interrupts the claim he's mid-way through, so two
@@ -332,8 +394,16 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
    * their stills) are built on. speakVirgilLine falls back to that same path by
    * itself if his portal isn't up, so this branch is never a way to lose a line.
    */
-  const speakLine = useCallback(async (voice, text) => {
+  const speakLine = useCallback(async (voice, text, seat = null) => {
     if (voice === VIRGIL.voice) { await speakVirgilLine(text); return; }
+    /* A SEAT WITH A PLAYER GOES THROUGH IT — same trade the cat makes, and for
+       the same reason: engine 14 is its own ElevenLabs voice AND its lip-sync
+       in one call, where the fallback is that voice over a still. Keyed on the
+       SEAT rather than the voice code because the portal is per-character;
+       speakSeatLine falls back by itself if the player never came up, so this
+       branch can never lose a line. The pitcher is excluded by having no
+       sitepal config — it has a rig with real viseme plates. */
+    if (seat && seatHasPortal(seat)) { await speakSeatLine(seat, text); return; }
     await speakAdviserLine(voice, text);
   }, []);
 
@@ -379,7 +449,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         // else.
         setOnCamera(p.seat || PITCHER);
         const startedAt = Date.now();
-        try { await speakLine(p.voice || VOICE, p.text); }
+        try { await speakLine(p.voice || VOICE, p.text, p.seat); }
         catch { /* voice is enrichment, never a gate on play */ }
         const floor = p.minMs ?? (dwell ? dwell(p.text) : 0);
         if (floor) {
@@ -426,23 +496,29 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      the input to the decision the claim has just posed, so it has to land after
      you have heard what you are deciding about, not over the top of it.
 
-     THE AGENDA, NEVER THE TIP. Only one of his two lines is spoken, and it is
-     the one that stays on under the mute switch (virgil.js: "the half that stays
-     ON"). The tip is a written aside about the SHAPE of the argument — read at
-     your own pace, or turned off — and speaking it would make the surface a
-     tutorial reading itself out loud.
+     THE TIP, NOT THE AGENDA (author, 2026-08-04). He used to say the agenda
+     out loud — "One more question about the story after this one" — on the
+     reasoning that only the never-off half should be spoken, and that voicing
+     the tip would make the surface a tutorial reading itself aloud. In
+     practice the spoken half was the one carrying no advice: a scheduling fact
+     delivered in a cat's voice, at the one moment the player is deciding what
+     to do. The tip is the line a cat on a trading desk would actually say, and
+     it is the one that names what is wrong with what you just heard.
 
-     SILENT WHEN THE TIPS ARE OFF, which is a change to what that switch means
-     and the honest one now that he has a throat: "Virgil stops chiming in" is
-     the design's own phrasing for it, and a cat you have muted who still talks
-     six times a session reads as a broken toggle. His agenda TEXT is untouched —
-     the actionable half stays on screen for everyone, exactly as before. */
+     It does not become a tutorial because of what the tip may CONTAIN: the
+     shape of the argument, never whether the claim is true (§3). Reading that
+     out is a character having a view, not the game explaining itself.
+
+     SILENT WHEN THE TIPS ARE OFF, unchanged and now literal — the switch and
+     the spoken line are the same half. "Virgil stops chiming in" is the
+     design's own phrasing for it. His AGENDA text is untouched and still on
+     screen for everyone, which is what §3 requires of it. */
   useEffect(() => {
     if (!floorLive || !claim) return;
     sayTurn(
       [
         { voice: VOICE, text: claim.spin },
-        { voice: VIRGIL.voice, text: tips ? virgil?.agenda : "", seat: VIRGIL.id, minMs: 900 },
+        { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", seat: VIRGIL.id, minMs: 900 },
       ],
       // Back to the pitcher: the claim is his and it is what you read next.
       { onDone: () => setOnCamera(PITCHER) },
@@ -543,10 +619,18 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       // `seat` puts the reporter ON CAMERA for the length of their line. It is
       // the only thing that names anyone but the pitcher, which is why the shot
       // needs no reset logic anywhere else.
-      sayTurn([solo
-        ? { voice: VOICE, text: outcome.barronSays, seat: PITCHER }
-        : { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays,
-            seat: outcome.seat }]),
+      /* THE WARM-UP OVERLAPS THE BEAT, it does not add to it. If the reporter's
+         player is mounted but has not registered sayText yet, this gives it a
+         moment — inside the same Promise.all that is already waiting on
+         MIN_BEAT, so a portal that is nearly up costs nothing and one that
+         never comes up costs at most the wait, after which speakSeatLine takes
+         the voice-only path by itself. Insurance for a nearly-ready player, not
+         a substitute for mounting it a claim early; see portalSeat. */
+      (solo ? Promise.resolve() : warmSeatPortal(outcome.seat))
+        .then(() => sayTurn([solo
+          ? { voice: VOICE, text: outcome.barronSays, seat: PITCHER }
+          : { voice: seatMeta(outcome.seat)?.voice, text: outcome.adviserSays,
+              seat: outcome.seat }])),
       new Promise((r) => setTimeout(r, MIN_BEAT)),
     ])
       .then(() => {
@@ -560,17 +644,27 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         if (outcome.receipt) board?.stamp(outcome.receipt);
         else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
         else board?.stayBlack();
-        setBoardPane(outcome.board);
+        // THE BADGE NEEDS NO OWNER TEST ANY MORE. It briefly had one, because
+        // the tab was permanently the bot's deck and a receipt Marisol produced
+        // would have had the seller taking credit for the desk's finding in the
+        // status line. The tab follows the camera now and the camera is holding
+        // on whoever just reported, so the screen the badge describes is always
+        // the screen the receipt is on.
         setHasRecord(!!outcome.receipt);
         setFlash((f) => (f && f.id === owed ? { ...f, stage: "choice" } : f));
-        // Already sitting on the screen? Then you watched it land and there's
-        // nothing to send you anywhere.
+        // Already sitting on the pane the answer landed on? Then you watched it
+        // land and there's nothing to send you anywhere. Which pane that is now
+        // depends on WHO answered, so the check has to as well.
         setLookPending(paneRef.current !== "screen");
       });
   }, [run, deal, claim, floorLive, sayTurn]);
 
-  // The one door to the screen — going there is what marks the outcome seen, and
-  // `looked` is the gate on the verdict note and the panel's colour.
+  /* GO AND LOOK. One door, one destination, because the pane always shows the
+     screen belonging to whoever is in frame — and the camera is already holding
+     on the reporter by the time this is offered (see the note on onCamera). So
+     the tab and this button do the same thing, which is the point: the player
+     can arrive at the finding from the row that just produced it or from the
+     channel strip, and both are the same move. */
   const lookAtScreen = useCallback(() => {
     setPane("screen");
     setLookPending(false);
@@ -590,7 +684,8 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     setFlash(null);
     setPane("feed");     // new claim, back to its face
     setOnCamera(PITCHER);  // ...and off the analyst who reported on the last one
-    setBoardPane(PITCHER);
+    // ...which also takes the second tab back to PITCH DECK, since it follows
+    // the camera. Nothing else to reset: screenOwner is derived, not stored.
     Object.values(screensRef.current).forEach((x) => x.stayBlack());
     setHasRecord(false);
     setLookPending(false);
@@ -674,7 +769,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 is true of every deal — which is this headline's whole licence
                 to be the largest type on a panel that withholds the deal. */}
             <h1>HEAR THE PITCH.<br /><span>MAKE THE CALL.</span></h1>
-            <p>One pitch. Three interruptions. Then say how much of it you believe.</p>
+            <p>One pitch. Three questions. Then say how much of it you believe.</p>
           </div>
           {/* THE PANEL NO LONGER NAMES THE DEAL HERE. A 20px headline, a subtitle
               restating the ticker, and the sheet below all printed the same
@@ -732,7 +827,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               "an agent is here for a client who didn't come", cut the same day for
               pointing at the absence instead of the incentive (engagement.jsx). */}
           <div className="pf-protocol" aria-label="Meeting protocol">
-            <div><b>03</b><span>INTERRUPTS</span></div>
+            <div><b>03</b><span>QUESTIONS</span></div>
             <div><b>04</b><span>ANALYSTS</span></div>
             <div><b>01</b><span>FINAL CALL</span></div>
           </div>
@@ -797,8 +892,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       )}
 
       {/* ---------- the floor ---------- */}
+      {/* THE FLOOR CARRIES ITS OWN BEAT ON THE CLASS, because two rows of it are
+          conditional and the stage is the only child that can spend the slack.
+          `opening` — no agenda, no dock, and ~450px of nothing under two lines
+          of speech; the bot introducing itself is what that space is for.
+          `on-screen` — you have gone to look at a board, so the board is the
+          content and a 30vh stage renders the receipt at 72x44. Both are pure
+          sizing: nothing keyed to either says anything about the deal. */}
       {onFloor && claim && (
-        <div className="pf-floor">
+        <div className={`pf-floor${floorLive ? "" : " opening"}${pane !== "feed" ? " on-screen" : ""}`}>
           <div className="pf-tabs">
             {/* NAMED FROM THE DESK, not typed in — and now named after WHOEVER
                 THE FEED IS ON, which is the same fix twice over. It said BARRON,
@@ -814,25 +916,56 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 He is deliberately absent from DESK (virgil.js: not staff, not a
                 seat) and pressRun must never import him, so he is resolved HERE
                 rather than by widening that lookup. */}
+            {/* TWO LINES BY DESIGN, not by accident. These were one line with the
+                status inline, which fits "PITCH BOT" and nothing else: at 347px
+                each tab is ~150px and "DETECTIVE MARISOL · speaking" wants 200,
+                so it broke wherever the words ran out — "◉ PITCH BOT ·" over
+                "speaking", the two tabs at different heights. The name is the
+                channel and the status is the readout under it; both are fixed
+                rows now, the name truncates rather than wrapping, and the tab
+                bar keeps one height whoever the camera is on. */}
             <button className={pane === "feed" ? "on" : ""} onClick={() => setPane("feed")}>
-              ◉ {(onCamera === VIRGIL.id
-                    ? VIRGIL.name
-                    : seatMeta(onCamera)?.name || PITCH_BOT.name).toUpperCase()}
-              {speaking && <em> · speaking</em>}
+              <span className="pf-tab-name">
+                ◉ {(onCamera === VIRGIL.id
+                      ? VIRGIL.name
+                      : seatMeta(onCamera)?.name || PITCH_BOT.name).toUpperCase()}
+              </span>
+              {/* LIVE is the panel's own word for its rest state (PressFigure
+                  prints "· LIVE" on the plate), so the row reads as a channel
+                  strip rather than going blank between utterances. */}
+              <em>{speaking ? "speaking" : "live"}</em>
             </button>
             {/* THE BADGE MAY NOT ANSWER THE QUESTION THE BOARD IS THERE TO
                 ANSWER. While the look is pending it says only that there IS
                 something — "ON RECORD" here would hand you the outcome from
                 the tab bar and make going to look pointless. */}
+            {/* ONE TAB, ONE MEANING: THE SCREEN OF WHOEVER IS IN FRAME (author,
+                2026-08-04). It is the bot's PITCH DECK while the bot has the
+                floor and an analyst's SCREEN while they do, because that is the
+                same sentence either way — and it is why the first tab went back
+                to being only a face.
+
+                Two earlier shapes were both worse. ITS SCREEN named the pitcher
+                over a switcher holding four boards with four owners. Splitting
+                them into a permanent deck tab plus a tabless analyst pane fixed
+                the lie but bought a second pulse location, a tab that could
+                read as selected while neither pane was, and a first tab doing
+                two jobs. Binding the tab to the camera collapses all of it: one
+                owner at a time, so one name, one badge and one pulse.
+
+                THE BADGE STILL MAY NOT ANSWER THE QUESTION THE SCREEN IS THERE
+                TO ANSWER. While the look is pending it says only that there IS
+                something — "ON RECORD" here would hand you the outcome from the
+                tab bar and make going to look pointless. */}
             <button className={`${pane === "screen" ? "on" : ""}${lookPending ? " look" : ""}`}
                     onClick={lookAtScreen}>
-              {/* ITS, not HIS. The bot is an "it" in every other line of copy
-                  the desk owns — "its client's deal", "ITS SCREEN STAYS BLACK",
-                  "on its screen, and it stays there" — and this tab was the last
-                  place still speaking about the pitcher as a man. */}
-              ▤ ITS SCREEN
+              <span className="pf-tab-name">
+                {screenOwner === PITCHER ? "▦ PITCH DECK" : "▤ SCREEN"}
+              </span>
               <em className={lookPending ? "" : hasRecord ? "rec" : ""}>
-                {lookPending ? " · LOOK" : hasRecord ? " · ON RECORD" : " · no record"}
+                {lookPending ? "LOOK"
+                  : hasRecord ? "ON RECORD"
+                  : screenOwner === PITCHER ? "the pitch" : "no record"}
               </em>
             </button>
           </div>
@@ -848,56 +981,59 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                   reach the face — the same rule desktop's LED expressions are
                   under (VC_GAME.md §1 rule 3). */}
               <PressFigure speaking={speaking} voice={speakingAs || VOICE}
-                           who={onCamera} band={mood.band} />
+                           who={onCamera} band={mood.band}
+                           portalSeat={portalSeat} />
             </div>
+            {/* ONE SCREEN PANE, SHOWING WHOEVER IS IN FRAME. All four canvases
+                stay mounted — they are painted by a timer that has to keep
+                running whether or not you are looking, so a receipt is already
+                on the glass when you arrive rather than drawing itself while
+                you watch — and exactly one is displayed. Which one is
+                `screenOwner`, derived from the camera, so the tab's name and
+                the panel under it cannot disagree. */}
             <div className={`pf-pane wide ${pane === "screen" ? "show" : ""}`}>
-              {/* One board full-width — four canvases side by side on a phone
-                  would render ~4.5px type, since evidenceScreen draws at fixed
-                  offsets against 512x320. The strip underneath is the
-                  comparison, in text, and it's how you reach the others. */}
               <div className="pf-boards">
                 {BOARDS.map((seat) => (
-                  <div key={seat} className={`pf-screen ${boardPane === seat ? "show" : ""}`}>
+                  <div key={seat} className={`pf-screen ${screenOwner === seat ? "show" : ""}`}>
                     <canvas id={`pf-screen-${seat}`} width={512} height={320} />
                   </div>
                 ))}
-                <div className="pf-bstrip">
-                  {BOARDS.map((seat) => {
-                    const sc = screensRef.current[seat];
-                    const state = sc?.hasReceipt?.() ? "rec" : sc?.hasSearched?.() ? "nil" : "";
-                    return (
-                      <button key={seat} className={`pf-bchip ${boardPane === seat ? "on" : ""} ${state}`}
-                              onClick={() => setBoardPane(seat)}>
-                        {seatMeta(seat)?.role}
-                        <em>{state === "rec" ? "ON RECORD" : state === "nil" ? "NOTHING" : "—"}</em>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             </div>
+            {/* THE FOUR-WAY CHIP STRIP IS GONE (author, 2026-08-04: "potentially
+                confusing"). It was a switcher across the pitcher's board and
+                three analysts', and three of its four chips read "—" for most
+                of a session: a permanent comparison UI for boards that mostly
+                have nothing on them, sitting where the one board you had just
+                paid a specialist for should have been. Each board now appears
+                in the one place it means something. Do not reintroduce a
+                switcher here — if a second board ever needs reaching, it
+                belongs next to the seat that owns it. */}
           </div>
 
-          {/* THE AGENDA. Every subject he'll cover, from second zero — without
-              it, holding an adviser back is a blind bet and everyone spends on
-              the first thing they see. Lane dots say who COULD settle each one;
-              they never say whether it's worth settling. */}
-          {/* THE AGENDA WAITS FOR THE FIRST CLAIM. It is a resource readout about
-              claims — which are coming, which are settled — and there are none yet
-              while the bot is still introducing itself. It also spoils the beat's
-              one job: the opening says how many points there are, and printing all
-              six subjects underneath answers that before it is asked. */}
-          {floorLive && (
-          <div className="pf-agenda">
-            {deal.claims.map((c, i) => (
-              <span key={c.id}
-                    className={`pf-ag ${i < run.claimIndex ? "past" : ""} ${i === run.claimIndex ? "now" : ""} ${run.outcomes[c.id] ? "done" : ""}`}
-                    data-lane={c.lane}>
-                {c.subject}
-              </span>
-            ))}
-          </div>
-          )}
+          {/* THE AGENDA RAIL IS GONE FROM THIS SURFACE (author, 2026-08-04:
+              "there's a whole row of tabs at the bottom... I don't think we
+              need the tabs and should remove them").
+
+              WHAT IT WAS FOR, AND WHAT NOW CARRIES IT. Its job was the one §3
+              names: "without it, holding an adviser back is a blind bet". But
+              the decision it informs is only ever about the CLAIM IN FRONT OF
+              YOU — whether this one is worth the specialist who owns its lane —
+              and Virgil now states exactly that, in words, on every claim:
+              "One more question about the story after this one. Eugene will
+              keep, if you'd rather wait." That line did not exist when the rail
+              was built; it does the rail's work and names the consequence,
+              which the rail never did.
+
+              WHAT IS ACTUALLY LOST is the full six-subject map, and on a phone
+              it was mostly lost anyway: three chips of six fit, the rest sat
+              behind a horizontal scroll nobody discovers, and the progress it
+              also showed is in the claim header's "1 / 6".
+
+              DESKTOP KEEPS ITS OWN. This is PressFlat's rail only — do not read
+              this as the mechanic being cut. If it ever comes back here it
+              should come back as something you open, not as a fourth pinned
+              row on a surface with a documented height contract. */}
 
           {/* THE ONLY THING ON THE FLOOR THAT SCROLLS. Tabs, feed and dock are
               all pinned, so the way out of a claim is never further than a
@@ -907,18 +1043,33 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               GO ON / CALL IT were clipped away — measured at 839px in a 700px
               box. The pitch had no exit. */}
           <div className={`pf-read${more ? " more" : ""}`} ref={readRef}>
-            {/* Opening, then claims. Same container either way — the block must
-                not move when the first claim replaces the introduction. */}
+            {/* THE ANSWER TAKES THE COLUMN (author, 2026-08-04: "here's where it
+                gets a bit too dense... when the character is up, we just show
+                the box that has the character's transcript and the 2 buttons").
+
+                While a report is live the column carried NINE blocks at once —
+                the tail of the spin, the FACT, the lane band, Virgil's agenda,
+                Virgil's tip, then the answer, and the dock's three rows under
+                all of it. The two buttons the beat exists for were the last
+                thing on a scroller, below everything already read, at the exact
+                moment there is a decision to make.
+
+                So the claim body stands down for the length of the answer. It
+                is not information withdrawn: every line of it was on screen
+                thirty seconds ago, and it returns the moment the claim moves
+                on. What replaces it is the one thing that is new. */}
             {opened ? (
-              <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
-                         pressure={mood} aside={aside}
-                         spent={run.advisersSpent}
-                         count={`${run.claimIndex + 1} / ${deal.claims.length}`} />
+              answering ? null : (
+                <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
+                           pressure={mood} aside={aside}
+                           spent={run.advisersSpent}
+                           count={`${run.claimIndex + 1} / ${deal.claims.length}`} />
+              )
             ) : (
               <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening} />
             )}
 
-            {flash && flash.id === claim.id && (
+            {answering && (
               /* The verdict — and the panel's COLOUR, which is a tell too — are
                  held back until he has finished, so every answer looks
                  identical while he's still talking. Once he stops, the LOOK
@@ -944,13 +1095,30 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               <b>{advisersLeft} ADVISER{advisersLeft === 1 ? "" : "S"}</b>
             </Meter>
 
-            {/* The seat row is here only while a press is LEGAL. Once you've
-                had your answer they are dead controls, and 195px of dead
-                controls pinned to the bottom of a phone is exactly what shoved
-                the one live control off the screen. The counter above keeps
-                the desk accounted for while the row is away. */}
-            <SeatRow run={run} live={live} pressed={pressed} options={options}
-                     onPress={press} />
+            {/* THE ROW APPEARS WHEN IT IS TIME TO CHOOSE, AND NOT BEFORE
+                (author, 2026-08-04: "only show the character buttons when it
+                is time to pick a character to consult or to call the deal").
+
+                Three states, and the row belongs to exactly one of them:
+                  SOMEBODY IS TALKING — you are listening, and the five tiles
+                    are ~100px of the pinned dock inviting a decision the beat
+                    has not reached. This is most of a claim's runtime.
+                  NOBODY IS TALKING, A PRESS IS LEGAL — now. This is the
+                    decision the game is about, and it gets the dock to itself.
+                  A REPORT IS UP — the two moves that matter are already in the
+                    answer box, and `live` is false here anyway, so the row was
+                    rendering its spent-state line: a second, quieter way of
+                    saying what the panel above it had just said.
+
+                `speaking` covers the bot and Virgil both, so the row also stays
+                away while the cat reads the agenda — which is exactly when a
+                player is being told what the choice is FOR.
+                COMPACT, because this dock is pinned and the reading column is
+                what pays for anything added to it; see SeatRow's own note. */}
+            {!speaking && !answering && (
+              <SeatRow run={run} live={live} pressed={pressed} options={options}
+                       onPress={press} compact />
+            )}
 
             <Nav lastClaim={lastClaim} pressed={pressed} onAdvance={advance} onCallIt={callIt} />
           </div>
@@ -1079,6 +1247,11 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
      dark behind it, so the fallback reads as intentional rather than as a
      stretched mobile page. */
   width:min(520px, 100%); margin:0 auto;
+  /* THE COLUMN IS A QUERY CONTAINER so the stage can be sized against ITS OWN
+     WIDTH rather than the viewport's — see .pf-stage. On a phone the two are
+     the same number, but on ?flat=1 the column is 520px inside a 1400px window
+     and a vw-based square would be four times too tall. */
+  container-type:inline-size;
   border-left:1px solid rgba(47,214,214,0.16);
   border-right:1px solid rgba(47,214,214,0.16); }
 @media (max-width:560px) { .pf-wrap { border:none; } }
@@ -1105,7 +1278,28 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch; padding:14px 14px calc(18px + env(safe-area-inset-bottom,0px));
 }
-.pf-scroll.center { display:flex; flex-direction:column; justify-content:center; text-align:center; }
+/* THE APP CENTRES EVERY PARAGRAPH. globals.css carries a bare p{text-align:
+   center} from the site's first theme, so a <p> on this surface is centred
+   wherever it lands — the ten-line RESOLUTION, the briefing's house rules, and
+   THE TELL sitting in a left-aligned box under a left-aligned label. Inherit
+   puts each paragraph back under whatever its own container decided, which
+   leaves the two screens below centred on purpose and everything else left. */
+.pf-wrap p { text-align:inherit; }
+
+/* THE SECOND justify-content IS A FALLBACK PAIR, NOT A TYPO. A flex box
+   centred on content taller than itself overflows in BOTH directions, and the
+   scroll origin is the top edge, so the first lines of a long resolution
+   become unreachable on a short viewport. The safe keyword degrades to
+   flex-start exactly when that would happen; the plain one above it is what
+   anything that drops the safe declaration is left with. */
+.pf-scroll.center { display:flex; flex-direction:column;
+  justify-content:center; justify-content:safe center; text-align:center; }
+/* CENTRED BOX, LEFT-ALIGNED PROSE. The number, its verdict line and the call's
+   controls are single objects and read fine centred; a full paragraph does not
+   — a resolution runs ten lines on a phone, and centring both its edges is the
+   least readable shape available for it. The note already did this alone,
+   which is what made the two paragraphs on that screen disagree. */
+.pf-scroll.center .pf-copy { text-align:left; }
 .pf-label { margin:10px 0 7px; color:#2fd6d6; font-size:10px; letter-spacing:.16em; }
 .pf-copy { margin:8px 0; color:#c8e5df; font-size:12px; line-height:1.48; }
 .pf-copy.sm { font-size:10.5px; }
@@ -1174,6 +1368,16 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-start .eng-client { font-size:14px; }
 .pf-start .eng-stats { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; }
 .pf-start .eng-stats dt { width:45px; }
+/* ONE COLUMN ON A PHONE. The form reserves the polaroid's width down its right
+   edge, so on a ~347px column the two stat columns are ~75px each and a 45px
+   label leaves 22px for the value: AGE printed "52" over "days", which then
+   shunted SOCIAL out of line with 24H. Queried against .eng-file, which is
+   already the inline-size container --badge-w is measured from — the record is
+   also 520px wide on ?flat=1 and two columns are right there. */
+@container (max-width: 360px) {
+  .pf-start .eng-stats { grid-template-columns:1fr; }
+  .pf-start .eng-part-h { letter-spacing:.12em; }
+}
 .pf-start .eng-particulars { flex-basis:100%; }
 
 /* THE SEALED-STATE CSS IS GONE WITH ITS MARKUP (2026-08-03). The collapse hacks
@@ -1275,37 +1479,92 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    ------------------------------------------------------------------------ */
 .pf-floor { flex:1; display:flex; flex-direction:column; min-height:0; }
 
-/* flex:0 1 auto — the feed gives up height before the words do. */
-.pf-stage { flex:0 1 auto; height:30vh; min-height:140px; max-height:330px; padding:10px 0;
+/* SQUARE, SO THE CHARACTER FILLS IT (author, 2026-08-04: "let's fill the whole
+   box with the pitchbot/character, instead of a box within a box").
+
+   The box-in-box was a shape mismatch, not a margin: .pf-feed is aspect-ratio
+   1/1 sized off this element's HEIGHT, so a 343x225 landscape stage rendered a
+   225px square with 59px of dead gradient down each side. Making the FEED fill
+   a landscape stage is the wrong repair twice over — cover-cropping a square
+   portrait to 1.5:1 cuts a third of its height, which is the character's head,
+   and .pf-mouth is positioned in percentages of the panel, so a changed aspect
+   silently drifts the drawn mouth off the face it patches.
+
+   So the STAGE takes the feed's shape instead. 100cqw is the column's own
+   width, which is what makes the square exactly fill it; the dvh cap is what
+   stops it eating the reading column on a short viewport, and the padding is
+   gone because 10px of it was 10px the square could not use.
+   flex:0 1 auto still lets it give up height before the words do.
+   (NO BACKTICKS IN THIS STRING — see the note under .pf-screen.) */
+/* THE dvh CAP IS THE OTHER WAY TO LOSE THE SQUARE, and it is worth being
+   explicit about which is which. 100cqw is the width the character has to fill;
+   the cap only exists so a very short viewport does not hand half the screen to
+   a portrait. Whenever the cap WINS, the stage is shorter than the column and
+   the inset returns by definition — so it is set high enough that it binds only
+   where it should. At 52dvh a 390x844 phone resolves min(390, 439) = 390 and
+   fills; a 600px-tall window resolves the cap and takes the margins, which at
+   that height is the right trade. */
+.pf-stage { flex:0 1 auto;
+  height:30vh;
+  height:min(100cqw, 52dvh);
+  min-height:140px; max-height:420px; padding:0;
   display:flex; justify-content:center; align-items:center; overflow:hidden;
   background:radial-gradient(ellipse at 50% 35%, rgba(255,45,111,0.14), transparent 68%); }
 .pf-stage > * { height:100%; }
 
-.pf-read { flex:1 1 auto; min-height:76px; overflow-y:auto; overscroll-behavior:contain;
+/* THE TWO BEATS THAT RESIZE THE STAGE. Both stay a DEFINITE height (a vh, never
+   auto) and that is load-bearing, not tidiness: the receipt canvas is an
+   absolutely positioned child sizing itself with max-height:100%, so the moment
+   an ancestor goes indefinite the percentage falls back to auto and the board
+   collapses — the same failure the note under .pf-screen records twice.
+
+   OPENING — the agenda and the dock are both absent while the bot introduces
+   itself, which left two lines of speech at the top of a ~450px void. The bot
+   is what the beat is about, so the stage takes the slack rather than the empty
+   reading column.
+
+   ON-SCREEN — you spent a move to go and look, so the board is the content. At
+   30vh, shared with the chip strip, the receipt drew at 72x44 CSS px: the one
+   panel whose emptiness is the product, too small to read either way. */
+/* dvh, WITH vh UNDERNEATH IT. The container these live in is MobileTerminalGame's
+   100dvh overlay, and on iOS Safari vh is the LARGE viewport — the one you get
+   with the toolbar hidden — so a vh fraction is a bigger share of the box than
+   it reads as whenever the toolbar is up. The vh line is the fallback for
+   anything that drops the dvh one; the base .pf-stage rule keeps its own vh. */
+.pf-floor.opening .pf-stage { height:46vh; height:46dvh; max-height:420px; }
+.pf-floor.on-screen .pf-stage { height:44vh; height:44dvh;
+  min-height:min(200px, 30vh); min-height:min(200px, 30dvh); max-height:400px; }
+/* The board pane used to need its own shrink weighting here — asking for 44vh
+   got 180px back, because flex distributes shrink by base size and the taller
+   box loses the most. That weighting is on .pf-read for EVERY beat now (see
+   its rule), for the same reason arrived at from the other direction: the
+   square stage stops being square the moment anything squeezes it. */
+
+/* THE COLUMN YIELDS BEFORE THE STAGE DOES, and that is what keeps the square
+   square. flex:0 1 auto on the stage means a long claim can shrink it, and a
+   shrunken square stops filling the column's width — so the character was
+   full-width on some claims and inset by 60px a side on others, varying with
+   how much the bot happened to say (author, 2026-08-04: "sometimes the
+   character screen is not full-width").
+
+   shrink:100 does not make the stage rigid — that would be the dock-overflow
+   bug again, and the dock is flex:none so anything unshrinkable here is height
+   the floor has to find under the clip edge. It makes this column absorb
+   essentially all of it FIRST, down to its own 76px floor, after which the
+   stage resumes shrinking normally. This column is the only thing on the floor
+   that scrolls, so height taken from it is deferred rather than lost. */
+.pf-read { flex:1 1 auto; flex-shrink:100; min-height:76px;
+  overflow-y:auto; overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch; padding-bottom:8px; }
 /* only while something IS below — so the last line is never the faded one */
 .pf-read.more { -webkit-mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent);
   mask-image:linear-gradient(180deg, #000 calc(100% - 24px), transparent); }
 
-.pf-agenda { flex:none; display:flex; gap:5px; overflow-x:auto; padding:8px 12px 6px;
-  -webkit-overflow-scrolling:touch; }
-.pf-ag { flex:0 0 auto; font:bold 9.5px/1 'Courier New',monospace; letter-spacing:0.07em;
-  padding:7px 9px; border:1px solid rgba(234,255,249,0.16); color:rgba(234,255,249,0.45);
-  white-space:nowrap; position:relative; }
-.pf-ag::before { content:""; display:inline-block; width:5px; height:5px; border-radius:50%;
-  margin-right:5px; vertical-align:middle; background:rgba(234,255,249,0.3); }
-/* THE LANE DOTS. They say who COULD settle each subject, never whether it is
-   worth settling — same colours as .pu-lane in pressUi, so a dot on the rail
-   and the band under the claim are obviously the same fact. CHART and SOCIAL
-   were missing here and fell back to the neutral dot; the rail was quietly
-   answering "whose is this" for two lanes out of four. */
-.pf-ag[data-lane="CHAIN"]::before  { background:#2fd6d6; }
-.pf-ag[data-lane="RECORD"]::before { background:#ffd23a; }
-.pf-ag[data-lane="CHART"]::before  { background:#ff5f9e; }
-.pf-ag[data-lane="SOCIAL"]::before { background:#bfeede; }
-.pf-ag.past { opacity:0.4; }
-.pf-ag.now  { border-color:#ff5f9e; color:#fff; }
-.pf-ag.done { border-style:dashed; }
+/* .pf-agenda AND .pf-ag ARE GONE WITH THE RAIL THEY STYLED — see the render
+   site for what replaced its job. Deleted rather than left dangling: an orphan
+   ruleset for markup no caller renders is how .pf-look outlived its button.
+   The LANE DOT COLOURS lived here and are not lost — the same four are on
+   .pu-virgil-lane in pressUi, which is where the lane is named now. */
 
 /* THE BOARD COLUMN: one panel, then the strip that switches between them. It
    takes the stage's whole height so the panel can be sized against something
@@ -1314,25 +1573,29 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    clipped stage rather than shrink. */
 .pf-boards { width:100%; height:100%; min-height:0;
   display:flex; flex-direction:column; gap:7px; }
-.pf-bstrip { flex:none; display:flex; gap:4px; }
-.pf-bchip { flex:1; min-width:0; background:rgba(2,16,14,0.85);
-  border:1px solid rgba(47,214,214,0.22);
-  color:rgba(234,255,249,0.6); font:bold 10px/1.35 'Courier New',monospace;
-  letter-spacing:0.07em; padding:7px 4px; cursor:pointer;
-  display:flex; flex-direction:column; gap:2px; }
-.pf-bchip.on { border-color:#2fd6d6; color:#2fd6d6; background:rgba(47,214,214,0.08); }
-.pf-bchip em { font-style:normal; font-weight:normal; font-size:9px; opacity:0.8; }
-.pf-bchip.rec em { color:#ffd23a; opacity:1; }
-.pf-bchip.nil em { color:#ff9b6f; opacity:1; }
+/* .pf-bstrip AND .pf-bchip ARE GONE WITH THE SWITCHER THEY STYLED. They were
+   the four-way chip row across the pitcher's board and three analysts'; each
+   board now appears in the one place it belongs, so there is nothing to switch
+   between. Deleted rather than left dangling — an orphan rule for a control no
+   caller renders is how .pf-look survived a rewrite of the beat it belonged to.
+   The board pane keeps ONE child now, so .pf-boards' gap has nothing to space;
+   it is harmless and stays, because the deck pane uses the same container. */
 
 .pf-tabs { flex:none; display:flex; gap:1px; margin:0 12px; }
+/* NAME OVER STATUS, two fixed rows — see the render site. The name row
+   truncates instead of wrapping, so the tallest analyst name on the desk
+   cannot change the height of the bar the floor is measured against. */
 .pf-tabs button { flex:1; min-width:0; background:rgba(2,16,14,0.9);
   border:1px solid rgba(47,214,214,0.22);
-  border-bottom:none; color:rgba(234,255,249,0.5); font:bold 9.5px/1 'Courier New',monospace;
-  letter-spacing:0.11em; padding:9px 6px; cursor:pointer; }
+  border-bottom:none; color:rgba(234,255,249,0.5); font:bold 9.5px/1.15 'Courier New',monospace;
+  letter-spacing:0.11em; padding:7px 6px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:2px; }
+.pf-tab-name { display:block; max-width:100%; min-width:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pf-tabs button.on { color:#2fd6d6; border-color:rgba(47,214,214,0.5);
   background:rgba(47,214,214,0.08); }
-.pf-tabs em { font-style:normal; font-weight:normal; opacity:0.7; }
+.pf-tabs em { font-style:normal; font-weight:normal; opacity:0.7;
+  font-size:8px; letter-spacing:0.09em; }
 .pf-tabs em.rec { color:#ffd23a; opacity:1; }
 /* GO AND LOOK. Cyan, deliberately — the tab's own accent, carrying no verdict.
    Gold is the receipt colour, so pulsing gold would announce a receipt before
@@ -1409,7 +1672,12 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-dock .pu-meter b { margin-left:auto; font-size:8.5px; letter-spacing:0.11em;
   color:rgba(47,214,214,0.75); }
 .pf-dock .pu-nav { margin-top:8px; }
-.pf-dock .pu-seats { flex-wrap:wrap; justify-content:flex-start; }
+/* .pf-dock .pu-seats IS DELIBERATELY UNSTYLED FROM HERE. It used to carry
+   flex-wrap:wrap, and that is what broke the height contract: five 104px tiles
+   in a ~323px dock is three rows, 403px of seats, a 511px dock, and the nav
+   off the bottom of the phone. The row is a GRID on this surface now — see
+   SeatRow's compact prop, styled once in pressUi with everything else the two
+   surfaces share. Nothing about it belongs back here. */
 
 .pf-dock { flex:none; padding:9px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top:1px solid rgba(47,214,214,0.25); background:rgba(2,16,14,0.96); }
@@ -1435,6 +1703,12 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   box-shadow:0 0 16px rgba(255,45,111,0.38); }
 .pf-btn.primary:disabled { background:rgba(120,120,120,0.35); box-shadow:none; color:rgba(255,255,255,0.5); }
 .pf-btn:not(.primary) { margin-top:8px; }
+/* THE ONLY BUTTON WITHOUT CLEARANCE was the primary one. On the call and the
+   resolution it is a direct sibling of the last line of copy and sat flush
+   against it, so LOCK IT IN cropped the risk line and WHAT WAS ACTUALLY SAID
+   cropped the settlement note. The sticky briefing CTA supplies its own
+   spacing through .pf-cta-row and must not be given a second helping. */
+.pf-scroll > .pf-btn.primary { margin-top:16px; }
 .pf-start .pf-btn.primary {
   position:relative; overflow:hidden;
   background:linear-gradient(90deg,#3a2d05,#ffd23a 48%,#3a2d05);
@@ -1455,11 +1729,19 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   background:#25312e; border-color:rgba(142,171,165,.28); color:#6d8781;
 }
 
-.pf-slider { width:100%; max-width:420px; accent-color:#ff2d6f; }
+/* THE ONE CONTROL THE WHOLE SESSION IS FOR, and at its native height it is a
+   ~16px target under a thumb — on a phone that is a drag you have to aim at.
+   Height on the input widens the hit area without taking over the rendering:
+   accent-color still paints it, so the track stays thin and centred and the
+   knob is the platform's own. */
+.pf-slider { width:100%; max-width:420px; accent-color:#ff2d6f;
+  height:40px; margin:0; }
 .pf-ends { display:flex; justify-content:space-between; width:100%; max-width:420px;
   font-size:9px; letter-spacing:0.11em; color:rgba(234,255,249,0.5); margin-top:4px; }
-.pf-saying { font-size:15px; margin-top:16px; }
-.pf-risk { font-size:12px; color:#ffd23a; margin-top:7px; }
+.pf-saying { font-size:15px; line-height:1.4; margin-top:16px; }
+/* line-height, because a 12px box around 12px type clips the descenders of the
+   one line on this screen that names what you stand to lose. */
+.pf-risk { font-size:12px; line-height:1.4; color:#ffd23a; margin-top:7px; }
 .pf-pnl { font-size:52px; font-weight:bold; }
 .pf-pnl.up { color:#4dffaa; text-shadow:0 0 24px rgba(77,255,170,0.5); }
 .pf-pnl.down { color:#ff5f6f; text-shadow:0 0 24px rgba(255,95,111,0.5); }
@@ -1483,6 +1765,10 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-pattern-case .pf-copy { margin:0; }
 .pf-au { border-left:2px solid rgba(234,255,249,0.16); padding:7px 0 7px 10px; margin-bottom:10px; }
 .pf-au.pressed { border-left-color:#ffd23a; }
-.pf-au-fact { font-size:12px; }
-.pf-au-verdict { font-size:11px; color:#2fd6d6; margin-top:3px; }
+/* Six of these stack into one wall of type on a phone, and the claim and its
+   verdict were 1px apart in size and 3px apart on the page — so the eye had no
+   way to tell "what it said" from "what it turned out to be" without reading
+   both. The gap and the leading do that work; the colours were already right. */
+.pf-au-fact { font-size:12px; line-height:1.45; }
+.pf-au-verdict { font-size:11px; line-height:1.45; color:#2fd6d6; margin-top:6px; }
 `;

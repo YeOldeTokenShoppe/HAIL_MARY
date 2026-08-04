@@ -158,14 +158,15 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
       <div className="pu-spin">“{claim.spin}”</div>
       <div className="pu-fact"><span className="pu-tag">FACT</span> {claim.fact}</div>
 
-      {/* WHOSE SPECIALISM THIS IS. Not a permission any more — anyone can be
-          sent at anything — so this names who goes DEEP and lets you price the
-          shallow alternative. A sentence, not a label, because "RECORD
-          QUESTION" parsed as either a noun or a verb. It reads the run, so once
-          the specialist is spent it says the claim is capped, not closed. */}
-      <div className="pu-lane" data-lane={stale ? "SPENT" : claim.lane}>
-        {laneSentence(claim, { spent })}
-      </div>
+      {/* THE LANE BAND'S OWN BOX IS GONE (author, 2026-08-04: "a stray box with
+          this text... maybe Virgil should speak this part"). It was a
+          colour-coded panel saying who goes deepest, sitting directly on top of
+          a cat panel whose job is also to tell you who to spend and when — two
+          boxes, one question, which is exactly the density the column was
+          drowning in. The sentence moved into Virgil's block below and is now
+          the FIRST thing he says. See laneSentence in desk.js for what survived
+          the move: the spent branch (invariant 8) and the rule that his tip may
+          never restate it. */}
 
       {/* VIRGIL — the office cat, and the only voice here who isn't staff.
           The free read used to be Eugene's, which made him the one seat in four
@@ -187,7 +188,7 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
           ("Virgil stops chiming in"), and it is the only reading that survives
           him having a throat: a cat you have muted who carries on talking six
           times a session reads as a broken toggle, not as a difficulty setting. */}
-      {(virgil?.agenda || virgil?.tip) && (
+      {(virgil?.agenda || virgil?.tip || claim) && (
         <div className="pu-virgil">
           <img className="pu-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
           <span className="pu-virgil-text">
@@ -202,8 +203,42 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
                 </button>
               )}
             </span>
-            {virgil.agenda && <span className="pu-virgil-agenda">{virgil.agenda}</span>}
+            {/* THE READ LEADS, THE RUNNING ORDER FOLLOWS (author, 2026-08-04:
+                the agenda line "That's not helpful at all. Better if he
+                advises 'Somebody said this. He isn't saying who' — that's the
+                real advice to consider").
+
+                THIS REVERSES THE 2026-08-03 ORDER and the reversal is the
+                point, so the old reasoning is worth keeping rather than
+                overwriting: the agenda led because it is the half nobody else
+                supplies and the half that never turns off, and because when
+                the two were CONCATENATED the eye skipped the block and the
+                actionable half went with it. Both those facts still hold. What
+                changed is which half is actionable on the beat it lands.
+
+                The agenda is a RESOURCE READOUT — it pays off only for a
+                player already tracking lane budgets, and reads as scheduling
+                noise to everyone else. The tip is the READ: it names the shape
+                of the weak argument you are looking at, in a cat's voice, at
+                the moment you are deciding whether to spend a specialist on
+                it. Leading with it is not demoting the agenda — that stays on
+                screen for everyone, under the switch's floor, exactly as §3
+                requires. It is putting the sentence a player can act on first.
+
+                NOTE FOR §7 ITEM 6 ("Let Virgil be wrong"): the tips are an
+                oracle today, always correct about the shape. Promoting the
+                oracle to the lead line makes that open item more load-bearing,
+                not less. */}
+            {/* WHOSE THIS IS, FIRST — and it is on the ALWAYS-ON side of the
+                switch, with the agenda, never with the tip. The tip is
+                mutable; who goes deepest on a claim is the one fact the floor
+                cannot take away, so putting it behind "tips off" would delete
+                the input the seat decision runs on (§3). */}
+            <span className="pu-virgil-lane" data-lane={stale ? "SPENT" : claim.lane}>
+              {laneSentence(claim, { spent })}
+            </span>
             {virgil.tip && <span className="pu-virgil-tip">{virgil.tip}</span>}
+            {virgil.agenda && <span className="pu-virgil-agenda">{virgil.agenda}</span>}
           </span>
         </div>
       )}
@@ -249,7 +284,14 @@ export function AnswerBody({ flash, children }) {
   const talking = flash.adviserSays ? (seatMeta(flash.seat)?.name ?? "They") : PITCH_BOT.name;
   return (
     <div className={`pu-answer ${tone}`}>
-      <div className="pu-asked">YOU SENT — {flash.asked}</div>
+      {/* SENT IS THE DEAD VERB, and this was the last surface still using it.
+          [A§11] cut it for the analysts — they never leave their desks, the
+          camera does the moving — and the row above has read ASK A FOLLOW-UP
+          ever since. The distinction it leaves is the real one: you ASK a
+          neutral colleague and you PRESS the one selling you the deal. */}
+      <div className="pu-asked">
+        {flash.seat === PITCHER ? "YOU PRESSED" : "YOU ASKED"} — {flash.asked}
+      </div>
 
       {flash.adviserSays && (
         <div className="pu-said">
@@ -297,10 +339,15 @@ export function AnswerChoice({ flash, onLook, onHear }) {
               onClick={onLook}>
         {flash.looked ? "✓ SEEN — LOOK AGAIN" : "▤ SEE WHAT LANDED ▸"}
       </button>
+      {/* LET PITCHBOT RESPOND, not HEAR ITS RESPONSE (author, 2026-08-04). It
+          is the same construction as the nav's LET PITCHBOT CONTINUE directly
+          below it, and the two are the same KIND of move: both hand the floor
+          back to the seller. "Hear" described the player's ear; "let" describes
+          what is actually being spent, which is the beat. */}
       {canHear && (
         <button type="button" className={`pu-choice-btn hear${flash.heard ? " done" : ""}`}
                 onClick={onHear}>
-          {flash.heard ? "✓ HEARD — PLAY AGAIN" : "◉ HEAR ITS RESPONSE ▸"}
+          {flash.heard ? "✓ HEARD — PLAY AGAIN" : "◉ LET PITCHBOT RESPOND ▸"}
         </button>
       )}
     </div>
@@ -319,13 +366,30 @@ export function AnswerChoice({ flash, onLook, onHear }) {
  * affordance — so the row goes away entirely rather than greying out. On mobile
  * it also reclaims ~195px of pinned dock, which is what was shoving the one
  * live control off the bottom of the screen.
+ *
+ * `compact` — the SAME row, one tile per column instead of five 104px tiles.
+ *
+ * IT IS A WIDTH ANSWER, NOT A DIFFERENT CONTROL. Five fixed tiles need 544px;
+ * a phone gives the dock about 323px, so they wrapped to three rows, the dock
+ * grew to 511px of a 751px box, and `.pu-nav` landed at y=810 — under the
+ * floor's own `overflow:hidden`, with `.pf-read` squeezed to its 76px minimum.
+ * That is the documented failure in VC_GAME.md §6 ("839px of rows in a 700px
+ * box... the pitch had no exit") arriving from the one direction the height
+ * budget didn't cover, and it is why hiding seats behind a horizontal scroller
+ * is the wrong trade: the decision the row exists for is "is this claim worth
+ * my one specialist", and you cannot make it against options you can't see.
+ *
+ * THE SHORT LABELS LIVE HERE, next to the long ones, on purpose. A stylesheet
+ * that swapped them with generated content would let someone edit the wording
+ * in this file and have the phone silently keep the old words. Same rule as
+ * everything else in this module: one place, both surfaces.
  */
-export function SeatRow({ run, live, pressed, options, onPress }) {
+export function SeatRow({ run, live, pressed, options, onPress, compact = false }) {
   if (!live) {
     return (
       <div className="pu-spent">
         {pressed ? "◼ YOU'VE HAD YOUR ANSWER ON THIS ONE."
-          : "▚ NO INTERRUPTIONS LEFT — THE REST IS ON FAITH."}
+          : "▚ NO QUESTIONS LEFT — THE REST IS ON FAITH."}
       </div>
     );
   }
@@ -360,9 +424,9 @@ export function SeatRow({ run, live, pressed, options, onPress }) {
              nothing on screen had ever said it. */}
       <div className="pu-seats-h">
         ASK A FOLLOW-UP
-        <em>{run.pressesLeft} interruption{run.pressesLeft === 1 ? "" : "s"} left</em>
+        <em>{run.pressesLeft} question{run.pressesLeft === 1 ? "" : "s"} left</em>
       </div>
-      <div className="pu-seats">
+      <div className={`pu-seats${compact ? " compact" : ""}`}>
         {options.map((o) => {
           // seatMeta, not DESK — the first option is the PITCHER, which is not
           // staff and has no DESK entry. A bare DESK lookup here threw.
@@ -374,7 +438,7 @@ export function SeatRow({ run, live, pressed, options, onPress }) {
                     className={`pu-seat ${boss ? "boss" : ""} ${o.deep ? "deep" : "shallow"} ${o.enabled ? "" : "off"}`}
                     disabled={!o.enabled}
                     title={boss
-                      ? `Press ${meta.name} — costs an interruption, never a specialist`
+                      ? `Press ${meta.name} — costs a question, never a specialist`
                       : o.deep
                         ? `Ask ${meta.name} — this is what they do`
                         : `Ask ${meta.name} anyway — you'll get the surface answer`}
@@ -402,10 +466,13 @@ export function SeatRow({ run, live, pressed, options, onPress }) {
                   Challenging the seller is a different act from asking a
                   colleague, and the row should never have blurred them. */}
               <span className="pu-seat-sub">
-                {o.reason === "spent" ? "already used"
+                {o.reason === "spent" ? (compact ? "used" : "already used")
                   : boss
-                    ? "press it · always free"      // the pitcher owns no lane, so never deep
-                    : (o.deep ? "▲ ASK — GOES DEEP" : "ask anyway · surface only")}
+                    // the pitcher owns no lane, so never deep
+                    ? (compact ? "free" : "press it · always free")
+                    : (o.deep
+                        ? (compact ? "▲ GOES DEEP" : "▲ ASK — GOES DEEP")
+                        : (compact ? "surface only" : "ask anyway · surface only"))}
               </span>
             </button>
           );
@@ -490,11 +557,11 @@ export function Transcript({ run, deal, open = true, onToggle = null }) {
  *  advisers there too, since it has no agenda rail to show them. */
 export function Meter({ run, presses, children }) {
   return (
-    <div className="pu-meter" aria-label={`${run.pressesLeft} interruptions left`}>
+    <div className="pu-meter" aria-label={`${run.pressesLeft} questions left`}>
       {Array.from({ length: presses }).map((_, i) => (
         <span key={i} className={i < run.pressesLeft ? "on" : ""} />
       ))}
-      <em>INTERRUPTIONS LEFT</em>
+      <em>QUESTIONS LEFT</em>
       {children}
     </div>
   );
@@ -512,7 +579,23 @@ export function Nav({ lastClaim, pressed, onAdvance, onCallIt }) {
         <button className="pu-btn primary" onClick={onCallIt}>THAT'S THE PITCH — CALL IT ▸</button>
       ) : (
         <>
-          <button className={`pu-btn${pressed ? " primary" : ""}`} onClick={onAdvance}>LET PITCHBOT CONTINUE ▸</button>
+          {/* NEXT POINT, not LET PITCHBOT CONTINUE (author, 2026-08-04: "the
+              pitchbot image button and also a button that says 'Let Pitchbot
+              Continue'... is this just a redundancy?").
+
+              They are OPPOSITES, which is what made the collision worth fixing
+              rather than explaining: the tile 30px above spends a question
+              CHALLENGING the bot, and this spends nothing and lets it move on.
+              Naming the bot in both made the two reads as one control, and a
+              third had just joined them — LET PITCHBOT RESPOND in the answer
+              box. Three "PITCHBOT" verbs in one dock.
+
+              So exactly one control keeps the bot as its object (the one that
+              hands it the floor: LET PITCHBOT RESPOND), and this one is named
+              for what it does to the PITCH instead. It is the decline path —
+              what you do when you spend nothing — and "next point" is what
+              declining actually gets you. */}
+          <button className={`pu-btn${pressed ? " primary" : ""}`} onClick={onAdvance}>NEXT POINT ▸</button>
           <button className="pu-btn amber" onClick={onCallIt}>CALL IT</button>
         </>
       )}
@@ -535,7 +618,15 @@ export const PRESS_UI_CSS = `
 .pu-claim[data-mood="backed"]   { border-left-color:#2fd6d6; }
 .pu-claim[data-mood="rattled"]  { border-left-color:#ffd23a; }
 .pu-claim[data-mood="cornered"] { border-left-color:#ff2d2d; border-left-width:3px; }
-.pu-who { display:flex; align-items:baseline; gap:6px;
+/* WRAPS AS A ROW, NEVER MID-TOKEN. Every part of this line is a label, and a
+   flex container that lets its items break internally turns them into
+   nonsense at a phone's width: "PITCH / BOT", "— its client's / deal", and
+   the count reading "1 / / 6". white-space:nowrap on the container reaches
+   the anonymous text items too (the bot's name is a bare text node and can't
+   be targeted any other way); flex-wrap is what still lets the ROW break, so
+   nothing overflows — it just breaks between labels instead of inside one. */
+.pu-who { display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 6px;
+  white-space:nowrap;
   font:bold 9.5px/1.4 'Courier New',monospace; letter-spacing:0.13em; color:#ff5f9e; }
 .pu-mood { font-size:8.5px; letter-spacing:0.16em; padding:1px 5px; }
 .pu-mood.backed   { color:#02100e; background:#2fd6d6; }
@@ -561,20 +652,33 @@ export const PRESS_UI_CSS = `
   font:bold 8.5px/1 'Courier New',monospace; letter-spacing:0.13em; padding:3px 6px; }
 .pu-skip:hover { border-color:rgba(234,255,249,0.55); color:#eafff9; }
 @media (prefers-reduced-motion:reduce) { .pu-open-line.now { animation:none; } }
-.pu-fact { font-size:11.5px; line-height:1.4; color:rgba(234,255,249,0.85); }
+/* THE FACT BELONGS TO THE QUOTE ABOVE IT, and it did not look like it (author,
+   2026-08-04: "i see a line by itself... shouldn't this be something Virgil
+   advises?"). It should NOT be Virgil's — he is mutable, and invariant 1 plus
+   §3 require the deal stay solvable with him muted, so nothing checkable can
+   sit behind the tips switch. What was wrong is that it read as a stray UI row:
+   the spin is in quotation marks and this was not, so two halves of one
+   utterance looked like a sentence and a widget.
+   Indented under the quote with a hairline rule, it reads as what it is — the
+   part of what the bot just said that you could actually go and check. */
+.pu-fact { font-size:11.5px; line-height:1.45; color:rgba(234,255,249,0.85);
+  margin-left:10px; padding-left:10px; border-left:1px solid rgba(47,214,214,0.28); }
 .pu-tag { font:bold 8.5px/1 'Courier New',monospace; letter-spacing:0.13em;
   background:#2fd6d6; color:#02100e; padding:2px 4px; margin-right:5px; }
 
-.pu-lane { margin-top:9px; padding:7px 9px; font:bold 10px/1.4 'Courier New',monospace;
-  letter-spacing:0.06em; border-left:3px solid rgba(234,255,249,0.3);
-  background:rgba(234,255,249,0.04); color:rgba(234,255,249,0.75); }
-.pu-lane[data-lane="CHAIN"]  { border-left-color:#2fd6d6; color:#8ff0f0; background:rgba(47,214,214,0.08); }
-.pu-lane[data-lane="RECORD"] { border-left-color:#ffd23a; color:#ffe487; background:rgba(255,210,58,0.08); }
-.pu-lane[data-lane="CHART"]  { border-left-color:#ff5f9e; color:#ffa8ca; background:rgba(255,95,158,0.08); }
-.pu-lane[data-lane="SOCIAL"] { border-left-color:#bfeede; color:#d8f7ec; background:rgba(191,238,222,0.08); }
+/* .pu-lane IS GONE WITH ITS BOX. It was a colour-coded panel with its own
+   border, background and inset — a second framed block stacked on the cat's,
+   both answering "who should look at this". The sentence lives inside Virgil
+   now (.pu-virgil-lane), so it keeps the lane's COLOUR as type and drops the
+   panel: one box, three lines, in one voice. */
+.pu-virgil-lane { font-size:12.5px; line-height:1.4; color:rgba(234,255,249,0.9); }
+.pu-virgil-lane[data-lane="CHAIN"]  { color:#8ff0f0; }
+.pu-virgil-lane[data-lane="RECORD"] { color:#ffe487; }
+.pu-virgil-lane[data-lane="CHART"]  { color:#ffa8ca; }
+.pu-virgil-lane[data-lane="SOCIAL"] { color:#d8f7ec; }
 /* the lane's owner is spent — this claim is now nobody's, and it should not
-   look like a live instruction */
-.pu-lane[data-lane="SPENT"]  { border-left-color:#ff9b6f; color:#ffb493; background:rgba(255,155,111,0.07); }
+   read like a live instruction */
+.pu-virgil-lane[data-lane="SPENT"]  { color:#ffb493; }
 
 /* THE TRANSCRIPT. Deliberately quiet: it is a reference you consult, never
    something competing with the claim on the floor. Scrolls inside itself so it can
@@ -623,11 +727,16 @@ export const PRESS_UI_CSS = `
   color:rgba(191,238,222,0.6); font:inherit; font-size:8.5px; letter-spacing:0.1em;
   padding:1px 6px; cursor:pointer; }
 .pu-virgil-mute:hover { color:#bfeede; border-color:rgba(191,238,222,0.6); }
-/* THE AGENDA NEVER TURNS OFF and leads the block — it is the only information
-   on the floor nobody else supplies, and it is what makes holding a specialist
-   a decision rather than a guess. */
-.pu-virgil-agenda { font-size:12.5px; line-height:1.4; color:#d8f7ec; font-weight:bold; }
-.pu-virgil-tip { font-size:12px; line-height:1.4; color:rgba(191,238,222,0.7); font-style:italic; }
+/* THE TIP LEADS AND CARRIES THE WEIGHT — see the render site for why the two
+   swapped on 2026-08-04. It keeps the italic, because it is still a cat's
+   remark rather than a readout, but it is now the bright one.
+   THE AGENDA NEVER TURNS OFF. It is still the only information on the floor
+   nobody else supplies and still what makes holding a specialist a decision
+   rather than a guess — it is the SECOND line now, not a demoted one, and the
+   two must never be concatenated (that is what trained the eye to skip both). */
+.pu-virgil-tip { font-size:12.5px; line-height:1.4; color:#d8f7ec;
+  font-weight:bold; font-style:italic; }
+.pu-virgil-agenda { font-size:11.5px; line-height:1.4; color:rgba(191,238,222,0.72); }
 
 .pu-answer { padding:10px 12px; background:rgba(4,20,15,0.97); border:1.5px solid #ffd23a; }
 .pu-answer.vibes { border-color:#7a8b86; }
@@ -717,6 +826,24 @@ export const PRESS_UI_CSS = `
 .pu-seat.boss .pu-seat-who { color:#ff5f9e; }
 .pu-seat-sub { font-size:9.5px; color:rgba(234,255,249,0.62); }
 .pu-seat.off .pu-seat-sub, .pu-seat:disabled .pu-seat-sub { color:rgba(255,155,111,0.9); }
+
+/* THE COMPACT ROW — one column per option, whatever the count. grid-auto-flow
+   with auto-columns rather than repeat(5,...) because the number of seats is
+   the controller's business: seatOptions returns PITCHER + SPENDABLE_SEATS,
+   and a hard 5 here would be a rule in a presentation the day a seat is added.
+   Everything below is a metric, not a behaviour — the states, the lit
+   specialist and the lift all come from the rules above unchanged. */
+.pu-seats.compact { display:grid; grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr); gap:4px; }
+.pu-seats.compact .pu-seat { width:auto; min-width:0; padding:6px 2px 5px; gap:2px; }
+.pu-seats.compact .pu-seat-face { width:34px; height:34px; }
+/* Two lines reserved for the name at this size too — "Detective Marisol" wraps
+   and nobody else does, and a grid row is only as tall as its tallest tile, so
+   without the reservation every other tile's role and verb sit a line high. */
+.pu-seats.compact .pu-seat-who { font-size:8px; line-height:1.15; letter-spacing:0.02em;
+  min-height:2.3em; display:flex; align-items:center; }
+.pu-seats.compact .pu-seat-name { font-size:7px; letter-spacing:0.05em; text-align:center; }
+.pu-seats.compact .pu-seat-sub { font-size:8px; line-height:1.25; text-align:center; }
 
 .pu-spent { font:bold 9.5px/1.5 'Courier New',monospace; letter-spacing:0.1em;
   color:rgba(191,238,222,0.7); padding:12px 4px; text-align:center;

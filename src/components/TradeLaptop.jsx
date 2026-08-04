@@ -675,7 +675,6 @@ function HudOverlay({ screenWidth = 1.45, screenHeight = 1.0, infoRef, ...props 
       label(p, text);
     };
 
-    const wave = new Array(60).fill(0).map(() => Math.random());
     let frame = 0;
     function draw() {
       ctx.clearRect(0, 0, W, H);
@@ -712,42 +711,53 @@ function HudOverlay({ screenWidth = 1.45, screenHeight = 1.0, infoRef, ...props 
       const sb = 2 + Math.floor((Math.sin(frame * 0.25) * 0.5 + 0.5) * 3);
       for (let i = 0; i < 4; i++) { const bh = 6 + i * 5; ctx.fillStyle = i < sb ? HUD_CY : HUD_CYd; ctx.fillRect(fp.x + fp.w - 74 + i * 13, fp.y + 22 - bh, 9, bh); }
 
-      // [SIGNAL] panel: a 2D trace of the geometric beacon (the same sacred-
-      // geometry knot the desktop projector casts) instead of a generic
-      // waveform — a Lissajous knot that slowly rotates/morphs. Cyan with a
-      // gold echo nods to the beacon's multi-strand look and ties mobile to the
-      // desktop scene.
+      // [SIGNAL] panel: an oscilloscope sine trace — a travelling cyan wave with
+      // a slowly breathing amplitude, a faint gold harmonic behind it, a dashed
+      // baseline with graticule ticks and a bright head riding the right edge.
+      // Reads as a live signal without pulling attention off the ASCII feed.
       const wv = px(HUD.wave);
-      const kcx = wv.x + wv.w / 2;
-      const kcy = wv.y + wv.h * 0.56;
-      const krx = wv.w * 0.34;
-      const kry = wv.h * 0.34;
-      const phi = frame * 0.05;
-      // Four strands in the beacon's four colours — one per character lens — so
-      // the SIGNAL knot mirrors the desktop beacon's "four strands, one signal".
-      // Phase-offset so they weave around each other as they rotate.
-      const strands = [
-        { col: '#37e3e3',              ph: 0.0 }, // cyan
-        { col: 'rgba(255,210,58,0.85)', ph: 0.5 }, // gold
-        { col: 'rgba(255,92,200,0.8)',  ph: 1.0 }, // magenta
-        { col: 'rgba(92,255,155,0.8)',  ph: 1.5 }, // green
-      ];
+      const wx = wv.x + wv.w * 0.07;         // trace inset from the panel frame
+      const ww = wv.w * 0.86;
+      const wy = wv.y + wv.h * 0.60;         // baseline, clear of the [SIGNAL] label
+      const amp = wv.h * 0.26 * (0.72 + 0.28 * Math.sin(frame * 0.045));
+      const phase = frame * 0.11;            // wave scrolls leftward
+
       ctx.save();
-      ctx.lineWidth = 1.6;
-      ctx.shadowBlur = 5;
-      const KN = 180;
-      for (const s of strands) {
-        ctx.strokeStyle = s.col;
-        ctx.shadowColor = s.col;
+
+      // dashed baseline + graticule ticks
+      ctx.strokeStyle = HUD_CYd; ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + ww, wy); ctx.stroke();
+      ctx.setLineDash([]);
+      for (let i = 0; i <= 4; i++) {
+        const gx = wx + (i / 4) * ww;
+        ctx.beginPath(); ctx.moveTo(gx, wy - 4); ctx.lineTo(gx, wy + 4); ctx.stroke();
+      }
+
+      const SN = 160;
+      const sine = (cycles, ph, ampScale, col, lw, alpha) => {
+        ctx.strokeStyle = col; ctx.shadowColor = col;
+        ctx.lineWidth = lw; ctx.globalAlpha = alpha;
         ctx.beginPath();
-        for (let i = 0; i <= KN; i++) {
-          const th = (i / KN) * Math.PI * 2;
-          const x = kcx + krx * Math.sin(3 * th + phi + s.ph);
-          const y = kcy + kry * Math.sin(2 * th - phi * 0.6);
+        for (let i = 0; i <= SN; i++) {
+          const u = i / SN;
+          const x = wx + u * ww;
+          const y = wy - Math.sin(u * Math.PI * 2 * cycles + ph) * amp * ampScale;
           i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         }
         ctx.stroke();
-      }
+      };
+      ctx.shadowBlur = 5;
+      sine(4, phase * 1.6, 0.42, HUD_YL, 1.2, 0.45); // gold second harmonic
+      sine(2, phase, 1, HUD_CY, 1.8, 1);             // primary trace
+
+      // live head at the right edge of the trace
+      ctx.globalAlpha = 1; ctx.shadowBlur = 8; ctx.shadowColor = HUD_CY;
+      ctx.fillStyle = '#bffcfc';
+      ctx.beginPath();
+      ctx.arc(wx + ww, wy - Math.sin(phase) * amp, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
 
       // footer status line

@@ -75,13 +75,34 @@ import { PITCH_BOT } from "@/game/terminal-traders/press/desk";
 // deal before it exists — was enforced by the dice timeline, then by the decode,
 // and is enforced here by the signature. Do not overlap them.
 
+/* THE ARRIVAL MAKES EXACTLY TWO SOUNDS, AND THEY ARE DIFFERENT ACTIONS.
+ * The beat is a form being filled in, so the audio is the two things that
+ * physically happen to a piece of paper:
+ *
+ *   SIGN  — a pen writing the client's name onto the REPRESENTING line. Paper
+ *           texture, a short scratchy stroke, no impact. It runs UNDER the
+ *           typing, so it wants to be about TYPE long (0.62s) and to end
+ *           rather than ring out; a tail still sounding when the stamp lands
+ *           muddies the one percussive moment in the beat.
+ *   STAMP  — the rubber stamp hitting the page. One percussive thud with a
+ *           little wood in it, ~STAMP long (0.34s), landing with the scale
+ *           snap. This is record_stamp.mp3 and it was always right.
+ *
+ * BOTH KEYS POINTED AT record_stamp.mp3, which is worse than a duplicate: it
+ * fired the STAMP IMPACT at t=0, before anything had been written, let alone
+ * stamped — and then fired the same impact again 0.72s later when the stamp
+ * actually landed. The beat played its punchline first and then repeated it.
+ *
+ * record_sign.mp3 IS NOT IN public/audio YET, and this is deliberately pointed
+ * at it anyway: playSfx no-ops safely on a missing file (uiSfx caches the
+ * failed fetch and the element fallback swallows the rest), so the signature
+ * beat is SILENT until the asset lands and then lights up by itself. Silence
+ * is the correct placeholder here — a stamp thud over a pen stroke is the
+ * interface describing something that is not on screen.
+ */
 export const SFX = {
-  // playSfx no-ops safely on a missing file (uiSfx caches the failed fetch and
-  // the element fallback swallows the rest), so these light up by themselves
-  // once audio lands at these paths.
-  // arrive: "/audio/record_sign.mp3",
-    arrive: "/audio/record_stamp.mp3",
-  settle: "/audio/record_stamp.mp3",
+  sign: "/audio/record_sign.mp3",
+  stamp: "/audio/record_stamp.mp3",
 };
 
 export function prefersReducedMotion() {
@@ -398,8 +419,6 @@ export function runArrival({
 }) {
   if (!record && !particulars && !client) return null;
 
-  playSfx(SFX.arrive, { volume: 0.5 });
-
   // LAG SMOOTHING OFF FOR THE DURATION, AND THIS SURFACE NEEDS IT MORE THAN MOST.
   // GSAP's default clamps any frame longer than 500ms to a 33ms step, which is the
   // right call for a scroll-linked effect and the wrong one here: this beat plays
@@ -428,6 +447,37 @@ export function runArrival({
     },
   });
 
+  /* A SKIPPED ARRIVAL IS SILENT, AND THE SKIP HAS TO SAY SO EXPLICITLY.
+     skipArrival ends the beat with tl.progress(1), which does not suppress
+     callbacks — it fires every cue it passes through in a single frame. State
+     callbacks WANT that (onSettled has to run or the deal is never named);
+     sound does not, because the pen and the stamp would land on one tick and
+     read as a click rather than as two actions. Silence also matches the
+     reduced-motion path, which builds no timeline and so has never made a
+     sound, and it is the honest reading of the gesture: the player asked for
+     the ceremony to stop.
+
+     THE FLAG IS SET BY THE SKIP, NOT INFERRED FROM THE PLAYHEAD. Inferring it
+     was the first attempt and it silenced normal playback: lagSmoothing is off
+     for this timeline precisely because frames here can run into seconds over
+     a still-streaming WebGL room, so "the playhead moved much further than one
+     frame" is ALSO what an ordinary stall looks like. Measured — a full,
+     unskipped arrival played no sound at all. A stall must still sound; only a
+     skip must not, and only the skip knows which it is.
+
+     A HARD ENOUGH STALL STILL STACKS THEM, and that is accepted rather than
+     guarded. Measured over the live temple: the whole arrival resolved inside
+     one frame and the two cues fired 1ms apart. No guard fixes that honestly
+     — dropping the later cue keeps the pen over a stamped record, dropping the
+     earlier one cannot be decided until the later one exists — and the smear
+     only happens on a machine already dropping seconds. The bug that mattered
+     was a stamp impact over a blank line, twice; this is two right sounds
+     close together. */
+  const sfxAt = (url, volume) => {
+    if (tl.__skipped) return;
+    playSfx(url, { volume });
+  };
+
   // NO OPENING BEAT AND NO SECOND OBJECT (2026-08-03). The file's own fields
   // are what fill in, so the timeline is exactly what it was before the folder
   // existed: the name types onto the line, the stamp lands after it, the
@@ -441,6 +491,12 @@ export function runArrival({
   // actually happening. Text only: no layout property is touched, so the 3D
   // underneath keeps its frames.
   if (client && clientText) {
+    // THE PEN STARTS WHEN THE WRITING DOES. This used to fire at t=0, outside
+    // the timeline — 100ms before the first character and, with the wrong
+    // asset on it, a stamp impact over a blank line. Scheduled here it is
+    // inside the same `if` as the typing, so a record with no name to write
+    // makes no writing sound.
+    tl.call(() => sfxAt(SFX.sign, 0.5), null, lead + 0.10);
     const t = { p: 0 };
     tl.to(t, {
       p: 1, duration: TYPE, ease: "none",
@@ -454,7 +510,14 @@ export function runArrival({
 
   const settledAt = lead + 0.10 + (client && clientText ? TYPE : 0);
 
-  tl.call(() => { playSfx(SFX.settle, { volume: 0.4 }); onSettled?.(); }, null, settledAt);
+  // THE THUD IS THE STAMP'S, so it is scheduled with the stamp's own +0.04
+  // offset rather than on the frame the name finishes. It was 40ms early —
+  // inaudible on its own, but it is the difference between the sound being
+  // the impact and the sound being a cue that something is about to happen.
+  tl.call(() => onSettled?.(), null, settledAt);
+  if (stampRetained) {
+    tl.call(() => sfxAt(SFX.stamp, 0.4), null, settledAt + 0.04);
+  }
 
   // THE STAMP. After the name, never during — a record stamped before the client
   // is named is invariant 7 with a rubber stamp on it.
@@ -495,6 +558,26 @@ export function runArrival({
 export function endArrival(tl) {
   tl?.kill();
   gsap.ticker.lagSmoothing(500, 33);
+}
+
+/**
+ * COMPLETE THE ARRIVAL NOW — the player tapped through it.
+ *
+ * This is `tl.progress(1)` with one thing added, and it exists so that one
+ * thing lives next to the timeline that depends on it. progress(1) fires every
+ * callback it passes over, which is REQUIRED here (onSettled names the deal,
+ * onComplete clears the transforms) and wrong for the two sounds, which would
+ * land stacked on a single tick. The flag is what tells the cues that their
+ * moment was jumped rather than played; nothing else can tell, because a
+ * stalled frame moves the playhead exactly the same way — see sfxAt.
+ *
+ * Callers used to inline progress(1). Reaching for it directly still works and
+ * still lands in the right state; it just makes the noise this suppresses.
+ */
+export function skipArrival(tl) {
+  if (!tl) return;
+  tl.__skipped = true;
+  tl.progress(1);
 }
 
 export const ENGAGEMENT_CSS = `

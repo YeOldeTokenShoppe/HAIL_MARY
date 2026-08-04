@@ -18,7 +18,7 @@ import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
 import { setPitchBotPressure, getPitchBotVoice } from "@/lib/trade/pitchBotScene";
 import { setUnicornGlow } from "@/lib/trade/unicornGlow";
 import {
-  EngagementRecord, runArrival, endArrival, prefersReducedMotion, SFX,
+  EngagementRecord, runArrival, endArrival, skipArrival, prefersReducedMotion, SFX,
   ENGAGEMENT_CSS, peekFileNo, commitFileNo,
 } from "./engagement";
 import { createEvidenceScreen, SCREEN_AGENTS } from "./evidenceScreen";
@@ -334,7 +334,7 @@ export default function PressSession({
   // Impatience is a legitimate input: a click anywhere mid-arrival completes it
   // instantly instead of making you sit through it.
   const skipRoll = useCallback(() => {
-    if (rolling) tlRef.current?.progress(1);
+    if (rolling) skipArrival(tlRef.current);
   }, [rolling]);
 
   /* ---- it says it out loud ----
@@ -392,7 +392,9 @@ export default function PressSession({
            so flying to him buys a close-up of a mute animal while his voice
            comes out of a panel somewhere else. The camera holds on the pitcher
            and .ps-virgil carries him instead. */
-        { voice: VIRGIL.voice, text: tips ? virgil?.agenda : "", minMs: 700 },
+        // THE TIP, NOT THE AGENDA — see the long note at the same effect in
+        // PressFlat. Both surfaces speak the same half of the cat or they drift.
+        { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", minMs: 700 },
       ],
     );
     return () => { try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {} try { stopUnicornBeat(); } catch {} };
@@ -831,7 +833,7 @@ export default function PressSession({
                 is true of every deal — which is this headline's whole licence
                 to be the largest type on a panel that withholds the deal. */}
             <h1>HEAR THE PITCH.<br /><span>MAKE THE CALL.</span></h1>
-            <p>One pitch. Three interruptions. Then say how much of it you believe.</p>
+            <p>One pitch. Three questions. Then say how much of it you believe.</p>
           </div>
 
           {/* BAND 2 — THE RECORD, full panel width, inside its housing, inside
@@ -891,7 +893,7 @@ export default function PressSession({
               The eyebrow the copy column carried (YOUR NEXT APPOINTMENT) moved up
               to the head, where it is CH 02 // INCOMING MANDATE. */}
           <div className="ps-protocol" aria-label="Meeting protocol">
-            <div><b>03</b><span>INTERRUPTS</span></div>
+            <div><b>03</b><span>QUESTIONS</span></div>
             <div><b>04</b><span>ANALYSTS</span></div>
             <div><b>01</b><span>FINAL CALL</span></div>
           </div>

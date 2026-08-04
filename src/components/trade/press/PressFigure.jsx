@@ -6,6 +6,7 @@ import { PITCHER, SEATS } from "@/game/terminal-traders/press/questions";
 import { seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL } from "@/game/terminal-traders/press/virgil";
 import { VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
+import { seatPortalId } from "@/lib/trade/seatVoice";
 import SitePalPortalTile from "./SitePalPortalTile";
 import {
   pitcherPortrait, pitcherVoice, pitcherHasStage, resolvePitcherId,
@@ -279,28 +280,18 @@ const SEAT_MOUTH = {
   },
 };
 
-/** How many bars in the level meter. Cheap: one style write each per frame. */
-const BARS = 14;
-
-/**
- * THE CARRIER — the floor the meter idles at while the lamp says ON AIR.
+/* BARS, CARRIER AND BARS_REST WENT WITH THE LEVEL METER (2026-08-04).
  *
- * NOT A FAKE LEVEL, and the distinction is the reason the number is this small:
- * real speech runs three to six times higher, so the carrier can never be
- * mistaken for it, and ONLY THE METER gets it. The glow, the swell and the mouth
- * stay honest to the amplitude — those are the panel saying "it is talking", and
- * the meter is the panel saying "the line is open".
- *
- * IT EXISTS BECAUSE THE VOICE IS ALLOWED TO FAIL. speakAdviserLine returns false
- * on any non-200 from /api/counsel-voice — no key configured, a rate limit, an
- * offline phone — and the game deliberately plays on regardless (voice is
- * enrichment, never a gate). Without a floor that failure renders as ON AIR over
- * a row of dead bars, which reads as a broken panel rather than as a quiet one.
+ * Worth keeping the carrier's reasoning, because it argues against its own
+ * feature and the argument is what retired the whole effect. The carrier was a
+ * floor the meter idled at so that a FAILED voice — speakAdviserLine returns
+ * false on any non-200 from /api/counsel-voice, and the game plays on because
+ * voice is enrichment and never a gate — did not render as ON AIR over a row of
+ * dead bars. That is a fake level existing to cover for a real absence, which
+ * is the same job the whole meter was doing on an analyst: standing in for a
+ * face that is not there. The lamp already says the line is open, and it says
+ * it without inventing a signal.
  */
-const CARRIER = 0.13;
-
-/** Where the bars sit when nothing is on the line. Must match .pf-meter i. */
-const BARS_REST = "scaleY(0.06)";
 
 /* ── the tuner ──
    Same shape as CyborgTempleScene's __rl80Mouth: a window object you can edit
@@ -316,10 +307,15 @@ function tunerOn() {
 
 export default function PressFigure({
   speaking = false, voice = null, band = "cool", who = PITCHER, className = "",
+  /** Which seat's SitePal player to keep warm — the current claim's lane owner.
+   *  See the mount note below for why it is not "whoever was pressed". */
+  portalSeat = null,
 }) {
-  const imgRef = useRef(null);
-  const glowRef = useRef(null);
-  const barsRef = useRef([]);
+  const portalSeatCfg = portalSeat ? seatMeta(portalSeat)?.sitepal || null : null;
+  /** This seat's own player is mounted AND the camera is on them, so the live
+   *  face is what the panel should be showing — see the still-suppression note
+   *  at the render site for what happens when this is forgotten. */
+  const portalOnCamera = !!portalSeatCfg && who === portalSeat;
   const ledRef = useRef(null);
   const mouthRef = useRef(null);
   // One failed load retires the portrait for the session — a broken-image glyph
@@ -437,8 +433,34 @@ export default function PressFigure({
     return () => { window.removeEventListener("keydown", onKey); };
   }, [cast]);
 
+  /* THE PANEL NO LONGER MIMES SPEECH IT CANNOT PERFORM (author, 2026-08-04:
+     "she is not speaking through sitepal — no face movement — just that screen
+     trick of synching the screen pulses with the voice. Let's retire that
+     effect").
+
+     THREE OF THE FOUR AMPLITUDE WRITES WERE STANDING IN FOR A FACE, and they
+     stood in for it on exactly the characters that have none: the glow
+     brightening, a 2.2% "breath" scale on the portrait, and a fourteen-bar
+     level meter, all riding the same RMS scalar. On the pitch bot they were
+     decoration next to a real mouth; on an analyst they WERE the performance,
+     and a still portrait behind a pulsing chrome reads as the panel pretending.
+     The honest version is a still portrait, the ON AIR lamp, and the voice.
+
+     WHAT SURVIVES IS THE ONE THING THAT IS ACTUALLY A FACE — the LED plate,
+     where the character has one. And the effect now runs ONLY when there is a
+     plate to drive: with no mouth there is nothing to animate, so the loop does
+     not start at all rather than starting and writing to nothing.
+
+     NOT RETIRED, AND DO NOT CONFUSE THEM WITH THIS: the border's mood ring
+     (pressure, not amplitude — §1 rule 3) and the ON AIR lamp and LIVE plate
+     (binary state, set once per utterance, never per frame). Those say who is
+     talking and how the pitch is going. Only the frame-by-frame mimicry went.
+
+     THE SLOT THIS LEAVES OPEN IS SITEPAL — §6's "the analysts are the SitePal
+     slot, deliberately unfilled". Twenty banked lines per seat is what would
+     put real mouths here; until then the panel says nothing it cannot back. */
   useEffect(() => {
-    if (!speaking) return;
+    if (!speaking || !cast.mouth) return;
     let raf;
     let smoothed = 0;
     const openSpan = Math.max(0.001, FULL_AT - OPEN_AT);
@@ -451,12 +473,6 @@ export default function PressFigure({
       const lvl = Math.min(1, Math.max(0, smoothed));
       const open = lvl >= OPEN_AT;
 
-      if (glowRef.current) glowRef.current.style.opacity = String(open ? 0.25 + lvl * 0.75 : 0);
-      // A breath, not a bounce. Anything past a couple of percent stops reading
-      // as a signal fluctuating and starts reading as the image being animated.
-      if (imgRef.current) {
-        imgRef.current.style.transform = `scale(${cast.frame.scale * (1 + lvl * 0.022)})`;
-      }
       // THE MOUTH. Continuous rather than the three discrete states desktop
       // uses: those exist because a mesh swap has nothing between Closed and
       // Mid, and a drawn bar does. No hysteresis needed for the same reason —
@@ -465,30 +481,15 @@ export default function PressFigure({
         const o = Math.min(1, Math.max(0, (lvl - OPEN_AT) / openSpan));
         ledRef.current.style.transform = `scaleY(${0.14 + o * 0.86})`;
       }
-      // The meter is the panel's "line is open" readout, so it gets the detail:
-      // each bar rides the same level through its own slow oscillator, which
-      // turns one scalar into something that looks like speech rather than like
-      // fourteen copies of one number. performance.now() rather than a stored
-      // phase so a dropped frame cannot drift the row out of step.
-      const t = performance.now() / 1000;
-      for (let i = 0; i < barsRef.current.length; i++) {
-        const el = barsRef.current[i];
-        if (!el) continue;
-        const wob = 0.62 + 0.38 * Math.sin(t * (5.5 + i * 0.47) + i * 1.7);
-        el.style.transform = `scaleY(${Math.max(CARRIER, lvl) * wob})`;
-      }
       raf = requestAnimationFrame(tick);
     };
     tick();
     return () => {
       cancelAnimationFrame(raf);
-      // Never leave the panel lit, swollen or mid-word after the voice stops.
-      if (glowRef.current) glowRef.current.style.opacity = "0";
-      if (imgRef.current) imgRef.current.style.transform = rest;
+      // Never leave the panel mid-word after the voice stops.
       if (ledRef.current) ledRef.current.style.transform = "scaleY(0.14)";
-      barsRef.current.forEach((el) => { if (el) el.style.transform = BARS_REST; });
     };
-  }, [speaking, cast, rest]);
+  }, [speaking, cast]);
 
   const m = cast.mouth;
   return (
@@ -559,7 +560,58 @@ export default function PressFigure({
             active={isVirgil}
           />
         )}
-        {isVirgil ? null : showStage ? null : artBroken || !cast.src ? (
+        {/* ONE ANALYST'S PLAYER, MOUNTED A CLAIM AHEAD OF THE PRESS.
+            `portalSeat` is the LANE OWNER of the claim now being made — the
+            seat the lane band is pointing at, and the one a player is most
+            likely to spend. Not the seat that was pressed: by then it is far
+            too late, which is the cold-start finding directly above, arrived at
+            once already on Virgil. Mounting at claim start buys the whole of
+            the bot's spin plus the cat's line as boot time, and the seat row
+            does not even appear until that speech ends, so the player cannot
+            press before the window has run.
+
+            WHY NOT ALL FOUR, WHICH IS WHAT VIRGIL'S NOTE WOULD IMPLY. He is
+            mounted for the session because he speaks on EVERY claim; a seat
+            speaks at most three times in six. Four live SitePal players on a
+            phone to warm three that may never be asked is a poor trade
+            (author: one iframe, not four). The cost of the choice is honest and
+            bounded: press a seat who is not the lane owner and their portal
+            was never mounted, so they take the voice-only path — the same
+            fallback a portal that failed to boot would take.
+
+            KEYED BY SEAT so a claim whose lane owner changes REMOUNTS rather
+            than reusing the player. SitePalPortalTile's own rule: one tile, one
+            character, for the life of the mount — loadSceneByID on a live
+            player can leave its audio subsystem null and it then plays nothing
+            at all, silently. */}
+        {portalSeatCfg && (
+          <SitePalPortalTile
+            key={portalSeat}
+            id={seatPortalId(portalSeat)}
+            sitepal={portalSeatCfg}
+            still={seatMeta(portalSeat)?.portrait}
+            active={who === portalSeat}
+          />
+        )}
+        {/* WHOEVER HAS A LIVE FACE DOES NOT ALSO GET A STILL PAINTED OVER IT.
+            This list is every character whose mouth is real, and an analyst
+            with a portal was missing from it — which is the entire reason
+            Virgil lip-synced and Marisol did not (author, 2026-08-04: "marisol
+            still doesn't move — are we just showing an image or are we using
+            the sitepal embed?").
+
+            BOTH. Her portal was healthy the whole time — measured mid-session:
+            still faded to 0, stage at 1, sayText registered, no STILL flag —
+            and then this block rendered her `.pf-frame` portrait AFTER the tile
+            in the DOM, so the still she had already faded out of covered the
+            player that was moving underneath it. Virgil escaped only because
+            `isVirgil` was hard-coded here when he was the one exception.
+
+            The condition is now the PROPERTY, not the name: does the character
+            in frame have a player of their own. Add a seat to DESK with a
+            sitepal block and it is covered; take one away and its still comes
+            back, with no second place to remember. */}
+        {isVirgil || portalOnCamera ? null : showStage ? null : artBroken || !cast.src ? (
           <div className="pf-feed-nosig">
             <b>{(cast.name || "NO SIGNAL").toUpperCase()}</b>
             <span>AUDIO ONLY</span>
@@ -571,7 +623,6 @@ export default function PressFigure({
              moved out here and the image inside is untransformed at rest. */
           <div className="pf-reg" style={{ transform: rest, transformOrigin: cast.frame.origin }}>
             <img
-              ref={imgRef}
               className="pf-frame"
               src={cast.src}
               alt=""
@@ -612,21 +663,16 @@ export default function PressFigure({
             )}
           </div>
         )}
-        {/* The projection brightening as it speaks. A separate element so the
-            per-frame write is an opacity on a compositor layer and never
-            touches the image's own paint — a `filter` mutated beside an animated
-            subtree computes and never paints on iOS Safari. */}
-        <span className="pf-glow" ref={glowRef} />
+        {/* .pf-glow AND .pf-meter ARE GONE — the brightening that rode the
+            voice and the fourteen-bar level row. See the note on the effect
+            above for why. .pf-scan and .pf-sweep stay: they are the panel's
+            own CRT idle and run whether or not anyone is speaking, so they
+            are furniture rather than a performance. */}
         <span className="pf-scan" />
         <span className="pf-sweep" />
       </div>
       <span className="pf-lamp">{speaking ? "● ON AIR" : "○ STANDBY"}</span>
       <span className="pf-cap">{cast.name} · LIVE</span>
-      <span className="pf-meter">
-        {Array.from({ length: BARS }, (_, i) => (
-          <i key={i} ref={(el) => { barsRef.current[i] = el; }} />
-        ))}
-      </span>
     </div>
   );
 }
@@ -707,9 +753,6 @@ const CSS = `
 .pf-feed-nosig b { color:#2fd6d6; font:bold 11px/1 'Courier New',monospace; letter-spacing:0.14em; }
 .pf-feed-nosig span { color:rgba(234,255,249,0.45); font:9px/1 'Courier New',monospace; letter-spacing:0.12em; }
 /* Lit by the voice. opacity only — see the note by the element. */
-.pf-glow { position:absolute; inset:0; z-index:3; opacity:0; pointer-events:none;
-  background:radial-gradient(ellipse at 50% 42%, rgba(140,255,244,0.30), transparent 62%);
-  mix-blend-mode:screen; }
 .pf-scan { position:absolute; inset:0; pointer-events:none; z-index:4;
   background:repeating-linear-gradient(180deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px); }
 /* A carrier that never stops, so a silent character still reads as a live
@@ -731,16 +774,7 @@ const CSS = `
 /* TALL ENOUGH TO READ AS A LEVEL. At 7px the carrier came out under a pixel and
    even a loud syllable was three, so the row was doing its job arithmetically
    and none of it visually. */
-.pf-meter { position:absolute; left:0; right:0; bottom:0; z-index:5; height:13px;
-  display:flex; align-items:flex-end; gap:2px; padding:0 8px 2px;
-  background:linear-gradient(0deg, rgba(2,10,9,0.62), transparent);
-  pointer-events:none; }
-.pf-meter i { flex:1; height:100%; transform:scaleY(0.06); transform-origin:50% 100%;
-  background:linear-gradient(180deg,#8cfff4,#2fd6d6); opacity:0.85;
-  transition:transform .05s linear; }
-.pf-feed:not(.live) .pf-meter i { opacity:0.22; }
-@media (prefers-reduced-motion:reduce) {
+.pf-feed:not(.live) @media (prefers-reduced-motion:reduce) {
   .pf-sweep { animation:none; opacity:0.22; top:33%; }
-  .pf-meter i { transition:none; }
-}
+  }
 `;
