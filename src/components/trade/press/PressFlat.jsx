@@ -12,6 +12,7 @@ import {
   settlementNote,
 } from "@/game/terminal-traders/press/pressRun";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
+import { speakVirgilLine, stopVirgilLine } from "@/lib/trade/virgilVoice";
 import PressFigure from "./PressFigure";
 import { preloadSfx } from "@/lib/uiSfx";
 import gsap from "gsap";
@@ -319,6 +320,33 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      must cover the whole exchange or the abandoned adviser line clears `speaking`
      while the new pitcher line is still playing. */
   /**
+   * ONE LINE, ROUTED TO WHICHEVER MOUTH THAT CHARACTER ACTUALLY HAS — the same
+   * indirection PressSession keeps for Eugene, and for the same reason: WHERE a
+   * character's lip-sync comes from is a property of the character, not of the
+   * turn, so the callers stay ignorant of it.
+   *
+   * VIRGIL IS THIS SURFACE'S EXCEPTION. He is the only cast member with a live
+   * SitePal player here, so his line goes through the portal, which speaks his
+   * ElevenLabs voice AND moves his face. Everyone else has no player and takes
+   * the analyser path, which is what their drawn mouths (or, for the seats,
+   * their stills) are built on. speakVirgilLine falls back to that same path by
+   * itself if his portal isn't up, so this branch is never a way to lose a line.
+   */
+  const speakLine = useCallback(async (voice, text) => {
+    if (voice === VIRGIL.voice) { await speakVirgilLine(text); return; }
+    await speakAdviserLine(voice, text);
+  }, []);
+
+  /* EVERY WAY A LINE CAN BE CUT OFF has to reach BOTH mouths. The portal is a
+     separate mechanism from the <audio>/buffer path — stopAdviserAudio knows
+     nothing about it — so a press landing while the cat is mid-sentence used to
+     leave him talking underneath the answer. */
+  const stopVoice = useCallback(() => {
+    try { stopAdviserAudio(); } catch {}
+    try { stopVirgilLine(); } catch {}
+  }, []);
+
+  /**
    * @param opts.onPart  index of each part AS IT STARTS — the opening reveals its
    *   lines in step with the voice rather than printing the block up front.
    * @param opts.dwell   (text) => ms floor per part, for the case where audio
@@ -351,7 +379,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         // else.
         setOnCamera(p.seat || PITCHER);
         const startedAt = Date.now();
-        try { await speakAdviserLine(p.voice || VOICE, p.text); }
+        try { await speakLine(p.voice || VOICE, p.text); }
         catch { /* voice is enrichment, never a gate on play */ }
         const floor = p.minMs ?? (dwell ? dwell(p.text) : 0);
         if (floor) {
@@ -362,7 +390,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     } finally {
       if (sayToken.current === token) { setSpeaking(false); onDone?.(); }
     }
-  }, []);
+  }, [speakLine]);
 
   /* ---- it introduces itself ----
      No audio-stopping cleanup, deliberately: a natural finish leaves nothing
@@ -384,7 +412,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // to touch `speaking`, so this clears it by hand.
   const skipOpening = useCallback(() => {
     sayToken.current++;
-    try { stopAdviserAudio(); } catch {}
+    stopVoice();
     setSpeaking(false);
     setOpened(true);
   }, []);
@@ -419,11 +447,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       // Back to the pitcher: the claim is his and it is what you read next.
       { onDone: () => setOnCamera(PITCHER) },
     );
-    return () => { try { stopAdviserAudio(); } catch {} };
+    return () => { stopVoice(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floorLive, run.claimIndex]);
 
-  useEffect(() => () => { try { stopAdviserAudio(); } catch {} }, []);
+  useEffect(() => () => { stopVoice(); }, []);
 
   /* ---- the reading column follows the beat ----
      His answer renders BELOW the claim, so on a short screen it lands out of
@@ -492,7 +520,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
     // You INTERRUPTED him — so he stops the sentence he was on and answers.
     // Without this the claim line and the reply play over each other.
-    try { stopAdviserAudio(); } catch {}
+    stopVoice();
 
     // HE KEEPS THE FRAME WHILE HE ANSWERS, THEN YOU GO AND LOOK.
     //
@@ -539,7 +567,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         // nothing to send you anywhere.
         setLookPending(paneRef.current !== "screen");
       });
-  }, [run, deal, claim, floorLive, say]);
+  }, [run, deal, claim, floorLive, sayTurn]);
 
   // The one door to the screen — going there is what marks the outcome seen, and
   // `looked` is the gate on the verdict note and the panel's colour.

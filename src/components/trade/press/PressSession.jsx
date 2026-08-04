@@ -12,6 +12,8 @@ import {
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
+import { speakVirgilLine, stopVirgilLine, VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
+import SitePalPortalTile from "./SitePalPortalTile";
 import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
 import { setPitchBotPressure, getPitchBotVoice } from "@/lib/trade/pitchBotScene";
 import { setUnicornGlow } from "@/lib/trade/unicornGlow";
@@ -55,6 +57,18 @@ import {
 // resolveAgentSettings still returns the authored pose, so the camera flies to
 // where the bot should be rather than throwing.
 const PITCHER_AGENT = "PitchBot";
+
+// VIRGIL'S BODY IN THE ROOM is 'Virgil' in CyborgTempleScene (renamed from
+// 'Fluffy' on 2026-08-03, since the slot keys clips, focus and the curtain call
+// and a surface passing the character's real name silently got no camera move).
+//
+// NOTHING HERE FOCUSES IT, and that is the finding rather than an omission. The
+// press floor cut the camera to him for his line for exactly one afternoon; the
+// glb has no face mesh, so the shot was a close-up of a cat not moving its mouth
+// while his voice played. His lip-sync is a 2D SitePal player now (.ps-virgil
+// below) and the camera stays where the claim is. The 3D cat keeps his idle,
+// his blink and his habit of relocating between rounds — he is set dressing that
+// happens to be the same character, which is fine, and he is never the shot.
 
 // THE PITCHER'S VOICE — same ElevenLabs voice the flat surface uses (VOICES.PB in
 // api/counsel-voice, override with ELEVENLABS_VOICE_PITCHBOT).
@@ -134,6 +148,12 @@ export default function PressSession({
   // loaded by the time we ask for a camera move — no race, no retry loop.
   const [started, setStarted] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  /* WHOSE VOICE IS IN FLIGHT — the flat surface has needed this all along (see
+     its `speakingAs`) and desktop did not, because every mouth here belongs to
+     something in the room that the camera was already pointed at. Virgil breaks
+     that: his mouth is a 2D player floating over the scene, so the panel has to
+     know it is HIM speaking and not merely that somebody is. */
+  const [speakingAs, setSpeakingAs] = useState(null);
   // Transcript open by default: its whole value is being able to re-read claim 2
   // while claim 5 is on the floor, and a panel you have to discover first mostly
   // doesn't get discovered.
@@ -337,15 +357,50 @@ export default function PressSession({
   // has the mouth, and starting the first claim underneath it would put two
   // utterances in flight from the same speaker — the exact collision sayToken
   // exists to arbitrate, except here BOTH would be legitimate.
+  /* ---- AND THEN THE CAT ----
+     The pitcher makes the claim; Virgil reads the runway on it, and the camera
+     crosses to him for it under this file's own rule (THE CAMERA FOLLOWS THE
+     VOICE). The ORDER is the point: the agenda ("two more money questions after
+     this one") is the input to the decision the claim has just posed, so it lands
+     after you have heard what you are deciding about rather than over the top.
+
+     THE AGENDA, NEVER THE TIP. Only one of his two lines is spoken, and it is the
+     one that stays on under the mute switch (virgil.js: "the half that stays
+     ON"). The tip is a written aside about the SHAPE of the argument, read at
+     your own pace; speaking it would turn the floor into a tutorial reading
+     itself out loud.
+
+     SILENT WHEN THE TIPS ARE OFF — a change to what that switch means, and the
+     honest one now that he has a throat: "Virgil stops chiming in" is the
+     design's own phrasing, and a cat you have muted who still talks six times a
+     session reads as a broken toggle. His agenda TEXT is untouched.
+
+     `virgil` and `tips` are declared several hundred lines below this effect and
+     that is safe rather than lucky: the callback body only ever runs after the
+     commit, by which point every const in the component scope is initialised. It
+     reads the values from the render that CHANGED THE CLAIM, which is exactly the
+     agenda this claim is owed. */
   useEffect(() => {
     if (!floorLive || !claim) return;
-    sayTurn([{ voice: VOICE, text: claim.spin, agent: PITCHER_AGENT }]);
-    return () => { try { stopAdviserAudio(); } catch {} try { stopUnicornBeat(); } catch {} };
+    sayTurn(
+      [
+        { voice: VOICE, text: claim.spin, agent: PITCHER_AGENT },
+        /* NO `agent` ON HIS PART, deliberately — the one exception to this
+           file's THE CAMERA FOLLOWS THE VOICE rule, and the rule's own logic is
+           what makes it one. Cutting to a speaker is worth doing because you
+           then watch them say it; the glb cat has no face mesh to lip-sync on,
+           so flying to him buys a close-up of a mute animal while his voice
+           comes out of a panel somewhere else. The camera holds on the pitcher
+           and .ps-virgil carries him instead. */
+        { voice: VIRGIL.voice, text: tips ? virgil?.agenda : "", minMs: 700 },
+      ],
+    );
+    return () => { try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {} try { stopUnicornBeat(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floorLive, run.claimIndex]);
 
   useEffect(() => () => {
-    try { stopAdviserAudio(); } catch {}
+    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
     try { stopUnicornBeat(); } catch {}
   }, []);
 
@@ -385,6 +440,21 @@ export default function PressSession({
       await playUnicornBeat({ line: text }, { setGlow: setUnicornGlow });
       return;
     }
+    /* VIRGIL IS THE SECOND EXCEPTION, and a different KIND of one. Eugene's
+     * mouth is a jaw bone on a rig already in this room; Virgil's is a SitePal
+     * player, and the glb cat cannot carry one — there is no face mesh on
+     * fluffyCat.glb to project onto, which is why the 2D player exists at all.
+     * speakVirgilLine falls back to speakAdviserLine on its own when the portal
+     * is not up, so this branch cannot lose a line.
+     *
+     * WHETHER HIS PLAYER IS EVEN MOUNTED ON THIS SURFACE IS A SEPARATE QUESTION —
+     * PressFigure hosts it, and that is the flat surface's panel. Here the branch
+     * is harmless and correct in advance: it resolves to the same ElevenLabs path
+     * desktop already used, and starts moving his face the moment a tile exists. */
+    if (voice === VIRGIL.voice) {
+      await speakVirgilLine(text);
+      return;
+    }
     await speakAdviserLine(voice, text);
   }, []);
 
@@ -398,8 +468,15 @@ export default function PressSession({
    *   The opening needs a READING floor instead: its lines are ~140 characters
    *   and, with no API key, speakLine resolves instantly, so a 900ms hold would
    *   flash three sentences past in under three seconds.
+   * @param opts.onDone  fired ONLY when the chain finishes without being
+   *   superseded — it sits inside the token guard for that reason. Hands the
+   *   camera back to the pitcher after Virgil's line; a press mid-turn bumps the
+   *   token, and pulling the camera off the seat that is about to report would
+   *   undo the cut the press just made.
+   *
+   * A part may carry its own `minMs` to override both.
    */
-  const sayTurn = useCallback(async (parts, { onPart = null, dwell = null } = {}) => {
+  const sayTurn = useCallback(async (parts, { onPart = null, dwell = null, onDone = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
     if (!live.length) return;
     const token = ++sayToken.current;
@@ -415,6 +492,7 @@ export default function PressSession({
         // utterance owns the frame while it plays, which is what "on a press it's
         // the camera that crosses the room" was always supposed to mean.
         if (p.agent) onFocusAgent?.(p.agent);
+        setSpeakingAs(p.voice || VOICE);
         const startedAt = Date.now();
         try { await speakLine(p.voice || VOICE, p.text); }
         catch { /* voice is enrichment, never a gate on play */ }
@@ -422,11 +500,11 @@ export default function PressSession({
         // not arrive. With no API key speakLine resolves almost instantly and the
         // two cuts collapse into one strobe across the desk; the shot has to hold
         // long enough to read as a shot even in silence.
-        const left = (dwell ? dwell(p.text) : MIN_DWELL_MS) - (Date.now() - startedAt);
+        const left = (p.minMs ?? (dwell ? dwell(p.text) : MIN_DWELL_MS)) - (Date.now() - startedAt);
         if (left > 0) await new Promise((r) => setTimeout(r, left));
       }
     } finally {
-      if (sayToken.current === token) setSpeaking(false);
+      if (sayToken.current === token) { setSpeaking(false); onDone?.(); }
     }
   }, [onFocusAgent, speakLine]);
 
@@ -453,7 +531,7 @@ export default function PressSession({
   // declines to touch `speaking`, so this has to clear it by hand.
   const skipOpening = useCallback(() => {
     sayToken.current++;
-    try { stopAdviserAudio(); } catch {}
+    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
     try { stopUnicornBeat(); } catch {}
     setSpeaking(false);
     setOpened(true);
@@ -503,7 +581,7 @@ export default function PressSession({
     // You INTERRUPTED it — the claim it was mid-way through stops. sayTurn's
     // token does this for us, but only once the new chain starts; stopping here
     // means the room never carries two voices across the gap.
-    try { stopAdviserAudio(); } catch {}
+    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
 
     const owed = claim.id;
     replyFor.current = owed;
@@ -653,6 +731,8 @@ export default function PressSession({
   // them per surface is exactly how the two presentations drifted apart.
   const live = pressIsLegal(run, claim);
   const lastClaim = run.claimIndex >= deal.claims.length - 1;
+  // His panel shows only while HE has the audio — not merely while somebody does.
+  const speakingVirgil = speaking && speakingAs === VIRGIL.voice;
 
   /* ------------------------------------------------------------------ */
   return (
@@ -936,6 +1016,38 @@ export default function PressSession({
               {rolled ? "HEAR THE PITCH ▸" : rolling ? "OPENING…" : "REVIEW THIS DEAL ▸"}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ---------- VIRGIL, AS A 2D PLAYER OVER THE ROOM ----------
+
+          THE GLB CAT CANNOT DO THIS, and that is the whole reason this panel
+          exists on a surface that already has him in the room. The temple's
+          SitePal work is a PROJECTION: a rendered head cropped onto a character's
+          face MESH (SITEPAL_PROJECTION_CONFIG's `crop`/`filter`, the Demon's Face
+          and the Monk's). fluffyCat.glb has no face mesh to project onto — a cat
+          muzzle is not a human face plate — so there is nothing to paint his
+          lip-sync onto. The 3D cat can idle, blink and relocate between rounds,
+          and that is all he will ever do.
+
+          SO THE CAMERA STAYS ON THE PITCHER while he talks (his part of the claim
+          turn no longer names an agent) and his voice comes from this tile
+          instead. Cutting to the glb AND running this panel would put two Virgils
+          on screen, one of them mute and filling frame — worse than either alone.
+
+          MOUNTED FOR THE WHOLE FLOOR, opacity-hidden between his lines: the
+          player takes seconds to boot and he speaks for about three, so anything
+          that mounts on demand is a tile that is always still. See the note in
+          PressFigure, which learned it the expensive way. */}
+      {floorLive && VIRGIL.sitepal && (
+        <div className={`ps-virgil${speakingVirgil ? " on" : ""}`}>
+          <SitePalPortalTile
+            id={VIRGIL_PORTAL_ID}
+            sitepal={VIRGIL.sitepal}
+            still={VIRGIL.portrait}
+            active={speakingVirgil}
+          />
+          <span className="ps-virgil-cap">{VIRGIL.name.toUpperCase()} · LIVE</span>
         </div>
       )}
 
@@ -1223,6 +1335,39 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    Given one, the top rule that separated it from the answer becomes a left rule
    like the claim's, so the column reads as three stacked records rather than two
    panels and a tail. */
+/* VIRGIL'S PLAYER — a small live tile, and the only lip-sync he can have on this
+   surface (the glb cat has no face mesh; see the note by .ps-virgil's markup).
+
+   IT IS ALWAYS IN THE TREE while the floor is live and only its OPACITY changes:
+   a SitePal subframe that is display:none or moved off-screen gets throttled to
+   ~0.1fps by WebKit and returns frozen, which is precisely the failure this tile
+   was built to cure. The wrapper's own dimensions never change for the same
+   reason — a box collapsed to 0 has an empty clip rect and counts as off-screen.
+
+   TOP-LEFT, UNDER THE BAR — NOT above the reading column, which is where this
+   first went. That column is anchored bottom-left and grows upward as the
+   transcript fills, so anything sharing its corner is clear on claim one and
+   underneath it by claim four. The top-left strip is the one large area of this
+   surface nothing else claims.
+
+   pointer-events stay off: he is not a seat, cannot be sent anywhere, and a
+   clickable cat is an invitation to try. */
+.ps-virgil { position:absolute; left:18px; top:64px;
+  width:132px; height:132px; pointer-events:none;
+  border:1px solid rgba(191,238,222,0.3); background:#02100e; overflow:hidden;
+  opacity:0; transform:translateY(-6px);
+  transition:opacity .3s ease, transform .3s ease, border-color .3s ease;
+  box-shadow:0 0 0 1px rgba(0,0,0,0.5) inset; }
+.ps-virgil.on { opacity:1; transform:translateY(0);
+  border-color:rgba(191,238,222,0.6);
+  box-shadow:0 0 20px rgba(191,238,222,0.18), 0 0 0 1px rgba(0,0,0,0.5) inset; }
+.ps-virgil-cap { position:absolute; left:6px; bottom:5px; z-index:2;
+  padding:2px 5px; background:rgba(2,10,9,0.6);
+  font:bold 8px/1 'Courier New',monospace; letter-spacing:0.11em;
+  color:rgba(234,255,249,0.72); }
+@media (prefers-reduced-motion:reduce) {
+  .ps-virgil { transition:none; transform:none; }
+}
 .ps-readcol .pu-claim { background:rgba(2,16,14,0.86); }
 .ps-readcol .pu-script {
   background:rgba(2,16,14,0.88);

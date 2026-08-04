@@ -178,7 +178,15 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
           TWO LINES, NOT ONE SENTENCE. The agenda is a resource readout and the
           tip is flavour; concatenated they trained the eye to skip the block,
           and the actionable half was the one being skipped. Agenda first and
-          brighter, and it is the half that never turns off. */}
+          brighter, and it is the half that never turns off.
+
+          THE SWITCH ALSO SILENCES HIM as of 2026-08-03, when he got a voice and
+          started speaking the agenda aloud on both surfaces. The agenda TEXT is
+          still the half that never turns off — what the switch now costs you is
+          the tip and the talking. That is the design's own phrasing for it
+          ("Virgil stops chiming in"), and it is the only reading that survives
+          him having a throat: a cat you have muted who carries on talking six
+          times a session reads as a broken toggle, not as a difficulty setting. */}
       {(virgil?.agenda || virgil?.tip) && (
         <div className="pu-virgil">
           <img className="pu-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
@@ -187,7 +195,9 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
               {VIRGIL.name.toUpperCase()}
               {onToggleTips && (
                 <button type="button" className="pu-virgil-mute" onClick={onToggleTips}
-                        title={virgil.tip ? "Stop the tips — keep the running order" : "Turn the tips back on"}>
+                        title={virgil.tip
+                          ? "Quiet him down — the running order stays on screen"
+                          : "Let him chime in again"}>
                   {virgil.tip ? "tips on" : "tips off"}
                 </button>
               )}

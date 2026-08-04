@@ -4,6 +4,9 @@ import dynamic from "next/dynamic";
 import { adviserMouth } from "@/lib/adviserMouth";
 import { PITCHER } from "@/game/terminal-traders/press/questions";
 import { seatMeta } from "@/game/terminal-traders/press/desk";
+import { VIRGIL } from "@/game/terminal-traders/press/virgil";
+import { VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
+import SitePalPortalTile from "./SitePalPortalTile";
 import {
   pitcherPortrait, pitcherVoice, pitcherHasStage, resolvePitcherId,
 } from "@/game/terminal-traders/press/pitchers";
@@ -209,7 +212,14 @@ export default function PressFigure({
         onStage: canStage,
       };
     }
-    const m = seatMeta(who);
+    /* VIRGIL IS NOT A SEAT AND NOT IN THE DESK — seatMeta answers null for him,
+       which would render the no-signal plate with a blank name while his voice
+       played. He carries the same three fields a seat does (name / portrait /
+       voice), so once he is resolved nothing below needs to know he is a cat.
+       Resolved here rather than by teaching seatMeta about him: desk.js is
+       imported by pressRun, and virgil.js may never be (virgil.js, THE
+       INVARIANT). */
+    const m = who === VIRGIL.id ? VIRGIL : seatMeta(who);
     return {
       id: who, canStage,
       name: m?.name || "",
@@ -223,6 +233,7 @@ export default function PressFigure({
     };
   }, [who, voice]);
   const showStage = cast.onStage && !stageFailed;
+  const isVirgil = who === VIRGIL.id;
 
   const rest = `scale(${cast.frame.scale})`;
 
@@ -349,7 +360,50 @@ export default function PressFigure({
                            onFail={() => setStageFailed(true)} />
           </div>
         )}
-        {showStage ? null : artBroken || !cast.src ? (
+        {/* VIRGIL'S LIVE PLAYER, IN PLACE OF HIS STILL — the SitePal slot this
+            file's closing note describes, taken for the one character who needs
+            it most and can have it cheapest.
+
+            WHY HIM AND NOT THE SEATS. The note below says the analysts are the
+            obvious candidates because their twenty press lines are a fixed bank
+            that could be uploaded and lip-synced by name. Virgil is the opposite
+            case and gets there first anyway: his agenda names a COUNT that is
+            rolled per deal ("Two more money questions after this one"), so there
+            is no clip to upload and never will be — live TTS is the only thing
+            that can say his lines at all. SitePal's engine 14 does exactly that
+            in his own ElevenLabs voice, and lip-syncs what it generated.
+
+            AND WHY NOT THE PITCH BOT. It has a rig with real viseme plates
+            (PressBotStage above); a 2D player would be a downgrade.
+
+            MOUNTED FOR THE WHOLE SESSION AND HIDDEN BY OPACITY — the same shape
+            as the bot's stage above, arrived at from the opposite direction and
+            for two reasons that both bite hard:
+
+            COLD START. He holds the camera for about three seconds per claim and
+            the player needs several to boot. Mounting on `isVirgil` looked
+            obviously right and is unshippable: the portal would still be loading
+            every time he finished talking, so the tile would show the still for
+            the entire session and the whole feature would silently do nothing.
+            Measured that way round on the first build of this.
+
+            AND IT MAY NOT BE display:none. That is the correct hide for the bot's
+            rig — its rAF loop gates on offsetParent, so hiding parks it — but a
+            SUBFRAME with an empty clip rect is throttled by WebKit to ~0.1fps,
+            and audio is untouched by that, so he would come back speaking with a
+            frozen face. Which is the exact bug this component exists to fix.
+            Opacity keeps it painting; see [[sitepal-iframe-offscreen-throttle]],
+            which has already been re-broken twice by hiding a portal some other
+            way. */}
+        {VIRGIL.sitepal && (
+          <SitePalPortalTile
+            id={VIRGIL_PORTAL_ID}
+            sitepal={VIRGIL.sitepal}
+            still={VIRGIL.portrait}
+            active={isVirgil}
+          />
+        )}
+        {isVirgil ? null : showStage ? null : artBroken || !cast.src ? (
           <div className="pf-feed-nosig">
             <b>{(cast.name || "NO SIGNAL").toUpperCase()}</b>
             <span>AUDIO ONLY</span>

@@ -6,6 +6,30 @@
   <style>
     html, body { margin: 0; padding: 0; background: #af9682; overflow: hidden; }
     #stage { width: 600px; height: 800px; }
+
+    /*
+      WHERE THE PLAYER ACTUALLY LANDS, which is not in #stage.
+
+      AC_VHost_Embed takes no container argument in the call below, so once the
+      document is loaded it APPENDS its player to the body — `_html5Player` ends
+      up a SIBLING of #stage, not a child. #stage still reserves 600x800 of flow
+      above it, so the canvas is laid out at y=800: entirely below the visible
+      area of a document whose body is overflow:hidden. Measured 2026-08-03:
+      canvas rect {x:0, y:800, w:600, h:450}.
+
+      IT WAS INVISIBLE UNTIL SOMETHING DISPLAYED THIS FRAME. /main never looks at
+      where the canvas sits — it mirrors it by PIXELS into its own canvas, and a
+      drawImage source does not care about layout. The press floor's Virgil tile
+      shows the iframe itself, and so is the first surface for which the player
+      being parked off the bottom of its own document means a blank beige box.
+
+      Both are pinned to the origin rather than reparenting the player: moving a
+      node SitePal owns is how you find out which of its internals cached the
+      old one. Note the real canvas is 600x450, not 600x800 — anything framing
+      this document should crop to that.
+    */
+    #stage { position: absolute; left: 0; top: 0; }
+    #_html5Player { position: absolute; left: 0; top: 0; }
   </style>
 </head>
 <body>

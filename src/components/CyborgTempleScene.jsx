@@ -66,7 +66,7 @@ export const AGENT_CAMERA_SETTINGS = {
     orbitCenter: null,
   },
 
-  Fluffy: {
+  Virgil: {
     cameraPos: new THREE.Vector3(0.54, 0.11, -1.65),
     lookAtPos: new THREE.Vector3(1.87, -1.35, 0.745),
     orbitCenter: null,
@@ -1071,7 +1071,7 @@ const CyborgTempleScene = ({
   //   • mode='typing' — character looks down at their station, "looking up"
   //                     info. Used between speech beats so they don't just
   //                     stare. Default state on focus before audio starts.
-  // Fluffy has no idle/typing distinction — her clips just get paused.
+  // Virgil has no idle/typing distinction — his clips just get paused.
   //
   // The Demon's full in-scene focus sequence (idle → pointing → typing) is
   // intentionally NOT replicated for game-mode focus — the user wants every
@@ -1119,7 +1119,7 @@ const CyborgTempleScene = ({
     RL80:      { aligned: /unicorn_clapping/i, missed: /unicorn_disappointed/i, abstained: /unicorn_stand/i,    council: [/unicorn_argue/i, /unicorn_stand/i] },
     // Virgil sits up out of his loaf for the curtain call — same clip for every
     // outcome; the cat has no opinion on the verdict.
-    Fluffy:    { aligned: /^cat_sitting_idle$/i, missed: /^cat_sitting_idle$/i, abstained: /^cat_sitting_idle$/i, council: /^cat_sitting_idle$/i },
+    Virgil:    { aligned: /^cat_sitting_idle$/i, missed: /^cat_sitting_idle$/i, abstained: /^cat_sitting_idle$/i, council: /^cat_sitting_idle$/i },
   };
 
   // Two-clip alternation for the curtain call / council lineups. A single
@@ -1503,11 +1503,11 @@ const CyborgTempleScene = ({
   // Everything else (loaf, sitting, standing, lying, walking, stretching,
   // mid-transition) is left completely alone.
   const catNoticeUser = () => {
-    const actions = actionsRef.current['Fluffy'];
+    const actions = actionsRef.current['Virgil'];
     if (!actions) return;
     Object.values(actions).forEach((a) => { a.paused = false; });
     const b = catBehaviourRef.current;
-    const cur = fluffyAnimStateRef.current?.currentAnimation || '';
+    const cur = virgilAnimStateRef.current?.currentAnimation || '';
 
     if (/^cat_cleaning_face$/i.test(cur)) {
       playCatClip(CAT_STATES.sitting.idle, { loop: true });
@@ -1530,7 +1530,7 @@ const CyborgTempleScene = ({
   // the clips connect through. Runs ONLY during normal gameplay — the curtain
   // call and the focus close-up each own the cat while they're active.
   const catActionKey = (re) => {
-    const actions = actionsRef.current['Fluffy'];
+    const actions = actionsRef.current['Virgil'];
     if (!actions) return null;
     return Object.keys(actions).find((k) => re.test(k)) || null;
   };
@@ -1538,13 +1538,13 @@ const CyborgTempleScene = ({
   // Play one cat clip. `rev` runs it backwards (for the unauthored return
   // legs). Returns its duration in ms, or 0 if the clip is missing.
   const playCatClip = (re, { rev = false, loop = false } = {}) => {
-    const actions = actionsRef.current['Fluffy'];
+    const actions = actionsRef.current['Virgil'];
     const key = catActionKey(re);
     if (!actions || !key) return 0;
     const action = actions[key];
     const dur = action.getClip().duration;
     // Already looping this exact clip — re-playing it would reset() and hitch.
-    if (loop && fluffyAnimStateRef.current?.currentAnimation === key
+    if (loop && virgilAnimStateRef.current?.currentAnimation === key
         && action.isRunning && action.isRunning() && !action.paused) {
       return dur * 1000;
     }
@@ -1555,7 +1555,7 @@ const CyborgTempleScene = ({
     // PAUSED but still weighs 1, so an isRunning()-only fade left it averaging
     // 50/50 with the idle that followed — the cat half-lying, half-sitting, and
     // only "sometimes" because it needs a transition to have just run.
-    const catMixer = mixersRef.current?.['Fluffy'];
+    const catMixer = mixersRef.current?.['Virgil'];
     fadeOutOthers(actions, action, CAT_XFADE, catMixer);
     action.reset();
     action.paused = false;
@@ -1572,7 +1572,7 @@ const CyborgTempleScene = ({
     action.setEffectiveWeight(1);
     fadeInOrSnap(action, actions, CAT_XFADE, catMixer);
     action.play();
-    if (fluffyAnimStateRef.current) fluffyAnimStateRef.current.currentAnimation = key;
+    if (virgilAnimStateRef.current) virgilAnimStateRef.current.currentAnimation = key;
     return dur * 1000;
   };
 
@@ -1587,7 +1587,7 @@ const CyborgTempleScene = ({
   const startCatBehaviour = (fromState = 'loaf') => {
     const b = catBehaviourRef.current;
     stopCatBehaviour();
-    if (!actionsRef.current['Fluffy']) return;
+    if (!actionsRef.current['Virgil']) return;
     b.active = true;
     b.state = fromState;
     b.goal = null;
@@ -1748,7 +1748,7 @@ const CyborgTempleScene = ({
       agentId === 'Demon'     ? demonAnimStateRef.current     :
       agentId === 'Detective' ? detectiveAnimStateRef.current :
       agentId === 'RL80'      ? rl80AnimStateRef.current      :
-      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    :
+      agentId === 'Virgil'    ? virgilAnimStateRef.current    :
       agentId === 'PitchBot'  ? pitchBotAnimStateRef.current  : null
     );
     if (!actions || !state) {
@@ -1827,7 +1827,7 @@ const CyborgTempleScene = ({
     // Focusing the cat pauses every one of his actions (see
     // applyCharacterFocusAnimation) — a paused action still blends its frozen
     // pose but never advances, so the reaction would sit dead. Un-pause first.
-    if (agentId === 'Fluffy') {
+    if (agentId === 'Virgil') {
       Object.values(actions).forEach((a) => { a.paused = false; });
     }
 
@@ -1843,7 +1843,7 @@ const CyborgTempleScene = ({
       if (outcome === 'council' && startMonkArgueSequence()) return;
       stopMonkArgueSequence();
     }
-    if (agentId === 'Fluffy') {
+    if (agentId === 'Virgil') {
       stopCatBehaviour(); // curtain call owns the cat while it runs
       if (startClipCycle({
         actions,
@@ -1916,13 +1916,13 @@ const CyborgTempleScene = ({
     Demon:     /demon_idle/i,
     Detective: /detective_idle/i,
     RL80:      /unicorn_idle/i,
-    Fluffy:    /^cat_loaf$/i,
+    Virgil:    /^cat_loaf$/i,
   };
   const restoreCharacterIdle = (agentId) => {
     stopBridge(agentId); // no stale bridge hand-off after the curtain call
     // Cat sit/groom cycle chains setTimeouts — kill it or it keeps flipping
     // clips after the reveal and overwrites the restored cat_loaf.
-    if (agentId === 'Fluffy') stopAlternateSequence(catRevealSeqRef);
+    if (agentId === 'Virgil') stopAlternateSequence(catRevealSeqRef);
     // Leaving the reveal — always stow the Demon's phone (it only shows during
     // demon_phone). Done before the guards so it hides even if idle can't resolve.
     if (agentId === 'Demon') {
@@ -1943,7 +1943,7 @@ const CyborgTempleScene = ({
       agentId === 'Demon'     ? demonAnimStateRef.current     :
       agentId === 'Detective' ? detectiveAnimStateRef.current :
       agentId === 'RL80'      ? rl80AnimStateRef.current      :
-      agentId === 'Fluffy'    ? fluffyAnimStateRef.current    :
+      agentId === 'Virgil'    ? virgilAnimStateRef.current    :
       agentId === 'PitchBot'  ? pitchBotAnimStateRef.current  : null
     );
     if (!pattern || !actions || !state) return;
@@ -1962,7 +1962,7 @@ const CyborgTempleScene = ({
     state.lastSwitchTime = Date.now();
     // Hand the cat back to his roaming behaviour once the curtain call has
     // put him back in the loaf.
-    if (agentId === 'Fluffy' && !fluffyFocusedRef.current) startCatBehaviour('loaf');
+    if (agentId === 'Virgil' && !virgilFocusedRef.current) startCatBehaviour('loaf');
   };
 
   // `releaseAfter` — hand the character back to the random alternation once the
@@ -2103,8 +2103,8 @@ const CyborgTempleScene = ({
           : (hasTyping ? typingPat : idlePat);
         crossfadeTo(rl80Actions, rl80AnimStateRef.current, pattern);
       }
-    } else if (agentId === 'Fluffy') {
-      // Fluffy has no idle/typing distinction — pause all clips so the cat
+    } else if (agentId === 'Virgil') {
+      // Virgil has no idle/typing distinction — pause all clips so the cat
       // sits still during the close-up (eliminates loop-seam glitch).
       catNoticeUser(); // head-track does the noticing; his behaviour continues
     }
@@ -2119,12 +2119,12 @@ const CyborgTempleScene = ({
   // shouldTrackHeadRef, which reads the same lobbyIntroDone flag.
   const releaseCharacterFocusAnimation = (agentId) => {
     focusAnimReleasedRef.current = true;
-    if (agentId === 'Fluffy') {
-      // Fluffy is frozen (not cross-faded) while focused — just let the cat
+    if (agentId === 'Virgil') {
+      // Virgil is frozen (not cross-faded) while focused — just let the cat
       // move again; there's no alternation state to restore.
-      const fluffyActions = actionsRef.current['Fluffy'];
-      if (fluffyActions) {
-        Object.values(fluffyActions).forEach((action) => { action.paused = false; });
+      const virgilActions = actionsRef.current['Virgil'];
+      if (virgilActions) {
+        Object.values(virgilActions).forEach((action) => { action.paused = false; });
       }
       return;
     }
@@ -2416,8 +2416,8 @@ const CyborgTempleScene = ({
       case 'RL80':
         rl80FocusedRef.current = true;
         break;
-      case 'Fluffy':
-        fluffyFocusedRef.current = true;
+      case 'Virgil':
+        virgilFocusedRef.current = true;
         break;
       default:
         break;
@@ -2430,8 +2430,8 @@ const CyborgTempleScene = ({
     setFocusTarget((prev) => {
       if (prev && prev.agentId === externalFocusAgent) return prev;
       const isOnMobile = isMobile || detectedMobile;
-      const resolved = externalFocusAgent === 'Fluffy'
-        ? (getCatFocusSettings() || resolveAgentSettings('Fluffy', isOnMobile))
+      const resolved = externalFocusAgent === 'Virgil'
+        ? (getCatFocusSettings() || resolveAgentSettings('Virgil', isOnMobile))
         : externalFocusAgent === 'PitchBot'
           ? (getPitchBotFocusSettings() || resolveAgentSettings('PitchBot', isOnMobile))
           : resolveAgentSettings(externalFocusAgent, isOnMobile);
@@ -2729,7 +2729,7 @@ const CyborgTempleScene = ({
       obj.rotation.set(...target.rotation);
     });
 
-    ['Monk', 'Demon', 'Detective', 'RL80', 'Fluffy'].forEach((agentId) => {
+    ['Monk', 'Demon', 'Detective', 'RL80', 'Virgil'].forEach((agentId) => {
       applyCharacterReaction(agentId, revealMode);
     });
 
@@ -2742,7 +2742,7 @@ const CyborgTempleScene = ({
       // Wind down each character's reaction so the regular animation
       // alternation can resume. Without this, BACK TO SERVICES leaves
       // every character looping their curtain-call clip forever.
-      ['Monk', 'Demon', 'Detective', 'RL80', 'Fluffy'].forEach((agentId) => {
+      ['Monk', 'Demon', 'Detective', 'RL80', 'Virgil'].forEach((agentId) => {
         restoreCharacterIdle(agentId);
       });
       // Allow the Monk hail/beckon attract loop to re-engage on the next
@@ -3232,15 +3232,15 @@ const CyborgTempleScene = ({
     };
   }, []);
   const rl80FocusedRef = useRef(false); // true when camera is zoomed in on RL80
-  const fluffyHeadBoneRef = useRef();
+  const virgilHeadBoneRef = useRef();
   const detectiveHeadBoneRef = useRef();
   // Hint marker group refs (positioned each frame from the head bones)
   const rl80HintRef = useRef();
   const demonHintRef = useRef();
   const monkHintRef = useRef();
-  const fluffyHintRef = useRef();
+  const virgilHintRef = useRef();
   const detectiveHintRef = useRef();
-  const fluffyFocusedRef = useRef(false); // true when camera is zoomed in on Fluffy
+  const virgilFocusedRef = useRef(false); // true when camera is zoomed in on Virgil
   const detectiveFocusedRef = useRef(false); // true when camera is zoomed in on Detective
 
   // SitePal-on-Demon overlay refs. Face1 is the regular face; Face2 is
@@ -3404,7 +3404,7 @@ const CyborgTempleScene = ({
   // Cat (Virgil) animation state. He has no random alternation — this exists
   // so applyCharacterReaction / restoreCharacterIdle can track him like the
   // other characters during the curtain call.
-  const fluffyAnimStateRef = useRef({
+  const virgilAnimStateRef = useRef({
     currentAnimation: 'cat_loaf',
     lastSwitchTime: 0,
     nextSwitchDelay: 999999,
@@ -4284,30 +4284,40 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           captureHeadRestPose(monkHeadBoneRef);
         }
         // The cat's root empty was 'Virgil_Empty' in older exports and is
-        // 'Cat_Empty' (containing 'Virgil') from v95 on — accept either. The
-        // internal character slot stays 'Fluffy': the focus/click/head-track
-        // plumbing keys off that name throughout this file.
+        // 'Cat_Empty' (containing 'Virgil') from v95 on — accept either. Either
+        // one lands in the 'Virgil' character slot, which the focus/click/
+        // head-track plumbing keys off throughout this file.
+        //
+        // THE SLOT WAS 'Fluffy' UNTIL 2026-08-03, from before the cat had a role
+        // or a name in the game. Renamed when the VC game's press floor started
+        // cutting the camera to him to speak (PressSession's CAT_AGENT): a
+        // surface passing the character's actual name and getting no camera move
+        // — resolveAgentSettings answers null for an unknown id and the focus
+        // simply doesn't happen — is a silent failure nobody would think to look
+        // for here. Contained to this file; nothing else referenced it.
+        // NOT renamed: the legacy '*_fluffy' CLIP suffix below, which is a name
+        // inside the glb rather than one of ours.
         else if (child.name === 'Cat_Empty' || child.name === 'Virgil_Empty') {
-          animatedCharacters['Fluffy'] = child;
+          animatedCharacters['Virgil'] = child;
           // Head bone for look-at-camera. GLTFLoader suffixes duplicate node
           // names, so the cat's 'head' may load as head_1/head_2 depending on
           // which skeleton was traversed first — match the base name plus any
           // numeric suffix rather than hard-coding 'head_1'.
           child.traverse((obj) => {
-            if (obj.isBone && /^head(_\d+)?$/i.test(obj.name) && !fluffyHeadBoneRef.current) {
-              fluffyHeadBoneRef.current = obj;
+            if (obj.isBone && /^head(_\d+)?$/i.test(obj.name) && !virgilHeadBoneRef.current) {
+              virgilHeadBoneRef.current = obj;
             }
           });
-          captureHeadRestPose(fluffyHeadBoneRef);
+          captureHeadRestPose(virgilHeadBoneRef);
           catEmptyRef.current = child;
           // Start him on a random desk so he isn't always on Eugene's.
           applyCatPerch(Math.floor(Math.random() * CAT_PERCHES.length));
           // Start the roaming idle behaviour once his actions exist. Deferred a
-          // tick because actionsRef for 'Fluffy' is populated later in this
+          // tick because actionsRef for 'Virgil' is populated later in this
           // same load pass. The curtain call / focus paths stop it if either is
           // already active.
           setTimeout(() => {
-            if (!revealModeRef.current && !fluffyFocusedRef.current) startCatBehaviour('loaf');
+            if (!revealModeRef.current && !virgilFocusedRef.current) startCatBehaviour('loaf');
           }, 0);
         }
         else if (child.name === 'Detective_Empty') {
@@ -4561,7 +4571,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           // bone 'spine'; older exports used sit_idle / *_fluffy. Without this
           // the cat_* clips matched no rule at all and the cat sat in bind pose.
           else if (/^cat[_ ]/i.test(animName) || animName === 'sit_idle' || animName.endsWith('_fluffy')) {
-            targetCharacters = ['Fluffy'];
+            targetCharacters = ['Virgil'];
           }
           // V2 model: unicorn rig clips (Typing_Unicorn, Unicorn_Idle, etc.)
           // → RL80 slot. Accept "unicorn" anywhere in the clip name or first
@@ -4739,7 +4749,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             } else {
               defaultAnimName = availableAnims[0];
             }
-          } else if (charName === 'Fluffy') {
+          } else if (charName === 'Virgil') {
             // Virgil sits in the 'loaf' pose by default.
             const loafKey = availableAnims.find(a => /^cat_loaf$/i.test(a));
             if (loafKey) {
@@ -4759,7 +4769,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             defaultAnim = charActions[defaultAnimName];
             
             // Add some timing variation for visual interest
-            if (charName === 'Monk' || charName === 'Demon' || charName === 'Fluffy' || charName === 'Detective') {
+            if (charName === 'Monk' || charName === 'Demon' || charName === 'Virgil' || charName === 'Detective') {
               defaultAnim.time = Math.random() * defaultAnim.getClip().duration * 0.5;
             }
             defaultAnim.setLoop(THREE.LoopRepeat);
@@ -5198,8 +5208,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               child.name === 'Devil_empty' || child.name === 'Devil_Empty') agentId = 'Demon';
           else if (child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01') agentId = 'Monk';
           // Cat root is 'Cat_Empty' from v95 on; 'Virgil_Empty' is the legacy
-          // pre-v94 name. Both map to the 'Fluffy' character slot.
-          else if (child.name === 'Virgil_Empty' || child.name === 'Cat_Empty') agentId = 'Fluffy';
+          // pre-v94 name. Both map to the 'Virgil' character slot.
+          else if (child.name === 'Virgil_Empty' || child.name === 'Cat_Empty') agentId = 'Virgil';
           else if (child.name === 'Detective_Empty') agentId = 'Detective';
 
           const setMechClickableData = (obj) => {
@@ -5900,10 +5910,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       rl80State.lastSwitchTime = Date.now();
     };
 
-    // Helper: restore Fluffy to normal when leaving focus
-    const restoreFluffyFromFocus = () => {
-      if (!fluffyFocusedRef.current) return;
-      fluffyFocusedRef.current = false;
+    // Helper: restore Virgil to normal when leaving focus
+    const restoreVirgilFromFocus = () => {
+      if (!virgilFocusedRef.current) return;
+      virgilFocusedRef.current = false;
       // Nothing to resume — the close-up never stopped his behaviour. Only
       // restart if something else (a wake-up, the curtain call) parked it.
       if (!revealModeRef.current && !catBehaviourRef.current.active) {
@@ -5952,7 +5962,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       restoreDemonFromFocus();
       restoreMonkFromFocus();
       restoreRL80FromFocus();
-      restoreFluffyFromFocus();
+      restoreVirgilFromFocus();
       restoreDetectiveFromFocus();
     };
 
@@ -6104,7 +6114,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         'Demon',
         'Detective',
         'RL80',
-        'Fluffy',
+        'Virgil',
       ]);
 
       // Focus-on-touch: bypass the dblclick gate that handleClick uses for
@@ -6468,7 +6478,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
                 dblClickAgentId === 'Monk' ||
                 dblClickAgentId === 'RL80' ||
                 dblClickAgentId === 'Detective' ||
-                dblClickAgentId === 'Fluffy' ||
+                dblClickAgentId === 'Virgil' ||
                 dblClickAgentId === 'Angel');
             const alreadyFocusedOnThis = focusTarget && focusTarget.agentId === dblClickAgentId;
             if (isDblClickTarget && !alreadyFocusedOnThis) {
@@ -6660,8 +6670,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
           
           // The cat moves between desks, so his framing is computed live rather
           // than read from the static preset table (see getCatFocusSettings).
-          const settings = object.userData.agentId === 'Fluffy'
-            ? (getCatFocusSettings() || resolveAgentSettings('Fluffy', isOnMobile))
+          const settings = object.userData.agentId === 'Virgil'
+            ? (getCatFocusSettings() || resolveAgentSettings('Virgil', isOnMobile))
             : resolveAgentSettings(object.userData.agentId, isOnMobile);
 
           if (!settings) {
@@ -6807,8 +6817,8 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             }
             // The greeting wave is fired by the page (unicornWave bridge) when
             // Eugene speaks a "hello" line — not on the focus click itself.
-          } else if (object.userData.agentId === 'Fluffy') {
-            fluffyFocusedRef.current = true;
+          } else if (object.userData.agentId === 'Virgil') {
+            virgilFocusedRef.current = true;
             // Pause the animation so the cat sits still — eliminates loop seam glitch
             catNoticeUser(); // head-track does the noticing; behaviour continues
           } else if (object.userData.agentId === 'Detective') {
@@ -8673,7 +8683,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
     }
 
-    // Fluffy (cat) head look-at-camera override.
+    // Virgil (cat) head look-at-camera override.
     //
     // This block used to assume "animation is paused, so we can just replace
     // the head pose" — true when the cat only ever appeared paused-on-focus,
@@ -8681,36 +8691,36 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // is now blended over the clip's own head track by a ramped weight:
     // 1 on neutral clips (pure look-at, the old behaviour), 0 while a grooming
     // clip owns the head. See CAT_HEAD_OWNED_RE.
-    const catClipNow = fluffyAnimStateRef.current?.currentAnimation || '';
+    const catClipNow = virgilAnimStateRef.current?.currentAnimation || '';
     const catHeadFree = !CAT_HEAD_OWNED_RE.test(catClipNow);
     // Base pose for the aim is only ever sampled from a neutral clip — sampling
     // it mid-groom would anchor the look-at to a head-down pose. Until one has
     // been captured, skip the override entirely and let the clip drive.
-    const catBaseReady = !!fluffyHeadBoneRef._baseQuat || catHeadFree;
-    if (fluffyHeadBoneRef.current && catBaseReady &&
+    const catBaseReady = !!virgilHeadBoneRef._baseQuat || catHeadFree;
+    if (virgilHeadBoneRef.current && catBaseReady &&
         // NOT gated on shouldTrackHeadRef: that resolves to `speechActive` once
         // the game has started, and the cat doesn't speak — he'd never make eye
         // contact. He's a guide the player clicks to look at, so he tracks for
         // the whole close-up.
-        (revealModeRef.current || fluffyFocusedRef.current)) {
-      const head = fluffyHeadBoneRef.current;
+        (revealModeRef.current || virgilFocusedRef.current)) {
+      const head = virgilHeadBoneRef.current;
 
       // mixer.update ran earlier this frame, so this IS the clip's authored
       // head pose for this frame — keep it to blend against at the end.
       const animQuat = head.quaternion.clone();
 
-      if (!fluffyHeadBoneRef._baseQuat) {
-        fluffyHeadBoneRef._baseQuat = animQuat.clone(); // guarded by catBaseReady
+      if (!virgilHeadBoneRef._baseQuat) {
+        virgilHeadBoneRef._baseQuat = animQuat.clone(); // guarded by catBaseReady
       }
 
-      if (fluffyHeadBoneRef._followW === undefined) {
-        fluffyHeadBoneRef._followW = catHeadFree ? 1 : 0;
+      if (virgilHeadBoneRef._followW === undefined) {
+        virgilHeadBoneRef._followW = catHeadFree ? 1 : 0;
       }
-      fluffyHeadBoneRef._followW +=
-        ((catHeadFree ? 1 : 0) - fluffyHeadBoneRef._followW) * CAT_HEAD_FOLLOW_RAMP;
+      virgilHeadBoneRef._followW +=
+        ((catHeadFree ? 1 : 0) - virgilHeadBoneRef._followW) * CAT_HEAD_FOLLOW_RAMP;
 
       // Restore base quat before computing world matrices to avoid feedback loop
-      head.quaternion.copy(fluffyHeadBoneRef._baseQuat);
+      head.quaternion.copy(virgilHeadBoneRef._baseQuat);
       head.updateWorldMatrix(true, false);
 
       const headWorldPos = new THREE.Vector3();
@@ -8719,10 +8729,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       head.getWorldQuaternion(baseWorldQuat);
 
       // Compute desired world quaternion facing camera
-      if (!fluffyHeadBoneRef._dummy) {
-        fluffyHeadBoneRef._dummy = new THREE.Object3D();
+      if (!virgilHeadBoneRef._dummy) {
+        virgilHeadBoneRef._dummy = new THREE.Object3D();
       }
-      const dummy = fluffyHeadBoneRef._dummy;
+      const dummy = virgilHeadBoneRef._dummy;
       dummy.position.copy(headWorldPos);
       dummy.lookAt(camera.position);
       // Cat face forward correction — X-axis rotation to tilt from "up" to "forward"
@@ -8741,20 +8751,20 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
 
       // Smooth transition
-      if (!fluffyHeadBoneRef._smoothedQuat) {
-        fluffyHeadBoneRef._smoothedQuat = targetQuat.clone();
+      if (!virgilHeadBoneRef._smoothedQuat) {
+        virgilHeadBoneRef._smoothedQuat = targetQuat.clone();
       }
-      fluffyHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.1);
+      virgilHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.1);
 
       // Blend the aim OVER the clip rather than replacing it.
       head.quaternion.copy(animQuat).slerp(
-        fluffyHeadBoneRef._smoothedQuat,
-        fluffyHeadBoneRef._followW,
+        virgilHeadBoneRef._smoothedQuat,
+        virgilHeadBoneRef._followW,
       );
-    } else if (fluffyHeadBoneRef._smoothedQuat) {
-      fluffyHeadBoneRef._smoothedQuat = null;
-      fluffyHeadBoneRef._dummy = null;
-      fluffyHeadBoneRef._followW = undefined;
+    } else if (virgilHeadBoneRef._smoothedQuat) {
+      virgilHeadBoneRef._smoothedQuat = null;
+      virgilHeadBoneRef._dummy = null;
+      virgilHeadBoneRef._followW = undefined;
     }
 
     // Demon head look-at-camera override — fires when EITHER the camera
@@ -8886,7 +8896,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
             RL80: rl80HeadBoneRef,
             Demon: demonHeadBoneRef,
             Monk: monkHeadBoneRef,
-            Fluffy: fluffyHeadBoneRef,
+            Virgil: virgilHeadBoneRef,
             Detective: detectiveHeadBoneRef,
           };
           const boneRef = headBoneByAgent[focusTarget.agentId];
@@ -9010,7 +9020,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     //     [rl80HeadBoneRef.current, rl80HintRef.current],
     //     [demonHeadBoneRef.current, demonHintRef.current],
     //     [monkHeadBoneRef.current, monkHintRef.current],
-    //     [fluffyHeadBoneRef.current, fluffyHintRef.current],
+    //     [virgilHeadBoneRef.current, virgilHintRef.current],
     //   ];
     //   for (const [bone, marker] of hintPairs) {
     //     if (bone && marker) {
@@ -9146,7 +9156,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
         { id: 'RL80', ref: rl80HintRef },
         { id: 'Demon', ref: demonHintRef },
         { id: 'Monk', ref: monkHintRef },
-        { id: 'Fluffy', ref: fluffyHintRef },
+        { id: 'Virgil', ref: virgilHintRef },
         { id: 'Detective', ref: detectiveHintRef },
       ].map(({ id, ref }) => (
         <group key={id} ref={ref} position={[0, 9999, 0]}>
