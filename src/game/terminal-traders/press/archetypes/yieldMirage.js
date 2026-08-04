@@ -306,5 +306,6 @@ export const AUTOPSY = {
 
 export const RESOLUTION = {
   rug: (v) => `${v.name} stopped paying on day ${v.collapseDay}. The basis trade was real and far too small; the rest of the yield had been coming out of the deposits the whole time. The last people in funded the exit of the first.`,
-  legit: (v) => `${v.name} is still paying. Lower than the headline, published every month, funded by an actual trade. A high number isn't a lie — it's a question, and this one had an answer.`,
+  // LEGIT SAYS ONLY THAT THE CLAIMS HELD — see the note in backdoorFork.js.
+  legit: () => `The yield was lower than the headline, published every month, and funded by an actual trade. A high number isn't a lie — it's a question, and this one had an answer.`,
 };

@@ -9,6 +9,7 @@ import {
   PHASE, PRESSES,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt, seatOptions,
   allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore, laneOutlook, pressure,
+  settlementNote,
 } from "@/game/terminal-traders/press/pressRun";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
 import PressFigure from "./PressFigure";
@@ -299,16 +300,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      started, clearing `speaking` and freezing the mouth for the whole reply.
      Only the newest utterance may say he's stopped. */
   const sayToken = useRef(0);
-  const say = useCallback(async (text) => {
-    if (!text) return;
-    const token = ++sayToken.current;
-    setSpeakingAs(VOICE);
-    setOnCamera(PITCHER);
-    setSpeaking(true);
-    try { await speakAdviserLine(VOICE, text); }
-    catch { /* voice is enrichment, never a gate on play */ }
-    finally { if (sayToken.current === token) setSpeaking(false); }
-  }, []);
+  /* THE SINGLE-UTTERANCE `say` IS GONE (2026-08-03). It claimed `sayToken` and
+     flipped `speaking` exactly as sayTurn does, which is the two-claimants shape
+     the token guard exists to arbitrate — desktop deleted its copy for the same
+     reason. Its one caller was the claim spin, which is now a one-part turn and
+     gets the camera handover free. */
 
   /* ---- TWO VOICES PER PRESS ----
      The seat that went and looked speaks FIRST, in ITS OWN voice; the pitcher
@@ -329,8 +325,17 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
    *   never arrives: speakAdviserLine resolves in milliseconds without an API
    *   key, and three un-held sentences are gone before they can be read. Voice is
    *   enrichment and never a gate, so anything timed off it needs a floor.
+   * @param opts.onDone  fired ONLY when the chain finishes without being
+   *   superseded — it sits inside the token guard for that reason. Used to hand
+   *   the feed back to the pitcher after Virgil's line; a press mid-turn bumps
+   *   the token, and yanking the camera off the seat that is about to report
+   *   would undo the cut the press just made.
+   *
+   * Per-part `minMs` overrides `dwell` for one part alone. Virgil needs a floor
+   * the claim spin does not: without an API key both resolve instantly, and the
+   * feed would cut pitcher -> cat -> pitcher inside a frame.
    */
-  const sayTurn = useCallback(async (parts, { onPart = null, dwell = null } = {}) => {
+  const sayTurn = useCallback(async (parts, { onPart = null, dwell = null, onDone = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
     if (!live.length) return;
     const token = ++sayToken.current;
@@ -342,18 +347,20 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         onPart?.(i);
         setSpeakingAs(p.voice || VOICE);
         // `seat` is optional and defaults to the pitcher, so the opening and the
-        // claim spins need no change — only a press names somebody else.
+        // claim spins need no change — only a press, or the cat, names somebody
+        // else.
         setOnCamera(p.seat || PITCHER);
         const startedAt = Date.now();
         try { await speakAdviserLine(p.voice || VOICE, p.text); }
         catch { /* voice is enrichment, never a gate on play */ }
-        if (dwell) {
-          const left = dwell(p.text) - (Date.now() - startedAt);
+        const floor = p.minMs ?? (dwell ? dwell(p.text) : 0);
+        if (floor) {
+          const left = floor - (Date.now() - startedAt);
           if (left > 0) await new Promise((r) => setTimeout(r, left));
         }
       }
     } finally {
-      if (sayToken.current === token) setSpeaking(false);
+      if (sayToken.current === token) { setSpeaking(false); onDone?.(); }
     }
   }, []);
 
@@ -385,9 +392,33 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // `floorLive`, not `onFloor`: during the opening the pitcher already has the
   // mouth, and starting claim 1 underneath it would put two of ITS OWN utterances
   // in flight — the collision sayToken arbitrates, except here both are valid.
+  /* ---- AND THEN THE CAT ----
+     The pitcher makes the claim; Virgil reads the runway on it. That ORDER is
+     the whole point: the agenda ("two more money questions after this one") is
+     the input to the decision the claim has just posed, so it has to land after
+     you have heard what you are deciding about, not over the top of it.
+
+     THE AGENDA, NEVER THE TIP. Only one of his two lines is spoken, and it is
+     the one that stays on under the mute switch (virgil.js: "the half that stays
+     ON"). The tip is a written aside about the SHAPE of the argument — read at
+     your own pace, or turned off — and speaking it would make the surface a
+     tutorial reading itself out loud.
+
+     SILENT WHEN THE TIPS ARE OFF, which is a change to what that switch means
+     and the honest one now that he has a throat: "Virgil stops chiming in" is
+     the design's own phrasing for it, and a cat you have muted who still talks
+     six times a session reads as a broken toggle. His agenda TEXT is untouched —
+     the actionable half stays on screen for everyone, exactly as before. */
   useEffect(() => {
     if (!floorLive || !claim) return;
-    say(claim.spin);
+    sayTurn(
+      [
+        { voice: VOICE, text: claim.spin },
+        { voice: VIRGIL.voice, text: tips ? virgil?.agenda : "", seat: VIRGIL.id, minMs: 900 },
+      ],
+      // Back to the pitcher: the claim is his and it is what you read next.
+      { onDone: () => setOnCamera(PITCHER) },
+    );
     return () => { try { stopAdviserAudio(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floorLive, run.claimIndex]);
@@ -748,8 +779,17 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 that analyst is one of the four you can send. Hard-coding the
                 pitcher instead would have reintroduced the same lie the moment
                 the feed started cutting to the reporter. */}
+            {/* THE CAT IS NOT IN THE DESK, so seatMeta answers null for him and
+                the fallback would have put the PITCHER's name over the cat's
+                face — the same wrong-name-over-a-live-feed bug this tab was
+                fixed for, arriving from the one direction seatMeta cannot cover.
+                He is deliberately absent from DESK (virgil.js: not staff, not a
+                seat) and pressRun must never import him, so he is resolved HERE
+                rather than by widening that lookup. */}
             <button className={pane === "feed" ? "on" : ""} onClick={() => setPane("feed")}>
-              ◉ {(seatMeta(onCamera)?.name || PITCH_BOT.name).toUpperCase()}
+              ◉ {(onCamera === VIRGIL.id
+                    ? VIRGIL.name
+                    : seatMeta(onCamera)?.name || PITCH_BOT.name).toUpperCase()}
               {speaking && <em> · speaking</em>}
             </button>
             {/* THE BADGE MAY NOT ANSWER THE QUESTION THE BOARD IS THERE TO
@@ -928,6 +968,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           </div>
           <div className="pf-label">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
           <p className="pf-copy">{deal.resolution}</p>
+          {/* THE GAP, SAID OUT LOUD (§7 item 7). Only ever renders when the
+              claims held and the venture died anyway — the one combination
+              where the payout above disagrees with the sentence above it, and
+              the header is showing YOU READ IT RIGHT over a corpse. Smoothing
+              that over would mean coupling the score to the outcome, which is
+              invariant 2 through the back door, so it is narrated instead. */}
+          {settlementNote(run, deal) && (
+            <p className="pf-copy note">{settlementNote(run, deal)}</p>
+          )}
           <button className="pf-btn primary" onClick={finish}>WHAT WAS ACTUALLY SAID ▸</button>
         </div>
       )}
@@ -1034,6 +1083,12 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-copy.sm { font-size:10.5px; }
 .pf-copy.dim { color:rgba(200,229,223,.58); }
 .pf-copy.gold { color:#ffd23a; }
+/* THE SETTLEMENT NOTE (§7 item 7) — see the desktop rule. Commentary, not
+   evidence, so it is dimmer and ruled off rather than coloured; gold on this
+   surface means a receipt. */
+.pf-copy.note { font-size:11px; line-height:1.45; margin-top:10px; padding-top:9px;
+  border-top:1px solid rgba(200,229,223,.2);
+  color:rgba(200,229,223,.62); font-style:italic; text-align:left; }
 
 /* START SCREEN — a mandate intake terminal, not a document page. */
 .pf-start { padding-top:13px; }

@@ -365,9 +365,10 @@ export const AUTOPSY = {
 // and the rug branch has to state out loud that the project is still running,
 // because a player who has met three archetypes arrives expecting a collapse.
 export const RESOLUTION = {
-  legit: (v) =>
-    `${v.name} is still running, and the vest is most of the way through. Six percent a year into a book that grew faster than it did, `
-    + `no cliff to survive, and the people paying the fees were never the people being paid in tokens. `
+  // LEGIT SAYS ONLY THAT THE CLAIMS HELD — see the note in backdoorFork.js.
+  legit: () =>
+    `The vest ran most of the way through at six percent a year, into a book that grew faster than it did. `
+    + `No cliff to survive, and the people paying the fees were never the people being paid in tokens. `
     + `The schedule was the only real risk in the file, and the schedule was survivable — which you could have known, because it was published.`,
   rug: (v) =>
     `${v.name} is still running. The product still works, the team still ships, and nobody ever took anything. `

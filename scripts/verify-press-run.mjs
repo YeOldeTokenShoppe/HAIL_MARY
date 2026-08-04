@@ -16,6 +16,7 @@ import {
   PRESSES, STAKE, PHASE,
   createRun, press, advance, callIt, allocate,
   resolvePress, sliderToP, coverageScore, currentClaim, seatOptions, laneOutlook, pressure, PRESSURE,
+  settlementNote,
 } from "../src/game/terminal-traders/press/pressRun.js";
 import { casePnl } from "../src/game/terminal-traders/caseTable.js";
 
@@ -752,6 +753,104 @@ console.log("\n-- PURITY: a run is a function of (seed, inputs) -----------");
     return JSON.stringify(allocate(r.phase === PHASE.ALLOCATION ? r : callIt(r, d), d, -60));
   };
   ok("replaying an identical input list reproduces the run byte for byte", play() === play());
+}
+
+console.log("\n-- FATES: a good call can still have a bad outcome ----------");
+{
+  // §7 item 7 / [A§16]. Until fates.js, `legit` meant *succeeded* and §1's
+  // headline — "a good decision and a bad outcome are not the same mistake" —
+  // described something the game could not produce. These assertions exist to
+  // stop it quietly becoming untrue again.
+
+  // THE REGRESSION GUARD ON THE PROSE. Each archetype's own legit line must say
+  // only that the CLAIMS held; what became of the venture comes from the shared
+  // fate. Three of the four opened with "is still running" / "is still paying"
+  // before 2026-08-03, which is exactly how `legit` came to mean succeeded.
+  for (const arch of ARCHETYPE_IDS) {
+    const line = ARCHETYPES[arch].RESOLUTION.legit({ name: "TESTCO", collapseDay: 57 });
+    ok(`${arch}: the legit line claims nothing about survival`,
+      !/still (running|paying|there|alive)|survived|thriving/i.test(line), line.slice(0, 60));
+  }
+
+  let legit = 0, failed = 0, rugWithFate = 0, noteOnRug = 0, noteOnStanding = 0;
+  let paidTheCall = 0, failedTotal = 0;
+  for (let seed = 1; seed <= 4000; seed++) {
+    const d = instanceDeal(seed);
+    if (d.truth === 1) { if (d.fate) rugWithFate++; continue; }
+    legit++;
+    if (d.fate?.failed) failed++;
+
+    // The resolution must actually contain the fate's sentence — a fate that
+    // rolls and is never printed is the whole feature failing silently.
+    const composed = d.resolution.includes(d.fate.line(d.name));
+    if (!composed) { console.log(`  FAIL fate not composed at seed ${seed}`); fail++; break; }
+  }
+  ok("a rug deal never carries a fate — it already has its ending", rugWithFate === 0);
+  const share = failed / legit;
+  ok(`legit deals fail sometimes, but not often (${(share * 100).toFixed(1)}%)`,
+    share > 0.2 && share < 0.4, `${failed}/${legit}`);
+  // §7 forbids modelling the real 1-in-10 survival rate: power-law payoffs end
+  // properness (invariant 2). This pins the direction, not just the band.
+  ok("surviving is still the common case for a legit deal", share < 0.5);
+
+  // THE PAYOUT IS UNTOUCHED BY THE FATE. This is the assertion that matters
+  // most: a fate is narration, and if it ever reaches casePnl the scoring rule
+  // has stopped being proper.
+  for (let seed = 1; seed <= 4000; seed++) {
+    const d = instanceDeal(seed);
+    if (d.truth !== 0 || !d.fate?.failed) continue;
+    failedTotal++;
+    let r = createRun(d);
+    while (r.phase === PHASE.FLOOR) r = advance(r, d);
+    r = allocate(r, d, 80); // a confident FUND
+    if (r.call.pnl > 0) paidTheCall++;
+    if (settlementNote(r, d) === null) { console.log(`  FAIL no note at seed ${seed}`); fail++; break; }
+  }
+  ok("a legit deal that FAILED still pays a confident FUND call",
+    failedTotal > 0 && paidTheCall === failedTotal, `${paidTheCall}/${failedTotal}`);
+
+  // The note is only ever the explanation of a genuine disagreement.
+  for (let seed = 1; seed <= 1500; seed++) {
+    const d = instanceDeal(seed);
+    let r = createRun(d);
+    while (r.phase === PHASE.FLOOR) r = advance(r, d);
+    r = allocate(r, d, 80);
+    if (d.truth === 1 && settlementNote(r, d)) noteOnRug++;
+    if (d.truth === 0 && !d.fate.failed && settlementNote(r, d)) noteOnStanding++;
+  }
+  ok("no settlement note on a rug", noteOnRug === 0);
+  ok("no settlement note when it held up AND survived", noteOnStanding === 0);
+  ok("the note speaks to all three calls",
+    (() => {
+      const d = Array.from({ length: 4000 }, (_, i) => instanceDeal(i + 1))
+        .find((x) => x.truth === 0 && x.fate?.failed);
+      const at = (v) => { let r = createRun(d); while (r.phase === PHASE.FLOOR) r = advance(r, d); return settlementNote(allocate(r, d, v), d); };
+      const [fund, fud, flat] = [at(80), at(-80), at(0)];
+      return fund && fud && flat && new Set([fund, fud, flat]).size === 3;
+    })());
+
+  // ARCHETYPE-AGNOSTIC, like desk.js — archetypes 5-13 must cost nothing here.
+  {
+    const src = fs.readFileSync("src/game/terminal-traders/press/fates.js", "utf8");
+    ok("fates.js names no archetype and no branch",
+      !ARCHETYPE_IDS.some((id) => src.includes(`"${id}"`)) && !/\brug\b/.test(src.split("*/").pop()));
+    // An IMPORT, not the word — the archetypes cite ../fates.js in a comment on
+    // purpose, so that whoever next edits a legit RESOLUTION finds out why it
+    // may not say "is still running".
+    const files = fs.readdirSync("src/game/terminal-traders/press/archetypes");
+    ok("no archetype imports fates.js — the fate layer is theirs to cite, not to use",
+      files.every((f) =>
+        !/^\s*import[^;]*["']\.\.\/fates(\.js)?["']/m.test(
+          fs.readFileSync(`src/game/terminal-traders/press/archetypes/${f}`, "utf8"))));
+    ok("the resolver does not import fates.js — it reads deal.fate and nothing more",
+      !fs.readFileSync("src/game/terminal-traders/press/pressRun.js", "utf8").includes('from "./fates'));
+  }
+
+  // The fate rides its own stream, so it must not have shifted the deal rolls.
+  ok("the fate roll did not disturb the deal sequence",
+    instanceDeal(7, "backdoor-fork").claims.map((c) => c.id).join() ===
+    instanceDeal(7, "backdoor-fork").claims.map((c) => c.id).join()
+    && instanceDeal(99).ticker === instanceDeal(99).ticker);
 }
 
 console.log("\n-- a full session, played two ways -------------------------");

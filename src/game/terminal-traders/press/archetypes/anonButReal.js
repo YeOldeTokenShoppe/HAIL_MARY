@@ -311,8 +311,9 @@ export const AUTOPSY = {
 };
 
 export const RESOLUTION = {
-  legit: (v) =>
-    `${v.name} is still running. Nobody ever learned their names. The vault held, the upgrade path stayed audited, and the investors who did know who they were never had to say. `
+  // LEGIT SAYS ONLY THAT THE CLAIMS HELD — see the note in backdoorFork.js.
+  legit: () =>
+    `Nobody ever learned their names. The vault held, the upgrade path stayed audited, and the investors who did know who they were never had to say. `
     + `Anonymity was the only thing wrong with it, and anonymity was never the thing that hurts you.`,
   rug: (v) =>
     `${v.name} drained on day ${v.collapseDay}, through the one admin function the timelock didn't cover. `

@@ -32,7 +32,8 @@ times**, then call it — long, short, or flat — and then you get the truth.
 
 The teaching payload, in one line: **a good decision and a bad outcome are not
 the same mistake.** You are graded on whether you read the claims right, never on
-whether the venture succeeded.
+whether the venture succeeded — and since 2026-08-03 the game can actually
+*produce* that case rather than only claim it (§4, fates).
 
 ```
 OUR LADY        remote, unseen       decides which deal comes down.        DESIGNED
@@ -137,7 +138,7 @@ is happening; the agent owns it when something is.
 | **THE FLOOR** | Six claims, one at a time. Each carries `FACT` (always true) + `SPIN` (the inference), a **lane band** naming who goes deepest, and **Virgil's read**. |
 | **THE PRESS** | Three interruptions. Ask anyone about anything — the lane decides how deep they get, not whether they answer. The analyst reports, then **you choose**: `SEE WHAT LANDED` (their screen) or `HEAR ITS RESPONSE` (the seller's spin). Neither is compulsory. |
 | **THE CALL** | One slider, `SHORT ← FLAT → LONG`. Plain-English readout including what you lose if wrong. |
-| **RESOLUTION** | Truth. On desktop the four stand up and play their real reactions; the summary is a lower third so it never covers them. |
+| **RESOLUTION** | Truth: what the claims turned out to be, then what became of the venture (§4, fates). On desktop the four stand up and play their real reactions; the summary is a lower third so it never covers them. When a good call had a bad outcome, one further line says so. |
 | **POST-DEAL ANALYSIS** | READ (did you press where the answer could have changed your mind) + BOOK (P&L), every chip flipped, **and the pattern named**. |
 
 | Press outcome | You hear | The board |
@@ -280,7 +281,37 @@ FUND call**.
 
 The branch keys stay `rug` / `legit` because the engine reads those two strings.
 Nothing is rugged in `bad-tokenomics`. **That gap between the key and the meaning
-is the point**, and it is why §7 item 7 is now overdue rather than optional.
+is the point.**
+
+### Fates — a good call with a bad outcome — `SHIPPED`
+
+`legit` used to mean *succeeded*, so the only way to lose money was to be cheated
+— which made §1's headline (*"a good decision and a bad outcome are not the same
+mistake"*) describe something the game could not produce. `press/fates.js` fixes
+it, and the rules are short:
+
+1. **A fate is NARRATION. It never reaches `casePnl`.** A legit deal that folds
+   **still pays the FUND call**, because the player was asked whether the claims
+   held. If a fate ever touches the score, properness is gone (invariant 2).
+2. **The archetype's legit line says only that the CLAIMS held.** What became of
+   the venture comes from the shared pool. *Never* put "is still running" back
+   into a `RESOLUTION` — that is exactly how `legit` came to mean succeeded, and
+   an assertion now blocks it.
+3. **A failure belongs in a fate if, and only if, it fails §4's admission test** —
+   the same question, read the other way. If a specialist could have found it, it
+   is a claim; if nobody could, it is a fate. This is the *only* place a
+   played-out premise is allowed to exist.
+4. **~30% of legit deals fail; surviving stays the common case.** Roughly one deal
+   in seven overall. **Do not make 1/10 the real rate** — real VC survives its hit
+   rate through asymmetric payoffs, and power-law payoffs end properness.
+5. **The fate reports; `settlementNote()` draws the lesson.** A fate may not
+   mention the call, the score, the claims or the desk. The note fires *only* on
+   the one combination where the payout disagrees with the story, and it answers
+   all three calls — including the hard one, where the player FUD-ded a deal that
+   did fail and still lost, because they answered a wider question than the one
+   asked.
+6. **Archetype-agnostic, like `desk.js`.** An archetype authors no word of it, so
+   archetypes 5–13 cost nothing here.
 
 **The exception rate is load-bearing, not flavour.** A backdoor-fork-shaped token
 is *usually* a rug and *sometimes* genuinely fine — which is why a perfect read
@@ -411,7 +442,7 @@ outcome, identity, surface numbers), `questions.js`, `desk.js`, `virgil.js`,
 `identities.js`, `archetypes/`. `components/trade/press/` is presentation —
 `pressUi.jsx` (the shared floor), `PressSession.jsx` (desktop),
 `PressFlat.jsx` (mobile), `PressFigure.jsx`, `evidenceScreen.js`,
-`arrival.jsx`. Verified by `scripts/verify-press-run.mjs` — **124 assertions, green.** The
+`arrival.jsx`. Verified by `scripts/verify-press-run.mjs` — **143 assertions, green.** The
 edge gate in §4 is `scripts/sim-press-edge.mjs`.
 
 *A file tree is not listed here on purpose: the previous edition's went stale and
@@ -512,7 +543,7 @@ bands · the shared floor · desktop in-room play · mobile CRT with voice, the
 pitcher's projection panel and per-rig faces · **three rigs, rolled blind to the
 deal, with their own throats on both surfaces** · all seven
 ElevenLabs voices wired, seat-then-pitcher on both surfaces ·
-lower-third reveal · post-deal analysis with the pattern named · 124 assertions ·
+lower-third reveal · post-deal analysis with the pattern named · fates, so a good call can have a bad outcome · 143 assertions ·
 `The VC Game` tile on the `/trade` rail (default). Case Table behind `?classic=1`.
 
 **Open on the bot specifically:** the face shield's four pressure textures are not
@@ -592,15 +623,8 @@ is done — derived from the face plate at focus time by `getPitchBotFocusSettin
    exception rate is a character — leak-safe while his confidence tracks the base
    rate and never the branch. **The agenda must stay exact**; make him wrong there
    and the seat decision has nothing to rest on.
-7. **Split `legit` into outcomes** `[A§16]`. `RESOLUTION` quietly makes `legit`
-   mean *succeeded*, so the only way to lose money is to be cheated — false about
-   the world. Ran out of runway, out-competed, team split, market never showed:
-   **all still a correct LONG call**, because the claims held up and that is what
-   you were asked to judge. **The scoring axis is already correct; only the
-   narration is wrong.** When a legit deal fails, P&L still pays the LONG call —
-   *say that out loud*; the gap IS the lesson. **Do not make 1/10 the actual base
-   rate**: real VC survives its hit rate through asymmetric payoffs, and power-law
-   payoffs end properness (invariant 2).
+7. ~~Split `legit` into outcomes~~ — **`SHIPPED` 2026-08-03**, `press/fates.js`.
+   See §4's fate rules; the reasoning is `[A§22]`.
 
 **Smaller, open:** desktop end-to-end unverified past the copy paths (receipt on
 the adviser's in-room monitor, `NOTHING ON FILE` in-scene, the curtain call) ·

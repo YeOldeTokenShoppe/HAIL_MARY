@@ -387,6 +387,48 @@ export function callReadout(v) {
   };
 }
 
+/**
+ * THE GAP, SAID OUT LOUD — §7 item 7, `[A§16]`.
+ *
+ * Returns a sentence only when the claims HELD and the venture died anyway.
+ * Every other combination explains itself and gets `null`; a note on a deal that
+ * needs no note is noise, and it would train the player to skim past this one.
+ *
+ * WHY IT HAS TO BE SAID. Until fates.js existed, `legit` meant *succeeded* and
+ * §1's headline — "a good decision and a bad outcome are not the same mistake" —
+ * described something the game could not produce. Now it can, and the moment it
+ * does, the screen is showing a payout that disagrees with the story: a player
+ * who funded a project that then folded sees `YOU READ IT RIGHT` over a
+ * corpse, and a player who FUD-ded it sees `YOU GOT IT WRONG` over a failure
+ * they called. Both of those are correct and neither is self-evident. **The
+ * disagreement IS the teaching payload**, so it is narrated rather than smoothed
+ * over — smoothing it would mean coupling the score to the outcome, which is
+ * invariant 2 through the back door.
+ *
+ * PURE, AND IT READS NO NEW STATE. `deal.fate` and `run.call` are both already
+ * settled by the time this can be called, so there is nothing here to leak — and
+ * this module does not import fates.js, because the resolver has no business
+ * knowing what fates exist.
+ */
+export function settlementNote(run, deal) {
+  if (!run?.call || !deal) return null;
+  if (deal.truth !== 0 || !deal.fate?.failed) return null;
+
+  const p = run.call.p;
+  if (p < 0.5) {
+    return "You backed it and it went under, and the book still paid you. "
+      + "You were asked whether the claims held up. They held up. What happened after that "
+      + "was not on the table, and nobody at this desk could have put it there.";
+  }
+  if (p > 0.5) {
+    return "It failed, and you still lost money on it. That is not the game punishing you for being right — "
+      + "it is the game asking a narrower question than the one you answered. "
+      + "The claims held. What killed it, none of us could have found before you called.";
+  }
+  return "You passed, and it folded. Worth noticing that you'd have been paid for backing it: "
+    + "the claims held up, and that was the only thing being scored.";
+}
+
 // READ — did you spend your interruptions where the answer could have changed
 // your mind?
 //

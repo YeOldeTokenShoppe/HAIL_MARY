@@ -79,7 +79,8 @@ export const SFX = {
   // playSfx no-ops safely on a missing file (uiSfx caches the failed fetch and
   // the element fallback swallows the rest), so these light up by themselves
   // once audio lands at these paths.
-  arrive: "/audio/record_sign.mp3",
+  // arrive: "/audio/record_sign.mp3",
+    arrive: "/audio/record_stamp.mp3",
   settle: "/audio/record_stamp.mp3",
 };
 

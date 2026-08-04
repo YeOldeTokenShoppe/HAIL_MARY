@@ -8,6 +8,7 @@ import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
   allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore, seatOptions, laneOutlook, pressure,
+  settlementNote,
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
@@ -1044,6 +1045,11 @@ export default function PressSession({
           <div className="ps-lower-body">
             <div className="ps-lower-h">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
             <div className="ps-lower-truth">{deal.resolution}</div>
+            {/* THE GAP, SAID OUT LOUD (§7 item 7) — see the note on PressFlat.
+                Renders only when the claims held and it folded anyway. */}
+            {settlementNote(run, deal) && (
+              <div className="ps-lower-note">{settlementNote(run, deal)}</div>
+            )}
           </div>
           <button className="ps-lower-go" onClick={finish}>WHAT WAS ACTUALLY SAID ▸</button>
         </div>
@@ -1578,6 +1584,14 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .ps-lower-h { font-size:11px; letter-spacing:0.16em; font-weight:bold; color:#2fd6d6; }
 .ps-lower-truth { font-size:12.5px; line-height:1.5; margin-top:5px;
   color:rgba(234,255,249,0.9); }
+/* THE SETTLEMENT NOTE — set apart from the truth line rather than styled as
+   more of it. It is a different KIND of sentence: the truth line says what
+   happened, this says why the number disagrees with it. Rule above, dimmer,
+   italic. It must not read as gold — gold is the receipt colour on this
+   surface, and this is commentary, not evidence. */
+.ps-lower-note { font-size:11.5px; line-height:1.45; margin-top:7px; padding-top:7px;
+  border-top:1px solid rgba(234,255,249,0.16);
+  color:rgba(234,255,249,0.62); font-style:italic; }
 .ps-lower-go { flex:none; background:none; border:1px solid #ffd23a; color:#ffd23a;
   font-size:11.5px; letter-spacing:0.1em; padding:12px 18px; cursor:pointer; }
 .ps-lower-go:hover { background:rgba(255,210,58,0.12); }

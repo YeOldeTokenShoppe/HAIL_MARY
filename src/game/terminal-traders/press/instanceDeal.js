@@ -13,6 +13,7 @@ import * as MIRAGE from "./archetypes/yieldMirage.js";
 import * as ANONREAL from "./archetypes/anonButReal.js";
 import * as SUPPLYCLIFF from "./archetypes/supplyCliff.js";
 import { IDENTITIES, CHAINS } from "./identities.js";
+import { rollFate, fateLine } from "./fates.js";
 import { getCardById } from "../cards.js";
 import { getCardArt } from "../templateCard.js";
 
@@ -114,6 +115,11 @@ export function instanceDeal(seed = 1, archetypeId = null) {
   };
 
   const resolve = (v) => (typeof v === "function" ? v(vars) : v);
+
+  // Off a salted stream, so it cannot shift the sequence above it — the same
+  // reasoning as rollPitcher. Taken here rather than at the return so the
+  // draw is unconditional and identical for every branch.
+  const fate = rollFate(seed >>> 0);
 
   // Play SIX of the archetype's slots. loadBearing slots are always in (a deal
   // must stay solvable cardless); the rest are a seeded pick, so which question
@@ -232,7 +238,19 @@ export function instanceDeal(seed = 1, archetypeId = null) {
     },
     claims,
     autopsy: A.AUTOPSY[branch],
-    resolution: A.RESOLUTION[branch](vars),
+    // WHAT BECAME OF IT — legit only, and narration only. See fates.js and §7
+    // item 7: the archetype's legit line says the CLAIMS held, the fate says
+    // what happened to the venture, and they are different axes. A rug branch
+    // already has its ending, so it gets no fate.
+    //
+    // ROLLED OFF ITS OWN STREAM, always, even on a rug. Rolling it only on legit
+    // would make the draw conditional on the branch, and the reason it rides a
+    // salted stream at all (see FATE_SALT) is so that no roll here can disturb
+    // or observe another. Nothing reads `fate` before the reveal.
+    fate: branch === "legit" ? fate : null,
+    resolution: branch === "legit"
+      ? `${A.RESOLUTION.legit(vars)} ${fateLine(fate, vars.name)}`
+      : A.RESOLUTION.rug(vars),
   };
 }
 

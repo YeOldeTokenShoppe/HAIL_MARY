@@ -329,5 +329,8 @@ export const AUTOPSY = {
 
 export const RESOLUTION = {
   rug: (v) => `${v.name} drained on day ${v.collapseDay} through the upgrade path the audit never covered. The ops partner's hot wallet was seeded, two hops, by the exit wallet of the project that quietly wound down.`,
-  legit: (v) => `${v.name} is still running. The upgrade path was audited, the prior failure was public, and the boring answer was the right one. Not every fork is a trapdoor.`,
+  // LEGIT SAYS ONLY THAT THE CLAIMS HELD. What became of the venture is a
+  // separate axis and comes from ../fates.js — see §7 item 7. Do not put "is
+  // still running" back in here: that is what made `legit` mean *succeeded*.
+  legit: () => `The upgrade path was audited, the prior failure was public, and the boring answer was the right one. Not every fork is a trapdoor.`,
 };

@@ -641,3 +641,106 @@ no widening at all.
 **§7 item 7 is now overdue rather than optional.** Three RESOLUTIONs still make
 `legit` mean *succeeded*. A fourth archetype whose bad branch leaves the project
 running makes that inconsistency visible in a way it was not before.
+
+---
+
+## 22. Fates — the eight days §7 item 7 sat there, and why it was cheap
+
+*2026-08-03, immediately after `[A§21]`. Item 7 had been written on 2026-07-28 and
+correctly diagnosed: "the scoring axis is already correct; only the narration is
+wrong." What it did not say is how little that costs to fix.*
+
+### The thing that was actually broken
+
+`truth: 0` reads as "legit", and all three archetypes' legit `RESOLUTION` opened
+with *is still running* or *is still paying*. So `legit` meant SUCCEEDED, and the
+only way to lose money in this game was to be cheated.
+
+The sharpest way to state the damage: **§1's headline sentence was aspirational.**
+*"A good decision and a bad outcome are not the same mistake"* has been printed at
+the top of the spec since the rewrite, and the game could not produce that case.
+Not "produced it rarely" — could not produce it. A player could have played a
+hundred deals and never met one.
+
+### Why archetype #4 forced it
+
+`bad-tokenomics` landed with a bad branch that leaves the project *running* — the
+product works, the team ships, nobody takes anything, and the token still goes to
+a fifth of what you paid. That put a survival-neutral BAD branch next to three
+legit branches that all asserted survival, and the inconsistency stopped being
+theoretical. `[A§21]` called item 7 "overdue rather than optional" on that basis
+and it was right.
+
+### The decomposition, which is the whole trick
+
+An archetype's legit line was doing two jobs at once: *the claims held up* and
+*the venture survived*. Those are the two axes `[A§16]` separated a week earlier
+and they had been welded together in one sentence the entire time. Split them:
+
+- **the archetype** keeps "here is what the claims turned out to be" — specific,
+  authored, and the transferable half;
+- **`fates.js`** supplies "and here is what became of it" — shared,
+  archetype-agnostic, rolled on its own salted stream.
+
+That is why item 7 was cheap. The four fates §7 names — ran out of runway,
+out-competed, team split, market never showed — are facts about the world rather
+than about an archetype, so they belong in one shared pool on exactly the
+`desk.js` argument: *an archetype authors claims and never a word for Virgil or an
+adviser's dispatch*, and now never a word for a fate either. **Archetypes 5–13
+pay nothing for this.** Had they been authored per archetype it would have been
+the 210-line-per-archetype tax `[A§17]` rejected, in a fifth costume.
+
+### The membership rule was already written
+
+Which failures may be fates? It is `[A§21]`'s admission test, read backwards.
+**Could a specialist at that desk have found it before you called?** If yes it is
+a claim and belongs in an archetype; if no it belongs here. One question, and it
+sorts every failure mode the game will ever want in either direction.
+
+That resolved something left dangling: the **played-out premise**, rejected as an
+archetype twice. It was never a bad idea, it was in the wrong slot — it is
+`quiet`, and this was always the only place it could live.
+
+### What had to be said out loud, and the case that is genuinely hard
+
+§7 said *"P&L still pays the LONG call — say that out loud; the gap IS the
+lesson."* The moment fates shipped, the resolution screen started showing a payout
+that disagrees with its own story, and it does so in **three** ways, not one:
+
+| the call | what they see | why it is right |
+|---|---|---|
+| funded | `YOU READ IT RIGHT` over a dead company | the claims held; that was the question |
+| **FUD-ded** | `YOU GOT IT WRONG` over a failure they called | **the hard one** — see below |
+| passed | nothing gained, and it folded | they'd have been paid for backing it |
+
+The middle row is the one worth defending, because it looks like the game
+punishing a correct prediction. It isn't. The claims held, the structure was
+sound, and nothing at that desk said no — so funding was the right call, and the
+thing that killed it was not on the table. **Being right for a reason you could
+not have had is not a read.** That is `[A§21]`'s axis seen from the other side,
+and it is the sharpest statement of the whole game's thesis that has been
+written down.
+
+`settlementNote()` fires on that combination and no other. A note on a deal that
+explains itself is noise, and would train the player to skim the one that doesn't.
+
+### Two smaller things
+
+**Smoothing the disagreement would have been invariant 2 through the back door.**
+The tempting fix is to soften the header — not say `YOU READ IT RIGHT` over a
+corpse. That means coupling the displayed verdict to the outcome, which is the
+coupling the whole scoring design exists to refuse. Narrate it instead.
+
+**A fate reports; it never draws the lesson.** Two of them originally ended on
+*"nobody at that desk could have told you"* — which is the note's sentence,
+arriving a paragraph early and then again a moment later. Caught by reading the
+composed output rather than the sources, which is the only way that class of
+duplication is ever visible.
+
+### The measurement that did not move
+
+The §4 edge stayed at **+5.12** across the whole change, exactly as it should:
+fates are narration, they touch no base rate and no expected P&L, and the closed
+form `4·STAKE·VAR(r_i)` has no term they could enter. A feature that changes what
+the game MEANS while provably not changing what it SCORES is the shape this
+design keeps reaching for, and it is worth noticing when one actually lands.
