@@ -744,13 +744,13 @@ export default function PressSession({
                 time, and §2 wants the session to read as "an offer, not a lie
                 hunt" — a headline promising a bluff sends the player hunting a
                 lie the game does not contain. It was also BINARY over a graded
-                mechanic: the call is SHORT ← FLAT → LONG, and §4 keeps the
-                middle on purpose. THE CALL is the game's own name for the beat
+                mechanic: the call is a conviction dial (RUG ← PASS → REAL),
+                and §4 keeps the middle on purpose. THE CALL is the game's own name for the beat
                 (the phase, callReadout, the 01 FINAL CALL cell below), and it
                 is true of every deal — which is this headline's whole licence
                 to be the largest type on a panel that withholds the deal. */}
             <h1>HEAR THE PITCH.<br /><span>MAKE THE CALL.</span></h1>
-            <p>One pitch. Three interruptions. Decide whether it deserves your book.</p>
+            <p>One pitch. Three interruptions. Then say how much of it you believe.</p>
           </div>
 
           {/* BAND 2 — THE RECORD, full panel width, inside its housing, inside
@@ -1006,7 +1006,24 @@ export default function PressSession({
             value={slider}
             onChange={(e) => setSlider(Number(e.target.value))}
           />
-          <div className="ps-slider-ends"><span>SHORT</span><span>FLAT</span><span>LONG</span></div>
+          {/* THE ENDS NAME WHAT THE SLIDER MEASURES (2026-08-03). They read
+              SHORT · FLAT · LONG, which promised a position with a SIZE — and
+              the control has never taken one: sliderToP maps the handle to
+              P(this is a rug) and the stake is fixed, so what you are setting
+              is CONVICTION. The labels also disagreed with the sentence
+              directly beneath them, which has always spoken in rug/real/
+              passing (callReadout). Left is p=1 and right is p=0, so RUG sits
+              left; PASS is the word the readout itself uses at dead centre. */}
+          {/* FUND vs FUD (author, 2026-08-03) — one letter apart, and both are
+              things a desk DOES, which is what SHORT/LONG and REAL/RUG could
+              not manage: funding is one-sided, so "reject it" could only ever
+              label half a two-sided control. FUD names the left half as an
+              action without alleging fraud, which matters because the downside
+              is not always a theft — it may be illiquid, or played out. Left
+              is p=1, so FUD sits left; PASS is the readout's own word for dead
+              centre. NOTE: VerdictScreen.jsx runs the mirrored order (TRUST
+              left); settle the direction before the two games merge. */}
+          <div className="ps-slider-ends"><span>FUD</span><span>PASS</span><span>FUND</span></div>
           <div className="ps-saying">{readout.saying}</div>
           <div className="ps-risk">{readout.risk}</div>
           <button className="ps-lock" onClick={lockCall}>LOCK IT IN</button>

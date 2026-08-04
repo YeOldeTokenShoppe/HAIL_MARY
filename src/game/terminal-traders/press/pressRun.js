@@ -339,13 +339,30 @@ export function callReadout(v) {
   const pct = Math.round(p * 100);
   if (v === 0) return { saying: "You're passing on this one.", risk: "You win nothing and lose nothing." };
 
-  const strength =
-    pct >= 85 || pct <= 15 ? "almost certainly"
-      : pct >= 70 || pct <= 30 ? "probably"
+  // COMES APART / HOLDS UP — the axis the resolver actually settles, no wider.
+  // "Doesn't work out" was tried first and pulled back the same day: it is a
+  // SUPERSET of what is modelled (it takes in an illiquid book and a played-out
+  // premise, neither of which any archetype writes), and a superset in UI copy
+  // invites a call the scoring will mark wrong — the file prints HOLDERS and
+  // MCAP, so a player can reason "too thin to ever exit" and FUD an honest
+  // project. [A§13]: copy cannot fix a mechanic mismatch. Widen this line when
+  // an archetype exists whose bad branch is survival-neutral, not before.
+  //
+  // NOT "A RUG" EITHER (author, 2026-08-03). The bad branch is not always a theft:
+  // yieldMirage's is a structure that could not work — "stopped paying... the
+  // rest of the yield had been coming out of the deposits the whole time" —
+  // and the failure space the game wants is wider still, including a sound
+  // project that is illiquid, or one whose premise is simply played out.
+  // Naming the downside "a rug" teaches the player that bad means FRAUD, which
+  // is the read this game most wants to complicate. It also fixed a grammar
+  // bug: the old template produced "this is leaning a rug".
+  const sure =
+    pct >= 85 || pct <= 15 ? "almost certain"
+      : pct >= 70 || pct <= 30 ? "fairly sure"
         : "leaning";
-  const saying = p > 0.5
-    ? `You're saying: this is ${strength} a rug.`
-    : `You're saying: this is ${strength} real.`;
+  const saying = sure === "leaning"
+    ? (p > 0.5 ? "You're leaning against this one." : "You're leaning toward this one.")
+    : `You're ${sure} this one ${p > 0.5 ? "comes apart" : "holds up"}.`;
 
   const win = casePnl(p, p > 0.5 ? 1 : 0, STAKE);
   const lose = casePnl(p, p > 0.5 ? 0 : 1, STAKE);
