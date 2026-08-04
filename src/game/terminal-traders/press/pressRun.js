@@ -341,12 +341,27 @@ export function callReadout(v) {
 
   // COMES APART / HOLDS UP — the axis the resolver actually settles, no wider.
   // "Doesn't work out" was tried first and pulled back the same day: it is a
-  // SUPERSET of what is modelled (it takes in an illiquid book and a played-out
-  // premise, neither of which any archetype writes), and a superset in UI copy
-  // invites a call the scoring will mark wrong — the file prints HOLDERS and
-  // MCAP, so a player can reason "too thin to ever exit" and FUD an honest
-  // project. [A§13]: copy cannot fix a mechanic mismatch. Widen this line when
-  // an archetype exists whose bad branch is survival-neutral, not before.
+  // SUPERSET of what is modelled (it takes in a played-out premise, which no
+  // archetype may ever write — see below), and a superset in UI copy invites a
+  // call the scoring will mark wrong. [A§13]: copy cannot fix a mechanic
+  // mismatch.
+  //
+  // THE CONDITION THIS COMMENT USED TO STATE WAS THE WRONG TEST (2026-08-03).
+  // It said: widen this line when an archetype exists whose bad branch is
+  // SURVIVAL-NEUTRAL. `bad-tokenomics` now is one — the product works, the team
+  // ships, nobody takes anything, and 48% of supply lands on a book that holds
+  // 6% — and the line still does not want widening, because survival was never
+  // the axis. VC_GAME.md §4 settles it: the binary is "was funding this the
+  // right call ON WHAT WAS CHECKABLE AT THE TABLE", and under that reading the
+  // DEAL comes apart while the company keeps running. "This one" was always the
+  // deal.
+  //
+  // The real test, for anyone editing this line or authoring an archetype:
+  // could a specialist at that desk have found it before the call? An illiquid
+  // book, yes — it is Marisol's lane and archetype #4 is built on it. A
+  // played-out premise, NO: [A§16], and §7 item 7 files "market never showed"
+  // as a LEGIT branch that still pays the FUND call. Widen the copy only if
+  // that ever stops being true, which would mean invariant 2 had gone first.
   //
   // NOT "A RUG" EITHER (author, 2026-08-03). The bad branch is not always a theft:
   // yieldMirage's is a structure that could not work — "stopped paying... the

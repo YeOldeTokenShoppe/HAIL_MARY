@@ -241,7 +241,10 @@ and never concede. No aside may name a fact, a lane or an outcome — "records" 
 something"*), but two `POSITIONED` slots still claim a personal stake —
 `backdoorFork` *"I'm in this myself"*, `yieldMirage` *"My own money's in the
 vault"*. A commissioned agent has no money in the vault: move the interest from
-ownership to the close. `anonButReal`'s is about the client's funding and is fine.
+ownership to the close. `anonButReal`'s is about the client's funding and is fine,
+and **`badTokenomics`'s `commission` slot is the worked example** — the bot's
+interest is the close, the honest answer is identical in both branches, and that
+is exactly why it cannot help you.
 
 ---
 
@@ -251,13 +254,33 @@ An archetype owns seven claim slots and all the prose. **The seed rolls the
 outcome; the outcome only changes what can be PRODUCED when pressed.** Same six
 questions, different answers. Each instance plays 6 of 7 slots.
 
-| id | label | rug rate | hides |
+| id | label | bad rate | hides |
 |---|---|---|---|
 | `backdoor-fork` | THE DOOR NOBODY AUDITED | 74% | a *mechanism* — an unaudited upgrade path |
 | `yield-mirage` | PAID OUT OF THE INFLOWS | 68% | an *accounting identity* — yield paid from inflows |
 | `anon-but-real` | NO NAMES, BUT RECEIPTS | **30%** | nothing — anonymity is not the tell |
+| `bad-tokenomics` | THE SUPPLY THAT HASN'T LANDED YET | **25%** | a *schedule* — published, unread, and pure arithmetic |
 
 Deliberately different silhouettes: learning one doesn't give you the others.
+
+### What the binary means — decided 2026-08-03
+
+**"Was funding this the right call ON WHAT WAS CHECKABLE AT THE TABLE."** Not "did
+the project survive" — that was never the axis, only how the first three happened
+to narrate it — and not "did it make money", which no seat can investigate and
+which needs power-law payoffs that end properness (invariant 2). `[A§21]`.
+
+**The admission test for any bad branch is one question: could a specialist at
+that desk have found it before you called?** A vesting cliff, a lock date, an LP
+concentration and a fee line all pass — `bad-tokenomics` is built on them, and its
+bad branch leaves the project *running*. A played-out premise fails: `[A§16]` says
+nobody at that desk can tell you whether the market will show up, and §7 item 7
+already files "market never showed" as **legit-branch narration, still a correct
+FUND call**.
+
+The branch keys stay `rug` / `legit` because the engine reads those two strings.
+Nothing is rugged in `bad-tokenomics`. **That gap between the key and the meaning
+is the point**, and it is why §7 item 7 is now overdue rather than optional.
 
 **The exception rate is load-bearing, not flavour.** A backdoor-fork-shaped token
 is *usually* a rug and *sometimes* genuinely fine — which is why a perfect read
@@ -268,19 +291,38 @@ scoring kernel with it.
 ### The number that justifies a new archetype
 
 **Not the hit rate. The edge from recognition** — expected P&L per deal, 8000
-seeds:
+seeds. **`scripts/sim-press-edge.mjs` computes this**; it reproduces every row
+below off the production `instanceDeal`, so the table is re-derivable rather than
+remembered. It had no harness until 2026-08-03, which is the same as no gate.
 
 | | base rate | blind | knows the archetype | **edge** |
 |---|---|---|---|---|
-| 2 archetypes | 71.5% rug | +4.61 | +4.71 | **+0.10** |
-| 3 archetypes | 57.3% rug | +0.54 | +4.62 | **+4.08** |
+| 2 archetypes | 71.5% bad | +4.61 | +4.71 | **+0.10** |
+| 3 archetypes | 57.3% bad | +0.54 | +4.62 | **+4.08** |
+| **4 archetypes** | **49.2% bad** | **+0.01** | **+5.12** | **+5.12** |
 | *perfect read* | | | **+24.99** | |
 
 At two archetypes, recognition was worth a tenth of a point — **a game whose stated
 skill did not pay.** `anon-but-real` inverts the base rate, which is what took it
 to +4.08 *and* made blind play worse (a lopsided world is easy to score in once you
 know it's lopsided). **Harder for the uninformed and more rewarding for the
-informed, at once — that is the test a fourth has to pass.**
+informed, at once — that is the test a fourth has to pass.** `bad-tokenomics`
+passes on both halves: blind falls to a rounding error, informed play rises.
+
+**THE GATE HAS A CLOSED FORM, AND IT DISQUALIFIES THE MIDDLE.** With a uniform
+archetype roll and base rates `r_i`, the whole table collapses to
+
+> **edge = 4 · STAKE · VAR(r_i)** — recognition is worth *only the spread of the
+> priors.* Prose, mechanism, lane design and how cleverly a tell is hidden move
+> this number by exactly zero.
+
+So a fifth archetype **anywhere between 35% and 79% makes the game worse**: it adds
+a near-zero deviation and dilutes the ones carrying the spread. `--sweep` prints
+the whole range. The gate pulls toward the extremes and the exception rate above
+pushes back (*"make an archetype deterministic and correct play collapses to a
+binary"*), and **the design lives in that gap** — roughly 20–30% or 80–85%. Pick
+the base rate by measurement, then write to it; the intuitive version of
+`bad-tokenomics`, where a thin book usually kills you, would have **failed**.
 
 **Never measure hit rate.** `casePnl` is Brier-affine, so always-short-with-
 conviction earns **−16.83** per deal — the worst strategy available, not an
@@ -302,12 +344,21 @@ you can't say how confident to be.
    what produces `NOTHING ON FILE`. An assertion once forbade it and silently
    killed the feature.
 4. **Every lane a spendable seat owns needs ≥1 slot, and one needs ≥2.**
-5. **Nothing visible may correlate with archetype or outcome.** Names come from
-   the shared pool in `identities.js` — never per archetype. A name must not
-   suggest a mechanism, must not suggest a team style, and must be plausible for
-   archetypes not yet written.
+5. **Nothing visible may correlate with archetype or outcome.** Names, **claimed
+   prior roles and auditors** all come from the shared pools in `identities.js` —
+   never per archetype. Each must not suggest a mechanism, must not suggest a team
+   style, and must be plausible for archetypes not yet written. *`PRIORS` was
+   still per-archetype until 2026-08-03 and yield-mirage's list was disjoint from
+   the other two's, so a trading-desk prior named the archetype outright — the
+   2026-07-28 identity fix had never been carried through to the other visible
+   pool. Check every pool an archetype can print, not just the one that broke.*
 6. **`miss` blocks are dead.** Delete on sight. *(All 10 removed 2026-07-30; no
    archetype carries one.)*
+7. **Every archetype needs a DELIBERATE ZERO** — one impressive-sounding slot
+   with identical receipts in both branches at both depths, so that pressing it
+   settles nothing. `funding` does it in backdoor-fork and anon-but-real,
+   `commission` in bad-tokenomics. Scoring coverage of the *discriminating* claims
+   is what teaches that a salesman disguises materiality on purpose.
 
 ---
 
@@ -360,8 +411,8 @@ outcome, identity, surface numbers), `questions.js`, `desk.js`, `virgil.js`,
 `identities.js`, `archetypes/`. `components/trade/press/` is presentation —
 `pressUi.jsx` (the shared floor), `PressSession.jsx` (desktop),
 `PressFlat.jsx` (mobile), `PressFigure.jsx`, `evidenceScreen.js`,
-`arrival.jsx`. Verified by `scripts/verify-press-run.mjs` — **118 assertions,
-green.**
+`arrival.jsx`. Verified by `scripts/verify-press-run.mjs` — **124 assertions, green.** The
+edge gate in §4 is `scripts/sim-press-edge.mjs`.
 
 *A file tree is not listed here on purpose: the previous edition's went stale and
 omitted a shipped archetype for two commits. `ls` is authoritative. What follows
@@ -453,7 +504,7 @@ them in the Audio Manager — not code.
 
 ## 7. Build order
 
-**`SHIPPED`:** three archetypes · seeded instancing, a fresh deal per sitting ·
+**`SHIPPED`:** four archetypes · seeded instancing, a fresh deal per sitting ·
 the engagement record and the client's name · four SYMMETRIC seats, one lane and one
 use each · the pitch bot as an outside pitcher, projected into the room with its
 own voice · Virgil's two reads and the tip switch · `NOTHING ON FILE` · pressure
@@ -461,7 +512,7 @@ bands · the shared floor · desktop in-room play · mobile CRT with voice, the
 pitcher's projection panel and per-rig faces · **three rigs, rolled blind to the
 deal, with their own throats on both surfaces** · all seven
 ElevenLabs voices wired, seat-then-pitcher on both surfaces ·
-lower-third reveal · post-deal analysis with the pattern named · 118 assertions ·
+lower-third reveal · post-deal analysis with the pattern named · 124 assertions ·
 `The VC Game` tile on the `/trade` rail (default). Case Table behind `?classic=1`.
 
 **Open on the bot specifically:** the face shield's four pressure textures are not
@@ -575,6 +626,8 @@ three times in one day.*
 | **Real 3D dice · numbered RPG dice** `[A§13]` | Second renderer over the live temple and second physics engine; and a d20 arrives with meaning pre-attached — a nat 1 would read as a tell. |
 | **A rotating cast of human pitchers** `[A§17]` | ~630 lines of prose and a 210-line tax on every future archetype, to vary a draw the spec *requires* to carry no information — so it trains face-reading as a skill when faces are noise. Replaced by one pitch bot with many clients (§1). |
 | **The exemplar coin as trophy** | Reintroduces a Genesis card pointing at the other game. You collect what you've learned to recognise. |
+| **A played-out premise as a BAD branch** `[A§16]`, `[A§21]` | The one failure mode no seat can investigate. §7 item 7 already files "market never showed" as legit-branch narration — still a correct FUND call. Pricing it needs power-law payoffs, which end properness. |
+| **A high-bad-rate illiquidity archetype** `[A§21]` | The intuitive version — a thin book usually kills you — lands at ~74% and FAILS the §4 gate: edge = 4·STAKE·VAR, so a fifth prior near the pack shrinks the spread it was meant to widen. |
 | **4th press · backers · holdings · precedent · docket events · horizon dial · research overage · crowd odds** | All fail the discipline rule. |
 
 **Worth building, unscheduled: a FACE-DOWN CLAIM.** One claim per session whose

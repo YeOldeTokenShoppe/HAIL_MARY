@@ -127,6 +127,26 @@ const VOICES = {
     id: process.env.ELEVENLABS_VOICE_PITCHBOT3 || "VYtAZPRhkK9OruILpVBz",
     settings: { stability: 0.6, similarity_boost: 0.75, style: 0.45 },
   },
+  // VIRGIL — the office cat, and the VC game's guide (voice id supplied by the
+  // author 2026-08-03). Registered here rather than beside the pitch bots
+  // because he is the one voice on that floor who is not selling and not staff:
+  // see game/terminal-traders/press/virgil.js for why the free read is a cat's.
+  //
+  // THE ONLY VOICE IN THIS MAP THAT IS ON THE PLAYER'S SIDE, and the settings
+  // say so. Steady like GR80 because a guide who wavers is not reassuring, but
+  // nowhere near his procedural 0.1 — GR80 reports what the file says and Virgil
+  // is talking TO you, dryly, about what you should do next. Nothing near
+  // Barron's 0.55 push or the closers' 0.45: the moment he sounds like he is
+  // selling you something, the one character you are meant to trust has become
+  // another one to read.
+  //
+  // UNTUNED BY EAR as of registration. `style` behaves differently on every
+  // model — that is the whole lesson of the PB2 entry above — so judge this one
+  // against the id actually in it and move it.
+  VG: {
+    id: process.env.ELEVENLABS_VOICE_VIRGIL || "R4Zv8YQNcHyNDZl0ViUG",
+    settings: { stability: 0.7, similarity_boost: 0.75, style: 0.3 },
+  },
 };
 
 // ElevenLabs reads "RL80" as "R-L-eighty"; the shrine says "R-Lady". Spoken
@@ -151,7 +171,7 @@ export async function POST(request) {
   // ElevenLabs with a voice id this route never chose. PB2 has to be added here
   // as well as to VOICES — a voice missing from this line is accepted nowhere,
   // and the symptom is the wrong character speaking, not an error.
-  const speaker = ["GR", "OL", "PB", "PB2", "PB3", "MR", "EU"].includes(body?.speaker) ? body.speaker : "JB";
+  const speaker = ["GR", "OL", "PB", "PB2", "PB3", "MR", "EU", "VG"].includes(body?.speaker) ? body.speaker : "JB";
   // Her id is looked up from the apparition KEY the client names — the same
   // source the SitePal player reads, so the fallback sounds like the same
   // person. Unknown or missing key falls back to ORACLE_VOICE, which is also

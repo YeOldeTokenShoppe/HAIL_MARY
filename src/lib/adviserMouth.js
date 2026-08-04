@@ -35,7 +35,14 @@
 // whole projection — glow, swell, level meter — off this number for WHICHEVER
 // rig is staged. A key missing here used to be a silent no-op nobody would
 // notice; on the flat surface it is a bot that talks behind a dead panel.
-export const adviserMouth = { JB: 0, GR: 0, MR: 0, EU: 0, PB: 0, PB2: 0, PB3: 0 };
+// VG joined on 2026-08-03 with Virgil, the VC game's guide. He is the one entry
+// here that may end up with NO amplitude reader at all: on a surface that hosts
+// his SitePal player, the player does its own lip-sync off its own audio and
+// this number is spare. It is listed anyway, because the alternative is
+// setAdviserMouth silently discarding every write the moment he speaks through
+// speakAdviserLine instead — the trap the paragraph above records three separate
+// voices falling into.
+export const adviserMouth = { JB: 0, GR: 0, MR: 0, EU: 0, PB: 0, PB2: 0, PB3: 0, VG: 0 };
 
 // READABLE FROM THE CONSOLE, because every failure in this chain is silent and
 // looks identical from the outside: a mouth that never opens is either a voice

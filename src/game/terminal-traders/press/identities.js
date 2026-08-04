@@ -52,3 +52,28 @@ export const IDENTITIES = [
 // One chain for now. Kept here rather than on the identity so a future
 // multi-chain roll can't accidentally become another per-archetype tell.
 export const CHAINS = ["Base"];
+
+/**
+ * CLAIMED PRIOR ROLES — shared, for exactly the reason the names above are.
+ *
+ * THE SAME BUG, FOUND AGAIN ON 2026-08-03 while authoring archetype #4. PRIORS
+ * was authored per archetype and yield-mirage's list was DISJOINT from the
+ * other two's: backdoor-fork and anon-but-real both drew from the protocol
+ * names, yield-mirage from trading desks. So `ex-Jump` in the deal sheet
+ * identified yield-mirage outright, and `ex-Aave` narrowed the field to two.
+ *
+ * Narrower than the identity leak — it separated one archetype rather than
+ * all three — but the same rule 5 violation, and adding a fourth per-archetype
+ * list would have widened it. Both lists are pooled here instead, so a prior
+ * role is plausible for every archetype and tells you nothing about which one
+ * you are in. That is the only property this array has to have.
+ *
+ * AUDITORS were already identical in all three files and are pooled for the
+ * same reason: one copy cannot drift into a tell.
+ */
+export const PRIORS = [
+  "ex-Aave", "ex-MakerDAO", "ex-Compound", "ex-Lido",
+  "ex-Jump", "ex-Alameda", "ex-Cumberland", "ex-GSR",
+];
+
+export const AUDITORS = ["Trail of Bits", "Spearbit", "OpenZeppelin", "Zellic"];

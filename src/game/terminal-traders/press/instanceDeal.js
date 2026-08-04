@@ -11,6 +11,7 @@ import { mulberry32 } from "../caseTable.js";
 import * as BACKDOOR from "./archetypes/backdoorFork.js";
 import * as MIRAGE from "./archetypes/yieldMirage.js";
 import * as ANONREAL from "./archetypes/anonButReal.js";
+import * as SUPPLYCLIFF from "./archetypes/supplyCliff.js";
 import { IDENTITIES, CHAINS } from "./identities.js";
 import { getCardById } from "../cards.js";
 import { getCardArt } from "../templateCard.js";
@@ -19,6 +20,7 @@ export const ARCHETYPES = {
   [BACKDOOR.ARCHETYPE_ID]: BACKDOOR,
   [MIRAGE.ARCHETYPE_ID]: MIRAGE,
   [ANONREAL.ARCHETYPE_ID]: ANONREAL,
+  [SUPPLYCLIFF.ARCHETYPE_ID]: SUPPLYCLIFF,
 };
 export const ARCHETYPE_IDS = Object.keys(ARCHETYPES);
 
@@ -124,10 +126,42 @@ export function instanceDeal(seed = 1, archetypeId = null) {
   // single slot each there. Under the gradient model they'd still be sendable,
   // so nothing would look broken; their expertise would just be silently
   // decorative, which is worse than an obvious failure.
+  // A LANE ALSO HAS TO KEEP SOMETHING THAT CAN SETTLE SOMETHING (2026-08-03).
+  // The count guard below stops a lane being emptied, and for a year that was
+  // read as "no specialist is left without a deep target". It isn't the same
+  // thing: a lane can survive the cut holding only a slot that returns the same
+  // receipt in both branches — the DELIBERATE ZERO every archetype now carries
+  // (§4 rule 7), or a VIBES slot that returns no receipt to anyone. The seat is
+  // still sendable and still says something, so nothing looks broken, and the
+  // one specialist you spent could never have moved your call.
+  //
+  //   yield-mirage  SOCIAL   26% of seeds — Eugene left holding `sustain` alone
+  //   anon-but-real CHAIN    19% of seeds — Marisol left holding `funding` alone
+  //   bad-tokenomics RECORD  26% of seeds — GR80 left holding `commission` alone
+  //
+  // So the last DISCRIMINATING slot in a lane is pinned too. Where a lane has
+  // several this changes nothing; where it has exactly one, that one now always
+  // plays. It cannot leak: `slotDiscriminates` compares the two authored
+  // branches against each other and is a fact about the SLOT, identical for
+  // every instance — the same reason `discriminates` is safe to derive here at
+  // all. What it must never do is reach the floor, and it still doesn't.
+  //
+  // A single-slot lane whose one slot is VIBES stays exactly as it was —
+  // backdoor-fork's and anon-but-real's `chart` are unsettleable on purpose,
+  // and there is no discriminating slot in that lane to pin. Barron's job there
+  // is to tell you price movement is not evidence, which is `[A§15]`'s lesson
+  // and not a gap.
   const PLAYED = 6;
   const laneCounts = {};
-  for (const s of A.SLOTS) laneCounts[s.lane] = (laneCounts[s.lane] || 0) + 1;
-  const mustKeep = (s) => s.loadBearing || laneCounts[s.lane] === 1;
+  const laneDiscCounts = {};
+  for (const s of A.SLOTS) {
+    laneCounts[s.lane] = (laneCounts[s.lane] || 0) + 1;
+    if (slotDiscriminates(s)) laneDiscCounts[s.lane] = (laneDiscCounts[s.lane] || 0) + 1;
+  }
+  const mustKeep = (s) =>
+    s.loadBearing
+    || laneCounts[s.lane] === 1
+    || (slotDiscriminates(s) && laneDiscCounts[s.lane] === 1);
 
   const forced = A.SLOTS.filter(mustKeep);
   const optional = A.SLOTS.filter((s) => !mustKeep(s));

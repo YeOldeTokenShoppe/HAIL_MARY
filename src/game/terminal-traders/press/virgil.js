@@ -46,6 +46,77 @@ export const VIRGIL = {
   model: "/models/fluffyCat.glb",   // 580KB. NOT FR80Cat.glb, which is 15MB and
                                     // would land on top of an already-heavy scene.
   blurb: "Sits on the desk. Has opinions. Cannot be sent anywhere.",
+
+  /**
+   * HIS VOICE, as a SPEAKER CODE — never a raw ElevenLabs id. This is client
+   * code on both surfaces; the id and the API key stay on /api/counsel-voice,
+   * which resolves "VG" itself precisely so this file can be imported into a
+   * bundle without publishing an id that would bill someone else's quota.
+   *
+   * IT LIVES HERE FOR THE SAME REASON THE SEATS' VOICES LIVE IN desk.js: both
+   * surfaces need it and neither should own it. See the VOICE IS DESK DATA note
+   * there — the failure it records is a surface that hard-codes one voice and
+   * then reads everybody's lines in it.
+   *
+   * ADDING A VOICE IS NEVER A ONE-FILE CHANGE, and two thirds of it fails
+   * SILENTLY (the list is written out in full on pitchBotScene's v3 entry):
+   *   api/counsel-voice VOICES      — or there is no id to synthesise with
+   *   api/counsel-voice allow-list  — or "VG" is quietly served as BARRON, and
+   *                                   the symptom is the wrong character
+   *                                   speaking rather than any error at all
+   *   lib/adviserMouth              — or setAdviserMouth drops every write and
+   *                                   whatever draws his mouth never opens
+   * All three are done for VG as of 2026-08-03.
+   */
+  voice: "VG",
+
+  /**
+   * HIS FACE, for the surfaces that host a live SitePal player rather than a
+   * still — the mobile CHANNEL feed (components/trade/SitePalFeed) and the
+   * desktop shared host portal, which swaps characters with loadSceneByID and
+   * therefore only ever needs `sceneId`.
+   *
+   * SHAPED LIKE SITEPAL_PROJECTION_CONFIG's entries (CyborgTempleScene) so it
+   * can be spread into that registry the day he is projected onto geometry. He
+   * is NOT in it today, and that is deliberate: that registry carries `crop` and
+   * `filter` for cropping a rendered head onto a mesh face, and Virgil's mesh is
+   * a cat — there is no face on fluffyCat.glb to project a portrait onto.
+   *
+   * FROM THE ACCOUNT SNIPPET, 2026-08-03:
+   *   AC_VHost_Embed(9308752,600,800,"",1,0,2775344,0,1,0,"JHWf…",0,1)
+   * The 6th and 10th positionals are 0 there, as they are in every raw snippet
+   * this account emits. SitePalFeed builds its own params with BOTH forced to 1
+   * and ignores anything passed for them — the 10th is SitePal's `context`, which
+   * their docs require to be 1 under a JS framework (see the note on
+   * HOST_SITEPAL_CONFIG in app/trade/page.js). So only `account`, `sceneId` and
+   * `hash` are load-bearing here; `embedContext` records the working value, not
+   * the snippet's.
+   */
+  sitepal: {
+    label: "Virgil",
+    account: "9308752",
+    sceneId: 2775344,
+    hash: "JHWfKVZHnCkhsMxxYs0ehXiPlNlayZxW",
+    embedContext: 1,
+    /**
+     * WHAT THE PLAYER SPEAKS WITH. Engine 14 = ElevenLabs through the
+     * SitePal-connected account, where `voice` is the EL voice UUID rather than
+     * one of SitePal's numbered built-ins (engine 7's "Gilbert" and friends).
+     *
+     * NOTE THE KEY IS `voice`, NOT `id`. SitePalFeed reads `v.voice` only;
+     * counselSpeech.speakInPortal reads `voice.voice ?? voice.id`. Written this
+     * way it satisfies both — COUNSEL_VOICES' `{ id }` shape works in the portal
+     * and comes out SILENT in the feed, which is the kind of mismatch that reads
+     * as a dead avatar rather than as a wrong field name.
+     *
+     * SAME HUMAN VOICE AS "VG" ABOVE, by design: he must not change voice when
+     * the surface changes. That is the exact trap GR80 fell into across /main's
+     * two layouts (SitePal Gilbert on one, ElevenLabs on the other) and the
+     * reason COUNSEL_VOICES.GR now carries a comment about staying in lockstep.
+     * If the id moves in api/counsel-voice, move it here in the same commit.
+     */
+    voice: { voice: "R4Zv8YQNcHyNDZl0ViUG", lang: 1, engine: 14 },
+  },
 };
 
 /**

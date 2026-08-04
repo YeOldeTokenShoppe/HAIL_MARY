@@ -82,11 +82,13 @@ export const OUTCOMES = [
 // Harmless while every archetype was ~70% rug; fatal the moment anon-but-real
 // landed at 70% legit. The pool is shared now and the name tells you nothing.
 
-export const AUDITORS = ["Trail of Bits", "Spearbit", "OpenZeppelin", "Zellic"];
-// CLAIMED priors, not shown ones. An anon founder saying "I was at Aave" is an
-// assertion about a person you cannot identify — which is the whole subject of
-// the load-bearing claim.
-export const PRIORS = ["ex-Aave", "ex-MakerDAO", "ex-Compound", "ex-Lido"];
+// PRIORS AND AUDITORS WENT THE SAME WAY (2026-08-03), and for the same reason.
+// They were still authored per archetype, and yield-mirage's list was DISJOINT
+// from the other two's — trading desks there, protocols here — so a prior role
+// in the deal sheet identified the archetype outright. The identity fix of
+// 2026-07-28 simply had not been carried through to the other visible pool.
+// Both are shared now; see ../identities.js.
+export { PRIORS, AUDITORS } from "../identities.js";
 
 export const SLOTS = [
   {

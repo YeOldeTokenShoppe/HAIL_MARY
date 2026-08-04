@@ -503,3 +503,141 @@ thing is. **The name was asking the question the copy had stopped asking.**
   pattern is the teaching payload, so it has to be plain English and has to
   describe the mechanism.
 
+
+---
+
+## 21. The axis, archetype #4, and the gate that had no harness
+
+*2026-08-03. Three separate things, and they turned out to be one thing.*
+
+### The question
+
+The call slider was relabelled `FUND · PASS · FUD` and the readout narrowed to
+*"You're almost certain this one comes apart / holds up."* Honest about what the
+resolver settles — and it exposed a gap. The deal file prints HOLDERS and MCAP, so
+a player can reason *"1,985 holders on a $4.1M cap, I could never exit this"*, FUD
+an honest project, and be marked wrong. **Good investment reasoning, punished.**
+
+Author's instinct, asked directly what the binary should mean: *"basically, does
+the proposed deal succeed and make money."*
+
+### Why "makes money" cannot be the axis, and what of that sentence survives
+
+It cannot, for a reason already in this file. `[A§16]` settled that honesty and
+success are independent axes and that **the desk can only answer one of them**:
+Marisol can tell you whether the money moved as claimed, GR80 what the audit
+covered, and *nobody at that desk can tell you whether the market will show up.*
+Pricing returns needs power-law payoffs, and those end properness — invariant 2,
+the same objection that killed the conviction-coupled stake and the leaderboard.
+
+But **the instinct was not wrong, only over-broad.** The reading that survives:
+
+> **"Was funding this the right call ON WHAT WAS CHECKABLE AT THE TABLE."**
+
+Which is not a widening at all — it is what the resolver already settled, finally
+said out loud. Survival was never the axis; it was how three archetypes happened
+to *narrate* it. §7 item 7 had already written the same sentence from the other
+side eight days earlier: *"The scoring axis is already correct; only the narration
+is wrong."* Look at what the RESOLUTIONs actually assert and none of them is really
+about corporate survival — nobody steals anything in yield-mirage's bad branch; an
+accounting identity fails to hold.
+
+**This produced a one-question admission test for every future archetype: could a
+specialist at that desk have found it before you called?** It sorted the two
+candidates that started the discussion, and it sorted them differently:
+
+- **Illiquidity — admitted.** "Can I exit at size" is not a forecast. Pool depth,
+  LP lock, holder concentration and unlock dates are present facts with receipts,
+  and Marisol's lane names `unlocks` explicitly. The *position* comes apart while
+  the company does not.
+- **A played-out premise — rejected**, and it was already rejected: §7 item 7
+  lists "market never showed" among the failures that are **still a correct FUND
+  call**. Authoring it as a bad branch would have contradicted the doc directly.
+
+### The gate had no harness, and building it changed the design
+
+§4 has printed an edge table since anon-but-real shipped — 2 archetypes +0.10,
+3 archetypes +4.08, perfect read +24.99 — and **nothing in `scripts/` computed
+it.** A number in a document that nobody can re-derive is not a gate.
+`sim-press-edge.mjs` now reproduces every row off the production `instanceDeal`
+(both historical rows land exactly, including the −16.83 hit-rate trap), which is
+what made it safe to trust on a candidate.
+
+Building it surfaced a closed form that the table had been hiding. With a uniform
+archetype roll and base rates `r_i`:
+
+```
+  blind reports r̄        E = S(1 − 4·r̄(1−r̄))
+  knows reports r_i      E = S·mean(1 − 4·r_i(1−r_i))
+  edge = 4S·[r̄(1−r̄) − mean(r_i(1−r_i))] = 4S·[mean(r_i²) − r̄²] = 4S·VAR(r_i)
+```
+
+**Recognition is worth only the spread of the priors.** Prose, mechanism, lane
+design and how cleverly a tell is hidden move it by exactly zero — which is
+humbling, and is the strongest argument yet that archetypes are cheap: the
+expensive part contributes nothing to the number that justifies them.
+
+Two consequences that are easy to get backwards, and one of them **reversed the
+design**:
+
+1. **The middle of the range fails.** A new archetype between 35% and 79% adds a
+   near-zero deviation and dilutes the ones carrying the spread. There is a real
+   band of base rates that make the game *worse*, and it is most of the band.
+2. **The intuitive illiquidity archetype was in it.** The obvious version — a thin
+   book usually kills you, ~74% — measured at −0.43 against baseline. **It would
+   have failed the gate it was proposed to pass.** The rate had to be *low*.
+
+### Why the inversion is the fix rather than a concession
+
+25% bad means the player who FUDs on the holder count alone is wrong three times
+in four — which reads, at first, like the original complaint made worse. It is the
+opposite. The complaint was never that the liquidity read was *wrong*; it was that
+it was **unanswerable**. Invariant 5 makes the surface stats uncorrelated noise by
+construction, so that reasoning had nowhere to go but a coin flip.
+
+`bad-tokenomics` leaves invariant 5 untouched — nothing in it reads `deal.surface`,
+and the holder count stays rolled noise, measured at |r| = 0.005 against truth —
+and puts a specialist underneath the number who can settle what it *means*. The
+instinct becomes a press instead of a punishment. `[A§13]`: copy could not have
+done that, and the three wordings tried on the readout are the evidence.
+
+The archetype's silhouette follows from the axis rather than from taste. The other
+three hide a mechanism, an accounting identity, and nothing at all. This one hides
+**a schedule** — every number published a year in advance, nothing concealed, and
+the case is pure arithmetic about a date that has not arrived. There is no tell to
+find. There is only a multiplication nobody did.
+
+### Three things found on the way, all of the same kind
+
+- **The harness was red and had been since the pitcher landed.** `desk.js`
+  imported `"./pitchers"` with no extension; bundlers resolve it, Node ESM does
+  not, so all 118 assertions were failing to *load* rather than failing. Then the
+  purity check legitimately caught `pitchers.js` — impure on purpose, per §1 rule
+  6. Exempted like `instanceDeal.js`, with two new assertions keeping the teeth:
+  the roll may not name an archetype, a branch or a deal, and nothing that builds
+  a deal may import it. **A silent failure only Node ever sees is the kind that
+  survives longest.**
+- **`PRIORS` was the identity leak, still live.** Authored per archetype, and
+  yield-mirage's list (trading desks) was disjoint from the other two's
+  (protocols) — so `ex-Jump` in a deal sheet identified the archetype outright.
+  The 2026-07-28 identity fix had simply never been carried through to the other
+  visible pool. Pooled in `identities.js` with `AUDITORS`. **The rule that came
+  out of it: check every pool an archetype can print, not just the one that broke.**
+- **Every archetype already had a deliberate zero and it was never written down.**
+  `funding` does the job twice. It is now authoring rule 7, and in the new file it
+  is `commission` — which doubles as the `POSITIONED` slot done the way §3 says
+  the other two want rewriting: the bot's interest is in the close, the honest
+  answer is identical in both branches, and that is exactly why it cannot help you.
+
+### Left open, deliberately
+
+**The readout was not touched.** `comes apart / holds up` still describes the
+restated axis — the *deal* comes apart while the company runs — and three wordings
+have already been tried and pulled on that line. Only the comment above it changed:
+its stated condition for widening ("when an archetype exists whose bad branch is
+survival-neutral") was the wrong test, and archetype #4 satisfies it while needing
+no widening at all.
+
+**§7 item 7 is now overdue rather than optional.** Three RESOLUTIONs still make
+`legit` mean *succeeded*. A fourth archetype whose bad branch leaves the project
+running makes that inconsistency visible in a way it was not before.
