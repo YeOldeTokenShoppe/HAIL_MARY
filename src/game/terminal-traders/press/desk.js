@@ -8,7 +8,11 @@
 // four-character layer here instead of into the archetypes.
 
 import { LANES, PITCHER, SEATS, SHAPES, inLane } from "./questions.js";
-import { pitcherPortrait, pitcherVoice, pitcherModel } from "./pitchers";
+// Explicit .js, like every other specifier in this directory: the harness
+// (scripts/verify-press-run.mjs) imports desk.js directly under Node ESM, which
+// will not resolve an extensionless path. Bare "./pitchers" bundles fine and
+// took the harness red — a silent failure, because only Node ever sees it.
+import { pitcherPortrait, pitcherVoice, pitcherModel } from "./pitchers.js";
 
 /**
  * THE PITCH BOT — the thing you press. Not a seat, not staff, not yours.

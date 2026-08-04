@@ -8,7 +8,7 @@
 // sale) is re-asserted against seats.
 
 import fs from "node:fs";
-import { instanceDeal, ARCHETYPE_IDS, backingOf, genericDiscriminates, sharpDiscriminates } from "../src/game/terminal-traders/press/instanceDeal.js";
+import { instanceDeal, ARCHETYPES, ARCHETYPE_IDS, backingOf, genericDiscriminates, sharpDiscriminates } from "../src/game/terminal-traders/press/instanceDeal.js";
 import { BACKING, SHAPES, LANES, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend, inLane } from "../src/game/terminal-traders/press/questions.js";
 import { DESK, EUGENE, PITCH_BOT, adviserLine, laneSentence, laneOwner, pitcherAside } from "../src/game/terminal-traders/press/desk.js";
 import { VIRGIL, virgilRead, agenda as virgilAgenda, shapeTip } from "../src/game/terminal-traders/press/virgil.js";
@@ -565,6 +565,39 @@ console.log("\n-- STRUCTURAL: is there always a real choice? --------------");
     // or their lane is decoration for that session.
     ok(`${arch}: every specialist gets at least one deep target`, none === 0, `sessions with a laneless specialist: ${none}`);
     console.log(`       ${arch}: an adviser is down to a single target in ${(one / n * 100).toFixed(1)}% of sessions`);
+
+    // A DEEP TARGET IS NOT THE SAME AS A USEFUL ONE (2026-08-03). The assertion
+    // above only proves the lane is non-empty. A lane can survive the cut
+    // holding nothing but a slot that returns the SAME receipt in both branches
+    // — the deliberate zero (§4 rule 7) or a VIBES slot — and then the seat is
+    // sendable, says its line, and could never have moved the call. Measured
+    // before instanceDeal pinned the last discriminating slot in a lane:
+    // yield-mirage stranded Eugene in 26% of seeds, anon-but-real stranded
+    // Marisol in 19%.
+    //
+    // EXEMPT: a lane whose slots are ALL non-discriminating in the archetype as
+    // authored. backdoor-fork and anon-but-real give CHART a single VIBES slot
+    // on purpose — there is no discriminating slot in that lane to pin, and
+    // Barron's job there is to say price movement is not evidence (`[A§15]`).
+    // That is an authoring choice; this assertion catches the cut destroying a
+    // lane that HAD one.
+    {
+      const A = ARCHETYPES[arch];
+      const authored = new Set(
+        A.SLOTS.filter((s) => genericDiscriminates(s) || sharpDiscriminates(s)).map((s) => s.lane));
+      let stranded = 0, worst = null;
+      for (let seed = 1; seed <= 500; seed++) {
+        const d = instanceDeal(seed, arch);
+        for (const lane of authored) {
+          const inLaneClaims = d.claims.filter((c) => c.lane === lane);
+          if (inLaneClaims.length && !inLaneClaims.some((c) => c.discriminates)) {
+            stranded++; worst ??= `seed ${seed}, ${lane}`;
+          }
+        }
+      }
+      ok(`${arch}: no lane is cut down to claims that cannot settle anything`,
+        stranded === 0, worst ? `${stranded} lane-sessions, first at ${worst}` : "");
+    }
   }
   let bad = 0;
   for (const arch of ARCHETYPE_IDS)
@@ -665,11 +698,33 @@ console.log("\n-- PURITY: a run is a function of (seed, inputs) -----------");
     .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
     .replace(/`(?:[^`\\]|\\.)*`/g, "``");
   const IMPURE = /Date\.|performance\.|localStorage|sessionStorage|Math\.random|window\./;
+  // TWO EXEMPT FILES, AND THEY ARE EXEMPT FOR THE SAME REASON: both PRODUCE a
+  // roll rather than consuming one. instanceDeal has rollSeed/dailySeed;
+  // pitchers.js has rollPitcher and the `?pitchbot=` override, which are how
+  // VC_GAME.md §1 rule 6 gets the rig drawn AT TEMPLE LOAD, before the deal
+  // exists. A file-level exemption is too blunt on its own, so each one is
+  // followed below by an assertion on what must stay pure inside it.
+  const EXEMPT = ["instanceDeal.js", "pitchers.js"];
   const offenders = files.filter((f) =>
-    !f.endsWith("instanceDeal.js") &&
+    !EXEMPT.some((e) => f.endsWith(e)) &&
     IMPURE.test(codeOnly(fs.readFileSync(f, "utf8"))));
-  ok("no impurity under press/ (instanceDeal's rollSeed is the exception)",
+  ok("no impurity under press/ (the two seed/roll producers are the exceptions)",
     offenders.length === 0, offenders.join(", "));
+
+  // THE RIG ROLL CANNOT SEE THE DEAL — VC_GAME.md §1 rule 6. With three or four
+  // rigs against three archetypes, a bot keyed to the case pattern would be
+  // close to a lookup table, read before a word is spoken. The independence is
+  // meant to be STRUCTURAL rather than a promise, so pin it: the module must
+  // never name an archetype, an outcome or a deal, and the thing that produces
+  // deals must not import it.
+  {
+    const src = codeOnly(fs.readFileSync("src/game/terminal-traders/press/pitchers.js", "utf8"));
+    ok("the pitcher roll cannot see the archetype, the branch or the deal",
+      !/\barchetype|\boutcome\b|\btruth\b|\bdeal\b|\bclaims\b/i.test(src));
+    ok("nothing that builds a deal imports the pitcher roster",
+      !/pitchers/.test(codeOnly(fs.readFileSync("src/game/terminal-traders/press/instanceDeal.js", "utf8")))
+      && !/pitchers/.test(codeOnly(fs.readFileSync("src/game/terminal-traders/press/pressRun.js", "utf8"))));
+  }
 
   // THE FILE-LEVEL EXEMPTION ABOVE IS TOO BLUNT ON ITS OWN, and it hid a real
   // change: `seedForMode` added Math.random to instanceDeal.js on 2026-07-28
