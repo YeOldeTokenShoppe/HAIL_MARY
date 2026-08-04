@@ -8,6 +8,22 @@
     #stage { width: 600px; height: 800px; }
 
     /*
+      THE BEIGE IS OURS, NOT SITEPAL'S. The scenes are authored with a
+      TRANSPARENT background, so every pixel behind the character in this
+      document is #af9682 from the rule above — a parchment tone that suits the
+      surfaces which MIRROR this canvas (/main's portraits, TalkShowScene's face
+      projection onto a mesh, and the same colour is set by hand on /vigil's
+      canvas). Opaque is what those want: they are painting the result onto
+      something and an alpha hole would show the mesh through his cheek.
+
+      A surface that DISPLAYS this frame directly wants the opposite — the beige
+      becomes a visible block behind a cutout character. So it is a parameter
+      with the old value as the default: ?bg=transparent for the press floor's
+      Virgil tile, nothing at all for everybody else.
+    */
+
+
+    /*
       WHERE THE PLAYER ACTUALLY LANDS, which is not in #stage.
 
       AC_VHost_Embed takes no container argument in the call below, so once the
@@ -56,7 +72,7 @@
     frame.contentWindow.sayText(text, voiceId, lang, engine)
   No selectPortal needed — one player per document, nothing to disambiguate.
 
-  Query params: ?acc=<account>&scene=<sceneId>&embed=<embedToken>
+  Query params: ?acc=<account>&scene=<sceneId>&embed=<embedToken>[&bg=<css colour>]
 -->
 <div id="stage"></div>
 
@@ -65,6 +81,17 @@
   var ACC = parseInt(Q.get("acc") || "9308752", 10);
   var SCENE = parseInt(Q.get("scene"), 10);
   var EMBED = Q.get("embed") || "";
+
+  /* Applied before the player exists so there is never a beige frame to flash.
+     Restricted to a safe shape — this value lands in a style property and the
+     query string is not a trusted input just because we normally write it. */
+  var BG = Q.get("bg");
+  if (BG && /^(transparent|#[0-9a-f]{3,8}|[a-z]+)$/i.test(BG)) {
+    document.documentElement.style.background = BG;
+    document.addEventListener("DOMContentLoaded", function () {
+      document.body.style.background = BG;
+    });
+  }
 
   // Force preserveDrawingBuffer so the parent can drawImage() this canvas every
   // frame — without it the buffer is cleared after compositing and reads blank.

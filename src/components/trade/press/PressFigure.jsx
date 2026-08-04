@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { adviserMouth } from "@/lib/adviserMouth";
-import { PITCHER } from "@/game/terminal-traders/press/questions";
+import { PITCHER, SEATS } from "@/game/terminal-traders/press/questions";
 import { seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL } from "@/game/terminal-traders/press/virgil";
 import { VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
@@ -130,6 +130,155 @@ const FEED_FRAMING = {
 };
 const FEED_FRAMING_DEFAULT = { scale: 1.04, origin: "50% 44%", mouth: null };
 
+/**
+ * SEATS THAT GET A DRAWN MOUTH AFTER ALL.
+ *
+ * The note at the top of this file rules the analysts out of drawn mouths, and
+ * the reasoning still holds for three of them: their press lines are a fixed bank
+ * of twenty, three of them have SitePal scenes in the account, and a sprite mouth
+ * would be the worse version of an upload pass.
+ *
+ * EUGENE IS THE ONE IT DOES NOT HOLD FOR, and the same note says why without
+ * drawing the conclusion: "Eugene has no scene — an equine head needed a custom
+ * build — so he stays on this panel's amplitude path". He was left on a path that
+ * had nothing to drive. The panel lit its lamp and ran its meter off
+ * adviserMouth.EU while his face sat still, which reads as a broken panel, and
+ * unlike the others he has no upload pass waiting to fix it. Desktop has moved
+ * his jaw for him all along (playUnicornBeat -> a real bone); this is the flat
+ * surface finally doing the 2D equivalent of the same amplitude.
+ *
+ * HIS MOUTH IS ALREADY OPEN IN THE ART, which is what makes this cheap: the
+ * plate covers a dark slot that is exactly mouth-shaped, so at rest he simply
+ * closes. The pitch bot's plates hide a drawn LED and light up; his hides a hole
+ * and fills it back in.
+ *
+ * MEASURED, NOT EYEBALLED — twice, because the first measurement was of the
+ * wrong thing. Thresholding thumbnail_eugene.png (570x604) at luminance 130 and
+ * taking the LONGEST CONTIGUOUS DARK RUN per row inside the muzzle, the slot is
+ * x 223-354, y 333-351 — 131 x 18 source pixels.
+ *
+ * SAMPLING A SINGLE ROW GAVE 90px AND THAT IS WHY THE FIRST TRY WAS TOO NARROW.
+ * The mouth's corners droop, so its widest point is at the TOP (131px at y337,
+ * tapering to 98px by y351); one row through the middle misses a third of it.
+ * A bare threshold does not work either — the portrait's background is dark, so
+ * a naive scan reports the window edges on every row. Longest-run-within-the-
+ * muzzle is the measurement that survives both.
+ *
+ * THEN PUSHED THROUGH THIS PANEL'S TRANSFORMS, which is what makes source
+ * percentages useless on their own:
+ *   COVER-CROP. 570x604 into a square fills on WIDTH, so height overflows by
+ *               604/570 = 1.0596 and ~2.98% is cropped off top and bottom.
+ *               y_tile = y_src * 1.0596 - 0.0298; x is untouched.
+ *   THE IMG'S OWN 1.04, about origin 50% 50% (the default — .pf-frame sets none).
+ *               v = 50 + (v - 50) * 1.04.
+ *
+ * NOT .pf-reg's 1.04, and getting that wrong cost a round: the wrapper's scale
+ * (origin 50% 44%) applies to the mouth and the image ALIKE, since both live
+ * inside it, so it cancels and must not appear in this derivation. Only the
+ * scale the <img> carries on its own displaces one relative to the other.
+ *
+ * Lands at: x 38.69-62.59 (centre 50.64, w 23.90), y 55.66-58.94 (h 3.28).
+ *
+ * Adjust by eye from here — the derivation gets you onto the mouth, not into it:
+ *
+ *     ?botmouth=1   then Shift+B to arm, arrows move, [ ] width, - = height,
+ *                   and the console logs a paste-ready block.
+ */
+const SEAT_MOUTH = {
+  [SEATS.EUGENE]: {
+    /* THE BOX IS THE OPENING, NOT THE SLOT. Its TOP edge lands on the top of the
+       measured slot (55.66%) and it hangs down from there, so the mouth grows
+       DOWNWARD out of the line already drawn on his face the way a jaw does.
+       `y` is a CENTRE — translate(-50%,-50%) — so it is 55.66 + h/2.
+       The slot itself is only 3.28% tall; 7% is how far a wide-open mouth should
+       reach, and it is the one number here that is a judgement rather than a
+       measurement. Lower h and `open` TOGETHER if it reads as a yawn — unequal
+       and the fill stops filling the box. */
+    x: 50.6, y: 58.5, w: 23.9, h: 5.6, open: 5.6,
+    /* A LENS, NOT A LOZENGE. `r` takes a full CSS border-radius here, and the
+       shape is the whole point: an opening is nearly FLAT across the top, where
+       the upper teeth sit in a line, and curves away underneath as the jaw drops.
+       A uniform radius gives a rounded rectangle with a flat bottom, which is
+       what read as wrong even once the size was right — and the measurement says
+       so too, the slot being 131px across at its top and 98px by its bottom.
+       Slash syntax so the horizontal and vertical radii differ: barely rounded at
+       the top corners, strongly rounded at the bottom. */
+    r: "14% 14% 52% 52% / 10% 10% 92% 92%",
+    align: "flex-start",
+    /* FULL WIDTH. The shared default is 82%, an inset that exists so the pitch
+       bot's LED bar sits INSIDE its plate with a rim of plate showing. Eugene has
+       no plate, so 82% just made his mouth a third too narrow on top of the
+       measurement error — 13.5% of tile against a real 23.9%. */
+    fillW: "100%",
+    /* SQUARE, because the BOX is now the mouth shape and it clips (.pf-mouth is
+       overflow:hidden). The fill's own 44% default would round its corners a
+       second time inside an already-rounded box and pull the teeth away from the
+       corners of the opening. */
+    fillRadius: "0",
+    /* NO PLATE. This is the whole fix for the pale lozenge, and it is a change of
+       approach rather than a better colour.
+       THE PITCH BOT NEEDS A PLATE because its portrait has a drawn LED mouth that
+       must be hidden before a new one is painted. EUGENE DOES NOT: his art
+       already carries a thin dark slot that reads perfectly well as a closed
+       mouth, and it is visible at rest in every screenshot of the panel. Covering
+       it meant painting a flat patch over a muzzle that is a gradient, on an
+       image that SWELLS up to 2.2% while he speaks (the per-frame scale is on the
+       <img> alone, so the patch cannot track it) — a lozenge that lit up the
+       moment he went live and never quite sat right. Drawing only the OPENING
+       leaves his own face doing the work and has nothing to misregister. */
+    plate: "transparent",
+    /* A MOUTH, NOT AN LED — and specifically HIS mouth. The default fill is the
+       robots' emissive cyan bar, which is right on a face that is a screen and
+       badly wrong on an animal.
+       THE TEETH ARE THE CHARACTER. The rig has big cream front teeth along the
+       upper rim with the dark opening below, and a plain dark oval loses the one
+       feature that makes the face read as his (author, 2026-08-04: "missing large
+       front teeth"). So the fill is banded — cream across the top ~42%, dark
+       under it — with a repeating layer scratching in the gaps between teeth.
+       Both bands scale together, so the proportion holds at every opening. */
+    /* THREE TEETH, NOT A ROW — author's call, 2026-08-04, and it is the fix for
+       the last thing that looked wrong rather than a stylistic preference. A
+       full-width band has to follow the top edge of the opening, and that edge is
+       a CURVE (see `r`) while a gradient stop is a straight line: the two
+       disagreed at the corners no matter how the band was coloured or how thin it
+       was cut. Three discrete teeth sit in the middle, where the opening is at
+       its full height and the curve has not started, so there is nothing left to
+       disagree with. It also matches the rig, where the teeth are a cluster in
+       the centre with dark mouth continuing past them on both sides.
+       Each is its own background layer — position / size / no-repeat — over the
+       dark interior. The middle one is slightly longer, as incisors are; a row of
+       three identical rectangles reads as a grille.
+       COLOURS OFF THE ART: the interior is #575357, nowhere near black, and the
+       teeth in this render are a pale lavender-white rather than the rig's cream.
+       A patch is only invisible if it is made of the same paint as its
+       surroundings. */
+    /* SHORT ENOUGH TO BELONG TO THE UPPER JAW (author, 2026-08-04). At ~half the
+       opening's height they read as free-floating in the middle of it; at a third
+       they are clearly hanging from the top edge, which is where teeth are.
+       THE GAPS ARE NARROW, and the arithmetic is the part worth writing down:
+       percentage background-position aligns the LAYER's own P% point to the
+       CONTAINER's P%, so a 12%-wide layer at 34% has its left edge at
+       34 * (100-12)/100 = 29.92%, not at 34%. Which makes the gap between two
+       teeth (P2-P1) * 0.88 - 12. At 33/50/67 x 11% that was 4.1% of the opening —
+       a visible space, more gum than mouth. 34/50/66 x 12% lands at 2.1%. Below
+       about 1.5% they fuse into one plate and the count stops reading. */
+    fill:
+      "linear-gradient(180deg,#efe6f2,#ddd0e6) 34% 0 / 12% 32% no-repeat," +
+      "linear-gradient(180deg,#efe6f2,#ddd0e6) 50% 0 / 12% 36% no-repeat," +
+      "linear-gradient(180deg,#efe6f2,#ddd0e6) 66% 0 / 12% 32% no-repeat," +
+      "linear-gradient(180deg,#575357,#46414a)",
+    glow: "none",
+    /* THE JAW DROPS; THE TOP LIP DOES NOT. The shared default scales from the
+       centre, which on a mouth with teeth on its upper rim slides them down into
+       the opening as it closes — a horse chewing its own face. Anchoring the top
+       edge means the teeth stay put and the jaw swings away from them, which is
+       what the rig does and what the eye expects. Paired with `align`, it also
+       means the closed state collapses onto the baked slot rather than hovering
+       below it. */
+    origin: "50% 0%",
+  },
+};
+
 /** How many bars in the level meter. Cheap: one style write each per frame. */
 const BARS = 14;
 
@@ -226,9 +375,12 @@ export default function PressFigure({
       src: m?.portrait || null,
       voice: voice || m?.voice,
       frame: FEED_FRAMING_DEFAULT,
-      // NO DRAWN MOUTH FOR A SEAT — see the note at the top of the file. This is
-      // the SitePal slot, not a gap.
-      mouth: null,
+      /* NO DRAWN MOUTH FOR MOST SEATS — see the note at the top of the file:
+         for the three with SitePal scenes this is the SitePal slot, not a gap,
+         and drawing a sprite mouth would be building the worse version of an
+         upload pass. SEAT_MOUTH carries the exception (Eugene, who has no scene
+         to wait for and was therefore waiting for nothing). */
+      mouth: SEAT_MOUTH[who] || null,
       onStage: false,
     };
   }, [who, voice]);
@@ -250,7 +402,10 @@ export default function PressFigure({
       if (!el) return;
       el.style.left = `${m.x}%`; el.style.top = `${m.y}%`;
       el.style.width = `${m.w}%`; el.style.height = `${m.h}%`;
-      el.style.borderRadius = `${m.r}%`;
+      // Same number-or-string rule the render uses; a bare `${m.r}%` turns a
+      // shaped radius into "14% 14% ... 92%%" and the browser drops the lot,
+      // so the tuner would silently square off the mouth it is meant to fit.
+      el.style.borderRadius = typeof m.r === "string" ? m.r : `${m.r}%`;
       el.style.background = m.plate;
     };
     const onKey = (e) => {
@@ -274,7 +429,8 @@ export default function PressFigure({
       apply();
       console.log(`[botMouth] ${cast.id}: mouth: { x: ${+m.x.toFixed(2)}, y: ${+m.y.toFixed(2)}, `
         + `w: ${+m.w.toFixed(2)}, h: ${+m.h.toFixed(2)}, open: ${+m.open.toFixed(2)}, `
-        + `r: ${m.r}, plate: "${m.plate}" },`);
+        + `r: ${typeof m.r === "string" ? JSON.stringify(m.r) : m.r}, `
+        + `plate: ${JSON.stringify(m.plate)} },`);
     };
     console.log("[botMouth] tuner ready — Shift+B to arm, arrows move, [ ] width, - = height, , . openness");
     window.addEventListener("keydown", onKey);
@@ -429,9 +585,29 @@ export default function PressFigure({
                  there: at rest you want the character's own face. */
               <span ref={mouthRef} className="pf-mouth"
                     style={{ left: `${m.x}%`, top: `${m.y}%`, width: `${m.w}%`,
-                             height: `${m.h}%`, borderRadius: `${m.r}%`,
-                             background: m.plate }}>
-                <i ref={ledRef} style={{ height: `${(m.open / m.h) * 100}%` }} />
+                             height: `${m.h}%`,
+                             // A number is a percentage on all four corners (the
+                             // bot rigs' pill). A STRING is a full CSS
+                             // border-radius, so a shape can be described rather
+                             // than approximated — see Eugene's lens.
+                             borderRadius: typeof m.r === "string" ? m.r : `${m.r}%`,
+                             background: m.plate,
+                             // Default is centred (the bot rigs' plate is the
+                             // mouth); flex-start lets a fill hang from the top
+                             // edge so it opens downward out of baked-in art.
+                             ...(m.align ? { alignItems: m.align } : null) }}>
+                {/* `fill`/`glow`/`origin` are per-character overrides on the
+                    shared LED styling — an emissive bar scaled from its centre
+                    is right for a face that IS a screen and wrong for one that
+                    isn't. Omitted, the CSS defaults (the robots' cyan, centre
+                    origin) apply. */}
+                <i ref={ledRef}
+                   style={{ height: `${(m.open / m.h) * 100}%`,
+                            ...(m.fill ? { background: m.fill } : null),
+                            ...(m.fillW ? { width: m.fillW } : null),
+                            ...(m.fillRadius != null ? { borderRadius: m.fillRadius } : null),
+                            ...(m.glow ? { boxShadow: m.glow } : null),
+                            ...(m.origin ? { transformOrigin: m.origin } : null) }} />
               </span>
             )}
           </div>

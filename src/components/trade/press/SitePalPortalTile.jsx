@@ -115,10 +115,17 @@ export default function SitePalPortalTile({
     return () => ro.disconnect();
   }, []);
 
+  /* bg=transparent, because the SCENE is authored transparent and the portal
+     document's default beige is a backdrop for the surfaces that MIRROR its
+     pixels onto something (see the note in sitepal-portal.html). This tile shows
+     the frame itself, so that backdrop is just a block of parchment behind a
+     cutout cat; transparent lets .spt-wrap's own dark ground show through and he
+     sits in the panel instead of on a swatch. */
   const src = sitepal
     ? `/sitepal-portal.html?acc=${encodeURIComponent(sitepal.account)}` +
       `&scene=${encodeURIComponent(sitepal.sceneId)}` +
-      `&embed=${encodeURIComponent(sitepal.hash)}`
+      `&embed=${encodeURIComponent(sitepal.hash)}` +
+      `&bg=transparent`
     : null;
 
   /* THE PORTAL ANNOUNCES ITSELF BY postMessage, not by onLoad: the iframe's
