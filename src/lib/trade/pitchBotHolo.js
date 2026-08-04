@@ -184,6 +184,9 @@ const registry = [];
 /** Every material the holo wash patched, for live tuning. Excluded (face)
  *  materials are deliberately absent — they are not part of the wash. */
 const materials = [];
+/** EXCLUDED materials — the face plates. Kept out of `materials` on purpose; see
+ *  castOnly. Disposed with the rest. */
+const castOnlyMaterials = [];
 /** Depth-prepass materials, disposed with the rest. */
 const depthMaterials = [];
 /** The depth twins themselves, so the cast can switch them off while it runs. */
@@ -269,9 +272,28 @@ const CAST_FRAG_BODY = `
    crown flash. No alpha: the plate is opaque, and turning it transparent to fade
    would move it into the sorted pass in front of a body that draws with depthWrite
    off. It is at the top of the figure, so the flash lands on it hardest, which is
-   the right place for it — the face is what you are waiting to see. */
+   the right place for it — the face is what you are waiting to see.
+
+   HENCE THE DISCARD, added 2026-08-04. Being opaque means it has no alpha ramp to
+   hide behind, and the rig spends the first ~1.05s of the cast SQUASHED to
+   castCompress (6%) on the projector plate. The body is invisible through that
+   hold — smoothstep(0, 0.4, reveal) is 0 — but this plate was drawing at full
+   strength the whole time, and a face screen flattened to 6% of its height reads
+   as a bright ring sitting on the plate a beat before the bot exists. Reported
+   from the room on v1, whose plate is its entire face; v2 and v3 never showed it
+   because their LED plates are hidden over the same window by a different route
+   (setPitchBotFaceHidden, driven by castOut.bodyDense).
+
+   THE THRESHOLD IS CAST_DEPTH_ON, deliberately the same one bodyDense and the
+   depth twins use, so everything that waits for the figure waits for the same
+   frame. Earlier than that and you get the failure the note above describes from
+   the other end: a face hanging in an empty beam ahead of its body.
+
+   DISCARD RATHER THAN alpha=0 because this material is in the opaque pass and must
+   stay there — see the sort-order note above. */
 const CAST_FRAG_BODY_OPAQUE = `
   if (uHoloReveal < 0.999) {
+    if (uHoloReveal < ${CAST_DEPTH_ON.toFixed(3)}) discard;
     float span = max(uHoloY1 - uHoloY0, 1e-4);
     float h = clamp((vHoloCastY - uHoloY0) / span, 0.0, 1.0);
     gl_FragColor.rgb += uHoloColor * uHoloEdgeGlow * pow(h, 5.0) * (1.0 - uHoloReveal);
@@ -288,6 +310,12 @@ const CAST_FRAG_BODY_OPAQUE = `
 function castOnly(src, o, color) {
   const m = src.clone();
   m.userData = {};
+  /* TRACKED FOR DISPOSAL, in its own list rather than in `materials`. It is a
+     clone like everything else here and leaks its compiled program if nobody
+     disposes it — but it carries none of the holo uniforms, so putting it in
+     `materials` would offer the face plate up to tunePitchBotHolo as a washable
+     surface, which is the one thing this material exists NOT to be. */
+  castOnlyMaterials.push(m);
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uHoloColor = { value: color };
     addCastUniforms(shader, o);
@@ -548,7 +576,17 @@ export function tickPitchBotCast(delta) {
 /** Clear the registry. Call on unmount, or stale uniforms tick forever. */
 export function disposePitchBotHolo() {
   registry.length = 0;
+  /* DISPOSE, don't just drop. Every material in these lists is a CLONE this module
+     made, so nothing else can be holding it — and dropping the reference alone
+     leaves its compiled program in the renderer's cache. The depth pass below has
+     always disposed; these two were only clearing their arrays, which is the same
+     bug the temple's texture leak was (see the ref-cleanup gotcha in this repo).
+     Safe because this runs from one place, the unmount cleanup, so the bot these
+     belong to is on its way out. */
+  for (const m of materials) m.dispose();
   materials.length = 0;
+  for (const m of castOnlyMaterials) m.dispose();
+  castOnlyMaterials.length = 0;
   for (const m of depthMaterials) m.dispose();
   depthMaterials.length = 0;
   depthTwins.length = 0;

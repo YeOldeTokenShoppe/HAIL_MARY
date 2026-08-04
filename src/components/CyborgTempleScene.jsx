@@ -2428,13 +2428,28 @@ const CyborgTempleScene = ({
     // right mode based on whether audio is currently playing.
 
     setFocusTarget((prev) => {
-      if (prev && prev.agentId === externalFocusAgent) return prev;
       const isOnMobile = isMobile || detectedMobile;
-      const resolved = externalFocusAgent === 'Virgil'
-        ? (getCatFocusSettings() || resolveAgentSettings('Virgil', isOnMobile))
-        : externalFocusAgent === 'PitchBot'
-          ? (getPitchBotFocusSettings() || resolveAgentSettings('PitchBot', isOnMobile))
-          : resolveAgentSettings(externalFocusAgent, isOnMobile);
+      /* TWO CHARACTERS HAVE A LIVE POSE, and it can be null. The cat and the pitch
+       * bot both MOVE, so their shots are read off the object rather than authored;
+       * both getters return null until their model has landed. Everyone else is
+       * authored, and for them the authored pose IS the source of truth. */
+      const live = externalFocusAgent === 'Virgil' ? getCatFocusSettings()
+        : externalFocusAgent === 'PitchBot' ? getPitchBotFocusSettings()
+          : null;
+      const wantsLive = externalFocusAgent === 'Virgil' || externalFocusAgent === 'PitchBot';
+      /* RE-FIRE ONCE THE REAL POSE EXISTS, which is the bug this guard used to have.
+       * It read `prev.agentId === externalFocusAgent` alone, so a focus that fired
+       * before the model landed flew to the AGENT_CAMERA_SETTINGS bootstrap and was
+       * then latched there for the whole session — the bootstrap is a wide shot from
+       * 1.6 out, so the pitch played to a camera parked in the wrong place with no
+       * way back. Now a bootstrapped target is upgraded the moment the getter can
+       * answer (this effect lists pitchBotReady, which is that moment).
+       *
+       * STILL BAILS on the two cases that matter: an already-derived target, and a
+       * getter that is still null. Neither re-flies the camera, so re-running this
+       * effect stays free. */
+      if (prev && prev.agentId === externalFocusAgent && (prev.derivedPose || !live)) return prev;
+      const resolved = live || resolveAgentSettings(externalFocusAgent, isOnMobile);
       if (!resolved) return prev;
       return {
         position: resolved.cameraPos,
@@ -2443,9 +2458,12 @@ const CyborgTempleScene = ({
         fov: isOnMobile ? 75 : undefined,
         agentId: externalFocusAgent,
         agentName: externalFocusAgent,
+        /* "This is the pose we actually wanted", not "this came from a getter" —
+         * an authored character is derived by definition, so it never re-fires. */
+        derivedPose: wantsLive ? !!live : true,
       };
     });
-  }, [externalFocusAgent, isMobile, detectedMobile]);
+  }, [externalFocusAgent, isMobile, detectedMobile, pitchBotReady]);
 
   // Lobby intro lifecycle. Clicking a character in the lobby flies the camera
   // in, holds them in an attentive idle and turns their head to the player
@@ -2829,10 +2847,28 @@ const CyborgTempleScene = ({
    * the floor where the bot used to be. The last version pointed a full unit
    * below it.
    *
-   * So read the bot instead. The datum is the FACE PLATE, not the body: the body
-   * is a SkinnedMesh whose geometry.boundingBox is its BIND POSE and ignores the
-   * skeleton entirely — measuring that way reports the figure as 0.07 units wide.
-   * The plate is unskinned, so its world position is true.
+   * So read the bot instead. THE DATUM IS THE RIG ROOT — its world position, which
+   * is the FEET, because every staged rig has its local origin there.
+   *
+   * IT WAS THE FACE PLATE until 2026-08-04, and that is the bug this replaced.
+   * Two things move that plate and neither of them moves the root:
+   *
+   *   THE CAST. startPitchBotCast drives `root.scale.y` from ~0 up over its
+   *   0.7s launch after a 1.05s delay, squashing the rig about its feet. Focus
+   *   fires inside that window, so a head-mounted plate was read anywhere between
+   *   the feet and the head depending on which frame won the race.
+   *
+   *   THE POSE. The plate hangs off a bone, so the idle clip moves it too.
+   *
+   * v2 and v3 hid this for a year because their Mixamo plates hang off Head at
+   * -152 local and land near the FEET either way — squashed or standing, the
+   * anchor barely moved. v1's plate sits AT its head, so the same code framed it
+   * correctly on some loads and a figure-height too high on others, and during the
+   * cast it aimed under the floor. Scaling about the feet is precisely what makes
+   * the root immune: the origin is the fixed point of that transform.
+   *
+   * SO THE NUMBERS BELOW ARE FEET-RELATIVE and mean the same thing on every rig,
+   * which is what lets all three share one framing block again.
    *
    * Approaching straight down +Z is safe rather than arbitrary: the bot is
    * BILLBOARDED, so it turns to face wherever the camera ends up. There is no
@@ -2844,50 +2880,27 @@ const CyborgTempleScene = ({
   const getPitchBotFocusSettings = useCallback(() => {
     const bot = pitchBotRef.current;
     if (!bot) return null;
-    /* WHERE TO AIM. Prefer an EYES plate, fall back to anything face-ish.
-     *
-     * TWO TRAPS HERE, both found the hard way on 2026-08-02:
-     *
-     *   `/Face/i` MATCHES "Beta_Surface". Sur-FACE. The body shell has always
-     *   matched this test; it only stayed harmless because the shell is traversed
-     *   before the bone hierarchy and this loop keeps the LAST match. The moment
-     *   anything face-ish was appended after the bones — the holo depth-prepass
-     *   twins, added to the Armature — the aim point silently became the whole
-     *   body and the camera framed the bot's feet.
-     *
-     *   THE DEPTH TWINS ARE NOT GEOMETRY ANYONE CAN SEE. They write depth and no
-     *   colour, so aiming at one is aiming at nothing.
-     *
-     * Eyes first because it is also the better shot: the split rigs carry three
-     * plates per expression and a mouth plate is a few centimetres low, which on a
-     * 0.85-unit framing is a visibly different composition. */
-    let face = null;
-    let eyes = null;
-    bot.traverse((o) => {
-      if (!o.isMesh || o.userData?.holoDepthTwin) return;
-      if (/_Eyes(_\d+)?$/.test(o.name)) { if (!eyes) eyes = o; return; }
-      if (/Face/i.test(o.name)) face = o;
-    });
-    face = eyes || face;
-    if (!face) return null;
     bot.updateWorldMatrix(true, true);
-    /* NODE ORIGIN, and deliberately so.
+    /* THE ROOT'S WORLD POSITION — the projector plate the rig stands on.
      *
-     * This is NOT the face's visible position — the plate's mesh sits ~158 local
-     * units from its own origin, which the head bone's rotation turns into about a
-     * third of the figure's height. Measured on v2: this point lands 4% up the
-     * bot, near its feet, where the geometry centre lands at 92%.
+     * NO TRAVERSAL, and that is a second bug gone with it. The old plate search
+     * had to dodge two traps: `/Face/i` also matches "Beta_Surface" (sur-FACE, the
+     * body shell), and the holo depth-prepass twins are invisible geometry that is
+     * nonetheless face-named — appending either after the bones silently moved the
+     * aim point to the whole body. A datum that is one object reference cannot be
+     * matched by the wrong mesh.
      *
-     * It stays because the FRAMING NUMBERS ARE CALIBRATED TO IT. dist/aimDrop/
-     * camLift in PITCH_BOT_FRAMING_DEFAULT were dialled in-browser against this
-     * datum and produce the shot the author signed off. Switching to the geometry
-     * centre moved the anchor by a third of the figure under values tuned for the
-     * old one, and every attempt to retune around it made the shot worse.
+     * SCALE-PROOF, which is the point. The cast animates `root.scale.y` about this
+     * exact origin, so it is the one point on the rig the launch cannot move. Bone
+     * animation cannot move it either — the root is not in the skeleton.
      *
-     * SO IF YOU 'FIX' THIS, RETUNE ALL THREE NUMBERS IN THE SAME CHANGE. They are
-     * a matched pair; correcting either alone breaks a working camera. */
+     * NOT SCALE-AWARE, and it does not need to be: all three rigs are fitted to the
+     * same staged height (see fitHeight), so a fixed offset from the feet lands on
+     * the same part of every figure. If a future rig is staged at a different
+     * height, give it a per-variant `framing` rather than reaching back for a
+     * body-relative datum. */
     const at = new THREE.Vector3();
-    face.getWorldPosition(at);
+    bot.getWorldPosition(at);
     // Framing numbers come from a REF, not the closure, so __pitchBotFrame can
     // change them without this callback being rebuilt (and without the focus
     // effect that captured it going stale).
@@ -2955,6 +2968,9 @@ const CyborgTempleScene = ({
           fov: (isMobile || detectedMobile) ? 75 : undefined,
           agentId: 'PitchBot',
           agentName: 'PitchBot',
+          // Derived by construction — this handle only runs with a live bot. Says so
+          // explicitly so the focus effect never "upgrades" a hand-tuned shot.
+          derivedPose: true,
         });
       }
       return readback();

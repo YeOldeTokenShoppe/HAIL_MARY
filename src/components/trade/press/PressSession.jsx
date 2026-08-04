@@ -13,6 +13,7 @@ import {
 import { preloadSfx } from "@/lib/uiSfx";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
 import { speakVirgilLine, stopVirgilLine, VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
+import { seatHasHostFace, speakSeatOnTempleHost, warmSeatHostFace } from "@/lib/trade/seatVoice";
 import SitePalPortalTile from "./SitePalPortalTile";
 import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
 import { setPitchBotPressure, getPitchBotVoice } from "@/lib/trade/pitchBotScene";
@@ -24,7 +25,7 @@ import {
 import { createEvidenceScreen, SCREEN_AGENTS } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
-  Meter, Nav, Transcript, readDwellMs, PRESS_UI_CSS,
+  Meter, Nav, Transcript, VirgilRead, readDwellMs, VIRGIL_BEAT_MS, PRESS_UI_CSS,
 } from "./pressUi";
 
 // THE PRESS — slice 1. Barron, six claims, three presses, over the LIVE room.
@@ -211,6 +212,11 @@ export default function PressSession({
      voice talked at you. */
   const openingLines = useMemo(() => pitchOpening(deal), [deal]);
   const [openingAt, setOpeningAt] = useState(-1);
+  // THREE STATES, NOT TWO. `openingDone` is the remarks having FINISHED;
+  // `opened` is the floor having been handed back. They used to be the same
+  // instant — see the gate note on OpeningBody — and the beat between them is
+  // now a button. Both surfaces hold this seam the same way or they drift.
+  const [openingDone, setOpeningDone] = useState(false);
   const [opened, setOpened] = useState(false);
   const floorLive = onFloor && opened;
 
@@ -282,10 +288,19 @@ export default function PressSession({
   // SPEECH STATE NOW FOLLOWS ACTUAL AUDIO. It used to be pinned true for the
   // whole floor, which told the room "still talking" through every silence — the
   // bot's talking clip would have run for four minutes straight.
+  //
+  // AND IT NAMES THE PITCHER, NOT "SOMEBODY". This flag is the PITCH BOT's mouth
+  // and talking clip; `speaking` spans the whole sayTurn chain, which since
+  // 2026-08-03 also carries Virgil and, since the seats got faces, their answers
+  // too. So the bot mouthed along to every other character in the room —
+  // "pitchbot and virgil appeared to speak virgil's lines" (author, 2026-08-04).
+  // The 2.4s beat before the cat made it obvious rather than causing it: the bot
+  // had been chewing through his lines all along, just tightly enough to read as
+  // one continuous speaker.
   useEffect(() => {
-    onSpeechActive?.(onFloor && speaking);
+    onSpeechActive?.(onFloor && speaking && speakingAs === VOICE);
     return () => onSpeechActive?.(false);
-  }, [onFloor, speaking, onSpeechActive]);
+  }, [onFloor, speaking, speakingAs, onSpeechActive]);
 
   /* ---- a claim takes the floor, then becomes pressable ---- */
   useEffect(() => {
@@ -394,7 +409,9 @@ export default function PressSession({
            and .ps-virgil carries him instead. */
         // THE TIP, NOT THE AGENDA — see the long note at the same effect in
         // PressFlat. Both surfaces speak the same half of the cat or they drift.
-        { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", minMs: 700 },
+        // leadMs: he waits for the bot to finish and THEN says his piece. Same
+        // number on both surfaces, for the same reason the tip is.
+        { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", leadMs: VIRGIL_BEAT_MS, minMs: 700 },
       ],
     );
     return () => { try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {} try { stopUnicornBeat(); } catch {} };
@@ -429,14 +446,26 @@ export default function PressSession({
    * in this scene reads. So he spoke in-game with a closed mouth while the very
    * same character moved his jaw fine one screen earlier (author, 2026-07-29).
    *
-   * Everyone else has no rig here (the analysts are static in-room and the pitcher
-   * has a screen for a face), so speakAdviserLine is right for them.
+   * "THE ANALYSTS ARE STATIC IN-ROOM" WAS TRUE AND IS NOT ANY MORE, which is what
+   * the third branch below is for. Marisol, GR80 and Connor each have a real
+   * SitePal face in this room — the room paints their player's canvas onto their
+   * `*_Face2` mesh whenever the camera focuses them, which the press already
+   * causes. What was missing was anybody telling that player to SAY anything: a
+   * line went to speakAdviserLine, which plays our own <audio> and writes
+   * `adviserMouth`, a channel this scene has no reader for. So you heard her,
+   * the camera cut to her, and her projected face never moved (author,
+   * 2026-08-04). The flat surface never had the bug because its speakLine takes
+   * a SEAT and hands it to speakSeatLine; this one only ever took a voice.
    *
-   * DELIBERATELY DESKTOP-ONLY. PressFlat has no unicorn — no 3D at all — so it
-   * keeps speakAdviserLine for Eugene. This is a presentation difference, not a
-   * rule, which is exactly the kind of thing §6 says belongs in the surface.
+   * SAME sayText AS MOBILE, DIFFERENT PLAYER — see the long note over
+   * speakSeatOnTempleHost for why a per-seat portal is the wrong answer on a
+   * surface whose faces are meshes.
+   *
+   * DELIBERATELY DESKTOP-ONLY, all of it. PressFlat has no unicorn and no room —
+   * no 3D at all — so it keeps its own routing. These are presentation
+   * differences, not rules, which is exactly what §6 says belongs in the surface.
    */
-  const speakLine = useCallback(async (voice, text) => {
+  const speakLine = useCallback(async (voice, text, seat = null) => {
     if (voice === "EU") {
       // Same hooks the lobby passes, so the horn glow comes along with the jaw.
       await playUnicornBeat({ line: text }, { setGlow: setUnicornGlow });
@@ -456,6 +485,26 @@ export default function PressSession({
     if (voice === VIRGIL.voice) {
       await speakVirgilLine(text);
       return;
+    }
+    /* A SEAT WITH A FACE IN THIS ROOM SPEAKS THROUGH IT. Engine 14 is that
+     * seat's ElevenLabs voice AND its lip-sync in one call, so this buys the
+     * mouth without changing how she sounds — DESK[seat].sitepal.voice.voice is
+     * the same id /api/counsel-voice would have used, which verify-press-run
+     * asserts precisely so the two routes can never drift.
+     *
+     * FALLS THROUGH ON FAILURE rather than returning. The host declines silently
+     * in several ways (no embed, wrong scene, muted) and every one of them must
+     * still produce a spoken line: a seat that says nothing reads as a bug, a
+     * seat that says it without moving reads as a still. Same trade the flat
+     * surface makes inside speakSeatLine. */
+    if (seat && seatHasHostFace(seat)) {
+      // AWAITED, THEN TESTED — in that order, and the order is the bug it fixed.
+      // This is an async function, so the promise it returns is truthy even when
+      // it resolves false; testing the promise took the host path unconditionally
+      // and could never fall back. It resolves TRUE having held for the length of
+      // her line, or FALSE if the host declined or its player never came up — and
+      // false has to reach our own audio, or the answer is simply never spoken.
+      if (await speakSeatOnTempleHost(seat, text)) return;
     }
     await speakAdviserLine(voice, text);
   }, []);
@@ -477,6 +526,15 @@ export default function PressSession({
    *   undo the cut the press just made.
    *
    * A part may carry its own `minMs` to override both.
+   *
+   * A part may also carry `leadMs` — SILENCE HELD BEFORE IT, which is not the
+   * same job as `minMs`. `minMs` pads the end of a line so the beat can be read;
+   * `leadMs` is the gap between two speakers. The cat used to come in on the
+   * pitcher's last syllable ("Virgil starts speaking too quickly after pitchbot
+   * ends", author 2026-08-04), which reads as an interruption rather than as
+   * somebody weighing what was just said. Nothing plays during the hold and
+   * `speakingAs` still names the PREVIOUS voice, so his panel does not light up
+   * until he actually starts.
    */
   const sayTurn = useCallback(async (parts, { onPart = null, dwell = null, onDone = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
@@ -487,6 +545,13 @@ export default function PressSession({
       for (let i = 0; i < live.length; i++) {
         const p = live[i];
         if (sayToken.current !== token) return;   // superseded — stop the chain
+        // THE GAP BEFORE THIS VOICE. Re-checked after the wait: two or three
+        // seconds is long enough for a press to have landed, and resuming into a
+        // superseded chain would put the cat over whoever interrupted him.
+        if (p.leadMs) {
+          await new Promise((r) => setTimeout(r, p.leadMs));
+          if (sayToken.current !== token) return;
+        }
         onPart?.(i);
         // THE CAMERA FOLLOWS THE VOICE, NOT THE PRESS. It used to cut to whoever
         // answered and then sit there while the PITCHER replied — so you watched
@@ -496,7 +561,10 @@ export default function PressSession({
         if (p.agent) onFocusAgent?.(p.agent);
         setSpeakingAs(p.voice || VOICE);
         const startedAt = Date.now();
-        try { await speakLine(p.voice || VOICE, p.text); }
+        // `seat` is optional and only a press ever sets it — the opening, the
+        // claim spins and the pitcher's reactions have no seat and route to
+        // their own rigs exactly as before.
+        try { await speakLine(p.voice || VOICE, p.text, p.seat); }
         catch { /* voice is enrichment, never a gate on play */ }
         // A DWELL FLOOR, because the camera move is now tied to audio that may
         // not arrive. With no API key speakLine resolves almost instantly and the
@@ -523,7 +591,10 @@ export default function PressSession({
       await sayTurn(
         openingLines.map((text) => ({ voice: VOICE, text, agent: PITCHER_AGENT })),
         { onPart: (i) => { if (alive) setOpeningAt(i); }, dwell: readDwellMs });
-      if (alive) setOpened(true);
+      // IT STOPS HERE. `opened` is now the player's to flip — see beginPitch.
+      // The effect's own guard is still `opened`, so this cannot re-run against
+      // the gate: openingDone leaves the block on screen with nothing playing.
+      if (alive) setOpeningDone(true);
     })();
     return () => { alive = false; };
   }, [onFloor, opened, openingLines, sayTurn]);
@@ -531,13 +602,22 @@ export default function PressSession({
   // Impatience is a legitimate input here as much as on the arrival (skipRoll).
   // Bumping the token is what supersedes the chain in flight — its `finally` then
   // declines to touch `speaking`, so this has to clear it by hand.
+  //
+  // SKIP GOES ALL THE WAY THROUGH, gate included. It is already an explicit "move
+  // on" — stopping such a player at a button that also says move on is the same
+  // click twice. The gate exists for the player who LISTENED to the whole thing.
   const skipOpening = useCallback(() => {
     sayToken.current++;
     try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
     try { stopUnicornBeat(); } catch {}
     setSpeaking(false);
+    setOpeningDone(true);
     setOpened(true);
   }, []);
+
+  // THE GATE ITSELF. Flipping `opened` is what starts the first claim — the claim
+  // effect below fires on `floorLive` — so the pitch now begins inside a click.
+  const beginPitch = useCallback(() => setOpened(true), []);
 
   /* ---- actions ---- */
   // The board updates when the reporter STOPS, not when you press — so the beat
@@ -587,6 +667,13 @@ export default function PressSession({
 
     const owed = claim.id;
     replyFor.current = owed;
+    // GET HER FACE READY WHILE THE ROOM IS STILL TURNING. The shared host has to
+    // be on this seat's scene before it will accept a line, and a cold swap is
+    // seconds. Fired here rather than inside speakLine so it overlaps the camera
+    // move and MIN_BEAT, both of which this answer already waits out — the same
+    // trick warmSeatPortal plays on the flat surface. Costs nothing when the
+    // host is already there, and speakLine falls back if it never arrives.
+    if (!solo) warmSeatHostFace(outcome.seat);
     // ONE VOICE, ON ITS OWN CAMERA. The second part of this chain used to be the
     // pitcher's reaction; it now waits behind a button.
     Promise.all([
@@ -596,6 +683,9 @@ export default function PressSession({
           voice: seatMeta(outcome.seat)?.voice,
           text: outcome.adviserSays,
           agent: seatMeta(outcome.seat)?.agentId,
+          // Names the seat so speakLine can reach its face — see the third
+          // branch there. Without this the line has a voice and no mouth.
+          seat: outcome.seat,
         }]),
       new Promise((r) => setTimeout(r, MIN_BEAT)),
     ]).then(() => {
@@ -1021,7 +1111,17 @@ export default function PressSession({
         </div>
       )}
 
-      {/* ---------- VIRGIL, AS A 2D PLAYER OVER THE ROOM ----------
+      {/* ---------- THE LEFT STACK: VIRGIL'S FEED, THEN THE READING COLUMN ----------
+
+          ONE ELEMENT FOR THE WHOLE SITTING, and that is the point of the
+          restructure. What used to be here was three separate conditional blocks
+          — the cat's tile pinned top-left, an opening column, and a floor column
+          — which is why the tile could not live anywhere near the words it
+          belongs to. Now the stack is bottom-anchored, the tile is its head and
+          the column is its body, so the two move together and nothing has to
+          guess where the other one ended up.
+
+          ---- VIRGIL, AS A 2D PLAYER OVER THE ROOM ----
 
           THE GLB CAT CANNOT DO THIS, and that is the whole reason this panel
           exists on a surface that already has him in the room. The temple's
@@ -1037,61 +1137,144 @@ export default function PressSession({
           instead. Cutting to the glb AND running this panel would put two Virgils
           on screen, one of them mute and filling frame — worse than either alone.
 
-          MOUNTED FOR THE WHOLE FLOOR, opacity-hidden between his lines: the
-          player takes seconds to boot and he speaks for about three, so anything
-          that mounts on demand is a tile that is always still. See the note in
-          PressFigure, which learned it the expensive way. */}
-      {floorLive && VIRGIL.sitepal && (
-        <div className={`ps-virgil${speakingVirgil ? " on" : ""}`}>
-          <SitePalPortalTile
-            id={VIRGIL_PORTAL_ID}
-            sitepal={VIRGIL.sitepal}
-            still={VIRGIL.portrait}
-            active={speakingVirgil}
-          />
-          <span className="ps-virgil-cap">{VIRGIL.name.toUpperCase()} · LIVE</span>
-        </div>
-      )}
+          IT NO LONGER COMES AND GOES. It was mounted for the whole floor and
+          faded in only for his ~3s line, in the top-left corner, a long way from
+          his words: "pops up in the far top left corner, speaks a very short
+          phrase, and then disappears" (author, 2026-08-04). A face you see for
+          three seconds an entire screen away from its transcript reads as a
+          glitch, not as a character. It is a standing feed now — his desk is
+          simply always on — and only the ON AIR state changes when he talks.
 
-      {/* ---------- the opening ----------
-          Same container as the reading column, so the block does not move when
-          the first claim replaces it: only the content inside changes. */}
-      {onFloor && !opened && (
-        <div className="ps-readcol">
-          <div className="ps-fade in">
-            <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening} />
+          MOUNTED ON `onFloor`, NOT `floorLive`, which is a second thing the gate
+          bought us: the player takes seconds to boot, and mounting it at the top
+          of the opening remarks means it has the whole introduction to come up
+          before anyone looks at it.
+
+          IT IS OUTSIDE .ps-readcol, WHICH IS THE ONE PLACE IT MUST NOT GO. The
+          obvious home is next to his transcript, in place of the 34px portrait
+          in ClaimBody — but that block sits inside the column's SCROLLER, and a
+          SitePal subframe scrolled out of an overflow container has an empty clip
+          rect and gets throttled by WebKit to ~0.1fps. The symptom is the exact
+          bug this tile was built to cure: he speaks with a frozen face, silently,
+          audio untouched. [[sitepal-iframe-offscreen-throttle]] has already been
+          re-learned twice, once through precisely this — "an overflow-clipped
+          second portal". Docked above the scroller it is adjacent to his words
+          and permanently on screen, which is what that idea actually wanted.
+
+          pointer-events stay off: he is not a seat, cannot be sent anywhere, and
+          a clickable cat is an invitation to try. */}
+      {onFloor && (
+        <div className="ps-readstack">
+          {/* ONE COLUMN, TWO CONTENTS. The opening and the floor were two
+              sibling .ps-readcol blocks that happened to be styled alike; making
+              them one element is what stops the block moving when claim 1
+              replaces the remarks, which the old comment here only claimed. */}
+          <div className="ps-readcol">
+            {!opened ? (
+              <div className="ps-fade in">
+                <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening}
+                             done={openingDone}
+                             onBegin={openingDone ? beginPitch : null} />
+              </div>
+            ) : claim ? (
+              <>
+                {/* Claim and answer share ONE flow column, so a long answer
+                    pushes the claim up instead of covering it. Both bodies come
+                    from pressUi — this file owns only WHERE the column sits. */}
+                <div className={`ps-fade ${claimVisible ? "in" : ""}`}>
+                  <ClaimBody claim={claim} virgil={virgil}
+                             pressure={mood} aside={aside}
+                             spent={run.advisersSpent}
+                             /* HIS READ IS NOT PART OF THE CLAIM ON THIS SURFACE.
+                                It is rendered below with his feed — see the
+                                .ps-virgil block. Leaving it here put his sentence
+                                inside the argument it is about, with his face a
+                                column away from it. PressFlat keeps it inline. */
+                             showVirgil={!VIRGIL.sitepal} />
+                </div>
+                {flash && flash.id === claim.id && (
+                  <AnswerBody flash={flash}>
+                    <AnswerChoice flash={flash} onLook={lookAtBoard} onHear={hearReply} />
+                  </AnswerBody>
+                )}
+
+                {/* ON THE RECORD. Claim six is a decision about claims one to
+                    five, and until now the only way to hold them was to remember
+                    them — the controller has been recording every one in
+                    `run.chips` since the first slice and neither surface ever
+                    showed it. Collapsible, and it scrolls inside itself so it
+                    can't push the claim body around. */}
+                <Transcript run={run} deal={deal} open={script}
+                            onToggle={() => setScript((v) => !v)} />
+              </>
+            ) : null}
           </div>
+
+          {/* ---------- VIRGIL: ONE BLOCK, FACE AND WORDS ----------
+
+              THE COLUMN READ VIRGIL / PITCH BOT / VIRGIL. The feed went in at the
+              top of the stack and his read stayed inside ClaimBody, so the cat
+              appeared twice with the argument he is commenting on wedged between
+              the two halves of him (author, 2026-08-04). Pinned UNDER the column
+              they are one panel: you read the claim, then the only person in the
+              room on your side tells you what shape it is.
+
+              WHY NOT SLID OUT OF THE SEAT ROW, which was the other idea on the
+              table: a slide-out is a thing that comes and goes, and coming and
+              going is the behaviour we just removed. Worse, it cannot work at
+              all — hiding a SitePal subframe (translated away, collapsed, behind
+              a closed drawer) empties its clip rect and WebKit throttles it to
+              ~0.1fps, so he would slide out mid-line with a frozen face. He also
+              is not a seat: the row is five people you can SPEND, and putting the
+              one free voice in it invites a click that has to be refused.
+
+              BELOW THE SCROLLER, NOT IN IT, for the same clip-rect reason — see
+              [[sitepal-iframe-offscreen-throttle]]. The column shrinks and
+              scrolls above him; this block never moves.
+
+              THE FEED IS RENDERED HERE, NOT PASSED INTO VirgilRead, so it holds
+              one position in the tree across the whole sitting. It mounts with
+              the opening remarks (SitePal takes seconds to boot) and must not be
+              re-parented when the first claim arrives — a remount reboots the
+              player, which is the several-second stall this placement exists to
+              hide. */}
+          {VIRGIL.sitepal && (
+            <div className={`ps-virgil${speakingVirgil ? " on" : ""}`}>
+              <span className="ps-virgil-feed">
+                {/* No `active` — it defaults true and the tile is meant to be
+                    seen for the whole sitting. Passing speakingVirgil here is
+                    what dropped the wrap to opacity 0.01 between lines, i.e. the
+                    disappearing act itself. */}
+                <SitePalPortalTile
+                  id={VIRGIL_PORTAL_ID}
+                  sitepal={VIRGIL.sitepal}
+                  still={VIRGIL.portrait}
+                />
+              </span>
+              {opened && claim ? (
+                <VirgilRead claim={claim} virgil={virgil} spent={run.advisersSpent}
+                            onToggleTips={() => setTips((t) => !t)}
+                            portrait={false}
+                            status={speakingVirgil ? "ON AIR" : "LIVE"}
+                            statusOn={speakingVirgil} />
+              ) : (
+                /* He has nothing to read yet — the bot has made no claim. Naming
+                   him is still worth the two lines: the feed is on from the
+                   opening remarks, and an unlabelled cat watching you is a
+                   question rather than an ally. */
+                <span className="ps-virgil-wait">
+                  <b>{VIRGIL.name.toUpperCase()}</b>
+                  <i>the office cat · he reads every claim, and he is free</i>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ---------- the floor ---------- */}
+      {/* ---------- the floor's controls ---------- */}
       {floorLive && claim && (
         <>
-          {/* Claim and answer share ONE flow column, so a long answer pushes
-              the claim up instead of covering it. Both bodies come from
-              pressUi — this file owns only WHERE the column sits. */}
-          <div className="ps-readcol">
-            <div className={`ps-fade ${claimVisible ? "in" : ""}`}>
-              <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
-                       pressure={mood} aside={aside}
-                         spent={run.advisersSpent} />
-            </div>
-            {flash && flash.id === claim.id && (
-              <AnswerBody flash={flash}>
-                <AnswerChoice flash={flash} onLook={lookAtBoard} onHear={hearReply} />
-              </AnswerBody>
-            )}
-
-            {/* ON THE RECORD. Claim six is a decision about claims one to five,
-                and until now the only way to hold them was to remember them —
-                the controller has been recording every one in `run.chips` since
-                the first slice and neither surface ever showed it.
-                Collapsible, and it scrolls inside itself so it can't push the
-                claim body around. */}
-            <Transcript run={run} deal={deal} open={script}
-                        onToggle={() => setScript((v) => !v)} />
-          </div>
-
           {/* The controls, grouped bottom-right and clear of the reading
               column on the left. */}
           <div className="ps-dock">
@@ -1322,9 +1505,20 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    column's TOP edge is unchanged — it starts where it always did and gives the
    38px back at the bottom, where it was never ours. */
 .ps-root { --nav-clear:72px; }
-.ps-readcol { position:absolute; left:18px; bottom:calc(var(--nav-clear) + 12px);
+/* THE STACK OWNS THE CORNER; the column just lives in it.
+   The positioning that used to be on .ps-readcol moved up one level so the cat's
+   feed can be docked to the column's top edge and stay there as the transcript
+   grows. Bottom-anchored, as it always was — the column still fills upward. */
+.ps-readstack { position:absolute; left:18px; bottom:calc(var(--nav-clear) + 12px);
   width:min(430px, 38vw);
-  max-height:calc(100vh - var(--nav-clear) - 96px); overflow-y:auto;
+  max-height:calc(100vh - var(--nav-clear) - 96px);
+  display:flex; flex-direction:column; gap:8px; }
+/* min-height:0 IS LOAD-BEARING (no backticks in here — template literal): a
+   flex child's default min-height is auto, so
+   without it the column refuses to shrink below its content and the stack grows
+   past its own max-height instead of scrolling — which would push the feed up
+   under the top bar exactly the way the old corner tile got buried. */
+.ps-readcol { flex:0 1 auto; min-height:0; overflow-y:auto;
   display:flex; flex-direction:column; gap:8px; }
 /* Over the room, so every block is opaque enough to read against anything.
    THE TRANSCRIPT WAS NOT. This rule said "both blocks" and there were two when
@@ -1337,38 +1531,80 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    Given one, the top rule that separated it from the answer becomes a left rule
    like the claim's, so the column reads as three stacked records rather than two
    panels and a tail. */
-/* VIRGIL'S PLAYER — a small live tile, and the only lip-sync he can have on this
-   surface (the glb cat has no face mesh; see the note by .ps-virgil's markup).
+/* VIRGIL'S PLAYER — a standing monitor at the head of the stack, and the only
+   lip-sync he can have on this surface (the glb cat has no face mesh; see the
+   note by .ps-virgil's markup).
 
-   IT IS ALWAYS IN THE TREE while the floor is live and only its OPACITY changes:
-   a SitePal subframe that is display:none or moved off-screen gets throttled to
-   ~0.1fps by WebKit and returns frozen, which is precisely the failure this tile
-   was built to cure. The wrapper's own dimensions never change for the same
-   reason — a box collapsed to 0 has an empty clip rect and counts as off-screen.
+   NEVER HIDDEN, BY ANY MEANS. It used to fade to opacity 0 between his lines,
+   which was safe but wrong-looking; what it must never do is go display:none,
+   collapse to zero, or leave the viewport. A SitePal subframe with an empty clip
+   rect is throttled by WebKit to ~0.1fps and returns FROZEN — audio untouched, so
+   he talks with a still face and nothing looks broken enough to investigate.
+   That is the exact failure this tile exists to cure.
 
-   TOP-LEFT, UNDER THE BAR — NOT above the reading column, which is where this
-   first went. That column is anchored bottom-left and grows upward as the
-   transcript fills, so anything sharing its corner is clear on claim one and
-   underneath it by claim four. The top-left strip is the one large area of this
-   surface nothing else claims.
+   PINNED UNDER THE COLUMN, WITH HIS WORDS. It was absolutely positioned at
+   left:18px top:64px — the one large area of the surface nothing else claimed,
+   chosen because the reading column is bottom-anchored and grows upward, so
+   anything sharing that corner is clear on claim one and buried by claim four.
+   Making the column a FLEX CHILD dissolves that constraint rather than dodging
+   it, and the block can then sit at the BOTTOM of the stack, where it is one
+   panel with VirgilRead instead of a face at one end of the column and a
+   sentence at the other. See the markup for why not a drawer off the seat row.
 
-   pointer-events stay off: he is not a seat, cannot be sent anywhere, and a
-   clickable cat is an invitation to try. */
-.ps-virgil { position:absolute; left:18px; top:64px;
-  width:132px; height:132px; pointer-events:none;
-  border:1px solid rgba(191,238,222,0.3); background:#02100e; overflow:hidden;
-  opacity:0; transform:translateY(-6px);
-  transition:opacity .3s ease, transform .3s ease, border-color .3s ease;
-  box-shadow:0 0 0 1px rgba(0,0,0,0.5) inset; }
-.ps-virgil.on { opacity:1; transform:translateY(0);
-  border-color:rgba(191,238,222,0.6);
-  box-shadow:0 0 20px rgba(191,238,222,0.18), 0 0 0 1px rgba(0,0,0,0.5) inset; }
-.ps-virgil-cap { position:absolute; left:6px; bottom:5px; z-index:2;
-  padding:2px 5px; background:rgba(2,10,9,0.6);
-  font:bold 8px/1 'Courier New',monospace; letter-spacing:0.11em;
-  color:rgba(234,255,249,0.72); }
+   A ROW, NOT A TILE: face left, read right. That is .pu-virgil's own shape —
+   the block was always [portrait | text] and this only swaps a 34px still for a
+   104px player, which is the whole idea in one line of markup. */
+.ps-virgil { flex:none; display:flex; gap:10px; align-items:flex-start;
+  padding:9px 11px; pointer-events:auto;
+  background:rgba(2,16,14,0.9);
+  border:1px solid rgba(191,238,222,0.24); border-left-width:2px;
+  transition:border-color .3s ease, box-shadow .3s ease, background .3s ease; }
+/* HE IS TALKING, AND THE PANEL SAYS SO FROM ACROSS THE SCREEN.
+   The first version moved the border a shade and added a 20px shadow at 0.15,
+   which is invisible against a room this bright — you had to already be looking
+   at him to notice he had started, and his line is about three seconds long.
+   A slow pulse is the right instrument: it reads as a live source rather than as
+   a selection state, it cannot be mistaken for the claim panel's mood border
+   (that one is pink and static), and it decays to nothing the moment he stops.
+   ~1.6s is one breath — fast enough to catch the eye inside a short line, slow
+   enough not to strobe under a paragraph of text. */
+.ps-virgil.on { border-color:rgba(191,238,222,0.85);
+  background:rgba(5,26,22,0.94);
+  animation:psVirgilOnAir 1.6s ease-in-out infinite; }
+@keyframes psVirgilOnAir {
+  0%, 100% { box-shadow:0 0 14px rgba(191,238,222,0.16); }
+  50%      { box-shadow:0 0 34px rgba(191,238,222,0.45); }
+}
+/* The feed lights with the panel — the frame around his face is the part the eye
+   goes to, and leaving it dim while the box glowed read as a lit empty box. */
+.ps-virgil.on .ps-virgil-feed { border-color:rgba(191,238,222,0.8);
+  box-shadow:0 0 12px rgba(191,238,222,0.28); }
+/* SQUARE, AND THE TILE FITS ITSELF TO IT. SitePalPortalTile measures this box and
+   solves the scale against the player's 600x450, so the height here is the only
+   number that matters — a square crops the 4:3 player at the sides, which is what
+   a talking head wants. .spt-wrap is position:absolute; inset:0, so this must be
+   a positioned box of its own.
+
+   pointer-events off, alone in this block: he is not a seat, cannot be sent
+   anywhere, and a clickable cat is an invitation to try. The tips switch beside
+   him IS clickable, which is why the row itself takes the pointer. */
+.ps-virgil-feed { position:relative; display:block; flex:none;
+  width:104px; height:104px; overflow:hidden; pointer-events:none;
+  border:1px solid rgba(191,238,222,0.28); background:#02100e;
+  transition:border-color .3s ease, box-shadow .3s ease; }
+.ps-virgil .pu-virgil { flex:1; min-width:0; }
+/* Before the first claim there is no read to show — see the markup. */
+.ps-virgil-wait { display:flex; flex-direction:column; gap:4px; padding-top:2px; }
+.ps-virgil-wait b { font:bold 10px/1.45 'Courier New',monospace;
+  letter-spacing:0.11em; color:#bfeede; }
+.ps-virgil-wait i { font-style:normal; font-size:11.5px; line-height:1.4;
+  color:rgba(191,238,222,0.6); }
+/* The pulse is the one thing here that must not run for a player who asked for
+   stillness — so it becomes a steady bright glow, which carries the same "he is
+   talking" reading without the motion. */
 @media (prefers-reduced-motion:reduce) {
-  .ps-virgil { transition:none; transform:none; }
+  .ps-virgil, .ps-virgil-feed { transition:none; }
+  .ps-virgil.on { animation:none; box-shadow:0 0 28px rgba(191,238,222,0.4); }
 }
 .ps-readcol .pu-claim { background:rgba(2,16,14,0.86); }
 .ps-readcol .pu-script {
@@ -1793,7 +2029,10 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 
 @media (max-width: 860px) {
   /* The reading column and the dock stop competing for the width and stack. */
-  .ps-readcol { width:calc(100% - 36px); right:18px; max-height:38vh; }
+  .ps-readstack { width:calc(100% - 36px); right:18px; max-height:44vh; }
+  /* The feed shrinks rather than going away — hiding it is the one thing that is
+     not allowed (an off-screen subframe is a throttled subframe). */
+  .ps-virgil-feed { width:78px; height:78px; }
   /* .ps-open-aside / .ps-tool-hand / .ps-tool-who went with the prose columns and
      the tool-group wrappers — every briefing band is full width at every size
      now, so the panel needs no direction flip here. What it DOES need is the head

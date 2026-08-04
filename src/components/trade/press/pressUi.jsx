@@ -66,6 +66,23 @@ export function readDwellMs(text = "") {
 }
 
 /**
+ * THE BEAT BEFORE THE CAT SPEAKS.
+ *
+ * Held silent between the pitch bot finishing a claim and Virgil's read of it —
+ * "Virgil starts speaking too quickly after pitchbot ends" (author, 2026-08-04).
+ * Coming in on the last syllable made him sound like he was talking over the bot;
+ * the pause is what turns the same two lines into somebody having LISTENED and
+ * then answered, which is the whole difference between a heckler and an adviser.
+ *
+ * NOT A DWELL. `readDwellMs` and a part's `minMs` pad the END of a line so it can
+ * be read; this is dead air BEFORE one, and it is the only thing on either
+ * surface that deliberately plays nothing. Consumed as a part's `leadMs`.
+ *
+ * Shared so the two surfaces cannot drift: one exchange, one tempo, on both.
+ */
+export const VIRGIL_BEAT_MS = 2400;
+
+/**
  * THE OPENING REMARKS — the beat between HEAR THE PITCH and claim 1.
  *
  * Lines arrive ONE AT A TIME, as each is spoken, and that is the whole point:
@@ -83,15 +100,32 @@ export function readDwellMs(text = "") {
  *
  * @param onSkip cut to the first claim. Impatience is a legitimate input on this
  *               surface as much as on the arrival — see skipRoll.
+ * @param onBegin THE GATE. Non-null once the remarks have finished, and while it
+ *               is up nothing is playing: the opening no longer runs on into the
+ *               first claim on its own (author, 2026-08-04). Introductions and
+ *               selling are two different things to be doing, and the seam between
+ *               them was the one place the floor never stopped for you — the bot
+ *               said who it was and was three sentences into an argument before
+ *               you had decided to hear one. Handing the floor back is a move the
+ *               player makes, which is also what every other beat in this game
+ *               does (LET PITCHBOT RESPOND, NEXT POINT).
+ *
+ *               It buys a second thing for free: the first claim's audio now
+ *               starts inside a click, so no autoplay policy can swallow it.
  */
-export function OpeningBody({ lines = [], at = -1, onSkip = null, done = false }) {
+export function OpeningBody({ lines = [], at = -1, onSkip = null, onBegin = null,
+                              done = false }) {
   if (!lines.length) return null;
   const shown = done ? lines.length : Math.max(0, at + 1);
   return (
     <div className="pu-claim pu-opening" data-mood="cool">
       <div className="pu-who">
         {PITCH_BOT.name.toUpperCase()} <span className="pu-dim">— opening remarks</span>
-        {onSkip && (
+        {/* SKIP AND THE GATE ARE NEVER BOTH UP. Once the remarks are done there
+            is nothing left to skip, and two buttons that do the same thing at
+            the same moment is a choice the player has to read to discover is
+            not one. The surfaces pass null for whichever is spent. */}
+        {onSkip && !onBegin && (
           <button type="button" className="pu-skip" onClick={onSkip}>
             SKIP INTRO ▸
           </button>
@@ -105,6 +139,13 @@ export function OpeningBody({ lines = [], at = -1, onSkip = null, done = false }
           “{line}”
         </div>
       ))}
+      {onBegin && (
+        <div className="pu-choice">
+          <button type="button" className="pu-choice-btn hear" onClick={onBegin}>
+            ◉ LET PITCHBOT MAKE ITS CASE ▸
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -131,8 +172,15 @@ export function answerNote(flash) {
  * whose specialism it is, and Virgil's read. `count` is optional ("3 / 6")
  * — mobile shows it because there's no progress rail there.
  */
+/**
+ * @param showVirgil  whether his read is part of this block. FALSE on a surface
+ *   that renders <VirgilRead> itself — PressSession pins it under the reading
+ *   column with his live feed, because the tile cannot live inside a scroller and
+ *   his words should not live a screen away from his face. The flat surface keeps
+ *   it inline, which is why this is a prop rather than a deletion.
+ */
 export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [], count = null,
-                           pressure = null, aside = "" }) {
+                           pressure = null, aside = "", showVirgil = true }) {
   if (!claim) return null;
   const owner = laneOwner(claim);
   const stale = !!owner && spent.includes(owner.id);
@@ -188,18 +236,62 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
           ("Virgil stops chiming in"), and it is the only reading that survives
           him having a throat: a cat you have muted who carries on talking six
           times a session reads as a broken toggle, not as a difficulty setting. */}
-      {(virgil?.agenda || virgil?.tip || claim) && (
-        <div className="pu-virgil">
-          <img className="pu-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+      {showVirgil && (
+        <VirgilRead claim={claim} virgil={virgil} spent={spent} onToggleTips={onToggleTips} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * VIRGIL'S READ, AS ITS OWN BLOCK — extracted from ClaimBody on 2026-08-04 so a
+ * surface can put it somewhere other than inside the claim.
+ *
+ * PressSession needs exactly that. Its live SitePal tile cannot go inside the
+ * reading column's scroller (an overflow-clipped subframe is a throttled one),
+ * so the tile is pinned below the scroller — and leaving his WORDS up inside the
+ * claim block left the column reading VIRGIL / PITCH BOT / VIRGIL, with his face
+ * and his sentence separated by the argument they are about (author, 2026-08-04).
+ * Rendered here, the surface can pin face and words together as one panel.
+ *
+ * ONE COPY OF THE MARKUP, still. The flat surface calls it through ClaimBody
+ * exactly as before and cannot tell the difference; keeping a second copy is what
+ * let the two presentations drift apart the last time.
+ *
+ * @param portrait  render the 34px still. FALSE when the surface is supplying its
+ *                  own face — PressSession puts a lip-syncing player where this
+ *                  image would be, and two of the same cat is what the live tile
+ *                  was added to remove.
+ * @param status    "LIVE" / "ON AIR" beside his name, for a surface that is
+ *                  showing a feed and so has a state to report. `statusOn` lights
+ *                  it. Omitted everywhere else — the flat surface has no tile and
+ *                  a status readout on a still is a lie.
+ */
+export function VirgilRead({ claim, virgil = null, onToggleTips = null, spent = [],
+                             portrait = true, status = null, statusOn = false }) {
+  if (!claim && !virgil?.agenda && !virgil?.tip) return null;
+  if (!claim) return null;
+  const owner = laneOwner(claim);
+  const stale = !!owner && spent.includes(owner.id);
+  return (
+        <div className={`pu-virgil${portrait ? "" : " nopic"}`}>
+          {portrait && (
+            <img className="pu-virgil-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+          )}
           <span className="pu-virgil-text">
             <span className="pu-virgil-who">
               {VIRGIL.name.toUpperCase()}
+              {status && (
+                <span className={`pu-virgil-live${statusOn ? " on" : ""}`}>
+                  <i />{status}
+                </span>
+              )}
               {onToggleTips && (
                 <button type="button" className="pu-virgil-mute" onClick={onToggleTips}
-                        title={virgil.tip
+                        title={virgil?.tip
                           ? "Quiet him down — the running order stays on screen"
                           : "Let him chime in again"}>
-                  {virgil.tip ? "tips on" : "tips off"}
+                  {virgil?.tip ? "tips on" : "tips off"}
                 </button>
               )}
             </span>
@@ -237,12 +329,10 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
             <span className="pu-virgil-lane" data-lane={stale ? "SPENT" : claim.lane}>
               {laneSentence(claim, { spent })}
             </span>
-            {virgil.tip && <span className="pu-virgil-tip">{virgil.tip}</span>}
-            {virgil.agenda && <span className="pu-virgil-agenda">{virgil.agenda}</span>}
+            {virgil?.tip && <span className="pu-virgil-tip">{virgil.tip}</span>}
+            {virgil?.agenda && <span className="pu-virgil-agenda">{virgil.agenda}</span>}
           </span>
         </div>
-      )}
-    </div>
   );
 }
 
@@ -720,6 +810,19 @@ export const PRESS_UI_CSS = `
   border-top:1px dashed rgba(191,238,222,0.22); }
 .pu-virgil-pic { flex:none; width:34px; height:34px; border-radius:50%; object-fit:cover;
   border:1px solid rgba(191,238,222,0.45); background:rgba(2,16,14,0.6); }
+/* NO PORTRAIT — the surface is supplying its own face (see VirgilRead's portrait
+   prop). Nothing else changes here: the block is still a flex row, the surface's
+   element simply takes the picture's slot as a sibling. */
+.pu-virgil.nopic { margin-top:0; padding-top:0; border-top:none; }
+/* LIVE / ON AIR, for a surface that is running his player. currentColor drives
+   the dot so the two can never disagree about the state. */
+.pu-virgil-live { display:inline-flex; align-items:center; gap:4px; flex:none;
+  font-size:8px; letter-spacing:0.14em; color:rgba(234,255,249,0.4);
+  transition:color .3s ease; }
+.pu-virgil-live i { width:5px; height:5px; border-radius:50%; background:currentColor; }
+.pu-virgil-live.on { color:#ff5f9e; }
+.pu-virgil-live.on i { box-shadow:0 0 6px #ff5f9e; }
+@media (prefers-reduced-motion:reduce) { .pu-virgil-live { transition:none; } }
 .pu-virgil-text { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
 .pu-virgil-who { display:flex; align-items:baseline; gap:8px;
   font:bold 10px/1.45 'Courier New',monospace; letter-spacing:0.11em; color:#bfeede; }

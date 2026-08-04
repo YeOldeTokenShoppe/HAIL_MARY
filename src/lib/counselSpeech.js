@@ -35,7 +35,11 @@ export const COUNSEL_VOICES = {
 // ElevenLabs reads "RL80" as "R-L-eighty"; the shrine says "R-Lady". Spoken
 // text only — the on-screen caption keeps the real spelling.
 // (Mirrors lib/oracleSpeech's toSpeech.)
-function toSpeech(text) {
+// EXPORTED as of 2026-08-04: the temple's shared SitePal host is spoken to
+// through /trade's request queue rather than through speakInPortal, so that path
+// has to apply the same substitution or the same character says the ticker two
+// different ways depending on which surface you are on.
+export function toSpeech(text) {
   return String(text).replace(/\$?\bRL[-\s]?80\b/gi, "R-Lady");
 }
 

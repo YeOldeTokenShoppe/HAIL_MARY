@@ -67,11 +67,19 @@ import { rollPitcher, resolvePitcherId, assignPitcher, PITCHER_ROSTER } from "@/
    restate those would be a second implementation wearing a config's clothes. */
 
 /**
- * CAMERA FRAMING when the room focuses the pitcher — the default, which is also
- * v1's authored values.
+ * CAMERA FRAMING when the room focuses the pitcher — shared by all three rigs.
  *
- * PER-VARIANT CAPABLE, but as of 2026-08-02 ALL THREE RIGS SHARE THIS ONE BLOCK —
- * add a `framing` to a variant only when it genuinely needs its own.
+ * PER-VARIANT CAPABLE; add a `framing` to a variant only when it genuinely needs
+ * its own, and read v1's note on why it does NOT have one before you add the first.
+ *
+ * MEASURED FROM THE FEET as of 2026-08-04 — the anchor is the rig ROOT's world
+ * position (see getPitchBotFocusSettings). It was the face plate's node origin
+ * until then, which is a point that MOVES: the cast squashes it toward the feet
+ * and the idle clip nudges it, so on v1 — the one rig whose plate rides its head —
+ * the same numbers framed a different shot depending on which frame the focus
+ * happened to fire. Nothing about the composition changed in that move; camLift
+ * gained 0.01 and aimDrop lost it, which is exactly how far v2's plate sat above
+ * its own feet, so the shot the author signed off is preserved to the millimetre.
  *
  * FINAL VALUES dialled in-browser 2026-08-02 with __pitchBotFrame. The step
  * before them was a mechanical +0.7 lift, described next; these are that shot
@@ -90,23 +98,16 @@ import { rollPitcher, resolvePitcherId, assignPitcher, PITCHER_ROSTER } from "@/
  * camera while leaving the target behind, steepening the pitch — a different shot
  * that happens to be higher, rather than the same shot higher up.
  *
- * aimDrop is NEGATIVE now, which is legal and means "aim above the anchor". The
- * anchor is the face plate's node origin, which sits near the bot's FEET, so
- * aiming above it is exactly right — see the note below.
- *
- * THE VALUES AND THE AIM ANCHOR ARE A MATCHED PAIR. These were dialled by eye
- * against getPitchBotFocusSettings' anchor, which is the face plate's NODE ORIGIN
- * and sits near the bot's FEET rather than its head. They look wrong on paper for
- * that reason — camLift is larger than the whole figure — and they are correct in
- * the room. An attempt to "fix" the anchor to the geometry centre on 2026-08-02
- * moved the datum by a third of the figure and cost several rounds of retuning
- * before being reverted. Change one, change both, and check it in the browser.
+ * aimDrop is NEGATIVE, which is legal and means "aim ABOVE the anchor". The anchor
+ * is the bot's feet, so of course the shot aims above it — every number here is an
+ * offset up off the floor plate, and camLift being most of a figure-height is what
+ * "camera at head height" looks like when you measure from the ground.
  *
  * THESE NUMBERS ONLY MEAN THE SAME THING ON RIGS OF THE SAME HEIGHT. `aimDrop`
  * and `camLift` are absolute world offsets, not fractions of the figure, so a rig
  * staged taller is framed lower on its body by exactly the ratio of the two
- * heights. v2 and v3 are both fitted to 0.300; if a rig ever diverges from that,
- * scale these with it or give it its own block.
+ * heights. All three rigs are fitted to the same staged height today; if one ever
+ * diverges, scale these with it or give it its own block.
  *
  * Dial with __pitchBotFrame({...}), which re-fires the focus so the change is
  * visible, then paste into the ACTIVE variant's `framing` — not this block,
@@ -115,11 +116,12 @@ import { rollPitcher, resolvePitcherId, assignPitcher, PITCHER_ROSTER } from "@/
 export const PITCH_BOT_FRAMING_DEFAULT = {
   /** How far back the camera sits, in world units. Smaller = tighter. */
   dist: 0.55,
-  /** How far BELOW the face to aim, so the head sits high in frame rather than
-   *  dead centre. Raise this to lift the subject without tilting the camera. */
-  aimDrop: -0.15,
-  /** Camera lift relative to the face. Near zero = eye level; positive looks down. */
-  camLift: 0.25,
+  /** How far BELOW the feet to aim — negative, so ABOVE them. Raise this (toward
+   *  zero and past it) to lower the subject in frame without tilting the shot. */
+  aimDrop: -0.16,
+  /** Camera height above the feet. Roughly the figure's head height, so the shot
+   *  reads as eye-level rather than looking down at it. */
+  camLift: 0.26,
 };
 
 /** Resolve the framing for a variant, falling back to the shared default. */
@@ -189,7 +191,10 @@ export const PITCH_BOT_VARIANTS = {
     url: "/models/pitch-bot.glb?v=1",
     /**
      * FITTED LIKE THE OTHERS as of 2026-08-02, so all three rigs stand the same
-     * height and one framing block serves them all.
+     * height and one framing block serves them all. That is load-bearing now: the
+     * framing offsets are measured from the FEET, and a fixed offset from the feet
+     * only lands on the same part of every figure while the figures are the same
+     * height.
      *
      * IT WAS A LITERAL SCALE until now — 0.41, eyeballed, from back when this was
      * the only rig and a raw number could mean something. It cannot across rigs:
@@ -222,6 +227,11 @@ export const PITCH_BOT_VARIANTS = {
      * measurement failed at all.
      */
     scale: 0.35,
+    /* NO `framing` OVERRIDE, and it is worth saying why, because this rig briefly
+     * had one. Its camera was landing high, and the obvious reading was that a
+     * chibi bot needs its own shot. It did not: the aim ANCHOR was moving under it
+     * (see getPitchBotFocusSettings). Per-variant numbers fitted to a moving datum
+     * made the bad frames worse rather than fixing them. Fixed at the datum. */
     holo: PITCH_BOT_HOLO,
     /** Canonical name -> the clip that actually carries it in THIS file. */
     clips: { idle: "idle", talking: "talking" },

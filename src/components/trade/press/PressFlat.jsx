@@ -25,7 +25,7 @@ import { createFlatEvidenceScreen } from "./evidenceScreen";
 import { createPitchDeck } from "./pitchDeck";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
-  Meter, Nav, readDwellMs, PRESS_UI_CSS,
+  Meter, Nav, readDwellMs, VIRGIL_BEAT_MS, PRESS_UI_CSS,
 } from "./pressUi";
 import TerminalModuleHeader from "../TerminalModuleHeader";
 
@@ -232,6 +232,10 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      the mouth. */
   const openingLines = useMemo(() => pitchOpening(deal), [deal]);
   const [openingAt, setOpeningAt] = useState(-1);
+  // THE REMARKS FINISHING AND THE FLOOR OPENING ARE TWO EVENTS, and the button
+  // between them is the player's. Same seam, same three states, as PressSession —
+  // see the gate note on OpeningBody for what the beat is for.
+  const [openingDone, setOpeningDone] = useState(false);
   const [opened, setOpened] = useState(false);
   const floorLive = onFloor && opened;
 
@@ -432,6 +436,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
    * Per-part `minMs` overrides `dwell` for one part alone. Virgil needs a floor
    * the claim spin does not: without an API key both resolve instantly, and the
    * feed would cut pitcher -> cat -> pitcher inside a frame.
+   *
+   * Per-part `leadMs` HOLDS SILENCE BEFORE a part, which is a different thing
+   * from `minMs` and needed for a different reason. `minMs` pads the END of a
+   * line so a beat can be read; `leadMs` is the gap between two speakers. The cat
+   * came in on the pitcher's last syllable — "Virgil starts speaking too quickly
+   * after pitchbot ends" (author, 2026-08-04) — which reads as an interruption
+   * rather than as a second person considering what was just said. Nothing is
+   * speaking during the hold, so `speakingAs` still names the PREVIOUS voice and
+   * the room does not light him up until he actually opens his mouth.
    */
   const sayTurn = useCallback(async (parts, { onPart = null, dwell = null, onDone = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
@@ -442,6 +455,13 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       for (let i = 0; i < live.length; i++) {
         const p = live[i];
         if (sayToken.current !== token) return;   // superseded — stop the chain
+        // THE GAP BEFORE THIS VOICE. Re-checked after the wait: two or three
+        // seconds is long enough for a press to have landed, and resuming into a
+        // superseded chain would put the cat over whoever interrupted him.
+        if (p.leadMs) {
+          await new Promise((r) => setTimeout(r, p.leadMs));
+          if (sayToken.current !== token) return;
+        }
         onPart?.(i);
         setSpeakingAs(p.voice || VOICE);
         // `seat` is optional and defaults to the pitcher, so the opening and the
@@ -473,19 +493,29 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     (async () => {
       await sayTurn(openingLines.map((text) => ({ voice: VOICE, text })),
                     { onPart: (i) => { if (alive) setOpeningAt(i); }, dwell: readDwellMs });
-      if (alive) setOpened(true);
+      // STOPS AT THE GATE — `opened` is beginPitch's to flip. The effect guard is
+      // still `opened`, so this cannot re-enter while the button is up.
+      if (alive) setOpeningDone(true);
     })();
     return () => { alive = false; };
   }, [onFloor, opened, openingLines, sayTurn]);
 
   // Bumping the token supersedes the chain in flight; its `finally` then declines
   // to touch `speaking`, so this clears it by hand.
+  //
+  // SKIP CLEARS THE GATE TOO: it is already the player saying move on, and making
+  // them say it twice is the impatience path answering itself.
   const skipOpening = useCallback(() => {
     sayToken.current++;
     stopVoice();
     setSpeaking(false);
+    setOpeningDone(true);
     setOpened(true);
   }, []);
+
+  // The handover. `opened` is what the claim effect below waits on, so the first
+  // claim — and its audio — begins inside the click.
+  const beginPitch = useCallback(() => setOpened(true), []);
 
   // `floorLive`, not `onFloor`: during the opening the pitcher already has the
   // mouth, and starting claim 1 underneath it would put two of ITS OWN utterances
@@ -518,7 +548,10 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     sayTurn(
       [
         { voice: VOICE, text: claim.spin },
-        { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", seat: VIRGIL.id, minMs: 900 },
+        // leadMs: he lets the bot finish before he says his piece. Same number as
+        // PressSession, from the same constant, for the same reason the tip is.
+        { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", seat: VIRGIL.id,
+          leadMs: VIRGIL_BEAT_MS, minMs: 900 },
       ],
       // Back to the pitcher: the claim is his and it is what you read next.
       { onDone: () => setOnCamera(PITCHER) },
@@ -1066,7 +1099,9 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                            count={`${run.claimIndex + 1} / ${deal.claims.length}`} />
               )
             ) : (
-              <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening} />
+              <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening}
+                           done={openingDone}
+                           onBegin={openingDone ? beginPitch : null} />
             )}
 
             {answering && (

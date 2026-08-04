@@ -19,6 +19,7 @@ import PostProcessingEffects from '@/components/PostProcessingEffects';
 import CyborgTempleScene, {
   DEMON_SITEPAL_CONTAINER_ID,
   SITEPAL_PROJECTION_CONFIG,
+  SITEPAL_SCENE_IDS,
   TEMPLE_MODEL_URL,
 } from '@/components/CyborgTempleScene';
 import VideoScreens from "@/components/VideoScreens";
@@ -160,6 +161,19 @@ function SitePalHostEmbed({ config }) {
     if (window.__sitePalCurrentSceneId === undefined) {
       window.__sitePalCurrentSceneId = 2774900;
     }
+    // WHICH SCENE EACH PROJECTED FACE EXPECTS, published for code that has to
+    // drive this host from outside the page — lib/trade/seatVoice, which speaks a
+    // seat's press answer through it.
+    //
+    // IT IS NOT THE SAME ID AS THE SEAT'S OWN PORTAL SCENE, which is the trap
+    // that cost an afternoon: DESK[seat].sitepal.sceneId is what the flat
+    // surface loads into its per-seat iframe, and for two of the three seats it
+    // is a DIFFERENT scene in the account (Connor 2775052 vs 2774900, GR80
+    // 2775053 vs 2774449). Marisol's happen to be the same number, so driving
+    // the host with the seat's id looked like it worked on the one character
+    // anybody tested and painted nothing on the other two — paintProjection
+    // needs the loaded scene to match ITS config or it leaves Face1 up.
+    window.__sitePalSceneIds = { ...SITEPAL_SCENE_IDS };
     // Desired volume after the next vh_sceneLoaded. The click handler
     // sets this BEFORE calling loadSceneByID so the new scene applies
     // it on load — calling setPlayerVolume directly across a scene
@@ -4117,9 +4131,22 @@ export default function CyborgTemple() {
               gameStarted={gameStarted}
               attractMonk={gameStarted && !rulesHeard && !focusedAgent}
               showCharacterHints={showCharacterHint && !focusedAgent}
-              useSitePalForDemon={focusedAgent === 'Demon'}
-              useSitePalForDetective={focusedAgent === 'Detective'}
-              useSitePalForMonk={focusedAgent === 'Monk'}
+              /* WHICH FACE IS BEING PROJECTED — and it has to agree with
+                  externalFocusAgent directly below, which is the bug these three
+                  lines carried. They read `focusedAgent`; the VC game runs on
+                  `pressFocus` and explicitly does setFocusedAgent(null) when it
+                  starts (see the 'vc-game' rail handler). So for the whole game
+                  these were false: the analysts kept their static Face1, no
+                  SitePal canvas was painted anywhere, and CyborgTempleScene's
+                  volume effect — which keys off the same three props — held the
+                  host at 0 and called stopSpeech(). Marisol answered a press
+                  with a real voice and a motionless face, and any line sent to
+                  the host was muted on arrival (author, 2026-08-04).
+                  'Stage' during the curtain call matches no character, so all
+                  three go false there, which is what we want. */
+              useSitePalForDemon={(pressMode ? pressFocus : focusedAgent) === 'Demon'}
+              useSitePalForDetective={(pressMode ? pressFocus : focusedAgent) === 'Detective'}
+              useSitePalForMonk={(pressMode ? pressFocus : focusedAgent) === 'Monk'}
               externalFocusAgent={revealMode ? 'Stage' : (pressMode ? pressFocus : focusedAgent)}
               speechActive={pressMode ? pressSpeaking : speechActive}
               revealMode={revealMode}
