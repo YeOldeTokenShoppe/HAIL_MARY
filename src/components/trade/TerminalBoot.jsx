@@ -263,7 +263,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
                     aria-live="polite"
                   >
                     {!channelPreview && <ChannelSignal type={channelMeta.signal} />}
-                    <div className="tb-card-overline">{channelMeta.overline}</div>
+                    {/* <div className="tb-card-overline">{channelMeta.overline}</div> */}
                     <div className="tb-card-title">{tuned.label}</div>
                     {tuned.sub && <div className="tb-card-sub">{tuned.sub}</div>}
                     {tuned.disabled && <div className="tb-card-soon">TRANSMISSION PENDING</div>}
@@ -311,7 +311,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
                 )}
               </div>
 
-              <div className="tb-telemetry" aria-label={`${tuned.label} live telemetry`}>
+              {/* <div className="tb-telemetry" aria-label={`${tuned.label} live telemetry`}>
                 {channelMeta.telemetry.map(([label, value]) => (
                   <div className="tb-metric" key={label}>
                     <span>{label}</span>
@@ -319,7 +319,7 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
                     <i aria-hidden="true" />
                   </div>
                 ))}
-              </div>
+              </div> */}
 
               <button
                 className="tb-enter"

@@ -8,7 +8,7 @@
 // four-character layer here instead of into the archetypes.
 
 import { LANES, PITCHER, SEATS, SHAPES, inLane } from "./questions.js";
-import { pitcherPortrait, pitcherVoice } from "./pitchers";
+import { pitcherPortrait, pitcherVoice, pitcherModel } from "./pitchers";
 
 /**
  * THE PITCH BOT — the thing you press. Not a seat, not staff, not yours.
@@ -54,6 +54,8 @@ export const PITCH_BOT = {
   get portrait() { return pitcherPortrait(); },
   /** Also per-rig — see the note on `portrait`. */
   get voice() { return pitcherVoice(); },
+  /** Also per-rig: the shell's plate number, printed on the file. */
+  get model() { return pitcherModel(); },
   clips: { idle: "idle", talking: "talking" },
   blurb: "Paid if you fund it. That is the entire relationship.",
 };

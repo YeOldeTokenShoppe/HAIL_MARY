@@ -166,9 +166,7 @@ export default function PressSession({
   const [fileNo] = useState(() => peekFileNo());
   const fileCommitted = useRef(false);
   const recordRef = useRef(null);
-  const shieldRef = useRef(null);
   const clientRef = useRef(null);
-  const termsRef = useRef(null);
   const stampRetainedRef = useRef(null);
   const particularsRef = useRef(null);
   const coverRef = useRef(null);
@@ -299,13 +297,10 @@ export default function PressSession({
     setRolling(true);
     const tl = runArrival({
       record: recordRef.current,
-      shield: shieldRef.current,
       client: clientRef.current,
       clientText: deal.name,
-      terms: termsRef.current,
       stampRetained: stampRetainedRef.current,
       particulars: particularsRef.current,
-      cover: coverRef.current,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -605,9 +600,11 @@ export default function PressSession({
   const finish = useCallback(() => setRun((r) => toAutopsy(r)), []);
 
   const options = useMemo(() => seatOptions(run, deal), [run, deal]);
-  // What's still coming in this lane — the one thing Eugene knows that no other
-  // surface does, and the reason his read stopped being a restatement of the
-  // lane band. Lanes only: it cannot leak the branch.
+  // What's still coming in this lane — VIRGIL'S AGENDA, and the reason his read
+  // is not a restatement of the lane band. VC_GAME.md §3: it "converts the core
+  // decision from a coin flip into a decision" — spend the specialist now or
+  // never. It was Eugene's free read until the cat took the guidance role
+  // ([A§9], virgil.js). Lanes only: it cannot leak the branch.
   const outlook = useMemo(() => laneOutlook(run, deal), [run, deal]);
   // How the pitch is going FOR HIM — a summary of outcomes you've already seen,
   // handed back as posture. The aside is held to the CLAIM so it can't change
@@ -741,7 +738,18 @@ export default function PressSession({
               spoiling the one thing the panel withholds. */}
           <div className="ps-start-head">
             <div className="ps-open-eyebrow">CH 02 // INCOMING MANDATE</div>
-            <h1>HEAR THE PITCH.<br /><span>CALL THE BLUFF.</span></h1>
+            {/* MAKE THE CALL, never CALL THE BLUFF (author, 2026-08-03: "is
+                there a bluff necessarily?"). There often isn't: every fact the
+                bot states is true (§1), anon-but-real is a good deal 70% of the
+                time, and §2 wants the session to read as "an offer, not a lie
+                hunt" — a headline promising a bluff sends the player hunting a
+                lie the game does not contain. It was also BINARY over a graded
+                mechanic: the call is SHORT ← FLAT → LONG, and §4 keeps the
+                middle on purpose. THE CALL is the game's own name for the beat
+                (the phase, callReadout, the 01 FINAL CALL cell below), and it
+                is true of every deal — which is this headline's whole licence
+                to be the largest type on a panel that withholds the deal. */}
+            <h1>HEAR THE PITCH.<br /><span>MAKE THE CALL.</span></h1>
             <p>One pitch. Three interruptions. Decide whether it deserves your book.</p>
           </div>
 
@@ -784,8 +792,8 @@ export default function PressSession({
               surface={identity ? deal.surface : null}
               ticker={identity ? deal.ticker : null}
               chain={identity ? deal.chain : null}
-              ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
-              termsRef={termsRef} particularsRef={particularsRef}
+              ref={recordRef} clientRef={clientRef}
+              particularsRef={particularsRef}
               stampRetainedRef={stampRetainedRef}
               coverRef={coverRef} />
           </div>
@@ -806,16 +814,20 @@ export default function PressSession({
             <div><b>04</b><span>ANALYSTS</span></div>
             <div><b>01</b><span>FINAL CALL</span></div>
           </div>
-          {/* THE ONE THING THE NUMBERS CAN'T SAY: who pays the speaker. The pitcher
-              is an outside contractor on commission, not a colleague. This said
-              "Connor brought this one in — it's his deal" until 2026-07-29, which
-              stopped being true when the bot took over the selling and Barron joined
-              the desk as a plain specialist; then "an agent is here for a client who
-              didn't come", cut the same day for pointing at the absence instead of
-              the incentive. What is worth knowing about a speaker is who pays it. */}
+          {/* THE TWO THINGS THE NUMBERS CAN'T SAY: what kind of claim is coming,
+              and who pays the speaker — in that order, rewritten 2026-08-03
+              (author: "let's just rewrite the whole section"). See the long note
+              at the same paragraph in PressFlat for why the facts-are-true line
+              now leads and why SEND had to go ([A§11], [A§20]); the two surfaces
+              carry identical copy and must be edited together.
+
+              WHAT THIS REPLACED, so it isn't reinstated: "Connor brought this one
+              in — it's his deal" until 2026-07-29, which stopped being true when
+              the bot took over the selling; then "an agent is here for a client
+              who didn't come", cut the same day for pointing at the absence
+              instead of the incentive. */}
           <p className="ps-directive">
-            The pitch bot is paid only if you fund the deal. Send one analyst
-            per interruption; anything verifiable lands on-screen.
+            Every fact the pitch bot states is true...technically. But is the project viable? Consult with the team and decide whether it deserves funding.
           </p>
 
           {/* BAND 4 — THE DESK. Portraits, not card faces — a card is a thing you

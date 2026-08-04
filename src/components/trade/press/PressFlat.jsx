@@ -146,9 +146,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const [fileNo] = useState(() => peekFileNo());
   const fileCommitted = useRef(false);
   const recordRef = useRef(null);
-  const shieldRef = useRef(null);
   const clientRef = useRef(null);
-  const termsRef = useRef(null);
   const stampRetainedRef = useRef(null);
   const particularsRef = useRef(null);
   const coverRef = useRef(null);
@@ -180,13 +178,10 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     setRolling(true);
     const tl = runArrival({
       record: recordRef.current,
-      shield: shieldRef.current,
       client: clientRef.current,
       clientText: deal.name,
-      terms: termsRef.current,
       stampRetained: stampRetainedRef.current,
       particulars: particularsRef.current,
-      cover: coverRef.current,
       onSettled: () => setSettled(true),
       onDone: () => { setRolling(false); setRolled(true); },
     });
@@ -218,9 +213,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // Who can be sent at the claim on the floor, and why not. Straight from the
   // controller so the button states can never disagree with the rules.
   const options = useMemo(() => seatOptions(run, deal), [run, deal]);
-  // What's still coming in this lane — the one thing Eugene knows that no other
-  // surface does, and the reason his read stopped being a restatement of the
-  // lane band. Lanes only: it cannot leak the branch.
+  // What's still coming in this lane — VIRGIL'S AGENDA, and the reason his read
+  // is not a restatement of the lane band. VC_GAME.md §3: it "converts the core
+  // decision from a coin flip into a decision" — spend the specialist now or
+  // never. It was Eugene's free read until the cat took the guidance role
+  // ([A§9], virgil.js). Lanes only: it cannot leak the branch.
   const outlook = useMemo(() => laneOutlook(run, deal), [run, deal]);
   // How the pitch is going FOR HIM — a summary of outcomes you've already seen,
   // handed back as posture. The aside is held to the CLAIM so it can't change
@@ -241,11 +238,14 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const live = pressIsLegal(run, claim);
   const lastClaim = run.claimIndex >= deal.claims.length - 1;
   const advisersLeft = SPENDABLE_SEATS.filter((x) => !run.advisersSpent.includes(x)).length;
-  // Eugene is free and automatic — he reads the shape of every claim and points
-  // at whose lane it is. He never stamps a receipt, so he can never carry the
-  // answer; he only tells you who COULD settle it. Reads the run as well as the
-  // claim, so he stops naming an adviser you've already spent.
-  // VIRGIL, not a seat. `tips` is the player's — the agenda half ignores it.
+  // VIRGIL, NOT A SEAT. The guidance is the cat's: free, automatic, and never a
+  // press — he reads the shape of every claim and points at whose lane it is,
+  // never at whether it is true, and he never stamps a receipt, so he cannot
+  // carry the answer. Reads the run as well as the claim, so he stops naming an
+  // adviser you've already spent. EUGENE IS A PLAIN SEAT — the exemption was
+  // his through three failed placements and moving it to a cat is what dissolved
+  // it ([A§9]; the whole argument is in virgil.js).
+  // `tips` is the player's — the agenda half ignores it, per §3's split.
   const [tips, setTips] = useState(true);
   const virgil = useMemo(
     () => (claim ? virgilRead(claim, {
@@ -603,7 +603,18 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               says "one deal", and "on the table" is left over from the cards. */}
           <div className="pf-start-head">
             <div className="pf-eyebrow">CH 02 // INCOMING MANDATE</div>
-            <h1>READ THE DEAL.<br /><span>CALL THE BLUFF.</span></h1>
+            {/* MAKE THE CALL, never CALL THE BLUFF (author, 2026-08-03: "is
+                there a bluff necessarily?"). There often isn't: every fact the
+                bot states is true (§1), anon-but-real is a good deal 70% of the
+                time, and §2 wants the session to read as "an offer, not a lie
+                hunt" — a headline promising a bluff sends the player hunting a
+                lie the game does not contain. It was also BINARY over a graded
+                mechanic: the call is SHORT ← FLAT → LONG, and §4 keeps the
+                middle on purpose. THE CALL is the game's own name for the beat
+                (the phase, callReadout, the 01 FINAL CALL cell below), and it
+                is true of every deal — which is this headline's whole licence
+                to be the largest type on a panel that withholds the deal. */}
+            <h1>HEAR THE PITCH.<br /><span>MAKE THE CALL.</span></h1>
             <p>One pitch. Three interruptions. Decide whether it deserves your book.</p>
           </div>
           {/* THE PANEL NO LONGER NAMES THE DEAL HERE. A 20px headline, a subtitle
@@ -640,8 +651,8 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               surface={identity ? deal.surface : null}
               ticker={identity ? deal.ticker : null}
               chain={identity ? deal.chain : null}
-              ref={recordRef} shieldRef={shieldRef} clientRef={clientRef}
-              termsRef={termsRef} particularsRef={particularsRef}
+              ref={recordRef} clientRef={clientRef}
+              particularsRef={particularsRef}
               stampRetainedRef={stampRetainedRef}
               coverRef={coverRef} />
           </div>
@@ -666,9 +677,21 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
             <div><b>04</b><span>ANALYSTS</span></div>
             <div><b>01</b><span>FINAL CALL</span></div>
           </div>
+          {/* THE HOUSE RULES, REWRITTEN 2026-08-03 (author: "let's just rewrite
+              the whole section"). Two things were wrong with the old line.
+              SEND WAS A DEAD VERB — [A§11] rejected it for the analysts
+              because they never leave their desks ("that's why 'send' seems
+              weird to me"), and [A§20] recorded it failing on the pitcher's
+              side too; the row header has been ASK A FOLLOW-UP ever since,
+              and this paragraph was the last place still teaching the word.
+              AND IT LED WITH THE INCENTIVE, which is the second-most useful
+              thing on the screen: the FIRST is that the bot's facts are true,
+              because that is the whole shape of the puzzle (VC_GAME §1 —
+              "Every fact stated is true. What you judge is the inference sold
+              on top of it") and the briefing had never said it anywhere. */}
           <p className="pf-directive">
-            The pitch bot is paid only if you fund the deal. Send one analyst
-            per interruption; anything verifiable lands on-screen.
+            Every fact the pitch bot states is true...technically. But is the
+            project viable? Consult with the team and make the final call.
           </p>
           {/* Portraits, not card faces. Not buttons either: on the briefing
               these introduce the four, and the sendable version of the same

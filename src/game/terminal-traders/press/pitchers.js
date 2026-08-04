@@ -99,10 +99,23 @@ export const PITCHER_FALLBACK = "v2";
  * stage itself is loaded dynamically, so three arrives only when a rig that can
  * use it is actually cast.
  */
+/**
+ * `model` — THE SHELL'S PLATE NUMBER, printed on the file's polaroid.
+ *
+ * Body data, not script: §1 rule 6 forbids per-rig PROSE, and a plate number is
+ * the same kind of fact as a portrait or a timbre — which shell turned up. It
+ * is safe to print for the same structural reason the face is: the rig is
+ * rolled before the deal exists and the roll cannot see the archetype or the
+ * branch, so the number correlates with nothing a player could trade on.
+ *
+ * It also satisfies the desk's own rule that a number on screen must be REAL
+ * (see the caseload counter in engagement.jsx): this one identifies the machine
+ * in the room, and swapping rigs changes it.
+ */
 export const PITCHER_IDENTITY = {
-  v1: { portrait: "/pitchBot.webp", voice: "PB", stage: false },
-  v2: { portrait: "/pitchBot2.webp", voice: "PB2", stage: true },
-  v3: { portrait: "/pitchBot3.webp", voice: "PB3", stage: true },
+  v1: { portrait: "/pitchBot.webp", voice: "PB", stage: false, model: "PB-100" },
+  v2: { portrait: "/pitchBot2.webp", voice: "PB2", stage: true, model: "PB-220" },
+  v3: { portrait: "/pitchBot3.webp", voice: "PB3", stage: true, model: "PB-340" },
 };
 
 /** Cached so identity and geometry cannot roll separately within a page load. */
@@ -149,6 +162,12 @@ export function pitcherPortrait(variant = null) {
 /** The staged rig's speaker code for api/counsel-voice. */
 export function pitcherVoice(variant = null) {
   return PITCHER_IDENTITY[resolvePitcherId(variant)]?.voice ?? "PB";
+}
+
+/** The staged shell's plate number. See `model` on PITCHER_IDENTITY. */
+export function pitcherModel(variant = null) {
+  return PITCHER_IDENTITY[resolvePitcherId(variant)]?.model
+    ?? PITCHER_IDENTITY[PITCHER_FALLBACK].model;
 }
 
 /** Can the staged rig be rendered live? See `stage` on PITCHER_IDENTITY. */

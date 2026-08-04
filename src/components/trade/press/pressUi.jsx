@@ -16,7 +16,7 @@ import { VIRGIL } from "@/game/terminal-traders/press/virgil";
  *   • the deck + CTA row swallowed, so the briefing had nothing to press
  *   • claim and answer anchored at the same `bottom`, so they overlapped
  *   • the seat row left ungated, so once a claim was answered every real
- *     control greyed out and the one deliberately-unclickable tile (Eugene)
+ *     control greyed out and the one deliberately-unclickable tile (the cat)
  *     became the brightest thing on screen
  *   • `canPress` defined on one surface and referenced on both
  *
@@ -128,7 +128,7 @@ export function answerNote(flash) {
 
 /**
  * The claim: who's talking, how he's holding up, the spin, the fact under it,
- * whose specialism it is, and Eugene's free read. `count` is optional ("3 / 6")
+ * whose specialism it is, and Virgil's read. `count` is optional ("3 / 6")
  * — mobile shows it because there's no progress rail there.
  */
 export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [], count = null,

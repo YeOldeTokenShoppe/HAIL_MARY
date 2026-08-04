@@ -88,16 +88,17 @@ export function prefersReducedMotion() {
   return !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 }
 
-/* THE TERM. Constant, and deliberately not a number — a percentage invites the
-   player to price the agent's incentive, and the lesson is that its direction is
-   what matters and that direction is never in doubt. */
-export const TERMS = "ONLY IF YOU FUND IT";
+/* THE TERM LEFT THE PAPERWORK (author, 2026-08-03: the bot "shouldn't get
+   paid" on the record — the brief is about the deal, not the courier). The
+   commission itself is untouched canon: the bot discloses it out loud in its
+   pitch opening (PITCH_OPENING in desk.js) and the briefing's directive
+   states it — the places an incentive actually confronts the player. The
+   shield-wake beat went with the portrait; the face's introduction now
+   belongs to the floor, where pressure() drives it. */
 
-const SIGN = 0.50;    // the shield waking
 const TYPE = 0.62;    // the client's name going onto the line
 const STAMP = 0.34;   // the stamps landing
 const REVEAL = 0.42;  // the dossier
-const OPEN = 0.45;    // the cover swinging back
 
 /* THE FILE NUMBER IS THE DESK'S CASELOAD — a persistent local counter, never a
    roll. A random number was cut the day it shipped (author: "does it make
@@ -167,86 +168,14 @@ export function fmtFileNo(n) {
  */
 export const EngagementRecord = React.forwardRef(function EngagementRecord(
   { arrived = false, client = null, surface = null, ticker = null, chain = null,
-    shieldRef = null, clientRef = null, termsRef = null, particularsRef = null,
-    stampRetainedRef = null, coverRef = null, fileNo = null,
+    clientRef = null, particularsRef = null,
+    stampRetainedRef = null, coverRef = null,
+    fileNo = null,
     title = "Engagement Record",
     restStatus = "AVAILABLE", arrivedStatus = "RETAINED",
     stampLabel = "Retained" }, ref) {
-  return (
+  const record = (
     <div className={`eng${arrived ? " in" : ""}`} ref={ref}>
-      {/* THE DEAL FILE. The record ships inside a closed folder, and the folder
-          — not a caption — is what withholds the name: invariant 7 enforced by
-          geometry, so no copy anywhere says SEALED. It replaced the sealed-state
-          overlay (CLIENT // SEALED, the 02 glyph, the INBOUND FILE scan bars,
-          and the readout's second AWAITING REVIEW), which had crept back to five
-          "not yet" signals — the exact count [A§20] records this briefing dying
-          of once already. DEAL FILE, never CASE FILE: case is detective
-          vocabulary and a deal meeting doesn't contain it.
-
-          THE COVER IS ALWAYS MOUNTED. runArrival opens it by ref, and the
-          arrived state is held by CSS (.eng.in .eng-cover) so skipRoll's
-          progress(1), reduced motion, and a re-mount that starts arrived all
-          land closed-case correct without a frame of the wrong state.
-          aria-hidden: the record's own status pill is the one status the
-          accessibility tree carries — same one-signal rule, same place. */}
-      {fileNo != null && (
-        <>
-          {/* THE FILE NUMBER IS REAL (author, 2026-08-03: "does it make sense
-              to have a deal number?" / "if so, a real number?"). A random
-              number was the 02 glyph's failure with more digits —
-              information-shaped, meant nothing, never returned. This one is
-              the desk's caseload: a persistent local counter (peekFileNo /
-              commitFileNo), so replaying shows 001 become 002 and the
-              bureaucracy is honest. Derived from nothing but the counter —
-              structurally unable to see the deal. */}
-          <span className="eng-tab" aria-hidden="true">
-            DEAL FILE // NO. {fmtFileNo(fileNo)}
-            <i className="eng-tab-ticker">{ticker ? ` · ${ticker}` : ""}</i>
-          </span>
-          <div className="eng-cover" ref={coverRef} aria-hidden="true">
-            {/* PROSPECTUS, not DEAL INTAKE (author, 2026-08-03): the cover
-                names the DOCUMENT, not the desk's process — it is what a deal
-                arrives as in this world, and it rhymes with the PROSPECT block
-                the record prints inside. Generic to every deal, so invariant 7
-                is untouched. */}
-            <div className="eng-cover-letter">PROSPECTUS<i /></div>
-            {/* Printed stock, not information — see .eng-cover-ghost. */}
-            <span className="eng-cover-ghost">NO. {fmtFileNo(fileNo)}</span>
-            {/* THE AGENT'S PHOTO, CLIPPED TO THE FILE. The one pictorial element
-                on the cover, and the face the briefing was missing at rest —
-                [A§20] recorded the cipher dying partly because the thing that
-                talks for two minutes had no face on this panel. It is the AGENT,
-                never the client: the same rig-rolled portrait the record wakes,
-                so the clipped photo previews the shield teach and cannot leak
-                the deal. The caption restates desk data, not status. */}
-            {/* NO CLASP. It was here as "one glyph of closed" — a circle with a
-                bar — and the author read it as a strike/prohibited icon
-                (2026-08-03). A glyph that needs explaining is failing, and the
-                folder says closed five other ways now. */}
-            <figure className="eng-cover-badge">
-              <span className="eng-cover-clip" />
-              <img src={PITCH_BOT.portrait} alt="" />
-              <figcaption>PITCH BOT<i>ON COMMISSION</i></figcaption>
-            </figure>
-            {/* RECEIVED IS A STAMP, NOT A LINE — the same fact in physical ink:
-                the file was logged before you got here, which is CHOOSES
-                NOTHING staged as an artifact rather than asserted as copy.
-                NO SOURCE ON THE STAMP: the desk is a non-hierarchical org
-                (author, 2026-08-03) — nothing arrives from "upstairs", it just
-                arrives, already logged. Faded relative to the photo: the stamp
-                landed first, the attachment came after. */}
-            <span className="eng-cover-received">RECEIVED</span>
-            {/* Two routing lines, both affirmative process facts. STATUS is
-                the cover's one waiting line — bronze ink, not gold: see
-                .eng-cover-wait — and the surface's one "not yet"; nothing
-                else here may wait. */}
-            <div className="eng-cover-route">
-              <span>VIA&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// COMMISSIONED AGENT</span>
-              <span className="eng-cover-wait">STATUS&nbsp;&nbsp;&nbsp;// AWAITING REVIEW</span>
-            </div>
-          </div>
-        </>
-      )}
       <div className="eng-head">
         <span className="eng-title">{title}</span>
         {/* THE ONE STATUS LABEL. The console shipped alongside four others —
@@ -257,38 +186,23 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
         <span className="eng-status">{arrived ? arrivedStatus : restStatus}</span>
       </div>
 
-      {/* THREE COLUMNS, ONE DOCUMENT: who is pitching, what they signed, and the
-          particulars of the thing being pitched.
+      {/* TWO COLUMNS, ONE PROJECT DOCUMENT: the name, and the particulars.
 
-          THE PARTICULARS USED TO BE A SECOND BOX (`.ps-sheet`, in the copy column
-          beside this one) and the author caught it immediately: "the pitch project
-          is in 2 separate boxes". It was — the client's NAME was on the record and
-          the client's NUMBERS were in a bordered panel four inches to the right,
-          so one deal arrived as two objects. A record that names a party and then
-          declines to describe it is not a document, it is a layout.
+          THE AGENT BLOCK IS GONE (author, 2026-08-03: "the pitchbot is just an
+          agent, and shouldn't get paid either" / "don't show the pitchbot
+          again"). The portrait, the idents, and the PAID // ONLY IF YOU FUND
+          IT row all left the paperwork — the courier's photo is on the folder,
+          and the commission is DISCLOSED BY THE BOT ITSELF in its pitch
+          opening (PITCH_OPENING in desk.js) and stated in the briefing's
+          directive copy, which are the two places an incentive actually
+          confronts the player. The brief is about the deal.
 
-          Folding them in also deleted the swap cell this panel needed when the
-          dossier lived outside: with the stat rows visible from the start at ——,
-          the blank form covers its own rest state and there is nothing left to
-          cross-fade. See the note on `particulars` in runArrival. */}
+          THE PARTICULARS USED TO BE A SECOND BOX (`.ps-sheet`) and the author
+          caught it immediately: "the pitch project is in 2 separate boxes".
+          With the stat rows visible from the start at ——, the blank form
+          covers its own rest state and nothing needs cross-fading. See the
+          note on `particulars` in runArrival. */}
       <div className="eng-body">
-      <div className="eng-parties">
-        <div className="eng-frame">
-          {/* THE SHIELD. Dim until retained, then lit — an opacity cross-fade and
-              NOT a filter swap, which does not repaint on iOS next to an animated
-              subtree. The lit state is held by `.eng.in` so the timeline's
-              clearProps hands it back to CSS at full. */}
-          <img className="eng-pic" src={PITCH_BOT.portrait} alt="" aria-hidden="true"
-               ref={shieldRef} />
-        </div>
-        <div className="eng-idents">
-          <span className="eng-who">{PITCH_BOT.name.toUpperCase()}</span>
-          <span className="eng-role">ON COMMISSION</span>
-        </div>
-      </div>
-
-      {/* THE CONTRACT LINES. Two, because a third would be restating what the
-          portrait already says — the bot's name is under its own photograph. */}
       <div className="eng-terms">
         <div className="eng-field">
           <span className="eng-label">REPRESENTING</span>
@@ -304,16 +218,6 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
           <div className={`eng-client${client ? " named" : ""}`} ref={clientRef}>
             {client || "————"}
           </div>
-        </div>
-        <div className="eng-field row">
-          <span className="eng-label">PAID</span>
-          {/* GSAP WRITES THIS ONE TOO, for the same reason it writes the client
-              line: the value has to change at the settle, and React's own render
-              of it arrives with `client`. Gated on `client` and not on `arrived`
-              so the two agree — keyed to `arrived` it stayed a dash for the whole
-              back half of the timeline and then popped in unanimated, while the
-              fade played on the placeholder. */}
-          <span className="eng-value" ref={termsRef}>{client ? TERMS : "——"}</span>
         </div>
       </div>
 
@@ -345,22 +249,134 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
       </span>
     </div>
   );
+
+  if (fileNo == null) return record;
+
+  /* THE FOLDER IS THE WHOLE OBJECT (author, 2026-08-03: "let's stop and think
+     of how we should show an outline of the proposal that makes sense
+     visually"). There is no second document and no transition between two
+     materials — the failure every previous attempt shared. Four openings died
+     first (top hinge, book spine, bottom drop, slide-away) and then a dark
+     sheet dropped onto the manila, which read as "a black semi-opaque
+     background over the first version" for a reason no easing could fix: THE
+     VALUE RELATIONSHIP WAS INVERTED. Paper is the bright thing on a dark desk;
+     anything darker laid over lighter stock reads as a scrim, never an object.
+
+     So the cover IS the form. Blank client line and stat rows sit on the
+     manila from the first frame, the arrival types them in, and the stamp
+     lands — which is this slot's oldest doctrine restated on paper: "a blank
+     form is not an empty box, it is a box that tells you what is about to be
+     written in it." Invariant 7 is unchanged: the fields exist at ————, and
+     admitting a deal HAS fields is not naming one. */
+  return (
+    <div className={`eng-file${arrived ? " in" : ""}`} ref={ref}>
+      <div className="eng-file-back" aria-hidden="true" />
+      <div className="eng-cover" ref={coverRef}>
+        {/* PROSPECTUS (author, 2026-08-03): the sheet names the DOCUMENT, not
+            the desk's process, and it is what a deal arrives as in this world.
+            Generic to every deal, so invariant 7 is untouched. */}
+        <div className="eng-cover-letter" aria-hidden="true">PROSPECTUS<i /></div>
+
+        {/* THE AGENT'S ONE APPEARANCE (author: "leave the polaroid of the
+            pitchbot, but then don't show the pitchbot again"). The clipped
+            photo is where the bot lives on paper; nothing else on the file
+            carries its face, and no term pays it — the commission is disclosed
+            aloud in the pitch opening and in the briefing's directive, which
+            are the places an incentive actually confronts the player. */}
+        <figure className="eng-cover-badge" aria-hidden="true">
+          <span className="eng-cover-clip" />
+          <img src={PITCH_BOT.portrait} alt="" />
+          {/* THE PLATE NUMBER, not a job description (author, 2026-08-03).
+              ON COMMISSION was the third place the briefing stated the
+              commission and the only one that couldn't argue it — the
+              directive says it in a sentence and the bot says it out loud in
+              its opening. What a photo caption on a file carries is WHICH
+              MACHINE this is: per-rig data, rolled before the deal exists. */}
+          <figcaption>
+            <i>PRESENTED BY</i>PITCH BOT {PITCH_BOT.model}
+          </figcaption>
+        </figure>
+
+        {/* RECEIVED IS A STAMP, NOT A LINE — the same fact in physical ink:
+            the file was logged before you got here, which is CHOOSES NOTHING
+            staged as an artifact rather than asserted as copy. NO SOURCE ON
+            THE STAMP: the desk is a non-hierarchical org (author) — nothing
+            arrives from anywhere above, it just arrives, already logged. */}
+        <span className="eng-cover-received" aria-hidden="true">RECEIVED</span>
+
+        {/* THE FORM. Cleared of the polaroid by its own right padding, never
+            by a magic offset — the photo shrinks with the container and the
+            padding tracks the same clamp. */}
+        <div className="eng-form">
+          <span className="eng-label">REPRESENTING</span>
+          {/* THE REVEAL LANDS HERE, the largest type on the file, because a
+              name belongs on the document rather than in a paragraph beside
+              it. Two lines are reserved at all widths: LANTERN WORKS wraps and
+              ALDERMAN doesn't, and a form that grows a line mid-signature
+              shunts the particulars below it. */}
+          <div className={`eng-client${client ? " named" : ""}`} ref={clientRef}>
+            {client || "————"}
+          </div>
+
+          {/* THE PARTICULARS. Every field is public surface data and none of it
+              correlates with the outcome — asserted in the suite, because the
+              moment the listing leaks the answer the analysts stop mattering.
+              Dimmed until the file is signed, then up to full WITH the values,
+              so the reveal is the form being COMPLETED rather than a panel
+              appearing. */}
+          <div className="eng-particulars" ref={particularsRef}>
+            <div className="eng-part-h">
+              PROSPECT{ticker && chain ? ` · ${ticker} · ${chain}` : ""}
+            </div>
+            <dl className="eng-stats">
+              <div><dt>MCAP</dt><dd>{surface?.mcap ?? "——"}</dd></div>
+              <div><dt>HOLDERS</dt><dd>{surface?.holders ?? "——"}</dd></div>
+              <div><dt>AGE</dt><dd>{surface?.age ?? "——"}</dd></div>
+              <div><dt>24H</dt><dd>{surface?.change24h ?? "——"}</dd></div>
+              <div><dt>SOCIAL</dt><dd>{surface?.social ?? "——"}</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        {/* Two routing lines, both affirmative process facts. STATUS is the
+            file's one waiting line and the surface's one "not yet" — and it
+            dies the frame the stamp lands, the same handover the status pill
+            had, for the same reason: two statuses on one document is a
+            surface that has hung. */}
+        <div className="eng-cover-route">
+          <span>VIA&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// COMMISSIONED AGENT</span>
+          <span className="eng-cover-wait">STATUS&nbsp;&nbsp;&nbsp;// AWAITING REVIEW</span>
+        </div>
+
+        {/* ONE STAMP, on the file itself. There is one document now, so there
+            is one impression — the second (on the old dark record) went with
+            the record. */}
+        <span className="eng-cover-stamp" ref={stampRetainedRef} aria-hidden={!arrived}>
+          {stampLabel}
+        </span>
+      </div>
+
+      {/* THE FILE NUMBER IS REAL (author: "does it make sense to have a deal
+          number?" / "if so, a real number?"). A random number was the 02
+          glyph's failure with more digits — information-shaped, meant nothing,
+          never returned. This is the desk's caseload: a persistent local
+          counter (peekFileNo / commitFileNo), so replaying shows 001 become
+          002 and the stationery is honest. */}
+      <span className="eng-tab" aria-hidden="true">
+        DEAL FILE // NO. {fmtFileNo(fileNo)}
+      </span>
+    </div>
+  );
 });
 
 /**
  * Play the arrival.
  *
  * @param record       the EngagementRecord element
- * @param shield       the agent's portrait (wakes)
  * @param client       the client-name node (typed in place)
  * @param clientText   what it types TO
- * @param terms        the PAID value node
  * @param stampRetained RETAINED, on the record
  * @param particulars  the prospect block inside the record (dim -> full)
- * @param cover        the deal-file cover (swings open on its top hinge, then
- *                     display:none — the arrived state is held by .eng.in).
- *                     Omitting it collapses `lead` to 0 and reproduces the
- *                     pre-folder timeline offsets exactly.
  * @param onSettled    () => void — signed; safe to name the deal
  * @param onDone       () => void — the record has finished filling in
  *
@@ -376,8 +392,8 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
  * one frame after it finished.
  */
 export function runArrival({
-  record, shield, client, clientText, terms, stampRetained,
-  particulars, cover, onSettled, onDone,
+  record, client, clientText, stampRetained,
+  particulars, onSettled, onDone,
 }) {
   if (!record && !particulars && !client) return null;
 
@@ -406,48 +422,17 @@ export function runArrival({
       // force3D default stamps translate3d(0,0,0) on every target, so an
       // opacity-only tween still leaves a promoted layer behind. Verified in the
       // DOM after a completed arrival, 2026-07-29.
-      if (shield) gsap.set(shield, { clearProps: "opacity,transform,willChange" });
       if (stampRetained) gsap.set(stampRetained, { clearProps: "opacity,transform,willChange" });
-      // The cover's arrived state is display:none, held by .eng.in — clearing
-      // display here is what makes that true: the timeline's own set() below
-      // wrote it inline, and an inline display outlives the session while the
-      // class-held one resets with the next mount.
-      if (cover) gsap.set(cover, { clearProps: "opacity,transform,transformOrigin,willChange,display" });
       onDone?.();
     },
   });
 
-  // THE FILE OPENS FIRST — the cover swings back on its top hinge and the blank
-  // record is simply THERE, already on the desk. Nothing about the open may
-  // read as a draw: the folder reveals a form that was under it all along,
-  // which is the paperwork fiction doing what the five dead props in this slot
-  // couldn't. transformPerspective on the tween keeps the 3D local to the
-  // cover — no perspective property lands on .eng, so nothing else in the
-  // record gains a containing block or a composited layer it didn't have.
-  // Everything downstream is offset by `lead`; with no cover the offsets are
-  // exactly the pre-folder timeline.
-  const lead = cover ? OPEN + 0.05 : 0;
-  if (cover) {
-    tl.to(cover, {
-      rotateX: -104, transformPerspective: 900, transformOrigin: "50% 0%",
-      duration: OPEN, ease: "power2.inOut", willChange: "transform",
-    }, 0.05);
-    // The fade rides the back 40% of the swing so no backface handling is
-    // needed; display:none the moment it lands drops the composited layer —
-    // this beat plays over the live WebGL room (see the lag-smoothing note).
-    tl.to(cover, { opacity: 0, duration: OPEN * 0.4, ease: "power1.in" }, 0.05 + OPEN * 0.6);
-    tl.set(cover, { display: "none" }, 0.05 + OPEN);
-  }
-
-  // THE SHIELD WAKES as the cover clears it — and this is the beat's tutorial:
-  // the face is a screen, and for the next four minutes it reads pressure().
-  // Nothing else in the game gets to introduce it for free. Opening the file is
-  // what wakes the agent clipped to it, which is why the overlap (the wake
-  // starts on the swing's last frames) reads as cause rather than coincidence.
-  if (shield) {
-    tl.fromTo(shield, { opacity: 0.26, willChange: "opacity" },
-      { opacity: 1, duration: SIGN, ease: "power2.out" }, Math.max(0, lead - 0.10));
-  }
+  // NO OPENING BEAT AND NO SECOND OBJECT (2026-08-03). The file's own fields
+  // are what fill in, so the timeline is exactly what it was before the folder
+  // existed: the name types onto the line, the stamp lands after it, the
+  // particulars complete. Four openings and a dropped sheet died to get back
+  // here — see the note on the folder in EngagementRecord for why.
+  const lead = 0;
 
   // THE NAME GOES ONTO THE LINE — typed, not scrambled. A random-letter resolve
   // was the cipher's own effect and has no motive once the machine is gone; a name
@@ -467,20 +452,6 @@ export function runArrival({
   }
 
   const settledAt = lead + 0.10 + (client && clientText ? TYPE : 0);
-
-  // The term arrives just before the stamps, so it is read as part of the deal
-  // being struck rather than as a footnote to it.
-  if (terms) {
-    // immediateRender:false OR THE PLACEHOLDER VANISHES AT t=0. A fromTo renders
-    // its `from` state the moment the timeline is BUILT, not when the tween
-    // starts, so opacity:0 landed half a second before onStart wrote the term —
-    // the PAID row simply went blank in between. The other fromTos here are safe
-    // from it only because their `from` values already match the CSS at rest.
-    tl.fromTo(terms, { opacity: 0 }, {
-      opacity: 1, duration: 0.3, ease: "power1.out", immediateRender: false,
-      onStart: () => { terms.textContent = TERMS; },
-    }, Math.max(0, settledAt - 0.22));
-  }
 
   tl.call(() => { playSfx(SFX.settle, { volume: 0.4 }); onSettled?.(); }, null, settledAt);
 
@@ -670,7 +641,11 @@ export const ENGAGEMENT_CSS = `
    replaced carried the same property for the same reason. The flat surface's
    skip lives on an ancestor and only works because clicks pass through here. */
 .eng-cover{
-  position:absolute; inset:0; z-index:5; pointer-events:none;
+  /* IN FLOW, not absolute: with the record gone the cover is the only thing
+     that can give the file its height. The back panel sits absolute behind
+     it, so the wrapper's padding still shows as the folder's rim. */
+  position:relative; z-index:5; pointer-events:none;
+  padding:16px 16px 46px; min-height:150px;
   /* MANILA, FOR REAL (author, 2026-08-03: "beige manila color") — noir manila:
      desaturated a step and scanlit so it sits in the dark room instead of
      glowing out of it. The one warm paper object on a teal terminal; every ink
@@ -691,27 +666,18 @@ export const ENGAGEMENT_CSS = `
   content:""; position:absolute; inset:0; pointer-events:none;
   background:repeating-linear-gradient(0deg,rgba(11,22,20,.05) 0 1px,transparent 1px 3px);
 }
-/* THE GHOST NUMBER — printed stock, not information. On the wide desktop cover
-   the empty middle read as unrendered rather than restrained (author,
-   2026-08-03), and what a real folder carries there is printed material: the
-   cover's one identity fact, oversized and embossed (~12% dark ink with a 7%
-   stroke — see the declaration). It repeats the tab, so it says nothing new —
-   filling, never signalling — and it cannot leak (the number is the desk's
-   caseload counter, derived from nothing but itself). A CONTAINER query, not a
-   media query: the record consults its own width, per the no-MQ rule (two
-   surfaces, one record), and the ghost exists only where the cover has room —
-   the narrow portrait folder already composes without it. */
-.eng{ container-type:inline-size; }
-.eng-cover-ghost{
-  position:absolute; left:45%; top:50%; transform:translate(-50%,-50%);
-  font-family:'Bebas Neue', Impact, sans-serif;
-  font-size:clamp(60px, 14cqw, 128px); line-height:1; letter-spacing:.06em;
-  color:rgba(36,28,8,.12);
-  -webkit-text-stroke:1px rgba(36,28,8,.07);
-  pointer-events:none; user-select:none; white-space:nowrap;
-  display:none;
-}
-@container (min-width: 520px){ .eng-cover-ghost{ display:block; } }
+/* THE FILE IS THE QUERY CONTAINER, and --badge-w is the photo's width as ONE
+   number: the stamps clear the photo by measuring it, and the form's right
+   padding clears it the same way, so nothing is a magic offset that drifts
+   when the photo resizes. cqw is declared on .eng-cover, not on .eng-file —
+   container units on the container element itself resolve against an ANCESTOR
+   container, which silently falls back to the viewport. */
+.eng-file{ container-type:inline-size; }
+.eng-cover{ --badge-w:clamp(96px, 31cqw, 150px); }
+
+/* THE GHOST NUMBER IS GONE (2026-08-03). It existed to fill an empty middle —
+   the file's middle is the form now, and a watermark under live values is
+   noise the tab already prints. */
 
 /* THE CLIPPED PHOTO. The matte is deliberately the brightest surface on the
    closed file — the face is the point, and a pale print on dark stock is how a
@@ -724,7 +690,7 @@ export const ENGAGEMENT_CSS = `
      cover's top edge and the clip grips across it — attached TO the folder
      (author, 2026-08-03), the way a paperclip actually holds a photo. */
   position:absolute; right:8%; top:-9px; z-index:2;
-  width:clamp(104px, 18cqw, 150px); margin:0; padding:5px 5px 0;
+  width:var(--badge-w); margin:0; padding:5px 5px 0;
   background:rgba(234,255,249,.92);
   transform:rotate(2.5deg);
   box-shadow:0 7px 18px rgba(0,0,0,.6);
@@ -734,12 +700,14 @@ export const ENGAGEMENT_CSS = `
   background:#031311;
 }
 .eng-cover-badge figcaption{
-  padding:4px 2px 5px; text-align:center;
-  font-size:7px; font-weight:bold; letter-spacing:.14em; color:#0b1614;
+  padding:4px 2px 5px; text-align:center; text-wrap:balance;
+  font-size:7.5px; font-weight:bold; letter-spacing:.1em; color:#0b1614;
 }
+/* The credit line above the plate — lighter and smaller, so the caption reads
+   as one photo credit rather than two labels. */
 .eng-cover-badge figcaption i{
-  display:block; margin-top:2px; font-style:normal;
-  font-size:5.5px; letter-spacing:.12em; color:rgba(11,22,20,.62);
+  display:block; margin-bottom:2px; font-style:normal; font-weight:normal;
+  font-size:5.8px; letter-spacing:.16em; color:rgba(11,22,20,.6);
 }
 /* One paperclip, drawn: an outlined loop over the photo's top edge. */
 .eng-cover-clip{
@@ -758,9 +726,8 @@ export const ENGAGEMENT_CSS = `
 }
 /* The arrived state is CLOSED-CASE CSS, not a leftover inline style: skipRoll's
    progress(1), reduced motion, and an arrived re-mount all land here. */
-.eng.in .eng-cover{ display:none; }
 .eng-cover-letter{
-  padding:18px 16px 0;
+  padding:0;
   font-family:'Bebas Neue', Impact, sans-serif;
   font-size:15px; letter-spacing:.14em; color:#241c08; font-weight:400;
 }
@@ -769,6 +736,7 @@ export const ENGAGEMENT_CSS = `
   background:rgba(36,28,8,.35);
 }
 /* The clasp glyph is gone — see the render site. */
+
 .eng-cover-route{
   position:absolute; left:16px; bottom:14px;
   display:flex; flex-direction:column; gap:4px;
@@ -781,7 +749,7 @@ export const ENGAGEMENT_CSS = `
    Half-faded so the fresh attachments (photo, manila tab) read as newer than
    the print under them. */
 .eng-cover-received{
-  position:absolute; left:34%; top:20px;
+  position:absolute; right:calc(8% + var(--badge-w) + 14px); top:20px;
   transform:rotate(-8deg);
   font-family:'Bebas Neue', Impact, sans-serif;
   font-size:21px; line-height:1; letter-spacing:.16em; white-space:nowrap;
@@ -793,8 +761,23 @@ export const ENGAGEMENT_CSS = `
    most of the word occluded at every phone width. Below the ghost's own
    threshold the stamp moves to the clear band under the letterhead instead of
    shrinking into illegibility. */
+/* NARROW: THE STAMPS GET THEIR OWN BAND AT THE FOOT. Right-anchoring clears
+   the photo but drops them onto the name and the stats — the reveal and the
+   data — because a narrow cover has no free middle. So the file grows a
+   stamp band instead: both impressions side by side under the form, above
+   the routing lines, which is where a clerk stamps a page anyway. */
 @container (max-width: 519px){
-  .eng-cover-received{ left:16px; top:52px; }
+  .eng-cover{ padding-bottom:92px; }
+  .eng-cover-received{
+    right:auto; left:16px; top:auto; bottom:52px;
+    font-size:17px; padding:4px 9px;
+  }
+}
+/* Squeezed containers (a narrowed desktop pane, not a phone — the flat surface
+   never gets this thin): the badge's 104px floor starts eating the letterhead
+   and the relocated stamp below ~300px, so both step down once. */
+@container (max-width: 299px){
+  .eng-cover-received{ font-size:16px; border-width:1.5px; padding:4px 9px; }
 }
 /* THE ONE WAITING LINE — the surface's single "not yet", in dark bronze:
    gold's voice as ink (bright #ffd23a vanishes on beige, and the lighter
@@ -803,9 +786,80 @@ export const ENGAGEMENT_CSS = `
    fact: number, letterhead, received, via, photo, pages. */
 .eng-cover-wait{ color:#443305; }
 
-/* THE TAB — the folder's handle, riding the record's top edge so it survives the
-   open (the cover leaves; the file stays). Lives in the shell's top padding on
-   both surfaces. At the settle it takes the ticker and becomes the deal's handle
+/* THE WRAPPER holds the folder's geometry; THE BACK LAYER holds its manila.
+   Split on purpose: the record inside never moves, so when the file is FILED
+   the boards leave without it — the cover and tab slide off, this layer fades,
+   and the wrapper keeps its box so nothing reflows. NO clip-path on either —
+   the tab and the polaroid's paperclip poke above this box, and a polygon
+   would shear them; the cover carries the corner-cut language. */
+.eng-file{
+  position:relative;
+  padding:14px 12px 12px;
+}
+.eng-file-back{
+  position:absolute; inset:0; z-index:0;
+  background:linear-gradient(170deg,#c9b47f,#96794a 75%);
+  border:1px solid rgba(59,44,12,.6);
+  box-shadow:inset 0 1px 0 rgba(238,232,214,.25), 0 8px 20px rgba(0,0,0,.45);
+}
+/* THE FORM, printed on the file. Right padding clears the polaroid and tracks
+   the same clamp the photo uses, so nothing collides at any container width.
+   Every ink is DARK — this is print on beige stock, and the terminal's bright
+   accents vanish here (the tab-label lesson). */
+.eng-form{
+  position:relative; z-index:2; margin-top:15px;
+  padding-right:calc(var(--badge-w) + 20px);
+}
+.eng-form .eng-label{ color:#8c2b52; }
+.eng-form .eng-client{
+  margin-top:5px; min-height:2.3em;
+  font-size:clamp(17px, 3.4cqw, 23px); font-weight:bold; line-height:1.12;
+  letter-spacing:.02em; color:rgba(36,28,8,.32); overflow-wrap:anywhere;
+}
+.eng-form .eng-client.named{ color:#1c1505; }
+.eng-form .eng-particulars{ margin-top:13px; opacity:.45; }
+.eng-file.in .eng-form .eng-particulars{ opacity:1; }
+.eng-form .eng-part-h{
+  color:#8c2b52; padding-bottom:6px;
+  border-bottom:1px solid rgba(36,28,8,.28);
+}
+.eng-form .eng-stats{
+  margin-top:8px; display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:3px 20px;
+}
+.eng-form .eng-stats > div{ display:flex; align-items:baseline; gap:8px; }
+.eng-form .eng-stats dt{ width:58px; color:rgba(36,28,8,.58); }
+.eng-form .eng-stats dd{ color:#1c1505; }
+/* One document, one impression: the stamp's landed state is class-held so
+   skipRoll, reduced motion and arrived re-mounts all show it without a
+   timeline — and the STATUS line dies the same frame, no transition, the
+   handover rule the status pill used to carry. */
+.eng-file.in .eng-cover-stamp{ opacity:1; transform:rotate(-6deg) scale(1); }
+.eng-file.in .eng-cover-wait{ opacity:0; }
+
+/* THE APPROVAL STAMP, on the cover — SAME STYLE AND PLACEMENT FAMILY AS
+   RECEIVED (author, 2026-08-03): identical metrics, struck just below it at a
+   slightly different angle, the way the same desk stamps the same document
+   twice. Only the ink differs — mint is MEETING SET's, pink is intake's. */
+.eng-cover-stamp{
+  position:absolute; right:calc(8% + var(--badge-w) + 14px); top:58px; z-index:3;
+  transform:rotate(-6deg) scale(1.35);
+  font-family:'Bebas Neue', Impact, sans-serif;
+  font-size:21px; line-height:1; letter-spacing:.16em; text-transform:uppercase;
+  color:rgba(46,143,107,.8);
+  border:2px solid currentColor; border-radius:2px; padding:5px 12px;
+  opacity:0; pointer-events:none; white-space:nowrap;
+}
+@container (max-width: 519px){
+  .eng-cover-stamp{
+    left:auto; right:16px; top:auto; bottom:52px;
+    font-size:17px; padding:4px 10px;
+  }
+}
+
+/* THE TAB — cut from the back panel it rides on, so it survives the open (the
+   cover leaves; the folder stays). Lives in the shell's top padding on both
+   surfaces. At the settle it takes the ticker and becomes the deal's handle
    for the rest of the session. */
 .eng-tab{
   position:absolute; top:-17px; left:12px; z-index:6; pointer-events:none;
@@ -825,8 +879,7 @@ export const ENGAGEMENT_CSS = `
 /* The ticker pops with the settle, the same frame as the stamp — the stamp
    scaling in is the motion at that instant, so the tab gets no transition of its
    own (the pill/stamp handover rule, for the same frame-drop reason). */
-/* #053a36, not #0e6b64: the lighter teal measured ~3.1:1 on the manila tab —
-   below AA at 11px. This one clears 4.5:1 across the tab's whole gradient. */
-.eng-tab-ticker{ font-style:normal; color:#053a36; opacity:0; }
-.eng.in .eng-tab-ticker{ opacity:1; }
+/* The tab's ticker mechanic is GONE (2026-08-03): the tab is filed away with
+   the boards before the settle, so a ticker on it would never be seen. The
+   brief's own header carries the deal's name from the settle on. */
 `;
