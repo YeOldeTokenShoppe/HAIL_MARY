@@ -3,7 +3,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDeal";
 import { BACKING, PITCHER, SEATS, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
 import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitchOpening, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
-import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
+import { VIRGIL, virgilRead, briefing,
+         afterAnswer as virgilAfterAnswer } from "@/game/terminal-traders/press/virgil";
+import { briefingMode, markBriefingSeen } from "@/lib/trade/briefingSeen";
 import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
@@ -12,7 +14,7 @@ import {
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
-import { speakVirgilLine, stopVirgilLine, VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
+import { speakVirgilLine, stopVirgilLine, faceVirgilFront, VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
 import { seatHasHostFace, speakSeatOnTempleHost, warmSeatHostFace } from "@/lib/trade/seatVoice";
 import SitePalPortalTile from "./SitePalPortalTile";
 import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
@@ -220,6 +222,40 @@ export default function PressSession({
   const [opened, setOpened] = useState(false);
   const floorLive = onFloor && opened;
 
+  /* ---- the briefing, which comes BEFORE the opening ----
+
+     Virgil explains the house rules — six claims, three follow-ups, one deep
+     check each, what the slider does — and then the bot pitches. It is the same
+     three-state seam as the opening (playing / finished / handed on) and it
+     reuses OpeningBody, so the two beats cannot drift on reveal or skip.
+
+     WHY IT PLAYS ON THE FLOOR rather than on the arrival panel, where a tutorial
+     more obviously belongs: his mouth is a SitePal player that only mounts with
+     the floor (see the .ps-virgil block), so anywhere earlier he speaks with no
+     face. The bot is staged and silent for these ~50 seconds, which reads as it
+     waiting its turn.
+
+     RESOLVED IN AN EFFECT, NOT IN THE INITIALISER. briefingMode() reads
+     localStorage and the query string; running that during render would give the
+     server a different answer than the client. Until it resolves `briefLines` is
+     empty and the effect below no-ops, which costs nothing — the floor is behind
+     a click and this settles on mount. */
+  const [briefMode, setBriefMode] = useState(null);
+  const [briefAt, setBriefAt] = useState(-1);
+  const [briefDone, setBriefDone] = useState(false);
+  // `briefed` is the OPENING'S gate: the bot may not start until the cat is done
+  // or has been waved off. It starts false and the "off" mode flips it on mount.
+  const [briefed, setBriefed] = useState(false);
+  const briefLines = useMemo(
+    () => (briefMode && briefMode !== "off" ? briefing(briefMode === "short") : []),
+    [briefMode]);
+
+  useEffect(() => {
+    const m = briefingMode();
+    setBriefMode(m);
+    if (m === "off") setBriefed(true);
+  }, []);
+
   /* ---- the evidence screen ----
      We don't own a texture. VideoScreens already owns the seat's mesh, canvas
      and material; we borrow the canvas through the EvidenceScreens handshake
@@ -399,6 +435,16 @@ export default function PressSession({
     if (!floorLive || !claim) return;
     sayTurn(
       [
+        /* IT SAYS WHAT THE POINT IS BEFORE IT ARGUES IT. The turn used to open
+           on `claim.spin` — so however well the column read, what you HEARD was
+           still an inference with nothing in front of it ("i got the same
+           unadorned claim", author 2026-08-04). Printing the lead and not
+           speaking it fixed the page and left the performance exactly as it was.
+           Its own part rather than a longer string: the mouth, the dwell floor
+           and the skip token all work per utterance, and one 200-character line
+           would hold the camera through a single unbroken breath. sayTurn drops
+           parts with no text, so a slot without a lead is a no-op here. */
+        { voice: VOICE, text: claim.lead, agent: PITCHER_AGENT },
         { voice: VOICE, text: claim.spin, agent: PITCHER_AGENT },
         /* NO `agent` ON HIS PART, deliberately — the one exception to this
            file's THE CAMERA FOLLOWS THE VOICE rule, and the rule's own logic is
@@ -412,6 +458,12 @@ export default function PressSession({
         // leadMs: he waits for the bot to finish and THEN says his piece. Same
         // number on both surfaces, for the same reason the tip is.
         { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", leadMs: VIRGIL_BEAT_MS, minMs: 700 },
+        /* THEN WHAT YOU CAN DO ABOUT IT. Its own part, following his read with a
+           short beat rather than the full VIRGIL_BEAT_MS — that constant is the
+           gap between two DIFFERENT speakers ("somebody having listened and then
+           answered"), and this is the same cat carrying on, so the same pause
+           would read as him losing his thread. See nextMove in virgil.js. */
+        { voice: VIRGIL.voice, text: virgil?.nextMove, leadMs: 500, minMs: 700 },
       ],
     );
     return () => { try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {} try { stopUnicornBeat(); } catch {} };
@@ -584,8 +636,36 @@ export default function PressSession({
      can end early — SKIP and unmount — are handled by skipOpening and by the
      unmount effect below. Adding one here would race the claim effect, which
      starts speaking in the same commit that `opened` flips. */
+  /* ---- the cat briefs you first ----
+     Same shape as the opening effect below, and gated so only one of the two can
+     ever be speaking: this one runs while `briefed` is false, that one refuses to
+     start until it is true.
+
+     THE LEAD IS NOT DECORATION. Virgil is now the FIRST voice of the session, and
+     his SitePal player takes a second or two to boot after the floor mounts — the
+     tile used to get the bot's whole opening as runway. speakVirgilLine falls back
+     to plain audio on its own if the portal isn't up, so the worst case is a line
+     read with a still face rather than silence, but a beat here usually avoids
+     spending the worst case on the very first thing the player hears. */
   useEffect(() => {
-    if (!onFloor || opened || !openingLines.length) return;
+    if (!onFloor || briefed || !briefLines.length) return;
+    let alive = true;
+    (async () => {
+      await sayTurn(
+        briefLines.map((text, i) => ({
+          voice: VIRGIL.voice, text, seat: VIRGIL.id,
+          ...(i === 0 ? { leadMs: VIRGIL_BEAT_MS } : null),
+        })),
+        { onPart: (i) => { if (alive) setBriefAt(i); }, dwell: readDwellMs });
+      if (alive) setBriefDone(true);
+    })();
+    return () => { alive = false; };
+  }, [onFloor, briefed, briefLines, sayTurn]);
+
+  useEffect(() => {
+    // `briefed` joins the guard: the bot waits for the cat to finish or be
+    // waved off. With ?brief=off it is already true on the first frame.
+    if (!onFloor || !briefed || opened || !openingLines.length) return;
     let alive = true;
     (async () => {
       await sayTurn(
@@ -597,7 +677,7 @@ export default function PressSession({
       if (alive) setOpeningDone(true);
     })();
     return () => { alive = false; };
-  }, [onFloor, opened, openingLines, sayTurn]);
+  }, [onFloor, briefed, opened, openingLines, sayTurn]);
 
   // Impatience is a legitimate input here as much as on the arrival (skipRoll).
   // Bumping the token is what supersedes the chain in flight — its `finally` then
@@ -618,6 +698,38 @@ export default function PressSession({
   // THE GATE ITSELF. Flipping `opened` is what starts the first claim — the claim
   // effect below fires on `floorLive` — so the pitch now begins inside a click.
   const beginPitch = useCallback(() => setOpened(true), []);
+
+  /* THE BRIEFING'S TWO EXITS. Both mark it seen: skipping is still a decision
+     ABOUT the briefing, and a player who waves it off does not want it again next
+     time. Skip supersedes the chain in flight (the token bump) and clears
+     `speaking` by hand, exactly as skipOpening does — its `finally` declines to
+     touch state once superseded. */
+  const skipBrief = useCallback(() => {
+    sayToken.current++;
+    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
+    setSpeaking(false);
+    setBriefDone(true);
+    setBriefed(true);
+    markBriefingSeen();
+  }, []);
+
+  const beginBrief = useCallback(() => { setBriefed(true); markBriefingSeen(); }, []);
+
+  /* REPLAY. Only offered before the pitch has the floor — see the note on
+     VirgilRead's onReplayBrief for why. Rewinds the beat rather than calling the
+     effect: setting `briefed` false is what re-arms its guard. Always the LONG
+     version; a player asking for the rules again wants the rules, not the
+     one-line reminder they have evidently just failed to act on. */
+  const replayBrief = useCallback(() => {
+    sayToken.current++;
+    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
+    try { stopUnicornBeat(); } catch {}
+    setSpeaking(false);
+    setOpeningAt(-1); setOpeningDone(false);
+    setBriefAt(-1); setBriefDone(false);
+    setBriefMode("long");
+    setBriefed(false);
+  }, []);
 
   /* ---- actions ---- */
   // The board updates when the reporter STOPS, not when you press — so the beat
@@ -707,6 +819,23 @@ export default function PressSession({
       else board?.stayBlack();
 
       setFlash((f) => (f && f.id === owed ? { ...f, stage: "choice" } : f));
+
+      /* THEN THE CAT CLOSES THE BEAT. The exchange is over and nothing said so
+         — see afterAnswer in virgil.js. A fresh sayTurn is safe here because the
+         chain above has already resolved; if the player presses on while he is
+         talking, the token bump supersedes him, which is the correct outcome.
+         Gated on `tips` like his other two voices: muted means muted. */
+      /* `tips` and `lastClaim` are declared below this callback, and reading
+         them here is safe for the reason the claim effect gives for the same
+         thing: the body only ever runs after the commit, by which point every
+         const in the component scope is initialised. */
+      if (tips) {
+        sayTurn([{
+          voice: VIRGIL.voice,
+          text: virgilAfterAnswer({ lastClaim, index: run.claimIndex }),
+          leadMs: VIRGIL_BEAT_MS, minMs: 700,
+        }]);
+      }
     });
   }, [run, deal, claim, floorLive, sayTurn]);
 
@@ -810,19 +939,29 @@ export default function PressSession({
   // pointing at them is the same wrong instruction the lane band was giving.
   // VIRGIL, not a seat. `tips` is the player's — the agenda half ignores it.
   const [tips, setTips] = useState(true);
+  // DECLARED ABOVE THE MEMO THAT READS IT. It used to sit further down with the
+  // other derived flags, which was fine until Virgil's nudge needed it — a
+  // useMemo dependency array is evaluated during render, so a `const` below it
+  // is a temporal-dead-zone crash rather than a stale value.
+  const lastClaim = run.claimIndex >= deal.claims.length - 1;
   const virgil = useMemo(
     () => (claim ? virgilRead(claim, {
       owner: laneOwner(claim), spent: run.advisersSpent,
       remaining: outlook.remaining, tips,
+      // The nudge needs the budget so it cannot tell you to spend a follow-up
+      // you no longer have, and the index so it rotates. See nextMove.
+      pressesLeft: run.pressesLeft, index: run.claimIndex,
+      // Once this claim has an outcome the nudge has to stop offering a press.
+      answered: !!run.outcomes[claim.id], lastClaim,
     }) : null),
-    [claim, run.advisersSpent, outlook.remaining, tips]);
+    [claim, run.advisersSpent, outlook.remaining, tips, run.pressesLeft, run.claimIndex,
+     run.outcomes, lastClaim]);
   const readout = useMemo(() => callReadout(slider), [slider]);
   const read = useMemo(() => coverageScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
   // Both derived from pressUi/pressRun rather than restated here — restating
   // them per surface is exactly how the two presentations drifted apart.
   const live = pressIsLegal(run, claim);
-  const lastClaim = run.claimIndex >= deal.claims.length - 1;
   // His panel shows only while HE has the audio — not merely while somebody does.
   const speakingVirgil = speaking && speakingAs === VIRGIL.voice;
 
@@ -965,6 +1104,7 @@ export default function PressSession({
               surface={identity ? deal.surface : null}
               ticker={identity ? deal.ticker : null}
               chain={identity ? deal.chain : null}
+              sector={identity ? deal.sector : null}
               ref={recordRef} clientRef={clientRef}
               particularsRef={particularsRef}
               stampRetainedRef={stampRetainedRef}
@@ -1170,7 +1310,20 @@ export default function PressSession({
               them one element is what stops the block moving when claim 1
               replaces the remarks, which the old comment here only claimed. */}
           <div className="ps-readcol">
-            {!opened ? (
+            {!briefed ? (
+              /* THE CAT FIRST. Not quoted — he is talking to you, where the bot
+                 is being quoted at you. */
+              <div className="ps-fade in">
+                <OpeningBody lines={briefLines} at={briefAt} onSkip={skipBrief}
+                             done={briefDone}
+                             onBegin={briefDone ? beginBrief : null}
+                             who={VIRGIL.name} kicker="— the house rules"
+                             skipLabel="SKIP THE RULES ▸"
+                             beginLabel="◉ READY — BRING IN THE PITCH BOT ▸"
+                             cue="▼ PRESS THIS TO START THE PITCH"
+                             quoted={false} subtitle />
+              </div>
+            ) : !opened ? (
               <div className="ps-fade in">
                 <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening}
                              done={openingDone}
@@ -1239,7 +1392,23 @@ export default function PressSession({
               player, which is the several-second stall this placement exists to
               hide. */}
           {VIRGIL.sitepal && (
-            <div className={`ps-virgil${speakingVirgil ? " on" : ""}`}>
+            /* HE IS THE BEAT WHILE HE IS BRIEFING YOU, and a thumbnail while he
+                is working. `lead` is on until the pitch takes the floor.
+
+                The tile was 104px square for the whole sitting, which is right
+                for a cat commenting on somebody else's claim and wrong for the
+                one stretch where he IS the screen. He guides by VOICE, and a
+                voice coming out of a 104px thumbnail beside a wall of text does
+                not read as being guided by anyone (author, 2026-08-04: "virgil
+                has the talking screen. Let's tighten the view/enlarge him so we
+                can see him better"). Large and centred while he talks you in;
+                back to a working tile the moment claim 1 lands and the column
+                needs its width for his read.
+
+                THE ELEMENT DOES NOT MOVE IN THE TREE — see the note above. Only
+                its class changes, so the player is never re-parented and never
+                reboots. */
+            <div className={`ps-virgil${speakingVirgil ? " on" : ""}${opened ? "" : " lead"}`}>
               <span className="ps-virgil-feed">
                 {/* No `active` — it defaults true and the tile is meant to be
                     seen for the whole sitting. Passing speakingVirgil here is
@@ -1249,6 +1418,18 @@ export default function PressSession({
                   id={VIRGIL_PORTAL_ID}
                   sitepal={VIRGIL.sitepal}
                   still={VIRGIL.portrait}
+                  /* TIGHTER WHILE HE LEADS. `zoom` rides on the measured fit, so
+                     this is a crop toward the face rather than a raw scale — the
+                     tile's own note records what treating it as a raw scale did. */
+                  zoom={opened ? 1 : 1.18}
+                  originY={opened ? "50%" : "44%"}
+                  /* THE SCENE COMES UP LOOKING UPWARDS. Centre him the moment
+                     the player reports in, so the first thing you see is a cat
+                     facing you rather than one studying the ceiling while it
+                     waits for its first line. speakVirgilLine repeats this
+                     before every line — see faceVirgilFront for why once is
+                     not enough. */
+                  onReady={(ok) => { if (ok) faceVirgilFront(); }}
                 />
               </span>
               {opened && claim ? (
@@ -1264,7 +1445,15 @@ export default function PressSession({
                    question rather than an ally. */
                 <span className="ps-virgil-wait">
                   <b>{VIRGIL.name.toUpperCase()}</b>
-                  <i>the office cat · he reads every claim, and he is free</i>
+                  <i>the office cat · he reads every claim.</i>
+                  {/* THE RULES AGAIN, while the opening column is still his to
+                      print in. It disappears the moment claim 1 lands — see the
+                      note on VirgilRead's onReplayBrief. */}
+                  {briefed && !opened && (
+                    <button type="button" className="ps-virgil-rules" onClick={replayBrief}>
+                      run the rules again
+                    </button>
+                  )}
                 </span>
               )}
             </div>
@@ -1593,12 +1782,33 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   border:1px solid rgba(191,238,222,0.28); background:#02100e;
   transition:border-color .3s ease, box-shadow .3s ease; }
 .ps-virgil .pu-virgil { flex:1; min-width:0; }
+
+/* HIM, LEADING. While the briefing runs he is the only thing happening, so the
+   tile stops being a 104px thumbnail beside some text and becomes the screen he
+   is talking out of: stacked, centred, ~5x the area. It reverts once the pitch
+   has the floor, because claims need the column's width back for his read and a
+   230px face over two lines of agenda is the same mistake in the other
+   direction. Square, so the 4:3 player still crops at the sides rather than
+   letterboxing — see the note on .ps-virgil-feed.
+   NO BACKTICKS IN HERE: this block is inside a template literal. */
+.ps-virgil.lead { flex-direction:column; align-items:center; gap:12px;
+  padding:14px 12px 13px; }
+.ps-virgil.lead .ps-virgil-feed { width:230px; height:230px; }
+.ps-virgil.lead .ps-virgil-wait { align-items:center; text-align:center; }
+.ps-virgil.lead .ps-virgil-rules { align-self:center; }
 /* Before the first claim there is no read to show — see the markup. */
 .ps-virgil-wait { display:flex; flex-direction:column; gap:4px; padding-top:2px; }
 .ps-virgil-wait b { font:bold 10px/1.45 'Courier New',monospace;
   letter-spacing:0.11em; color:#bfeede; }
 .ps-virgil-wait i { font-style:normal; font-size:11.5px; line-height:1.4;
   color:rgba(191,238,222,0.6); }
+/* Deliberately quiet — a player who wants the rules again will look for them,
+   and one who doesn't should not be invited to restart a 50-second beat. */
+.ps-virgil-rules { align-self:flex-start; margin-top:2px; padding:2px 6px;
+  font:10px/1.3 'Courier New',monospace; letter-spacing:0.06em;
+  color:rgba(191,238,222,0.55); background:none; cursor:pointer;
+  border:1px solid rgba(191,238,222,0.22); border-radius:3px; }
+.ps-virgil-rules:hover { color:#bfeede; border-color:rgba(191,238,222,0.5); }
 /* The pulse is the one thing here that must not run for a player who asked for
    stillness — so it becomes a steady bright glow, which carries the same "he is
    talking" reading without the motion. */

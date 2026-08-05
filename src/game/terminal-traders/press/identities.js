@@ -54,6 +54,46 @@ export const IDENTITIES = [
 export const CHAINS = ["Base"];
 
 /**
+ * WHAT THE PROJECT ACTUALLY IS — added 2026-08-04.
+ *
+ * THE HOLE THIS FILLS. A deal used to be a name, a ticker, a chain and six
+ * surface numbers, and nothing anywhere said what the thing DID. The bot opened
+ * with "This is WESTBROOK: $WSTB, on Base" and then made a claim about its TEAM,
+ * so the player was asked to judge the case for funding a company whose business
+ * had never been stated ("there is no context to this claim", author 2026-08-04).
+ * Every claim was an attribute of an unspecified thing.
+ *
+ * IT WENT MISSING FOR A GOOD REASON, which is why the fix belongs HERE and not
+ * in an archetype. Rule 1 above bars the NAME from suggesting a mechanism —
+ * "SIREN YIELD" belongs to a ponzi, "KEYSTONE VAULT" to a fork — so the design
+ * correctly stripped every hint of what the project was, and then never replaced
+ * it with a neutral one. A premise authored per archetype would reopen exactly
+ * the leak the name pool was built to close.
+ *
+ * THE RULE FOR ADDING ONE, and it is stricter than the name rules:
+ *
+ *   IT MUST BE PLAUSIBLE FOR EVERY ARCHETYPE, INCLUDING UNWRITTEN ONES.
+ *
+ * Which in practice means it must take deposits, pay a return, and be an
+ * upgradeable contract with a token — because yield-mirage needs something that
+ * PAYS (its whole case is where the yield comes from), backdoor-fork needs an
+ * upgrade path to hide a door in, and bad-tokenomics needs a supply schedule.
+ * "A DEX aggregator" and "a bridge" were both considered and rejected on this:
+ * neither pays a depositor, so a yield-mirage deal could not sit on one, and a
+ * premise that only fits some archetypes is the name leak again in a new field.
+ *
+ * Deliberately generic, for the same reason the names are boring.
+ */
+export const SECTORS = [
+  "a lending market",
+  "a perpetuals venue",
+  "a liquid-staking product",
+  "an RWA credit vault",
+  "a structured-yield vault",
+  "a money market",
+];
+
+/**
  * CLAIMED PRIOR ROLES — shared, for exactly the reason the names above are.
  *
  * THE SAME BUG, FOUND AGAIN ON 2026-08-03 while authoring archetype #4. PRIORS

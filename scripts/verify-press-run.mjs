@@ -11,7 +11,9 @@ import fs from "node:fs";
 import { instanceDeal, ARCHETYPES, ARCHETYPE_IDS, backingOf, genericDiscriminates, sharpDiscriminates } from "../src/game/terminal-traders/press/instanceDeal.js";
 import { BACKING, SHAPES, LANES, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, canSend, inLane } from "../src/game/terminal-traders/press/questions.js";
 import { DESK, EUGENE, PITCH_BOT, adviserLine, laneSentence, laneOwner, pitcherAside } from "../src/game/terminal-traders/press/desk.js";
-import { VIRGIL, virgilRead, agenda as virgilAgenda, shapeTip } from "../src/game/terminal-traders/press/virgil.js";
+import { VIRGIL, virgilRead, agenda as virgilAgenda, shapeTip,
+         nextMove as virgilNextMove,
+         afterAnswer as virgilAfterAnswer } from "../src/game/terminal-traders/press/virgil.js";
 import {
   PRESSES, STAKE, PHASE,
   createRun, press, advance, callIt, allocate,
@@ -104,6 +106,19 @@ console.log("\n-- the desk ------------------------------------------------");
     }
     ok("a seat's portal voice matches its api/counsel-voice id", lockstep);
     if (drift.length) console.log("       " + drift.join("\n       "));
+
+    /* VIRGIL IS NOT A SEAT, so the sweep above skipped him — and he is the one
+       character whose two ids have actually been edited by hand twice in a day.
+       virgil.js carries the rule in a comment ("If the id moves in
+       api/counsel-voice, move it here in the same commit") and nothing enforced
+       it, which is precisely the silent failure that file warns about: a route
+       and a portal that disagree don't error, they just make the cat sound like
+       two different animals depending on which path got there first. */
+    ok("Virgil's portal voice matches his api/counsel-voice id",
+      !!routeIds[VIRGIL.voice] && routeIds[VIRGIL.voice] === VIRGIL.sitepal?.voice?.voice,
+      `route=${routeIds[VIRGIL.voice]} portal=${VIRGIL.sitepal?.voice?.voice}`);
+    ok("Virgil speaks through ElevenLabs, not a SitePal built-in",
+      VIRGIL.sitepal?.voice?.engine === 14);
   }
   ok("all four seats have every result line, deep and shallow",
     SPENDABLE_SEATS.every((s) => ["dispatch", "found", "partial", "nothing"].every((r) => adviserLine(s, r))
@@ -144,7 +159,10 @@ console.log("\n-- the desk ------------------------------------------------");
     (() => {
       const live = virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), remaining: 2 });
       const dead = virgilAgenda(chainClaim, { owner: laneOwner(chainClaim), spent: [SEATS.MARISOL], remaining: 2 });
-      return live !== dead && /shallow looks left/i.test(dead);
+      // WORDING UPDATED FOR DRAFT 2 (2026-08-04), property unchanged: once the
+      // owner is spent the agenda must say the lane is CAPPED, not closed. Was
+      // "shallow looks left"; the same idea is now "a surface view".
+      return live !== dead && /surface view/i.test(dead) && /already taken a deep look/i.test(dead);
     })());
   ok("spending the OTHER adviser changes nothing about this lane",
     laneSentence(chainClaim, { spent: [SEATS.GR80] }) === laneSentence(chainClaim)
@@ -197,6 +215,57 @@ console.log("\n-- the desk ------------------------------------------------");
           const line = virgilAgenda({ id: "x", lane }, { owner: laneOwner({ lane }), spent, remaining });
           return !/\bme\b|\bI\b|send me/i.test(line);
         }))));
+  /* THE NUDGE NAMES THE MOVES AND NEVER INSTRUCTS AN IMPOSSIBLE ONE. Same rule
+     the lane band learned the hard way: copy that points at a spent resource is
+     an instruction the controller rejects as a no-op. */
+  {
+    const withBudget = Array.from({ length: 8 }, (_, i) => virgilNextMove({ pressesLeft: 2, index: i }));
+    const spent = Array.from({ length: 8 }, (_, i) => virgilNextMove({ pressesLeft: 0, index: i }));
+    ok("with follow-ups left, the nudge names BOTH moves",
+      withBudget.every((l) => /teammate|team\b/i.test(l) && /pitch bot/i.test(l)));
+    ok("with none left, it stops offering a follow-up",
+      spent.every((l) => !/press the pitch bot|ask (one of )?your|send a teammate/i.test(l))
+      && spent.every((l) => /left|gone/i.test(l)));
+    ok("the nudge never repeats itself twice running",
+      [2, 0].every((p) =>
+        Array.from({ length: 12 }, (_, i) => virgilNextMove({ pressesLeft: p, index: i }))
+          .every((l, i, all) => i === 0 || l !== all[i - 1])));
+    ok("the nudge never names a lane, a seat by name, or an outcome",
+      [...withBudget, ...spent].every((l) =>
+        !/marisol|gr80|eugene|connor|chain|record|paperwork|rug|legit/i.test(l)));
+    // It is flavour+controls, not the resource readout, so the mute switch takes
+    // it — "Virgil stops chiming in" has to mean he stops.
+    ok("muting the tips mutes the nudge, and never the agenda",
+      (() => {
+        const c = { id: "dep", shape: SHAPES.SELECTIVE_WINDOW, lane: LANES.CHAIN };
+        const on = virgilRead(c, { owner: laneOwner(c), remaining: 2, tips: true, pressesLeft: 2 });
+        const off = virgilRead(c, { owner: laneOwner(c), remaining: 2, tips: false, pressesLeft: 2 });
+        return on.nextMove && !off.nextMove && off.agenda === on.agenda;
+      })());
+  }
+
+  /* THE POST-ANSWER LINE CLOSES THE BEAT AND JUDGES NOTHING. It fires the moment
+     a finding lands, which is exactly the moment a guide must not have an
+     opinion — the player's whole job is to weigh what came back, and grading it
+     for them would also require seeing the outcome, which is autopsy-only. */
+  {
+    const more = Array.from({ length: 6 }, (_, i) => virgilAfterAnswer({ lastClaim: false, index: i }));
+    const last = Array.from({ length: 6 }, (_, i) => virgilAfterAnswer({ lastClaim: true, index: i }));
+    ok("it points at NEXT POINT while points remain, and at the call on the last",
+      more.every((l) => /next point/i.test(l))
+      && last.every((l) => !/next point/i.test(l) && /call it|your call/i.test(l)));
+    ok("it never grades the finding it just heard",
+      [...more, ...last].every((l) =>
+        !/concerning|worrying|clean|solid|suspicious|bad|good|damning|fine\b|reassuring/i.test(l)));
+    ok("it never names a lane, a seat or an outcome",
+      [...more, ...last].every((l) =>
+        !/marisol|gr80|eugene|connor|chain|record|paperwork|rug|legit|receipt/i.test(l)));
+    ok("it never repeats itself twice running",
+      [false, true].every((lc) =>
+        Array.from({ length: 12 }, (_, i) => virgilAfterAnswer({ lastClaim: lc, index: i }))
+          .every((l, i, all) => i === 0 || l !== all[i - 1])));
+  }
+
   ok("Virgil is not a seat and owns no lane",
     !DESK[VIRGIL.id] && !Object.values(DESK).some((d) => d.id === VIRGIL.id));
   ok("the tips can be silenced; the agenda cannot",
@@ -209,7 +278,10 @@ console.log("\n-- the desk ------------------------------------------------");
   ok("a SHAPE claim reports what's checkable at all, not a lane",
     (() => {
       const s = virgilAgenda({ id: "vibe", shape: SHAPES.UNFALSIFIABLE, lane: LANES.SHAPE }, { owner: null, remaining: 2 });
-      return /Nobody's the expert/i.test(s) && !/money|paperwork|chart|story/i.test(s);
+      // WORDING UPDATED FOR DRAFT 2 (2026-08-04), property unchanged: a SHAPE
+      // claim must report that NOBODY specialises in it, and must not name a
+      // lane while doing so. Was "Nobody's the expert on that one".
+      return /Nobody owns this kind of check/i.test(s) && !/money|paperwork|chart|story/i.test(s);
     })());
 }
 
@@ -768,6 +840,66 @@ console.log("\n-- PURITY: a run is a function of (seed, inputs) -----------");
     ok("nothing that builds a deal imports the pitcher roster",
       !/pitchers/.test(codeOnly(fs.readFileSync("src/game/terminal-traders/press/instanceDeal.js", "utf8")))
       && !/pitchers/.test(codeOnly(fs.readFileSync("src/game/terminal-traders/press/pressRun.js", "utf8"))));
+  }
+
+  /* THE PREMISE CANNOT NAME THE PATTERN — the same rule as the name pool, and it
+     is the reason `sector` lives in identities.js rather than on an archetype.
+     A premise authored per archetype would reopen exactly the leak IDENTITIES
+     was created to close (see its header: identifying the archetype is worth a
+     ~44 point swing). Three things to pin. */
+  {
+    const idsrc = codeOnly(fs.readFileSync("src/game/terminal-traders/press/identities.js", "utf8"));
+    ok("the sector pool is shared and names no archetype",
+      /SECTORS/.test(idsrc)
+      && !/yield|mirage|fork|backdoor|tokenomics|anon|ponzi|rug/i.test(
+        idsrc.split("export const SECTORS")[1]?.split("]")[0] ?? ""));
+
+    // No archetype may author its own premise — that is the leak, restated.
+    const files = fs.readdirSync("src/game/terminal-traders/press/archetypes")
+      .map((f) => `src/game/terminal-traders/press/archetypes/${f}`);
+    ok("no archetype authors its own sector",
+      files.every((f) => !/\bsector\b/i.test(codeOnly(fs.readFileSync(f, "utf8")))));
+
+    // And it must actually be uncorrelated: across many seeds, every archetype
+    // has to be able to turn up on every premise. A sector that only ever
+    // appears on one pattern IS the lookup table, however it got there.
+    const seen = {};
+    for (let s = 1; s <= 600; s++) {
+      const d = instanceDeal(s);
+      (seen[d.sector] ||= new Set()).add(d.archetype);
+    }
+    const pool = Object.keys(seen);
+    ok("every sector is reachable, and each carries every archetype",
+      pool.length >= 5 && pool.every((k) => seen[k].size === ARCHETYPE_IDS.length),
+      pool.map((k) => `${k}:${seen[k].size}`).join(" "));
+  }
+
+  /* EVERY CLAIM OPENS WITH A FRAMING LINE, and it may not differ by branch.
+     The lead is deck language, not evidence — printed above the fact so the
+     point is introduced before it is argued. Authored at SLOT level, which is
+     what makes the branch-independence structural; this pins that it stayed
+     that way and that nobody left a slot without one. */
+  {
+    const missing = [];
+    for (const id of ARCHETYPE_IDS) {
+      for (const s of [0, 1]) {
+        const d = instanceDeal(11 + s * 977, id);
+        d.claims.forEach((c) => { if (!c.lead) missing.push(`${id}/${c.id}`); });
+      }
+    }
+    ok("every claim carries a lead", missing.length === 0, missing.join(", "));
+
+    const drift = [];
+    for (const id of ARCHETYPE_IDS) {
+      const rug = findDeal((d) => d.truth === 1, id);
+      const legit = findDeal((d) => d.truth === 0, id);
+      if (!rug || !legit) continue;
+      const byId = Object.fromEntries(legit.claims.map((c) => [c.id, c.lead]));
+      rug.claims.forEach((c) => {
+        if (byId[c.id] !== undefined && byId[c.id] !== c.lead) drift.push(`${id}/${c.id}`);
+      });
+    }
+    ok("a lead never differs between the branches", drift.length === 0, drift.join(", "));
   }
 
   // THE FILE-LEVEL EXEMPTION ABOVE IS TOO BLUNT ON ITS OWN, and it hid a real

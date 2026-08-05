@@ -12,7 +12,7 @@ import * as BACKDOOR from "./archetypes/backdoorFork.js";
 import * as MIRAGE from "./archetypes/yieldMirage.js";
 import * as ANONREAL from "./archetypes/anonButReal.js";
 import * as SUPPLYCLIFF from "./archetypes/supplyCliff.js";
-import { IDENTITIES, CHAINS } from "./identities.js";
+import { IDENTITIES, CHAINS, SECTORS } from "./identities.js";
 import { rollFate, fateLine } from "./fates.js";
 import { getCardById } from "../cards.js";
 import { getCardArt } from "../templateCard.js";
@@ -74,6 +74,9 @@ function rollOutcome(rand, outcomes) {
  * @param {string} archetypeId   which read this deal is an instance of
  * @returns a deal object in exactly the shape pressRun.js already consumes
  */
+/** Mixed into the seed so the premise rides its own stream. See vars.sector. */
+const SECTOR_SALT = 0x6a09e667;
+
 export function instanceDeal(seed = 1, archetypeId = null) {
   const rand = mulberry32(seed >>> 0);
   // Which READ you're facing is itself part of the shuffle. Pass an id to pin
@@ -113,6 +116,16 @@ export function instanceDeal(seed = 1, archetypeId = null) {
     change24h: `+${between(rand, 2, 14)}%`,
     social: `${(between(rand, 55, 88) / 10).toFixed(1)}/10`,
   };
+
+  /* WHAT THE PROJECT IS — off its own salted stream, for the same two reasons
+     the pitcher and the fate are: the draw must not shift the sequence above it
+     (a pinned ?dealseed has to keep describing the same deal), and riding a
+     separate stream makes the independence STRUCTURAL rather than a promise.
+     Nothing about the archetype or the branch is in scope at this line, so the
+     premise cannot correlate with either — which is the whole requirement. See
+     SECTORS in identities.js for why it may not be authored per archetype. */
+  vars.sector = SECTORS[
+    Math.floor(mulberry32((seed ^ SECTOR_SALT) >>> 0)() * SECTORS.length)];
 
   const resolve = (v) => (typeof v === "function" ? v(vars) : v);
 
@@ -196,6 +209,13 @@ export function instanceDeal(seed = 1, archetypeId = null) {
       discriminates: slotDiscriminates(slot),
       // loadBearing only means anything when there IS something to find.
       loadBearing: !!slot.loadBearing,
+      // THE FRAMING SENTENCE THE SELLER OPENS THE POINT WITH. Slot-level and
+      // therefore branch-independent by construction, exactly like `fact` and
+      // `spin`: it is deck language, never evidence, so there is nothing in it
+      // that could differ between a rug and an honest run. A claim now reads
+      // lead → fact → spin: what this point is about, the checkable specifics,
+      // and the inference sold on top of them.
+      lead: resolve(slot.lead),
       fact: resolve(slot.fact),
       spin: resolve(slot.spin),
       backing: backingOf(slot) ?? b.backing,
@@ -228,6 +248,9 @@ export function instanceDeal(seed = 1, archetypeId = null) {
     ticker: vars.ticker,
     name: vars.name,
     chain: vars.chain,
+    // WHAT IT IS, in words the record and the opening can both print. Rolled
+    // blind of archetype and branch — see the note on vars.sector above.
+    sector: vars.sector,
     truth: rolled.truth,          // 1 = rug, 0 = legit
     outcome: branch,
     collapseDay: branch === "rug" ? vars.collapseDay : null,

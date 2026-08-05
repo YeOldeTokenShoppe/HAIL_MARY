@@ -4,7 +4,9 @@ import { instanceDeal, rollSeed } from "@/game/terminal-traders/press/instanceDe
 import { BACKING, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, LANES } from "@/game/terminal-traders/press/questions";
 import { DESK, DESK_ORDER, PITCH_BOT, laneOwner, laneSentence, pitchOpening, pitcherAside, seatMeta } from "@/game/terminal-traders/press/desk";
 import { pitcherVoice } from "@/game/terminal-traders/press/pitchers";
-import { VIRGIL, virgilRead } from "@/game/terminal-traders/press/virgil";
+import { VIRGIL, virgilRead, briefing,
+         afterAnswer as virgilAfterAnswer } from "@/game/terminal-traders/press/virgil";
+import { briefingMode, markBriefingSeen } from "@/lib/trade/briefingSeen";
 import {
   PHASE, PRESSES,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt, seatOptions,
@@ -239,6 +241,24 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const [opened, setOpened] = useState(false);
   const floorLive = onFloor && opened;
 
+  /* ---- Virgil's house rules, before any of that ----
+     Mirrors PressSession: mode resolved in a mount effect (never in the
+     initialiser — briefingMode reads localStorage and the query string), and
+     `briefed` is the opening's gate. */
+  const [briefMode, setBriefMode] = useState(null);
+  const [briefAt, setBriefAt] = useState(-1);
+  const [briefDone, setBriefDone] = useState(false);
+  const [briefed, setBriefed] = useState(false);
+  const briefLines = useMemo(
+    () => (briefMode && briefMode !== "off" ? briefing(briefMode === "short") : []),
+    [briefMode]);
+
+  useEffect(() => {
+    const m = briefingMode();
+    setBriefMode(m);
+    if (m === "off") setBriefed(true);
+  }, []);
+
   // Who can be sent at the claim on the floor, and why not. Straight from the
   // controller so the button states can never disagree with the rules.
   const options = useMemo(() => seatOptions(run, deal), [run, deal]);
@@ -300,8 +320,14 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     () => (claim ? virgilRead(claim, {
       owner: laneOwner(claim), spent: run.advisersSpent,
       remaining: outlook.remaining, tips,
+      // The nudge needs the budget so it cannot tell you to spend a follow-up
+      // you no longer have, and the index so it rotates. See nextMove.
+      pressesLeft: run.pressesLeft, index: run.claimIndex,
+      // Once this claim has an outcome the nudge has to stop offering a press.
+      answered: !!run.outcomes[claim.id], lastClaim,
     }) : null),
-    [claim, run.advisersSpent, outlook.remaining, tips]);
+    [claim, run.advisersSpent, outlook.remaining, tips, run.pressesLeft, run.claimIndex,
+     run.outcomes, lastClaim]);
 
   /* ---- the evidence screen, as an actual on-screen terminal ---- */
   // One board per seat that can be sent. Only one is on screen at a time; the
@@ -487,8 +513,31 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      playing, and the two early exits (SKIP, unmount) are handled by skipOpening
      and by the unmount effect below. One here would race the claim effect, which
      starts speaking in the same commit that `opened` flips. */
+  /* ---- the cat briefs you first ----
+     Virgil's house rules run before the bot says anything. Same three-state seam
+     as the opening, same component, and gated so only one of the two can be
+     speaking: this runs while `briefed` is false, the opening refuses to start
+     until it is true. See PressSession for why the beat lives on the floor and
+     why the first part carries a lead. */
   useEffect(() => {
-    if (!onFloor || opened || !openingLines.length) return;
+    if (!onFloor || briefed || !briefLines.length) return;
+    let alive = true;
+    (async () => {
+      await sayTurn(
+        briefLines.map((text, i) => ({
+          voice: VIRGIL.voice, text, seat: VIRGIL.id,
+          ...(i === 0 ? { leadMs: VIRGIL_BEAT_MS } : null),
+        })),
+        { onPart: (i) => { if (alive) setBriefAt(i); }, dwell: readDwellMs });
+      if (alive) setBriefDone(true);
+    })();
+    return () => { alive = false; };
+  }, [onFloor, briefed, briefLines, sayTurn]);
+
+  useEffect(() => {
+    // `briefed` joins the guard — the bot waits for the cat. ?brief=off flips it
+    // on mount, so that path reaches the opening on the first frame as before.
+    if (!onFloor || !briefed || opened || !openingLines.length) return;
     let alive = true;
     (async () => {
       await sayTurn(openingLines.map((text) => ({ voice: VOICE, text })),
@@ -498,7 +547,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       if (alive) setOpeningDone(true);
     })();
     return () => { alive = false; };
-  }, [onFloor, opened, openingLines, sayTurn]);
+  }, [onFloor, briefed, opened, openingLines, sayTurn]);
 
   // Bumping the token supersedes the chain in flight; its `finally` then declines
   // to touch `speaking`, so this clears it by hand.
@@ -516,6 +565,30 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // The handover. `opened` is what the claim effect below waits on, so the first
   // claim — and its audio — begins inside the click.
   const beginPitch = useCallback(() => setOpened(true), []);
+
+  /* THE BRIEFING'S EXITS, mirroring PressSession exactly — one beat, one tempo,
+     on both surfaces. Skipping counts as having seen it. */
+  const skipBrief = useCallback(() => {
+    sayToken.current++;
+    stopVoice();
+    setSpeaking(false);
+    setBriefDone(true);
+    setBriefed(true);
+    markBriefingSeen();
+  }, []);
+
+  const beginBrief = useCallback(() => { setBriefed(true); markBriefingSeen(); }, []);
+
+  // Replay, offered only while the opening column is still free to print in.
+  const replayBrief = useCallback(() => {
+    sayToken.current++;
+    stopVoice();
+    setSpeaking(false);
+    setOpeningAt(-1); setOpeningDone(false);
+    setBriefAt(-1); setBriefDone(false);
+    setBriefMode("long");
+    setBriefed(false);
+  }, []);
 
   // `floorLive`, not `onFloor`: during the opening the pitcher already has the
   // mouth, and starting claim 1 underneath it would put two of ITS OWN utterances
@@ -547,11 +620,19 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     if (!floorLive || !claim) return;
     sayTurn(
       [
+        // THE FRAMING LINE FIRST, then the argument — see the long note at the
+        // matching effect in PressSession. Both surfaces speak the claim the same
+        // way or they drift on what the bot sounds like.
+        { voice: VOICE, text: claim.lead },
         { voice: VOICE, text: claim.spin },
         // leadMs: he lets the bot finish before he says his piece. Same number as
         // PressSession, from the same constant, for the same reason the tip is.
         { voice: VIRGIL.voice, text: tips ? virgil?.tip : "", seat: VIRGIL.id,
           leadMs: VIRGIL_BEAT_MS, minMs: 900 },
+        // Then the controls. Same cat carrying on, so a short beat rather than
+        // VIRGIL_BEAT_MS — see the matching note in PressSession.
+        { voice: VIRGIL.voice, text: virgil?.nextMove, seat: VIRGIL.id,
+          leadMs: 500, minMs: 700 },
       ],
       // Back to the pitcher: the claim is his and it is what you read next.
       { onDone: () => setOnCamera(PITCHER) },
@@ -689,6 +770,17 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         // land and there's nothing to send you anywhere. Which pane that is now
         // depends on WHO answered, so the check has to as well.
         setLookPending(paneRef.current !== "screen");
+
+        // AND THE CAT CLOSES THE BEAT — same moment, same rule, same bank as
+        // PressSession. See afterAnswer in virgil.js; the two surfaces speak the
+        // same three Virgil voices or they drift on what having a guide means.
+        if (tips) {
+          sayTurn([{
+            voice: VIRGIL.voice, seat: VIRGIL.id,
+            text: virgilAfterAnswer({ lastClaim, index: run.claimIndex }),
+            leadMs: VIRGIL_BEAT_MS, minMs: 700,
+          }]);
+        }
       });
   }, [run, deal, claim, floorLive, sayTurn]);
 
@@ -838,6 +930,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               surface={identity ? deal.surface : null}
               ticker={identity ? deal.ticker : null}
               chain={identity ? deal.chain : null}
+              sector={identity ? deal.sector : null}
               ref={recordRef} clientRef={clientRef}
               particularsRef={particularsRef}
               stampRetainedRef={stampRetainedRef}
@@ -1098,10 +1191,30 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                            spent={run.advisersSpent}
                            count={`${run.claimIndex + 1} / ${deal.claims.length}`} />
               )
+            ) : !briefed ? (
+              /* THE CAT FIRST, and unquoted — he is talking to you rather than
+                 being quoted at you. Same component as the bot's remarks so the
+                 two beats cannot drift on reveal, skip or gate. */
+              <>
+                <OpeningBody lines={briefLines} at={briefAt} onSkip={skipBrief}
+                             done={briefDone}
+                             onBegin={briefDone ? beginBrief : null}
+                             who={VIRGIL.name} kicker="— the house rules"
+                             skipLabel="SKIP THE RULES ▸"
+                             beginLabel="◉ READY — BRING IN THE PITCH BOT ▸"
+                             cue="▼ PRESS THIS TO START THE PITCH"
+                             quoted={false} subtitle />
+              </>
             ) : (
-              <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening}
-                           done={openingDone}
-                           onBegin={openingDone ? beginPitch : null} />
+              <>
+                <OpeningBody lines={openingLines} at={openingAt} onSkip={skipOpening}
+                             done={openingDone}
+                             onBegin={openingDone ? beginPitch : null} />
+                {/* Quiet by design — see the matching control on PressSession. */}
+                <button type="button" className="pf-rules" onClick={replayBrief}>
+                  run the rules again
+                </button>
+              </>
             )}
 
             {answering && (
@@ -1336,6 +1449,13 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    which is what made the two paragraphs on that screen disagree. */
 .pf-scroll.center .pf-copy { text-align:left; }
 .pf-label { margin:10px 0 7px; color:#2fd6d6; font-size:10px; letter-spacing:.16em; }
+/* Quiet on purpose: a player who wants the house rules again will go looking,
+   and one who doesn't should not be nudged into restarting a ~50s beat. */
+.pf-rules { display:block; margin:9px auto 0; padding:3px 8px;
+  font:10px/1.3 'Courier New',monospace; letter-spacing:.06em;
+  color:rgba(200,229,223,.5); background:none; cursor:pointer;
+  border:1px solid rgba(200,229,223,.2); border-radius:3px; }
+.pf-rules:hover { color:#c8e5df; border-color:rgba(200,229,223,.45); }
 .pf-copy { margin:8px 0; color:#c8e5df; font-size:12px; line-height:1.48; }
 .pf-copy.sm { font-size:10.5px; }
 .pf-copy.dim { color:rgba(200,229,223,.58); }

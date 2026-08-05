@@ -288,9 +288,9 @@ export function laneSentence(claim, { spent = [] } = {}) {
 // HOW THE PITCHER CARRIES IT AFTER YOU'VE HAD A GO AT IT.
 //
 // Delivered as an ASIDE before the next claim, so the pitch visibly changes shape
-// as the room turns. Fourteen lines, archetype-agnostic, paid for once — a new
-// archetype adds none. None of them names a fact, an outcome or a lane; they are
-// posture only, so no line here can ever carry information the pressure score
+// as the room turns. Twenty-three lines, archetype-agnostic, paid for once — a
+// new archetype adds none. None of them names a fact, an outcome or a lane; they
+// are posture only, so no line here can ever carry information the pressure score
 // didn't already give you.
 //
 // THESE WERE BARRON'S UNTIL 2026-07-29 and moved wholesale to the bot, which is
@@ -299,31 +299,53 @@ export function laneSentence(claim, { spent = [] } = {}) {
 // shipped something" was Barron appealing to the DESK, which an outside agent
 // cannot do — it now appeals to the client instead.
 //
-// It never apologises and never concedes. A closer who folds is a different
-// character, and a much less interesting one to have to read.
+// IT MAY NOW FLINCH (draft 2, 2026-08-04). This comment used to read "It never
+// apologises and never concedes", and draft 2 deliberately reverses that: the
+// bank now carries embarrassment, self-correction and open frustration, because
+// a closer who is visibly working is more readable than one who is armour-plated.
+//
+// THE RULE THAT REPLACES IT, AND IT IS THE LOAD-BEARING ONE:
+//
+//   COMPOSURE BELONGS TO THE PRESSURE BAND, NEVER TO THE BRANCH.
+//
+// pressure() reads run.outcomes and nothing else — it cannot see `truth`, and an
+// assertion pins that. So a bot representing a sound project stumbles exactly as
+// often as one representing a rotten project, given the same findings. That is
+// what makes the flinching safe to author: it is a reaction to BEING CHECKED, not
+// to what is being hidden, and a player who learns to read nerves instead of
+// evidence is being taught the precise mistake this game exists to correct.
 const PITCHER_ASIDE = {
   backed: [
-    "Check it again if you like. It'll say the same thing.",
-    "Good. Ask me another one.",
-    "That's what I like. Somebody who actually looks.",
-    "You'll find I don't say things I can't stand behind.",
+    "Good check. Please keep going; strong projects should survive good questions.",
+    "That one held. I'm glad this desk verifies before it decides.",
+    "Exactly. You looked past the pitch and found the support underneath it.",
+    "Check it twice if you like. A sound answer should not change when you inspect it.",
+    "Yes, that was in my notes. I had a smoother way of saying it in rehearsal.",
+    "You found it before I got to the impressive part. That is mildly devastating, but useful.",
   ],
   rattled: [
-    "I'm not sure what you think you found there.",
-    "Alright. You want to do this the long way.",
-    // NOTE: "records" and "paperwork" are forbidden here — RECORD is a lane and
-    // THE PAPERWORK is GR80's role label, so either word in Barron's mouth
-    // reads as him naming a lane. Pinned by an assertion.
-    "That's a bookkeeping gap, not a business one.",
-    "Show me a company with no loose ends. I'll wait.",
-    "You can keep pulling threads. It's your afternoon.",
+    // NOTE: "records" and "paperwork" are forbidden in this bank — RECORD is a
+    // lane and THE PAPERWORK is GR80's role label, so either word in the bot's
+    // mouth reads as it naming a lane. Pinned by an assertion.
+    "I'm not sure that gap carries the weight you're putting on it, but I hear the concern.",
+    "All right—let's slow down and separate what is missing from what is actually wrong.",
+    "That is an unanswered detail, not necessarily a broken business. Necessarily.",
+    "No young company is perfectly tidy. The question is whether this loose end reaches the core claim.",
+    "Keep pulling at it if you need to. I would rather earn the decision than rush it.",
+    "I know how that answer sounded. Give me a second; there is a less alarming way to explain it.",
+    "That was supposed to be the reassuring slide. Fine. Let me try it without the slide.",
+    "You are very good at finding the sentence I hoped would stay in the appendix.",
+    "Right. I'm not flustered. I'm reorganizing the pitch at speed, which is completely different.",
   ],
   cornered: [
-    "You've made your mind up. Let me finish anyway.",
-    "My client has shipped something. Let's not pretend that's nothing.",
-    "Fine — you want the version with every caveat in it? Here it is.",
-    "I've watched people talk themselves out of the best deal of their career.",
-    "Ask the next one. I'd rather you asked than sat there deciding quietly.",
+    "I can feel the room turning. Let me finish the case before you close the door.",
+    "Whatever you think of the inference, my client did ship a working product. That deserves some weight.",
+    "You want every caveat stated plainly. Fair enough—here is the less flattering version.",
+    "Careful teams avoid bad deals. Sometimes they also interrogate good ones until the opportunity is gone.",
+    "Ask the next one. A hard question gives me something real to answer.",
+    "That came out badly. The claim is stronger than my last ten seconds made it sound.",
+    "I did not expect four people to notice the same footnote at once. Impressive. Uncomfortable, but impressive.",
+    "All right, I'm frustrated. Not with the question—with how long it is taking me to give you the clean answer. Let me try once more.",
   ],
 };
 
@@ -387,24 +409,47 @@ export const barronAside = pitcherAside;
    claim 1 with no hand-off and the beat ends on a jolt.
    If you edit these, re-measure; the audio dominates and character count is the
    only lever on it. */
+/* DRAFT 2 (2026-08-04). Retoned to a courteous professional who WANTS to be
+   tested — the charm is the pitch now, rather than swagger — and line 3 names
+   the follow-up budget out loud, which nothing in the opening used to do.
+
+   LINE 3 IS COUPLED TO `PRESSES` (pressRun.js). All three variants say "three",
+   so raising or lowering that constant makes this bank lie. If PRESSES ever
+   moves, these three lines move with it. */
+/* LINE 1 NOW SAYS WHAT THE THING IS. It used to give a name, a ticker and a
+   chain, and the deal model had nothing else to give — so the bot introduced a
+   company and then argued about its team without ever saying what it did
+   ("there is no context to this claim", author 2026-08-04). `d.sector` comes
+   from the shared pool in identities.js and is rolled blind of archetype and
+   branch, so it is safe to say out loud in the first sentence. */
 const PITCH_OPENING = [
   [
-    (d) => `Thanks for the slot. I'm here for ${d.name} — ${d.ticker}, on ${d.chain}.`,
-    () => "Up front: I'm on commission. I only earn if you fund this. Everything I tell you is true — I just pick which true things.",
-    (d) => `${d.count} points. Stop me whenever.`,
+    (d) => `Thanks for the time. I'm here with ${d.name} — ${d.ticker}, ${d.sector} on ${d.chain}.`,
+    () => "Full disclosure: I'm paid if you fund it. Every claim is true; your sharp team decides what it proves.",
+    (d) => `${d.count} points. I'm happy to take three follow-up questions.`,
   ],
   [
-    (d) => `Appreciate the time. I represent ${d.name} — ${d.ticker}, ${d.chain}.`,
-    () => "I only get paid if this closes. That doesn't make me a liar — it makes me selective. Nothing I say is false.",
-    (d) => `${d.count} things for you. Interrupt when you like.`,
+    (d) => `I appreciate the meeting. I represent ${d.name} — ${d.ticker}, ${d.sector} on ${d.chain}.`,
+    () => "I earn my fee if this closes. I'll make the strongest truthful case I can; your team can test it.",
+    (d) => `${d.count} claims. Your team can dig into three of them.`,
   ],
   [
-    (d) => `Good — you took the meeting. ${d.name}. ${d.ticker}, ${d.chain}.`,
-    // THE THREE VARIANTS ARE THE SAME LENGTH ON PURPOSE (~106-115 chars). This
-    // one was 132 and ran ~9.2s against the others' ~7, so which greeting the
+    (d) => `Good to meet a desk that checks its own work. This is ${d.name} — ${d.ticker}, ${d.sector} on ${d.chain}.`,
+    // THE THREE VARIANTS ARE THE SAME LENGTH ON PURPOSE. An earlier line 2 was
+    // 132 chars and ran ~9.2s against the others' ~7, so which greeting the
     // seed rolled changed how long the beat took by two seconds.
-    () => "Disclosure: I'm on commission. I won't tell you anything untrue — I'm just not obliged to tell you all of it.",
-    (d) => `The case is ${d.count} parts. Cut in whenever.`,
+    //
+    // MEASURED FOR DRAFT 2 (2026-08-04), on a 6-claim deal:
+    //   line 2 alone   102 / 98 / 97 chars   (spread 5 — was the failure mode)
+    //   whole variant  256 / 259 / 247       (~18.3 / 18.5 / 17.6s at 14 cps)
+    // Variant-to-variant spread is now under a second, which is the property
+    // this comment exists to protect. The ABSOLUTE length grew: the bank used
+    // to run ~15s and now runs ~18s, because draft 2 lengthened line 1 and made
+    // line 3 name the follow-up budget out loud. That is a deliberate trade —
+    // three seconds bought a rule the player previously had to infer — but it
+    // is the number to watch if the pre-claim runway ever needs winning back.
+    () => "I'm on commission, and I'd like to earn it. The facts are real; you decide whether the case holds.",
+    (d) => `${d.count} points, with time for three follow-ups. I expect good questions.`,
   ],
 ];
 
@@ -427,6 +472,10 @@ export function pitchOpening(deal) {
     name: deal.name,
     ticker: deal.ticker,
     chain: deal.chain,
+    // WHAT IT IS. Falls back to a bare noun rather than printing `undefined`
+    // into the first sentence of the session — a deal built before `sector`
+    // existed, or a hand-made stub in a test, must still open cleanly.
+    sector: deal.sector || "a protocol",
     count: deal.claims?.length ?? 0,
   };
   return PITCH_OPENING[variantOf(deal.id ?? "", PITCH_OPENING.length)].map((f) => f(vars));
@@ -444,45 +493,58 @@ export function pitchOpening(deal) {
 // Sixteen deep lines + four shallow ones, archetype-agnostic, paid for once.
 // (Four seats × dispatch/found/partial/nothing, plus one shallow each. Barron
 // joined the bank on 2026-07-29 when the pitch bot took over the selling.)
+// DRAFT 2 (2026-08-04). Retoned so each seat says WHAT KIND OF EVIDENCE it just
+// produced and what that evidence cannot settle — the old bank stated a result
+// ("Partial. That's as far as the chain goes.") without teaching what a partial
+// trace licenses you to conclude. `nothing` in particular now says out loud that
+// an absence is a finding and not a disproof, which is the read the game most
+// wants and the one players get wrong.
+//
+// THE `dispatch` KEY IS UNCHANGED. Draft 2 calls this beat a "consult" in prose,
+// but the key is read by both surfaces and by the harness; renaming it would be
+// a refactor wearing a copy edit's clothes.
 const ADVISER_LINES = {
   [SEATS.MARISOL]: {
-    dispatch: "Give me a second. I'll pull it.",
-    found: "Here. Timestamped, and you can check it yourself.",
-    partial: "Partial. That's as far as the chain goes.",
-    nothing: "There's nothing to pull. No record of it anywhere.",
-    shallow: "Not my area, so take this for what it is — here's what's visible from outside.",
+    dispatch: "Give me a second. I'm tracing where the money entered, where it moved, and who could take it out.",
+    found: "Found it. The amounts and times line up, and the transactions are public. This is evidence we can independently check.",
+    partial: "I can verify part of the path, then it disappears. That does not prove the rest is bad; it means the pitch outruns what the chain supports.",
+    nothing: "There is no transaction or account trail supporting that claim. Absence is the finding here, not proof of the opposite.",
+    shallow: "This is outside my lane. From the money side I can only tell you who was paid and when; I can't verify the larger claim from that alone.",
   },
   [SEATS.GR80]: {
-    dispatch: "I have read it. One moment.",
-    found: "It is in the document. Section and all.",
-    // "less than he does" — same category error as the tip bank; the rig is
-    // rolled, so the pitcher has no gender this copy can know. See SHAPE_TIP.
-    partial: "The document says less than the pitch bot does.",
-    nothing: "Nothing on file. Not redacted — absent.",
-    shallow: "I can read what is in front of me. On this one, that is not much.",
+    dispatch: "I have the document. One moment while I check the scope, exclusions, and who signed it.",
+    found: "The claim is supported here, in a named section, and the reviewer actually covered the question we care about.",
+    // "less than he does" was the same category error as the tip bank; the rig
+    // is rolled, so the pitcher has no gender this copy can know. See SHAPE_TIP.
+    partial: "The document supports a narrower claim than the pitch bot made. The name is real; the implied protection is wider than the review.",
+    nothing: "Nothing on file. Not hidden and not redacted—absent. We cannot treat a missing source as confirmation or denial.",
+    shallow: "I can inspect the language in front of me, but this is outside my specialty. I can flag what it says; I cannot supply the missing context.",
   },
   [SEATS.EUGENE]: {
-    dispatch: "Let me see who's actually saying this.",
-    found: "Found the source. And who repeated it, and when.",
-    partial: "Half of it traces. The other half is just people agreeing with each other.",
-    nothing: "Nobody's saying it. There's no story here to trace — that's the finding.",
-    shallow: "This isn't really a story question, so all I've got is the surface.",
+    dispatch: "Let me trace who first said this, who actually witnessed it, and who is only repeating whom.",
+    found: "I found the original sources, the people who repeated them, and the dates. The first-hand accounts are independent of the pitch.",
+    partial: "Part of the story traces to first-hand sources. The rest circles among people repeating one another, so it is not separate confirmation.",
+    nothing: "I cannot find anyone with first-hand knowledge making this claim. That does not prove it false; it means the story has no traceable origin.",
+    shallow: "This is not really a story question. I can tell you who is promoting it and how the message spread, but not whether the underlying mechanism works.",
   },
   // BARRON, AS A SPECIALIST — new on 2026-07-29, and the only prose the pitch-bot
   // change actually required. This bank was `{}` for as long as he was the
   // pitcher: he answered in his own voice under his own name, so he never needed
   // the four retrieval lines every other seat has.
   //
-  // He keeps his jargon — "tape" is characterisation in a seat's mouth, and
-  // invariant 6 binds the UI, not the people. What he retrieves is the WINDOW,
-  // never the price: the chart lane's whole lesson is that price movement isn't
-  // evidence, so his findings are about what series exists to be looked at.
+  // HE LOST THE WORD "TAPE" IN DRAFT 2. It was kept as characterisation — a
+  // seat may hold jargon invariant 6 bars from the UI — but it was doing that
+  // job in four lines out of five, and "the full performance history" says the
+  // same thing while naming the actual object. What he retrieves is unchanged
+  // and is the point: the SERIES, never the price. The chart lane's whole lesson
+  // is that price movement is not evidence, so his findings are about what
+  // history exists to be looked at.
   [SEATS.BARRON]: {
-    dispatch: "Hold on. Let me pull the tape.",
-    found: "There. The whole window, not the slice you were shown.",
-    partial: "That's as much tape as exists. It's thin, and thin is all it is.",
-    nothing: "There's no series to pull. Nobody ever published one — that's the finding.",
-    shallow: "This isn't a chart question. I can tell you what the price did, and price isn't evidence.",
+    dispatch: "Give me a moment. I'll pull the full performance history.",
+    found: "There. That is the full published history, not just the favorable slice. Now we can compare the headline with ordinary and bad periods.",
+    partial: "That is the entire series available. The shown number is real, but a thin history cannot tell us how it behaves across conditions.",
+    nothing: "There is no published series to analyze. That does not make the headline false; it makes performance over time untestable.",
+    shallow: "This is not a chart question. I can show movement and timing, but a rising price cannot prove the claim you are being asked to believe.",
   },
 };
 

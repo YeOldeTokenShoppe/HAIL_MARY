@@ -4148,6 +4148,13 @@ export default function CyborgTemple() {
               useSitePalForDetective={(pressMode ? pressFocus : focusedAgent) === 'Detective'}
               useSitePalForMonk={(pressMode ? pressFocus : focusedAgent) === 'Monk'}
               externalFocusAgent={revealMode ? 'Stage' : (pressMode ? pressFocus : focusedAgent)}
+              /* THE VC GAME OWNS THE CAMERA. PressSession cuts to whoever is
+                 speaking and back; a stray click on a character used to zoom the
+                 player out with no way back in, because the parent ignores
+                 onAgentClick in press mode so externalFocusAgent never changes
+                 and the sync effect has nothing to react to. Orbit and zoom
+                 still work — only focus/unfocus gestures are held. */
+              focusLocked={pressMode}
               speechActive={pressMode ? pressSpeaking : speechActive}
               revealMode={revealMode}
               onCoinFaceTap={(coinIndex) => {

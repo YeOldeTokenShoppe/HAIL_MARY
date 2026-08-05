@@ -171,6 +171,61 @@ export function fmtFileNo(n) {
   return String(n ?? 1).padStart(3, "0");
 }
 
+/* THE PAPERCLIP — a real gem clip, not an outlined box.
+ *
+ * The old version was one rounded rect with a border, which at 17px reads as a
+ * ring, not a clip: no inner return loop, square-ended, and lit flat. This is
+ * the actual wire topology in ONE continuous stroke — long outer U, up the left
+ * rail, over the top hook, down and around the shorter inner U, ending in a free
+ * tip tucked under the hook — so the eye gets the two nested loops that say
+ * "paperclip" at any size.
+ *
+ * SVG rather than the CSS-pseudo-element build (three nested border-radius boxes
+ * with `groove` borders): at this scale the wire is ~1.2px, and a groove border
+ * degenerates to mush below ~2px while border-radius corners can't make a
+ * continuous stroke. A stroked path gets round caps, true arcs, and stays crisp.
+ *
+ * GEOMETRY IS LOAD-BEARING. The 42px height and the -11px top are what put the
+ * hook ~21px above .eng-cover's border box, and that polygon only clears 28px —
+ * see the clip-path note there before raising either number.
+ */
+const COVER_CLIP_WIRE =
+  "M 37 -12 L 37 70 A 17 17 0 0 1 3 70 L 3 -16 " +
+  "A 13.5 13.5 0 0 1 30 -16 L 30 42 A 10.5 10.5 0 0 1 9 42 L 9 -18";
+
+/* Three passes on the same path make the wire cylindrical: a mid-tone body, a
+ * dark edge nudged one way and a specular nudged the other. Both offsets stay
+ * inside the body's half-width (1.6), so they shade the wire instead of
+ * doubling it. No gradient — a <defs> id would collide if the record ever
+ * mounts twice, and offset strokes read as rounder metal anyway. */
+function CoverClip() {
+  return (
+    <svg
+      className="eng-cover-clip"
+      viewBox="-1.8 -32 43.6 122"
+      aria-hidden="true"
+      focusable="false"
+      shapeRendering="geometricPrecision"
+    >
+      <g fill="none" strokeLinecap="round">
+        <path d={COVER_CLIP_WIRE} stroke="#8fa39e" strokeWidth="3.2" />
+        <path
+          d={COVER_CLIP_WIRE}
+          stroke="rgba(3,15,13,.5)"
+          strokeWidth="1"
+          transform="translate(0.8 0.35)"
+        />
+        <path
+          d={COVER_CLIP_WIRE}
+          stroke="rgba(242,251,248,.85)"
+          strokeWidth="1.1"
+          transform="translate(-0.75 -0.3)"
+        />
+      </g>
+    </svg>
+  );
+}
+
 /**
  * THE RECORD — what sits where the console, and the dice tray before it, used to.
  *
@@ -190,6 +245,11 @@ export function fmtFileNo(n) {
  */
 export const EngagementRecord = React.forwardRef(function EngagementRecord(
   { arrived = false, client = null, surface = null, ticker = null, chain = null,
+    // WHAT THE PROSPECT ACTUALLY IS. New 2026-08-04 — the record carried six
+    // market numbers and never said what the business was, so a player signed a
+    // deal sheet for a ticker and a market cap. Public surface data like every
+    // other field here, and rolled blind of archetype and branch (identities.js).
+    sector = null,
     clientRef = null, particularsRef = null,
     stampRetainedRef = null, coverRef = null,
     fileNo = null,
@@ -257,6 +317,7 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
             PROSPECT{ticker && chain ? ` · ${ticker} · ${chain}` : ""}
           </div>
           <dl className="eng-stats">
+            <div className="eng-sector"><dt>WHAT IT IS</dt><dd>{sector ?? "——"}</dd></div>
             <div><dt>MCAP</dt><dd>{surface?.mcap ?? "——"}</dd></div>
             <div><dt>HOLDERS</dt><dd>{surface?.holders ?? "——"}</dd></div>
             <div><dt>AGE</dt><dd>{surface?.age ?? "——"}</dd></div>
@@ -306,7 +367,7 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
             aloud in the pitch opening and in the briefing's directive, which
             are the places an incentive actually confronts the player. */}
         <figure className="eng-cover-badge" aria-hidden="true">
-          <span className="eng-cover-clip" />
+          <CoverClip />
           <img src={PITCH_BOT.portrait} alt="" />
           {/* THE PLATE NUMBER, not a job description (author, 2026-08-03).
               ON COMMISSION was the third place the briefing stated the
@@ -351,6 +412,7 @@ export const EngagementRecord = React.forwardRef(function EngagementRecord(
               PROSPECT{ticker && chain ? ` · ${ticker} · ${chain}` : ""}
             </div>
             <dl className="eng-stats">
+              <div className="eng-sector"><dt>WHAT IT IS</dt><dd>{sector ?? "——"}</dd></div>
               <div><dt>MCAP</dt><dd>{surface?.mcap ?? "——"}</dd></div>
               <div><dt>HOLDERS</dt><dd>{surface?.holders ?? "——"}</dd></div>
               <div><dt>AGE</dt><dd>{surface?.age ?? "——"}</dd></div>
@@ -706,9 +768,15 @@ export const ENGAGEMENT_CSS = `
   padding-bottom:7px; border-bottom:1px solid rgba(47,214,214,.18); }
 .eng-stats{ margin:8px 0 0; display:flex; flex-direction:column; gap:3px; }
 .eng-stats > div{ display:flex; align-items:baseline; gap:9px; }
-.eng-stats dt{ flex:none; width:60px; font-size:8.5px; letter-spacing:.13em;
+/* 74px, not 60: "WHAT IT IS" is a longer label than the five market fields and
+   the column has to stay aligned, so every dt widens rather than that one row
+   hanging out of the stack. */
+.eng-stats dt{ flex:none; width:74px; font-size:8.5px; letter-spacing:.13em;
   color:rgba(234,255,249,.45); }
 .eng-stats dd{ margin:0; font-size:11px; font-weight:bold; color:#eafff9; }
+/* The premise is a phrase, not a metric — normal weight so it doesn't read as
+   another number, and it leads the block because it is what the rest describes. */
+.eng-stats .eng-sector dd{ font-weight:normal; }
 
 /* THE DEAL FILE — the closed cover over the record: MANILA on purpose (author,
    2026-08-03), the one warm paper object on a teal terminal, wearing the same
@@ -739,11 +807,14 @@ export const ENGAGEMENT_CSS = `
   border:1px solid rgba(59,44,12,.55);
   border-left:2px solid rgba(255,95,158,.5);
   /* The polygon runs PAST the border box on purpose — 5px below for the
-     sheet-edge ::after, 28px above for the paperclip (its rotated loop tops
-     out ~27px above the border box at the badge clamp's max — no slack, do
-     not shrink it):
-     a polygon ending at the box edge clips both out of existence. The extra
-     points keep the top-right corner cut's diagonal exactly where it was. */
+     sheet-edge ::after, 28px above for the paperclip: a polygon ending at the
+     box edge clips both out of existence. The extra points keep the top-right
+     corner cut's diagonal exactly where it was.
+     The 28 was sized to the old clip, which topped out ~27px above the border
+     box with no slack. The drawn gem clip sits lower (top:-11px) and tops out
+     ~21px, so there is ~7px of headroom now — that is the budget for lowering
+     .eng-cover-clip's top further or growing its height, and the number to
+     re-derive against if either moves. */
   clip-path:polygon(0 -28px,calc(100% - 14px) -28px,calc(100% - 14px) 0,100% 14px,100% calc(100% + 5px),0 calc(100% + 5px));
 }
 .eng-cover::before{
@@ -793,12 +864,20 @@ export const ENGAGEMENT_CSS = `
   display:block; margin-bottom:2px; font-style:normal; font-weight:normal;
   font-size:5.8px; letter-spacing:.16em; color:rgba(11,22,20,.6);
 }
-/* One paperclip, drawn: an outlined loop over the photo's top edge. */
+/* One paperclip, drawn: a gem-clip wire gripping the photo's top edge. The SVG
+   carries the shape and its own shading (see CoverClip) — all this rule owns is
+   where it sits, how crooked it is, and the shadow it casts on the matte.
+   drop-shadow, not box-shadow: the shadow has to follow the WIRE, and a box
+   shadow would print the element's rectangle onto the photo.
+   15px wide, not 17: the viewBox is narrower than the old rounded rect, and the
+   height/top pair is the clip-path headroom constraint documented on the
+   component — at top:-11px the rotated hook lands ~21px above .eng-cover, well
+   inside the 28 the polygon clears. */
 .eng-cover-clip{
-  position:absolute; left:16px; top:-16px; width:17px; height:42px;
-  border:2px solid rgba(205,224,219,.92); border-radius:9px;
+  position:absolute; left:16px; top:-11px; width:15px; height:42px;
+  overflow:visible;
   transform:rotate(-9deg);
-  box-shadow:inset 0 0 0 1.5px rgba(2,15,13,.4), 0 1px 3px rgba(0,0,0,.35);
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));
 }
 /* Sheet edges under the cover's bottom lip: white paper peeking from a manila
    folder. Affirmative — "there is a file here" — the opposite of narrating an
@@ -914,6 +993,13 @@ export const ENGAGEMENT_CSS = `
 .eng-form .eng-stats > div{ display:flex; align-items:baseline; gap:8px; }
 .eng-form .eng-stats dt{ width:58px; color:rgba(36,28,8,.58); }
 .eng-form .eng-stats dd{ color:#1c1505; }
+/* THE PREMISE SPANS THE FORM. On the paper record the particulars are a
+   two-column grid of short market numbers, and "a money market" is neither
+   short nor a number — sharing a cell with MCAP wrapped its label onto two
+   lines. Full width, label sized to its own text, sitting above the grid it
+   describes. */
+.eng-form .eng-stats .eng-sector{ grid-column:1 / -1; }
+.eng-form .eng-stats .eng-sector dt{ width:auto; white-space:nowrap; }
 /* One document, one impression: the stamp's landed state is class-held so
    skipRoll, reduced motion and arrived re-mounts all show it without a
    timeline — and the STATUS line dies the same frame, no transition, the

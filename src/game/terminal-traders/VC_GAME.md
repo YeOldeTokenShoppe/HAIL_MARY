@@ -234,18 +234,32 @@ face shield** (§1).
 evidence summarised back at you. It still *correlates* with truth, because an
 honest deal yields fewer catches; that correlation is information you earned.
 
-The 14 asides are archetype-agnostic and live in `desk.js`. They never apologise
-and never concede. No aside may name a fact, a lane or an outcome — "records" and
-"paperwork" are forbidden words there, being a lane and a role label.
+The 23 asides are archetype-agnostic and live in `desk.js`. No aside may name a
+fact, a lane or an outcome — "records" and "paperwork" are forbidden words there,
+being a lane and a role label.
 
-**Content debt from the bot:** the asides are rewritten (*"My client has shipped
-something"*), but two `POSITIONED` slots still claim a personal stake —
-`backdoorFork` *"I'm in this myself"*, `yieldMirage` *"My own money's in the
-vault"*. A commissioned agent has no money in the vault: move the interest from
-ownership to the close. `anonButReal`'s is about the client's funding and is fine,
-and **`badTokenomics`'s `commission` slot is the worked example** — the bot's
-interest is the close, the honest answer is identical in both branches, and that
-is exactly why it cannot help you.
+**They may now flinch (draft 2, 2026-08-04).** This section used to say the bot
+"never apologises and never concedes"; the retone deliberately reverses that, and
+the bank carries embarrassment, self-correction and open frustration. The rule
+that replaces it is the load-bearing one: **composure belongs to the pressure
+band, never to the branch.** `pressure()` reads `run.outcomes` and nothing else —
+an assertion pins that — so a bot selling a sound project stumbles exactly as
+often as one selling a rotten project, given the same findings. Reading nerves
+instead of evidence stays a mistake, and the briefing's last line says so out loud.
+
+**Content debt from the bot:** two `POSITIONED` slots claimed a personal stake.
+`yieldMirage` *"My own money's in the vault"* is **fixed** as of draft 2 — its
+`stake` slot is now a future commission deposit, which is true, sits in a
+contract, and is verifiable before funding, while leaving the slot's real lesson
+(lock, waiver, redemption order) untouched. `backdoorFork` *"I'm in this myself"*
+is **still outstanding**, and note that the shared `POSITIONED` tip bank in
+`virgil.js` now assumes the commission framing in two of its three lines, so it
+reads slightly wrong against that slot until it is brought across. A commissioned
+agent has no money in the vault: move the interest from ownership to the close.
+`anonButReal`'s is about the client's funding and is fine, and **`badTokenomics`'s
+`commission` slot is the worked example** — the bot's interest is the close, the
+honest answer is identical in both branches, and that is exactly why it cannot
+help you.
 
 ---
 

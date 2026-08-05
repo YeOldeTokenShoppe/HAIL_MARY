@@ -790,6 +790,24 @@ const CyborgTempleScene = ({
   useSitePalForDetective = false, // Same as above, for the Detective character.
   useSitePalForMonk = false, // Same shared SitePal portal, mapped onto Monk_Face2.
   externalFocusAgent = null, // When set, sync internal focus to this agentId — lets the parent (e.g. the consultant railway in /trade) fly the camera to a character without an in-scene click. Pass `null` to clear focus.
+  /* THE PARENT OWNS THE CAMERA — set during the VC game, where PressSession
+   * drives every cut itself and an in-scene gesture can only get in the way.
+   *
+   * IT IS A ONE-WAY TRAP WITHOUT THIS, which is the bug it fixes. A click sets
+   * focus LOCALLY as well as calling onAgentClick, and during the press game the
+   * parent deliberately ignores that callback (externalFocusAgent is pressFocus,
+   * not focusedAgent). So the scene zooms out on its own and the sync effect
+   * cannot put it back — it early-returns when the prop's VALUE is unchanged
+   * (`prev.agentId === externalFocusAgent`), and pressFocus has not changed.
+   * Recovery had to wait for the next claim or press: "if i accidentally click
+   * the pitchbot, i am zoomed out and can't return" (author, 2026-08-04).
+   *
+   * Locking the gestures is the right half to disable rather than making the
+   * sync effect re-fire on an unchanged value: during the game the room is a
+   * stage, not something you browse, and every shot it needs is one the game
+   * asks for. Orbit and zoom are untouched — this is only the focus/unfocus
+   * gestures. */
+  focusLocked = false,
   speechActive = false, // When true, the focused character cross-fades to idle (speaking to player). When false, they cross-fade to typing (looking up info). Parent flips this when game-flow audio starts/ends.
   revealMode = null, // null | 'aligned' | 'missed' | 'abstained'. When set, hides the StageProps collection, flies the camera to the Stage preset, and plays each character's reaction animation. Parent sets this after the verdict is locked; clear it to restore the gameplay scene for the next case.
 }) => {
@@ -901,6 +919,12 @@ const CyborgTempleScene = ({
   // stale closure in there.
   const pitchStartedRef = useRef(false);
   useEffect(() => { pitchStartedRef.current = !!pitchStarted; }, [pitchStarted]);
+  /* Mirrored for the same reason: the pointer/key handlers are bound once in an
+   * effect that must not re-run on every prop change (rebinding them mid-gesture
+   * drops the gesture), so they read the lock through a ref rather than closing
+   * over the prop. See focusLocked. */
+  const focusLockedRef = useRef(false);
+  useEffect(() => { focusLockedRef.current = !!focusLocked; }, [focusLocked]);
   /* THE BOT IS TALKING RIGHT NOW. Same signal that picks his talking clip, mirrored
    * into a ref so useFrame can read it without re-subscribing every beat. */
   const speechActiveRef = useRef(false);
@@ -6017,7 +6041,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       }
       
       
-      if (event.key === 'Escape' && focusTarget) {
+      if (event.key === 'Escape' && focusTarget && !focusLockedRef.current) {
         restoreAllFromFocus();
 
         // Notify parent that focus is cleared
@@ -6039,6 +6063,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
 
     // Touch events for mobile and tablets
     const handleTouchStart = (event) => {
+      if (focusLockedRef.current) return;   // see focusLocked
       // Don't prevent default for better touch compatibility
       // event.preventDefault();
 
@@ -6414,6 +6439,10 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
       // Prevent default to avoid any interference
       event.preventDefault();
       event.stopPropagation();
+
+      // THE PARENT IS DRIVING — see focusLocked. Bail before the raycast so no
+      // focus, unfocus or screen gesture can fire.
+      if (focusLockedRef.current) return;
 
       // Safety check for groupRef
       if (!groupRef.current) return;
@@ -7011,6 +7040,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
 
     // Double-click to unfocus and return to default view
     const handleDblClick = () => {
+      if (focusLockedRef.current) return;   // see focusLocked
       // The Screen double-click-to-focus gesture in handleClick fires a
       // native dblclick event right after; consume it once so we don't
       // immediately unfocus what was just focused.

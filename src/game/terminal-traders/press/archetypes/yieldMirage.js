@@ -57,27 +57,28 @@ export const SLOTS = [
     subject: "WHERE IT COMES FROM",
     shape: SHAPES.UNSOURCED,
     loadBearing: true,
+    lead: "The first thing you'll want to know is where the return actually comes from.",
     fact: (v) => `Yield's been paid every day for ${v.days} days straight.`,
-    spin: "It pays. It's paid every single day. At some point you stop asking why and start asking why you're not in.",
+    spin: "That kind of consistency is rare. If your team wants dependable performance, this deserves a serious look.",
     // backing is slot-level: identical in both branches by construction.
     backing: BACKING.HARD,
     rug: {
       generic: {
-        line: "Where's it from? Basis trade, mostly. Some market-making. And— fine, and inflows, in the thin months. That's normal in the ramp.",
+        line: "The main engines are basis trades and market-making fees. New deposits have helped smooth thinner months too, which can happen while a vault is growing.",
         receipt: { title: "YIELD SOURCE", rows: [["Basis trade", "PARTIAL"], ["Market making", "PARTIAL"], ["New deposits", "YES — 'IN THIN MONTHS'"]] },
       },
       sharp: {
-        line: "What share is inflows? …I've asked. I get a range. The range moves. Last quarter I'd have said a third, and I'd have been guessing.",
+        line: "You want the exact deposit share. Fair question. I've asked, but the range keeps moving. Last quarter I might have said a third, and that would have been an estimate.",
         receipt: { title: "SOURCE SPLIT", rows: [["Disclosed split", "NONE"], ["Estimate stability", "MOVES"], ["Inflow share", "UNKNOWN"]] },
       },
     },
     legit: {
       generic: {
-        line: "Basis trade and market-making fees, split published monthly. Zero from deposits — they publish that line specifically because everyone asks.",
+        line: "Basis trades and market-making fees. The split is published monthly, including a separate deposits line at zero, because careful desks always ask.",
         receipt: { title: "YIELD SOURCE", rows: [["Basis trade", "62%"], ["Market making", "38%"], ["New deposits", "0%"]] },
       },
       sharp: {
-        line: "Published monthly, audited quarterly, and the deposits line is a hard zero. That's the whole reason I'll put my name on it.",
+        line: "Monthly source reports, quarterly independent checks, and a hard zero beside deposit-funded yield. That is the evidence that made me comfortable bringing it to you.",
         receipt: { title: "SOURCE SPLIT", rows: [["Disclosed split", "MONTHLY"], ["Deposit-funded", "0%"], ["Independent check", "QUARTERLY"]] },
       },
     },
@@ -89,8 +90,9 @@ export const SLOTS = [
     subject: "THE HEADLINE",
     shape: SHAPES.SELECTIVE_WINDOW,
     loadBearing: false,
+    lead: "On the headline number, which I assume is what got this meeting.",
     fact: (v) => `${v.apy}% APY, net of fees.`,
-    spin: "Show me where else you're getting that. I'll wait.",
+    spin: "Net of fees, that is a compelling return. I'd be delighted if your chart expert can show me a cleaner opportunity at the same level.",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
     // does not; that is a property of the claim, not of whether the deal is
     // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
@@ -100,19 +102,19 @@ export const SLOTS = [
     // Confident, technically true, and stopping exactly short of the question
     // that would settle it. Only a loadBearing slot may keep this per-branch.
     generic: {
-      line: "That's the live number, trailing thirty, net. It's on the dashboard, it updates hourly, and it's what the thing actually paid — I'm not quoting you a forecast.",
+      line: "That is the live trailing-thirty-day result, net of fees. The dashboard updates hourly. It is what the vault paid, not a forecast — though thirty days is still one window.",
       receipt: { title: "HEADLINE RATE", partial: true, rows: [["Window", "TRAILING 30D"], ["Net of fees", "CONFIRMED"], ["Source", "LIVE DASHBOARD"]] },
     },
     rug: {
       // THE ESCALATION — the only press that moves your call on a rug.
       sharp: {
-        line: "You want the whole tape? There isn't one. Thirty days is the window they publish, and it is the only window they have ever published — no since-launch series, no quarterly prints, nothing behind it. The thirty is real. It is also all there is.",
+        line: "The complete history? They publish thirty days, and only thirty days: no since-launch series and no quarterly results. The number is real. I understand that a short history limits what it can prove.",
         receipt: { title: "RATE HISTORY", partial: true, rows: [["Published window", "30D ONLY"], ["Since-launch series", "NEVER PUBLISHED"], ["Quarterly prints", "NONE"]] },
       },
     },
     legit: {
       sharp: {
-        line: "Pull whatever you like, it's all posted back to day one. Since launch it runs high teens, worst quarter was single digits, and they printed the bad quarter themselves. Nobody prints the bad quarter.",
+        line: "Please pull the full history; it runs back to day one. Since launch it is in the high teens, its worst quarter was single digits, and the team published that weak quarter without being pushed.",
         receipt: { title: "RATE HISTORY", rows: [["Published window", "SINCE LAUNCH"], ["Since-launch rate", "HIGH TEENS"], ["Worst quarter", "SINGLE DIGITS"]] },
       },
     },
@@ -124,8 +126,9 @@ export const SLOTS = [
     subject: "GETTING OUT",
     shape: SHAPES.SURVIVORSHIP,
     loadBearing: false,
+    lead: "Liquidity next — whether people can leave when they want to.",
     fact: "Deposits are up every month since launch.",
-    spin: "Nobody's leaving. That's not a queue, that's conviction.",
+    spin: "More people are choosing the vault every month. That is a meaningful vote of confidence from the market.",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
     // does not; that is a property of the claim, not of whether the deal is
     // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
@@ -135,19 +138,19 @@ export const SLOTS = [
     // Confident, technically true, and stopping exactly short of the question
     // that would settle it. Only a loadBearing slot may keep this per-branch.
     generic: {
-      line: "Withdrawals are open and they're onchain — go and look. Nobody's come to me with a problem, and I'd be the first call they made. People come and go. That's a market.",
+      line: "Withdrawals are open and visible onchain, so your team can inspect them. I have received no complaints, though I agree that tells you less than the settlement history itself.",
       receipt: { title: "WITHDRAWALS", rows: [["Withdrawals", "OPEN"], ["Onchain", "PUBLIC"], ["Complaints to me", "ZERO"]] },
     },
     rug: {
       // THE ESCALATION — the only press that moves your call on a rug.
       sharp: {
-        line: "Eleven days on the biggest one — and it cleared. Late isn't never. The money that cleared it came in that week, which is what a book is for.",
+        line: "The largest exit took eleven days, but it did clear. The funds came from deposits received that week. I'd call that active cash management; I understand you may call it dependence on new money.",
         receipt: { title: "LARGEST EXIT", rows: [["Requested", "DAY 0"], ["Settled", "DAY 11"], ["Funded by", "SAME-WEEK DEPOSITS"]] },
       },
     },
     legit: {
       sharp: {
-        line: "Biggest single exit cleared same-day, no haircut, straight out of the reserve wallet. You want the tx, I'll find you the tx — check the one under it while you're in there.",
+        line: "The largest exit settled the same day, at full value, directly from the reserve wallet. I'll give you the transaction; check the next-largest exit while you are there.",
         receipt: { title: "LARGEST EXIT", rows: [["Settled", "SAME DAY"], ["Haircut", "NONE"], ["Funded by", "RESERVES"], ["Onchain", "VERIFIABLE"]] },
       },
     },
@@ -159,8 +162,9 @@ export const SLOTS = [
     subject: "THE AUDIT",
     shape: SHAPES.BORROWED_CREDIBILITY,
     loadBearing: false,
+    lead: "On the contracts, they brought in an outside firm before launch.",
     fact: (v) => `${v.auditor} looked at the contracts.`,
-    spin: "Audited. By a name you know. Next question.",
+    spin: "A respected firm reviewed the contracts. For a team that cares about technical risk, that is a strong starting point.",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
     // does not; that is a property of the claim, not of whether the deal is
     // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
@@ -170,19 +174,19 @@ export const SLOTS = [
     // Confident, technically true, and stopping exactly short of the question
     // that would settle it. Only a loadBearing slot may keep this per-branch.
     generic: {
-      line: "They signed it. Published report, no criticals, everything they flagged closed out before launch — that's a firm that turns work down, they don't put the name on a mess.",
+      line: "The report is public: no critical findings, and every issue they raised was closed before launch. A selective firm was willing to sign its name to that work.",
       receipt: { title: "AUDIT REPORT", partial: true, rows: [["Contracts", "REVIEWED"], ["Report", "PUBLISHED"], ["Criticals", "0"], ["Remediation", "CLOSED"]] },
     },
     rug: {
       // THE ESCALATION — the only press that moves your call on a rug.
       sharp: {
-        line: "Scope. Right. Of course it's scope. They read the code and the code does exactly what it says it does — where the money comes from was never a thing anyone hired them to look at.",
+        line: "You're asking about scope, and that distinction is fair. The firm checked whether the code behaves as written. It was not hired to verify where the yield comes from or whether the vault is solvent.",
         receipt: { title: "WHAT WAS EXAMINED", partial: true, rows: [["Contract logic", "IN SCOPE"], ["Fund flows", "OUT OF SCOPE"], ["Solvency", "NOT EXAMINED"]] },
       },
     },
     legit: {
       sharp: {
-        line: "Go and pull the scope page then. Contracts by one firm, reserves by a different one, quarterly, both published — two questions, two firms. I did say it was checked.",
+        line: "The scope page should reassure you: one firm checked the contracts, another verifies reserves each quarter, and both reports are public. Different questions, appropriately different reviews.",
         receipt: { title: "WHAT WAS EXAMINED", rows: [["Contract logic", "IN SCOPE"], ["Fund flows", "VERIFIED QUARTERLY"], ["Verifier", "SECOND FIRM, INDEPENDENT"]] },
       },
     },
@@ -194,17 +198,18 @@ export const SLOTS = [
     subject: "WHY IT KEEPS WORKING",
     shape: SHAPES.UNFALSIFIABLE,
     loadBearing: false,
+    lead: "Then the fair question, which is whether it keeps working.",
     fact: "The strategy scales with volume, and volume is up.",
-    spin: "It works in every market. Up, down, sideways — the basis is always there.",
+    spin: "More volume gives the strategy more chances to earn. In rising, falling, or sideways markets, there can still be a price gap to capture.",
     // backing is slot-level: identical in both branches by construction.
     backing: BACKING.VIBES,
     rug: {
-      generic: { line: "It works. It's been working. It works in chop, it works in a rally, I don't know what else to tell you.", receipt: null },
-      sharp: { line: "What would make me get out? Nothing— I mean, obviously if it stopped paying. But it hasn't stopped paying.", receipt: null },
+      generic: { line: "It has worked through choppy and rising markets so far. I can't offer you every future market in advance, but the operating record is encouraging.", receipt: null },
+      sharp: { line: "What would change my mind? I—well, if it stopped paying, obviously. I don't have a threshold before that. It hasn't stopped yet.", receipt: null },
     },
     legit: {
-      generic: { line: "It works. It's been working. Look, I'm not going to pretend I've stress-tested it myself.", receipt: null },
-      sharp: { line: "What would get me out? Reserves slipping below the published floor two quarters running. It's a real number, I watch it.", receipt: null },
+      generic: { line: "It has worked so far, but I won't pretend I personally stress-tested every market condition. The monitoring rules matter more than my confidence.", receipt: null },
+      sharp: { line: "I would get out if reserves fell below the published floor for two straight quarters. That is a public threshold, set in advance, and I watch it.", receipt: null },
     },
   },
 
@@ -214,8 +219,9 @@ export const SLOTS = [
     subject: "THE DESK",
     shape: SHAPES.UNSOURCED,
     loadBearing: false,
+    lead: "Behind the strategy there's a desk, and desks have histories.",
     fact: (v) => `Desk of four. Two out of ${v.priorA}, one out of ${v.priorB}.`,
-    spin: "These are real trading people. They've run size before.",
+    spin: "This is an experienced trading team, not a collection of new profiles. They have handled serious capital before.",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
     // does not; that is a property of the claim, not of whether the deal is
     // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
@@ -225,13 +231,13 @@ export const SLOTS = [
     // Confident, technically true, and stopping exactly short of the question
     // that would settle it. Only a loadBearing slot may keep this per-branch.
     generic: {
-      line: "They've run size. The pedigree's public — same names, same desks, you can look every one of them up. Nobody here appeared last year.",
+      line: "The names and previous desks are public, and the profiles match the deck. Their résumés are real. The next question is whether former colleagues support the reputation being sold.",
       receipt: { title: "PEDIGREE", rows: [["Desk size", "4"], ["Prior desks", "CONFIRMED"], ["Public profiles", "MATCH DECK"]] },
     },
     rug: {
       // THE ESCALATION — the only press that moves your call on a rug.
       sharp: {
-        line: "So it traces back to the same two mouths. It's a small industry — everybody was introduced by somebody. You won't find a desk on earth that passes that test.",
+        line: "So the praise traces back to the same two people. It is a small industry, and introductions are common—but no, I cannot give you an independent first-hand source beyond them today.",
         // NULL ON PURPOSE — this is the NOTHING ON FILE beat. A specialist went
         // and looked and found a proven absence, which is strictly stronger than
         // a board staying dark and is the only way this game can prove a negative.
@@ -241,7 +247,7 @@ export const SLOTS = [
     },
     legit: {
       sharp: {
-        line: "You went and rang them yourself. Then you heard what I heard — nobody set those calls up, and every one of them gets to risk discipline before they get to returns. That's the part I was buying.",
+        line: "You called people independently and heard what I heard. No one arranged those conversations, and every source mentioned risk discipline before returns. That consistency is what won me over.",
         receipt: { title: "WHO VOUCHES", rows: [["Endorsements traced", "11"], ["First-hand sources", "6"], ["Via warm intro", "NONE"], ["Praised for", "RISK DISCIPLINE"]] },
       },
     },
@@ -250,11 +256,20 @@ export const SLOTS = [
   {
     id: "stake",
     lane: LANES.CHAIN,
-    subject: "HIS POSITION",
+    subject: "THE PITCH BOT'S POSITION",
     shape: SHAPES.POSITIONED,
     loadBearing: false,
-    fact: "My own money's in the vault.",
-    spin: "I eat here. That's the only credential that's ever mattered.",
+    // DRAFT 2 (2026-08-04). This was "My own money's in the vault." A
+    // COMMISSIONED AGENT HAS NO HOLDING — VC_GAME.md §3 files that exact
+    // sentence as content debt, and Virgil's POSITIONED tip was already
+    // rewritten off "He's in it" for the same reason; the slot itself never
+    // was. A FUTURE commission deposit is true, is in a contract, and is
+    // verifiable BEFORE funding — and it leaves the slot's real lesson
+    // untouched: what settles alignment is the lock, the waiver and the
+    // redemption order, never the gesture.
+    lead: "And my own position, because you should weigh it.",
+    fact: "If this closes, part of my commission goes into the vault.",
+    spin: "I don't simply collect a fee and leave. Part of my compensation rides beside your capital.",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
     // does not; that is a property of the claim, not of whether the deal is
     // rotten. Authored per branch it WAS the leak: resolvePress zeroes every
@@ -264,43 +279,56 @@ export const SLOTS = [
     // Confident, technically true, and stopping exactly short of the question
     // that would settle it. Only a loadBearing slot may keep this per-branch.
     generic: {
-      line: "Same vault as yours, same product, and I've not taken a penny back out since the day it went in. That's onchain. Count it yourself.",
-      receipt: { title: "HIS DEPOSIT", rows: [["Same vault", "YES"], ["Deposit", "ONCHAIN"], ["Withdrawn to date", "NONE"]] },
+      line: "The commission deposit is in my contract and goes into the same vault and product as yours. The amount and any later withdrawal will be visible onchain.",
+      receipt: { title: "COMMISSION TERMS", rows: [["Same vault", "YES"], ["Deposit requirement", "IN CONTRACT"], ["Future withdrawals", "ONCHAIN"]] },
     },
     rug: {
       // THE ESCALATION — the only press that moves your call on a rug.
       sharp: {
-        line: "Seven days against the depositors' thirty, and yes, the desk can lift it — they can lift anyone's, it's a standard clause. Queue's first asked, first paid. None of that's hidden. Nobody had asked.",
-        receipt: { title: "EXIT TERMS", rows: [["Depositor lock", "30 DAYS"], ["His lock", "7 DAYS"], ["Waiver", "DESK DISCRETION"], ["Redemption order", "FIRST ASKED"]] },
+        line: "My lock is seven days; yours is thirty. The desk may waive mine, and redemptions are first requested, first paid. Those terms are disclosed. You're right that they give me an easier exit.",
+        receipt: { title: "EXIT TERMS", rows: [["Depositor lock", "30 DAYS"], ["Pitch bot lock", "7 DAYS"], ["Waiver", "DESK DISCRETION"], ["Redemption order", "FIRST ASKED"]] },
       },
     },
     legit: {
       sharp: {
-        line: "Ninety days against their thirty, no waiver clause in mine, and I'm paid out behind every depositor in the book. I had that written in. Without it the claim's worth nothing.",
-        receipt: { title: "EXIT TERMS", rows: [["Depositor lock", "30 DAYS"], ["His lock", "90 DAYS"], ["Waiver", "NONE"], ["Redemption order", "HIM LAST"]] },
+        line: "My lock is ninety days against your thirty, with no waiver, and every depositor is paid before me. I required those terms because \"aligned\" means very little without them.",
+        receipt: { title: "EXIT TERMS", rows: [["Depositor lock", "30 DAYS"], ["Pitch bot lock", "90 DAYS"], ["Waiver", "NONE"], ["Redemption order", "PITCH BOT LAST"]] },
       },
     },
   },
 ];
 
+// DRAFT 2 (2026-08-04). Two things changed together here.
+//
+// DE-GENDERED. Every rug line and two legit lines said "he" of the pitcher —
+// the same category error §4's tip bank and GR80's `partial` line were already
+// fixed for. The rig is rolled blind (§1 rule 6), so the copy cannot know which
+// shell is on screen and must not guess.
+//
+// AND THE VERDICT NOW NAMES THE REASONING ERROR, not just the truth value. The
+// old labels (TRUE / SHADED) told the player the answer without telling them
+// what to do differently next time; the transferable half is WHICH inference
+// failed. Nothing here may imply that tone or nerves were evidence — the
+// pressure band is authored independently of the branch, so reading it is a
+// mistake the autopsy must never reward.
 export const AUTOPSY = {
   rug: {
-    source: "TRUE — it did pay every day. He just couldn't say how much of it was other people's deposits.",
-    apy: "SHADED — annualised from the good weeks.",
-    withdrawals: "TRUE, AND IT SETTLED — eleven days, out of that week's deposits. The exit that cleared was funded by the people still arriving.",
-    audit: "TRUE, BUT IT DOESN'T ANSWER THE QUESTION — auditors checked the plumbing, never the solvency.",
-    sustain: "SHADED — 'it works' was the whole argument, and nothing could have counted against it.",
-    team: "SHADED — the pedigree came off the deck. Nobody was called.",
-    stake: "TRUE — he was in, and he could leave any time he liked.",
+    source: "TRUE FACT, UNSUPPORTED CONCLUSION — yield arrived every day, but the source split was undisclosed and unstable. The pitch bot could not show how much came from new deposits.",
+    apy: "TRUE NUMBER, SELECTED WINDOW — the quoted rate was what the last thirty days paid. With no earlier series, it could not show whether that month was typical.",
+    withdrawals: "TRUE GROWTH, MISSING EXIT STORY — deposits rose, but the largest withdrawal waited eleven days and was paid from that week's new deposits.",
+    audit: "TRUE REVIEW, WRONG QUESTION — the auditors checked whether the contracts worked as written. They did not examine fund flows or solvency.",
+    sustain: "NO TESTABLE SUPPORT — \"it has kept working\" was the argument. The pitch bot named no warning sign before payments stopped.",
+    team: "TRUE RÉSUMÉS, CIRCULAR REPUTATION — the jobs were real, but the praise traced back to the same two people. No independent source was found.",
+    stake: "TRUE COMMITMENT, UNEQUAL RISK — commission was due to enter the vault, but with a shorter lock, a possible waiver, and first-requested priority.",
   },
   legit: {
-    source: "TRUE — published split, zero from deposits, and they publish it because everyone asks.",
-    apy: "TRUE — headline was the good window, but the twelve-month sat right beside it.",
-    withdrawals: "TRUE — two exits at size, settled same day. The test had been run.",
-    audit: "TRUE — contracts and reserves checked separately, which is the version that means something.",
-    sustain: "SHADED — he still couldn't stress-test it himself, and he admitted that.",
-    team: "TRUE — he actually made the calls.",
-    stake: "TRUE — locked longer than you. That's the claim worth hearing.",
+    source: "SUPPORTED — monthly reports split the yield by source, quarterly checks confirmed it, and the deposit-funded line was zero.",
+    apy: "SUPPORTED WITH CONTEXT — the headline used a strong thirty-day window, but the full history sat beside it and included the weak quarter.",
+    withdrawals: "SUPPORTED — the largest exits settled the same day, at full value, directly from reserves. The liquidity claim had been tested.",
+    audit: "SUPPORTED — one firm checked the contracts and an independent firm checked reserves. Together, their scopes reached the questions being implied.",
+    sustain: "LIMITED — the pitch bot could not personally stress-test the strategy, but did name a public reserve threshold that would change the recommendation.",
+    team: "SUPPORTED — independent calls confirmed the team's history, and the sources consistently emphasized risk discipline before returns.",
+    stake: "SUPPORTED ALIGNMENT — the commission had a longer lock than depositors, no waiver, and last place in the redemption order.",
   },
 };
 

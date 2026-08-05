@@ -113,36 +113,86 @@ export const VIRGIL_BEAT_MS = 2400;
  *               It buys a second thing for free: the first claim's audio now
  *               starts inside a click, so no autoplay policy can swallow it.
  */
+/**
+ * TWO BEATS, ONE COMPONENT (2026-08-04). This renders the pitch bot's opening
+ * remarks AND Virgil's first-run briefing, because they are the same shape — a
+ * fixed list of lines revealed in step with a voice, a skip while it plays, a
+ * gate when it stops — and forking it would guarantee the two drift on the
+ * reveal animation, the skip semantics or the gate wording.
+ *
+ * Everything that differs between them is a prop with a pitch-bot default, so
+ * the existing call sites did not have to change:
+ *
+ * @param who        speaker label. Defaults to the pitch bot.
+ * @param kicker     the dim half of the header ("— opening remarks").
+ * @param skipLabel  text on the skip button.
+ * @param beginLabel text on the gate button.
+ * @param quoted     wrap each line in quotation marks. TRUE for the pitch, which
+ *                   is somebody selling you something and reads as reported
+ *                   speech; FALSE for Virgil, who is talking TO you rather than
+ *                   being quoted at you, and whose lines are house rules.
+ */
 export function OpeningBody({ lines = [], at = -1, onSkip = null, onBegin = null,
-                              done = false }) {
+                              done = false, who = null, kicker = "— opening remarks",
+                              skipLabel = "SKIP INTRO ▸",
+                              beginLabel = "◉ LET PITCHBOT MAKE ITS CASE ▸",
+                              cue = "▼ YOUR MOVE — PRESS TO CONTINUE",
+                              quoted = true, subtitle = false }) {
   if (!lines.length) return null;
   const shown = done ? lines.length : Math.max(0, at + 1);
   return (
     <div className="pu-claim pu-opening" data-mood="cool">
       <div className="pu-who">
-        {PITCH_BOT.name.toUpperCase()} <span className="pu-dim">— opening remarks</span>
+        {(who ?? PITCH_BOT.name).toUpperCase()} <span className="pu-dim">{kicker}</span>
         {/* SKIP AND THE GATE ARE NEVER BOTH UP. Once the remarks are done there
             is nothing left to skip, and two buttons that do the same thing at
             the same moment is a choice the player has to read to discover is
             not one. The surfaces pass null for whichever is spent. */}
         {onSkip && !onBegin && (
           <button type="button" className="pu-skip" onClick={onSkip}>
-            SKIP INTRO ▸
+            {skipLabel}
           </button>
         )}
       </div>
-      {lines.slice(0, shown).map((line, i) => (
-        // Keyed by index deliberately: the bank is fixed for the session, so an
-        // index key is stable, and it is what lets the entrance animation fire
-        // per line instead of once for the block.
-        <div key={i} className={`pu-open-line${i === shown - 1 ? " now" : ""}`}>
-          “{line}”
-        </div>
-      ))}
+      {/* SUBTITLE MODE: the line he is ON, not every line he has said.
+          The accumulating transcript is right for the bot's three-line opening
+          and wrong for an eight-line briefing delivered over a big talking head
+          — the block grew taller than the viewport and drove itself up into the
+          wordmark. It is also the wrong READING of the beat: he is guiding by
+          voice, so the text is a subtitle under a face, not a document.
+          It lands the instruction for free — the last line stays on screen with
+          the gate, so what you are looking at when the button appears is the
+          sentence telling you to press it. */}
+      {(subtitle ? lines.slice(Math.max(0, shown - 1), shown) : lines.slice(0, shown))
+        .map((line, i, arr) => {
+          // Keyed by the line's REAL index, so subtitle mode swaps the node on
+          // every part and re-fires the entrance animation instead of mutating
+          // one div's text in place.
+          const realIndex = subtitle ? shown - arr.length + i : i;
+          return (
+            <div key={realIndex}
+                 className={`pu-open-line${realIndex === shown - 1 ? " now" : ""}`}>
+              {quoted ? `“${line}”` : line}
+            </div>
+          );
+        })}
+      {/* THE GATE HAS TO WIN A BUSY SCREEN (author, 2026-08-04: "the scene and
+          page are busy and i want to make sure the player understands what to do
+          after Virgil speaks"). Saying "click the button" in the briefing was not
+          enough on its own, and it was never going to be: the instruction was a
+          10px line of dialogue and the thing it pointed at was a 10px translucent
+          bar, both losing to a lit 3D room. Copy cannot fix an affordance.
+
+          So the gate gets its own treatment rather than wearing the answer
+          buttons' — a gold cue line naming it as YOUR move (gold is already this
+          UI's "primary control" colour; see .pu-seats-h), a louder fill, and a
+          slow pulse that stops for prefers-reduced-motion. It is the only thing
+          on screen that is animating when it is up, which is the actual signal. */}
       {onBegin && (
-        <div className="pu-choice">
-          <button type="button" className="pu-choice-btn hear" onClick={onBegin}>
-            ◉ LET PITCHBOT MAKE ITS CASE ▸
+        <div className="pu-choice pu-gate">
+          <span className="pu-gate-cue">{cue}</span>
+          <button type="button" className="pu-choice-btn hear gate" onClick={onBegin}>
+            {beginLabel}
           </button>
         </div>
       )}
@@ -203,8 +253,37 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
           sixth claim should not be delivered like the first. */}
       {aside && <div className="pu-aside">“{aside}”</div>}
 
-      <div className="pu-spin">“{claim.spin}”</div>
+      {/* THE CLAIM IS NOW SUBJECT → FACT → SPIN, and it used to be spin → fact
+          with no subject at all (2026-08-04: "there is no context to this
+          claim"). Two bugs, one symptom.
+
+          THE SUBJECT WAS AUTHORED ALL ALONG and thrown away. Every slot carries
+          one — THE TEAM, WHERE IT COMES FROM, THE HEADLINE — and neither surface
+          rendered it; its only consumer was stampNothing on an evidence board.
+          So the heading that says what the next two lines are ABOUT existed, was
+          maintained, and was invisible.
+
+          AND THE INFERENCE CAME BEFORE ITS EVIDENCE. Spins are deictic by
+          construction — "THESE are real people", "THAT kind of consistency",
+          "Net of fees, THAT is a compelling return" — so printing the spin first
+          hands the player a pronoun with no antecedent and supplies the referent
+          on the line below. That is backwards from the game's own thesis (§1:
+          every fact is true, "what you judge is the inference sold on top of
+          it"): the fact is the floor, the spin is what gets built on it, and the
+          eye has to meet them in that order for the judgement to be available at
+          all. Reordering fixes every archetype at once and cost no prose — the
+          lines that read as context-free were the right lines in the wrong
+          order. */}
+      <div className="pu-subject">{claim.subject}</div>
+      {/* THE LEAD — normal deck framing, so the point is introduced before it is
+          argued (author, 2026-08-04: "there should be some normal opening line
+          ... followed by the specifics"). It is the seller's voice but it is not
+          the SPIN: it says what this point is about and claims nothing, which is
+          what lets the fact underneath land as evidence rather than as a fragment.
+          Slot-level, so it cannot differ between branches. */}
+      {claim.lead && <div className="pu-lead">“{claim.lead}”</div>}
       <div className="pu-fact"><span className="pu-tag">FACT</span> {claim.fact}</div>
+      <div className="pu-spin">“{claim.spin}”</div>
 
       {/* THE LANE BAND'S OWN BOX IS GONE (author, 2026-08-04: "a stray box with
           this text... maybe Virgil should speak this part"). It was a
@@ -267,8 +346,18 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
  *                  it. Omitted everywhere else — the flat surface has no tile and
  *                  a status readout on a still is a lie.
  */
+/**
+ * @param onReplayBrief  re-run the first-run briefing. Null hides the control.
+ *   THE SURFACES ONLY PASS IT BEFORE THE PITCH HAS THE FLOOR, and that is a
+ *   deliberate limit rather than an oversight: the briefing renders in the
+ *   opening column, which claim 1 takes over for the rest of the session, so a
+ *   replay from claim 4 would speak six lines of house rules over the claim you
+ *   were reading with nowhere to print them. Wiring it mid-session means giving
+ *   it a surface of its own — worth doing, not free.
+ */
 export function VirgilRead({ claim, virgil = null, onToggleTips = null, spent = [],
-                             portrait = true, status = null, statusOn = false }) {
+                             portrait = true, status = null, statusOn = false,
+                             onReplayBrief = null }) {
   if (!claim && !virgil?.agenda && !virgil?.tip) return null;
   if (!claim) return null;
   const owner = laneOwner(claim);
@@ -292,6 +381,12 @@ export function VirgilRead({ claim, virgil = null, onToggleTips = null, spent = 
                           ? "Quiet him down — the running order stays on screen"
                           : "Let him chime in again"}>
                   {virgil?.tip ? "tips on" : "tips off"}
+                </button>
+              )}
+              {onReplayBrief && (
+                <button type="button" className="pu-virgil-mute" onClick={onReplayBrief}
+                        title="Have Virgil run through the house rules again">
+                  rules
                 </button>
               )}
             </span>
@@ -331,6 +426,12 @@ export function VirgilRead({ claim, virgil = null, onToggleTips = null, spent = 
             </span>
             {virgil?.tip && <span className="pu-virgil-tip">{virgil.tip}</span>}
             {virgil?.agenda && <span className="pu-virgil-agenda">{virgil.agenda}</span>}
+            {/* THE CONTROLS, LAST. Read → running order → what you can do about
+                it: the same order he says them in, so the panel and the voice
+                cannot disagree about which thought came first. Styled like the
+                agenda rather than the tip because it is actionable, not
+                flavour. */}
+            {virgil?.nextMove && <span className="pu-virgil-next">{virgil.nextMove}</span>}
           </span>
         </div>
   );
@@ -726,7 +827,20 @@ export const PRESS_UI_CSS = `
   padding-left:9px; border-left:2px solid rgba(255,255,255,0.18);
   color:rgba(234,255,249,0.62); }
 .pu-count { margin-left:auto; color:rgba(234,255,249,0.45); letter-spacing:0.1em; }
-.pu-spin { font-size:14px; line-height:1.42; margin:6px 0 8px; }
+/* WHAT THIS CLAIM IS ABOUT. Sized between the speaker line and the fact — it is
+   a label, not a voice, so it must not compete with the sentence underneath it.
+   Cyan ties it to the FACT tag it heads rather than to the pink speaker line. */
+.pu-subject { margin:8px 0 5px;
+  font:bold 9.5px/1.4 'Courier New',monospace; letter-spacing:0.15em;
+  color:rgba(47,214,214,0.85); }
+/* THE LEAD. Same voice as the spin and deliberately a step quieter than it —
+   framing, not argument — so the eye runs lead → fact → spin and the loudest
+   line is the one being judged. */
+.pu-lead { font-size:12.5px; line-height:1.42; margin:0 0 7px;
+  color:rgba(234,255,249,0.72); }
+/* THE SPIN NOW FOLLOWS THE FACT, so its top margin closes the gap to the line it
+   is built on and its bottom margin opens one before Virgil. */
+.pu-spin { font-size:14px; line-height:1.42; margin:9px 0 4px; }
 
 /* THE OPENING. Same block as a claim so the transition into claim 1 is a change
    of CONTENT, not a change of furniture — the border, the name line and the
@@ -837,6 +951,9 @@ export const PRESS_UI_CSS = `
    nobody else supplies and still what makes holding a specialist a decision
    rather than a guess — it is the SECOND line now, not a demoted one, and the
    two must never be concatenated (that is what trained the eye to skip both). */
+/* The controls he just named. Gold, because that is this UI's colour for the
+   move that is yours to make (.pu-seats-h, the gate's cue). */
+.pu-virgil-next { font-size:11.5px; line-height:1.4; color:#ffd23a; }
 .pu-virgil-tip { font-size:12.5px; line-height:1.4; color:#d8f7ec;
   font-weight:bold; font-style:italic; }
 .pu-virgil-agenda { font-size:11.5px; line-height:1.4; color:rgba(191,238,222,0.72); }
@@ -872,6 +989,27 @@ export const PRESS_UI_CSS = `
 .pu-choice-btn.hear { background:rgba(255,95,158,0.10);
   border-color:rgba(255,95,158,0.55); color:#ff5f9e; }
 .pu-choice-btn.hear:hover { background:rgba(255,95,158,0.18); }
+
+/* THE GATE — the one control the beat is waiting on, and the only animating
+   thing on screen while it is up. See the note at OpeningBody: a busy 3D room
+   was swallowing a 10px translucent bar, so this is louder on purpose and its
+   cue names it as a MOVE rather than as an option. */
+.pu-gate { gap:5px; margin-top:12px; }
+.pu-gate-cue { font:bold 9px/1.3 'Courier New',monospace; letter-spacing:0.18em;
+  color:#ffd23a; }
+.pu-choice-btn.gate { padding:12px; font-size:11.5px;
+  background:rgba(255,95,158,0.20); border-color:#ff5f9e; color:#ffd9e8;
+  animation:pu-gate-pulse 1.9s ease-in-out infinite; }
+.pu-choice-btn.gate:hover { background:rgba(255,95,158,0.32); animation:none;
+  box-shadow:0 0 16px 2px rgba(255,95,158,0.38); }
+@keyframes pu-gate-pulse {
+  0%, 100% { box-shadow:0 0 0 0 rgba(255,95,158,0.00); }
+  50%      { box-shadow:0 0 15px 2px rgba(255,95,158,0.34); }
+}
+/* Still obviously the live control without moving — a held glow, not a pulse. */
+@media (prefers-reduced-motion:reduce) {
+  .pu-choice-btn.gate { animation:none; box-shadow:0 0 12px rgba(255,95,158,0.30); }
+}
 /* TAKEN, NOT SPENT. Still live — re-reading the receipt against what you were
    then told, and replaying the reaction against the receipt, are both real
    moves. Dimmed only so the untaken one is the one that catches the eye. */

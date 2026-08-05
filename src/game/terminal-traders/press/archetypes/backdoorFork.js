@@ -83,6 +83,7 @@ export const SLOTS = [
     subject: "THE TEAM",
     shape: SHAPES.UNSOURCED,
     loadBearing: true, // the decisive thread, always free-press reachable
+    lead: "Let me start with the people, because that's what you're really funding.",
     fact: (v) => `Three named founders. Two with verifiable prior roles — ${v.priorA}, ${v.priorB}.`,
     spin: "These are real people with real résumés. You can look them up. That isn't nothing, that's the whole ballgame.",
     // backing is slot-level: identical in both branches by construction.
@@ -115,6 +116,7 @@ export const SLOTS = [
     subject: "THE AUDIT",
     shape: SHAPES.BORROWED_CREDIBILITY,
     loadBearing: false,
+    lead: "On security, they did what a serious team does before launch.",
     fact: (v) => `${v.auditor}. The audit came back clean.`,
     spin: "Gold-standard firm, clean report. What more do you want, a notarised prophecy?",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
@@ -150,6 +152,7 @@ export const SLOTS = [
     subject: "THE MONEY",
     shape: SHAPES.UNSOURCED,
     loadBearing: false,
+    lead: "The cap table is clean, and you should hear that from me rather than find it.",
     fact: (v) => `$${v.seed}M seed. Named funds. Multisig treasury. Zero mixer hops.`,
     spin: "Smart money already did this diligence for you. You're free-riding on their lawyers.",
     // Clean in BOTH branches. Not every press is a gotcha — if pressing always
@@ -172,6 +175,7 @@ export const SLOTS = [
     subject: "THE CHART",
     shape: SHAPES.SELECTIVE_WINDOW,
     loadBearing: false,
+    lead: "The market has started to notice, which is worth a moment.",
     fact: (v) => `Up ${v.pump} percent in seven days.`,
     spin: "It's working. The market has already voted and you're still reading.",
     // Hollow either way — a cherry-picked window is a cherry-picked window even
@@ -194,6 +198,7 @@ export const SLOTS = [
     subject: "THE TIMELOCK",
     shape: SHAPES.UNFALSIFIABLE,
     loadBearing: false,
+    lead: "Governance next — where a protocol either respects its users or doesn't.",
     fact: "Three-of-five multisig on governance. Twenty-four hour timelock on parameter changes.",
     spin: "Nobody can pull anything. There's a timelock. You'd see it coming a day out.",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
@@ -229,6 +234,7 @@ export const SLOTS = [
     subject: "TRACK RECORD",
     shape: SHAPES.SURVIVORSHIP,
     loadBearing: false,
+    lead: "There's one thing in their history, so let me put it in front of you.",
     fact: "One of them co-launched something earlier that wound down.",
     spin: "Everybody's got a graveyard behind them. Around here we call that experience.",
     // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
@@ -277,6 +283,7 @@ SLOTS.push({
   // "Same terms as you'd get" pre-answered the question the deep look exists to
   // settle, and was false in the rug branch. The FACT may only assert what the
   // seller's shared script asserts; alignment is the INFERENCE being sold.
+  lead: "And my own interest in this, which you're entitled to ask about.",
   fact: "I'm in this myself. Entered at the seed, at the price the funds paid.",
   spin: "I don't pitch what I don't hold. That should tell you everything.",
   // BACKING IS SLOT-LEVEL. A claim either has a receipt to be had or it
