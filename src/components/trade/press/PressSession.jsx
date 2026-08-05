@@ -9,7 +9,7 @@ import { briefingMode, markBriefingSeen } from "@/lib/trade/briefingSeen";
 import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
-  allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore, seatOptions, laneOutlook, pressure,
+  allocate as doAllocate, toAutopsy, currentClaim, callReadout, stakeFor, pressPrice, callVerdict, betRestated, coverageScore, seatOptions, laneOutlook, pressure,
   settlementNote,
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
@@ -27,6 +27,7 @@ import {
 import { createEvidenceScreen, SCREEN_AGENTS } from "./evidenceScreen";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
+  ConvictionGauge,
   Meter, Nav, Transcript, VirgilRead, readDwellMs, VIRGIL_BEAT_MS, PRESS_UI_CSS,
 } from "./pressUi";
 
@@ -143,6 +144,14 @@ export default function PressSession({
   const [run, setRun] = useState(() => createRun(deal));
   const [slider, setSlider] = useState(0);
   const [flash, setFlash] = useState(null); // the spoken answer to a press
+  /* THE OVERLAY STANDS DOWN WHILE YOU ARE LOOKING AT A SCREEN (author,
+     2026-08-05: "there is a lot of html overlay that gets in the way - the
+     overlay should be turned off when a screen is in focus").
+     SEE WHAT LANDED flies the camera to an analyst's monitor, and the reading
+     column then sat on top of the left third of the receipt it had just sent the
+     player to read — "AGAINST FLOAT" rendering as "INST FLOAT". Set when the
+     look happens, cleared by anything that ends the look. */
+  const [screenLook, setScreenLook] = useState(false);
   const [claimVisible, setClaimVisible] = useState(false);
   // The opening beat. You land on the wide desk shot and start when you're
   // ready. This is also load-bearing technically: the scene resets the camera
@@ -157,10 +166,26 @@ export default function PressSession({
      that: his mouth is a 2D player floating over the scene, so the panel has to
      know it is HIM speaking and not merely that somebody is. */
   const [speakingAs, setSpeakingAs] = useState(null);
-  // Transcript open by default: its whole value is being able to re-read claim 2
-  // while claim 5 is on the floor, and a panel you have to discover first mostly
-  // doesn't get discovered.
-  const [script, setScript] = useState(true);
+  // HOW MUCH OF VIRGIL HAS BEEN SPOKEN on this claim — 0 none, 1 his read, 2
+  // the consequence. Driven by the claim turn's onPart so his panel can never
+  // show a line the voice has not reached. See VirgilRead's `reveal`.
+  const [virgilAt, setVirgilAt] = useState(0);
+  // COLLAPSED BY DEFAULT (author, 2026-08-05: "very busy text panel, often
+  // current dialogue is not even highlighted or visible").
+  //
+  // Open, this is the largest of the three blocks in the column and it grows a
+  // claim at a time, so by claim 2 the record of what was said was taller and
+  // brighter than the thing being said — and .ps-readcol scrolls as a whole, so
+  // the live claim was pushed off its own top edge. The screenshot that reported
+  // this has the current claim clipped mid-sentence with a full transcript and a
+  // full Virgil panel legible beneath it.
+  //
+  // The old rationale — "a panel you have to discover first mostly doesn't get
+  // discovered" — survives the change, because collapsing is not hiding: the
+  // header stays up with the count and the control ("ON THE RECORD · 2 of 6 ·
+  // show"), so it advertises both that it exists and that there is something in
+  // it. What it stops doing is outranking the live claim by default.
+  const [script, setScript] = useState(false);
   const screenRef = useRef(null);
   // One board per seat, each painted onto that character's OWN monitor in the
   // scene via the evidenceActive handshake. Eugene has none — he never stamps.
@@ -220,6 +245,22 @@ export default function PressSession({
   // now a button. Both surfaces hold this seam the same way or they drift.
   const [openingDone, setOpeningDone] = useState(false);
   const [opened, setOpened] = useState(false);
+
+  /* THE BRIEFING CAN BE PUT DOWN (author, 2026-08-05: "can you also make the
+   * engagement.js screen dismissable?").
+   *
+   * DISMISSED, NOT SKIPPED — the distinction matters, because the panel already
+   * had a way forward. REVIEW THIS DEAL / HEAR THE PITCH is how you LEAVE the
+   * briefing, and a second control that also left it would be one beat with two
+   * exits. What there was no way to do is get the panel out of the way and look
+   * at the room it is describing: four analysts at their desks, a pitch bot
+   * standing in the middle of them, all of it behind an opaque sheet of copy.
+   *
+   * So this hides and restores, and starting the pitch stays exactly where it
+   * was. The brief is never destroyed — the restore chip is rendered in the same
+   * breath as the hide, so there is no state in which the deal sheet is gone and
+   * nothing brings it back. */
+  const [briefHidden, setBriefHidden] = useState(false);
   const floorLive = onFloor && opened;
 
   /* ---- the briefing, which comes BEFORE the opening ----
@@ -299,6 +340,7 @@ export default function PressSession({
   useEffect(() => {
     if (!onFloor) return;
     onFocusAgent?.(PITCHER_AGENT);
+    setScreenLook(false);   // camera is off any screen — see screenLook
   }, [onFloor, run.claimIndex, onFocusAgent]);
 
   /* ---- the post-deal panel gets the room back ----
@@ -433,6 +475,10 @@ export default function PressSession({
      agenda this claim is owed. */
   useEffect(() => {
     if (!floorLive || !claim) return;
+    // A new claim starts with none of him said — otherwise claim 2 inherits
+    // claim 1's level and his read is on screen before the bot opens his mouth,
+    // which is the exact thing `reveal` exists to stop.
+    setVirgilAt(0);
     sayTurn(
       [
         /* IT SAYS WHAT THE POINT IS BEFORE IT ARGUES IT. The turn used to open
@@ -445,6 +491,32 @@ export default function PressSession({
            would hold the camera through a single unbroken breath. sayTurn drops
            parts with no text, so a slot without a lead is a no-op here. */
         { voice: VOICE, text: claim.lead, agent: PITCHER_AGENT },
+        /* AND IT SAYS THE CHECKABLE PART OUT LOUD (author, 2026-08-05: "the
+           claim fact shouldn't be withheld as text only").
+
+           This is the same defect the note above fixed, one element further
+           along. The column has printed SUBJECT → FACT → SPIN since 2026-08-04,
+           but the voice ran lead → spin: the audio skipped the middle thing the
+           page was showing, so the FACT row read as a line the bot ought to have
+           said and somehow hadn't — "just surfaced in the text only".
+
+           IT WAS ALWAYS THE BOT'S. pu-fact's own note settles the ownership —
+           it is "the part of what the bot just said that you could actually go
+           and check", and it is explicitly NOT Virgil's, because he is mutable
+           and nothing checkable may sit behind the tips switch. A line the
+           design calls part of an utterance should be in that utterance.
+
+           THE TAG STAYS AND DOES THE SEPARATING. Speaking it does not make it
+           less stipulated: FACT is the promise that the bot never lies, which is
+           what stops three questions being spent hunting one. Heard, the fact and
+           the inference arrive adjacent in one voice — which is the experience
+           being simulated; read, the tag and the rule hold them apart — which is
+           the analysis. That split is the point, not a problem to fix.
+
+           Its own part, for the reason the lead is: the mouth, the dwell floor
+           and the skip token all work per utterance. sayTurn drops parts with no
+           text, so a slot with no fact stays a no-op. */
+        { voice: VOICE, text: claim.fact, agent: PITCHER_AGENT },
         { voice: VOICE, text: claim.spin, agent: PITCHER_AGENT },
         /* NO `agent` ON HIS PART, deliberately — the one exception to this
            file's THE CAMERA FOLLOWS THE VOICE rule, and the rule's own logic is
@@ -465,6 +537,17 @@ export default function PressSession({
            would read as him losing his thread. See nextMove in virgil.js. */
         { voice: VIRGIL.voice, text: virgil?.nextMove, leadMs: 500, minMs: 700 },
       ],
+      /* HIS TEXT ARRIVES WHEN HIS VOICE DOES. `reveal` levels are keyed off the
+         part index: 0-2 are the bot's three utterances, so nothing of the cat is
+         on screen while the bot still has the floor; 3 is his read, 4 the
+         consequence. sayTurn calls onPart AFTER each part's leadMs, which is
+         exactly right — the 2.4s beat before he speaks should be silence with
+         nothing new to read, not a panel that has already said it.
+         Index rather than a flag on the part: onPart's contract is the index,
+         and hoisting the array to name the parts would fork a literal both
+         surfaces keep deliberately identical. If a part is ever inserted before
+         his, these two numbers move. */
+      { onPart: (i) => setVirgilAt(i >= 4 ? 2 : i >= 3 ? 1 : 0) },
     );
     return () => { try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {} try { stopUnicornBeat(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -597,14 +680,14 @@ export default function PressSession({
       for (let i = 0; i < live.length; i++) {
         const p = live[i];
         if (sayToken.current !== token) return;   // superseded — stop the chain
-        // THE GAP BEFORE THIS VOICE. Re-checked after the wait: two or three
-        // seconds is long enough for a press to have landed, and resuming into a
-        // superseded chain would put the cat over whoever interrupted him.
-        if (p.leadMs) {
-          await new Promise((r) => setTimeout(r, p.leadMs));
-          if (sayToken.current !== token) return;
-        }
-        onPart?.(i);
+        // THE CAMERA CUTS BEFORE THE PAUSE, NOT AFTER — kept identical to
+        // PressFlat's, where the report came from ("the pitchbot appear[s] for a
+        // few seconds, and then virgil pops up. Then, a long pause"). The move
+        // used to sit below the leadMs wait, so the beat played on whoever was
+        // already in frame and the incoming rig started warming only at
+        // speakLine. Moved above it, the pause plays on the arriving face and
+        // the rig gets the beat as a head start.
+        //
         // THE CAMERA FOLLOWS THE VOICE, NOT THE PRESS. It used to cut to whoever
         // answered and then sit there while the PITCHER replied — so you watched
         // Eugene's back through the agent's whole line (author, 2026-07-29). Each
@@ -612,6 +695,18 @@ export default function PressSession({
         // the camera that crosses the room" was always supposed to mean.
         if (p.agent) onFocusAgent?.(p.agent);
         setSpeakingAs(p.voice || VOICE);
+        // THE GAP BEFORE THIS VOICE. Re-checked after the wait: two or three
+        // seconds is long enough for a press to have landed, and resuming into a
+        // superseded chain would put the cat over whoever interrupted him. The
+        // camera having already moved is not a leak — whoever supersedes this
+        // chain sets it to their own seat on their first part.
+        if (p.leadMs) {
+          await new Promise((r) => setTimeout(r, p.leadMs));
+          if (sayToken.current !== token) return;
+        }
+        // AFTER the wait, still: the lead is dead air BEFORE a line, so the text
+        // must not appear during it. Only the face arrives early.
+        onPart?.(i);
         const startedAt = Date.now();
         // `seat` is optional and only a press ever sets it — the opening, the
         // claim spins and the pitcher's reactions have no seat and route to
@@ -869,18 +964,81 @@ export default function PressSession({
     const screenAgent = station ? SCREEN_AGENTS[station] : null;
     onFocusAgent?.(screenAgent
       || (flash.board === PITCHER ? PITCHER_AGENT : seatMeta(flash.board)?.agentId));
+    setScreenLook(true);   // get the column off the receipt — see screenLook
     setFlash((f) => (f ? { ...f, looked: true } : f));
   }, [flash, onFocusAgent]);
+
+  /* PUT THE CHOICE IN VIEW WHEN IT LANDS (author, 2026-08-05: "i had to scroll
+   * up to find the button options for Marisol's work").
+   *
+   * The reading column scrolls with the claim stuck to its top, so an answer
+   * arrives BELOW whatever the player was reading — and on a short viewport the
+   * buttons at the foot of it can land past the bottom edge, which reads as the
+   * control not existing rather than as being one scroll away.
+   *
+   * Scrolls .pu-choice, not .pu-answer: the buttons are the last thing inside a
+   * block that can be taller than the column, so framing the block's TOP is
+   * exactly the failure being fixed. "nearest" leaves an already-visible choice
+   * where it is instead of jerking it to an edge.
+   *
+   * An effect and not a call beside the setFlash that causes it, because that
+   * one runs inside an async chain with no guarantee React has committed the
+   * new stage yet — the element to scroll to may not exist at that moment. */
+  /* ESC PUTS THE BRIEF DOWN AND PICKS IT BACK UP. One key, both directions —
+   * a dismiss whose undo is only a mouse target is a worse deal than the one the
+   * player took. Bound only while the briefing is up, so it cannot shadow an Esc
+   * the floor or the autopsy might want later. */
+  useEffect(() => {
+    if (started) return;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setBriefHidden((h) => !h);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [started]);
+
+  /* THE PAGE TITLE IS NOT OURS TO CLASS (author, 2026-08-05: "Screen appeared
+   * with most html overlay suppressed, except the page h1").
+   *
+   * .custom-title is the gothic headline in app/trade/page.js — it sits OUTSIDE
+   * this component's tree, so .ps-readstack.ghost cannot reach it however the
+   * class is arranged. An attribute on the document is the smallest thing that
+   * crosses that boundary, and the rule for it lives in this file's CSS with
+   * every other rule about looking at a screen, rather than as a second
+   * definition of "a screen is in focus" over in the page.
+   *
+   * No hover restore, unlike the reading column: the column holds the claim you
+   * may want to check the receipt against, and the title is decoration. */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (screenLook) root.setAttribute("data-press-screenlook", "");
+    else root.removeAttribute("data-press-screenlook");
+    return () => root.removeAttribute("data-press-screenlook");
+  }, [screenLook]);
+
+  const choiceUp = flash?.stage === "choice" && flash?.id;
+  useEffect(() => {
+    if (!choiceUp) return;
+    document.querySelector(".ps-readcol .pu-choice")
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [choiceUp]);
 
   // LET IT ANSWER. Its own camera, its own voice — the handover sayTurn used to
   // make on its own the moment the adviser stopped.
   const hearReply = useCallback(() => {
     if (!flash?.line) return;
+    // AND THE COLUMN COMES BACK. sayTurn flies the camera to the pitcher, so no
+    // screen is in focus any more — leaving it ghosted would hide the reply's
+    // text for the whole time the reply is being spoken.
+    setScreenLook(false);
     sayTurn([{ voice: VOICE, text: flash.line, agent: PITCHER_AGENT }]);
     setFlash((f) => (f ? { ...f, heard: true } : f));
   }, [flash, sayTurn]);
 
   const advance = useCallback(() => {
+    setScreenLook(false);   // new claim, the column comes back
     // Voids any beat still owed — see replyFor. Without this a board stamped by
     // a press you walked out of lands on the NEXT claim.
     replyFor.current = null;
@@ -956,7 +1114,9 @@ export default function PressSession({
     }) : null),
     [claim, run.advisersSpent, outlook.remaining, tips, run.pressesLeft, run.claimIndex,
      run.outcomes, lastClaim]);
-  const readout = useMemo(() => callReadout(slider), [slider]);
+  const readout = useMemo(() => callReadout(slider, stakeFor(run)), [slider, run]);
+  // The reveal headline. Four bands (callVerdict), not a sign test on the payout.
+  const verdict = useMemo(() => callVerdict(run, deal), [run, deal]);
   const read = useMemo(() => coverageScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
   // Both derived from pressUi/pressRun rather than restated here — restating
@@ -972,7 +1132,14 @@ export default function PressSession({
 
       {/* ---------- top bar: always visible, never blocks the room ---------- */}
       <div className="ps-bar">
-        <button className="ps-exit" onClick={onExit}>◀ LEAVE THE DESK</button>
+        {/* "LEAVE THE DESK" UNTIL 2026-08-05, and it named the opposite of what
+            it does (author: "you don't really leave the desk, just the game
+            opening screen"). onExit is exitPressGame in app/trade/page.js: it
+            clears pressMode and nothing else — same page, same room, same desk,
+            with the pitch turned off. The desk is where this button LANDS you,
+            so the old label promised to take away the one thing it gives back.
+            A back control should name its destination, and now it does. */}
+        <button className="ps-exit" onClick={onExit}>◀ BACK TO THE DESK</button>
         {/* The bar names the deal only once the deal has a face. It sits above
             the panel and in bigger type, so leaving it live would spoil the
             reveal more loudly than the headline the panel withholds. */}
@@ -999,8 +1166,18 @@ export default function PressSession({
       </div>
 
       {/* ---------- the opening: the room, then the deal ---------- */}
+      {/* THE RESTORE CHIP, rendered as the panel's sibling so it survives the
+          panel being hidden — inside .ps-open it would be hidden by the same
+          rule it exists to undo. Only while the briefing is up: once `started`
+          flips there is no brief to come back to. */}
+      {!started && briefHidden && (
+        <button className="ps-brief-back" onClick={() => setBriefHidden(false)}>
+          ▤ DEAL BRIEF ▸
+        </button>
+      )}
+
       {!started && (
-        <div className={`ps-open${rolled ? " is-rolled" : ""}${rolling ? " is-rolling" : ""}`}>
+        <div className={`ps-open${rolled ? " is-rolled" : ""}${rolling ? " is-rolling" : ""}${briefHidden ? " hid" : ""}`}>
           {/* The roll and the deal sheet fill the left. Copy right, with the
               four portraits beneath it. Nothing in this panel is clickable except
               the one CTA — it is a briefing, not a board. */}
@@ -1010,6 +1187,21 @@ export default function PressSession({
               and hands input only to buttons and inputs. */}
           {rolling && (
             <button className="ps-skip-deal" onClick={skipRoll} aria-label="Show them in now" />
+          )}
+
+          {/* PUT THE BRIEF DOWN — see briefHidden. NOT while `rolling`: the skip
+              button directly above is a transparent sheet over the whole panel,
+              so a dismiss offered during the arrival is either unreachable or
+              steals the click that completes it. The arrival is two seconds and
+              already skippable; there is nothing to escape from. */}
+          {/* LABELLED, NOT A BARE ✕. There is now a prominent BACK TO THE DESK
+              in the opposite corner of the same screen, and a naked glyph next
+              to it reads as a second way out rather than as a way to see past
+              the panel. Two controls that both mean "get this off my screen"
+              have to differ in WORDS, not only in corner. */}
+          {!rolling && (
+            <button className="ps-brief-hide" onClick={() => setBriefHidden(true)}
+                    aria-label="Hide the brief and look at the room">✕ HIDE BRIEF</button>
           )}
 
           {/* THE BRIEFING IS THE FLAT SURFACE'S, AT DESKTOP SIZE (2026-08-02).
@@ -1030,19 +1222,20 @@ export default function PressSession({
               long form back, it belongs under the section line — NOT as a third
               column, which is what forced the deal into two boxes the last time. */}
 
-          {/* BAND 0 — THE STATUS RAIL. Inside the panel rather than up on .ps-bar:
-              the rail reports the state of THIS INTAKE (mandate, access, mode) and
-              the bar reports the session (leave, book). On the phone the two are
-              stacked instruments; here the panel is the instrument, so the rail is
-              its top edge. It leaves with the briefing, as it does on the phone. */}
-          <div className="ps-market-rail" aria-label="Deal simulation status">
-            {/* —— at rest, not PENDING — same fix as the flat surface: the rail
-                cell is a blank field the settle fills, and PENDING was a second
-                "not yet" the one-signal count couldn't carry. */}
-            <span><i>MANDATE</i>{identity ? deal.ticker : "——"}</span>
-            <span><i>ACCESS</i>GUEST</span>
-            <span><i>MODE</i>LIVE SIM</span>
-          </div>
+          {/* BAND 0 — THE STATUS RAIL — IS GONE (author, 2026-08-05: "there is a
+              top section that says 'mandate', 'access', and 'mode' - don't need
+              that"), 34px of the scroll fix.
+
+              IT WAS THREE READOUTS AND NONE OF THEM WAS A DECISION. MANDATE was
+              blank — "——" until the settle, and the settle already prints the
+              ticker on the file itself, in the particulars, where a deal's name
+              belongs. ACCESS GUEST and MODE LIVE SIM are true of every sitting
+              this surface will ever run: nothing the player does changes either,
+              and a readout that can only report one value is set dressing shaped
+              like an instrument. On a briefing whose stated problem was too many
+              signals ([A§20], the five-signal count), a band that reports three
+              constants is the cheapest one to lose.
+              The ticker survives on the record; the rest was never information. */}
 
           {/* BAND 1 — THE HEAD. NOTHING HERE MAY NAME THE DEAL BEFORE THE ARRIVAL
               LANDS (invariant 7): the headline is about the PLAYER'S JOB, which is
@@ -1062,10 +1255,67 @@ export default function PressSession({
                 is true of every deal — which is this headline's whole licence
                 to be the largest type on a panel that withholds the deal. */}
             <h1>HEAR THE PITCH.<br /><span>MAKE THE CALL.</span></h1>
-            <p>One pitch. Three questions. Then say how much of it you believe.</p>
+            {/* THE SUBLINE IS GONE (author, 2026-08-05: "we have 2 text
+                sections - do we need 2?"). It read "One pitch. Three questions.
+                Then say how much of it you believe." — and every clause of it is
+                restated within 60px of itself: ONE PITCH is the headline
+                directly above, THREE QUESTIONS is 03 QUESTIONS in the protocol
+                row, and "how much of it you believe" is 01 FINAL CALL and the
+                conviction dial it opens. The protocol row exists precisely
+                because the shape of the session reads better as counts than as
+                prose (see its note, which cut ~90 words on the same argument);
+                this sentence was the last of that prose, saying the counts again
+                in words directly above them.
+                THE DIRECTIVE IS THE ONE THAT STAYS. It carries what no numeral
+                can — that every fact is true TECHNICALLY, and what the player is
+                actually being asked to decide. Two prose blocks on a briefing is
+                one too many; the survivor should be the one that isn't a
+                caption. */}
           </div>
 
-          {/* BAND 2 — THE RECORD, full panel width, inside its housing, inside
+          {/* BAND 2 — WHAT IS ABOUT TO HAPPEN, AS THREE NUMBERS.
+              This replaced ~90 words in two columns (.ps-open-copy's "A pitch bot
+              is here to present its client's deal…" and .ps-open-aside's HOW YOUR
+              ANALYSTS WORK). Those columns existed because the panel's full width
+              ran ~97ch of monospace per line and a single column of that much prose
+              was unreadable — but the fix for too much prose on a briefing is less
+              prose, not a second measure to put it in. The shape of the session is
+              three counts; only the INCENTIVE needed a sentence, and it gets one.
+
+              The eyebrow the copy column carried (YOUR NEXT APPOINTMENT) moved up
+              to the head, where it is CH 02 // INCOMING MANDATE.
+
+              IT MOVED ABOVE THE FILE (author, 2026-08-05: "should the description
+              and number boxes be towards the top?"). The counts are orientation —
+              the shape of the next four minutes — and orientation belongs before
+              the object it is about, not after it. They also refer to nothing on
+              screen, which is what lets them lead: 03, 04 and 01 are true of every
+              sitting and name no part of this deal (invariant 7 is untouched by
+              them, which is exactly why they can sit this high).
+
+              THE DIRECTIVE DID NOT COME WITH THEM, and the reason is a forward
+              reference: it opens "Every fact the PITCH BOT states is true...
+              technically", and the only thing that introduces the pitch bot is the
+              polaroid clipped to the file, captioned PRESENTED BY. Read above the
+              file it names a character the player has not met; read below it, it
+              is a remark about the face they just looked at. It also ends in the
+              instruction that leads into the button, so it wants to be the last
+              thing before the button. Numbers up, prose down — the split is the
+              answer, not the order. */}
+          {/* ONE ANSWER EACH LIVES HERE NOW (2026-08-05). It was the right half
+              of the analyst band's section line, and when that band was cut for
+              the scroll the rule could not go with it — it is scarcity, the
+              thing that makes choosing an analyst a decision instead of a click.
+              This is where it always belonged anyway: it is a property of the
+              count beside it, and the section line's own note said as much about
+              moving it out of the prose. */}
+          <div className="ps-protocol" aria-label="Meeting protocol">
+            <div><b>03</b><span>QUESTIONS</span></div>
+            <div><b>04</b><span>ANALYSTS<i>ONE ANSWER EACH</i></span></div>
+            <div><b>01</b><span>FINAL CALL</span></div>
+          </div>
+
+          {/* BAND 3 — THE RECORD, full panel width, inside its housing, inside
               its DEAL FILE. The record itself is unchanged: one document with
               three columns, which is what deleted the second box the particulars
               used to live in (author: "the pitch project is in 2 separate
@@ -1092,6 +1342,36 @@ export default function PressSession({
               geometry instead; the readout's DEAL INTAKE label was retired for
               the cover's PROSPECTUS letterhead, and the record's own pill is
               the one place this panel says "not yet". */}
+          {/* THE INTAKE ROW — the file, and the one person in the building who
+              is yours (author, 2026-08-05: "maybe i should feature him on the
+              engagement screen?" / "all that manila envelope is dominating the
+              space"). Those are one problem: the folder read as dominant partly
+              because it was 58% of a panel where nothing else earned any room.
+              Putting Virgil beside it fixes both — the folder narrows to ~450 in
+              its own column, and the space it gives up goes to something rather
+              than to margin.
+
+              WHY THIS PLACEMENT IS SAFE WHEN THE OLD ONE WASN'T. A cat's face on
+              this panel failed once: above the pitching CTA it read as the CAT
+              doing the pitching (author, 2026-07-28). What made it safe again in
+              the analyst band was that the pitcher stopped being one of these
+              faces — and here that argument is at its strongest, because the
+              pitcher's face is 16px away on the folder itself, captioned
+              PRESENTED BY. Two portraits, one labelled as the presenter and one
+              labelled YOUR GUIDE, cannot swap. He does NOT go back over the
+              button.
+
+              HE IS THE ONLY ONE WHO BELONGS HERE. The four analysts were cut
+              from this panel earlier today because they are consultants you
+              meet when you can spend them; Virgil is not spendable and not
+              staff — virgil.js: "he is on your side, which not one other person
+              at this desk is." A briefing is exactly when that is worth knowing.
+
+              EVERY STRING IS VIRGIL'S OWN DATA — name, role line and blurb
+              straight off the export, no new copy for this surface to keep in
+              sync. The blurb does the work the analyst band's NOT A SEAT
+              divider used to: "Cannot be sent anywhere." */}
+          <div className="ps-intake">
           <div className="ps-record-shell">
             <EngagementRecord
               arrived={identity}
@@ -1111,22 +1391,64 @@ export default function PressSession({
               coverRef={coverRef} />
           </div>
 
-          {/* BAND 3 — WHAT IS ABOUT TO HAPPEN, AS THREE NUMBERS.
-              This replaced ~90 words in two columns (.ps-open-copy's "A pitch bot
-              is here to present its client's deal…" and .ps-open-aside's HOW YOUR
-              ANALYSTS WORK). Those columns existed because the panel's full width
-              ran ~97ch of monospace per line and a single column of that much prose
-              was unreadable — but the fix for too much prose on a briefing is less
-              prose, not a second measure to put it in. The shape of the session is
-              three counts; only the INCENTIVE needed a sentence, and it gets one.
+            {/* NOT A BUTTON AND NOT A SEAT — no onClick, no hover lift, nothing
+                that invites a press. That is the failure this character was
+                invented to make impossible (see virgil.js: a colleague with an
+                exemption needs explaining, and the fix was a creature nobody
+                tries to dispatch). The moment this card gains an affordance it
+                becomes a fifth seat. */}
+            <aside className="ps-guide">
+              <img className="ps-guide-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+              <div className="ps-guide-who">{VIRGIL.name}</div>
+              <div className="ps-guide-role">{VIRGIL.role}</div>
+              <p className="ps-guide-blurb">{VIRGIL.blurb}</p>
 
-              The eyebrow the copy column carried (YOUR NEXT APPOINTMENT) moved up
-              to the head, where it is CH 02 // INCOMING MANDATE. */}
-          <div className="ps-protocol" aria-label="Meeting protocol">
-            <div><b>03</b><span>QUESTIONS</span></div>
-            <div><b>04</b><span>ANALYSTS</span></div>
-            <div><b>01</b><span>FINAL CALL</span></div>
+              {/* WHAT THE 04 ANALYSTS CELL DOESN'T SAY (author, 2026-08-05:
+                  "maybe since i have a lot of space in virgil's box, i could
+                  rotate through the analyst's pictures?"). The space is real and
+                  so is the gap — the protocol row asserts four analysts and one
+                  answer each, and nothing on the panel says four analysts OF
+                  WHAT. This is that answer.
+
+                  SUBJECTS, NOT FACES, AND THAT IS THE WHOLE POINT. Portraits
+                  cycling in this frame would put Virgil first in a carousel of
+                  five and collapse the one distinction he exists to create —
+                  virgil.js: he is on your side, "which not one other person at
+                  this desk is", and the band this replaced kept a divider and a
+                  NOT A SEAT line precisely to hold that apart. A rotation is
+                  also a worse roster than the one that was cut: four at once let
+                  a player compare them, one at a time does not, and anyone who
+                  presses REVIEW early meets two.
+                  What was mechanically load-bearing about that band was never
+                  the faces anyway — it was the LANES. You meet the people when
+                  you can spend them; you need to know the coverage now.
+
+                  IT IS IN HIS CARD BECAUSE HE IS THE ONE WHO WOULD TELL YOU.
+                  Listing your resources is what a guide does, and it keeps the
+                  structural line intact: he is the speaker, they are the list. */}
+              {/* NAMED, BECAUSE "THEY" HAD NO ANTECEDENT (author, 2026-08-05:
+                  "there's no context about who 'they' are"). The first build of
+                  this list was four bare subjects under WHAT THEY COVER, and the
+                  only thing on the panel that "they" could point at was the
+                  numeral 04 in a different band. A coverage list with nobody
+                  attached is a table of contents for a book you can't see.
+                  YOUR ANALYSTS, keeping the possessive the deleted band's label
+                  had — its note called that half load-bearing: they are the
+                  player's, one use each. The count and the scarcity are in the
+                  protocol row directly above; this says who they are and what
+                  each one is for, which is everything that band taught except
+                  the faces. */}
+              <div className="ps-guide-lanes">
+                <span>YOUR ANALYSTS</span>
+                <ul>
+                  {DESK_ORDER.map((m) => (
+                    <li key={m.id}><b>{m.name}</b>{m.role}</li>
+                  ))}
+                </ul>
+              </div>
+            </aside>
           </div>
+
           {/* THE TWO THINGS THE NUMBERS CAN'T SAY: what kind of claim is coming,
               and who pays the speaker — in that order, rewritten 2026-08-03
               (author: "let's just rewrite the whole section"). See the long note
@@ -1140,70 +1462,41 @@ export default function PressSession({
               who didn't come", cut the same day for pointing at the absence
               instead of the incentive. */}
           <p className="ps-directive">
-            Every fact the pitch bot states is true...technically. But is the project viable? Consult with the team and decide whether it deserves funding.
+            Every fact the pitch bot states is true...technically. But is the project viable? Consult with the team and decide whether to fund it or FUD it.
           </p>
 
-          {/* BAND 4 — THE DESK. Portraits, not card faces — a card is a thing you
-              look at, and four in a row read as a cast list even when they were the
-              controls (see the note on SeatRow in pressUi.jsx). Nothing here is
-              clickable: on the briefing they are an introduction, and the sendable
-              version of the same four is the seat row on the floor.
+          {/* BAND 4 — THE DESK — IS GONE (author, 2026-08-05: "what i'd like to
+              do is avoid scrolling to see everything").
 
-              "THE DESK — always these four, and the cat" until 2026-07-29 (author:
-              didn't like it). "always these four" was reassurance about a rotating
-              cast, and the rotating cast was cut in [A§17] — so it answered a
-              question no player can now think to ask, in the defensive register of
-              a changelog. The possessive is the load-bearing half: they are the
-              player's, one use each. The cat needs no mention in the label; he has
-              a divider and a NOT A SEAT line of his own.
+              THE BRIEFING WAS 890px OF CONTENT IN A 699px SLOT on a 779px window
+              — worse on a 13" laptop — and this band was 119 of the 191 over,
+              149 with the section line that existed only to label it. It was the
+              one cut that fixes the scroll rather than nibbling at it, and the
+              only band on the panel whose job another screen already does.
 
-              ANALYSTS, NOT AGENTS. "The Trade Agents" was the other candidate and
-              it was rejected on the same day the PITCHER stopped being called "The
-              Agent": one word for both sides of the table is the cast-legibility
-              failure this file keeps logging (see the borrowed-portrait note in
-              desk.js, and [A§12] on four cards reading as a cast list). ANALYST is
-              also what §1 has called them all along. Internals keep DESK/DESK_ORDER;
-              only the label is player-facing.
+              IT WAS AN INTRODUCTION TO PEOPLE YOU MEET ONE CLICK LATER. Its own
+              note said so — "on the briefing they are an introduction, and the
+              sendable version of the same four is the seat row on the floor" —
+              which is an admission that the band is a preview of the next
+              screen. Meeting an analyst at the moment you can spend one is a
+              better introduction than meeting a portrait of them while you can't.
+              The COUNT was the part that was a rule, and the count is still on
+              the panel: 04 ANALYSTS, in the protocol row, now carrying ONE
+              ANSWER EACH with it.
 
-              THE LABEL IS A RULED SECTION LINE NOW, not a centred caption over the
-              row, and the right half of it is where the scarcity rule went when the
-              prose columns were cut: ONE ANSWER EACH. The rule reads better as a
-              property of the band than as a paragraph two bands above it. */}
-          <div className="ps-section-line">
-            <span>YOUR ANALYST TEAM</span>
-            <i>ONE ANSWER EACH</i>
-          </div>
-          <div className="ps-tools">
-              <div className="ps-draw-row">
-                {DESK_ORDER.map((m) => (
-                  <div key={m.id} className="ps-face" title={m.blurb}>
-                    <img className="ps-face-pic" src={m.portrait} alt="" aria-hidden="true" />
-                    <span className="ps-face-who">{m.name}</span>
-                    <span className="ps-face-role">{m.role}</span>
-                  </div>
-                ))}
-                {/* VIRGIL, AT THE END OF THE ROW AND BEHIND A DIVIDER.
-                    He was here once and it failed: a cat's face above the
-                    pitching CTA read as the CAT doing the pitching (author,
-                    2026-07-28), which is why he was moved into the hero
-                    column. Moving him back is safe now for a reason that
-                    didn't exist then — THE PITCHER IS NO LONGER ONE OF THESE
-                    FACES. It's an outside agent, named in the copy above, so
-                    a fifth portrait can't be mistaken for the one selling.
+              VIRGIL WENT WITH IT, AND HE IS FINE. His card was his only
+              appearance on the briefing, but the floor's first beat IS him — he
+              opens it in his own player with the house rules, speaking, which is
+              what he is for. A silent portrait one screen earlier was the weaker
+              of his two introductions. If he ever needs to be on the briefing
+              again he does NOT go back above the CTA: a cat's face over the
+              pitching button read as the cat doing the pitching (author,
+              2026-07-28), and the divider and NOT A SEAT line existed to hold
+              that reading off.
 
-                    The divider and the NOT A SEAT line are load-bearing, not
-                    decoration: they are what keeps him legible as a companion
-                    rather than a spendable. If he ever reads as pitching
-                    again, he goes back to his own block. */}
-                <span className="ps-face-div" aria-hidden="true" />
-                <div className="ps-face ps-face-cat" title={VIRGIL.blurb}>
-                  <img className="ps-face-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
-                  <span className="ps-face-who">{VIRGIL.name}</span>
-                  <span className="ps-face-role">{VIRGIL.role}</span>
-                  <span className="ps-face-note">NOT A SEAT</span>
-                </div>
-              </div>
-          </div>
+              WHAT THIS COSTS, so it is a decision and not an accident: nothing
+              on the briefing now shows the player who is on their side. The bet
+              is that one click away, said out loud, lands harder. */}
 
           {/* The one live control. My seat-row rewrite replaced the whole
              tools block and took this with it, which left the briefing with
@@ -1304,7 +1597,12 @@ export default function PressSession({
           pointer-events stay off: he is not a seat, cannot be sent anywhere, and
           a clickable cat is an invitation to try. */}
       {onFloor && (
-        <div className="ps-readstack">
+        /* `ghost` while a screen is in focus — see screenLook. Ghosted rather
+           than removed, and it keeps its pointer events, so hovering it brings
+           it straight back: the player can re-read the claim against the
+           receipt without any new control, and nothing they were mid-sentence
+           on disappears on them. */
+        <div className={`ps-readstack${screenLook ? " ghost" : ""}`}>
           {/* ONE COLUMN, TWO CONTENTS. The opening and the floor were two
               sibling .ps-readcol blocks that happened to be styled alike; making
               them one element is what stops the block moving when claim 1
@@ -1433,7 +1731,8 @@ export default function PressSession({
                 />
               </span>
               {opened && claim ? (
-                <VirgilRead claim={claim} virgil={virgil} spent={run.advisersSpent}
+                <VirgilRead claim={claim} virgil={virgil} spent={run.advisersSpent} reveal={virgilAt}
+                            remaining={outlook.remaining} earlier={outlook.earlier}
                             onToggleTips={() => setTips((t) => !t)}
                             portrait={false}
                             status={speakingVirgil ? "ON AIR" : "LIVE"}
@@ -1487,12 +1786,13 @@ export default function PressSession({
       {run.phase === PHASE.ALLOCATION && (
         <div className="ps-panel">
           <div className="ps-panel-h">YOUR CALL — {deal.ticker}</div>
-          <input
-            className="ps-slider"
-            type="range" min={-100} max={100} step={5}
-            value={slider}
-            onChange={(e) => setSlider(Number(e.target.value))}
-          />
+          {/* ONE GAUGE, BOTH SURFACES (2026-08-05). This was a bare styled
+              range input duplicated here and in PressFlat, with these two long
+              label notes copied alongside it — the exact shape that let the two
+              floors drift apart the first time. The control and its face now
+              live in pressUi.ConvictionGauge; the reasoning about the LABELS
+              stays here because it is about this game's vocabulary, not about
+              the widget. */}
           {/* THE ENDS NAME WHAT THE SLIDER MEASURES (2026-08-03). They read
               SHORT · FLAT · LONG, which promised a position with a SIZE — and
               the control has never taken one: sliderToP maps the handle to
@@ -1510,7 +1810,7 @@ export default function PressSession({
               is p=1, so FUD sits left; PASS is the readout's own word for dead
               centre. NOTE: VerdictScreen.jsx runs the mirrored order (TRUST
               left); settle the direction before the two games merge. */}
-          <div className="ps-slider-ends"><span>FUD</span><span>PASS</span><span>FUND</span></div>
+          <ConvictionGauge value={slider} onChange={setSlider} />
           <div className="ps-saying">{readout.saying}</div>
           <div className="ps-risk">{readout.risk}</div>
           <button className="ps-lock" onClick={lockCall}>LOCK IT IN</button>
@@ -1525,11 +1825,18 @@ export default function PressSession({
           thirds clear; the copy is short enough to read in a strip. */}
       {run.phase === PHASE.RESOLUTION && (
         <div className="ps-lower">
-          <div className={`ps-lower-pnl ${run.call.pnl >= 0 ? "up" : "down"}`}>
-            {run.call.pnl >= 0 ? "+" : ""}{Math.round(run.call.pnl)}
+          {/* FOUR BANDS, NOT A SIGN TEST — see callVerdict in pressRun.js, and
+              keep this identical to PressFlat's: one run, two presentations, and
+              the two surfaces must never name the same call differently. */}
+          <div className={`ps-lower-pnl ${verdict ? verdict.tone : "up"}`}>
+            {run.call.pnl > 0 ? "+" : ""}{Math.round(run.call.pnl)}
           </div>
           <div className="ps-lower-body">
-            <div className="ps-lower-h">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
+            <div className="ps-lower-h">{verdict ? verdict.label : ""}</div>
+            {/* The bet, restated against the outcome, before the deal's story. */}
+            {betRestated(run, deal) && (
+              <div className="ps-lower-bet">{betRestated(run, deal)}</div>
+            )}
             <div className="ps-lower-truth">{deal.resolution}</div>
             {/* THE GAP, SAID OUT LOUD (§7 item 7) — see the note on PressFlat.
                 Renders only when the claims held and it folded anyway. */}
@@ -1633,7 +1940,7 @@ export default function PressSession({
               </div>
             ))}
           </div>
-          <button className="ps-lock" onClick={onExit}>LEAVE THE DESK</button>
+          <button className="ps-lock" onClick={onExit}>BACK TO THE DESK</button>
         </div>
       )}
     </div>
@@ -1668,8 +1975,19 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   align-items:center; justify-content:space-between; gap:12px; padding:0 14px;
   background:linear-gradient(180deg, rgba(2,16,14,0.9), rgba(2,16,14,0));
   font-size:12px; letter-spacing:0.08em; }
-.ps-exit { background:none; border:1px solid rgba(47,214,214,0.45); color:#2fd6d6;
-  font-size:11px; letter-spacing:0.08em; padding:6px 10px; cursor:pointer; }
+/* EASY TO MISS (author, 2026-08-05: "there's a 'leave the desk' button in the
+   top left but it is easy to miss"). 11px hairline cyan on a dark room, in the
+   corner, at the same weight as the two readouts beside it — it was styled like
+   a label and read like one. It is the only way out of the game, so it gets
+   filled, bordered at full strength, and lifts under the pointer. Still cyan and
+   still small: it must not compete with the gold CTA that moves the game ON. */
+.ps-exit { background:rgba(4,20,15,0.9); border:1.5px solid rgba(47,214,214,0.8);
+  color:#2fd6d6; font-size:11px; font-weight:bold; letter-spacing:0.1em;
+  padding:7px 12px; border-radius:3px; cursor:pointer;
+  box-shadow:0 0 12px rgba(47,214,214,0.18);
+  transition:background .15s ease, box-shadow .15s ease; }
+.ps-exit:hover { background:rgba(47,214,214,0.18);
+  box-shadow:0 0 18px rgba(47,214,214,0.35); }
 .ps-deal { font-weight:bold; letter-spacing:0.1em; }
 .ps-book b { color:#ffd23a; font-size:15px; margin-left:6px; }
 
@@ -1698,7 +2016,23 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    The positioning that used to be on .ps-readcol moved up one level so the cat's
    feed can be docked to the column's top edge and stay there as the transcript
    grows. Bottom-anchored, as it always was — the column still fills upward. */
-.ps-readstack { position:absolute; left:18px; bottom:calc(var(--nav-clear) + 12px);
+/* GHOSTED WHILE A SCREEN IS IN FOCUS. Opacity rather than display:none for two
+   reasons: the column can come back on hover with no new control, and a block
+   that vanishes outright takes the player's place in the text with it.
+   0.06 and not 0 — a faint trace is what makes the hover discoverable. */
+/* The page's own headline, reached by attribute because it is not in this
+   component's tree — see the data-press-screenlook effect. Goes fully out and
+   does not come back on hover: it is decoration, not something to re-read. */
+/* The transition is on the BASE rule, not the attribute one. Put it only on the
+   attribute rule and the fade-out animates while the fade-back snaps, because
+   removing the attribute takes the transition away with it. This stylesheet only
+   exists while PressSession is mounted, so it reaches no other page. */
+.custom-title { transition:opacity .28s ease; }
+html[data-press-screenlook] .custom-title { opacity:0; pointer-events:none; }
+.ps-readstack.ghost { opacity:.06; }
+.ps-readstack.ghost:hover { opacity:1; }
+.ps-readstack { transition:opacity .28s ease;
+  position:absolute; left:18px; bottom:calc(var(--nav-clear) + 12px);
   width:min(430px, 38vw);
   max-height:calc(100vh - var(--nav-clear) - 96px);
   display:flex; flex-direction:column; gap:8px; }
@@ -1707,8 +2041,62 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    without it the column refuses to shrink below its content and the stack grows
    past its own max-height instead of scrolling — which would push the feed up
    under the top bar exactly the way the old corner tile got buried. */
+/* THE LIVE CLAIM MAY NEVER SCROLL OFF ITS OWN TOP EDGE.
+   This column used to scroll AS A WHOLE (overflow-y:auto here), which meant the
+   answer and the transcript growing under the claim pushed the claim up and out
+   — the reported symptom was the current sentence clipped mid-line while the
+   record of older ones sat fully legible below it.
+   Now the column itself does not scroll; each block owns its own overflow. The
+   claim takes the free space and scrolls INSIDE its box if a long one needs to,
+   so its first line is always at the top of the column. .pu-script-list has
+   capped and scrolled itself at 190px since it was built, so the record was
+   already well behaved; it just needed the column to stop moving underneath it. */
+/* IT SCROLLS AGAIN, AND THE CLAIM STICKS INSTEAD.
+   Three passes on this and the first two each traded one bug for its mirror:
+   "overflow-y:auto" let the claim scroll off its own top edge; "overflow:hidden"
+   pinned the claim but CLIPPED whatever ran past the bottom — and what runs past
+   the bottom is the answer panel, whose last element is SEE WHAT LANDED. The
+   button was rendered, invisible, and unreachable, which read as the control
+   simply not existing (author, 2026-08-05: "nor is there a button available to
+   look at the screen").
+   A scroll container can never hide a control; sticky positioning can never let
+   the claim leave. Using both is the only combination with neither failure.
+   THE RULE FOR ANYONE EDITING THIS: nothing in this column may be unreachable.
+   If a future change needs the claim pinned harder, pin it with position, not by
+   taking the scroll away. */
 .ps-readcol { flex:0 1 auto; min-height:0; overflow-y:auto;
   display:flex; flex-direction:column; gap:8px; }
+/* THE CLAIM YIELDS, THE ANSWER DOES NOT (author, 2026-08-05: "Marisol's
+   dialogue box is mostly stuck behind Virgil's").
+   First pass gave the claim "flex:1 1 auto", which made it GREEDY — it took the
+   free space and the answer, arriving under it in a column that no longer
+   scrolls, got clipped mid-sentence. That traded the original bug for its
+   mirror image.
+   The answer is the thing the player just spent a question on and it is short;
+   it never shrinks. The claim is long, already read, and re-readable, so it is
+   the one that gives way and scrolls inside itself. */
+/* STICKY, not flex-pinned: the claim rides the top of the scroller so it is
+   always readable, and everything below scrolls under it. flex:none because a
+   sticky item that can shrink stops being a reliable header. */
+.ps-readcol > .pu-claim {
+  position:sticky; top:0; z-index:2; flex:0 0 auto;
+  /* Opaque, or the answer scrolls visibly through it. */
+  background:linear-gradient(180deg, rgba(255,95,158,.07), rgba(2,16,14,.94) 60%),
+             rgba(2,16,14,.94);
+}
+.ps-readcol > .pu-answer { flex:0 0 auto; }
+.ps-readcol > .pu-script { flex:0 0 auto; }
+/* AND IT OUTRANKS THE RECORD. Three blocks in one dark column at the same
+   weight is the "busy" half of the report: nothing said which one was NOW.
+   The live claim keeps the pink rule and gains the only lit background in the
+   stack; the transcript recedes. Colour is not carrying this alone — the claim
+   is also the only block at full text opacity. */
+/* Background lives on the sticky rule above — it has to be OPAQUE there, and a
+   second declaration down here would quietly win the cascade and make the claim
+   translucent again, with the answer visible through it as it scrolls under. */
+.ps-readcol > .pu-claim { border-left-width:3px; }
+.ps-readcol > .pu-script { opacity:.72; }
+.ps-readcol > .pu-script:hover, .ps-readcol > .pu-script.open { opacity:1; }
 /* Over the room, so every block is opaque enough to read against anything.
    THE TRANSCRIPT WAS NOT. This rule said "both blocks" and there were two when
    it was written; ON THE RECORD arrived later with a hairline top rule and no
@@ -1893,33 +2281,19 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    can name a client but cannot describe one. */
 .ps-open > * { flex-basis:100%; }
 
-/* BAND 0 — THE STATUS RAIL. Three cells, bevelled at opposite corners, in the
-   same register as the rest of the terminal's readouts. MANDATE gets the widest
-   cell because it is the only one whose value changes (—— at rest → the ticker
-   at the settle). */
-.ps-market-rail {
-  display:grid; grid-template-columns:1.1fr .85fr 1fr;
-  border:1px solid rgba(47,214,214,.18); background:rgba(2,18,17,.72);
-  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));
-}
-.ps-market-rail span {
-  min-width:0; padding:9px 13px; color:#b9d8d3;
-  font-size:10.5px; letter-spacing:.1em; white-space:nowrap; overflow:hidden;
-  text-overflow:ellipsis;
-}
-.ps-market-rail span + span { border-left:1px solid rgba(47,214,214,.12); }
-.ps-market-rail i {
-  display:block; margin-bottom:3px; color:rgba(47,214,214,.5);
-  font-style:normal; font-size:8.5px; letter-spacing:.17em;
-}
-.ps-market-rail span:first-child { color:#ffd23a; }
+/* BAND 0's rail is gone with its markup (2026-08-05) — .ps-market-rail and its
+   four descendant rules. See the render site for why three constants are not an
+   instrument. The head is the panel's top edge now. */
 
 /* BAND 1 — THE HEAD. The one display face on the panel other than the record's
    letterhead, and it is Orbitron rather than Bebas because this is the terminal
    speaking, not the paperwork. Two lines, the second in gold: the instruction
    splits into what you do and what you do it for, and colouring the second half
    is what keeps a 34px headline from reading as a single shout. */
-.ps-start-head { margin:12px 0 0; }
+/* No top margin: with the rail cut this is the first band, and its offset from
+   the panel edge is .ps-open's own padding. The old 12px was clearance from the
+   rail beneath it. */
+.ps-start-head { margin:0; }
 .ps-start-head h1 {
   margin:7px 0 7px; font-family:'Orbitron','IoskeleyMono',monospace;
   color:#eafff9; font-size:32px; line-height:1.06; letter-spacing:.04em;
@@ -1940,7 +2314,7 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    was the third accent in four lines. */
 .ps-open-eyebrow { font-size:11px; letter-spacing:.2em; color:#ffd23a; font-weight:bold; }
 
-/* BAND 2 — THE HOUSING. See the render site for why the record now sits in one.
+/* BAND 3 — THE HOUSING. See the render site for why the record now sits in one.
    The 28px top padding is the TAB BAND and the paperclip's headroom: the deal
    file's tab rides the record's top edge at -17px and the polaroid's clip
    reaches ~27px above it — the shell's clip-path would shear the loop at
@@ -1953,6 +2327,79 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    flat surface runs the same record at 520, stacked, so every narrower shape
    is already proven. The folder reads as an object on the desk rather than a
    stripe across it. */
+/* THE INTAKE ROW. align-items:start so the guide card sits at the file's top
+   edge rather than stretching to its height — a column of card that tall would
+   be a panel, and it is a caption with a face on it.
+   THE GUIDE'S WIDTH IS FIXED AND THE FILE TAKES THE REST, not the other way
+   round: the card has a floor below which the role line wraps, and the folder is
+   the element that degrades gracefully at any width (that is what the container
+   query in engagement.jsx is for). */
+.ps-intake { display:flex; align-items:flex-start; gap:14px; margin-top:14px; }
+/* margin:0 is not tidying — the shell carries margin-left/right:auto
+   for its old centred life, and an auto margin on a flex item eats free space
+   before justify-content ever sees it. */
+.ps-intake .ps-record-shell {
+  flex:1 1 auto; min-width:0; max-width:none; margin:0;
+}
+
+/* VIRGIL ON THE BRIEFING — see the render site for why this placement is safe
+   where the old one wasn't. Deliberately quiet: no border box competing with the
+   file's housing beside it, no accent colour but his own mint. He is the second
+   object in the row and must not out-shout the first. */
+.ps-guide {
+  /* STRETCH TO THE FILE, CENTRE INSIDE IT. align-self:stretch alone left the
+     portrait at the top of a 320px card with 170px of empty box under it, which
+     reads as a column that failed to load. The card matching the file's height
+     is what makes the row a row rather than a folder with a sticker beside it,
+     so the height stays and the content moves to the middle of it. */
+  flex:0 0 218px; align-self:stretch;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:14px 12px; gap:4px;
+  border:1px solid rgba(191,238,222,.22);
+  background:linear-gradient(160deg,rgba(12,32,28,.72),rgba(2,14,13,.72));
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));
+}
+.ps-guide-pic {
+  width:84px; height:84px; object-fit:cover; border-radius:50%;
+  border:1px solid rgba(191,238,222,.45); background:#020f0d;
+}
+.ps-guide-who {
+  margin-top:8px; font-size:11px; font-weight:bold; letter-spacing:.1em;
+  color:#eafff9;
+}
+/* HIS ROLE LINE IS THE WHOLE PITCH FOR HIM (virgil.js) — the one string on this
+   card that has to read, so it gets the mint and the letterspacing. */
+.ps-guide-role { font-size:9px; letter-spacing:.13em; color:#bfeede; }
+.ps-guide-blurb {
+  margin:7px 0 0; font-size:10.5px; line-height:1.45;
+  color:rgba(234,255,249,.62); text-align:center;
+}
+/* THE COVERAGE LIST. Ruled off from Virgil's own three lines, because it is
+   about somebody else — the rule is doing the job the deleted band's divider
+   did, one level up: his identity above it, the desk's below it. */
+.ps-guide-lanes {
+  width:100%; margin-top:15px; padding-top:12px;
+  border-top:1px solid rgba(191,238,222,.18);
+}
+.ps-guide-lanes > span {
+  display:block; font-size:8px; letter-spacing:.18em;
+  color:rgba(191,238,222,.55);
+}
+.ps-guide-lanes ul {
+  list-style:none; margin:8px 0 0; padding:0;
+  display:flex; flex-direction:column; gap:9px;
+}
+/* Gold, which is what .ps-face-role wore — the roles are what survived that
+   band, so they keep its colour. The NAME is the quieter of the two lines on
+   purpose: what the player has to hold going in is the coverage, and the name
+   is how they'll ask for it. */
+.ps-guide-lanes li { font-size:9.5px; letter-spacing:.12em; color:#ffd23a; }
+.ps-guide-lanes li b {
+  display:block; margin-bottom:2px;
+  font-size:10px; font-weight:bold; letter-spacing:.04em;
+  color:rgba(234,255,249,.92);
+}
+
 .ps-record-shell {
   position:relative; margin-top:14px; padding:28px 10px 10px;
   max-width:640px; margin-left:auto; margin-right:auto;
@@ -1986,8 +2433,9 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    everything a closed file needs to. The desktop record wears the cover at its
    own width — the cover is inset over the record, so no per-surface geometry. */
 
-/* BAND 3 — THE PROTOCOL. Three counts, baseline-aligned so the numerals read as
-   a row of values rather than three stacked captions. */
+/* BAND 2 — THE PROTOCOL, above the file since 2026-08-05 (see the render site).
+   Three counts, baseline-aligned so the numerals read as a row of values rather
+   than three stacked captions. */
 .ps-protocol {
   display:grid; grid-template-columns:repeat(3,1fr); margin-top:14px;
   border:1px solid rgba(255,210,58,.2); background:rgba(42,34,7,.12);
@@ -2001,66 +2449,55 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   font-size:20px; font-weight:600;
 }
 .ps-protocol span { color:#91b7b0; font-size:9.5px; letter-spacing:.11em; }
+/* THE RULE UNDER THE COUNT. Stacked rather than run on, so ANALYSTS stays the
+   same word at the same size as QUESTIONS and FINAL CALL — the row reads as
+   three counts first, and the scarcity is a note on one of them. */
+.ps-protocol span i {
+  display:block; margin-top:3px;
+  color:rgba(255,210,58,.6); font-style:normal; font-size:8px; letter-spacing:.13em;
+}
 .ps-directive { margin:11px 2px 0; max-width:78ch; color:#b7d5cf; font-size:13px; line-height:1.5; }
 
-/* BAND 4's label — a ruled line with the rule on the right, which is what the
-   band's old centred caption became. The border-top is the band separator the
-   deleted .ps-tools rule used to carry. */
-.ps-section-line {
-  display:flex; align-items:center; justify-content:space-between; gap:10px;
-  margin-top:15px; padding-top:11px; border-top:1px solid rgba(47,214,214,.16);
-  color:#2fd6d6; font-size:11px; letter-spacing:.16em;
-}
-.ps-section-line i {
-  color:rgba(255,210,58,.58); font-style:normal; font-size:9px; letter-spacing:.13em;
-}
-
-/* THE DESK, FULL PANEL WIDTH. Inside the deleted copy column it was 460px of a
-   756px panel, which left the five portraits crowded on the right while the space
-   under the record sat empty; out here a cast list gets the wide row it wants.
-   CENTRED, AND BIGGER (author: "maybe the analyst images could be larger and/or
-   centered") — both, and they need each other: 52px portraits left-aligned read
-   as a footnote to the copy above them, and this band is not a footnote. It is
-   the interface for the next four minutes. */
-.ps-tools { margin-top:10px; }
-.ps-draw-row { display:flex; gap:9px; flex-wrap:wrap; justify-content:center; }
-
-/* THE DESK, as people rather than card faces. Not buttons: on the briefing
-   these introduce the four, and the sendable version is SeatRow on the floor.
-   Fixed width so four tiles hold one row and the names can't ragged-wrap. */
-.ps-face { flex:none; width:94px; display:flex; flex-direction:column;
-  align-items:center; gap:4px; text-align:center; }
-.ps-face-pic { width:66px; height:66px; object-fit:cover; border-radius:50%;
-  border:1px solid rgba(47,214,214,0.35); background:#020f0d; }
-/* Two lines reserved for every name — "Detective Marisol" wraps and the other
-   three don't, which put her role label a line below everyone else's. */
-.ps-face-who { font-size:9px; font-weight:bold; letter-spacing:0.04em;
-  color:rgba(234,255,249,0.92); line-height:1.2; min-height:2.4em;
-  display:flex; align-items:center; justify-content:center; }
-/* THE LANE IS THE POINT — readable at rest, hover zoom as a reading aid; see
-   the note on .pf-face-role, which this mirrors band for band. */
-.ps-face-role { font-size:9.5px; letter-spacing:0.11em; color:#ffd23a; }
-@media (hover:hover) {
-  .ps-face-pic { transition:transform .18s ease; }
-  .ps-face:hover .ps-face-pic { transform:scale(1.22); }
-  .ps-face:hover .ps-face-role { color:#ffe27a; }
-}
-
-/* VIRGIL, at the end of the desk row and set apart from it on purpose — not a
-   seat, no lane, cannot be sent. The divider is what carries that, so it is not
-   a decoration to tidy away. */
-.ps-face-div { flex:none; align-self:center; width:1px; height:44px;
-  background:rgba(234,255,249,0.16); margin:0 3px; }
-.ps-face-cat .ps-face-pic { border-color:rgba(191,238,222,0.5); }
-.ps-face-cat .ps-face-who { color:#bfeede; }
-.ps-face-cat .ps-face-role { color:rgba(191,238,222,0.75); }
-.ps-face-note { font-size:7.5px; letter-spacing:0.12em;
-  color:rgba(191,238,222,0.5); margin-top:1px; }
+/* BAND 4 AND ITS SECTION LINE ARE GONE (2026-08-05) — .ps-section-line,
+   .ps-tools, .ps-draw-row, .ps-face*, and the hover-zoom media query with them.
+   See the note at the render site for what the band was and why the floor's
+   seat row does its job. Nothing else on this surface used these classes; the
+   floor's portraits are SeatRow in pressUi.jsx, which never shared them. */
 
 /* THE ARRIVAL — record styles come from engagement.jsx's ENGAGEMENT_CSS,
    prepended to this sheet. What's local to this surface is the skip target. */
 .ps-skip-deal { position:absolute; inset:0; z-index:5; background:none; border:none;
   padding:0; cursor:pointer; }
+
+/* ---- putting the brief down (briefHidden) ----
+   Visibility rides with opacity so the hidden panel takes no clicks and no tab
+   stops: a briefing you cannot see but can still tab into is the same trap as
+   one you cannot dismiss. The transform is small on purpose — it reads as the
+   sheet being set down rather than as a modal being thrown. */
+.ps-open { transition:opacity .3s ease, transform .3s ease, visibility 0s linear 0s; }
+.ps-open.hid { opacity:0; visibility:hidden; transform:translate(-50%,-46%) scale(.985);
+  transition:opacity .3s ease, transform .3s ease, visibility 0s linear .3s; }
+/* The ✕ sits ON the panel's top-right corner, outside the content flow so no
+   band has to make room for it. z-index above .ps-skip-deal's sheet for the
+   frames either side of the "rolling" gate. */
+.ps-brief-hide { position:absolute; top:8px; right:10px; z-index:6;
+  padding:6px 10px; cursor:pointer; border-radius:3px;
+  background:rgba(0,0,0,.35); border:1px solid rgba(255,210,58,.35);
+  color:#ffd23a; font:bold 10px/1 'Courier New',monospace; letter-spacing:.12em;
+  transition:background .15s ease, border-color .15s ease; }
+.ps-brief-hide:hover { background:rgba(255,210,58,.16); border-color:#ffd23a; }
+/* THE WAY BACK, and it is deliberately the loudest small thing on an otherwise
+   empty screen — the panel it restores is the only place the deal is written
+   down, so this may never read as decoration. Same corner the ✕ was in, so the
+   gesture reverses where it happened. */
+.ps-brief-back { position:absolute; top:16px; right:18px; z-index:7;
+  padding:8px 14px; cursor:pointer; border-radius:3px;
+  background:rgba(4,20,15,.92); border:1.5px solid #ffd23a; color:#ffd23a;
+  font:bold 11px/1 'Courier New',monospace; letter-spacing:.14em;
+  box-shadow:0 0 18px rgba(255,210,58,.22);
+  animation:psin .3s ease both;
+  transition:background .15s ease; }
+.ps-brief-back:hover { background:rgba(255,210,58,.18); }
 /* THE ONE BUTTON ON THE BRIEFING, and it was the most templated thing on a
    screen that owns a blackletter sign and a neon window: a full-width hairline
    rectangle. Scoped to this row so the shared .ps-lock (the call, the autopsy)
@@ -2198,6 +2635,10 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   color:#ffd23a; font-size:13px; letter-spacing:0.12em; padding:13px; cursor:pointer; }
 .ps-pnl { font-size:44px; font-weight:bold; letter-spacing:0.04em; }
 .ps-pnl.up { color:#4dffaa; } .ps-pnl.down { color:#ff5f6f; }
+.ps-lower-pnl.flat, .ps-pnl.flat { color:rgba(234,255,249,0.55); }
+/* The bet restated against the outcome — gold, like every other line on this
+   surface that is about the players own commitment rather than the deal. */
+.ps-lower-bet { color:#ffd23a; font-size:12.5px; line-height:1.5; margin:6px 0 10px; }
 .ps-truth { font-size:13px; line-height:1.55; margin-top:14px; color:rgba(234,255,249,0.85); }
 .ps-scores { display:flex; gap:28px; margin-bottom:6px; }
 .ps-scores span { font-size:10px; letter-spacing:0.12em; display:block; }
@@ -2219,22 +2660,71 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    out on a laptop is vertical room, and keying this off max-width would compact
    a tall narrow window that has no need of it. */
 @media (max-height: 820px) {
-  .ps-market-rail span { padding:5px 13px; }
-  .ps-start-head { margin-top:7px; }
   .ps-start-head h1 { margin:5px 0 5px; font-size:25px; }
   .ps-start-head p { font-size:12px; }
-  .ps-record-shell { margin-top:9px; padding:28px 9px 8px; }
+  .ps-intake { margin-top:9px; }
+  .ps-record-shell { padding:28px 9px 8px; }
+  .ps-guide { padding:11px 10px; }
+  .ps-guide-pic { width:70px; height:70px; }
   .ps-open .eng-frame { width:62px; }
   .ps-protocol { margin-top:9px; }
   .ps-protocol div { padding:8px 14px 7px; }
   .ps-protocol b { font-size:17px; }
   .ps-directive { margin-top:9px; font-size:12px; }
-  .ps-section-line { margin-top:9px; padding-top:9px; }
-  .ps-face-pic { width:48px; height:48px; }
   /* Only the top margin moves — the -18px bottom is the sticky flush offset and
      tracks .ps-open's padding, not the band rhythm. */
   .ps-cta-row { margin-top:10px; padding-top:9px; }
   .ps-cta-row .ps-lock { font-size:15px; padding:11px 13px; }
+}
+
+/* SHORTER STILL — the three cuts above (status rail, analyst band, head subline)
+   put the briefing at 676px in a 676px slot on a 779px window, which is exactly
+   no scroll and no headroom. Below ~760px of window the panel would start
+   scrolling again, and the folder is where the room has to come from: it is 58%
+   of the panel, and the other four bands are a headline, three numbers, one
+   sentence and the button — none of which has slack.
+
+   SHRINK IT, DO NOT SQUASH IT. Capping the width and letting the derived height
+   follow keeps the ~1.6 ratio the folder was rebuilt for; taking the height
+   alone would flatten it back toward the 2:1 banner that started all this. 520
+   is the floor, not a preference — below it the file crosses its own 519px
+   container query and flips to the narrow layout, which moves the stamps to a
+   foot band and makes the folder TALLER, not shorter. */
+@media (max-height: 760px) {
+  .ps-intake { margin-top:7px; }
+  .ps-record-shell { padding:24px 9px 7px; }
+  .ps-protocol { margin-top:7px; }
+  .ps-directive { margin-top:7px; }
+  .ps-cta-row { margin-top:8px; padding-top:7px; }
+}
+
+/* NARROW WINDOWS UNSTACK THE INTAKE ROW. The panel is min(800px, 100vw - 40px),
+   so below ~760px of viewport the row is dividing less than 700px between a
+   folder and a 218px card — which pushes the file under its 400px container
+   query, into the layout that makes it taller. Stacking is the cheaper outcome:
+   the file goes full width and the guide becomes a wide short card beneath it,
+   which is also the order he is read in (the file arrives, then the cat tells
+   you what to do with it). */
+@media (max-width: 760px) {
+  .ps-intake { flex-wrap:wrap; }
+  .ps-intake .ps-record-shell { flex-basis:100%; }
+  /* Grid, not a row of flex items: the portrait has to span all three text
+     lines, which flex-direction:row cannot express without a wrapper element. */
+  .ps-guide {
+    flex:1 1 100%; align-self:auto;
+    display:grid; grid-template-columns:auto 1fr; align-items:center;
+    column-gap:12px; row-gap:0; text-align:left;
+  }
+  /* 1 / -1, not a row count: the card gained a fourth child and a hard-coded
+     span would have left the coverage list under the portrait instead of beside
+     it. This spans whatever is there. */
+  .ps-guide-pic { width:56px; height:56px; grid-row:1 / -1; align-self:start; }
+  .ps-guide-who { margin-top:0; }
+  .ps-guide-blurb { margin:3px 0 0; text-align:left; }
+  /* Horizontal at this width — four short roles fit one line and a stacked list
+     would double the card's height for no gain. */
+  .ps-guide-lanes { margin-top:8px; padding-top:8px; }
+  .ps-guide-lanes ul { flex-direction:row; flex-wrap:wrap; gap:4px 16px; margin-top:5px; }
 }
 
 @media (max-width: 860px) {

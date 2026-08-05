@@ -30,6 +30,7 @@
 // fully scoreable with him muted — which is exactly why muting him is offered.
 
 import { LANES, SEATS } from "./questions.js";
+import { LANE_NOUN, countWord } from "./desk.js";
 
 // THE ROLE LINE IS THE WHOLE PITCH FOR HIM (author, 2026-07-28: "Virgil - the
 // cat - your guide"). The four seats get a subject — THE TAPE, THE MONEY, THE
@@ -198,25 +199,16 @@ export function shapeTip(claim, salt = 0) {
 
 /* ---------------------------------------------------------------------- */
 
-// The agenda's noun per lane. Singular and plural are both authored: the plural
-// is not always a trailing "s" — "question about the story" pluralises on the
-// HEAD noun, and appending to the phrase produced "two more question about the
-// storys".
+// LANE_NOUN AND countWord MOVED TO desk.js, next to LANE_LABEL, when
+// laneSentence became their second consumer — two per-lane string tables in two
+// files is how they drift apart. The note on why both numbers are authored (the
+// plural is not always a trailing "s") went with them.
 //
 // CHART WAS "question about the tape" UNTIL 2026-07-28, when ticker-tape slang
 // failed invariant 6 on the author (see LANE_LABEL in desk.js). It is now a
 // plain compound like CHAIN and RECORD, which also drops it out of the
 // head-noun case — SOCIAL is the only lane still in there, and it is the reason
 // that case still needs its assertion.
-const LANE_NOUN = {
-  [LANES.CHAIN]: ["money question", "money questions"],
-  [LANES.RECORD]: ["paperwork question", "paperwork questions"],
-  [LANES.CHART]: ["chart question", "chart questions"],
-  [LANES.SOCIAL]: ["question about the story", "questions about the story"],
-};
-
-const COUNT_WORD = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven"];
-const countWord = (n) => COUNT_WORD[n] ?? String(n);
 
 /**
  * HOW MUCH RUNWAY IS LEFT IN THIS LANE — the half that stays ON.

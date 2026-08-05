@@ -10,7 +10,7 @@ import { briefingMode, markBriefingSeen } from "@/lib/trade/briefingSeen";
 import {
   PHASE, PRESSES,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt, seatOptions,
-  allocate as doAllocate, toAutopsy, currentClaim, callReadout, coverageScore, laneOutlook, pressure,
+  allocate as doAllocate, toAutopsy, currentClaim, callReadout, stakeFor, pressPrice, callVerdict, betRestated, coverageScore, laneOutlook, pressure,
   settlementNote,
 } from "@/game/terminal-traders/press/pressRun";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
@@ -27,6 +27,7 @@ import { createFlatEvidenceScreen } from "./evidenceScreen";
 import { createPitchDeck } from "./pitchDeck";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
+  ConvictionGauge,
   Meter, Nav, readDwellMs, VIRGIL_BEAT_MS, PRESS_UI_CSS,
 } from "./pressUi";
 import TerminalModuleHeader from "../TerminalModuleHeader";
@@ -114,6 +115,10 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      so under a bare `speaking` the panel lit its ON AIR lamp and ran a dead
      level meter every time a seat reported, under the pitcher's face. */
   const [speakingAs, setSpeakingAs] = useState(null);
+  // HOW MUCH OF VIRGIL HAS BEEN SPOKEN on this claim — 0 none, 1 his read, 2
+  // the consequence. Driven by the claim turn's onPart so his panel can never
+  // show a line the voice has not reached. See VirgilRead's `reveal`.
+  const [virgilAt, setVirgilAt] = useState(0);
   /* WHO THE FEED IS POINTED AT. Desktop cuts the camera to whoever is talking
      (PressSession's "THE CAMERA FOLLOWS THE VOICE, NOT THE PRESS"); this surface
      had one fixed shot of the pitcher, so an adviser you had just spent went and
@@ -143,7 +148,22 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      Virgil takes the camera to say the agenda and has no screen, so anyone
      without a board falls back to the deck: the bot's slides are what is on
      screen whenever nobody's own findings are. */
-  const screenOwner = BOARDS_SET.has(onCamera) ? onCamera : PITCHER;
+  /* THE FINDING OUTRANKS THE CAMERA WHILE THERE IS A FINDING.
+     The camera-only rule above held while it was true that "the camera is
+     already on the reporter by the time this is offered" — and Virgil's
+     after-answer turn ended that. He carries `seat: VIRGIL.id` and has no
+     board, so ~2.4s after EVERY analyst report the camera landed on him, this
+     fell through to PITCHER, and the tab silently became ▦ PITCH DECK — while
+     it was still pulsing LOOK and the note under it still said "on Marisol's
+     screen". The single most expensive action in the game handed you the
+     seller's slide.
+     `flash.board` is set by resolvePress and cleared by advance() and callIt(),
+     so this override has exactly the lifetime of the answer beat and needs no
+     reset of its own — which is what the note at the flash reset requires
+     ("screenOwner is derived, not stored"). Pitcher presses fall through
+     unchanged, because the pitcher's board IS the deck. */
+  const screenOwner = (flash && BOARDS_SET.has(flash.board)) ? flash.board
+    : BOARDS_SET.has(onCamera) ? onCamera : PITCHER;
   // He's answered and the board has changed, and you HAVEN'T LOOKED YET.
   // Until you do, nothing on this surface may name the outcome — see the tab
   // badge and .pf-answer below.
@@ -275,7 +295,9 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const aside = useMemo(
     () => pitcherAside(mood.band, claim, run.claimIndex),
     [mood.band, claim, run.claimIndex]);
-  const readout = useMemo(() => callReadout(slider), [slider]);
+  const readout = useMemo(() => callReadout(slider, stakeFor(run)), [slider, run]);
+  // The reveal headline. Four bands (callVerdict), not a sign test on the payout.
+  const verdict = useMemo(() => callVerdict(run, deal), [run, deal]);
   const read = useMemo(() => coverageScore(run, deal), [run, deal]);
   const pressed = claim ? run.outcomes[claim.id] : null;
   // A press is legal only while he's on a claim you haven't already answered
@@ -481,19 +503,41 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       for (let i = 0; i < live.length; i++) {
         const p = live[i];
         if (sayToken.current !== token) return;   // superseded — stop the chain
+        // THE CAMERA CUTS BEFORE THE PAUSE, NOT AFTER (author, 2026-08-05: "i
+        // saw the pitchbot appear for a few seconds, and then virgil pops up.
+        // Then, a long pause, finally i hear virgil's voice but no sitepal
+        // animation").
+        //
+        // These two lines used to sit BELOW the leadMs wait, and every symptom
+        // in that report is that ordering: `seat` defaults to the pitcher, so
+        // the bot held the screen for the whole 2.4s beat, Virgil cut in only as
+        // the wait ended, and his SitePal portal did not begin booting until the
+        // speakLine call immediately after — which is why the voice arrives late
+        // and lands on a face that never animates.
+        //
+        // Moved above the wait, VIRGIL_BEAT_MS now buys what it was always
+        // supposed to: the beat plays on the INCOMING speaker's face, which is
+        // what "somebody having listened and then answered" looks like rather
+        // than sounds like, and the portal gets those 2.4 seconds as a head
+        // start instead of spending them on the wrong character.
+        //
+        // `seat` is optional and defaults to the pitcher, so the opening and the
+        // claim spins need no change — only a press, or the cat, names somebody
+        // else.
+        setSpeakingAs(p.voice || VOICE);
+        setOnCamera(p.seat || PITCHER);
         // THE GAP BEFORE THIS VOICE. Re-checked after the wait: two or three
         // seconds is long enough for a press to have landed, and resuming into a
-        // superseded chain would put the cat over whoever interrupted him.
+        // superseded chain would put the cat over whoever interrupted him. The
+        // camera having already moved is not a leak — whoever supersedes this
+        // chain sets it to their own seat on their first part.
         if (p.leadMs) {
           await new Promise((r) => setTimeout(r, p.leadMs));
           if (sayToken.current !== token) return;
         }
+        // AFTER the wait, still: the lead is dead air BEFORE a line, so the text
+        // must not appear during it. Only the face arrives early.
         onPart?.(i);
-        setSpeakingAs(p.voice || VOICE);
-        // `seat` is optional and defaults to the pitcher, so the opening and the
-        // claim spins need no change — only a press, or the cat, names somebody
-        // else.
-        setOnCamera(p.seat || PITCHER);
         const startedAt = Date.now();
         try { await speakLine(p.voice || VOICE, p.text, p.seat); }
         catch { /* voice is enrichment, never a gate on play */ }
@@ -618,12 +662,21 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      screen for everyone, which is what §3 requires of it. */
   useEffect(() => {
     if (!floorLive || !claim) return;
+    // A new claim starts with none of him said — otherwise claim 2 inherits
+    // claim 1's level and his read is on screen before the bot opens his mouth,
+    // which is the exact thing `reveal` exists to stop.
+    setVirgilAt(0);
     sayTurn(
       [
         // THE FRAMING LINE FIRST, then the argument — see the long note at the
         // matching effect in PressSession. Both surfaces speak the claim the same
         // way or they drift on what the bot sounds like.
         { voice: VOICE, text: claim.lead },
+        // AND THE CHECKABLE PART OUT LOUD — see the long note at the matching
+        // effect in PressSession for why it was always the bot's line and why
+        // the FACT tag still does the separating. Both surfaces speak the claim
+        // the same way or they drift on what the bot sounds like.
+        { voice: VOICE, text: claim.fact },
         { voice: VOICE, text: claim.spin },
         // leadMs: he lets the bot finish before he says his piece. Same number as
         // PressSession, from the same constant, for the same reason the tip is.
@@ -634,8 +687,14 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         { voice: VIRGIL.voice, text: virgil?.nextMove, seat: VIRGIL.id,
           leadMs: 500, minMs: 700 },
       ],
-      // Back to the pitcher: the claim is his and it is what you read next.
-      { onDone: () => setOnCamera(PITCHER) },
+      {
+        // Back to the pitcher: the claim is his and it is what you read next.
+        onDone: () => setOnCamera(PITCHER),
+        // HIS TEXT ARRIVES WHEN HIS VOICE DOES — same levels and same indices as
+        // PressSession; see the long note there. Parts 0-2 are the bot's, 3 is
+        // his read, 4 the consequence.
+        onPart: (i) => setVirgilAt(i >= 4 ? 2 : i >= 3 ? 1 : 0),
+      },
     );
     return () => { stopVoice(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -766,10 +825,40 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         // the screen the receipt is on.
         setHasRecord(!!outcome.receipt);
         setFlash((f) => (f && f.id === owed ? { ...f, stage: "choice" } : f));
-        // Already sitting on the pane the answer landed on? Then you watched it
-        // land and there's nothing to send you anywhere. Which pane that is now
-        // depends on WHO answered, so the check has to as well.
-        setLookPending(paneRef.current !== "screen");
+        /* IT COMES TO YOU (author, 2026-08-05: "make the evidence screen more
+           accessible or float it up automatically and let player dismiss/close
+           it").
+
+           A press is the most expensive thing the player does, and the finding
+           it buys was two taps away behind a pane the strip does not make
+           obvious — so the receipt, which is the whole return on the spend, was
+           the easiest thing in the game to miss entirely.
+
+           THE DEFERRED REVEAL IS INTACT, and it is worth being exact about why,
+           because it is doctrine (pressUi's header: "nothing naming the outcome
+           until you have gone and looked"). That rule is about TEXT naming a
+           verdict the player has not seen. Switching the pane does not name
+           anything — it IS the looking, performed for you. `looked` is set here
+           for the same reason: the beat genuinely has been satisfied, and
+           leaving it false would keep pulsing LOOK at a board already on screen.
+
+           ONLY WHEN THERE IS SOMETHING TO SEE. No receipt means the board would
+           come up empty, which teaches the player that floating up means
+           nothing. Those answers leave the old pulse behind instead.
+
+           THE STRIP IS THE DISMISS. It is already a two-tab control the player
+           has been using all session; adding a close button would be a third
+           way to do what FEED does. */
+        if (outcome.receipt) {
+          setPane("screen");
+          setLookPending(false);
+          setFlash((f) => (f && f.id === owed ? { ...f, looked: true } : f));
+        } else {
+          // Already sitting on the pane the answer landed on? Then you watched it
+          // land and there's nothing to send you anywhere. Which pane that is now
+          // depends on WHO answered, so the check has to as well.
+          setLookPending(paneRef.current !== "screen");
+        }
 
         // AND THE CAT CLOSES THE BEAT — same moment, same rule, same bank as
         // PressSession. See afterAnswer in virgil.js; the two surfaces speak the
@@ -969,9 +1058,18 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               because that is the whole shape of the puzzle (VC_GAME §1 —
               "Every fact stated is true. What you judge is the inference sold
               on top of it") and the briefing had never said it anywhere. */}
+          {/* KEPT IDENTICAL TO .ps-directive (author, 2026-08-05) — the two
+              surfaces carry the same words and are edited together; see the note
+              at the same paragraph there. The tail was "make the final call"
+              here and "decide whether it deserves funding" on the panel, which
+              had already drifted apart before this. Both are now the author's
+              fund-it-or-FUD-it line: it names the two outcomes in the player's
+              own vocabulary and makes the verdict a choice between two acts
+              rather than a rating. */}
           <p className="pf-directive">
             Every fact the pitch bot states is true...technically. But is the
-            project viable? Consult with the team and make the final call.
+            project viable? Consult with the team and decide whether to fund it
+            or FUD it.
           </p>
           {/* Portraits, not card faces. Not buttons either: on the briefing
               these introduce the four, and the sendable version of the same
@@ -1189,7 +1287,9 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 <ClaimBody claim={claim} virgil={virgil} onToggleTips={() => setTips((t) => !t)}
                            pressure={mood} aside={aside}
                            spent={run.advisersSpent}
-                           count={`${run.claimIndex + 1} / ${deal.claims.length}`} />
+                           count={`${run.claimIndex + 1} / ${deal.claims.length}`}
+                           remaining={outlook.remaining} earlier={outlook.earlier}
+                           reveal={virgilAt} />
               )
             ) : !briefed ? (
               /* THE CAT FIRST, and unquoted — he is talking to you rather than
@@ -1278,9 +1378,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       {run.phase === PHASE.ALLOCATION && (
         <div className="pf-scroll center">
           <div className="pf-label">YOUR CALL — {deal.ticker}</div>
-          <input className="pf-slider" type="range" min={-100} max={100} step={5}
-                 value={slider} onChange={(e) => setSlider(Number(e.target.value))} />
-          {/* THE ENDS NAME WHAT THE SLIDER MEASURES (2026-08-03). They read
+                    {/* THE ENDS NAME WHAT THE SLIDER MEASURES (2026-08-03). They read
               SHORT · FLAT · LONG, which promised a position with a SIZE — and
               the control has never taken one: sliderToP maps the handle to
               P(this is a rug) and the stake is fixed, so what you are setting
@@ -1297,7 +1395,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               is p=1, so FUD sits left; PASS is the readout's own word for dead
               centre. NOTE: VerdictScreen.jsx runs the mirrored order (TRUST
               left); settle the direction before the two games merge. */}
-          <div className="pf-ends"><span>FUD</span><span>PASS</span><span>FUND</span></div>
+          <ConvictionGauge value={slider} onChange={setSlider} />
           <div className="pf-saying">{readout.saying}</div>
           <div className="pf-risk">{readout.risk}</div>
           <button className="pf-btn primary" onClick={lockCall}>LOCK IT IN</button>
@@ -1307,10 +1405,20 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       {/* ---------- resolution ---------- */}
       {run.phase === PHASE.RESOLUTION && (
         <div className="pf-scroll center">
-          <div className={`pf-pnl ${run.call.pnl >= 0 ? "up" : "down"}`}>
-            {run.call.pnl >= 0 ? "+" : ""}{Math.round(run.call.pnl)}
+          {/* FOUR BANDS, NOT A SIGN TEST — see callVerdict in pressRun.js. The
+              old headline keyed on `pnl >= 0`, which is |p - truth| <= 0.5: a
+              hit rate, and one that congratulated a dead-centre PASS for
+              reading a rug correctly. */}
+          <div className={`pf-pnl ${verdict ? verdict.tone : "up"}`}>
+            {run.call.pnl > 0 ? "+" : ""}{Math.round(run.call.pnl)}
           </div>
-          <div className="pf-label">{run.call.pnl >= 0 ? "YOU READ IT RIGHT" : "YOU GOT IT WRONG"}</div>
+          <div className="pf-label">{verdict ? verdict.label : ""}</div>
+          {/* THE BET, BEFORE THE STORY. What the player committed to, in their
+              own stated conviction, next to what it was worth — then the deal's
+              own account of what happened, then the settlement note. */}
+          {betRestated(run, deal) && (
+            <p className="pf-copy gold">{betRestated(run, deal)}</p>
+          )}
           <p className="pf-copy">{deal.resolution}</p>
           {/* THE GAP, SAID OUT LOUD (§7 item 7). Only ever renders when the
               claims held and the venture died anyway — the one combination
@@ -1340,32 +1448,64 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               DIFFERENT token's name under a headline claiming the player had
               seen it before, which is false on a first play. Pattern first,
               this deal tied to it, then the classic case as a separate box. */}
+          {/* THE TELL IS THE HEADLINE NOW (author, 2026-08-05: "the post-game
+              analysis was too detailed and small font makes it hard to read").
+              It was set SMALLER than the pattern name above it, inside a nested
+              box — which had the emphasis exactly inverted. The pattern name is
+              a filing label; the tell is the one sentence that survives the
+              token and the only thing here a player carries to the next deal.
+              So the tell takes the large type and the label becomes its kicker.
+              Nothing was deleted from this block — it was re-ranked. */}
           <div className="pf-pattern">
             <div className="pf-label">THE PATTERN</div>
-            <div className="pf-name sm">{deal.archetypeLabel}</div>
-            <div className="pf-pattern-was">{deal.name} was one of these.</div>
-
-            {/* THE TELL, not the exemplar coin — see the note on the desktop
-                panel. The player has their own concrete case; what they can't
-                get from it is the rule that survives the token. */}
-            {deal.archetypeTell && (
-              <div className="pf-pattern-case">
-                <div className="pf-pattern-caselabel">THE TELL</div>
-                <p className="pf-copy sm">{deal.archetypeTell}</p>
-              </div>
-            )}
-
+            <div className="pf-pattern-kicker">
+              {deal.archetypeLabel} — {deal.name} was one of these.
+            </div>
+            {deal.archetypeTell && <p className="pf-tell">{deal.archetypeTell}</p>}
             <p className="pf-copy sm dim">
               Same shape, different token. Learn it and you get every one of these.
             </p>
           </div>
-          {deal.claims.map((c) => (
-            <div key={c.id} className={`pf-au ${run.outcomes[c.id] ? "pressed" : ""}`}>
-              <div className="pf-au-fact">{c.fact}</div>
-              <div className="pf-au-verdict">{deal.autopsy[c.id]}</div>
-            </div>
-          ))}
-          <button className="pf-btn primary" onClick={onExit}>LEAVE THE DESK</button>
+
+          {/* THE AUDIT, CUT TO WHAT THE PLAYER BOUGHT. Six claims each with a
+              verdict was the bulk that made this screen unreadable, and most of
+              it is confirmation the player never asked for. The claims they
+              PRESSED lead; the rest stay one tap away, so the audit is still
+              complete and the screen is no longer a wall.
+              It also settles a tension worth naming: the autopsy adjudicates
+              every claim whether or not you pressed it, so pressing bought
+              timing rather than access. Making the pressed ones the default view
+              is the smallest honest way to pay the press back.
+              <details>, not React state — native disclosure, keyboard and screen
+              reader support for free, and no new state on a component that
+              already holds a run. Open by default when nothing was pressed,
+              because a collapsed section is not an audit. */}
+          {(() => {
+            const pressed = deal.claims.filter((c) => run.outcomes[c.id]);
+            const rest = deal.claims.filter((c) => !run.outcomes[c.id]);
+            const row = (c) => (
+              <div key={c.id} className={`pf-au ${run.outcomes[c.id] ? "pressed" : ""}`}>
+                <div className="pf-au-fact">{c.fact}</div>
+                <div className="pf-au-verdict">{deal.autopsy[c.id]}</div>
+              </div>
+            );
+            return (
+              <>
+                {pressed.map(row)}
+                {rest.length > 0 && (
+                  <details className="pf-au-rest" open={pressed.length === 0}>
+                    <summary>
+                      {pressed.length === 0
+                        ? `ALL ${rest.length} CLAIMS`
+                        : `THE OTHER ${rest.length} YOU DIDN'T ASK ABOUT`}
+                    </summary>
+                    {rest.map(row)}
+                  </details>
+                )}
+              </>
+            );
+          })()}
+          <button className="pf-btn primary" onClick={onExit}>BACK TO THE DESK</button>
         </div>
       )}
     </div>
@@ -1900,6 +2040,10 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-pnl { font-size:52px; font-weight:bold; }
 .pf-pnl.up { color:#4dffaa; text-shadow:0 0 24px rgba(77,255,170,0.5); }
 .pf-pnl.down { color:#ff5f6f; text-shadow:0 0 24px rgba(255,95,111,0.5); }
+/* THE ABSTAIN IS NEITHER. A pass scores exactly 0 and used to render green
+   under "YOU READ IT RIGHT"; it gets its own neutral tone so the colour stops
+   claiming a result the player declined to have. */
+.pf-pnl.flat { color:rgba(234,255,249,0.55); text-shadow:none; }
 
 .pf-scores { display:flex; gap:24px; margin:4px 0 12px; }
 .pf-scores em { font-style:normal; font-size:9px; letter-spacing:0.12em; display:block;
@@ -1908,22 +2052,43 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-pattern { margin:8px 0 16px; padding:11px;
   background:rgba(255,210,58,0.05); border:1px solid rgba(255,210,58,0.28); }
 .pf-pattern .pf-label { margin-top:0; }
-/* THIS deal, tied to the pattern by name — the line whose absence made the
-   exemplar look like the subject of the screen. */
-.pf-pattern-was { font-size:12px; color:rgba(234,255,249,0.85); margin:4px 0 10px; }
-/* The tell, boxed so it reads as the portable lesson rather than more prose
-   about this one deal. */
-.pf-pattern-case { padding:9px 10px;
-  border:1px solid rgba(255,210,58,0.22); background:rgba(0,0,0,0.28); }
-.pf-pattern-caselabel { font:bold 8px/1.4 'Courier New',monospace;
-  letter-spacing:0.12em; color:rgba(255,210,58,0.7); margin-bottom:3px; }
-.pf-pattern-case .pf-copy { margin:0; }
+/* THE KICKER — the archetype name and this deal, folded into one small line.
+   These were two stacked elements at 12px+ competing with the tell below them;
+   as filing metadata they only need to be findable, not read first. */
+.pf-pattern-kicker { font:bold 9px/1.5 'Courier New',monospace; letter-spacing:.1em;
+  color:rgba(255,210,58,0.72); text-transform:uppercase; margin:3px 0 9px; }
+/* THE TELL — the largest type on the screen, and the box is gone with the
+   demotion. It was boxed to read as "the portable lesson"; at this size it
+   reads that way on its own, and the border was one more thing competing for
+   the eye on a screen the author called too detailed. */
+.pf-tell {
+  margin:0 0 10px; font-size:15px; line-height:1.5; color:#fff6dc;
+  text-align:left;
+}
 .pf-au { border-left:2px solid rgba(234,255,249,0.16); padding:7px 0 7px 10px; margin-bottom:10px; }
 .pf-au.pressed { border-left-color:#ffd23a; }
+/* THE CLAIMS YOU DIDN'T ASK ABOUT. Collapsed by default — see the render site.
+   The summary is a real control, so it gets a control's affordance and hit
+   area; the rows inside inherit .pf-au untouched. */
+.pf-au-rest { margin:2px 0 12px; }
+.pf-au-rest > summary {
+  cursor:pointer; list-style:none; padding:8px 0;
+  font:bold 9px/1.4 'Courier New',monospace; letter-spacing:.14em;
+  color:rgba(47,214,214,0.72);
+}
+.pf-au-rest > summary::-webkit-details-marker { display:none; }
+.pf-au-rest > summary::before { content:"▸ "; }
+.pf-au-rest[open] > summary::before { content:"▾ "; }
+.pf-au-rest > summary:hover { color:#2fd6d6; }
 /* Six of these stack into one wall of type on a phone, and the claim and its
    verdict were 1px apart in size and 3px apart on the page — so the eye had no
    way to tell "what it said" from "what it turned out to be" without reading
    both. The gap and the leading do that work; the colours were already right. */
-.pf-au-fact { font-size:12px; line-height:1.45; }
-.pf-au-verdict { font-size:11px; line-height:1.45; color:#2fd6d6; margin-top:6px; }
+/* BOTH UP A STEP, AND THE EMPHASIS FLIPPED. 12/11px was small enough that the
+   author couldn't read the screen, and the brighter of the two was the CLAIM —
+   but the claim is what the bot already said; the VERDICT is the payload and
+   the only line that teaches. So the verdict gets the weight now, and the claim
+   recedes to the quote it is. */
+.pf-au-fact { font-size:12.5px; line-height:1.5; color:rgba(234,255,249,0.62); }
+.pf-au-verdict { font-size:13px; line-height:1.5; color:#2fd6d6; margin-top:6px; }
 `;

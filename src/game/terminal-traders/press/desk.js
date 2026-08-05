@@ -214,6 +214,25 @@ export const LANE_LABEL = {
   [LANES.SHAPE]: "nobody's specialism",
 };
 
+/* The COUNTING noun per lane, as against LANE_LABEL's naming one: "the money" is
+   what a claim is about, "money question" is what you have two more of. Singular
+   and plural are both authored because the plural is not always a trailing "s" —
+   "question about the story" pluralises on the HEAD noun, and appending to the
+   phrase produced "two more question about the storys".
+
+   IT LIVES HERE, NEXT TO LANE_LABEL, and virgil.js imports it. It was virgil.js's
+   private table while the agenda was its only consumer; laneSentence is now the
+   second, and two per-lane string tables in two files is how they drift apart. */
+export const LANE_NOUN = {
+  [LANES.CHAIN]: ["money question", "money questions"],
+  [LANES.RECORD]: ["paperwork question", "paperwork questions"],
+  [LANES.CHART]: ["chart question", "chart questions"],
+  [LANES.SOCIAL]: ["question about the story", "questions about the story"],
+};
+
+const COUNT_WORD = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven"];
+export const countWord = (n) => COUNT_WORD[n] ?? String(n);
+
 /** Who is the SPECIALIST for this claim. Null only on a LANES.SHAPE claim. */
 export function laneOwner(claim) {
   if (!claim) return null;
@@ -233,7 +252,7 @@ export function laneOwner(claim) {
  * remaining seat still answers, just shallowly — and the copy has to say
  * exactly that, or it reproduces the old lie in a new place.
  */
-export function laneSentence(claim, { spent = [] } = {}) {
+export function laneSentence(claim, { spent = [], remaining = 0, earlier = 0 } = {}) {
   if (!claim) return "";
   const who = laneOwner(claim);
   /* IT IS THE CAT SAYING IT NOW (author, 2026-08-04), so it is sentence case
@@ -254,9 +273,58 @@ export function laneSentence(claim, { spent = [] } = {}) {
   if (!who) return "Nobody here specialises in this one — anyone you ask gets the shallow version.";
   const label = LANE_LABEL[claim.lane].toLowerCase();
   if (spent.includes(who.id)) {
-    return `This one's about ${label} — ${who.name}'s specialty, and ${who.name} is spent. Anyone else gets the shallow version.`;
+    /* "…MARISOL'S SPECIALTY, AND MARISOL IS SPENT" said the name twice in one
+       sentence, in the panel an overload report is open against. "That use is
+       gone" carries the same fact in fewer words and without a pronoun — the
+       four seats are characters whose pronouns the copy has never asserted, and
+       this sentence is not the place to start. */
+    return `This one's about ${label} — ${who.name}'s specialty, and that use is gone. Anyone else gets the shallow version.`;
   }
-  return `This one's about ${label} — this is ${who.name}'s specialty.`;
+  /* HOW MUCH RUNWAY IS LEFT IN THE LANE (author, 2026-08-05: "the first 3 claims
+     were all for Marisol… of course i could only consult with her on the first
+     question").
+
+     Measured before writing this: authored slot order is preserved deliberately
+     (instanceDeal.js — "the pitch has a rhythm and shuffling it reads wrong"),
+     and archetypes author their slots grouped by lane, so a lane's whole run can
+     land consecutively at the FRONT. Over 400 seeds, 7% of deals open with three
+     claims in one lane and 71% contain a run of two. Seed 4 is the author's:
+     CHAIN, CHAIN, CHAIN, RECORD, CHART, SOCIAL.
+
+     THE GAME IS SUPPOSED TO BE WHICH CLAIM INSIDE A LANE DESERVES THE ONE USE.
+     That is a timing decision, and on claim 1 of a front-loaded run the player
+     had nothing to time WITH — they could not know two more money questions were
+     coming, so spending Marisol immediately wasn't a bad read, it was a blind
+     one. The count is what converts it back into the decision it was designed to
+     be, which is why this is a copy fix and not a deal-shape fix.
+
+     THIS IS THE CLAUSE THE CUT AGENDA CARRIED. See pressUi.jsx, where the cut is
+     recorded: "the move is to fold the count into laneSentence as a clause, not
+     to restore a second paragraph." One clause, one sentence.
+
+     Leak-free by the same argument the lane itself is: composition is public
+     from second zero, and laneOutlook counts running order, never truth.
+
+     UNSPENT ONLY. Once the specialist is gone the sentence already says every
+     remaining seat is shallow, and "…and two more you also can't settle" is a
+     longer sentence that changes no decision — the author is fighting text
+     overload, so the clause goes where it is actionable and nowhere else. */
+  const [one, many] = LANE_NOUN[claim.lane] ?? ["question", "questions"];
+  const head = `This one's about ${label} — ${who.name}'s specialty`;
+  /* THREE CASES, NOT TWO. "The last money question you'll get" asserts earlier
+     ones, so on a lane holding a single claim it is a false statement about the
+     running order — and single-claim lanes are the common case, not the corner:
+     four of the six claims on seed 4. `earlier` is what tells them apart. */
+  if (remaining > 0) {
+    return `${head}, and ${countWord(remaining).toLowerCase()} more ${remaining === 1 ? one : many} ${remaining === 1 ? "follows" : "follow"} it.`;
+  }
+  if (earlier > 0) return `${head}, and the last ${one} you'll get.`;
+  /* NOT "the ONLY money question" — the harness rejects the word `only` in this
+     sentence wholesale, because "only Marisol can settle it" is the permission
+     lie that shipped here once and the guard against it is deliberately blunt.
+     A count sentence has no business tripping it, and the negative phrasing is
+     no worse to read, so the copy moves rather than the guard. */
+  return `${head}, and there are no other ${many} in the pitch.`;
 }
 
 // THE FREE READ MOVED TO THE CAT (./virgil.js). It was Eugene's, which made him

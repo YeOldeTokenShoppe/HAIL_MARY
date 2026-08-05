@@ -185,9 +185,11 @@ export function fmtFileNo(n) {
  * degenerates to mush below ~2px while border-radius corners can't make a
  * continuous stroke. A stroked path gets round caps, true arcs, and stays crisp.
  *
- * GEOMETRY IS LOAD-BEARING. The 42px height and the -11px top are what put the
- * hook ~21px above .eng-cover's border box, and that polygon only clears 28px —
- * see the clip-path note there before raising either number.
+ * GEOMETRY. The 42px height and the -11px top put the hook ~21px above
+ * .eng-cover's border box. That used to be a hard budget — the cover carried a
+ * clip-path that cleared exactly 28px and would have sheared the wire — but the
+ * cover is die-cut with a radius now and clips nothing, so the only thing above
+ * it is .eng-tab, 16px in from the same edge. Keep the clip left of it.
  */
 const COVER_CLIP_WIRE =
   "M 37 -12 L 37 70 A 17 17 0 0 1 3 70 L 3 -16 " +
@@ -797,29 +799,80 @@ export const ENGAGEMENT_CSS = `
      that can give the file its height. The back panel sits absolute behind
      it, so the wrapper's padding still shows as the folder's rim. */
   position:relative; z-index:5; pointer-events:none;
-  padding:16px 16px 46px; min-height:150px;
+  padding:16px 16px 46px;
+  /* FOLDER PROPORTION, NOT PANEL PROPORTION (author, 2026-08-05: "make it look
+     more like a manila folder, in size"). The cover was min-height:150px and so
+     took whatever height its contents happened to need — at the desktop
+     surface's width that landed near 2:1, which is a banner. A closed folder is
+     LANDSCAPE BUT BARELY: letter stock is 11.75 x 9.5 (1.24), legal 14.75 x 9.5
+     (1.55). This holds ~1.5 by deriving the height from the file's own width
+     (cqw, the same container the photo measures against) rather than pinning a
+     px height that only reads right at one width.
+     MIN-height, not aspect-ratio: a block box with aspect-ratio does not grow
+     for its content, it overflows. On a 266px phone column the form is taller
+     than any folder ratio would allow and MUST win — which is also correct,
+     since a folder held in one hand reads portrait.
+     THE NUMBER IS TUNED TO THE FORM, NOT TO THE IDEAL. 66cqw got the ratio to
+     ~1.46 — nearly letter stock — and bought it with 110px of empty manila
+     between SOCIAL and the routing lines, which reads as a folder with a hole in
+     it rather than as a folder. 62 lands just past what the form needs once the
+     form is given the rhythm below, so the shape is held by the min-height and
+     the page still looks printed on. Raise it only alongside content that fills
+     the middle. */
+  /* NO PX OFFSET ANY MORE: this used to subtract the wrapper's 13px side
+     padding, which is gone — the cover is now exactly as wide as the file, so
+     cqw and the cover's own width are one measurement and the ratio is 1/0.62. */
+  min-height:clamp(210px, 62cqw, 380px);
   /* MANILA, FOR REAL (author, 2026-08-03: "beige manila color") — noir manila:
      desaturated a step and scanlit so it sits in the dark room instead of
      glowing out of it. The one warm paper object on a teal terminal; every ink
      on it goes dark, like print. The pink spine stays — the record's own left
-     rule, worn by the folder. */
-  background:linear-gradient(165deg,#dbc896,#a98f58 72%);
-  border:1px solid rgba(59,44,12,.55);
+     rule, worn by the folder.
+     Three stops, not two: the old pair ran to #a98f58 by the bottom corner,
+     which reads as a panel someone put a vignette on. Real stock is nearly one
+     value with the light falling across it, so the shift is held to the last
+     third and the light itself moved to ::before, where it belongs. */
+  background:linear-gradient(166deg,#e3d1a4,#d7c18f 46%,#bda76e);
+  border:1px solid rgba(59,44,12,.5);
   border-left:2px solid rgba(255,95,158,.5);
-  /* The polygon runs PAST the border box on purpose — 5px below for the
-     sheet-edge ::after, 28px above for the paperclip: a polygon ending at the
-     box edge clips both out of existence. The extra points keep the top-right
-     corner cut's diagonal exactly where it was.
-     The 28 was sized to the old clip, which topped out ~27px above the border
-     box with no slack. The drawn gem clip sits lower (top:-11px) and tops out
-     ~21px, so there is ~7px of headroom now — that is the budget for lowering
-     .eng-cover-clip's top further or growing its height, and the number to
-     re-derive against if either moves. */
-  clip-path:polygon(0 -28px,calc(100% - 14px) -28px,calc(100% - 14px) 0,100% 14px,100% calc(100% + 5px),0 calc(100% + 5px));
+  /* DIE-CUT, NOT MITRED. This was a 14px diagonal corner cut carried in a
+     clip-path — the housing's vocabulary, and the single most machine-looking
+     thing on the object. Folder stock is cut with a radius, and only on the
+     OPEN edge: square at the fold (left), radiused right, because the fold is
+     one continuous sheet and has no corner to round.
+     The clip-path is gone with it, which is a simplification and not just a
+     restyle — it existed only to let the paperclip (28px above) and the
+     sheet-edge ::after (5px below) escape a box that was being clipped in the
+     first place. Nothing clips now, so both simply overflow.
+     8px, NOT 13 (author, 2026-08-05: "corners may need adjusted"). Stock is die-
+     cut at about 4mm on an 11" folder — call it 1.5% of the width, ~8px here.
+     13 was 2.4%, which is the radius of a UI card, and it was reading as one.
+     ALL FOUR, NOT JUST THE OPEN EDGE (author: "top corners don't match yet").
+     This was 2px on the fold side and 9px on the open side, on the reasoning
+     that a fold has no cut corner to round — true of the object, invisible on
+     the screen, where what you actually see is one corner square and the other
+     round and no reason for it. The fold is carried by the crease shading and
+     the pink rule; it does not also need the corners to disagree. 8 everywhere,
+     which is also the tab's, so every radius on the file is one number. */
+  border-radius:8px;
+  /* The fold, the lit top edge, and the cover's own lift off the back panel. */
+  box-shadow:
+    inset 5px 0 8px -5px rgba(59,44,12,.65),
+    inset 0 1px 0 rgba(255,250,231,.45),
+    3px 5px 13px -5px rgba(0,0,0,.55);
 }
+/* PAPER TOOTH AND ROOM LIGHT. The scanline stays (it is what keeps the stock
+   in the room rather than glowing out of it) but drops to .035 and gains a
+   cross-hatch, because one-axis banding reads as a CRT and two axes read as
+   fibre. The radial is the light: falling from the top-left, the direction
+   every shadow on this object already implies. */
 .eng-cover::before{
   content:""; position:absolute; inset:0; pointer-events:none;
-  background:repeating-linear-gradient(0deg,rgba(11,22,20,.05) 0 1px,transparent 1px 3px);
+  border-radius:inherit;
+  background:
+    repeating-linear-gradient(0deg,rgba(11,22,20,.035) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(90deg,rgba(255,252,236,.045) 0 1px,transparent 1px 2px),
+    radial-gradient(125% 95% at 16% -6%, rgba(255,252,236,.3), transparent 60%);
 }
 /* THE FILE IS THE QUERY CONTAINER, and --badge-w is the photo's width as ONE
    number: the stamps clear the photo by measuring it, and the form's right
@@ -828,7 +881,15 @@ export const ENGAGEMENT_CSS = `
    container units on the container element itself resolve against an ANCESTOR
    container, which silently falls back to the viewport. */
 .eng-file{ container-type:inline-size; }
-.eng-cover{ --badge-w:clamp(96px, 31cqw, 150px); }
+/* 27cqw, NOT 31 (2026-08-05). The photo is what crowds a narrow folder: the form
+   reserves --badge-w + 20px on its right and the stamps clear it by the same
+   measurement, so a third of the cover's width spent on the polaroid is a third
+   spent three times over. At the desktop surface's new ~450px folder, 31cqw was
+   140px of photo against 258px of usable form; 27 makes that 122 against 277 and
+   is what lets the wide layout survive down to 400 (see the container query).
+   UNCHANGED WHERE IT MATTERED: past ~555px both land on the 150px ceiling, so the
+   folder this was tuned against looks exactly as it did. */
+.eng-cover{ --badge-w:clamp(92px, 27cqw, 150px); }
 
 /* THE GHOST NUMBER IS GONE (2026-08-03). It existed to fill an empty middle —
    the file's middle is the form now, and a watermark under live values is
@@ -881,11 +942,16 @@ export const ENGAGEMENT_CSS = `
 }
 /* Sheet edges under the cover's bottom lip: white paper peeking from a manila
    folder. Affirmative — "there is a file here" — the opposite of narrating an
-   absence. */
+   absence. NOW THE ONLY THING THE BACK PANEL'S 10px STRIP IS FOR, so it is two
+   stacked sheets rather than one rule — it has to carry "there are pages in
+   here" on its own, and a single hairline in a gap reads as a seam. 6 of the
+   10px, leaving the folder's own back edge showing beneath them. */
 .eng-cover::after{
-  content:""; position:absolute; left:8px; right:8px; bottom:-4px; height:4px;
-  border-top:1px solid rgba(238,232,214,.85);
-  box-shadow:0 3px 0 -1px rgba(11,22,20,.4);
+  content:""; position:absolute; left:13px; right:17px; bottom:-6px; height:6px;
+  border-radius:0 0 3px 3px;
+  background:linear-gradient(180deg,
+    #efe9d6 0 2px, rgba(11,22,20,.4) 2px 3px,
+    #e2dac1 3px 5px, rgba(11,22,20,.32) 5px 6px);
 }
 /* The arrived state is CLOSED-CASE CSS, not a leftover inline style: skipRoll's
    progress(1), reduced motion, and an arrived re-mount all land here. */
@@ -895,7 +961,7 @@ export const ENGAGEMENT_CSS = `
   font-size:15px; letter-spacing:.14em; color:#241c08; font-weight:400;
 }
 .eng-cover-letter i{
-  display:block; height:1px; max-width:150px; margin-top:7px;
+  display:block; height:1px; max-width:150px; margin-top:9px;
   background:rgba(36,28,8,.35);
 }
 /* The clasp glyph is gone — see the render site. */
@@ -928,8 +994,16 @@ export const ENGAGEMENT_CSS = `
    the photo but drops them onto the name and the stats — the reveal and the
    data — because a narrow cover has no free middle. So the file grows a
    stamp band instead: both impressions side by side under the form, above
-   the routing lines, which is where a clerk stamps a page anyway. */
-@container (max-width: 519px){
+   the routing lines, which is where a clerk stamps a page anyway.
+
+   400, NOT 519 (2026-08-05). The threshold is not a taste call — it is the
+   width at which "right: 8% + badge + 14" stops leaving a stamp room, so it
+   moves whenever --badge-w does, and --badge-w just came down to 27cqw. The
+   arithmetic at 450: the offset is 36 + 122 + 14 = 172, leaving 278 for a
+   MEETING SET that measures ~165. At 400 it is 30 + 108 + 14 = 152, leaving 248
+   — still clear, and the form behind it is where the squeeze actually starts.
+   RE-DERIVE THIS IF THE CLAMP MOVES AGAIN; the two numbers are one decision. */
+@container (max-width: 400px){
   .eng-cover{ padding-bottom:92px; }
   .eng-cover-received{
     right:auto; left:16px; top:auto; bottom:52px;
@@ -957,20 +1031,48 @@ export const ENGAGEMENT_CSS = `
    would shear them; the cover carries the corner-cut language. */
 .eng-file{
   position:relative;
-  padding:14px 12px 12px;
+  /* ONE FACE, NOT A PANEL IN A MAT. The padding used to be even on all four
+     sides, which puts a manila border around a manila panel — a frame inside a
+     frame, and the reading that made this look like a UI card in folder colours.
+     Zeroing the fold side alone did not fix it (author, 2026-08-05: "there's a
+     border still"): a 13px rim on the other three reads as a mat whichever edge
+     it is missing from.
+     A closed folder head-on is ONE manila face. Its two panels are the same
+     sheet folded, so they are the same size — there is no reveal to see, at any
+     edge. What actually says "folder" is the three things a flat card cannot
+     have: a TAB rising off the top edge, the FOLD down the left, and PAGES
+     showing at the foot. So the back panel keeps only the bottom strip, which is
+     where the pages live and the only edge a real folder shows anything at. */
+  padding:0 0 10px;
+  /* A FOLDER DOES NOT GET WIDER THAN A FOLDER. Both surfaces hand this element
+     the full width of their record shell (~620px on desktop), and past ~560 the
+     height derived above hits its clamp and the ratio starts flattening back
+     out toward the banner this change exists to kill. Centred, so the shell
+     frames it rather than the folder filling the shell edge to edge. */
+  max-width:560px; margin-inline:auto;
 }
 .eng-file-back{
   position:absolute; inset:0; z-index:0;
-  background:linear-gradient(170deg,#c9b47f,#96794a 75%);
-  border:1px solid rgba(59,44,12,.6);
-  box-shadow:inset 0 1px 0 rgba(238,232,214,.25), 0 8px 20px rgba(0,0,0,.45);
+  background:linear-gradient(170deg,#d0ba85,#a08350 78%);
+  /* Only the bottom strip of this is ever visible — the cover covers the rest
+     exactly. It is still full-size because it casts the folder's shadow and cuts
+     the tab's stock. */
+  border:1px solid rgba(59,44,12,.6); border-left:0;
+  border-radius:8px;
+  box-shadow:inset 0 1px 0 rgba(238,232,214,.25), 0 9px 22px rgba(0,0,0,.5);
 }
 /* THE FORM, printed on the file. Right padding clears the polaroid and tracks
    the same clamp the photo uses, so nothing collides at any container width.
    Every ink is DARK — this is print on beige stock, and the terminal's bright
    accents vanish here (the tab-label lesson). */
+/* THE FORM SPREADS DOWN THE PAGE, because the folder is folder-shaped now and a
+   form that keeps its old 3px row rhythm inside it clusters at the top with a
+   blank half beneath. Every step below is spacing only — no element was added
+   to fill the gap, which is the failure mode this panel has a history of
+   ([A§20], the three elements that narrated one absence). A printed form spaces
+   its fields; a UI card stacks them tight. */
 .eng-form{
-  position:relative; z-index:2; margin-top:15px;
+  position:relative; z-index:2; margin-top:18px;
   padding-right:calc(var(--badge-w) + 20px);
 }
 .eng-form .eng-label{ color:#8c2b52; }
@@ -980,19 +1082,34 @@ export const ENGAGEMENT_CSS = `
   letter-spacing:.02em; color:rgba(36,28,8,.32); overflow-wrap:anywhere;
 }
 .eng-form .eng-client.named{ color:#1c1505; }
-.eng-form .eng-particulars{ margin-top:13px; opacity:.45; }
+.eng-form .eng-particulars{ margin-top:20px; opacity:.45; }
 .eng-file.in .eng-form .eng-particulars{ opacity:1; }
 .eng-form .eng-part-h{
   color:#8c2b52; padding-bottom:6px;
   border-bottom:1px solid rgba(36,28,8,.28);
 }
 .eng-form .eng-stats{
-  margin-top:8px; display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
-  gap:3px 20px;
+  margin-top:11px; display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:9px 20px;
 }
-.eng-form .eng-stats > div{ display:flex; align-items:baseline; gap:8px; }
-.eng-form .eng-stats dt{ width:58px; color:rgba(36,28,8,.58); }
-.eng-form .eng-stats dd{ color:#1c1505; }
+.eng-form .eng-stats > div{ display:flex; align-items:baseline; gap:8px; min-width:0; }
+.eng-form .eng-stats dt{ flex:none; width:58px; color:rgba(36,28,8,.58); }
+.eng-form .eng-stats dd{ min-width:0; color:#1c1505; }
+/* ONE COLUMN ONCE THE BADGE HAS EATEN THE WIDTH. The form reserves
+   var(--badge-w) + 20px on its right for the photo, and --badge-w bottoms out at
+   a 96px floor — so on the flat surface's ~266px column the two-column grid is
+   splitting ~137px into cells narrower than the 58px dt plus its value, and the
+   numbers ran straight over the labels beside them ($4.2M across HOLDERS, "9
+   days" across 24H). Pre-existing, and invisible on the desktop surface this
+   folder was tuned against. Six short rows in one column is what a form does on
+   a narrow page anyway. */
+/* 400 like the stamps, and for a related reason: with --badge-w at 27cqw the
+   form keeps ~277px at a 450 folder, which is two columns of ~128 against the
+   ~106 a dt-plus-value needs. Holding this at 519 would put six rows in one
+   column on the desktop folder and grow it taller than the layout it is in. */
+@container (max-width: 400px){
+  .eng-form .eng-stats{ grid-template-columns:1fr; gap:7px; }
+}
 /* THE PREMISE SPANS THE FORM. On the paper record the particulars are a
    two-column grid of short market numbers, and "a money market" is neither
    short nor a number — sharing a cell with MCAP wrapped its label onto two
@@ -1020,7 +1137,9 @@ export const ENGAGEMENT_CSS = `
   border:2px solid currentColor; border-radius:2px; padding:5px 12px;
   opacity:0; pointer-events:none; white-space:nowrap;
 }
-@container (max-width: 519px){
+/* Paired with RECEIVED's — the two impressions move to the foot band together
+   or they collide. One threshold, both rules. */
+@container (max-width: 400px){
   .eng-cover-stamp{
     left:auto; right:16px; top:auto; bottom:52px;
     font-size:17px; padding:4px 10px;
@@ -1032,18 +1151,28 @@ export const ENGAGEMENT_CSS = `
    surfaces. At the settle it takes the ticker and becomes the deal's handle
    for the rest of the session. */
 .eng-tab{
-  position:absolute; top:-17px; left:12px; z-index:6; pointer-events:none;
-  padding:3px 14px 2px;
+  /* A 1/3 CUT, WHICH IS A ROUNDED RECTANGLE AND NOT A TRAPEZOID. The tab was a
+     6px-taper polygon ~17px tall — at that size the taper is invisible and what
+     survives is a thin ribbon, the shape of a chip label rather than of stock
+     die-cut to stand above a folder. Real tabs are radiused at the two top
+     corners and sit roughly a third of the width; the extra padding here is
+     what buys that third from a label that would otherwise size to its text.
+     It rises 20px and overlaps the back panel by 2, so there is no seam between
+     tab and folder — one piece of card, which is what a tab is. */
+  position:absolute; top:-20px; left:16px; z-index:6; pointer-events:none;
+  padding:5px 22px 4px;
   font-family:'Bebas Neue', Impact, sans-serif;
   /* Dark ink on manila — the gold label was a leftover from the dark-folder
      pass and vanished against beige. */
-  font-size:11px; letter-spacing:.12em; color:#2c2108; text-transform:uppercase;
+  font-size:11.5px; letter-spacing:.12em; color:#2c2108; text-transform:uppercase;
   /* Cut from the folder's own stock — manila, like the cover, so tab and
      folder read as one object with the record filed inside. Dark ink label;
-     the tab keeps its manila fill after the open, so the handle stays paper. */
-  background:linear-gradient(180deg,#e0cd9b,#b59b60);
-  border-top:1px solid rgba(59,44,12,.5);
-  clip-path:polygon(6px 0,calc(100% - 6px) 0,100% 100%,0 100%);
+     the tab keeps its manila fill after the open, so the handle stays paper.
+     Lit like the back panel it is part of, not like the cover in front of it. */
+  background:linear-gradient(180deg,#e6d5a6,#d3bd88 68%,#c6af77);
+  border:1px solid rgba(59,44,12,.45); border-bottom:0;
+  border-radius:8px 8px 0 0;
+  box-shadow:inset 0 1px 0 rgba(255,250,231,.4), 2px -2px 7px -3px rgba(0,0,0,.5);
   white-space:nowrap;
 }
 /* The ticker pops with the settle, the same frame as the stamp — the stamp

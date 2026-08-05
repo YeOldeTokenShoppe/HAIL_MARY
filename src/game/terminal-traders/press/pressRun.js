@@ -26,6 +26,62 @@ export const PRESSES = 3;
 export const START_BOOK = 100;
 export const STAKE = 25; // matches TABLE_RULES.stake — the validated sim value
 
+/* THE PRICE OF ASKING (author, 2026-08-05: "should the questions be used at a
+   price vs. not using them at all - any incentive or disincentives there?").
+
+   THE PROBLEM IT SOLVES. A hard cap with no cost is an ALLOCATION puzzle, not an
+   economy: an unspent press was worth exactly zero, so every rational player
+   spent all three every time and the only live decision was WHERE, never
+   WHETHER. The game's own autopsy promises "same shape, different token — learn
+   it and you get every one of these", and until now recognising the shape from
+   the prospectus alone paid nothing.
+
+   Each question spent trims the stake. Call cold and you play for full size.
+
+   IT SCALES THE WHOLE PAYOUT, NOT THE UPSIDE, AND THAT IS THE ENTIRE POINT.
+   The first proposal was to shrink the win and leave the loss — which is the
+   same defect as the coupled stake the note on sliderToP rejects, in mirror
+   image. Scale wins by k and leave losses, and the expected-value optimum moves
+   to p* = kq/(1-q+kq), which for k<1 sits BELOW the player's true belief q: it
+   pays you to understate, and it makes PASS (untouched at zero) look better the
+   more you investigated. Exactly backwards.
+   A positive scalar on BOTH branches leaves the argmax alone, so this stays a
+   proper scoring rule — verify-press-run's PROPERNESS block still passes, and it
+   is the reason this is a factor on `stake` and not a term anywhere else.
+
+   WHAT IT COSTS YOU IS VARIANCE, NOT EDGE. Because both branches shrink
+   together, asking never raises your risk — it lowers the size of the swing in
+   both directions. That is what diligence actually buys, and it means a cautious
+   player is never taxed for being careful; they just win smaller when they were
+   already right.
+
+   INVARIANT 1 IS INTACT: PRESSES is still frozen at 3 and nothing ownable reads
+   or writes it. This prices the budget, it does not grant a fourth press — if a
+   card ever tries to buy the stake back, that is the spiral the invariant names.
+   press() also still touches neither STAKE nor PRESSES; the coupling lives here
+   and in callReadout, which is what keeps the harness's seat-path check true. */
+export const PRESS_COST = 0.1;
+
+/**
+ * The stake this run is playing for, after the SPECIALISTS it has spent.
+ *
+ * IT COUNTS advisersSpent, NOT pressesLeft, AND THAT IS LOAD-BEARING. press()
+ * decrements pressesLeft unconditionally — the pitcher costs a question like
+ * anyone else — but it leaves advisersSpent alone, which is the only sense in
+ * which the pitcher is "free". Virgil says so out loud on the floor ("press the
+ * pitch bot — asking it is always free"), so pricing on pressesLeft would have
+ * made that line false the day this shipped, and [A§13] is explicit that copy
+ * cannot paper over a mechanic that disagrees with it.
+ *
+ * Keying on the specialists also sharpens the thing the pitcher is FOR: the one
+ * source that costs you no size is the one being paid to close you. Ask it as
+ * often as your questions allow; it is free because it is compromised.
+ */
+export function stakeFor(run) {
+  const spent = run && Array.isArray(run.advisersSpent) ? run.advisersSpent.length : 0;
+  return STAKE * (1 - PRESS_COST * Math.max(0, Math.min(PRESSES, spent)));
+}
+
 export const PHASE = {
   FLOOR: "floor",             // characters advocating; presses are live
   ALLOCATION: "allocation",   // the call
@@ -184,7 +240,16 @@ export function laneOutlook(run, deal) {
   const remaining = claim.lane === LANES.SHAPE
     ? later.filter((c) => c.lane !== LANES.SHAPE).length
     : later.filter((c) => c.lane === claim.lane).length;
-  return { lane: claim.lane, remaining };
+  /* AND HOW MANY ARE BEHIND YOU. `remaining` alone cannot tell "the last money
+     question you'll get" from "the only money question in the pitch", and the
+     first phrasing on a single-claim lane asserts earlier ones that never
+     existed — laneSentence shipped that for four of six claims on seed 4 before
+     this was added. Same slice logic, other direction. */
+  const before = deal.claims.slice(0, run.claimIndex);
+  const earlier = claim.lane === LANES.SHAPE
+    ? before.filter((c) => c.lane !== LANES.SHAPE).length
+    : before.filter((c) => c.lane === claim.lane).length;
+  return { lane: claim.lane, remaining, earlier };
 }
 
 /* ---------------------------------------------------------------------- */
@@ -313,7 +378,8 @@ export function sliderToP(v) {
 export function allocate(run, deal, v) {
   if (run.phase !== PHASE.ALLOCATION) return run;
   const p = sliderToP(v);
-  const pnl = casePnl(p, deal.truth, STAKE);
+  // stakeFor(run), not STAKE — the questions already spent have priced this call.
+  const pnl = casePnl(p, deal.truth, stakeFor(run));
   return {
     ...run,
     call: { v, p, pnl, direction: v === 0 ? "FLAT" : v < 0 ? "SHORT" : "LONG" },
@@ -334,7 +400,20 @@ export function toAutopsy(run) {
 // Plain language, no finance literacy required, no visible math. The loss
 // line is stated up front because the whole lesson is that being confident
 // and wrong is expensive.
-export function callReadout(v) {
+// `stake` defaults to the full STAKE so a caller with no run in hand still gets
+// a sane readout, but both surfaces pass stakeFor(run) — a readout that quoted
+// numbers the resolver would not pay is the mechanic/copy mismatch [A§13] warns
+// about, and here it would be the game lying about the bet.
+/* The one conviction ladder, so the pre-commit readout and the retrospective
+   restatement cannot drift into describing the same slider two ways. */
+function convictionWord(p) {
+  const pct = Math.round(p * 100);
+  return pct >= 85 || pct <= 15 ? "almost certain"
+    : pct >= 70 || pct <= 30 ? "fairly sure"
+      : "leaning";
+}
+
+export function callReadout(v, stake = STAKE) {
   const p = sliderToP(v);
   const pct = Math.round(p * 100);
   if (v === 0) return { saying: "You're passing on this one.", risk: "You win nothing and lose nothing." };
@@ -371,20 +450,117 @@ export function callReadout(v) {
   // Naming the downside "a rug" teaches the player that bad means FRAUD, which
   // is the read this game most wants to complicate. It also fixed a grammar
   // bug: the old template produced "this is leaning a rug".
-  const sure =
-    pct >= 85 || pct <= 15 ? "almost certain"
-      : pct >= 70 || pct <= 30 ? "fairly sure"
-        : "leaning";
+  const sure = convictionWord(p);
   const saying = sure === "leaning"
     ? (p > 0.5 ? "You're leaning against this one." : "You're leaning toward this one.")
     : `You're ${sure} this one ${p > 0.5 ? "comes apart" : "holds up"}.`;
 
-  const win = casePnl(p, p > 0.5 ? 1 : 0, STAKE);
-  const lose = casePnl(p, p > 0.5 ? 0 : 1, STAKE);
+  const win = casePnl(p, p > 0.5 ? 1 : 0, stake);
+  const lose = casePnl(p, p > 0.5 ? 0 : 1, stake);
   return {
     saying,
     risk: `Right, you make ${Math.round(win)}. Wrong, you lose ${Math.abs(Math.round(lose))}.`,
   };
+}
+
+/**
+ * WHAT THE NEXT QUESTION COSTS — the incentive, made visible before it is spent.
+ *
+ * A price the player cannot see is not an incentive, it is a hidden penalty. The
+ * floor asks "is this claim worth a question?" and this is the only honest way to
+ * answer it: the swing you are playing for now, and the swing you would be
+ * playing for after asking once more.
+ *
+ * QUOTED AT A FIXED REFERENCE CONVICTION, not at the slider. On the floor the
+ * slider does not exist yet — the call screen comes later — so there is no
+ * "current position" to quote against, and quoting the resting position would
+ * print a price of zero (a PASS wins and loses nothing, so it is untouched by
+ * any stake at all). PRICE_AT is the "fairly sure" band the readout itself
+ * names, which makes the two numbers here read in the same units and the same
+ * vocabulary the player meets one screen later.
+ *
+ * The RATIO is the honest part and it is conviction-independent: both branches
+ * scale by the same factor, so "what does asking cost me" is the same
+ * proportion wherever the player ends up putting the slider.
+ *
+ * Returns null when there is nothing left to spend — a price on a purchase you
+ * cannot make is noise, and the meter says NO QUESTIONS LEFT on its own.
+ */
+const PRICE_AT = 70;
+
+export function pressPrice(run) {
+  if (!run || run.pressesLeft <= 0) return null;
+  const spent = Array.isArray(run.advisersSpent) ? run.advisersSpent : [];
+  if (spent.length >= SPENDABLE_SEATS.length) return null; // no specialist left to buy
+  const p = sliderToP(PRICE_AT);
+  const swing = (s) => Math.abs(Math.round(casePnl(p, p > 0.5 ? 1 : 0, s)));
+  return {
+    now: swing(stakeFor(run)),
+    // One more SPECIALIST, not one more question — the pitcher moves neither.
+    after: swing(stakeFor({ ...run, advisersSpent: [...spent, "_"] })),
+    pressesLeft: run.pressesLeft,
+  };
+}
+
+/**
+ * HOW THE CALL IS NAMED — four bands, replacing a sign test on the payout.
+ *
+ * THE BUG IT FIXES. Both surfaces headlined on `run.call.pnl >= 0`. With
+ * casePnl = stake·(1 − 4(p−truth)²) that predicate is exactly |p − truth| ≤ 0.5
+ * — a HIT RATE. It says YOU READ IT RIGHT for any call on the correct side of
+ * the line, however timid, which is the one thing a calibration game must not
+ * reward: it tells a player who reported 0.55 on a certainty and a player who
+ * reported 0.95 the same sentence, so the screen that exists to teach
+ * confidence teaches only direction.
+ *
+ * AND IT MISNAMED THE ABSTAIN OUTRIGHT. A dead-centre PASS is p = 0.5, so
+ * |p − truth| = 0.5 and casePnl is exactly 0 — which satisfies `>= 0`. Passing
+ * on a rug rendered "+0 · YOU READ IT RIGHT". The player declined to have an
+ * opinion and was congratulated for reading it.
+ *
+ * WHY FOUR AND NOT A NUMBER. A Brier score on screen would be honest and
+ * unreadable; these bands are the same information in the vocabulary the dial
+ * already speaks. The middle band is the one that earns its place — RIGHT
+ * DIRECTION, UNDERSOLD is the sentence the old headline could not say, and with
+ * truth ∈ {0,1} it is always exactly that: right side, under-confident.
+ *
+ * THE TONE STILL AGREES WITH THE NUMBER ABOVE IT. `timid` scores positive, so
+ * it stays "up"; only the abstain gets its own flat tone, because zero is
+ * neither. Nothing here couples the SCORE to the outcome — invariant 2 is
+ * untouched; this renames what the score already was.
+ */
+export function callVerdict(run, deal) {
+  if (!run || !run.call || !deal) return null;
+  if (run.call.v === 0) {
+    return { key: "pass", label: "YOU PASSED", tone: "flat" };
+  }
+  const err = Math.abs(run.call.p - deal.truth);
+  if (err <= 0.25) return { key: "well", label: "WELL CALLED", tone: "up" };
+  if (err < 0.5) return { key: "timid", label: "RIGHT DIRECTION, UNDERSOLD", tone: "up" };
+  return { key: "wrong", label: "YOU GOT IT WRONG", tone: "down" };
+}
+
+/**
+ * THE BET, RESTATED AGAINST THE OUTCOME.
+ *
+ * callReadout's risk line — "Right, you make 24. Wrong, you lose 56." — is the
+ * best teaching sentence in the game, and until now it appeared exactly once,
+ * BEFORE the result, and was never reconciled with it. A player therefore never
+ * saw their own stated conviction next to what it was worth.
+ *
+ * Past tense on purpose: this is the same numbers said after the fact, so the
+ * player reads their commitment as a commitment rather than as a forecast. Null
+ * on an abstain — there was no bet to restate, and inventing one would teach
+ * that passing is a position.
+ */
+export function betRestated(run, deal) {
+  if (!run || !run.call || run.call.v === 0 || !deal) return null;
+  const { p } = run.call;
+  const stake = stakeFor(run);
+  const paid = Math.abs(Math.round(casePnl(p, p > 0.5 ? 1 : 0, stake)));
+  const cost = Math.abs(Math.round(casePnl(p, p > 0.5 ? 0 : 1, stake)));
+  const side = p > 0.5 ? "it would come apart" : "it would hold up";
+  return `You said: ${convictionWord(p)} ${side}. That bet paid ${paid} if you were right and cost ${cost} if you weren't.`;
 }
 
 /**

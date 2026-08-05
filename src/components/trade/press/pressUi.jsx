@@ -3,6 +3,7 @@ import React from "react";
 import { BACKING, PITCHER, SEATS } from "@/game/terminal-traders/press/questions";
 import { DESK, PITCH_BOT, laneOwner, laneSentence, seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL } from "@/game/terminal-traders/press/virgil";
+import { pressPrice } from "@/game/terminal-traders/press/pressRun";
 
 /*
  * SHARED FLOOR UI — the reading column and the dock, authored once.
@@ -230,7 +231,8 @@ export function answerNote(flash) {
  *   it inline, which is why this is a prop rather than a deletion.
  */
 export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [], count = null,
-                           pressure = null, aside = "", showVirgil = true }) {
+                           pressure = null, aside = "", showVirgil = true, reveal = 2,
+                           remaining = 0, earlier = 0 }) {
   if (!claim) return null;
   const owner = laneOwner(claim);
   const stale = !!owner && spent.includes(owner.id);
@@ -316,7 +318,8 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
           him having a throat: a cat you have muted who carries on talking six
           times a session reads as a broken toggle, not as a difficulty setting. */}
       {showVirgil && (
-        <VirgilRead claim={claim} virgil={virgil} spent={spent} onToggleTips={onToggleTips} />
+        <VirgilRead claim={claim} virgil={virgil} spent={spent} onToggleTips={onToggleTips}
+                    reveal={reveal} remaining={remaining} earlier={earlier} />
       )}
     </div>
   );
@@ -355,11 +358,34 @@ export function ClaimBody({ claim, virgil = null, onToggleTips = null, spent = [
  *   were reading with nowhere to print them. Wiring it mid-session means giving
  *   it a surface of its own — worth doing, not free.
  */
+/**
+ * `reveal` — HOW MUCH OF HIM HAS ACTUALLY BEEN SAID YET (author, 2026-08-05:
+ * "i don't want to show all that text until he speaks it", and the note it came
+ * attached to: "too much text all stacked up, different sources, different
+ * colors and sizes — this would be overload for most players").
+ *
+ * His block used to print in full the moment the claim changed, so all four of
+ * his lines sat on screen through the bot's three utterances with nothing
+ * driving them. On the desktop column that put the cat's read — pink lane line,
+ * bold tip, grey agenda, gold next-move — under a claim the bot had not finished
+ * making, which is most of the stacking the report is about.
+ *
+ * 0 = nothing of his yet, 1 = his read (the lane line and the tip), 2 = the
+ * consequence (the agenda and what to do next). The levels are set by the claim
+ * turn's own `onPart`, so the text arrives exactly when the voice does and the
+ * silent case still resolves: with no audio the dwell floors advance the parts
+ * anyway, so the lines appear on the same schedule, just faster.
+ *
+ * Defaults to 2 so any caller that does not thread it through — and the
+ * post-claim states, where he has long since spoken — behaves as before.
+ */
 export function VirgilRead({ claim, virgil = null, onToggleTips = null, spent = [],
                              portrait = true, status = null, statusOn = false,
-                             onReplayBrief = null }) {
+                             onReplayBrief = null, reveal = 2, remaining = 0, earlier = 0 }) {
   if (!claim && !virgil?.agenda && !virgil?.tip) return null;
   if (!claim) return null;
+  // Nothing of his has been said yet — the bot still has the floor.
+  if (reveal < 1) return null;
   const owner = laneOwner(claim);
   const stale = !!owner && spent.includes(owner.id);
   return (
@@ -422,16 +448,38 @@ export function VirgilRead({ claim, virgil = null, onToggleTips = null, spent = 
                 cannot take away, so putting it behind "tips off" would delete
                 the input the seat decision runs on (§3). */}
             <span className="pu-virgil-lane" data-lane={stale ? "SPENT" : claim.lane}>
-              {laneSentence(claim, { spent })}
+              {laneSentence(claim, { spent, remaining, earlier })}
             </span>
             {virgil?.tip && <span className="pu-virgil-tip">{virgil.tip}</span>}
-            {virgil?.agenda && <span className="pu-virgil-agenda">{virgil.agenda}</span>}
+            {/* THE AGENDA IS CUT (author, 2026-08-05: "there is an extra block
+                of text in virgil's section that can be cut… that's just noise
+                in an already excessive amount of text to look at").
+
+                It was NEVER SPOKEN — only the tip and the next move are — so it
+                was pure page weight in the panel the overload report is about.
+                And in the case the author quoted it is a near-verbatim restating
+                of the lane line directly above it: "Marisol is spent, anyone
+                else gets the shallow version" against "Marisol has already taken
+                a deep look, anyone else can only give you a surface view."
+
+                WHAT WENT WITH IT, so it can be recovered deliberately rather
+                than rediscovered: the UNSPENT variant (virgil.js:265) carried a
+                count the lane line does not — "two more money questions after
+                this one" — which is the opportunity cost of spending a
+                specialist now versus saving them. If that is missed, the move is
+                to fold the count into laneSentence as a clause, not to restore a
+                second paragraph. The generator in virgil.js is left intact for
+                exactly that. §3's requirement is untouched either way: who goes
+                deepest and who is spent is the LANE line's job, and it is still
+                on the always-on side of the tips switch. */}
             {/* THE CONTROLS, LAST. Read → running order → what you can do about
                 it: the same order he says them in, so the panel and the voice
                 cannot disagree about which thought came first. Styled like the
                 agenda rather than the tip because it is actionable, not
                 flavour. */}
-            {virgil?.nextMove && <span className="pu-virgil-next">{virgil.nextMove}</span>}
+            {reveal >= 2 && virgil?.nextMove && (
+              <span className="pu-virgil-next">{virgil.nextMove}</span>
+            )}
           </span>
         </div>
   );
@@ -744,15 +792,87 @@ export function Transcript({ run, deal, open = true, onToggle = null }) {
   );
 }
 
+/**
+ * THE CONVICTION GAUGE — the final call, as an instrument rather than a form.
+ *
+ * WHY IT IS STILL AN <input type="range"> (author, 2026-08-05: "the sliding
+ * scale - might be nicer as a dial", then "let's do a restyle on the linear
+ * gauge"). A radial dial was the first idea and was talked out of on three
+ * counts, recorded here so it doesn't come back by accident:
+ *
+ *   PRECISION IS THE MECHANIC. The gap between 70% and 85% moves the payout
+ *     materially — this is a calibration game, and angular dragging is measurably
+ *     coarser than linear at the same pixel budget.
+ *   IT SHIPS ON PHONES. A thumb dragging an arc covers the arc. A thumb on a
+ *     horizontal track does not cover the track it is travelling.
+ *   THE NATIVE CONTROL IS FREE ACCESSIBILITY. Arrow keys, Home/End, focus, and
+ *     a screen reader that announces the value — all of it works because this is
+ *     a real range input. A custom radial would mean rebuilding every bit of that
+ *     as role="slider" with hand-written key handling, and it is normally
+ *     rebuilt half way.
+ *
+ * So the ELEMENT is unchanged and only the SKIN moved: the native track is made
+ * transparent and a drawn scale sits behind it, the thumb becomes a needle
+ * rather than a dot, and the ends are engraved on the scale instead of floating
+ * under it. Every native behaviour is intact; it just stops looking like the one
+ * un-styled form control in a room full of instruments.
+ *
+ * NO PERCENTAGE ON THE FACE, deliberately. The readout beneath already says the
+ * conviction in words and the stake in money, and this surface has avoided
+ * visible math throughout (see callReadout). A number here would make it a form
+ * again — which is the thing being fixed.
+ *
+ * The centre tick is gold and taller because PASS is a real position, not the
+ * absence of one, and the eye needs somewhere to return to.
+ */
+const GAUGE_TICKS = Array.from({ length: 21 }, (_, i) => i);
+
+export function ConvictionGauge({ value, onChange, min = -100, max = 100, step = 5,
+                                  label = "Your conviction" }) {
+  return (
+    <div className="pu-gauge">
+      <div className="pu-gauge-scale" aria-hidden="true">
+        {GAUGE_TICKS.map((i) => (
+          <i key={i} className={`pu-gauge-tick${i === 10 ? " centre" : i % 5 === 0 ? " major" : ""}`} />
+        ))}
+        <span className="pu-gauge-rail" />
+      </div>
+      <input
+        className="pu-gauge-input"
+        type="range" min={min} max={max} step={step}
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <div className="pu-gauge-ends"><span>FUD</span><span>PASS</span><span>FUND</span></div>
+    </div>
+  );
+}
+
 /** Interruptions left. `children` is an extra badge slot — mobile counts the
  *  advisers there too, since it has no agenda rail to show them. */
 export function Meter({ run, presses, children }) {
+  /* THE PRICE OF THE NEXT QUESTION, next to the count of them.
+     A price the player cannot see before spending is not an incentive, it is a
+     hidden penalty — and the whole point of pricing the budget (see PRESS_COST
+     in pressRun.js) is to make "is this claim worth a question?" a live
+     decision. It sits on the meter because the meter is already the thing that
+     answers "how many have I got"; the cost of the next one belongs with the
+     count of them, not on a fourth element somewhere else.
+     Quiet by default and quiet on purpose: this is a number to glance at while
+     deciding, not a scoreboard. It should never out-shout the claim. */
+  const price = pressPrice(run);
   return (
     <div className="pu-meter" aria-label={`${run.pressesLeft} questions left`}>
       {Array.from({ length: presses }).map((_, i) => (
         <span key={i} className={i < run.pressesLeft ? "on" : ""} />
       ))}
       <em>QUESTIONS LEFT</em>
+      {price && (
+        <i className="pu-price" title="Every question you spend trims the stake you play for.">
+          PLAYING FOR ±{price.now} · A SPECIALIST MAKES IT ±{price.after}
+        </i>
+      )}
       {children}
     </div>
   );
@@ -1090,7 +1210,73 @@ export const PRESS_UI_CSS = `
   color:rgba(191,238,222,0.7); padding:12px 4px; text-align:center;
   border:1px dashed rgba(191,238,222,0.28); }
 
-.pu-meter { display:flex; align-items:center; gap:5px; }
+/* THE CONVICTION GAUGE. The native input is kept and made invisible; everything
+   you see is drawn behind it. Nothing here may set pointer-events:none on the
+   input — it IS the control. */
+.pu-gauge { position:relative; width:100%; max-width:460px; margin:0 auto; }
+.pu-gauge-scale {
+  position:relative; height:22px; display:flex; align-items:flex-end;
+  justify-content:space-between; padding:0 1px;
+}
+.pu-gauge-tick { width:1px; height:6px; background:rgba(47,214,214,.3); }
+.pu-gauge-tick.major { height:12px; background:rgba(47,214,214,.6); }
+/* PASS is a position, not the absence of one — the eye needs a home to return
+   to, so dead centre is the only gold mark on the face. */
+.pu-gauge-tick.centre { width:2px; height:17px; background:rgba(255,210,58,.85); }
+.pu-gauge-rail {
+  position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:1px;
+  background:linear-gradient(90deg,
+    rgba(255,45,111,.85) 0%, rgba(255,45,111,.25) 34%,
+    rgba(255,210,58,.5) 50%,
+    rgba(77,255,170,.25) 66%, rgba(77,255,170,.85) 100%);
+}
+/* The input sits ON the scale and owns the hit area. -20px pulls its track over
+   the rail the scale just drew, so the needle rides the calibrated face. */
+.pu-gauge-input {
+  position:relative; display:block; width:100%; height:34px; margin:-20px 0 0;
+  background:none; -webkit-appearance:none; appearance:none; cursor:pointer;
+}
+.pu-gauge-input::-webkit-slider-runnable-track { height:34px; background:none; border:none; }
+.pu-gauge-input::-moz-range-track { height:34px; background:none; border:none; }
+/* THE NEEDLE — a machined bar, not a dot. Two shadows: a tight white core so it
+   reads as lit metal, and a wide pink bloom so it is findable against the room
+   on the desktop surface, where this floats over live 3D. */
+.pu-gauge-input::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none;
+  width:3px; height:28px; border-radius:1px; border:none; background:#fff;
+  box-shadow:0 0 6px rgba(255,255,255,.95), 0 0 18px rgba(255,45,111,.55);
+  margin-top:3px;
+}
+.pu-gauge-input::-moz-range-thumb {
+  width:3px; height:28px; border-radius:1px; border:none; background:#fff;
+  box-shadow:0 0 6px rgba(255,255,255,.95), 0 0 18px rgba(255,45,111,.55);
+}
+/* Keyboard focus must be visible — this control is reachable by arrow keys and
+   that is half the reason it stayed a native input. */
+.pu-gauge-input:focus { outline:none; }
+.pu-gauge-input:focus-visible::-webkit-slider-thumb {
+  box-shadow:0 0 0 2px rgba(47,214,214,.9), 0 0 14px rgba(47,214,214,.7);
+}
+.pu-gauge-input:focus-visible::-moz-range-thumb {
+  box-shadow:0 0 0 2px rgba(47,214,214,.9), 0 0 14px rgba(47,214,214,.7);
+}
+/* ENGRAVED ON THE FACE, not floating under it — the ends are part of the
+   instrument, so they take the scale's own colour and letterspacing. */
+.pu-gauge-ends {
+  display:flex; justify-content:space-between; margin-top:-2px;
+  font:bold 9px/1 'Courier New',monospace; letter-spacing:.18em;
+  color:rgba(200,229,223,.5);
+}
+.pu-gauge-ends span:nth-child(2) { color:rgba(255,210,58,.7); }
+
+.pu-meter { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+/* The price of the next question — deliberately the quietest thing in the row.
+   It is a number to glance at while deciding, not a scoreboard; if it ever
+   competes with the claim for attention it has failed. */
+.pu-meter .pu-price {
+  font-style:normal; font:9px/1 'Courier New',monospace; letter-spacing:.08em;
+  color:rgba(234,255,249,0.42); white-space:nowrap; margin-left:2px;
+}
 .pu-meter > span { width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,45,111,0.6); }
 .pu-meter > span.on { background:#ff2d6f; box-shadow:0 0 8px rgba(255,45,111,0.8); }
 .pu-meter em { font-style:normal; font:bold 9.5px/1 'Courier New',monospace;

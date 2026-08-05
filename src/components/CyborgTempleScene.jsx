@@ -1373,6 +1373,26 @@ const CyborgTempleScene = ({
     bridgeTimersRef.current[agentId] = null;
   };
 
+  // WHICH POSE IS THIS CHARACTER IN — not which clip is playing.
+  //
+  // While a bridge runs, state.currentAnimation names the BRIDGE, and a bridge is
+  // deliberately neither a typing nor an idle clip (that's what TRANSITION_RE
+  // enforces). So every classifier in this file answers "neither" for it, and a
+  // caller that landed mid-bridge looked like a swap from nowhere: isDeskSwap
+  // false, authoredTransitionFor unresolvable, tryDeskBridge declines, and the
+  // caller runs the plain crossfade — the ONE move the bridge exists to prevent.
+  // The room changes its mind well inside the 1.03s a bridge takes (the bot
+  // starts a new line while a press is still sending someone back to the keys),
+  // so this was the common case during a pitch, not an edge.
+  //
+  // A bridge is a character LEAVING a pose, so the pose it departed from is the
+  // honest answer to "where are they now" for the purpose of picking the move.
+  const poseKeyFor = (agentId, state) => {
+    const rec = bridgeTimersRef.current[agentId];
+    if (rec && rec.timer && rec.fromKey) return rec.fromKey;
+    return state?.currentAnimation;
+  };
+
   // Gate + play. Bridges ONLY when the move is a real desk swap or has an
   // authored clip for it; everything else falls through to the caller's plain
   // crossfade. Every path that poses a character should go through this rather
@@ -1380,17 +1400,27 @@ const CyborgTempleScene = ({
   // never played on click.
   const tryDeskBridge = ({ agentId, actions, state, toKey, onSettled }) => {
     if (!actions || !state || !toKey) return false;
-    const fromKey = state.currentAnimation;
+    const fromKey = poseKeyFor(agentId, state);
     const useKey = authoredTransitionFor(actions, fromKey, toKey);
-    if (!useKey && !isDeskSwap(fromKey, toKey)) return false;
-    return playTypingIdleBridge({ agentId, actions, state, toKey, useKey, onSettled });
+    // BEING SENT BACK WHERE THE BRIDGE CAME FROM IS A DESK SWAP TOO. It reads as
+    // from === to here only because poseKeyFor answers with the bridge's origin,
+    // and isDeskSwap would call that a no-op — leaving the plain crossfade to
+    // drag the arms from halfway through the transition straight down to the
+    // resting pose, which passes through the keyboard on the way. Let it reach
+    // playTypingIdleBridge, which turns the bridge around instead.
+    const inFlight = bridgeTimersRef.current[agentId];
+    const turningBack = !!inFlight?.timer && inFlight.fromKey === toKey &&
+      (isTypingClip(toKey) || isIdleClip(toKey));
+    if (!useKey && !turningBack && !isDeskSwap(fromKey, toKey)) return false;
+    return playTypingIdleBridge({ agentId, actions, state, toKey, useKey, onSettled, fromKey });
   };
 
   // Play the bridge once, then hand off to the destination loop. Returns true
   // when it took over (caller must NOT also run its own crossfade); false to
   // fall back to the direct swap (clip missing, etc.).
-  const playTypingIdleBridge = ({ agentId, actions, state, toKey, onSettled, useKey }) => {
+  const playTypingIdleBridge = ({ agentId, actions, state, toKey, onSettled, useKey, fromKey }) => {
     if (!actions || !state) return false;
+    const originKey = fromKey ?? poseKeyFor(agentId, state);
 
     // ADOPT A BRIDGE ALREADY HEADED WHERE WE'RE GOING. A `*_to_*` clip is
     // neither a typing nor an idle clip, so a caller a beat later can't tell by
@@ -1426,6 +1456,83 @@ const CyborgTempleScene = ({
     const XF = BRIDGE_XFADE;
     const dur = bridge.getClip().duration;
 
+    const bridgeMixer = mixersRef.current?.[agentId];
+
+    // Park the alternation while the bridge runs, so its own timer can't fire
+    // a second switch mid-bridge.
+    const park = () => {
+      state.currentAnimation = bridgeKey;
+      state.isPlayingSpecial = true;
+      state.nextSwitchDelay = 999999;
+      state.lastSwitchTime = Date.now();
+    };
+
+    // HAND-OFF TIMING IS THE WHOLE BALLGAME FOR AN AUTHORED CLIP. The generic
+    // connector hands off at dur-XF so the overlap hides the seam. An authored
+    // transition must play to COMPLETION: demon_pointing_to_typing lands on
+    // demon_typing's frame 0 exactly, but ~97° of arm travel is still left at
+    // dur-XF — cutting there cross-fades a mid-descent arm against the
+    // destination, and a weighted blend of two different arm poses is not a
+    // valid pose (hands sink through the keyboard).
+    //
+    // `travel` is the clip time still to run, so a bridge that turned around
+    // mid-air hands off when IT gets there rather than a full clip later.
+    const armHandOff = (rec, travel) => {
+      rec.timer = setTimeout(() => {
+        // SOMEBODY ELSE TOOK THE CHARACTER WHILE WE WERE IN THE AIR — stand down.
+        //
+        // Every path that poses a character writes state.currentAnimation, so if
+        // it no longer names this bridge, this hand-off has been superseded and
+        // its destination is not where the character is going any more. Playing
+        // it now would drop a SECOND looping clip in at full weight on top of
+        // theirs (fadeInOrSnap snaps to 1 exactly when the fading bridge has
+        // stopped covering), and three.js averages the two — which for
+        // typing+idle is hands buried in the keyboard, held for as long as
+        // nobody swaps again. That is the artifact this guard exists for: it
+        // survived because a stale hand-off leaves BOTH clips at weight 1 and
+        // nothing downstream reads the pose as wrong.
+        //
+        // A guard here rather than a stopBridge() at every fall-through: this
+        // catches callers that don't know the bridge machinery exists, including
+        // ones added later.
+        if (state.currentAnimation !== bridgeKey) {
+          bridgeTimersRef.current[agentId] = null;
+          return;
+        }
+        bridgeTimersRef.current[agentId] = null;
+        target.reset();
+        target.setLoop(THREE.LoopRepeat);
+        target.setEffectiveWeight(1);
+        fadeInOrSnap(target, actions, XF, bridgeMixer);
+        target.play();
+        bridge.fadeOut(XF);
+        state.currentAnimation = toKey;
+        state.isPlayingSpecial = false;
+        state.lastSwitchTime = Date.now();
+        if (rec.onSettled) rec.onSettled();
+      }, Math.max(100, (travel - (useKey ? 0 : XF)) * 1000));
+      bridgeTimersRef.current[agentId] = rec;
+    };
+
+    // TURN THE BRIDGE AROUND RATHER THAN RESTARTING IT. Reaching here with the
+    // same bridge clip already in flight means the destination changed, and
+    // since `forward` is derived from the destination that can only be the
+    // opposite direction — the character is being sent back where they came
+    // from. The authored motion IS the way back, so play it backwards from
+    // wherever it has got to. Restarting it (reset + time = the far end) would
+    // teleport the arms across the whole transition in one frame.
+    if (inFlight && inFlight.timer && inFlight.bridgeKey === bridgeKey &&
+        bridge.isRunning() && !bridge.paused) {
+      stopBridge(agentId);
+      bridge.setEffectiveTimeScale(forward ? 1 : -1);
+      park();
+      armHandOff(
+        { toKey, onSettled, fromKey: originKey, bridgeKey },
+        forward ? Math.max(0, dur - bridge.time) : Math.max(0, bridge.time),
+      );
+      return true;
+    }
+
     // FADE OUT ANYTHING STILL HOLDING WEIGHT — running or not.
     //
     // isRunning() is FALSE for a finished LoopOnce+clampWhenFinished one-shot:
@@ -1436,7 +1543,6 @@ const CyborgTempleScene = ({
     // for the rest of the focus. The weight ramp still advances while paused
     // (only the clip's own time is frozen), so fadeOut works without
     // un-pausing it.
-    const bridgeMixer = mixersRef.current?.[agentId];
     fadeOutOthers(actions, bridge, XF, bridgeMixer);
 
     bridge.reset();                       // reset() does NOT touch timeScale
@@ -1448,36 +1554,12 @@ const CyborgTempleScene = ({
     fadeInOrSnap(bridge, actions, XF, bridgeMixer);
     bridge.play();
 
-    // Park the alternation while the bridge runs, so its own timer can't fire
-    // a second switch mid-bridge.
-    state.currentAnimation = bridgeKey;
-    state.isPlayingSpecial = true;
-    state.nextSwitchDelay = 999999;
-    state.lastSwitchTime = Date.now();
+    park();
 
     stopBridge(agentId);
-    // HAND-OFF TIMING IS THE WHOLE BALLGAME FOR AN AUTHORED CLIP. The generic
-    // connector hands off at dur-XF so the overlap hides the seam. An authored
-    // transition must play to COMPLETION: demon_pointing_to_typing lands on
-    // demon_typing's frame 0 exactly, but ~97° of arm travel is still left at
-    // dur-XF — cutting there cross-fades a mid-descent arm against the
-    // destination, and a weighted blend of two different arm poses is not a
-    // valid pose (hands sink through the keyboard).
-    const rec = { toKey, onSettled };
-    rec.timer = setTimeout(() => {
-      bridgeTimersRef.current[agentId] = null;
-      target.reset();
-      target.setLoop(THREE.LoopRepeat);
-      target.setEffectiveWeight(1);
-      fadeInOrSnap(target, actions, XF, bridgeMixer);
-      target.play();
-      bridge.fadeOut(XF);
-      state.currentAnimation = toKey;
-      state.isPlayingSpecial = false;
-      state.lastSwitchTime = Date.now();
-      if (rec.onSettled) rec.onSettled();
-    }, Math.max(100, (dur - (useKey ? 0 : XF)) * 1000));
-    bridgeTimersRef.current[agentId] = rec;
+    // `fromKey`/`bridgeKey` are carried so a caller that lands mid-flight can
+    // ask where this character is actually coming from — see poseKeyFor.
+    armHandOff({ toKey, onSettled, fromKey: originKey, bridgeKey }, dur);
 
     return true;
   };
@@ -3064,9 +3146,27 @@ const CyborgTempleScene = ({
   const attentionTimersRef = useRef({});
   useEffect(() => {
     if (!pitchStarted || !loadedModel) return;
+    /* demonFocusedRef, NOT demonHeadTrackingRef — the other three name their own
+     * focus ref here and the Demon used to name a HEAD-TRACKING one.
+     *
+     * demonHeadTrackingRef is set in exactly one place: inside
+     * startDemonFocusSequence, which is lobby-only (gated on
+     * !gameStartedRef && !pitchStartedRef). This effect is the opposite — it
+     * early-returns unless pitchStarted. So the two never overlapped, the ref was
+     * permanently false whenever this ran, and the exclusion below silently
+     * excluded nobody. Barron was the one seat the room kept posing WHILE HE WAS
+     * ANSWERING: his own focus pose pinned him, this un-pinned him a beat later
+     * (the 'typing' branch passes releaseAfter), and his ungated alternation and
+     * the H80Z price poll were then free to cross-fade him mid-sentence. Two
+     * drivers on one rig is how demon_typing and demon_idle both ended up at
+     * weight 1, and their average puts his hands through the keyboard.
+     *
+     * A leftover from when the Demon was the pitching agent and had a bespoke
+     * lobby focus sequence; this effect was written later, for the pitch, and
+     * reached for the ref that existed rather than the one that means "focused". */
     const focusedRefs = {
       Monk: monkFocusedRef,
-      Demon: demonHeadTrackingRef,
+      Demon: demonFocusedRef,
       Detective: detectiveFocusedRef,
       RL80: rl80FocusedRef,
     };
@@ -3506,8 +3606,115 @@ const CyborgTempleScene = ({
 
   // Refs for PalmTree meshes - store multiple instances
   const palmTreeRefs = useRef([]);
-  
-  
+
+  /* WHAT IS ACTUALLY POSING THE DESK RIGHT NOW — read the scene, not the intent.
+   *
+   *     __deskAnim()          // all four seats
+   *     __deskAnim('Demon')   // one of them
+   *
+   * Reports two things per character, and it needs both. First, EVERY action the
+   * mixer is still weighting — not state.currentAnimation, which records what was
+   * asked for. Every animation bug in this file has lived in the gap between the
+   * two, and the expensive ones are the ones where a second clip is quietly still
+   * at weight 1: three.js averages them, and an average of two valid poses is not
+   * a valid pose. Second, the LIVE world position of the wrist and fingertip
+   * bones against that seat's OWN key surface.
+   *
+   * Measured off the live graph on purpose. Deriving the same numbers from the
+   * GLB is how a wedge-shaped laptop case got read as a 48mm slab — its bounding
+   * box is tall at the screen hinge and the hands are at the other end — which
+   * condemned two rigs that render perfectly. If you want to know whether a hand
+   * is in the keyboard, ask the hand and ask the keyboard, in the same space, at
+   * the same moment.
+   *
+   * ONE TRAP: the bone half is only meaningful while the render loop is running.
+   * A backgrounded tab freezes useFrame, so mixer.update stops and every bone
+   * reads its BIND pose — hands ~1.3 apart, which looks like a T-pose because it
+   * is one. The weights are plain state and stay honest either way. Take a
+   * screenshot first to force a frame if the positions look absurd.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined' || !loadedModel) return;
+    const WRIST_RE = /^(hand_[lr](_\d+)?|mixamorig:(left|right)hand)$/i;
+    const TIP_RE = /(indexfinger_04|finger_04|handindex4|handmiddle4)/i;
+    const MOUNTS = {
+      Monk: 'Monk_empty', Demon: 'Demon_Empty',
+      Detective: 'Detective_Empty', RL80: 'Unicorn_Empty',
+    };
+    const v = new THREE.Vector3();
+    const worldOf = (o) => { o.getWorldPosition(v); return [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)]; };
+
+    window.__deskAnim = (who) => {
+      // Key surfaces + mice, in world space, once.
+      const props = [];
+      loadedModel.traverse((o) => {
+        if (o.isMesh && /ExtendedButtonArea|GreenKey|^Mouse_/i.test(o.name || '')) {
+          props.push({ name: o.name, p: worldOf(o) });
+        }
+      });
+      const out = {};
+      for (const agentId of Object.keys(MOUNTS)) {
+        if (who && agentId !== who) continue;
+        const acts = actionsRef.current?.[agentId] || {};
+        const mixer = mixersRef.current?.[agentId];
+        const state = (
+          agentId === 'Monk' ? monkAnimStateRef.current :
+          agentId === 'Demon' ? demonAnimStateRef.current :
+          agentId === 'Detective' ? detectiveAnimStateRef.current :
+          rl80AnimStateRef.current
+        );
+        const weighted = Object.entries(acts)
+          .map(([k, a]) => ({
+            clip: k,
+            w: +liveWeight(mixer, a).toFixed(3),
+            t: +(a.time ?? 0).toFixed(2),
+            running: !!(a.isRunning && a.isRunning()),
+            paused: !!a.paused,
+          }))
+          .filter((r) => r.w > 0.001 || r.running)
+          .sort((a, b) => b.w - a.w);
+
+        const root = loadedModel.getObjectByName(MOUNTS[agentId]);
+        const wrists = [], tips = [];
+        if (root) {
+          root.traverse((o) => {
+            if (!o.isBone) return;
+            if (WRIST_RE.test(o.name)) wrists.push({ bone: o.name, p: worldOf(o) });
+            else if (TIP_RE.test(o.name)) tips.push({ bone: o.name, p: worldOf(o) });
+          });
+        }
+        // This seat's key surface = the ExtendedButtonArea nearest its wrists.
+        let keys = null, best = Infinity;
+        for (const pr of props) {
+          if (!/ExtendedButtonArea/i.test(pr.name)) continue;
+          for (const w of wrists) {
+            const d = Math.hypot(pr.p[0] - w.p[0], pr.p[2] - w.p[2]);
+            if (d < best) { best = d; keys = pr; }
+          }
+        }
+        const mountScale = root ? (root.getWorldScale(v), [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)]) : null;
+        out[agentId] = {
+          currentAnimation: state?.currentAnimation,
+          isPlayingSpecial: state?.isPlayingSpecial,
+          bridgeInFlight: bridgeTimersRef.current?.[agentId]
+            ? { toKey: bridgeTimersRef.current[agentId].toKey, fromKey: bridgeTimersRef.current[agentId].fromKey }
+            : null,
+          weighted,
+          blended: weighted.filter((r) => r.w > 0.001).length > 1,
+          mount: root ? { world: worldOf(root), scale: mountScale } : null,
+          keySurfaceY: keys ? keys.p[1] : null,
+          keySurface: keys,
+          // The number that matters: how far each fingertip is above the keys.
+          tipsAboveKeys: keys ? tips.map((t) => ({ bone: t.bone, dy: +(t.p[1] - keys.p[1]).toFixed(4) })) : null,
+          wristsAboveKeys: keys ? wrists.map((t) => ({ bone: t.bone, dy: +(t.p[1] - keys.p[1]).toFixed(4) })) : null,
+        };
+      }
+      return out;
+    };
+    return () => { delete window.__deskAnim; };
+  }, [loadedModel]);
+
+
   /* WIDTH ONLY — the UA sniff was removed 2026-08-02, and it was causing a real bug.
    *
    * `detectedMobile` feeds exactly two things (MOBILE_CAMERA_OFFSET.y and the
@@ -3680,17 +3887,27 @@ const CyborgTempleScene = ({
       const demonState = demonAnimStateRef.current;
       // Don't interrupt if already playing a special animation
       if (demonState.isPlayingSpecial) return;
+      // NOR WHILE HE IS ANSWERING. This fires off a 15s price poll — an external
+      // clock that knows nothing about the game — and a celebration in the middle
+      // of a report reads as a non-sequitur even when it poses him legally.
+      if (demonFocusedRef.current) return;
+      // A bridge in the air owns his arms; let its hand-off stand down first.
+      stopBridge('Demon');
 
-      // Fade out current animation
-      if (demonActions[demonState.currentAnimation]) {
-        demonActions[demonState.currentAnimation].fadeOut(0.5);
-      }
+      const demonMixer = mixersRef.current?.['Demon'];
+      // FADE OUT EVERYTHING, NOT JUST state.currentAnimation. That field records
+      // what was last ASKED for, and this path is reached from a timer that races
+      // the focus and attention effects — so the clip actually holding weight is
+      // routinely not the one named there, and fading only the named one left the
+      // real one blending underneath. See fadeOutOthers for the finished-one-shot
+      // half of the same trap.
+      fadeOutOthers(demonActions, demonActions[fistPumpKey], 0.5, demonMixer);
 
       const fistPump = demonActions[fistPumpKey];
       fistPump.reset();
-      fistPump.fadeIn(0.5);
       fistPump.setLoop(THREE.LoopOnce, 1);
       fistPump.clampWhenFinished = true;
+      fadeInOrSnap(fistPump, demonActions, 0.5, demonMixer);
       fistPump.play();
 
       demonState.currentAnimation = fistPumpKey;
@@ -3706,12 +3923,18 @@ const CyborgTempleScene = ({
           ? loopAnims[Math.floor(Math.random() * loopAnims.length)]
           : Object.keys(demonActions)[0];
         if (demonActions[returnAnim]) {
-          fistPump.fadeOut(0.5);
-          demonActions[returnAnim].stop();
-          demonActions[returnAnim].reset();
-          demonActions[returnAnim].setLoop(THREE.LoopRepeat);
-          demonActions[returnAnim].setEffectiveWeight(1);
-          demonActions[returnAnim].play();
+          const back = demonActions[returnAnim];
+          // Same reason as the trigger: fade out EVERY other action, not just the
+          // fist pump. Slamming the return clip to weight 1 while a second loop
+          // clip is still weighted is precisely the 50/50 average that buries his
+          // hands in the keyboard — and because both clips then sit at 1 and
+          // nothing downstream reads the pose as wrong, it holds until the next
+          // swap rather than flickering and clearing.
+          fadeOutOthers(demonActions, back, 0.5, mixersRef.current?.['Demon']);
+          back.reset();
+          back.setLoop(THREE.LoopRepeat);
+          fadeInOrSnap(back, demonActions, 0.5, mixersRef.current?.['Demon']);
+          back.play();
         }
         demonState.currentAnimation = returnAnim;
         demonState.isPlayingSpecial = false;

@@ -15,7 +15,7 @@ import { VIRGIL, virgilRead, agenda as virgilAgenda, shapeTip,
          nextMove as virgilNextMove,
          afterAnswer as virgilAfterAnswer } from "../src/game/terminal-traders/press/virgil.js";
 import {
-  PRESSES, STAKE, PHASE,
+  PRESSES, STAKE, PHASE, stakeFor, callVerdict, betRestated,
   createRun, press, advance, callIt, allocate,
   resolvePress, sliderToP, coverageScore, currentClaim, seatOptions, laneOutlook, pressure, PRESSURE,
   settlementNote,
@@ -152,8 +152,15 @@ console.log("\n-- the desk ------------------------------------------------");
       // Capped, not closed: everyone else still answers, just shallowly.
       const a = laneSentence(chainClaim, { spent: [SEATS.MARISOL] });
       const b = laneSentence(recClaim, { spent: [SEATS.GR80] });
-      return /spent/i.test(a) && /shallow/i.test(a)
-        && /spent/i.test(b) && /shallow/i.test(b);
+      // WORDING UPDATED 2026-08-05, property unchanged. This pinned the literal
+      // word "spent", which is copy and not behaviour — the sentence now reads
+      // "…Marisol's specialty, and that use is gone" to stop naming the seat
+      // twice in one sentence. What must hold is that the spent branch DIFFERS
+      // from the unspent one and still says every other seat answers shallowly;
+      // pin that instead, so the next rewording is caught only if it drops the
+      // fact rather than merely the word.
+      return a !== laneSentence(chainClaim) && /shallow/i.test(a)
+        && b !== laneSentence(recClaim) && /shallow/i.test(b);
     })());
   ok("Virgil stops pointing at a spent adviser",
     (() => {
@@ -164,6 +171,47 @@ console.log("\n-- the desk ------------------------------------------------");
       // "shallow looks left"; the same idea is now "a surface view".
       return live !== dead && /surface view/i.test(dead) && /already taken a deep look/i.test(dead);
     })());
+  /* THE LANE RUNWAY CLAUSE (author, 2026-08-05: three consecutive Marisol claims,
+     "of course i could only consult with her on the first question"). The game is
+     which claim inside a lane deserves the one use — a timing decision the player
+     could not make, because nothing said more of the lane was coming. */
+  ok("the lane band says how many more of this lane are coming",
+    (() => {
+      const two = laneSentence(chainClaim, { remaining: 2, earlier: 0 });
+      const one = laneSentence(chainClaim, { remaining: 1, earlier: 0 });
+      // The COUNT has to be there, and it has to agree with itself.
+      return /\btwo more\b/i.test(two) && /\bone more\b/i.test(one)
+        && /questions\b/i.test(two) && /question\b/i.test(one)
+        && two !== one;
+    })());
+  ok("the runway clause pluralises its verb with its count",
+    /follows it/i.test(laneSentence(chainClaim, { remaining: 1 }))
+    && /follow it/i.test(laneSentence(chainClaim, { remaining: 3 }))
+    && !/follows it/i.test(laneSentence(chainClaim, { remaining: 3 })));
+  // "The LAST money question you'll get" asserts earlier ones. On a lane holding
+  // a single claim that is a false statement about the running order — and it is
+  // the common case, not the corner: four of six claims on seed 4.
+  ok("a lane with one claim is never called the LAST one",
+    (() => {
+      const solo = laneSentence(chainClaim, { remaining: 0, earlier: 0 });
+      const last = laneSentence(chainClaim, { remaining: 0, earlier: 2 });
+      return !/\blast\b/i.test(solo) && /\blast\b/i.test(last) && solo !== last;
+    })());
+  ok("laneOutlook reports the lane behind you as well as ahead",
+    (() => {
+      const d = instanceDeal(4);   // CHAIN CHAIN CHAIN RECORD CHART SOCIAL
+      const at = (i) => laneOutlook({ ...createRun(d), claimIndex: i }, d);
+      return at(0).remaining === 2 && at(0).earlier === 0
+        && at(2).remaining === 0 && at(2).earlier === 2
+        && at(3).remaining === 0 && at(3).earlier === 0;
+    })());
+  // Invariant 8 in the copy's own terms: the floor may not issue an instruction
+  // the controller rejects. A count of claims is not an instruction, so it may
+  // never bring permission language in with it.
+  ok("the runway clause introduces no permission language",
+    [0, 1, 2, 3].every((r) => [0, 2].every((e) =>
+      !permissionish.test(laneSentence(chainClaim, { remaining: r, earlier: e })))));
+
   ok("spending the OTHER adviser changes nothing about this lane",
     laneSentence(chainClaim, { spent: [SEATS.GR80] }) === laneSentence(chainClaim)
     && virgilRead(chainClaim, { owner: laneOwner(chainClaim), spent: [SEATS.GR80] }).agenda === virgilRead(chainClaim, { owner: laneOwner(chainClaim) }).agenda);
@@ -792,6 +840,54 @@ console.log("\n-- PROPERNESS (the design theorem) -------------------------");
     worst = Math.max(worst, Math.abs(bestV - Math.round((1 - 2 * q) * 100)));
   }
   ok("honest reporting maximises expected P&L at every belief", worst === 0, `${worst}`);
+
+  // AND AT EVERY PRESS COUNT. The stake is scaled by the questions already spent
+  // (stakeFor), and the whole reason that scaling is a factor on `stake` rather
+  // than a term on either branch is that a positive scalar leaves the argmax
+  // alone. This pins it: shrink the win alone and this block fails immediately,
+  // because the optimum slides off honest reporting toward under-confidence.
+  let worstPriced = 0;
+  for (let used = 0; used <= PRESSES; used++) {
+    const stake = stakeFor({ advisersSpent: Array.from({ length: used }, (_, i) => i) });
+    for (let qi = 0; qi <= 20; qi++) {
+      const q = qi / 20;
+      let bestV = null, bestE = -Infinity;
+      for (let v = -100; v <= 100; v++) {
+        const p = sliderToP(v);
+        const E = q * casePnl(p, 1, stake) + (1 - q) * casePnl(p, 0, stake);
+        if (E > bestE) { bestE = E; bestV = v; }
+      }
+      worstPriced = Math.max(worstPriced, Math.abs(bestV - Math.round((1 - 2 * q) * 100)));
+    }
+  }
+  ok("the press price keeps the rule proper at every press count", worstPriced === 0, `${worstPriced}`);
+  // THE REVEAL NAMES CONFIDENCE, NOT DIRECTION. The old headline was
+  // `pnl >= 0`, which under casePnl is exactly |p - truth| <= 0.5 — a hit rate.
+  // These pin the two calls it got wrong.
+  {
+    const rugDeal = { truth: 1 };
+    const mk = (v) => ({ call: { v, p: sliderToP(v), pnl: casePnl(sliderToP(v), 1, STAKE) },
+                         advisersSpent: [], pressesLeft: 3 });
+    ok("an abstain is named an abstain, not a correct read",
+      callVerdict(mk(0), rugDeal).key === "pass"
+      && casePnl(0.5, 1, STAKE) === 0);
+    ok("a timid right-side call is not told it read it right",
+      callVerdict(mk(-30), rugDeal).key === "timid");
+    ok("a confident right-side call is",
+      callVerdict(mk(-90), rugDeal).key === "well");
+    ok("a confident wrong-side call is named wrong",
+      callVerdict(mk(90), rugDeal).key === "wrong");
+    ok("the abstain restates no bet", betRestated(mk(0), rugDeal) === null);
+    ok("a real call restates its own stake",
+      /paid \d+ if you were right and cost \d+/.test(betRestated(mk(-90), rugDeal)));
+  }
+
+  ok("spending questions shrinks the stake and never inverts it",
+    stakeFor({ advisersSpent: [] }) === STAKE
+    && stakeFor({ advisersSpent: [1, 2, 3] }) < STAKE
+    && stakeFor({ advisersSpent: [1, 2, 3] }) > 0
+    // the pitcher is free of SIZE — Virgil says so on the floor.
+    && stakeFor({ advisersSpent: [], pressesLeft: 0 }) === STAKE);
   const pressBody = fs.readFileSync("src/game/terminal-traders/press/pressRun.js", "utf8")
     .split("export function press(")[1].split("export function seatOptions")[0];
   ok("no seat path touches the stake or the budget constant",
