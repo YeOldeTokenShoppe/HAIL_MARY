@@ -12,7 +12,7 @@
 // — and the failure being chased ("audio plays, mouth doesn't move") can only be
 // diagnosed by A/B-ing the same call against a scene known to work.
 //
-//   /sitepal-test?scene=2775344&hash=Pfnc…&voice=2ajXGJNYBR0iNHpS4VZb&engine=14
+//   /sitepal-test?scene=2775344&hash=Pfnc…&voice=KHYwwEInJIX7PM9tZS0K&engine=14
 //   /sitepal-test?scene=2774449&hash=SfJw…            (the Monk — known good)
 //
 // EMBED FRESH, NEVER loadSceneByID. Swapping scenes in a live player can leave

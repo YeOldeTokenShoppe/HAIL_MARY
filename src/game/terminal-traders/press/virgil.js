@@ -124,7 +124,10 @@ export const VIRGIL = {
      * reason COUNSEL_VOICES.GR now carries a comment about staying in lockstep.
      * If the id moves in api/counsel-voice, move it here in the same commit.
      */
-    voice: { voice: "2ajXGJNYBR0iNHpS4VZb", lang: 1, engine: 14 },
+    // VOICE CHANGED 2026-08-05 (was 2ajXGJNYBR0iNHpS4VZb), and both copies moved
+    // in the same commit exactly as the rule above requires — the route's VG
+    // entry is the other one.
+    voice: { voice: "KHYwwEInJIX7PM9tZS0K", lang: 1, engine: 14 },
   },
 };
 

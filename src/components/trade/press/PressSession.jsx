@@ -2928,19 +2928,45 @@ html[data-press-screenlook] .custom-title { opacity:0 !important; }
      lines, which flex-direction:row cannot express without a wrapper element. */
   .ps-guide {
     flex:1 1 100%; align-self:auto;
-    display:grid; grid-template-columns:auto 1fr; align-items:center;
+    display:grid; grid-template-columns:auto 1fr; align-content:start;
     column-gap:12px; row-gap:0; text-align:left;
   }
-  /* 1 / -1, not a row count: the card gained a fourth child and a hard-coded
-     span would have left the coverage list under the portrait instead of beside
-     it. This spans whatever is there. */
-  .ps-guide-pic { width:56px; height:56px; grid-row:1 / -1; align-self:start; }
-  .ps-guide-who { margin-top:0; }
-  .ps-guide-blurb { margin:3px 0 0; text-align:left; }
-  /* Horizontal at this width — four short roles fit one line and a stacked list
-     would double the card's height for no gain. */
-  .ps-guide-lanes { margin-top:8px; padding-top:8px; }
-  .ps-guide-lanes ul { flex-direction:row; flex-wrap:wrap; gap:4px 16px; margin-top:5px; }
+  /* EVERY CHILD IS PLACED, AND NOT ONE OF THEM MAY GO BACK TO auto (fixed
+     2026-08-05, and PressFlat's copy of this card had the identical bug). The
+     obvious spelling of "the portrait spans his three text lines" —
+     grid-row:1 / -1 — SILENTLY DOES NOTHING: -1 counts back from the end of the
+     EXPLICIT row grid, this grid declares no rows, so the line resolves to 1 and
+     the span collapses to a single row. The portrait then took row 1 alone and
+     auto-placement pushed THE CAT · YOUR GUIDE into column 1 underneath it,
+     which widened the auto column to the role line's width and shunted his name
+     that far right of the face it names. The coverage list landed in column 1
+     too, squeezed under the portrait — which is the exact failure the old note
+     here claimed 1 / -1 was preventing.
+     "span 3" is the honest count and creates its own implicit rows. It is also
+     why the rows below are explicit: with the pic spanning 1-3, auto-placement
+     has no way to know the lanes belong on 4. */
+  .ps-guide-pic {
+    width:56px; height:56px;
+    grid-column:1; grid-row:1 / span 3; align-self:start;
+  }
+  .ps-guide-who { grid-column:2; grid-row:1; margin-top:0; }
+  .ps-guide-role { grid-column:2; grid-row:2; }
+  .ps-guide-blurb { grid-column:2; grid-row:3; margin:3px 0 0; text-align:left; }
+  /* SPANS THE CARD, unlike his three lines: the roster is about somebody else,
+     and four names indented past the portrait would run to two lines each once
+     this panel gets down near 400px. */
+  .ps-guide-lanes { grid-column:1 / -1; grid-row:4; margin-top:8px; padding-top:8px; }
+  /* TWO COLUMNS, NOT A WRAPPING ROW (2026-08-05, matched to PressFlat so the two
+     surfaces read the same when they are the same width). This was
+     flex-direction:row + wrap on the reasoning that four short roles fit one
+     line — true at 760px, false by 480, where the names wrap at whatever point
+     their own lengths happen to fall and the list stops looking like a table.
+     A 2-col grid holds the same rows at every width in this range. */
+  .ps-guide-lanes ul {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px 16px; margin-top:5px;
+  }
+  .ps-guide-lanes li b { overflow-wrap:anywhere; }
 }
 
 @media (max-width: 860px) {

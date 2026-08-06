@@ -748,19 +748,74 @@ export default function TerminalBoot({ options = [], onSelect, onExit, instant =
           opacity: 0.5;
         }
 
+        /* THE STRUCK GOLD BAR — the same object as the briefing's REVIEW THIS
+           DEAL (PressFlat's .pf-start .pf-btn.primary), and deliberately the ONLY
+           button on this screen that gets it (author, 2026-08-05).
+
+           WHAT WAS WRONG. This was a dark bar with a hairline channel-tinted
+           border on a screen where the three channel tiles below it are lit
+           panels with gradients and inset glow. The one committing action was
+           the quietest control on its own screen — you tune with the tiles, and
+           the thing that actually takes you INTO a channel looked like a caption.
+           The tuner is glass and light; the button has to be metal for the eye to
+           separate "the instrument" from "the switch."
+
+           WHY GOLD AND NOT var(--tb-channel), which is the tuner's whole colour
+           system. Gold is ALREADY this terminal's action colour independent of
+           channel — SELECT A CHANNEL, the CH 01 readout and every preset number
+           are --tb-gold on all three channels — so a gold CTA joins a family that
+           exists rather than fighting the tuner. A channel-tinted bar would also
+           make the button change identity three times on a screen whose entire
+           job is that the CHANNEL changes and the ACT does not. Channel identity
+           stays where it is legible: the CRT header, the bezel glow, the strip.
+           (If this is ever wanted per-channel, it is one token — swap --tb-gold
+           for var(--tb-channel) in the gradient and the border.)
+
+           NOT THE SOFTKEYS AND NOT THE PRESETS. F1/F2 are navigation and the
+           strip carries each channel's own accent, which is the one thing on the
+           screen that must stay keyed to --tb-channel. Gold on all of them would
+           spend the emphasis it exists to create. */
         .tb-enter {
+          position: relative; overflow: hidden;
           min-height: 54px; display: flex; align-items: baseline; justify-content: center; gap: 10px;
-          background: linear-gradient(90deg, rgba(6,26,24,0.88), color-mix(in srgb, var(--tb-channel) 10%, #061a18), rgba(6,26,24,0.88));
-          border: 1px solid color-mix(in srgb, var(--tb-channel) 55%, transparent);
-          color: #eafff9; font: inherit; font-weight: bold; padding: 13px; cursor: pointer;
+          background: linear-gradient(90deg, #3a2d05, var(--tb-gold) 48%, #3a2d05);
+          border: 1px solid rgba(255,210,58,0.8);
+          /* DARK INK ON METAL. The old #eafff9 was light-on-dark and there is no
+             version of it that reads on a lit gold bar. */
+          color: #07100d;
+          font-family: 'Orbitron', 'IoskeleyMono', monospace; font-weight: 700;
+          padding: 13px; cursor: pointer;
+          text-shadow: 0 1px rgba(255,255,255,0.25);
+          box-shadow: 0 0 20px rgba(255,210,58,0.2), inset 0 0 18px rgba(255,255,255,0.14);
           clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
           transition: box-shadow 0.15s ease, transform 0.1s ease;
         }
-        .tb-enter-command { color: var(--tb-ink); font-size: 14px; letter-spacing: 0.1em; }
-        .tb-enter-label { color: var(--tb-channel); font-size: 10px; letter-spacing: 0.08em; }
+        /* The struck inner rule — what makes it read as stamped stock rather than
+           as a rectangle with a gradient. Inset 4px, same as the briefing's. */
+        .tb-enter::after {
+          content: ""; position: absolute; inset: 4px; pointer-events: none;
+          border: 1px solid rgba(5,15,12,0.23);
+        }
+        .tb-enter-command { color: #07100d; font-size: 14px; letter-spacing: 0.1em; }
+        /* The readout stays MONO while the verb goes Orbitron — "CH 01 // LT TV"
+           is machine output and the slashes and digits are what that face is for.
+           Dimmed ink rather than a second colour: it is the button's subtitle. */
+        .tb-enter-label {
+          font-family: 'IoskeleyMono', 'Courier New', monospace; font-weight: 400;
+          color: rgba(7,16,13,0.7); font-size: 10px; letter-spacing: 0.08em;
+        }
         .tb-enter:not(:disabled):active { transform: scale(0.99); }
-        .tb-enter:not(:disabled):hover { box-shadow: inset 0 0 24px color-mix(in srgb, var(--tb-channel) 16%, transparent); }
-        .tb-enter:disabled { opacity: 0.4; cursor: default; border-color: color-mix(in srgb, #2fd6d6 30%, transparent); }
+        .tb-enter:not(:disabled):hover {
+          box-shadow: 0 0 26px rgba(255,210,58,0.34), inset 0 0 18px rgba(255,255,255,0.22);
+        }
+        /* OFF AIR IS DEAD METAL, not a faded gold one. opacity:0.4 on a lit bar
+           leaves a glowing ghost that still reads as pressable; this strikes the
+           gradient out entirely, which is what "no signal" should look like. */
+        .tb-enter:disabled {
+          background: #25312e; border-color: rgba(142,171,165,0.28); color: #6d8781;
+          box-shadow: none; text-shadow: none; cursor: default;
+        }
+        .tb-enter:disabled::after { border-color: rgba(255,255,255,0.05); }
 
         .tb-presets-label {
           display: flex; align-items: center; justify-content: space-between;

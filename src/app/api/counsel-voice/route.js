@@ -147,7 +147,7 @@ const VOICES = {
     // Voice changed twice on 2026-08-04: R4Zv8YQNcHyNDZl0ViUG →
     // I1T6PEfqPxl45yKRN4aS → the id below. Moved here and in press/virgil.js in
     // the same commit — see the lockstep note there.
-    id: process.env.ELEVENLABS_VOICE_VIRGIL || "2ajXGJNYBR0iNHpS4VZb",
+    id: process.env.ELEVENLABS_VOICE_VIRGIL || "KHYwwEInJIX7PM9tZS0K",
     settings: { stability: 0.7, similarity_boost: 0.75, style: 0.3 },
   },
 };

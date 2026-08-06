@@ -49,13 +49,29 @@ const CY = "#2fd6d6";
 const CY_DIM = "rgba(47,214,214,0.30)";
 const GOLD = "#ffd23a";
 const WHITE = "#eafff9";
-const CRT_CHARS = "01<>/\\|=+*[]{}#%@xABCDEF0123456789:.░▒▓";
 
-function randLine(n = 24) {
-  let s = "";
-  for (let i = 0; i < n; i++) s += CRT_CHARS[Math.floor(Math.random() * CRT_CHARS.length)];
-  return s;
-}
+/* THE IDLE CARRIER IS GONE (author, 2026-08-05: "it's really just a placeholder
+   screen - it has no actual functionality other than to look active" / "we don't
+   want to use it in this game"). It was CRT_CHARS + randLine(): seven rows of
+   random hex and box-drawing glyphs, reshuffled on every tick.
+
+   IT WAS BORROWED VOCABULARY. The animated-code look belongs to the ambient
+   painters that own these same monitors OUTSIDE the game (CRTScreen,
+   DetectiveScreen, MobiusScreen — see the header note), and this board's whole
+   premise is that it TAKES the screen from them. Wearing their idle animation
+   while doing so is the one thing that made a game board look like set dressing.
+
+   ITS STATED JOB IS ALREADY DONE BY SOMETHING HONEST. The old note argued the
+   carrier proved "the machine is alive", which is what keeps an empty board
+   reading as a fact about the analyst rather than a bug — but the blinking caret
+   below has been carrying that on its own the whole time, and a caret is a
+   terminal waiting, not a terminal pretending to compute. An empty board says
+   NO RECORD in the status line; nothing needs to scroll for that to be true.
+
+   It also removes a class of bug rather than just a look: the carrier animated
+   UNDER the receipt at 6% alpha until earlier today, and the fix for that was
+   opaque panels plus a panelBottom row-skip — both of which exist only to
+   contain this, and both of which go with it. */
 
 /**
  * FLAT variant — paints into a caller-supplied <canvas> instead of borrowing a
@@ -67,7 +83,7 @@ function randLine(n = 24) {
  * div. The product moment — you press, and the board conspicuously stays
  * empty — is identical either way, because it was never about the 3D.
  */
-export function createFlatEvidenceScreen(canvas, { header = "EVIDENCE", fps = 11 } = {}) {
+export function createFlatEvidenceScreen(canvas, { header = "EVIDENCE", fps = 2 } = {}) {
   return makeScreen({
     header, fps,
     getCanvas: () => canvas || null,
@@ -77,7 +93,7 @@ export function createFlatEvidenceScreen(canvas, { header = "EVIDENCE", fps = 11
   });
 }
 
-export function createEvidenceScreen({ station = "demon", header = "EVIDENCE", fps = 11 } = {}) {
+export function createEvidenceScreen({ station = "demon", header = "EVIDENCE", fps = 2 } = {}) {
   const target = SCREEN_TARGETS[station];
   return makeScreen({
     header, fps,
@@ -98,7 +114,6 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
   // thing an adviser can do that Barron structurally cannot, so it needs its
   // own picture.
   let empty = null;   // { title, query }
-  let carrier = Array.from({ length: 7 }, () => randLine());
   let tick = 0;
   let live = true;
 
@@ -123,30 +138,10 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
     ctx.fillStyle = "rgba(47,214,214,0.25)";
     ctx.fillRect(14, 28, w - 28, 1);
 
-    // Idle carrier — dim, so a stamped receipt dominates. Its job is to prove
-    // the machine is alive, which is what makes an empty board read as a fact
-    // about Barron rather than a bug in the game.
-    //
-    // NOT UNDER A PANEL (author, 2026-08-05: "the evidence screen is overlaying
-    // another screen in the background with a bunch of animated noise"). Both
-    // panels below paint over this at 0.94 alpha, so 6% of seven lines of random
-    // garbage came through the receipt — and the carrier reshuffles on every
-    // interval tick, so the leak ANIMATED under the one thing on this screen the
-    // player is meant to read. The panels are opaque now, which fixes the bleed;
-    // skipping the covered rows outright is the belt to that braces, and stops a
-    // future alpha tweak quietly reopening it. Lines below the panel still draw,
-    // because that is where the liveness argument above still applies.
-    ctx.font = "12px 'Courier New', monospace";
-    ctx.fillStyle = CY_DIM;
-    const panelBottom = receipt
-      ? 44 + 34 + (receipt.rows || []).length * 22 + 8
-      : empty ? 44 + 104 : 0;
-    carrier.forEach((l, i) => {
-      const ly = 48 + i * 18;
-      if (ly - 12 < panelBottom) return;   // -12: the row's ascent, not its baseline
-      ctx.fillText(l, 14, ly);
-    });
-
+    // NOTHING FILLS THE BODY WHEN THERE IS NOTHING ON THE BOARD — see the note
+    // where the carrier used to be built. The panels below still paint opaque:
+    // that stays correct on its own terms (a receipt is a document, not a
+    // transparency), and it is no longer load-bearing against a bleed.
     if (receipt) {
       const rows = receipt.rows || [];
       const x = 12, y = 44, bw = w - 24, bh = 34 + rows.length * 22 + 8;
@@ -204,8 +199,12 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
       ctx.fillStyle = "rgba(255,155,111,0.9)";
       ctx.fillText("0 RESULTS \u00b7 NOT REDACTED \u2014 ABSENT", x + 12, y + 88);
     } else if (tick % 2 === 0) {
+      // THE WAITING CARET, and now the only moving thing on an idle board. It
+      // sat at the bottom-left under seven rows of carrier; with the body empty
+      // it is the board's one mark, so it moves up to where a prompt actually
+      // is — the first line under the rule.
       ctx.fillStyle = CY;
-      ctx.fillRect(14, h - 26, 8, 13);
+      ctx.fillRect(14, 40, 8, 13);
     }
 
     ctx.fillStyle = "rgba(0,0,0,0.15)";
@@ -217,12 +216,17 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
     return true;
   }
 
-  const timer = setInterval(() => {
-    tick++;
-    carrier.shift();
-    carrier.push(randLine());
-    draw();
-  }, Math.round(1000 / fps));
+  /* 2Hz, NOT 11 — and `fps` is now a blink rate, not a frame rate. The old 11
+     existed to reshuffle the carrier fast enough to read as noise; with the
+     carrier gone the only thing this loop animates is the caret, and at 11fps
+     that blinked ~5 times a second, which is a stutter rather than a cursor.
+     Two ticks a second gives the 1Hz blink a caret should have.
+     THE LOOP MAY NOT STOP ALTOGETHER, for two reasons that outlive the caret:
+     desktop's getCanvas() reads a global VideoScreens may not have published
+     yet, so draw() returning false has to be retried (the note below), and
+     claim() re-asserts dataset.evidenceActive every pass, which is what keeps
+     the ambient painters yielding this monitor for as long as we hold it. */
+  const timer = setInterval(() => { tick++; draw(); }, Math.round(1000 / fps));
   draw(); // VideoScreens may mount after us; the interval retries until it lands.
 
   return {

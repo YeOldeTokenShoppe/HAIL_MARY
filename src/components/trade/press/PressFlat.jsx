@@ -24,7 +24,6 @@ import {
   ENGAGEMENT_CSS, peekFileNo, commitFileNo,
 } from "./engagement";
 import { createFlatEvidenceScreen } from "./evidenceScreen";
-import { createPitchDeck } from "./pitchDeck";
 import {
   canPress as pressIsLegal, ClaimBody, AnswerBody, AnswerChoice, OpeningBody, SeatRow,
   ConvictionGauge,
@@ -127,16 +126,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      snapping back — their finding is what you are reading at that moment. Back
      to the pitcher when the next claim starts. */
   const [onCamera, setOnCamera] = useState(PITCHER);
-  /* FEED | BOARD | DECK. Not just a space-saver on a phone: a press CUTS to a
+  /* FEED | SCREEN. Not just a space-saver on a phone: a press CUTS to a
      screen, so "nothing landed" is something you went and looked at rather
      than something you passively failed to notice.
-     THREE, NOT TWO, since 2026-08-04. The old pair was feed | screen, where
-     "screen" was a switcher over four boards with different owners. They are
-     separated now because ownership is the thing this surface kept getting
-     wrong: BOARD is an analyst's finding and belongs with that analyst, DECK
-     is the bot's own presentation and belongs to the bot. `board` has no tab —
-     it is reached by going to look at what you sent someone for, and it comes
-     down when the claim does. */
+     TWO AGAIN (2026-08-05). It was briefly feed | board | deck, split on the
+     argument that ownership is the thing this surface kept getting wrong — a
+     BOARD is an analyst's finding and belongs with that analyst, a DECK is the
+     bot's own presentation and belongs to the bot. That distinction died with
+     the deck: every board is an evidence terminal now, so there is one KIND of
+     second pane and `screenOwner` carries who it belongs to. */
   const [pane, setPane] = useState("feed");
   // Mirrored into state because the tab label reads it during render — a ref
   // would never re-render and the badge would stay stale after a press.
@@ -146,22 +144,24 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
      between presses, the analyst who reported through the beat that follows
      one), so a separate selection could only ever agree with it or be a bug.
      Virgil takes the camera to say the agenda and has no screen, so anyone
-     without a board falls back to the deck: the bot's slides are what is on
-     screen whenever nobody's own findings are. */
+     without a board falls back to the pitcher's, which is the board the room
+     defaults to when nobody's own findings are up. */
   /* THE FINDING OUTRANKS THE CAMERA WHILE THERE IS A FINDING.
      The camera-only rule above held while it was true that "the camera is
      already on the reporter by the time this is offered" — and Virgil's
      after-answer turn ended that. He carries `seat: VIRGIL.id` and has no
-     board, so ~2.4s after EVERY analyst report the camera landed on him, this
-     fell through to PITCHER, and the tab silently became ▦ PITCH DECK — while
-     it was still pulsing LOOK and the note under it still said "on Marisol's
-     screen". The single most expensive action in the game handed you the
-     seller's slide.
+     board, so ~2.4s after EVERY analyst report the camera landed on him and this
+     fell through to PITCHER — swapping the board out from under a tab that was
+     still pulsing LOOK while the note under it still said "on Marisol's screen".
+     The single most expensive action in the game pointed you at the wrong
+     terminal. (Until 2026-08-05 it did something worse: the pitcher's board was
+     a pink SLIDE DECK, so the swap handed you the seller's own pitch. The board
+     is an evidence terminal now and the failure is milder, but the override is
+     still what makes the beat correct.)
      `flash.board` is set by resolvePress and cleared by advance() and callIt(),
      so this override has exactly the lifetime of the answer beat and needs no
      reset of its own — which is what the note at the flash reset requires
-     ("screenOwner is derived, not stored"). Pitcher presses fall through
-     unchanged, because the pitcher's board IS the deck. */
+     ("screenOwner is derived, not stored"). */
   const screenOwner = (flash && BOARDS_SET.has(flash.board)) ? flash.board
     : BOARDS_SET.has(onCamera) ? onCamera : PITCHER;
   // He's answered and the board has changed, and you HAVEN'T LOOKED YET.
@@ -377,15 +377,20 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     for (const seat of BOARDS) {
       const el = document.getElementById(`pf-screen-${seat}`);
       if (!el) continue;
-      // THE PITCHER'S BOARD IS NOT AN EVIDENCE TERMINAL ANY MORE. It used to be
-      // one — the same cyan receipt screen the three analysts have — which made
-      // the one surface in the room that is SELLING you something look exactly
-      // like the three that are checking it. See pitchDeck.js: it takes the
-      // same contract (setClaim/stamp/stayBlack/dispose) so nothing else here
-      // has to know which kind of board it is holding.
-      made[seat] = seat === PITCHER
-        ? createPitchDeck(el, { ticker: deal.ticker })
-        : createFlatEvidenceScreen(el, { header: seatMeta(seat).name.toUpperCase() });
+      // THE PITCHER'S BOARD IS AN EVIDENCE TERMINAL AGAIN (author, 2026-08-05:
+      // match desktop). It was a createPitchDeck — a pink slide renderer in the
+      // seller's palette, on the argument that the one surface SELLING you
+      // something should not look like the three that are checking it. That is
+      // a real argument and it is why pitchDeck.js existed, but it was true on
+      // ONE of the two surfaces: desktop has no deck at all, and its pitcher
+      // aliases Barron's cyan evidence terminal (PressSession's board effect,
+      // "PITCHER and Barron ALIAS one screen"). Two presentations of one beat is
+      // the drift both files keep logging, so the deck went rather than being
+      // built a second time in 3D.
+      // header comes from seatMeta for every seat now, PITCHER included — it
+      // answers PITCH_BOT for the pitcher, which is the same string desktop
+      // passes (PITCH_BOT.name.toUpperCase()).
+      made[seat] = createFlatEvidenceScreen(el, { header: seatMeta(seat).name.toUpperCase() });
     }
     screensRef.current = made;
     made[SEATS.BARRON] = made[PITCHER];   // alias — see BOARDS note
@@ -394,19 +399,15 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
       Object.values(made).forEach((x) => x.dispose());
       screensRef.current = {}; screenRef.current = null;
     };
-  }, [started, deal.ticker]);
+  }, [started]);
 
-  /* THE DECK FOLLOWS THE RUNNING ORDER. One slide per claim, swapped when the
-     claim does — the deck is what the bot is presenting FROM, so it cannot sit
-     on the previous point while it argues the next one.
-     It reads `claim` and nothing else: no outcome, no branch, no pressure. The
-     leak argument is pitchDeck.js's header, and it is the shield's (§1 rule 3)
-     — a surface keyed only to slot-level fields is auditable, and every field
-     it touches is already on screen in the agenda rail. */
-  useEffect(() => {
-    if (!started || !claim) return;
-    screensRef.current[PITCHER]?.setClaim?.(claim, deal.surface);
-  }, [started, claim, deal.surface]);
+  /* THE "DECK FOLLOWS THE RUNNING ORDER" EFFECT WENT WITH THE DECK (2026-08-05).
+     It called screensRef.current[PITCHER].setClaim(claim, deal.surface) once per
+     claim so the slide tracked what was being argued. An evidence terminal has
+     no slides and no setClaim — evidenceScreen.js's contract is
+     stamp/stampNothing/stayBlack/dispose — so the board is blank until something
+     is stamped onto it, exactly as the analysts' are and exactly as desktop's
+     shared pitcher/Barron screen is. Nothing else read setClaim. */
 
   /* ---- he says it out loud ----
      Token-guarded. A press interrupts the claim he's mid-way through, so two
@@ -843,7 +844,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         else if (outcome.nothingOnFile) board?.stampNothing(claim.subject);
         else board?.stayBlack();
         // THE BADGE NEEDS NO OWNER TEST ANY MORE. It briefly had one, because
-        // the tab was permanently the bot's deck and a receipt Marisol produced
+        // the tab was permanently the bot's board and a receipt Marisol produced
         // would have had the seller taking credit for the desk's finding in the
         // status line. The tab follows the camera now and the camera is holding
         // on whoever just reported, so the screen the badge describes is always
@@ -924,8 +925,9 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     setFlash(null);
     setPane("feed");     // new claim, back to its face
     setOnCamera(PITCHER);  // ...and off the analyst who reported on the last one
-    // ...which also takes the second tab back to PITCH DECK, since it follows
-    // the camera. Nothing else to reset: screenOwner is derived, not stored.
+    // ...which also hands the second pane back to the pitcher's board, since it
+    // follows the camera. Nothing else to reset: screenOwner is derived, not
+    // stored.
     Object.values(screensRef.current).forEach((x) => x.stayBlack());
     setHasRecord(false);
     setLookPending(false);
@@ -973,17 +975,18 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         onBack={onExit}
       />
 
-      {!started && (
-        <div className="pf-market-rail" aria-label="Deal simulation status">
-          {/* —— at rest, not PENDING: the rail cell is a blank field the settle
-              fills, same idiom as the record's own —— rows. PENDING was status
-              vocabulary — a fifth "not yet" the one-signal count (see the deal
-              file in engagement.jsx) couldn't carry. */}
-          <span><i>MANDATE</i>{identity ? deal.ticker : "——"}</span>
-          <span><i>ACCESS</i>GUEST</span>
-          <span><i>MODE</i>LIVE SIM</span>
-        </div>
-      )}
+      {/* BAND 0 — THE STATUS RAIL — IS GONE (author, 2026-08-05: "there is a top
+          section that says 'mandate', 'access', and 'mode' - don't need that").
+          Cut on the panel the same day; this surface is the one it was built on,
+          so leaving it here would have been the drift both files keep logging.
+
+          IT WAS THREE READOUTS AND NONE OF THEM WAS A DECISION. MANDATE was
+          blank — "——" until the settle, and the settle already prints the ticker
+          on the file itself, in the particulars, where a deal's name belongs.
+          ACCESS GUEST and MODE LIVE SIM are true of every sitting this surface
+          will ever run. On a phone the rail also cost 34px of the one dimension
+          this column has none of.
+          The ticker survives on the record; the rest was never information. */}
 
       {/* ---------- the briefing ----------
           NOTHING HERE MAY NAME THE DEAL BEFORE THE DICE STOP (invariant 7).
@@ -1014,7 +1017,18 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 is true of every deal — which is this headline's whole licence
                 to be the largest type on a panel that withholds the deal. */}
             <h1>HEAR THE PITCH.<br /><span>MAKE THE CALL.</span></h1>
-            <p>One pitch. Three questions. Then say how much of it you believe.</p>
+            {/* THE SUBLINE IS GONE (author, 2026-08-05: "we have 2 text sections
+                - do we need 2?"). It read "One pitch. Three questions. Then say
+                how much of it you believe." — and every clause of it is restated
+                within 60px of itself: ONE PITCH is the headline directly above,
+                THREE QUESTIONS is 03 QUESTIONS in the protocol row, and "how much
+                of it you believe" is 01 FINAL CALL and the conviction dial it
+                opens. The protocol row exists precisely because the shape of the
+                session reads better as counts than as prose.
+                THE DIRECTIVE IS THE ONE THAT STAYS. It carries what no numeral
+                can — that every fact is true TECHNICALLY. Two prose blocks on a
+                briefing is one too many; the survivor should be the one that
+                isn't a caption. */}
           </div>
           {/* THE PANEL NO LONGER NAMES THE DEAL HERE. A 20px headline, a subtitle
               restating the ticker, and the sheet below all printed the same
@@ -1023,10 +1037,39 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               the record's CLIENT line now. The block glyphs went with it: they
               were one of five things on this screen saying "not yet". */}
 
-          {/* THE RECORD, INSIDE ITS DEAL FILE. Picked fresh for this sitting;
-              you can't ask for a different one without leaving and coming back.
-              See engagement.jsx for the five props that held this slot before
-              it, and why the sixth is paperwork rather than another machine.
+          {/* BAND 2 — WHAT IS ABOUT TO HAPPEN, AS THREE NUMBERS.
+
+              IT MOVED ABOVE THE FILE (author, 2026-08-05: "should the description
+              and number boxes be towards the top?"). The counts are orientation —
+              the shape of the next four minutes — and orientation belongs before
+              the object it is about, not after it. They also refer to nothing on
+              screen, which is what lets them lead: 03, 04 and 01 are true of every
+              sitting and name no part of this deal (invariant 7 is untouched by
+              them, which is exactly why they can sit this high).
+
+              THE DIRECTIVE DID NOT COME WITH THEM, and the reason is a forward
+              reference: it opens "Every fact the PITCH BOT states is true...
+              technically", and the only thing that introduces the pitch bot is the
+              polaroid clipped to the file, captioned PRESENTED BY. Read above the
+              file it names a character the player has not met; read below it, it
+              is a remark about the face they just looked at. Numbers up, prose
+              down — the split is the answer, not the order. */}
+          {/* ONE ANSWER EACH LIVES HERE NOW (2026-08-05). It was the right half of
+              the analyst band's section line, and when that band was cut the rule
+              could not go with it — it is scarcity, the thing that makes choosing
+              an analyst a decision instead of a click. It is a property of the
+              count beside it, which is where it always belonged. */}
+          <div className="pf-protocol" aria-label="Meeting protocol">
+            <div><b>03</b><span>QUESTIONS</span></div>
+            <div><b>04</b><span>ANALYSTS<i>ONE ANSWER EACH</i></span></div>
+            <div><b>01</b><span>FINAL CALL</span></div>
+          </div>
+
+          {/* BAND 3 — THE RECORD, INSIDE ITS DEAL FILE. Picked fresh for this
+              sitting; you can't ask for a different one without leaving and coming
+              back. See engagement.jsx for the five props that held this slot
+              before it, and why the sixth is paperwork rather than another
+              machine.
 
               THE SEALED OVERLAY IS GONE (2026-08-03) and the folder cover is
               what replaced it — closed geometry instead of CLIENT // SEALED
@@ -1037,24 +1080,86 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               DEAL INTAKE label was retired — the cover's letterhead names the
               document instead, PROSPECTUS (author's word). The shell is
               the housing, the cover is the file, and the record's own pill is
-              the one place this surface says "not yet". */}
-          <div className="pf-record-shell">
-            <EngagementRecord
-              arrived={identity}
-              title={identity ? "Deal Brief" : "Inbound Deal"}
-              restStatus="AWAITING REVIEW"
-              arrivedStatus="MEETING SET"
-              stampLabel="Meeting Set"
-              fileNo={fileNo}
-              client={identity ? deal.name : null}
-              surface={identity ? deal.surface : null}
-              ticker={identity ? deal.ticker : null}
-              chain={identity ? deal.chain : null}
-              sector={identity ? deal.sector : null}
-              ref={recordRef} clientRef={clientRef}
-              particularsRef={particularsRef}
-              stampRetainedRef={stampRetainedRef}
-              coverRef={coverRef} />
+              the one place this surface says "not yet".
+
+              AND THE ONE PERSON IN THE BUILDING WHO IS YOURS (author, 2026-08-05:
+              "maybe i should feature him on the engagement screen?"). On the panel
+              that also narrowed a folder that was dominating the space; here the
+              column is 520px at its widest, so the row STACKS at every size and
+              what the change buys is different — it replaces a five-portrait strip
+              with one card, which is a shorter screen and a clearer claim.
+
+              WHY THIS PLACEMENT IS SAFE WHEN THE OLD ONE WASN'T. A cat's face on
+              this surface failed once: above the pitching CTA it read as the CAT
+              doing the pitching (author, 2026-07-28). What made it safe again was
+              that the pitcher stopped being one of these faces — and here that
+              argument is at its strongest, because the pitcher's face is 16px away
+              on the folder itself, captioned PRESENTED BY. Two portraits, one
+              labelled as the presenter and one labelled YOUR GUIDE, cannot swap.
+              He does NOT go back over the button.
+
+              EVERY STRING IS VIRGIL'S OWN DATA — name, role line and blurb
+              straight off the export, no new copy for this surface to keep in
+              sync. The blurb does the work the strip's NOT A SEAT divider used to:
+              "Cannot be sent anywhere." */}
+          <div className="pf-intake">
+            <div className="pf-record-shell">
+              <EngagementRecord
+                arrived={identity}
+                title={identity ? "Deal Brief" : "Inbound Deal"}
+                restStatus="AWAITING REVIEW"
+                arrivedStatus="MEETING SET"
+                stampLabel="Meeting Set"
+                fileNo={fileNo}
+                client={identity ? deal.name : null}
+                surface={identity ? deal.surface : null}
+                ticker={identity ? deal.ticker : null}
+                chain={identity ? deal.chain : null}
+                sector={identity ? deal.sector : null}
+                ref={recordRef} clientRef={clientRef}
+                particularsRef={particularsRef}
+                stampRetainedRef={stampRetainedRef}
+                coverRef={coverRef} />
+            </div>
+
+            {/* NOT A BUTTON AND NOT A SEAT — no onClick, no hover lift, nothing
+                that invites a press. That is the failure this character was
+                invented to make impossible (see virgil.js: a colleague with an
+                exemption needs explaining, and the fix was a creature nobody
+                tries to dispatch). The moment this card gains an affordance it
+                becomes a fifth seat — which is exactly what the strip it replaced
+                needed a divider and a NOT A SEAT label to hold off. */}
+            <aside className="pf-guide">
+              <img className="pf-guide-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
+              <div className="pf-guide-who">{VIRGIL.name}</div>
+              <div className="pf-guide-role">{VIRGIL.role}</div>
+              <p className="pf-guide-blurb">{VIRGIL.blurb}</p>
+
+              {/* WHAT THE 04 ANALYSTS CELL DOESN'T SAY: the protocol row asserts
+                  four analysts and one answer each, and nothing else on the
+                  briefing says four analysts OF WHAT. This is that answer.
+
+                  SUBJECTS, NOT FACES, AND THAT IS THE WHOLE POINT. What was
+                  mechanically load-bearing about the strip was never the
+                  portraits — it was the LANES. You meet the people when you can
+                  spend them (the floor's seat row, one click away); you need to
+                  know the coverage now. NAMED, because "they" needs an antecedent
+                  (author, 2026-08-05: "there's no context about who 'they' are").
+                  YOUR ANALYSTS keeps the possessive the strip's label had — they
+                  are the player's, one use each.
+
+                  IT IS IN HIS CARD BECAUSE HE IS THE ONE WHO WOULD TELL YOU.
+                  Listing your resources is what a guide does, and it keeps the
+                  structural line intact: he is the speaker, they are the list. */}
+              <div className="pf-guide-lanes">
+                <span>YOUR ANALYSTS</span>
+                <ul>
+                  {DESK_ORDER.map((m) => (
+                    <li key={m.id}><b>{m.name}</b>{m.role}</li>
+                  ))}
+                </ul>
+              </div>
+            </aside>
           </div>
           {/* THE CAPTION IS GONE (author, 2026-07-29: "this line seems
               unnecessary"). It read SENT DOWN TO YOU · YOU DON'T GET TO ASK WHY
@@ -1066,17 +1171,6 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
               failure as the three elements that used to narrate the client's
               absence. Both cuts are [A§20]. */}
 
-
-          {/* The pitcher is an outside contractor on commission. This said "John
-              Barron brought this one in — it's his deal" until 2026-07-29, when
-              the bot took over the selling and Barron joined the desk; and then
-              "an agent is here for a client who didn't come", cut the same day for
-              pointing at the absence instead of the incentive (engagement.jsx). */}
-          <div className="pf-protocol" aria-label="Meeting protocol">
-            <div><b>03</b><span>QUESTIONS</span></div>
-            <div><b>04</b><span>ANALYSTS</span></div>
-            <div><b>01</b><span>FINAL CALL</span></div>
-          </div>
           {/* THE HOUSE RULES, REWRITTEN 2026-08-03 (author: "let's just rewrite
               the whole section"). Two things were wrong with the old line.
               SEND WAS A DEAD VERB — [A§11] rejected it for the analysts
@@ -1102,37 +1196,26 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
             project viable? Consult with the team and decide whether to fund it
             or FUD it.
           </p>
-          {/* Portraits, not card faces. Not buttons either: on the briefing
-              these introduce the four, and the sendable version of the same
-              row is SeatRow on the floor. */}
-          {/* See PressSession — "always these four" answered a question the
-              rotating-cast cut [A§17] deleted. */}
-          <div className="pf-section-line">
-            <span>YOUR ANALYST TEAM</span>
-            <i>ONE ANSWER EACH</i>
-          </div>
-          <div className="pf-strip">
-            {DESK_ORDER.map((m) => (
-              <div key={m.id} className="pf-face">
-                <img className="pf-face-pic" src={m.portrait} alt="" aria-hidden="true" />
-                <span className="pf-face-who">{m.name}</span>
-                <span className="pf-face-role">{m.role}</span>
-              </div>
-            ))}
-            {/* VIRGIL, END OF THE ROW, BEHIND A DIVIDER. He was here once and it
-                failed — a cat's face above the pitching CTA read as the CAT
-                pitching (author, 2026-07-28). Safe now for a reason that didn't
-                exist then: THE PITCHER IS NOT ONE OF THESE FACES any more. The
-                divider and NOT A SEAT are what keep him legible as a companion;
-                if he reads as pitching again he goes back to his own block. */}
-            <span className="pf-face-div" aria-hidden="true" />
-            <div className="pf-face pf-face-cat">
-              <img className="pf-face-pic" src={VIRGIL.portrait} alt="" aria-hidden="true" />
-              <span className="pf-face-who">{VIRGIL.name}</span>
-              <span className="pf-face-role">{VIRGIL.role}</span>
-              <span className="pf-face-note">NOT A SEAT</span>
-            </div>
-          </div>
+          {/* BAND 4 — THE DESK STRIP — IS GONE (2026-08-05), .pf-section-line and
+              .pf-strip / .pf-face* with it. It was five portraits at 40px with
+              7px names under them, a section line to label it, and Virgil parked
+              at the end behind a divider that had to be styled into existence
+              just to say he wasn't one of them.
+
+              IT WAS AN INTRODUCTION TO PEOPLE YOU MEET ONE CLICK LATER. The
+              sendable version of the same four is SeatRow on the floor, and
+              meeting an analyst at the moment you can spend one is a better
+              introduction than meeting a 40px portrait of them while you can't.
+              THE COUNT was the part that was a rule, and the count is still on
+              the screen: 04 ANALYSTS in the protocol row, now carrying ONE ANSWER
+              EACH with it. THE LANES were the other part, and they are in
+              Virgil's card as a named list — bigger type than they had here.
+
+              VIRGIL DID NOT GO WITH IT; he moved up into the intake row, where he
+              gets a face at 52px instead of 40 and his own blurb instead of a
+              5.5px NOT A SEAT tag. If he ever comes back down he does NOT go
+              above the CTA: a cat's face over the pitching button read as the cat
+              doing the pitching (author, 2026-07-28). */}
           {/* ONE BUTTON — a LOCAL/DAILY split lived here briefly and was cut.
               See the note in instanceDeal.js. */}
           <div className="pf-cta-row">
@@ -1195,18 +1278,22 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 something — "ON RECORD" here would hand you the outcome from
                 the tab bar and make going to look pointless. */}
             {/* ONE TAB, ONE MEANING: THE SCREEN OF WHOEVER IS IN FRAME (author,
-                2026-08-04). It is the bot's PITCH DECK while the bot has the
-                floor and an analyst's SCREEN while they do, because that is the
-                same sentence either way — and it is why the first tab went back
-                to being only a face.
+                2026-08-04). Binding the tab to the camera is what collapsed two
+                earlier shapes — ITS SCREEN naming the pitcher over a switcher
+                holding four boards with four owners, and a permanent deck tab
+                plus a tabless analyst pane, which fixed the lie but bought a
+                second pulse location, a tab that could read as selected while
+                neither pane was, and a first tab doing two jobs. That binding
+                stays; it is what `screenOwner` is for.
 
-                Two earlier shapes were both worse. ITS SCREEN named the pitcher
-                over a switcher holding four boards with four owners. Splitting
-                them into a permanent deck tab plus a tabless analyst pane fixed
-                the lie but bought a second pulse location, a tab that could
-                read as selected while neither pane was, and a first tab doing
-                two jobs. Binding the tab to the camera collapses all of it: one
-                owner at a time, so one name, one badge and one pulse.
+                THE NAME NO LONGER FLIPS (2026-08-05). It read ▦ PITCH DECK while
+                the bot held the floor and ▤ SCREEN while an analyst did, which
+                was honest while the pitcher's board was a different KIND of
+                object. It isn't any more — every board is an evidence terminal,
+                the pitcher's included, same as desktop — so two names for one
+                kind of thing is a distinction the screen can no longer cash.
+                One name, and the OWNER is what the badge and the note below
+                carry.
 
                 THE BADGE STILL MAY NOT ANSWER THE QUESTION THE SCREEN IS THERE
                 TO ANSWER. While the look is pending it says only that there IS
@@ -1214,13 +1301,9 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                 tab bar and make going to look pointless. */}
             <button className={`${pane === "screen" ? "on" : ""}${lookPending ? " look" : ""}`}
                     onClick={lookAtScreen}>
-              <span className="pf-tab-name">
-                {screenOwner === PITCHER ? "▦ PITCH DECK" : "▤ SCREEN"}
-              </span>
+              <span className="pf-tab-name">▤ SCREEN</span>
               <em className={lookPending ? "" : hasRecord ? "rec" : ""}>
-                {lookPending ? "LOOK"
-                  : hasRecord ? "ON RECORD"
-                  : screenOwner === PITCHER ? "the pitch" : "no record"}
+                {lookPending ? "LOOK" : hasRecord ? "ON RECORD" : "no record"}
               </em>
             </button>
           </div>
@@ -1579,23 +1662,9 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   border-right:1px solid rgba(47,214,214,0.16); }
 @media (max-width:560px) { .pf-wrap { border:none; } }
 
-.pf-market-rail {
-  flex:none; display:grid; grid-template-columns:1.1fr .85fr 1fr;
-  margin:9px 11px 0; border:1px solid rgba(47,214,214,.18);
-  background:rgba(2,18,17,.72);
-  clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));
-}
-.pf-market-rail span {
-  min-width:0; padding:7px 9px; color:#b9d8d3;
-  font-size:8px; letter-spacing:.1em; white-space:nowrap; overflow:hidden;
-  text-overflow:ellipsis;
-}
-.pf-market-rail span + span { border-left:1px solid rgba(47,214,214,.12); }
-.pf-market-rail i {
-  display:block; margin-bottom:2px; color:rgba(47,214,214,.5);
-  font-style:normal; font-size:6.5px; letter-spacing:.17em;
-}
-.pf-market-rail span:first-child { color:#ffd23a; }
+/* .pf-market-rail IS GONE (2026-08-05) with the band it styled — see the render
+   site. Nothing else on this surface used the class; the module header above it
+   is what carries the channel and the book. */
 
 .pf-scroll {
   flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
@@ -1656,9 +1725,98 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-start-head h1 span {
   color:#ffd23a; text-shadow:0 0 15px rgba(255,210,58,.22);
 }
-.pf-start-head p {
-  margin:0; max-width:330px; color:#81aaa4; font-size:9.5px;
-  line-height:1.4; letter-spacing:.035em;
+/* .pf-start-head p went with the subline (2026-08-05). The head is an eyebrow
+   and a headline now; the briefing's one paragraph is .pf-directive, below the
+   file, and it is styled there. */
+
+/* THE INTAKE ROW — the file, then the guide beneath it. STACKED AT EVERY WIDTH,
+   which is not the panel's rule but is the right one here: this column is
+   min(520px, 100vw), and the panel already unstacks its own version below 760px
+   of viewport (see .ps-intake's max-width:760px query) — every width this
+   surface can ever be is inside that. So there is no two-column case to write,
+   and the order is the one it is read in: the file arrives, then the cat tells
+   you what to do with it. Plain block flow; the gap is the guide's margin. */
+.pf-intake { margin-top:10px; }
+
+/* VIRGIL ON THE BRIEFING — see the render site for why this placement is safe
+   where the strip's was not. Deliberately quiet: no accent but his own mint, and
+   a lighter box than the record's housing directly above it. He is the second
+   object in the column and must not out-shout the first.
+   GRID, NOT A FLEX ROW: the portrait spans all three text lines, which
+   flex-direction:row cannot express without a wrapper element. Same structure as
+   the panel's stacked variant, at this surface's type scale. */
+.pf-guide {
+  margin-top:9px;
+  display:grid; grid-template-columns:auto 1fr; align-content:start;
+  column-gap:11px; row-gap:0;
+  padding:10px 11px;
+  border:1px solid rgba(191,238,222,.22);
+  background:linear-gradient(160deg,rgba(12,32,28,.72),rgba(2,14,13,.72));
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));
+}
+/* EVERY CHILD IS PLACED, AND NOT ONE OF THEM MAY GO BACK TO auto. The portrait
+   has to span his three text lines, and the obvious spelling of that —
+   grid-row:1 / -1 — SILENTLY DOES NOTHING HERE: -1 counts back from the end of
+   the EXPLICIT row grid, this grid declares no rows, so the line resolves to 1
+   and the span collapses to a single row. The portrait then took row 1 alone and
+   auto-placement pushed THE CAT · YOUR GUIDE into column 1 underneath it, which
+   widened the auto column to the role line's ~117px and shunted his name a
+   further 60px right of the face it names.
+   "span 3" is the honest count and creates its own implicit rows. It is also why
+   the rows below are explicit: with the pic spanning 1-3, auto-placement has no
+   way to know the lanes belong on 4.
+   NOTE FOR ANYONE EDITING THIS SHEET: it is a template literal, so a backtick in
+   a comment ends the CSS string and the file stops parsing. Quote code with " ". */
+.pf-guide-pic {
+  width:52px; height:52px; object-fit:cover; border-radius:50%;
+  grid-column:1; grid-row:1 / span 3; align-self:start;
+  border:1px solid rgba(191,238,222,.45); background:#020f0d;
+}
+.pf-guide-who {
+  grid-column:2; grid-row:1;
+  font-size:10px; font-weight:bold; letter-spacing:.1em; color:#eafff9;
+}
+/* HIS ROLE LINE IS THE WHOLE PITCH FOR HIM (virgil.js) — the one string on this
+   card that has to read, so it gets the mint and the letterspacing. */
+.pf-guide-role {
+  grid-column:2; grid-row:2;
+  font-size:8px; letter-spacing:.13em; color:#bfeede;
+}
+.pf-guide-blurb {
+  grid-column:2; grid-row:3;
+  margin:4px 0 0; font-size:9px; line-height:1.45;
+  color:rgba(234,255,249,.62); text-align:left;
+}
+/* THE COVERAGE LIST. Ruled off from Virgil's own three lines, because it is
+   about somebody else — the rule does the job the deleted strip's divider did,
+   one level up: his identity above it, the desk's below it.
+   IT SPANS THE CARD, unlike his three lines: four names indented past a 52px
+   portrait would run to two lines each on a ~300px phone column. */
+.pf-guide-lanes {
+  grid-column:1 / -1; grid-row:4; margin-top:9px; padding-top:8px;
+  border-top:1px solid rgba(191,238,222,.18);
+}
+.pf-guide-lanes > span {
+  display:block; font-size:7px; letter-spacing:.18em;
+  color:rgba(191,238,222,.55);
+}
+/* Two columns, not the panel's single stack and not one wrapping row: four
+   name-over-role pairs in a row wrap unpredictably as the names change length,
+   and stacking all four doubles the card's height on the surface that has the
+   least of it. */
+.pf-guide-lanes ul {
+  list-style:none; margin:6px 0 0; padding:0;
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px 12px;
+}
+/* Gold, which is what .pf-face-role wore — the roles are what survived that
+   strip, so they keep its colour. The NAME is the quieter of the two lines on
+   purpose: what the player has to hold going in is the coverage, and the name is
+   how they'll ask for it. Both are up from the strip's 7px. */
+.pf-guide-lanes li { font-size:8px; letter-spacing:.1em; color:#ffd23a; }
+.pf-guide-lanes li b {
+  display:block; margin-bottom:2px;
+  font-size:8.5px; font-weight:bold; letter-spacing:.03em;
+  color:rgba(234,255,249,.92); overflow-wrap:anywhere;
 }
 
 /* The top padding is the TAB BAND now, not readout clearance: the deal file's
@@ -1692,23 +1850,43 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 .pf-start .eng-title {
   font-family:'Orbitron','IoskeleyMono',monospace; font-size:11px;
 }
+/* EVERY ONE OF THESE IS SCOPED TO .eng-body — THE OPEN RECORD — AND MUST STAY
+   THAT WAY (2026-08-05). The record renders TWICE: the open document inside
+   .eng-body, and the closed folder's printed form inside .eng-form, which is
+   what the player actually looks at for the whole briefing. These rules were
+   written as bare ".pf-start .eng-stats" etc., which matches both — and since
+   this sheet is concatenated AFTER ENGAGEMENT_CSS at the same specificity
+   (two classes either way), the flat surface was quietly overriding the cover's
+   own ".eng-form .eng-…" rules and undoing the folder tuning both surfaces are
+   supposed to share. That is the whole reason the phone's file did not look
+   like the panel's after engagement.jsx was reworked.
+   The visible symptom was the 400px stat query: engagement.jsx drops the cover's
+   form to one column below a 400px file, and the un-scoped two-column
+   grid-template-columns here put it straight back for every container between
+   360 and 400 — the label-overrun this surface has a note about, on the one
+   layer that had already fixed it.
+   If the cover needs a per-surface value, it goes in engagement.jsx behind a
+   container query, not here: the folder is one object on both surfaces. */
 .pf-start .eng-body { gap:10px; padding:10px 10px 0; }
-.pf-start .eng-frame { width:62px; }
-.pf-start .eng-terms { flex-basis:145px; }
-.pf-start .eng-client { font-size:14px; }
-.pf-start .eng-stats { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; }
-.pf-start .eng-stats dt { width:45px; }
-/* ONE COLUMN ON A PHONE. The form reserves the polaroid's width down its right
-   edge, so on a ~347px column the two stat columns are ~75px each and a 45px
-   label leaves 22px for the value: AGE printed "52" over "days", which then
+.pf-start .eng-body .eng-frame { width:62px; }
+.pf-start .eng-body .eng-terms { flex-basis:145px; }
+.pf-start .eng-body .eng-client { font-size:14px; }
+.pf-start .eng-body .eng-stats { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; }
+.pf-start .eng-body .eng-stats dt { width:45px; }
+/* ONE COLUMN ON A PHONE. The open record reserves the polaroid's width down its
+   right edge, so on a ~347px column the two stat columns are ~75px each and a
+   45px label leaves 22px for the value: AGE printed "52" over "days", which then
    shunted SOCIAL out of line with 24H. Queried against .eng-file, which is
    already the inline-size container --badge-w is measured from — the record is
-   also 520px wide on ?flat=1 and two columns are right there. */
+   also 520px wide on ?flat=1 and two columns are right there.
+   360 HERE, 400 IN ENGAGEMENT_CSS, and they are not the same decision: that one
+   is derived from --badge-w against the cover's form (see its note), this one
+   from a 45px dt in the open record's narrower cells. */
 @container (max-width: 360px) {
-  .pf-start .eng-stats { grid-template-columns:1fr; }
-  .pf-start .eng-part-h { letter-spacing:.12em; }
+  .pf-start .eng-body .eng-stats { grid-template-columns:1fr; }
+  .pf-start .eng-body .eng-part-h { letter-spacing:.12em; }
 }
-.pf-start .eng-particulars { flex-basis:100%; }
+.pf-start .eng-body .eng-particulars { flex-basis:100%; }
 
 /* THE SEALED-STATE CSS IS GONE WITH ITS MARKUP (2026-08-03). The collapse hacks
    went with it: the record renders its full blank form at rest — mounted,
@@ -1731,64 +1909,28 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   font-size:12px; font-weight:600;
 }
 .pf-protocol span { color:#91b7b0; font-size:6.5px; letter-spacing:.11em; }
+/* THE RULE UNDER THE COUNT. Stacked rather than run on, so ANALYSTS stays the
+   same word at the same size as QUESTIONS and FINAL CALL — the row reads as
+   three counts first, and the scarcity is a note on one of them. */
+.pf-protocol span i {
+  display:block; margin-top:2px;
+  color:rgba(255,210,58,.6); font-style:normal; font-size:5.5px;
+  letter-spacing:.11em;
+}
 .pf-directive {
   margin:8px 2px 11px; color:#b7d5cf; font-size:9.5px; line-height:1.45;
 }
-.pf-section-line {
-  display:flex; align-items:center; justify-content:space-between; gap:10px;
-  padding-top:8px; border-top:1px solid rgba(47,214,214,.16);
-  color:#2fd6d6; font-size:8px; letter-spacing:.16em;
-}
-.pf-section-line i {
-  color:rgba(255,210,58,.58); font-style:normal; font-size:6.5px;
-}
 
-/* THE DESK STRIP. These had NO CSS AT ALL until 2026-07-29 — .pf-strip and
-   .pf-face existed only as class names, so the four portraits fell back to
-   block layout and stacked. Styling them was forced by giving Virgil a divider
-   at the end of the row: an unstyled 1px span in a block flow is invisible.
-   Five tiles wrap on a narrow phone, which is fine — the cat wrapping onto its
-   own line still reads as "and the cat", never as a fifth seat. */
+/* THE SECTION LINE AND THE DESK STRIP ARE GONE (2026-08-05) — .pf-section-line,
+   .pf-strip, .pf-face*, .pf-face-div, .pf-face-cat*, .pf-face-note, and the
+   hover-zoom media query with them. See the note at the render site for what the
+   band was and why the floor's seat row does its job. Nothing else on this
+   surface used these classes; the floor's portraits are SeatRow in pressUi.jsx,
+   which never shared them. */
 /* Kept for the POST-DEAL pattern label, which is the only .pf-name left — the
    briefing's headline was cut when the record took the reveal. Archetype labels
    are long and this column gets down to ~266px. */
 .pf-name { overflow-wrap:anywhere; }
-
-/* The house rules, as plain copy. Their block used to share a grid cell with the
-   dossier; the dossier moved inside the record, so the cell went with it. */
-/* .pf-roll-cap went with the caption it styled. */
-.pf-strip { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; margin:7px 0 0; min-width:0; }
-.pf-face { min-width:0;
-  display:flex; flex-direction:column;
-  align-items:center; gap:3px; text-align:center; }
-.pf-face-pic { width:40px; height:40px; object-fit:cover; border-radius:50%;
-  border:1px solid rgba(47,214,214,0.35); background:#020f0d;
-  box-shadow:0 0 12px rgba(47,214,214,.08); }
-/* Two lines reserved for every name — "Detective Marisol" wraps and the others
-   don't, which would drop her role label a line below everyone else's. */
-.pf-face-who { font-size:7px; font-weight:bold; letter-spacing:0.02em;
-  color:rgba(234,255,249,0.92); line-height:1.2; min-height:2.4em;
-  display:flex; align-items:center; justify-content:center; }
-/* THE LANE IS THE POINT of this strip — it is the one fact a new player needs
-   from it (author, 2026-08-03: the SME labels were "low contrast and small").
-   Readable at REST, because touch has no hover; hover adds the zoom, gated on
-   (hover:hover) so phones never get a stuck-hover state. Not a button — the
-   zoom is a reading aid, and nothing here gains a click. */
-.pf-face-role { font-size:7px; letter-spacing:0.08em; color:#ffd23a; }
-@media (hover:hover) {
-  .pf-face-pic { transition:transform .18s ease; }
-  .pf-face:hover .pf-face-pic { transform:scale(1.22); }
-  .pf-face:hover .pf-face-role { color:#ffe27a; }
-}
-
-/* VIRGIL, at the end of the strip and set apart from it on purpose — not a seat,
-   no lane, cannot be sent. The divider carries that; don't tidy it away. */
-.pf-face-div { display:none; }
-.pf-face-cat .pf-face-pic { border-color:rgba(191,238,222,0.5); }
-.pf-face-cat .pf-face-who { color:#bfeede; }
-.pf-face-cat .pf-face-role { color:rgba(191,238,222,0.75); }
-.pf-face-note { font-size:5.5px; letter-spacing:0.08em;
-  color:rgba(191,238,222,0.5); margin-top:1px; }
 
 /* ------------------------------------------------------------------------
    THE FLOOR. RESTORED 2026-08-02 — every rule from here to the pf-look
@@ -1838,6 +1980,10 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   height:30vh;
   height:min(100cqw, 52dvh);
   min-height:140px; max-height:420px; padding:0;
+  /* POSITIONED, because .pf-pane is absolute now (see its note — the live
+     SitePal iframe may not be collapsed by display:none). This is the definite
+     box both panes and the receipt canvas resolve their percentages against. */
+  position:relative;
   display:flex; justify-content:center; align-items:center; overflow:hidden;
   background:radial-gradient(ellipse at 50% 35%, rgba(255,45,111,0.14), transparent 68%); }
 .pf-stage > * { height:100%; }
@@ -1909,7 +2055,7 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
    between. Deleted rather than left dangling — an orphan rule for a control no
    caller renders is how .pf-look survived a rewrite of the beat it belonged to.
    The board pane keeps ONE child now, so .pf-boards' gap has nothing to space;
-   it is harmless and stays, because the deck pane uses the same container. */
+   it is harmless and stays, because every board still shares that container. */
 
 .pf-tabs { flex:none; display:flex; gap:1px; margin:0 12px; }
 /* NAME OVER STATUS, two fixed rows — see the render site. The name row
@@ -1949,8 +2095,37 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
     box-shadow:0 0 15px rgba(47,214,214,0.45); }
 }
 
-.pf-pane { display:none; width:100%; height:100%; justify-content:center; align-items:center; }
-.pf-pane.show { display:flex; }
+/* HIDDEN BY OPACITY, NEVER BY display:none OR BY MOVING IT — the feed pane holds
+   a LIVE SITEPAL IFRAME (PressFigure → SitePalPortalTile), and this rule was
+   display:none until 2026-08-05. Measured on the phone layout: the portal is
+   441x331 on the FEED tab and 0x0 the instant you tap SCREEN.
+   A subframe with an empty window clip rect is throttled by WebKit to ~0.1fps
+   and the symptom is deceptive — audio is untouched, so the character SPEAKS
+   WITH A FROZEN FACE. SitePalPortalTile's own header spells this out and says
+   "hide by opacity if that day comes"; [[sitepal-iframe-offscreen-throttle]]
+   records it coming back twice already, once via left:-10000px and once via an
+   overflow-clipped second portal. This was the third, and the only one where the
+   collapse was a plain tab switch — which is why nobody caught it: you have to
+   be ON the other tab while someone is talking to see it.
+   The pane still leaves the layout: visibility+position take it out of the flow
+   and off the hit-testing surface, so a hidden pane cannot be tapped or focused,
+   while the iframe keeps a real clip rect and keeps painting. */
+/* OPACITY, NOT visibility AND NOT display — matched to .ps-readstack.warming on
+   the desktop surface, which is the pattern in this codebase that is known to
+   keep a portal painting (it is how desktop boots Virgil's iframe during the
+   briefing). visibility:hidden is NOT a substitute: a non-painted subframe is
+   the same bet as a zero-sized one, and the whole point is to keep it painting.
+   Both panes are absolute so the hidden one leaves the flow without leaving the
+   viewport. inset:0 against a definite .pf-stage keeps the ancestor chain
+   DEFINITE, which .pf-screen's canvas depends on — see the three failures
+   recorded under .pf-stage and .pf-screen, all of them one percentage resolved
+   against an indefinite parent. Do not make this height:auto. */
+.pf-pane {
+  position:absolute; inset:0; z-index:0;
+  opacity:0; pointer-events:none;
+  display:flex; width:100%; height:100%; justify-content:center; align-items:center;
+}
+.pf-pane.show { z-index:1; opacity:1; pointer-events:auto; }
 .pf-pane.wide { padding:0 12px; }
 /* SIZED BY HEIGHT, WHICH IS THE AXIS THAT'S SCARCE. width:100% derives the
    height from the 512x320 bitmap, so on anything wider than ~345px the bottom
