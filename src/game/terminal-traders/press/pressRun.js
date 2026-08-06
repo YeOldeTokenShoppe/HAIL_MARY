@@ -463,43 +463,56 @@ export function callReadout(v, stake = STAKE) {
   };
 }
 
-/**
- * WHAT THE NEXT QUESTION COSTS — the incentive, made visible before it is spent.
+/* pressPrice() LIVED HERE AND IS DELETED (2026-08-05, same day it shipped).
  *
- * A price the player cannot see is not an incentive, it is a hidden penalty. The
- * floor asks "is this claim worth a question?" and this is the only honest way to
- * answer it: the swing you are playing for now, and the swing you would be
- * playing for after asking once more.
+ * It quoted the swing at PRICE_AT — a fixed reference conviction of "fairly
+ * sure" — so the floor would speak in the same units as the call screen. It
+ * achieved the opposite, and the author caught it in one sitting: "Top indicator
+ * said 'playing for 23' before I asked any questions. I went to 'make the call'
+ * and the slider showed an upside of 25."
  *
- * QUOTED AT A FIXED REFERENCE CONVICTION, not at the slider. On the floor the
- * slider does not exist yet — the call screen comes later — so there is no
- * "current position" to quote against, and quoting the resting position would
- * print a price of zero (a PASS wins and loses nothing, so it is untouched by
- * any stake at all). PRICE_AT is the "fairly sure" band the readout itself
- * names, which makes the two numbers here read in the same units and the same
- * vocabulary the player meets one screen later.
+ * The flaw is structural, not a tuning error. Any figure quoted at a conviction
+ * the player has not chosen yet will disagree with the one they get, and casePnl
+ * is quadratic in the error, so there is no reference point that makes the two
+ * agree for every player. The readout it fed now shows stakeFor(run) instead —
+ * the quantity the call screen's numbers are DERIVED from, which cannot
+ * contradict them.
  *
- * The RATIO is the honest part and it is conviction-independent: both branches
- * scale by the same factor, so "what does asking cost me" is the same
- * proportion wherever the player ends up putting the slider.
- *
- * Returns null when there is nothing left to spend — a price on a purchase you
- * cannot make is noise, and the meter says NO QUESTIONS LEFT on its own.
+ * Recoverable from git if a forward-looking price is ever wanted again. If it
+ * is, quote it as a RATIO (the one part of this that was conviction-independent)
+ * and never as an absolute.
  */
-const PRICE_AT = 70;
 
-export function pressPrice(run) {
-  if (!run || run.pressesLeft <= 0) return null;
-  const spent = Array.isArray(run.advisersSpent) ? run.advisersSpent : [];
-  if (spent.length >= SPENDABLE_SEATS.length) return null; // no specialist left to buy
-  const p = sliderToP(PRICE_AT);
-  const swing = (s) => Math.abs(Math.round(casePnl(p, p > 0.5 ? 1 : 0, s)));
-  return {
-    now: swing(stakeFor(run)),
-    // One more SPECIALIST, not one more question — the pitcher moves neither.
-    after: swing(stakeFor({ ...run, advisersSpent: [...spent, "_"] })),
-    pressesLeft: run.pressesLeft,
-  };
+/** Trim a stake for display: 25, 22.5, 20, 17.5 — never 22.50 and never 25.0. */
+export const money = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+/**
+ * WHERE THE SIZE WENT — the sentence the call screen was missing.
+ *
+ * The player reaches the slider, reads "Right, you make 10. Wrong, you lose 14",
+ * and has no way to know those numbers started at a full stake and were trimmed
+ * by their own questions. Every other readout of the decay reports it while it
+ * is happening; this one is retrospective and states the arithmetic.
+ *
+ * SHOWN EVEN WHEN NOTHING HAS BEEN SPENT. A cost you only hear about after you
+ * have paid it is a trap, and the zero case is the one that teaches the rule
+ * while it can still change a decision.
+ *
+ * SPECIALISTS, NOT QUESTIONS, for the reason stakeFor gives: pressing the pitch
+ * bot is free of size, Virgil says so out loud, and a sentence here that counted
+ * questions would make that line false.
+ */
+export function stakeNote(run) {
+  const spent = Array.isArray(run?.advisersSpent) ? run.advisersSpent.length : 0;
+  const pct = Math.round(PRESS_COST * 100);
+  if (spent <= 0) {
+    return `Full stake ${money(STAKE)} — you consulted no specialists. Each one would have cost ${pct}% of it.`;
+  }
+  // "at 10% of the stake EACH" is wrong at one, and one is the commonest case.
+  const tail = spent === 1
+    ? `1 specialist, at ${pct}% of the stake`
+    : `${spent} specialists, at ${pct}% of the stake each`;
+  return `Stake ${money(STAKE)} → ${money(stakeFor(run))}: you consulted ${tail}.`;
 }
 
 /**
@@ -626,8 +639,24 @@ export function coverageScore(run, deal) {
   const spent = Object.keys(run.outcomes).length;
   const wasted = spent - covered.length;
 
+  /* A PASS TAKES NOTHING ON FAITH (author, 2026-08-05: "i chose to risk no money
+     on a call, leaving the slider at the center, and the post-deal analysis said
+     … 'You took all of it on faith.' even though i took nothing 'on faith'").
+
+     Faith is a thing you can only extend by ACTING on an unchecked claim. This
+     line reported coverage alone, so it read the empty question budget and said
+     the one sentence that also presumes a position — true of a player who backed
+     a deal blind, false of one who declined to touch it. Those are the two most
+     different plays in the game and it named them identically.
+
+     `direction` is set by allocate: v === 0 is dead centre, p = 0.5, and casePnl
+     at p = 0.5 is exactly 0 whatever the truth is. So FLAT is not a small bet, it
+     is the absence of one, and the copy has to say so. */
+  const passed = run?.call?.direction === "FLAT";
   const note = spent === 0
-    ? "You took all of it on faith."
+    ? (passed
+      ? "You asked nothing and backed nothing. The deal went past you untouched."
+      : "You took all of it on faith.")
     : covered.length === 0
       ? `You asked ${spent}, and none of them could have changed your mind.`
       : `${covered.length} of your ${spent} landed where the answer actually differed.`;

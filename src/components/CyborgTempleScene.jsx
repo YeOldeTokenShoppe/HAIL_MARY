@@ -54,14 +54,33 @@ export const AGENT_CAMERA_SETTINGS = {
     // Retuned in-app 2026-08-02 (?tune=1): brought in from z 2.215 and dropped
     // 0.015, which is the difference between watching him from across the room
     // and sitting at the desk with him. lookAtPos unchanged.
-    cameraPos: new THREE.Vector3(-0.375, -0.575, 1.565),
+    //
+    // BACKED OFF 0.35 ON 2026-08-05 (author: "move the camera back a little bit
+    // for Barron/Connor - it's a little too close"), giving back about a third
+    // of that move: 2.80 units from the lookAt to 3.15, +12%.
+    //
+    // MOVED ALONG THE VIEW AXIS, not by editing one component. Backing off in z
+    // alone would have swung the camera round him as well as away, because the
+    // view direction here is mostly x — so the framing would have changed, not
+    // just the distance. lookAtPos is untouched for the same reason: the shot is
+    // the same shot, taken from further back.
+    cameraPos: new THREE.Vector3(-0.645, -0.586, 1.788),
     lookAtPos: new THREE.Vector3(1.785, -0.485, -0.22),
     orbitCenter: null,
   },
   Monk: {
     // Retuned in-app 2026-08-02 (?tune=1). Same story as the Demon's: almost all
     // of the move is distance (x -1.79 -> -1.555), a little z, no height change.
-    cameraPos: new THREE.Vector3(-1.555, -0.325, -0.38),
+    //
+    // BACKED OFF 0.24 ON 2026-08-05 (author: "same for GR80 - need to move back
+    // just a bit"), along the view axis exactly as the Demon's was.
+    //
+    // THE NUMBER IS SMALLER BECAUSE HE SITS CLOSER. This pose is 1.93 units from
+    // its lookAt where the Demon's is 2.80, so the Demon's 0.35 would have been
+    // an 18% pull here against his 12% — the same absolute step reads as a much
+    // bigger move on the tighter shot. Matched on PROPORTION instead: both are
+    // now +12%, which is what makes the two cuts feel like one decision.
+    cameraPos: new THREE.Vector3(-1.764, -0.339, -0.263),
     lookAtPos: new THREE.Vector3(0.125, -0.215, -1.325),
     orbitCenter: null,
   },

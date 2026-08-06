@@ -9,12 +9,12 @@ import { briefingMode, markBriefingSeen } from "@/lib/trade/briefingSeen";
 import {
   PHASE, PRESSES, STAKE,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt,
-  allocate as doAllocate, toAutopsy, currentClaim, callReadout, stakeFor, pressPrice, callVerdict, betRestated, coverageScore, seatOptions, laneOutlook, pressure,
+  allocate as doAllocate, toAutopsy, currentClaim, callReadout, stakeFor, stakeNote, callVerdict, betRestated, coverageScore, seatOptions, laneOutlook, pressure,
   settlementNote,
 } from "@/game/terminal-traders/press/pressRun";
 import { preloadSfx } from "@/lib/uiSfx";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
-import { speakVirgilLine, stopVirgilLine, faceVirgilFront, VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
+import { speakVirgilLine, stopVirgilLine, faceVirgilFront, virgilWatchPitcher, lineSeconds, VIRGIL_PORTAL_ID } from "@/lib/trade/virgilVoice";
 import { seatHasHostFace, speakSeatOnTempleHost, warmSeatHostFace } from "@/lib/trade/seatVoice";
 import SitePalPortalTile from "./SitePalPortalTile";
 import { playUnicornBeat, stopUnicornBeat } from "@/lib/trade/playUnicornBeat";
@@ -159,6 +159,41 @@ export default function PressSession({
   // before that gets clobbered. Gating on a click means the model is always
   // loaded by the time we ask for a camera move — no race, no retry loop.
   const [started, setStarted] = useState(false);
+
+  /* LEAVING MID-DEAL ASKS FIRST (author, 2026-08-05: "when i clicked 'call it'
+   * and went to the slider and then went to the top left button… i am exited
+   * from the game… could be a mistake for other players").
+   *
+   * THIS IS A HAZARD I INTRODUCED EARLIER TODAY. The same button used to be an
+   * 11px hairline in the corner that the author reported as easy to miss; making
+   * it findable also made it findable BY ACCIDENT, and it is one click from
+   * discarding a run with no undo — the run lives in component state, so the
+   * deal, the presses spent and the call are gone the moment it unmounts.
+   *
+   * ARMED, NOT MODAL. A dialog would have to be portaled past .ps-root's
+   * pointer-events:none and would take the floor hostage at the exact moment the
+   * player is deciding something; the button changing into its own question
+   * costs one click, blocks nothing, and cannot be missed because it is the
+   * thing under the cursor. It disarms itself after four seconds, so a stray
+   * first click leaves no trap primed under a later real one.
+   *
+   * ONLY WHILE THERE IS SOMETHING TO LOSE. Before the pitch starts there is no
+   * run, and at AUTOPSY the deal is resolved and read — both exit on one click,
+   * as they always did. The guard covers FLOOR, ALLOCATION and RESOLUTION: mid
+   * pitch, at the slider, and after the call but before the post-mortem. */
+  const [exitArmed, setExitArmed] = useState(false);
+  const exitTimer = useRef(null);
+  const exitAtRisk = started && run.phase !== PHASE.AUTOPSY;
+  useEffect(() => () => clearTimeout(exitTimer.current), []);
+  // Something resolved or reset under us — never leave the trap primed.
+  useEffect(() => { if (!exitAtRisk) setExitArmed(false); }, [exitAtRisk]);
+  const handleExit = useCallback(() => {
+    if (!exitAtRisk || exitArmed) { onExit?.(); return; }
+    setExitArmed(true);
+    clearTimeout(exitTimer.current);
+    exitTimer.current = setTimeout(() => setExitArmed(false), 4000);
+  }, [exitAtRisk, exitArmed, onExit]);
+
   const [speaking, setSpeaking] = useState(false);
   /* WHOSE VOICE IS IN FLIGHT — the flat surface has needed this all along (see
      its `speakingAs`) and desktop did not, because every mouth here belongs to
@@ -439,6 +474,43 @@ export default function PressSession({
      utterance may say it has stopped. (Learned on PressFlat; ported verbatim.) */
   const sayToken = useRef(0);
 
+  /* ---- ONE WAY TO MAKE THE ROOM QUIET ----
+   *
+   * Two reports, 2026-08-05: "i did occasionally get virgil talking over
+   * pitchbot when i skipped intros, and i also one time had the pitchbot still
+   * talking after i had moved on to the gauge page."
+   *
+   * They are the same defect at two severities, and the second one is not a race
+   * at all — `callIt` moved the run to ALLOCATION without touching audio, so
+   * whatever the pitcher was mid-sentence on simply carried on over the gauge.
+   * Deterministic, and it survived because the stopping was copy-pasted at five
+   * call sites and any transition that forgot to paste it got nothing. skipBrief
+   * had pasted two of the three and was leaving Eugene's beat running.
+   *
+   * THE ABORT CONTROLLER IS THE PART THAT FIXES THE RACE. The token alone cannot:
+   * it stops the CHAIN from advancing, but a line already inside speakLine is
+   * between a fetch and a play, and stopVirgilLine() aimed at audio that has not
+   * started yet is a no-op that the fetch then resolves straight past. Both
+   * speakAdviserLine and speakVirgilLine already took a `signal` and nothing here
+   * had ever passed one. Aborting closes the window where it is widest — the
+   * network — so a skipped line is cancelled before it can become sound.
+   *
+   * Returns the fresh token so a caller starting a new chain can use it.
+   */
+  const sayAbort = useRef(null);
+  const silence = useCallback(() => {
+    sayAbort.current?.abort();
+    sayAbort.current = null;
+    // ALL THREE, ALWAYS. Eugene routes through playUnicornBeat, Virgil through a
+    // SitePal portal, everyone else through the shared audio element, and a
+    // caller that remembers two of them is the bug this function exists to make
+    // unwriteable.
+    try { stopAdviserAudio(); } catch {}
+    try { stopVirgilLine(); } catch {}
+    try { stopUnicornBeat(); } catch {}
+    return ++sayToken.current;
+  }, []);
+
   // ONE SPEECH PATH. A second helper lived here — a single-utterance `say` calling
   // speakAdviserLine directly — and it survived the two-voice rewrite as the
   // claim-spin caller. Two functions both claiming `sayToken` and both flipping
@@ -549,14 +621,11 @@ export default function PressSession({
          his, these two numbers move. */
       { onPart: (i) => setVirgilAt(i >= 4 ? 2 : i >= 3 ? 1 : 0) },
     );
-    return () => { try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {} try { stopUnicornBeat(); } catch {} };
+    return () => { silence(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floorLive, run.claimIndex]);
 
-  useEffect(() => () => {
-    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
-    try { stopUnicornBeat(); } catch {}
-  }, []);
+  useEffect(() => () => { silence(); }, [silence]);
 
   /* ---- TWO VOICES PER PRESS ----
      The seat that went and looked speaks FIRST, in ITS OWN voice; the pitcher
@@ -600,7 +669,13 @@ export default function PressSession({
    * no 3D at all — so it keeps its own routing. These are presentation
    * differences, not rules, which is exactly what §6 says belongs in the surface.
    */
-  const speakLine = useCallback(async (voice, text, seat = null) => {
+  /* `signal` REACHES THE TWO PATHS THAT FETCH. It is threaded, not stored, so a
+   * line always carries the controller of the chain that started it — a chain
+   * superseded mid-fetch aborts its own request and cannot arrive late over the
+   * chain that replaced it. The host-face and unicorn paths take no signal (they
+   * talk to a live player rather than the network); their stops are synchronous
+   * and land inside `silence`. */
+  const speakLine = useCallback(async (voice, text, seat = null, signal = undefined) => {
     if (voice === "EU") {
       // Same hooks the lobby passes, so the horn glow comes along with the jaw.
       await playUnicornBeat({ line: text }, { setGlow: setUnicornGlow });
@@ -618,7 +693,7 @@ export default function PressSession({
      * is harmless and correct in advance: it resolves to the same ElevenLabs path
      * desktop already used, and starts moving his face the moment a tile exists. */
     if (voice === VIRGIL.voice) {
-      await speakVirgilLine(text);
+      await speakVirgilLine(text, { signal });
       return;
     }
     /* A SEAT WITH A FACE IN THIS ROOM SPEAKS THROUGH IT. Engine 14 is that
@@ -641,7 +716,7 @@ export default function PressSession({
       // false has to reach our own audio, or the answer is simply never spoken.
       if (await speakSeatOnTempleHost(seat, text)) return;
     }
-    await speakAdviserLine(voice, text);
+    await speakAdviserLine(voice, text, { signal });
   }, []);
 
   /**
@@ -674,7 +749,15 @@ export default function PressSession({
   const sayTurn = useCallback(async (parts, { onPart = null, dwell = null, onDone = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
     if (!live.length) return;
-    const token = ++sayToken.current;
+    /* STARTING A CHAIN SILENCES THE ONE BEFORE IT. sayTurn used to bump the token
+       and nothing else, which stops the old chain ADVANCING but leaves its
+       current line audible until the new line's audio happens to start — the gap
+       the press path had already noticed and was patching locally ("stopping
+       here means the room never carries two voices across the gap"). Doing it
+       here means every caller gets that, not just the one that remembered. */
+    const token = silence();
+    const ctl = new AbortController();
+    sayAbort.current = ctl;
     setSpeaking(true);
     try {
       for (let i = 0; i < live.length; i++) {
@@ -707,12 +790,40 @@ export default function PressSession({
         // AFTER the wait, still: the lead is dead air BEFORE a line, so the text
         // must not appear during it. Only the face arrives early.
         onPart?.(i);
+        /* THE CAT WATCHES THE BOT (author, 2026-08-05). Issued per part and held
+           for the length of the line, because SitePal drops a gaze when its
+           duration lapses — one that expires mid-claim snaps his head back,
+           which reads worse than never having turned at all.
+           HIS OWN LINES ARE NOT INCLUDED and need no undoing: SitePal releases
+           the gaze the moment a character is asked to speak, and faceVirgilFront
+           runs inside speakVirgilLine besides.
+           THE PITCHER ONLY, not every other voice. The analysts sit at their own
+           desks in their own directions, and a single screen-right turn aimed at
+           centre stage would be wrong for all of them — see the studio's warning
+           that gaze degrees are per-scene. Watching the analysts too is a real
+           enhancement, but it needs a direction per seat, not this one. */
+        if ((p.voice || VOICE) === VOICE) {
+          try { virgilWatchPitcher({ seconds: lineSeconds(p.text) }); } catch {}
+        }
         const startedAt = Date.now();
         // `seat` is optional and only a press ever sets it — the opening, the
         // claim spins and the pitcher's reactions have no seat and route to
         // their own rigs exactly as before.
-        try { await speakLine(p.voice || VOICE, p.text, p.seat); }
+        try { await speakLine(p.voice || VOICE, p.text, p.seat, ctl.signal); }
         catch { /* voice is enrichment, never a gate on play */ }
+        /* THE BACKSTOP. The signal closes the network window; this closes what is
+           left of it. speakAdviserLine still has to decode the bytes it already
+           has, and the host-face and unicorn paths never saw a signal at all — so
+           a line CAN still reach playback a beat after being superseded. If the
+           token moved while this one was resolving, stop everything again and
+           leave. Cheap, idempotent, and it converts "occasionally two voices"
+           into "at most a fragment". */
+        if (sayToken.current !== token) {
+          try { stopAdviserAudio(); } catch {}
+          try { stopVirgilLine(); } catch {}
+          try { stopUnicornBeat(); } catch {}
+          return;
+        }
         // A DWELL FLOOR, because the camera move is now tied to audio that may
         // not arrive. With no API key speakLine resolves almost instantly and the
         // two cuts collapse into one strobe across the desk; the shot has to hold
@@ -723,7 +834,7 @@ export default function PressSession({
     } finally {
       if (sayToken.current === token) { setSpeaking(false); onDone?.(); }
     }
-  }, [onFocusAgent, speakLine]);
+  }, [onFocusAgent, speakLine, silence]);
 
   /* ---- it introduces itself ----
      Runs once per session, on the first frame of the floor. No cleanup that stops
@@ -782,13 +893,11 @@ export default function PressSession({
   // on" — stopping such a player at a button that also says move on is the same
   // click twice. The gate exists for the player who LISTENED to the whole thing.
   const skipOpening = useCallback(() => {
-    sayToken.current++;
-    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
-    try { stopUnicornBeat(); } catch {}
+    silence();
     setSpeaking(false);
     setOpeningDone(true);
     setOpened(true);
-  }, []);
+  }, [silence]);
 
   // THE GATE ITSELF. Flipping `opened` is what starts the first claim — the claim
   // effect below fires on `floorLive` — so the pitch now begins inside a click.
@@ -800,13 +909,12 @@ export default function PressSession({
      `speaking` by hand, exactly as skipOpening does — its `finally` declines to
      touch state once superseded. */
   const skipBrief = useCallback(() => {
-    sayToken.current++;
-    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
+    silence();   // was missing stopUnicornBeat — see the note on silence()
     setSpeaking(false);
     setBriefDone(true);
     setBriefed(true);
     markBriefingSeen();
-  }, []);
+  }, [silence]);
 
   const beginBrief = useCallback(() => { setBriefed(true); markBriefingSeen(); }, []);
 
@@ -816,15 +924,13 @@ export default function PressSession({
      version; a player asking for the rules again wants the rules, not the
      one-line reminder they have evidently just failed to act on. */
   const replayBrief = useCallback(() => {
-    sayToken.current++;
-    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
-    try { stopUnicornBeat(); } catch {}
+    silence();
     setSpeaking(false);
     setOpeningAt(-1); setOpeningDone(false);
     setBriefAt(-1); setBriefDone(false);
     setBriefMode("long");
     setBriefed(false);
-  }, []);
+  }, [silence]);
 
   /* ---- actions ---- */
   // The board updates when the reporter STOPS, not when you press — so the beat
@@ -867,10 +973,13 @@ export default function PressSession({
         : `${seatMeta(outcome.seat).name} — ${seatMeta(outcome.seat).role}`,
     });
 
-    // You INTERRUPTED it — the claim it was mid-way through stops. sayTurn's
-    // token does this for us, but only once the new chain starts; stopping here
-    // means the room never carries two voices across the gap.
-    try { stopAdviserAudio(); } catch {} try { stopVirgilLine(); } catch {}
+    // You INTERRUPTED it — the claim it was mid-way through stops. This was the
+    // one site that had spotted the gap and patched it locally, with two of the
+    // three stops; sayTurn now silences on every chain start, so the general fix
+    // has absorbed it. Kept anyway, and promoted to the full set: the press does
+    // several seconds of camera and face-warming work before any new chain
+    // begins, and the room should be quiet for all of it.
+    silence();
 
     const owed = claim.id;
     replyFor.current = owed;
@@ -1038,6 +1147,12 @@ export default function PressSession({
   }, [flash, sayTurn]);
 
   const advance = useCallback(() => {
+    /* Same gap as callIt, one beat shorter: the next claim DOES start a chain,
+       so the old voice was cut — but only once the new line's audio arrived,
+       which is a camera move and a lead-in later. Silencing on the gesture means
+       the room is quiet for that stretch rather than finishing the last thought
+       over the top of the new one. */
+    silence();
     setScreenLook(false);   // new claim, the column comes back
     // Voids any beat still owed — see replyFor. Without this a board stamped by
     // a press you walked out of lands on the NEXT claim.
@@ -1046,13 +1161,21 @@ export default function PressSession({
     Object.values(screensRef.current).forEach((x) => x.stayBlack());
     onFocusAgent?.(PITCHER_AGENT);
     setRun((r) => doAdvance(r, deal));
-  }, [deal, onFocusAgent]);
+  }, [deal, onFocusAgent, silence]);
 
+  /* THE FLOOR IS OVER, SO THE FLOOR STOPS TALKING (author, 2026-08-05: "i also
+     one time had the pitchbot still talking after i had moved on to the gauge
+     page"). This touched no audio at all — not the token, not the three stops —
+     and nothing downstream covered for it: ALLOCATION starts no new chain, so
+     there was never a superseding sayTurn to cut the old one off. Whatever was
+     mid-sentence played out in full over the gauge. Not a race; the one path off
+     the floor that had simply never been given the line. */
   const callIt = useCallback(() => {
+    silence();
     replyFor.current = null;
     setFlash(null);
     setRun((r) => doCallIt(r, deal));
-  }, [deal]);
+  }, [deal, silence]);
 
   const lockCall = useCallback(() => setRun((r) => doAllocate(r, deal, slider)), [deal, slider]);
   const finish = useCallback(() => setRun((r) => toAutopsy(r)), []);
@@ -1139,7 +1262,9 @@ export default function PressSession({
             with the pitch turned off. The desk is where this button LANDS you,
             so the old label promised to take away the one thing it gives back.
             A back control should name its destination, and now it does. */}
-        <button className="ps-exit" onClick={onExit}>◀ BACK TO THE DESK</button>
+        <button className={`ps-exit${exitArmed ? " armed" : ""}`} onClick={handleExit}>
+          {exitArmed ? "◀ QUIT? THIS DEAL IS LIVE" : "◀ BACK TO THE DESK"}
+        </button>
         {/* The bar names the deal only once the deal has a face. It sits above
             the panel and in bigger type, so leaving it live would spoil the
             reveal more loudly than the headline the panel withholds. */}
@@ -1160,6 +1285,20 @@ export default function PressSession({
             <>{deal.ticker} · {deal.name} <span className="ps-dim">· {deal.chain}</span></>
           )}
         </div>
+        {/* THE METER WAS IMPORTED AND NEVER RENDERED (author, 2026-08-05: "i
+            still don't see any reference anywhere to the profit cost for the
+            questions"). This file has had `Meter` in its import list the whole
+            time; PressFlat renders it, desktop never did. So the price of a
+            question — the one number that makes a question a DECISION rather
+            than a free action — existed, was correct, was tested, and was only
+            ever on the phone.
+
+            IN THE BAR, not the reading column: the column scrolls and is
+            ghosted while a screen is in focus, and a cost you have to go looking
+            for is the thing being fixed. ON THE FLOOR ONLY — before it there is
+            nothing to spend, and at the call the panel's own stakeNote says
+            where the size already went. */}
+        {onFloor && <Meter run={run} presses={PRESSES} />}
         <div className="ps-book">
           BOOK <b>{Math.round(run.book)}</b>
         </div>
@@ -1596,13 +1735,41 @@ export default function PressSession({
 
           pointer-events stay off: he is not a seat, cannot be sent anywhere, and
           a clickable cat is an invitation to try. */}
-      {onFloor && (
+      {/* MOUNTED BEFORE THE FLOOR, SO HIS PLAYER HAS TIME TO BOOT (author,
+          2026-08-05: "considerable lag to start virgil… voice starts after 20 or
+          more seconds but without any sitepal animation").
+
+          This block was gated on `onFloor`, and `onFloor` flips on the very
+          click that starts the briefing — so the SitePal iframe BEGAN LOADING at
+          the instant Virgil's first line was handed to it. It could not have
+          been ready; a scene takes seconds. Everything downstream was
+          consequence, including the watchdog stall virgilPortalLive now
+          documents.
+
+          The briefing screen is dead time the player spends reading and
+          clicking, which is exactly the warm-up the portal needed and never got.
+          Rendering the stack from mount hands it those seconds.
+
+          HIDDEN BY OPACITY, NOT UNMOUNTED AND NOT MOVED OFF-SCREEN. Unmounting
+          is what caused this. Off-screen is worse than either: WebKit throttles
+          off-screen subframes to ~0.1fps, which is how you get a portal that
+          speaks with a frozen face. Opacity is the technique SitePalPortalTile
+          already uses for its own `active` prop, for the same reason. */}
+      {(
         /* `ghost` while a screen is in focus — see screenLook. Ghosted rather
            than removed, and it keeps its pointer events, so hovering it brings
            it straight back: the player can re-read the claim against the
            receipt without any new control, and nothing they were mid-sentence
            on disappears on them. */
-        <div className={`ps-readstack${screenLook ? " ghost" : ""}`}>
+        /* `inert` WHILE WARMING. The block is invisible but it still contains
+           SKIP THE RULES and the gate button, and opacity alone leaves both in
+           the tab order and reachable by a screen reader — a keyboard could
+           start the pitch from a panel nobody can see. inert drops the subtree
+           from hit-testing and focus without touching layout, which is what the
+           iframe underneath needs kept intact. */
+        <div className={`ps-readstack${screenLook ? " ghost" : ""}${onFloor ? "" : " warming"}`}
+             inert={!onFloor || undefined}
+             aria-hidden={!onFloor || undefined}>
           {/* ONE COLUMN, TWO CONTENTS. The opening and the floor were two
               sibling .ps-readcol blocks that happened to be styled alike; making
               them one element is what stops the block moving when claim 1
@@ -1617,7 +1784,7 @@ export default function PressSession({
                              onBegin={briefDone ? beginBrief : null}
                              who={VIRGIL.name} kicker="— the house rules"
                              skipLabel="SKIP THE RULES ▸"
-                             beginLabel="◉ READY — BRING IN THE PITCH BOT ▸"
+                             beginLabel="◉ READY — LET THE PITCH BEGIN ▸"
                              cue="▼ PRESS THIS TO START THE PITCH"
                              quoted={false} subtitle />
               </div>
@@ -1813,6 +1980,13 @@ export default function PressSession({
           <ConvictionGauge value={slider} onChange={setSlider} />
           <div className="ps-saying">{readout.saying}</div>
           <div className="ps-risk">{readout.risk}</div>
+          {/* WHERE THE SIZE WENT (author, 2026-08-05: "i do see the different
+              win/loss values, but… i don't know how i got to those values. I
+              don't know the questions i asked had some opportunity cost"). The
+              two numbers above are the whole point of the screen and they arrive
+              unexplained; the floor's meter prices the NEXT specialist and never
+              accounts for the ones already bought. See stakeNote. */}
+          <div className="ps-stakenote">{stakeNote(run)}</div>
           <button className="ps-lock" onClick={lockCall}>LOCK IT IN</button>
         </div>
       )}
@@ -1988,8 +2162,35 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
   transition:background .15s ease, box-shadow .15s ease; }
 .ps-exit:hover { background:rgba(47,214,214,0.18);
   box-shadow:0 0 18px rgba(47,214,214,0.35); }
+/* ARMED — see exitArmed. It leaves the cyan family entirely rather than just
+   getting brighter: this is the one control on the surface that destroys work,
+   and a player who is not reading the label has to be able to tell from colour
+   alone that the button under their cursor is no longer the one they clicked.
+   The pulse is what carries the four-second window without printing a timer. */
+.ps-exit.armed { border-color:#ff9b6f; color:#ff9b6f;
+  background:rgba(40,10,4,0.92); box-shadow:0 0 16px rgba(255,155,111,0.4);
+  animation:psarm 1s ease-in-out infinite; }
+.ps-exit.armed:hover { background:rgba(255,155,111,0.22);
+  box-shadow:0 0 22px rgba(255,155,111,0.55); }
+@keyframes psarm { 0%,100%{opacity:1} 50%{opacity:.72} }
 .ps-deal { font-weight:bold; letter-spacing:0.1em; }
-.ps-book b { color:#ffd23a; font-size:15px; margin-left:6px; }
+
+/* THE THREE STANDING NUMBERS, SIZED TO BE READ (author, 2026-08-05: "make the
+   Book and 'questions left' and 'stake' amount bigger").
+   BOOK and STAKE are the two quantities the whole game settles in, and QUESTIONS
+   LEFT is the budget every press spends — they had all been sized as bar
+   furniture, at 10 to 15px, next to a ticker in the same weight.
+   THE METER RULES ARE SCOPED TO .ps-bar ON PURPOSE. .pu-meter is shared with the
+   flat surface, where it sits beside the claim in a phone-width column rather
+   than alone in a 44px bar; growing it there would cost the claim its room.
+   Same markup, two contexts, and only this one has the space. */
+.ps-book { font-size:13px; }
+.ps-book b { color:#ffd23a; font-size:20px; margin-left:7px; }
+.ps-bar .pu-meter { gap:6px; }
+.ps-bar .pu-meter > span { width:12px; height:12px; }
+.ps-bar .pu-meter em { font-size:12px; margin-left:7px; }
+.ps-bar .pu-meter .pu-price { font-size:12px; margin-left:9px; }
+.ps-bar .pu-meter .pu-price b { font-size:16px; margin-left:4px; }
 
 /* THE FLOOR MARKUP LIVES IN pressUi.jsx AND IS STYLED THERE.
    What stays here is only what is TRUE OF THIS SURFACE: where the two blocks
@@ -2023,12 +2224,22 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 /* The page's own headline, reached by attribute because it is not in this
    component's tree — see the data-press-screenlook effect. Goes fully out and
    does not come back on hover: it is decoration, not something to re-read. */
-/* The transition is on the BASE rule, not the attribute one. Put it only on the
-   attribute rule and the fade-out animates while the fade-back snaps, because
-   removing the attribute takes the transition away with it. This stylesheet only
-   exists while PressSession is mounted, so it reaches no other page. */
-.custom-title { transition:opacity .28s ease; }
-html[data-press-screenlook] .custom-title { opacity:0; pointer-events:none; }
+/* !important IS LOAD-BEARING HERE, and it is the one thing that made the first
+   attempt do nothing (author, 2026-08-05: "h1 didn't hide"). .custom-title sets
+   its opacity INLINE — app/trade/page.js computes "focusedAgent || talkShowMode
+   ? 0 : 1" in a style object — so a stylesheet rule at any specificity loses to
+   it. The same page already reaches for the same escape hatch on the same
+   element for the zoomed-CRT case, so this is that file's own idiom, not a new
+   one. No transition of ours either: the inline style carries a 0.4s opacity
+   transition that applies whoever sets the value. */
+html[data-press-screenlook] .custom-title { opacity:0 !important; }
+/* WARMING — mounted so the SitePal iframe can boot during the briefing screen,
+   invisible and inert until the floor opens. See the note at the render site.
+   Opacity and not display:none: a display:none subtree does not lay out, and a
+   zero-sized iframe is exactly the case WebKit throttles. visibility:hidden is
+   left off for the same reason. Nothing here is reachable — pointer-events off,
+   and it sits behind the briefing panel. */
+.ps-readstack.warming { opacity:0; pointer-events:none; z-index:0; }
 .ps-readstack.ghost { opacity:.06; }
 .ps-readstack.ghost:hover { opacity:1; }
 .ps-readstack { transition:opacity .28s ease;
@@ -2631,6 +2842,11 @@ html[data-press-screenlook] .custom-title { opacity:0; pointer-events:none; }
   letter-spacing:0.12em; color:rgba(234,255,249,0.5); margin-top:4px; }
 .ps-saying { font-size:16px; margin-top:18px; }
 .ps-risk { font-size:12.5px; color:#ffd23a; margin-top:8px; }
+/* QUIETER THAN THE RISK LINE IT EXPLAINS. It is the footnote to the two numbers
+   above, not a third number competing with them — cyan-dim, a rule to tie it to
+   the line it annotates, and it must never pull the eye off the gauge. */
+.ps-stakenote { font-size:11px; line-height:1.5; color:rgba(191,238,222,0.62);
+  margin-top:10px; padding-top:8px; border-top:1px solid rgba(47,214,214,0.18); }
 .ps-lock { margin-top:4px; width:100%; background:none; border:1px solid #ffd23a;
   color:#ffd23a; font-size:13px; letter-spacing:0.12em; padding:13px; cursor:pointer; }
 .ps-pnl { font-size:44px; font-weight:bold; letter-spacing:0.04em; }

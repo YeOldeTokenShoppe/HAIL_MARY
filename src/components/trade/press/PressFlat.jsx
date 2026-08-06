@@ -10,7 +10,7 @@ import { briefingMode, markBriefingSeen } from "@/lib/trade/briefingSeen";
 import {
   PHASE, PRESSES,
   createRun, press as doPress, advance as doAdvance, callIt as doCallIt, seatOptions,
-  allocate as doAllocate, toAutopsy, currentClaim, callReadout, stakeFor, pressPrice, callVerdict, betRestated, coverageScore, laneOutlook, pressure,
+  allocate as doAllocate, toAutopsy, currentClaim, callReadout, stakeFor, stakeNote, callVerdict, betRestated, coverageScore, laneOutlook, pressure,
   settlementNote,
 } from "@/game/terminal-traders/press/pressRun";
 import { speakAdviserLine, stopAdviserAudio, unlockAdviserAudio } from "@/lib/counselSpeech";
@@ -446,8 +446,11 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
    * their stills) are built on. speakVirgilLine falls back to that same path by
    * itself if his portal isn't up, so this branch is never a way to lose a line.
    */
-  const speakLine = useCallback(async (voice, text, seat = null) => {
-    if (voice === VIRGIL.voice) { await speakVirgilLine(text); return; }
+  /* `signal` REACHES THE PATHS THAT FETCH — kept identical to PressSession's,
+     where the reports came from. A chain superseded mid-fetch aborts its own
+     request rather than arriving late over the chain that replaced it. */
+  const speakLine = useCallback(async (voice, text, seat = null, signal = undefined) => {
+    if (voice === VIRGIL.voice) { await speakVirgilLine(text, { signal }); return; }
     /* A SEAT WITH A PLAYER GOES THROUGH IT — same trade the cat makes, and for
        the same reason: engine 14 is its own ElevenLabs voice AND its lip-sync
        in one call, where the fallback is that voice over a still. Keyed on the
@@ -456,16 +459,27 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
        branch can never lose a line. The pitcher is excluded by having no
        sitepal config — it has a rig with real viseme plates. */
     if (seat && seatHasPortal(seat)) { await speakSeatLine(seat, text); return; }
-    await speakAdviserLine(voice, text);
+    await speakAdviserLine(voice, text, { signal });
   }, []);
 
   /* EVERY WAY A LINE CAN BE CUT OFF has to reach BOTH mouths. The portal is a
      separate mechanism from the <audio>/buffer path — stopAdviserAudio knows
      nothing about it — so a press landing while the cat is mid-sentence used to
      leave him talking underneath the answer. */
+  /* ONE WAY TO MAKE THE ROOM QUIET, and it also bumps the token and aborts the
+     chain's fetch — see the long note on PressSession's `silence`, which this
+     mirrors. Two reports on desktop, 2026-08-05: a skipped intro leaving Virgil
+     over the pitcher, and the pitcher still talking on the gauge screen. Both
+     shapes exist here too: `callIt` and `advance` below touched no audio, and a
+     token bump alone cannot stop a line that is between its fetch and its play.
+     Returns the fresh token so a caller starting a chain can use it. */
+  const sayAbort = useRef(null);
   const stopVoice = useCallback(() => {
+    sayAbort.current?.abort();
+    sayAbort.current = null;
     try { stopAdviserAudio(); } catch {}
     try { stopVirgilLine(); } catch {}
+    return ++sayToken.current;
   }, []);
 
   /**
@@ -497,7 +511,12 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   const sayTurn = useCallback(async (parts, { onPart = null, dwell = null, onDone = null } = {}) => {
     const live = parts.filter((p) => p && p.text);
     if (!live.length) return;
-    const token = ++sayToken.current;
+    // STARTING A CHAIN SILENCES THE ONE BEFORE IT — the token stops the old
+    // chain ADVANCING but left its current line audible until the new line's
+    // audio happened to start.
+    const token = stopVoice();
+    const ctl = new AbortController();
+    sayAbort.current = ctl;
     setSpeaking(true);
     try {
       for (let i = 0; i < live.length; i++) {
@@ -539,8 +558,17 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
         // must not appear during it. Only the face arrives early.
         onPart?.(i);
         const startedAt = Date.now();
-        try { await speakLine(p.voice || VOICE, p.text, p.seat); }
+        try { await speakLine(p.voice || VOICE, p.text, p.seat, ctl.signal); }
         catch { /* voice is enrichment, never a gate on play */ }
+        /* THE BACKSTOP. The signal closes the network window; this closes what is
+           left of it — decode time, and the portal path, which takes no signal.
+           Stops rather than calling stopVoice(), which would bump the token a
+           second time for no one's benefit. */
+        if (sayToken.current !== token) {
+          try { stopAdviserAudio(); } catch {}
+          try { stopVirgilLine(); } catch {}
+          return;
+        }
         const floor = p.minMs ?? (dwell ? dwell(p.text) : 0);
         if (floor) {
           const left = floor - (Date.now() - startedAt);
@@ -599,7 +627,6 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   // SKIP CLEARS THE GATE TOO: it is already the player saying move on, and making
   // them say it twice is the impatience path answering itself.
   const skipOpening = useCallback(() => {
-    sayToken.current++;
     stopVoice();
     setSpeaking(false);
     setOpeningDone(true);
@@ -613,7 +640,6 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   /* THE BRIEFING'S EXITS, mirroring PressSession exactly — one beat, one tempo,
      on both surfaces. Skipping counts as having seen it. */
   const skipBrief = useCallback(() => {
-    sayToken.current++;
     stopVoice();
     setSpeaking(false);
     setBriefDone(true);
@@ -625,7 +651,6 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
 
   // Replay, offered only while the opening column is still free to print in.
   const replayBrief = useCallback(() => {
-    sayToken.current++;
     stopVoice();
     setSpeaking(false);
     setOpeningAt(-1); setOpeningDone(false);
@@ -894,6 +919,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
   }, [flash, sayTurn]);
 
   const advance = useCallback(() => {
+    stopVoice();   // don't finish the last thought over the next claim
     revealFor.current = null;
     setFlash(null);
     setPane("feed");     // new claim, back to its face
@@ -904,13 +930,18 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
     setHasRecord(false);
     setLookPending(false);
     setRun((r) => doAdvance(r, deal));
-  }, [deal]);
+  }, [deal, stopVoice]);
+  /* THE FLOOR IS OVER, SO THE FLOOR STOPS TALKING. ALLOCATION starts no chain,
+     so nothing downstream would ever have superseded a line still playing — the
+     same hole desktop was reported on ("the pitchbot still talking after i had
+     moved on to the gauge page"). */
   const callIt = useCallback(() => {
+    stopVoice();
     revealFor.current = null;
     setFlash(null);
     setLookPending(false);
     setRun((r) => doCallIt(r, deal));
-  }, [deal]);
+  }, [deal, stopVoice]);
   const lockCall = useCallback(() => setRun((r) => doAllocate(r, deal, slider)), [deal, slider]);
   const finish = useCallback(() => setRun((r) => toAutopsy(r)), []);
 
@@ -1301,7 +1332,7 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
                              onBegin={briefDone ? beginBrief : null}
                              who={VIRGIL.name} kicker="— the house rules"
                              skipLabel="SKIP THE RULES ▸"
-                             beginLabel="◉ READY — BRING IN THE PITCH BOT ▸"
+                             beginLabel="◉ READY — LET THE PITCH BEGIN ▸"
                              cue="▼ PRESS THIS TO START THE PITCH"
                              quoted={false} subtitle />
               </>
@@ -1398,6 +1429,10 @@ export default function PressFlat({ deal: dealOverride = null, onExit }) {
           <ConvictionGauge value={slider} onChange={setSlider} />
           <div className="pf-saying">{readout.saying}</div>
           <div className="pf-risk">{readout.risk}</div>
+          {/* Same footnote as desktop's .ps-stakenote, same reason — one run,
+              two presentations, and the surface that explains where the size
+              went may not be only one of them. See stakeNote. */}
+          <div className="pf-stakenote">{stakeNote(run)}</div>
           <button className="pf-btn primary" onClick={lockCall}>LOCK IT IN</button>
         </div>
       )}
@@ -2037,6 +2072,9 @@ const CSS = ENGAGEMENT_CSS + PRESS_UI_CSS + `
 /* line-height, because a 12px box around 12px type clips the descenders of the
    one line on this screen that names what you stand to lose. */
 .pf-risk { font-size:12px; line-height:1.4; color:#ffd23a; margin-top:7px; }
+/* The footnote to the two numbers above it, not a third number — see .ps-stakenote. */
+.pf-stakenote { font-size:10.5px; line-height:1.5; color:rgba(191,238,222,0.62);
+  margin-top:9px; padding-top:7px; border-top:1px solid rgba(47,214,214,0.18); }
 .pf-pnl { font-size:52px; font-weight:bold; }
 .pf-pnl.up { color:#4dffaa; text-shadow:0 0 24px rgba(77,255,170,0.5); }
 .pf-pnl.down { color:#ff5f6f; text-shadow:0 0 24px rgba(255,95,111,0.5); }

@@ -3,7 +3,7 @@ import React from "react";
 import { BACKING, PITCHER, SEATS } from "@/game/terminal-traders/press/questions";
 import { DESK, PITCH_BOT, laneOwner, laneSentence, seatMeta } from "@/game/terminal-traders/press/desk";
 import { VIRGIL } from "@/game/terminal-traders/press/virgil";
-import { pressPrice } from "@/game/terminal-traders/press/pressRun";
+import { PRESS_COST, money, stakeFor } from "@/game/terminal-traders/press/pressRun";
 
 /*
  * SHARED FLOOR UI — the reading column and the dock, authored once.
@@ -136,7 +136,7 @@ export const VIRGIL_BEAT_MS = 2400;
 export function OpeningBody({ lines = [], at = -1, onSkip = null, onBegin = null,
                               done = false, who = null, kicker = "— opening remarks",
                               skipLabel = "SKIP INTRO ▸",
-                              beginLabel = "◉ LET PITCHBOT MAKE ITS CASE ▸",
+                              beginLabel = "◉ LET PITCHBOT MAKE ITS FIRST CLAIM ▸",
                               cue = "▼ YOUR MOVE — PRESS TO CONTINUE",
                               quoted = true, subtitle = false }) {
   if (!lines.length) return null;
@@ -665,6 +665,32 @@ export function SeatRow({ run, live, pressed, options, onPress, compact = false 
         ASK A FOLLOW-UP
         <em>{run.pressesLeft} question{run.pressesLeft === 1 ? "" : "s"} left</em>
       </div>
+      {/* THE PRICE BELONGS TO THE CHOICE, NOT TO THE COUNTER (author, 2026-08-05:
+          "i see the reference but it is very very tiny at the top of the screen.
+          I don't think most players are going to see this").
+
+          It lived in Meter, which on desktop is a 44px status bar sharing a row
+          with the ticker and the book — 9px, dim, and read as a caption on a
+          strip nobody looks at during a decision. This row is where the decision
+          IS: the buttons directly below it are the specialists being priced, and
+          a cost printed anywhere else is a cost you find out about afterwards.
+          Meter keeps PLAYING FOR — what you are playing for is a status, and a
+          status bar is the right place for it. What it COSTS to change that is
+          this row's, and the two are no longer said twice at two sizes.
+
+          The pitcher clause is not decoration: the first button in the row below
+          is the pitch bot, and without it the sentence prices a button it does
+          not apply to. */}
+      {/* Gone once there is no specialist left to buy. A price quoted over a row
+          where every priced button is already spent describes a purchase that
+          cannot be made, and the row below says "already used" on each of them
+          itself. */}
+      {options.some((o) => o.seat !== PITCHER && o.enabled) && (
+        <div className="pu-seats-cost">
+          Each specialist costs <b>{Math.round(PRESS_COST * 100)}%</b> of your stake.
+          <span> The pitch bot is free.</span>
+        </div>
+      )}
       <div className={`pu-seats${compact ? " compact" : ""}`}>
         {options.map((o) => {
           // seatMeta, not DESK — the first option is the PITCHER, which is not
@@ -852,27 +878,50 @@ export function ConvictionGauge({ value, onChange, min = -100, max = 100, step =
 /** Interruptions left. `children` is an extra badge slot — mobile counts the
  *  advisers there too, since it has no agenda rail to show them. */
 export function Meter({ run, presses, children }) {
-  /* THE PRICE OF THE NEXT QUESTION, next to the count of them.
+  /* WHAT YOU HAVE LEFT AND WHAT IT IS WORTH — the two standing quantities, in
+     one place, because the meter is already the thing that answers "how many
+     have I got".
      A price the player cannot see before spending is not an incentive, it is a
-     hidden penalty — and the whole point of pricing the budget (see PRESS_COST
-     in pressRun.js) is to make "is this claim worth a question?" a live
-     decision. It sits on the meter because the meter is already the thing that
-     answers "how many have I got"; the cost of the next one belongs with the
-     count of them, not on a fourth element somewhere else.
-     Quiet by default and quiet on purpose: this is a number to glance at while
-     deciding, not a scoreboard. It should never out-shout the claim. */
-  const price = pressPrice(run);
+     hidden penalty, and the whole point of pricing the budget (see PRESS_COST in
+     pressRun.js) is to make "is this claim worth a question?" a live decision.
+     THE COST OF THE NEXT ONE IS NO LONGER HERE. It moved to the seat row, which
+     is the row whose buttons it prices — this element is a status readout, and a
+     cost on a status bar is a cost you find out about afterwards. What is left
+     here is the stake itself: the standing quantity both the cost and the call
+     screen are expressed against. */
   return (
     <div className="pu-meter" aria-label={`${run.pressesLeft} questions left`}>
       {Array.from({ length: presses }).map((_, i) => (
         <span key={i} className={i < run.pressesLeft ? "on" : ""} />
       ))}
       <em>QUESTIONS LEFT</em>
-      {price && (
-        <i className="pu-price" title="Every question you spend trims the stake you play for.">
-          PLAYING FOR ±{price.now} · A SPECIALIST MAKES IT ±{price.after}
-        </i>
-      )}
+      {/* THE STAKE, NOT A SWING QUOTED AT A CONVICTION NOBODY CHOSE (author,
+          2026-08-05: "Top indicator said 'playing for 23' before I asked any
+          questions. I went to 'make the call' and the slider showed an upside of
+          25").
+
+          This read pressPrice().now, which is casePnl evaluated at PRICE_AT — a
+          FIXED reference conviction of "fairly sure". It was chosen so the floor
+          would speak in the same units as the call screen, and it achieved the
+          opposite: the player reaches the slider, puts it somewhere else, and the
+          number they were quoted is not the number they get. 23 against 25, with
+          nothing on either screen admitting the 23 was hypothetical.
+
+          The "±" was the second lie in the same four characters. At PRICE_AT the
+          downside is 47 against an upside of 23, and at full conviction it is
+          −75 against +25: casePnl is quadratic in the error, so the two sides are
+          never equal and the symmetry the glyph promises exists at no setting of
+          the control.
+
+          THE STAKE HAS NEITHER PROBLEM. It is what the call screen's two numbers
+          are derived FROM, it is what the specialists are priced against, and it
+          is already the word every other readout uses — the seat row's "10% of
+          your stake", stakeNote's "Stake 25 → 20", and Virgil's briefing line.
+          One quantity, one word, four surfaces, and the floor can no longer quote
+          a figure the call screen contradicts. */}
+      <i className="pu-price" title="Each specialist you consult trims the stake you play for.">
+        STAKE <b>{money(stakeFor(run))}</b>
+      </i>
       {children}
     </div>
   );
@@ -1270,17 +1319,31 @@ export const PRESS_UI_CSS = `
 .pu-gauge-ends span:nth-child(2) { color:rgba(255,210,58,.7); }
 
 .pu-meter { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
-/* The price of the next question — deliberately the quietest thing in the row.
-   It is a number to glance at while deciding, not a scoreboard; if it ever
-   competes with the claim for attention it has failed. */
+/* WHAT YOU ARE PLAYING FOR — a status, next to the counter it moves with.
+   It was 9px at 42% white on the reasoning that it must never out-shout the
+   claim; on desktop it landed in the top bar instead, where it out-shouts
+   nothing and simply could not be read (author, 2026-08-05: "very very tiny").
+   The number is gold because every other quantity of money on both surfaces is
+   gold — BOOK, the risk line, the stake note — and the label stays quiet. */
 .pu-meter .pu-price {
-  font-style:normal; font:9px/1 'Courier New',monospace; letter-spacing:.08em;
-  color:rgba(234,255,249,0.42); white-space:nowrap; margin-left:2px;
+  font-style:normal; font:10.5px/1 'Courier New',monospace; letter-spacing:.08em;
+  color:rgba(234,255,249,0.6); white-space:nowrap; margin-left:6px;
 }
+.pu-meter .pu-price b { color:#ffd23a; font-size:12px; margin-left:3px; }
+
+/* THE COST OF THE BUTTONS DIRECTLY BELOW IT. Sized to be read rather than
+   glanced at: this is the one line standing between a player and spending a
+   specialist they did not know had a price. Sentence case and a plain sentence,
+   because the row above it is already shouting in caps and a second all-caps
+   line reads as a label rather than as something to act on. */
+.pu-seats-cost { font:11.5px/1.5 'Courier New',monospace; color:rgba(234,255,249,0.72);
+  margin:0 0 7px; letter-spacing:.02em; }
+.pu-seats-cost b { color:#ffd23a; font-size:12.5px; letter-spacing:.04em; }
+.pu-seats-cost span { color:rgba(47,214,214,0.85); }
 .pu-meter > span { width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,45,111,0.6); }
 .pu-meter > span.on { background:#ff2d6f; box-shadow:0 0 8px rgba(255,45,111,0.8); }
-.pu-meter em { font-style:normal; font:bold 9.5px/1 'Courier New',monospace;
-  letter-spacing:0.11em; color:rgba(234,255,249,0.5); margin-left:5px; }
+.pu-meter em { font-style:normal; font:bold 10px/1 'Courier New',monospace;
+  letter-spacing:0.11em; color:rgba(234,255,249,0.66); margin-left:5px; }
 
 .pu-nav { display:flex; gap:8px; }
 .pu-nav > * { flex:1; }

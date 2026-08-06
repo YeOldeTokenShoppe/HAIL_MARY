@@ -42,8 +42,33 @@ import { portalWindow, recenterPortal, speakAdviserLine, speakInPortal } from "@
 export const VIRGIL_PORTAL_ID = "virgil-portal";
 
 /** Is his player up and able to take a line right now? */
+/**
+ * CAN HE ACTUALLY SPEAK RIGHT NOW — not "has the SitePal script parsed".
+ *
+ * THE OLD CHECK WAS `typeof sayText === "function"` AND THAT IS TRUE FAR TOO
+ * EARLY (author, 2026-08-05: "considerable lag to start virgil… virgil's voice
+ * starts after 20 or more seconds but without any sitepal animation"). The embed
+ * defines its whole API the moment its script loads, seconds before the scene
+ * and character are up and able to say anything. So speakVirgilLine took the
+ * portal path on a player that could not talk, speakInPortal waited out its
+ * watchdog — max(6000, length * 130), which is 16s on his opening line and 26s
+ * on the short briefing — and only then fell back to plain audio. The reported
+ * "20 or more seconds, then voice with no animation" is that timer, exactly.
+ *
+ * `__portalReady` is set by the frame's own vh_sceneLoaded handler (see
+ * public/sitepal-portal.html) and is the signal every other consumer of that
+ * frame already waits on — SitePalPortalTile, TalkShowScene and /main all listen
+ * for the "sitepal-portal-ready" message it posts in the same breath. This check
+ * had simply never been told about it.
+ *
+ * NOTE FOR A LATER PASS: counselSpeech's `waitForPortal` carries the identical
+ * too-early predicate, so it returns true against a player that cannot speak.
+ * Nothing on this surface calls it — deliberately, see speakVirgilLine — but
+ * /main does, and it is the same bug waiting there.
+ */
 export function virgilPortalLive() {
-  return typeof portalWindow(VIRGIL_PORTAL_ID)?.sayText === "function";
+  const w = portalWindow(VIRGIL_PORTAL_ID);
+  return !!w && w.__portalReady === true && typeof w.sayText === "function";
 }
 
 /* ---------------------------------------------------------------------- */
@@ -84,10 +109,74 @@ function gazeSettings() {
 }
 
 /**
+ * WATCH WHOEVER IS PITCHING (author, 2026-08-05: "can you set his gaze towards
+ * the pitchbot when pitchbot is active?").
+ *
+ * THIS IS THE CASE THE NOTE ABOVE WAS HOLDING setGaze IN RESERVE FOR. That note
+ * says a non-zero gaze is the wrong tool and reintroduces the symptom — true of
+ * "look at the PLAYER", which is a recentre, not a turn. Watching another
+ * character across the room IS a turn, and it is the only thing setGaze does.
+ * So the default stays amp 0 for facing front, and the turn lives here.
+ *
+ * DEGREES ARE SCREEN-RELATIVE: 0 top, 90 right, 180 bottom, 270 left (see GAZE
+ * in counselSpeech.js, and the studio's warning that they are per-scene and
+ * cannot be reasoned about from the code — if he turns the wrong way, swap 90
+ * and 270). 90 is right for the desktop floor, where his tile is bottom-left and
+ * the bot stands centre stage. The studio settled the same geometry the same
+ * way: whoever is on the left turns 90 toward whoever is on the right.
+ *
+ * followCursor(0) FIRST, for the reason faceVirgilFront gives at length: pointer
+ * tracking fights a held pose, and the next mouse move undoes it. Stop the
+ * tracking, then turn.
+ *
+ * SitePal drops the gaze when the duration lapses OR when the character is asked
+ * to speak — so his own line straightens him without anyone arranging it, and
+ * `seconds` only has to outlast the line he is listening to.
+ *
+ * Tunable live, like the front-facing pose: window.__virgilWatch = { deg, amp }.
+ */
+export const VIRGIL_WATCH = { deg: 90, seconds: 12, amp: 65 };
+
+function watchSettings() {
+  const o = (typeof window !== "undefined" && window.__virgilWatch) || null;
+  return { ...VIRGIL_WATCH, ...(o || {}) };
+}
+
+/**
+ * @param seconds  how long to hold it. Pass the length of the line he is
+ *   listening to; a gaze that lapses mid-line snaps his head back, which reads
+ *   worse than never having turned.
+ * @returns false if his player isn't up, or if the turn has been tuned off.
+ */
+export function virgilWatchPitcher({ seconds } = {}) {
+  // READY, not merely present: aiming a gaze at a scene that has not loaded is
+  // at best a no-op and pokes the frame during the exact seconds it is trying
+  // to boot. See virgilPortalLive.
+  if (!virgilPortalLive()) return false;
+  const w = portalWindow(VIRGIL_PORTAL_ID);
+  if (!w) return false;
+  const g = watchSettings();
+  if (!(g.amp > 0)) return false;
+  try { w.followCursor?.(0); } catch { /* frame not up */ }
+  try { w.setGaze?.(g.deg, seconds ?? g.seconds, g.amp); }
+  catch { return false; /* frame not up */ }
+  return true;
+}
+
+/** Roughly how long a line takes to say, for holding a gaze across it. ~12
+ *  characters a second is the rate these voices actually read at; the floor and
+ *  ceiling keep a one-word aside and a 30-second claim both sane. */
+export function lineSeconds(text) {
+  const n = String(text || "").length;
+  return Math.min(45, Math.max(6, Math.round(n / 12) + 2));
+}
+
+/**
  * Face front. Safe to call at any time — every hop is optional-chained and the
  * whole thing no-ops on a frame that has not come up.
  */
 export function faceVirgilFront() {
+  if (!virgilPortalLive()) return false;   // same reason as virgilWatchPitcher
   const w = portalWindow(VIRGIL_PORTAL_ID);
   if (!w) return false;
   // 1. STOP TRACKING THE POINTER. This is the fix; the rest is tidying.

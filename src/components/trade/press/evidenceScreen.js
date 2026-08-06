@@ -126,14 +126,33 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
     // Idle carrier — dim, so a stamped receipt dominates. Its job is to prove
     // the machine is alive, which is what makes an empty board read as a fact
     // about Barron rather than a bug in the game.
+    //
+    // NOT UNDER A PANEL (author, 2026-08-05: "the evidence screen is overlaying
+    // another screen in the background with a bunch of animated noise"). Both
+    // panels below paint over this at 0.94 alpha, so 6% of seven lines of random
+    // garbage came through the receipt — and the carrier reshuffles on every
+    // interval tick, so the leak ANIMATED under the one thing on this screen the
+    // player is meant to read. The panels are opaque now, which fixes the bleed;
+    // skipping the covered rows outright is the belt to that braces, and stops a
+    // future alpha tweak quietly reopening it. Lines below the panel still draw,
+    // because that is where the liveness argument above still applies.
     ctx.font = "12px 'Courier New', monospace";
     ctx.fillStyle = CY_DIM;
-    carrier.forEach((l, i) => ctx.fillText(l, 14, 48 + i * 18));
+    const panelBottom = receipt
+      ? 44 + 34 + (receipt.rows || []).length * 22 + 8
+      : empty ? 44 + 104 : 0;
+    carrier.forEach((l, i) => {
+      const ly = 48 + i * 18;
+      if (ly - 12 < panelBottom) return;   // -12: the row's ascent, not its baseline
+      ctx.fillText(l, 14, ly);
+    });
 
     if (receipt) {
       const rows = receipt.rows || [];
       const x = 12, y = 44, bw = w - 24, bh = 34 + rows.length * 22 + 8;
-      ctx.fillStyle = "rgba(2,16,14,0.94)";
+      // FULLY OPAQUE. At 0.94 the live carrier behind it showed through and
+      // animated under the receipt — see the carrier note above.
+      ctx.fillStyle = "#02100e";
       ctx.fillRect(x, y, bw, bh);
       ctx.strokeStyle = receipt.partial ? "rgba(191,238,222,0.8)" : GOLD;
       ctx.lineWidth = 2;
@@ -159,7 +178,7 @@ function makeScreen({ header: header0, fps, getCanvas, getTexture, claim, releas
       // not a gold fact. The rule under it is what makes the absence mean
       // something: he did not decline to answer, there is nothing to answer with.
       const x = 12, y = 44, bw = w - 24, bh = 104;
-      ctx.fillStyle = "rgba(2,16,14,0.94)";
+      ctx.fillStyle = "#02100e";   // opaque, same reason as the receipt panel
       ctx.fillRect(x, y, bw, bh);
       ctx.strokeStyle = "#ff9b6f";
       ctx.lineWidth = 2;

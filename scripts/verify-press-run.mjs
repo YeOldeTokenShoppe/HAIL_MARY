@@ -13,9 +13,9 @@ import { BACKING, SHAPES, LANES, PITCHER, SEATS, SEAT_LANE, SPENDABLE_SEATS, can
 import { DESK, EUGENE, PITCH_BOT, adviserLine, laneSentence, laneOwner, pitcherAside } from "../src/game/terminal-traders/press/desk.js";
 import { VIRGIL, virgilRead, agenda as virgilAgenda, shapeTip,
          nextMove as virgilNextMove,
-         afterAnswer as virgilAfterAnswer } from "../src/game/terminal-traders/press/virgil.js";
+         afterAnswer as virgilAfterAnswer, briefing } from "../src/game/terminal-traders/press/virgil.js";
 import {
-  PRESSES, STAKE, PHASE, stakeFor, callVerdict, betRestated,
+  PRESSES, STAKE, PHASE, PRESS_COST, stakeFor, stakeNote, callReadout, callVerdict, betRestated,
   createRun, press, advance, callIt, allocate,
   resolvePress, sliderToP, coverageScore, currentClaim, seatOptions, laneOutlook, pressure, PRESSURE,
   settlementNote,
@@ -888,6 +888,92 @@ console.log("\n-- PROPERNESS (the design theorem) -------------------------");
     && stakeFor({ advisersSpent: [1, 2, 3] }) > 0
     // the pitcher is free of SIZE — Virgil says so on the floor.
     && stakeFor({ advisersSpent: [], pressesLeft: 0 }) === STAKE);
+  /* THE DECAY HAS TO BE LEGIBLE, not merely correct (author, 2026-08-05: "i do
+     see the different win/loss values, but… i don't know how i got to those
+     values"). It was applied silently for a week — a proper scoring rule the
+     player could not see the terms of. */
+  ok("the call screen can say where the size went, spent or not",
+    (() => {
+      const none = stakeNote({ advisersSpent: [] });
+      const some = stakeNote({ advisersSpent: [1, 2] });
+      // The zero case must still teach the rule — it is the one that can still
+      // change a decision — so it may not be empty, and the two must differ.
+      return !!none && !!some && none !== some
+        && none.includes(String(STAKE))
+        // The spent case has to show the arithmetic: both ends, and the count.
+        && some.includes(String(STAKE)) && some.includes("20") && /\b2\b/.test(some);
+    })());
+  /* AND THE PLAYER IS TOLD BEFORE THEY SPEND (author, 2026-08-05: "we should
+     add a line about this mechanic in virgil's intro"). Every other readout of
+     the decay reports it while it is happening; the briefing is the only place
+     that can change a decision instead of explaining a disappointment. Both
+     versions, because "same contract" is the short one's whole job. */
+  ok("Virgil's briefing states the price of a teammate",
+    (() => {
+      const pct = String(Math.round(PRESS_COST * 100));
+      const long = briefing().join(" ");
+      const short = briefing(true).join(" ");
+      const priced = (s) => s.includes(pct) && /stake/i.test(s);
+      // The pitcher exception travels with it: free-of-size is the entire reason
+      // the compromised source is worth pressing, and stakeFor keys on
+      // advisersSpent purely to keep that true.
+      return priced(long) && priced(short)
+        && /free/i.test(long) && /free/i.test(short);
+    })());
+  ok("the briefing's price is templated, not typed in",
+    // A name that drifts reads as a different character; a NUMBER that drifts is
+    // the briefing lying about the rules the resolver is running.
+    !fs.readFileSync("src/game/terminal-traders/press/virgil.js", "utf8")
+      .split("export const BRIEFING")[1].split("export function briefing")[0]
+      .match(/\b10 percent\b/));
+
+  ok("the stake note counts SPECIALISTS, not questions",
+    // Same reason stakeFor keys on advisersSpent: pressing the pitcher is free
+    // of size, and Virgil says so out loud on the floor.
+    stakeNote({ advisersSpent: [], pressesLeft: 0 }) === stakeNote({ advisersSpent: [] }));
+  /* THE FLOOR MAY NOT QUOTE A FIGURE THE CALL SCREEN CONTRADICTS (author,
+     2026-08-05: "Top indicator said 'playing for 23' before I asked any
+     questions. I went to 'make the call' and the slider showed an upside of
+     25"). The deleted pressPrice quoted casePnl at a fixed reference conviction,
+     which disagrees with wherever the player actually puts the slider — see the
+     note where it used to live. What the meter shows now is the stake itself,
+     and the property that makes that safe is that the call screen's own numbers
+     are derived from it. */
+  ok("the meter's stake is the number the call screen is built from",
+    (() => {
+      const run = { pressesLeft: 3, advisersSpent: ["a"] };
+      const stake = stakeFor(run);            // what the meter prints
+      // At full conviction the upside IS the stake — casePnl(p,p,stake) = stake.
+      const risk = callReadout(100, stake).risk;
+      return risk.includes(String(Math.round(stake)))
+        // …and the note on the call screen names the same number.
+        && stakeNote(run).includes(String(stake));
+    })());
+  ok("passing on a deal is not called taking it on faith",
+    (() => {
+      const d = instanceDeal(4);
+      const base = { ...createRun(d), outcomes: {} };
+      // Same empty question budget, opposite plays: dead centre is p = 0.5 and
+      // casePnl is exactly 0 there, so FLAT is the absence of a bet, not a small
+      // one. The two must not share a sentence.
+      const flat = coverageScore({ ...base, call: { v: 0, direction: "FLAT" } }, d);
+      const bet = coverageScore({ ...base, call: { v: 80, direction: "LONG" } }, d);
+      return flat.note !== bet.note
+        && /faith/i.test(bet.note) && !/faith/i.test(flat.note)
+        // Both still report the same coverage — only the sentence differs.
+        && flat.spent === bet.spent && flat.hit === bet.hit;
+    })());
+  ok("the stake readout never claims a symmetric payoff",
+    (() => {
+      // "±23" promised a symmetry that exists at no setting of the control:
+      // casePnl is quadratic in the error, so the loss outruns the gain
+      // everywhere off the resting position. Pinned so nobody reinstates ±.
+      const s = STAKE;
+      const win = Math.abs(Math.round(casePnl(sliderToP(100), 0, s)));
+      const lose = Math.abs(Math.round(casePnl(sliderToP(100), 1, s)));
+      return win !== lose && lose > win;
+    })());
+
   const pressBody = fs.readFileSync("src/game/terminal-traders/press/pressRun.js", "utf8")
     .split("export function press(")[1].split("export function seatOptions")[0];
   ok("no seat path touches the stake or the budget constant",

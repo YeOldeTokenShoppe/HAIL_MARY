@@ -31,8 +31,23 @@ export function pickGreeting(apparitionKey = "classic") {
 // spelling. "R-Lady" matches the studio/how-to-play scripts so the whole app
 // says the token the same way. Handles an optional "$" ticker prefix and
 // RL-80 / RL 80 spacing variants.
+// GR80 IS SAID "GRADY" (author, 2026-08-05: "virgil has to know to pronounce
+// GR80 as 'GRADY'"). Same class of fix as RL80 above and applied in the same
+// place, so it holds however a line reaches a voice — ElevenLabs through this
+// route, or SitePal's own engine through speakInPortal.
+//
+// EVERY SPEAKER, NOT JUST VIRGIL. The request came from his briefing, but a
+// desk where the cat says "Grady" and the pitch bot says "G-R-eighty" is a desk
+// that cannot agree on a colleague's name. RL80 was made global for exactly this
+// reason — see the note on this function being exported.
+//
+// CASE-SENSITIVE, unlike the RL80 rule. "Gr80" and "gr80" are not spellings this
+// project uses, and a /gi here would also rewrite any lowercase occurrence in a
+// url or an id that happened to pass through.
 function toSpeech(text) {
-  return text.replace(/\$?\bRL[-\s]?80\b/gi, "R-Lady");
+  return text
+    .replace(/\$?\bRL[-\s]?80\b/gi, "R-Lady")
+    .replace(/\bGR[-\s]?80\b/g, "Grady");
 }
 
 let timers = [];

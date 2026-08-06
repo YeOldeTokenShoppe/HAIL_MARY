@@ -31,6 +31,7 @@
 
 import { LANES, SEATS } from "./questions.js";
 import { LANE_NOUN, countWord } from "./desk.js";
+import { PRESS_COST } from "./pressRun.js";
 
 // THE ROLE LINE IS THE WHOLE PITCH FOR HIM (author, 2026-07-28: "Virgil - the
 // cat - your guide"). The four seats get a subject — THE TAPE, THE MONEY, THE
@@ -426,6 +427,23 @@ export const BRIEFING = [
   "You'll hear six claims. After any three of them, you may ask a follow-up and have one teammate examine the claim more closely.",
   "Connor checks charts. Marisol follows money. GR80 reads documents and reputations. Eugene traces the story and the people telling it.",
   "Ask the matching specialist for the deepest check. Anyone can offer a quick outside view, but each teammate can only do one deep check.",
+  /* THE PRICE, SAID OUT LOUD (author, 2026-08-05: "we should add a line about
+     this mechanic in virgil's intro"). The decay shipped as a silent term — the
+     numbers on the call screen were already trimmed by the player's own
+     questions and nothing had ever said so. The readouts added today report it
+     while it is happening; this is the only place that tells you BEFORE you
+     spend the first one, which is the only point at which the rule can change a
+     decision rather than explain a disappointment.
+     IT SITS HERE, after "one deep check each" and before the scale: the cost of
+     a teammate belongs to the paragraph about teammates, and the line that
+     follows is the first mention of winning and losing size.
+     THE PITCHER EXCEPTION IS NOT A SIDE NOTE. Free-of-size is what makes the
+     compromised source worth using, and stakeFor keys on advisersSpent purely so
+     this sentence stays true — see its note.
+     TEMPLATED FROM PRESS_COST, unlike the seat names above, which are written
+     out deliberately. A name that drifts reads as a different character; a
+     NUMBER that drifts is the briefing lying about the rules. */
+  `Every teammate you use costs you ${Math.round(PRESS_COST * 100)} percent of your stake. Pressing the pitch bot is free — it's the one voice here that's paid to close you.`,
   "At the end, use the scale to back the project, bet against its case, or pass. The farther you move it, the more you can win or lose.",
   "Don't judge the pitch bot by charm or nerves. Those can mislead you. Judge the evidence your team can actually find.",
   // THE HAND-OFF. The briefing used to end on the line above and the gate button
@@ -443,12 +461,16 @@ export const BRIEFING = [
   // and his tile is under it, so the button is ABOVE him on desktop. The flat
   // surface stacks differently again. Copy that points at a position has to be
   // right on every layout, and this one only has to name the control.
-  "When you're ready, press BRING IN THE PITCH BOT, and we'll begin.",
+  "When you're ready, press LET THE PITCH BEGIN, and we'll begin.",
 ];
 
 /** The returning player's version — same contract, one breath. */
 export const BRIEFING_SHORT =
   "Six claims, three follow-ups, one deep check per specialist. "
+  // The price belongs in the short version too — "same contract" is the whole
+  // point of this string, and a returning player who never heard the long one
+  // explain the decay is exactly the player it has been invisible to.
+  + `Each teammate costs ${Math.round(PRESS_COST * 100)} percent of your stake; the pitch bot is free. `
   + "Then back the case, call against it, or pass. Evidence beats vibes.";
 
 /**

@@ -39,8 +39,23 @@ export const COUNSEL_VOICES = {
 // through /trade's request queue rather than through speakInPortal, so that path
 // has to apply the same substitution or the same character says the ticker two
 // different ways depending on which surface you are on.
+// GR80 IS SAID "GRADY" (author, 2026-08-05: "virgil has to know to pronounce
+// GR80 as 'GRADY'"). Same class of fix as RL80 above and applied in the same
+// place, so it holds however a line reaches a voice — ElevenLabs through this
+// route, or SitePal's own engine through speakInPortal.
+//
+// EVERY SPEAKER, NOT JUST VIRGIL. The request came from his briefing, but a
+// desk where the cat says "Grady" and the pitch bot says "G-R-eighty" is a desk
+// that cannot agree on a colleague's name. RL80 was made global for exactly this
+// reason — see the note on this function being exported.
+//
+// CASE-SENSITIVE, unlike the RL80 rule. "Gr80" and "gr80" are not spellings this
+// project uses, and a /gi here would also rewrite any lowercase occurrence in a
+// url or an id that happened to pass through.
 export function toSpeech(text) {
-  return String(text).replace(/\$?\bRL[-\s]?80\b/gi, "R-Lady");
+  return String(text)
+    .replace(/\$?\bRL[-\s]?80\b/gi, "R-Lady")
+    .replace(/\bGR[-\s]?80\b/g, "Grady");
 }
 
 /** The window that owns a portal's player, or null if the frame isn't up. */
