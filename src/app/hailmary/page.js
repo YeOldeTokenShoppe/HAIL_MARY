@@ -3402,6 +3402,10 @@ export default function OilPage() {
   const handleFocusObject = useCallback((worldPoint, normal, dist) => {
     if (!worldPoint) return;
     flyIdRef.current++;
+    // Focus clicks are navigation intent too — end the intro orbit so the
+    // OrbitControls + CameraFlyTo rig mounts and acts on this target (same
+    // reason handleFlyTo does it; without this, pre-intro clicks no-op).
+    setIntroComplete(true);
     setFlyTarget({
       x: worldPoint.x, y: worldPoint.y, z: worldPoint.z,
       nx: normal?.x, ny: normal?.y, nz: normal?.z,
@@ -6780,9 +6784,9 @@ export default function OilPage() {
                     <OrbitControls
                       ref={controlsRefMobile}
                       enableDamping
-                      dampingFactor={0.2}
+                      dampingFactor={0.1}
                       enablePan
-                      minDistance={0.1}
+                      minDistance={0.01}
                       maxDistance={15}
                       maxPolarAngle={Math.PI}
                       minPolarAngle={0}

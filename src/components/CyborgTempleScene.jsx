@@ -4,6 +4,8 @@ import {
   mountPitchBot, tickPitchBotBillboard, disposePitchBotBillboard, getPitchBotFraming,
 } from "@/lib/trade/pitchBotScene";
 import { tickPitchBotFace, setPitchBotFaceHidden } from "@/lib/trade/pitchBotExpressions";
+import { tickPitchBotFacePanel, setPitchBotPanelHidden } from "@/lib/trade/pitchBotFacePanel";
+import { tickPitchBotFaceState } from "@/lib/trade/pitchBotFaceState";
 import { TEMPLE_ANCHOR_NAME } from "@/lib/templePresence";
 import {
   tickPitchBotHolo, disposePitchBotHolo,
@@ -7711,6 +7713,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // in an empty beam a beat before the figure. Driven from here rather than
     // inside either module because this is the one place that already ticks both.
     setPitchBotFaceHidden(!cast.bodyDense);
+    setPitchBotPanelHidden(!cast.bodyDense);
     // Face the camera, yaw only. No-op until the bot loads.
     tickPitchBotBillboard(state.camera);
     // THE LED FACE FOLLOWS THE CLIP — v2's rig only. It reads which action
@@ -7718,7 +7721,15 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
     // which is why the speech effect below needed no edit: anything that drives
     // `actions.talking` / `actions.idle` moves the face for free. No-op on v1
     // (no face meshes) and while an expression is pinned via __pitchBotFace.
+    // ONE SHARED ADVANCE, THEN THE RENDERERS. tickPitchBotFaceState runs the
+    // smoothing filter, the speak-hold and the clip follower exactly once; calling
+    // it from inside each renderer instead would double-apply the filter on any rig
+    // where both are live, which reads as a sluggish mouth and logs nothing.
+    tickPitchBotFaceState();
     tickPitchBotFace();
+    // The panel rig's equivalent. No-ops unless the loaded glb had a Face_Panel,
+    // so both can run unconditionally for as long as the two rigs coexist.
+    tickPitchBotFacePanel(delta);
 
     // Update all character mixers independently
     if (mixersRef.current) {

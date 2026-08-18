@@ -12,6 +12,10 @@ import {
   getPitchBotMouth, getPitchBotFaceState, blinkPitchBot,
   measurePitchBotHeight, PITCH_BOT_DEFAULT_EXPRESSION,
 } from "./pitchBotExpressions";
+import {
+  initPitchBotFacePanel, hasPitchBotFacePanel, disposePitchBotFacePanel,
+} from "./pitchBotFacePanel";
+import { disposePitchBotFaceState, getPitchBotFaceStateReport } from "./pitchBotFaceState";
 import { rollPitcher, resolvePitcherId, assignPitcher, PITCHER_ROSTER } from "@/game/terminal-traders/press/pitchers";
 
 // THE PITCH BOT, IN THE ROOM — everything the temple scene needs to host the VC
@@ -256,7 +260,11 @@ export const PITCH_BOT_VARIANTS = {
     // v=2 for the 2026-08-02 split-face re-import. BUMP THIS ON EVERY RE-EXPORT:
     // the suffix is part of the edge cache key, and the failure it guards against
     // is not a stale face but a TRUNCATED glb served forever from cache.
-    url: "/models/pitchbot2.glb?v=3",
+    // v=4 (2026-08-06): re-exported with the Face_Panel display replacing the 27
+    // plates. BUMP THIS ON EVERY RE-EXPORT — the bytes changed under an unchanged
+    // URL and both the browser cache and the CDN kept serving the old rig, which
+    // presents as a rig that loads fine and simply ignores the new code.
+    url: "/models/pitchbot2.glb?v=5",
     /**
      * SOLVED, NOT AUTHORED. The height this rig should occupy, in the same local
      * units as `position` and `scale` — mountPitchBot measures the loaded bind
@@ -303,7 +311,14 @@ export const PITCH_BOT_VARIANTS = {
       // because that material is also the only thing in the rig bright enough to
       // bloom (emissive 0.25/0.95/1 at intensity 4, against the /trade Bloom pass's
       // 0.3 luminance threshold). Wash it and the glow goes with it.
-      exclude: ["Expression_LED_MAT"],
+      // Face_Panel_MAT joined on 2026-08-06 with the display panel. NOTE THIS LIST
+      // REPLACES the default rather than extending it — spreading PITCH_BOT_HOLO
+      // above does not save you, because `exclude` is overwritten wholesale — so a
+      // material added to the default there is NOT excluded here. The panel is
+      // MeshBasicMaterial, and the wash is not merely wrong on it: the injection
+      // reads `normal` and `vViewPosition`, which an unlit shader does not declare,
+      // so the fragment shader fails to COMPILE and the face renders pure black.
+      exclude: ["Expression_LED_MAT", "Face_Panel_MAT"],
     },
     clips: { idle: "Stand_Idle", talking: "Talking", bow: "Formal_Bow" },
     /**
@@ -680,6 +695,10 @@ export function disposePitchBotBillboard() {
   _billboardState = null;
   _mounted = null;
   disposePitchBotExpressions();
+  disposePitchBotFacePanel();
+  // AFTER both renderers — each unregisters itself from the shared state, and
+  // wiping it first would leave those registrations behind.
+  disposePitchBotFaceState();
 }
 
 /**
@@ -853,6 +872,13 @@ export function mountPitchBot({
       // and the midline heuristic picks; set it when that heuristic is wrong, which
       // it has been once (see alignPitchBotPlates).
       if (faceCount || visemeCount) alignPitchBotPlates(c.expressions?.alignTo || null);
+
+      // THE PANEL RIG, if this is one. Returns 0 the moment the glb has no
+      // Face_Panel mesh, so every plate rig above is untouched — the two face
+      // implementations are selected by what the FILE contains, not by a variant
+      // flag, which means a rig can be re-exported from plates to panel without a
+      // matching code change landing in the same commit.
+      initPitchBotFacePanel(bot, { ...(c.facePanel || {}), voice: c.facePanel?.voice || c.voice });
 
       // SIZE. Solve from the measured rig when the variant asked for a height,
       // else take its literal scale.
@@ -1182,8 +1208,24 @@ function installDebugHandles(bot, c) {
    * plate, ["eyes","mouth"] is v3's split one.
    */
   window.__pitchBotFace = (name) => {
+    // ONE CALL DRIVES BOTH RENDERERS: this pins the shared manual tier in
+    // pitchBotFaceState, and plates and panel each follow it every frame.
     if (name !== undefined) setPitchBotExpression(name);
-    const out = { variant: c.variant, ...getPitchBotFaceState() };
+    // `shared` is the tier stack itself — which tier won, and what the clip
+    // follower thinks is dominant. On a panel rig it is the ONLY view of that:
+    // getPitchBotFaceState reports the plate renderer, which has nothing loaded.
+    const shared = getPitchBotFaceStateReport();
+    const out = {
+      variant: c.variant, panel: hasPitchBotFacePanel(),
+      ...getPitchBotFaceState(),
+      // PLATE STATE FIRST, SHARED AS THE FALLBACK. getPitchBotFaceState reports the
+      // plate renderer, which on a panel rig has nothing loaded and answers `null`
+      // — so this read `expression: null` while the face was plainly showing
+      // Confuse. Whichever renderer is live, the top-level answer is now the one
+      // you can see.
+      expression: getPitchBotExpression() ?? shared.expression,
+      shared,
+    };
     probe(out);
     return out;
   };

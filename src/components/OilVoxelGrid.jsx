@@ -8,6 +8,7 @@ import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistributio
 import { generateArtifactDistribution3D } from "@/lib/artifactDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
+import CommercialStrip from "@/components/CommercialStrip";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
@@ -6538,6 +6539,9 @@ export default function OilVoxelGrid({
   // Click-to-zoom on scene objects (e.g. MachinePanel): called with the THREE
   // world intersection point so the page can dolly the camera in.
   onFocusObject,
+  // Vendor stall clicked on the back-edge commercial strip; called with the
+  // vendor id ("insurance" | "fortunes" | "souvenirs" | "tonics").
+  onVendorClick,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -6928,6 +6932,19 @@ export default function OilVoxelGrid({
           </Text>
         );
       })}
+
+      {/* Commercial strip on the back (−Z) edge — same visibility gate as the
+          opaque ground box, so it vanishes with the mesa during X-ray reveal. */}
+      {!animateReveal && revealProgress === 0 && (
+        <CommercialStrip
+          worldW={worldW}
+          worldD={worldD}
+          cellSize={cellSize}
+          onVendorClick={onVendorClick}
+          onFocusObject={onFocusObject}
+          onZoomOut={onZoomOut}
+        />
+      )}
 
       {/* Y axis labels (along left edge of top surface) */}
       {Array.from({ length: gridY }, (_, i) => {

@@ -1,0 +1,241 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Pitch bot — face lab</title>
+<style>
+  body{background:#0e0e13;color:#9fb;font:12px ui-monospace,SFMono-Regular,monospace;margin:0;padding:22px}
+  h1{color:#6cf;font-size:13px;letter-spacing:.18em;text-transform:uppercase;margin:0 0 4px}
+  .sub{color:#667;margin:0 0 26px}
+  h2{color:#ff2eaf;font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin:26px 0 2px}
+  .why{color:#7a8;margin:0 0 12px;max-width:760px;line-height:1.55}
+  .row{display:flex;gap:16px;flex-wrap:wrap}
+  .cell{text-align:center}
+  canvas{background:#08080c;border:1px solid #1e1e26;border-radius:4px}
+  .cap{margin-top:5px;color:#667}
+</style></head><body>
+<h1>Pitch bot — face lab</h1>
+<p class="sub">Three directions for the panel. Nothing here ships; the live face is unchanged.</p>
+<div id="out"></div>
+
+<script>
+const S = 240;
+const CORE = "#9dfcff", HALO = "#ff2eaf", DIM = "rgba(120,220,240,0.20)";
+
+/* ── shared panel furniture ─────────────────────────────────────────────── */
+function visor(ctx){ ctx.beginPath(); ctx.roundRect(S*0.05,S*0.085,S*0.90,S*0.83,S*0.15); }
+function panelBase(ctx){
+  ctx.clearRect(0,0,S,S); ctx.save(); visor(ctx); ctx.clip();
+  ctx.fillStyle="rgba(5,7,13,0.96)"; ctx.fillRect(0,0,S,S);
+}
+function panelTop(ctx){
+  ctx.fillStyle="rgba(0,0,0,0.22)";
+  for(let y=0;y<S;y+=3) ctx.fillRect(0,y,S,1);
+  ctx.restore();
+  ctx.strokeStyle="rgba(48,120,150,0.55)"; ctx.lineWidth=Math.max(1,S*0.006);
+  visor(ctx); ctx.stroke();
+}
+function glow(ctx,b){ ctx.shadowColor=HALO; ctx.shadowBlur=S*b; }
+function noGlow(ctx){ ctx.shadowBlur=0; }
+function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); }
+
+/* ═══ A — INSTRUMENT ════════════════════════════════════════════════════════
+   Brow bars (hard, mechanical) + slab eyes with a moving pupil + chassis marks. */
+function drawA(ctx,p,level,t){
+  panelBase(ctx);
+
+  // chassis: corner brackets — abstract, no fake numbers
+  ctx.strokeStyle="rgba(80,150,175,0.40)"; ctx.lineWidth=1.4;
+  const m=S*0.115, L=S*0.045;
+  for(const [sx,sy] of [[1,1],[-1,1],[1,-1],[-1,-1]]){
+    const x=sx>0?m:S-m, y=sy>0?m:S-m;
+    ctx.beginPath();
+    ctx.moveTo(x+sx*L,y); ctx.lineTo(x,y); ctx.lineTo(x,y+sy*L); ctx.stroke();
+  }
+
+  for(const side of [-1,1]){
+    const cx=S*0.5+side*S*0.175;
+
+    // BROW BAR — angle carries the whole expression, and it is a machined part,
+    // not an eyebrow. This is the single biggest departure from the pumpkin.
+    ctx.save();
+    ctx.translate(cx,S*(0.255 - p.browLift*0.035));
+    ctx.rotate(side*p.tilt*0.42);
+    glow(ctx,0.05); ctx.fillStyle=CORE;
+    rr(ctx,-S*0.072,-S*0.011,S*0.144,S*0.022,S*0.006); ctx.fill();
+    ctx.restore();
+
+    // EYE SLAB — a dim lit region, i.e. a screen area rather than an eye shape
+    const h=S*0.105*p.open;
+    ctx.save();
+    noGlow(ctx); ctx.fillStyle=DIM;
+    rr(ctx,cx-S*0.062,S*0.395-h/2,S*0.124,h,S*0.022); ctx.fill();
+    // clip the pupil to the slab so it can travel to the edge and be occluded
+    ctx.clip();
+    glow(ctx,0.05); ctx.fillStyle=CORE;
+    const px=cx+p.gazeX*S*0.030, py=S*0.395+p.gazeY*S*0.018;
+    rr(ctx,px-S*0.028,py-Math.min(h*0.42,S*0.030),S*0.056,Math.min(h*0.84,S*0.060),S*0.012);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // mouth: the standing wave, thinner — a readout, not a feature
+  mouthWave(ctx,p,level,0.735,0.19,0.055);
+  panelTop(ctx);
+}
+
+/* ═══ B — OPTIC ═════════════════════════════════════════════════════════════
+   Two camera apertures. Iris + pupil give depth and a real gaze; a sweeping lid
+   does the emoting. Fewer, larger elements — reads at any size. */
+function drawB(ctx,p,level,t){
+  panelBase(ctx);
+  for(const side of [-1,1]){
+    const cx=S*0.5+side*S*0.178, cy=S*0.40, R=S*0.108;
+
+    noGlow(ctx);
+    ctx.strokeStyle="rgba(120,220,240,0.28)"; ctx.lineWidth=S*0.008;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+
+    // IRIS — segmented like a mechanical aperture, drifting slowly. Motion with
+    // no informational content, which is what makes it feel powered rather than drawn.
+    ctx.strokeStyle="rgba(157,252,255,0.55)"; ctx.lineWidth=S*0.013;
+    for(let i=0;i<9;i++){
+      const a=t*0.12+i*(Math.PI*2/9);
+      ctx.beginPath(); ctx.arc(cx,cy,R*0.70,a,a+0.34); ctx.stroke();
+    }
+
+    // PUPIL — the thing that looks at you
+    glow(ctx,0.07); ctx.fillStyle=CORE;
+    ctx.beginPath();
+    ctx.arc(cx+p.gazeX*S*0.032,cy+p.gazeY*S*0.026,R*(0.20+p.pupil*0.22),0,7);
+    ctx.fill(); noGlow(ctx);
+
+    // LID — a shutter sweeping down from the top; angle carries mood
+    const lid=(1-p.open)*R*2.1 + p.tilt*side*R*0.55;
+    if(lid>0.5){
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx,cy,R+S*0.012,0,7); ctx.clip();
+      ctx.fillStyle="rgba(5,7,13,0.97)";
+      ctx.translate(cx,cy); ctx.rotate(side*p.tilt*0.34);
+      ctx.fillRect(-R*1.6,-R*1.6,R*3.2,R*1.6+lid-R*0.6);
+      ctx.restore();
+    }
+  }
+  mouthWave(ctx,p,level,0.745,0.155,0.048);
+  panelTop(ctx);
+}
+
+/* ═══ C — TERMINAL ══════════════════════════════════════════════════════════
+   The face as the machine's own display language: bracketed eye cells and a
+   block VU mouth. Most on-brand — and the most at risk of illegibility, which
+   is a stated failure mode on this surface. */
+function drawC(ctx,p,level,t){
+  panelBase(ctx);
+
+  for(const side of [-1,1]){
+    const cx=S*0.5+side*S*0.175, cy=S*0.38;
+    // brackets — the chrome around a value
+    ctx.strokeStyle="rgba(120,220,240,0.45)"; ctx.lineWidth=S*0.011; noGlow(ctx);
+    for(const s2 of [-1,1]){
+      const bx=cx+s2*S*0.078;
+      ctx.beginPath();
+      ctx.moveTo(bx-s2*S*0.016,cy-S*0.055);
+      ctx.lineTo(bx,cy-S*0.055); ctx.lineTo(bx,cy+S*0.055);
+      ctx.lineTo(bx-s2*S*0.016,cy+S*0.055); ctx.stroke();
+    }
+    // the value: a block whose height/offset is the expression
+    glow(ctx,0.06); ctx.fillStyle=CORE;
+    const bh=S*0.075*p.open, bw=S*0.085;
+    const off=side*p.tilt*S*0.020;
+    rr(ctx,cx-bw/2+p.gazeX*S*0.016,cy-bh/2+off+p.gazeY*S*0.012,bw,bh,S*0.005);
+    ctx.fill(); noGlow(ctx);
+  }
+
+  // mouth as a block VU row — standing, not scrolling
+  const N=13, y0=S*0.755, bw=S*0.021;
+  glow(ctx,0.05); ctx.fillStyle=CORE;
+  for(let i=0;i<N;i++){
+    const u=i/(N-1);
+    const env=Math.sin(Math.PI*u);
+    const h=Math.max(S*0.008, S*0.075*level*env*(1+0.26*Math.cos(u*Math.PI*6)));
+    const bow=p.curve*S*0.045*Math.sin(Math.PI*u);
+    const x=S*0.5-S*0.20+u*S*0.40;
+    rr(ctx,x-bw/2,y0+bow-h/2,bw,h,S*0.004); ctx.fill();
+  }
+  noGlow(ctx);
+
+  // cursor block — the one thing that says "this terminal is live"
+  if(Math.floor(t*1.6)%2===0){
+    ctx.fillStyle="rgba(157,252,255,0.75)";
+    ctx.fillRect(S*0.815,S*0.845,S*0.030,S*0.016);
+  }
+  panelTop(ctx);
+}
+
+/* ── shared mouth (A and B) ─────────────────────────────────────────────── */
+function mouthWave(ctx,p,level,yF,halfF,ampF){
+  const y=S*yF, half=S*halfF*(1+0.05*level), open=S*ampF*level, STEPS=52;
+  ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.strokeStyle=CORE; ctx.lineWidth=Math.max(1.5,S*0.010); glow(ctx,0.05);
+  for(const sign of [-1,1]){
+    ctx.beginPath();
+    for(let i=0;i<=STEPS;i++){
+      const u=i/STEPS, x=S*0.5-half+u*half*2;
+      const env=Math.sin(Math.PI*u);
+      const rip=1+0.26*Math.cos(u*Math.PI*6);
+      const bow=p.curve*S*0.045*Math.sin(Math.PI*u);
+      const yy=y+bow+sign*open*env*rip;
+      i?ctx.lineTo(x,yy):ctx.moveTo(x,yy);
+    }
+    ctx.stroke();
+  }
+  noGlow(ctx);
+}
+
+/* ── expression presets in the LAB's own vocabulary ─────────────────────── */
+const P = {
+  Neutral:{open:1,tilt:0,curve:0,browLift:0,pupil:0.5,gazeX:0,gazeY:0},
+  Angry:  {open:0.72,tilt:-0.9,curve:-0.45,browLift:-0.9,pupil:0.85,gazeX:0,gazeY:0},
+  Happy:  {open:0.9,tilt:0.15,curve:0.8,browLift:0.6,pupil:0.35,gazeX:0,gazeY:-0.15},
+};
+
+const DESIGNS = [
+  {k:"A",name:"Instrument",fn:drawA,
+   why:"Brow BARS instead of curved eyes, and a pupil block inside a dim slab. The brow is a machined part, so the face stops being organic; the pupil gives it somewhere to look. Corner brackets say a chassis is holding this screen."},
+  {k:"B",name:"Optic",fn:drawB,
+   why:"Two camera apertures — iris rings, a real pupil, and a shutter lid that does the emoting. Fewest elements, largest shapes, so it survives being 40px tall on the deal-file polaroid. The slow iris drift is what makes it read as powered rather than drawn."},
+  {k:"C",name:"Terminal",fn:drawC,
+   why:"The face in the machine's own display language: bracketed eye cells, a block VU mouth, a live cursor. Most on-brand for Liminal Terminal — and the riskiest, because illegible glyphs are a known failure mode here. Judge it small before judging it big."},
+];
+
+const out=document.getElementById("out");
+const live=[];
+for(const d of DESIGNS){
+  const h2=document.createElement("h2"); h2.textContent=d.k+" — "+d.name; out.appendChild(h2);
+  const why=document.createElement("p"); why.className="why"; why.textContent=d.why; out.appendChild(why);
+  const row=document.createElement("div"); row.className="row"; out.appendChild(row);
+  for(const [label,expr,lvl,anim] of [["Neutral","Neutral",0,false],["Angry","Angry",0,false],
+                                      ["Happy","Happy",0,false],["speaking","Neutral",0.7,true]]){
+    const cell=document.createElement("div"); cell.className="cell";
+    const c=document.createElement("canvas"); c.width=c.height=S;
+    const cap=document.createElement("div"); cap.className="cap"; cap.textContent=label;
+    cell.appendChild(c); cell.appendChild(cap); row.appendChild(cell);
+    const ctx=c.getContext("2d");
+    if(anim) live.push({ctx,fn:d.fn,expr});
+    else { d.fn(ctx,P[expr],lvl,0); }
+  }
+}
+
+let f=0;
+(function frame(){
+  f++; const t=f/60;
+  for(const o of live){
+    const env=Math.max(0,Math.sin(t*3.1)*0.5+0.5)*Math.max(0,Math.sin(t*9.7)*0.4+0.6);
+    // gaze: slow drift plus occasional saccade — micro-motion is most of "alive"
+    const sac=Math.floor(t*0.7)%3===0?1:0;
+    const p={...P[o.expr],
+      gazeX:Math.sin(t*0.5)*0.25+sac*Math.sin(t*11)*0.25,
+      gazeY:Math.sin(t*0.31)*0.18,
+      pupil:0.45+0.18*Math.sin(t*1.7)};
+    o.fn(o.ctx,p,0.85*env,t);
+  }
+  requestAnimationFrame(frame);
+})();
+</script></body></html>

@@ -109,7 +109,10 @@ export const PITCH_BOT_HOLO = {
   depthPrepass: false,
   /** Material names that keep their own look. The face plate is the pressure
    *  display; see the note above. */
-  exclude: ["lambert2.003"],
+  // Face_Panel_MAT is the panel rig's screen (see lib/trade/pitchBotFacePanel).
+  // It is an unlit CanvasTexture repainted every frame; washing it would grade a
+  // light source as though it were a surface catching one.
+  exclude: ["lambert2.003", "Face_Panel_MAT"],
 
   // ── THE CAST: the bot assembling up the projector beam ──────────────────────
   // VC_GAME.md §1 has said all along that "the projector casts the bot, its beam
@@ -614,7 +617,16 @@ export function applyPitchBotHolo(root, cfg = {}) {
     const mats = Array.isArray(node.material) ? node.material : [node.material];
 
     const next = mats.map((src) => {
-      if (o.exclude.includes(src.name)) return castOnly(src, o, color);
+      // `holoSkip` IS THE STRUCTURAL HALF OF `exclude`, and it exists because the
+      // name list cannot be relied on: every variant's `holo` block overwrites
+      // `exclude` wholesale, so a material added to the default is silently NOT
+      // excluded on any rig that set its own list. That was survivable while the
+      // excluded materials were merely PRETTIER unwashed. It stopped being
+      // survivable with the face panel: an unlit material cannot compile the wash
+      // at all (it reads `normal` and `vViewPosition`), so the miss is not a
+      // washed-out face, it is a black one plus a page of shader errors. A
+      // material that knows it must not be washed now says so itself.
+      if (src.userData?.holoSkip || o.exclude.includes(src.name)) return castOnly(src, o, color);
 
       // CLONE, so the easel and the body can diverge later and so we never
       // mutate a material the temple model might share. Then SCRUB userData:

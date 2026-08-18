@@ -1,5 +1,13 @@
 import * as THREE from "three";
-import { adviserMouth } from "../adviserMouth";
+import {
+  PITCH_BOT_DEFAULT_EXPRESSION, PITCH_BOT_SPEECH,
+  registerFaceRenderer, unregisterFaceRenderer,
+  setFaceManual, getFaceManual, setFacePressure, getFacePressure, setFaceMaps,
+  setFaceVoice, setFaceMouthOverride, getFaceSpeech,
+  resolveFaceExpression, assertFaceStateTicked,
+} from "./pitchBotFaceState";
+
+export { PITCH_BOT_DEFAULT_EXPRESSION };
 
 // THE LED FACE — expression, viseme mouth and blink for the pitch-bot rigs.
 //
@@ -34,8 +42,10 @@ import { adviserMouth } from "../adviserMouth";
 // which is also why switching expression mid-animation is safe: it cannot fight
 // the mixer, because the mixer has no opinion about these nodes.
 
-/** Shown on load. Only expression that reads as "listening". */
-export const PITCH_BOT_DEFAULT_EXPRESSION = "Neutral";
+/* Shown on load, and the only expression that reads as "listening". Defined in
+   pitchBotFaceState now (both renderers need it) and re-exported above, so every
+   existing `import { PITCH_BOT_DEFAULT_EXPRESSION } from "./pitchBotExpressions"`
+   keeps resolving. */
 
 /**
  * Legacy painted-face nodes, killed on sight.
@@ -83,20 +93,16 @@ function plateRe(prefix, suffix = "") {
 
    If a `byArchetype` map is ever proposed, it fails that test in one line. ───── */
 
+// THE TIERS AND THE SPEECH STATE NOW LIVE IN lib/trade/pitchBotFaceState, because
+// a second renderer arrived and neither was ever about plates — see that module's
+// header. The block above is kept here because it is what these plates obey; the
+// code that enforces it moved.
 const state = {
   /** layerKey -> (expressionName -> nodes[]). Order preserved for reporting. */
   layers: new Map(),
   /** every expression name any layer knows about. */
   names: new Set(),
   current: null,
-  /** debug pin; outranks every other tier. */
-  manual: null,
-  /** pressure().band — the game signal. */
-  pressure: null,
-  byPressure: null,
-  byClip: null,
-  actions: null,
-  lastDominant: null,
 
   /* ── VISEMES: the talking mouth ─────────────────────────────────────────── */
   /** stateName -> nodes[] (Closed / Mid / Open). */
@@ -104,14 +110,9 @@ const state = {
   visemeSpec: null,
   /** which expression LAYER goes dark while the viseme mouth is talking. */
   visemeSuppresses: null,
-  /** adviserMouth key to read — the rig's voice code. */
-  mouthVoice: null,
   visemeIndex: 0,
-  mouthLevel: 0,
-  mouthOverride: null,
-  /** ms timestamp the level last cleared the speaking floor. */
-  lastVoiceAt: 0,
-  speaking: false,
+  /** last frame's shared `speaking`, so the handover still reports one change. */
+  wasSpeaking: false,
 
   /* ── BLINK ──────────────────────────────────────────────────────────────── */
   blinkSpec: null,
@@ -197,8 +198,15 @@ export function initPitchBotExpressions(root, spec = {}) {
   // reasonably assumes one call is enough would otherwise get a face that loads,
   // shows its default, and never reacts to a pressure band — with nothing in the
   // console to say why. bindPitchBotFaceSpec then only has to add `actions`.
-  if (spec.byPressure) state.byPressure = spec.byPressure;
-  if (spec.byClip) state.byClip = spec.byClip;
+  setFaceMaps({
+    ...(spec.byPressure ? { byPressure: spec.byPressure } : {}),
+    ...(spec.byClip ? { byClip: spec.byClip } : {}),
+  });
+
+  // REGISTER BEFORE resolving a default, or the tier stack refuses every name this
+  // rig just loaded — that gate closing on a rig that has a face is the whole
+  // reason pitchBotFaceState exists.
+  registerFaceRenderer("plates", state.names);
 
   if (spec.blink && state.layers.has(spec.blink.layer)) {
     state.blinkSpec = { holdMs: 100, everyMs: [2600, 6800], ...spec.blink };
@@ -226,9 +234,7 @@ export function initPitchBotVisemes(root, spec = {}) {
   state.visemes.clear();
   state.visemeSpec = null;
   state.visemeIndex = 0;
-  state.mouthLevel = 0;
-  state.mouthOverride = null;
-  state.speaking = false;
+  setFaceMouthOverride(null);
   if (!root || !spec.prefix) return 0;
 
   const o = { ...PITCH_BOT_VISEMES, ...spec };
@@ -257,7 +263,16 @@ export function initPitchBotVisemes(root, spec = {}) {
 
   state.visemeSpec = { ...o, states };
   state.visemeSuppresses = o.suppresses || null;
-  state.mouthVoice = o.voice || null;
+
+  // THE SPEECH CONSTANTS ARE SHARED NOW, but they are still authored in this
+  // variant's `visemes` block, so a rig that tuned them keeps its tuning. Only the
+  // three that describe the AUDIO move; the thresholds, hysteresis and dead-bands
+  // stay local because they describe a mesh swap and nothing else.
+  if (o.smoothing != null) PITCH_BOT_SPEECH.smoothing = o.smoothing;
+  if (o.speakFloor != null) PITCH_BOT_SPEECH.speakFloor = o.speakFloor;
+  if (o.speakHoldMs != null) PITCH_BOT_SPEECH.speakHoldMs = o.speakHoldMs;
+  setFaceVoice(o.voice || null);
+
   return state.visemes.size;
 }
 
@@ -513,13 +528,11 @@ export const PITCH_BOT_VISEMES = {
  */
 export function setPitchBotExpression(name, opts = {}) {
   const manual = opts.manual !== false;
-  if (name == null && manual) {
-    state.manual = null;
-    renderFace();
-    return true;
-  }
-  if (!state.names.has(name)) return false;
-  if (manual) state.manual = name;
+  // DELEGATED, and it now drives EVERY renderer rather than these plates. The
+  // vocabulary is the union across renderers, so this no longer refuses a name
+  // just because this rig shipped no plate for it.
+  if (manual && !setFaceManual(name == null ? null : name)) return false;
+  if (!manual && name != null && !state.names.has(name)) return false;
   renderFace();
   return true;
 }
@@ -530,10 +543,11 @@ export function listPitchBotLayers() { return [...state.layers.keys()]; }
 
 /** Register the clip/pressure maps and the actions the follower reads. */
 export function bindPitchBotFaceSpec(actions, spec = {}) {
-  state.actions = actions || null;
-  state.byPressure = spec.byPressure || null;
-  state.byClip = spec.byClip || null;
-  state.lastDominant = null;
+  setFaceMaps({
+    actions: actions || null,
+    byPressure: spec.byPressure || null,
+    byClip: spec.byClip || null,
+  });
   renderFace();
 }
 
@@ -547,13 +561,12 @@ export function bindPitchBotFaceSpec(actions, spec = {}) {
  * Call it with `pressure(run).band` and nothing else.
  */
 export function setPitchBotPressure(band) {
-  if (state.pressure === band) return false;
-  state.pressure = band || null;
+  if (!setFacePressure(band)) return false;
   renderFace();
   return true;
 }
 
-export function getPitchBotPressure() { return state.pressure; }
+export function getPitchBotPressure() { return getFacePressure(); }
 
 /**
  * HOLD ONE LAYER on a named expression — the emphasis channel.
@@ -582,17 +595,17 @@ export function getPitchBotLayerOverrides() {
   return Object.fromEntries(state.layerOverrides);
 }
 
-/** Highest-priority tier with an opinion. */
+/**
+ * Highest-priority tier with an opinion, narrowed to what THIS renderer can draw.
+ *
+ * The tier stack resolves against the union of every renderer's vocabulary, so it
+ * can hand back a name these plates do not have. Falling through to the last plate
+ * that DID exist is right: the alternative is a layer going dark mid-pitch because
+ * some other renderer knew a mood this one doesn't.
+ */
 function resolveExpression() {
-  if (state.manual && state.names.has(state.manual)) return state.manual;
-  if (state.pressure && state.byPressure) {
-    const want = state.byPressure[state.pressure];
-    if (want && state.names.has(want)) return want;
-  }
-  if (state.byClip && state.lastDominant) {
-    const want = state.byClip[state.lastDominant];
-    if (want && state.names.has(want)) return want;
-  }
+  const want = resolveFaceExpression();
+  if (want && state.names.has(want)) return want;
   return state.current || PITCH_BOT_DEFAULT_EXPRESSION;
 }
 
@@ -644,7 +657,7 @@ function renderFace() {
    * govern rigs that set alwaysOn false.
    */
   const visemesLive = state.visemes.size > 0
-    && (state.visemeSpec?.alwaysOn || state.speaking);
+    && (state.visemeSpec?.alwaysOn || getFaceSpeech().speaking);
 
   for (const [layerKey, byName] of state.layers) {
     let want = expr;
@@ -682,26 +695,16 @@ function tickVisemes() {
   const spec = state.visemeSpec;
   if (!spec || state.visemes.size === 0) return false;
 
-  const raw = state.mouthOverride != null
-    ? state.mouthOverride
-    : (state.mouthVoice ? adviserMouth[state.mouthVoice] || 0 : 0);
+  // THE SMOOTHING AND THE HOLD HAPPENED IN pitchBotFaceState THIS FRAME. Both
+  // renderers need the same `level` and the same `speaking`, and running the
+  // filter twice off one signal produced two subtly different mouths.
+  assertFaceStateTicked("tickPitchBotFace");
+  const { level, speaking } = getFaceSpeech();
+  const wasSpeaking = state.wasSpeaking;
+  state.wasSpeaking = speaking;
 
-  state.mouthLevel += (raw - state.mouthLevel) * spec.smoothing;
-  const level = state.mouthLevel;
-
-  const t = now();
-  // THE FLOOR TESTS `raw`, NOT `level`, and the distinction is the whole hold.
-  // `level` is the SMOOTHED value, which decays gradually after audio stops — so
-  // testing it re-arms lastVoiceAt on every frame of the decay and the hold does
-  // not begin until the smoothing has bottomed out. The mouth then keeps talking
-  // for speakHoldMs PLUS however long the filter takes, and at low frame rates it
-  // can fail to hand back at all. `raw` goes to 0 on the frame the line ends, so
-  // the hold means the number it says.
-  if (raw >= spec.speakFloor) state.lastVoiceAt = t;
-  const wasSpeaking = state.speaking;
-  state.speaking = (t - state.lastVoiceAt) < spec.speakHoldMs;
-
-  // Rise and fall one band at a time, each move needing the level to clear the
+  // WHAT STAYED HERE: the quantiser. Rise and fall one band at a time, each move
+  // needing the level to clear the
   // boundary by `hysteresis`. Stepping rather than jumping also means a sudden
   // loud onset opens THROUGH the middle state instead of snapping past it, which
   // is what makes a three-state mouth read as a mouth.
@@ -710,7 +713,7 @@ function tickVisemes() {
   while (i < states.length - 1 && level >= states[i + 1].at + spec.hysteresis) i++;
   while (i > 0 && level < states[i].at - spec.hysteresis) i--;
 
-  const changed = i !== state.visemeIndex || state.speaking !== wasSpeaking;
+  const changed = i !== state.visemeIndex || speaking !== wasSpeaking;
   state.visemeIndex = i;
   return changed;
 }
@@ -742,40 +745,25 @@ function tickBlink() {
 }
 
 /**
- * Advance the whole face. Call once per frame.
+ * Advance the PLATES. Call once per frame, AFTER tickPitchBotFaceState().
  *
- * ONE CALL FOR THREE SYSTEMS, so CyborgTempleScene's useFrame keeps a single
- * line. Each sub-tick reports whether anything changed and renderFace runs only
- * when something did — the common case is a frame where the mouth is between
- * thresholds and nothing moves at all.
+ * The clip follower used to live here and now runs in pitchBotFaceState, because
+ * it resolves which expression the game wants and never touched a plate. What is
+ * left is the two things that are genuinely about meshes: the quantised mouth and
+ * the blink. Each reports whether anything changed and renderFace runs only when
+ * something did — the common case is a frame where the mouth is between thresholds
+ * and nothing moves at all.
+ *
+ * `expressionDirty` covers the case where nothing local changed but the shared
+ * tier stack resolved to a different face; without it a pressure band arriving on
+ * a silent, un-blinking frame would not repaint until the next blink.
  */
 export function tickPitchBotFace() {
+  if (state.layers.size === 0) return;
   let dirty = false;
   if (tickVisemes()) dirty = true;
   if (tickBlink()) dirty = true;
-
-  // CLIP FOLLOWER. Dominant by WEIGHT, not by isRunning: both clips run for the
-  // length of every crossfade, so isRunning would flap. Weight resolves the tie
-  // the same way the renderer does, so the face turns over at the visual midpoint
-  // of the fade rather than at either end.
-  if (state.byClip && state.actions && state.names.size) {
-    let dominant = null;
-    let best = 0;
-    for (const key in state.byClip) {
-      const action = state.actions[key];
-      if (!action || !action.isRunning()) continue;
-      const w = action.getEffectiveWeight();
-      if (w > best) { best = w; dominant = key; }
-    }
-    // TRACKED EVEN WHILE OUTRANKED. If this bailed on a manual pin or a live
-    // band, lastDominant would go stale and the face would snap to whatever clip
-    // played several beats ago the moment the higher tier cleared.
-    if (dominant && dominant !== state.lastDominant) {
-      state.lastDominant = dominant;
-      dirty = true;
-    }
-  }
-
+  if (resolveExpression() !== state.current) dirty = true;
   if (dirty) renderFace();
 }
 
@@ -788,21 +776,22 @@ export function tickPitchBotFace() {
  *     __pitchBotMouth(null)  // back to the voice
  */
 export function setPitchBotMouthLevel(level) {
-  state.mouthOverride = level == null ? null : Math.max(0, Math.min(1, Number(level) || 0));
-  if (state.mouthOverride != null) state.lastVoiceAt = now();
-  return state.mouthOverride;
+  // Drives BOTH renderers now — the override is a property of the signal, not of
+  // whichever mesh happens to be drawing it.
+  return setFaceMouthOverride(level);
 }
 
 export function getPitchBotMouth() {
+  const speech = getFaceSpeech();
   return {
     visemes: [...state.visemes.keys()],
-    active: state.speaking ? state.visemeSpec?.states?.[state.visemeIndex]?.name ?? null : null,
-    speaking: state.speaking,
+    active: speech.speaking ? state.visemeSpec?.states?.[state.visemeIndex]?.name ?? null : null,
+    speaking: speech.speaking,
     alwaysOn: !!state.visemeSpec?.alwaysOn,
     resting: state.visemeSpec?.states?.[0]?.name ?? null,
-    level: +state.mouthLevel.toFixed(3),
-    voice: state.mouthVoice,
-    override: state.mouthOverride,
+    level: +speech.level.toFixed(3),
+    voice: speech.voice,
+    override: speech.override ?? null,
     suppresses: state.visemeSuppresses,
     enabled: !!state.visemeSpec,
   };
@@ -839,8 +828,8 @@ export function getPitchBotFaceState() {
     expression: state.current,
     layers: [...state.layers.keys()],
     expressions: [...state.names],
-    pinned: state.manual,
-    pressure: state.pressure,
+    pinned: getFaceManual(),
+    pressure: getFacePressure(),
     held: Object.fromEntries(state.layerOverrides),
     blink: state.blinkSpec
       ? { layer: state.blinkSpec.layer, using: state.blinkSpec.using, holdMs: state.blinkSpec.holdMs }
@@ -854,20 +843,14 @@ export function disposePitchBotExpressions() {
   state.names.clear();
   state.visemes.clear();
   state.current = null;
-  state.manual = null;
-  state.pressure = null;
-  state.byPressure = null;
-  state.byClip = null;
-  state.actions = null;
-  state.lastDominant = null;
+  // ONLY THIS RENDERER'S REGISTRATION. The shared tier/speech state is disposed by
+  // pitchBotScene alongside the panel's, because it outlives either renderer and
+  // clearing it here would wipe a live panel's pressure band on a plate teardown.
+  unregisterFaceRenderer("plates");
   state.visemeSpec = null;
   state.visemeSuppresses = null;
-  state.mouthVoice = null;
   state.visemeIndex = 0;
-  state.mouthLevel = 0;
-  state.mouthOverride = null;
-  state.lastVoiceAt = 0;
-  state.speaking = false;
+  state.wasSpeaking = false;
   state.blinkSpec = null;
   state.blinkUntil = 0;
   state.blinkNextAt = 0;

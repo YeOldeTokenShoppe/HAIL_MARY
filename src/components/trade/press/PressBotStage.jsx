@@ -10,6 +10,10 @@ import {
   getPitchBotFaceState, getPitchBotMouth, setPitchBotMouthLevel,
   setPitchBotExpression, disposePitchBotExpressions,
 } from "@/lib/trade/pitchBotExpressions";
+import {
+  initPitchBotFacePanel, tickPitchBotFacePanel, disposePitchBotFacePanel,
+} from "@/lib/trade/pitchBotFacePanel";
+import { tickPitchBotFaceState, disposePitchBotFaceState } from "@/lib/trade/pitchBotFaceState";
 import { applyPitchBotHolo, tickPitchBotHolo, disposePitchBotHolo } from "@/lib/trade/pitchBotHolo";
 
 // THE PITCH BOT, LIVE, ON THE FLAT SURFACE — the actual rig rather than a
@@ -189,6 +193,11 @@ export default function PressBotStage({ speaking = false, band = "cool", onFail 
         // Eyes, mouths and visemes have to land on ONE plane or the mouth jumps
         // the moment it starts talking.
         alignPitchBotPlates(cfg.expressions?.alignTo || null);
+        // The panel rig's equivalent, and a no-op on any glb without a
+        // Face_Panel. BEFORE the holo wash, so applyPitchBotHolo sees the
+        // material this assigns and can honour its `exclude` list — patched
+        // after the fact, the screen gets washed as body surface.
+        initPitchBotFacePanel(root, { ...(cfg.facePanel || {}), voice: cfg.facePanel?.voice || cfg.voice });
         applyPitchBotHolo(root, cfg.holo || {});
 
         scene.add(root);
@@ -252,6 +261,8 @@ export default function PressBotStage({ speaking = false, band = "cool", onFail 
            * borrowed grin firing every few seconds reads as the wrong face.
            */
           window.__botFace = (name) => {
+            // ONE CALL DRIVES BOTH RENDERERS. This pins the shared manual tier,
+            // and plates and panel each follow it — no mirroring needed.
             if (name !== undefined) setPitchBotExpression(name);
             return getPitchBotFaceState();
           };
@@ -308,7 +319,11 @@ export default function PressBotStage({ speaking = false, band = "cool", onFail 
       const dt = clock.getDelta();
       if (host.offsetParent === null) return;
       mixer?.update(dt);
+      // One shared advance, then the renderers — see the matching note in
+      // CyborgTempleScene for why this is not folded into either tick.
+      tickPitchBotFaceState();
       tickPitchBotFace();
+      tickPitchBotFacePanel(dt);
       try { tickPitchBotHolo(clock.elapsedTime); } catch { /* wash is cosmetic */ }
       renderer.render(scene, camera);
     };
@@ -319,6 +334,10 @@ export default function PressBotStage({ speaking = false, band = "cool", onFail 
       cancelAnimationFrame(raf);
       ro.disconnect();
       try { disposePitchBotExpressions(); } catch {}
+      try { disposePitchBotFacePanel(); } catch {}
+      // AFTER both renderers, never before: each unregisters itself from the
+      // shared state, and wiping it first would leave those registrations behind.
+      try { disposePitchBotFaceState(); } catch {}
       try { disposePitchBotHolo(); } catch {}
       mixer?.stopAllAction();
       // Walk the graph we actually built rather than trusting a ref: by now the
