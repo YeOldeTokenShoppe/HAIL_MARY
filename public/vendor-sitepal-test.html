@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Vendor SitePal isolation test</title>
+<style>
+  body { background: #223; color: #cde; font-family: monospace; }
+  #stage { width: 600px; height: 800px; border: 1px dashed #586; }
+  #log { white-space: pre-wrap; font-size: 12px; }
+</style>
+</head>
+<body>
+<h3>FortuneTeller scene 2775386 — isolation test</h3>
+<div id="stage"></div>
+<div id="log"></div>
+<script>
+  // Embed AFTER window load: AC_VHost_Embed uses document.write while the
+  // parser is open, which wipes the document (see public/sitepal-portal.html).
+  const log = (m) => { document.getElementById("log").textContent += m + "\n"; };
+  window.vh_sceneLoaded = function () { log("vh_sceneLoaded fired " + JSON.stringify(typeof getSceneAttributes === "function" ? getSceneAttributes() : null)); };
+  window.vh_audioStarted = function (id) { log("vh_audioStarted " + id); };
+  window.vh_audioError = function (id, portal, code, msg) { log("vh_audioError " + code + " " + msg); };
+  window.addEventListener("load", () => {
+    const s = document.createElement("script");
+    s.src = "//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=9308752&js=0";
+    s.onload = () => {
+      log("embed script loaded, calling AC_VHost_Embed (context=0, plain doc)");
+      const s2 = document.createElement("script");
+      // FT scene with responsive=0 (last param): SitePal's current
+      // sitepalPlayer_v1.js crashes in its responsive-resize ancestor walk
+      // (isUnstableTag reading tagName of null), killing the boot. Fixed-size
+      // mode skips that code path entirely.
+      s2.textContent = 'try { AC_VHost_Embed(9308752,600,800,"",1,0,2775386,0,1,0,"NnOEeZgOFXXyFlkCbvkh423d963uH40B",0,0); } catch (e) { document.getElementById("log").textContent += "embed error: " + e.message; }';
+      document.getElementById("stage").appendChild(s2);
+      // Report canvas presence over time
+      let n = 0;
+      const t = setInterval(() => {
+        n++;
+        const c = document.querySelectorAll("canvas").length;
+        const v = document.querySelectorAll("video").length;
+        log(`t+${n * 2}s canvases=${c} videos=${v}`);
+        if (n >= 10 || c > 0) clearInterval(t);
+      }, 2000);
+    };
+    document.head.appendChild(s);
+  });
+</script>
+</body>
+</html>

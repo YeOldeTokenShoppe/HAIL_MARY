@@ -4,6 +4,12 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Text, useGLTF, useAnimations } from "@react-three/drei";
+import {
+  VENDOR_SITEPAL_CONFIG,
+  getVendorSitePalSource,
+  activateVendorSitePal,
+  deactivateVendorSitePal,
+} from "@/lib/vendorSitePal";
 
 // ── Commercial strip — a boardwalk apron hung off the −Z edge of the mesa
 // (the side clear of the X/Y axis labels), outside the drillable grid so it
@@ -20,7 +26,16 @@ export const VENDOR_CATALOG = [
     // faceDist stops the camera inside the wagon, close up.
     // Seated character: keep the approach nearly level — big camDrop values
     // put the camera under her table
-    faceYaw: Math.PI / 2, faceDist: 0.32, faceLift: 0, camDrop: -0.05 },
+    faceYaw: Math.PI / 2, faceDist: 0.25, faceLift: 0, camDrop: -0.05,
+    // Crystal ball mood: cloned-material emissive glow + a small violet
+    // point light pooled inside the wagon, gently pulsing.
+    // Crystal ball: faint emissive sheen + a small violet light. (Set
+    // moodDim: true here to also dim the world lights while she's focused —
+    // the theatrical night-séance look; currently off, daylight stays.)
+    glowMesh: "SM_Prop_Crystal_Ball_01", glowColor: "#8a63e8",
+    // Key into VENDOR_SITEPAL_CONFIG: on focus her SitePal avatar is cropped
+    // onto Face1 (Face2, the painted face, hides) and she speaks a greeting.
+    sitepal: "fortunes" },
   { id: "souvenirs", label: "SOUVENIRS", awning: "#8a6d2f", accent: "#ffd700" },
   { id: "tonics",    label: "TONICS",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_Salesman1.glb", modelScale: 0.1, modelRotY: Math.PI / 2, idleClip: "idle",
@@ -54,6 +69,115 @@ const _deltaQ = /* @__PURE__ */ new THREE.Quaternion();
 const HEAD_YAW_LIMIT = 1.1;    // rad (~63°) — how far the head will turn to follow
 const HEAD_PITCH_UP = 0.7;     // rad (~40°) — looking up at a tall camera
 const HEAD_PITCH_DOWN = 0.55;  // rad (~32°) — looking down
+
+// Tuned for full daylight: a subtle magic presence on the ball with a soft
+// violet pool right around it — the sun stays in charge of the interior.
+const GLOW_EMISSIVE_BASE = 0.12;   // resting glow on the non-glass prop parts
+const GLOW_EMISSIVE_AMP = 0.08;    // extra glow at the top of the flicker
+const GLOW_LIGHT_INTENSITY = 0.08; // point light strength — it sits nearly on
+                                   // the table, so inverse-square makes even
+                                   // small values read strongly up close
+const GLOW_LIGHT_DISTANCE = 0.3;   // world units — a pool around the ball only
+const SWIRL_BASE_OPACITY = 0.5;    // resting density of the swirl glass
+
+// ── Crystal-ball swirl shader ──────────────────────────────────────────────
+// Replaces the glass mesh's material (the prop's "crystal" primitive is its
+// own mesh). Angular interference bands, twisted harder toward the core and
+// drifting with time, plus a fresnel rim — bright regions push past the base
+// color, which reads as bloom without a postprocessing pass.
+const SWIRL_VERT = /* glsl */ `
+  varying vec3 vLocal;
+  varying vec3 vWorldNormal;
+  varying vec3 vViewDir;
+  void main() {
+    vLocal = position;
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    vViewDir = cameraPosition - wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const SWIRL_FRAG = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uColorA;
+  uniform vec3 uColorB;
+  uniform float uOpacity;
+  uniform vec3 uCenter;
+  uniform float uRadius;
+  varying vec3 vLocal;
+  varying vec3 vWorldNormal;
+  varying vec3 vViewDir;
+  void main() {
+    vec3 p = (vLocal - uCenter) / uRadius;
+    float ang = atan(p.z, p.x);
+    float r = length(p.xz);
+    float tw = ang + uTime * 0.45 + (1.0 - r) * 2.8;
+    float bands =
+      sin(tw * 3.0 + p.y * 6.0 + uTime * 0.9) * 0.5 +
+      sin(tw * 5.0 - p.y * 4.0 - uTime * 1.4) * 0.35 +
+      sin(p.y * 9.0 + uTime * 0.65) * 0.15;
+    bands = bands * 0.5 + 0.5;
+    float fresnel = pow(1.0 - abs(dot(normalize(vViewDir), normalize(vWorldNormal))), 2.0);
+    vec3 col = mix(uColorA, uColorB, bands);
+    col += uColorB * fresnel * 0.7;
+    float alpha = clamp(uOpacity + bands * 0.22 + fresnel * 0.35, 0.0, 1.0);
+    gl_FragColor = vec4(col * (0.55 + bands * 0.9 + fresnel * 0.6), alpha);
+  }
+`;
+
+function makeSwirlMaterial(glassMesh, colorHex) {
+  const geo = glassMesh.geometry;
+  if (!geo.boundingSphere) geo.computeBoundingSphere();
+  const bs = geo.boundingSphere;
+  return new THREE.ShaderMaterial({
+    vertexShader: SWIRL_VERT,
+    fragmentShader: SWIRL_FRAG,
+    uniforms: {
+      uTime: { value: 0 },
+      uColorA: { value: new THREE.Color(colorHex).multiplyScalar(0.55) },
+      uColorB: { value: new THREE.Color(colorHex).lerp(new THREE.Color("#ffffff"), 0.45) },
+      uOpacity: { value: SWIRL_BASE_OPACITY },
+      uCenter: { value: bs.center.clone() },
+      uRadius: { value: bs.radius },
+    },
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
+// Lazily builds the 512² crop canvas + CanvasTexture + unlit material and
+// assigns it to the projection face mesh. flipY=false matches glTF UVs;
+// toneMapped=false so the tuned filter values are what actually shows.
+function ensureVendorProjectionMaterial(st) {
+  if (!st.cropCanvas) {
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 512;
+    st.cropCanvas = c;
+    st.cropCtx = c.getContext("2d");
+  }
+  if (!st.texture) {
+    const tex = new THREE.CanvasTexture(st.cropCanvas);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    st.texture = tex;
+  }
+  if (!st.material) {
+    st.material = new THREE.MeshBasicMaterial({
+      map: st.texture,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    });
+  }
+  if (!st.materialApplied && st.proj) {
+    st.proj.material = st.material;
+    st.materialApplied = true;
+  }
+}
 const HEAD_EASE = 8;           // 1/s — smoothing rate toward the target angles
 
 function VendorModel({ vendor, focusedRef, headRef }) {
@@ -88,12 +212,141 @@ function VendorModel({ vendor, focusedRef, headRef }) {
     return () => { if (headRef) headRef.current = null; };
   }, [scene, vendor.headBone, headRef]);
 
+  // Glow mesh (e.g. the crystal ball): clone its material(s) before setting
+  // emissive — Synty props share one atlas material, so mutating in place
+  // would set the whole wagon glowing. Originals are restored on cleanup
+  // because the useGLTF scene is cached and shared across mounts.
+  const glowRef = useRef({ mats: [], targets: [], light: null, swirl: null });
+  useEffect(() => {
+    if (!vendor.glowMesh) return;
+    const g = glowRef.current;
+    // Multi-material glTF exports arrive as a Group named for the prop with
+    // one child Mesh per material — traverse rather than assuming a Mesh.
+    const root = scene.getObjectByName(vendor.glowMesh);
+    if (!root) return;
+    const color = new THREE.Color(vendor.glowColor || "#c79bff");
+    g.mats = [];
+    g.targets = [];
+    root.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      g.targets.push({ mesh: o, original: o.material });
+      // The glass primitive ("crystal" material) gets the animated swirl;
+      // the stand and any other parts get the plain emissive clone.
+      if (mats.some((m) => /crystal|glass/i.test(m?.name || ""))) {
+        const swirl = makeSwirlMaterial(o, vendor.glowColor || "#c79bff");
+        g.swirl = swirl;
+        g.mats.push(swirl);
+        o.material = swirl;
+        return;
+      }
+      const clones = mats.map((m) => {
+        const clone = m.clone();
+        clone.emissive = color.clone();
+        clone.emissiveIntensity = GLOW_EMISSIVE_BASE;
+        g.mats.push(clone);
+        return clone;
+      });
+      o.material = Array.isArray(o.material) ? clones : clones[0];
+    });
+    if (!g.targets.length) return;
+    const light = new THREE.PointLight(color, GLOW_LIGHT_INTENSITY, GLOW_LIGHT_DISTANCE, 2);
+    root.add(light);
+    g.light = light;
+    return () => {
+      root.remove(light);
+      g.targets.forEach(({ mesh, original }) => { mesh.material = original; });
+      g.mats.forEach((m) => { try { m.dispose(); } catch (e) {} });
+      g.mats = []; g.targets = []; g.light = null; g.swirl = null;
+    };
+  }, [scene, vendor.glowMesh, vendor.glowColor]);
+
+  // SitePal projection state: proj face (receives the avatar crop) + regular
+  // face (hidden while projecting). Texture/material are built lazily on
+  // first show and disposed on unmount (material.dispose does NOT free map).
+  const projRef = useRef({
+    proj: null, regulars: [],
+    cropCanvas: null, cropCtx: null,
+    texture: null, material: null, materialApplied: false,
+  });
+  useEffect(() => {
+    const sp = vendor.sitepal ? VENDOR_SITEPAL_CONFIG[vendor.sitepal] : null;
+    if (!sp) return;
+    const st = projRef.current;
+    st.proj = scene.getObjectByName(sp.projFace) || null;
+    st.regulars = (sp.regularFaces || [])
+      .map((name) => scene.getObjectByName(name))
+      .filter(Boolean);
+    if (st.proj) st.proj.visible = false; // hidden until the projection is live
+    return () => {
+      if (st.texture) { try { st.texture.dispose(); } catch (e) {} }
+      if (st.material) { try { st.material.dispose(); } catch (e) {} }
+      st.texture = null; st.material = null;
+      st.cropCanvas = null; st.cropCtx = null;
+      st.materialApplied = false;
+      st.regulars.forEach((m) => { m.visible = true; });
+      if (st.proj) st.proj.visible = false;
+    };
+  }, [scene, vendor.sitepal]);
+
   // Head-follows-camera while the stall is in focus. Registered after
   // useAnimations so it runs after the mixer writes the animated pose each
   // frame; the delta is applied in world space, which stays axis-correct
   // regardless of the rig's bone orientation convention.
   const trackRef = useRef({ yaw: 0, pitch: 0 });
   useFrame((state, delta) => {
+    // Crystal-ball life: advance the swirl shader, and drive the light +
+    // stand emissive with a quasi-periodic flicker (two incommensurate
+    // sines — organic drift, never a metronome).
+    const g = glowRef.current;
+    if (g.mats.length) {
+      const tNow = state.clock.elapsedTime;
+      if (g.swirl) g.swirl.uniforms.uTime.value = tNow;
+      const flicker = 0.75 + 0.17 * Math.sin(tNow * 1.7) + 0.08 * Math.sin(tNow * 2.93 + 1.3);
+      g.mats.forEach((m) => {
+        if (!m.isShaderMaterial) m.emissiveIntensity = (GLOW_EMISSIVE_BASE + GLOW_EMISSIVE_AMP) * flicker;
+      });
+      if (g.light) g.light.intensity = GLOW_LIGHT_INTENSITY * 1.3 * flicker;
+    }
+    // SitePal face projection: while focused (and the right scene is live in
+    // the host), crop the avatar frame onto the proj face and hide the
+    // regular one. Same math as the temple/talk-show compositors.
+    const sp = vendor.sitepal ? VENDOR_SITEPAL_CONFIG[vendor.sitepal] : null;
+    if (sp) {
+      const st = projRef.current;
+      const focusedNow = !!focusedRef?.current;
+      const source = focusedNow ? getVendorSitePalSource() : null;
+      const onScene =
+        typeof window !== "undefined" &&
+        window.__vendorSitePalSceneLoaded === true &&
+        window.__vendorSitePalCurrentSceneId === sp.sceneId;
+      const show = !!(focusedNow && source && onScene && st.proj);
+      if (show) {
+        ensureVendorProjectionMaterial(st);
+        const ctx = st.cropCtx;
+        const canvas = st.cropCanvas;
+        const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = sp.crop;
+        const f = sp.filter;
+        ctx.fillStyle = "#9F7854"; // skin-tone backfill for letterboxing
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        try {
+          ctx.save();
+          ctx.filter = `saturate(${f.saturate}%) contrast(${f.contrast}%) brightness(${f.brightness}%) hue-rotate(${f.hueRotate}deg) sepia(${f.sepia}%)`;
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate((rotateZ * Math.PI) / 180);
+          ctx.scale(1, Math.cos((rotateX * Math.PI) / 180));
+          ctx.translate(-canvas.width / 2, -canvas.height / 2);
+          ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+          ctx.filter = "none";
+        } catch (e) {
+          // Source canvas not yet renderable (preserveDrawingBuffer race).
+        }
+        if (st.texture) st.texture.needsUpdate = true;
+      }
+      if (st.proj) st.proj.visible = show;
+      st.regulars.forEach((m) => { m.visible = !show; });
+    }
     const head = headRef?.current;
     if (!head) return;
     const t = trackRef.current;
@@ -166,10 +419,17 @@ function VendorStall({ vendor, position, cellSize, onVendorClick, onFocusObject,
     e.stopPropagation();
     if (zoomedRef.current) {
       zoomedRef.current = false;
+      if (vendor.sitepal) deactivateVendorSitePal();
+      if (vendor.moodDim) window.dispatchEvent(new CustomEvent("vendor-mood", { detail: { active: false } }));
       onZoomOut?.();
       return;
     }
     onVendorClick?.(vendor.id);
+    // Voiced vendors greet on approach: swap the host to their SitePal scene
+    // and speak an ElevenLabs line (engine 14) with real lipsync. The click
+    // itself is the audio-unlock gesture.
+    if (vendor.sitepal) activateVendorSitePal(vendor.sitepal);
+    if (vendor.moodDim) window.dispatchEvent(new CustomEvent("vendor-mood", { detail: { active: true } }));
     if (!onFocusObject || !rootRef.current) return;
     const normal = faceDirWorld(vendor, new THREE.Vector3());
     if (headRef.current) {

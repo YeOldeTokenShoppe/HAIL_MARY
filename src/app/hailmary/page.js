@@ -18,6 +18,7 @@ import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import HowToPlayPanel from "@/components/HowToPlayPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
+import VendorSitePalHost from "@/components/VendorSitePalHost";
 import OilOverlayModal from "@/components/OilOverlayModal";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
@@ -3373,6 +3374,18 @@ export default function OilPage() {
   }, []);
 
   const flyIdRef = useRef(0);
+  // Vendor "mood dim": while a moodDim vendor (the fortune teller) is
+  // focused, CommercialStrip dispatches vendor-mood events and the global
+  // lights drop to a fraction — her crystal-ball glow then carries the wagon
+  // interior (the walls don't occlude light, so darkness must be global).
+  const [vendorMood, setVendorMood] = useState(false);
+  useEffect(() => {
+    const onMood = (e) => setVendorMood(!!e.detail?.active);
+    window.addEventListener("vendor-mood", onMood);
+    return () => window.removeEventListener("vendor-mood", onMood);
+  }, []);
+  const moodScale = vendorMood ? 0.12 : 1;
+
   const handleFlyTo = useCallback((col, row) => {
     const worldW = gridSize * CELL_SIZE;
     const worldD = gridSize * CELL_SIZE;
@@ -6721,11 +6734,11 @@ export default function OilPage() {
                 {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} finale sound={fireworksSound} />}
                 {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
-                <ambientLight intensity={env.ambient} />
-                {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
-                <directionalLight position={[10, 15, 10]} intensity={env.dirA} color={env.dirAColor || "#ffffff"} />
-                <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
-                <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
+                <ambientLight intensity={env.ambient * moodScale} />
+                {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity * moodScale]} />}
+                <directionalLight position={[10, 15, 10]} intensity={env.dirA * moodScale} color={env.dirAColor || "#ffffff"} />
+                <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
+                <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
                 <group position={[0, 1, 0]}>
                   {GeodeMode && <FieldUnderglow />}
                   <OilVoxelGrid
@@ -7292,11 +7305,11 @@ export default function OilPage() {
             {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
             {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} />}
             {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
-            <ambientLight intensity={env.ambient} />
-            {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
-            <directionalLight position={[10, 15, 10]} intensity={env.dirA} color={env.dirAColor || "#ffffff"} />
-            <directionalLight position={[-5, 10, -5]} intensity={env.dirB} color={env.dirBColor || "#ffffff"} />
-            <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
+            <ambientLight intensity={env.ambient * moodScale} />
+            {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity * moodScale]} />}
+            <directionalLight position={[10, 15, 10]} intensity={env.dirA * moodScale} color={env.dirAColor || "#ffffff"} />
+            <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
+            <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
             <group position={[0, 5, 0]}>
               {GeodeMode && <FieldUnderglow />}
               <OilVoxelGrid
@@ -7648,6 +7661,10 @@ export default function OilPage() {
       />
 
       <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+
+      {/* SitePal host for the commercial-strip vendors (fortune teller
+          greeting). Desktop-first, matching the /trade projection. */}
+      {!isMobile && <VendorSitePalHost />}
 
       {/* Concretion reveal waits until the away-recap is dismissed. */}
       {!awayRecap && pendingConcretion && (
