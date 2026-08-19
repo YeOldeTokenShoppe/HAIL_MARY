@@ -204,6 +204,24 @@ export function getVendorSitePalSource() {
   return state.sourceEl;
 }
 
+// Mobile/iOS audio unlock: must run INSIDE a user gesture. Resumes a shared
+// AudioContext and plays a one-sample silent buffer — after that, the page is
+// licensed to start audio, so the greeting that begins ~1.2s later (outside
+// the gesture window) is allowed. saySilent(0) in activate primes SitePal's
+// own pipeline the same way.
+function unlockAudio(win) {
+  try {
+    const Ctx = win.AudioContext || win.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = (win.__vendorAudioCtx ||= new Ctx());
+    if (ctx.state === "suspended") { try { ctx.resume(); } catch (e) {} }
+    const src = ctx.createBufferSource();
+    src.buffer = ctx.createBuffer(1, 1, 22050);
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch (e) {}
+}
+
 function pickGreeting(vendorId, config) {
   const lines = config.greetings || [];
   if (!lines.length) return null;
@@ -257,6 +275,9 @@ export function activateVendorSitePal(vendorId) {
     win.__vendorSitePalDesiredVolume = 7;
     state.speakNotBefore = Date.now() + GREETING_DELAY_MS;
     if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
+    // This runs inside the stall click/tap — the one user gesture we get.
+    // Unlock browser audio and prime SitePal's pipeline while it lasts.
+    unlockAudio(win);
     // saySilent(0) is the framework-page audio-activation primer (iOS).
     if (typeof win.saySilent === "function") { try { win.saySilent(0); } catch (e) {} }
     const text = pickGreeting(vendorId, config);

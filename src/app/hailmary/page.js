@@ -7119,6 +7119,11 @@ export default function OilPage() {
 
         <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
 
+        {/* SitePal host for the commercial-strip vendors (mobile branch —
+            the desktop branch mounts its own; the embed itself is guarded
+            once-per-page, so both mounting is safe). */}
+        <VendorSitePalHost />
+
         {/* Concretion reveal waits until the away-recap is dismissed. */}
         {!awayRecap && pendingConcretion && (
           <ConcretionModal artifact={pendingConcretion} onDone={dismissConcretion} darkMode={uiDark} />
@@ -7667,9 +7672,11 @@ export default function OilPage() {
 
       <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
 
-      {/* SitePal host for the commercial-strip vendors (fortune teller
-          greeting). Desktop-first, matching the /trade projection. */}
-      {!isMobile && <VendorSitePalHost />}
+      {/* SitePal host for the commercial-strip vendors. Mounted on mobile
+          too: only one vendor speaks at a time, and without the host mobile
+          has no sayText at all. The stall tap is the audio-unlock gesture
+          (activateVendorSitePal primes audio inside it). */}
+      <VendorSitePalHost />
 
       {/* Concretion reveal waits until the away-recap is dismissed. */}
       {!awayRecap && pendingConcretion && (
