@@ -9,15 +9,19 @@ import {
   FORTUNES_SITEPAL_FILTER,
   TONICS_SITEPAL_CROP,
   TONICS_SITEPAL_FILTER,
+  HOTDOGS_SITEPAL_CROP,
+  HOTDOGS_SITEPAL_FILTER,
   speakPendingVendorLine,
   getVendorSitePalSource,
+  notifyVendorTalk,
 } from "@/lib/vendorSitePal";
 
 // Vendor tabs for the crop tuner. constName is used by the "Log values"
 // output so the pasted block lands on the right export in vendorSitePal.js.
 const TUNER_VENDORS = {
-  fortunes: { label: "FORTUNE TELLER", crop: FORTUNES_SITEPAL_CROP, filter: FORTUNES_SITEPAL_FILTER, constName: "FORTUNES" },
+  fortunes: { label: "FORTUNE", crop: FORTUNES_SITEPAL_CROP, filter: FORTUNES_SITEPAL_FILTER, constName: "FORTUNES" },
   tonics: { label: "SALESMAN", crop: TONICS_SITEPAL_CROP, filter: TONICS_SITEPAL_FILTER, constName: "TONICS" },
+  hotdogs: { label: "HOT DOG", crop: HOTDOGS_SITEPAL_CROP, filter: HOTDOGS_SITEPAL_FILTER, constName: "HOTDOGS" },
 };
 
 // ── Single SitePal host embed for the /hailmary vendor strip ───────────────
@@ -233,6 +237,16 @@ export default function VendorSitePalHost() {
         speakPendingVendorLine();
       }
     };
+
+    // Talk-state callbacks → the vendor-model animation bridge. sayText (TTS)
+    // fires the vh_talk* pair; the vh_audio* names are kept as belt-and-braces
+    // (some player builds fire them for TTS too — notifyVendorTalk dedups).
+    window.vh_talkStarted = () => notifyVendorTalk(true);
+    window.vh_talkEnded = () => notifyVendorTalk(false);
+    window.vh_audioStarted = () => notifyVendorTalk(true);
+    window.vh_audioEnded = () => notifyVendorTalk(false);
+    window.vh_audioStopped = () => notifyVendorTalk(false);
+    window.vh_speechEnded = () => notifyVendorTalk(false);
 
     const host = ensureHostDiv();
     // Embed exactly ONCE per page lifetime, no matter how many times this

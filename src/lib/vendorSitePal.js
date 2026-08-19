@@ -64,6 +64,25 @@ export const TONICS_SITEPAL_FILTER = {
   sepia: 34,
 };
 
+// Hot dog vendor crop/filter — tuned via /hailmary?tune=vendor (HOT DOG
+// tab); re-tune there and paste the logged values back here if his scene's
+// avatar ever changes.
+export const HOTDOGS_SITEPAL_CROP = {
+  cropX: 184,
+  cropY: 140,
+  cropW: 187,
+  cropH: 222,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const HOTDOGS_SITEPAL_FILTER = {
+  saturate: 199,
+  contrast: 103,
+  brightness: 124,
+  hueRotate: 0,
+  sepia: 34,
+};
+
 // Per-vendor registry, keyed by VENDOR_CATALOG id. `projFace` receives the
 // SitePal projection; `regularFaces` are the painted face layers hidden
 // while the projection is active (the two models label them differently —
@@ -101,6 +120,21 @@ export const VENDOR_SITEPAL_CONFIG = {
       "The fortune teller reads your future. I improve it. Small distinction, friend. Big difference.",
     ],
   },
+  hotdogs: {
+    sceneId: 2775403,
+    voice: { voice: "KKjzrOiscwOprYdapRQa", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    crop: HOTDOGS_SITEPAL_CROP,
+    filter: HOTDOGS_SITEPAL_FILTER,
+    greetings: [
+      "Hot dogs! Get your hot dogs! The only thing on this field that comes up from the ground fully cooked!",
+      "Fresh off the roller, friend. The secret ingredient is that I never discuss the ingredients.",
+      "You cannot drill on an empty stomach. Technically you can. But why suffer?",
+      "Mustard, relish, onions, and my complete discretion regarding the frank. All included.",
+      "One for a dollar, two for two dollars. The bulk discount is imaginary, but the dogs are real.",
+    ],
+  },
 };
 
 // The beat between arriving at a vendor and the first word: long enough for
@@ -119,7 +153,26 @@ const state = {
   lastSceneVersion: -1,
   speakNotBefore: 0,
   speakTimer: null,
+  activeVendorId: null,
+  talking: false,
 };
+
+// ── Talk-state bridge: host callbacks → vendor models ──────────────────────
+// The SitePal vh_talk*/vh_audio* callbacks land in VendorSitePalHost; vendor
+// models subscribe here to crossfade idle ↔ talk clips while their greeting
+// actually plays.
+const talkListeners = new Set();
+export function onVendorTalk(fn) {
+  talkListeners.add(fn);
+  return () => talkListeners.delete(fn);
+}
+export function notifyVendorTalk(talking) {
+  if (talking === state.talking) return;
+  state.talking = talking;
+  talkListeners.forEach((fn) => {
+    try { fn(state.activeVendorId, talking); } catch (e) {}
+  });
+}
 
 const w = () => (typeof window === "undefined" ? null : window);
 
@@ -200,6 +253,7 @@ export function activateVendorSitePal(vendorId) {
   if (!win || !config) return;
   try {
     state.desiredVolume = 7;
+    state.activeVendorId = vendorId;
     win.__vendorSitePalDesiredVolume = 7;
     state.speakNotBefore = Date.now() + GREETING_DELAY_MS;
     if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
@@ -230,6 +284,9 @@ export function deactivateVendorSitePal() {
   if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
   state.speakNotBefore = 0;
   state.desiredVolume = 0;
+  // Return the character to idle even if no SitePal end-callback lands
+  // (stopSpeech mid-line doesn't always fire one).
+  notifyVendorTalk(false);
   win.__vendorSitePalDesiredVolume = 0;
   try { if (typeof win.setPlayerVolume === "function") win.setPlayerVolume(0); } catch (e) {}
   try { if (typeof win.stopSpeech === "function") win.stopSpeech(); } catch (e) {}

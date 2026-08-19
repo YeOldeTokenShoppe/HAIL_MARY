@@ -3,12 +3,13 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { Text, useGLTF, useAnimations } from "@react-three/drei";
+import { Text, useGLTF, useAnimations, useEnvironment } from "@react-three/drei";
 import {
   VENDOR_SITEPAL_CONFIG,
   getVendorSitePalSource,
   activateVendorSitePal,
   deactivateVendorSitePal,
+  onVendorTalk,
 } from "@/lib/vendorSitePal";
 
 // ── Commercial strip — a boardwalk apron hung off the −Z edge of the mesa
@@ -37,10 +38,21 @@ export const VENDOR_CATALOG = [
     // onto Face1 (Face2, the painted face, hides) and she speaks a greeting.
     sitepal: "fortunes" },
   { id: "souvenirs", label: "SOUVENIRS", awning: "#8a6d2f", accent: "#ffd700" },
+  { id: "hotdogs",   label: "HOT DOGS",  awning: "#a33b2a", accent: "#ffd24d",
+    model: "/models/Vendor_HotDog.glb", modelScale: 0.1, modelRotY: Math.PI / 2, idleClip: "idle",
+    // Standing cart vendor — same framing as the salesman; flip modelRotY
+    // sign if the cart faces sideways.
+    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+    talkClip: "talking",
+    sitepal: "hotdogs" },
   { id: "tonics",    label: "TONICS",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_Salesman1.glb", modelScale: 0.1, modelRotY: Math.PI / 2, idleClip: "idle",
     // His head is ~0.045 world units tall — a true close-up needs to be this near
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+    // His idle carries the head slightly low and left of center; lift the
+    // tracked gaze ~7° and turn it ~4.5° toward the viewer's right
+    gazeLift: 0.12, gazeTurn: -0.2,
+    talkClip: "hard_sell",
     sitepal: "tonics" },
 ];
 
@@ -204,6 +216,49 @@ function VendorModel({ vendor, focusedRef, headRef }) {
     return () => action?.stop();
   }, [actions, vendor.idleClip]);
 
+  // Environment-map fill: the strip sits on the −Z edge where one scene
+  // directional grazes and the other lights the vendors' BACKS, so their
+  // field-facing sides read near-silhouette on ambient alone. The rigs stay
+  // legible via IBL from the same preset — give the vendor materials the
+  // identical treatment (no extra dynamic lights, mobile-safe).
+  const envMap = useEnvironment({ preset: "warehouse" });
+  useEffect(() => {
+    if (!envMap) return;
+    scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m) => {
+        if (!m || !m.isMeshStandardMaterial) return;
+        if (m.envMap !== envMap) { m.envMap = envMap; m.needsUpdate = true; }
+        m.envMapIntensity = 0.45;
+      });
+    });
+  }, [scene, envMap]);
+
+  // Talk-clip swap: crossfade idle → vendor.talkClip while the greeting audio
+  // actually plays (SitePal's talk callbacks via the vendorSitePal bridge),
+  // and back when it ends or is cut off. Vendors without a talkClip (the
+  // seated fortune teller) simply never swap. Crossfades run between two
+  // playing actions, so bind pose is never touched.
+  const talkModeRef = useRef(false);
+  useEffect(() => {
+    if (!vendor.sitepal || !vendor.talkClip) return;
+    const off = onVendorTalk((vendorId, talking) => {
+      if (vendorId !== vendor.sitepal) return;
+      if (talking === talkModeRef.current) return;
+      const idle = (vendor.idleClip && actions?.[vendor.idleClip]) || Object.values(actions || {})[0];
+      const talk = actions?.[vendor.talkClip];
+      if (!idle || !talk) return;
+      talkModeRef.current = talking;
+      if (talking) {
+        talk.reset().crossFadeFrom(idle, 0.25, false).play();
+      } else {
+        idle.reset().crossFadeFrom(talk, 0.35, false).play();
+      }
+    });
+    return () => { off(); talkModeRef.current = false; };
+  }, [actions, vendor.sitepal, vendor.talkClip, vendor.idleClip]);
+
   // Locate the head bone once (Synty-style rigs name it "Head"/"head")
   useEffect(() => {
     const want = (vendor.headBone || "head").toLowerCase();
@@ -357,8 +412,15 @@ function VendorModel({ vendor, focusedRef, headRef }) {
       _toCam.copy(state.camera.position).sub(_headPos);
       faceDirWorld(vendor, _face);
       const flat = Math.hypot(_toCam.x, _toCam.z);
-      targetPitch = THREE.MathUtils.clamp(Math.atan2(_toCam.y, flat), -HEAD_PITCH_DOWN, HEAD_PITCH_UP);
-      let dYaw = Math.atan2(_toCam.x, _toCam.z) - Math.atan2(_face.x, _face.z);
+      // gazeLift (rad) corrects a rest pose that carries the head high or
+      // low — positive lifts the gaze above the pure camera angle.
+      targetPitch = THREE.MathUtils.clamp(
+        Math.atan2(_toCam.y, flat) + (vendor.gazeLift ?? 0),
+        -HEAD_PITCH_DOWN, HEAD_PITCH_UP
+      );
+      // gazeTurn (rad) corrects a sideways rest-pose bias — positive shifts
+      // the gaze toward the viewer's right.
+      let dYaw = Math.atan2(_toCam.x, _toCam.z) - Math.atan2(_face.x, _face.z) + (vendor.gazeTurn ?? 0);
       dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
       targetYaw = THREE.MathUtils.clamp(dYaw, -HEAD_YAW_LIMIT, HEAD_YAW_LIMIT);
     }
