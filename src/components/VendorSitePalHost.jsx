@@ -7,9 +7,18 @@ import {
   VENDOR_SITEPAL_EMBED_PARAMS,
   FORTUNES_SITEPAL_CROP,
   FORTUNES_SITEPAL_FILTER,
+  TONICS_SITEPAL_CROP,
+  TONICS_SITEPAL_FILTER,
   speakPendingVendorLine,
   getVendorSitePalSource,
 } from "@/lib/vendorSitePal";
+
+// Vendor tabs for the crop tuner. constName is used by the "Log values"
+// output so the pasted block lands on the right export in vendorSitePal.js.
+const TUNER_VENDORS = {
+  fortunes: { label: "FORTUNE TELLER", crop: FORTUNES_SITEPAL_CROP, filter: FORTUNES_SITEPAL_FILTER, constName: "FORTUNES" },
+  tonics: { label: "SALESMAN", crop: TONICS_SITEPAL_CROP, filter: TONICS_SITEPAL_FILTER, constName: "TONICS" },
+};
 
 // ── Single SitePal host embed for the /hailmary vendor strip ───────────────
 // Mounted once at page level (outside the Canvas). CommercialStrip's
@@ -74,7 +83,9 @@ const TUNER_FILTER_FIELDS = [
 
 function VendorCropTuner() {
   const previewRef = useRef(null);
+  const [vendorKey, setVendorKey] = useState("fortunes");
   const [, force] = useState(0);
+  const active = TUNER_VENDORS[vendorKey];
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -92,19 +103,19 @@ function VendorCropTuner() {
         ctx.fillStyle = "#333";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-      const c = FORTUNES_SITEPAL_CROP;
+      const c = TUNER_VENDORS[vendorKey].crop;
       ctx.strokeStyle = "#ff3355";
       ctx.lineWidth = 2;
       ctx.strokeRect(c.cropX * scale, c.cropY * scale, c.cropW * scale, c.cropH * scale);
     }, 120);
     return () => clearInterval(timer);
-  }, []);
+  }, [vendorKey]);
 
   const logValues = () => {
-    const c = FORTUNES_SITEPAL_CROP, f = FORTUNES_SITEPAL_FILTER;
+    const { crop: c, filter: f, constName } = active;
     console.log(
-      `export const FORTUNES_SITEPAL_CROP = {\n  cropX: ${c.cropX},\n  cropY: ${c.cropY},\n  cropW: ${c.cropW},\n  cropH: ${c.cropH},\n  rotateZ: ${c.rotateZ},\n  rotateX: ${c.rotateX},\n};\n` +
-      `export const FORTUNES_SITEPAL_FILTER = {\n  saturate: ${f.saturate},\n  contrast: ${f.contrast},\n  brightness: ${f.brightness},\n  hueRotate: ${f.hueRotate},\n  sepia: ${f.sepia},\n};`
+      `export const ${constName}_SITEPAL_CROP = {\n  cropX: ${c.cropX},\n  cropY: ${c.cropY},\n  cropW: ${c.cropW},\n  cropH: ${c.cropH},\n  rotateZ: ${c.rotateZ},\n  rotateX: ${c.rotateX},\n};\n` +
+      `export const ${constName}_SITEPAL_FILTER = {\n  saturate: ${f.saturate},\n  contrast: ${f.contrast},\n  brightness: ${f.brightness},\n  hueRotate: ${f.hueRotate},\n  sepia: ${f.sepia},\n};`
     );
   };
 
@@ -127,11 +138,25 @@ function VendorCropTuner() {
       borderRadius: 8, fontFamily: "monospace", display: "flex",
       flexDirection: "column", gap: 4,
     }}>
-      <div style={{ fontSize: 12, opacity: 0.8 }}>FORTUNE TELLER — crop tuner</div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {Object.entries(TUNER_VENDORS).map(([key, v]) => (
+          <button
+            key={key}
+            onClick={() => setVendorKey(key)}
+            style={{
+              flex: 1, padding: "3px 4px", fontSize: 10, cursor: "pointer",
+              background: key === vendorKey ? "#3a4a6a" : "#1a2230",
+              color: "#cde", border: "1px solid #3a4a6a", borderRadius: 4,
+            }}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
       <canvas ref={previewRef} width={240} height={180} style={{ width: "100%", borderRadius: 4, background: "#222" }} />
-      {TUNER_CROP_FIELDS.map(([k, min, max]) => slider(FORTUNES_SITEPAL_CROP, k, min, max))}
+      {TUNER_CROP_FIELDS.map(([k, min, max]) => slider(active.crop, k, min, max))}
       <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>filter</div>
-      {TUNER_FILTER_FIELDS.map(([k, min, max]) => slider(FORTUNES_SITEPAL_FILTER, k, min, max))}
+      {TUNER_FILTER_FIELDS.map(([k, min, max]) => slider(active.filter, k, min, max))}
       <button onClick={logValues} style={{ marginTop: 6, padding: "4px 8px", cursor: "pointer" }}>
         Log values to console
       </button>

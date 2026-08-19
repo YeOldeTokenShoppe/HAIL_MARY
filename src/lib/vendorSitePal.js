@@ -45,9 +45,29 @@ export const FORTUNES_SITEPAL_FILTER = {
   sepia: 34,
 };
 
+// Salesman crop/filter — tuned via /hailmary?tune=vendor (SALESMAN tab);
+// re-tune there and paste the logged values back here if his scene's avatar
+// ever changes.
+export const TONICS_SITEPAL_CROP = {
+  cropX: 184,
+  cropY: 141,
+  cropW: 187,
+  cropH: 222,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const TONICS_SITEPAL_FILTER = {
+  saturate: 199,
+  contrast: 103,
+  brightness: 124,
+  hueRotate: 0,
+  sepia: 34,
+};
+
 // Per-vendor registry, keyed by VENDOR_CATALOG id. `projFace` receives the
 // SitePal projection; `regularFaces` are the painted face layers hidden
-// while the projection is active.
+// while the projection is active (the two models label them differently —
+// per-vendor fields, not a convention).
 export const VENDOR_SITEPAL_CONFIG = {
   fortunes: {
     sceneId: 2775386,
@@ -60,6 +80,25 @@ export const VENDOR_SITEPAL_CONFIG = {
       "Ah. The ball has been restless all afternoon, and now I see why. Sit.",
       "The cards said nothing about you, stranger. I like that. It means tonight is still negotiable.",
       "Come closer. Every well out there dreams, and I am the only one on this field who listens.",
+    ],
+  },
+  tonics: {
+    sceneId: 2775402,
+    voice: { voice: "QPJKUe47zCn3aejMTMUr", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    crop: TONICS_SITEPAL_CROP,
+    filter: TONICS_SITEPAL_FILTER,
+    greetings: [
+      "Step right up, friend! You have the look of a prospector who knows value when it winks at him.",
+      "Ah, a discerning customer. One bottle of my patented tonic and that drill of yours practically steers itself.",
+      "Everything on this cart is one hundred percent genuine, friend. Mostly. The mustache included.",
+      "You there! Yes, you. Dry holes got you down? I bottle luck itself, and business is booming.",
+      "This tonic cured a man's rig of squeaking, his boots of pinching, and his marriage of silence. One bottle left.",
+      "I don't sell hope, friend. Hope is free. I sell the bottle you keep it in.",
+      "Free advice, no charge: never trust a salesman. Present company excepted, naturally.",
+      "Rub two drops on your derrick and stand well back. That is all I am legally permitted to say.",
+      "The fortune teller reads your future. I improve it. Small distinction, friend. Big difference.",
     ],
   },
 };

@@ -40,7 +40,8 @@ export const VENDOR_CATALOG = [
   { id: "tonics",    label: "TONICS",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_Salesman1.glb", modelScale: 0.1, modelRotY: Math.PI / 2, idleClip: "idle",
     // His head is ~0.045 world units tall — a true close-up needs to be this near
-    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35 },
+    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+    sitepal: "tonics" },
 ];
 
 // Preload vendor GLBs (same idiom as ADDON_CATALOG in OilVoxelGrid)
