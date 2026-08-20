@@ -95,11 +95,22 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face2"],
     crop: FORTUNES_SITEPAL_CROP,
     filter: FORTUNES_SITEPAL_FILTER,
-    greetings: [
-      "Ah. The ball has been restless all afternoon, and now I see why. Sit.",
-      "The cards said nothing about you, stranger. I like that. It means tonight is still negotiable.",
-      "Come closer. Every well out there dreams, and I am the only one on this field who listens.",
-    ],
+    greetings: {
+      first: [
+        "A new face. Sit. The ball has been expecting you, even if you were not expecting the ball.",
+        "So. The field sends me a stranger. Give me your eyes, and I will tell you what the dust will not.",
+      ],
+      returning: [
+        "Ah. The ball has been restless all afternoon, and now I see why. Sit.",
+        "The cards said nothing about you, stranger. I like that. It means tonight is still negotiable.",
+        "Come closer. Every well out there dreams, and I am the only one on this field who listens.",
+        "Day {day} already. The field grows honest near the end. So do I.",
+      ],
+      frequent: [
+        "Back again. The regulars get the true readings. The tourists get the pretty ones. Sit.",
+        "I have read your face so often I could do it from memory. Tonight, let us read something else.",
+      ],
+    },
   },
   tonics: {
     sceneId: 2775402,
@@ -108,17 +119,28 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: TONICS_SITEPAL_CROP,
     filter: TONICS_SITEPAL_FILTER,
-    greetings: [
-      "Step right up, friend! You have the look of a prospector who knows value when it winks at him.",
-      "Ah, a discerning customer. One bottle of my patented tonic and that drill of yours practically steers itself.",
-      "Everything on this cart is one hundred percent genuine, friend. Mostly. The mustache included.",
-      "You there! Yes, you. Dry holes got you down? I bottle luck itself, and business is booming.",
-      "This tonic cured a man's rig of squeaking, his boots of pinching, and his marriage of silence. One bottle left.",
-      "I don't sell hope, friend. Hope is free. I sell the bottle you keep it in.",
-      "Free advice, no charge: never trust a salesman. Present company excepted, naturally.",
-      "Rub two drops on your derrick and stand well back. That is all I am legally permitted to say.",
-      "The fortune teller reads your future. I improve it. Small distinction, friend. Big difference.",
-    ],
+    greetings: {
+      first: [
+        "A NEW customer! Friend, you have wandered into the single luckiest moment of your prospecting career.",
+        "First time at my cart? Then the first sip of advice is free: buy the second bottle.",
+      ],
+      returning: [
+        "Step right up, friend! You have the look of a prospector who knows value when it winks at him.",
+        "Ah, a discerning customer. One bottle of my patented tonic and that drill of yours practically steers itself.",
+        "Everything on this cart is one hundred percent genuine, friend. Mostly. The mustache included.",
+        "You there! Yes, you. Dry holes got you down? I bottle luck itself, and business is booming.",
+        "This tonic cured a man's rig of squeaking, his boots of pinching, and his marriage of silence. One bottle left.",
+        "I don't sell hope, friend. Hope is free. I sell the bottle you keep it in.",
+        "Free advice, no charge: never trust a salesman. Present company excepted, naturally.",
+        "Rub two drops on your derrick and stand well back. That is all I am legally permitted to say.",
+        "The fortune teller reads your future. I improve it. Small distinction, friend. Big difference.",
+        "Day {day}, and business is booming. Somebody on this field is lucky. Statistically. Probably.",
+      ],
+      frequent: [
+        "My favorite customer returns! For you, the regular price. Which is the special price. Which is the price.",
+        "You again! I would offer the loyalty discount, but loyalty, friend, is priceless.",
+      ],
+    },
   },
   hotdogs: {
     sceneId: 2775403,
@@ -127,13 +149,24 @@ export const VENDOR_SITEPAL_CONFIG = {
     regularFaces: ["Face1", "Face3"],
     crop: HOTDOGS_SITEPAL_CROP,
     filter: HOTDOGS_SITEPAL_FILTER,
-    greetings: [
-      "Hot dogs! Get your hot dogs! The only thing on this field that comes up from the ground fully cooked!",
-      "Fresh off the roller, friend. The secret ingredient is that I never discuss the ingredients.",
-      "You cannot drill on an empty stomach. Technically you can. But why suffer?",
-      "Mustard, relish, onions, and my complete discretion regarding the frank. All included.",
-      "One for a dollar, two for two dollars. The bulk discount is imaginary, but the dogs are real.",
-    ],
+    greetings: {
+      first: [
+        "New on the field? First rule: never drill hungry. Second rule: I am the only food for forty miles.",
+        "Welcome to the boardwalk, friend. The dogs are hot, the field is cold, and the gossip is free.",
+      ],
+      returning: [
+        "Hot dogs! Get your hot dogs! The only thing on this field that comes up from the ground fully cooked!",
+        "Fresh off the roller, friend. The secret ingredient is that I never discuss the ingredients.",
+        "You cannot drill on an empty stomach. Technically you can. But why suffer?",
+        "Mustard, relish, onions, and my complete discretion regarding the frank. All included.",
+        "One for a dollar, two for two dollars. The bulk discount is imaginary, but the dogs are real.",
+        "Day {day}. I have sold enough dogs to pave a claim. Nobody has struck oil in a hot dog yet. Yet.",
+      ],
+      frequent: [
+        "The usual? Of course the usual. I had it rolling the moment I saw you cross the field.",
+        "You know, you are the only one out here who chews before swallowing. I respect that.",
+      ],
+    },
   },
 };
 
@@ -222,13 +255,65 @@ function unlockAudio(win) {
   } catch (e) {}
 }
 
+// ── State-aware greetings ──────────────────────────────────────────────────
+// Greeting pools come in visit tiers: `first` (never met — tracked in
+// localStorage per vendor), `returning` (the default), `frequent` (6+
+// visits — regulars treatment). A plain array still works and is treated as
+// { returning: [...] }. Lines may embed {tokens} resolved from the greeting
+// context (set from the page via setVendorGreetingContext); a line whose
+// token has no value yet simply stays out of the pool, so data-driven lines
+// switch on the moment the page supplies the data.
+let greetingContext = {};
+export function setVendorGreetingContext(patch) {
+  greetingContext = { ...greetingContext, ...patch };
+}
+
+const FREQUENT_VISITS = 6;
+
+function vendorVisits(vendorId, increment) {
+  const win = w();
+  if (!win || !win.localStorage) return 2; // SSR/no-storage → returning tier
+  const key = `hm_vendor_visits_${vendorId}`;
+  let n = parseInt(win.localStorage.getItem(key) || "0", 10) || 0;
+  if (increment) {
+    n += 1;
+    try { win.localStorage.setItem(key, String(n)); } catch (e) {}
+  }
+  return n;
+}
+
+function resolveLine(line) {
+  let missing = false;
+  const out = line.replace(/\{(\w+)\}/g, (m, k) => {
+    if (greetingContext[k] === undefined || greetingContext[k] === null) {
+      missing = true;
+      return m;
+    }
+    return String(greetingContext[k]);
+  });
+  return missing ? null : out;
+}
+
 function pickGreeting(vendorId, config) {
-  const lines = config.greetings || [];
+  const g = config.greetings;
+  if (!g) return null;
+  const pools = Array.isArray(g) ? { returning: g } : g;
+  const visits = vendorVisits(vendorId, true);
+  const tier =
+    visits <= 1 ? (pools.first?.length ? "first" : "returning")
+    : visits >= FREQUENT_VISITS && pools.frequent?.length ? "frequent"
+    : "returning";
+  // Regulars still hear the plain pool sometimes so it doesn't wear out.
+  const raw = tier === "frequent" && Math.random() < 0.4
+    ? [...pools.frequent, ...(pools.returning || [])]
+    : (pools[tier] || pools.returning || []);
+  const lines = raw.map(resolveLine).filter(Boolean);
   if (!lines.length) return null;
-  const last = state.lastGreetingIdx[vendorId];
+  const lastKey = `${vendorId}:${tier}`;
+  const last = state.lastGreetingIdx[lastKey];
   let idx = Math.floor(Math.random() * lines.length);
   if (lines.length > 1 && idx === last) idx = (idx + 1) % lines.length;
-  state.lastGreetingIdx[vendorId] = idx;
+  state.lastGreetingIdx[lastKey] = idx;
   return lines[idx];
 }
 

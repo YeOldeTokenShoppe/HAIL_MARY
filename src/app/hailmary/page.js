@@ -19,6 +19,7 @@ import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPa
 import HowToPlayPanel from "@/components/HowToPlayPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
+import { setVendorGreetingContext } from "@/lib/vendorSitePal";
 import OilOverlayModal from "@/components/OilOverlayModal";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
@@ -2101,6 +2102,15 @@ export default function OilPage() {
   const effectiveDrillDay = (isAdmin || isReport) ? demoDay
     : isTest ? testDay
     : (reviewDay !== null ? reviewDay : cellDepth);
+
+  // Feed live game data into the vendors' greeting context: lines with
+  // {tokens} only enter a vendor's pool once their datum exists here, so
+  // adding a token to this object is all it takes to unlock new lines.
+  useEffect(() => {
+    // day: null before the season starts (day 0) — keeps "Day {day}" lines
+    // out of the pools rather than speaking "Day 0".
+    setVendorGreetingContext({ day: effectiveDrillDay > 0 ? effectiveDrillDay : null });
+  }, [effectiveDrillDay]);
 
   // Drill status — click-to-drill, but ceiling is time-gated (passiveDepth + bonusDrills)
   const drillStatus = useMemo(() => {
