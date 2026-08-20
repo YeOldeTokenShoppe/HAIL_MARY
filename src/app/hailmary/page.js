@@ -657,6 +657,15 @@ function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
   const { camera, gl } = useThree();
   const elapsed = useRef(0);
   const done = useRef(false);
+  // The intro's current look point, reported to onComplete at interruption so
+  // OrbitControls can adopt it as their starting target — without it the
+  // controls snap the view to their fixed default pivot mid-motion.
+  const lastLook = useRef(new THREE.Vector3(0, mobile ? 1.5 : 5, 0));
+  // Glide-out: interruption decays the intro clock's advance rate instead of
+  // freezing it — the camera decelerates along its own path (orbit, bob and
+  // gaze slow together) and hands off to OrbitControls at rest.
+  const stopping = useRef(false);
+  const speed = useRef(1);
   // Hold the intro clock until the initial asset load finishes — otherwise a
   // cold load runs the vendor fly-by behind a black screen and the viewer
   // joins mid-tour. Once started, later lazy loads must NOT pause the flight.
@@ -667,10 +676,10 @@ function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
   useEffect(() => {
     const canvas = gl.domElement;
     const stop = () => {
-      if (!done.current) {
-        done.current = true;
-        onComplete();
-      }
+      // Begin the glide-out; useFrame completes the intro once at rest.
+      // (Clicks that navigate — plots, stalls — still end the intro
+      // instantly via setIntroComplete in their own handlers.)
+      stopping.current = true;
     };
     canvas.addEventListener("pointerdown", stop);
     canvas.addEventListener("wheel", stop);
@@ -687,7 +696,17 @@ function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
       started.current = true;
     }
 
-    elapsed.current += delta;
+    if (stopping.current) {
+      // Exponential deceleration (~halves every 0.15s); done in ~0.8s.
+      speed.current *= Math.exp(-delta * 4.5);
+      if (speed.current < 0.02) {
+        done.current = true;
+        onComplete([lastLook.current.x, lastLook.current.y, lastLook.current.z]);
+        return;
+      }
+    }
+
+    elapsed.current += delta * speed.current;
     const time = elapsed.current;
 
     // Corkscrew-in: the orbit RADIUS (and base height) eases inward over `dur`
@@ -740,7 +759,8 @@ function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
       );
       // Less tower-centric: look low, biased toward the vendor half (−Z);
       // the crest lift toward the tower is kept but reduced.
-      camera.lookAt(0, SURFACE + 0.35 + 1.4 * up, -1.2 * f);
+      lastLook.current.set(0, SURFACE + 0.35 + 1.4 * up, -1.2 * f);
+      camera.lookAt(lastLook.current);
     } else {
       // Desktop: wide field-and-tower shot → wide orbit skimming the strip.
       // Slower than the original (dur 13 → 17, ~2/3 the angular speed) and
@@ -771,7 +791,8 @@ function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
       );
       // Less tower-centric: look low, biased toward the vendor half (−Z);
       // the crest lift toward the tower is kept but reduced.
-      camera.lookAt(0, SURFACE + 0.4 + 1.6 * up, -1.8 * f);
+      lastLook.current.set(0, SURFACE + 0.4 + 1.6 * up, -1.8 * f);
+      camera.lookAt(lastLook.current);
     }
   });
 
@@ -3390,6 +3411,15 @@ export default function OilPage() {
     return () => window.removeEventListener("vendor-mood", onMood);
   }, []);
   const moodScale = vendorMood ? 0.12 : 1;
+
+  // Where the intro camera was looking when the user interrupted it — adopted
+  // as OrbitControls' initial target so the handoff doesn't snap the view to
+  // the fixed default pivot. null = intro not interrupted (skipped/rig open).
+  const [introExitTarget, setIntroExitTarget] = useState(null);
+  const handleIntroComplete = useCallback((look) => {
+    if (look) setIntroExitTarget(look);
+    setIntroComplete(true);
+  }, []);
 
   const handleFlyTo = useCallback((col, row) => {
     const worldW = gridSize * CELL_SIZE;
@@ -6812,12 +6842,12 @@ export default function OilPage() {
                       autoRotate={hellOrbit}
                       autoRotateSpeed={0.6}
                       onStart={() => { if (hellOrbit) setHellOrbit(false); }}
-                      target={[1.5, 1.5, 1.5]}
+                      target={introExitTarget || [1.5, 1.5, 1.5]}
                     />
                     <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
                   </>
                 ) : introRig ? null : (
-                  <CameraFlyIn onComplete={() => setIntroComplete(true)} mobile grid={gridSize} />
+                  <CameraFlyIn onComplete={handleIntroComplete} mobile grid={gridSize} />
                 )}
                 <CameraShake shakeRef={shakeRef} />
                 {/* Dev-only perf HUD (plain canvas here — no CRT
@@ -7385,13 +7415,13 @@ export default function OilPage() {
                   maxDistance={45}
                   maxPolarAngle={Math.PI}
                   minPolarAngle={0}
-                  target={[3, 5, 3]}
+                  target={introExitTarget || [3, 5, 3]}
                   zoomToCursor
                 />
                 <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />
               </>
             ) : introRig ? null : (
-              <CameraFlyIn onComplete={() => setIntroComplete(true)} grid={gridSize} />
+              <CameraFlyIn onComplete={handleIntroComplete} grid={gridSize} />
             )}
             <CameraShake shakeRef={shakeRef} />
             {/* Dev-only perf HUD (plain canvas here — no CRT wrapper,

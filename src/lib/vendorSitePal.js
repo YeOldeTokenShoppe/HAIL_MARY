@@ -49,9 +49,9 @@ export const FORTUNES_SITEPAL_FILTER = {
 // re-tune there and paste the logged values back here if his scene's avatar
 // ever changes.
 export const TONICS_SITEPAL_CROP = {
-  cropX: 184,
-  cropY: 141,
-  cropW: 187,
+  cropX: 195,
+  cropY: 143,
+  cropW: 160,
   cropH: 222,
   rotateZ: 0,
   rotateX: 0,

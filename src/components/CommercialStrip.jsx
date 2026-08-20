@@ -19,8 +19,8 @@ import {
 // layout/click wiring stays the same.
 
 export const VENDOR_CATALOG = [
-  { id: "insurance", label: "INSURANCE", awning: "#3e6b64", accent: "#7fd6c8" },
-  { id: "fortunes",  label: "FORTUNES",  awning: "#5a4a78", accent: "#c79bff",
+  { id: "insurance", label: "", awning: "#3e6b64", accent: "#7fd6c8" },
+  { id: "fortunes",  label: "",  awning: "#5a4a78", accent: "#c79bff",
     model: "/models/Vendor_FortuneTeller.glb", modelScale: 0.1, modelRotY: -Math.PI / 2, idleClip: "sit_idle",
     // She sits −90° from stall-forward; faceYaw swings the fly-in (and the
     // head-tracking rest direction) to meet her face across the table, and
@@ -37,15 +37,15 @@ export const VENDOR_CATALOG = [
     // Key into VENDOR_SITEPAL_CONFIG: on focus her SitePal avatar is cropped
     // onto Face1 (Face2, the painted face, hides) and she speaks a greeting.
     sitepal: "fortunes" },
-  { id: "souvenirs", label: "SOUVENIRS", awning: "#8a6d2f", accent: "#ffd700" },
-  { id: "hotdogs",   label: "HOT DOGS",  awning: "#a33b2a", accent: "#ffd24d",
+  { id: "souvenirs", label: "", awning: "#8a6d2f", accent: "#ffd700" },
+  { id: "hotdogs",   label: "",  awning: "#a33b2a", accent: "#ffd24d",
     model: "/models/Vendor_HotDog.glb", modelScale: 0.1, modelRotY: Math.PI / 2, idleClip: "idle",
     // Standing cart vendor — same framing as the salesman; flip modelRotY
     // sign if the cart faces sideways.
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     talkClip: "talking",
     sitepal: "hotdogs" },
-  { id: "tonics",    label: "TONICS",    awning: "#7a3524", accent: "#ff8c5a",
+  { id: "tonics",    label: "",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_Salesman1.glb", modelScale: 0.1, modelRotY: Math.PI / 2, idleClip: "idle",
     // His head is ~0.045 world units tall — a true close-up needs to be this near
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
