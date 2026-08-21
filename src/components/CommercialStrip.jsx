@@ -53,9 +53,14 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 //   standing pose need very different approach angles (this is what put the
 //   fortune teller's camera inside her wagon), and a working pose may want to
 //   pause and look up where a standing one just tracks.
-//   Useful keys: faceDist / faceLift / camDrop (framing), faceYaw (which way
+//   Useful keys: companionModel (a second character that exists only with this
+//   pose, e.g. the tattoo client in the chair), faceDist / faceLift / camDrop
+//   (framing), focusOffset [x,y,z] in strip-local units (shifts the look-at
+//   target laterally, for shots framing more than one character), faceYaw
+//   (which way
 //   the character LOOKS — also sets the head-tracking pitch axis), approachYaw
 //   (where the camera flies in from; defaults to faceYaw), pauseOnFocus,
+//   focusGazeDelay (seconds to keep working before looking up),
 //   focusGazeLift, headPitchUp, gazeTurn.
 export const VENDOR_CATALOG = [
   { id: "insurance", label: "", awning: "#3e6b64", accent: "#7fd6c8",
@@ -114,12 +119,29 @@ export const VENDOR_CATALOG = [
       // "look up" reads as a sideways roll.
       // Then freeze the clip on focus and lift her gaze the rest of the way —
       // focusGazeLift ≈ how far her animated head is pitched down.
-      // approachYaw pulls the camera 45° off her eyeline: straight down +X is
-      // through the barber chair (0.15 world away, camera lands at 0.32).
-      // Set it to 0 for a head-on shot if the chair turns out not to block.
-      "/models/Vendor_TattooArtist_tattooing.glb": { faceYaw: 0, approachYaw: -Math.PI / 4,
-        faceDist: 0.24, faceLift: 0, camDrop: -0.06,
-        pauseOnFocus: true, focusGazeLift: 0.7, headPitchUp: 1.35 },
+      // Camera comes straight in from the boardwalk front (local -X). The
+      // tent's front poles sit at local x 0.2-0.5 in two clusters, z 28.2-28.6
+      // and z 29.8-30.2, leaving an opening between them — and the pair's
+      // midpoint is z 29.11, so a pure -X line threads that gap almost dead
+      // centre. The earlier -PI/4 aimed straight into the z~29.8 pole.
+      // Side-on is also what frames BOTH of them; she turns to camera via the
+      // head tracking (clamped at 63°, so a natural 3/4 rather than a full
+      // swivel).
+      "/models/Vendor_TattooArtist_tattooing.glb": {
+        // The client only exists on the loads where she is actually tattooing.
+        // Kept in his own GLB rather than merged into hers: both Synty rigs
+        // name their bones identically (Pelvis, spine_01, head...), and three
+        // binds animation tracks to bones BY NAME taking the first match — so
+        // merged, his idle_sit could end up driving her skeleton.
+        companionModel: "/models/Vendor_TattooArtist_Client.glb",
+        faceYaw: 0, approachYaw: -Math.PI / 2,
+        // pull back a little and aim at the artist/client midpoint rather than
+        // her head — she is at local z 28.58, the client at 29.64
+        faceDist: 0.34, faceLift: 0.02, camDrop: -0.06,
+        focusOffset: [0.15, 0, 0.5],
+        // beat before she looks up — long enough to read as finishing a line,
+        // short enough not to feel unresponsive
+        pauseOnFocus: true, focusGazeDelay: 1.8, focusGazeLift: 0.5, headPitchUp: 1.0 },
     } },
   { id: "tonics",    label: "",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_SnakeOilSalesman_Character.glb", idleClip: "idle",
@@ -147,6 +169,12 @@ VENDOR_CATALOG.forEach((v) => {
 // Preload the strip and vendor GLBs (same idiom as ADDON_CATALOG in OilVoxelGrid)
 useGLTF.preload(STRIP_MODEL);
 Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(url));
+// ...and the companion belonging to whichever pose was drawn, so it arrives
+// with the character rather than popping in a beat later.
+VENDOR_CATALOG.forEach((v) => {
+  const companion = v.poseOverrides?.[CHOSEN_POSE_MODEL[v.id]]?.companionModel;
+  if (companion) useGLTF.preload(companion);
+});
 
 // three.js GLTFLoader pushes EVERY node name through
 // PropertyBinding.sanitizeNodeName, whose reserved set is [ ] . : / — dots are
@@ -360,13 +388,37 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
 
   const restActionRef = useRef(null);
   useEffect(() => {
-    const action = (restClip && actions?.[restClip]) || Object.values(actions || {})[0];
+    const all = Object.values(actions || {});
+    const action = (restClip && actions?.[restClip]) || all[0];
     restActionRef.current = action || null;
     // No fadeIn: on (re)mount the bindings sit at bind pose, and a weight fade
     // would visibly blend from T-pose. Playing at full weight snaps straight
     // into the idle on the first mixer update instead.
     action?.reset().play();
-    return () => { action?.stop(); restActionRef.current = null; };
+
+    // A pose file can carry MORE THAN ONE character — the tattoo artist's
+    // client rides along in her tattooing export. Those clips drive separate
+    // skeletons and all of them have to run, whereas a vendor's own alternate
+    // clips (hard_sell, shifty) drive the SAME bones as the idle and must not,
+    // or they blend into mush. Disjoint bone targets is what separates the two
+    // cases, so no per-vendor config is needed.
+    const extras = [];
+    if (action) {
+      const bone = (t) => t.name.split(".")[0];
+      const restTargets = new Set(action.getClip().tracks.map(bone));
+      all.forEach((a) => {
+        if (a === action) return;
+        if (a.getClip().tracks.some((t) => restTargets.has(bone(t)))) return;
+        a.reset().play();
+        extras.push(a);
+      });
+    }
+
+    return () => {
+      action?.stop();
+      extras.forEach((a) => a.stop());
+      restActionRef.current = null;
+    };
   }, [actions, restClip]);
 
   // Environment-map fill: the strip sits on the −Z edge where one scene
@@ -520,6 +572,7 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   // frame; the delta is applied in world space, which stays axis-correct
   // regardless of the rig's bone orientation convention.
   const trackRef = useRef({ yaw: 0, pitch: 0 });
+  const dwellRef = useRef(0);   // seconds focused, for focusGazeDelay
   useFrame((state, delta) => {
     // Crystal-ball life: advance the swirl shader, and drive the light +
     // stand emissive with a quasi-periodic flicker (two incommensurate
@@ -579,15 +632,25 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     // Freeze the clip instead and let the gaze bias carry her head all the way
     // up. Paused actions keep writing their frozen pose, so the additive delta
     // still has a stable base and the anti-compounding guard below still holds.
+    //
+    // focusGazeDelay holds that off for a beat so she finishes the line she is
+    // working on before noticing you. It gates the clip freeze AND the gaze
+    // together — freezing her instantly and lifting her head later reads as a
+    // hitch, whereas doing both at once reads as "stopped work, looked up".
+    // Returning to work is NOT delayed: she should drop her gaze promptly.
+    const isFocused = !!focusedRef?.current;
+    dwellRef.current = isFocused ? dwellRef.current + delta : 0;
+    const engaged = isFocused && dwellRef.current >= (vendor.focusGazeDelay ?? 0);
+
     if (vendor.pauseOnFocus && restActionRef.current) {
-      restActionRef.current.paused = !!focusedRef?.current;
+      restActionRef.current.paused = engaged;
     }
 
     const head = headRef?.current;
     if (!head) return;
     const t = trackRef.current;
     let targetYaw = 0, targetPitch = 0;
-    if (focusedRef?.current) {
+    if (engaged) {
       head.getWorldPosition(_headPos);
       _toCam.copy(state.camera.position).sub(_headPos);
       faceDirWorld(vendor, _face, stripRotY);
@@ -702,6 +765,17 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
       headRef.current.getWorldPosition(headPos);
       // faceLift moves the look-at point (frame center) up/down the body.
       headPos.y += (vendor.faceLift ?? 0) * framingUnit;
+      // focusOffset shifts the look-at LATERALLY, in strip-local units, for
+      // shots framing more than one character — the tattoo pair wants the
+      // midpoint between artist and client, not her head. Converted through the
+      // group's +90°: local (x,y,z) -> world (z, y, -x).
+      const fo = vendor.focusOffset;
+      if (fo) {
+        const sc = framingUnit * LEGACY_MODEL_SCALE;
+        headPos.x += (fo[2] ?? 0) * sc;
+        headPos.y += (fo[1] ?? 0) * sc;
+        headPos.z += -(fo[0] ?? 0) * sc;
+      }
       // camDrop tilts the approach ray: negative puts the camera BELOW the
       // target looking up (hero shot), positive above looking down. This is
       // what changes the composition — faceLift alone shifts camera and
@@ -741,6 +815,7 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = "auto"; }}
     >
+      {vendor.companionModel && <CompanionModel url={vendor.companionModel} />}
       {(vendor.model || vendor.poseModels?.length) && (
         <VendorModel
           vendor={vendor}
@@ -1144,6 +1219,40 @@ function BulbRig({ stripScene, envPreset, clipPlanes }) {
         />
       </points>
     </>
+  );
+}
+
+// A second character that only exists alongside a particular pose — the tattoo
+// client, who should be in the chair only on the loads where the artist is
+// actually seated and tattooing. Kept in its OWN GLB rather than merged into
+// hers: both Synty rigs name their bones identically (Pelvis, spine_01, head,
+// Hand_L...), and three.js binds animation tracks to bones BY NAME, taking the
+// first match in the tree. Merged, the client's clip can end up driving the
+// artist's skeleton. Separate files keep each binding unambiguous, and each
+// export stays a simple one-armature job.
+//
+// Exported in position like every other character, so it renders at identity.
+function CompanionModel({ url }) {
+  const group = useRef();
+  const { scene, animations } = useGLTF(url);
+  const { actions, mixer } = useAnimations(animations, group);
+
+  useEffect(() => {
+    const orig = mixer.update.bind(mixer);
+    mixer.update = (d) => orig(Math.min(d, 1 / 30));
+    return () => { mixer.update = orig; };
+  }, [mixer]);
+
+  useEffect(() => {
+    const a = Object.values(actions || {})[0];
+    a?.reset().play();
+    return () => a?.stop();
+  }, [actions]);
+
+  return (
+    <group ref={group}>
+      <primitive object={scene} />
+    </group>
   );
 }
 
