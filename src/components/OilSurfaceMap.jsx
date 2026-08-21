@@ -34,6 +34,11 @@ export default function OilSurfaceMap({
   // Dark-theme bgs: dark (#12161c), parabolumDark (#0c0717), hud (#0f141c).
   const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717" || theme?.bg === "#0f141c";
   const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#2dd6c8", accent: "#7a5a1a" };
+  // Cell fills shared by the grid and the legend beneath it.
+  const dryFill = dark ? "rgba(74,88,104,0.5)" : "rgba(150,162,178,0.34)";
+  const emptyFill = t.mapEmpty || (dark ? "rgba(255,255,255,0.03)" : "rgba(120,108,90,0.06)");
+  const ownedBorder = dark ? "#555" : "#aaa";
+  const oilGradient = `linear-gradient(90deg, ${getSurfaceColor(0.2, 1, dark)}, ${getSurfaceColor(0.6, 1, dark)}, ${getSurfaceColor(1, 1, dark)})`;
 
   return (
     <div style={{ fontFamily: "'Share Tech Mono', 'Courier New', monospace", color: t.muted, position: "relative" }}>
@@ -49,7 +54,7 @@ export default function OilSurfaceMap({
         fontSize: 9, color: t.inspectorKey || t.muted, marginBottom: 8,
         textAlign: "center", letterSpacing: "0.08em",
       }}>
-        {claimJumpMode ? "CLAIM JUMP \u2014 Click an unclaimed cell" : "SURVEY MAP \u2014 oil \u00b7 dry \u00b7 unexplored"}
+        {claimJumpMode ? "CLAIM JUMP \u2014 Click an unclaimed cell" : "SURVEY MAP"}
       </div>
       {/* X axis labels along top */}
       <div style={{
@@ -109,9 +114,9 @@ export default function OilSurfaceMap({
             } else if (claim.total > 0) {
               bg = getSurfaceColor(claim.total, maxClaimTotal, dark, parabolum);
             } else if (hasDrillHistory) {
-              bg = dark ? "rgba(74,88,104,0.5)" : "rgba(150,162,178,0.34)";
+              bg = dryFill;
             } else {
-              bg = t.mapEmpty || (dark ? "rgba(255,255,255,0.03)" : "rgba(120,108,90,0.06)");
+              bg = emptyFill;
             }
 
             return (
@@ -132,7 +137,7 @@ export default function OilSurfaceMap({
                     : isMine
                     ? `2px solid ${t.green}88`
                     : isOwned
-                    ? `1px solid ${dark ? "#555" : "#aaa"}`
+                    ? `1px solid ${ownedBorder}`
                     : `1px solid ${t.borderLight}`,
                   boxShadow: claim.index === selectedClaimIndex ? `0 0 8px rgba(90, 138, 58, 0.4)` : "none",
                   display: "flex",
@@ -174,6 +179,29 @@ export default function OilSurfaceMap({
         fontSize: 7, color: t.muted, textAlign: "center",
         letterSpacing: "0.1em", marginTop: 2, paddingLeft: 14,
       }}>X &rarr;</div>
+      <div style={{
+        display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "3px 10px",
+        marginTop: 4, paddingLeft: 14, fontSize: 9, letterSpacing: "0.08em",
+        color: t.inspectorKey || t.muted,
+      }}>
+        {[
+          ["OIL", { background: oilGradient }],
+          ["DRY", { background: dryFill }],
+          ["UNEXPLORED", { background: emptyFill, border: `1px solid ${t.borderLight}` }],
+          ["YOU", { background: emptyFill, border: `2px solid ${t.green}88` }],
+          ["CLAIMED", { background: emptyFill, border: `1px solid ${ownedBorder}` }],
+        ].map(([label, swatch]) => (
+          <span key={label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{
+              width: 10, height: 10, borderRadius: 1, flexShrink: 0, boxSizing: "border-box",
+              display: "inline-flex", alignItems: "center", justifyContent: "center", ...swatch,
+            }}>
+              {label === "CLAIMED" && <span style={{ width: 4, height: 4, background: dark ? "#888" : "#999" }} />}
+            </span>
+            {label}
+          </span>
+        ))}
+      </div>
       <div style={{
         position: "absolute", left: 1, top: "50%",
         fontSize: 7, color: t.muted, letterSpacing: "0.1em",

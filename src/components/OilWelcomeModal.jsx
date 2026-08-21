@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import dynamic from "next/dynamic";
 import { HOW_TO_PLAY_STEPS } from "./HowToPlayPanel";
+
+const OilVerifyExplainer = dynamic(() => import("./OilVerifyExplainer"), { ssr: false });
 
 // Transcript of the intro video's spoken dialogue. Rendered as on-page text so
 // browsers' built-in page translation picks it up (a <video> <track> subtitle
@@ -24,7 +27,13 @@ const INTRO_TRANSCRIPT = [
 
 // First-visit onboarding overlay for /hailmary. Shows a character greeting video
 // up top with the How-to-Play steps below. Re-openable via the "?" help button.
-export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
+export default function OilWelcomeModal({
+  isOpen, onClose, darkMode = false,
+  // Passed through to the fairness explainer (it re-derives the field locally).
+  numberOfDeposits, totalOilBudget, gridX = 10, gridY = 10,
+  // Desktop UI scale (matches the side panels); the card zooms, the backdrop doesn't.
+  scale = 1,
+}) {
   // Close on Escape for keyboard users.
   useEffect(() => {
     if (!isOpen) return;
@@ -65,7 +74,9 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
           // dvh (not vh) so the modal fits the *visible* viewport on iOS Safari
           // even while the URL bar is showing — otherwise the centered modal
           // overflows past the top and the close button hides under the URL bar.
-          width: "100%", maxWidth: 460, maxHeight: "90dvh",
+          width: "100%", maxWidth: 460,
+          maxHeight: scale !== 1 && typeof window !== "undefined" ? Math.round(window.innerHeight * 0.9 / scale) : "90dvh",
+          zoom: scale,
           overflowY: "auto",
           background: c.panelBg,
           border: `1px solid ${c.border}`,
@@ -167,6 +178,12 @@ export default function OilWelcomeModal({ isOpen, onClose, darkMode = false }) {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Provable fairness — kept here with the rules so the ? button is the
+            one home for reference material (the side column stays live-only). */}
+        <div style={{ padding: "0 4px 8px" }}>
+          <OilVerifyExplainer darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridX} gridY={gridY} />
         </div>
 
         {/* CTA */}

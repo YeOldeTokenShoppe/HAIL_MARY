@@ -61,6 +61,7 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 //   the character LOOKS — also sets the head-tracking pitch axis), approachYaw
 //   (where the camera flies in from; defaults to faceYaw), pauseOnFocus,
 //   focusGazeDelay (seconds to keep working before looking up),
+//   focusHeadRoll (radians of head cock about the gaze axis),
 //   focusGazeLift, headPitchUp, gazeTurn.
 export const VENDOR_CATALOG = [
   { id: "insurance", label: "", awning: "#3e6b64", accent: "#7fd6c8",
@@ -141,7 +142,9 @@ export const VENDOR_CATALOG = [
         focusOffset: [0.15, 0, 0.5],
         // beat before she looks up — long enough to read as finishing a line,
         // short enough not to feel unresponsive
-        pauseOnFocus: true, focusGazeDelay: 1.8, focusGazeLift: 0.5, headPitchUp: 1.0 },
+        pauseOnFocus: true, focusGazeDelay: 1.8, focusGazeLift: 0.5, headPitchUp: 1.0,
+        // ~20° head cock, eased in with the look-up. Negative flips the tilt.
+        focusHeadRoll: -0.55 },
     } },
   { id: "tonics",    label: "",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_SnakeOilSalesman_Character.glb", idleClip: "idle",
@@ -237,6 +240,8 @@ const _worldQ = /* @__PURE__ */ new THREE.Quaternion();
 const _yawQ = /* @__PURE__ */ new THREE.Quaternion();
 const _pitchQ = /* @__PURE__ */ new THREE.Quaternion();
 const _deltaQ = /* @__PURE__ */ new THREE.Quaternion();
+const _rollQ = /* @__PURE__ */ new THREE.Quaternion();
+const _rollAxis = /* @__PURE__ */ new THREE.Vector3();
 
 const HEAD_YAW_LIMIT = 1.1;    // rad (~63°) — how far the head will turn to follow
 const HEAD_PITCH_UP = 0.7;     // rad (~40°) — looking up at a tall camera
@@ -571,7 +576,7 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   // useAnimations so it runs after the mixer writes the animated pose each
   // frame; the delta is applied in world space, which stays axis-correct
   // regardless of the rig's bone orientation convention.
-  const trackRef = useRef({ yaw: 0, pitch: 0 });
+  const trackRef = useRef({ yaw: 0, pitch: 0, roll: 0 });
   const dwellRef = useRef(0);   // seconds focused, for focusGazeDelay
   useFrame((state, delta) => {
     // Crystal-ball life: advance the swirl shader, and drive the light +
@@ -649,10 +654,10 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     const head = headRef?.current;
     if (!head) return;
     const t = trackRef.current;
-    let targetYaw = 0, targetPitch = 0;
+    head.getWorldPosition(_headPos);
+    _toCam.copy(state.camera.position).sub(_headPos);
+    let targetYaw = 0, targetPitch = 0, targetRoll = 0;
     if (engaged) {
-      head.getWorldPosition(_headPos);
-      _toCam.copy(state.camera.position).sub(_headPos);
       faceDirWorld(vendor, _face, stripRotY);
       const flat = Math.hypot(_toCam.x, _toCam.z);
       // gazeLift (rad) corrects a rest pose that carries the head high or
@@ -669,11 +674,17 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
       let dYaw = Math.atan2(_toCam.x, _toCam.z) - Math.atan2(_face.x, _face.z) + (vendor.gazeTurn ?? 0);
       dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
       targetYaw = THREE.MathUtils.clamp(dYaw, -HEAD_YAW_LIMIT, HEAD_YAW_LIMIT);
+      // focusHeadRoll cocks the head about the GAZE axis (head -> camera), so
+      // the tilt reads as exactly this angle on screen no matter how far she
+      // had to turn or lift to meet you. Rolling about the rest-pose forward
+      // instead would smear into yaw/pitch once her head is turned.
+      targetRoll = vendor.focusHeadRoll ?? 0;
     }
     const k = 1 - Math.exp(-HEAD_EASE * delta);
     t.yaw += (targetYaw - t.yaw) * k;
     t.pitch += (targetPitch - t.pitch) * k;
-    if (Math.abs(t.yaw) >= 1e-4 || Math.abs(t.pitch) >= 1e-4) {
+    t.roll += (targetRoll - t.roll) * k;
+    if (Math.abs(t.yaw) >= 1e-4 || Math.abs(t.pitch) >= 1e-4 || Math.abs(t.roll) >= 1e-4) {
       // The mixer does not necessarily rewrite the bone every frame (e.g. the
       // first frames after a loop wrap). If the bone still holds the value WE
       // wrote last frame, restore the clean animated pose first — otherwise
@@ -692,6 +703,12 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
       // above) needs a negative rotation about it to tilt the face upward
       _pitchQ.setFromAxisAngle(_right, -t.pitch);
       _deltaQ.copy(_yawQ).multiply(_pitchQ);
+      if (Math.abs(t.roll) >= 1e-4) {
+        // roll last, about the axis she is actually looking along
+        _rollAxis.copy(_toCam).normalize();
+        _rollQ.setFromAxisAngle(_rollAxis, t.roll);
+        _deltaQ.premultiply(_rollQ);
+      }
       _worldQ.premultiply(_deltaQ);
       head.quaternion.copy(_parentQ.invert().multiply(_worldQ));
       t.lastOut.copy(head.quaternion);
@@ -710,6 +727,13 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
 
 const DECK_DEPTH = 1.2;   // boardwalk depth (cellSize units), off the mesa edge
 const DECK_MARGIN = 0.2;  // deck overhang past the mesa's side walls
+const DECK_OVERLAP = 0.02;  // how far the deck's inner edge bites into the mesa wall
+const STRUT_COUNT = 4;      // knee braces spaced along the deck's length
+const STRUT_END_INSET = 0.6; // gap from the deck's ends to the outermost brace
+const STRUT_DROP = 1.15;    // how far a brace falls down the mesa face (cellSize units)
+const STRUT_EMBED = 0.15;   // how far the foot buries into the mesa wall
+const STRUT_TOP_INSET = 0.08; // how far in from the deck's outer edge the head sits
+const STRUT_THICK = 0.09;   // square section of the brace
 const WOOD_POST = "#4e3b26";
 
 // The strip GLB is authored running along its own local Z; +90° about Y lays
@@ -910,13 +934,20 @@ const BEAM_FAR = 4.0;
 const FLAT_Q = /* @__PURE__ */ new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 // Undercarriage glow comes from real PointLights authored in Blender and
 // carried by the GLB via KHR_lights_punctual. The model owns position, colour
-// and intensity; this only gates them by time of day.
+// and intensity; this gates them by time of day and nothing else.
 //
-// Worth remembering if a colour ever exports as white again: Blender's glTF
-// exporter reads a light's colour from its **Emission node**, not the Colour
-// swatch in the Light panel. With "Use Nodes" on (Blender forces it on for
-// lights) the swatch is cosmetic as far as glTF is concerned — set the Emission
-// node's Color to match, or you ship [1,1,1].
+// The one exception is a WHITE-only safety net, because this specific failure
+// has happened twice: Blender's glTF exporter reads a light's colour from its
+// **Emission node**, not the Colour swatch in the Light panel. "Use Nodes" is
+// forced on for lights, so the swatch is cosmetic to glTF and a default
+// Emission node ships [1,1,1] no matter how the swatch looks. Fix at source by
+// matching the Emission node's Color to the swatch — but the fallback below
+// keeps the scene right if an export regresses, and yields the moment the file
+// carries a real colour, so the asset always wins when it has an opinion.
+const WAGON_LIGHT_FALLBACK = {
+  Point: "#3fd6c8",      // salesman wagon  — teal
+  Point001: "#8a63e8",   // fortune teller  — purple
+};
 // Multiplier on the AUTHORED intensity, so Blender still owns the brightness.
 const WAGON_LIGHT_BY_ENV = { night: 1.0, dusk: 0.7, hell: 1.0 };
 
@@ -1272,13 +1303,19 @@ function WagonLights({ stripScene, envPreset }) {
 
     // Remember what the asset shipped so repeated mounts never compound on
     // their own output, and so unmount leaves the GLB's values intact.
-    const original = lights.map((l) => ({ l, intensity: l.intensity }));
-    original.forEach(({ l, intensity }) => {
+    const original = lights.map((l) => ({ l, color: l.color.clone(), intensity: l.intensity }));
+    original.forEach(({ l, color, intensity }) => {
+      const white = color.r > 0.99 && color.g > 0.99 && color.b > 0.99;
+      const fallback = WAGON_LIGHT_FALLBACK[sanitizeName(l.name)];
+      if (white && fallback) l.color.set(fallback);   // export regressed — stand in
+      else l.color.copy(color);                       // authored colour wins
       l.intensity = intensity * gain;
       l.castShadow = false;
     });
 
-    return () => { original.forEach(({ l, intensity }) => { l.intensity = intensity; }); };
+    return () => {
+      original.forEach(({ l, color, intensity }) => { l.color.copy(color); l.intensity = intensity; });
+    };
   }, [stripScene, gain]);
 
   return null;
@@ -1356,6 +1393,17 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   const deckD = DECK_DEPTH * cellSize;
   const deckZ = -(worldD / 2 + deckD / 2); // flush against the −Z edge
 
+  // The Boardwalk's own bounds in strip-local space. Hoisted out of clipPlanes
+  // because the fit and the knee braces both need to know where the deck's
+  // surface and underside actually are.
+  const deckLocal = useMemo(() => {
+    const deck = findByBaseName(stripScene, "Boardwalk");
+    if (!deck) return null;
+    stripScene.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(stripScene.matrixWorld).invert();
+    return new THREE.Box3().setFromObject(deck).applyMatrix4(inv);
+  }, [stripScene]);
+
   // Auto-fit from the GLB's own bounds rather than hand-tuned numbers, so a
   // re-export at a different size — or a different grid — still lands right.
   // With STRIP_ROT_Y = +90°, local (x,y,z) → world (z, y, −x): the strip's long
@@ -1365,15 +1413,44 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const scale = deckW / (size.z || 1);
+    // Anchor on the deck's TOP surface, not the GLB's lowest point. The boards
+    // now have real thickness, so the old min.y anchor would lever the walking
+    // surface up off the field by however far anything hangs below it and open
+    // a seam along the mesa edge. Falls back to min.y if the mesh is missing.
+    const deckTop = deckLocal ? deckLocal.max.y : box.min.y;
+    // Butt the deck's inner edge into the mesa wall rather than centring it on
+    // the nominal deck line. Scale is driven by the strip's LONG axis, so its
+    // depth lands wherever the model's aspect puts it (~1.05 cells, not
+    // DECK_DEPTH's 1.2) — centring split that slack in two and left an open
+    // slot along the wall. local +X maps to world −Z, so the deck's MIN local x
+    // is its inner edge; DECK_OVERLAP buries it just past the face so no
+    // hairline can open up at grazing angles.
+    const zPos = deckLocal
+      ? -worldD / 2 + DECK_OVERLAP * cellSize + deckLocal.min.x * scale
+      : deckZ + center.x * scale;
     return {
       scale,
       position: [
-        -center.z * scale,        // long axis centred on the mesa edge
-        -box.min.y * scale,       // deck surface flush with the field (y = 0)
-        deckZ + center.x * scale, // depth centred on the deck line
+        -center.z * scale, // long axis centred on the mesa edge
+        -deckTop * scale,  // walking surface flush with the field (y = 0)
+        zPos,              // inner edge flush against the mesa wall
       ],
     };
-  }, [stripScene, deckW, deckZ]);
+  }, [stripScene, deckW, deckZ, deckLocal, worldD, cellSize]);
+
+  // Where the deck actually ended up, in world units. The braces need its real
+  // outer edge and underside — both move with the fit, so neither can be
+  // written as a constant offset from the nominal deck line.
+  const deckSpan = useMemo(() => {
+    if (!deckLocal) {
+      return { zOuter: deckZ - deckD / 2, underY: 0 };
+    }
+    const s = fit.scale;
+    return {
+      zOuter: fit.position[2] - deckLocal.max.x * s, // furthest from the mesa
+      underY: (deckLocal.min.y - deckLocal.max.y) * s,
+    };
+  }, [deckLocal, fit, deckZ, deckD]);
 
   // Clip the beams AND pools to the boardwalk's actual footprint. The Y plane
   // alone was never enough: a pool is a flat quad AT deck height, so nothing
@@ -1382,13 +1459,10 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   //   local X -> world Z (negated by the +90° Y rotation), local Z -> world X.
   const clipPlanes = useMemo(() => {
     const planes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -fit.position[1])];
-    const deck = findByBaseName(stripScene, "Boardwalk");
-    if (!deck) {
+    if (!deckLocal) {
       return planes;
     }
-    stripScene.updateMatrixWorld(true);
-    const inv = new THREE.Matrix4().copy(stripScene.matrixWorld).invert();
-    const lb = new THREE.Box3().setFromObject(deck).applyMatrix4(inv);
+    const lb = deckLocal;
     const s = fit.scale, p = fit.position;
     const zMin = -lb.max.x * s + p[2], zMax = -lb.min.x * s + p[2];
     const xMin = lb.min.z * s + p[0],  xMax = lb.max.z * s + p[0];
@@ -1397,19 +1471,41 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     planes.push(new THREE.Plane(new THREE.Vector3(1, 0, 0), -xMin));
     planes.push(new THREE.Plane(new THREE.Vector3(-1, 0, 0), xMax));
     return planes;
-  }, [stripScene, fit]);
+  }, [deckLocal, fit]);
 
   return (
     <>
-      {/* diagonal knee braces: lower end embedded in the mesa wall, upper end
-          meeting the deck's underside near its outer edge. These tie the strip
-          to the mesa and are not part of the Synty set, so they stay procedural
-          and in world units — outside the auto-fitted group below. */}
-      {Array.from({ length: 4 }, (_, i) => {
-        const x = -deckW / 2 + (i + 0.5) * (deckW / 4);
+      {/* diagonal knee braces: foot embedded in the mesa wall, head meeting the
+          deck's underside near its outer edge. These tie the strip to the mesa
+          and are not part of the Synty set, so they stay procedural and in
+          world units — outside the auto-fitted group below.
+          Derived from the deck line rather than hand-tuned offsets. The old
+          fixed −45° brace could never fall further than the deck is deep
+          (DECK_DEPTH = 1.2 cells), so its foot stopped a cell short and hung in
+          the air against a 10-cell mesa wall; raking it steeper lets STRUT_DROP
+          be set independently of the deck's depth. */}
+      {Array.from({ length: STRUT_COUNT }, (_, i) => {
+        // Spread end-to-end rather than in even cells. Cell-centring parked the
+        // outermost brace a full half-cell in from each end, leaving DECK_MARGIN's
+        // overhang plus that half-cell cantilevered off the mesa's side walls with
+        // nothing under it — invisible from above, but the ends float at low angles.
+        const span = deckW - 2 * STRUT_END_INSET * cellSize;
+        const x =
+          STRUT_COUNT > 1
+            ? -deckW / 2 + STRUT_END_INSET * cellSize + (i * span) / (STRUT_COUNT - 1)
+            : 0;
+        const zTop = deckSpan.zOuter + STRUT_TOP_INSET * cellSize; // under the real outer edge
+        const zBot = -worldD / 2 + STRUT_EMBED * cellSize;         // buried in the mesa wall
+        const run = zTop - zBot;                                     // negative: leans inward
+        const drop = STRUT_DROP * cellSize;
+        const len = Math.hypot(run, drop);
         return (
-          <mesh key={`strut-${i}`} position={[x, -0.55 * cellSize, -(worldD / 2 + 0.4 * cellSize)]} rotation={[-Math.PI / 4, 0, 0]}>
-            <boxGeometry args={[0.06 * cellSize, 1.3 * cellSize, 0.06 * cellSize]} />
+          <mesh
+            key={`strut-${i}`}
+            position={[x, deckSpan.underY - drop / 2, (zTop + zBot) / 2]}
+            rotation={[Math.atan2(run, drop), 0, 0]}
+          >
+            <boxGeometry args={[STRUT_THICK * cellSize, len, STRUT_THICK * cellSize]} />
             <meshStandardMaterial color={WOOD_POST} roughness={0.85} metalness={0.05} />
           </mesh>
         );

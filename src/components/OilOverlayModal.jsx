@@ -5,7 +5,9 @@ import { useEffect } from "react";
 // Generic centered overlay for /hailmary — wraps any panel content (e.g. the
 // leaderboard) in a dismissible, scrollable card. Closes on backdrop click,
 // the × button, or Escape.
-export default function OilOverlayModal({ isOpen, onClose, darkMode = false, maxWidth = 420, children }) {
+// `scale` zooms the card (not the backdrop) to match the desktop panel scale;
+// the height cap is computed in px so it stays 90% of the real viewport.
+export default function OilOverlayModal({ isOpen, onClose, darkMode = false, maxWidth = 420, scale = 1, children }) {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
@@ -34,7 +36,9 @@ export default function OilOverlayModal({ isOpen, onClose, darkMode = false, max
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
-          width: "100%", maxWidth, maxHeight: "90vh",
+          width: "100%", maxWidth,
+          maxHeight: scale !== 1 && typeof window !== "undefined" ? Math.round(window.innerHeight * 0.9 / scale) : "90vh",
+          zoom: scale,
           overflowY: "auto",
           background: c.panelBg,
           border: `1px solid ${c.border}`,

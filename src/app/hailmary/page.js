@@ -16,7 +16,6 @@ import OilAnchorEvent from "@/components/OilAnchorEvent";
 import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
-import HowToPlayPanel from "@/components/HowToPlayPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
@@ -625,7 +624,6 @@ const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { 
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
 const OilAdminGuide = dynamic(() => import("@/components/OilAdminGuide"), { ssr: false });
 const OilClaimCertificate = dynamic(() => import("@/components/OilClaimCertificate"), { ssr: false });
-const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
 const OilPlotChat = dynamic(() => import("@/components/OilPlotChat"), { ssr: false });
 const CoreSamplePanel = dynamic(() => import("@/components/CoreSamplePanel"), { ssr: false });
 const MuseumPanel = dynamic(() => import("@/components/MuseumPanel"), { ssr: false });
@@ -1123,6 +1121,23 @@ const SeasonCountdown = memo(function SeasonCountdown({ gameStartDate, style }) 
   return <span style={style}>SEASON STARTS {label}</span>;
 });
 
+// Desktop UI scale. The panel columns, header and canvas trays are authored in
+// px for a ~1440-wide viewport; on a wider screen (or a zoomed-out page) they
+// would stay 620px of chrome beside an ever-larger scene, with 10px type nobody
+// can read. Scale them with the viewport instead. CSS zoom (not transform)
+// reflows fonts, widths and SVGs together, so the grid columns are multiplied
+// by the same factor below to keep the panels' own layout width unchanged.
+function useUiScale(base = 1440, max = 2.5) {
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const update = () => setScale(Math.min(max, Math.max(1, window.innerWidth / base)));
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [base, max]);
+  return scale;
+}
+
 function useIsMobile(breakpoint = 900) {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -1270,6 +1285,7 @@ function SceneThemeToolbar({
 
 export default function OilPage() {
   const isMobile = useIsMobile();
+  const uiScale = useUiScale();
 
   // Read mode from URL search params (avoids useSearchParams / Suspense issues)
   const [mode, setMode] = useState("active");
@@ -1926,6 +1942,8 @@ export default function OilPage() {
 
   // Review day scrub (player mode only): null = live, number = reviewing history
   const [reviewDay, setReviewDay] = useState(null);
+  const [depthProfileOpen, setDepthProfileOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   // Demo drill day
   const [demoDay, setDemoDay] = useState(0);
@@ -4339,21 +4357,19 @@ export default function OilPage() {
   const seedReadoutLabel = (showOilData || isReport) ? "SEED HASH" : "SEED COMMITMENT";
   const statsPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>GEOLOGICAL SURVEY</h3>
-      <div style={isMobile ? m.statGrid : styles.statGrid}>
+      {/* Field-wide only — the player's own depth / haul / value live in the
+          YOUR RIG card, so nothing here changes with who is looking. */}
+      <h3 style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), justifyContent: "space-between" }}>
+        <span>GEOLOGICAL SURVEY</span>
+        <span style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.1em", fontWeight: 400 }}>
+          {gridSize}&times;{gridSize} &middot; {DEPTH_Z} LAYERS
+        </span>
+      </h3>
+      <div style={isMobile ? { ...m.statGrid, gridTemplateColumns: "1fr 1fr" } : styles.statGrid}>
         <StatBlock s={styles} accentColor={theme.accent} label="PRIZE POOL" value={<AnimNum value={totalOilBudget} />} unit="USDC" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={numberOfDeposits} />
         <StatBlock s={styles} accentColor={theme.accent} label="AVAILABLE CLAIMS" value={`${(gridSize * gridSize) - Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length}/${gridSize * gridSize}`} />
-        <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
-        <StatBlock s={styles} accentColor={theme.accent} label="MAX DEPTH" value={DEPTH_Z} unit="LVL" />
-        {!isAdmin && !isReport && effectiveDrillDay > 0 && (
-          <>
-            <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
-            <StatBlock s={styles} accentColor={theme.accent} label="EXTRACTED" value={<AnimNum value={playerExtracted} />} unit="OIL" accent />
-            {/* Fixed-rate value of oil found — no share dilution, depends only on your own haul. */}
-            <StatBlock s={styles} accentColor={theme.gold} label="VALUE" value={`≈ ${oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} unit="USDC" accent />
-          </>
-        )}
+        <StatBlock s={styles} accentColor={theme.green} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
         {(isAdmin || isReport) && (
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="OIL" />
@@ -4400,7 +4416,7 @@ export default function OilPage() {
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
         }}>
           <span style={{
-            fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
+            fontFamily: "'Share Tech Mono', monospace", fontSize: 10,
             color: uiDark ? "#8a8070" : "#8b7d6b", letterSpacing: "0.12em",
           }}>
             {seedReadoutLabel}
@@ -4408,7 +4424,7 @@ export default function OilPage() {
           <span
             title={seedReadout}
             style={{
-              fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
+              fontFamily: "'Share Tech Mono', monospace", fontSize: 10,
               color: uiDark ? "#8a8070" : "#8b7d6b",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               maxWidth: "65%", textAlign: "right", cursor: "pointer",
@@ -4457,7 +4473,8 @@ export default function OilPage() {
     padding: "0 3px", lineHeight: "12px", flexShrink: 0,
   };
 
-  const leaderboardBody = (
+  const topCollectorsFor = (compact) => compact ? leaderboardData.topCollectors.slice(0, 3) : leaderboardData.topCollectors;
+  const renderLeaderboard = (compact) => (
     <>
       {/* Summary stats row */}
       <div style={{
@@ -4504,10 +4521,10 @@ export default function OilPage() {
       {leaderboardData.topCollectors.length > 0 && (
         <>
           <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.accent, marginBottom: 6 }}>TOP COLLECTORS</div>
-          {leaderboardData.topCollectors.map((d, i) => (
+          {topCollectorsFor(compact).map((d, i) => (
             <div key={d.id} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "3px 0", borderBottom: i < leaderboardData.topCollectors.length - 1 ? `1px solid ${theme.barBg}` : "none",
+              padding: "3px 0", borderBottom: i < topCollectorsFor(compact).length - 1 ? `1px solid ${theme.barBg}` : "none",
               opacity: d.id === user?.id ? 1 : 0.8,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
@@ -4540,8 +4557,8 @@ export default function OilPage() {
         </>
       )}
 
-      {/* Today's Top */}
-      {leaderboardData.topToday.length > 0 && (
+      {/* Today's Top — full view only */}
+      {!compact && leaderboardData.topToday.length > 0 && (
         <>
           <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.accent, marginTop: 10, marginBottom: 6 }}>TODAY&apos;S TOP</div>
           {leaderboardData.topToday.map((d, i) => (
@@ -4588,6 +4605,8 @@ export default function OilPage() {
     </>
   );
 
+  const leaderboardBody = renderLeaderboard(false);
+
   // Full panel (with title) — used inside the header trophy overlay.
   const leaderboardPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
@@ -4606,7 +4625,15 @@ export default function OilPage() {
         LEADERBOARD
         <span style={{ fontSize: 10, color: theme.muted }}>{leaderboardSectionOpen ? "▴" : "▾"}</span>
       </h3>
-      {leaderboardSectionOpen && leaderboardBody}
+      {leaderboardSectionOpen && (
+        <>
+          {renderLeaderboard(true)}
+          <button
+            onClick={() => setShowLeaderboard(true)}
+            style={{ width: "100%", marginTop: 6, padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.12em", color: theme.muted, textAlign: "right" }}
+          >FULL LEADERBOARD &#9656;</button>
+        </>
+      )}
     </div>
   );
 
@@ -4695,7 +4722,7 @@ export default function OilPage() {
         <div style={{ position: "relative", paddingLeft: 2, maxHeight: 280, overflowY: "auto" }}>
           {/* vertical spine */}
           <div style={{ position: "absolute", left: 7, top: 4, bottom: 4, width: 2, background: theme.border }} />
-          {timelineEvents.map((ev) => {
+          {(timelineOpen ? timelineEvents : timelineEvents.slice(0, 4)).map((ev) => {
             const meta = TIMELINE_META[ev.type] || TIMELINE_META.strike;
             const who = ev.username || (ev.userId ? truncId(ev.userId) : null);
             return (
@@ -4724,6 +4751,14 @@ export default function OilPage() {
             );
           })}
         </div>
+      )}
+      {timelineEvents.length > 4 && (
+        <button
+          onClick={() => setTimelineOpen((o) => !o)}
+          style={{ width: "100%", marginTop: 2, padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.12em", color: theme.muted, textAlign: "right" }}
+        >
+          {timelineOpen ? "SHOW LESS \u25B4" : `SHOW ALL ${timelineEvents.length} \u25BE`}
+        </button>
       )}
     </div>
   );
@@ -5880,15 +5915,15 @@ export default function OilPage() {
     </div>
   );
 
+  // Rig state block — CTA + status copy for the player's rig, one branch per
+  // drillStatus. Rendered inside the YOUR RIG card (no section chrome here).
   const drillButton = !isAdmin && !isReport && !isTest && (
     <div style={{
-      padding: "10px 14px",
-      borderBottom: `1px solid ${theme.border}`,
-      background: theme.tintBg,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       gap: 12,
+      marginBottom: 8,
     }}>
       {drillStatus === "pre-game" && (
         <div style={drillBtnStyles.wrap}>
@@ -6219,7 +6254,6 @@ export default function OilPage() {
           <button disabled style={{ ...drillBtnStyles.active, cursor: "default" }}>
             ⛏ RIG PUMPING
           </button>
-          <div style={drillBtnStyles.depth}>DEPTH {Math.min(cellDepth + 1, MAX_DEPTH)}/{MAX_DEPTH}</div>
           {/* Depth progress bar removed — the horizontal drill core (Core Sample)
               now serves as the live depth/progress meter. */}
           {userDrill?.lastStrikeDepth != null ? (
@@ -6312,7 +6346,7 @@ export default function OilPage() {
           fontSize: 11, color: theme.accent,
           fontFamily: "'Share Tech Mono', monospace", fontWeight: 700,
         }}>
-          DAY {testDay}/{DEPTH_Z}
+          LAYER {testDay}/{DEPTH_Z}
         </span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -6377,12 +6411,11 @@ export default function OilPage() {
     </div>
   );
 
-  // ── Player Drill Panel (depth profile for active players) ──
-  const playerDrillPanel = !isAdmin && !isReport && activeUserDrill?.col != null && (
-    <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
-        YOUR CLAIM ({activeUserDrill.col + 1}, {activeUserDrill.row + 1})
-      </h3>
+  // ── Rig details (active players): extraction, tank + bank, referrals,
+  //    depth profile. Body of the YOUR RIG card — the card title carries the
+  //    coordinates, so there is no heading here. ──
+  const rigDetails = !isAdmin && !isReport && activeUserDrill?.col != null && (
+    <div>
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <input
@@ -6636,7 +6669,16 @@ export default function OilPage() {
           </span>
         </div>
       )}
-      <div style={{ fontSize: 11, letterSpacing: "0.15em", color: theme.accent, marginBottom: 6 }}>DEPTH PROFILE</div>
+      {/* Per-layer oil — collapsed by default; the Core Sample bar is the
+          at-a-glance version of the same data. */}
+      <div
+        onClick={() => setDepthProfileOpen((o) => !o)}
+        style={{ fontSize: 11, letterSpacing: "0.15em", color: theme.accent, marginBottom: 6, display: "flex", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+      >
+        <span>DEPTH PROFILE</span>
+        <span style={{ fontSize: 10, color: theme.muted }}>{depthProfileOpen ? "\u25B4" : "\u25BE"}</span>
+      </div>
+      {depthProfileOpen && (
       <div style={styles.depthChart}>
         {Array.from({ length: DEPTH_Z }, (_, d) => {
           const drilled = d < effectiveDrillDay;
@@ -6676,6 +6718,76 @@ export default function OilPage() {
           );
         })}
       </div>
+      )}
+    </div>
+  );
+
+  // ── YOUR RIG — the player's one card: state/CTA, live gauges, tank + bank ──
+  const drillingActive = drillStatus === "auto-pumping"
+    || ((isAdmin || isReport || isTest) && effectiveDrillDay > 0 && effectiveDrillDay < DEPTH_Z);
+  // Gauges earn their space only while something is happening under the bit:
+  // pumping, a reveal in flight, or a hell/blockade event. A signed-out or
+  // claimless visitor never sees a row of 0.0s.
+  const showGauges = drillingActive || drillEvent > 0 || hellActive || !!demonBlockade?.active;
+  const rigStatus = (() => {
+    switch (drillStatus) {
+      case "sign-in": return { label: "SIGNED OUT", color: theme.muted };
+      case "stunned": return { label: "INCAPACITATED", color: theme.red };
+      case "blockade": return { label: "BLOCKADE", color: theme.red };
+      case "pre-game": return { label: "PRE-SEASON", color: theme.gold };
+      case "no-claim": return { label: "NO CLAIM", color: theme.muted };
+      case "max-depth": return { label: "MAX DEPTH", color: theme.muted };
+      case "depth-ceiling": return { label: "CAUGHT UP", color: theme.gold };
+      case "ready": return { label: "READY", color: theme.gold };
+      case "auto-pumping": return { label: "PUMPING", color: theme.green };
+      // Looking at another plot: report the rig's own state, not the selection's.
+      case "wrong-claim": return (isAdmin || isReport || isTest)
+        ? { label: "SELECT A PLOT", color: theme.muted }
+        : userDrill?.rigDepleted ? { label: "MAX DEPTH", color: theme.muted } : { label: "PUMPING", color: theme.green };
+      default: return { label: String(drillStatus).toUpperCase(), color: theme.muted };
+    }
+  })();
+  const gaugesPanel = showGauges && (
+    <DrillGeode
+      embedded
+      drillEvent={drillEvent}
+      depthLevel={effectiveDrillDay}
+      maxDepth={DEPTH_Z}
+      oilStrike={oilStrike}
+      oilValue={drilledOilValue}
+      maxOil={displayMaxOil}
+      drillProximity={drillProximity}
+      hellProximity={hellProximity}
+      darkMode={uiDark}
+      parabolum={parabolum}
+      Geode={GeodeMode}
+      hellActive={hellActive}
+      demonBlockade={demonBlockade}
+      drillingActive={drillingActive}
+    />
+  );
+  const yourRigCard = (drillButton || gaugesPanel || rigDetails) && (
+    <div style={{ ...(isMobile ? m.section : styles.panelSection), background: theme.tintBg }}>
+      <h3 style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), justifyContent: "space-between" }}>
+        <span>
+          YOUR RIG
+          {activeUserDrill?.col != null && (
+            <span style={{ marginLeft: 6, color: theme.muted, letterSpacing: "0.08em", fontWeight: 400 }}>
+              ({activeUserDrill.col + 1}, {activeUserDrill.row + 1})
+            </span>
+          )}
+        </span>
+        <span style={{
+          fontSize: 9, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 2,
+          border: `1px solid ${rigStatus.color}`, color: rigStatus.color,
+          fontFamily: "'Share Tech Mono', monospace", fontWeight: 400, lineHeight: 1.5, whiteSpace: "nowrap",
+        }}>
+          {rigStatus.label}
+        </span>
+      </h3>
+      {drillButton}
+      {gaugesPanel}
+      {rigDetails}
     </div>
   );
 
@@ -7031,24 +7143,9 @@ export default function OilPage() {
           {/* Panels below active view */}
           {testStepper}
           {finalHaulCard}
-          {drillButton}
-          <DrillGeode
-            drillEvent={drillEvent}
-            depthLevel={effectiveDrillDay}
-            maxDepth={DEPTH_Z}
-            oilStrike={oilStrike}
-            oilValue={drilledOilValue}
-            maxOil={displayMaxOil}
-            drillProximity={drillProximity}
-            hellProximity={hellProximity}
-            darkMode={uiDark}
-            parabolum={parabolum}
-            Geode={GeodeMode}
-            hellActive={hellActive}
-            demonBlockade={demonBlockade}
-            drillingActive={drillStatus === "auto-pumping" || ((isAdmin || isReport || isTest) && effectiveDrillDay > 0 && effectiveDrillDay < DEPTH_Z)}
-          />
-          {/* Live drill core — moved up beside the gauges as the top "drill dashboard". */}
+          {/* Live first: the rig, its core, its finds, then the field. */}
+          {yourRigCard}
+          {gusherShutoffPanel}
           <CoreSamplePanel
             grid3D={displayGrid3D}
             maxOil={displayMaxOil}
@@ -7064,36 +7161,32 @@ export default function OilPage() {
             hellPockets={displayHellPockets}
             artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
           />
-          {gusherShutoffPanel}
-          {playerDrillPanel}
           <MuseumPanel
             inventory={userDrill?.artifacts || {}}
             artifactFinds={userDrill?.artifactFinds || 0}
             darkMode={uiDark}
             isMobile
           />
+          {timelineSection}
+          {leaderboardSection}
           {isAdmin && parametersPanel}
           {isAdmin && testToolsPanel}
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
           {(isAdmin || isReport) && demoDrillPanel}
-          {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
           <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
+          {(isAdmin || isReport) && inspectorPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && fieldIntelPanel}
           {(isAdmin || isReport) && hellPocketsPanel}
-          <HowToPlayPanel isMobile darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
-          {/* Seed bar — admin/report only (moved here, just above Verify The Map) */}
+          {/* Seed bar — admin/report only */}
           {(isAdmin || isReport) && (
             <div style={m.seedBar}>
               <span style={styles.seedLabel}>SEED</span>
               <span style={styles.seedValue}>{blockHash}</span>
             </div>
           )}
-          <OilVerifyExplainer isMobile darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
-          {leaderboardSection}
-          {timelineSection}
           {fieldDispatchSection}
           {isAdmin && pendingFeedPanel}
           {(isAdmin || isReport) && (
@@ -7157,7 +7250,7 @@ export default function OilPage() {
           onClose={() => setShowBuyModal(false)}
         />
 
-        <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+        <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
         {/* SitePal host for the commercial-strip vendors (mobile branch —
             the desktop branch mounts its own; the embed itself is guarded
@@ -7252,7 +7345,7 @@ export default function OilPage() {
       <div style={styles.grain} />
       <style>{`.nav-mobile-home { background: transparent !important; border: none !important; box-shadow: none !important; }`}</style>
 
-      <header style={styles.header}>
+      <header style={{ ...styles.header, zoom: uiScale }}>
         <div style={styles.headerLeft}>
           <Link
             href="/"
@@ -7320,7 +7413,7 @@ export default function OilPage() {
       </header>
 
       {(isAdmin || isReport) && (
-        <div style={styles.seedBar}>
+        <div style={{ ...styles.seedBar, zoom: uiScale }}>
           <span style={styles.seedLabel}>BLOCK HASH SEED</span>
           <span style={styles.seedValue}>{blockHash}</span>
           <div style={styles.seedVerified}>
@@ -7334,7 +7427,7 @@ export default function OilPage() {
 
       <div style={{
         ...styles.dashboard,
-        gridTemplateColumns: panelsCollapsed ? "1fr" : "1fr 340px 280px",
+        gridTemplateColumns: panelsCollapsed ? "1fr" : `1fr ${Math.round(340 * uiScale)}px ${Math.round(280 * uiScale)}px`,
       }}>
         {/* 3D Voxel View */}
         <div id="oil-canvas" style={{
@@ -7456,10 +7549,10 @@ export default function OilPage() {
           <div style={{ ...styles.cornerBracket, top: 8, right: 8, transform: "scaleX(-1)" }} />
           <div style={{ ...styles.cornerBracket, bottom: 8, left: 8, transform: "scaleY(-1)" }} />
           <div style={{ ...styles.cornerBracket, bottom: 8, right: 8, transform: "scale(-1)" }} />
-          <div style={styles.gridLabel}>
+          <div style={{ ...styles.gridLabel, zoom: uiScale }}>
             {gridSize}&times;{gridSize}&times;{DEPTH_Z}
           </div>
-          <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, ...TOOLBAR_TRAY }}>
+          <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, zoom: uiScale, ...TOOLBAR_TRAY }}>
             <button
               onClick={toggleFireworks}
               title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
@@ -7501,7 +7594,7 @@ export default function OilPage() {
               </svg>
             </button>
           </div>
-          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, zoom: uiScale, display: "flex", alignItems: "center", gap: 8 }}>
             <SceneThemeToolbar
               size={28}
               envPreset={envPreset} setEnvPreset={setEnvPreset}
@@ -7522,7 +7615,7 @@ export default function OilPage() {
 
         {/* Middle column */}
         {!panelsCollapsed && (
-          <div style={styles.midColumn}>
+          <div style={{ ...styles.midColumn, zoom: uiScale }}>
             <div style={styles.midPanel}>
               <OilSurfaceMap
                 claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
@@ -7562,28 +7655,15 @@ export default function OilPage() {
         {!panelsCollapsed && (
           <aside style={{
             ...styles.sidePanel,
+            zoom: uiScale,
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateX(0)" : "translateX(20px)",
           }}>
             {testStepper}
             {finalHaulCard}
-            {drillButton}
-            <DrillGeode
-              drillEvent={drillEvent}
-              depthLevel={effectiveDrillDay}
-              maxDepth={DEPTH_Z}
-              oilStrike={oilStrike}
-              oilValue={drilledOilValue}
-              maxOil={displayMaxOil}
-              drillProximity={drillProximity}
-              hellProximity={hellProximity}
-              darkMode={uiDark}
-              parabolum={parabolum}
-              Geode={GeodeMode}
-              hellActive={hellActive}
-              drillingActive={drillStatus === "auto-pumping" || ((isAdmin || isReport || isTest) && effectiveDrillDay > 0 && effectiveDrillDay < DEPTH_Z)}
-            />
-            {/* Live drill core — moved up beside the gauges as the top "drill dashboard". */}
+            {/* Live first: the rig, its core, its finds, then the field. */}
+            {yourRigCard}
+            {gusherShutoffPanel}
             <CoreSamplePanel
               grid3D={displayGrid3D}
               maxOil={displayMaxOil}
@@ -7598,15 +7678,15 @@ export default function OilPage() {
               hellPockets={displayHellPockets}
               artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
             />
-            {gusherShutoffPanel}
-            {playerDrillPanel}
             <MuseumPanel
               inventory={userDrill?.artifacts || {}}
               artifactFinds={userDrill?.artifactFinds || 0}
               darkMode={uiDark}
             />
+            {timelineSection}
+            {leaderboardSection}
             {isAdmin && parametersPanel}
-          {isAdmin && testToolsPanel}
+            {isAdmin && testToolsPanel}
             {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
@@ -7614,12 +7694,8 @@ export default function OilPage() {
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && fieldIntelPanel}
-          {(isAdmin || isReport) && hellPocketsPanel}
-            <HowToPlayPanel darkMode={uiDark} onLaunch={() => setShowWelcome(true)} />
-            <OilVerifyExplainer darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+            {(isAdmin || isReport) && hellPocketsPanel}
             <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
-            {leaderboardSection}
-            {timelineSection}
             {fieldDispatchSection}
             {isAdmin && pendingFeedPanel}
             {(isAdmin || isReport) && (
@@ -7652,7 +7728,7 @@ export default function OilPage() {
       </div>
 
       {isAdmin && (
-        <div style={styles.controlBar}>
+        <div style={{ ...styles.controlBar, zoom: uiScale }}>
           {controlButtons}
         </div>
       )}
@@ -7710,7 +7786,7 @@ export default function OilPage() {
         onClose={() => setShowBuyModal(false)}
       />
 
-      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} />
+      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} scale={uiScale} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
       {/* SitePal host for the commercial-strip vendors. Mounted on mobile
           too: only one vendor speaks at a time, and without the host mobile
@@ -7734,7 +7810,7 @@ export default function OilPage() {
         onClose={() => setAwayRecap(null)}
       />
 
-      <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark}>
+      <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark} scale={uiScale}>
         {leaderboardPanel}
       </OilOverlayModal>
 

@@ -393,7 +393,7 @@ export default function CoreSamplePanel({
                 display: "flex", justifyContent: "space-between", alignItems: "baseline",
                 marginBottom: 6, padding: "0 2px",
               }}>
-                <span>PLOT ({selectedX}, {selectedY})</span>
+                <span>PLOT ({selectedX + 1}, {selectedY + 1})</span>
                 <span style={{ color: c.accent }}>
                   {drillDepth < DEPTH_Z
                     ? `DRILLING · ${Math.min(drillDepth, DEPTH_Z)}/${DEPTH_Z}`
@@ -463,7 +463,7 @@ export default function CoreSamplePanel({
             </div>
           )}
 
-          <Legend dark={dark} parabolum={parabolum} />
+          {hasClaim && personalColumn && <Legend dark={dark} parabolum={parabolum} />}
         </div>
       )}
     </div>

@@ -274,7 +274,7 @@ export default function OilPlotChat({
             }} />
           )}
           <span style={{ fontSize: 9, fontWeight: 400, color: c.muted, letterSpacing: "0.05em" }}>
-            {(() => { const [cx, cy] = plotKey.split("_").map(Number); return `[${cx + 1},${cy + 1}]`; })()}
+            {(() => { const [cx, cy] = plotKey.split("_").map(Number); return `(${cx + 1}, ${cy + 1})`; })()}
           </span>
         </h3>
         <span style={{ fontSize: 10, color: c.muted }}>{expanded ? "\u25B4" : "\u25BE"}</span>

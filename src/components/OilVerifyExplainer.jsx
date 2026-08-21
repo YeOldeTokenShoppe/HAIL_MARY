@@ -60,8 +60,9 @@ export default function OilVerifyExplainer({
   numberOfDeposits,
   gridX = 10,
   gridY = 10,
+  defaultExpanded = false,
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [showTech, setShowTech] = useState(false);      // technical "how it works"
   const [showChecks, setShowChecks] = useState(false);  // technical result breakdown
   const [status, setStatus] = useState("idle"); // idle | loading | done | error

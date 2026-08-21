@@ -1,47 +1,48 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const REVEAL_TIME = 10000;
+const ANALYZE_AT = REVEAL_TIME * 0.6;
 const PRELIM_DELAY = 2500;
 
-// Paraboleum density readout — dim grey-green at barren, phosphorescent green at rich.
-const DENSITY_LABELS = [
-  { label: "BARREN", color: "#7a8a72" },
-  { label: "TRACE", color: "#5cae6c" },
-  { label: "GLIMMER", color: "#2f9f4e" },
-  { label: "LUMEN", color: "#2dd64a" },
-  { label: "RADIANCE", color: "#74ff96" },
-];
+// Yield tiers for a drilled layer — the same five names as the core sample's
+// strata, in the substance's own teal, so the dial, the drill bar and the
+// cross-section agree on what "rich" looks like. Index-aligned with classifyTier().
+const TIER_LABELS = ["SHALE", "SANDSTONE", "GLIMMER", "LUMEN", "RADIANCE"];
+const TIER_COLORS_DARK = ["#5a6a68", "#5f8a8c", "#2f9f9f", "#2dd6c8", "#7afff2"];
+// Light-console tints run darker as they get richer (≥4.5:1 on the cream panels).
+const TIER_COLORS_LIGHT = ["#5c6866", "#32706f", "#25706e", "#1b6e70", "#0e5e60"];
 
-const PRELIM_LEVELS = [
-  { label: "NOMINAL", color: "#7a8a72", threshold: 0 },
-  { label: "TRACE ACTIVITY", color: "#5cae6c", threshold: 0.05 },
-  { label: "ELEVATED READINGS", color: "#2dd64a", threshold: 0.15 },
-  { label: "ANOMALOUS SIGNAL", color: "#74ff96", threshold: 0.35 },
+// Area scan — oil within one cell of the bit, as a level. `short` is what fits
+// in the centre of a 76px dial; `label` is the status-line wording.
+const SCAN_LEVELS = [
+  { label: "NOMINAL", short: "NOMINAL", threshold: 0 },
+  { label: "TRACE ACTIVITY", short: "TRACE", threshold: 0.05 },
+  { label: "ELEVATED READINGS", short: "ELEVATED", threshold: 0.15 },
+  { label: "ANOMALOUS SIGNAL", short: "ANOMALOUS", threshold: 0.35 },
 ];
+const SCAN_COLORS_DARK = ["#7a8a72", "#5cae6c", "#2dd64a", "#74ff96"];
+// Light-console greens sit at ≥4.5:1 on the cream panels (the dark phosphor set is ~1.2:1 there).
+const SCAN_COLORS_LIGHT = ["#5a6a53", "#21743b", "#0e7a32", "#0a5e26"];
 
-// Hell-pocket proximity readings — amber→orange thermal/chemical cues that warn a
-// hell pocket is near WITHOUT naming the demon or its direction. Deliberately
-// ambiguous (could read as a thermal vent over a rich vein), and visually distinct
-// from the green oil scan so it doesn't blend into a normal "good" signal.
-const HELL_PRELIM_LEVELS = [
-  { label: "THERMAL FLUX", color: "#d6a23c" },
-  { label: "SULFUROUS TRACE", color: "#e8742a" },
-  { label: "EXOTHERMIC ANOMALY", color: "#ff5a1e" },
+// Hell-pocket proximity — amber→orange thermal/chemical cues that warn a hell
+// pocket is near WITHOUT naming the demon or its direction. Deliberately
+// ambiguous (could read as a thermal vent over a rich vein) and visually
+// distinct from the green scan. `lit` = how many of the four scan segments glow.
+const HELL_LEVELS = [
+  { label: "THERMAL FLUX", short: "THERMAL", lit: 2, color: "#d6a23c", light: "#9a6410" },
+  { label: "SULFUROUS TRACE", short: "SULFUROUS", lit: 3, color: "#e8742a", light: "#b5480e" },
+  { label: "EXOTHERMIC ANOMALY", short: "EXOTHERMIC", lit: 4, color: "#ff5a1e", light: "#c0330a" },
 ];
-function getHellPrelimLevel(intensity) {
+const HELL_COLOR = "#ff2200";
+const MONO = "'Share Tech Mono', monospace";
+
+function hellLevelIndex(intensity) {
   if (intensity >= 0.8) return 2;
   if (intensity >= 0.55) return 1;
   return 0;
 }
-
-// Status-readout colors (index-aligned). Green everywhere now — dark variant is
-// bright for dark/console bg, light variant is deeper for the light console.
-const DENSITY_COLORS_PARA_DARK = ["#7a8a72", "#5cae6c", "#2f9f4e", "#2dd64a", "#74ff96"];
-const DENSITY_COLORS_PARA_LIGHT = ["#6a7a62", "#3f9a52", "#1f8a3e", "#0e7a32", "#0a5e26"];
-const PRELIM_COLORS_PARA_DARK = ["#7a8a72", "#5cae6c", "#2dd64a", "#74ff96"];
-const PRELIM_COLORS_PARA_LIGHT = ["#6a7a62", "#2f9a4e", "#0e7a32", "#0a5e26"];
 
 function classifyTier(value, maxOil) {
   if (value === 0) return 0;
@@ -52,71 +53,128 @@ function classifyTier(value, maxOil) {
   return 4;
 }
 
-function getPrelimLevel(proximity, maxOil) {
-  if (!proximity || !maxOil) return PRELIM_LEVELS[0];
+function scanLevelIndex(proximity, maxOil) {
+  if (!proximity || !maxOil) return 0;
   const t = proximity / maxOil;
-  for (let i = PRELIM_LEVELS.length - 1; i >= 0; i--) {
-    if (t >= PRELIM_LEVELS[i].threshold) return PRELIM_LEVELS[i];
+  for (let i = SCAN_LEVELS.length - 1; i >= 0; i--) {
+    if (t >= SCAN_LEVELS[i].threshold) return i;
   }
-  return PRELIM_LEVELS[0];
+  return 0;
 }
 
-function GaugeArc({ value, max, label, unit, color, size = 80, dark = true }) {
+// Dial animation — namespaced so it can't collide with the page's own keyframes.
+const DIAL_CSS = `
+@keyframes hmDialChase { 0%, 100% { opacity: 0.22; } 50% { opacity: 1; } }
+@keyframes hmDialBreathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes hmDialProgress { from { width: 0; } to { width: 100%; } }
+.hm-dial-chase { animation: hmDialChase 1.2s ease-in-out infinite; }
+.hm-dial-breathe { animation: hmDialBreathe 3s ease-in-out infinite; }
+.hm-dial-pulse { animation: hmDialBreathe 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hm-dial-chase, .hm-dial-breathe, .hm-dial-pulse { animation: none !important; opacity: 1 !important; }
+}
+`;
+
+// 270° sweep, open at the bottom — same geometry as the old continuous arc, so
+// the cluster keeps its footprint.
+const ARC_START = -225;
+const ARC_END = 45;
+function polar(cx, cy, r, deg) {
+  const rad = (deg * Math.PI) / 180;
+  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+}
+function arcPath(cx, cy, r, a, b) {
+  const [sx, sy] = polar(cx, cy, r, a);
+  const [ex, ey] = polar(cx, cy, r, b);
+  return `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 ${b - a > 180 ? 1 : 0} 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+}
+
+// One instrument: the sweep cut into `segments`, lit from the left.
+//   mode "lit"   — the first `lit` segments on, each in colorFor(i)
+//   mode "chase" — every segment cycles through its own colour (reveal running)
+//   mode "hell"  — every segment in the hell red, centre word pulsing
+// `value` is a number (a count, set large) or a word (a reading, set small).
+function SegmentDial({ segments, lit = 0, colorFor, mode = "lit", value, sub, label, dark, breathe = false, size = 76 }) {
   const r = size * 0.38;
   const cx = size / 2;
   const cy = size * 0.52;
-  const startAngle = -225;
-  const endAngle = 45;
-  const range = endAngle - startAngle;
-  const fillAngle = startAngle + (Math.min(value, max) / max) * range;
+  const gap = segments > 8 ? 2.5 : 3.5;
+  const span = (ARC_END - ARC_START) / segments;
+  const track = dark ? "rgba(212,168,84,0.2)" : "rgba(90,64,16,0.2)";
+  const muted = dark ? "#6a7888" : "#8b7d6b";
+  const ink = dark ? "#d4dce4" : "#3e2e10";
+  const isNumber = typeof value === "number";
+  const topLit = Math.min(lit, segments) - 1;
 
-  const toXY = (deg) => {
-    const rad = (deg * Math.PI) / 180;
-    return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
-  };
+  const paths = [];
+  for (let i = 0; i < segments; i++) {
+    const a = ARC_START + i * span + gap / 2;
+    const b = ARC_START + (i + 1) * span - gap / 2;
+    const on = mode === "chase" || mode === "hell" || i < lit;
+    const color = mode === "hell" ? HELL_COLOR : on ? colorFor(i) : track;
+    const className = mode === "chase" ? "hm-dial-chase"
+      : breathe && mode === "lit" && i === topLit ? "hm-dial-breathe"
+      : undefined;
+    paths.push(
+      <path
+        key={i}
+        className={className}
+        d={arcPath(cx, cy, r, a, b)}
+        fill="none"
+        stroke={color}
+        strokeWidth="5"
+        strokeLinecap={segments > 8 ? "butt" : "round"}
+        style={{
+          animationDelay: mode === "chase" ? `${((i * 1.2) / segments).toFixed(2)}s` : undefined,
+          filter: dark && on && mode !== "chase" ? `drop-shadow(0 0 3px ${color})` : "none",
+        }}
+      />
+    );
+  }
 
-  const [sx, sy] = toXY(startAngle);
-  const [ex, ey] = toXY(fillAngle);
-  const largeArc = fillAngle - startAngle > 180 ? 1 : 0;
-  const [bsx, bsy] = toXY(startAngle);
-  const [bex, bey] = toXY(endAngle);
+  const valueColor = mode === "hell" ? HELL_COLOR
+    : mode === "chase" ? muted
+    : isNumber ? ink
+    : lit > 0 ? colorFor(topLit)
+    : muted;
+  const word = String(value);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-      <svg width={size} height={size * 0.75} viewBox={`0 0 ${size} ${size * 0.75}`}>
-        <path
-          d={`M ${bsx} ${bsy} A ${r} ${r} 0 1 1 ${bex} ${bey}`}
-          fill="none" stroke={dark ? "rgba(212,168,84,0.2)" : "rgba(90,64,16,0.2)"} strokeWidth="5" strokeLinecap="round"
-        />
-        {value > 0 && (
-          <path
-            d={`M ${sx} ${sy} A ${r} ${r} 0 ${largeArc} 1 ${ex} ${ey}`}
-            fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 4px ${color})` }}
-          />
-        )}
+      <svg width={size} height={size * 0.75} viewBox={`0 0 ${size} ${size * 0.75}`} aria-label={`${label} ${word}${sub ? ` ${sub}` : ""}`}>
+        {paths}
         <text
-          x={cx} y={cy + 2}
-          textAnchor="middle" fontFamily="'Share Tech Mono', monospace"
-          fontSize="14" fontWeight="700" fill={color}
-          style={{ filter: `drop-shadow(0 0 2px ${color})` }}
+          x={cx}
+          y={cy + (isNumber ? 3 : 2)}
+          textAnchor="middle"
+          className={mode === "hell" ? "hm-dial-pulse" : undefined}
+          fontFamily={isNumber ? "'Orbitron', 'Share Tech Mono', monospace" : MONO}
+          fontSize={isNumber ? 15 : word.length > 7 ? 8 : 9}
+          fontWeight="700"
+          letterSpacing={isNumber ? 0 : "0.08em"}
+          fill={valueColor}
+          style={{ filter: dark && !isNumber && mode === "lit" && lit > 0 ? `drop-shadow(0 0 2px ${valueColor})` : "none" }}
         >
-          {typeof value === "number" ? value.toFixed(1) : value}
+          {word}
         </text>
-        {unit && (
+        {sub && (
           <text
-            x={cx} y={cy + 14}
-            textAnchor="middle" fontFamily="'Share Tech Mono', monospace"
-            fontSize="7.5" fill={dark ? "rgba(212,168,84,0.7)" : "rgba(90,64,16,0.6)"} letterSpacing="0.1em"
+            x={cx}
+            y={cy + 14}
+            textAnchor="middle"
+            fontFamily={MONO}
+            fontSize="7.5"
+            letterSpacing="0.05em"
+            fill={dark ? "rgba(212,168,84,0.7)" : "rgba(90,64,16,0.6)"}
           >
-            {unit}
+            {sub}
           </text>
         )}
       </svg>
       <div style={{
         fontSize: 9, fontWeight: 600, letterSpacing: "0.15em",
         color: dark ? "rgba(212,168,84,0.8)" : "rgba(90,64,16,0.7)",
-        fontFamily: "'Share Tech Mono', monospace",
+        fontFamily: MONO,
         textAlign: "center",
       }}>
         {label}
@@ -125,6 +183,10 @@ function GaugeArc({ value, max, label, unit, color, size = 80, dark = true }) {
   );
 }
 
+// The rig's instrument cluster: one count (DEPTH) and two readings (PRESSURE =
+// the area scan, DENSITY = the last layer's yield). At rest both readings come
+// straight from the live props; a strike runs the reveal, which masks them with
+// a chase for ten seconds and then settles on the result and the scan.
 export default function DrillHUD({
   drillEvent,
   depthLevel,
@@ -140,187 +202,89 @@ export default function DrillHUD({
   hellActive = false,
   demonBlockade = null,
   drillingActive = false,
+  // Rendered inside another card (YOUR RIG): drop the section padding/rule.
+  embedded = false,
 }) {
-  const [phase, setPhase] = useState("standby");
-  // Mirrors for the zero-dep animate() callback to read current theme state.
-  const parabolumRef = useRef(parabolum);
-  parabolumRef.current = parabolum;
-  const darkRef = useRef(darkMode);
-  darkRef.current = darkMode;
-  // HUD reuses the Parabolum (dark) violet status palette so the readout matches
-  // the violet selection highlights.
-  const hudRef = useRef(hud);
-  hudRef.current = hud;
-  const [pressure, setPressure] = useState(0);
-  const [density, setDensity] = useState(0);
-  const [status, setStatus] = useState("STANDBY");
-  const [statusColor, setStatusColor] = useState(null);
-  const [prelimPressure, setPrelimPressure] = useState(0);
-  const prelimPressureRef = useRef(0);
-  prelimPressureRef.current = prelimPressure;
-  const rafRef = useRef(null);
-  const startRef = useRef(0);
+  const [phase, setPhase] = useState("standby"); // standby | drilling | analyzing | result | preliminary
+  // Tier of the layer the running/last reveal uncovered — shown while the
+  // reveal settles; afterwards the dial reads the live layer again.
+  const [resultTier, setResultTier] = useState(null);
   const prevDrillEvent = useRef(0);
-  const pendingOilValue = useRef(0);
-  const pendingMaxOil = useRef(1);
-  const pendingProximity = useRef(0);
-  const pendingHellProximity = useRef(0);
-  const prelimTimerRef = useRef(null);
-
-  const animate = useCallback(() => {
-    const now = performance.now();
-    const ms = now - startRef.current;
-    const t = ms / REVEAL_TIME;
-
-    if (ms < REVEAL_TIME * 0.6) {
-      setPhase("drilling");
-      setStatus("DRILLING...");
-      setStatusColor(null);
-      const base = 15 + t * 45;
-      const noise = Math.sin(ms * 0.008) * 10 + Math.sin(ms * 0.013) * 6 + Math.sin(ms * 0.021) * 4;
-      setPressure(Math.max(0, Math.min(99, base + noise)));
-      setDensity(0);
-    } else if (ms < REVEAL_TIME) {
-      setPhase("analyzing");
-      setStatus("ANALYZING SAMPLE...");
-      setStatusColor(null);
-      const base = 50 + (t - 0.6) / 0.4 * 30;
-      const noise = Math.sin(ms * 0.01) * 12 + Math.sin(ms * 0.019) * 6;
-      const spike = t > 0.85 ? (t - 0.85) / 0.15 * 20 : 0;
-      setPressure(Math.max(0, Math.min(99, base + noise + spike)));
-      const analysisT = (ms - REVEAL_TIME * 0.6) / (REVEAL_TIME * 0.4);
-      const dNoise = Math.sin(ms * 0.012) * 18 + Math.sin(ms * 0.019) * 10;
-      setDensity(Math.max(0, analysisT * 45 + dNoise));
-    } else if (ms < REVEAL_TIME + 300) {
-      setPhase("result");
-      const val = pendingOilValue.current;
-      const mx = pendingMaxOil.current;
-      const tier = classifyTier(val, mx);
-      const info = DENSITY_LABELS[tier];
-      setStatus(`RESULT: ${info.label}`);
-      setStatusColor((parabolumRef.current || hudRef.current) ? (darkRef.current ? DENSITY_COLORS_PARA_DARK : DENSITY_COLORS_PARA_LIGHT)[tier] : info.color);
-      setPressure(val > 0 ? 80 + (tier / 4) * 19 : 3 + Math.random() * 8);
-      setDensity(val > 0 ? 55 + (tier / 4) * 44 : 1 + Math.random() * 4);
-    }
-
-    if (ms >= REVEAL_TIME + 300) {
-      // Drill animation done — schedule preliminary scan transition
-      prelimTimerRef.current = setTimeout(() => {
-        const prox = pendingProximity.current;
-        const mx = pendingMaxOil.current;
-        const hellProx = pendingHellProximity.current;
-        // A nearby hell pocket overrides the oil scan with an ambiguous thermal
-        // cue — it's the more important (and more dangerous) thing under the bit.
-        if (hellProx > 0) {
-          const hi = getHellPrelimLevel(hellProx);
-          const hl = HELL_PRELIM_LEVELS[hi];
-          const hp = 55 + hellProx * 40; // elevated pressure — reads as "energetic"
-          setPrelimPressure(hp);
-          setPressure(hp);
-          setDensity(0);
-          setStatus(`AREA SCAN: ${hl.label}`);
-          setStatusColor(hl.color);
-          setPhase("preliminary");
-          return;
-        }
-        const prelim = getPrelimLevel(prox, mx);
-        const prelimIdx = PRELIM_LEVELS.indexOf(prelim);
-        const proxRatio = mx > 0 ? prox / mx : 0;
-        const prelimP = 5 + proxRatio * 65;
-        setPrelimPressure(prelimP);
-        setPressure(prelimP);
-        setDensity(0);
-        setStatus(`AREA SCAN: ${prelim.label}`);
-        setStatusColor((parabolumRef.current || hudRef.current) ? (darkRef.current ? PRELIM_COLORS_PARA_DARK : PRELIM_COLORS_PARA_LIGHT)[prelimIdx] : prelim.color);
-        setPhase("preliminary");
-      }, PRELIM_DELAY);
-      return;
-    }
-
-    rafRef.current = requestAnimationFrame(animate);
-  }, []);
+  const timersRef = useRef([]);
 
   useEffect(() => {
-    if (drillEvent > 0 && drillEvent !== prevDrillEvent.current) {
-      prevDrillEvent.current = drillEvent;
-      pendingOilValue.current = oilValue;
-      pendingMaxOil.current = maxOil;
-      pendingProximity.current = drillProximity;
-      pendingHellProximity.current = hellProximity;
-      if (prelimTimerRef.current) clearTimeout(prelimTimerRef.current);
-      setPhase("drilling");
-      setStatus("DRILLING...");
-      setStatusColor(null);
-      startRef.current = performance.now();
-      rafRef.current = requestAnimationFrame(animate);
-    }
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (prelimTimerRef.current) clearTimeout(prelimTimerRef.current);
-    };
-  }, [drillEvent, animate, oilValue, maxOil, drillProximity, hellProximity]);
-
-  // Idle "DRILLING" loop — when the rig is actively drilling but NOT mid-reveal
-  // (standby on a fresh rig, or settled on the AREA SCAN between strikes), gently
-  // jitter the gauges so they read as working instead of parked. Keeps the AREA
-  // SCAN label/level when present (jitters around it); just adds life. Throttled.
-  const idleRafRef = useRef(null);
-  const idleTickRef = useRef(0);
-  useEffect(() => {
-    const idleOk = drillingActive && !hellActive && !demonBlockade?.active
-      && (phase === "standby" || phase === "preliminary");
-    if (!idleOk) {
-      if (idleRafRef.current) cancelAnimationFrame(idleRafRef.current);
-      idleRafRef.current = null;
-      return;
-    }
-    if (phase === "standby") {
-      setStatus("DRILLING");
-      setStatusColor(null);
-    }
-    const loop = () => {
-      const ms = performance.now();
-      if (ms - idleTickRef.current >= 55) {  // ~18fps — enough for a subtle breathe
-        idleTickRef.current = ms;
-        const base = phase === "preliminary" ? prelimPressureRef.current : 24;
-        const noise = Math.sin(ms * 0.0017) * 6 + Math.sin(ms * 0.0033) * 4 + Math.sin(ms * 0.0008) * 3;
-        setPressure(Math.max(2, Math.min(85, base + noise)));
-        const d = 5 + Math.sin(ms * 0.0022) * 4 + Math.max(0, Math.sin(ms * 0.011)) * 4;
-        setDensity(Math.max(0, d));
-      }
-      idleRafRef.current = requestAnimationFrame(loop);
-    };
-    idleRafRef.current = requestAnimationFrame(loop);
-    return () => {
-      if (idleRafRef.current) cancelAnimationFrame(idleRafRef.current);
-      idleRafRef.current = null;
-    };
-  }, [drillingActive, phase, hellActive, demonBlockade]);
+    if (!(drillEvent > 0 && drillEvent !== prevDrillEvent.current)) return;
+    prevDrillEvent.current = drillEvent;
+    const tier = classifyTier(oilValue, maxOil);
+    timersRef.current.forEach(clearTimeout);
+    setPhase("drilling");
+    timersRef.current = [
+      setTimeout(() => setPhase("analyzing"), ANALYZE_AT),
+      setTimeout(() => { setResultTier(tier); setPhase("result"); }, REVEAL_TIME),
+      setTimeout(() => setPhase("preliminary"), REVEAL_TIME + 300 + PRELIM_DELAY),
+    ];
+  }, [drillEvent, oilValue, maxOil]);
+  useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
 
   const dark = darkMode;
-  const hellColor = "#ff2200";
-  const isHellOrBlockade = hellActive || demonBlockade?.active;
-  const bg = isHellOrBlockade ? "rgba(204,17,0,0.08)" : (dark ? "rgba(212,168,84,0.06)" : "rgba(90,64,16,0.04)");
-  const border = isHellOrBlockade ? "rgba(255,34,0,0.4)" : (dark ? "rgba(212,168,84,0.2)" : "rgba(90,64,16,0.18)");
+  const isHell = hellActive || !!demonBlockade?.active;
+  const busy = phase === "drilling" || phase === "analyzing";
+  const scanColors = dark ? SCAN_COLORS_DARK : SCAN_COLORS_LIGHT;
+  const tierColors = dark ? TIER_COLORS_DARK : TIER_COLORS_LIGHT;
+  const muted = dark ? "#6a7888" : "#8b7d6b";
+  const accent = dark ? "#d4a854" : "#5a4010";
+  const gold = dark ? "#d4a854" : "#8b7355";
+
+  // Area scan, live. A nearby hell pocket overrides the oil scan — it's the more
+  // important (and more dangerous) thing under the bit. Nothing to scan until
+  // the bit has been in the ground.
+  const hellIdx = hellProximity > 0 ? hellLevelIndex(hellProximity) : -1;
+  const hasScan = depthLevel > 0 || drillProximity > 0 || hellProximity > 0;
+  let scan;
+  if (hellIdx >= 0) {
+    const h = HELL_LEVELS[hellIdx];
+    const color = dark ? h.color : h.light;
+    scan = { lit: h.lit, word: h.short, label: h.label, color, colorFor: () => color };
+  } else if (hasScan) {
+    const i = scanLevelIndex(drillProximity, maxOil);
+    scan = { lit: i + 1, word: SCAN_LEVELS[i].short, label: SCAN_LEVELS[i].label, color: scanColors[i], colorFor: (k) => scanColors[k] };
+  } else {
+    scan = { lit: 0, word: "—", label: null, color: muted, colorFor: (k) => scanColors[k] };
+  }
+
+  // Last layer: the strike's tier while the reveal settles, else the live layer.
+  const liveTier = depthLevel > 0 ? classifyTier(oilValue, maxOil) : null;
+  const tier = (phase === "result" || phase === "preliminary") && resultTier !== null ? resultTier : liveTier;
+
+  let status, statusColor;
+  if (hellActive) { status = "DEMONIC FORCE DETECTED"; statusColor = HELL_COLOR; }
+  else if (demonBlockade?.active) { status = `OIL BLOCKADE — BOUNTY: ${demonBlockade.bountyAmount || 0} USDC`; statusColor = HELL_COLOR; }
+  else if (phase === "drilling") { status = "DRILLING..."; statusColor = accent; }
+  else if (phase === "analyzing") { status = "ANALYZING SAMPLE..."; statusColor = accent; }
+  else if (phase === "result") { status = `RESULT: ${TIER_LABELS[tier ?? 0]}`; statusColor = tierColors[tier ?? 0]; }
+  else if (phase === "preliminary" && scan.label) { status = `AREA SCAN: ${scan.label}`; statusColor = scan.color; }
+  else { status = drillingActive ? "PUMPING" : "STANDBY"; statusColor = drillingActive ? accent : muted; }
+
+  const scanMode = isHell ? "hell" : (busy || phase === "result") ? "chase" : "lit";
+  const tierMode = isHell ? "hell" : phase === "analyzing" ? "chase" : "lit";
+  const tierLit = isHell || phase === "drilling" || tier === null ? 0 : tier + 1;
+  const tierWord = isHell || phase === "drilling" || tier === null ? "—"
+    : phase === "analyzing" ? "…"
+    : TIER_LABELS[tier];
+  const scanWord = isHell ? (hellActive ? "BREACH" : "BLOCKADE")
+    : scanMode === "chase" ? "…"
+    : scan.word;
+
+  const bg = isHell ? "rgba(204,17,0,0.08)" : (dark ? "rgba(212,168,84,0.06)" : "rgba(90,64,16,0.04)");
+  const border = isHell ? "rgba(255,34,0,0.4)" : (dark ? "rgba(212,168,84,0.2)" : "rgba(90,64,16,0.18)");
   const sectionBorder = dark ? "#2a2e36" : "#d4c8b4";
-  const mutedColor = dark ? "#6a7888" : "#8b7d6b";
-  const accentColor = dark ? "#d4a854" : "#5a4010";
-  const isPrelim = phase === "preliminary";
-  const isDrilling = phase === "drilling" || phase === "analyzing";
-  const displayPressure = isHellOrBlockade ? 99 : pressure;
-  const displayDensity = isHellOrBlockade ? 99 : density;
-  const displayStatus = hellActive
-    ? "DEMONIC FORCE DETECTED"
-    : demonBlockade?.active
-      ? `OIL BLOCKADE — BOUNTY: ${demonBlockade.bountyAmount || 0} USDC`
-      : status;
-  const displayStatusColor = isHellOrBlockade ? hellColor : statusColor;
 
   return (
     <div style={{
-      padding: "10px 14px",
-      borderBottom: `1px solid ${sectionBorder}`,
+      padding: embedded ? "2px 0 8px" : "10px 14px",
+      borderBottom: embedded ? "none" : `1px solid ${sectionBorder}`,
     }}>
+      <style>{DIAL_CSS}</style>
       <div style={{
         background: bg,
         border: `1px solid ${border}`,
@@ -331,73 +295,62 @@ export default function DrillHUD({
         alignItems: "center",
         gap: 6,
       }}>
-        {/* Status line */}
-        <div style={{
-          fontSize: 10, fontWeight: 600, letterSpacing: "0.18em",
-          color: displayStatusColor || ((isDrilling || (drillingActive && phase === "standby")) ? accentColor : mutedColor),
-          fontFamily: "'Share Tech Mono', monospace",
-          textAlign: "center",
-          textShadow: displayStatusColor && displayStatusColor !== "#6e6050" ? `0 0 6px ${displayStatusColor}` : "none",
-          minHeight: 14,
-          transition: "color 0.5s",
-        }}>
-          {displayStatus}
+        {/* Status line — the colour rides on the indicator, the words stay in ink. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 14 }}>
+          <span
+            className={isHell ? "hm-dial-pulse" : undefined}
+            style={{
+              width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+              background: statusColor,
+              boxShadow: dark ? `0 0 6px ${statusColor}` : "none",
+              transition: "background 0.5s",
+            }}
+          />
+          <span style={{
+            fontSize: 10, fontWeight: 600, letterSpacing: "0.18em",
+            color: isHell ? HELL_COLOR : accent,
+            fontFamily: MONO, textAlign: "center",
+          }}>
+            {status}
+          </span>
         </div>
 
-        {/* Gauges */}
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-          <GaugeArc
+          <SegmentDial
+            segments={maxDepth}
+            lit={depthLevel}
+            colorFor={() => gold}
             value={depthLevel}
-            max={maxDepth}
+            sub={`OF ${maxDepth}`}
             label="DEPTH"
-            unit={`LV ${depthLevel}`}
-            color={dark ? "#d4a854" : "#8b7355"}
-            size={76}
             dark={dark}
           />
-          <GaugeArc
-            value={displayPressure}
-            max={100}
+          <SegmentDial
+            segments={4}
+            lit={scan.lit}
+            colorFor={scan.colorFor}
+            mode={scanMode}
+            value={scanWord}
+            sub="AREA SCAN"
             label="PRESSURE"
-            unit="PSI"
-            color={
-              hellActive ? hellColor
-              : isPrelim
-                ? (statusColor || mutedColor)
-                : statusColor && statusColor !== "#6e6050"
-                  ? statusColor
-                  : (dark ? "#8a98a8" : "#6e6050")
-            }
-            size={76}
             dark={dark}
+            breathe={drillingActive && scanMode === "lit"}
           />
-          <GaugeArc
-            value={displayDensity}
-            max={100}
+          <SegmentDial
+            segments={TIER_LABELS.length}
+            lit={tierLit}
+            colorFor={(i) => tierColors[i]}
+            mode={tierMode}
+            value={tierWord}
+            sub="LAST LAYER"
             label="DENSITY"
-            unit={
-              hellActive
-                ? "HELL"
-                : isPrelim
-                  ? "???"
-                  : phase === "result" && statusColor
-                    ? status.replace("RESULT: ", "")
-                    : "g/cm³"
-            }
-            color={
-              hellActive ? hellColor
-              : isPrelim
-                ? mutedColor
-                : statusColor || (dark ? "#8a98a8" : "#6e6050")
-            }
-            size={76}
             dark={dark}
           />
         </div>
 
-        {/* Progress bar — only during active drilling */}
-        {isDrilling && (
-          <div style={{
+        {/* Reveal progress — only while the bit is running */}
+        {busy && (
+          <div key={drillEvent} style={{
             width: "100%", height: 3, borderRadius: 2,
             background: dark ? "rgba(212,168,84,0.1)" : "rgba(90,64,16,0.08)",
             overflow: "hidden",
@@ -405,22 +358,8 @@ export default function DrillHUD({
             <div style={{
               height: "100%", borderRadius: 2,
               background: dark ? "rgba(212,168,84,0.4)" : "rgba(90,64,16,0.3)",
-              width: `${Math.min(100, ((performance.now() - startRef.current) / (REVEAL_TIME + 300)) * 100)}%`,
-              transition: "width 0.3s linear",
+              animation: `hmDialProgress ${REVEAL_TIME}ms linear forwards`,
             }} />
-          </div>
-        )}
-
-        {/* Preliminary scan hint */}
-        {isPrelim && depthLevel < maxDepth && (
-          <div style={{
-            fontSize: 8, letterSpacing: "0.1em",
-            color: dark ? "#4a5565" : "#a09888",
-            fontFamily: "'Share Tech Mono', monospace",
-            textAlign: "center", lineHeight: 1.4,
-            marginTop: 2,
-          }}>
-            PROXIMITY SCAN — 1 CELL RADIUS
           </div>
         )}
       </div>
