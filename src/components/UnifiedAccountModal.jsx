@@ -1011,7 +1011,8 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
           padding: 1.5rem;
           width: 90%;
           max-width: 480px;
-          max-height: 80vh;
+          max-height: calc(80vh / var(--hm-ui-scale, 1));
+          zoom: var(--hm-ui-scale, 1);
           position: relative;
           box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
           display: flex;

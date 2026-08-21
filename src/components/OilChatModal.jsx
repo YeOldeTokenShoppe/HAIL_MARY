@@ -181,7 +181,8 @@ export default function OilChatModal({
         style={{
           background: c.panel, border: `1px solid ${c.border}`,
           borderRadius: 8, width: "90%", maxWidth: 420,
-          maxHeight: "80vh", display: "flex", flexDirection: "column",
+          maxHeight: "calc(80vh / var(--hm-ui-scale, 1))", zoom: "var(--hm-ui-scale, 1)",
+          display: "flex", flexDirection: "column",
           boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
         }}
       >

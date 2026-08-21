@@ -138,7 +138,7 @@ export default function ConcretionModal({ artifact, onDone, darkMode = true }) {
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
       <div style={{
-        width: "min(92vw, 340px)", padding: "22px 18px 18px",
+        width: "min(calc(92vw / var(--hm-ui-scale, 1)), 340px)", zoom: "var(--hm-ui-scale, 1)", padding: "22px 18px 18px",
         background: darkMode ? "#12101c" : "#f4f0e6",
         border: `1px solid ${opened ? skin.glow : "rgba(199,155,255,0.25)"}`,
         borderRadius: 4, textAlign: "center", fontFamily: mono,

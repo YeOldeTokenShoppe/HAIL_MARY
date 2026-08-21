@@ -1286,6 +1286,13 @@ function SceneThemeToolbar({
 export default function OilPage() {
   const isMobile = useIsMobile();
   const uiScale = useUiScale();
+  // Published as a CSS variable on <html> so overlays — including the ones that
+  // portal to document.body (polaroid, purchase modal, certificate lightbox) —
+  // can zoom their cards to match the panels. Mobile stays at 1.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--hm-ui-scale", String(isMobile ? 1 : uiScale));
+    return () => document.documentElement.style.removeProperty("--hm-ui-scale");
+  }, [uiScale, isMobile]);
 
   // Read mode from URL search params (avoids useSearchParams / Suspense issues)
   const [mode, setMode] = useState("active");
@@ -3677,7 +3684,7 @@ export default function OilPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setTesterMsg(data.error || "Invalid code"); return; }
-      setTesterMsg("✓ Qualified! Select an unclaimed plot, then CLAIM THIS PLOT.");
+      setTesterMsg("✓ Qualified! Select an open plot, then CLAIM THIS PLOT.");
       setTesterCode("");
     } catch (err) {
       setTesterMsg(err.message || "failed");
@@ -4155,8 +4162,8 @@ export default function OilPage() {
         })}>ZERO SCORES</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-        <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Claiming cell", async () => {
-          if (selectedX === null) throw new Error("select a cell on the survey map first");
+        <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Claiming plot", async () => {
+          if (selectedX === null) throw new Error("select a plot on the survey map first");
           // Claim for YOUR account when signed in (so a FORCE STRIKE fills the tank
           // your meter reads); otherwise fall back to a synthetic "admin_test" rig so
           // admin can test gushers/effects without signing in. Reset clears it like
@@ -4197,7 +4204,7 @@ export default function OilPage() {
         <button disabled={toolBusy || selectedX === null} style={styles.btn} onClick={() => runTool("Banking tank", async () => {
           // Bank the selected rig's un-banked tankOil into the community tank
           // (mirrors the player BANK OIL flow; password-gated, targeted by cell).
-          if (selectedX === null) throw new Error("select the rig's cell first");
+          if (selectedX === null) throw new Error("select the rig's plot first");
           const r = await fetch("/api/oil-admin-bank", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: adminPassword, col: selectedX, row: sliceY }) }).then(r => r.json());
           if (!r?.ok) throw new Error(r?.error || "failed");
           return r.delta > 0
@@ -4368,12 +4375,12 @@ export default function OilPage() {
       <div style={isMobile ? { ...m.statGrid, gridTemplateColumns: "1fr 1fr" } : styles.statGrid}>
         <StatBlock s={styles} accentColor={theme.accent} label="PRIZE POOL" value={<AnimNum value={totalOilBudget} />} unit="USDC" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={numberOfDeposits} />
-        <StatBlock s={styles} accentColor={theme.accent} label="AVAILABLE CLAIMS" value={`${(gridSize * gridSize) - Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length}/${gridSize * gridSize}`} />
+        <StatBlock s={styles} accentColor={theme.accent} label="OPEN PLOTS" value={`${(gridSize * gridSize) - Object.values(allPlotsMap).filter((p) => p?.currentOwnerId != null).length}/${gridSize * gridSize}`} />
         <StatBlock s={styles} accentColor={theme.green} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
         {(isAdmin || isReport) && (
           <>
-            <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="OIL" />
-            <StatBlock s={styles} accentColor={theme.accent} label="DRY CLAIMS" value={stats.dryClaims} />
+            <StatBlock s={styles} accentColor={theme.accent} label="PEAK PLOT" value={<AnimNum value={stats.maxClaimTotal} />} unit="OIL" />
+            <StatBlock s={styles} accentColor={theme.accent} label="DRY PLOTS" value={stats.dryClaims} />
             <StatBlock s={styles} accentColor={theme.accent} label="FIELD OIL" value={OIL_FIELD_UNITS.toLocaleString()} unit="OIL" />
             <StatBlock s={styles} accentColor={theme.accent} label="FIELD TAPPED" value={OIL_FIELD_UNITS > 0 ? `${(communityOil / OIL_FIELD_UNITS * 100).toFixed(2)}%` : "0%"} accent={communityOil > 0} />
           </>
@@ -4881,12 +4888,13 @@ export default function OilPage() {
           fontSize: 20, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >✕</button>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, zoom: "var(--hm-ui-scale, 1)" }}>
       <img
         src={lightboxItem.storageUrl}
         alt={lightboxItem.caption || "dispatch"}
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: "min(92vw, 560px)", maxHeight: "82vh", objectFit: "contain",
+          maxWidth: "min(calc(92vw / var(--hm-ui-scale, 1)), 560px)", maxHeight: "calc(82vh / var(--hm-ui-scale, 1))", objectFit: "contain",
           cursor: "default", filter: "drop-shadow(0 24px 70px rgba(0,0,0,0.65))",
         }}
       />
@@ -4900,6 +4908,7 @@ export default function OilPage() {
           <span style={{ fontSize: 12 }}>{lightboxItem.username || "A Prospector"}</span>
         </div>
       )}
+      </div>
     </div>
   );
 
@@ -4914,10 +4923,10 @@ export default function OilPage() {
         }}
       >
         {selectedX !== null
-          ? `CLAIM (${selectedX + 1}, ${sliceY + 1}) INSPECTOR`
+          ? `PLOT (${selectedX + 1}, ${sliceY + 1}) INSPECTOR`
           : userDrill?.col != null
             ? `YOUR CLAIM (${userDrill.col + 1}, ${userDrill.row + 1}) — TAP TO VIEW`
-            : "SELECT A CLAIM"}
+            : "SELECT A PLOT"}
       </h3>
 
       {selectedData ? (
@@ -5014,7 +5023,7 @@ export default function OilPage() {
         </>
       ) : (
         <div style={styles.emptyState}>
-          Click any claim on the surface map or cross-section to inspect
+          Click any plot on the survey map or cross-section to inspect
         </div>
       )}
     </div>
@@ -5066,7 +5075,7 @@ export default function OilPage() {
       {intelTab === "claims" ? (
         <>
           <div style={styles.paramRow}>
-            <span style={styles.paramLabel}>MAX CLAIM</span>
+            <span style={styles.paramLabel}>RICHEST PLOT</span>
             <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 700, color: theme.accent }}>
               {stats.maxClaimTotal} OIL
             </span>
@@ -5076,7 +5085,7 @@ export default function OilPage() {
               <div
                 key={c.claim ?? i}
                 onClick={() => handleSelectClaim(c)}
-                title="Fly to this claim"
+                title="Fly to this plot"
                 style={{
                   display: "flex", justifyContent: "space-between", cursor: "pointer",
                   padding: "1px 3px", borderRadius: 2,
@@ -5220,7 +5229,7 @@ export default function OilPage() {
 
   // CCTV overlay — collapsible widget, top-left of canvas
   const cctvOverlay = selectedX !== null && flyTarget && pumpConfig.showCamera && cameraViewable && (
-    <div style={cctvStyles.wrap}>
+    <div style={{ ...cctvStyles.wrap, zoom: "var(--hm-ui-scale, 1)" }}>
       <div
         style={cctvStyles.header}
         onClick={() => setCctvOpen((o) => !o)}
@@ -5562,6 +5571,7 @@ export default function OilPage() {
   const previewBanner = previewMode && (
     <div style={{
       width: "100%",
+      zoom: "var(--hm-ui-scale, 1)",
       padding: "8px 16px",
       background: "linear-gradient(90deg, rgba(212,168,84,0.95), rgba(184,146,46,0.95))",
       borderBottom: "1px solid #8b6914",
@@ -5633,6 +5643,7 @@ export default function OilPage() {
       left: 0,
       right: 0,
       zIndex: 9999,
+      zoom: "var(--hm-ui-scale, 1)",
       padding: "10px 16px",
       background: "linear-gradient(180deg, rgba(140,10,0,0.95), rgba(80,5,0,0.9))",
       borderBottom: "2px solid rgba(255,34,0,0.6)",
@@ -5712,6 +5723,7 @@ export default function OilPage() {
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 9998,
+        zoom: "var(--hm-ui-scale, 1)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -5741,6 +5753,7 @@ export default function OilPage() {
       left: 0,
       right: 0,
       zIndex: 9999,
+      zoom: "var(--hm-ui-scale, 1)",
       padding: "12px 16px",
       background: "linear-gradient(180deg, rgba(20,100,20,0.95), rgba(10,60,10,0.9))",
       borderBottom: "2px solid rgba(80,200,80,0.5)",
@@ -5783,6 +5796,7 @@ export default function OilPage() {
       left: 0,
       right: 0,
       zIndex: 9999,
+      zoom: "var(--hm-ui-scale, 1)",
       padding: "12px 16px",
       background: "linear-gradient(180deg, rgba(120,90,20,0.95), rgba(70,50,10,0.9))",
       borderBottom: "2px solid rgba(212,168,84,0.6)",
@@ -6067,7 +6081,7 @@ export default function OilPage() {
                   <button disabled style={drillBtnStyles.disabled}>SELECT AN OPEN PLOT</button>
                 )}
                 <div style={drillBtnStyles.hint}>
-                  Click any open cell on the field or the surface map — that ground is yours for the season.
+                  Click any open plot on the field or the survey map — that ground is yours for the season.
                 </div>
                 <SeasonCountdown
                   gameStartDate={gameStartDate}
@@ -6132,7 +6146,7 @@ export default function OilPage() {
                 CLAIM THIS PLOT ({selectedX + 1}, {sliceY + 1})
               </button>
             ) : (
-              <button disabled style={drillBtnStyles.disabled}>SELECT AN UNCLAIMED PLOT</button>
+              <button disabled style={drillBtnStyles.disabled}>SELECT AN OPEN PLOT</button>
             )
           ) : (
             /* Claims closed (mid-season / ended) — next-season waitlist is the
@@ -6385,7 +6399,7 @@ export default function OilPage() {
       </div>
       {selectedX === null && (
         <div style={{ fontSize: 11, color: theme.accent, marginTop: 6, fontFamily: "'Share Tech Mono', monospace" }}>
-          Click a cell on the map to start testing
+          Click a plot on the map to start testing
         </div>
       )}
     </div>
@@ -6554,7 +6568,7 @@ export default function OilPage() {
           </button>
           {claimJumpMode && (
             <div style={{ fontSize: 10, color: theme.gold, marginTop: 4, textAlign: "center" }}>
-              Click an unclaimed cell on the map to jump
+              Click an open plot on the map to jump
               {(userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS && " (costs 1 bonus drill)"}
             </div>
           )}
@@ -7081,7 +7095,7 @@ export default function OilPage() {
             <button
               type="button"
               style={m.scrollHandle}
-              aria-label="Scroll down to your claim"
+              aria-label="Scroll down to your rig"
               onClick={() => {
                 document.getElementById("oil-scroll")?.scrollBy({
                   top: Math.round(window.innerHeight * 0.5),
@@ -7090,7 +7104,7 @@ export default function OilPage() {
               }}
             >
               <span style={m.scrollHandleGrip} />
-              <span>Scroll for your claim ↓</span>
+              <span>Scroll for your rig ↓</span>
             </button>
           )}
 
@@ -7786,7 +7800,7 @@ export default function OilPage() {
         onClose={() => setShowBuyModal(false)}
       />
 
-      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} scale={uiScale} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
       {/* SitePal host for the commercial-strip vendors. Mounted on mobile
           too: only one vendor speaks at a time, and without the host mobile
@@ -7810,7 +7824,7 @@ export default function OilPage() {
         onClose={() => setAwayRecap(null)}
       />
 
-      <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark} scale={uiScale}>
+      <OilOverlayModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} darkMode={uiDark}>
         {leaderboardPanel}
       </OilOverlayModal>
 

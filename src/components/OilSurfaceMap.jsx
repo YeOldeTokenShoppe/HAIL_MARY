@@ -54,7 +54,7 @@ export default function OilSurfaceMap({
         fontSize: 9, color: t.inspectorKey || t.muted, marginBottom: 8,
         textAlign: "center", letterSpacing: "0.08em",
       }}>
-        {claimJumpMode ? "CLAIM JUMP \u2014 Click an unclaimed cell" : "SURVEY MAP"}
+        {claimJumpMode ? "CLAIM JUMP \u2014 Click an open plot" : "SURVEY MAP"}
       </div>
       {/* X axis labels along top */}
       <div style={{

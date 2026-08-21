@@ -361,7 +361,7 @@ export default function OilPlotChat({
                 onClick={(e) => { e.stopPropagation(); setShowTransfer(true); setTransferError(""); setTransferSuccess(false); setTransferUsername(""); }}
                 style={{ ...btnStyle("#8b4513"), fontSize: 9, padding: "3px 8px" }}
               >
-                TRANSFER PLOT
+                TRANSFER CLAIM
               </button>
             </div>
           )}
@@ -369,7 +369,7 @@ export default function OilPlotChat({
           {isOwner && onTransferPlot && showTransfer && (
             <div style={{ marginBottom: 10, padding: "8px", border: `1px solid #8b4513`, borderRadius: 4, background: darkMode ? "rgba(60,30,10,0.3)" : "rgba(139,69,19,0.06)" }}>
               <div style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: "#8b4513", letterSpacing: "0.1em", marginBottom: 6 }}>
-                TRANSFER PLOT
+                TRANSFER CLAIM
               </div>
               <input
                 style={{ ...inputStyle, marginBottom: 6 }}
@@ -393,7 +393,7 @@ export default function OilPlotChat({
               )}
               {transferUsername.trim() && !transferSuccess && (
                 <p style={{ fontFamily: mono, fontSize: 9, color: "#c44", margin: "0 0 6px", lineHeight: 1.3 }}>
-                  This will transfer your plot to <strong>{transferUsername.trim()}</strong>. You will lose ownership.
+                  This will transfer your claim to <strong>{transferUsername.trim()}</strong>. You will lose ownership.
                 </p>
               )}
               {transferError && (
@@ -403,7 +403,7 @@ export default function OilPlotChat({
               )}
               {transferSuccess && (
                 <p style={{ fontFamily: mono, fontSize: 9, color: "#2a2", margin: "0 0 6px", fontWeight: 600 }}>
-                  Plot transferred!
+                  Claim transferred!
                 </p>
               )}
               <div style={{ display: "flex", gap: 6 }}>

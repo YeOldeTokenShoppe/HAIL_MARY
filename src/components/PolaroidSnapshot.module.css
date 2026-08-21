@@ -13,6 +13,9 @@
   opacity: 0;
   transition: opacity 0.5s ease-out;
   cursor: pointer;
+  /* Desktop UI scale published by /hailmary; the polaroid capture clones the
+     card into an unzoomed container, so the saved image is unaffected. */
+  zoom: var(--hm-ui-scale, 1);
 }
 
 .overlay.visible {

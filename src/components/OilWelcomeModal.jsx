@@ -31,8 +31,6 @@ export default function OilWelcomeModal({
   isOpen, onClose, darkMode = false,
   // Passed through to the fairness explainer (it re-derives the field locally).
   numberOfDeposits, totalOilBudget, gridX = 10, gridY = 10,
-  // Desktop UI scale (matches the side panels); the card zooms, the backdrop doesn't.
-  scale = 1,
 }) {
   // Close on Escape for keyboard users.
   useEffect(() => {
@@ -75,8 +73,10 @@ export default function OilWelcomeModal({
           // even while the URL bar is showing — otherwise the centered modal
           // overflows past the top and the close button hides under the URL bar.
           width: "100%", maxWidth: 460,
-          maxHeight: scale !== 1 && typeof window !== "undefined" ? Math.round(window.innerHeight * 0.9 / scale) : "90dvh",
-          zoom: scale,
+          // Card zooms with the desktop UI scale (--hm-ui-scale, set by /hailmary);
+          // dvh scales with zoom, so the cap divides by it.
+          maxHeight: "calc(90dvh / var(--hm-ui-scale, 1))",
+          zoom: "var(--hm-ui-scale, 1)",
           overflowY: "auto",
           background: c.panelBg,
           border: `1px solid ${c.border}`,

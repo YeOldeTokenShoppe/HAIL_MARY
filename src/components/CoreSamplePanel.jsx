@@ -457,7 +457,7 @@ export default function CoreSamplePanel({
               <span style={{ fontSize: 18, opacity: 0.5, marginRight: 8 }}>⛏️</span>
               <span style={{ fontSize: 10, color: c.muted, letterSpacing: "0.08em" }}>
                 {selectedX === null
-                  ? "Select a claim to see your drill log."
+                  ? "Select a plot to see its drill log."
                   : "Start drilling to build your core sample."}
               </span>
             </div>

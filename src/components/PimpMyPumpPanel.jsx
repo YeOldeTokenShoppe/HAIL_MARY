@@ -805,7 +805,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
         <div style={styles.body}>
           {!hasSelection && (
             <div style={{ ...styles.selectHint, fontSize: mFsLg, color: c.hintText }}>
-              Click a rig on the grid to select it, then customize below
+              Select your claim to customize your rig
             </div>
           )}
 

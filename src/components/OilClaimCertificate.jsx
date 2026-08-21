@@ -301,7 +301,7 @@ export default function OilClaimCertificate({
               fontSize: 20, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >✕</button>
-          <div onClick={(e) => e.stopPropagation()} style={{ cursor: "default", width: "min(92vw, 440px)" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ cursor: "default", width: "min(calc(92vw / var(--hm-ui-scale, 1)), 440px)", zoom: "var(--hm-ui-scale, 1)" }}>
             {art(true, certRef, { filter: "drop-shadow(0 24px 70px rgba(0,0,0,0.65))" })}
             {shareRow}
           </div>

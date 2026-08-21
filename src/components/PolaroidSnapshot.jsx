@@ -785,6 +785,7 @@ const PolaroidSnapshot = ({
       font-size: 16px;
       font-weight: 600;
       z-index: 999999;
+      zoom: var(--hm-ui-scale, 1);
       animation: slideUp 0.3s ease;
       border: 1px solid rgba(255, 255, 255, 0.2);
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);

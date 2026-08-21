@@ -142,7 +142,8 @@ export default function OilAwayRecap({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: isMobile ? "min(100%, 420px)" : 440,
-          maxHeight: "86vh",
+          maxHeight: "calc(86vh / var(--hm-ui-scale, 1))",
+          zoom: "var(--hm-ui-scale, 1)",
           overflowY: "auto",
           background: "linear-gradient(180deg, #1c1024, #140b1c)",
           border: `1px solid ${gold}55`,

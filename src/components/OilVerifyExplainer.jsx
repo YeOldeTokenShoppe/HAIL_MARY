@@ -182,7 +182,7 @@ export default function OilVerifyExplainer({
       }
       return {
         tone: c.bad, icon: "⚠", title: "Couldn't fully verify",
-        body: "The core proof checks out — the locked-in fingerprint is valid and the seed was tied to an unpredictable block — but some drilled cells didn't match the rebuilt map. In a live game this shouldn't happen; reach out if you see it.",
+        body: "The core proof checks out — the locked-in fingerprint is valid and the seed was tied to an unpredictable block — but some drilled plots didn't match the rebuilt map. In a live game this shouldn't happen; reach out if you see it.",
       };
     }
     if (report.phase === "anchored") {
@@ -332,7 +332,7 @@ export default function OilVerifyExplainer({
                     )}
                     {report.checks.field && (
                       <Check
-                        label={`FIELD · ${report.checks.field.checked} CELLS`}
+                        label={`FIELD · ${report.checks.field.checked} PLOTS`}
                         state={report.checks.field.ok ?? null}
                         detail={report.checks.field.ok ? "all match" : `${report.checks.field.mismatches?.length || "?"} off`}
                       />
@@ -363,7 +363,7 @@ export default function OilVerifyExplainer({
               {report.claimTotals && (
                 <>
                   <div style={{ fontSize: 8, color: c.text, letterSpacing: "0.04em", marginBottom: 6, fontFamily: mono }}>
-                    THE REAL MAP — tap a claim to see how much oil it held
+                    THE REAL MAP — tap a plot to see how much oil it held
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
                     {Array.from({ length: gridY }, (_, rowIdx) => (
