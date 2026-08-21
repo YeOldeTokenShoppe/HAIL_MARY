@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Text, useGLTF, useAnimations, useEnvironment } from "@react-three/drei";
 import {
   VENDOR_SITEPAL_CONFIG,
@@ -29,6 +29,34 @@ const STRIP_MODEL = "/models/CommercialStrip.glb";
 // own Y-rotation is added on top in faceDirWorld to get world space.
 const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 
+// Per-vendor fields: `model`, `prop`, `idleClip`, `talkClip`, `sitepal`,
+// `faceYaw`/`faceDist`/`faceLift`/`camDrop` (close-up framing), `gazeLift`/
+// `gazeTurn` (head-tracking bias), `glowMesh`/`glowColor`.
+//
+// Two ways to give a vendor more than one resting pose. Pick ONE:
+//
+// `poseModels: ["/models/X_Stand.glb", "/models/X_Sit.glb"]` — separate GLBs,
+//   each exported with the character already in place (the normal pipeline).
+//   One is drawn at random per page load and it is the only file fetched, so
+//   this costs nothing at runtime. Simplest to author; the cost is that a mesh
+//   or texture change means re-exporting every pose file.
+//
+// `poseClips: ["idle", "sit"]` — one GLB, several clips, where each clip's Root
+//   bone carries the placement. Use only if you need to TRANSITION between
+//   poses at runtime. Both clips must key the Root bone even when static, and
+//   "Export Deformation Bones Only" must be off or the non-deforming Synty Root
+//   is stripped and every placement silently vanishes.
+//
+// `poseOverrides: { "<model url>": { ...any vendor field } }` — optional. The
+//   named pose's fields are merged over the vendor when that pose is drawn, so
+//   behaviour can differ per pose, not just framing. A seated pose and a
+//   standing pose need very different approach angles (this is what put the
+//   fortune teller's camera inside her wagon), and a working pose may want to
+//   pause and look up where a standing one just tracks.
+//   Useful keys: faceDist / faceLift / camDrop (framing), faceYaw (which way
+//   the character LOOKS — also sets the head-tracking pitch axis), approachYaw
+//   (where the camera flies in from; defaults to faceYaw), pauseOnFocus,
+//   focusGazeLift, headPitchUp, gazeTurn.
 export const VENDOR_CATALOG = [
   { id: "insurance", label: "", awning: "#3e6b64", accent: "#7fd6c8",
     // No character of its own — the strip GLB supplies the tent, and `prop`
@@ -62,6 +90,37 @@ export const VENDOR_CATALOG = [
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     talkClip: "talking",
     sitepal: "hotdogs" },
+  { id: "tattoos",   label: "",    awning: "#4a3b6b", accent: "#d6a4ff",
+    // Two exported poses, one drawn per page load. Deliberately NO idleClip:
+    // each file carries a single, differently-named clip ("idle" vs
+    // "tattooing"), so the first-clip fallback picks the right one either way.
+    poseModels: ["/models/Vendor_TattooArtist_idle.glb",
+                 "/models/Vendor_TattooArtist_tattooing.glb"],
+    // Her booth: sign, barber chair and stool all cluster at z ≈ 29; the tent
+    // is the click volume. In the tattooing pose she sits on
+    // SM_Prop_Stool_01.004 (x 1.90, z 28.58) — her own root matches it exactly.
+    prop: "SM_Prop_Tent_01",
+    // Standing out front vs seated at the stool want different approaches:
+    // standing takes the low hero angle the other standing vendors use, seated
+    // needs a near-level one or the camera ends up under the bench.
+    // STARTING VALUES — worth an eyeball pass once both files are in.
+    poseOverrides: {
+      "/models/Vendor_TattooArtist_idle.glb":      { faceDist: 0.18, faceLift: -0.03, camDrop: -0.35 },
+      // Seated at the stool (local z 28.58) working on the barber chair (z
+      // 29.69), so she faces strip-local +Z — which the group's +90° maps to
+      // world +X. faceYaw 0 encodes that. This matters for more than the
+      // camera: pitch is applied about UP × faceDir, so a faceYaw that is 90°
+      // out rotates her head about an axis running THROUGH her face and the
+      // "look up" reads as a sideways roll.
+      // Then freeze the clip on focus and lift her gaze the rest of the way —
+      // focusGazeLift ≈ how far her animated head is pitched down.
+      // approachYaw pulls the camera 45° off her eyeline: straight down +X is
+      // through the barber chair (0.15 world away, camera lands at 0.32).
+      // Set it to 0 for a head-on shot if the chair turns out not to block.
+      "/models/Vendor_TattooArtist_tattooing.glb": { faceYaw: 0, approachYaw: -Math.PI / 4,
+        faceDist: 0.24, faceLift: 0, camDrop: -0.06,
+        pauseOnFocus: true, focusGazeLift: 0.7, headPitchUp: 1.35 },
+    } },
   { id: "tonics",    label: "",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_SnakeOilSalesman_Character.glb", idleClip: "idle",
     prop: "SM_Veh_Wagon_Shop_01",
@@ -74,23 +133,50 @@ export const VENDOR_CATALOG = [
     sitepal: "tonics" },
 ];
 
+// A vendor with `poseModels` ships one GLB per resting pose, each exported with
+// the character already placed (standing outside the booth vs seated inside).
+// The choice is made HERE, at module scope, so it happens once per page load
+// and the preloader and the component agree — which means only the chosen file
+// is ever fetched. Two files on disk, one file downloaded.
+const CHOSEN_POSE_MODEL = {};
+VENDOR_CATALOG.forEach((v) => {
+  const pool = v.poseModels?.length ? v.poseModels : (v.model ? [v.model] : []);
+  if (pool.length) CHOSEN_POSE_MODEL[v.id] = pool[Math.floor(Math.random() * pool.length)];
+});
+
 // Preload the strip and vendor GLBs (same idiom as ADDON_CATALOG in OilVoxelGrid)
 useGLTF.preload(STRIP_MODEL);
-VENDOR_CATALOG.forEach((v) => { if (v.model) useGLTF.preload(v.model); });
+Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(url));
 
-// Blender appends .001/.002 to names that collide across a session, and which
-// file gets the suffix changes between exports — the fortune teller ships
-// "Face3.001" and the salesman "Face3.002" for what the SitePal config calls
-// "Face3". Match the exact name first, then any name that is it plus a numeric
-// suffix, so a re-export can't silently break the face projection.
+// three.js GLTFLoader pushes EVERY node name through
+// PropertyBinding.sanitizeNodeName, whose reserved set is [ ] . : / — dots are
+// deleted outright and whitespace becomes "_". So the names in the GLB are NOT
+// the names in the scene:
+//     "Spotlight_Bulb.001"    -> "Spotlight_Bulb001"
+//     "SM_Prop_Tent_02 (23)"  -> "SM_Prop_Tent_02_(23)"
+//     "Face3.001"             -> "Face3001"
+// Every lookup here must therefore compare sanitized-to-sanitized, or it
+// silently matches nothing. (This is also why a ".\d{3}" suffix pattern can
+// never fire — the dot is already gone by the time we see the name.)
+function sanitizeName(n) {
+  return String(n ?? "").replace(/\s/g, "_").replace(/[\[\]\.:\/]/g, "");
+}
+
+// Match a Blender-authored name against the loaded scene: exact sanitized hit
+// first, then the same name plus Blender's 3-digit dedup suffix, so a re-export
+// that renames "Foo" to "Foo.001" still resolves.
 function findByBaseName(root, name) {
   if (!root || !name) return null;
-  const exact = root.getObjectByName(name);
-  if (exact) return exact;
-  let hit = null;
-  const re = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.\\d{3}$`);
-  root.traverse((o) => { if (!hit && re.test(o.name)) hit = o; });
-  return hit;
+  const want = sanitizeName(name);
+  const re = new RegExp(`^${want.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\d{3}$`);
+  let exact = null, suffixed = null;
+  root.traverse((o) => {
+    if (exact) return;
+    const n = sanitizeName(o.name);
+    if (n === want) exact = o;
+    else if (!suffixed && re.test(n)) suffixed = o;
+  });
+  return exact || suffixed;
 }
 
 // Rest-pose face direction in world space. vendor.faceYaw is expressed in the
@@ -98,6 +184,17 @@ function findByBaseName(root, name) {
 // stripRotY is the shared group's Y-rotation, which carries it to world space.
 function faceDirWorld(vendor, out, stripRotY = 0) {
   const yaw = (vendor.faceYaw ?? VENDOR_LOCAL_FACE_YAW) + stripRotY;
+  return out.set(Math.sin(yaw), 0, Math.cos(yaw));
+}
+
+// Where the camera flies IN from. Defaults to the way the vendor faces, which
+// is usually what you want — but the two are not the same thing and must be
+// separable: faceYaw also picks the head-tracking pitch axis, so it has to stay
+// truthful about which way the character actually looks, while the camera may
+// need to come in off-axis to clear whatever the vendor is working on (the
+// tattoo artist's barber chair sits exactly on her eyeline).
+function approachDirWorld(vendor, out, stripRotY = 0) {
+  const yaw = (vendor.approachYaw ?? vendor.faceYaw ?? VENDOR_LOCAL_FACE_YAW) + stripRotY;
   return out.set(Math.sin(yaw), 0, Math.cos(yaw));
 }
 
@@ -229,7 +326,9 @@ const HEAD_EASE = 8;           // 1/s — smoothing rate toward the target angle
 
 function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 }) {
   const group = useRef();
-  const { scene, animations } = useGLTF(vendor.model);
+  // Stable for the whole session: chosen at module load, so the hook's URL
+  // never changes under it and Suspense fetches exactly one file.
+  const { scene, animations } = useGLTF(CHOSEN_POSE_MODEL[vendor.id] || vendor.model);
   const { actions, mixer } = useAnimations(animations, group);
 
   // Cap per-frame animation advance: on a main-thread hitch the mixer would
@@ -241,14 +340,34 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     mixer.update = (d) => orig(Math.min(d, 1 / 30));
     return () => { mixer.update = orig; };
   }, [mixer]);
+  // Pose variants. A vendor may ship several mutually-exclusive RESTING poses
+  // that place the armature differently — e.g. the tattoo artist standing
+  // outside her booth vs seated inside it. Because the placement lives in the
+  // Root bone inside each clip, switching between them mid-scene would teleport
+  // her, so one is drawn at random per page load and held for the whole
+  // session. Chosen in a ref, not per render: re-rolling on any re-render (a
+  // parent state change, HMR) would move her while the player is looking.
+  const poseRef = useRef(null);
+  if (poseRef.current === null) {
+    const pool = vendor.poseClips?.length ? vendor.poseClips
+      : (vendor.idleClip ? [vendor.idleClip] : []);
+    poseRef.current = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "";
+  }
+  // The chosen pose IS this session's idle — everything that used to reach for
+  // vendor.idleClip has to come back to this one instead, or a talk crossfade
+  // would drop her back into the other pose's position.
+  const restClip = poseRef.current || vendor.idleClip;
+
+  const restActionRef = useRef(null);
   useEffect(() => {
-    const action = (vendor.idleClip && actions?.[vendor.idleClip]) || Object.values(actions || {})[0];
+    const action = (restClip && actions?.[restClip]) || Object.values(actions || {})[0];
+    restActionRef.current = action || null;
     // No fadeIn: on (re)mount the bindings sit at bind pose, and a weight fade
     // would visibly blend from T-pose. Playing at full weight snaps straight
     // into the idle on the first mixer update instead.
     action?.reset().play();
-    return () => action?.stop();
-  }, [actions, vendor.idleClip]);
+    return () => { action?.stop(); restActionRef.current = null; };
+  }, [actions, restClip]);
 
   // Environment-map fill: the strip sits on the −Z edge where one scene
   // directional grazes and the other lights the vendors' BACKS, so their
@@ -280,7 +399,7 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     const off = onVendorTalk((vendorId, talking) => {
       if (vendorId !== vendor.sitepal) return;
       if (talking === talkModeRef.current) return;
-      const idle = (vendor.idleClip && actions?.[vendor.idleClip]) || Object.values(actions || {})[0];
+      const idle = (restClip && actions?.[restClip]) || Object.values(actions || {})[0];
       const talk = actions?.[vendor.talkClip];
       if (!idle || !talk) return;
       talkModeRef.current = talking;
@@ -291,7 +410,7 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
       }
     });
     return () => { off(); talkModeRef.current = false; };
-  }, [actions, vendor.sitepal, vendor.talkClip, vendor.idleClip]);
+  }, [actions, vendor.sitepal, vendor.talkClip, restClip]);
 
   // All three character exports carry a stray unskinned "Icosphere" (42 verts,
   // ~2 units across) sitting at the character's origin — the debris the source
@@ -301,7 +420,7 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   useEffect(() => {
     const junk = [];
     scene.traverse((o) => {
-      if (o.isMesh && !o.isSkinnedMesh && /^Icosphere(\.\d+)?$/.test(o.name)) junk.push(o);
+      if (o.isMesh && !o.isSkinnedMesh && /^Icosphere\d*$/.test(sanitizeName(o.name))) junk.push(o);
     });
     junk.forEach((o) => { o.visible = false; o.raycast = () => {}; });
     return () => { junk.forEach((o) => { o.visible = true; }); };
@@ -454,6 +573,16 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
       if (st.proj) st.proj.visible = show;
       st.regulars.forEach((m) => { m.visible = !show; });
     }
+    // A working pose (head down over the tattoo) can't be corrected by additive
+    // tracking: the delta is driven by CAMERA ELEVATION, so a level camera asks
+    // for ~0 pitch and she never lifts — you just get the small yaw twitch.
+    // Freeze the clip instead and let the gaze bias carry her head all the way
+    // up. Paused actions keep writing their frozen pose, so the additive delta
+    // still has a stable base and the anti-compounding guard below still holds.
+    if (vendor.pauseOnFocus && restActionRef.current) {
+      restActionRef.current.paused = !!focusedRef?.current;
+    }
+
     const head = headRef?.current;
     if (!head) return;
     const t = trackRef.current;
@@ -465,9 +594,12 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
       const flat = Math.hypot(_toCam.x, _toCam.z);
       // gazeLift (rad) corrects a rest pose that carries the head high or
       // low — positive lifts the gaze above the pure camera angle.
+      // focusGazeLift is added only while focused — it is the "look up from
+      // your work" correction, and headPitchUp raises the clamp so a steeply
+      // bowed pose isn't capped before it reaches the viewer.
       targetPitch = THREE.MathUtils.clamp(
-        Math.atan2(_toCam.y, flat) + (vendor.gazeLift ?? 0),
-        -HEAD_PITCH_DOWN, HEAD_PITCH_UP
+        Math.atan2(_toCam.y, flat) + (vendor.gazeLift ?? 0) + (vendor.focusGazeLift ?? 0),
+        -HEAD_PITCH_DOWN, vendor.headPitchUp ?? HEAD_PITCH_UP
       );
       // gazeTurn (rad) corrects a sideways rest-pose bias — positive shifts
       // the gaze toward the viewer's right.
@@ -534,7 +666,13 @@ const LEGACY_MODEL_SCALE = 0.1;
 // roughly this size in the strip's own space).
 const PROXY_LOCAL_SIZE = 5;
 
-function VendorStall({ vendor, stripScene, stripRotY, framingUnit, propObj, onVendorClick, onFocusObject, onZoomOut, onFocusChange }) {
+function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, propObj, onVendorClick, onFocusObject, onZoomOut, onFocusChange }) {
+  // Fold this session's pose framing over the vendor so the close-up matches
+  // whichever pose was actually drawn.
+  const vendor = useMemo(() => {
+    const over = baseVendor.poseOverrides?.[CHOSEN_POSE_MODEL[baseVendor.id]];
+    return over ? { ...baseVendor, ...over } : baseVendor;
+  }, [baseVendor]);
   const rootRef = useRef();
   const zoomedRef = useRef(false);
   const headRef = useRef(null);
@@ -558,7 +696,7 @@ function VendorStall({ vendor, stripScene, stripRotY, framingUnit, propObj, onVe
     if (vendor.sitepal) activateVendorSitePal(vendor.sitepal);
     if (vendor.moodDim) window.dispatchEvent(new CustomEvent("vendor-mood", { detail: { active: true } }));
     if (!onFocusObject || !rootRef.current) return;
-    const normal = faceDirWorld(vendor, new THREE.Vector3(), stripRotY);
+    const normal = approachDirWorld(vendor, new THREE.Vector3(), stripRotY);
     if (headRef.current) {
       const headPos = new THREE.Vector3();
       headRef.current.getWorldPosition(headPos);
@@ -603,7 +741,7 @@ function VendorStall({ vendor, stripScene, stripRotY, framingUnit, propObj, onVe
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = "auto"; }}
     >
-      {vendor.model && (
+      {(vendor.model || vendor.poseModels?.length) && (
         <VendorModel
           vendor={vendor}
           focusedRef={zoomedRef}
@@ -654,7 +792,7 @@ function VendorStall({ vendor, stripScene, stripRotY, framingUnit, propObj, onVe
 // is authored in Blender. This component defers to that and only applies its
 // own emissive when the asset ships an unlit bulb — Blender stays the single
 // source of truth for the look, and re-exports can't fight the code.
-const BULB_RE = /^Spotlight_Bulb(\.\d+)?$/;
+const BULB_RE = /^Spotlight_Bulb\d*$/;   // post-sanitize: "Spotlight_Bulb.001" -> "Spotlight_Bulb001"
 
 const BULB_EMISSIVE = "#ffdca8";   // warm filament
 const BULB_EMISSIVE_INTENSITY = 1.6;
@@ -688,9 +826,81 @@ const SPOT_EASE = 4.5;             // 1/s fade in/out
 // nothing; it is purely the beam you can see. The two are complements, not
 // alternatives — the cone can't brighten the vendor, the light can't be seen.
 const BEAM_COLOR = "#ffeec4";
-const BEAM_OPACITY = 0.16;         // additive, so this reads brighter than it looks
-const BEAM_SPREAD = 1.35;          // beam radius vs. the light cone, slightly wider
-                                   // so the visible shaft frames the lit pool
+const BEAM_ANGLE = 0.30;           // rad, half-angle of the visible shaft
+const BEAM_NEAR = 1.5;             // world units: hidden this close (a focus
+                                   // close-up puts the camera INSIDE the cone,
+                                   // which would just wash the screen)…
+const BEAM_FAR = 4.0;
+// PlaneGeometry faces +Z; this lays it flat so its normal points up.
+const FLAT_Q = /* @__PURE__ */ new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+// Undercarriage glow comes from real PointLights authored in Blender and
+// carried by the GLB via KHR_lights_punctual. The model owns position, colour
+// and intensity; this only gates them by time of day.
+//
+// Worth remembering if a colour ever exports as white again: Blender's glTF
+// exporter reads a light's colour from its **Emission node**, not the Colour
+// swatch in the Light panel. With "Use Nodes" on (Blender forces it on for
+// lights) the swatch is cosmetic as far as glTF is concerned — set the Emission
+// node's Color to match, or you ship [1,1,1].
+// Multiplier on the AUTHORED intensity, so Blender still owns the brightness.
+const WAGON_LIGHT_BY_ENV = { night: 1.0, dusk: 0.7, hell: 1.0 };
+
+const POOL_LIFT = 0.05;            // strip-local nudge off the boards (no z-fight)
+const POOL_SPREAD = 1.15;          // pool radius vs. the cone base, a touch wider
+                                   // so the light looks like it spills, not stops
+const POOL_GAIN = 1.9;             // pool is brighter than the shaft: you are
+                                   // seeing a lit surface, not thin air              // …and at full strength by here, which is
+                                   // the range the strip is actually viewed from
+
+// A beam is ADDITIVE: it can only brighten what is behind it, so against a lit
+// daytime sky there is nothing to add to and it reads as nothing. This is a
+// property of the lighting, not a tuning value — no opacity makes a beam show
+// in full sun. So the rig keys off the scene's env preset: strong at night,
+// present at dusk/hell, off in daylight where it would only add haze.
+// (GeodeDusk / parabolumEnv are separate modes on the page — add them here if
+// you want beams there too.)
+const BEAM_BY_ENV = { night: 0.05, dusk: 0.01, hell: 0.05 };
+const BEAM_DEFAULT = 0;            // day, solstice: no beam
+const SPOT_BOOST_BY_ENV = { night: 1.2, dusk: 1.0, hell: 1.0 };  // × SPOT_INTENSITY
+
+
+// Build a light cone that ENDS ON THE GROUND by construction, instead of a
+// symmetric cone we then try to clip. A plain ConeGeometry's base is a disk
+// perpendicular to its own axis, so once the lamp is tilted only the disk's
+// centre sits at deck height and the low side punches through the boards.
+//
+// Here every rim vertex is the intersection of an edge-ray with the deck plane,
+// so the base is a horizontal ellipse at exactly deck level and nothing can
+// exist below it — no clipping planes, no renderer state, no material recompile
+// order to get wrong. Positions are relative to the apex, so the mesh just sits
+// at the bulb with no rotation or scale.
+function groundConeGeometry(aimQuat, apexY, halfAngle, groundY, segs = 22) {
+  const d = new THREE.Vector3(0, 1, 0).applyQuaternion(aimQuat).normalize();
+  if (d.y > -1e-3) return null;                       // aimed level or up
+  const ref = Math.abs(d.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const u = new THREE.Vector3().crossVectors(d, ref).normalize();
+  const v = new THREE.Vector3().crossVectors(d, u).normalize();
+  const tanA = Math.tan(halfAngle);
+  const drop = apexY - groundY;
+  if (!(drop > 0)) return null;
+  const maxT = (drop / -d.y) * 2.5;                   // cap rays that never hit
+  const rim = [];
+  const dir = new THREE.Vector3();
+  for (let i = 0; i <= segs; i++) {
+    const th = (i / segs) * Math.PI * 2;
+    dir.copy(d).addScaledVector(u, Math.cos(th) * tanA).addScaledVector(v, Math.sin(th) * tanA).normalize();
+    const t = dir.y < -1e-4 ? Math.min((groundY - apexY) / dir.y, maxT) : maxT;
+    rim.push(dir.x * t, dir.y * t, dir.z * t);
+  }
+  const pos = [];
+  for (let i = 0; i < segs; i++) {
+    const a = i * 3, b = (i + 1) * 3;
+    pos.push(0, 0, 0, rim[a], rim[a + 1], rim[a + 2], rim[b], rim[b + 1], rim[b + 2]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  return g;
+}
 
 function haloTexture() {
   const c = document.createElement("canvas");
@@ -712,14 +922,27 @@ function haloTexture() {
 // pixel size, so the group's ~0.135 scale can't shrink it away.
 const _haloAt = /* @__PURE__ */ new THREE.Vector3();
 
-function BulbRig({ stripScene }) {
+function BulbRig({ stripScene, envPreset, clipPlanes }) {
+  // A tilted cone's base disk is perpendicular to its OWN axis, so only its
+  // centre lands at deck height — the low side dips below the boards and shows
+  // against the void under the strip. A world-space clipping plane at deck
+  // level cuts exactly that, and costs one uniform plus a discard.
+  const gl = useThree((st) => st.gl);
+  // Must be on BEFORE the materials first compile: the shader bakes in
+  // NUM_CLIPPING_PLANES, and flipping this in an effect (i.e. after the first
+  // render) leaves already-compiled materials with clipping stripped out — the
+  // plane then looks inert no matter what you set its constant to.
+  if (gl && !gl.localClippingEnabled) gl.localClippingEnabled = true;
+
   const matRef = useRef(null);
   const [localPts, setLocalPts] = useState(null);
+  const [beamXf, setBeamXf] = useState(null);
+  const [coneGeos, setConeGeos] = useState(null);
   const pointsMat = useRef(null);
 
   useEffect(() => {
     const bulbs = [];
-    stripScene.traverse((o) => { if (o.isMesh && BULB_RE.test(o.name)) bulbs.push(o); });
+    stripScene.traverse((o) => { if (o.isMesh && BULB_RE.test(sanitizeName(o.name))) bulbs.push(o); });
     if (!bulbs.length) return;
 
     // Defer to the asset when Blender already authored the glow. Only light the
@@ -749,16 +972,74 @@ function BulbRig({ stripScene }) {
     stripScene.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(stripScene.matrixWorld).invert();
     const arr = new Float32Array(bulbs.length * 3);
+    const xf = [];
+    const m4 = new THREE.Matrix4();
+    const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
     bulbs.forEach((b, i) => {
-      const v = b.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
-      arr.set([v.x, v.y, v.z], i * 3);
+      b.updateWorldMatrix(true, false);
+      // full local transform, not just position — each lamp is aimed
+      // individually and the cone has to inherit that rotation
+      m4.copy(inv).multiply(b.matrixWorld).decompose(pos, quat, scl);
+      arr.set([pos.x, pos.y, pos.z], i * 3);
+      xf.push({ p: [pos.x, pos.y, pos.z], q: [quat.x, quat.y, quat.z, quat.w] });
     });
     setLocalPts(arr);
+    setBeamXf(xf);
 
-    return () => { restore?.(); };
+    // one exact, ground-terminated cone per lamp (deck is local y = 0)
+    const qq = new THREE.Quaternion();
+    const geos = xf.map((t) => {
+      qq.set(t.q[0], t.q[1], t.q[2], t.q[3]);
+      return groundConeGeometry(qq, t.p[1], BEAM_ANGLE, 0);
+    });
+    setConeGeos((prev) => { prev?.forEach((g) => g && g.dispose()); return geos; });
+
+    return () => {
+      restore?.();
+      setConeGeos((prev) => { prev?.forEach((g) => g && g.dispose()); return null; });
+    };
   }, [stripScene]);
 
+  const beamMat = useRef();
+  const poolMat = useRef();
+  const beamPeak = BEAM_BY_ENV[envPreset] ?? BEAM_DEFAULT;
+
+  // One cone geometry and one material shared by all 14 shafts.
+  const poolGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+  const beamMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: new THREE.Color(BEAM_COLOR),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    clippingPlanes: clipPlanes,
+  }), [clipPlanes]);
+  const poolMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: new THREE.Color(BEAM_COLOR),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    clippingPlanes: clipPlanes,
+  }), [clipPlanes]);
+  beamMat.current = beamMaterial;
+  poolMat.current = poolMaterial;
+  useEffect(() => () => {
+    try { beamMaterial.dispose(); } catch (e) {}
+    try { poolGeo.dispose(); } catch (e) {}
+    try { poolMaterial.dispose(); } catch (e) {}
+  }, [beamMaterial, poolGeo, poolMaterial]);
+
   const tex = useMemo(() => (typeof document === "undefined" ? null : haloTexture()), []);
+  useEffect(() => { if (tex && poolMaterial) { poolMaterial.map = tex; poolMaterial.needsUpdate = true; } }, [tex, poolMaterial]);
+  useEffect(() => {
+    if (beamMaterial) beamMaterial.needsUpdate = true;
+    if (poolMaterial) poolMaterial.needsUpdate = true;
+  }, [beamMaterial, poolMaterial]);
   useEffect(() => () => { try { tex?.dispose(); } catch (e) {} }, [tex]);
 
   // Fade the halo in with camera distance so it carries the aerial read without
@@ -773,49 +1054,142 @@ function BulbRig({ stripScene }) {
     const d = state.camera.position.distanceTo(_haloAt);
     m.opacity = THREE.MathUtils.clamp((d - HALO_NEAR) / (HALO_FAR - HALO_NEAR), 0, 1);
     m.visible = m.opacity > 0.01;
+
+    const bm = beamMat.current;
+    if (bm) {
+      const ramp = THREE.MathUtils.clamp((d - BEAM_NEAR) / (BEAM_FAR - BEAM_NEAR), 0, 1);
+      bm.opacity = beamPeak * ramp;
+      bm.visible = bm.opacity > 0.005;
+      const pm = poolMat.current;
+      if (pm) {
+        pm.opacity = Math.min(1, beamPeak * POOL_GAIN * ramp);
+        pm.visible = pm.opacity > 0.005;
+      }
+    }
   });
 
   if (!localPts || !tex) return null;
+
+  // Visible shafts, in STRIP-LOCAL units so the auto-fit scale carries them for
+  // free. Each cone hangs from its bulb down to the deck (local y≈0): the cone
+  // apex is at +h/2, so seating it at y - h/2 pins the apex on the lamp and
+  // flares the base into a pool on the boards. One geometry + one material
+  // shared across all 14.
+  // Each lamp is aimed individually in Blender — the fixture's local +Y is its
+  // throw direction (consistently ~0.7–0.83 downward in world, with the two
+  // lamps on each pole splaying opposite ways). So the cone inherits that
+  // rotation instead of hanging straight down, and its length is extended to
+  // wherever the tilted axis actually reaches the deck.
+  const beams = [];
+  if (beamPeak > 0 && beamXf && coneGeos && beamMaterial) {
+    const aim = new THREE.Vector3(), q = new THREE.Quaternion(), poolQ = new THREE.Quaternion();
+    beamXf.forEach((t, i) => {
+      const geo = coneGeos[i];
+      if (!geo) return;                          // lamp aimed level or upward
+      q.set(t.q[0], t.q[1], t.q[2], t.q[3]);
+      aim.set(0, 1, 0).applyQuaternion(q).normalize();
+      const h = t.p[1] / -aim.y;
+      const r = Math.tan(BEAM_ANGLE) * h;
+
+      // shaft: geometry is already apex-relative and ends on the deck, so it
+      // needs position only — no rotation, no scale, nothing to get wrong
+      beams.push(
+        <mesh
+          key={`beam-${i}`}
+          position={[t.p[0], t.p[1], t.p[2]]}
+          geometry={geo}
+          material={beamMaterial}
+          frustumCulled={false}
+          renderOrder={2}
+        />
+      );
+
+      // the pool it lands in: a cone meeting a plane off-axis makes an ELLIPSE,
+      // stretched along the direction of travel by 1/sin(elevation)
+      poolQ.setFromAxisAngle(_UP, Math.atan2(aim.x, aim.z)).multiply(FLAT_Q);
+      const stretch = 1 / Math.max(0.25, -aim.y);
+      beams.push(
+        <mesh
+          key={`pool-${i}`}
+          position={[t.p[0] + aim.x * h, POOL_LIFT, t.p[2] + aim.z * h]}
+          quaternion={[poolQ.x, poolQ.y, poolQ.z, poolQ.w]}
+          scale={[r * 2 * POOL_SPREAD, r * 2 * POOL_SPREAD * stretch, 1]}
+          geometry={poolGeo}
+          material={poolMaterial}
+          frustumCulled={false}
+          renderOrder={3}
+        />
+      );
+    });
+  }
+
   return (
-    <points ref={ptsRef} frustumCulled={false}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[localPts, 3]} />
-      </bufferGeometry>
-      <pointsMaterial
-        ref={pointsMat}
-        map={tex}
-        color={HALO_COLOR}
-        size={HALO_PX}
-        sizeAttenuation={false}
-        transparent
-        opacity={0}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        toneMapped={false}
-      />
-    </points>
+    <>
+      {beams}
+      <points ref={ptsRef} frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[localPts, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          ref={pointsMat}
+          map={tex}
+          color={HALO_COLOR}
+          size={HALO_PX}
+          sizeAttenuation={false}
+          transparent
+          opacity={0}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </points>
+    </>
   );
 }
 
 const _spotAt = /* @__PURE__ */ new THREE.Vector3();
-const _beamDir = /* @__PURE__ */ new THREE.Vector3();
 const _bulbAt = /* @__PURE__ */ new THREE.Vector3();
+
+// Adopt the PointLights that arrived inside the GLB rather than making our own:
+// they already sit at the right place under each wagon, already carry the
+// authored intensity, and move automatically if the wagons move in Blender.
+function WagonLights({ stripScene, envPreset }) {
+  const gain = WAGON_LIGHT_BY_ENV[envPreset] ?? 0;
+
+  useEffect(() => {
+    const lights = [];
+    stripScene.traverse((o) => { if (o.isPointLight) lights.push(o); });
+    if (!lights.length) return;
+
+    // Remember what the asset shipped so repeated mounts never compound on
+    // their own output, and so unmount leaves the GLB's values intact.
+    const original = lights.map((l) => ({ l, intensity: l.intensity }));
+    original.forEach(({ l, intensity }) => {
+      l.intensity = intensity * gain;
+      l.castShadow = false;
+    });
+
+    return () => { original.forEach(({ l, intensity }) => { l.intensity = intensity; }); };
+  }, [stripScene, gain]);
+
+  return null;
+}
 
 // One SpotLight for the whole strip, mounted OUTSIDE the scaled group: distance
 // and decay are world-space and do NOT inherit the group's scale, while
 // position would — mixing the two is the trap behind GLOW_LIGHT_DISTANCE.
-function VendorSpotlight({ focus, stripScene }) {
+function VendorSpotlight({ focus, stripScene, envPreset }) {
   const lightRef = useRef();
   const targetRef = useRef();
-  const beamRef = useRef();
-  const beamMat = useRef();
   const level = useRef(0);
 
   const bulbs = useMemo(() => {
     const out = [];
-    stripScene.traverse((o) => { if (o.isMesh && BULB_RE.test(o.name)) out.push(o); });
+    stripScene.traverse((o) => { if (o.isMesh && BULB_RE.test(sanitizeName(o.name))) out.push(o); });
     return out;
   }, [stripScene]);
+
+  const spotBoost = SPOT_BOOST_BY_ENV[envPreset] ?? 1;
 
   useEffect(() => {
     if (lightRef.current && targetRef.current) lightRef.current.target = targetRef.current;
@@ -826,9 +1200,8 @@ function VendorSpotlight({ focus, stripScene }) {
     if (!l || !t) return;
     const want = focus?.object ? 1 : 0;
     level.current += (want - level.current) * (1 - Math.exp(-SPOT_EASE * delta));
-    l.intensity = level.current * SPOT_INTENSITY;
+    l.intensity = level.current * SPOT_INTENSITY * spotBoost;
     l.visible = level.current > 0.004;
-    if (beamRef.current) beamRef.current.visible = l.visible;
     if (!l.visible || !focus?.object) return;
 
     focus.object.getWorldPosition(_spotAt);
@@ -843,22 +1216,8 @@ function VendorSpotlight({ focus, stripScene }) {
       const d = (_bulbAt.x - _spotAt.x) ** 2 + (_bulbAt.z - _spotAt.z) ** 2;
       if (d < bestD) { bestD = d; best = _bulbAt.clone(); }
     }
-    if (!best) return;
-    l.position.copy(best);
+    if (best) l.position.copy(best);
 
-    // Visible shaft: a cone spanning bulb → target. coneGeometry runs along +Y
-    // with the apex at +h/2, so pointing +Y at the bulb puts the apex on the
-    // lamp and flares the base out over the vendor.
-    const beam = beamRef.current, bm = beamMat.current;
-    if (!beam || !bm) return;
-    const h = best.distanceTo(_spotAt);
-    if (h < 1e-4) return;
-    const r = Math.tan(SPOT_ANGLE) * h * BEAM_SPREAD;
-    beam.position.copy(best).add(_spotAt).multiplyScalar(0.5);
-    _beamDir.copy(best).sub(_spotAt).normalize();
-    beam.quaternion.setFromUnitVectors(_UP, _beamDir);
-    beam.scale.set(r, h, r);                 // unit cone: r=1, h=1
-    bm.opacity = level.current * BEAM_OPACITY;
   });
 
   return (
@@ -874,24 +1233,11 @@ function VendorSpotlight({ focus, stripScene }) {
         decay={2}
         castShadow={false}
       />
-      <mesh ref={beamRef} frustumCulled={false} renderOrder={2}>
-        <coneGeometry args={[1, 1, 20, 1, true]} />
-        <meshBasicMaterial
-          ref={beamMat}
-          color={BEAM_COLOR}
-          transparent
-          opacity={0}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          toneMapped={false}
-        />
-      </mesh>
     </>
   );
 }
 
-export default function CommercialStrip({ worldW, worldD, cellSize = 1, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut }) {
+export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut }) {
   const { scene: stripScene } = useGLTF(STRIP_MODEL);
   // Which vendor is zoomed, and what the beam should point at. Lifted here so
   // one shared SpotLight can serve every vendor.
@@ -920,6 +1266,30 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, vendors 
     };
   }, [stripScene, deckW, deckZ]);
 
+  // Clip the beams AND pools to the boardwalk's actual footprint. The Y plane
+  // alone was never enough: a pool is a flat quad AT deck height, so nothing
+  // vertical can trim it — what spills past the boards is lateral, and needs
+  // edge planes. Derived from the Boardwalk mesh so it tracks the auto-fit.
+  //   local X -> world Z (negated by the +90° Y rotation), local Z -> world X.
+  const clipPlanes = useMemo(() => {
+    const planes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -fit.position[1])];
+    const deck = findByBaseName(stripScene, "Boardwalk");
+    if (!deck) {
+      return planes;
+    }
+    stripScene.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(stripScene.matrixWorld).invert();
+    const lb = new THREE.Box3().setFromObject(deck).applyMatrix4(inv);
+    const s = fit.scale, p = fit.position;
+    const zMin = -lb.max.x * s + p[2], zMax = -lb.min.x * s + p[2];
+    const xMin = lb.min.z * s + p[0],  xMax = lb.max.z * s + p[0];
+    planes.push(new THREE.Plane(new THREE.Vector3(0, 0, 1), -zMin));
+    planes.push(new THREE.Plane(new THREE.Vector3(0, 0, -1), zMax));
+    planes.push(new THREE.Plane(new THREE.Vector3(1, 0, 0), -xMin));
+    planes.push(new THREE.Plane(new THREE.Vector3(-1, 0, 0), xMax));
+    return planes;
+  }, [stripScene, fit]);
+
   return (
     <>
       {/* diagonal knee braces: lower end embedded in the mesa wall, upper end
@@ -940,12 +1310,13 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, vendors 
           the identical scale/rotation or they drift off their props. */}
       {/* Outside the scaled group on purpose: SpotLight distance/decay are
           world-space and would not inherit fit.scale, while position would. */}
-      <VendorSpotlight focus={focus} stripScene={stripScene} />
+      <VendorSpotlight focus={focus} stripScene={stripScene} envPreset={envPreset} />
+      <WagonLights stripScene={stripScene} envPreset={envPreset} />
       <group position={fit.position} rotation={[0, STRIP_ROT_Y, 0]} scale={fit.scale}>
         <primitive object={stripScene} />
         {/* Inside the group: halo positions are strip-local, and the constant
             pixel size is immune to the scale. */}
-        <BulbRig stripScene={stripScene} />
+        <BulbRig stripScene={stripScene} envPreset={envPreset} clipPlanes={clipPlanes} />
         {vendors.map((v) => (
           <VendorStall
             key={v.id}

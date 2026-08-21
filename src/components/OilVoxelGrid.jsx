@@ -6940,6 +6940,7 @@ export default function OilVoxelGrid({
           worldW={worldW}
           worldD={worldD}
           cellSize={cellSize}
+          envPreset={envPreset}
           onVendorClick={onVendorClick}
           onFocusObject={onFocusObject}
           onZoomOut={onZoomOut}
