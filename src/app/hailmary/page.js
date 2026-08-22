@@ -17,7 +17,7 @@ import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
-import DailyCallPanel from "@/components/DailyCallPanel";
+import DailyTicketPanel from "@/components/DailyTicketPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
@@ -1958,6 +1958,17 @@ export default function OilPage() {
       return !on;
     });
   }, [envPreset, isMobile]);
+  // A jackpot on the DAILY TICKET fires the fireworks for a fixed run, then
+  // puts the scene back — unless the player has already stopped them by hand.
+  const fireworksOnRef = useRef(false);
+  useEffect(() => { fireworksOnRef.current = fireworksOn; }, [fireworksOn]);
+  const jackpotFireworksTimer = useRef(null);
+  const fireJackpotFireworks = useCallback((ms = 10000) => {
+    if (!fireworksOnRef.current) toggleFireworks();
+    clearTimeout(jackpotFireworksTimer.current);
+    jackpotFireworksTimer.current = setTimeout(() => { if (fireworksOnRef.current) toggleFireworks(); }, ms);
+  }, [toggleFireworks]);
+  useEffect(() => () => clearTimeout(jackpotFireworksTimer.current), []);
 
   // Reset snapshot trigger after timeout (fallback if user dismisses without onComplete)
   useEffect(() => {
@@ -2129,8 +2140,24 @@ export default function OilPage() {
     return Math.min(Math.max(day, 1), len);
   }, [gameStartDate, seasonLengthDays, todayUTC]);
 
-  const bonusDrills = userDrill?.bonusDrills ?? 0;
+  // Test mode: DAILY TICKET prizes land here (a bonus drill is a bonus drill)
+  // and in the FIELD ACTIVITY feed; the real version writes the drill doc.
+  const [testBonusDrills, setTestBonusDrills] = useState(0);
+  const [testTimelineEvents, setTestTimelineEvents] = useState([]);
+  const bonusDrills = (userDrill?.bonusDrills ?? 0) + (isTest ? testBonusDrills : 0);
   const playerDepth = Math.min(passiveDepth + bonusDrills, MAX_DEPTH);
+  const onTicketSettle = useCallback((r) => {
+    if (!isTest || !r?.win) return; // wins only — a loss stays on the ticket
+    if (r.tier === "jackpot") setTestBonusDrills((n) => n + 3);
+    else if (r.sym === "pickaxe") setTestBonusDrills((n) => n + 1);
+    setTestTimelineEvents((prev) => [{
+      id: `test-ticket-${r.ticketNo}-${prev.length}`,
+      type: r.tier === "jackpot" ? "ticket_jackpot" : "ticket",
+      username: "YOU (TEST)",
+      createdAt: { seconds: Math.floor(Date.now() / 1000) },
+      detail: `ticket ${r.ticketNo} · three ${r.symName.toLowerCase()}s · ${r.prize.toLowerCase()}`,
+    }, ...prev].slice(0, 10));
+  }, [isTest]);
 
   // In test mode, synthesize a userDrill from the selected cell
   const activeUserDrill = isTest && selectedX !== null
@@ -4492,6 +4519,9 @@ export default function OilPage() {
     artifact_find: { icon: "🏺", color: "#c79bff", fill: false, verb: "unearthed an artifact" },
     curse:   { icon: "⚰", color: theme.red, fill: true, verb: "disturbed a cursed burial ground" },
     cache_found: { icon: "💰", color: theme.gold, fill: true, verb: "found the OUTLAW CACHE!" },
+    // DAILY TICKET (wins only; a loss stays on the ticket)
+    ticket: { icon: "🎟", color: theme.gold, fill: false, verb: "matched three on the daily ticket" },
+    ticket_jackpot: { icon: "🎟", color: theme.gold, fill: true, verb: "hit the DAILY TICKET JACKPOT!" },
   };
 
   const testerBadgeStyle = {
@@ -4728,6 +4758,7 @@ export default function OilPage() {
   );
 
   // FIELD ACTIVITY — single-rail live timeline feed (who / what / when only).
+  const feedEvents = isTest && testTimelineEvents.length ? [...testTimelineEvents, ...timelineEvents] : timelineEvents;
   const timelineSection = (
     <div style={isMobile ? m.section : styles.panelSection}>
       <PanelTitle
@@ -4741,7 +4772,7 @@ export default function OilPage() {
       >
         FIELD ACTIVITY
       </PanelTitle>
-      {timelineEvents.length === 0 ? (
+      {feedEvents.length === 0 ? (
         <div style={{ fontSize: 10, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", padding: "4px 0" }}>
           No activity yet — the field is quiet.
         </div>
@@ -4749,7 +4780,7 @@ export default function OilPage() {
         <div style={{ position: "relative", paddingLeft: 2, maxHeight: 280, overflowY: "auto" }}>
           {/* vertical spine */}
           <div style={{ position: "absolute", left: 7, top: 4, bottom: 4, width: 2, background: theme.border }} />
-          {(timelineOpen ? timelineEvents : timelineEvents.slice(0, 4)).map((ev) => {
+          {(timelineOpen ? feedEvents : feedEvents.slice(0, 4)).map((ev) => {
             const meta = TIMELINE_META[ev.type] || TIMELINE_META.strike;
             const who = ev.username || (ev.userId ? truncId(ev.userId) : null);
             return (
@@ -4779,12 +4810,12 @@ export default function OilPage() {
           })}
         </div>
       )}
-      {timelineEvents.length > 4 && (
+      {feedEvents.length > 4 && (
         <button
           onClick={() => setTimelineOpen((o) => !o)}
           style={{ width: "100%", marginTop: 2, padding: "8px 0 2px", background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: "0.12em", color: theme.muted, textAlign: "right" }}
         >
-          {timelineOpen ? "SHOW LESS \u25B4" : `SHOW ALL ${timelineEvents.length} \u25BE`}
+          {timelineOpen ? "SHOW LESS \u25B4" : `SHOW ALL ${feedEvents.length} \u25BE`}
         </button>
       )}
     </div>
@@ -7241,10 +7272,6 @@ export default function OilPage() {
           {finalHaulCard}
           {/* Live first: the rig, its core, its finds, then the field. */}
           {yourRigCard}
-          {/* DAILY CALL — prototype of the Betroleum directional-call loop (test mode only). */}
-          {isTest && (
-            <DailyCallPanel theme={theme} isMobile={isMobile} darkMode={uiDark} grid3D={displayGrid3D} gridX={gridSize} gridY={gridSize} maxOil={displayMaxOil} selectedX={selectedX} selectedY={sliceY} drillDepth={effectiveDrillDay} drillProximity={drillProximity} devControls />
-          )}
           {gusherShutoffPanel}
           <CoreSamplePanel
             theme={theme}
@@ -7269,6 +7296,10 @@ export default function OilPage() {
             darkMode={uiDark}
             isMobile
           />
+          {/* DAILY TICKET — scratch-off prototype (test mode only), after the rig's own cards. */}
+          {isTest && (
+            <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+          )}
           {timelineSection}
           {leaderboardSection}
           {isAdmin && parametersPanel}
@@ -7783,10 +7814,6 @@ export default function OilPage() {
             {finalHaulCard}
             {/* Live first: the rig, its core, its finds, then the field. */}
             {yourRigCard}
-            {/* DAILY CALL — prototype of the Betroleum directional-call loop (test mode only). */}
-            {isTest && (
-              <DailyCallPanel theme={theme} isMobile={isMobile} darkMode={uiDark} grid3D={displayGrid3D} gridX={gridSize} gridY={gridSize} maxOil={displayMaxOil} selectedX={selectedX} selectedY={sliceY} drillDepth={effectiveDrillDay} drillProximity={drillProximity} devControls />
-            )}
             {gusherShutoffPanel}
             <CoreSamplePanel
               theme={theme}
@@ -7809,6 +7836,10 @@ export default function OilPage() {
               artifactFinds={userDrill?.artifactFinds || 0}
               darkMode={uiDark}
             />
+            {/* DAILY TICKET — scratch-off prototype (test mode only), after the rig's own cards. */}
+            {isTest && (
+              <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+            )}
             {timelineSection}
             {leaderboardSection}
             {isAdmin && parametersPanel}

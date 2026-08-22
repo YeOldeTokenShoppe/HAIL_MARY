@@ -32,6 +32,7 @@
     "@wagmi/core": "^3.4.3",
     "@walletconnect/ethereum-provider": "^2.23.9",
     "animejs": "^4.4.1",
+    "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",
