@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { PanelSection, PanelTitle, PANEL_ICONS } from "./HailMaryPanel";
 import { useOilApiFetch } from "@/lib/oilApiClient";
 import {
   db, collection, query, where, orderBy, limit, onSnapshot, doc,
@@ -15,6 +16,7 @@ export default function OilPlotChat({
   darkMode = false,
   isMobile = false,
   defaultExpanded = false,
+  theme = null,
   hasMessages = false,
   onRead,
   onTransferPlot,
@@ -205,20 +207,18 @@ export default function OilPlotChat({
     }
   }, [onTransferPlot, transferUsername, transferUpgrades]);
 
+  // Section chrome follows the page theme; the body keeps its own palette (c).
+  const t = theme || { border: c.sectionBorder, accent: c.accent, muted: c.muted };
+
   // ── No plot selected ──────────────────────────────────────────────────────
   if (!plotKey) {
     return (
-      <div style={{ padding: isMobile ? "12px 12px" : "12px 14px", borderBottom: `1px solid ${c.sectionBorder}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c.activeBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
-          <span style={{ fontFamily: mono, fontSize: isMobile ? 12 : 11, fontWeight: 600, color: c.accent, letterSpacing: "0.2em" }}>
-            MESSAGES
-          </span>
-        </div>
-        <p style={{ fontFamily: mono, fontSize: 10, color: c.muted, margin: "8px 0 0" }}>
+      <PanelSection theme={t} isMobile={isMobile}>
+        <PanelTitle theme={t} isMobile={isMobile} icon={PANEL_ICONS.messages} style={{ marginBottom: 8 }}>MESSAGES</PanelTitle>
+        <p style={{ fontFamily: mono, fontSize: 10, color: c.muted, margin: 0 }}>
           Select a plot to message
         </p>
-      </div>
+      </PanelSection>
     );
   }
 
@@ -253,35 +253,23 @@ export default function OilPlotChat({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: isMobile ? "12px 12px" : "12px 14px", borderBottom: `1px solid ${c.sectionBorder}` }}>
-      {/* Header / accordion toggle */}
-      <div
-        onClick={() => { setExpanded((e) => { if (!e && plotKey) setTimeout(() => onRead?.(plotKey), 0); return !e; }); setHasUnread(false); }}
-        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+    <PanelSection theme={t} isMobile={isMobile}>
+      <PanelTitle
+        theme={t} isMobile={isMobile} icon={PANEL_ICONS.messages}
+        onToggle={() => { setExpanded((e) => { if (!e && plotKey) setTimeout(() => onRead?.(plotKey), 0); return !e; }); setHasUnread(false); }}
+        open={expanded}
       >
-        <h3 style={{
-          margin: 0, fontSize: isMobile ? 12 : 11, fontWeight: 600,
-          color: c.accent, letterSpacing: "0.2em", textTransform: "uppercase",
-          display: "flex", alignItems: "center", gap: 6,
-          fontFamily: mono,
-        }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={(hasMessages || hasUnread) ? "#22cc44" : c.activeBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
-          MESSAGES
-          {(hasMessages || (hasUnread && !expanded)) && (
-            <span style={{
-              display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-              background: "#22cc44", marginLeft: 2, flexShrink: 0,
-            }} />
-          )}
-          <span style={{ fontSize: 9, fontWeight: 400, color: c.muted, letterSpacing: "0.05em" }}>
-            {(() => { const [cx, cy] = plotKey.split("_").map(Number); return `(${cx + 1}, ${cy + 1})`; })()}
-          </span>
-        </h3>
-        <span style={{ fontSize: 10, color: c.muted }}>{expanded ? "\u25B4" : "\u25BE"}</span>
-      </div>
+        MESSAGES
+        {(hasMessages || (hasUnread && !expanded)) && (
+          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#22cc44", flexShrink: 0 }} />
+        )}
+        <span style={{ fontSize: 9, fontWeight: 400, color: c.muted, letterSpacing: "0.05em" }}>
+          {(() => { const [cx, cy] = plotKey.split("_").map(Number); return `(${cx + 1}, ${cy + 1})`; })()}
+        </span>
+      </PanelTitle>
 
       {expanded && (
-        <div style={{ marginTop: 10 }}>
+        <div>
 
           {/* ── Owner social links ──────────────────────────────────── */}
           {hasLinks && (
@@ -642,6 +630,6 @@ export default function OilPlotChat({
           )}
         </div>
       )}
-    </div>
+    </PanelSection>
   );
 }

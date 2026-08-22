@@ -185,7 +185,7 @@ export default function OilSurfaceMap({
         color: t.inspectorKey || t.muted,
       }}>
         {[
-          ["OIL", { background: oilGradient }],
+          ["BTR", { background: oilGradient }],
           ["DRY", { background: dryFill }],
           ["UNEXPLORED", { background: emptyFill, border: `1px solid ${t.borderLight}` }],
           ["YOU", { background: emptyFill, border: `2px solid ${t.green}88` }],

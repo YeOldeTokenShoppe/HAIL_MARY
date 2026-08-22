@@ -45,7 +45,7 @@ const TECH_STEPS = [
   {
     num: "3",
     title: "FINAL SEED",
-    desc: "Once that block is mined, the seed is fixed: finalSeed = SHA-256(secret : blockHash). A deterministic algorithm turns it into the 3D oil field — same seed, same map, every time.",
+    desc: "Once that block is mined, the seed is fixed: finalSeed = SHA-256(secret : blockHash). A deterministic algorithm turns it into the 3D Betroleum field — same seed, same map, every time.",
   },
   {
     num: "4",
@@ -238,7 +238,7 @@ export default function OilVerifyExplainer({
       {expanded && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: c.text, lineHeight: 1.5, letterSpacing: "0.02em", marginBottom: 12 }}>
-            The map of where the oil is hidden is locked in <b>before anyone plays</b>, and tied to something
+            The map of where the Betroleum is hidden is locked in <b>before anyone plays</b>, and tied to something
             nobody can predict — so it can't be rigged. Here's how, and you can prove it yourself.
           </div>
 
@@ -363,7 +363,7 @@ export default function OilVerifyExplainer({
               {report.claimTotals && (
                 <>
                   <div style={{ fontSize: 8, color: c.text, letterSpacing: "0.04em", marginBottom: 6, fontFamily: mono }}>
-                    THE REAL MAP — tap a plot to see how much oil it held
+                    THE REAL MAP — tap a plot to see how much Betroleum it held
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
                     {Array.from({ length: gridY }, (_, rowIdx) => (

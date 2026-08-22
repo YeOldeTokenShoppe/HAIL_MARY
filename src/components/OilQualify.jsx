@@ -776,7 +776,7 @@ export default function OilQualify({
               { step: "01", title: "HOLD RL80 & FOLLOW", desc: `Hold at least $${QUALIFICATION_THRESHOLD} of RL80 and follow @rl80token on X. You never spend it — holding is the ticket. Sell anytime; you only lose your seat.` },
               { step: "02", title: "STAKE YOUR CLAIM", desc: `Connect your wallet, verify your follow, and pick a plot on the ${GRID_SIZE}x${GRID_SIZE} grid. First come, first served.` },
               { step: "03", title: "YOUR RIG DRILLS 24/7", desc: "No clicking. Once the season starts, your rig pumps around the clock and strikes at random, unpredictable times — day or night. Refer friends to drill deeper (+3 layers each, up to depth 20)." },
-              { step: "04", title: "STRIKE LYQUID80 — GET PAID", desc: "Every unit you haul is worth real USDC at a fixed rate. When the season ends, payouts go straight to your wallet." },
+              { step: "04", title: "STRIKE BETROLEUM — GET PAID", desc: "Every unit you haul is worth real USDC at a fixed rate. When the season ends, payouts go straight to your wallet." },
             ].map((item) => (
               <div key={item.step} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <div style={{

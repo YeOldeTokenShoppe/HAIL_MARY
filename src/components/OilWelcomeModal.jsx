@@ -148,7 +148,7 @@ export default function OilWelcomeModal({
             margin: "6px 0 0", fontSize: 11, color: c.muted,
             letterSpacing: "0.04em", lineHeight: 1.5,
           }}>
-            Strike oil, climb the leaderboard. Here's how it works.
+            Strike Betroleum — the only crude you can wager. Here's how it works.
           </p>
         </div>
 

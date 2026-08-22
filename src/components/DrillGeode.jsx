@@ -258,7 +258,7 @@ export default function DrillHUD({
 
   let status, statusColor;
   if (hellActive) { status = "DEMONIC FORCE DETECTED"; statusColor = HELL_COLOR; }
-  else if (demonBlockade?.active) { status = `OIL BLOCKADE — BOUNTY: ${demonBlockade.bountyAmount || 0} USDC`; statusColor = HELL_COLOR; }
+  else if (demonBlockade?.active) { status = `BLOCKADE — BOUNTY: ${demonBlockade.bountyAmount || 0} USDC`; statusColor = HELL_COLOR; }
   else if (phase === "drilling") { status = "DRILLING..."; statusColor = accent; }
   else if (phase === "analyzing") { status = "ANALYZING SAMPLE..."; statusColor = accent; }
   else if (phase === "result") { status = `RESULT: ${TIER_LABELS[tier ?? 0]}`; statusColor = tierColors[tier ?? 0]; }

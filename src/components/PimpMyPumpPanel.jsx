@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { PanelSection, PanelTitle, PANEL_ICONS } from "./HailMaryPanel";
 import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId, PREMIUM_PRICES } from "@/lib/oilPremium";
 
 // Normalize an uploaded sign image to <=maxDim px (preserving aspect) and re-encode
@@ -682,7 +683,7 @@ metalAF: {
 
 // ── Panel component ──────────────────────────────────────────────────────────
 
-export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId, readOnly = false, unlockedItems = new Set(), onPurchaseRequest }) {
+export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, theme = null, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId, readOnly = false, unlockedItems = new Set(), onPurchaseRequest }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [activeZone, setActiveZone] = useState(null);
   const [pickerSlot, setPickerSlot] = useState(null); // which slot is picking an addon
@@ -782,27 +783,19 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
     setPreviewThemeKey(themeKey);
   }, [onChange, config.signImageUrl, config.showSign, config.showCamera, config.fenceType, config.addons]);
 
-  const sectionStyle = { ...(isMobile ? mStyles.section : styles.section), borderBottomColor: c.sectionBorder };
-  const titleStyle = { ...(isMobile ? mStyles.title : styles.title), color: c.accent };
+  // Section chrome follows the page theme; the editor body keeps its own palette (c).
+  const t = theme || { border: c.sectionBorder, accent: c.accent, muted: c.muted };
   const mFs = isMobile ? 10 : 10;   // base font for labels/buttons
   const mFsLg = isMobile ? 11 : 11; // larger font for zone names/hints
 
   return (
-    <div style={sectionStyle}>
-      {/* Header — click to expand/collapse */}
-      <div
-        onClick={() => setExpanded((e) => !e)}
-        style={styles.header}
-      >
-        <h3 style={titleStyle}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c.activeBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect width="16" height="6" x="2" y="2" rx="2"/><path d="M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect width="4" height="6" x="8" y="16" rx="1"/></svg>
-          PIMP MY PUMP
-        </h3>
-        <span style={{ ...styles.chevron, color: c.muted }}>{expanded ? "\u25B4" : "\u25BE"}</span>
-      </div>
+    <PanelSection theme={t} isMobile={isMobile}>
+      <PanelTitle theme={t} isMobile={isMobile} icon={PANEL_ICONS.pump} onToggle={() => setExpanded((e) => !e)} open={expanded}>
+        PIMP MY PUMP
+      </PanelTitle>
 
       {expanded && (
-        <div style={styles.body}>
+        <div>
           {!hasSelection && (
             <div style={{ ...styles.selectHint, fontSize: mFsLg, color: c.hintText }}>
               Select your claim to customize your rig
@@ -1489,7 +1482,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
           )}
         </div>
       )}
-    </div>
+    </PanelSection>
   );
 }
 

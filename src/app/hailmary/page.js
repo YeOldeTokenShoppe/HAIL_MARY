@@ -16,6 +16,7 @@ import OilAnchorEvent from "@/components/OilAnchorEvent";
 import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
+import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
@@ -42,12 +43,12 @@ import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 // types. The chosen caption is set once into the polaroid meta and flows through
 // to the saved/published feed entry. (Admins can still hand-edit before publish.)
 const GUSHER_CAPTIONS = [
-  "STRUCK LYQUID80! 💸",
+  "BETROLEUM STRIKE! 💸",
   "PAYDIRT! 💸",
   "THAR SHE BLOWS! 🛢️",
   "GUSHER! 💦",
   "RICH STRIKE — DRINKS ON ME! 🥂",
-  "FROM ZERO TO OIL BARON 📈",
+  "FROM ZERO TO BETROLEUM BARON 📈",
   "DIVERSIFYING THE PORTFOLIO 💸",
 ];
 const HELL_CAPTIONS = [
@@ -4158,7 +4159,7 @@ export default function OilPage() {
           const res = await fetch(`/api/oil-admin-zero-scores?password=${encodeURIComponent(adminPassword)}`);
           const r = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(r?.error || `HTTP ${res.status}`);
-          return `✓ zeroed ${r.rigsZeroed} rig(s) — ${(r.oilZeroed || 0).toLocaleString()} banked oil erased`;
+          return `✓ zeroed ${r.rigsZeroed} rig(s) — ${(r.oilZeroed || 0).toLocaleString()} banked Betroleum erased`;
         })}>ZERO SCORES</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
@@ -4366,12 +4367,12 @@ export default function OilPage() {
     <div style={isMobile ? m.section : styles.panelSection}>
       {/* Field-wide only — the player's own depth / haul / value live in the
           YOUR RIG card, so nothing here changes with who is looking. */}
-      <h3 style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), justifyContent: "space-between" }}>
-        <span>GEOLOGICAL SURVEY</span>
-        <span style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.1em", fontWeight: 400 }}>
-          {gridSize}&times;{gridSize} &middot; {DEPTH_Z} LAYERS
-        </span>
-      </h3>
+      <PanelTitle
+        theme={theme} isMobile={isMobile} icon={PANEL_ICONS.survey}
+        right={<span style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.1em", textTransform: "uppercase" }}>{gridSize}&times;{gridSize} &middot; {DEPTH_Z} LAYERS</span>}
+      >
+        GEOLOGICAL SURVEY
+      </PanelTitle>
       <div style={isMobile ? { ...m.statGrid, gridTemplateColumns: "1fr 1fr" } : styles.statGrid}>
         <StatBlock s={styles} accentColor={theme.accent} label="PRIZE POOL" value={<AnimNum value={totalOilBudget} />} unit="USDC" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={numberOfDeposits} />
@@ -4379,9 +4380,9 @@ export default function OilPage() {
         <StatBlock s={styles} accentColor={theme.green} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
         {(isAdmin || isReport) && (
           <>
-            <StatBlock s={styles} accentColor={theme.accent} label="PEAK PLOT" value={<AnimNum value={stats.maxClaimTotal} />} unit="OIL" />
+            <StatBlock s={styles} accentColor={theme.accent} label="PEAK PLOT" value={<AnimNum value={stats.maxClaimTotal} />} unit="BTR" />
             <StatBlock s={styles} accentColor={theme.accent} label="DRY PLOTS" value={stats.dryClaims} />
-            <StatBlock s={styles} accentColor={theme.accent} label="FIELD OIL" value={OIL_FIELD_UNITS.toLocaleString()} unit="OIL" />
+            <StatBlock s={styles} accentColor={theme.accent} label="FIELD TOTAL" value={OIL_FIELD_UNITS.toLocaleString()} unit="BTR" />
             <StatBlock s={styles} accentColor={theme.accent} label="FIELD TAPPED" value={OIL_FIELD_UNITS > 0 ? `${(communityOil / OIL_FIELD_UNITS * 100).toFixed(2)}%` : "0%"} accent={communityOil > 0} />
           </>
         )}
@@ -4460,7 +4461,7 @@ export default function OilPage() {
 
   // Event-type → icon, color, and phrasing for the FIELD ACTIVITY feed.
   const TIMELINE_META = {
-    strike:  { icon: "⛏", color: theme.muted, fill: false, verb: "struck oil" },
+    strike:  { icon: "⛏", color: theme.muted, fill: false, verb: "struck Betroleum" },
     gusher:  { icon: "💎", color: theme.gold, fill: false, verb: "hit a gusher!" },
     motherlode: { icon: "🌋", color: theme.gold, fill: true, verb: "hit the MOTHERLODE!" },
     hell:    { icon: "☠", color: theme.red, fill: false, verb: "breached a hell pocket" },
@@ -4551,7 +4552,7 @@ export default function OilPage() {
               </div>
               <span style={{ whiteSpace: "nowrap", marginLeft: 8, textAlign: "right" }}>
                 <span style={{ fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
-                  {(d.totalCollected || 0).toLocaleString()} OIL
+                  {(d.totalCollected || 0).toLocaleString()} BTR
                 </span>
                 {fmtOilUsd(d.totalCollected) && (
                   <span style={{ fontSize: 8, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
@@ -4591,7 +4592,7 @@ export default function OilPage() {
               </div>
               <span style={{ whiteSpace: "nowrap", marginLeft: 8, textAlign: "right" }}>
                 <span style={{ fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
-                  {(d.totalCollected || 0).toLocaleString()} OIL
+                  {(d.totalCollected || 0).toLocaleString()} BTR
                 </span>
                 {fmtOilUsd(d.totalCollected) && (
                   <span style={{ fontSize: 8, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
@@ -4617,7 +4618,7 @@ export default function OilPage() {
   // Full panel (with title) — used inside the header trophy overlay.
   const leaderboardPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>LEADERBOARD</h3>
+      <PanelTitle theme={theme} isMobile={isMobile} icon={PANEL_ICONS.leaderboard}>LEADERBOARD</PanelTitle>
       {leaderboardBody}
     </div>
   );
@@ -4625,13 +4626,9 @@ export default function OilPage() {
   // Collapsible inline section — lives at the bottom of the side panel.
   const leaderboardSection = (
     <div style={isMobile ? m.section : styles.panelSection}>
-      <h3
-        style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
-        onClick={() => setLeaderboardSectionOpen((o) => !o)}
-      >
+      <PanelTitle theme={theme} isMobile={isMobile} icon={PANEL_ICONS.leaderboard} onToggle={() => setLeaderboardSectionOpen((o) => !o)} open={leaderboardSectionOpen}>
         LEADERBOARD
-        <span style={{ fontSize: 10, color: theme.muted }}>{leaderboardSectionOpen ? "▴" : "▾"}</span>
-      </h3>
+      </PanelTitle>
       {leaderboardSectionOpen && (
         <>
           {renderLeaderboard(true)}
@@ -4714,13 +4711,17 @@ export default function OilPage() {
   // FIELD ACTIVITY — single-rail live timeline feed (who / what / when only).
   const timelineSection = (
     <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span>FIELD ACTIVITY</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 8, letterSpacing: "0.14em", color: theme.green }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: theme.green, boxShadow: `0 0 6px ${theme.green}`, animation: "tankPulse 1.6s ease-in-out infinite" }} />
-          LIVE
-        </span>
-      </h3>
+      <PanelTitle
+        theme={theme} isMobile={isMobile} icon={PANEL_ICONS.activity}
+        right={(
+          <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9, letterSpacing: "0.14em", color: theme.green, textTransform: "uppercase" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: theme.green, boxShadow: `0 0 6px ${theme.green}`, animation: "tankPulse 1.6s ease-in-out infinite" }} />
+            LIVE
+          </span>
+        )}
+      >
+        FIELD ACTIVITY
+      </PanelTitle>
       {timelineEvents.length === 0 ? (
         <div style={{ fontSize: 10, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", padding: "4px 0" }}>
           No activity yet — the field is quiet.
@@ -4772,28 +4773,29 @@ export default function OilPage() {
 
   const fieldDispatchSection = (
     <div style={isMobile ? m.section : styles.panelSection}>
-      <h3
-        style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
-        onClick={() => setFeedDispatchOpen((o) => !o)}
+      <PanelTitle
+        theme={theme} isMobile={isMobile} icon={PANEL_ICONS.dispatch}
+        onToggle={() => setFeedDispatchOpen((o) => !o)} open={feedDispatchOpen}
+        right={(
+          <>
+            <a
+              href="/hailmary/feed"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Open the public gallery"
+              style={{ fontSize: 9, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline", textTransform: "uppercase" }}
+            >VIEW ALL</a>
+            <span
+              onClick={(e) => { e.stopPropagation(); loadFeed(); }}
+              title="Refresh"
+              style={{ fontSize: 12, color: theme.muted, cursor: "pointer", lineHeight: 1 }}
+            >⟳</span>
+          </>
+        )}
       >
-        <span>FIELD DISPATCH{feedItems.length > 0 ? ` · ${feedItems.length}` : ""}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <a
-            href="/hailmary/feed"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            title="Open the public gallery"
-            style={{ fontSize: 9, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline" }}
-          >VIEW ALL</a>
-          <span
-            onClick={(e) => { e.stopPropagation(); loadFeed(); }}
-            title="Refresh"
-            style={{ fontSize: 12, color: theme.muted, cursor: "pointer", lineHeight: 1 }}
-          >⟳</span>
-          <span style={{ fontSize: 10, color: theme.muted }}>{feedDispatchOpen ? "▴" : "▾"}</span>
-        </span>
-      </h3>
+        FIELD DISPATCH{feedItems.length > 0 ? ` · ${feedItems.length}` : ""}
+      </PanelTitle>
       {feedDispatchOpen && fieldDispatchBody}
     </div>
   );
@@ -4937,8 +4939,8 @@ export default function OilPage() {
               <span style={styles.inspectorVal}>X{selectedX}, Y{sliceY}</span>
             </div>
             <div style={styles.inspectorRow}>
-              <span style={styles.inspectorKey}>Total Oil:</span>
-              <span style={styles.inspectorVal}>{selectedData.total.toLocaleString()} OIL</span>
+              <span style={styles.inspectorKey}>Total Betroleum:</span>
+              <span style={styles.inspectorVal}>{selectedData.total.toLocaleString()} BTR</span>
             </div>
             <div style={styles.inspectorRow}>
               <span style={styles.inspectorKey}>Richest Depth:</span>
@@ -4972,14 +4974,14 @@ export default function OilPage() {
               <div style={styles.inspectorRow}>
                 <span style={{ ...styles.inspectorKey, color: theme.green }}>Extracted:</span>
                 <span style={{ ...styles.inspectorVal, color: theme.green }}>
-                  {selectedData.extracted.toLocaleString()} OIL
+                  {selectedData.extracted.toLocaleString()} BTR
                 </span>
               </div>
               {drillDepth < DEPTH_Z && selectedData.missed > 0 && (
                 <div style={styles.inspectorRow}>
                   <span style={{ ...styles.inspectorKey, color: theme.warn }}>Underground:</span>
                   <span style={{ ...styles.inspectorVal, color: theme.warn }}>
-                    {selectedData.missed.toLocaleString()} OIL
+                    {selectedData.missed.toLocaleString()} BTR
                   </span>
                 </div>
               )}
@@ -5077,7 +5079,7 @@ export default function OilPage() {
           <div style={styles.paramRow}>
             <span style={styles.paramLabel}>RICHEST PLOT</span>
             <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 13, fontWeight: 700, color: theme.accent }}>
-              {stats.maxClaimTotal} OIL
+              {stats.maxClaimTotal} BTR
             </span>
           </div>
           <div style={{ marginTop: 4, fontSize: 9, color: theme.muted, lineHeight: 1.6 }}>
@@ -5093,7 +5095,7 @@ export default function OilPage() {
                 }}
               >
                 <span>#{i + 1} ({c.x + 1},{c.y + 1})</span>
-                <span style={{ color: c.oil > 0 ? theme.textStrong : theme.muted }}>{c.oil} OIL</span>
+                <span style={{ color: c.oil > 0 ? theme.textStrong : theme.muted }}>{c.oil} BTR</span>
               </div>
             ))}
           </div>
@@ -5152,7 +5154,7 @@ export default function OilPage() {
       <button
         onClick={handleReveal}
         disabled={isRevealed}
-        title="Show where the oil is buried for the current field (visualization only — does not change anything)"
+        title="Show where the Betroleum is buried for the current field (visualization only — does not change anything)"
         style={{
           ...styles.btn,
           ...styles.btnPrimary,
@@ -5908,7 +5910,7 @@ export default function OilPage() {
           {playerScore.toLocaleString()}
         </div>
         <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#e8dcc8", marginTop: 4 }}>
-          LYQUID80 · ≈ ${oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC
+          BTR · ≈ ${oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC
         </div>
         <div style={{ fontSize: 8, letterSpacing: "0.08em", color: "#b8a890", marginTop: 8 }}>
           real USDC, paid to your wallet on Base · rl80.com/hailmary
@@ -6117,7 +6119,7 @@ export default function OilPage() {
       {drillStatus === "blockade" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={{ ...drillBtnStyles.disabled, border: "1px solid #ff2200", color: "#ff2200" }}>
-            OIL BLOCKADE
+            BETROLEUM BLOCKADE
           </button>
           <div style={{ ...drillBtnStyles.depth, color: "#ff2200" }}>
             DEMON LOOSE — CLICK IT TO CLAIM BOUNTY
@@ -6425,11 +6427,92 @@ export default function OilPage() {
     </div>
   );
 
-  // ── Rig details (active players): extraction, tank + bank, referrals,
-  //    depth profile. Body of the YOUR RIG card — the card title carries the
+  // ── Payout so far. BANKED is the real number — safe, counted — and the tank
+  //    is at risk until it is banked, so the two are shown together with the
+  //    BANK button. Pre-season shows the countdown (in drillButton) instead. ──
+  const showPayout = gamePhase !== "ticket_sale";
+  const bankedOil = activeUserDrill?.totalCollected || 0;
+  const tankShownOil = tankDrained ? 0 : oilInTank;
+  const tankHeavy = tankFill >= 1.0 && !tankDrained;
+  const fmtUsd = (oil) => {
+    const v = (oil || 0) * (oilUsdRate || 0);
+    return `$${v === 0 || v >= 0.01 ? v.toFixed(2) : v.toFixed(4)}`;
+  };
+  const payoutHeadline = showPayout && (
+    <div style={{
+      marginBottom: 10, padding: "10px 12px",
+      border: `1px solid ${tankHeavy ? theme.red : theme.border}`, borderRadius: 4,
+      background: theme.panelBg,
+      animation: tankHeavy ? "tankPulse 1.2s ease-in-out infinite" : "none",
+    }}>
+      <div style={{ fontSize: 9, letterSpacing: "0.18em", color: theme.muted }}>BANKED · PAYOUT SO FAR</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2, flexWrap: "wrap" }}>
+        <span style={{
+          fontFamily: "'Orbitron', monospace", fontSize: 26, fontWeight: 700, lineHeight: 1.1,
+          color: theme.gold, fontVariantNumeric: "tabular-nums",
+          textShadow: uiDark ? "0 0 14px rgba(212,168,84,0.25)" : "none",
+        }}>
+          {fmtUsd(bankedOil)}
+        </span>
+        <span style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.muted }}>
+          {bankedOil.toLocaleString()} BTR · locked in
+        </span>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8, marginBottom: 3 }}>
+        <span style={{ fontSize: 10, letterSpacing: "0.14em", color: tankHeavy ? theme.red : theme.accent }}>IN TANK · AT RISK</span>
+        <span style={{ fontSize: 11, letterSpacing: "0.06em", color: tankHeavy ? theme.red : theme.textStrong }}>
+          {fmtUsd(tankShownOil)}
+          <span style={{ fontSize: 9, color: theme.muted, marginLeft: 6 }}>{tankShownOil.toLocaleString()} BTR</span>
+        </span>
+      </div>
+      <div style={{
+        width: "100%", height: 8, background: theme.barBg, borderRadius: 2, overflow: "hidden",
+        border: `1px solid ${tankHeavy ? theme.red : theme.border}`,
+      }}>
+        <div style={{
+          width: tankDrained ? "0%" : `${Math.min((oilInTank / TANK_CAPACITY) * 100, 100)}%`,
+          height: "100%",
+          background: tankHeavy
+            ? `linear-gradient(90deg, ${theme.gold}, ${theme.red})`
+            : `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
+          borderRadius: 2,
+          transition: "width 0.4s ease",
+        }} />
+      </div>
+      {((oilInTank > 0 && !tankDrained) || myGusherActive) && (
+        <button
+          onClick={handleTankDrain}
+          style={{
+            width: "100%", marginTop: 6, padding: "7px 12px",
+            border: `1px solid ${tankHeavy ? theme.red : theme.gold}`,
+            borderRadius: 3, cursor: "pointer",
+            background: tankHeavy ? `${theme.red}22` : `${theme.gold}22`,
+            color: tankHeavy ? theme.red : theme.gold,
+            fontFamily: "'Share Tech Mono', monospace",
+            fontSize: 10, letterSpacing: "0.12em", fontWeight: 700,
+            animation: tankHeavy ? "tankPulse 1.2s ease-in-out infinite" : "none",
+          }}
+        >
+          {oilInTank <= 0 && myGusherActive
+            ? "SHUT OFF GUSHER"
+            : tankHeavy ? "TANK HEAVY — BANK NOW" : "BANK BETROLEUM"}
+        </button>
+      )}
+      {tankDrained && (
+        <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.green, marginTop: 4, textAlign: "right" }}>
+          SENT TO MAIN TANK
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Rig details (active players): payout, extraction, referrals, depth
+  //    profile. Body of the YOUR RIG card — the card title carries the
   //    coordinates, so there is no heading here. ──
   const rigDetails = !isAdmin && !isReport && activeUserDrill?.col != null && (
     <div>
+      {payoutHeadline}
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <input
@@ -6474,18 +6557,10 @@ export default function OilPage() {
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.green }}>
-          EXTRACTED: {playerExtracted.toLocaleString()} OIL
+          EXTRACTED: {playerExtracted.toLocaleString()} BTR
         </span>
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
           DEPTH {effectiveDrillDay}/{DEPTH_Z}
-        </span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.gold }}>
-          VALUE: ≈ {oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC
-        </span>
-        <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.muted }}>
-          BANK TO LOCK IN
         </span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
@@ -6613,76 +6688,6 @@ export default function OilPage() {
           />
         </div>
       )}
-      {/* Tank fill bar */}
-      <div style={{ marginBottom: 10 }}>
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3,
-        }}>
-          <span style={{ fontSize: 11, letterSpacing: "0.12em", color: theme.accent }}>TANK · UNBANKED</span>
-          <span style={{ fontSize: 11, letterSpacing: "0.08em", color: tankFill >= 1.0 && !tankDrained ? theme.red : theme.muted }}>
-            {tankDrained ? 0 : oilInTank.toLocaleString()} OIL
-            {!tankDrained && fmtOilUsd(oilInTank) && (
-              <span style={{ fontSize: 9, color: theme.muted, marginLeft: 6, letterSpacing: "0.04em" }}>{fmtOilUsd(oilInTank)}</span>
-            )}
-          </span>
-        </div>
-        <div style={{
-          width: "100%", height: 8, background: theme.barBg, borderRadius: 2, overflow: "hidden",
-          border: `1px solid ${tankFill >= 1.0 && !tankDrained ? theme.red : theme.border}`,
-          animation: tankFill >= 1.0 && !tankDrained ? "tankPulse 1.2s ease-in-out infinite" : "none",
-        }}>
-          <div style={{
-            width: tankDrained ? "0%" : `${Math.min((oilInTank / TANK_CAPACITY) * 100, 100)}%`,
-            height: "100%",
-            background: tankFill >= 1.0 && !tankDrained
-              ? `linear-gradient(90deg, ${theme.gold}, ${theme.red})`
-              : `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
-            borderRadius: 2,
-            transition: "width 0.4s ease",
-          }} />
-        </div>
-        {((oilInTank > 0 && !tankDrained) || myGusherActive) && (
-          <button
-            onClick={handleTankDrain}
-            style={{
-              width: "100%", marginTop: 6, padding: "6px 12px",
-              border: `1px solid ${tankFill >= 1.0 ? theme.red : theme.border}`,
-              borderRadius: 3, cursor: "pointer",
-              background: tankFill >= 1.0 ? `${theme.red}22` : "transparent",
-              color: tankFill >= 1.0 ? theme.red : theme.accent,
-              fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 10, letterSpacing: "0.12em", fontWeight: tankFill >= 1.0 ? 700 : 400,
-              animation: tankFill >= 1.0 ? "tankPulse 1.2s ease-in-out infinite" : "none",
-            }}
-          >
-            {oilInTank <= 0 && myGusherActive
-              ? "SHUT OFF GUSHER"
-              : tankFill >= 1.0 ? "TANK HEAVY — BANK SOON" : "BANK OIL TO STORAGE"}
-          </button>
-        )}
-        {tankDrained && (
-          <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.green, marginTop: 2, textAlign: "right" }}>
-            SENT TO MAIN TANK
-          </div>
-        )}
-      </div>
-      {/* Community storage accounting */}
-      {(activeUserDrill?.totalCollected > 0 || activeUserDrill?.tankDrains > 0) && (
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "baseline",
-          padding: "6px 0", marginBottom: 6, borderTop: `1px solid ${theme.barBg}`,
-        }}>
-          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
-            SENT TO STORAGE
-          </span>
-          <span style={{ fontSize: 11, letterSpacing: "0.08em", color: theme.green, fontWeight: 700 }}>
-            {(activeUserDrill.totalCollected || 0).toLocaleString()} OIL
-            {fmtOilUsd(activeUserDrill.totalCollected) && (
-              <span style={{ fontSize: 9, color: theme.muted, marginLeft: 6, fontWeight: 400, letterSpacing: "0.04em" }}>{fmtOilUsd(activeUserDrill.totalCollected)}</span>
-            )}
-          </span>
-        </div>
-      )}
       {/* Per-layer oil — collapsed by default; the Core Sample bar is the
           at-a-glance version of the same data. */}
       <div
@@ -6781,28 +6786,30 @@ export default function OilPage() {
     />
   );
   const yourRigCard = (drillButton || gaugesPanel || rigDetails) && (
-    <div style={{ ...(isMobile ? m.section : styles.panelSection), background: theme.tintBg }}>
-      <h3 style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), justifyContent: "space-between" }}>
-        <span>
-          YOUR RIG
-          {activeUserDrill?.col != null && (
-            <span style={{ marginLeft: 6, color: theme.muted, letterSpacing: "0.08em", fontWeight: 400 }}>
-              ({activeUserDrill.col + 1}, {activeUserDrill.row + 1})
-            </span>
-          )}
-        </span>
-        <span style={{
-          fontSize: 9, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 2,
-          border: `1px solid ${rigStatus.color}`, color: rigStatus.color,
-          fontFamily: "'Share Tech Mono', monospace", fontWeight: 400, lineHeight: 1.5, whiteSpace: "nowrap",
-        }}>
-          {rigStatus.label}
-        </span>
-      </h3>
+    <PanelSection theme={theme} isMobile={isMobile} tint>
+      <PanelTitle
+        theme={theme} isMobile={isMobile} icon={PANEL_ICONS.rig}
+        right={(
+          <span style={{
+            fontSize: 9, letterSpacing: "0.14em", padding: "2px 7px", borderRadius: 2,
+            border: `1px solid ${rigStatus.color}`, color: rigStatus.color,
+            fontFamily: "'Share Tech Mono', monospace", lineHeight: 1.5, whiteSpace: "nowrap", textTransform: "uppercase",
+          }}>
+            {rigStatus.label}
+          </span>
+        )}
+      >
+        YOUR RIG
+        {activeUserDrill?.col != null && (
+          <span style={{ color: theme.muted, letterSpacing: "0.08em", fontWeight: 400 }}>
+            ({activeUserDrill.col + 1}, {activeUserDrill.row + 1})
+          </span>
+        )}
+      </PanelTitle>
       {drillButton}
       {gaugesPanel}
       {rigDetails}
-    </div>
+    </PanelSection>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -7161,6 +7168,7 @@ export default function OilPage() {
           {yourRigCard}
           {gusherShutoffPanel}
           <CoreSamplePanel
+            theme={theme}
             grid3D={displayGrid3D}
             maxOil={displayMaxOil}
             darkMode={uiDark}
@@ -7176,6 +7184,7 @@ export default function OilPage() {
             artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
           />
           <MuseumPanel
+            theme={theme}
             inventory={userDrill?.artifacts || {}}
             artifactFinds={userDrill?.artifactFinds || 0}
             darkMode={uiDark}
@@ -7188,7 +7197,7 @@ export default function OilPage() {
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
           {(isAdmin || isReport) && demoDrillPanel}
           {statsPanel}
-          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
+          <OilPlotChat theme={theme} plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
           {(isAdmin || isReport) && inspectorPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && fieldIntelPanel}
@@ -7200,7 +7209,7 @@ export default function OilPage() {
               <span style={styles.seedValue}>{blockHash}</span>
             </div>
           )}
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+          <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {fieldDispatchSection}
           {isAdmin && pendingFeedPanel}
           {(isAdmin || isReport) && (
@@ -7566,6 +7575,17 @@ export default function OilPage() {
           <div style={{ ...styles.gridLabel, zoom: uiScale }}>
             {gridSize}&times;{gridSize}&times;{DEPTH_Z}
           </div>
+          {/* With the panels hidden the payout has no home, so it rides the
+              scene as a pill; it goes away the moment the panels return. */}
+          {panelsCollapsed && showPayout && !isAdmin && !isReport && activeUserDrill?.col != null && (
+            <div style={{ position: "absolute", bottom: 34, left: 16, zIndex: 10, zoom: uiScale, ...TOOLBAR_PILL, cursor: "default", gap: 7 }}>
+              <span style={{ fontFamily: "'Orbitron', monospace", fontWeight: 700, color: "#ffe08a" }}>{fmtUsd(bankedOil)}</span>
+              <span style={{ fontSize: 9, letterSpacing: "0.14em", opacity: 0.7 }}>BANKED</span>
+              <span style={{ opacity: 0.35 }}>|</span>
+              <span style={{ color: tankHeavy ? "#ff7a5c" : "rgba(245,232,200,0.9)" }}>{fmtUsd(tankShownOil)}</span>
+              <span style={{ fontSize: 9, letterSpacing: "0.14em", opacity: 0.7 }}>TANK</span>
+            </div>
+          )}
           <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, zoom: uiScale, ...TOOLBAR_TRAY }}>
             <button
               onClick={toggleFireworks}
@@ -7679,6 +7699,7 @@ export default function OilPage() {
             {yourRigCard}
             {gusherShutoffPanel}
             <CoreSamplePanel
+              theme={theme}
               grid3D={displayGrid3D}
               maxOil={displayMaxOil}
               darkMode={uiDark}
@@ -7693,6 +7714,7 @@ export default function OilPage() {
               artifactMarks={revealedArtifactsByPlot[`${selectedX}_${sliceY}`] || []}
             />
             <MuseumPanel
+              theme={theme}
               inventory={userDrill?.artifacts || {}}
               artifactFinds={userDrill?.artifactFinds || 0}
               darkMode={uiDark}
@@ -7704,12 +7726,12 @@ export default function OilPage() {
             {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={uiDark} adminPassword={adminPassword} />}
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
-            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
+            <OilPlotChat theme={theme} plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={uiDark} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} claimJumpOption={buildClaimJumpOption(selectedX !== null ? `${selectedX}_${sliceY}` : null)} isPlayer={!!userDrill} />
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && fieldIntelPanel}
             {(isAdmin || isReport) && hellPocketsPanel}
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+            <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
             {fieldDispatchSection}
             {isAdmin && pendingFeedPanel}
             {(isAdmin || isReport) && (
@@ -8301,23 +8323,9 @@ function getStyles(t) { return {
     boxShadow: t.softShadow || "none",
   },
 
-  panelSection: {
-    padding: "12px 14px",
-    borderBottom: `1px solid ${t.border}`,
-    background: t.panelLine ? `${t.panelLine} left bottom / 100% 1px no-repeat` : "transparent",
-  },
-
-  panelTitle: {
-    margin: "0 0 10px",
-    fontSize: 11,
-    fontWeight: 600,
-    color: t.titleCool || t.accent,
-    letterSpacing: "0.2em",
-    textTransform: "uppercase",
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-  },
+  // One definition for every section in the column — see HailMaryPanel.jsx.
+  panelSection: panelChrome(t).section,
+  panelTitle: panelChrome(t).title,
 
   rankIcon: {
     fontSize: 10,
@@ -8711,23 +8719,8 @@ function getMobileStyles(t) { return {
     opacity: 0.5,
   },
 
-  section: {
-    padding: "12px 12px",
-    borderBottom: `1px solid ${t.border}`,
-    background: t.panelLine ? `${t.panelLine} left bottom / 100% 1px no-repeat` : "transparent",
-  },
-
-  sectionTitle: {
-    margin: "0 0 10px",
-    fontSize: 11,
-    fontWeight: 600,
-    color: t.titleCool || t.accent,
-    letterSpacing: "0.2em",
-    textTransform: "uppercase",
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-  },
+  section: panelChrome(t, true).section,
+  sectionTitle: panelChrome(t, true).title,
 
   statGrid: {
     display: "grid",

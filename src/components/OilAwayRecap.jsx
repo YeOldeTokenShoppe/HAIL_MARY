@@ -86,7 +86,7 @@ export default function OilAwayRecap({
       setShareNote(copied ? "Card copied! Paste it into your post (Cmd+V)" : null);
       if (copied) await new Promise((r) => setTimeout(r, 1200));
       const usdTxt = usdRate > 0 && recap.oilGained > 0 ? ` (≈ $${(recap.oilGained * usdRate).toFixed(2)})` : "";
-      const text = `My rig struck ${recap.oilGained.toLocaleString()} Lyquid80${usdTxt} while I was away ⛏ Hail Mary Prospecting Co.\n\nrl80.com/hailmary${referralCode ? `?ref=${referralCode}` : ""}`;
+      const text = `My rig struck ${recap.oilGained.toLocaleString()} Betroleum${usdTxt} while I was away ⛏ Hail Mary Prospecting Co.\n\nrl80.com/hailmary${referralCode ? `?ref=${referralCode}` : ""}`;
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "width=550,height=420");
       setTimeout(() => setShareNote(null), 4000);
     } catch (err) {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { PanelSection, PanelTitle, PANEL_ICONS } from "./HailMaryPanel";
 
 const DEPTH_Z = 20;
 
@@ -45,33 +46,27 @@ const ARTIFACT_MARKS = {
   cache: { fill: "#ffd700", label: "CACHE" },
 };
 
-// Horizontal drill core / depth-progress band — surface at LEFT, deepest at RIGHT.
-// Drilled strata (colored) fill the left; UNCHARTED (hatched) on the right; the
-// steel auger bores rightward at the cut face. Tight horizontal element so it reads
-// as a live "drilling" status line, distinct from the vertical strata charts.
-function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], artifactMarks = [], parabolum = false }) {
+// Horizontal core tray — surface at LEFT, deepest at RIGHT. A core is an
+// extracted object laid out to be read, so this is a tray of 20 slots: cored
+// strata fill from the left, empty slots wait on the right, and the cut face
+// (where the next layer will land) glows. The drilling itself is the 3D rig and
+// the DEPTH dial — there is deliberately no drill bit in here.
+function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], artifactMarks = [], parabolum = false, animateFrom = Infinity }) {
   const svgW = 280;
   const barX = 14, barW = svgW - 28;        // 252
   const barY = 8, barH = 40;
-  const svgH = barY + barH + 22;            // room for ticks below
+  const svgH = barY + barH + 32;            // ticks + orientation words below
   const segW = barW / DEPTH_Z;
   const dd = Math.min(Math.max(drillDepth, 0), DEPTH_Z);
   const drilledW = dd * segW;
   const faceX = barX + drilledW;
   const colors = parabolum ? PARABOLUM_COLORS(dark) : dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
-  const unknownFill = dark ? "#141820" : "#e0d8cc";
-  const steel = dark ? "#46627e" : "#34495e";
+  const trayFill = dark ? "#141820" : "#e0d8cc";
+  const slotLine = dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)";
   const hot = parabolum ? "#7fe7ff" : (dark ? "#ffd27f" : "#c8861e");
-  const drilling = dd < DEPTH_Z;
-
-  // Auger geometry (horizontal, boring right). Anchored at the surface (left),
-  // grows to the cut face, spine + arrowhead jut a touch past into the unknown.
-  const augerT = 17, rodT = 8;
-  const augerCY = barY + barH / 2;
-  const augerTop = augerCY - augerT / 2;
-  const rodRight = Math.min(barX + barW, faceX + segW * 0.5);
-  const tipLen = augerT * 0.55;
-  const fluteP = 11;
+  const muted = dark ? "rgba(212,168,84,0.6)" : "rgba(139,115,85,0.6)";
+  const coring = dd < DEPTH_Z;
+  const reduceMotion = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
   return (
     <svg width="100%" height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}
@@ -82,40 +77,35 @@ function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], a
           <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
         <clipPath id="bar-clip"><rect x={barX} y={barY} width={barW} height={barH} rx={6} /></clipPath>
-        <clipPath id="auger-clip"><rect x={barX} y={augerTop} width={Math.max(0, faceX - barX)} height={augerT} /></clipPath>
-        <pattern id="bar-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="6" stroke={dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"} strokeWidth="2" />
-        </pattern>
-        <linearGradient id="bar-depth" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={hot} stopOpacity="0.16" />
-          <stop offset="0.5" stopColor={hot} stopOpacity="0.03" />
-          <stop offset="1" stopColor={hot} stopOpacity="0" />
-        </linearGradient>
       </defs>
 
       <rect x={barX} y={barY} width={barW} height={barH} rx={6}
         fill={dark ? "rgba(18,10,22,0.6)" : "rgba(200,190,175,0.3)"} />
 
       <g clipPath="url(#bar-clip)">
-        {/* Drilled strata segments (left → cut face) */}
+        {/* Empty slots — not cored yet */}
+        {dd < DEPTH_Z && (
+          <rect x={faceX} y={barY} width={barW - drilledW} height={barH} fill={trayFill} />
+        )}
+        {Array.from({ length: DEPTH_Z }, (_, z) => (z > dd ? (
+          <line key={`s-${z}`} x1={barX + z * segW} y1={barY + 5} x2={barX + z * segW} y2={barY + barH - 5}
+            stroke={slotLine} strokeWidth="1" />
+        ) : null))}
+
+        {/* Cored strata (surface → cut face). Layers cored since mount slide in
+            from the cut face — the core being pulled. */}
         {column.map((value, z) => {
           if (z >= dd) return null;
           const cc = colors[classifyDensity(value, maxOil)];
-          return <rect key={z} x={barX + z * segW} y={barY} width={segW + 0.5} height={barH} fill={cc.fill} opacity={cc.opacity} />;
+          const x = barX + z * segW;
+          const fresh = !reduceMotion && z >= animateFrom;
+          return (
+            <rect key={z} x={x} y={barY} width={segW + 0.5} height={barH} fill={cc.fill} opacity={cc.opacity}>
+              {fresh && <animate attributeName="x" from={x + segW * 2.5} to={x} dur="0.45s" fill="freeze" calcMode="spline" keySplines="0.2 0.8 0.2 1" />}
+              {fresh && <animate attributeName="opacity" from="0" to={cc.opacity} dur="0.45s" fill="freeze" />}
+            </rect>
+          );
         })}
-
-        {/* Unknown zone (cut face → right) */}
-        {dd < DEPTH_Z && (
-          <>
-            <rect x={faceX} y={barY} width={barW - drilledW} height={barH} fill={unknownFill} />
-            <rect x={faceX} y={barY} width={barW - drilledW} height={barH} fill="url(#bar-hatch)" />
-            {drilling && (
-              <rect x={faceX} y={barY} width={Math.min(segW * 3.5, barW - drilledW)} height={barH} fill="url(#bar-depth)">
-                <animate attributeName="opacity" values="0.55;1;0.7;0.55" dur="3.2s" repeatCount="indefinite" />
-              </rect>
-            )}
-          </>
-        )}
 
         {/* Hell pockets struck */}
         {hellDepths.filter((z) => z < dd).map((z) => (
@@ -136,34 +126,19 @@ function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], a
           );
         })}
 
-        {/* Drill auger — bores rightward at the cut face */}
-        {drilling && (
-          <g>
-            <animateTransform attributeName="transform" type="translate" values="0 0; 0 1.2; 0 0" dur="1.4s" repeatCount="indefinite" />
-            {/* spine: surface → past the cut face */}
-            <rect x={barX} y={augerCY - rodT / 2} width={rodRight - barX} height={rodT} fill={steel} />
-            {/* augered threads scrolling RIGHT → spinning */}
-            <g clipPath="url(#auger-clip)" stroke={steel} strokeWidth="5" strokeLinecap="butt">
-              <animateTransform attributeName="transform" type="translate" from="0 0" to={`${fluteP} 0`} dur="0.3s" repeatCount="indefinite" />
-              {Array.from({ length: Math.ceil((faceX - barX) / fluteP) + 4 }).map((_, i) => {
-                const x = barX - fluteP * 2 + i * fluteP;
-                return <line key={i} x1={x} y1={augerTop + augerT} x2={x + augerT * 1.1} y2={augerTop} />;
-              })}
-            </g>
-            {/* head cap at the surface (left edge) */}
-            <rect x={barX - 1} y={augerTop - 1} width={5} height={augerT + 2} rx={1.5} fill={steel} />
-            {/* arrowhead pointing right (into the unknown) */}
-            <polygon points={`${rodRight},${augerCY - 7} ${rodRight},${augerCY + 7} ${rodRight + tipLen},${augerCY}`} fill={steel} />
-          </g>
+        {/* Cut face — the next layer lands here */}
+        {coring && dd > 0 && (
+          <rect x={faceX - 1} y={barY} width={2} height={barH} fill={hot} opacity="0.9">
+            {!reduceMotion && <animate attributeName="opacity" values="0.35;1;0.35" dur="2.4s" repeatCount="indefinite" />}
+          </rect>
         )}
       </g>
 
       <rect x={barX} y={barY} width={barW} height={barH} rx={6} fill="none"
         stroke={dark ? "#d4a854" : "#b8922e"} strokeWidth="0.8" opacity="0.5" />
 
-      {/* Depth ticks below */}
-      <g fontFamily='"Share Tech Mono", monospace' fontSize="8"
-        fill={dark ? "rgba(212,168,84,0.6)" : "rgba(139,115,85,0.6)"} letterSpacing="0.05em">
+      {/* Layer ticks */}
+      <g fontFamily='"Share Tech Mono", monospace' fontSize="8" fill={muted} letterSpacing="0.05em">
         {[0, 4, 9, 14, 19].map((z) => {
           const xPos = barX + z * segW + segW * 0.5;
           return (
@@ -174,6 +149,11 @@ function PersonalDrillBar({ column, maxOil, drillDepth, dark, hellDepths = [], a
             </g>
           );
         })}
+      </g>
+      {/* Orientation — a horizontal core still reads surface-to-deep */}
+      <g fontFamily='"Share Tech Mono", monospace' fontSize="8" fill={muted} letterSpacing="0.12em">
+        <text x={barX} y={barY + barH + 27} textAnchor="start">SURFACE</text>
+        <text x={barX + barW} y={barY + barH + 27} textAnchor="end">DEEP →</text>
       </g>
     </svg>
   );
@@ -214,14 +194,14 @@ function FieldProfileBar({ profile, maxPeak, dark, parabolum = false }) {
   );
 }
 
-function Legend({ dark, parabolum = false }) {
+function Legend({ dark, parabolum = false, border }) {
   const colors = parabolum ? PARABOLUM_COLORS(dark) : dark ? DENSITY_COLORS_DARK : DENSITY_COLORS_LIGHT;
   return (
     <div style={{
       display: "flex", flexWrap: "wrap", gap: "4px 10px",
       justifyContent: "center",
       marginTop: 6, paddingTop: 6,
-      borderTop: `1px solid ${dark ? "#2a2e36" : "#d4c8b4"}`,
+      borderTop: `1px solid ${border}`,
     }}>
       {colors.map((c, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -268,6 +248,8 @@ export default function CoreSamplePanel({
   hud = false,
   isMobile = false,
   defaultExpanded = true,
+  // Page theme — drives the section chrome and the text colours below.
+  theme = null,
   gridX = 10,
   gridY = 10,
   selectedX = null,
@@ -283,35 +265,11 @@ export default function CoreSamplePanel({
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const dark = darkMode;
-  // HUD console — cyan chrome (tabs, headings, callouts) around the gold/amber
-  // core tube, mirroring the SpaceScene prospecting HUD. Takes precedence over
-  // the day/dark/parabolum palettes; the stratigraphy colors stay amber.
-  const c = hud ? {
-    accent: "#6bc7d1", muted: "#7e94a6",
-    sectionBorder: "rgba(107,199,209,0.18)",
-    btnBg: "rgba(107,199,209,0.1)", btnBorder: "rgba(107,199,209,0.35)",
-    btnBgHover: "rgba(107,199,209,0.2)",
-  } : parabolum ? (dark ? {
-    accent: "#c79bff", muted: "#7a6a9c",
-    sectionBorder: "#2a1d44",
-    btnBg: "rgba(123,45,214,0.16)", btnBorder: "rgba(164,92,255,0.35)",
-    btnBgHover: "rgba(123,45,214,0.28)",
-  } : {
-    accent: "#7a2dd6", muted: "#5e7178",
-    sectionBorder: "#c8dcd9",
-    btnBg: "rgba(123,45,214,0.08)", btnBorder: "rgba(106,45,176,0.28)",
-    btnBgHover: "rgba(123,45,214,0.16)",
-  }) : dark ? {
-    accent: "#d4a854", muted: "#6a7888",
-    sectionBorder: "#2a2e36",
-    btnBg: "rgba(212,168,84,0.12)", btnBorder: "rgba(212,168,84,0.3)",
-    btnBgHover: "rgba(212,168,84,0.2)",
-  } : {
-    accent: "#5a4010", muted: "#6e6050",
-    sectionBorder: "#d4c8b4",
-    btnBg: "rgba(139,105,20,0.06)", btnBorder: "rgba(139,105,20,0.25)",
-    btnBgHover: "rgba(139,105,20,0.12)",
-  };
+  // Chrome + text colours come from the page theme; the fallback only keeps the
+  // component rendering if it is ever mounted without one.
+  const t = theme || (dark
+    ? { border: "#2a2e36", accent: "#d4a854", muted: "#6a7888" }
+    : { border: "#d4c8b4", accent: "#5a4010", muted: "#6e6050" });
 
   const personalColumn = useMemo(() => {
     if (selectedX === null || selectedY === null || !grid3D) return null;
@@ -348,56 +306,32 @@ export default function CoreSamplePanel({
   // inert "start drilling" placeholder. Only a no-selection state stays empty.
   const hasClaim = selectedX !== null && selectedY !== null;
 
+  // Layers cored after this mount (or after a plot switch) slide in from the
+  // cut face; layers already in the tray just sit there.
+  const animateFromRef = useRef(drillDepth);
+  useEffect(() => { animateFromRef.current = drillDepth; }, [selectedX, selectedY]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!grid3D) return null;
 
   return (
-    <div style={{
-      padding: isMobile ? "12px 12px" : "12px 14px",
-      borderBottom: `1px solid ${c.sectionBorder}`,
-    }}>
-      <div
-        onClick={() => setExpanded((e) => !e)}
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          cursor: "pointer", userSelect: "none",
-        }}
-      >
-        <h3 style={{
-          margin: 0, fontSize: isMobile ? 12 : 11, fontWeight: 600,
-          color: c.accent, letterSpacing: "0.2em", textTransform: "uppercase",
-          display: "flex", alignItems: "center", gap: 6,
-          fontFamily: "'Share Tech Mono', monospace",
-        }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-               stroke={dark ? "#d4a854" : "#b8922e"} strokeWidth="2"
-               strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <path d="M12 2v20" />
-            <path d="M2 12h4" />
-            <path d="M18 12h4" />
-            <circle cx="12" cy="12" r="3" />
-            <path d="M4.93 4.93l2.83 2.83" />
-            <path d="M16.24 16.24l2.83 2.83" />
-          </svg>
-          CORE SAMPLE
-        </h3>
-        <span style={{ fontSize: 10, color: c.muted }}>{expanded ? "▴" : "▾"}</span>
-      </div>
+    <PanelSection theme={t} isMobile={isMobile}>
+      <PanelTitle theme={t} isMobile={isMobile} icon={PANEL_ICONS.core} onToggle={() => setExpanded((e) => !e)} open={expanded}>
+        CORE SAMPLE
+      </PanelTitle>
 
       {expanded && (
-        <div style={{ marginTop: 10 }}>
+        <div>
           {hasClaim && personalColumn ? (
             <>
               <div style={{
-                fontSize: 10, color: c.muted, letterSpacing: "0.1em",
+                fontSize: 10, color: t.muted, letterSpacing: "0.1em",
                 fontFamily: "'Share Tech Mono', monospace",
                 display: "flex", justifyContent: "space-between", alignItems: "baseline",
                 marginBottom: 6, padding: "0 2px",
               }}>
                 <span>PLOT ({selectedX + 1}, {selectedY + 1})</span>
-                <span style={{ color: c.accent }}>
-                  {drillDepth < DEPTH_Z
-                    ? `DRILLING · ${Math.min(drillDepth, DEPTH_Z)}/${DEPTH_Z}`
-                    : `DEPTH ${DEPTH_Z}/${DEPTH_Z}`}
+                <span style={{ color: t.accent }}>
+                  CORED {Math.min(Math.max(drillDepth, 0), DEPTH_Z)} / {DEPTH_Z} LAYERS
                 </span>
               </div>
               <PersonalDrillBar
@@ -408,7 +342,16 @@ export default function CoreSamplePanel({
                 hellDepths={hellDepthsForPlot}
                 artifactMarks={artifactMarks}
                 parabolum={parabolum}
+                animateFrom={animateFromRef.current}
               />
+              {drillDepth <= 0 && (
+                <div style={{
+                  fontSize: 10, color: t.muted, letterSpacing: "0.06em", textAlign: "center",
+                  padding: "0 0 4px", fontFamily: "'Share Tech Mono', monospace",
+                }}>
+                  No core yet — the first layer lands at your first strike.
+                </div>
+              )}
               {(() => {
                 // SEISMIC READING — an honest ratchet, not a psychological one.
                 // ≥artifactGuaranteeMin artifacts per column is a public,
@@ -422,14 +365,14 @@ export default function CoreSamplePanel({
                 const pct = undrilled > 0 && owed > 0 ? Math.min(100, Math.ceil((owed / undrilled) * 100)) : 0;
                 return (
                   <div style={{
-                    fontSize: 9, letterSpacing: "0.1em", padding: "3px 2px 0",
+                    fontSize: 9, letterSpacing: "0.1em", padding: "2px 2px 0",
                     fontFamily: "'Share Tech Mono', monospace",
-                    display: "flex", justifyContent: "space-between",
-                    color: c.muted,
+                    display: "flex", flexDirection: "column", gap: 2,
+                    color: t.muted,
                   }}>
-                    <span>SEISMIC · ARTIFACTS {found}{owed > 0 ? `/${artifactGuaranteeMin}+` : " RECOVERED"}</span>
+                    <span>SEISMIC · ARTIFACTS {found}{owed > 0 ? ` / ${artifactGuaranteeMin}+` : " RECOVERED"}</span>
                     {owed > 0 && undrilled > 0 ? (
-                      <span style={{ color: "#c79bff" }}>NEXT-LAYER FIND ≥ {pct}%</span>
+                      <span style={{ color: dark ? "#c79bff" : "#7a2dd6" }}>NEXT-LAYER FIND ≥ {pct}%</span>
                     ) : (
                       <span>DEEPER SIGNATURES UNKNOWN</span>
                     )}
@@ -439,7 +382,7 @@ export default function CoreSamplePanel({
               {fieldMaxPeak > 0 && (
                 <div style={{ marginTop: 6 }}>
                   <div style={{
-                    fontSize: 8, color: c.muted, letterSpacing: "0.1em",
+                    fontSize: 8, color: t.muted, letterSpacing: "0.1em",
                     fontFamily: "'Share Tech Mono', monospace",
                     padding: "0 2px", marginBottom: 2, textTransform: "uppercase",
                   }}>
@@ -455,7 +398,7 @@ export default function CoreSamplePanel({
               fontFamily: "'Share Tech Mono', monospace",
             }}>
               <span style={{ fontSize: 18, opacity: 0.5, marginRight: 8 }}>⛏️</span>
-              <span style={{ fontSize: 10, color: c.muted, letterSpacing: "0.08em" }}>
+              <span style={{ fontSize: 10, color: t.muted, letterSpacing: "0.08em" }}>
                 {selectedX === null
                   ? "Select a plot to see its drill log."
                   : "Start drilling to build your core sample."}
@@ -463,9 +406,9 @@ export default function CoreSamplePanel({
             </div>
           )}
 
-          {hasClaim && personalColumn && <Legend dark={dark} parabolum={parabolum} />}
+          {hasClaim && personalColumn && <Legend dark={dark} parabolum={parabolum} border={t.border} />}
         </div>
       )}
-    </div>
+    </PanelSection>
   );
 }
