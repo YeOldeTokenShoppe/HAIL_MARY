@@ -1139,6 +1139,16 @@ function useUiScale(base = 1440, max = 2.5) {
   return scale;
 }
 
+// Mobile: the panel stack is authored for the 280px desktop column. A phone
+// gives it ~375px, so the same px type reads small and the 26px buttons miss
+// fingers; zoom the non-canvas content (same mechanism as the desktop UI
+// scale). 1.2 keeps the 252px gauge row inside the 312px layout width.
+const MOBILE_PANEL_ZOOM = 1.2;
+// Height of the pinned scene while the rig editor is open on mobile: 45% of
+// the viewport (≈365px on a 812px phone), so the rig is a proper viewer and the
+// editor still has ~300px below it. Clamped for very short / very tall phones.
+const editorSceneHeight = (viewportH) => Math.min(440, Math.max(260, Math.round(viewportH * 0.45)));
+
 function useIsMobile(breakpoint = 900) {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -1903,6 +1913,8 @@ export default function OilPage() {
 
   // Mobile tab view
   const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "surface" | "xsec"
+  // Rig editor (Pimp My Pump) open on the phone — pins the scene as a compact live view.
+  const [pimpOpenMobile, setPimpOpenMobile] = useState(false);
 
   // 2D interaction state lifted up
   const [selectedX, setSelectedX] = useState(null);
@@ -4634,7 +4646,7 @@ export default function OilPage() {
           {renderLeaderboard(true)}
           <button
             onClick={() => setShowLeaderboard(true)}
-            style={{ width: "100%", marginTop: 6, padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.12em", color: theme.muted, textAlign: "right" }}
+            style={{ width: "100%", marginTop: 4, padding: "8px 0 2px", background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: "0.12em", color: theme.muted, textAlign: "right" }}
           >FULL LEADERBOARD &#9656;</button>
         </>
       )}
@@ -4763,7 +4775,7 @@ export default function OilPage() {
       {timelineEvents.length > 4 && (
         <button
           onClick={() => setTimelineOpen((o) => !o)}
-          style={{ width: "100%", marginTop: 2, padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.12em", color: theme.muted, textAlign: "right" }}
+          style={{ width: "100%", marginTop: 2, padding: "8px 0 2px", background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: "0.12em", color: theme.muted, textAlign: "right" }}
         >
           {timelineOpen ? "SHOW LESS \u25B4" : `SHOW ALL ${timelineEvents.length} \u25BE`}
         </button>
@@ -6786,7 +6798,7 @@ export default function OilPage() {
     />
   );
   const yourRigCard = (drillButton || gaugesPanel || rigDetails) && (
-    <PanelSection theme={theme} isMobile={isMobile} tint>
+    <PanelSection theme={theme} isMobile={isMobile} tint id="your-rig">
       <PanelTitle
         theme={theme} isMobile={isMobile} icon={PANEL_ICONS.rig}
         right={(
@@ -6811,6 +6823,50 @@ export default function OilPage() {
       {rigDetails}
     </PanelSection>
   );
+
+  // ── Rig editor on the phone: opening it switches to the 3D tab, selects your
+  //    claim if nothing is selected (the camera flies there), and scrolls the
+  //    editor up under the pinned scene strip. ──
+  const editorOpen = isMobile && pimpOpenMobile && mobileTab === "3d";
+  const editorSceneH = editorSceneHeight(typeof window !== "undefined" ? window.innerHeight : 812);
+  const handlePimpExpanded = (open) => {
+    setPimpOpenMobile(open);
+    if (!open || !isMobile) return;
+    setMobileTab("3d");
+    if (selectedX === null && userDrill?.col != null) handleSelectClaim({ x: userDrill.col, y: userDrill.row });
+    // The canvas remounts when the tab switches; re-issue the fly so the viewer
+    // lands on the rig regardless of which tab the editor was opened from.
+    else if (selectedX !== null) setTimeout(() => handleFlyTo(selectedX, sliceY), 150);
+    setTimeout(() => document.getElementById("pimp-my-pump")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+  };
+
+  // ── Mobile bottom-nav primary button — the one action that matters in the
+  //    player's current state, instead of a fixed BUY. PLAY → sign in; CLAIM →
+  //    the survey map to pick a plot (or the waitlist once claims close);
+  //    BANK while Betroleum sits un-banked; MY RIG otherwise. ──
+  const scrollToRig = () => {
+    setTimeout(() => document.getElementById("your-rig")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  };
+  const mobilePrimary = (() => {
+    if (!user) return { label: "PLAY", sub: "SIGN IN", title: "Sign in to play", onClick: () => clerk.openSignIn() };
+    if (userDrill?.col == null) {
+      const claimsOpen = gamePhase === "ticket_sale" || (gamePhase === "active" && testingEnabled);
+      return {
+        label: "CLAIM", sub: claimsOpen ? "PICK A PLOT" : "WAITLIST", title: claimsOpen ? "Pick a plot to claim" : "Join the waitlist",
+        onClick: () => {
+          if (claimsOpen) { setMobileTab("surface"); document.getElementById("oil-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); }
+          else scrollToRig();
+        },
+      };
+    }
+    if (showPayout && oilInTank > 0 && !tankDrained) {
+      return { label: "BANK", sub: fmtUsd(tankShownOil), title: "Bank your Betroleum", onClick: handleTankDrain };
+    }
+    return {
+      label: "MY RIG", sub: showPayout ? fmtUsd(bankedOil) : "PRE-SEASON", title: "Go to your rig",
+      onClick: () => { setMobileTab("3d"); handleSelectClaim({ x: userDrill.col, y: userDrill.row }); scrollToRig(); },
+    };
+  })();
 
   // ═══════════════════════════════════════════════════════════
   // MOBILE LAYOUT — tabbed views + scrollable panel below
@@ -6897,7 +6953,7 @@ export default function OilPage() {
         <div id="oil-scroll" style={m.scroll}>
           {/* 3D Voxel */}
           {mobileTab === "3d" && (
-            <div id="oil-canvas" style={m.canvasWrap}>
+            <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}) }}>
               <CleanCanvas
                 camera={{ position: [0, 3.5, 4], fov: 50 }}
                 dpr={[1, 1.5]}
@@ -7040,11 +7096,12 @@ export default function OilPage() {
                   </div>
                 );
               })()}
+              {!editorOpen && (<>
               <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, ...TOOLBAR_TRAY }}>
                 <button
                   onClick={toggleFireworks}
                   title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
-                  style={toolbarBtn(fireworksOn, 26)}
+                  style={toolbarBtn(fireworksOn, 32)}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 2 L14 8 L12 6 L10 8 Z" />
@@ -7059,7 +7116,7 @@ export default function OilPage() {
                   <button
                     onClick={() => setFireworksSound((s) => !s)}
                     title={fireworksSound ? "Mute fireworks sound" : "Unmute fireworks sound"}
-                    style={toolbarBtn(fireworksSound, 26)}
+                    style={toolbarBtn(fireworksSound, 32)}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 5 6 9H2v6h4l5 4z" />
@@ -7074,7 +7131,7 @@ export default function OilPage() {
                 <button
                   title="Snapshot"
                   onClick={handleManualSnapshot}
-                  style={toolbarBtn(false, 26)}
+                  style={toolbarBtn(false, 32)}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -7084,7 +7141,7 @@ export default function OilPage() {
               </div>
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10 }}>
                 <SceneThemeToolbar
-                  size={26}
+                  size={32}
                   envPreset={envPreset} setEnvPreset={setEnvPreset}
                   darkMode={darkMode} setDarkMode={setDarkMode}
                   parabolum={parabolum} setParabolum={setParabolum}
@@ -7092,13 +7149,15 @@ export default function OilPage() {
                   setFireworksOn={setFireworksOn}
                 />
               </div>
+              </>)}
             </div>
           )}
 
+          <div style={{ zoom: MOBILE_PANEL_ZOOM }}>
           {/* Scroll handle — only on the 3D tab, where the canvas captures touch.
               Gives a non-canvas grab area so the page can be scrolled, and taps
               nudge the panels below the scene into view. */}
-          {mobileTab === "3d" && (
+          {mobileTab === "3d" && !editorOpen && (
             <button
               type="button"
               style={m.scrollHandle}
@@ -7209,7 +7268,9 @@ export default function OilPage() {
               <span style={styles.seedValue}>{blockHash}</span>
             </div>
           )}
-          <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+          <div id="pimp-my-pump" style={{ scrollMarginTop: Math.round(editorSceneH / MOBILE_PANEL_ZOOM) }}>
+          <PimpMyPumpPanel theme={theme} config={pumpConfig} onChange={handleConfigChange} onExpandedChange={handlePimpExpanded} hasSelection={selectedX !== null} isMobile darkMode={uiDark} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={user?.id ? !isConfigOwner : plotOwnerForCell != null} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
+          </div>
           {fieldDispatchSection}
           {isAdmin && pendingFeedPanel}
           {(isAdmin || isReport) && (
@@ -7237,6 +7298,7 @@ export default function OilPage() {
               {gameEndedBanner}
             </div>
           )}
+          </div>
         </div>
 
         {/* Bottom Mobile Nav */}
@@ -7251,7 +7313,10 @@ export default function OilPage() {
           onUserClick={() => {}}
           isUserSignedIn={!!user}
           userImage={user?.imageUrl}
-          onBuyClick={() => setShowBuyModal(true)}
+          onBuyClick={mobilePrimary.onClick}
+          centerLabel={mobilePrimary.label}
+          centerSubLabel={mobilePrimary.sub}
+          centerTitle={mobilePrimary.title}
           isMobile
           show80sButton={false}
           darkMode={uiDark}
@@ -8686,6 +8751,18 @@ function getMobileStyles(t) { return {
     minHeight: 240,
     maxHeight: 420,
     borderBottom: `1px solid ${t.border}`,
+    transition: "height 0.3s ease, min-height 0.3s ease, max-height 0.3s ease",
+  },
+
+  // While the rig editor is open, the scene pins to the top of the scroll as a
+  // compact live view, so every customization shows without scrolling back up
+  // (and the rig can still be orbited in the strip).
+  // (height is set inline from editorSceneHeight())
+  canvasCompact: {
+    position: "sticky",
+    top: 0,
+    zIndex: 30,
+    boxShadow: "0 10px 28px rgba(0,0,0,0.45)",
   },
 
   scrollHandle: {
@@ -8754,13 +8831,13 @@ function getMobileStyles(t) { return {
 
   tab: {
     flex: 1,
-    padding: "8px 0",
+    padding: "11px 0",
     background: "transparent",
     border: "none",
     borderBottom: "2px solid transparent",
     color: t.muted,
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: "0.12em",
     cursor: "pointer",
     transition: "all 0.2s",

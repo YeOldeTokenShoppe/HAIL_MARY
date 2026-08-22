@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { PanelSection, PanelTitle, PANEL_ICONS } from "./HailMaryPanel";
 import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId, PREMIUM_PRICES } from "@/lib/oilPremium";
 
@@ -683,8 +683,12 @@ metalAF: {
 
 // ── Panel component ──────────────────────────────────────────────────────────
 
-export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, theme = null, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId, readOnly = false, unlockedItems = new Set(), onPurchaseRequest }) {
+export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, theme = null, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, onExpandedChange = null, userId, readOnly = false, unlockedItems = new Set(), onPurchaseRequest }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  // Lets the page react to the editor opening — mobile pins a compact live view
+  // of the rig above it. Reports closed on unmount.
+  useEffect(() => { onExpandedChange?.(expanded); }, [expanded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onExpandedChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [activeZone, setActiveZone] = useState(null);
   const [pickerSlot, setPickerSlot] = useState(null); // which slot is picking an addon
   const [partsExpanded, setPartsExpanded] = useState(false);

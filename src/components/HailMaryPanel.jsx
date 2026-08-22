@@ -33,10 +33,10 @@ export function panelChrome(t, isMobile = false) {
   };
 }
 
-export function PanelSection({ theme, isMobile = false, tint = false, style, children }) {
+export function PanelSection({ theme, isMobile = false, tint = false, style, id, children }) {
   const c = panelChrome(theme, isMobile);
   return (
-    <div style={{ ...c.section, ...(tint ? { background: theme.tintBg } : {}), ...style }}>
+    <div id={id} style={{ ...c.section, ...(tint ? { background: theme.tintBg } : {}), ...style }}>
       {children}
     </div>
   );
