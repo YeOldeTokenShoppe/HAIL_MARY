@@ -30,7 +30,6 @@ export default function OilCrossSection({
   selectedX,
   drillDepth,
   onSelectX,
-  onSliceY,
   theme,
   gridX = 10,
   gridY = 10,
@@ -42,52 +41,16 @@ export default function OilCrossSection({
 }) {
   // Dark-theme bgs: dark (#12161c), parabolumDark (#0c0717), hud (#0f141c).
   const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717" || theme?.bg === "#0f141c";
+  const sliceHasData = Array.from({ length: gridX }, (_, x) => grid3D[x]?.[sliceY] || []).some((col) => col.some((v) => v > 0));
   const t = theme || { text: "#5a4e3e", muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", accent: "#7a5a1a", gold: "#d4a854", goldBorder: "#b8922e", textStrong: "#3e2e10", inspectorKey: "#8b7d6b", seedLabel: "#8b7355" };
 
   return (
     <div style={{ fontFamily: "'Share Tech Mono', 'Courier New', monospace", color: t.text, ...(fillHeight ? { height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } : {}) }}>
       <div style={{
-        fontSize: 9, color: t.inspectorKey || t.muted, marginBottom: 6,
+        fontSize: 10, color: t.inspectorKey || t.muted, marginBottom: 6,
         textAlign: "center", letterSpacing: "0.08em",
       }}>
-        CROSS-SECTION &mdash; {selectedX !== null ? `Plot (${selectedX + 1}, ${sliceY + 1}) · ` : ""}Row {sliceY + 1} slice (X across, depth down)
-      </div>
-
-      {/* Row (Y) slice picker — each button selects which row of the field to
-          slice through. marginLeft 28 matches the cross-section below so the
-          buttons line up over their columns; the active row uses the same green
-          as the selected column. */}
-      <div style={{ position: "relative", marginLeft: 28, marginBottom: 6 }}>
-        <span style={{
-          position: "absolute", left: -28, top: "50%", transform: "translateY(-50%)",
-          fontSize: 8, color: t.seedLabel || t.muted, letterSpacing: "0.04em",
-        }}>ROW</span>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridY}, 1fr)`, gap: 2 }}>
-          {Array.from({ length: gridY }, (_, y) => {
-            const sel = sliceY === y;
-            return (
-              <button
-                key={y}
-                onClick={() => onSliceY(y)}
-                title={`Slice through row ${y + 1}`}
-                style={{
-                  height: 20,
-                  background: sel ? (t.green || "#2f8f8f") : t.inputBg,
-                  border: `1px solid ${sel ? (t.green || "#2f8f8f") : t.borderLight}`,
-                  borderRadius: 2,
-                  color: sel ? t.textStrong : (t.inspectorKey || t.muted),
-                  fontFamily: "'Share Tech Mono', monospace",
-                  fontSize: 9,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  padding: 0,
-                }}
-              >
-                {y + 1}
-              </button>
-            );
-          })}
-        </div>
+        CROSS-SECTION &mdash; {selectedX !== null ? `Plot (${selectedX + 1}, ${sliceY + 1}) · ` : ""}Row {sliceY + 1} (X across, depth down)
       </div>
 
       <div style={{
@@ -95,7 +58,9 @@ export default function OilCrossSection({
         border: `1px solid ${t.borderLight}`,
         background: t.mapBg || t.inputBg,
         marginLeft: 28,
-        ...(fillHeight ? { flex: 1, minHeight: 120 } : {}),
+        // Capped so the slice never becomes the tallest thing on screen; the
+        // column's spare height stays with the survey map above.
+        ...(fillHeight ? { flex: 1, minHeight: 120, maxHeight: 380 } : {}),
       }}>
         <div style={{
           position: "absolute", left: -28, top: 0, height: "100%",
@@ -103,7 +68,7 @@ export default function OilCrossSection({
           padding: "4px 0",
         }}>
           {[1, 5, 10, 15, 20].map(d => (
-            <div key={d} style={{ fontSize: 7, color: t.muted, lineHeight: 1 }}>D{d}</div>
+            <div key={d} style={{ fontSize: 8, color: t.muted, lineHeight: 1 }}>D{d}</div>
           ))}
         </div>
         <div style={{
@@ -176,6 +141,17 @@ export default function OilCrossSection({
             })
           )}
         </div>
+        {/* Players only see layers the community has revealed — say so instead
+            of showing an unlabeled empty grid. */}
+        {!sliceHasData && (
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            pointerEvents: "none", padding: "0 28px", textAlign: "center",
+            fontSize: 10, lineHeight: 1.5, letterSpacing: "0.06em", color: t.muted,
+          }}>
+            No strikes on row {sliceY + 1} yet — layers appear here as rigs hit.
+          </div>
+        )}
       </div>
 
       {/* X-axis labels + position — moved OUTSIDE the bordered grid box so the
@@ -185,14 +161,14 @@ export default function OilCrossSection({
         <div style={{
           display: "grid",
           gridTemplateColumns: `repeat(${gridX}, 1fr)`,
-          padding: "3px 0", fontSize: 7, color: t.muted, textAlign: "center",
+          padding: "3px 0", fontSize: 8, color: t.muted, textAlign: "center",
         }}>
           {Array.from({ length: gridX }, (_, x) => (
             <span key={x}>{x + 1}</span>
           ))}
         </div>
         <div style={{
-          fontSize: 7, color: t.muted, textAlign: "center",
+          fontSize: 8, color: t.muted, textAlign: "center",
           letterSpacing: "0.1em", paddingBottom: 2,
         }}>X position &rarr;</div>
       </div>
@@ -200,7 +176,7 @@ export default function OilCrossSection({
       {/* Legend */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center",
-        gap: 6, marginTop: 6, fontSize: 7, color: t.inspectorKey || t.muted,
+        gap: 6, marginTop: 6, fontSize: 8, color: t.inspectorKey || t.muted,
         letterSpacing: "0.1em",
       }}>
         <span>DRY</span>

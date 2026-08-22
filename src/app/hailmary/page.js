@@ -1429,6 +1429,7 @@ export default function OilPage() {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [helpFairness, setHelpFairness] = useState(false); // open the help modal on the fairness explainer
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardSectionOpen, setLeaderboardSectionOpen] = useState(true);
 
@@ -1441,6 +1442,7 @@ export default function OilPage() {
 
   const closeWelcome = useCallback(() => {
     setShowWelcome(false);
+    setHelpFairness(false);
     try { localStorage.setItem("oilWelcomeSeen", "1"); } catch {}
   }, []);
 
@@ -4442,14 +4444,14 @@ export default function OilPage() {
             {seedReadoutLabel}
           </span>
           <span
-            title={seedReadout}
+            title={`${seedReadout} — open "Is this game fair?"`}
             style={{
               fontFamily: "'Share Tech Mono', monospace", fontSize: 10,
               color: uiDark ? "#8a8070" : "#8b7d6b",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               maxWidth: "65%", textAlign: "right", cursor: "pointer",
             }}
-            onClick={() => navigator.clipboard?.writeText(seedReadout)}
+            onClick={() => { setHelpFairness(true); setShowWelcome(true); }}
           >
             {seedReadout.slice(0, 10)}...{seedReadout.slice(-8)}
           </span>
@@ -4488,7 +4490,7 @@ export default function OilPage() {
   };
 
   const testerBadgeStyle = {
-    fontSize: 8, letterSpacing: "0.1em", fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 9, letterSpacing: "0.1em", fontFamily: "'Share Tech Mono', monospace",
     color: theme.gold, border: `1px solid ${theme.gold}55`, borderRadius: 2,
     padding: "0 3px", lineHeight: "12px", flexShrink: 0,
   };
@@ -4567,7 +4569,7 @@ export default function OilPage() {
                   {(d.totalCollected || 0).toLocaleString()} BTR
                 </span>
                 {fmtOilUsd(d.totalCollected) && (
-                  <span style={{ fontSize: 8, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
+                  <span style={{ fontSize: 9, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
                     {fmtOilUsd(d.totalCollected)}
                   </span>
                 )}
@@ -4607,7 +4609,7 @@ export default function OilPage() {
                   {(d.totalCollected || 0).toLocaleString()} BTR
                 </span>
                 {fmtOilUsd(d.totalCollected) && (
-                  <span style={{ fontSize: 8, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
+                  <span style={{ fontSize: 9, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", display: "block" }}>
                     {fmtOilUsd(d.totalCollected)}
                   </span>
                 )}
@@ -4704,11 +4706,11 @@ export default function OilPage() {
                 />
                 <div style={{ padding: "5px 4px 0", textAlign: "center", maxWidth: "100%" }}>
                   {dispatchTag(it.eventType) && (
-                    <div style={{ fontSize: 8, letterSpacing: "0.1em", color: dispatchTag(it.eventType).color, textTransform: "uppercase", fontFamily: "'Share Tech Mono', monospace", marginBottom: 1 }}>
+                    <div style={{ fontSize: 9, letterSpacing: "0.1em", color: dispatchTag(it.eventType).color, textTransform: "uppercase", fontFamily: "'Share Tech Mono', monospace", marginBottom: 1 }}>
                       {dispatchTag(it.eventType).label}
                     </div>
                   )}
-                  <div style={{ fontSize: 9, color: theme.text, fontFamily: "'Share Tech Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>
+                  <div style={{ fontSize: 10, color: theme.text, fontFamily: "'Share Tech Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>
                     {it.username || "A Prospector"}
                   </div>
                 </div>
@@ -4858,7 +4860,7 @@ export default function OilPage() {
                     style={{ width: 72, height: "auto", display: "block", cursor: "zoom-in", flexShrink: 0, filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.4))" }}
                   />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    {tag && <div style={{ fontSize: 8, letterSpacing: "0.1em", color: tag.color, fontFamily: "'Share Tech Mono', monospace", marginBottom: 2 }}>{tag.label}</div>}
+                    {tag && <div style={{ fontSize: 9, letterSpacing: "0.1em", color: tag.color, fontFamily: "'Share Tech Mono', monospace", marginBottom: 2 }}>{tag.label}</div>}
                     <div style={{ fontSize: 10, color: theme.text, fontFamily: "'Share Tech Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.username || "A Prospector"}</div>
                     {it.caption && <div style={{ fontSize: 9, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.caption}</div>}
                     <div style={{ display: "flex", gap: 6, marginTop: 5 }}>
@@ -5888,12 +5890,12 @@ export default function OilPage() {
         )}
       </div>
       {pushAlerts.needsInstall && (
-        <div style={{ fontSize: 8, color: theme.muted, marginTop: 4, fontFamily: "'Share Tech Mono', monospace" }}>
+        <div style={{ fontSize: 9, color: theme.muted, marginTop: 4, fontFamily: "'Share Tech Mono', monospace" }}>
           iPhone: Add to Home Screen first, then enable from the installed app
         </div>
       )}
       {pushAlerts.error && (
-        <div style={{ fontSize: 8, color: theme.red, marginTop: 4, fontFamily: "'Share Tech Mono', monospace" }}>{pushAlerts.error}</div>
+        <div style={{ fontSize: 9, color: theme.red, marginTop: 4, fontFamily: "'Share Tech Mono', monospace" }}>{pushAlerts.error}</div>
       )}
     </div>
   );
@@ -5914,7 +5916,7 @@ export default function OilPage() {
           fontFamily: "'Share Tech Mono', monospace",
         }}
       >
-        <div style={{ fontSize: 8, letterSpacing: "0.3em", color: "#b8a890" }}>HAIL MARY PROSPECTING CO.</div>
+        <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "#b8a890" }}>HAIL MARY PROSPECTING CO.</div>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.18em", color: "#d4a854", marginTop: 6 }}>
           🏁 SEASON ENDED — FINAL HAUL
         </div>
@@ -5924,7 +5926,7 @@ export default function OilPage() {
         <div style={{ fontSize: 10, letterSpacing: "0.2em", color: "#e8dcc8", marginTop: 4 }}>
           BTR · ≈ ${oilValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC
         </div>
-        <div style={{ fontSize: 8, letterSpacing: "0.08em", color: "#b8a890", marginTop: 8 }}>
+        <div style={{ fontSize: 9, letterSpacing: "0.08em", color: "#b8a890", marginTop: 8 }}>
           real USDC, paid to your wallet on Base · rl80.com/hailmary
         </div>
       </div>
@@ -5962,7 +5964,7 @@ export default function OilPage() {
             const askNum = (done) => ({ fontSize: 11, fontWeight: 700, minWidth: 14, textAlign: "center", color: done ? theme.green : theme.gold });
             const askText = { flex: 1, textAlign: "left", minWidth: 0 };
             const askTitle = { fontSize: 10, letterSpacing: "0.08em", color: theme.text };
-            const askSub = { fontSize: 8, letterSpacing: "0.05em", color: theme.muted, marginTop: 1 };
+            const askSub = { fontSize: 9, letterSpacing: "0.05em", color: theme.muted, marginTop: 1 };
             const askBtn = { padding: "4px 10px", fontSize: 9, letterSpacing: "0.08em", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", background: `${theme.gold}22`, color: theme.gold, border: `1px solid ${theme.gold}`, borderRadius: 3, whiteSpace: "nowrap" };
             return (
               <>
@@ -6007,7 +6009,7 @@ export default function OilPage() {
                         {!telegramLinked && pushAlerts.supported && !pushAlerts.enabled && (
                           <button
                             onClick={() => window.open(tgUrl, "_blank")}
-                            style={{ width: "100%", padding: 0, marginTop: 2, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline", textAlign: "right" }}
+                            style={{ width: "100%", padding: 0, marginTop: 2, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline", textAlign: "right" }}
                           >or link Telegram →</button>
                         )}
                         {/* Pipeline self-test + opt-out once push is on */}
@@ -6016,12 +6018,12 @@ export default function OilPage() {
                             <button
                               onClick={pushAlerts.disable}
                               disabled={pushAlerts.busy}
-                              style={{ padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline" }}
+                              style={{ padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.08em", color: theme.muted, textDecoration: "underline" }}
                             >{pushAlerts.busy ? "…" : "turn off this device"}</button>
                             <button
                               onClick={pushAlerts.sendTest}
                               disabled={pushAlerts.testState === "sending"}
-                              style={{ padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: pushAlerts.testState === "sent" ? theme.green : pushAlerts.testState === "failed" ? theme.red : theme.muted, textDecoration: "underline", textAlign: "right" }}
+                              style={{ padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "'Share Tech Mono', monospace", fontSize: 9, letterSpacing: "0.08em", color: pushAlerts.testState === "sent" ? theme.green : pushAlerts.testState === "failed" ? theme.red : theme.muted, textDecoration: "underline", textAlign: "right" }}
                             >
                               {pushAlerts.testState === "sending" ? "sending…" : pushAlerts.testState === "sent" ? "test sent ✓" : pushAlerts.testState === "failed" ? "test failed — retry?" : "send a test ping →"}
                             </button>
@@ -6311,12 +6313,12 @@ export default function OilPage() {
                 🔔 {pushAlerts.busy ? "…" : "GET STRIKE ALERTS"}
               </button>
               {pushAlerts.needsInstall && (
-                <div style={{ fontSize: 8, color: theme.muted, letterSpacing: "0.06em", textAlign: "center", maxWidth: 220 }}>
+                <div style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.06em", textAlign: "center", maxWidth: 220 }}>
                   iPhone: Share → Add to Home Screen, then enable — or tap to link Telegram
                 </div>
               )}
               {pushAlerts.error && (
-                <div style={{ fontSize: 8, color: theme.red, letterSpacing: "0.06em", textAlign: "center", maxWidth: 220 }}>{pushAlerts.error}</div>
+                <div style={{ fontSize: 9, color: theme.red, letterSpacing: "0.06em", textAlign: "center", maxWidth: 220 }}>{pushAlerts.error}</div>
               )}
             </>
           )}
@@ -6438,6 +6440,13 @@ export default function OilPage() {
       </button>
     </div>
   );
+
+  const drillingActive = drillStatus === "auto-pumping"
+    || ((isAdmin || isReport || isTest) && effectiveDrillDay > 0 && effectiveDrillDay < DEPTH_Z);
+  // Gauges earn their space only while something is happening under the bit:
+  // pumping, a reveal in flight, or a hell/blockade event. A signed-out or
+  // claimless visitor never sees a row of 0.0s.
+  const showGauges = drillingActive || drillEvent > 0 || hellActive || !!demonBlockade?.active;
 
   // ── Payout so far. BANKED is the real number — safe, counted — and the tank
   //    is at risk until it is banked, so the two are shown together with the
@@ -6571,9 +6580,12 @@ export default function OilPage() {
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.green }}>
           EXTRACTED: {playerExtracted.toLocaleString()} BTR
         </span>
-        <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
-          DEPTH {effectiveDrillDay}/{DEPTH_Z}
-        </span>
+        {/* The DEPTH dial carries this while the gauges are up */}
+        {!showGauges && (
+          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
+            DEPTH {effectiveDrillDay}/{DEPTH_Z}
+          </span>
+        )}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
         <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}>
@@ -6754,12 +6766,6 @@ export default function OilPage() {
   );
 
   // ── YOUR RIG — the player's one card: state/CTA, live gauges, tank + bank ──
-  const drillingActive = drillStatus === "auto-pumping"
-    || ((isAdmin || isReport || isTest) && effectiveDrillDay > 0 && effectiveDrillDay < DEPTH_Z);
-  // Gauges earn their space only while something is happening under the bit:
-  // pumping, a reveal in flight, or a hell/blockade event. A signed-out or
-  // claimless visitor never sees a row of 0.0s.
-  const showGauges = drillingActive || drillEvent > 0 || hellActive || !!demonBlockade?.active;
   const rigStatus = (() => {
     switch (drillStatus) {
       case "sign-in": return { label: "SIGNED OUT", color: theme.muted };
@@ -7189,6 +7195,7 @@ export default function OilPage() {
                 maxClaimTotal={communityMaxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
+                sliceY={sliceY}
                 theme={theme}
                 parabolum={parabolum}
                 gridX={gridSize}
@@ -7211,7 +7218,6 @@ export default function OilPage() {
                 selectedX={xsecCol}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
-                onSliceY={handleSliceY}
                 theme={theme}
                 parabolum={parabolum}
                 gridX={gridSize}
@@ -7317,6 +7323,7 @@ export default function OilPage() {
           centerLabel={mobilePrimary.label}
           centerSubLabel={mobilePrimary.sub}
           centerTitle={mobilePrimary.title}
+          centerSize={72}
           isMobile
           show80sButton={false}
           darkMode={uiDark}
@@ -7338,7 +7345,7 @@ export default function OilPage() {
           onClose={() => setShowBuyModal(false)}
         />
 
-        <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+        <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
         {/* SitePal host for the commercial-strip vendors (mobile branch —
             the desktop branch mounts its own; the embed itself is guarded
@@ -7703,11 +7710,11 @@ export default function OilPage() {
               setFireworksOn={setFireworksOn}
             />
             <button
-              title={panelsCollapsed ? "Show side panel" : "Hide side panel"}
+              title={panelsCollapsed ? "Show the map and side panels" : "Hide the map and side panels"}
               onClick={() => setPanelsCollapsed((p) => !p)}
               style={TOOLBAR_PILL}
             >
-              {panelsCollapsed ? "◂ SHOW PANEL" : "HIDE PANEL ▸"}
+              {panelsCollapsed ? "◂ SHOW PANELS" : "HIDE PANELS ▸"}
             </button>
           </div>
         </div>
@@ -7721,6 +7728,7 @@ export default function OilPage() {
                 maxClaimTotal={communityMaxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
+                sliceY={sliceY}
                 theme={theme}
                 parabolum={parabolum}
                 gridX={gridSize}
@@ -7739,7 +7747,6 @@ export default function OilPage() {
                 selectedX={xsecCol}
                 drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
-                onSliceY={handleSliceY}
                 theme={theme}
                 parabolum={parabolum}
                 gridX={gridSize}
@@ -7887,7 +7894,7 @@ export default function OilPage() {
         onClose={() => setShowBuyModal(false)}
       />
 
-      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
       {/* SitePal host for the commercial-strip vendors. Mounted on mobile
           too: only one vendor speaks at a time, and without the host mobile
@@ -8028,7 +8035,7 @@ const cctvStyles = {
     letterSpacing: "0.1em",
   },
   recCount: {
-    fontSize: 8,
+    fontSize: 9,
     color: "#111",
     background: "#ff3333",
     borderRadius: 6,
@@ -8038,14 +8045,14 @@ const cctvStyles = {
     lineHeight: "14px",
   },
   camLabel: {
-    fontSize: 8,
+    fontSize: 9,
     color: "#888",
     letterSpacing: "0.12em",
     flex: 1,
     textAlign: "center",
   },
   toggle: {
-    fontSize: 8,
+    fontSize: 9,
     color: "#666",
   },
   canvas: {
@@ -8071,7 +8078,7 @@ const cctvStyles = {
     textAlign: "right",
   },
   timestamp: {
-    fontSize: 8,
+    fontSize: 9,
     color: "#888",
     letterSpacing: "0.08em",
   },
@@ -8084,7 +8091,7 @@ const cctvStyles = {
     zIndex: 2,
   },
   backToLive: {
-    fontSize: 8,
+    fontSize: 9,
     color: "#fff",
     background: "rgba(255,50,50,0.8)",
     border: "none",
@@ -8130,7 +8137,7 @@ const cctvStyles = {
     textDecoration: "none",
   },
   recBtn: {
-    fontSize: 7,
+    fontSize: 8,
     color: "#aaa",
     background: "#1a1a1a",
     border: "1px solid #333",

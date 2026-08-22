@@ -30,6 +30,8 @@ export default function OilSurfaceMap({
   onClaimJump,
   currentUserId,
   parabolum = false,
+  // Row the cross-section is slicing — highlighted here so the two views agree.
+  sliceY = null,
 }) {
   // Dark-theme bgs: dark (#12161c), parabolumDark (#0c0717), hud (#0f141c).
   const dark = theme?.bg === "#12161c" || theme?.bg === "#0c0717" || theme?.bg === "#0f141c";
@@ -51,7 +53,7 @@ export default function OilSurfaceMap({
         `}</style>
       )}
       <div style={{
-        fontSize: 9, color: t.inspectorKey || t.muted, marginBottom: 8,
+        fontSize: 10, color: t.inspectorKey || t.muted, marginBottom: 8,
         textAlign: "center", letterSpacing: "0.08em",
       }}>
         {claimJumpMode ? "CLAIM JUMP \u2014 Click an open plot" : "SURVEY MAP"}
@@ -64,7 +66,7 @@ export default function OilSurfaceMap({
         <div style={{ width: 14 }} />
         {Array.from({ length: gridX }, (_, x) => (
           <span key={x} style={{
-            fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
+            fontSize: 8, color: t.muted, textAlign: "center", lineHeight: 1,
             display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
           }}>{x + 1}</span>
         ))}
@@ -79,7 +81,7 @@ export default function OilSurfaceMap({
             const y = gridY - 1 - i;
             return (
               <span key={y} style={{
-                fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
+                fontSize: 8, color: sliceY === y ? t.green : t.muted, fontWeight: sliceY === y ? 700 : 400, textAlign: "center", lineHeight: 1,
                 display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
               }}>{y + 1}</span>
             );
@@ -139,7 +141,8 @@ export default function OilSurfaceMap({
                     : isOwned
                     ? `1px solid ${ownedBorder}`
                     : `1px solid ${t.borderLight}`,
-                  boxShadow: claim.index === selectedClaimIndex ? `0 0 8px rgba(90, 138, 58, 0.4)` : "none",
+                  // The sliced row carries a faint band so the cross-section's row reads on the map.
+                  boxShadow: claim.index === selectedClaimIndex ? `0 0 8px rgba(90, 138, 58, 0.4)` : claim.y === sliceY ? `inset 0 0 0 1px ${t.green}55` : "none",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -162,13 +165,13 @@ export default function OilSurfaceMap({
                     the depth drilled as "D{n}" on a slate fill, and unexplored
                     cells are blank. */}
                 {isJumpTarget ? (
-                  <div style={{ fontSize: "6px", color: t.gold || t.accent, marginTop: "1px" }}>JUMP</div>
+                  <div style={{ fontSize: "7px", color: t.gold || t.accent, marginTop: "1px" }}>JUMP</div>
                 ) : claim.total > 0 ? (
                   <div style={{ fontSize: "8px", fontWeight: 700, color: dark ? "rgba(255,255,255,0.9)" : "rgba(30,22,10,0.82)" }}>
                     {claim.total >= 1e6 ? `${(claim.total / 1e6).toFixed(1)}M` : claim.total >= 1000 ? `${(claim.total / 1000).toFixed(1)}k` : Math.round(claim.total)}
                   </div>
                 ) : hasDrillHistory ? (
-                  <div style={{ fontSize: "6px", color: t.muted, marginTop: "1px" }}>D{plotData.drillDay}</div>
+                  <div style={{ fontSize: "7px", color: t.muted, marginTop: "1px" }}>D{plotData.drillDay}</div>
                 ) : null}
               </div>
             );
@@ -176,7 +179,7 @@ export default function OilSurfaceMap({
         </div>
       </div>
       <div style={{
-        fontSize: 7, color: t.muted, textAlign: "center",
+        fontSize: 8, color: t.muted, textAlign: "center",
         letterSpacing: "0.1em", marginTop: 2, paddingLeft: 14,
       }}>X &rarr;</div>
       <div style={{
@@ -204,7 +207,7 @@ export default function OilSurfaceMap({
       </div>
       <div style={{
         position: "absolute", left: 1, top: "50%",
-        fontSize: 7, color: t.muted, letterSpacing: "0.1em",
+        fontSize: 8, color: t.muted, letterSpacing: "0.1em",
       }}>Y &darr;</div>
     </div>
   );

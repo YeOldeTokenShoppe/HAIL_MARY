@@ -163,7 +163,7 @@ function SegmentDial({ segments, lit = 0, colorFor, mode = "lit", value, sub, la
             y={cy + 14}
             textAnchor="middle"
             fontFamily={MONO}
-            fontSize="7.5"
+            fontSize="8"
             letterSpacing="0.05em"
             fill={dark ? "rgba(212,168,84,0.7)" : "rgba(90,64,16,0.6)"}
           >

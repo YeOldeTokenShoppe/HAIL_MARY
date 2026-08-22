@@ -31,6 +31,8 @@ export default function OilWelcomeModal({
   isOpen, onClose, darkMode = false,
   // Passed through to the fairness explainer (it re-derives the field locally).
   numberOfDeposits, totalOilBudget, gridX = 10, gridY = 10,
+  // Open with the fairness explainer expanded and scrolled into view (seed row click).
+  fairnessOpen = false,
 }) {
   // Close on Escape for keyboard users.
   useEffect(() => {
@@ -39,6 +41,15 @@ export default function OilWelcomeModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !fairnessOpen) return;
+    // The explainer is a dynamic chunk: on first open the card is still short
+    // when the modal mounts, so scroll again once it has had time to render.
+    const go = () => document.getElementById("fairness-explainer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const timers = [setTimeout(go, 120), setTimeout(go, 700)];
+    return () => timers.forEach(clearTimeout);
+  }, [isOpen, fairnessOpen]);
 
   if (!isOpen) return null;
 
@@ -182,8 +193,8 @@ export default function OilWelcomeModal({
 
         {/* Provable fairness — kept here with the rules so the ? button is the
             one home for reference material (the side column stays live-only). */}
-        <div style={{ padding: "0 4px 8px" }}>
-          <OilVerifyExplainer darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridX} gridY={gridY} />
+        <div id="fairness-explainer" style={{ padding: "0 4px 8px", scrollMarginTop: 12 }}>
+          <OilVerifyExplainer defaultExpanded={fairnessOpen} darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridX} gridY={gridY} />
         </div>
 
         {/* CTA */}

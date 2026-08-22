@@ -39,6 +39,9 @@ export default function MobileBottomNav({
   centerLabel = null,
   centerSubLabel = 'RL80',
   centerTitle = 'Buy RL80',
+  // Diameter of the round FAB. 60 fits a 3-letter BUY; pages with longer
+  // labels (CLAIM, MY RIG) pass something larger.
+  centerSize = 60,
   // When provided, this replaces the entire default center-FAB wrapper —
   // useful for callers that want a multi-button center (e.g. /trade's
   // BUY/HOLD/SELL trio) instead of the single round FAB.
@@ -635,13 +638,13 @@ export default function MobileBottomNav({
           flex-direction: column;
           align-items: center;
           position: relative;
-          margin-top: -28px;
+          margin-top: ${-(centerSize - 32)}px;
           z-index: 2;
         }
 
         .btm-buy-fab {
-          width: 60px;
-          height: 60px;
+          width: ${centerSize}px;
+          height: ${centerSize}px;
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -674,9 +677,9 @@ export default function MobileBottomNav({
 
         .btm-buy-text {
           font-family: ${nm ? "'Pirata One', 'IBM Plex Serif', serif" : "'Orbitron', monospace"};
-          font-size: ${nm ? '16px' : '14px'};
+          font-size: ${nm ? '16px' : (centerLabel || '').length > 4 ? '12px' : '14px'};
           font-weight: ${nm ? '400' : '900'};
-          letter-spacing: ${nm ? '3px' : '2px'};
+          letter-spacing: ${nm ? '3px' : (centerLabel || '').length > 3 ? '1.5px' : '2px'};
           color: #ffffff;
           text-shadow: ${nm
             ? '0 0 8px rgba(244, 181, 63, 0.7), 0 0 14px rgba(255, 200, 90, 0.4)'
@@ -684,7 +687,7 @@ export default function MobileBottomNav({
         }
 
         .btm-buy-label {
-          font-size: 8px;
+          font-size: 9px;
           font-weight: 700;
           letter-spacing: 0.5px;
           text-transform: uppercase;
@@ -782,8 +785,8 @@ export default function MobileBottomNav({
            padding-box/border-box background trick. */
         .btm-buy-fab-wrap {
           position: relative;
-          width: 60px;
-          height: 60px;
+          width: ${centerSize}px;
+          height: ${centerSize}px;
         }
 
         /* Melt-timer ring — overlays the FAB and depletes clockwise as the

@@ -558,7 +558,7 @@ export default function OilPlotChat({
                         onClick={() => setReplyTarget(replyTarget === thread.threadUserId ? null : thread.threadUserId)}
                         style={{
                           ...btnStyle(replyTarget === thread.threadUserId ? c.accent : c.muted),
-                          fontSize: 8, padding: "2px 6px",
+                          fontSize: 9, padding: "2px 6px",
                         }}
                       >
                         {replyTarget === thread.threadUserId ? "REPLYING" : "REPLY"}
@@ -573,10 +573,10 @@ export default function OilPlotChat({
                         }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div>
-                              <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 600, color: isMine ? c.accent : c.link }}>
+                              <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 600, color: isMine ? c.accent : c.link }}>
                                 {isMine ? "you" : msg.fromUsername}
                               </span>
-                              <span style={{ fontFamily: mono, fontSize: 8, color: c.muted, marginLeft: 4 }}>
+                              <span style={{ fontFamily: mono, fontSize: 9, color: c.muted, marginLeft: 4 }}>
                                 {msg.timestamp?.toDate
                                   ? msg.timestamp.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                                   : "..."}
@@ -584,7 +584,7 @@ export default function OilPlotChat({
                             </div>
                             <button onClick={() => handleDelete(msg.id)} style={{
                               background: "none", border: "none", color: c.muted, cursor: "pointer",
-                              fontFamily: mono, fontSize: 8, padding: "0 2px", opacity: 0.6,
+                              fontFamily: mono, fontSize: 9, padding: "0 2px", opacity: 0.6,
                             }}>&times;</button>
                           </div>
                           <div style={{ fontFamily: mono, fontSize: 10, color: c.text, marginTop: 1, lineHeight: 1.3, wordBreak: "break-word" }}>

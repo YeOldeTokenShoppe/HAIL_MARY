@@ -80,7 +80,7 @@ export default function MuseumPanel({
           ) : (
             <>
               {/* Saurian specimens — 6 distinct amber shards each */}
-              <div style={{ fontSize: 8, color: t.muted, letterSpacing: "0.15em", marginBottom: 4 }}>
+              <div style={{ fontSize: 9, color: t.muted, letterSpacing: "0.15em", marginBottom: 4 }}>
                 SAURIAN SEQUENCING · AMBER
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 10px", marginBottom: 10 }}>
@@ -108,7 +108,7 @@ export default function MuseumPanel({
               </div>
 
               {/* Relics */}
-              <div style={{ fontSize: 8, color: t.muted, letterSpacing: "0.15em", marginBottom: 4 }}>
+              <div style={{ fontSize: 9, color: t.muted, letterSpacing: "0.15em", marginBottom: 4 }}>
                 BURIAL RELICS
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 10px", marginBottom: 10 }}>
@@ -126,7 +126,7 @@ export default function MuseumPanel({
               {/* Outlaw map + cache */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <div style={{ fontSize: 8, color: t.muted, letterSpacing: "0.15em", marginBottom: 4 }}>
+                  <div style={{ fontSize: 9, color: t.muted, letterSpacing: "0.15em", marginBottom: 4 }}>
                     OUTLAW MAP
                   </div>
                   <div style={{ display: "flex", gap: 3 }}>
@@ -135,7 +135,7 @@ export default function MuseumPanel({
                         width: 14, height: 18, borderRadius: 1,
                         border: `1px ${n > 0 ? "solid" : "dashed"} ${n > 0 ? gold : dim}`,
                         background: n > 0 ? `${gold}22` : "transparent",
-                        fontSize: 8, color: n > 0 ? gold : t.muted,
+                        fontSize: 9, color: n > 0 ? gold : t.muted,
                         display: "inline-flex", alignItems: "center", justifyContent: "center",
                       }}>{p + 1}</span>
                     ))}

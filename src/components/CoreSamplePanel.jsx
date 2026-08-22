@@ -382,7 +382,7 @@ export default function CoreSamplePanel({
               {fieldMaxPeak > 0 && (
                 <div style={{ marginTop: 6 }}>
                   <div style={{
-                    fontSize: 8, color: t.muted, letterSpacing: "0.1em",
+                    fontSize: 9, color: t.muted, letterSpacing: "0.1em",
                     fontFamily: "'Share Tech Mono', monospace",
                     padding: "0 2px", marginBottom: 2, textTransform: "uppercase",
                   }}>
