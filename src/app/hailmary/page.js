@@ -17,6 +17,7 @@ import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
+import DailyCallPanel from "@/components/DailyCallPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
@@ -6489,7 +6490,8 @@ export default function OilPage() {
         <span style={{ fontSize: 10, letterSpacing: "0.14em", color: tankHeavy ? theme.red : theme.accent }}>IN TANK · AT RISK</span>
         <span style={{ fontSize: 11, letterSpacing: "0.06em", color: tankHeavy ? theme.red : theme.textStrong }}>
           {fmtUsd(tankShownOil)}
-          <span style={{ fontSize: 9, color: theme.muted, marginLeft: 6 }}>{tankShownOil.toLocaleString()} BTR</span>
+          {/* real space (not just margin) so the line reads as two values to screen readers */}
+          <span style={{ fontSize: 9, color: theme.muted, marginLeft: 6 }}> {tankShownOil.toLocaleString()} BTR</span>
         </span>
       </div>
       <div style={{
@@ -6772,6 +6774,9 @@ export default function OilPage() {
 
   // ── YOUR RIG — the player's one card: state/CTA, live gauges, tank + bank ──
   const rigStatus = (() => {
+    // A live breach outranks whatever the drill state machine says (in test
+    // mode the stun isn't synthesized, so the pill would keep reading CAUGHT UP).
+    if (hellActive) return { label: "BREACH", color: theme.red };
     switch (drillStatus) {
       case "sign-in": return { label: "SIGNED OUT", color: theme.muted };
       case "stunned": return { label: "INCAPACITATED", color: theme.red };
@@ -7236,6 +7241,10 @@ export default function OilPage() {
           {finalHaulCard}
           {/* Live first: the rig, its core, its finds, then the field. */}
           {yourRigCard}
+          {/* DAILY CALL — prototype of the Betroleum directional-call loop (test mode only). */}
+          {isTest && (
+            <DailyCallPanel theme={theme} isMobile={isMobile} darkMode={uiDark} grid3D={displayGrid3D} gridX={gridSize} gridY={gridSize} maxOil={displayMaxOil} selectedX={selectedX} selectedY={sliceY} drillDepth={effectiveDrillDay} drillProximity={drillProximity} devControls />
+          )}
           {gusherShutoffPanel}
           <CoreSamplePanel
             theme={theme}
@@ -7774,6 +7783,10 @@ export default function OilPage() {
             {finalHaulCard}
             {/* Live first: the rig, its core, its finds, then the field. */}
             {yourRigCard}
+            {/* DAILY CALL — prototype of the Betroleum directional-call loop (test mode only). */}
+            {isTest && (
+              <DailyCallPanel theme={theme} isMobile={isMobile} darkMode={uiDark} grid3D={displayGrid3D} gridX={gridSize} gridY={gridSize} maxOil={displayMaxOil} selectedX={selectedX} selectedY={sliceY} drillDepth={effectiveDrillDay} drillProximity={drillProximity} devControls />
+            )}
             {gusherShutoffPanel}
             <CoreSamplePanel
               theme={theme}

@@ -175,10 +175,10 @@ export default function OilAwayRecap({
           {recap.oilGained > 0 ? (
             <>
               <div style={{ fontSize: isMobile ? 44 : 42, fontWeight: 700, color: gold, fontFamily: mono, lineHeight: 1, textShadow: `0 0 18px ${gold}44` }}>
-                +{heroOil.toLocaleString()}
+                +{heroOil.toLocaleString()}<span style={{ fontSize: "0.42em", fontWeight: 400, marginLeft: 8, letterSpacing: "0.12em" }}>BTR</span>
               </div>
               <div style={{ fontSize: isMobile ? 11 : 10, letterSpacing: "0.25em", color: muted, marginTop: 5, fontFamily: mono }}>
-                LYQUID80 STRUCK {usd(recap.oilGained) ? `· ${usd(recap.oilGained)}` : ""}
+                BETROLEUM STRUCK {usd(recap.oilGained) ? `· ${usd(recap.oilGained)}` : ""}
               </div>
             </>
           ) : (recap.artifactsFound?.length || 0) > 0 ? (
@@ -212,7 +212,7 @@ export default function OilAwayRecap({
             <span style={{ color: gold }}>▸</span>
             <span>
               <b>{recap.strikes.length}</b> strike{recap.strikes.length === 1 ? "" : "s"}
-              {bestStrike ? <> — best <b style={{ color: gold }}>{bestStrike.oil.toLocaleString()}</b> at depth {bestStrike.layer + 1}</> : null}
+              {bestStrike ? <> — best <b style={{ color: gold }}>{bestStrike.oil.toLocaleString()} BTR</b> at depth {bestStrike.layer + 1}</> : null}
             </span>
           </div>
         )}
@@ -246,7 +246,7 @@ export default function OilAwayRecap({
         {recap.bankedDelta > 0 && (
           <div style={row}>
             <span style={{ color: green }}>▸</span>
-            <span><b style={{ color: green }}>+{recap.bankedDelta.toLocaleString()}</b> banked while away {usd(recap.bankedDelta) ? `(${usd(recap.bankedDelta)})` : ""}</span>
+            <span><b style={{ color: green }}>+{recap.bankedDelta.toLocaleString()} BTR</b> banked while away {usd(recap.bankedDelta) ? `(${usd(recap.bankedDelta)})` : ""}</span>
           </div>
         )}
         <div style={{ ...row, marginTop: 8, padding: "8px 10px", border: `1px solid ${tankHeavy ? red : border}`, borderRadius: 3, background: tankHeavy ? `${red}14` : "rgba(212,168,84,0.06)", justifyContent: "space-between" }}>
@@ -254,7 +254,7 @@ export default function OilAwayRecap({
             TANK · UNBANKED
           </span>
           <span style={{ color: tankHeavy ? red : text, fontWeight: 700 }}>
-            {(recap.tank ?? 0).toLocaleString()} {usd(recap.tank) ? <span style={{ fontWeight: 400, color: muted }}> {usd(recap.tank)}</span> : null}
+            {(recap.tank ?? 0).toLocaleString()} BTR {usd(recap.tank) ? <span style={{ fontWeight: 400, color: muted }}> {usd(recap.tank)}</span> : null}
           </span>
         </div>
         {tankHeavy && onBank && (

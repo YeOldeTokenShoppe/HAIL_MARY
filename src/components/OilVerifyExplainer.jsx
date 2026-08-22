@@ -238,7 +238,7 @@ export default function OilVerifyExplainer({
       {expanded && (
         <div style={{ marginTop: 10 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: c.text, lineHeight: 1.5, letterSpacing: "0.02em", marginBottom: 12 }}>
-            The map of where the Betroleum is hidden is locked in <b>before anyone plays</b>, and tied to something
+            The map of where the Betroleum is hidden is locked in <b style={{ color: "inherit" }}>before anyone plays</b>, and tied to something
             nobody can predict — so it can't be rigged. Here's how, and you can prove it yourself.
           </div>
 
