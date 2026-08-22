@@ -25,7 +25,7 @@ export async function POST(req) {
     }
 
     const label = eventType === "gusher" ? "GUSHER" : "ROGUE INTRUSION";
-    const caption = `📹 CCTV FOOTAGE — Plot (${col}, ${row})\n${label} recorded.\nEvent: ${eventId || "unknown"}`;
+    const caption = `📹 CCTV FOOTAGE — Plot (${Number(col) + 1}, ${Number(row) + 1})\n${label} recorded.\nEvent: ${eventId || "unknown"}`;
 
     const videoRes = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, {
       method: "POST",

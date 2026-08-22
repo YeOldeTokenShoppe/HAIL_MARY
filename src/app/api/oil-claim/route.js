@@ -19,7 +19,7 @@ export async function POST(req) {
     const { col, row, username, referredByCode } = await req.json().catch(() => ({}));
     if (!Number.isInteger(col) || !Number.isInteger(row) ||
         col < 0 || row < 0 || col > GRID_MAX || row > GRID_MAX) {
-      return NextResponse.json({ error: "Invalid cell" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid plot" }, { status: 400 });
     }
 
     const db = getAdminDb();

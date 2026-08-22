@@ -41,7 +41,7 @@ function computeTotalUsdc(itemIds) {
 // successful settle, making it findable via the discovery APIs at
 // https://api.cdp.coinbase.com/platform/v2/x402/discovery/*
 const DISCOVERY_METADATA = {
-  name: "RL80 Oil Game — Premium Items",
+  name: "Hail Mary Prospecting Co. — Rig Upgrades",
   description:
     "Unlock cosmetic premium items for the RL80 oil-rig game on rl80.com. " +
     "Pay-per-item in USDC on Base. Items include rig themes ($5), fences ($3), " +
@@ -111,7 +111,7 @@ function buildPaymentRequirements(itemIds, totalUsdc, resourceUrl) {
     network: "base",
     maxAmountRequired: String(totalUsdc * 1_000_000), // USDC has 6 decimals
     resource: resourceUrl,
-    description: `Unlock ${itemIds.length} oil rig ${itemIds.length === 1 ? "item" : "items"}`,
+    description: `Unlock ${itemIds.length} rig ${itemIds.length === 1 ? "upgrade" : "upgrades"}`,
     mimeType: "application/json",
     payTo: treasury,
     maxTimeoutSeconds: 120,

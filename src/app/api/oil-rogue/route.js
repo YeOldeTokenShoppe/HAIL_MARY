@@ -315,7 +315,7 @@ export async function POST(req) {
           const { chatId } = tgDoc.data();
           const botToken = process.env.TELEGRAM_BOT_TOKEN;
           if (botToken && chatId) {
-            let alertText = `🚨 SECURITY ALERT — Plot (${targetCol}, ${targetRow})\nA ${characterType.toUpperCase()} was spotted on your property!`;
+            let alertText = `🚨 SECURITY ALERT — Plot (${targetCol + 1}, ${targetRow + 1})\nA ${characterType.toUpperCase()} was spotted on your property!`;
             if (consequence.type === "delete_addon") {
               alertText += `\nYour ${(consequence.addonId || "item").toUpperCase()} was eaten! 💀`;
             } else if (consequence.type === "graffiti") {

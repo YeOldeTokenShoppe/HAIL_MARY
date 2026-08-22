@@ -31,7 +31,7 @@ async function handle(req) {
     const plotSnap = await db.collection("oilPlots").doc(`${col}_${row}`).get();
     userId = plotSnap.exists ? plotSnap.data().currentOwnerId : null;
     if (!userId) {
-      return NextResponse.json({ error: "no rig on that cell" }, { status: 404 });
+      return NextResponse.json({ error: "no rig on that plot" }, { status: 404 });
     }
   }
 

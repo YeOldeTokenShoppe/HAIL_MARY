@@ -61,7 +61,7 @@ export async function POST(req) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId,
-          text: "Use the 'Link Telegram' button in the Oil Game to connect your account.",
+          text: "Use the 'Link Telegram' button at Hail Mary Prospecting Co. (rl80.com/hailmary) to connect your account.",
         }),
       });
     }

@@ -452,27 +452,27 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
               const artSuffix = artLine ? `\n${artLine}` : "";
               await sendPlayerAlert(db, userId, {
                 title: "⛽ YOUR RIG STRUCK!",
-                body: `Plot (${col}, ${row}) hit ${outcome.oil.toLocaleString()}${usdTag} at depth ${outcome.depth}. Bank it before a dino comes sniffing.${artSuffix}`,
+                body: `Plot (${col + 1}, ${row + 1}) hit ${outcome.oil.toLocaleString()} BTR${usdTag} at depth ${outcome.depth}. Bank it before a dino comes sniffing.${artSuffix}`,
                 tag: "hmpc-strike",
-                telegramHtml: `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col}, ${row}) hit ${outcome.oil}${usdTag} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.${artSuffix}`,
+                telegramHtml: `⛽ <b>YOUR RIG STRUCK!</b>\nPlot (${col + 1}, ${row + 1}) hit ${outcome.oil.toLocaleString()} BTR${usdTag} at depth ${outcome.depth}.\nBank it before a dino comes sniffing.${artSuffix}`,
               });
             } else if (art) {
               // A dry layer with an artifact is a FIND, not a miss — it gets a
               // real push. This is the "dry strikes stop being silent" beat.
               await sendPlayerAlert(db, userId, {
                 title: art.type === "cache" ? "💰 OUTLAW CACHE FOUND!" : "🏺 ARTIFACT UNEARTHED!",
-                body: `Depth ${outcome.depth} at (${col}, ${row}): no LYQUID80… but the drill hit something else.\n${artLine}`,
+                body: `Depth ${outcome.depth} at plot (${col + 1}, ${row + 1}): no Betroleum… but the drill hit something else.\n${artLine}`,
                 tag: "hmpc-artifact",
-                telegramHtml: `🏺 <b>ARTIFACT UNEARTHED!</b>\nDepth ${outcome.depth} at (${col}, ${row}) — ${artLine}`,
+                telegramHtml: `🏺 <b>ARTIFACT UNEARTHED!</b>\nDepth ${outcome.depth} at plot (${col + 1}, ${row + 1}) — ${artLine}`,
               });
             } else {
               // Truly empty layers go to Telegram only — push stays reserved
               // for paydirt so the notification keeps its signal value.
               await sendPlayerAlert(db, userId, {
                 title: "🪨 Dry layer",
-                body: `Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`,
+                body: `Your rig drilled to depth ${outcome.depth} at plot (${col + 1}, ${row + 1}) — dry layer this time.`,
                 channels: { telegram: true, push: false },
-                telegramHtml: `🪨 Your rig drilled to depth ${outcome.depth} at (${col}, ${row}) — dry layer this time.`,
+                telegramHtml: `🪨 Your rig drilled to depth ${outcome.depth} at plot (${col + 1}, ${row + 1}) — dry layer this time.`,
               });
             }
           }

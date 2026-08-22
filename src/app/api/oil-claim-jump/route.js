@@ -19,7 +19,7 @@ export async function POST(req) {
     const { newCol, newRow } = await req.json().catch(() => ({}));
     if (!Number.isInteger(newCol) || !Number.isInteger(newRow) ||
         newCol < 0 || newRow < 0 || newCol > GRID_MAX || newRow > GRID_MAX) {
-      return NextResponse.json({ error: "Invalid target cell" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid target plot" }, { status: 400 });
     }
 
     const db = getAdminDb();
