@@ -1308,6 +1308,7 @@ export default function OilPage() {
   // Read mode from URL search params (avoids useSearchParams / Suspense issues)
   const [mode, setMode] = useState("active");
   const [previewMode, setPreviewMode] = useState(false);
+  const [lobbyForce, setLobbyForce] = useState(false);
   // Ref mirror of previewMode so write-handler gates aren't fooled by a
   // stale useCallback closure (handlers don't need previewMode in their deps).
   const previewModeRef = useRef(false);
@@ -1315,6 +1316,9 @@ export default function OilPage() {
     const params = new URLSearchParams(window.location.search);
     setMode(params.get("mode") || "active");
     const preview = params.get("preview") === "1";
+    // Dev-only: ?lobby=1 renders the registration lobby regardless of phase so
+    // the first-run path can be reviewed without flipping the game settings.
+    setLobbyForce(process.env.NODE_ENV === "development" && params.get("lobby") === "1");
     setPreviewMode(preview);
     previewModeRef.current = preview;
     // Capture referral code from URL and store in localStorage
@@ -5463,7 +5467,7 @@ export default function OilPage() {
   // pre-season mode, qualified plot-less users get the ON-FIELD PLOT PICK
   // (the only claiming path: lobby CTA → field → click a cell → stake).
   // null (undecided) falls back on plot ownership.
-  if (gamePhase === "ticket_sale" && !previewMode && (lobbyView ?? !userHasPlot)) {
+  if ((gamePhase === "ticket_sale" || lobbyForce) && !previewMode && (lobbyView ?? !userHasPlot)) {
     return (
       <OilQualify
         theme={theme}
@@ -5479,6 +5483,7 @@ export default function OilPage() {
         storedRef={typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null}
         gridSize={gridSize}
         prizePool={totalOilBudget}
+        numberOfDeposits={numberOfDeposits}
         gameStartDate={gameStartDate}
         onEnterField={() => setLobbyView(false)}
         seedCommitment={seedCommitment}

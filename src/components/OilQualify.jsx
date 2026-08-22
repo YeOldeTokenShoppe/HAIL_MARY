@@ -16,6 +16,7 @@ import { db, collection, query, orderBy, onSnapshot, doc } from "@/lib/firebaseC
 import { useOilApiFetch } from "@/lib/oilApiClient";
 import OilAnchorEvent from "@/components/OilAnchorEvent";
 import OilClaimCertificate from "@/components/OilClaimCertificate";
+import OilWelcomeModal from "@/components/OilWelcomeModal";
 import dynamic from "next/dynamic";
 
 // Fairness console (COMMIT / ANCHOR / REVEAL) — needed HERE because the commit
@@ -89,7 +90,7 @@ function SeasonStartBanner({ gameStartDate, theme, isMobile }) {
       alignItems: "center",
       gap: 3,
     }}>
-      <div style={{ fontSize: 9, letterSpacing: "0.35em", color: theme.muted }}>
+      <div style={{ fontSize: 10, letterSpacing: "0.35em", color: theme.muted }}>
         SEASON STARTS
       </div>
       <div style={{
@@ -124,6 +125,7 @@ export default function OilQualify({
   storedRef,
   gridSize,
   prizePool = 500,
+  numberOfDeposits = 5,
   onEnterField,
   seedCommitment,
   anchorBlock,
@@ -151,6 +153,7 @@ export default function OilQualify({
   const [xIdentityVerified, setXIdentityVerified] = useState(false); // true when X username comes from Clerk OAuth
   const [allPlots, setAllPlots] = useState({}); // oilPlots collection: { "col_row": { ... } }
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showRules, setShowRules] = useState(false); // full rules + fairness (the game's own help modal)
   const [lightboxSrc, setLightboxSrc] = useState(null);
 
   useEffect(() => {
@@ -571,7 +574,7 @@ export default function OilQualify({
             HOLD ${QUALIFICATION_THRESHOLD}+ USD OF RL80 & FOLLOW @RL80TOKEN
           </div>
           <div style={{
-            fontSize: 9,
+            fontSize: 10,
             color: theme.muted,
             marginTop: 4,
             letterSpacing: "0.08em",
@@ -582,109 +585,8 @@ export default function OilQualify({
           <SeasonStartBanner gameStartDate={gameStartDate} theme={theme} isMobile={isMobile} />
         </div>
 
-        {/* Hero — Claim Certificate with dynamic fields + the share pipeline.
-            Shared component (OilClaimCertificate) — the field's pre-season
-            panel renders the same certificate as a click-to-enlarge thumb.
-            Fields fill in progressively (sign in → register → claim plot) so
-            the certificate previews a completed claim, as enticement. */}
-        <OilClaimCertificate
-          variant="hero"
-          user={user}
-          walletAddress={walletAddress}
-          plotCol={userPlotEntry?.col ?? userPlayer?.plotCol}
-          plotRow={userPlotEntry?.row ?? userPlayer?.plotRow}
-          pickedAt={userPlayer?.pickedAt}
-          theme={theme}
-          isMobile={isMobile}
-          showShare={!!(userPlayer && userHasPlot)}
-        />
-
-
-        {/* Claim staked → the lobby's job is done. Hand the player to the 3D
-            field (pre-season mode: countdown + alerts/referral/rig checklist). */}
-        {userPlayer && userHasPlot && onEnterField && (
-          <div style={{ margin: "16px auto 0", maxWidth: 480 }}>
-            <button
-              onClick={onEnterField}
-              style={{
-                width: "100%",
-                padding: "14px 28px",
-                background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
-                border: `1px solid ${theme.goldBorder || theme.gold}`,
-                borderRadius: 3,
-                color: "#fff",
-                fontFamily: mono,
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: "0.15em",
-                cursor: "pointer",
-              }}
-            >
-              ⛏ ENTER THE FIELD →
-            </button>
-            <div style={{ textAlign: "center", fontSize: 9, color: theme.muted, marginTop: 6, letterSpacing: "0.08em" }}>
-              YOUR RIG IS STAKED — SEE IT ON THE GRID & GET READY FOR THE SEASON
-            </div>
-          </div>
-        )}
-
-        {/* Sign-in / user badge */}
-        <div style={{ marginTop: 20 }}>
-          {!user ? (
-            <SignInButton mode="modal" forceRedirectUrl="/hailmary">
-              <button style={{
-                padding: "10px 28px",
-                background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
-                border: `1px solid ${theme.goldBorder}`,
-                borderRadius: 3,
-                color: "#fff",
-                fontFamily: mono,
-                fontSize: 12,
-                letterSpacing: "0.15em",
-                cursor: "pointer",
-              }}>
-                SIGN IN TO PARTICIPATE
-              </button>
-            </SignInButton>
-          ) : (
-            <div style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 14px",
-              border: `1px solid ${theme.border}`,
-              borderRadius: 3,
-              background: theme.tintBg,
-            }}>
-              {user.imageUrl && (
-                <img src={user.imageUrl} alt="" style={{ width: 22, height: 22, borderRadius: 11 }} />
-              )}
-              <span style={{ fontSize: 11, color: theme.textStrong }}>
-                {user.fullName || user.firstName || "Signed In"}
-              </span>
-              {userRegistered && (
-                <span style={{
-                  fontSize: 9,
-                  letterSpacing: "0.1em",
-                  color: userPlayer?.qualified ? theme.green : theme.warn,
-                  padding: "2px 6px",
-                  background: userPlayer?.qualified ? `${theme.green}15` : `${theme.warn}15`,
-                  border: `1px solid ${userPlayer?.qualified ? theme.green : theme.warn}30`,
-                  borderRadius: 2,
-                }}>
-                  {userPlayer?.qualified ? "QUALIFIED" : "REGISTERED"}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{
-        maxWidth: 720,
-        margin: "0 auto",
-        padding: isMobile ? "20px 16px" : "28px 32px",
-      }}>
+        {/* Plots remaining — scarcity is the hook, so it sits with the headline. */}
+        <div style={{ maxWidth: 720, margin: "20px auto 0" }}>
         {/* Qualified Player Counter */}
         <div style={{
           textAlign: "center",
@@ -742,135 +644,18 @@ export default function OilQualify({
             marginTop: 16,
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: theme.gold }}>
-              {GRID_SIZE}x{GRID_SIZE} GRID
+              {GRID_SIZE}&times;{GRID_SIZE} FIELD
             </div>
-            <div style={{ fontSize: 9, color: theme.muted }}>
-              {GRID_SIZE * GRID_SIZE} PLOTS &mdash; ${prizePool} USDC PRIZE POOL
+            <div style={{ fontSize: 10, color: theme.muted }}>
+              {GRID_SIZE * GRID_SIZE} PLOTS
             </div>
           </div>
         </div>
 
-        {/* How It Works */}
-        <div style={{
-          marginBottom: 24,
-          padding: isMobile ? 16 : 20,
-          border: `1px solid ${theme.border}`,
-          borderRadius: 4,
-          background: "rgba(20, 12, 28, 0.55)",
-          backdropFilter: "blur(24px) saturate(1.2)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
-          color: "#e8dcc8",
-        }}>
-          <div style={{
-            fontSize: 10,
-            letterSpacing: "0.2em",
-            color: theme.muted,
-            marginBottom: 14,
-            paddingBottom: 6,
-            borderBottom: `1px solid ${theme.border}`,
-          }}>
-            HOW IT WORKS
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[
-              { step: "01", title: "HOLD RL80 & FOLLOW", desc: `Hold at least $${QUALIFICATION_THRESHOLD} of RL80 and follow @rl80token on X. You never spend it — holding is the ticket. Sell anytime; you only lose your seat.` },
-              { step: "02", title: "STAKE YOUR CLAIM", desc: `Connect your wallet, verify your follow, and pick a plot on the ${GRID_SIZE}x${GRID_SIZE} grid. First come, first served.` },
-              { step: "03", title: "YOUR RIG DRILLS 24/7", desc: "No clicking. Once the season starts, your rig pumps around the clock and strikes at random, unpredictable times — day or night. Refer friends to drill deeper (+3 layers each, up to depth 20)." },
-              { step: "04", title: "STRIKE BETROLEUM — GET PAID", desc: "Every unit you haul is worth real USDC at a fixed rate. When the season ends, payouts go straight to your wallet." },
-            ].map((item) => (
-              <div key={item.step} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                <div style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: theme.gold,
-                  lineHeight: 1,
-                  minWidth: 28,
-                }}>
-                  {item.step}
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: theme.textStrong, marginBottom: 2 }}>
-                    {item.title}
-                  </div>
-                  <div style={{ fontSize: 11, color: theme.muted, lineHeight: 1.5 }}>
-                    {item.desc}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
-
-        {/* Anchor-as-event — the provable-fairness trust beat: the map doesn't
-            exist until the anchor block mines (live countdown once committed). */}
-        <OilAnchorEvent
-          theme={theme}
-          isMobile={isMobile}
-          seedCommitment={seedCommitment}
-          anchorBlock={anchorBlock}
-          anchorBlockHash={anchorBlockHash}
-          gameStartDate={gameStartDate}
-        />
-
-        {/* Brochure Images */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-          gap: 12,
-          marginBottom: 24,
-        }}>
-          {BROCHURE_IMAGES.map(({ src, caption, tilt }) => (
-            <div key={src}>
-              <button
-                type="button"
-                onClick={() => setLightboxSrc(src)}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  // Box matches the source aspect so the polaroids fill it
-                  // with no letterbox. MUST match the panorama box below so
-                  // all four images render at the same size.
-                  aspectRatio: "694 / 800",
-                  border: "none",
-                  padding: 0,
-                  margin: 0,
-                  background: "transparent",
-                  appearance: "none",
-                  WebkitAppearance: "none",
-                  cursor: "zoom-in",
-                }}
-                aria-label="View larger"
-              >
-                {/* Individual CSS tilt. scale(0.92) leaves headroom so the
-                    rotated corners don't clip; contain avoids cropping. */}
-                <img
-                  src={src}
-                  alt={caption}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    display: "block",
-                    transform: `rotate(${tilt}deg) scale(0.92)`,
-                    transformOrigin: "center",
-                  }}
-                />
-              </button>
-              <div style={{
-                padding: "6px 4px",
-                fontSize: 10,
-                fontStyle: "italic",
-                color: theme.muted,
-                letterSpacing: "0.04em",
-                lineHeight: 1.5,
-                textAlign: "center",
-              }}>
-                {caption}
-              </div>
-            </div>
-          ))}
-        </div>
-
+        {/* The action itself — sign in, check qualification, pick a plot — sits
+            above the fold; the certificate and brochure follow as enticement. */}
+        <div style={{ maxWidth: 720, margin: "0 auto", textAlign: "left" }}>
         {/* Qualification Section */}
         <div style={{
           marginBottom: 24,
@@ -918,7 +703,7 @@ export default function OilQualify({
                 PREVIEW THE GAME &rarr;
               </div>
               <div style={{ fontSize: 10, color: "#e8dcc8", marginTop: 4, letterSpacing: "0.06em" }}>
-                See the rigs and grid before claiming a plot
+                See the rigs and the field before claiming a plot
               </div>
             </a>
           )}
@@ -1015,8 +800,8 @@ export default function OilQualify({
                     maxWidth: 420,
                   }}>
                     Stake your claim — walk the live field and choose your
-                    ground. Click any open cell on the {GRID_SIZE}x{GRID_SIZE}{" "}
-                    grid and plant your rig where you want to drill. First come,
+                    ground. Click any open plot on the {GRID_SIZE}&times;{GRID_SIZE}{" "}
+                    field and plant your rig where you want to drill. First come,
                     first served.
                   </div>
                   <button
@@ -1089,7 +874,7 @@ export default function OilQualify({
                   borderRadius: 3,
                   textAlign: "center",
                 }}>
-                  <div style={{ fontSize: 9, letterSpacing: "0.15em", color: theme.muted, marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.muted, marginBottom: 4 }}>
                     RL80 BALANCE
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: theme.textStrong }}>
@@ -1102,7 +887,7 @@ export default function OilQualify({
                   borderRadius: 3,
                   textAlign: "center",
                 }}>
-                  <div style={{ fontSize: 9, letterSpacing: "0.15em", color: theme.muted, marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.muted, marginBottom: 4 }}>
                     USD VALUE
                   </div>
                   <div style={{
@@ -1120,7 +905,7 @@ export default function OilQualify({
                 <div style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  fontSize: 9,
+                  fontSize: 10,
                   color: theme.muted,
                   marginBottom: 4,
                 }}>
@@ -1171,7 +956,7 @@ export default function OilQualify({
                         <span style={{ fontSize: 12, color: theme.muted, marginRight: 2 }}>@</span>
                         <span style={{ fontSize: 11, color: theme.textStrong, fontFamily: mono }}>{xUsername}</span>
                         <span style={{
-                          marginLeft: 8, fontSize: 9, color: theme.green,
+                          marginLeft: 8, fontSize: 10, color: theme.green,
                           padding: "1px 6px", background: `${theme.green}15`,
                           border: `1px solid ${theme.green}30`, borderRadius: 2,
                         }}>
@@ -1438,6 +1223,215 @@ export default function OilQualify({
           )}
         </div>
 
+        </div>
+        {/* Hero — Claim Certificate with dynamic fields + the share pipeline.
+            Shared component (OilClaimCertificate) — the field's pre-season
+            panel renders the same certificate as a click-to-enlarge thumb.
+            Fields fill in progressively (sign in → register → claim plot) so
+            the certificate previews a completed claim, as enticement. */}
+        <OilClaimCertificate
+          variant="hero"
+          user={user}
+          walletAddress={walletAddress}
+          plotCol={userPlotEntry?.col ?? userPlayer?.plotCol}
+          plotRow={userPlotEntry?.row ?? userPlayer?.plotRow}
+          pickedAt={userPlayer?.pickedAt}
+          theme={theme}
+          isMobile={isMobile}
+          showShare={!!(userPlayer && userHasPlot)}
+        />
+
+
+        {/* Claim staked → the lobby's job is done. Hand the player to the 3D
+            field (pre-season mode: countdown + alerts/referral/rig checklist). */}
+        {userPlayer && userHasPlot && onEnterField && (
+          <div style={{ margin: "16px auto 0", maxWidth: 480 }}>
+            <button
+              onClick={onEnterField}
+              style={{
+                width: "100%",
+                padding: "14px 28px",
+                background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
+                border: `1px solid ${theme.goldBorder || theme.gold}`,
+                borderRadius: 3,
+                color: "#fff",
+                fontFamily: mono,
+                fontSize: 14,
+                fontWeight: 700,
+                letterSpacing: "0.15em",
+                cursor: "pointer",
+              }}
+            >
+              ⛏ ENTER THE FIELD →
+            </button>
+            <div style={{ textAlign: "center", fontSize: 10, color: theme.muted, marginTop: 6, letterSpacing: "0.08em" }}>
+              YOUR RIG IS STAKED — SEE IT ON THE GRID & GET READY FOR THE SEASON
+            </div>
+          </div>
+        )}
+
+        {/* Signed-in badge — the sign-in button lives in the qualify card above */}
+        <div style={{ marginTop: 20 }}>
+          {user && (
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 14px",
+              border: `1px solid ${theme.border}`,
+              borderRadius: 3,
+              background: theme.tintBg,
+            }}>
+              {user.imageUrl && (
+                <img src={user.imageUrl} alt="" style={{ width: 22, height: 22, borderRadius: 11 }} />
+              )}
+              <span style={{ fontSize: 11, color: theme.textStrong }}>
+                {user.fullName || user.firstName || "Signed In"}
+              </span>
+              {userRegistered && (
+                <span style={{
+                  fontSize: 10,
+                  letterSpacing: "0.1em",
+                  color: userPlayer?.qualified ? theme.green : theme.warn,
+                  padding: "2px 6px",
+                  background: userPlayer?.qualified ? `${theme.green}15` : `${theme.warn}15`,
+                  border: `1px solid ${userPlayer?.qualified ? theme.green : theme.warn}30`,
+                  borderRadius: 2,
+                }}>
+                  {userPlayer?.qualified ? "QUALIFIED" : "REGISTERED"}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{
+        maxWidth: 720,
+        margin: "0 auto",
+        padding: isMobile ? "20px 16px" : "28px 32px",
+      }}>
+        {/* How It Works */}
+        <div style={{
+          marginBottom: 24,
+          padding: isMobile ? 16 : 20,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 4,
+          background: "rgba(20, 12, 28, 0.55)",
+          backdropFilter: "blur(24px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.2)",
+          color: "#e8dcc8",
+        }}>
+          <div style={{
+            fontSize: 10,
+            letterSpacing: "0.2em",
+            color: theme.muted,
+            marginBottom: 14,
+            paddingBottom: 6,
+            borderBottom: `1px solid ${theme.border}`,
+          }}>
+            HOW IT WORKS
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {[
+              { step: "01", title: "HOLD RL80 & FOLLOW", desc: `Hold at least $${QUALIFICATION_THRESHOLD} of RL80 and follow @rl80token on X. You never spend it — holding is the ticket. Sell anytime; you only lose your seat.` },
+              { step: "02", title: "STAKE YOUR CLAIM", desc: `Connect your wallet, verify your follow, and pick a plot on the ${GRID_SIZE}x${GRID_SIZE} grid. First come, first served.` },
+              { step: "03", title: "YOUR RIG DRILLS 24/7", desc: "No clicking. Once the season starts, your rig pumps around the clock and strikes at random, unpredictable times — day or night. Refer friends to drill deeper (+3 layers each, up to depth 20)." },
+              { step: "04", title: "STRIKE BETROLEUM — GET PAID", desc: "Every unit you haul is worth real USDC at a fixed rate. When the season ends, payouts go straight to your wallet." },
+            ].map((item) => (
+              <div key={item.step} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: theme.gold,
+                  lineHeight: 1,
+                  minWidth: 28,
+                }}>
+                  {item.step}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: theme.textStrong, marginBottom: 2 }}>
+                    {item.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: theme.muted, lineHeight: 1.5 }}>
+                    {item.desc}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Anchor-as-event — the provable-fairness trust beat: the map doesn't
+            exist until the anchor block mines (live countdown once committed). */}
+        <OilAnchorEvent
+          theme={theme}
+          isMobile={isMobile}
+          seedCommitment={seedCommitment}
+          anchorBlock={anchorBlock}
+          anchorBlockHash={anchorBlockHash}
+          gameStartDate={gameStartDate}
+        />
+
+        {/* Brochure Images */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: 12,
+          marginBottom: 24,
+        }}>
+          {BROCHURE_IMAGES.map(({ src, caption, tilt }) => (
+            <div key={src}>
+              <button
+                type="button"
+                onClick={() => setLightboxSrc(src)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  // Box matches the source aspect so the polaroids fill it
+                  // with no letterbox. MUST match the panorama box below so
+                  // all four images render at the same size.
+                  aspectRatio: "694 / 800",
+                  border: "none",
+                  padding: 0,
+                  margin: 0,
+                  background: "transparent",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  cursor: "zoom-in",
+                }}
+                aria-label="View larger"
+              >
+                {/* Individual CSS tilt. scale(0.92) leaves headroom so the
+                    rotated corners don't clip; contain avoids cropping. */}
+                <img
+                  src={src}
+                  alt={caption}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    display: "block",
+                    transform: `rotate(${tilt}deg) scale(0.92)`,
+                    transformOrigin: "center",
+                  }}
+                />
+              </button>
+              <div style={{
+                padding: "6px 4px",
+                fontSize: 10,
+                fontStyle: "italic",
+                color: theme.muted,
+                letterSpacing: "0.04em",
+                lineHeight: 1.5,
+                textAlign: "center",
+              }}>
+                {caption}
+              </div>
+            </div>
+          ))}
+        </div>
+
         {/* (Qualified-with-no-plot CTA merged into the "QUALIFY TO PLAY"
             confirmation panel above — the single game link lives there now.) */}
 
@@ -1542,13 +1536,13 @@ export default function OilQualify({
                 color: "#e8dcc8",
               }}
             >
-              <div style={{ fontSize: 9, letterSpacing: "0.2em", color: theme.muted, marginBottom: 4 }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.2em", color: theme.muted, marginBottom: 4 }}>
                 {item.label}
               </div>
               <div style={{ fontSize: 16, fontWeight: 700, color: theme.textStrong }}>
                 {item.value}
               </div>
-              <div style={{ fontSize: 9, color: theme.muted, marginTop: 2 }}>{item.sub}</div>
+              <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>{item.sub}</div>
             </div>
           ))}
         </div>
@@ -1606,7 +1600,7 @@ export default function OilQualify({
                     }}
                   >
                     <div style={{
-                      fontSize: 9,
+                      fontSize: 10,
                       fontWeight: 700,
                       color: p.qualified ? theme.green : theme.muted,
                       minWidth: 52,
@@ -1634,17 +1628,17 @@ export default function OilQualify({
                       <div style={{ fontSize: 12, color: theme.textStrong }}>
                         {p.clerkName || "Anonymous"}
                         {isMe && (
-                          <span style={{ fontSize: 9, color: theme.gold, marginLeft: 6 }}>YOU</span>
+                          <span style={{ fontSize: 10, color: theme.gold, marginLeft: 6 }}>YOU</span>
                         )}
                       </div>
                       {p.walletAddress && (
-                        <div style={{ fontSize: 9, color: theme.muted }}>
+                        <div style={{ fontSize: 10, color: theme.muted }}>
                           {p.walletAddress.slice(0, 6)}...{p.walletAddress.slice(-4)}
                         </div>
                       )}
                     </div>
                     {p.referredBy && (
-                      <div style={{ fontSize: 9, color: theme.gold, padding: "1px 4px", background: `${theme.gold}15`, borderRadius: 2, marginRight: 4 }}>
+                      <div style={{ fontSize: 10, color: theme.gold, padding: "1px 4px", background: `${theme.gold}15`, borderRadius: 2, marginRight: 4 }}>
                         ref:{p.referredBy}
                       </div>
                     )}
@@ -1742,21 +1736,20 @@ export default function OilQualify({
           }}>
             RULES
           </div>
-          <ul style={{
-            margin: 0,
-            paddingLeft: 16,
-            fontSize: 11,
-            color: theme.text,
-            lineHeight: 1.8,
-          }}>
-            <li>Hold at least ${QUALIFICATION_THRESHOLD} USD worth of RL80 tokens and follow @rl80token on X to qualify. You never spend the tokens — holding is the ticket.</li>
-            <li>Balance snapshots verify holdings on-chain. You&apos;re only disqualified by <em>selling</em> below your entry position — a price dip never disqualifies you.</li>
-            <li>Fixed {GRID_SIZE}x{GRID_SIZE} grid ({GRID_SIZE * GRID_SIZE} plots). Pick your plot when you register. First come, first served.</li>
-            <li>Your rig drills automatically, 24/7 — no clicking. It strikes at random, unpredictable times, pacing through 10 base layers over the season. Refer friends for up to 10 bonus layers (max depth: 20) — deeper usually means richer.</li>
-            <li>Claim jumping: move to an unclaimed plot mid-season. First 2 jumps free, then each jump costs 1 bonus drill.</li>
-            <li>Referrals: share your referral link. When a new player qualifies and claims a plot, you earn +{REFERRAL_BONUS} bonus drills (capped at {MAX_BONUS_DRILLS}).</li>
-            <li>The map is seeded by a future Base block hash nobody can predict — not even us — and revealed for public verification when the season ends. ${prizePool} USDC prize pool.</li>
-          </ul>
+          <div style={{ fontSize: 11, color: theme.text, lineHeight: 1.6 }}>
+            The same rulebook the game uses: qualifying, how your rig drills, banking, hell pockets,
+            claim jumps, referrals — and how to verify the map yourself.
+          </div>
+          <button
+            onClick={() => setShowRules(true)}
+            style={{
+              marginTop: 12, padding: "9px 18px",
+              background: `${theme.gold}22`, border: `1px solid ${theme.gold}`, borderRadius: 3,
+              color: theme.gold, fontFamily: mono, fontSize: 11, letterSpacing: "0.15em", cursor: "pointer",
+            }}
+          >
+            FULL RULES &amp; FAIRNESS &rarr;
+          </button>
         </div>
 
         {/* RL80 Price Info */}
@@ -1772,13 +1765,13 @@ export default function OilQualify({
             WebkitBackdropFilter: "blur(24px) saturate(1.2)",
             color: "#e8dcc8",
           }}>
-            <div style={{ fontSize: 9, letterSpacing: "0.2em", color: theme.muted, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.2em", color: theme.muted, marginBottom: 4 }}>
               CURRENT RL80 PRICE
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: theme.gold }}>
               ${formatRl80Price(rl80Price)}
             </div>
-            <div style={{ fontSize: 9, color: theme.muted, marginTop: 2 }}>
+            <div style={{ fontSize: 10, color: theme.muted, marginTop: 2 }}>
               via Uniswap V2 on Base
             </div>
             <button
@@ -1867,7 +1860,7 @@ export default function OilQualify({
               )}
 
               {lastSnapshot && (
-                <div style={{ fontSize: 9, color: theme.muted, marginTop: 6 }}>
+                <div style={{ fontSize: 10, color: theme.muted, marginTop: 6 }}>
                   Last snapshot: {lastSnapshot.qualifiedCount}/{lastSnapshot.totalChecked} qualified
                   {lastSnapshot.timestamp?.toDate && (
                     <> — {lastSnapshot.timestamp.toDate().toLocaleString()}</>
@@ -1894,7 +1887,7 @@ export default function OilQualify({
                   onClick={() => saveGameSettings({ gameStartDate: new Date().toISOString().slice(0, 10) })}
                   style={{
                     padding: "6px 12px", border: `1px solid ${theme.border}`, borderRadius: 3,
-                    fontFamily: mono, fontSize: 9, cursor: "pointer", background: "rgba(160,48,48,0.15)",
+                    fontFamily: mono, fontSize: 10, cursor: "pointer", background: "rgba(160,48,48,0.15)",
                     color: theme.textStrong,
                   }}
                 >
@@ -1917,7 +1910,7 @@ export default function OilQualify({
                       border: `1px solid ${theme.border}`,
                       borderRadius: 3,
                       fontFamily: mono,
-                      fontSize: 9,
+                      fontSize: 10,
                       cursor: "pointer",
                       background: "transparent",
                       color: theme.muted,
@@ -1935,7 +1928,7 @@ export default function OilQualify({
         <div style={{
           textAlign: "center",
           padding: "24px 0 60px",
-          fontSize: 9,
+          fontSize: 10,
           letterSpacing: "0.15em",
           color: theme.muted,
         }}>
@@ -1968,6 +1961,8 @@ export default function OilQualify({
           icon: <img src="/brand-mark-mono.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
         }]}
       />}
+
+      <OilWelcomeModal isOpen={showRules} onClose={() => setShowRules(false)} darkMode numberOfDeposits={numberOfDeposits} totalOilBudget={prizePool} gridX={GRID_SIZE} gridY={GRID_SIZE} />
 
       {/* Buy Modal */}
       <BuyModal
