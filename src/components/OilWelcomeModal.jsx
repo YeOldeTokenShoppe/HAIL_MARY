@@ -33,6 +33,8 @@ export default function OilWelcomeModal({
   numberOfDeposits, totalOilBudget, gridX = 10, gridY = 10,
   // Open with the fairness explainer expanded and scrolled into view (seed row click).
   fairnessOpen = false,
+  // Daily-ticket verification (per player): the page's authenticated fetch + sign-in state.
+  apiFetch = null, signedIn = false,
 }) {
   // Close on Escape for keyboard users.
   useEffect(() => {
@@ -194,7 +196,7 @@ export default function OilWelcomeModal({
         {/* Provable fairness — kept here with the rules so the ? button is the
             one home for reference material (the side column stays live-only). */}
         <div id="fairness-explainer" style={{ padding: "0 4px 8px", scrollMarginTop: 12 }}>
-          <OilVerifyExplainer defaultExpanded={fairnessOpen} darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridX} gridY={gridY} />
+          <OilVerifyExplainer defaultExpanded={fairnessOpen} darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridX} gridY={gridY} apiFetch={apiFetch} signedIn={signedIn} />
         </div>
 
         {/* CTA */}

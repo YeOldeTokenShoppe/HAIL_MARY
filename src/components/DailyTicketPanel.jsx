@@ -3,33 +3,38 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PanelSection, PanelTitle, PANEL_ICONS } from "./HailMaryPanel";
 import ScratchReveal from "./ScratchReveal";
+import {
+  TICKET_CELLS as CELLS, TICKET_MATCH as MATCH, TICKET_STREAK_GUARANTEE as STREAK_GUARANTEE,
+  TICKET_PRIZES as PRIZES, hashStr, mintTicketCells, evaluateCells, ticketDayKey, msToNextTicketDay,
+} from "@/lib/oilTicket";
 
-// DAILY TICKET — a HAIL MARY PROSPECTING CO. scratch ticket, rendered in test
-// mode only. Nine silver circles in a 3×3; match three of one symbol and win
-// the prize on the legend — a win settles the moment the third one shows, a
-// loss only once every disc is scratched. No pick, no external event: a
-// pure instant-win, free entry, prizes paid in game terms (never dollars), so
-// it's a sweepstakes, not a wager. The outcome is decided when the ticket is
-// minted — here from a seeded PRNG over (date, claim, serial); the real
-// version swaps in the game's daily seed so the fairness explainer covers it.
-// Scratching only uncovers it.
+// DAILY TICKET — a HAIL MARY PROSPECTING CO. scratch ticket. Nine silver
+// circles in a 3×3; match three of one symbol and win the prize on the legend
+// — a win settles the moment the third one shows, a loss only once every disc
+// is scratched. No pick, no external event: a pure instant-win, free entry,
+// prizes paid in game terms (never dollars), so it's a sweepstakes, not a
+// wager. The rules (cells, prizes, odds, mint, evaluate) live in
+// src/lib/oilTicket.js, shared with the server.
+//
+// Two modes.
+//   live (the game): the ticket is minted and settled by the server —
+//     /api/oil-ticket-mint (one per UTC day, seeded from the season's committed
+//     secret) and /api/oil-ticket-settle (recomputes the outcome from the
+//     stored cells and applies the prize to the drill doc). The client only
+//     ever reports "scratched".
+//   test (?mode=test): minted locally from (date, claim, serial), with NEW
+//     TICKET and FORCE NEXT controls; prizes land via onSettle.
 //
 // Fanfare scales with the tier: every win pops the hit discs, flashes the
 // band, shows a headline and fires canvas-confetti from the ticket (a bigger
 // burst as the tier rises); the jackpot also rings the church bell and fires
-// the page's fireworks for a timed run (onJackpot). A loss gets a
-// NO MATCH stamp thudding onto the grid and the discs dim — kind, not mocking.
+// the page's fireworks for a timed run (onJackpot). A loss gets a NO MATCH
+// stamp thudding onto the grid and the discs dim — kind, not mocking.
 // Everything is still under prefers-reduced-motion; sound follows the page's
 // effects toggle (soundOn).
-//
-// Nothing here talks to the server: one ticket per "day" (a NEW TICKET in test
-// mode), the streak counts tickets settled, results aren't posted to Field
-// Activity yet.
 
 const MONO = "'Share Tech Mono', monospace";
 const DISPLAY = "'Bebas Neue', 'Share Tech Mono', sans-serif";
-const CELLS = 9;
-const MATCH = 3;
 
 // Relative luminance of a theme token (#rrggbb or rgb[a]()), for picking the
 // text colour that contrasts most with a band — white on dark bands, near-
@@ -61,7 +66,7 @@ function ticketPalette(t, dark) {
   };
 }
 
-// ── Symbols (24-grid line icons, game vocabulary) ──
+// ── Symbols (24-grid line icons, game vocabulary; ids match oilTicket.js) ──
 const SYMBOLS = {
   pickaxe: { name: "PICKAXE", icon: <><path d="M14.531 12.469 6.619 20.38a1 1 0 1 1-3-3l7.912-7.912" /><path d="M15.686 4.314A12.5 12.5 0 0 0 5.461 2.958 1 1 0 0 0 5.58 4.71a22 22 0 0 1 6.318 3.393" /><path d="M17.7 3.7a1 1 0 0 0-1.4 0l-4.6 4.6a1 1 0 0 0 0 1.4l2.6 2.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4z" /><path d="M19.686 8.314a12.501 12.501 0 0 1 1.356 10.225 1 1 0 0 1-1.751.119 22 22 0 0 0-3.393-6.319" /></> },
   derrick: { name: "DERRICK", icon: <><path d="M8 22 11 3h2l3 19" /><path d="M5 22h14" /><path d="M9.4 10h5.2" /><path d="M8.6 16h6.8" /><path d="M12 3V1" /></> },
@@ -70,18 +75,6 @@ const SYMBOLS = {
   barrel:  { name: "BARREL", icon: <><rect x="6" y="3" width="12" height="18" rx="3" /><path d="M6 9h12" /><path d="M6 15h12" /></> },
   dry:     { name: "DRY HOLE", icon: <><path d="M5 20h14" /><path d="M8 20V9" /><path d="M16 20V9" /><path d="M7 9h10" /><path d="M12 9v4" /></> },
 };
-
-// ── Prize table — the only numbers that matter ──
-// Probabilities are per ticket, checked top-down; what's left is a losing
-// ticket (≈57%). Three of the symbol wins the prize. The tier sets the
-// fanfare. Edit freely.
-const PRIZES = [
-  { sym: "gusher",  prize: "JACKPOT · 3 BONUS DRILLS + A SIDEQUEST", short: "JACKPOT",  p: 1 / 60, tier: "jackpot" },
-  { sym: "coin",    prize: "A STALL COUPON",                          short: "COUPON",   p: 1 / 24, tier: "medium" },
-  { sym: "derrick", prize: "A TONIC",                                 short: "TONIC",    p: 1 / 24, tier: "medium" },
-  { sym: "pickaxe", prize: "+1 BONUS DRILL",                          short: "+1 DRILL", p: 1 / 3,  tier: "small" },
-];
-const STREAK_GUARANTEE = 7; // every 7th ticket is at least a small win (the real version counts the streak at mint)
 const FRESH = Object.freeze(new Array(CELLS).fill(false));
 
 // ── Fanfare ──
@@ -123,45 +116,14 @@ const FX_CSS = `
 @keyframes hmTicketGlimmer { 0% { background-position: 120% 0 } 100% { background-position: -120% 0 } }
 `;
 
-// ── Seeded minting ──
-const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
-const mulberry32 = (a) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-const shuffle = (arr, rng) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
-
-// Draw the outcome first, then lay symbols consistent with it: a winning
-// ticket carries exactly three of the winning symbol and at most two of
-// anything else; a losing ticket at most two of everything. No engineered
-// near-misses — the fillers are random.
-// `forced` (test mode only) overrides the draw: a prize symbol, or "lose".
-function mintTicket(seedStr, guaranteeWin, forced = null) {
+// Test-mode mint: the shared rules over a label hash. `forced` is a prize
+// symbol or "lose".
+function mintLocal(seedStr, guaranteeWin, forced = null) {
   const seed = hashStr(seedStr);
-  const rng = mulberry32(seed);
-  const roll = rng();
-  let win = null, acc = 0;
-  for (const pz of PRIZES) { acc += pz.p; if (roll < acc) { win = pz; break; } }
-  if (!win && guaranteeWin) win = PRIZES[PRIZES.length - 1];
-  if (forced) win = forced === "lose" ? null : PRIZES.find((pz) => pz.sym === forced) || win;
-  const cells = new Array(CELLS).fill(null);
-  const counts = {};
-  if (win) {
-    const idx = shuffle([...Array(CELLS).keys()], rng);
-    for (let i = 0; i < MATCH; i++) cells[idx[i]] = win.sym;
-    counts[win.sym] = MATCH;
-  }
-  const all = Object.keys(SYMBOLS);
-  for (let i = 0; i < CELLS; i++) {
-    if (cells[i]) continue;
-    const pool = all.filter((s) => s !== win?.sym && (counts[s] || 0) < MATCH - 1);
-    const s = pool[Math.floor(rng() * pool.length)];
-    cells[i] = s; counts[s] = (counts[s] || 0) + 1;
-  }
+  const { cells, win } = mintTicketCells(seed, { guaranteeWin, forced });
   return { cells, win, seedHex: seed.toString(16).padStart(8, "0"), forced: !!forced };
 }
 
-// The ticket day is a UTC day, like the drill day; the next ticket arrives at
-// the next UTC midnight.
-const dateKey = () => { const d = new Date(); return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`; };
-const msToNextTicket = (now) => { const d = new Date(now); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1) - now; };
 const fmtCountdown = (ms) => { const m = Math.max(0, Math.ceil(ms / 60000)); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`; };
 
 function Icon({ path, size = 32, color }) {
@@ -174,32 +136,45 @@ function Icon({ path, size = 32, color }) {
 
 export default function DailyTicketPanel({
   theme, isMobile = false, darkMode = true, selectedX = null, selectedY = null, devControls = false,
+  live = false, apiFetch,   // live: mint/settle through the server with the page's authenticated fetch
   soundOn = true, onJackpot,
-  onSettle, // ({ ticketNo, win, sym, symName, tier, prize }) — the page records the prize and posts the feed line
+  onSettle, // ({ ticketNo, win, sym, symName, tier, prize }) — test mode: the page records the prize and posts the feed line
 }) {
   const t = theme;
   const K = useMemo(() => ticketPalette(t, darkMode), [t, darkMode]);
   const reduceMotion = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const hasPlot = selectedX !== null && selectedY !== null;
   const plotKey = hasPlot ? `${selectedX + 1}.${selectedY + 1}` : "field";
-  const day = dateKey();
+  const day = ticketDayKey();
 
+  // ── the ticket ──
   const [serial, setSerial] = useState(1);
   const [streak, setStreak] = useState(0);
+  const [history, setHistory] = useState([]); // settled tickets, newest first: { id, no, sym, tier }
   // Test mode can force the next ticket's outcome — a 1-in-60 jackpot is not
-  // something QA should wait for (today's field sequence had its first at
-  // serial 277). { serial, outcome } so the force applies to exactly one ticket.
+  // something QA should wait for. { serial, outcome } applies to exactly one ticket.
   const [forced, setForced] = useState(null);
-  // The guarantee is fixed at mint (every Nth ticket), never re-derived from
-  // the live streak — a ticket must not re-mint itself after it settles.
-  const ticketId = `${day}-${plotKey}-${serial}`;
-  const forcedOutcome = forced && forced.serial === serial ? forced.outcome : null;
-  const ticket = useMemo(() => mintTicket(ticketId, serial % STREAK_GUARANTEE === 0, forcedOutcome), [ticketId, serial, forcedOutcome]);
-  const ticketNo = `${day.slice(4)}-${String(serial).padStart(2, "0")}`;
+  // Live: the server's ticket for today, or why there isn't one.
+  const [remote, setRemote] = useState(null);
+  const [remoteError, setRemoteError] = useState(null);
+  const [countedId, setCountedId] = useState(null);
+
+  const ticketId = live ? `live-${day}` : `${day}-${plotKey}-${serial}`;
+  const forcedOutcome = !live && forced && forced.serial === serial ? forced.outcome : null;
+  const ticket = useMemo(() => {
+    if (live) {
+      if (!remote) return null;
+      // The cells carry the outcome; the server confirms it at settle.
+      return { cells: remote.cells, win: evaluateCells(remote.cells).win, seedHex: String(remote.seedHash || "").slice(0, 8), forced: false };
+    }
+    // The guarantee is fixed at mint (every Nth ticket in test mode), never
+    // re-derived from the live streak — a ticket must not re-mint itself.
+    return mintLocal(ticketId, serial % STREAK_GUARANTEE === 0, forcedOutcome);
+  }, [live, remote, ticketId, serial, forcedOutcome]);
+  const ticketNo = `${day.slice(4)}-${String(live ? 1 : serial).padStart(2, "0")}`;
 
   // Scratch state is keyed to the ticket, so a fresh ticket is unscratched in
-  // the same render it appears (an effect-based reset was one frame late and
-  // briefly scored the new ticket against the old discs).
+  // the same render it appears.
   const [scratch, setScratch] = useState({ id: ticketId, cells: FRESH });
   const revealed = scratch.id === ticketId ? scratch.cells : FRESH;
   const markRevealed = (i) => setScratch((s) => { const cells = s.id === ticketId ? s.cells : FRESH; return cells[i] ? s : { id: ticketId, cells: cells.map((v, k) => (k === i ? true : v)) }; });
@@ -207,20 +182,40 @@ export default function DailyTicketPanel({
   const newTicket = () => setSerial((s) => s + 1);
   const forceTicket = (outcome) => { setForced({ serial: serial + 1, outcome }); setSerial((s) => s + 1); };
 
+  // Live: mint (or fetch) today's ticket on mount. A ticket already settled
+  // today comes back scratched, with no fanfare — it's a replay.
+  useEffect(() => {
+    if (!live || !apiFetch) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/oil-ticket-mint", { method: "POST" });
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) { setRemoteError(json.error || `ticket unavailable (${res.status})`); return; }
+        const id = `live-${json.day}`;
+        setRemote(json);
+        setStreak(json.streak || 0);
+        setHistory((json.recent || []).map((r) => ({ id: `live-${r.day}`, no: `${String(r.day).slice(4)}-01`, sym: r.sym || null, tier: r.tier || null })));
+        if (json.status === "settled") { setCountedId(id); setScratch({ id, cells: new Array(CELLS).fill(true) }); }
+      } catch (e) {
+        if (!cancelled) setRemoteError("couldn't reach the ticket booth");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [live, apiFetch]);
+
   const count = revealed.filter(Boolean).length;
   const complete = count === CELLS;
-  const winSym = ticket.win?.sym;
+  const winSym = ticket?.win?.sym || null;
   // A win settles the moment the third matching symbol shows; a losing ticket
   // is only known once every disc is scratched.
-  const won = !!winSym && ticket.cells.filter((s, i) => revealed[i] && s === winSym).length >= MATCH;
-  const lost = complete && !won;
-  const settled = won || complete;
+  const won = !!ticket && !!winSym && ticket.cells.filter((s, i) => revealed[i] && s === winSym).length >= MATCH;
+  const lost = !!ticket && complete && !won;
+  const settled = !!ticket && (won || complete);
 
-  // ── settle: streak, fanfare, sound, fireworks ──
-  const [countedId, setCountedId] = useState(null);
+  // ── settle: streak, ledger, server, fanfare, sound, fireworks ──
   const [fx, setFx] = useState(null); // { id, kind: "small" | "medium" | "jackpot" | "lose" }
-  // The ledger: settled tickets, newest first (the real version reads tickets/{date}).
-  const [history, setHistory] = useState([]);
   const ticketRef = useRef(null);
   const confettiTimer = useRef(null);
   useEffect(() => {
@@ -229,11 +224,19 @@ export default function DailyTicketPanel({
     setStreak((s) => s + 1);
     const kind = won ? ticket.win.tier : "lose";
     setFx({ id: ticketId, kind });
-    setHistory((h) => [{ id: ticketId, no: ticketNo, sym: won ? winSym : null, tier: won ? ticket.win.tier : null }, ...h].slice(0, 30));
+    setHistory((h) => [{ id: ticketId, no: ticketNo, sym: won ? winSym : null, tier: won ? ticket.win.tier : null }, ...h.filter((x) => x.id !== ticketId)].slice(0, 30));
     onSettle?.({ ticketNo, win: won, sym: won ? winSym : null, symName: won ? SYMBOLS[winSym].name : null, tier: won ? ticket.win.tier : null, prize: won ? ticket.win.prize : null });
+    if (live && apiFetch) {
+      // The server recomputes the outcome from the stored cells and applies
+      // the prize; the streak it returns is the one that counts.
+      apiFetch("/api/oil-ticket-settle", { method: "POST", body: JSON.stringify({ day }) })
+        .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+        .then(({ ok, j }) => { if (ok && typeof j.streak === "number") setStreak(j.streak); else if (!ok) console.warn("[daily ticket] settle:", j.error); })
+        .catch((e) => console.warn("[daily ticket] settle failed:", e.message));
+    }
     if (soundOn) { try { const a = new Audio(SFX[kind]); a.volume = kind === "lose" ? 0.5 : 0.65; a.play().catch(() => {}); } catch { /* no audio */ } }
     if (kind !== "lose") {
-      // The headline and the pop land first; the confetti follows two seconds
+      // The headline and the pop land first; the confetti follows a beat
       // after the reveal, measured from wherever the ticket is by then.
       clearTimeout(confettiTimer.current);
       confettiTimer.current = setTimeout(() => {
@@ -242,7 +245,7 @@ export default function DailyTicketPanel({
       }, CONFETTI_DELAY_MS);
     }
     if (kind === "jackpot") onJackpot?.();
-  }, [settled, countedId, ticketId, ticketNo, won, winSym, ticket, soundOn, onJackpot, onSettle]);
+  }, [settled, countedId, ticketId, ticketNo, day, won, winSym, ticket, live, apiFetch, soundOn, onJackpot, onSettle]);
   useEffect(() => () => clearTimeout(confettiTimer.current), []);
   const fxLive = fx && fx.id === ticketId ? fx : null;
 
@@ -255,7 +258,7 @@ export default function DailyTicketPanel({
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(id); }, []);
-  const nextIn = fmtCountdown(msToNextTicket(now));
+  const nextIn = fmtCountdown(msToNextTicketDay(now));
   const muted = t.muted, gold = t.gold;
   const link = { background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", color: muted, textDecoration: "underline" };
   const chip = (
@@ -267,27 +270,31 @@ export default function DailyTicketPanel({
     </span>
   );
   const onGold = onColor(gold);
-  const ticketBar = !settled
+  const barBase = { display: "flex", alignItems: "center", width: "100%", minHeight: 28, borderRadius: 3, fontFamily: MONO, textTransform: "uppercase", padding: "0 9px", gap: 8 };
+  const ticketBar = !ticket
     ? (
-      <button onClick={() => setOpen(true)} style={{
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", minHeight: 30, cursor: "pointer",
-        border: `1px solid ${t.goldBorder}`, borderRadius: 3, color: onGold, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase",
-        background: `linear-gradient(110deg, ${gold} 0%, ${gold} 38%, #fff3c4 50%, ${gold} 62%, ${gold} 100%)`, backgroundSize: "260% 100%",
-        boxShadow: `0 0 10px ${gold}55, inset 0 1px 0 rgba(255,255,255,0.35)`,
-        animation: reduceMotion ? "none" : "hmTicketGlimmer 2.6s ease-in-out infinite",
-      }}>
-        <span>✦</span><span>Scratch today&apos;s ticket</span><span>▸</span>
-      </button>
+      <div style={{ ...barBase, justifyContent: "center", border: `1px solid ${t.border}`, background: t.btnBg, color: remoteError ? K.lose : muted, fontSize: 9, letterSpacing: "0.12em" }}>
+        {remoteError ? remoteError : "Minting today's ticket…"}
+      </div>
     )
-    : (
-      <button onClick={() => setOpen(true)} style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%", minHeight: 28, cursor: "pointer", padding: "0 9px",
-        border: `1px solid ${t.border}`, borderRadius: 3, background: t.btnBg, color: muted, fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", textTransform: "uppercase",
-      }}>
-        <span style={{ color: won ? K.win : muted, fontWeight: 700, whiteSpace: "nowrap" }}>{won ? `✓ ${ticket.win.short}` : "— No match"}</span>
-        <span style={{ whiteSpace: "nowrap" }}>Next ticket in {nextIn}</span>
-      </button>
-    );
+    : !settled
+      ? (
+        <button onClick={() => setOpen(true)} style={{
+          ...barBase, justifyContent: "center", minHeight: 30, cursor: "pointer",
+          border: `1px solid ${t.goldBorder}`, color: onGold, fontSize: 10, fontWeight: 700, letterSpacing: "0.18em",
+          background: `linear-gradient(110deg, ${gold} 0%, ${gold} 38%, #fff3c4 50%, ${gold} 62%, ${gold} 100%)`, backgroundSize: "260% 100%",
+          boxShadow: `0 0 10px ${gold}55, inset 0 1px 0 rgba(255,255,255,0.35)`,
+          animation: reduceMotion ? "none" : "hmTicketGlimmer 2.6s ease-in-out infinite",
+        }}>
+          <span>✦</span><span>Scratch today&apos;s ticket</span><span>▸</span>
+        </button>
+      )
+      : (
+        <button onClick={() => setOpen(true)} style={{ ...barBase, justifyContent: "space-between", cursor: "pointer", border: `1px solid ${t.border}`, background: t.btnBg, color: muted, fontSize: 9, letterSpacing: "0.12em" }}>
+          <span style={{ color: won ? K.win : muted, fontWeight: 700, whiteSpace: "nowrap" }}>{won ? `✓ ${ticket.win.short}` : "— No match"}</span>
+          <span style={{ whiteSpace: "nowrap" }}>Next ticket in {nextIn}</span>
+        </button>
+      );
   const band = (text, kind) => (
     <div style={{
       background: kind === "win" ? K.win : K.band, color: kind === "win" ? K.onWin : K.bandText,
@@ -300,6 +307,11 @@ export default function DailyTicketPanel({
   const resultColor = won ? K.win : lost ? K.lose : K.ink;
   const headline = fxLive && fxLive.kind !== "lose" && !reduceMotion
     ? (fxLive.kind === "jackpot" ? "JACKPOT!" : "MATCH 3!") : null;
+  // Tickets until the guaranteed one: from the streak at mint in live mode,
+  // from the serial in test mode.
+  const until = live
+    ? (STREAK_GUARANTEE - ((remote?.streakAtMint || 0) + 1) % STREAK_GUARANTEE) % STREAK_GUARANTEE
+    : (STREAK_GUARANTEE - (serial % STREAK_GUARANTEE)) % STREAK_GUARANTEE;
 
   return (
     <PanelSection theme={t} isMobile={isMobile}>
@@ -307,7 +319,8 @@ export default function DailyTicketPanel({
       <PanelTitle theme={t} isMobile={isMobile} icon={PANEL_ICONS.call} right={chip} onToggle={() => setOpen((o) => !o)} open={open}>DAILY TICKET</PanelTitle>
 
       {!open && <div style={{ marginTop: 8 }}>{ticketBar}</div>}
-      {open && (<>
+      {open && !ticket && <div style={{ marginTop: 8 }}>{ticketBar}</div>}
+      {open && ticket && (<>
       <div ref={ticketRef} style={{ position: "relative", border: `2px solid ${K.frame}`, borderRadius: 6, background: K.ground, overflow: "hidden", boxShadow: darkMode ? "0 2px 8px rgba(0,0,0,0.45)" : "inset 0 0 0 1px rgba(255,255,255,0.25), 0 2px 6px rgba(0,0,0,0.2)" }}>
         {/* header — one line, in the theme's band colour */}
         <div title="Luck is a strategy." style={{ background: K.headBg, color: K.headText, borderBottom: `2px solid ${K.frame}`, padding: "5px 10px 4px", display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8, textAlign: "center" }}>
@@ -372,9 +385,7 @@ export default function DailyTicketPanel({
               }}>{headline}</div>
             )}
             {lost && (
-              <div aria-hidden="true" style={{
-                position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none",
-              }}>
+              <div aria-hidden="true" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
                 <div style={{
                   fontFamily: DISPLAY, fontSize: 34, lineHeight: 1, letterSpacing: "0.14em", color: K.lose,
                   border: `3px solid ${K.lose}`, borderRadius: 4, padding: "4px 10px 2px 14px", background: `${K.ground}`,
@@ -396,7 +407,6 @@ export default function DailyTicketPanel({
           {(() => {
             const recent = history.slice(0, STREAK_GUARANTEE).reverse();
             const stubs = [...Array(STREAK_GUARANTEE - recent.length).fill(null), ...recent];
-            const until = (STREAK_GUARANTEE - (serial % STREAK_GUARANTEE)) % STREAK_GUARANTEE;
             return (
               <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px dotted ${K.rule}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
@@ -429,7 +439,6 @@ export default function DailyTicketPanel({
             No purchase necessary · one free ticket a day · prizes paid in-game
           </div>
         </div>
-
       </div>
 
       {/* ── state line + dev controls ── */}

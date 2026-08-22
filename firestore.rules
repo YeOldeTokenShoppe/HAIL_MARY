@@ -295,6 +295,13 @@
       match /oilDrills/{docId} {
         allow read: if true;
         allow write: if false;
+        // DAILY TICKET docs (one per UTC day). Server-only: the API routes mint
+        // and settle them with the admin SDK and hand the player their own
+        // cells; nobody reads another player's unscratched ticket.
+        match /tickets/{day} {
+          allow read: if false;
+          allow write: if false;
+        }
       }
 
       // Oil Game settings — public read, server-only write via Admin SDK.

@@ -54,6 +54,13 @@ const TECH_STEPS = [
   },
 ];
 
+// The DAILY TICKET rides the same commitment: each ticket's seed is an HMAC of
+// the sealed secret over (player, day), and the ticket is stamped with the
+// seed's SHA-256 fingerprint the moment it's minted. When the secret is
+// revealed, every ticket a player ever scratched can be rebuilt and checked.
+const TICKET_PLAIN = "Your daily scratch ticket is sealed the same way. Each ticket gets a fingerprint the moment it's minted, derived from the same locked-in secret and your player id and the day — so the house can't pick who wins, and can't change a ticket after you've seen it. When the game ends and the secret is revealed, every ticket you scratched can be rebuilt and checked, disc by disc.";
+const TICKET_TECH = "ticketSeed = HMAC-SHA256(secret, userId:YYYYMMDD). The ticket stores SHA-256(ticketSeed) at mint. After the reveal: recompute the seed, confirm its hash matches the fingerprint, regenerate the nine cells with the open-source mint (src/lib/oilTicket.js) and confirm they match what you scratched, and confirm the recorded result matches the cells.";
+
 export default function OilVerifyExplainer({
   isMobile,
   darkMode = false,
@@ -61,6 +68,10 @@ export default function OilVerifyExplainer({
   gridX = 10,
   gridY = 10,
   defaultExpanded = false,
+  // Daily-ticket verification is per player: the page's authenticated fetch,
+  // and whether anyone is signed in to have tickets at all.
+  apiFetch = null,
+  signedIn = false,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [showTech, setShowTech] = useState(false);      // technical "how it works"
@@ -69,6 +80,23 @@ export default function OilVerifyExplainer({
   const [error, setError] = useState(null);
   const [report, setReport] = useState(null); // { phase, verdict, checks, published, claimTotals? }
   const [selectedCell, setSelectedCell] = useState(null);
+  const [ticketStatus, setTicketStatus] = useState("idle"); // idle | loading | done | error
+  const [ticketReport, setTicketReport] = useState(null);
+  const [ticketError, setTicketError] = useState(null);
+
+  // Check the player's own tickets against the (sealed or revealed) secret.
+  const handleVerifyTickets = useCallback(async () => {
+    if (!apiFetch) return;
+    try {
+      setTicketStatus("loading"); setTicketError(null);
+      const res = await apiFetch("/api/oil-ticket-verify", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "verify failed");
+      setTicketReport(data); setTicketStatus("done");
+    } catch (e) {
+      setTicketError(e.message || "verify failed"); setTicketStatus("error");
+    }
+  }, [apiFetch]);
 
   const c = darkMode
     ? {
@@ -406,6 +434,67 @@ export default function OilVerifyExplainer({
               </div>
             </>
           )}
+
+          {/* ── DAILY TICKET — the same commitment, per player, per day ── */}
+          <div style={{ marginTop: 14, paddingTop: 10, borderTop: `1px dashed ${c.sectionBorder}` }}>
+            <div style={{ fontFamily: mono, fontSize: 10, fontWeight: 600, color: c.text, letterSpacing: "0.12em", marginBottom: 4, textTransform: "uppercase" }}>
+              Your daily ticket
+            </div>
+            <div style={{ fontFamily: mono, fontSize: 10, color: c.muted, lineHeight: 1.45, letterSpacing: "0.02em", marginBottom: 8 }}>
+              {showTech ? TICKET_TECH : TICKET_PLAIN}
+            </div>
+            {signedIn && apiFetch ? (
+              <button
+                onClick={handleVerifyTickets}
+                disabled={ticketStatus === "loading"}
+                style={{
+                  width: "100%", padding: "8px 10px", cursor: ticketStatus === "loading" ? "wait" : "pointer",
+                  background: "none", border: `1px solid ${c.accent}`, borderRadius: 2,
+                  color: c.accent, fontFamily: mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase",
+                }}
+              >
+                {ticketStatus === "loading" ? "CHECKING…" : "VERIFY MY TICKETS"}
+              </button>
+            ) : (
+              <div style={{ fontFamily: mono, fontSize: 9, color: c.muted, letterSpacing: "0.06em" }}>Sign in to check your own tickets.</div>
+            )}
+            {ticketStatus === "error" && (
+              <div style={{ marginTop: 6, fontFamily: mono, fontSize: 9, color: c.bad }}>{ticketError}</div>
+            )}
+            {ticketReport && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4,
+                  color: ticketReport.verdict === "VERIFIED" ? c.ok : ticketReport.verdict === "FAILED" ? c.bad : c.pending }}>
+                  {ticketReport.verdict === "VERIFIED" ? `✓ ${ticketReport.summary.ok} of ${ticketReport.summary.checked} tickets check out`
+                    : ticketReport.verdict === "FAILED" ? `⚠ ${ticketReport.summary.mismatches} of ${ticketReport.summary.checked} tickets don't match`
+                      : ticketReport.tickets.length ? `🔒 ${ticketReport.tickets.length} ticket${ticketReport.tickets.length === 1 ? "" : "s"} sealed — fingerprints below, full check when the game ends`
+                        : "• No tickets yet"}
+                </div>
+                {ticketReport.tickets.length > 0 && (
+                  <div style={{ background: c.infoBg, border: `1px solid ${c.infoBorder}`, padding: 8, maxHeight: 160, overflowY: "auto" }}>
+                    {ticketReport.tickets.map((t) => (
+                      <div key={t.day} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 9, marginBottom: 3, fontFamily: mono }}>
+                        <span style={{ color: c.infoKey, letterSpacing: "0.08em", flexShrink: 0 }}>
+                          {t.day.slice(4, 6)}/{t.day.slice(6, 8)}{t.status === "settled" ? (t.win ? ` · ${t.win}` : " · no match") : " · open"}
+                        </span>
+                        <span style={{ color: t.checks ? (t.ok ? c.ok : c.bad) : c.hashVal, fontSize: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "58%", textAlign: "right", fontWeight: t.checks ? 700 : 400 }}>
+                          {t.checks ? (t.ok ? "✓ rebuilt & matches" : `✗ ${["fingerprint", "cells", "result"].filter((k) => !t.checks[k]).join(", ")}`) : t.seedHash}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {ticketReport.recipe && showTech && (
+                  <div style={{ marginTop: 6, fontFamily: mono, fontSize: 8, color: c.noteText, lineHeight: 1.5, letterSpacing: "0.02em" }}>
+                    <div>seed = {ticketReport.recipe.seed}</div>
+                    <div>check: {ticketReport.recipe.fingerprint}</div>
+                    <div>cells = {ticketReport.recipe.cells}</div>
+                    <div>your id: {ticketReport.recipe.userId}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

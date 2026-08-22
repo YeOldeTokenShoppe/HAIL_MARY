@@ -7296,9 +7296,9 @@ export default function OilPage() {
             darkMode={uiDark}
             isMobile
           />
-          {/* DAILY TICKET — scratch-off prototype (test mode only), after the rig's own cards. */}
-          {isTest && (
-            <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+          {/* DAILY TICKET — one free scratch ticket a day (server-minted for players with a claim; local + dev controls in test mode), after the rig's own cards. */}
+          {(isTest || (user && userDrill)) && (
+            <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
           )}
           {timelineSection}
           {leaderboardSection}
@@ -7390,7 +7390,7 @@ export default function OilPage() {
           onClose={() => setShowBuyModal(false)}
         />
 
-        <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+        <OilWelcomeModal apiFetch={oilApiFetch} signedIn={!!user} isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
         {/* SitePal host for the commercial-strip vendors (mobile branch —
             the desktop branch mounts its own; the embed itself is guarded
@@ -7836,9 +7836,9 @@ export default function OilPage() {
               artifactFinds={userDrill?.artifactFinds || 0}
               darkMode={uiDark}
             />
-            {/* DAILY TICKET — scratch-off prototype (test mode only), after the rig's own cards. */}
-            {isTest && (
-              <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+            {/* DAILY TICKET — one free scratch ticket a day (server-minted for players with a claim; local + dev controls in test mode), after the rig's own cards. */}
+            {(isTest || (user && userDrill)) && (
+              <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
             )}
             {timelineSection}
             {leaderboardSection}
@@ -7943,7 +7943,7 @@ export default function OilPage() {
         onClose={() => setShowBuyModal(false)}
       />
 
-      <OilWelcomeModal isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
+      <OilWelcomeModal apiFetch={oilApiFetch} signedIn={!!user} isOpen={showWelcome} onClose={closeWelcome} darkMode={uiDark} fairnessOpen={helpFairness} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} />
 
       {/* SitePal host for the commercial-strip vendors. Mounted on mobile
           too: only one vendor speaks at a time, and without the host mobile
