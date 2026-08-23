@@ -5501,27 +5501,32 @@ export default function OilPage() {
   // null (undecided) falls back on plot ownership.
   if ((gamePhase === "ticket_sale" || lobbyForce) && !previewMode && (lobbyView ?? !userHasPlot)) {
     return (
-      <OilQualify
-        theme={theme}
-        darkMode={uiDark}
-        isMobile={isMobile}
-        user={user}
-        isAdmin={isAdmin && adminAuthed}
-        adminPassword={adminPassword}
-        saveGameSettings={saveGameSettings}
-        walletAddress={walletAddress}
-        tokenBalance={tokenBalance}
-        isWalletConnected={isWalletConnected}
-        storedRef={typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null}
-        gridSize={gridSize}
-        prizePool={totalOilBudget}
-        numberOfDeposits={numberOfDeposits}
-        gameStartDate={gameStartDate}
-        onEnterField={() => setLobbyView(false)}
-        seedCommitment={seedCommitment}
-        anchorBlock={anchorBlock}
-        anchorBlockHash={anchorBlockHash}
-      />
+      // The lobby sits outside the main layout, so it gets the UI-scale zoom
+      // here (desktop only — mobile is authored for the phone). Its fixed
+      // noise background counter-zooms itself to stay full-bleed and crisp.
+      <div style={{ zoom: isMobile ? 1 : uiScale }}>
+        <OilQualify
+          theme={theme}
+          darkMode={uiDark}
+          isMobile={isMobile}
+          user={user}
+          isAdmin={isAdmin && adminAuthed}
+          adminPassword={adminPassword}
+          saveGameSettings={saveGameSettings}
+          walletAddress={walletAddress}
+          tokenBalance={tokenBalance}
+          isWalletConnected={isWalletConnected}
+          storedRef={typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null}
+          gridSize={gridSize}
+          prizePool={totalOilBudget}
+          numberOfDeposits={numberOfDeposits}
+          gameStartDate={gameStartDate}
+          onEnterField={() => setLobbyView(false)}
+          seedCommitment={seedCommitment}
+          anchorBlock={anchorBlock}
+          anchorBlockHash={anchorBlockHash}
+        />
+      </div>
     );
   }
 

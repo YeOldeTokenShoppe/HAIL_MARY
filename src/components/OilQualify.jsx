@@ -439,17 +439,22 @@ export default function OilQualify({
       {/* Ambient noise background — fully opaque, premixes gold noise onto
           theme.bg in the shader so it IS the page background. Sits at z:1.
           Page content below is wrapped in a z:2 layer so it stacks above. */}
-      <NoiseBackground
-        bgColor={[0.10, 0.05, 0.14]} // deep midnight plum — darker than theme.bg
-        palette={[
-          [0.20, 0.06, 0.40], // dark indigo violet
-          [0.55, 0.15, 0.50], // dusty fuchsia
-          [0.65, 0.40, 0.35], // muted terracotta
-        ]}
-        mix={0.55}
-        speed={0.00003}
-        scale={3}
-      />
+      {/* The lobby is zoomed by the page's UI scale (desktop); the fixed,
+          full-viewport noise canvas counter-zooms so it stays full-bleed at
+          native resolution instead of scaling up and cropping. */}
+      <div style={{ zoom: "calc(1 / var(--hm-ui-scale, 1))" }}>
+        <NoiseBackground
+          bgColor={[0.10, 0.05, 0.14]} // deep midnight plum — darker than theme.bg
+          palette={[
+            [0.20, 0.06, 0.40], // dark indigo violet
+            [0.55, 0.15, 0.50], // dusty fuchsia
+            [0.65, 0.40, 0.35], // muted terracotta
+          ]}
+          mix={0.55}
+          speed={0.00003}
+          scale={3}
+        />
+      </div>
       <div style={{ position: "relative", zIndex: 2 }}>
 
       {/* Nav Controls (desktop only — mobile uses MobileBottomNav) */}
