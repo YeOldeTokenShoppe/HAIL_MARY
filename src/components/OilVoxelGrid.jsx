@@ -6484,6 +6484,21 @@ const getCloserStyle = {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
+// Click bare ground to fly the camera there. Same reason the boardwalk got this
+// treatment: OrbitControls' dolly is TARGET-relative — it only slides the camera
+// along the line to controls.target — so zooming can never take you somewhere
+// new. Only the focus rig moves camera AND target together.
+//
+// GROUND_CLICK_DRAG_PX is not a nicety, it is what makes this usable. R3F hands
+// handlers an `e.delta` (pixels travelled since pointerdown) but does NOT
+// suppress clicks after a drag for objects that were HIT — its internal
+// `delta <= 2` check only guards the pointer-MISSED path. The ground is the
+// largest target in the scene, so very nearly every orbit drag finishes on it;
+// without this guard, rotating the view would fling the camera across the field.
+const GROUND_CLICK_DRAG_PX = 4;
+const GROUND_VIEW_DIST = 1.4;   // world units back from the clicked point
+const GROUND_VIEW_RAISE = 0.3;  // lift the look-at off the dirt a touch
+
 export default function OilVoxelGrid({
   blockHash = "0x8a3f7b2c91d4e6f5a0b3c8d7e2f1a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0",
   gridX = 10,
@@ -6687,6 +6702,22 @@ export default function OilVoxelGrid({
     if (revealRef.current >= 1) animatingRef.current = false;
   });
 
+  // Navigation only, deliberately: clicking a RIG already selects that plot
+  // (onSelectCell) and flies to it, whereas this touches no game state at all.
+  // Chasing a wandering demon across the field should not keep re-picking your
+  // plot or swapping the cross-section panel out from under you.
+  const handleGroundClick = useCallback((e) => {
+    if (e.delta > GROUND_CLICK_DRAG_PX) return;   // it was a drag, not a click
+    e.stopPropagation();
+    if (!onFocusObject || !e.point) return;
+    const look = new THREE.Vector3(e.point.x, e.point.y + GROUND_VIEW_RAISE, e.point.z);
+    // No normal on purpose. CameraFlyTo swings to a canonical head-on angle when
+    // given one, which is right for a vendor's face and wrong for open dirt —
+    // with the normal omitted it dollies in along the CURRENT view direction, so
+    // the click moves you without changing which way you are facing.
+    onFocusObject(look, null, GROUND_VIEW_DIST);
+  }, [onFocusObject]);
+
   return (
     <group>
       {/* Atmospheric distance fog (per-environment) — depth + softer horizon */}
@@ -6754,7 +6785,7 @@ export default function OilVoxelGrid({
 
       {/* Opaque ground block — hidden once reveal starts */}
       {!animateReveal && revealProgress === 0 && (
-        <mesh position={[0, -worldH / 2, 0]} material={groundMaterials}>
+        <mesh position={[0, -worldH / 2, 0]} material={groundMaterials} onClick={handleGroundClick}>
           <boxGeometry args={[worldW, worldH, worldD]} />
         </mesh>
       )}

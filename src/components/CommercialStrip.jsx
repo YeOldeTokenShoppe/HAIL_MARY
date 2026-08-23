@@ -780,6 +780,26 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
 const DECK_DEPTH = 1.2;   // boardwalk depth (cellSize units), off the mesa edge
 const DECK_MARGIN = 0.2;  // deck overhang past the mesa's side walls
 const DECK_OVERLAP = 0.02;  // how far the deck's inner edge bites into the mesa wall
+// Clicking the boardwalk itself flies the camera to whatever stretch you
+// clicked. This exists because OrbitControls' dolly is TARGET-relative: it
+// slides the camera along the line to controls.target and nothing more, so with
+// the target parked over the middle of the field no amount of zooming ever
+// reaches the strip on the far −Z edge. Panning the target there works but is
+// undiscoverable. Handing the existing focus rig a point is the cheap fix — it
+// moves camera AND target together, which is the thing zoom cannot do.
+//
+// Framing numbers are in WORLD units, not strip-local, because the focus rig
+// lives outside the auto-fitted group. For scale: a stall is only ~0.49 world
+// units tall at the current fit, so these are small numbers by design.
+// At fov 50 this frames roughly half the strip's length (~5 world units of the
+// 10.4 the deck spans) and about six stall-heights vertically — wide enough to
+// read as "the area you clicked" rather than a single booth, close enough that
+// picking a character out of it is an easy second click. Raise it to see more
+// of the strip, lower it to land tighter on one stall.
+const STRIP_VIEW_DIST = 3.0;   // how far back the camera sits from the hit point
+const STRIP_VIEW_RAISE = 0.35; // lift the LOOK-AT off the deck to awning height
+const STRIP_VIEW_LIFT = 0.45;  // +Y on the approach vector → looking slightly down
+const STRIP_CLICK_DRAG_PX = 4; // beyond this the pointer was orbiting, not clicking
 const STRUT_COUNT = 4;      // knee braces spaced along the deck's length
 const STRUT_END_INSET = 0.6; // gap from the deck's ends to the outermost brace
 const STRUT_DROP = 1.15;    // how far a brace falls down the mesa face (cellSize units)
@@ -1706,6 +1726,29 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     return planes;
   }, [deckLocal, fit]);
 
+  // Fly to the stretch of boardwalk that was clicked, rather than to one fixed
+  // "the strip" pose — clicking near the tattoo booth should land you at the
+  // tattoo booth. Characters never reach this: VendorStall stops propagation,
+  // and its stalls are siblings of the wrapper below anyway.
+  const handleStripClick = (e) => {
+    // R3F does not suppress clicks after a drag for objects that were HIT (its
+    // internal delta<=2 check only guards the pointer-MISSED path), and the deck
+    // is a wide target, so an orbit drag that happens to finish over it would
+    // otherwise fly the camera. e.delta is pixels travelled since pointerdown.
+    if (e.delta > STRIP_CLICK_DRAG_PX) return;
+    // Without this the same ray keeps going and also lands on the grid/ground
+    // handlers behind the strip, which would fly there instead / as well.
+    e.stopPropagation();
+    if (!onFocusObject || !e.point) return;
+    // Approach from the field side. +Z is the same direction the vendors use
+    // (approachDirWorld resolves their default to exactly (0,0,1)), so a strip
+    // click and a character click fly in from the same side and the second
+    // click after the first never has to swing the camera around.
+    const look = new THREE.Vector3(e.point.x, e.point.y + STRIP_VIEW_RAISE, e.point.z);
+    const normal = new THREE.Vector3(0, STRIP_VIEW_LIFT, 1).normalize();
+    onFocusObject(look, normal, STRIP_VIEW_DIST);
+  };
+
   return (
     <>
       {/* diagonal knee braces: foot embedded in the mesa wall, head meeting the
@@ -1717,6 +1760,13 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           (DECK_DEPTH = 1.2 cells), so its foot stopped a cell short and hung in
           the air against a 10-cell mesa wall; raking it steeper lets STRUT_DROP
           be set independently of the deck's depth. */}
+      {/* Braces get the same click as the deck — they are part of the structure,
+          and from a low angle they are most of what is actually hit. */}
+      <group
+        onClick={handleStripClick}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = "auto"; }}
+      >
       {Array.from({ length: STRUT_COUNT }, (_, i) => {
         // Spread end-to-end rather than in even cells. Cell-centring parked the
         // outermost brace a full half-cell in from each end, leaving DECK_MARGIN's
@@ -1743,6 +1793,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           </mesh>
         );
       })}
+      </group>
       {/* One shared transform for the strip AND every character: the character
           GLBs are exported in the strip's coordinate space, so they must ride
           the identical scale/rotation or they drift off their props. */}
@@ -1755,7 +1806,18 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           other material-only effects. */}
       <StringLights stripScene={stripScene} envPreset={envPreset} />
       <group position={fit.position} rotation={[0, STRIP_ROT_Y, 0]} scale={fit.scale}>
-        <primitive object={stripScene} />
+        {/* Only the strip GLB is wrapped, deliberately. The vendor stalls and
+            BulbRig's beam/pool cones are SIBLINGS of this group, so neither
+            routes through this handler: a character keeps its own click, and
+            the additive light shafts (big invisible-ish cones hanging in the
+            air) never become click targets. */}
+        <group
+          onClick={handleStripClick}
+          onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+          onPointerOut={() => { document.body.style.cursor = "auto"; }}
+        >
+          <primitive object={stripScene} />
+        </group>
         {/* Inside the group: halo positions are strip-local, and the constant
             pixel size is immune to the scale. */}
         <BulbRig stripScene={stripScene} envPreset={envPreset} clipPlanes={clipPlanes} />

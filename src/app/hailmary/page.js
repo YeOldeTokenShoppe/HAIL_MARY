@@ -7102,8 +7102,8 @@ export default function OilPage() {
                       enableDamping
                       dampingFactor={0.1}
                       enablePan
-                      minDistance={0.01}
-                      maxDistance={15}
+                      minDistance={1.5}
+                      maxDistance={45}
                       maxPolarAngle={Math.PI}
                       minPolarAngle={0}
                       zoomToCursor
@@ -7677,7 +7677,7 @@ export default function OilPage() {
                   dampingFactor={0.08}
                   enablePan
                   panSpeed={2}
-                  minDistance={5}
+                  minDistance={1.5}
                   maxDistance={45}
                   maxPolarAngle={Math.PI}
                   minPolarAngle={0}
