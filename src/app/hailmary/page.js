@@ -7303,7 +7303,7 @@ export default function OilPage() {
           />
           {/* DAILY TICKET — one free scratch ticket a day (server-minted for players with a claim; local + dev controls in test mode), after the rig's own cards. */}
           {(isTest || (user && userDrill)) && (
-            <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+            <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} mintKey={seedCommitment} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
           )}
           {timelineSection}
           {leaderboardSection}
@@ -7843,7 +7843,7 @@ export default function OilPage() {
             />
             {/* DAILY TICKET — one free scratch ticket a day (server-minted for players with a claim; local + dev controls in test mode), after the rig's own cards. */}
             {(isTest || (user && userDrill)) && (
-              <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
+              <DailyTicketPanel theme={theme} isMobile={isMobile} darkMode={uiDark} selectedX={selectedX} selectedY={sliceY} devControls={isTest} live={!isTest} apiFetch={oilApiFetch} mintKey={seedCommitment} soundOn={fireworksSound} onJackpot={fireJackpotFireworks} onSettle={onTicketSettle} />
             )}
             {timelineSection}
             {leaderboardSection}

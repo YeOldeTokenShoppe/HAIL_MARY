@@ -137,6 +137,7 @@ function Icon({ path, size = 32, color }) {
 export default function DailyTicketPanel({
   theme, isMobile = false, darkMode = true, selectedX = null, selectedY = null, devControls = false,
   live = false, apiFetch,   // live: mint/settle through the server with the page's authenticated fetch
+  mintKey = null,           // live: anything that should make the panel ask the server again (the season commitment)
   soundOn = true, onJackpot,
   onSettle, // ({ ticketNo, win, sym, symName, tier, prize }) — test mode: the page records the prize and posts the feed line
 }) {
@@ -182,8 +183,13 @@ export default function DailyTicketPanel({
   const newTicket = () => setSerial((s) => s + 1);
   const forceTicket = (outcome) => { setForced({ serial: serial + 1, outcome }); setSerial((s) => s + 1); };
 
-  // Live: mint (or fetch) today's ticket on mount. A ticket already settled
-  // today comes back scratched, with no fanfare — it's a replay.
+  // Live: mint (or fetch) today's ticket on mount — and again whenever the
+  // season commitment changes (a fresh COMMIT in the admin panel turns "not
+  // committed yet" into a ticket without a reload) or the player taps the
+  // error bar to retry. A ticket already settled today comes back scratched,
+  // with no fanfare — it's a replay.
+  const [mintAttempt, setMintAttempt] = useState(0);
+  const retryMint = () => { setRemoteError(null); setMintAttempt((n) => n + 1); };
   useEffect(() => {
     if (!live || !apiFetch) return;
     let cancelled = false;
@@ -203,7 +209,7 @@ export default function DailyTicketPanel({
       }
     })();
     return () => { cancelled = true; };
-  }, [live, apiFetch]);
+  }, [live, apiFetch, mintKey, mintAttempt]);
 
   const count = revealed.filter(Boolean).length;
   const complete = count === CELLS;
@@ -273,9 +279,10 @@ export default function DailyTicketPanel({
   const barBase = { display: "flex", alignItems: "center", width: "100%", minHeight: 28, borderRadius: 3, fontFamily: MONO, textTransform: "uppercase", padding: "0 9px", gap: 8 };
   const ticketBar = !ticket
     ? (
-      <div style={{ ...barBase, justifyContent: "center", border: `1px solid ${t.border}`, background: t.btnBg, color: remoteError ? K.lose : muted, fontSize: 9, letterSpacing: "0.12em" }}>
-        {remoteError ? remoteError : "Minting today's ticket…"}
-      </div>
+      <button onClick={remoteError ? retryMint : undefined} style={{ ...barBase, justifyContent: "center", gap: 10, cursor: remoteError ? "pointer" : "default", border: `1px solid ${t.border}`, background: t.btnBg, color: remoteError ? K.lose : muted, fontSize: 9, letterSpacing: "0.12em", textAlign: "center" }}>
+        <span>{remoteError ? remoteError : "Minting today's ticket…"}</span>
+        {remoteError && <span style={{ color: muted, textDecoration: "underline", whiteSpace: "nowrap" }}>retry</span>}
+      </button>
     )
     : !settled
       ? (
