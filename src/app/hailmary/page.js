@@ -12,6 +12,7 @@ import { Perf } from "r3f-webgpu-perf";
 import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { REFERRAL_BONUS } from "@/lib/oilBonusMath";
+import { couponValid, couponDaysLeft } from "@/lib/oilTicket";
 import OilAnchorEvent from "@/components/OilAnchorEvent";
 import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
@@ -2005,7 +2006,7 @@ export default function OilPage() {
       setDrillLoaded(true);
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0 });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -3678,10 +3679,11 @@ export default function OilPage() {
     const [col, row] = plotKey.split("_").map(Number);
     if (col === userDrill.col && row === userDrill.row) return null; // already standing here
     const used = userDrill.claimJumpsUsed ?? 0;
-    const costsBonus = used >= FREE_CLAIM_JUMPS;
+    const freeAllowance = FREE_CLAIM_JUMPS + (userDrill.bonusClaimJumps ?? 0); // season allowance + DAILY TICKET jackpots
+    const costsBonus = used >= freeAllowance;
     const bonus = userDrill.bonusDrills ?? 0;
     const blocked = costsBonus && bonus <= 0;
-    const free = Math.max(0, FREE_CLAIM_JUMPS - used);
+    const free = Math.max(0, freeAllowance - used);
     return {
       label: "CLAIM JUMP HERE",
       note: blocked
@@ -4522,6 +4524,7 @@ export default function OilPage() {
     // DAILY TICKET (wins only; a loss stays on the ticket)
     ticket: { icon: "🎟", color: theme.gold, fill: false, verb: "matched three on the daily ticket" },
     ticket_jackpot: { icon: "🎟", color: theme.gold, fill: true, verb: "hit the DAILY TICKET JACKPOT!" },
+    tonic: { icon: "🧪", color: theme.green, fill: false, verb: "downed a tonic" },
   };
 
   const testerBadgeStyle = {
@@ -6635,7 +6638,7 @@ export default function OilPage() {
           {passiveDepth} PASSIVE + {bonusDrills} BONUS
         </span>
         <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}>
-          JUMPS {userDrill?.claimJumpsUsed ?? 0} ({Math.max(0, FREE_CLAIM_JUMPS - (userDrill?.claimJumpsUsed ?? 0))} free)
+          JUMPS {userDrill?.claimJumpsUsed ?? 0} ({Math.max(0, FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0) - (userDrill?.claimJumpsUsed ?? 0))} free)
         </span>
       </div>
       {/* Referral stats */}
@@ -6656,13 +6659,27 @@ export default function OilPage() {
           {(() => {
             const shares = userDrill.bonusFromShares || 0;
             const holding = userDrill.bonusFromHolding || 0;
-            const refs = Math.max(0, bonusDrills - shares - holding);
+            const tickets = userDrill.bonusFromTickets || 0;
+            const refs = Math.max(0, bonusDrills - shares - holding - tickets);
             const parts = [];
             if (refs > 0) parts.push(`+${refs} referrals/hunts`);
             if (shares > 0) parts.push(`+${shares} shares`);
             if (holding > 0) parts.push(`+${holding} holding`);
+            if (tickets > 0) parts.push(`+${tickets} tickets`);
             return parts.join("  ·  ");
           })()}
+        </div>
+      )}
+      {/* SUPPLIES — DAILY TICKET prizes that are held, not spent yet: tonics
+          (the next strike drills two layers) and the stall coupon. */}
+      {((userDrill?.supplies?.tonic ?? 0) > 0 || couponValid(userDrill?.coupon)) && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6, fontSize: 10, letterSpacing: "0.1em", flexWrap: "wrap" }}>
+          <span style={{ color: theme.muted }}>SUPPLIES</span>
+          <span style={{ color: theme.green, textAlign: "right" }}>
+            {(userDrill?.supplies?.tonic ?? 0) > 0 && <span title="Your next strike drills two layers">🧪 TONIC ×{userDrill.supplies.tonic}</span>}
+            {(userDrill?.supplies?.tonic ?? 0) > 0 && couponValid(userDrill?.coupon) && "  ·  "}
+            {couponValid(userDrill?.coupon) && <span title="Applied automatically at the Pimp My Pump checkout">🎟 COUPON {userDrill.coupon.pct}% OFF · {couponDaysLeft(userDrill.coupon)}d left</span>}
+          </span>
         </div>
       )}
       {/* Copyable referral link */}
@@ -6711,7 +6728,7 @@ export default function OilPage() {
           {claimJumpMode && (
             <div style={{ fontSize: 10, color: theme.gold, marginTop: 4, textAlign: "center" }}>
               Click an open plot on the map to jump
-              {(userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS && " (costs 1 bonus drill)"}
+              {(userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS + (userDrill?.bonusClaimJumps ?? 0) && " (costs 1 bonus drill)"}
             </div>
           )}
         </div>
@@ -7330,7 +7347,7 @@ export default function OilPage() {
           {fieldDispatchSection}
           {isAdmin && pendingFeedPanel}
           {(isAdmin || isReport) && (
-            <OilVerifyPanel adminPassword={adminPassword} />
+            <OilVerifyPanel adminPassword={adminPassword} userId={user?.id || null} />
           )}
           {isAdmin && <OilAdminGuide />}
           {adminAlertsPanel}
@@ -7427,6 +7444,7 @@ export default function OilPage() {
             items={purchaseModalItem}
             activeAccount={walletAddress}
             userId={user?.id}
+            coupon={userDrill?.coupon || null}
             onComplete={handlePurchaseComplete}
             onClose={() => setPurchaseModalItem(null)}
             onConnectWallet={() => setShowAccountModal(true)}
@@ -7861,7 +7879,7 @@ export default function OilPage() {
             {fieldDispatchSection}
             {isAdmin && pendingFeedPanel}
             {(isAdmin || isReport) && (
-              <OilVerifyPanel adminPassword={adminPassword} />
+              <OilVerifyPanel adminPassword={adminPassword} userId={user?.id || null} />
             )}
             {isAdmin && <OilAdminGuide />}
             {adminAlertsPanel}
@@ -7936,6 +7954,7 @@ export default function OilPage() {
           items={purchaseModalItem}
           activeAccount={walletAddress}
           userId={user?.id}
+          coupon={userDrill?.coupon || null}
           onComplete={handlePurchaseComplete}
           onClose={() => setPurchaseModalItem(null)}
           onConnectWallet={() => setShowAccountModal(true)}

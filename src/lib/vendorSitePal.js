@@ -83,6 +83,28 @@ export const HOTDOGS_SITEPAL_FILTER = {
   sepia: 34,
 };
 
+// Promos hologram crop/filter — tuned via /hailmary?tune=vendor (PROMOS tab);
+// re-tune there and paste the logged values back here if her scene's avatar
+// ever changes. Note the tighter box than the other three: cropH 155 against
+// their 222. No sepia either, unlike the dusty prospectors — she is a
+// projection, and the warm cast reads as grime on a screen that should look
+// backlit.
+export const PROMOS_SITEPAL_CROP = {
+  cropX: 202,
+  cropY: 124,
+  cropW: 150,
+  cropH: 155,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const PROMOS_SITEPAL_FILTER = {
+  saturate: 150,
+  contrast: 103,
+  brightness: 124,
+  hueRotate: 0,
+  sepia: 0,
+};
+
 // Per-vendor registry, keyed by VENDOR_CATALOG id. `projFace` receives the
 // SitePal projection; `regularFaces` are the painted face layers hidden
 // while the projection is active (the two models label them differently —
@@ -165,6 +187,44 @@ export const VENDOR_SITEPAL_CONFIG = {
       frequent: [
         "The usual? Of course the usual. I had it rolling the moment I saw you cross the field.",
         "You know, you are the only one out here who chews before swallowing. I respect that.",
+      ],
+    },
+  },
+  // Promotions hologram at the prize wheel. NOTE the "R-Lady" spelling below:
+  // these strings go STRAIGHT to sayText with no on-screen caption, and
+  // ElevenLabs reads "RL80" as "R-L-eighty". Her whole pitch is the token, so
+  // every line that names it has to be written phonetically. Keep it that way
+  // in any line added here.
+  promos: {
+    sceneId: 2775409,
+    voice: { voice: "wRBnwLc9kmVUe7Iim1Qo", lang: 1, engine: 14 },
+    projFace: "Face2",
+    // Face1/Face3 are her painted face layers, but Eye_L and Eye_R are NOT —
+    // they are two separate eye planes (mesh "Plane") parented under the `eyes`
+    // bone, so they ride the head animation and would otherwise float on top of
+    // the projected avatar. `regularFaces` is just "things to hide while
+    // projecting", so they belong here even though they are not face layers.
+    regularFaces: ["Face1", "Face3", "Eye_L", "Eye_R"],
+    crop: PROMOS_SITEPAL_CROP,
+    filter: PROMOS_SITEPAL_FILTER,
+    greetings: {
+      first: [
+        "First time at the wheel? Then you get the newcomer spin. One pull, one prize, and I do not check identification.",
+        "Well, a new face. I am the promotions department, the merchandise counter, and the entire marketing budget. Charmed.",
+      ],
+      returning: [
+        "Step up and spin! Every pull on that wheel is a shot at R-Lady merchandise, and every miss is a reason to try again.",
+        "Fresh merchandise, straight off the balloon. Caps, patches, and one shirt so loud it violates three county ordinances.",
+        "You look like a prospector who needs a hat. Everyone out here needs a hat. That is not a pitch, that is meteorology.",
+        "Today's promotion: spin the wheel, take the prize, tell absolutely everyone. That last part is the one I care about.",
+        "I am projected, not printed, so the merchandise is more real than I am. Sit with that for a second.",
+        "The balloon goes up at sundown with a banner on it. If your name is on that banner, you will be the last to find out.",
+        "Day {day} and the wheel has not been fair once. It has been generous, which is better than fair and sells more hats.",
+        "Buy nothing, spin anyway. My job is attention, and you are already giving me some.",
+      ],
+      frequent: [
+        "My most loyal customer. You have spun that wheel so often the paint is coming off the good wedge.",
+        "Back for more merchandise? At this point you are less a customer and more a walking advertisement. I approve.",
       ],
     },
   },

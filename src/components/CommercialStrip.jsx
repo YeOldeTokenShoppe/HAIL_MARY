@@ -64,10 +64,6 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 //   focusHeadRoll (radians of head cock about the gaze axis),
 //   focusGazeLift, headPitchUp, gazeTurn.
 export const VENDOR_CATALOG = [
-  { id: "insurance", label: "", awning: "#3e6b64", accent: "#7fd6c8",
-    // No character of its own — the strip GLB supplies the tent, and `prop`
-    // anchors an invisible click volume over it.
-    prop: "SM_Prop_Tent_02 (23)" },
   { id: "fortunes",  label: "",  awning: "#5a4a78", accent: "#c79bff",
     model: "/models/Vendor_FortuneTeller_Character.glb", idleClip: "sit_idle",
     prop: "FortuneTeller_Wagon_Empty",
@@ -110,8 +106,12 @@ export const VENDOR_CATALOG = [
     // standing takes the low hero angle the other standing vendors use, seated
     // needs a near-level one or the camera ends up under the bench.
     // STARTING VALUES — worth an eyeball pass once both files are in.
+    // Each override names its own clip. The first-clip fallback above does work,
+    // but it is the fragile path (it depends on enumerating drei's lazy action
+    // getters at a moment when they may all still be undefined). Naming the
+    // clip routes her through actions[restClip] like every other vendor.
     poseOverrides: {
-      "/models/Vendor_TattooArtist_idle.glb":      { faceDist: 0.18, faceLift: -0.03, camDrop: -0.35 },
+      "/models/Vendor_TattooArtist_idle.glb":      { idleClip: "idle", faceDist: 0.18, faceLift: -0.03, camDrop: -0.35 },
       // Seated at the stool (local z 28.58) working on the barber chair (z
       // 29.69), so she faces strip-local +Z — which the group's +90° maps to
       // world +X. faceYaw 0 encodes that. This matters for more than the
@@ -129,6 +129,7 @@ export const VENDOR_CATALOG = [
       // head tracking (clamped at 63°, so a natural 3/4 rather than a full
       // swivel).
       "/models/Vendor_TattooArtist_tattooing.glb": {
+        idleClip: "tattooing",
         // The client only exists on the loads where she is actually tattooing.
         // Kept in his own GLB rather than merged into hers: both Synty rigs
         // name their bones identically (Pelvis, spine_01, head...), and three
@@ -146,6 +147,24 @@ export const VENDOR_CATALOG = [
         // ~20° head cock, eased in with the look-up. Negative flips the tilt.
         focusHeadRoll: -0.55 },
     } },
+  { id: "promos",    label: "",    awning: "#17505e", accent: "#5fe9ff",
+    // RL80 promos + merch, working the prize wheel at the balloon end of the
+    // strip. Her GLB is exported in strip space like the rest (root at local
+    // x 0, z -29.96), so she needs no placement here.
+    model: "/models/Vendor_HoloGirl.glb", idleClip: "idle", talkClip: "talking",
+    // The wheel, NOT the tent she happens to stand inside: SM_Prop_Tent_02
+    // (23) has no vendor now, so it has no click volume either, and hers is
+    // the only proxy in this stretch of boardwalk. Keep it that way — a
+    // PROXY_LOCAL_SIZE box is 5 units on a side, so a second vendor on that
+    // tent would put a cube (origin x 1.79) around her too.
+    prop: "SM_Prop_Prize_Wheel_01",
+    // Standing vendor: same close-up framing as the salesman and hot dog cart.
+    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+    // Her GLB also ships "bored" and "thankful". Both key the same bones as
+    // the idle, so the extras pass in VendorModel correctly refuses to play
+    // them alongside it — they are here for a future mood hook, not dead
+    // weight to delete.
+    sitepal: "promos" },
   { id: "tonics",    label: "",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_SnakeOilSalesman_Character.glb", idleClip: "idle",
     prop: "SM_Veh_Wagon_Shop_01",
@@ -392,14 +411,30 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   const restClip = poseRef.current || vendor.idleClip;
 
   const restActionRef = useRef(null);
-  useEffect(() => {
+  const extrasRef = useRef([]);
+  const needsStartRef = useRef(false);
+
+  // Start (or restart) this session's resting pose. Returns false if the rig
+  // is not ready yet, which is a real state and not an error — see the retry
+  // in useFrame below.
+  const startRest = () => {
     const all = Object.values(actions || {});
-    const action = (restClip && actions?.[restClip]) || all[0];
-    restActionRef.current = action || null;
+    // find(Boolean), NOT [0]. drei builds `actions` out of lazy getters that
+    // return undefined while the group ref is still unattached, so enumerating
+    // them can hand back a list of undefineds. Taking [0] then silently leaves
+    // the character in bind pose — a T-pose that never recovers, because this
+    // effect only re-runs on [actions, restClip] and neither ever changes
+    // again. Vendors that name their clip get here via actions[restClip];
+    // the tattoo artist's two pose files deliberately do not, so this
+    // fallback is her ONLY path in.
+    const action = (restClip && actions?.[restClip]) || all.find(Boolean);
+    if (!action) return false;
+
+    restActionRef.current = action;
     // No fadeIn: on (re)mount the bindings sit at bind pose, and a weight fade
     // would visibly blend from T-pose. Playing at full weight snaps straight
     // into the idle on the first mixer update instead.
-    action?.reset().play();
+    action.reset().play();
 
     // A pose file can carry MORE THAN ONE character — the tattoo artist's
     // client rides along in her tattooing export. Those clips drive separate
@@ -407,24 +442,41 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     // clips (hard_sell, shifty) drive the SAME bones as the idle and must not,
     // or they blend into mush. Disjoint bone targets is what separates the two
     // cases, so no per-vendor config is needed.
+    const bone = (t) => t.name.split(".")[0];
+    const restTargets = new Set(action.getClip().tracks.map(bone));
     const extras = [];
-    if (action) {
-      const bone = (t) => t.name.split(".")[0];
-      const restTargets = new Set(action.getClip().tracks.map(bone));
-      all.forEach((a) => {
-        if (a === action) return;
-        if (a.getClip().tracks.some((t) => restTargets.has(bone(t)))) return;
-        a.reset().play();
-        extras.push(a);
-      });
-    }
+    all.forEach((a) => {
+      if (!a || a === action) return;
+      if (a.getClip().tracks.some((t) => restTargets.has(bone(t)))) return;
+      a.reset().play();
+      extras.push(a);
+    });
+    extrasRef.current = extras;
+    return true;
+  };
 
+  useEffect(() => {
+    needsStartRef.current = !startRest();
     return () => {
-      action?.stop();
-      extras.forEach((a) => a.stop());
+      restActionRef.current?.stop();
+      extrasRef.current.forEach((a) => a.stop());
+      extrasRef.current = [];
       restActionRef.current = null;
+      needsStartRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, restClip]);
+
+  // The retry. VendorModel suspends TWICE on the way in — once on useGLTF and
+  // again on useEnvironment further down — so the order in which the group ref
+  // attaches relative to this effect is not something to rely on, and a
+  // re-suspend after commit (any newly added vendor GLB perturbs it) tears
+  // effects down and back up. If the pose could not be started, keep trying:
+  // one cheap ref check per frame until it takes, then never again.
+  useFrame(() => {
+    if (!needsStartRef.current) return;
+    if (startRest()) needsStartRef.current = false;
+  });
 
   // Environment-map fill: the strip sits on the −Z edge where one scene
   // directional grazes and the other lights the vendors' BACKS, so their
@@ -895,6 +947,12 @@ const BULB_RE = /^Spotlight_Bulb\d*$/;   // post-sanitize: "Spotlight_Bulb.001" 
 
 const BULB_EMISSIVE = "#ffdca8";   // warm filament
 const BULB_EMISSIVE_INTENSITY = 1.6;
+// "Did Blender author a glow?" has to be a BRIGHTNESS test, not a non-zero
+// test. An export can carry a small but non-zero emissiveFactor for a lamp
+// that is visually dead — this one ships 0.0253, about sRGB #2d2d2d — and a
+// `> 0` check reads that as authored and suppresses the fallback. Any max
+// channel below this is treated as "shipped unlit".
+const BULB_AUTHORED_MIN = 0.35;
 const HALO_COLOR = "#ffe6b8";
 const HALO_PX = 11;                // constant SCREEN size — a bulb mesh goes
                                    // sub-pixel from aerial and vanishes; a
@@ -1053,10 +1111,16 @@ function BulbRig({ stripScene, envPreset, clipPlanes }) {
 
     // Defer to the asset when Blender already authored the glow. Only light the
     // bulbs ourselves if they arrive unlit — and clone before touching, since
-    // all 14 share one material.
+    // all 14 share one material (and so does the unrelated "Circle" mesh, which
+    // must not inherit a filament).
+    //
+    // The current export ships emissiveFactor 0.0253 on Material.001 — black to
+    // the eye, but enough to clear a "not zero" threshold, which is what left
+    // the lamps dark at night: the code believed Blender had an opinion and
+    // stood down. Compare against BULB_AUTHORED_MIN so only a real glow wins.
     const first = bulbs[0].material;
     const e = first?.emissive;
-    const authored = !!e && (e.r + e.g + e.b) > 0.01;
+    const authored = !!e && Math.max(e.r, e.g, e.b) >= BULB_AUTHORED_MIN;
     let restore = null;
     if (!authored) {
       const lit = first.clone();
@@ -1321,6 +1385,154 @@ function WagonLights({ stripScene, envPreset }) {
   return null;
 }
 
+// ── Blinking string lights ──────────────────────────────────────────────────
+// SM_Prop_Light_04(.001-.006): seven festoon strands slung pole to pole, 23
+// bulbs each. Synty's Unity build blinks them; that effect did NOT survive the
+// glTF export — BOARDWALK_Atlas_MAT arrives carrying a baseColorTexture and no
+// emissive of any kind — so it is rebuilt here.
+//
+// Two obvious approaches are both wrong, for different reasons:
+//   * emissive on the material itself → BOARDWALK_Atlas_MAT is shared by 77
+//     meshes across 125 nodes, i.e. most of the boardwalk. That lights the pier.
+//   * emissive on a CLONE of it → closer, but one strand mesh holds the wire
+//     and the sockets as well as the bulbs, so the whole strand glows as a
+//     rope rather than as points.
+//
+// What makes it tractable is the atlas layout. All 1659 verts of the strand sit
+// in just three tiny UV islands, and the bulbs are one of them. Measured off the
+// decoded Draco geometry: the bulb island's 1037 verts form 23 compact ~8.5³
+// blobs, while the wire island's are flat (6.8 x 6.9 x 2.4) and the sockets sit
+// at u~0.076. So a cloned material plus one UV test in the fragment shader
+// lights the bulbs and nothing else — no re-export, no added draw calls, no
+// geometry.
+const STRING_RE = /^SM_Prop_Light_04\d*$/;
+// The bulb island, padded a hair past the measured box (u 0.0211-0.0225,
+// v 0.9741-0.9858) so no rim vert sitting exactly on the boundary drops out.
+// The wire (v~0.929) and sockets (u~0.076) are nowhere near, so padding is free.
+const STRING_BULB_UV = [0.0200, 0.0236, 0.9730, 0.9869];   // u0, u1, v0, v1
+const STRING_COLOR = "#ffe0a8";
+// Unlike the spotlight bulbs, this emissive IS tone mapped. Those set
+// toneMapped:false, but this material also draws the wire and the sockets, and
+// exempting those from ACES would leave the strands reading brighter than every
+// prop touching them. So the VALUE is pushed instead: ~3 lands near white
+// through ACES at the page's exposure of 1.0.
+const STRING_EMISSIVE_MAX = 3.0;
+const STRING_BLINK_HZ = 0.7;    // full on-off cycles per second
+const STRING_DUTY = 0.55;       // fraction of each cycle spent lit
+const STRING_EDGE = 0.10;       // fraction spent fading at each edge (0 = hard square)
+// Each strand runs on its own clock. Golden ratio for the phase offsets: it
+// spreads N values as evenly as possible around the cycle for ANY N, and
+// unlike i/N it does not line the strands up into a marching chase down the
+// boardwalk. Set to 0 for the old blink-in-unison behaviour.
+const STRING_PHASE_STEP = 0.6180339887;
+// …and each strand's rate is nudged too, so they drift instead of holding a
+// fixed relationship forever. With equal rates the pattern is periodic and the
+// eye finds it; a spread this small is invisible per-strand but means the
+// arrangement never quite repeats. 0 disables.
+const STRING_RATE_SPREAD = 0.18;   // ± fraction of STRING_BLINK_HZ
+// Same reasoning as BEAM_BY_ENV: an unlit bulb against a bright sky reads as
+// nothing, so daylight gets no blink at all rather than a wasted one.
+const STRING_BY_ENV = { night: 1.0, dusk: 0.85, hell: 1.0 };
+
+function StringLights({ stripScene, envPreset }) {
+  const gain = STRING_BY_ENV[envPreset] ?? 0;
+  // One entry per strand: its own material clone, its own uniforms, its own
+  // phase and rate. Seven materials rather than one shared clone is what buys
+  // the independent blink — a uniform is per material, so a single clone can
+  // only ever drive all seven together.
+  //
+  // It costs seven Material objects and nothing else. They are not seven
+  // shaders: three keys its program cache on onBeforeCompile.toString(), and
+  // every clone's function has identical source, so all seven share ONE
+  // compiled program and differ only in uniform values. Draw calls are
+  // unchanged too — these were already seven separate meshes.
+  const rigRef = useRef([]);
+
+  useEffect(() => {
+    const strands = [];
+    stripScene.traverse((o) => { if (o.isMesh && STRING_RE.test(sanitizeName(o.name))) strands.push(o); });
+    if (!strands.length) return;
+
+    const originals = strands.map((m) => m.material);
+    const rig = strands.map((mesh, i) => {
+      const lit = mesh.material.clone();
+      // clone() JSON-round-trips userData, so any Texture stashed there comes
+      // back as a plain object that crashes the renderer if it is ever assigned
+      // to a texture slot. Nothing uses it on this material today; dropping it
+      // costs nothing and does not depend on that staying true.
+      lit.userData = {};
+      lit.name = `BOARDWALK_Atlas_MAT__stringlights_${i}`;
+
+      const u = {
+        uBlink: { value: 0 },
+        uBulbUV: { value: new THREE.Vector4(...STRING_BULB_UV) },
+        uBulbColor: { value: new THREE.Color(STRING_COLOR) },
+      };
+      lit.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, u);
+        shader.fragmentShader =
+          "uniform float uBlink;\nuniform vec4 uBulbUV;\nuniform vec3 uBulbColor;\n" +
+          shader.fragmentShader.replace(
+            "#include <emissivemap_fragment>",
+            `#include <emissivemap_fragment>
+            {
+              // vMapUv is declared under USE_MAP, which this material has via
+              // its baseColorTexture. Injected AFTER the include so it adds to
+              // the final totalEmissiveRadiance rather than being multiplied
+              // away.
+              float inU = step(uBulbUV.x, vMapUv.x) * step(vMapUv.x, uBulbUV.y);
+              float inV = step(uBulbUV.z, vMapUv.y) * step(vMapUv.y, uBulbUV.w);
+              totalEmissiveRadiance += uBulbColor * (uBlink * inU * inV);
+            }`
+          );
+      };
+      lit.needsUpdate = true;
+      mesh.material = lit;
+
+      // Deterministic, not random: the same strand gets the same offset every
+      // load, so a tuning pass is reproducible. (i * 3) % 7 permutes the index
+      // first, so neighbouring strands never land on adjacent rates.
+      const k = strands.length > 1 ? ((i * 3) % strands.length) / (strands.length - 1) : 0.5;
+      return {
+        mat: lit,
+        u,
+        phase: (i * STRING_PHASE_STEP) % 1,
+        rate: 1 + STRING_RATE_SPREAD * (k * 2 - 1),
+      };
+    });
+    rigRef.current = rig;
+
+    return () => {
+      strands.forEach((m, i) => { m.material = originals[i]; });
+      rig.forEach((r) => { try { r.mat.dispose(); } catch (e) {} });
+      rigRef.current = [];
+    };
+    // Deliberately NOT keyed on envPreset: swapping materials on a theme change
+    // would force a shader recompile mid-scene. The uniform carries the gain
+    // instead, so day is simply uBlink = 0.
+  }, [stripScene]);
+
+  useFrame((state) => {
+    const rig = rigRef.current;
+    if (!rig.length) return;
+    if (gain <= 0) {
+      for (let i = 0; i < rig.length; i++) rig[i].u.uBlink.value = 0;
+      return;
+    }
+    const t = state.clock.elapsedTime;
+    const peak = gain * STRING_EMISSIVE_MAX;
+    for (let i = 0; i < rig.length; i++) {
+      const r = rig[i];
+      const phase = (t * STRING_BLINK_HZ * r.rate + r.phase) % 1;
+      const rise = THREE.MathUtils.smoothstep(phase, 0, STRING_EDGE);
+      const fall = 1 - THREE.MathUtils.smoothstep(phase, STRING_DUTY, STRING_DUTY + STRING_EDGE);
+      r.u.uBlink.value = Math.min(rise, fall) * peak;
+    }
+  });
+
+  return null;
+}
+
 // One SpotLight for the whole strip, mounted OUTSIDE the scaled group: distance
 // and decay are world-space and do NOT inherit the group's scale, while
 // position would — mixing the two is the trap behind GLOW_LIGHT_DISTANCE.
@@ -1408,33 +1620,54 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   // re-export at a different size — or a different grid — still lands right.
   // With STRIP_ROT_Y = +90°, local (x,y,z) → world (z, y, −x): the strip's long
   // local Z becomes the mesa's X edge, and its local X becomes deck depth.
+  //
+  // Fit the BOARDWALK, not the whole scene. The deck is what has to line up
+  // with the mesa edge, and it is the one thing in here that is symmetric:
+  // local z spans ±38.576 about zero. The full-scene box is neither — the hot
+  // air balloon at the near end hangs 3.0 units past the last board, so sizing
+  // by it squeezed the deck to 96% of the edge AND slid its midpoint 1.5 units
+  // off centre. The result butted up flush at the +X corner and fell short at
+  // −X by 0.24 cells on a 6×6 up to 0.39 on a 10×10 — the gap widening with
+  // grid size is exactly the "boardwalk drifts off centre" symptom.
+  //
+  // Props are allowed to overhang the ends; that is what makes the strip look
+  // like it spills off the mesa. They just must not get a vote on the fit.
   const fit = useMemo(() => {
+    if (deckLocal) {
+      // Already in strip-local space (deckLocal divides out stripScene's own
+      // world matrix), so this is immune to the transform the group below is
+      // about to apply. Measuring the live scene with setFromObject is not:
+      // once mounted, stripScene.matrixWorld carries the previous fit, and a
+      // grid resize re-entering this memo would feed that scale back into
+      // itself. Keep the local path as the one that normally runs.
+      const scale = deckW / ((deckLocal.max.z - deckLocal.min.z) || 1);
+      return {
+        scale,
+        position: [
+          -((deckLocal.min.z + deckLocal.max.z) / 2) * scale, // deck centred on the mesa edge
+          -deckLocal.max.y * scale,  // walking surface flush with the field (y = 0)
+          // Butt the deck's inner edge into the mesa wall rather than centring
+          // it on the nominal deck line. Scale is driven by the strip's LONG
+          // axis, so its depth lands wherever the model's aspect puts it
+          // (~1.05 cells, not DECK_DEPTH's 1.2) — centring split that slack in
+          // two and left an open slot along the wall. local +X maps to world
+          // −Z, so the deck's MIN local x is its inner edge; DECK_OVERLAP
+          // buries it just past the face so no hairline can open up at grazing
+          // angles.
+          -worldD / 2 + DECK_OVERLAP * cellSize + deckLocal.min.x * scale,
+        ],
+      };
+    }
+    // Boardwalk mesh missing (bad export): fall back to the whole-scene box and
+    // its lowest point, which is wrong in the ways described above but keeps
+    // the strip on screen instead of collapsing it to zero.
     const box = new THREE.Box3().setFromObject(stripScene);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const scale = deckW / (size.z || 1);
-    // Anchor on the deck's TOP surface, not the GLB's lowest point. The boards
-    // now have real thickness, so the old min.y anchor would lever the walking
-    // surface up off the field by however far anything hangs below it and open
-    // a seam along the mesa edge. Falls back to min.y if the mesh is missing.
-    const deckTop = deckLocal ? deckLocal.max.y : box.min.y;
-    // Butt the deck's inner edge into the mesa wall rather than centring it on
-    // the nominal deck line. Scale is driven by the strip's LONG axis, so its
-    // depth lands wherever the model's aspect puts it (~1.05 cells, not
-    // DECK_DEPTH's 1.2) — centring split that slack in two and left an open
-    // slot along the wall. local +X maps to world −Z, so the deck's MIN local x
-    // is its inner edge; DECK_OVERLAP buries it just past the face so no
-    // hairline can open up at grazing angles.
-    const zPos = deckLocal
-      ? -worldD / 2 + DECK_OVERLAP * cellSize + deckLocal.min.x * scale
-      : deckZ + center.x * scale;
     return {
       scale,
-      position: [
-        -center.z * scale, // long axis centred on the mesa edge
-        -deckTop * scale,  // walking surface flush with the field (y = 0)
-        zPos,              // inner edge flush against the mesa wall
-      ],
+      position: [-center.z * scale, -box.min.y * scale, deckZ + center.x * scale],
     };
   }, [stripScene, deckW, deckZ, deckLocal, worldD, cellSize]);
 
@@ -1517,6 +1750,10 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
           world-space and would not inherit fit.scale, while position would. */}
       <VendorSpotlight focus={focus} stripScene={stripScene} envPreset={envPreset} />
       <WagonLights stripScene={stripScene} envPreset={envPreset} />
+      {/* Renders nothing — it swaps a shader-patched clone onto the seven
+          festoon strands and drives one uniform. Outside the group with the
+          other material-only effects. */}
+      <StringLights stripScene={stripScene} envPreset={envPreset} />
       <group position={fit.position} rotation={[0, STRIP_ROT_Y, 0]} scale={fit.scale}>
         <primitive object={stripScene} />
         {/* Inside the group: halo positions are strip-local, and the constant

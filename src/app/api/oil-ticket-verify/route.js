@@ -37,7 +37,7 @@ export async function POST(req) {
     const db = getAdminDb();
     const [sSnap, tSnap] = await Promise.all([
       db.collection("oilGame").doc("settings").get(),
-      db.collection("oilDrills").doc(userId).collection("tickets").orderBy("__name__", "desc").limit(60).get(),
+      db.collection("oilDrills").doc(userId).collection("tickets").get(), // one doc per day; sorted below — no index needed
     ]);
     const s = sSnap.exists ? sSnap.data() : {};
     const gameOver = s.gameEnded === true || s.gamePhase === "ended";
@@ -52,7 +52,8 @@ export async function POST(req) {
       userId,
     };
 
-    const tickets = tSnap.docs.map((d) => d.data());
+    const tickets = tSnap.docs.map((d) => d.data()).filter((t) => t.day)
+      .sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : 0)).slice(0, 60);
     if (!tickets.length) {
       return NextResponse.json({ ok: true, phase, commitment, tickets: [], recipe, summary: { checked: 0, ok: 0, mismatches: 0 } });
     }

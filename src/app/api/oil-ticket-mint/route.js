@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 // cells). The prize is not returned until the ticket is settled.
 
 const publicTicket = (t) => ({
-  day: t.day, seedHash: t.seedHash, cells: t.cells, status: t.status,
+  id: t.id || t.day, day: t.day, seedHash: t.seedHash, cells: t.cells, status: t.status, test: !!t.test,
   streakAtMint: t.streakAtMint || 0, guaranteeWin: !!t.guaranteeWin,
   ...(t.status === "settled" ? { win: t.win || null, tier: t.tier || null, prize: t.prize || null, drillsAdded: t.drillsAdded || 0 } : {}),
 });
@@ -89,13 +89,26 @@ export async function POST(req) {
       return NextResponse.json({ error: "Claim a plot first — the ticket's prizes land on your rig." }, { status: 403 });
     }
 
-    // The ledger: the last seven settled tickets, newest first (doc ids are day keys).
-    const recentSnap = await drillRef.collection("tickets").orderBy("__name__", "desc").limit(9).get();
-    const recent = recentSnap.docs.map((d) => d.data()).filter((t) => t.status === "settled").slice(0, 7)
+    // The ledger: the last seven settled tickets, newest first. A player's
+    // subcollection holds at most one doc per day, so it's read whole and
+    // sorted here — no ordered query, so no index to maintain.
+    const recentSnap = await drillRef.collection("tickets").get();
+    const all = recentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const recent = all
+      .filter((t) => t.status === "settled" && t.day && !t.test)
+      .sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : 0))
+      .slice(0, 7)
       .map((t) => ({ day: t.day, sym: t.win || null, tier: t.tier || null }));
     const streak = dayDiff(result.drill.lastTicketDay, day) >= 0 && dayDiff(result.drill.lastTicketDay, day) <= 1 ? (result.drill.ticketStreak || 0) : 0;
 
-    return NextResponse.json({ ok: true, created: result.created, ...publicTicket(result.ticket), recent, streak });
+    // The ticket on the stage: today's daily while it's open; otherwise the
+    // newest OPEN admin test ticket for today (QA can see every prize land
+    // without waiting a day); otherwise today's settled daily.
+    const daily = { id: day, ...result.ticket };
+    const openTest = all.filter((t) => t.test && t.status === "open" && t.day === day).sort((a, b) => (a.id < b.id ? 1 : -1))[0];
+    const stage = daily.status === "open" ? daily : (openTest || daily);
+
+    return NextResponse.json({ ok: true, created: result.created, ...publicTicket(stage), recent, streak });
   } catch (e) {
     console.error("[oil-ticket-mint]", e);
     return NextResponse.json({ error: e.message || "mint failed" }, { status: 500 });

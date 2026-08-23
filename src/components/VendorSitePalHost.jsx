@@ -11,6 +11,8 @@ import {
   TONICS_SITEPAL_FILTER,
   HOTDOGS_SITEPAL_CROP,
   HOTDOGS_SITEPAL_FILTER,
+  PROMOS_SITEPAL_CROP,
+  PROMOS_SITEPAL_FILTER,
   speakPendingVendorLine,
   getVendorSitePalSource,
   notifyVendorTalk,
@@ -22,6 +24,7 @@ const TUNER_VENDORS = {
   fortunes: { label: "FORTUNE", crop: FORTUNES_SITEPAL_CROP, filter: FORTUNES_SITEPAL_FILTER, constName: "FORTUNES" },
   tonics: { label: "SALESMAN", crop: TONICS_SITEPAL_CROP, filter: TONICS_SITEPAL_FILTER, constName: "TONICS" },
   hotdogs: { label: "HOT DOG", crop: HOTDOGS_SITEPAL_CROP, filter: HOTDOGS_SITEPAL_FILTER, constName: "HOTDOGS" },
+  promos: { label: "PROMOS", crop: PROMOS_SITEPAL_CROP, filter: PROMOS_SITEPAL_FILTER, constName: "PROMOS" },
 };
 
 // ── Single SitePal host embed for the /hailmary vendor strip ───────────────
@@ -64,8 +67,12 @@ function loadVendorSitePalScriptOnce(account) {
       const script = document.createElement("script");
       script.src = `//vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=${account}&js=0`;
       script.type = "text/javascript";
-      script.onload = () => resolve();
-      script.onerror = () => resolve();
+      // Resolve either way — the CALLER decides what to do — but say which
+      // happened. A 504 from the CDN fires onerror; a 200 serving an HTML
+      // error page fires onload and still defines nothing, so `ok` alone is
+      // not enough and the caller re-checks for the global.
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
       document.head.appendChild(script);
     });
   }
@@ -256,7 +263,28 @@ export default function VendorSitePalHost() {
     // which kills the player.
     if (!window.__vendorSitePalEmbedded) {
       window.__vendorSitePalEmbedded = true;
-      loadVendorSitePalScriptOnce(VENDOR_SITEPAL_ACCOUNT).then(() => {
+      loadVendorSitePalScriptOnce(VENDOR_SITEPAL_ACCOUNT).then((ok) => {
+        // The embed functions come from vhss-d.oddcast.com. When that host is
+        // down it answers 504 with an HTML error page, which defines nothing.
+        // This used to call AC_VHost_Embed regardless, so a vendor-side outage
+        // surfaced only as an uncaught "AC_Vhost_Embed is not defined" thrown
+        // from an <anonymous> script — no hint that the cause was upstream.
+        const embed = window.AC_VHost_Embed || window.AC_Vhost_Embed;
+        if (!ok || typeof embed !== "function") {
+          console.warn(
+            "[vendorSitePal] SitePal embed functions did not load from " +
+              "vhss-d.oddcast.com — vendor faces and voices are unavailable. " +
+              "This is an upstream outage, not a page bug: that URL should " +
+              "return JavaScript, and returns an HTML error page when SitePal " +
+              "is down. Everything else on the strip is unaffected."
+          );
+          // Un-latch. Both guards are set BEFORE the load resolves, so without
+          // this the page stays permanently wedged even after SitePal recovers
+          // — the next mount gets to try again instead.
+          window.__vendorSitePalEmbedded = false;
+          window.__vendorSitePalScriptPromise = null;
+          return;
+        }
         const script = document.createElement("script");
         script.type = "text/javascript";
         script.textContent =

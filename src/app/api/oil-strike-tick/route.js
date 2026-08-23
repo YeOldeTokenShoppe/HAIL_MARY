@@ -312,13 +312,35 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             return { status: "depleted" };
           }
 
-          const newDepth = currentDepth + 1;
-          const layerIndex = currentDepth; // layers 0..drillDay-1 are revealed
-          const oilAtLayer = grid?.[col]?.[row]?.[layerIndex] ?? 0;
-          const isHell = hellSet.has(`${col}_${row}_${layerIndex}`);
-          // Buried artifact at this layer (never co-located with hell — the
-          // generator avoids those cells, so hell and artifact paths are exclusive).
-          const artifact = artifactsByKey[artifactKey(col, row, layerIndex)] || null;
+          // The layers this strike drills: one, or two when the rig has a
+          // TONIC (a DAILY TICKET prize) and the cap allows a second. Each
+          // layer reveals its own oil / hell / artifact exactly as a single
+          // strike would; a hell pocket on the first layer stops the second.
+          const tonicReady = (drillNow.supplies?.tonic || 0) > 0 && currentDepth + 1 < effectiveCap;
+          const layers = [];
+          for (let k = 0; k < (tonicReady ? 2 : 1); k++) {
+            const li = currentDepth + k; // layers 0..drillDay-1 are revealed
+            const isHellK = hellSet.has(`${col}_${row}_${li}`);
+            layers.push({
+              layerIndex: li,
+              oil: grid?.[col]?.[row]?.[li] ?? 0,
+              isHell: isHellK,
+              // Buried artifact at this layer (never co-located with hell — the
+              // generator avoids those cells, so hell and artifact paths are exclusive).
+              artifact: artifactsByKey[artifactKey(col, row, li)] || null,
+            });
+            if (isHellK) break;
+          }
+          const tonicUsed = layers.length === 2;
+          const newDepth = currentDepth + layers.length;
+          const oilAtLayer = layers.reduce((s, l) => s + l.oil, 0);
+          const isHell = layers.some((l) => l.isHell);
+          const artifact = layers.find((l) => l.artifact)?.artifact || null;
+          const revealed = Object.fromEntries(layers.map((l) => [l.layerIndex, l.oil]));
+          const hellLayers = Object.fromEntries(layers.filter((l) => l.isHell).map((l) => [l.layerIndex, true]));
+          const revealedArtifacts = Object.fromEntries(layers.filter((l) => l.artifact).map((l) => [l.layerIndex, publicArtifact(l.artifact)]));
+          const artifactInventory = {};
+          for (const l of layers) if (l.artifact) { const k = artifactItemKey(l.artifact); artifactInventory[k] = FieldValue.increment(1); }
 
           t.set(plotRef, {
             col, row,
@@ -328,9 +350,9 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             // layer so the client renders the field from Firestore, never by
             // recomputing the secret seed. merge:true deep-merges the map, so
             // previously revealed layers are preserved.
-            revealed: { [layerIndex]: oilAtLayer },
-            ...(isHell ? { hellLayers: { [layerIndex]: true } } : {}),
-            ...(artifact ? { revealedArtifacts: { [layerIndex]: publicArtifact(artifact) } } : {}),
+            revealed,
+            ...(Object.keys(hellLayers).length ? { hellLayers } : {}),
+            ...(Object.keys(revealedArtifacts).length ? { revealedArtifacts } : {}),
           }, { merge: true });
 
           t.set(drillRef, {
@@ -344,20 +366,26 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             lastStrikeArtifact: artifact ? publicArtifact(artifact) : null,
             // Inventory: flat item-key → count. Dupes increment (item leveling);
             // artifactFinds is the running Museum tally for recap/leaderboard.
-            ...(artifact ? {
-              artifacts: { [artifactItemKey(artifact)]: FieldValue.increment(1) },
-              artifactFinds: FieldValue.increment(1),
+            ...(Object.keys(artifactInventory).length ? {
+              artifacts: artifactInventory,
+              artifactFinds: FieldValue.increment(Object.keys(artifactInventory).length),
             } : {}),
+            // The tonic is spent on the strike it doubled.
+            ...(tonicUsed ? { supplies: { tonic: FieldValue.increment(-1) }, tonicsUsed: FieldValue.increment(1), lastTonicAt: FieldValue.serverTimestamp() } : {}),
             rigDepleted: false, // a successful strike clears any stale depleted cache
             updatedAt: FieldValue.serverTimestamp(),
           }, { merge: true });
 
-          return { status: "struck", oil: oilAtLayer, depth: newDepth, isHell, artifact, username: drillNow.username || null, newTank: (drillNow.tankOil || 0) + oilAtLayer };
+          return { status: "struck", oil: oilAtLayer, depth: newDepth, isHell, artifact, tonicUsed, username: drillNow.username || null, newTank: (drillNow.tankOil || 0) + oilAtLayer };
         });
 
         if (outcome.status === "struck") {
           summary.struck++;
           strikes.push({ userId, col, row, ...outcome });
+          if (outcome.tonicUsed) {
+            summary.tonicsUsed = (summary.tonicsUsed || 0) + 1;
+            await logTimeline(db, { type: "tonic", username: outcome.username, userId, detail: "two layers in one strike" });
+          }
 
           if (outcome.isHell) {
             // Hell pocket → summon the demon via the shared creator (identical to the

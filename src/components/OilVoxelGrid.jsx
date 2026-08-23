@@ -6540,7 +6540,8 @@ export default function OilVoxelGrid({
   // world intersection point so the page can dolly the camera in.
   onFocusObject,
   // Vendor stall clicked on the back-edge commercial strip; called with the
-  // vendor id ("insurance" | "fortunes" | "souvenirs" | "tonics").
+  // vendor id ("fortunes" | "souvenirs" | "hotdogs" | "tattoos" | "promos" |
+  // "tonics").
   onVendorClick,
 }) {
   const matRef = useRef();

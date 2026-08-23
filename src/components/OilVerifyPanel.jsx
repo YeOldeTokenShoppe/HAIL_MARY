@@ -8,7 +8,7 @@ import { useState, useCallback, useEffect } from "react";
 //   REVEAL  → publish the secret so anyone can regenerate + verify the field.
 // All actions hit /api/oil-fairness (admin-gated); status comes from the public
 // /api/oil-verify endpoint so the admin sees exactly what players will see.
-export default function OilVerifyPanel({ adminPassword }) {
+export default function OilVerifyPanel({ adminPassword, userId = null }) {
   const [collapsed, setCollapsed] = useState(true);
   const [lead, setLead] = useState("");
   const [busy, setBusy] = useState(null); // 'commit' | 'anchor' | 'reveal' | 'refresh'
@@ -32,6 +32,24 @@ export default function OilVerifyPanel({ adminPassword }) {
   }, []);
 
   useEffect(() => { if (!collapsed && !state) refresh(); }, [collapsed, state, refresh]);
+
+  // QA: mint an extra DAILY TICKET for the signed-in admin with a chosen
+  // outcome (pays its prize, never counts toward the streak).
+  const [testOutcome, setTestOutcome] = useState("pickaxe");
+  const [testTicket, setTestTicket] = useState(null);
+  const mintTestTicket = useCallback(async () => {
+    if (!userId) { setError("Sign in first — the test ticket is minted for your own rig."); return; }
+    try {
+      setBusy("ticket"); setError(null); setTestTicket(null);
+      const res = await fetch("/api/oil-ticket-admin", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPassword, userId, outcome: testOutcome }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.error || "mint failed");
+      setTestTicket(data);
+    } catch (e) { setError(e.message); } finally { setBusy(null); }
+  }, [adminPassword, userId, testOutcome]);
 
   const runAction = useCallback(async (action) => {
     try {
@@ -114,6 +132,25 @@ export default function OilVerifyPanel({ adminPassword }) {
                 </span>
               </div>
             )}
+          </div>
+
+          {/* QA: a DAILY TICKET with a chosen outcome, for the signed-in admin */}
+          <div style={s.inputRow}>
+            <select value={testOutcome} onChange={(e) => setTestOutcome(e.target.value)} style={{ ...s.input, cursor: "pointer" }}>
+              <option value="pickaxe">TEST TICKET · +1 DRILL</option>
+              <option value="derrick">TEST TICKET · TONIC</option>
+              <option value="coin">TEST TICKET · COUPON</option>
+              <option value="gusher">TEST TICKET · JACKPOT</option>
+              <option value="lose">TEST TICKET · NO MATCH</option>
+            </select>
+            <button onClick={mintTestTicket} style={s.smallBtn} disabled={!!busy}>
+              {busy === "ticket" ? "..." : "MINT"}
+            </button>
+          </div>
+          <div style={{ ...s.note, marginTop: -4, marginBottom: 8 }}>
+            {testTicket
+              ? `Minted ${testTicket.id} (${testTicket.outcome}) — open DAILY TICKET on the field; it takes the stage once today's daily is settled. Pays its prize; never counts toward the streak.`
+              : "Mints an extra ticket for YOUR rig with that outcome so every prize can be watched landing. Not seeded from the season secret; flagged TEST TICKET."}
           </div>
 
           {/* Commit (with optional lead override) */}

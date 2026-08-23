@@ -52,7 +52,8 @@ export async function POST(req) {
 
       const jumpsUsed = drill.claimJumpsUsed ?? 0;
       const bonus = drill.bonusDrills ?? 0;
-      const isFree = jumpsUsed < FREE_CLAIM_JUMPS;
+      // Free jumps: the season allowance plus any won on the DAILY TICKET (jackpot).
+      const isFree = jumpsUsed < FREE_CLAIM_JUMPS + (drill.bonusClaimJumps ?? 0);
       if (!isFree && bonus <= 0) throw new Error("No jumps left (need a bonus drill)");
 
       const oldRef = db.collection("oilPlots").doc(oldKey);

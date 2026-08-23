@@ -19,16 +19,33 @@ export const TICKET_STREAK_GUARANTEE = 7; // every 7th ticket of an unbroken str
 export const TICKET_SYMBOLS = ["pickaxe", "derrick", "coin", "gusher", "barrel", "dry"];
 
 // The prize table — the economy. Probabilities are per ticket, checked
-// top-down. `bonusDrills` credits the drill doc (capped like every other bonus),
-// `supply` credits oilDrills.supplies.{name}, `quest` queues a sidequest.
+// top-down. Prizes are progression, protection, access or cosmetics — never
+// BTR or USDC (banked BTR converts to USDC at the buzzer; a free ticket that
+// paid it would be a cash lottery, not a sweepstakes).
+//   bonusDrills → oilDrills.bonusDrills (capped like every other bonus) + bonusFromTickets
+//   claimJumps  → oilDrills.bonusClaimJumps (extra free rig moves)
+//   supply      → oilDrills.supplies.{tonic}: a tonic makes the next strike drill two layers
+//   coupon      → oilDrills.coupon: COUPON_PCT off one Pimp My Pump purchase, COUPON_DAYS to use it
+export const COUPON_PCT = 25;
+export const COUPON_DAYS = 7;
 export const TICKET_PRIZES = [
-  { sym: "gusher",  tier: "jackpot", p: 1 / 60, prize: "JACKPOT · 3 BONUS DRILLS + A SIDEQUEST", short: "JACKPOT",  bonusDrills: 3, quest: "fortune_teller_sidequest" },
-  { sym: "coin",    tier: "medium",  p: 1 / 24, prize: "A STALL COUPON",                          short: "COUPON",   supply: "coupon" },
-  { sym: "derrick", tier: "medium",  p: 1 / 24, prize: "A TONIC",                                 short: "TONIC",    supply: "tonic" },
-  { sym: "pickaxe", tier: "small",   p: 1 / 3,  prize: "+1 BONUS DRILL",                          short: "+1 DRILL", bonusDrills: 1 },
+  { sym: "gusher",  tier: "jackpot", p: 1 / 60, prize: "JACKPOT · 3 BONUS DRILLS + A CLAIM JUMP",    short: "JACKPOT",  bonusDrills: 3, claimJumps: 1 },
+  { sym: "coin",    tier: "medium",  p: 1 / 24, prize: `STALL COUPON · ${COUPON_PCT}% OFF ONE UPGRADE`, short: "COUPON",   coupon: true },
+  { sym: "derrick", tier: "medium",  p: 1 / 24, prize: "A TONIC · NEXT STRIKE DRILLS TWO LAYERS",      short: "TONIC",    supply: "tonic" },
+  { sym: "pickaxe", tier: "small",   p: 1 / 3,  prize: "+1 BONUS DRILL",                               short: "+1 DRILL", bonusDrills: 1 },
 ];
 export const TICKET_PRIZE_BY_SYM = Object.fromEntries(TICKET_PRIZES.map((p) => [p.sym, p]));
 export const TICKET_WIN_RATE = TICKET_PRIZES.reduce((s, p) => s + p.p, 0);
+
+// A coupon on the drill doc: { pct, expiresAt (ms), issuedDay }. Valid while unexpired.
+export const couponValid = (c, now = Date.now()) => !!c && typeof c.expiresAt === "number" && c.expiresAt > now && (c.pct || 0) > 0;
+export const couponDaysLeft = (c, now = Date.now()) => (couponValid(c, now) ? Math.max(1, Math.ceil((c.expiresAt - now) / 86400000)) : 0);
+
+// Ticket ids: the daily ticket is its day key; admin test tickets are
+// `${day}_t${n}` — they pay prizes (so QA can see them land) but never touch
+// the streak or the ledger.
+export const isTicketId = (s) => typeof s === "string" && /^\d{8}(_t\d{1,3})?$/.test(s);
+export const isTestTicketId = (s) => typeof s === "string" && /_t\d{1,3}$/.test(s);
 
 // ── days ──
 // The ticket day is a UTC day, like the drill day.

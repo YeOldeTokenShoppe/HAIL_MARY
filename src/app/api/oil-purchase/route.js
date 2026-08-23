@@ -10,6 +10,8 @@ import {
   serverTimestamp,
 } from "@/lib/firebaseServer";
 import { PREMIUM_PRICES, getItemCategory } from "@/lib/oilPremium";
+import { getAdminDb, FieldValue as AdminFieldValue } from "@/lib/firebaseAdmin";
+import { couponValid } from "@/lib/oilTicket";
 import { useFacilitator } from "x402/verify";
 import { exact } from "x402/schemes";
 import { createFacilitatorConfig } from "@coinbase/x402";
@@ -155,6 +157,25 @@ export async function POST(req) {
       return NextResponse.json({ error: "Nothing to charge" }, { status: 400 });
     }
 
+    // DAILY TICKET stall coupon: COUPON_PCT off this purchase while it's
+    // valid. The discount is applied to what the 402 asks for, so the x402
+    // client pays exactly the discounted amount; the coupon is spent once the
+    // unlock is granted. Read/written with the admin SDK (oilDrills is
+    // client-read-only).
+    const listUsdc = totalUsdc;
+    let coupon = null;
+    try {
+      const adb = getAdminDb();
+      const dSnap = await adb.collection("oilDrills").doc(userId).get();
+      const c = dSnap.exists ? dSnap.data().coupon : null;
+      if (couponValid(c)) {
+        coupon = { pct: c.pct, expiresAt: c.expiresAt };
+        totalUsdc = Math.max(0.01, Math.round(listUsdc * (1 - c.pct / 100) * 100) / 100);
+      }
+    } catch (err) {
+      console.warn("[oil-purchase] coupon lookup failed:", err.message);
+    }
+
     const paymentRequirements = buildPaymentRequirements(itemIds, totalUsdc, req.url);
 
     // No payment header → return 402 with requirements so x402-fetch can sign + retry.
@@ -165,6 +186,7 @@ export async function POST(req) {
           x402Version: X402_VERSION,
           error: "X-PAYMENT header required",
           accepts: [paymentRequirements],
+          ...(coupon ? { coupon: { ...coupon, listUsdc, totalUsdc } } : {}),
         },
         { status: 402 },
       );
@@ -239,6 +261,20 @@ export async function POST(req) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
 
+    // The unlock is granted — spend the coupon (best effort; the discount was
+    // already honoured in what was charged).
+    if (coupon) {
+      try {
+        await getAdminDb().collection("oilDrills").doc(userId).set({
+          coupon: AdminFieldValue.delete(),
+          couponsUsed: AdminFieldValue.increment(1),
+          lastCouponUsedAt: AdminFieldValue.serverTimestamp(),
+        }, { merge: true });
+      } catch (err) {
+        console.warn("[oil-purchase] coupon spend failed:", err.message);
+      }
+    }
+
     // Settle on-chain via the facilitator. If settle fails after the unlock
     // was granted, we still return the unlock — refund logic would belong
     // in a separate reconciliation pass.
@@ -250,7 +286,7 @@ export async function POST(req) {
       settleResult = { success: false, error: err.message };
     }
 
-    const response = NextResponse.json({ ok: true, itemIds, settle: settleResult });
+    const response = NextResponse.json({ ok: true, itemIds, settle: settleResult, charged: totalUsdc, ...(coupon ? { coupon: { ...coupon, listUsdc } } : {}) });
     if (settleResult?.transaction) {
       response.headers.set(
         "x-payment-response",

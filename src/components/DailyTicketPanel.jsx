@@ -160,13 +160,13 @@ export default function DailyTicketPanel({
   const [remoteError, setRemoteError] = useState(null);
   const [countedId, setCountedId] = useState(null);
 
-  const ticketId = live ? `live-${day}` : `${day}-${plotKey}-${serial}`;
+  const ticketId = live ? `live-${remote?.id || day}` : `${day}-${plotKey}-${serial}`;
   const forcedOutcome = !live && forced && forced.serial === serial ? forced.outcome : null;
   const ticket = useMemo(() => {
     if (live) {
       if (!remote) return null;
       // The cells carry the outcome; the server confirms it at settle.
-      return { cells: remote.cells, win: evaluateCells(remote.cells).win, seedHex: String(remote.seedHash || "").slice(0, 8), forced: false };
+      return { cells: remote.cells, win: evaluateCells(remote.cells).win, seedHex: String(remote.seedHash || "").slice(0, 8), forced: !!remote.test, test: !!remote.test };
     }
     // The guarantee is fixed at mint (every Nth ticket in test mode), never
     // re-derived from the live streak — a ticket must not re-mint itself.
@@ -190,6 +190,7 @@ export default function DailyTicketPanel({
   // with no fanfare — it's a replay.
   const [mintAttempt, setMintAttempt] = useState(0);
   const retryMint = () => { setRemoteError(null); setMintAttempt((n) => n + 1); };
+  const liveSettled = live && remote?.status === "settled";
   useEffect(() => {
     if (!live || !apiFetch) return;
     let cancelled = false;
@@ -199,7 +200,7 @@ export default function DailyTicketPanel({
         const json = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) { setRemoteError(json.error || `ticket unavailable (${res.status})`); return; }
-        const id = `live-${json.day}`;
+        const id = `live-${json.id || json.day}`;
         setRemote(json);
         setStreak(json.streak || 0);
         setHistory((json.recent || []).map((r) => ({ id: `live-${r.day}`, no: `${String(r.day).slice(4)}-01`, sym: r.sym || null, tier: r.tier || null })));
@@ -235,7 +236,7 @@ export default function DailyTicketPanel({
     if (live && apiFetch) {
       // The server recomputes the outcome from the stored cells and applies
       // the prize; the streak it returns is the one that counts.
-      apiFetch("/api/oil-ticket-settle", { method: "POST", body: JSON.stringify({ day }) })
+      apiFetch("/api/oil-ticket-settle", { method: "POST", body: JSON.stringify({ id: remote?.id || day }) })
         .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
         .then(({ ok, j }) => { if (ok && typeof j.streak === "number") setStreak(j.streak); else if (!ok) console.warn("[daily ticket] settle:", j.error); })
         .catch((e) => console.warn("[daily ticket] settle failed:", e.message));
@@ -251,7 +252,7 @@ export default function DailyTicketPanel({
       }, CONFETTI_DELAY_MS);
     }
     if (kind === "jackpot") onJackpot?.();
-  }, [settled, countedId, ticketId, ticketNo, day, won, winSym, ticket, live, apiFetch, soundOn, onJackpot, onSettle]);
+  }, [settled, countedId, ticketId, ticketNo, day, won, winSym, ticket, live, apiFetch, remote?.id, soundOn, onJackpot, onSettle]);
   useEffect(() => () => clearTimeout(confettiTimer.current), []);
   const fxLive = fx && fx.id === ticketId ? fx : null;
 
@@ -262,6 +263,7 @@ export default function DailyTicketPanel({
   // next ticket once it has settled. Nothing shares the title's line, so it
   // never wraps or gets overlapped. The ticket itself only renders while open.
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (open && liveSettled) retryMint(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(id); }, []);
   const nextIn = fmtCountdown(msToNextTicketDay(now));
@@ -342,7 +344,7 @@ export default function DailyTicketPanel({
             <span style={{ background: K.band, color: K.bandText, fontFamily: MONO, fontSize: 8, fontWeight: 700, letterSpacing: "0.16em", padding: "3px 7px", borderRadius: "2px 0 0 2px", display: "flex", alignItems: "center", whiteSpace: "nowrap" }}>TICKET NO.</span>
             <span style={{ flex: 1, minWidth: 0, background: K.field, color: K.ink, fontFamily: MONO, fontSize: 11, letterSpacing: "0.18em", padding: "2px 8px", borderWidth: "1px 1px 1px 0", borderStyle: "solid", borderColor: K.band, borderRadius: "0 2px 2px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
               <span style={{ whiteSpace: "nowrap" }}>{ticketNo}</span>
-              {ticket.forced && <span style={{ fontSize: 8, color: K.lose, letterSpacing: "0.12em", whiteSpace: "nowrap" }}>FORCED (TEST)</span>}
+              {ticket.forced && <span style={{ fontSize: 8, color: K.lose, letterSpacing: "0.12em", whiteSpace: "nowrap" }}>{ticket.test ? "TEST TICKET" : "FORCED (TEST)"}</span>}
             </span>
           </div>
 

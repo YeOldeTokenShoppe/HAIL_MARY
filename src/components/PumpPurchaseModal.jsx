@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
+import { couponValid, couponDaysLeft } from "@/lib/oilTicket";
 import { createPortal } from "react-dom";
 import { getItemPrice, getItemCategory } from "@/lib/oilPremium";
 import { useWalletClient, useReadContract } from "wagmi";
@@ -11,7 +12,7 @@ const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const BASE_CHAIN_ID = 8453;
 
 // items = array of { id, label, category }
-export default function PumpPurchaseModal({ items, activeAccount, userId, onComplete, onClose, onConnectWallet, onGetUsdc }) {
+export default function PumpPurchaseModal({ items, activeAccount, userId, onComplete, onClose, onConnectWallet, onGetUsdc, coupon = null }) {
   const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const { data: walletClient } = useWalletClient();
@@ -24,6 +25,10 @@ export default function PumpPurchaseModal({ items, activeAccount, userId, onComp
     }
     return sum;
   }, [items]);
+  // DAILY TICKET stall coupon — the server applies the same discount to what
+  // it asks the wallet for; this just shows it.
+  const couponPct = couponValid(coupon) ? coupon.pct : 0;
+  const payUsdc = couponPct ? Math.max(0.01, Math.round(totalUsdc * (1 - couponPct / 100) * 100) / 100) : totalUsdc;
 
   // Pre-check USDC balance on Base so we can offer the Onramp fallback
   // before the user signs a payment that would fail at settle time.
@@ -124,9 +129,14 @@ export default function PumpPurchaseModal({ items, activeAccount, userId, onComp
           <>
             <div style={sectionLabel}>PAY WITH</div>
             <div style={payCard}>
-              <span style={priceNum}>${totalUsdc}</span>
+              <span style={priceNum}>${payUsdc}</span>
               <span style={priceUnit}>USDC ON BASE</span>
             </div>
+            {couponPct > 0 && (
+              <div style={{ ...sectionLabel, marginTop: 6, color: "#5a8a3a" }}>
+                🎟 STALL COUPON · {couponPct}% OFF · was ${totalUsdc} · {couponDaysLeft(coupon)}d left
+              </div>
+            )}
 
             {insufficient && onGetUsdc ? (
               <>
