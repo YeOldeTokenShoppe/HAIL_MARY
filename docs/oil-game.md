@@ -6,6 +6,79 @@ A 3D oil exploration game where players claim land on a fixed 10x10 grid and dri
 
 > **Status: BUILT (2026-06-07).** The pacing/depth model, the uncapped local tank, the depth levers, and the fixed-rate prize economics in this section are implemented and tested — see *TIMING FRAMEWORK* and *Depth levers* below for specifics and file pointers. Older descriptive sections (Core Mechanics, Game Phase Flow, Data Model) have been reconciled to match. **Still proposal-only:** the *contested-capture* theft rework in **Rogue Characters → Consequences v2** — the dino still takes un-banked tank oil today.
 
+## v2 LOOP — EXTRACT OR PASS (decided 2026-08-23 · NOT BUILT)
+
+> **Status: DESIGN, decided with Michelle 2026-08-23 — supersedes "Local tank & banking" and the "milk-vs-gamble" line of the current loop. Nothing below is implemented yet; see *What changes* for the build list.**
+
+### Why
+
+The current loop is passive: the rig drills to its cap on its own, and the player's only verb is BANK. The one decision the design promised — "keep drilling deeper or not" — doesn't exist in code (`drillStatus` is always `auto-pumping` for real players), and it couldn't work anyway: with free, instant banking, a player who wants to play **never** stops pumping and banks often. A hold/stop control would be dead.
+
+So the tension moves to three places where it's real:
+
+1. **What to take** — a layer, once revealed, is a decision: spend a charge on it or let it go.
+2. **Where to take it from** — passed layers are open to neighbours' lateral drills, so a full grid still has a game.
+3. **What to spend** — bonus drills are charges; tonics are answers to bad layers.
+
+Banking stops being a chore: extracted oil is banked on extraction.
+
+### The loop
+
+- The bore stays passive and paced exactly as today (`lib/oilStrikeClock.js`): over the season the rig **reveals all 20 layers in order**, one per strike, at a secret moment inside each window. Cadence with the current settings (8-day season): a reveal every **9.6 h**.
+- A **drill is an extraction charge.** Passive charges per season + bonus charges (referrals, holding milestones, daily-ticket prizes, demon bounties) up to the layer count. A player with 20 charges extracts everything — their reward for the bonuses is never having to choose. Everyone else plays the game every strike.
+- Each strike **reveals** the layer (oil amount, dry, or hell) and fills the rig's tank with it. The layer is **UNDECIDED** until the next strike. The player chooses:
+  - **EXTRACT** — spend a charge; the tank pumps down the pipeline to the main tank; BANKED ticks up. Final.
+  - **PASS** — the layer is gone from this column; the tank vents it back into the ground at that layer, where it is **open to lateral drills** from neighbours. **Pass is final** (decided; no re-open, not for any price).
+- **Offline default — the player's own line.** Every rig has a threshold ("auto-extract any layer ≥ 800 BTR"). If a layer is still undecided when the next strike lands, the rig resolves it by the threshold. Nobody is punished for being asleep; the threshold *is* the strategy dial and the strike alert becomes actionable: "Layer 12: 1,400 BTR — above your line, extracting" / "below it — passing in 9 h unless you say otherwise."
+- **Endgame rule:** when charges remaining ≥ layers remaining, the rig extracts everything automatically (there is nothing left to decide). Unspent charges at the buzzer are wasted, so hoarding has a cost.
+
+### Lateral drills — the full-grid game
+
+- A **passed layer in a neighbouring column** (the 4 orthogonal neighbours; 8 if the field wants it) can be taken by a **lateral drill**: spend a charge, take that layer's oil. Contested between neighbours: first lateral wins; the layer then closes.
+- Nothing anyone chose to keep can ever be touched — this is the "contested capture" principle already in this doc, finally with a concrete object. Banked oil stays sacrosanct.
+- Claim jumps stay for when plots release. The dino, if it remains, hunts **passed layers only**.
+
+### The tonic (daily-ticket prize)
+
+One clear consumable for one clear moment: **cap a hell pocket.** The breach happens on reveal; a tonic in supply neutralizes it — no demon, no halt. (Spent automatically on the breach; a setting can make it manual later.) A second consumable — re-open a passed layer — was considered and **rejected**: pass is final.
+
+### Banking is removed
+
+- No BANK button, no "IN TANK · AT RISK". Extraction = banking.
+- The per-rig **tank model stays** and becomes the decision buffer: it fills on a strike (something's on the table), drains down the pipeline on EXTRACT (the reward beat — the existing "sent to main tank" animation), or vents on PASS (the visual cue to the field that a layer is open). Fill level is honest: full = a decision is waiting; the "heavy" red state = the decision is about to auto-resolve by the threshold.
+- The main tank keeps its meaning: the community total on the leaderboard. Payout stays fixed-rate per unit (`payout = banked × rate`), bounded by the field.
+
+### Field tuning — the decision must bind (measured)
+
+Simulated 2026-08-23 against the real generator (`generateOilDistribution3D`, 6×6×20, 30–40 seeds each) with the extract-or-pass rules above (threshold strategies include the endgame rule):
+
+| deposits | wet layers | wet / column (median) | columns where charges bind | extract-every-wet-layer | best fixed threshold | oracle share of column |
+|---|---|---|---|---|---|---|
+| **5 (today)**, 10 charges | 13% | 2 | **0%** | 98.7% of oracle | 98.7% | 100% |
+| 12, 10 charges | 30% | 6 | 14% | 97.2% | 97.2% | 99% |
+| 25, 10 charges | 51% | 10 | 49% | 91.3% | 92.9% | 96% |
+| 40, 10 charges | 66% | 14 | 75% | 85.1% | 91.6% | 92% |
+| 25, 6 charges | 51% | 10 | 79% | 73.2% | 86.0% | 84% |
+| 40, 6 charges | 66% | 14 | 93% | 65.4% | 84.2% | 76% |
+
+Reading it: with the field as tuned today the mechanic is fake — a column rarely has more wet layers than charges, so "extract every wet layer" is the whole game. It becomes a real decision once **wet layers per column exceed passive charges**: at 25–40 smaller deposits, a good threshold beats a naive one by 13–19 points, and a perfect player has ~15 more to find. **Recommendation for the first v2 season: ~30 deposits, 8 passive charges, bonuses to 20.** Re-run the sim at tuning time (the script is trivial — strategies are ten lines) and tune `numberOfDeposits`, not the formula. The distribution knob must be set **before the anchor** (changing it after commit remaps every seed — same rule as the oil radius band).
+
+### What changes (build list)
+
+**Data — `oilDrills/{userId}`:** `charges` (int, replaces the role of `bonusDrills` in the depth math; `bonusDrills` keeps feeding it), `threshold` (BTR), `pending` `{ layer, oil, isHell, revealedAt, decideBy }` or null, `layersExtracted` / `layersPassed` (maps layer → oil), `laterals` (count), `supplies.tonic` (exists). **`oilPlots/{col_row}`:** `passed: { [layer]: oil }` (open to laterals), `lateralTaken: { [layer]: userId }`.
+
+**Server:** the tick reveals (no extraction) and, before revealing the next layer, **resolves the pending one by the threshold**; a hell reveal consumes a tonic if present, else summons the demon as today. New routes: `oil-layer-decide { layer, action: extract|pass }`, `oil-threshold { btr }`, `oil-lateral { col, row, layer }` (neighbour check, passed-and-unclaimed check, charge, transaction). `oil-tank-drain` retires (or becomes a no-op). Alerts: the strike alert carries the number and the line ("above/below your threshold"). `depthCapFor` stops gating the bore (the bore goes to 20) and becomes the charge count.
+
+**Client:** the Core Sample column is the decision surface (EXTRACT / PASS on the pending layer, passed layers marked open, neighbours' open layers marked for laterals); the rig card shows CHARGES n/20, the threshold (editable), the pending layer with its countdown, and the cadence line ("a reveal every 9.6 h · next before …"); the BANK block is replaced by the pending-layer block; the tank animates fill / pipeline / vent.
+
+**Test mode:** the existing LAYER stepper reveals; add EXTRACT / PASS / LATERAL controls and a threshold field.
+
+### Open questions
+
+- Lateral reach: 4 neighbours or 8? (Start with 4.)
+- Should a lateral cost more than a charge (a charge + a bonus drill) to keep columns primary? (Start at one charge; watch the sim.)
+- Whether the dino survives at all once passed layers exist for it to hunt.
+
 ### Design through-line
 
 The goal is **constant ambient curiosity** (players compulsively check "did my rig strike?") instead of a predictable daily-appointment loop, while keeping the game **fair, growth-friendly, and never punishing players for being offline** — important because oil is real money.
