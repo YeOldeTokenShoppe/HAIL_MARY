@@ -13,6 +13,12 @@ import {
   HOTDOGS_SITEPAL_FILTER,
   PROMOS_SITEPAL_CROP,
   PROMOS_SITEPAL_FILTER,
+  RUGS_SITEPAL_CROP,
+  RUGS_SITEPAL_FILTER,
+  TACOS_SITEPAL_CROP,
+  TACOS_SITEPAL_FILTER,
+  CARNY_SITEPAL_CROP,
+  CARNY_SITEPAL_FILTER,
   speakPendingVendorLine,
   getVendorSitePalSource,
   notifyVendorTalk,
@@ -25,6 +31,9 @@ const TUNER_VENDORS = {
   tonics: { label: "SALESMAN", crop: TONICS_SITEPAL_CROP, filter: TONICS_SITEPAL_FILTER, constName: "TONICS" },
   hotdogs: { label: "HOT DOG", crop: HOTDOGS_SITEPAL_CROP, filter: HOTDOGS_SITEPAL_FILTER, constName: "HOTDOGS" },
   promos: { label: "PROMOS", crop: PROMOS_SITEPAL_CROP, filter: PROMOS_SITEPAL_FILTER, constName: "PROMOS" },
+  rugs: { label: "RUGS", crop: RUGS_SITEPAL_CROP, filter: RUGS_SITEPAL_FILTER, constName: "RUGS" },
+  tacos: { label: "TACOS", crop: TACOS_SITEPAL_CROP, filter: TACOS_SITEPAL_FILTER, constName: "TACOS" },
+  carny: { label: "CARNY", crop: CARNY_SITEPAL_CROP, filter: CARNY_SITEPAL_FILTER, constName: "CARNY" },
 };
 
 // ── Single SitePal host embed for the /hailmary vendor strip ───────────────
@@ -131,31 +140,36 @@ function VendorCropTuner() {
   };
 
   const slider = (obj, key, min, max) => (
-    <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
-      <span style={{ width: 72 }}>{key}</span>
+    <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+      <span style={{ width: 84 }}>{key}</span>
       <input
         type="range" min={min} max={max} step={1} value={obj[key]}
         onChange={(e) => { obj[key] = Number(e.target.value); force((n) => n + 1); }}
         style={{ flex: 1 }}
       />
-      <span style={{ width: 34, textAlign: "right" }}>{obj[key]}</span>
+      <span style={{ width: 42, textAlign: "right" }}>{obj[key]}</span>
     </label>
   );
 
   return (
     <div style={{
-      position: "fixed", right: 10, bottom: 10, zIndex: 9999, width: 260,
-      background: "rgba(16,20,26,0.92)", color: "#cde", padding: 10,
+      position: "fixed", right: 10, bottom: 10, zIndex: 9999, width: 420,
+      // The panel grew past a short viewport once there were this many vendors
+      // and eleven sliders, so it scrolls rather than running off the screen.
+      maxHeight: "calc(100vh - 20px)", overflowY: "auto",
+      background: "rgba(16,20,26,0.94)", color: "#cde", padding: 12,
       borderRadius: 8, fontFamily: "monospace", display: "flex",
-      flexDirection: "column", gap: 4,
+      flexDirection: "column", gap: 5,
     }}>
-      <div style={{ display: "flex", gap: 4 }}>
+      {/* wrap: the row is per-vendor and keeps growing — squeezing six-plus
+          labels onto one line made them unreadable */}
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         {Object.entries(TUNER_VENDORS).map(([key, v]) => (
           <button
             key={key}
             onClick={() => setVendorKey(key)}
             style={{
-              flex: 1, padding: "3px 4px", fontSize: 10, cursor: "pointer",
+              flex: "1 1 60px", padding: "4px 6px", fontSize: 11, cursor: "pointer",
               background: key === vendorKey ? "#3a4a6a" : "#1a2230",
               color: "#cde", border: "1px solid #3a4a6a", borderRadius: 4,
             }}
@@ -164,11 +178,11 @@ function VendorCropTuner() {
           </button>
         ))}
       </div>
-      <canvas ref={previewRef} width={240} height={180} style={{ width: "100%", borderRadius: 4, background: "#222" }} />
+      <canvas ref={previewRef} width={400} height={300} style={{ width: "100%", borderRadius: 4, background: "#222" }} />
       {TUNER_CROP_FIELDS.map(([k, min, max]) => slider(active.crop, k, min, max))}
-      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>filter</div>
+      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>filter</div>
       {TUNER_FILTER_FIELDS.map(([k, min, max]) => slider(active.filter, k, min, max))}
-      <button onClick={logValues} style={{ marginTop: 6, padding: "4px 8px", cursor: "pointer" }}>
+      <button onClick={logValues} style={{ marginTop: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>
         Log values to console
       </button>
     </div>

@@ -67,17 +67,26 @@ const pickCaption = (eventType) => {
 };
 
 // ── Environment presets ──────────────────────────────────────────────────────
+// Which scene a visitor with no saved preference opens on, from their LOCAL
+// clock. There is no dawn preset, so early morning borrows dusk — the sky reads
+// the same either side of the sun. Boundaries are deliberately generous at the
+// edges: nobody should open on a blazing noon sky at 7pm.
+//   20:00-05:59  night
+//   06:00-07:59  dusk (dawn)
+//   08:00-17:59  day
+//   18:00-19:59  dusk
+function presetForHour(h) {
+  if (h >= 20 || h < 6) return "night";
+  if (h < 8 || h >= 18) return "dusk";
+  return "day";
+}
+
 const ENV_PRESETS = {
   day:   { sky: "#7da4c9", skyBottom: null, ambient: 0.6, dirA: 4.0, dirB: 3.0, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
   solstice: { sky: "#36aee2", skyBottom: "#aee6c0", ambient: 0.82, dirA: 5.2, dirB: 2.4, dirAColor: "#fff2b8", dirBColor: "#7fd8ff", point: "#ffd45a", cloudOpacity: 0.34, fog: "#d8c86a", hemi: { sky: "#80ddff", ground: "#e6b758", intensity: 0.72 } },
   dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
   night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.38, dirA: 1.1, dirB: 0.6, dirAColor: "#aac4ff", dirBColor: "#6a80c0", point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: { sky: "#2e3650", ground: "#161824", intensity: 0.4 } },
   hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } },
-  // Backdrop for Geode mode — a colorful sunset: deep indigo-blue overhead melting
-  // into a warm rose/amber horizon. Lighter than night so the field stays alive,
-  // but saturated and dusky enough that the cool frosted-glass Geode panels read as
-  // glowing glass rather than muddy brown. Warm key light + cool fill.
-  GeodeDusk: { sky: "#1613d7", skyBottom: "#8519d3", ambient: 0.56, dirA: 2.8, dirB: 1.4, dirAColor: "#ffc890", dirBColor: "#88b0e0", point: "#e09060", cloudOpacity: 0.22, fog: "#4a3f55", hemi: { sky: "#5a5a88", ground: "#3a2e3a", intensity: 0.5 } },
   // Self-contained scene for Parabolum — an arcane violet twilight. Brighter
   // ambient than night (which left the ground near-black) so the field reads,
   // with violet key/fill/point lights to match the Parabolum console.
@@ -158,39 +167,6 @@ const THEMES = {
     btnText: "#c9b3e6", btnBg: "rgba(123,45,214,0.16)",
     cornerBorder: "rgba(164,92,255,0.3)",
   },
-  // Geode — mirrors the SpaceScene prospecting-Geode palette (the `Geode` constant in
-  // SpaceScene.jsx): gold/cyan/orange accents floating on a translucent
-  // indigo-black panel. A standalone reskin of the overlay chrome, toggled
-  // independently of the day/dark/parabolum controls. Cyan rides on the `green`
-  // token (status + positive readouts); orange rides on `warn`.
-  Geode: {
-    bg: "#0f141c", text: "#aebccb", textStrong: "#e8d9b8", accent: "#d4a854",
-    muted: "#7e94a6", border: "rgba(107,199,209,0.24)", borderLight: "rgba(107,199,209,0.14)",
-    panelBg: "rgba(15,22,30,0.08)", headerBg: "rgba(13,19,27,0.66)",
-    inputBg: "rgba(22,32,42,0.5)", barBg: "rgba(107,199,209,0.12)", tintBg: "rgba(107,199,209,0.06)",
-    green: "#6bc7d1", greenBg: "rgba(107,199,209,0.12)",
-    warn: "#e87a2b", red: "#e0563c",
-    gold: "#d4a854", goldBorder: "#b8922e",
-    scanline: "rgba(107,199,209,0.04)",
-    statusText: "#6bc7d1", seedLabel: "#7e94a6", seedValue: "#9fc4cf",
-    rankClaim: "#8aa0b0", rankOil: "#cbd9e2", rankBarBg: "rgba(107,199,209,0.14)",
-    inspectorKey: "#7e94a6", depthUndrilled: "#3a4754",
-    btnText: "#bfe0e6", btnBg: "rgba(107,199,209,0.1)",
-    cornerBorder: "rgba(107,199,209,0.32)",
-    // Cool frosted-glass panel — a cyan-led wash with a gold counterpoint, a
-    // cyan/gold accent line, and a cream top-highlight. The low panel opacity
-    // lets the sunset bleed through as colored glass, not an opaque brown slab.
-    titleCool: "#6bc7d1", titleCoolBorder: "rgba(107,199,209,0.7)",
-    panelWash: "linear-gradient(160deg, rgba(107,199,209,0.10) 0%, rgba(170,210,220,0.03) 50%, rgba(212,168,84,0.06) 100%)",
-    panelLine: "linear-gradient(90deg, rgba(107,199,209,0.05), rgba(107,199,209,0.40), rgba(212,168,84,0.34), rgba(107,199,209,0.05))",
-    statWash: "linear-gradient(150deg, rgba(107,199,209,0.08), rgba(15,22,30,0.16) 55%, rgba(212,168,84,0.05))",
-    softShadow: "inset 0 1px 0 rgba(190,224,230,0.10), 0 10px 30px rgba(0,0,0,0.4)",
-    // Selection highlight FILL — arcane violet (the cyan border stays via t.green).
-    // Used by the surface map + cross-section selected column.
-    selectFill: "rgba(176,123,255,0.5)",
-    selectOverlay: "rgba(176,123,255,0.22)",
-    selectHatch: "rgba(176,123,255,0.45)",
-  },
 };
 
 // ── Sky dome gradient ────────────────────────────────────────────────────────
@@ -214,106 +190,6 @@ const skyGradientShader = {
     }
   `,
 };
-
-// Colored glow hovering just beneath the floating oil-field cube. The cube's
-// bottom face sits at local y = -worldH (≈ -10 for the default 20-level grid),
-// so this sits a touch below it. Placeholder color for now — placement first.
-function FieldUnderglow({ y = -8, color = "#e88409", size = 40, drop = 3, haloSize = 30, haloDrop = 5, haloOpacity = 0.6 }) {
-  // Soft radial-gradient sprite (camera-facing) so the glow has feathered edges
-  // instead of a hard sphere silhouette. Keeps default depthTest so the cube
-  // occludes the upper half and the glow spills out from beneath the field.
-  // The light stays just under the field (casting the dusky surface color), but
-  // the sprite's bright core is dropped into open space below the cube so the
-  // glow reads as light from *below* rather than from within the field; its
-  // faint outer falloff still bleeds up to keep the surface dusk.
-  const texture = useMemo(() => {
-    if (typeof document === "undefined") return null;
-    const s = 128;
-    const c = document.createElement("canvas");
-    c.width = c.height = s;
-    const ctx = c.getContext("2d");
-    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-    g.addColorStop(0, "rgba(255,255,255,1)");
-    g.addColorStop(0.35, "rgba(255,255,255,0.5)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, s, s);
-    return new THREE.CanvasTexture(c);
-  }, []);
-  // Bottom-weighted variant for the camera-facing halo: the same radial glow,
-  // but its UPPER half is faded to transparent so the halo can be large/bright
-  // enough to hold the horizon glow at any orbit angle without its top reaching
-  // up to light the grid surface. Decouples horizon brightness from grid reach,
-  // which size/drop alone can't. (Canvas top = sprite top.)
-  const haloTexture = useMemo(() => {
-    if (typeof document === "undefined") return null;
-    const s = 128;
-    const c = document.createElement("canvas");
-    c.width = c.height = s;
-    const ctx = c.getContext("2d");
-    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-    g.addColorStop(0, "rgba(255,255,255,1)");
-    g.addColorStop(0.35, "rgba(255,255,255,0.5)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, s, s);
-    // Cut the top: keep the lower half, ramp the upper half down to nothing.
-    ctx.globalCompositeOperation = "destination-in";
-    const v = ctx.createLinearGradient(0, 0, 0, s);
-    v.addColorStop(0, "rgba(0,0,0,0)");      // top edge — fully removed
-    v.addColorStop(0.5, "rgba(0,0,0,0.12)"); // around the core — mostly removed
-    v.addColorStop(1, "rgba(0,0,0,1)");      // bottom — kept
-    ctx.fillStyle = v;
-    ctx.fillRect(0, 0, s, s);
-    return new THREE.CanvasTexture(c);
-  }, []);
-  return (
-    <group position={[0, y, 0]}>
-      {/* Horizontal ground-glow disc (lies flat in the XZ plane) rather than a
-          camera-facing vertical sprite. A vertical quad's plane cuts up through
-          the cube, and depthTest clips it into a hard occlusion seam that slides
-          across the cube as you orbit (the "shadow"). A flat disc sits just
-          under the cube: the cube cleanly occludes the part directly beneath it
-          and the rim spills out around the base as the horizon glow — no seam.
-          Stays depthTest'd, so it also avoids the iOS additive-CanvasTexture
-          blocky-rectangle artifact. */}
-      <mesh position={[0, -drop, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[size / 2, 48]} />
-        <meshBasicMaterial
-          map={texture}
-          color={color}
-          transparent
-          opacity={0.85}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {/* Camera-facing halo: keeps the horizon glow alive at low orbit angles,
-          where the flat disc projects edge-on and nearly vanishes. Kept small
-          and dropped LOW so its top edge tucks under the cube's bottom — it
-          spills out and down into the sky as the horizon rim but never rises in
-          front of the grid surface, so it doesn't re-introduce the extra-light
-          bleed onto the grid that the vertical sprite alone caused. Tune:
-          smaller haloSize / larger haloDrop = less grid reach; larger haloSize /
-          haloOpacity = more horizon glow. */}
-      <sprite position={[0, -haloDrop, 0]} scale={[haloSize, haloSize, 1]}>
-        <spriteMaterial
-          map={texture}
-          color={color}
-          transparent
-          opacity={haloOpacity}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </sprite>
-      {/* No pointLight: an omni light here under-lit the tall water tower and
-          threw an uneven hotspot on the grid ground at certain angles. The
-          additive disc + halo are unlit and carry the glow without shading any
-          geometry. */}
-    </group>
-  );
-}
 
 const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false }) {
   const topCol = useMemo(() => new THREE.Color(skyColor), [skyColor]);
@@ -831,9 +707,12 @@ function CameraFlyTo({ target, controlsRef }) {
       // next frame until the ref is populated.
       if (controls) {
         lastId.current = target.id;
-        // Save and temporarily lower minDistance
+        // Save and temporarily lower minDistance. A focus flight may override
+        // the floor even lower: the photo booth's cabin is ~0.18 world units
+        // deep, so a camera parked inside needs a smaller radius than the 0.3
+        // default or OrbitControls shoves it back out through the wall.
         if (savedMinDist.current === null) savedMinDist.current = controls.minDistance;
-        controls.minDistance = 0.3;
+        controls.minDistance = target.minDist ?? 0.3;
 
         startPos.current.copy(camera.position);
         startTarget.current.copy(controls.target);
@@ -913,6 +792,11 @@ function CameraFlyTo({ target, controlsRef }) {
           const focusDist = target.focusDist ?? (target.mobile ? 0.2 : 0.25);
           endPos.current.copy(endTarget.current).addScaledVector(dir, focusDist);
         } else if (target.rigIntro) {
+          // CURRENTLY UNREACHABLE. This was the plot-owner page-open pose; owners
+          // now get the same aerial intro as everyone else and nothing sets
+          // rigIntro. Kept because it is the one framing tuned to clear the high
+          // desktop surface — reach for it if you ever want a "fly to my rig"
+          // shot that handleFlyTo's near-level close-up can't give you.
           // Desktop page-open focus on the player's own rig: an elevated, pulled-
           // back 3/4 view. The camera sits well above the surface and looks down
           // ~30°, so the open never dives to near-ground level into the grid.
@@ -1225,7 +1109,8 @@ const TIME_OF_DAY = [["day", ICON_DAY], ["dusk", ICON_DUSK], ["night", ICON_NIGH
 // permanent screen space over the hero shot of the field.
 function SceneThemeToolbar({
   envPreset, setEnvPreset, darkMode, setDarkMode,
-  parabolum, setParabolum, GeodeMode, setGeodeMode,
+  parabolum, setParabolum,
+  autoTheme, enableAutoTheme,
   setFireworksOn, size = 28,
 }) {
   const [open, setOpen] = useState(false);
@@ -1244,10 +1129,16 @@ function SceneThemeToolbar({
 
   // Glyph + tint shown on the collapsed trigger, reflecting the active theme.
   let triggerGlyph, triggerVariant = "gold";
-  if (GeodeMode) { triggerGlyph = "⊞"; triggerVariant = "cyan"; }
-  else if (parabolum) { triggerGlyph = "◈"; triggerVariant = "violet"; }
+  if (parabolum) { triggerGlyph = "◈"; triggerVariant = "violet"; }
   else if (envPreset === "solstice") triggerGlyph = "✺";
-  else if (darkMode || envPreset === "night") triggerGlyph = ICON_NIGHT;
+  // Reads envPreset ONLY, deliberately. This used to be `darkMode || envPreset
+  // === "night"`, which let the tray show the night glyph while the 3D scene was
+  // still in day — the two are separate states and the time-of-day buttons only
+  // move envPreset. That cost real debugging time (spotlight beams and string
+  // lights are gated on envPreset, so they were correctly off while every UI
+  // affordance insisted it was night). The glyph now cannot disagree with the
+  // scene it is controlling.
+  else if (envPreset === "night") triggerGlyph = ICON_NIGHT;
   else if (envPreset === "dusk") triggerGlyph = ICON_DUSK;
   else triggerGlyph = ICON_DAY;
 
@@ -1255,19 +1146,27 @@ function SceneThemeToolbar({
     <div ref={ref} style={TOOLBAR_TRAY}>
       {open && (
         <>
+          {/* Auto — follow the wall clock. Highlighted while no explicit pick is
+              stored; choosing any preset below turns it off. Sits first so the
+              row reads "auto, or pin one of these". */}
+          <button
+            title={autoTheme ? "Auto — follows time of day (active)" : "Auto — follow time of day"}
+            onClick={() => { enableAutoTheme?.(); setFireworksOn(false); }}
+            style={toolbarBtn(autoTheme, size)}
+          >⏱</button>
           {TIME_OF_DAY.map(([key, icon]) => (
             <button
               key={key}
               title={key[0].toUpperCase() + key.slice(1)}
               onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
-              style={toolbarBtn(envPreset === key, size)}
+              style={toolbarBtn(!autoTheme && envPreset === key, size)}
             >{icon}</button>
           ))}
           <div style={TOOLBAR_DIVIDER} />
           <button
             title="Solstice theme"
-            onClick={() => { setEnvPreset("solstice"); setParabolum(false); setGeodeMode(false); setDarkMode(false); setFireworksOn(false); }}
-            style={toolbarBtn(envPreset === "solstice" && !parabolum && !GeodeMode, size)}
+            onClick={() => { setEnvPreset("solstice"); setParabolum(false); setDarkMode(false); setFireworksOn(false); }}
+            style={toolbarBtn(!autoTheme && envPreset === "solstice" && !parabolum, size)}
           >✺</button>
           <button
             title={darkMode ? "Dark theme (active)" : "Dark theme"}
@@ -1276,14 +1175,9 @@ function SceneThemeToolbar({
           >{darkMode ? "●" : "◐"}</button>
           <button
             title="Lyquid80 theme"
-            onClick={() => { setParabolum((p) => !p); setGeodeMode(false); }}
+            onClick={() => setParabolum((p) => !p)}
             style={toolbarBtn(parabolum, size, "violet")}
           >◈</button>
-          <button
-            title="Geode theme"
-            onClick={() => { setGeodeMode((h) => !h); setParabolum(false); }}
-            style={toolbarBtn(GeodeMode, size, "cyan")}
-          >⊞</button>
           <div style={TOOLBAR_DIVIDER} />
         </>
       )}
@@ -1337,15 +1231,36 @@ export default function OilPage() {
       const saved = localStorage.getItem("oil_envPreset");
       // "hell" is a transient event state, never a restorable user choice.
       if (saved && saved !== "hell" && ENV_PRESETS[saved]) return saved;
+      // Nothing chosen yet → match the real world. An explicit pick always wins
+      // over this, and only an explicit pick is ever written to storage (see the
+      // persist effect below), so "never chose a theme" keeps tracking the clock
+      // instead of freezing on whatever the first visit happened to land on.
+      return presetForHour(new Date().getHours());
     }
+    // SSR has no clock worth trusting and no storage; the client initializer
+    // re-runs on hydration and corrects this. Same shape the saved-preset read
+    // already relied on.
     return "day";
   });
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("oil_darkMode") === "true";
-    }
-    return false;
+  // Is the scene currently following the clock? True whenever no deliberate pick
+  // is stored — which is exactly the condition the initializer above used to
+  // fall through to presetForHour. Kept as state (not recomputed) so the tray
+  // can show the mode and the persist effect can tell "auto" from "chosen".
+  const [autoTheme, setAutoTheme] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("oil_envPreset");
+    return !(saved && saved !== "hell" && ENV_PRESETS[saved]);
   });
+  // Derived from envPreset on load, NOT read back from oil_darkMode. The two are
+  // persisted under separate keys and can drift apart within a session (the
+  // time-of-day buttons move envPreset without touching darkMode), and reading
+  // both back independently is what let a contradictory pair — dark UI chrome
+  // with a day scene — survive every reload. envPreset wins because it is the
+  // richer state and the one the 3D scene actually reads.
+  //
+  // oil_darkMode is still WRITTEN (below), so an in-session choice persists; it
+  // just no longer gets to contradict the scene at startup.
+  const [darkMode, setDarkMode] = useState(() => envPreset === "night");
   // Parabolum material theme — independent of the day/dusk/night env presets.
   // When on, the UI shifts to the arcane violet console AND the extracted fluid
   // glows violet in the 3D scene (threaded into OilVoxelGrid below).
@@ -1355,57 +1270,66 @@ export default function OilPage() {
     }
     return false;
   });
-  // Geode overlay reskin — gold/cyan/orange-on-dark prospecting console (mirrors
-  // the SpaceScene Geode). The translucent panels need a dark backdrop to read as
-  // glowing glass, so Geode mode also swaps the 3D scene to a deep, cool dusk
-  // (not full night — that's too dark). Toggling Geode off restores the user's
-  // chosen scene. Mutually exclusive with parabolum (the toggles clear each other).
-  const [GeodeMode, setGeodeMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      // Geode is the default theme (shows the opal sheen best). New visitors
-      // (no stored pref) get it; anyone who explicitly toggled it off is honored.
-      const stored = localStorage.getItem("oil_GeodeMode");
-      return stored === null ? true : stored === "true";
-    }
-    return false;
-  });
-  // Active scene lighting: Geode forces the dusk backdrop and Parabolum forces its
-  // own violet-lit scene (both are self-contained themed looks, independent of
-  // the day/dusk/night presets); otherwise the user's selected time-of-day.
-  const env = ENV_PRESETS[GeodeMode ? "GeodeDusk" : parabolum ? "parabolumEnv" : envPreset];
+  // Handed to the tray IN PLACE OF setEnvPreset, so a click there counts as a
+  // deliberate pick and ends auto mode. The page keeps using the raw setter for
+  // its own programmatic changes (fireworks, hell), which must NOT.
+  const chooseEnvPreset = useCallback((next) => {
+    setAutoTheme(false);
+    setEnvPreset(next);
+  }, []);
+  // Back to following the clock: drop the stored pick and re-derive now, so the
+  // scene changes immediately rather than at the next reload. darkMode is synced
+  // the same way the load-time derivation does it.
+  const enableAutoTheme = useCallback(() => {
+    try { localStorage.removeItem("oil_envPreset"); } catch (e) {}
+    const next = presetForHour(new Date().getHours());
+    setAutoTheme(true);
+    setEnvPreset(next);
+    setDarkMode(next === "night");
+  }, []);
+
+  // Active scene lighting: Parabolum forces its own violet-lit scene (a
+  // self-contained themed look, independent of the day/dusk/night presets);
+  // otherwise the user's selected time-of-day.
+  const env = ENV_PRESETS[parabolum ? "parabolumEnv" : envPreset];
   // Reflections-only env map for the rigs' metal (NOT the sky). Warm "sunset"
   // reflections flatter the warm brass/copper on the bright day/dusk scenes;
   // "warehouse" (cooler, contrasty) suits the night/dark scenes and the Lyquid80
-  // substance themes (Parabolum + Geode). Drei caches each HDR, so toggling is
+  // substance theme (Parabolum). Drei caches each HDR, so toggling is
   // instant after first load.
   const envMapPreset = useMemo(() => {
-    if (parabolum || GeodeMode) return "warehouse";              // Lyquid80 themes
+    if (parabolum) return "warehouse";                           // Lyquid80 theme
     if (envPreset === "night" || envPreset === "hell") return "warehouse";
     return "sunset";                                             // day, solstice, dusk
-  }, [parabolum, GeodeMode, envPreset]);
+  }, [parabolum, envPreset]);
   // Don't persist the transient "hell" preset — otherwise a reload during a
   // demon event restores hell forever. Keep the last real preset saved instead.
+  //
+  // Nothing is written while autoTheme is on. That covers the mount pass (whose
+  // value is the CLOCK pick — saving it would instantly turn an auto theme into
+  // a "preference" and pin the page to it at any hour) and it also means the
+  // programmatic preset changes, fireworks forcing night and the hell event,
+  // can't quietly end auto mode either. Storage only ever holds a deliberate
+  // choice made in the tray.
   useEffect(() => {
+    if (autoTheme) return;
     if (envPreset !== "hell") localStorage.setItem("oil_envPreset", envPreset);
-  }, [envPreset]);
+  }, [envPreset, autoTheme]);
   useEffect(() => { localStorage.setItem("oil_darkMode", String(darkMode)); }, [darkMode]);
   useEffect(() => { localStorage.setItem("oil_parabolum", String(parabolum)); }, [parabolum]);
-  useEffect(() => { localStorage.setItem("oil_GeodeMode", String(GeodeMode)); }, [GeodeMode]);
   // Parabolum overrides light/dark for the UI chrome when active, but still
   // Parabolum is a self-contained dark violet look (its own violet scene), so it
   // always uses the dark console — there's no Parabolum "day" variant.
-  const themeKey = GeodeMode
-    ? "Geode"
-    : parabolum
-      ? "parabolumDark"
+  const themeKey = parabolum
+    ? "parabolumDark"
       : envPreset === "solstice"
         ? "solsticeLight"
         : (darkMode ? "dark" : "light");
   const theme = THEMES[themeKey];
   // Effective dark flag for the child overlay panels (CoreSamplePanel, How-To,
-  // inspector, etc.). Geode, Parabolum, and dark mode are all dark aesthetics, so
-  // their panels render dark even when the day/night toggle is on "day".
-  const uiDark = darkMode || GeodeMode || parabolum;
+  // inspector, etc.). Parabolum and dark mode are both dark aesthetics, so their
+  // panels render dark even when the day/night toggle is on "day".
+  const uiDark = darkMode || parabolum;
   const styles = useMemo(() => getStyles(theme), [theme]);
   const m = useMemo(() => getMobileStyles(theme), [theme]);
   const drillBtnStyles = useMemo(() => getDrillStyles(theme), [theme]);
@@ -3075,10 +2999,25 @@ export default function OilPage() {
 
   const snapshotLabel = captureMeta?.label ?? "Diversifying my investment portfolio!";
 
+  // PHOTOMATIC booth print, handed up when it finishes developing on the booth
+  // screen. While set, PolaroidSnapshot uses it as the photo instead of
+  // capturing the WebGL canvas — every other trigger source clears it, so a
+  // later manual screenshot can never accidentally reuse the booth photo.
+  const [boothPhoto, setBoothPhoto] = useState(null);
+  const handleBoothPhoto = useCallback((dataUrl, format) => {
+    captureMetaRef.current = null; // never feed-persisted
+    setCaptureMeta({ label: "Greetings from the boardwalk!" });
+    // format "strip" = the composed 4-frame booth strip; PolaroidSnapshot
+    // renders it tall instead of square-cropping it to death.
+    setBoothPhoto({ url: dataUrl, format: format === "strip" ? "strip" : "square" });
+    setSnapshotTrigger(true);
+  }, []);
+
   // Manual Snapshot button: a plain capture, never persisted to the feed.
   const handleManualSnapshot = useCallback(() => {
     captureMetaRef.current = null;
     setCaptureMeta(null);
+    setBoothPhoto(null);
     setSnapshotTrigger(true);
   }, []);
 
@@ -3087,6 +3026,7 @@ export default function OilPage() {
   const fireEventCapture = useCallback((meta) => {
     captureMetaRef.current = meta;
     setCaptureMeta(meta);
+    setBoothPhoto(null);
     setSnapshotTrigger(true);
   }, []);
 
@@ -3495,6 +3435,17 @@ export default function OilPage() {
   }, []);
   const moodScale = vendorMood ? 0.12 : 1;
 
+  // Photo booth camera failure → a readable instruction card. The booth's own
+  // NO SIGNAL screen names the cause diegetically but in small canvas text;
+  // this repeats it large, with actual steps, and clears itself when the
+  // camera comes up or the player leaves the booth.
+  const [boothCamError, setBoothCamError] = useState(null);
+  useEffect(() => {
+    const onErr = (e) => setBoothCamError(e.detail?.code || null);
+    window.addEventListener("booth-camera-error", onErr);
+    return () => window.removeEventListener("booth-camera-error", onErr);
+  }, []);
+
   // Where the intro camera was looking when the user interrupted it — adopted
   // as OrbitControls' initial target so the handoff doesn't snap the view to
   // the fixed default pivot. null = intro not interrupted (skipped/rig open).
@@ -3530,7 +3481,7 @@ export default function OilPage() {
 
   // Click-to-zoom on a scene object (e.g. MachinePanel). worldPoint is the THREE
   // intersection point; CameraFlyTo's `focus` branch dollies the camera in toward it.
-  const handleFocusObject = useCallback((worldPoint, normal, dist) => {
+  const handleFocusObject = useCallback((worldPoint, normal, dist, minDist) => {
     if (!worldPoint) return;
     flyIdRef.current++;
     // Focus clicks are navigation intent too — end the intro orbit so the
@@ -3541,6 +3492,9 @@ export default function OilPage() {
       x: worldPoint.x, y: worldPoint.y, z: worldPoint.z,
       nx: normal?.x, ny: normal?.y, nz: normal?.z,
       focusDist: dist,
+      // Optional OrbitControls floor for targets tighter than the 0.3 default
+      // (the photo booth interior). Undefined for every other caller.
+      minDist,
       id: flyIdRef.current, mobile: isMobile, focus: true,
     });
   }, [isMobile]);
@@ -3557,31 +3511,28 @@ export default function OilPage() {
     return { col, row: row ?? 0 };
   }, [userDrill?.col, userDrill?.row, myPlot?.col, myPlot?.row]);
 
-  // Plot owners open straight on their rig: fly from the default camera pose to
-  // the rig instead of running the aerial orbit. Fires once, only before the
-  // player has interacted. Mobile reuses handleFlyTo (its close pose looks down
-  // enough to stay clear of the ground). Desktop's surface sits high (grid group
-  // at y=5) and handleFlyTo's near-level close-up grazes into the grid, so the
-  // desktop open uses a dedicated elevated, pulled-back rig focus (rigIntro).
-  const didRigFocus = useRef(false);
+  // Plot owners used to skip the aerial intro entirely — the JSX below read
+  // `introRig ? null : <CameraFlyIn/>`, so the opening tour everyone else gets
+  // was the one thing an owner never saw; the camera simply appeared parked on
+  // their rig.
+  //
+  // Owners now get the IDENTICAL intro to a claimless visitor — same start, same
+  // corkscrew, same endless gentle orbit — and the only difference is that their
+  // plot is selected from the first frame, so its marching amber outline marks
+  // the claim while the camera drifts past it. Nothing steers the camera toward
+  // the rig: an earlier version flew there when a timer expired, which snapped
+  // the view mid-orbit and then left the camera parked and motionless. The
+  // outline is what points the claim out; the player goes to it when they want,
+  // by clicking it or via "GO TO YOUR CLAIM".
+  const didRigSelect = useRef(false);
   useEffect(() => {
-    if (didRigFocus.current || introComplete || !introRig) return;
-    didRigFocus.current = true;
-    if (isMobile) {
-      handleFlyTo(introRig.col, introRig.row);
-      return;
-    }
-    const worldW = gridSize * CELL_SIZE;
-    const worldD = gridSize * CELL_SIZE;
-    const x = -worldW / 2 + introRig.col * CELL_SIZE + CELL_SIZE / 2;
-    const z = worldD / 2 - introRig.row * CELL_SIZE - CELL_SIZE / 2;
-    flyIdRef.current++;
-    setFlyTarget({ x, y: 5.3, z, id: flyIdRef.current, mobile: false, rigIntro: true });
+    if (didRigSelect.current || !introRig) return;
+    didRigSelect.current = true;
     setSelectedX(introRig.col);
     setSliceY(introRig.row);
     setDrillDepth(0);
-    setIntroComplete(true);
-  }, [introRig, introComplete, isMobile, handleFlyTo, gridSize]);
+  }, [introRig]);
+
 
   // Auto-select and fly to the target cell when a rogue event appears
   useEffect(() => {
@@ -5878,6 +5829,67 @@ export default function OilPage() {
     </div>
   );
 
+  // Step-by-step help for a photo booth camera failure, keyed by the cause the
+  // booth reported. Platform-aware where it matters (the OS-level block).
+  const boothCamHelpSteps = {
+    insecure: { title: "CAMERA NEEDS A SECURE CONNECTION", steps: [
+      "Browsers disable the camera on plain http — open this site via https:// (or localhost).",
+    ] },
+    NotAllowedError: { title: "CAMERA BLOCKED FOR THIS SITE", steps: [
+      "Click the camera icon at the right end of your browser's address bar.",
+      "Set camera access to Allow, then click the photo booth again.",
+    ] },
+    SystemDenied: { title: "YOUR SYSTEM IS BLOCKING THE CAMERA", steps: [
+      typeof navigator !== "undefined" && /Mac/.test(navigator.platform || "")
+        ? "System Settings → Privacy & Security → Camera → enable your browser."
+        : "In your OS privacy settings, allow camera access for your browser.",
+      "Fully quit and reopen the browser, then click the booth again.",
+    ] },
+    NotFoundError: { title: "NO CAMERA DETECTED", steps: ["Connect a camera, then click the booth again."] },
+    NotReadableError: { title: "CAMERA IS IN USE", steps: ["Another app is holding the camera (video call, Photo Booth…). Quit it, then click the booth again."] },
+    unknown: { title: "CAMERA UNAVAILABLE", steps: ["Check your browser's camera permissions, then click the booth again."] },
+  };
+  const boothCamInfo = boothCamError ? (boothCamHelpSteps[boothCamError] || boothCamHelpSteps.unknown) : null;
+  const boothCamBanner = boothCamInfo && (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 9999,
+      zoom: "var(--hm-ui-scale, 1)",
+      padding: "12px 40px 12px 16px",
+      background: "linear-gradient(180deg, rgba(120,90,20,0.95), rgba(70,50,10,0.9))",
+      borderBottom: "2px solid rgba(212,168,84,0.6)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      textAlign: "center",
+      fontFamily: "'Share Tech Mono', monospace",
+    }}>
+      <div style={{
+        fontSize: isMobile ? 12 : 14,
+        fontWeight: 700,
+        letterSpacing: "0.2em",
+        color: "#e8c878",
+        textShadow: "0 0 10px rgba(212,168,84,0.5)",
+      }}>
+        {boothCamInfo.title}
+      </div>
+      {boothCamInfo.steps.map((s, i) => (
+        <div key={i} style={{ fontSize: isMobile ? 11 : 12, color: "#d8c9a8", marginTop: 4 }}>
+          {s}
+        </div>
+      ))}
+      <button
+        onClick={() => setBoothCamError(null)}
+        style={{ position: "absolute", top: 8, right: 12, background: "none", border: "none", color: "#e8c878", fontSize: 16, cursor: "pointer", fontFamily: "inherit" }}
+        aria-label="Dismiss camera help"
+      >
+        ✕
+      </button>
+    </div>
+  );
+
   const modeBadge = (isAdmin || isReport) && (
     <span style={{
       padding: "2px 8px",
@@ -6860,7 +6872,6 @@ export default function OilPage() {
       hellProximity={hellProximity}
       darkMode={uiDark}
       parabolum={parabolum}
-      Geode={GeodeMode}
       hellActive={hellActive}
       demonBlockade={demonBlockade}
       drillingActive={drillingActive}
@@ -7043,7 +7054,6 @@ export default function OilPage() {
                 <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
                 <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
                 <group position={[0, 1, 0]}>
-                  {GeodeMode && <FieldUnderglow />}
                   <OilVoxelGrid
                     blockHash={blockHash}
                     numberOfDeposits={numberOfDeposits}
@@ -7092,6 +7102,7 @@ export default function OilPage() {
                     onDemonAttack={handleDemonAttack}
                     cameraViewable={cameraViewable}
                     onFocusObject={handleFocusObject}
+                    onBoothPhoto={handleBoothPhoto}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -7114,7 +7125,7 @@ export default function OilPage() {
                     />
                     <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
                   </>
-                ) : introRig ? null : (
+                ) : (
                   <CameraFlyIn onComplete={handleIntroComplete} mobile grid={gridSize} />
                 )}
                 <CameraShake shakeRef={shakeRef} />
@@ -7211,10 +7222,10 @@ export default function OilPage() {
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10 }}>
                 <SceneThemeToolbar
                   size={32}
-                  envPreset={envPreset} setEnvPreset={setEnvPreset}
+                  envPreset={envPreset} setEnvPreset={chooseEnvPreset}
+                  autoTheme={autoTheme} enableAutoTheme={enableAutoTheme}
                   darkMode={darkMode} setDarkMode={setDarkMode}
                   parabolum={parabolum} setParabolum={setParabolum}
-                  GeodeMode={GeodeMode} setGeodeMode={setGeodeMode}
                   setFireworksOn={setFireworksOn}
                 />
               </div>
@@ -7301,7 +7312,6 @@ export default function OilPage() {
             maxOil={displayMaxOil}
             darkMode={uiDark}
             parabolum={parabolum}
-            Geode={GeodeMode}
             isMobile
             gridX={gridSize}
             gridY={gridSize}
@@ -7471,11 +7481,14 @@ export default function OilPage() {
         {demonBanner}
         {bountyClaimedBanner}
         {claimToastBanner}
+        {boothCamBanner}
         {claimBountyButton}
 
         <PolaroidSnapshot
           trigger={snapshotTrigger}
           captureElementId="oil-canvas"
+          imageSource={boothPhoto?.url || null}
+          format={boothPhoto?.format || "square"}
           label={snapshotLabel}
           referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : { link: "rl80.com/hailmary" }}
           onComplete={handleSnapshotComplete}
@@ -7617,7 +7630,6 @@ export default function OilPage() {
             <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
             <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
             <group position={[0, 5, 0]}>
-              {GeodeMode && <FieldUnderglow />}
               <OilVoxelGrid
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
@@ -7666,6 +7678,7 @@ export default function OilPage() {
                 onDemonAttack={handleDemonAttack}
                 cameraViewable={cameraViewable}
                 onFocusObject={handleFocusObject}
+                onBoothPhoto={handleBoothPhoto}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -7686,7 +7699,7 @@ export default function OilPage() {
                 />
                 <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />
               </>
-            ) : introRig ? null : (
+            ) : (
               <CameraFlyIn onComplete={handleIntroComplete} grid={gridSize} />
             )}
             <CameraShake shakeRef={shakeRef} />
@@ -7771,10 +7784,10 @@ export default function OilPage() {
           <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, zoom: uiScale, display: "flex", alignItems: "center", gap: 8 }}>
             <SceneThemeToolbar
               size={28}
-              envPreset={envPreset} setEnvPreset={setEnvPreset}
+              envPreset={envPreset} setEnvPreset={chooseEnvPreset}
+              autoTheme={autoTheme} enableAutoTheme={enableAutoTheme}
               darkMode={darkMode} setDarkMode={setDarkMode}
               parabolum={parabolum} setParabolum={setParabolum}
-              GeodeMode={GeodeMode} setGeodeMode={setGeodeMode}
               setFireworksOn={setFireworksOn}
             />
             <button
@@ -7844,7 +7857,6 @@ export default function OilPage() {
               maxOil={displayMaxOil}
               darkMode={uiDark}
               parabolum={parabolum}
-              Geode={GeodeMode}
               gridX={gridSize}
               gridY={gridSize}
               selectedX={selectedX}
@@ -7925,11 +7937,14 @@ export default function OilPage() {
       {demonBanner}
       {bountyClaimedBanner}
       {claimToastBanner}
+      {boothCamBanner}
       {claimBountyButton}
 
       <PolaroidSnapshot
         trigger={snapshotTrigger}
         captureElementId="oil-canvas"
+        imageSource={boothPhoto?.url || null}
+        format={boothPhoto?.format || "square"}
         label={snapshotLabel}
         referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : { link: "rl80.com/hailmary" }}
         onComplete={handleSnapshotComplete}

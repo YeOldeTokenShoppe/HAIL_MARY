@@ -23,6 +23,7 @@
     "@coinbase/wallet-sdk": "^4.3.7",
     "@coinbase/x402": "^2.1.0",
     "@farcaster/miniapp-sdk": "^0.2.3",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@metamask/sdk": "^0.33.1",
     "@react-three/drei": "^10.6.1",
     "@react-three/fiber": "^9.3.0",

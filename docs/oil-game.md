@@ -61,6 +61,8 @@ Simulated 2026-08-23 against the real generator (`generateOilDistribution3D`, 6�
 | 25, 6 charges | 51% | 10 | 79% | 73.2% | 86.0% | 84% |
 | 40, 6 charges | 66% | 14 | 93% | 65.4% | 84.2% | 76% |
 
+Two different "hit rates" — don't confuse them. The generator's hit rate (the one `oilDistribution.js` tunes with the radius band) is **per plot**: does a claim hold oil anywhere in its column. That is healthy as tuned (6×6, 5 deposits → 69% of plots; 10×10, 5 deposits → 36%; 10×10, 30 deposits → 88%). The figure that matters for extract-or-pass is **per layer**: inside a wet plot, oil sits in a median of **3 of 20 layers** (p90 7) at 5 deposits, **6 of 20** (p90 11) at 30. "Wet layers" in the table above is the per-layer figure across the whole field.
+
 Reading it: with the field as tuned today the mechanic is fake — a column rarely has more wet layers than charges, so "extract every wet layer" is the whole game. It becomes a real decision once **wet layers per column exceed passive charges**: at 25–40 smaller deposits, a good threshold beats a naive one by 13–19 points, and a perfect player has ~15 more to find. **Recommendation for the first v2 season: ~30 deposits, 8 passive charges, bonuses to 20.** Re-run the sim at tuning time (the script is trivial — strategies are ten lines) and tune `numberOfDeposits`, not the formula. The distribution knob must be set **before the anchor** (changing it after commit remaps every seed — same rule as the oil radius band).
 
 ### What changes (build list)

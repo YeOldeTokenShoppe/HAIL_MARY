@@ -105,6 +105,69 @@ export const PROMOS_SITEPAL_FILTER = {
   sepia: 0,
 };
 
+// Rug merchant crop/filter — tuned via /hailmary?tune=vendor (RUGS tab);
+// re-tune there and paste the logged values back here if his scene's avatar ever
+// changes. He is the only vendor carrying a hueRotate (27°) — his SitePal
+// avatar's skin runs a different hue from the goblin mesh it projects onto, and
+// that shift is what reconciles the two. Don't "clean it up" to 0.
+export const RUGS_SITEPAL_CROP = {
+cropX: 190,
+  cropY: 163,
+  cropW: 171,
+  cropH: 212,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const RUGS_SITEPAL_FILTER = {
+ saturate: 210,
+  contrast: 87,
+  brightness: 183,
+  hueRotate: 27,
+  sepia: 19,
+};
+
+// Taco trailer alien crop/filter — tuned via /hailmary?tune=vendor (TACOS tab).
+// His filter is the odd one out and that is deliberate: near-identity, and the
+// only one that DARKENS (brightness 94) where every human vendor is pushed to
+// 124-137 with heavy saturation. Those corrections exist to rescue washed-out
+// human skin; his avatar needs none of it, and the usual warm push turns him
+// grey-green. Resist normalising these toward the others.
+export const TACOS_SITEPAL_CROP = {
+  cropX: 208,
+  cropY: 162,
+  cropW: 159,
+  cropH: 217,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const TACOS_SITEPAL_FILTER = {
+  saturate: 104,
+  contrast: 96,
+  brightness: 94,
+  hueRotate: 0,
+  sepia: 0,
+};
+
+// Balloon-ride carny. The CROP is tuned via /hailmary?tune=vendor (CARNY tab);
+// the FILTER below is the promos seed, kept because it read correctly on him by
+// eye rather than because it was swept — so if his colour ever looks off, that
+// block is the one that was never actually measured.
+export const CARNY_SITEPAL_CROP = {
+  cropX: 208,
+  cropY: 106,
+  cropW: 191,
+  cropH: 239,
+  rotateZ: 0,
+  rotateX: 0,
+};
+export const CARNY_SITEPAL_FILTER = {
+  saturate: 180,
+  contrast: 103,
+  brightness: 124,
+  hueRotate: 0,
+  sepia: 28,
+};
+
 // Per-vendor registry, keyed by VENDOR_CATALOG id. `projFace` receives the
 // SitePal projection; `regularFaces` are the painted face layers hidden
 // while the projection is active (the two models label them differently —
@@ -190,6 +253,106 @@ export const VENDOR_SITEPAL_CONFIG = {
       ],
     },
   },
+  // The balloon-ride carny. "R-Lady" spelling rule applies here too.
+  carny: {
+    sceneId: 2775422,
+    voice: { voice: "oubi7HGxNVjXMnWLgwBT", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    crop: CARNY_SITEPAL_CROP,
+    filter: CARNY_SITEPAL_FILTER,
+    greetings: {
+      first: [
+        "Well hey there! Step right up, friend. First ride's the same price as the second, on account of I don't do discounts.",
+        { text: "Howdy! You are lookin' at the finest hot air balloon ride in the territory. Only one in the territory, too. Them two facts are related.", gesture: "pointing" },
+      ],
+      returning: [
+        "Step right up! One ticket, one ride, one signature on this here waiver. Don't read it, it's long.",
+        "She's safe as houses, buddy. Well — safe as one house. A small one. With some issues.",
+        { text: "Balloon ride! See the whole field from up top! See your rig, see your neighbor's rig, see how much better his rig's doin'.", gesture: "pointing" },
+        "That creakin' sound? That's just the wicker settlin'. Wicker does that. Constantly. Forever.",
+        "I been runnin' this ride eleven years and ain't lost but a handful. Handful's a figure of speech. Mostly.",
+        { text: "You get a real nice view up there. Real nice perspective, too. Folks come down different. Quieter.", gesture: "pointing" },
+        "They tell me the smart money's in R-Lady. I don't follow it much myself. I take cash, and I take it up front.",
+        "Day {day}. Wind's pickin' up, which means the ride's more excitin' and the price is more flexible. Your call.",
+        { text: "Naw, I don't go up no more. Somebody's gotta hold the rope. That's the important job. Real important job.", gesture: "pointing" },
+      ],
+      frequent: [
+        "There he is! My best customer. You keep comin' back, which tells me either the ride's good or your memory ain't.",
+        "Back for another go? Tell you what — same price as last time. Which was already the special price. Which is the price.",
+      ],
+    },
+  },
+  // The taco-and-beverage alien. "R-Lady" spelling rule applies here too.
+  tacos: {
+    sceneId: 2775414,
+    voice: { voice: "OhisAd2u8Q6qSA4xXAAT", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    crop: TACOS_SITEPAL_CROP,
+    filter: TACOS_SITEPAL_FILTER,
+    greetings: {
+      first: [
+        "Greetings, organism. You have arrived at the finest taco establishment within four light years. The competition is not close. There is no competition.",
+        "Welcome. Do not be alarmed by my appearance. Be alarmed, if you wish, by the green sauce.",
+      ],
+      returning: [
+        "Two tacos, one beverage. This is the correct order. I have run the calculations many times.",
+        "The recipe is from my homeworld. I have adjusted it for your species. Mostly the temperature. Somewhat the legality.",
+        "The green sauce is safe. The other green sauce, we do not speak of.",
+        "Your planet has magnificent food and terrible opinions about which food is best. I am here to correct this, one taco at a time.",
+        "You look tired, prospector. Drilling is hard work. I know. I watched you do it. All day. Through the window.",
+        "This beverage glows a little. That is normal. That is flavor.",
+        "I am told the clever money is in R-Lady. On my world we also had a clever money. It is now a museum.",
+        "Day {day}. I have served two hundred tacos and abducted nobody. I feel this deserves more recognition than it receives.",
+        "No, I will not tell you what is in it. On my world, a chef who reveals the recipe is eaten. It is a strong tradition.",
+      ],
+      frequent: [
+        "You return. Again. My scanners recognize your walk from forty meters. This is friendship, I am told.",
+        "The usual? I began preparing it while you were still out by the water tower. Efficiency. Not surveillance. Efficiency.",
+      ],
+    },
+  },
+  // The rug merchant — an exotic dealer, courtly and evasive rather than
+  // street. Written in elevated, formal English on purpose: the accent belongs
+  // to the ElevenLabs voice, so phonetic spelling here would only fight it (and
+  // read as caricature). Keep new lines ornate and unhurried, never clipped.
+  // He is seated at his stall, so no "sit down" invitations, and nothing that
+  // assumes the player is standing on his merchandise.
+  //
+  // Same "R-Lady" spelling rule as promos below — these strings
+  // go straight to sayText with no on-screen caption, and ElevenLabs reads
+  // "RL80" as "R-L-eighty".
+  rugs: {
+    sceneId: 2775421,
+    voice: { voice: "pO3rCaEbT3xVc0h3pPoG", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    crop: RUGS_SITEPAL_CROP,
+    filter: RUGS_SITEPAL_FILTER,
+    greetings: {
+      first: [
+        "Ah — a face I do not know. Welcome. Every piece here was carried a very long way, by people who no longer speak to me. That is how you know it is genuine.",
+        "You honor my corner of the boardwalk. Look as long as you wish. Looking is free. Everything after the looking, we discuss.",
+      ],
+      returning: [
+        "Silk, wool, and a little something the weaver would not name. Feel it — but only with the eyes, for now.",
+        "A thief? You wound me. I am a merchant. The difference is paperwork, and I have a great deal of paperwork.",
+        "This one crossed three borders to reach you. Two of them legally.",
+        "You ask for my finest price. I have many finest prices. Which would you like?",
+        "I would never take advantage of a customer. Advantage is taken, never given. There is a distinction, and I observe it.",
+        "Every rug carries a story. This one carries a story I have improved a little, for the enjoyment of the customer.",
+        "They say the clever money is in R-Lady. I am a simple dealer in textiles. But my brother deals in R-Lady, and his house is very fine.",
+        "Day {day}. Eleven pieces have found new homes. The twelfth found its own way out. It will return, or it will not.",
+        "The fortune teller warns you against me. She sells what has not yet happened. I sell what you can hold in two hands. Decide which is the better bargain.",
+        "No, no — do not tell me your budget. Tell me your taste, and I will discover your budget.",
+      ],
+      frequent: [
+        "My most valued friend returns. The piece I sold you — it has behaved itself? Good. Not all of them do.",
+        "You come often. In my trade this means one of two things, and I am far too polite to say which. Come, there is something new.",
+      ],
+    },
+  },
   // Promotions hologram at the prize wheel. NOTE the "R-Lady" spelling below:
   // these strings go STRAIGHT to sayText with no on-screen caption, and
   // ElevenLabs reads "RL80" as "R-L-eighty". Her whole pitch is the token, so
@@ -248,6 +411,7 @@ const state = {
   speakTimer: null,
   activeVendorId: null,
   talking: false,
+  gesture: null,   // clip name for the line currently being spoken
 };
 
 // ── Talk-state bridge: host callbacks → vendor models ──────────────────────
@@ -262,8 +426,9 @@ export function onVendorTalk(fn) {
 export function notifyVendorTalk(talking) {
   if (talking === state.talking) return;
   state.talking = talking;
+  const gesture = talking ? state.gesture : null;
   talkListeners.forEach((fn) => {
-    try { fn(state.activeVendorId, talking); } catch (e) {}
+    try { fn(state.activeVendorId, talking, gesture); } catch (e) {}
   });
 }
 
@@ -342,7 +507,15 @@ function vendorVisits(vendorId, increment) {
   return n;
 }
 
-function resolveLine(line) {
+// A greeting entry is either a plain string or { text, gesture }. `gesture`
+// names a clip in the vendor's own GLB to crossfade to while THAT line plays,
+// instead of the vendor's default talkClip — so a line about the balloon can
+// point at the balloon. Unknown gesture names fall back to talkClip, so a
+// typo or a re-export that drops a clip degrades quietly.
+function resolveLine(entry) {
+  const line = typeof entry === "string" ? entry : entry?.text;
+  const gesture = typeof entry === "string" ? null : entry?.gesture || null;
+  if (!line) return null;
   let missing = false;
   const out = line.replace(/\{(\w+)\}/g, (m, k) => {
     if (greetingContext[k] === undefined || greetingContext[k] === null) {
@@ -351,7 +524,7 @@ function resolveLine(line) {
     }
     return String(greetingContext[k]);
   });
-  return missing ? null : out;
+  return missing ? null : { text: out, gesture };
 }
 
 function pickGreeting(vendorId, config) {
@@ -374,7 +547,7 @@ function pickGreeting(vendorId, config) {
   let idx = Math.floor(Math.random() * lines.length);
   if (lines.length > 1 && idx === last) idx = (idx + 1) % lines.length;
   state.lastGreetingIdx[lastKey] = idx;
-  return lines[idx];
+  return lines[idx];   // { text, gesture }
 }
 
 function speakNow(text, voice) {
@@ -403,8 +576,12 @@ export function speakPendingVendorLine() {
     }, wait);
     return;
   }
-  const { text, voice } = state.pending;
+  const { text, voice, gesture } = state.pending;
   state.pending = null;
+  // Set BEFORE speaking: SitePal's vh_talkStarted can fire synchronously off
+  // sayText, and notifyVendorTalk reads this to tell the model which clip to
+  // play. Setting it after would race and the gesture would be missed.
+  state.gesture = gesture;
   if (text) speakNow(text, voice);
 }
 
@@ -425,8 +602,12 @@ export function activateVendorSitePal(vendorId) {
     unlockAudio(win);
     // saySilent(0) is the framework-page audio-activation primer (iOS).
     if (typeof win.saySilent === "function") { try { win.saySilent(0); } catch (e) {} }
-    const text = pickGreeting(vendorId, config);
-    state.pending = { vendorId, sceneId: config.sceneId, text, voice: config.voice };
+    const picked = pickGreeting(vendorId, config);
+    state.pending = {
+      vendorId, sceneId: config.sceneId,
+      text: picked?.text, gesture: picked?.gesture || null,
+      voice: config.voice,
+    };
     if (vendorSitePalReady(config.sceneId)) {
       speakPendingVendorLine();
     } else if (
@@ -447,6 +628,7 @@ export function deactivateVendorSitePal() {
   const win = w();
   if (!win) return;
   state.pending = null;
+  state.gesture = null;
   if (state.speakTimer) { clearTimeout(state.speakTimer); state.speakTimer = null; }
   state.speakNotBefore = 0;
   state.desiredVolume = 0;

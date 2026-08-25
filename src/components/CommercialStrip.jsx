@@ -22,7 +22,7 @@ import {
 // group and no per-stall placement exists any more. Re-exporting any of them
 // from Blender just works: the group auto-fits from the strip's bounding box.
 
-const STRIP_MODEL = "/models/CommercialStrip.glb";
+const STRIP_MODEL = "/models/CommercialStrip2.glb";
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's
@@ -47,6 +47,16 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 //   "Export Deformation Bones Only" must be off or the non-deforming Synty Root
 //   is stripped and every placement silently vanishes.
 //
+// `offset: [x, y, z]` — nudge the CHARACTER without re-exporting the GLB. In
+//   STRIP-LOCAL units, the same space the character GLBs are authored in, so the
+//   numbers line up with the root translations you would read in Blender (the
+//   strip is ~77 units long and auto-fits to ~0.135 world scale, so 1 here is a
+//   small step, not a metre). Moves the character and nothing else — the prop's
+//   click volume and label stay put. Because poseOverrides merge over the
+//   vendor, a pose can carry its own offset.
+//   NOT to be confused with `focusOffset`, which moves the CAMERA's look-at
+//   target and leaves the character where it is.
+//
 // `poseOverrides: { "<model url>": { ...any vendor field } }` — optional. The
 //   named pose's fields are merged over the vendor when that pose is drawn, so
 //   behaviour can differ per pose, not just framing. A seated pose and a
@@ -66,6 +76,7 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 export const VENDOR_CATALOG = [
   { id: "fortunes",  label: "",  awning: "#5a4a78", accent: "#c79bff",
     model: "/models/Vendor_FortuneTeller_Character.glb", idleClip: "sit_idle",
+    offset: [0, 0, 0],
     prop: "FortuneTeller_Wagon_Empty",
     // She sits square to the boardwalk rather than facing off it, so her
     // strip-local face yaw is 0 (90° off the VENDOR_LOCAL_FACE_YAW default).
@@ -87,7 +98,9 @@ export const VENDOR_CATALOG = [
     prop: "SM_Prop_Tent_02 (24)" },
   { id: "hotdogs",   label: "",  awning: "#a33b2a", accent: "#ffd24d",
     model: "/models/Vendor_HotDog_Character.glb", idleClip: "idle",
-    prop: "SM_Prop_HotdogStand_01",
+    offset: [-0.5, 0, 5.0],
+    // CommercialStrip2 replaced SM_Prop_HotdogStand_01 with the full cart.
+    prop: "SM_Veh_Hotdog_Cart_01",
     // Standing cart vendor — same framing as the salesman.
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
     talkClip: "talking",
@@ -98,6 +111,9 @@ export const VENDOR_CATALOG = [
     // "tattooing"), so the first-clip fallback picks the right one either way.
     poseModels: ["/models/Vendor_TattooArtist_idle.glb",
                  "/models/Vendor_TattooArtist_tattooing.glb"],
+    // Her two poses are placed differently, so each can override this in
+    // poseOverrides below if they need to diverge.
+    offset: [0, 0, 0],
     // Her booth: sign, barber chair and stool all cluster at z ≈ 29; the tent
     // is the click volume. In the tattooing pose she sits on
     // SM_Prop_Stool_01.004 (x 1.90, z 28.58) — her own root matches it exactly.
@@ -152,6 +168,7 @@ export const VENDOR_CATALOG = [
     // strip. Her GLB is exported in strip space like the rest (root at local
     // x 0, z -29.96), so she needs no placement here.
     model: "/models/Vendor_HoloGirl.glb", idleClip: "idle", talkClip: "talking",
+    offset: [-0.3, 0, 2.5],
     // The wheel, NOT the tent she happens to stand inside: SM_Prop_Tent_02
     // (23) has no vendor now, so it has no click volume either, and hers is
     // the only proxy in this stretch of boardwalk. Keep it that way — a
@@ -165,8 +182,72 @@ export const VENDOR_CATALOG = [
     // them alongside it — they are here for a future mood hook, not dead
     // weight to delete.
     sitepal: "promos" },
+  { id: "tacos",     label: "",    awning: "#2f6b4a", accent: "#8fe6b0",
+    // Extraterrestrial taco-and-beverage trailer. His GLB was re-exported with
+    // idle/talking clips and Face1-3 — an earlier build had neither, so if he
+    // ever reverts to a T-pose or the projection stops landing, check the export
+    // before checking this file.
+    model: "/models/Vendor_Alien.glb", idleClip: "idle", talkClip: "talking",
+    offset: [0, 0, 0],
+    // The trailer itself, not the sign or the taco — it is the big click target
+    // and the thing a player reads as "the booth".
+    prop: "SM_Veh_Food_Trailer_02",
+    // He serves from inside the trailer: his root is lifted 0.52 and his head
+    // sits ~2.4 strip-local against a standing vendor's ~1.6. faceDist/faceLift
+    // are measured from the head BONE so they need no height compensation, but
+    // camDrop does — the standing -0.35 looks up steeply enough to frame the
+    // trailer's underside, so this is eased off.
+    faceDist: 0.2, faceLift: -0.02, camDrop: -0.28,
+    sitepal: "tacos" },
+  { id: "rugs",      label: "",    awning: "#7a2f3a", accent: "#e0a4b0",
+    // The rug merchant — a con artist by metaphor, which in this field's
+    // vocabulary means one thing. He is SEATED at his stall.
+    //
+    // His GLB ships five clips and only two are wired. Root offsets from
+    // idle_goblin, measured in Empty space (his rig is RugGoblin_Empty > Root,
+    // where Root carries the 0.01 scale, so these need no rescaling — unlike
+    // the carny, whose Armature holds the scale above Root):
+    //   sit_talk  0.024   <- used; the smallest offset of any talk clip here
+    //   pointing  no Root track at all, so it cannot displace him
+    //   talking   0.397   <- NOT used, would visibly pop (HoloGirl's 0.25 is
+    //                        the largest that ships)
+    //   idle      0.407   <- the superseded placement, kept in the export
+    model: "/models/Vendor_Rugs.glb", idleClip: "idle_goblin", talkClip: "sit_talk",
+    offset: [0, 0, 0],
+    prop: "SM_Prop_Market_Stall_05",
+    // Seated, so the camera stays much closer to level than the standing
+    // vendors' -0.35 — a big camDrop here puts the lens under his stall. His
+    // face sits at local y ~1.25 against a standing vendor's ~1.6.
+    faceDist: 0.2, faceLift: -0.02, camDrop: -0.15,
+    sitepal: "rugs" },
+  { id: "carny",     label: "",    awning: "#6b3f1f", accent: "#ffc46b",
+    // The balloon barker, alone at the far -Z end with the hot air balloon as
+    // his only neighbour — so the balloon is his click volume.
+    //
+    // "yelling" is his talk clip and "pointing" is used per-line (see the carny
+    // greetings in vendorSitePal.js) for the lines that reference the balloon.
+    //
+    // Both are safe to crossfade, but the check needs care: his rig nests as
+    // Carny_Empty > Armature(scale 0.01) > Root, so his Root translations are
+    // INSIDE that 0.01 and must be scaled before comparing to a rig like
+    // HoloGirl's, where Root itself carries the scale. Corrected, "yelling"
+    // sits 0.027 from carny_idle and "pointing" 0.139 — against 0.12 for the
+    // hot dog vendor and 0.25 for HoloGirl, both of which ship fine. Compare
+    // raw numbers across rigs and you will "find" a 10x pop that is not there.
+    //
+    // His hat, hair, eyepatch, mustache and mic are bone-parented statics on the
+    // Head bone, so they stay put over the projected face. If the SitePal avatar
+    // already draws a mustache or eyepatch, add those mesh names to regularFaces
+    // so they hide while he is speaking.
+    model: "/models/Vendor_Carny.glb", idleClip: "carny_idle",
+    offset: [0, 0, 0],
+    prop: "SM_Prop_Hot_Air_Balloon_01.002",
+    talkClip: "yelling",
+    faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+    sitepal: "carny" },
   { id: "tonics",    label: "",    awning: "#7a3524", accent: "#ff8c5a",
     model: "/models/Vendor_SnakeOilSalesman_Character.glb", idleClip: "idle",
+    offset: [0, 0, 0],
     prop: "SM_Veh_Wagon_Shop_01",
     // His head is ~0.045 world units tall — a true close-up needs to be this near
     faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
@@ -475,6 +556,10 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   // one cheap ref check per frame until it takes, then never again.
   useFrame(() => {
     if (!needsStartRef.current) return;
+    // A GLB with no animations at all can never succeed — retrying it every
+    // frame for the life of the page would be a silent spin. Only the
+    // "clips exist but the rig wasn't ready yet" case is worth retrying.
+    if (!animations?.length) { needsStartRef.current = false; return; }
     if (startRest()) needsStartRef.current = false;
   });
 
@@ -503,22 +588,38 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   // seated fortune teller) simply never swap. Crossfades run between two
   // playing actions, so bind pose is never touched.
   const talkModeRef = useRef(false);
+  // Which action is currently standing in for the idle — talkClip or a gesture.
+  const activeTalkRef = useRef(null);
   useEffect(() => {
-    if (!vendor.sitepal || !vendor.talkClip) return;
-    const off = onVendorTalk((vendorId, talking) => {
+    // talkClip is no longer required: a vendor with per-line gestures but no
+    // default talk clip still animates on the lines that name one.
+    if (!vendor.sitepal) return;
+    const off = onVendorTalk((vendorId, talking, gesture) => {
       if (vendorId !== vendor.sitepal) return;
       if (talking === talkModeRef.current) return;
-      const idle = (restClip && actions?.[restClip]) || Object.values(actions || {})[0];
-      const talk = actions?.[vendor.talkClip];
-      if (!idle || !talk) return;
-      talkModeRef.current = talking;
+      const idle = (restClip && actions?.[restClip]) || Object.values(actions || {}).find(Boolean);
+      if (!idle) return;
       if (talking) {
-        talk.reset().crossFadeFrom(idle, 0.25, false).play();
+        // A gesture named by THIS line wins over the vendor's default talkClip.
+        // An unknown name falls through, so a typo or a re-export that drops a
+        // clip degrades to ordinary talking rather than freezing the rig.
+        const next = (gesture && actions?.[gesture]) || actions?.[vendor.talkClip];
+        if (!next) return;
+        talkModeRef.current = true;
+        activeTalkRef.current = next;
+        next.reset().crossFadeFrom(idle, 0.25, false).play();
       } else {
-        idle.reset().crossFadeFrom(talk, 0.35, false).play();
+        // Fade back from whatever ACTUALLY played. Recomputing talkClip here
+        // would fade from the wrong action whenever a gesture had replaced it,
+        // leaving the gesture running at full weight underneath the idle.
+        const prev = activeTalkRef.current;
+        talkModeRef.current = false;
+        activeTalkRef.current = null;
+        if (prev) idle.reset().crossFadeFrom(prev, 0.35, false).play();
+        else idle.reset().play();
       }
     });
-    return () => { off(); talkModeRef.current = false; };
+    return () => { off(); talkModeRef.current = false; activeTalkRef.current = null; };
   }, [actions, vendor.sitepal, vendor.talkClip, restClip]);
 
   // All three character exports carry a stray unskinned "Icosphere" (42 verts,
@@ -825,6 +926,10 @@ const LEGACY_MODEL_SCALE = 0.1;
 // roughly this size in the strip's own space).
 const PROXY_LOCAL_SIZE = 5;
 
+// Module-level so the common "no offset" case reuses one array instead of
+// allocating a fresh [0,0,0] every render (R3F would then see a changed prop).
+const VENDOR_NO_OFFSET = /* @__PURE__ */ Object.freeze([0, 0, 0]);
+
 function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, propObj, onVendorClick, onFocusObject, onZoomOut, onFocusChange }) {
   // Fold this session's pose framing over the vendor so the close-up matches
   // whichever pose was actually drawn.
@@ -913,13 +1018,19 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
     >
       {vendor.companionModel && <CompanionModel url={vendor.companionModel} />}
       {(vendor.model || vendor.poseModels?.length) && (
-        <VendorModel
-          vendor={vendor}
-          focusedRef={zoomedRef}
-          headRef={headRef}
-          stripScene={stripScene}
-          stripRotY={stripRotY}
-        />
+        // Wraps ONLY the character. The prop click-proxy and label below are
+        // positioned from the prop's own origin and must stay on the prop, so
+        // they deliberately sit outside this group — nudging a vendor moves the
+        // vendor, not their tent's click volume.
+        <group position={vendor.offset || VENDOR_NO_OFFSET}>
+          <VendorModel
+            vendor={vendor}
+            focusedRef={zoomedRef}
+            headRef={headRef}
+            stripScene={stripScene}
+            stripRotY={stripRotY}
+          />
+        </group>
       )}
       {p && (
         <mesh position={[p.x, p.y + PROXY_LOCAL_SIZE / 2, p.z]}>
@@ -1004,10 +1115,17 @@ const SPOT_EASE = 4.5;             // 1/s fade in/out
 // alternatives — the cone can't brighten the vendor, the light can't be seen.
 const BEAM_COLOR = "#ffeec4";
 const BEAM_ANGLE = 0.30;           // rad, half-angle of the visible shaft
-const BEAM_NEAR = 1.5;             // world units: hidden this close (a focus
-                                   // close-up puts the camera INSIDE the cone,
-                                   // which would just wash the screen)…
-const BEAM_FAR = 4.0;
+// Measured to the STRIP'S ORIGIN, not to the nearest bulb — so this is "how far
+// back am I standing from the boardwalk", not "how close is that one lamp".
+//
+// Retuned 2026-08-23. The old 1.5 → 4.0 band assumed you only ever reached the
+// strip by orbiting in from the far side, which left you beyond BEAM_FAR at full
+// strength. Click-to-fly now lands you at STRIP_VIEW_DIST (3.0), which sat right
+// inside the fade and dimmed the shafts to ~60%. The band still exists for the
+// case it was written for — a vendor face close-up putting the camera INSIDE a
+// cone, which would just wash the screen — it simply starts later now.
+const BEAM_NEAR = 0.9;             // world units: hidden this close…
+const BEAM_FAR = 2.2;
 // PlaneGeometry faces +Z; this lays it flat so its normal points up.
 const FLAT_Q = /* @__PURE__ */ new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 // Undercarriage glow comes from real PointLights authored in Blender and
@@ -1041,8 +1159,9 @@ const POOL_GAIN = 1.9;             // pool is brighter than the shaft: you are
 // property of the lighting, not a tuning value — no opacity makes a beam show
 // in full sun. So the rig keys off the scene's env preset: strong at night,
 // present at dusk/hell, off in daylight where it would only add haze.
-// (GeodeDusk / parabolumEnv are separate modes on the page — add them here if
-// you want beams there too.)
+// (parabolumEnv is a separate mode on the page — add it here if you want beams
+// there too. GeodeDusk used to be listed here; the Geode theme was removed
+// 2026-08-23.)
 const BEAM_BY_ENV = { night: 0.05, dusk: 0.01, hell: 0.05 };
 const BEAM_DEFAULT = 0;            // day, solstice: no beam
 const SPOT_BOOST_BY_ENV = { night: 1.2, dusk: 1.0, hell: 1.0 };  // × SPOT_INTENSITY
@@ -1371,6 +1490,1327 @@ function CompanionModel({ url }) {
   );
 }
 
+// ── Photo booth ─────────────────────────────────────────────────────────────
+// A working PHOTOMATIC: click the booth and its polaroid-framed side screen
+// becomes a live webcam viewfinder (the square screen behind the curtain
+// mirrors the same feed); click again for a 3-2-1 countdown, flash, and a
+// stylized print that develops from overexposed white and stays on the outer
+// screen across sessions (localStorage). Everything the player reads —
+// prompts, countdown, the datestamp — is drawn ON the screen canvas, not as
+// DOM chrome, so the whole exchange happens with an in-world machine.
+//
+// The screens are found by MATERIAL name, not node name: the booth mesh is one
+// object whose glTF primitives split per material, and material names survive
+// export untouched (unlike node names, which sanitizeNodeName rewrites). The
+// .blend authors both screens with clean 0-1 UVs, verified un-flipped —
+// flipY:false + a normally-drawn canvas is the correct pairing for glTF UVs,
+// same as the SitePal projection above.
+// Screen roles (post booth-remodel, Aug 23): BoothScreen_Cabin is the framed
+// viewfinder INSIDE the curtained pocket — flight target and live mirror.
+// BoothScreen_Inner/Outer are the LEGACY names from the previous export and
+// only matter until the strip GLB is re-exported: outer was the framed screen,
+// inner the entrance niche (now separated out as Booth_AdBoard, material
+// "BoothScreen_Ad", which this code deliberately never touches).
+const BOOTH_SCREEN_CABIN = "BoothScreen_Cabin";
+const BOOTH_SCREEN_OUTER = "BoothScreen_Outer";
+const BOOTH_SCREEN_INNER = "BoothScreen_Inner";
+const BOOTH_PHOTO_KEY = "hm_booth_photo";
+
+// Canvas matches the outer screen's authored aspect (0.489 × 0.426 strip
+// units ≈ 1.148:1). The inner screen is square, so the shared texture squeezes
+// ~15% there — it is a preview mirror behind a curtain; nobody measures it.
+const BOOTH_W = 512;
+const BOOTH_H = 446;
+
+// The session happens INSIDE the cabin: the flight threads through the
+// curtain and parks facing the inner screen, so the booth's own walls provide
+// the enclosure (the open top spills daylight in). Distance in strip-local
+// units × the auto-fit scale; the cabin is ~1.3 local units deep, so the
+// camera sits most of the way back toward the curtain.
+const BOOTH_INSIDE_DIST_LOCAL = 0.85;
+// OrbitControls floor while inside, in WORLD units. CameraFlyTo's default 0.3
+// floor is deeper than the entire cabin — this override (threaded through
+// handleFocusObject's 4th arg) is what lets the camera fit at all.
+const BOOTH_INSIDE_MIN_DIST = 0.05;
+// Occupancy lamp: a small warm bulb that eases on while the booth is in use.
+// Mounted inside the scaled group, so POSITION is strip-local but distance is
+// WORLD units (the GLOW_LIGHT_DISTANCE trap). Inverse-square makes tiny
+// intensities read strongly this close — same reasoning as the crystal ball.
+const BOOTH_CABIN_LIGHT = 0.06;
+const BOOTH_CABIN_LIGHT_DIST = 0.5;  // WORLD units
+
+const BOOTH_COUNT_SECONDS = 3;    // countdown length
+const BOOTH_FLASH_TIME = 0.35;    // seconds of white-out on the screen
+const BOOTH_DEVELOP_TIME = 2.4;   // overexposed white → print, polaroid-style
+// The flash also pops in the WORLD: one point light just off the screen face.
+// Mounted inside the scaled group, so its POSITION is strip-local — but
+// distance/decay are world-space and do not inherit the fit (the
+// GLOW_LIGHT_DISTANCE trap), hence the small world-unit distance.
+const BOOTH_FLASH_LIGHT = 18;
+const BOOTH_FLASH_DIST = 2.0;     // WORLD units
+const BOOTH_AMBER = "#ffd9a0";    // screen chrome text — kin to the vendor accents
+
+// NO SIGNAL diagnoses, keyed by the getUserMedia rejection's error name (plus
+// "insecure" for origins where the API doesn't exist at all). Naming the exact
+// cause on the screen turns a support question into a self-serve fix.
+// Kept SHORT on purpose: these render on the 512px booth screen (the DOM
+// banner the page pops alongside carries the full step-by-step). Lines that
+// still run long get auto-shrunk by boothMessageScreen.
+const BOOTH_CAM_HINTS = {
+  insecure: ["camera needs localhost or https"],
+  NotAllowedError: ["camera blocked for this site", "address bar camera icon > allow", "then re-enter the booth"],
+  // NotAllowedError whose message says "denied by system": the OS, not the
+  // browser, is the blocker (this is the one that bit on macOS — the site
+  // permission read `granted` while every request still failed).
+  SystemDenied: ["the OS is blocking the camera", "system settings > privacy > camera", "then restart the browser"],
+  NotFoundError: ["no camera detected on this device"],
+  NotReadableError: ["camera is in use by another app"],
+  unknown: ["camera unavailable", "check browser permissions"],
+};
+
+// Companion overlay hook: draws a scene character into the print BEFORE
+// stylization, so player and companion grade as one photograph.
+// (ctx, w, h) on the snapshot canvas, base video frame already down.
+let boothCompanionDraw = null;
+export function setBoothCompanionDraw(fn) { boothCompanionDraw = fn; }
+
+// ── Booth photobombs ────────────────────────────────────────────────────────
+// Transparent character renders (authored in Blender) drawn into the print at
+// capture. Deliberately NOT shown in the live mirror — the photobomb reveals
+// itself as the print develops, which is the whole gag, and rarity is what
+// makes a bombed print worth showing off.
+//   url:    PNG with alpha under /public. The render's flat cut edge is the
+//           side it enters from and sits flush on the print's border.
+//   side:   "left" | "right" — which border the cut edge hugs.
+//   height: fraction of the print's height the render is scaled to.
+//   chance: independent roll per snap, tried in order — first hit wins.
+// Dev override: ?boothbomb=<substring of url> forces that companion.
+const BOOTH_COMPANIONS = [
+  { url: "/booth/companions/demon.webp", side: "left", height: 0.95, chance: 0.2 },
+];
+const _companionImgs = new Map();
+function boothCompanionImage(url) {
+  let img = _companionImgs.get(url);
+  // A FAILED load retries (throttled): assets get dropped into /public
+  // mid-session while authoring, and a permanently-cached 404 would need a
+  // full reload to notice the file arrived.
+  if (img && img.complete && !img.naturalWidth && Date.now() - (img.__failedAt || 0) > 3000) {
+    img = null;
+  }
+  if (!img) {
+    img = new Image();
+    img.onerror = () => { img.__failedAt = Date.now(); };
+    img.src = url;
+    _companionImgs.set(url, img);
+  }
+  return img;
+}
+// The render's OPAQUE bounding box, scanned once and cached on the image.
+// Anchoring by opaque pixels (not the file's canvas) means transparent padding
+// left over from an export can never open a gap at the print's edge.
+//
+// The threshold is deliberately HIGH: lossy WebP alpha leaves a feather of
+// near-invisible pixels along a hard cut edge, and a low threshold anchors
+// that invisible fringe to the border — which reads as a thin gap against a
+// dark photo. Requiring solidly visible pixels puts the character's real
+// silhouette on the edge and simply discards the fringe.
+const COMPANION_ALPHA_MIN = 96;
+
+// ── Booth styles ────────────────────────────────────────────────────────────
+// The CHOSEN overlay layer, cycled via the STYLE chip drawn on the mirror —
+// visible live before the snap, unlike photobombs, which stay random and
+// capture-only (the demon is not a menu item). Each style is a full-print-size
+// transparent webp (512×446) drawn 1:1 over the video, before the stylize
+// pass, so it grades into the photograph. Adding a style = one line here plus
+// the webp in /public/booth/styles/. A missing file shows its label but draws
+// nothing, so styles can be wired before the art lands.
+// Optional `fit` places a raw render instead of requiring pre-composed art:
+// the image's OPAQUE bounds are scaled to `h` (fraction of print height,
+// aspect preserved) and centered at (`cx`,`cy`) in print fractions. No `fit`
+// = full-bleed 1:1 (for frames/borders authored at 512×446).
+const BOOTH_STYLES = [
+  { id: "plain", label: "PLAIN", url: null },
+  { id: "hat", label: "HMPC HAT", url: "/booth/styles/hat.webp", fit: { h: 0.38, cx: 0.5, cy: 0.17 } },
+  // `bg` = full scene rendered BEHIND the segmented sitter (author it as a
+  // complete opaque 512×446 scene — no cutout window needed). A style may
+  // carry both `bg` and `url` (overlay on top).
+  { id: "synthwave", label: "SYNTHWAVE", bg: "/booth/styles/synthwave.webp" },
+  // Full kit: segmented sitter in front of the sunset, cap on top.
+  { id: "hat_synthwave", label: "HAT + SYNTHWAVE", bg: "/booth/styles/synthwave.webp", url: "/booth/styles/hat.webp", fit: { h: 0.38, cx: 0.5, cy: 0.17 } },
+];
+const BOOTH_STYLE_KEY = "hm_booth_style";
+// STYLE chip: canvas rect on the mirror, bottom-left above the footer bar.
+// Clicks are routed by the screen quad's UV, so this rect IS the hit target —
+// computed from the label so draw and hit-test always agree, whatever the
+// longest style name grows to. (10.3 ≈ advance width of 17px monospace.)
+function boothChipRect(label) {
+  return { x: 12, y: BOOTH_H - 78, w: 24 + Math.round((label.length + 8) * 10.3), h: 32 };
+}
+
+// ── Booth capture modes ─────────────────────────────────────────────────────
+// POLAROID = the single print. STRIP = four shots in sequence, composited
+// into the classic vertical booth strip. Cycled by the MODE chip
+// (bottom-right of the mirror, mirroring the STYLE chip's mechanics).
+const BOOTH_MODES = ["POLAROID", "STRIP"];
+const BOOTH_MODE_KEY = "hm_booth_mode";
+const BOOTH_STRIP_SHOTS = 4;
+const BOOTH_STRIP_COUNT = 2;      // seconds of countdown for shots 2..N
+const BOOTH_INTERLUDE_TIME = 1.4; // beat between shots — reposition time
+function boothModeChipRect(label) {
+  const w = 24 + Math.round((label.length + 7) * 10.3); // "MODE ▸ " = 7 chars
+  return { x: BOOTH_W - 12 - w, y: BOOTH_H - 78, w, h: 32 };
+}
+function boothModeChip(ctx, label) {
+  const c = boothModeChipRect(label);
+  ctx.fillStyle = "rgba(10,8,6,0.72)";
+  ctx.fillRect(c.x, c.y, c.w, c.h);
+  ctx.strokeStyle = "rgba(255,217,160,0.65)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(c.x, c.y, c.w, c.h);
+  ctx.font = "700 17px ui-monospace, Menlo, monospace";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = BOOTH_AMBER;
+  ctx.fillText("MODE ▸ " + label, c.x + 10, c.y + c.h / 2 + 1);
+}
+
+// The physical print that EJECTS from the slot under the cabin screen —
+// nothing auto-pops any more: the machine hands you the print in-world, and
+// clicking it opens the share overlay. Sizes in strip-local units; the eject
+// slides out over BOOTH_EJECT_TIME with a paper flutter that settles.
+const BOOTH_EJECT_TIME = 1.6;
+// Fallback print widths for exports that predate the Booth_PrintSlot mesh —
+// when the slot exists, prints are sized to its mouth instead.
+const BOOTH_PRINT_WIDTH = { strip: 0.26, square: 0.3 };
+// How far the print feeds out before it rests, per format. With the
+// bottom-first feed the UNEMERGED part is the image's TOP, so these run
+// nearly full: what stays gripped in the slit is just the top paper margin —
+// every frame (and the whole polaroid photo) ends up visible.
+// Clicking the hanging print opens the full view.
+const BOOTH_EJECT_EXTENT = { strip: 0.97, square: 0.97 };
+// Print width as a fraction of the slot's slit width, per format.
+const BOOTH_PRINT_SLIT_FACTOR = { strip: 0.55, square: 0.8 };
+// Paper curl: the emerged paper runs straight for BOOTH_CURL_FLAT of its
+// length, then bends toward the viewer on this radius (strip-local units) —
+// receipt physics, and it lifts the strip's tail so nothing scrapes the wall.
+const BOOTH_CURL_RADIUS = 0.45;
+const BOOTH_CURL_FLAT = 0.45;
+// Pitch of the whole feed path away from the wall, radians — the print juts
+// diagonally out of the slit toward the viewer (dispenser-ticket style)
+// instead of dropping flat down the wall. 0 = the old straight-down hang.
+const BOOTH_EJECT_PITCH = 0.6;
+
+// The little physical polaroid: the print's centre square on white stock with
+// the classic chin. (The DOM overlay still shows the full captioned card —
+// this is just the object the machine spits out.)
+function composeMiniPolaroid(snap) {
+  const M = 14, F = 336, CHIN = 64;
+  const W = F + M * 2, H = M + F + CHIN;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const x = c.getContext("2d");
+  x.fillStyle = "#f7f4ec";
+  x.fillRect(0, 0, W, H);
+  const S = Math.min(snap.width, snap.height);
+  x.drawImage(snap, (snap.width - S) / 2, 0, S, S, M, M, F, F);
+  return c;
+}
+
+// The classic strip: each shot center-cropped to the same square the polaroid
+// keeps, stacked with gutters on warm paper, HMPC branding + date at the foot.
+function composeBoothStrip(shots) {
+  const F = BOOTH_H;                 // square frame edge
+  const M = 20, G = 12, FOOT = 64;
+  const W = F + M * 2;
+  const H = M + shots.length * F + (shots.length - 1) * G + FOOT;
+  const cnv = document.createElement("canvas");
+  cnv.width = W;
+  cnv.height = H;
+  const x = cnv.getContext("2d");
+  x.fillStyle = "#f2ecdf";
+  x.fillRect(0, 0, W, H);
+  const sx = (BOOTH_W - F) / 2;
+  shots.forEach((s, i) => {
+    x.drawImage(s, sx, 0, F, F, M, M + i * (F + G), F, F);
+  });
+  const now = new Date();
+  const stamp = `${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")}.'${String(now.getFullYear() % 100).padStart(2, "0")}`;
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  x.font = "700 22px ui-monospace, Menlo, monospace";
+  x.fillStyle = "#6b5b47";
+  x.fillText("HMPC PHOTOMATIC", W / 2, H - FOOT / 2 - 10);
+  x.font = "500 16px ui-monospace, Menlo, monospace";
+  x.fillStyle = "rgba(107,91,71,0.8)";
+  x.fillText(stamp, W / 2, H - FOOT / 2 + 14);
+  return cnv;
+}
+
+function drawBoothStyleOverlay(ctx, w, h, style) {
+  if (!style?.url) return;
+  const img = boothCompanionImage(style.url);
+  if (!img.complete || !img.naturalWidth) return;
+  const fit = style.fit;
+  if (!fit) {
+    ctx.drawImage(img, 0, 0, w, h);
+    return;
+  }
+  const bb = companionOpaqueBox(img);
+  const dh = h * (fit.h ?? 0.4);
+  const dw = dh * (bb.w / bb.h);
+  const dx = w * (fit.cx ?? 0.5) - dw / 2;
+  const dy = h * (fit.cy ?? 0.2) - dh / 2;
+  ctx.drawImage(img, bb.x, bb.y, bb.w, bb.h, dx, dy, dw, dh);
+}
+
+function boothStyleChip(ctx, label) {
+  const c = boothChipRect(label);
+  ctx.fillStyle = "rgba(10,8,6,0.72)";
+  ctx.fillRect(c.x, c.y, c.w, c.h);
+  ctx.strokeStyle = "rgba(255,217,160,0.65)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(c.x, c.y, c.w, c.h);
+  ctx.font = "700 17px ui-monospace, Menlo, monospace";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = BOOTH_AMBER;
+  ctx.fillText("STYLE ▸ " + label, c.x + 10, c.y + c.h / 2 + 1);
+}
+
+// ── Booth backdrop segmentation ─────────────────────────────────────────────
+// A style with `bg` puts a full scene BEHIND the sitter, which needs to know
+// which pixels are the person: MediaPipe selfie segmentation, self-hosted
+// (public/mediapipe — wasm + 250KB model), lazy-loaded only when the booth is
+// entered and only if some style declares a bg. Everything degrades: while the
+// segmenter loads (or if it fails), a bg style just shows the plain mirror.
+let _segmenter = null;
+let _segmenterState = "idle"; // idle | loading | ready | failed
+async function ensureBoothSegmenter() {
+  if (_segmenterState !== "idle") return;
+  _segmenterState = "loading";
+  try {
+    const { ImageSegmenter, FilesetResolver } = await import("@mediapipe/tasks-vision");
+    const files = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+    _segmenter = await ImageSegmenter.createFromOptions(files, {
+      baseOptions: { modelAssetPath: "/mediapipe/selfie_segmenter.tflite", delegate: "GPU" },
+      runningMode: "VIDEO",
+      outputCategoryMask: false,
+      outputConfidenceMasks: true,
+    });
+    _segmenterState = "ready";
+  } catch (e) {
+    console.warn("[booth] segmenter unavailable — backdrop styles will show the plain mirror:", e);
+    _segmenterState = "failed";
+  }
+}
+
+// Flip this if the composite comes out inverted (backdrop covering the PERSON
+// while the room survives) — the mask's polarity is model-defined. (true is
+// CORRECT for this model — Michelle verified the category mask ran inverted.)
+const BOOTH_MASK_INVERT = false;
+// The cutout knobs. THRESHOLD is how sure the model must be that a pixel is
+// you before it survives — RAISE it to trim the dark halo the model hedges
+// around hair, LOWER it if it starts eating hairline/shoulders. SOFTNESS is
+// the width of the semi-transparent band at the silhouette edge.
+const BOOTH_MASK_THRESHOLD = 0.5;
+const BOOTH_MASK_SOFTNESS = 0.2;
+// Per-frame confidence jitter makes the silhouette boundary crawl; each new
+// mask is blended into a running average at this weight before thresholding.
+// Lower = steadier edge but more ghosting on fast movement; 1 = off.
+const BOOTH_MASK_SMOOTHING = 0.35;
+
+// Backdrop scene (unmirrored) + segmented sitter (mirrored) onto ctx. Runs a
+// fresh segmentation per call, so the capture gets the exact snap-moment mask.
+// Returns true when something was drawn (even the graceful unmasked fallback).
+function drawBoothBackdropFrame(st, ctx, w, h, bgImg) {
+  const video = st.video;
+  if (!video?.videoWidth) return false;
+  let masked = false;
+  if (_segmenterState === "ready" && _segmenter) {
+    try {
+      const res = _segmenter.segmentForVideo(video, performance.now());
+      const mask = res.confidenceMasks[0];
+      const mw = mask.width, mh = mask.height;
+      const arr = mask.getAsFloat32Array();
+      if (!st.maskCanvas) {
+        st.maskCanvas = document.createElement("canvas");
+        st.maskCtx = st.maskCanvas.getContext("2d");
+        st.personCanvas = document.createElement("canvas");
+        st.personCanvas.width = w;
+        st.personCanvas.height = h;
+        st.personCtx = st.personCanvas.getContext("2d");
+      }
+      if (st.maskCanvas.width !== mw || st.maskCanvas.height !== mh) {
+        st.maskCanvas.width = mw;
+        st.maskCanvas.height = mh;
+        st.maskData = null;
+      }
+      if (!st.maskData) st.maskData = st.maskCtx.createImageData(mw, mh);
+      const md = st.maskData.data;
+      if (!st.maskSmooth || st.maskSmooth.length !== arr.length) {
+        st.maskSmooth = new Float32Array(arr.length);
+        st.maskSmoothInit = false;
+      }
+      const sm = st.maskSmooth;
+      for (let i = 0; i < arr.length; i++) {
+        const conf = BOOTH_MASK_INVERT ? 1 - arr[i] : arr[i];
+        sm[i] = st.maskSmoothInit ? sm[i] + (conf - sm[i]) * BOOTH_MASK_SMOOTHING : conf;
+        const a = (sm[i] - BOOTH_MASK_THRESHOLD) / BOOTH_MASK_SOFTNESS;
+        md[i * 4 + 3] = a <= 0 ? 0 : a >= 1 ? 255 : (a * 255) | 0;
+      }
+      st.maskSmoothInit = true;
+      st.maskCtx.putImageData(st.maskData, 0, 0);
+      mask.close();
+      // person = mirrored video ∩ mirrored mask (identical cover transforms,
+      // so the mask lands exactly on the pixels it was computed from)
+      const p = st.personCtx;
+      p.clearRect(0, 0, w, h);
+      drawCoverMirrored(p, video, video.videoWidth, video.videoHeight, w, h);
+      p.globalCompositeOperation = "destination-in";
+      p.filter = "blur(2px)"; // soften the binary mask edge
+      drawCoverMirrored(p, st.maskCanvas, mw, mh, w, h);
+      p.filter = "none";
+      p.globalCompositeOperation = "source-over";
+      masked = true;
+    } catch (e) {
+      // fall through to the unmasked mirror
+    }
+  }
+  const bs = Math.max(w / bgImg.naturalWidth, h / bgImg.naturalHeight);
+  ctx.drawImage(
+    bgImg,
+    (w - bgImg.naturalWidth * bs) / 2,
+    (h - bgImg.naturalHeight * bs) / 2,
+    bgImg.naturalWidth * bs,
+    bgImg.naturalHeight * bs
+  );
+  if (masked) ctx.drawImage(st.personCanvas, 0, 0);
+  else drawVideoCover(ctx, video, w, h);
+  return true;
+}
+
+// The booth screen's NO SIGNAL hints are diegetic but small; this event lets
+// the page pop a readable DOM instruction card for the same cause (and clear
+// it when the camera comes up or the player leaves). Same window-event idiom
+// as vendor-mood.
+function announceBoothCamError(code) {
+  try {
+    window.dispatchEvent(new CustomEvent("booth-camera-error", { detail: code ? { code } : null }));
+  } catch (e) {}
+}
+function companionOpaqueBox(img) {
+  if (img.__bbox) return img.__bbox;
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height).data;
+  let minX = c.width, minY = c.height, maxX = -1, maxY = -1;
+  for (let yy = 0; yy < c.height; yy++) {
+    for (let xx = 0; xx < c.width; xx++) {
+      if (d[(yy * c.width + xx) * 4 + 3] > 8) {
+        if (xx < minX) minX = xx;
+        if (xx > maxX) maxX = xx;
+        if (yy < minY) minY = yy;
+        if (yy > maxY) maxY = yy;
+      }
+    }
+  }
+  img.__bbox = maxX < 0
+    ? { x: 0, y: 0, w: c.width, h: c.height }
+    : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  return img.__bbox;
+}
+
+function pickBoothPhotobomb() {
+  let forced = null;
+  try { forced = new URLSearchParams(window.location.search).get("boothbomb"); } catch (e) {}
+  if (forced) return BOOTH_COMPANIONS.find((c) => c.url.includes(forced)) || null;
+  for (const c of BOOTH_COMPANIONS) {
+    if (Math.random() < c.chance) return c;
+  }
+  return null;
+}
+function drawBoothPhotobomb(ctx, w, h, pick = pickBoothPhotobomb()) {
+  if (!pick) return;
+  const img = boothCompanionImage(pick.url);
+  // Not loaded yet (or missing on disk): quietly no photobomb this snap.
+  if (!img.complete || !img.naturalWidth) return;
+  const bb = companionOpaqueBox(img);
+  const dh = h * (pick.height ?? 0.95);
+  const dw = dh * (bb.w / bb.h);
+  // Bottom-anchored, cut edge overdrawn 1px past the border so no seam shows.
+  // (The shareable polaroid center-crops ~33px off each side, trimming that
+  // much of an edge-entering companion — they stay flush there too, just a
+  // step less deep into frame, which an off-frame leaner reads as anyway.)
+  const y = h - dh;
+  const x = pick.side === "right" ? w - dw + 1 : -1;
+  ctx.drawImage(img, bb.x, bb.y, bb.w, bb.h, x, y, dw, dh);
+}
+
+// Material-name lookup (exact — material names are not sanitized on import).
+function findMaterialMesh(root, matName) {
+  if (!root) return null;
+  let hit = null;
+  root.traverse((o) => {
+    if (hit || !o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.some((m) => m?.name === matName)) hit = o;
+  });
+  return hit;
+}
+
+// Outward world normal of a mesh's first triangle. The screen primitives hold
+// ONLY the screen quad, so the first tri IS the screen face; glTF fronts are
+// CCW, so the winding cross-product points out of the glass.
+function firstTriWorldNormal(mesh, out) {
+  const geo = mesh.geometry;
+  const pos = geo.attributes.position;
+  const ix = (i) => (geo.index ? geo.index.getX(i) : i);
+  const a = new THREE.Vector3().fromBufferAttribute(pos, ix(0));
+  const b = new THREE.Vector3().fromBufferAttribute(pos, ix(1));
+  const c = new THREE.Vector3().fromBufferAttribute(pos, ix(2));
+  b.sub(a); c.sub(a);
+  out.crossVectors(b, c);
+  const nm = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+  return out.applyMatrix3(nm).normalize();
+}
+
+// Fill the canvas with the video, cover-cropped and mirrored (the preview is a
+// mirror, and the print keeps what the preview showed — WYSIWYG beats the
+// "real photo booths print un-mirrored" trivia).
+function drawCoverMirrored(ctx, src, sw, sh, w, h) {
+  if (!sw || !sh) return false;
+  const s = Math.max(w / sw, h / sh);
+  const dw = sw * s, dh = sh * s;
+  ctx.save();
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  ctx.restore();
+  return true;
+}
+function drawVideoCover(ctx, video, w, h) {
+  return drawCoverMirrored(ctx, video, video?.videoWidth, video?.videoHeight, w, h);
+}
+
+// The print treatment. A raw webcam frame is a photographic hole punched in a
+// low-poly world; posterizing to a few levels per channel pulls it toward the
+// flat-shaded look, the warm lift + vignette age it into the noir-manila
+// palette, and grain keeps the quantized bands from reading as banding.
+// One-time cost at capture (~230k px), never per-frame.
+function stylizeBoothPhoto(ctx, w, h, opts = {}) {
+  const { stamp = true } = opts;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  // 8 levels reads as "graded film" where 6 read as "screen print" — still
+  // stylized, but faces keep more of their modelling.
+  const LEVELS = 8;
+  const step = 255 / (LEVELS - 1);
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i] * 1.07 + 10;
+    let g = d[i + 1] * 1.0 + 5;
+    let b = d[i + 2] * 0.9;
+    r = Math.round(r / step) * step;
+    g = Math.round(g / step) * step;
+    b = Math.round(b / step) * step;
+    const n = (Math.random() - 0.5) * 11;
+    d[i] = Math.max(0, Math.min(255, r + n));
+    d[i + 1] = Math.max(0, Math.min(255, g + n));
+    d[i + 2] = Math.max(0, Math.min(255, b + n));
+  }
+  ctx.putImageData(img, 0, 0);
+  const v = ctx.createRadialGradient(w / 2, h / 2, h * 0.42, w / 2, h / 2, h * 0.85);
+  v.addColorStop(0, "rgba(20,10,4,0)");
+  v.addColorStop(1, "rgba(20,10,4,0.38)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+  // film-back datestamp — the real date, burned into the print. Strip frames
+  // skip it (the strip stamps its footer once instead of four times).
+  if (stamp) {
+    const now = new Date();
+    const ds = `${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")}.'${String(now.getFullYear() % 100).padStart(2, "0")}`;
+    ctx.font = "600 24px ui-monospace, Menlo, monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "alphabetic";
+    ctx.shadowColor = "rgba(120,40,0,0.8)";
+    ctx.shadowBlur = 5;
+    ctx.fillStyle = "rgba(255,150,60,0.9)";
+    // Inset past the (w - h)/2 side trim of PolaroidSnapshot's square
+    // center-crop, or the stamp's tail gets cropped off the shareable print.
+    const cropInset = Math.max(0, (w - Math.min(w, h)) / 2);
+    ctx.fillText(ds, w - cropInset - 18, h - 16);
+    ctx.shadowBlur = 0;
+  }
+}
+
+function boothScanlines(ctx, w, h) {
+  ctx.fillStyle = "rgba(6,4,2,0.13)";
+  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
+}
+
+function boothChrome(ctx, w, h, t, footer) {
+  ctx.fillStyle = "rgba(10,8,6,0.55)";
+  ctx.fillRect(0, 0, w, 36);
+  ctx.font = "700 20px ui-monospace, Menlo, monospace";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  ctx.fillStyle = BOOTH_AMBER;
+  ctx.fillText("PHOTOMATIC", 14, 19);
+  // live tally: red dot breathing, not blinking hard
+  ctx.fillStyle = `rgba(255,70,50,${0.55 + 0.45 * Math.sin(t * 4)})`;
+  ctx.beginPath();
+  ctx.arc(w - 58, 18, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = BOOTH_AMBER;
+  ctx.textAlign = "right";
+  ctx.fillText("LIVE", w - 14, 19);
+  if (footer) {
+    ctx.fillStyle = "rgba(10,8,6,0.55)";
+    ctx.fillRect(0, h - 40, w, 40);
+    ctx.font = "700 22px ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = `rgba(255,217,160,${0.55 + 0.45 * Math.sin(t * 2.6)})`;
+    ctx.fillText(footer, w / 2, h - 19);
+  }
+}
+
+function boothMessageScreen(ctx, w, h, t, title, lines) {
+  ctx.fillStyle = "#0c0906";
+  ctx.fillRect(0, 0, w, h);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "700 44px ui-monospace, Menlo, monospace";
+  ctx.fillStyle = `rgba(255,217,160,${0.7 + 0.3 * Math.sin(t * 2.2)})`;
+  ctx.fillText(title, w / 2, h * 0.42);
+  ctx.fillStyle = "rgba(255,217,160,0.75)";
+  // Per-line auto-shrink: a line wider than the screen scales its font down
+  // (floored for legibility) instead of running off the glass.
+  const maxLineW = w - 36;
+  lines.forEach((ln, i) => {
+    let size = 20;
+    ctx.font = `500 ${size}px ui-monospace, Menlo, monospace`;
+    const tw = ctx.measureText(ln).width;
+    if (tw > maxLineW) {
+      size = Math.max(13, Math.floor((size * maxLineW) / tw));
+      ctx.font = `500 ${size}px ui-monospace, Menlo, monospace`;
+    }
+    ctx.fillText(ln, w / 2, h * 0.58 + i * 30);
+  });
+  boothScanlines(ctx, w, h);
+}
+
+const _boothNormal = /* @__PURE__ */ new THREE.Vector3();
+
+function PhotoBoothRig({ boothScene, stripScale, focus, onVendorClick, onFocusObject, onZoomOut, onFocusChange, onBoothPhoto, boothClickRef }) {
+  const screens = useMemo(() => ({
+    cabin: findMaterialMesh(boothScene, BOOTH_SCREEN_CABIN),
+    inner: findMaterialMesh(boothScene, BOOTH_SCREEN_INNER),
+    outer: findMaterialMesh(boothScene, BOOTH_SCREEN_OUTER),
+  }), [boothScene]);
+  // The screen the occupant faces: the cabin viewfinder, or the legacy framed
+  // screen until the re-export lands. Everything keys off this one mesh.
+  const viewfinder = screens.cabin || screens.outer;
+  const viewfinderKey = screens.cabin ? "cabin" : "outer";
+
+  // Strip-local geometry for the click proxy and flash lamp — via the same
+  // world-box ÷ root-matrix idiom as BulbRig, so it holds whether the booth
+  // arrives in its own GLB or inside a future strip export.
+  const [frame, setFrame] = useState(null);
+  useEffect(() => {
+    if (!viewfinder) return;
+    // The click proxy must span the whole BOOTH, not just the screen assembly
+    // (which is its own object now) — find the shell by node name, falling
+    // back to the screen's parent for exports that keep them merged.
+    const root = findByBaseName(boothScene, "Photo_booth_Cube.031") || viewfinder.parent || boothScene;
+    boothScene.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(boothScene.matrixWorld).invert();
+    const box = new THREE.Box3().setFromObject(root).applyMatrix4(inv);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3()).multiplyScalar(1.15);
+    // Cabin interior point (booth-box centre at screen height): the occupancy
+    // lamp and the flash both live here, so the flash floods the pocket and
+    // spills out the open top for anyone watching from the boardwalk.
+    const sBox = new THREE.Box3().setFromObject(viewfinder).applyMatrix4(inv);
+    const sCenter = sBox.getCenter(new THREE.Vector3());
+    const cabin = box.getCenter(new THREE.Vector3()).setY(sCenter.y);
+    // Print slot: the authored Booth_PrintSlot mesh when the export carries
+    // it — prints emerge through its mouth, sized to fit it. Falls back to a
+    // computed point under the screen for older exports. Faces the same way
+    // the screen does (same wall).
+    const mV = new THREE.Matrix4().copy(inv).multiply(viewfinder.matrixWorld);
+    const nL = firstTriWorldNormal({ geometry: viewfinder.geometry, matrixWorld: mV }, new THREE.Vector3());
+    nL.setY(0).normalize();
+    let slotPos, printW = null;
+    const slotMesh = findByBaseName(boothScene, "Booth_PrintSlot");
+    if (slotMesh) {
+      const kBox = new THREE.Box3().setFromObject(slotMesh).applyMatrix4(inv);
+      const kC = kBox.getCenter(new THREE.Vector3());
+      const kS = kBox.getSize(new THREE.Vector3());
+      // proud of the slot's bezel along the wall normal so the paper never
+      // z-fights the housing
+      const proud = (Math.abs(kS.x * nL.x) + Math.abs(kS.y * nL.y) + Math.abs(kS.z * nL.z)) / 2 + 0.02;
+      slotPos = kC.clone().addScaledVector(nL, proud);
+      slotPos.y = kC.y - 0.01;
+      // slit width = the horizontal extent perpendicular to the wall normal
+      printW = Math.abs(nL.z) > Math.abs(nL.x) ? kS.x : kS.z;
+    } else {
+      slotPos = new THREE.Vector3(sCenter.x, sBox.min.y - 0.06, sCenter.z).addScaledVector(nL, 0.05);
+    }
+    const slotQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), nL);
+    setFrame({
+      center: center.toArray(), size: size.toArray(), cabin: cabin.toArray(),
+      slotPos: slotPos.toArray(), slotQuat: slotQuat.toArray(), printW,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boothScene, screens]);
+
+  // Everything transient lives in one ref: canvas pipeline, webcam handles,
+  // and the state machine ("idle" | "boot" | "denied" | "preview" |
+  // "countdown" | "flash" | "develop" | "photo"). No React state — the whole
+  // exchange is drawn in useFrame, and re-renders would buy nothing.
+  const rig = useRef(null);
+  const zoomedRef = useRef(false);
+  const flashRef = useRef(null);
+  const cabinRef = useRef(null);
+  // The physical print hanging from the slot: { tex, w, h, format }. Its
+  // slide-out is animated in useFrame; clicking it opens the share overlay.
+  const [ejected, setEjected] = useState(null);
+  const printRef = useRef(null);
+  const ejectStartRef = useRef(0);
+  useEffect(() => () => { try { ejected?.tex.dispose(); } catch (e) {} }, [ejected]);
+
+  const ensureRig = () => {
+    if (rig.current) return rig.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = BOOTH_W;
+    canvas.height = BOOTH_H;
+    const snap = document.createElement("canvas");
+    snap.width = BOOTH_W;
+    snap.height = BOOTH_H;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.flipY = false;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
+    rig.current = {
+      canvas, ctx: canvas.getContext("2d"),
+      snap, snapCtx: snap.getContext("2d"),
+      texture, material,
+      applied: { cabin: null, inner: null, outer: null },
+      video: null, stream: null, starting: false,
+      state: "idle", t: 0, hasSnap: false, photoDrawn: false, camError: null,
+      shutter: null, snapUrl: null, idleTimer: null,
+      styleIdx: 0, modeIdx: 0,
+      shots: null, bombPick: null, bombFrame: -1,
+      countLen: BOOTH_COUNT_SECONDS, pendingShare: null, printCanvas: null,
+    };
+    // Same shutter the page's screenshot Polaroid uses, fired at the FLASH —
+    // the polaroid overlay pops seconds later and stays silent (its trigger
+    // path skips the sound when handed an imageSource).
+    try {
+      const a = new Audio("/audio/cameraShutter.mp3");
+      a.preload = "auto";
+      a.load();
+      rig.current.shutter = a;
+    } catch (e) {}
+    // Last chosen style + mode survive across visits.
+    try {
+      const saved = BOOTH_STYLES.findIndex((s) => s.id === localStorage.getItem(BOOTH_STYLE_KEY));
+      rig.current.styleIdx = Math.max(0, saved);
+      rig.current.modeIdx = Math.max(0, BOOTH_MODES.indexOf(localStorage.getItem(BOOTH_MODE_KEY)));
+    } catch (e) {}
+    return rig.current;
+  };
+
+  const applyScreen = (st, which) => {
+    const mesh = screens[which];
+    if (mesh && !st.applied[which]) {
+      st.applied[which] = mesh.material;
+      mesh.material = st.material;
+    }
+  };
+  const restoreScreen = (st, which) => {
+    const mesh = screens[which];
+    if (mesh && st.applied[which]) {
+      mesh.material = st.applied[which];
+      st.applied[which] = null;
+    }
+  };
+
+  const stopCam = (st) => {
+    st.stream?.getTracks().forEach((tr) => tr.stop());
+    st.stream = null;
+    st.video = null;
+  };
+
+  const startCam = () => {
+    const st = rig.current;
+    if (!st || st.stream || st.starting) return;
+    const md = typeof navigator !== "undefined" ? navigator.mediaDevices : null;
+    if (!md?.getUserMedia) {
+      // Browsers strip the camera API off insecure origins entirely — a LAN
+      // IP over plain http lands here with no prompt ever shown.
+      st.camError = "insecure";
+      st.state = "denied";
+      st.t = 0;
+      announceBoothCamError(st.camError);
+      return;
+    }
+    st.starting = true;
+    md.getUserMedia({ audio: false, video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } } })
+      .then((stream) => {
+        const cur = rig.current;
+        // The player may have left the booth (or the component unmounted)
+        // while the permission prompt sat open — a granted stream then MUST be
+        // stopped, or the camera-in-use light stays on with nothing drawing it.
+        if (!cur || cur !== st || !zoomedRef.current) {
+          stream.getTracks().forEach((tr) => tr.stop());
+          if (cur === st) st.starting = false;
+          return;
+        }
+        const video = document.createElement("video");
+        video.muted = true;
+        video.setAttribute("playsinline", "");
+        video.srcObject = stream;
+        const go = () => {
+          st.stream = stream;
+          st.video = video;
+          st.starting = false;
+          if (st.state === "boot") { st.state = "preview"; st.t = 0; }
+          announceBoothCamError(null);
+        };
+        // The booth click was the user gesture, so play() resolving is the
+        // normal path — but treat a rejection as ready anyway and let
+        // drawVideoCover gate on videoWidth.
+        video.play().then(go).catch(go);
+      })
+      .catch((err) => {
+        if (rig.current !== st) return;
+        st.starting = false;
+        if (zoomedRef.current) {
+          st.camError =
+            err?.name === "NotAllowedError" && /system/i.test(err?.message || "")
+              ? "SystemDenied"
+              : (err?.name || "unknown");
+          st.state = "denied";
+          st.t = 0;
+          announceBoothCamError(st.camError);
+        }
+      });
+  };
+
+  // Leaving the booth, by any road: camera off, extra screens back to black.
+  // The VIEWFINDER keeps the print when one exists — your last photo hangs in
+  // the cabin, waiting for whoever pushes through the curtain next.
+  const endSession = () => {
+    const st = rig.current;
+    if (!st) return;
+    stopCam(st);
+    announceBoothCamError(null);
+    restoreScreen(st, "inner");
+    restoreScreen(st, viewfinderKey === "cabin" ? "outer" : "cabin");
+    clearTimeout(st.idleTimer);
+    if (st.hasSnap) {
+      // Power the screen down as the player leaves. Swapping the live mirror
+      // straight to the stored print HERE flashes it in their face during the
+      // exit flight — go dark now, hang the print quietly once the camera is
+      // long gone. It's there for the next peek through the curtain.
+      st.ctx.fillStyle = "#0c0906";
+      st.ctx.fillRect(0, 0, BOOTH_W, BOOTH_H);
+      st.texture.needsUpdate = true;
+      st.idleTimer = setTimeout(() => {
+        if (rig.current !== st || st.state !== "idle" || !st.hasSnap) return;
+        st.ctx.drawImage(st.snap, 0, 0);
+        st.texture.needsUpdate = true;
+      }, 2000);
+    } else {
+      restoreScreen(st, viewfinderKey);
+    }
+    st.state = "idle";
+    st.photoDrawn = false;
+    // Abandoned mid-sequence state must not leak into the next visit, and
+    // the hanging print goes back into the machine.
+    st.shots = null;
+    st.pendingShare = null;
+    st.printCanvas = null;
+    st.countLen = BOOTH_COUNT_SECONDS;
+    setEjected(null);
+    // Next session starts its mask average fresh — a stale silhouette from
+    // the previous sitter would ghost over the first frames.
+    st.maskSmoothInit = false;
+  };
+
+  // One styled frame of the current mirror, rendered to a fresh canvas.
+  // `bomb`: false = never, true = roll the odds, or a specific companion pick
+  // (the strip pre-rolls once and lands its bomb on one chosen frame).
+  const captureShot = (st, { bomb, stamp }) => {
+    const cnv = document.createElement("canvas");
+    cnv.width = BOOTH_W;
+    cnv.height = BOOTH_H;
+    const c = cnv.getContext("2d");
+    c.filter = "saturate(82%) contrast(110%) brightness(104%)";
+    c.fillStyle = "#0d0b09";
+    c.fillRect(0, 0, BOOTH_W, BOOTH_H);
+    {
+      const style = BOOTH_STYLES[st.styleIdx];
+      const bgImg = style?.bg ? boothCompanionImage(style.bg) : null;
+      if (bgImg && bgImg.complete && bgImg.naturalWidth) {
+        drawBoothBackdropFrame(st, c, BOOTH_W, BOOTH_H, bgImg);
+      } else {
+        drawVideoCover(c, st.video, BOOTH_W, BOOTH_H);
+      }
+    }
+    c.filter = "none";
+    drawBoothStyleOverlay(c, BOOTH_W, BOOTH_H, BOOTH_STYLES[st.styleIdx]);
+    if (bomb) {
+      try { drawBoothPhotobomb(c, BOOTH_W, BOOTH_H, bomb === true ? undefined : bomb); } catch (e) { console.warn("[booth] photobomb draw failed:", e); }
+    }
+    try { boothCompanionDraw?.(c, BOOTH_W, BOOTH_H); } catch (e) {}
+    stylizeBoothPhoto(c, BOOTH_W, BOOTH_H, { stamp });
+    return cnv;
+  };
+
+  // Mirror a shot onto the booth screen canvas and persist it as the idle
+  // print (a strip session keeps its LAST frame as the in-world print).
+  const adoptShot = (st, cnv) => {
+    st.snapCtx.drawImage(cnv, 0, 0);
+    st.hasSnap = true;
+    st.snapUrl = st.snap.toDataURL("image/jpeg", 0.85);
+    try { localStorage.setItem(BOOTH_PHOTO_KEY, st.snapUrl); } catch (e) {}
+  };
+
+  // Single-shot POLAROID capture.
+  const capture = (st) => {
+    adoptShot(st, captureShot(st, { bomb: true, stamp: true }));
+    st.pendingShare = { url: st.snapUrl, format: "square" };
+  };
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    // Same drag guard as the deck: the booth is a wide target, and R3F only
+    // suppresses post-drag clicks on the pointer-MISSED path.
+    if (e.delta > STRIP_CLICK_DRAG_PX) return;
+    const st = ensureRig();
+    if (!zoomedRef.current) {
+      zoomedRef.current = true;
+      onVendorClick?.("photobooth");
+      // Fly INSIDE: through the curtain to face the cabin viewfinder. Its
+      // outward normal points into the pocket, so following it parks the
+      // camera surrounded by the booth's own walls, mirror ahead. Computed
+      // live off the mesh so a re-export that moves the booth moves the shot.
+      const screenMesh = viewfinder;
+      if (screenMesh && onFocusObject) {
+        screenMesh.updateWorldMatrix(true, false);
+        const center = new THREE.Box3().setFromObject(screenMesh).getCenter(new THREE.Vector3());
+        const normal = firstTriWorldNormal(screenMesh, _boothNormal).clone();
+        onFocusObject(center, normal, BOOTH_INSIDE_DIST_LOCAL * stripScale, BOOTH_INSIDE_MIN_DIST);
+      }
+      onFocusChange?.({ id: "photobooth", object: viewfinder || screens.inner });
+      st.state = st.stream ? "preview" : "boot";
+      st.t = 0;
+      st.photoDrawn = false;
+      clearTimeout(st.idleTimer);
+      applyScreen(st, "cabin");
+      applyScreen(st, "inner");
+      applyScreen(st, "outer");
+      // Kick the photobomb + style renders loading now so they're decoded
+      // well before a capture needs them (a miss just means they sit out).
+      BOOTH_COMPANIONS.forEach((cmp) => boothCompanionImage(cmp.url));
+      BOOTH_STYLES.forEach((s) => {
+        if (s.url) boothCompanionImage(s.url);
+        if (s.bg) boothCompanionImage(s.bg);
+      });
+      // ...and the segmentation runtime, only because a bg style exists.
+      if (BOOTH_STYLES.some((s) => s.bg)) ensureBoothSegmenter();
+      st.ctx.fillStyle = "#0c0906";
+      st.ctx.fillRect(0, 0, BOOTH_W, BOOTH_H);
+      st.texture.needsUpdate = true;
+      startCam();
+      return;
+    }
+    if (st.state === "countdown" || st.state === "flash" || st.state === "develop" || st.state === "interlude") return;
+    // The camera sequence belongs to the SCREEN: only a click that lands on
+    // the viewfinder assembly (the screen quad or its frame) starts the
+    // countdown — or, with a print showing, goes again for a retake. A click
+    // anywhere else in the cabin means "I'm done": exit.
+    let onScreen = false;
+    {
+      const assembly = viewfinder?.parent;
+      let o = e.object;
+      while (o) {
+        if (o === viewfinder || (assembly && o === assembly)) { onScreen = true; break; }
+        o = o.parent;
+      }
+    }
+    if (onScreen && st.stream) {
+      if (st.state === "preview") {
+        // The STYLE chip is a region of the mirror itself: the intersection's
+        // UV maps straight onto the canvas (glTF v runs top-down, matching
+        // the flipY:false texture), so the chip rect doubles as its hit-box.
+        // Only the glass quad has meaningful UVs — frame clicks always snap.
+        if (e.object === viewfinder && e.uv) {
+          const cx = e.uv.x * BOOTH_W;
+          const cy = e.uv.y * BOOTH_H;
+          const chip = boothChipRect(BOOTH_STYLES[st.styleIdx].label);
+          if (cx >= chip.x && cx <= chip.x + chip.w && cy >= chip.y && cy <= chip.y + chip.h) {
+            st.styleIdx = (st.styleIdx + 1) % BOOTH_STYLES.length;
+            try { localStorage.setItem(BOOTH_STYLE_KEY, BOOTH_STYLES[st.styleIdx].id); } catch (err) {}
+            return;
+          }
+          const mchip = boothModeChipRect(BOOTH_MODES[st.modeIdx]);
+          if (cx >= mchip.x && cx <= mchip.x + mchip.w && cy >= mchip.y && cy <= mchip.y + mchip.h) {
+            st.modeIdx = (st.modeIdx + 1) % BOOTH_MODES.length;
+            try { localStorage.setItem(BOOTH_MODE_KEY, BOOTH_MODES[st.modeIdx]); } catch (err) {}
+            return;
+          }
+        }
+        st.countLen = BOOTH_COUNT_SECONDS;
+        // A fresh session swallows the previous print back into the machine.
+        setEjected(null);
+        st.pendingShare = null;
+        if (BOOTH_MODES[st.modeIdx] === "STRIP") {
+          // Pre-roll the photobomb ONCE for the whole strip and land it on a
+          // random frame — the demon crashes exactly one pose of four.
+          st.shots = [];
+          st.bombPick = pickBoothPhotobomb();
+          st.bombFrame = st.bombPick ? Math.floor(Math.random() * BOOTH_STRIP_SHOTS) : -1;
+        } else {
+          st.shots = null;
+        }
+        st.state = "countdown";
+        st.t = 0;
+        return;
+      }
+      if (st.state === "photo") { st.state = "preview"; st.t = 0; st.photoDrawn = false; return; }
+    }
+    // anywhere else (or "denied"/"boot" anywhere): leave
+    zoomedRef.current = false;
+    endSession();
+    onFocusChange?.(null);
+    onZoomOut?.();
+  };
+
+  // Registered with CommercialStrip so the deck's click handler can hand
+  // in-booth clicks (which land on strip geometry — the cabin's own walls)
+  // back to this state machine. No dep array: handleClick closes over fresh
+  // props each render, so re-registering every commit keeps it current.
+  useEffect(() => {
+    if (!boothClickRef) return;
+    boothClickRef.current = handleClick;
+    return () => { boothClickRef.current = null; };
+  });
+
+  // Another stall taking the shared focus is also "leaving the booth" — the
+  // webcam must not stay live while the player chats with the hot dog vendor.
+  useEffect(() => {
+    if (!zoomedRef.current) return;
+    if (focus?.id === "photobooth") return;
+    zoomedRef.current = false;
+    endSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
+
+  // A previous session's print hangs in the cabin on load.
+  useEffect(() => {
+    if (!viewfinder) return;
+    let url = null;
+    try { url = localStorage.getItem(BOOTH_PHOTO_KEY); } catch (e) {}
+    if (!url) return;
+    const st = ensureRig();
+    const img = new Image();
+    img.onload = () => {
+      if (rig.current !== st) return;
+      st.snapCtx.drawImage(img, 0, 0, BOOTH_W, BOOTH_H);
+      st.hasSnap = true;
+      if (st.state === "idle") {
+        st.ctx.drawImage(st.snap, 0, 0);
+        st.texture.needsUpdate = true;
+        applyScreen(st, viewfinderKey);
+      }
+    };
+    img.src = url;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screens]);
+
+  // The useGLTF scene is cached and shared across mounts: hand the screens
+  // their original materials back and release the GPU objects on the way out.
+  useEffect(() => () => {
+    const st = rig.current;
+    if (!st) return;
+    stopCam(st);
+    clearTimeout(st.idleTimer);
+    restoreScreen(st, "cabin");
+    restoreScreen(st, "inner");
+    restoreScreen(st, "outer");
+    try { st.texture.dispose(); } catch (e) {}
+    try { st.material.dispose(); } catch (e) {}
+    rig.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screens]);
+
+  useFrame((state, delta) => {
+    const lamp = flashRef.current;
+    if (lamp && lamp.intensity > 0.01) lamp.intensity *= Math.exp(-delta * 9);
+    else if (lamp) lamp.intensity = 0;
+
+    const st = rig.current;
+    // Occupancy lamp eases on while the booth is in use, off when vacated.
+    const cab = cabinRef.current;
+    if (cab) {
+      const want = st && st.state !== "idle" ? BOOTH_CABIN_LIGHT : 0;
+      cab.intensity += (want - cab.intensity) * (1 - Math.exp(-6 * delta));
+    }
+    // Ejecting print: the paper feeds out of the slit (visible portion grows
+    // via texture crop) and CURLS toward the viewer like a receipt — the
+    // plane's rows are laid along a straight-then-arc curve each frame, with
+    // a flutter that settles as it finishes.
+    const pr = printRef.current;
+    if (pr && ejected) {
+      const e = Math.min(1, (state.clock.elapsedTime - ejectStartRef.current) / BOOTH_EJECT_TIME);
+      const extent = BOOTH_EJECT_EXTENT[ejected.format] ?? 0.6;
+      const k = Math.max(0.02, (1 - Math.pow(1 - e, 3)) * extent);
+      const m = ejected.h * k;              // emerged paper length
+      const flat = m * BOOTH_CURL_FLAT;     // straight drop before the curl
+      const geo = pr.geometry;
+      const pos = geo.attributes.position;
+      const uv = geo.attributes.uv;
+      for (let i = 0; i < pos.count; i++) {
+        const s = (1 - uv.getY(i)) * m;     // distance along the paper from the slit
+        if (s <= flat) {
+          pos.setY(i, -s);
+          pos.setZ(i, 0);
+        } else {
+          const a = (s - flat) / BOOTH_CURL_RADIUS;
+          pos.setY(i, -(flat + BOOTH_CURL_RADIUS * Math.sin(a)));
+          pos.setZ(i, BOOTH_CURL_RADIUS * (1 - Math.cos(a)));
+        }
+      }
+      pos.needsUpdate = true;
+      geo.computeBoundingSphere();          // keep the click raycast honest
+      // Bottom-edge-first feed: the visible window is the image's BOTTOM k,
+      // so content travels through the slit as the paper advances (offset 0),
+      // and the print ends right-side-up. Pinning the TOP window instead
+      // (offset 1-k) reads as the print unrolling from a fixed top edge.
+      ejected.tex.repeat.set(1, k);
+      ejected.tex.offset.set(0, 0);
+      // negative about x tips the hang OUT of the wall toward the viewer
+      pr.rotation.x = -BOOTH_EJECT_PITCH;
+      pr.rotation.z = Math.sin(state.clock.elapsedTime * 5) * 0.05 * (1 - e);
+    }
+    if (!st || st.state === "idle") return;
+    st.t += delta;
+    const { ctx } = st;
+    const t = st.t;
+    switch (st.state) {
+      case "boot":
+        boothMessageScreen(ctx, BOOTH_W, BOOTH_H, t, "PHOTOMATIC", ["starting camera…", "allow the prompt if your browser asks"]);
+        break;
+      case "denied":
+        boothMessageScreen(ctx, BOOTH_W, BOOTH_H, t, "NO SIGNAL", [
+          ...(BOOTH_CAM_HINTS[st.camError] || BOOTH_CAM_HINTS.unknown),
+          "click to exit",
+        ]);
+        break;
+      case "preview":
+      case "countdown": {
+        const style = BOOTH_STYLES[st.styleIdx];
+        const bgImg = style?.bg ? boothCompanionImage(style.bg) : null;
+        const bgReady = !!(bgImg && bgImg.complete && bgImg.naturalWidth);
+        const live = bgReady
+          ? drawBoothBackdropFrame(st, ctx, BOOTH_W, BOOTH_H, bgImg)
+          : drawVideoCover(ctx, st.video, BOOTH_W, BOOTH_H);
+        if (!live) {
+          boothMessageScreen(ctx, BOOTH_W, BOOTH_H, t, "PHOTOMATIC", ["starting camera…", "allow the prompt if your browser asks"]);
+          break;
+        }
+        drawBoothStyleOverlay(ctx, BOOTH_W, BOOTH_H, style);
+        boothScanlines(ctx, BOOTH_W, BOOTH_H);
+        if (st.state === "preview") {
+          boothChrome(ctx, BOOTH_W, BOOTH_H, t, "CLICK SCREEN TO SNAP");
+          boothStyleChip(ctx, BOOTH_STYLES[st.styleIdx].label);
+          boothModeChip(ctx, BOOTH_MODES[st.modeIdx]);
+        } else {
+          const remain = (st.countLen || BOOTH_COUNT_SECONDS) - t;
+          if (remain <= 0) {
+            if (st.shots) {
+              const idx = st.shots.length;
+              const cnv = captureShot(st, { bomb: idx === st.bombFrame ? st.bombPick : false, stamp: false });
+              st.shots.push(cnv);
+              adoptShot(st, cnv);
+              if (st.shots.length >= BOOTH_STRIP_SHOTS) {
+                const strip = composeBoothStrip(st.shots);
+                st.pendingShare = { url: strip.toDataURL("image/jpeg", 0.85), format: "strip" };
+                st.printCanvas = strip;
+                st.shots = null;
+              }
+            } else {
+              capture(st);
+            }
+            st.state = "flash";
+            st.t = 0;
+            if (lamp) lamp.intensity = BOOTH_FLASH_LIGHT;
+            if (st.shutter) {
+              try { st.shutter.currentTime = 0; st.shutter.play().catch(() => {}); } catch (e) {}
+            }
+            break;
+          }
+          boothChrome(ctx, BOOTH_W, BOOTH_H, t, st.shots ? `HOLD STILL — ${st.shots.length + 1} OF ${BOOTH_STRIP_SHOTS}` : "HOLD STILL");
+          const n = String(Math.ceil(remain));
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.font = "700 210px ui-monospace, Menlo, monospace";
+          ctx.lineWidth = 10;
+          ctx.strokeStyle = "rgba(12,9,6,0.75)";
+          ctx.strokeText(n, BOOTH_W / 2, BOOTH_H / 2);
+          ctx.fillStyle = "rgba(255,245,225,0.92)";
+          ctx.fillText(n, BOOTH_W / 2, BOOTH_H / 2);
+        }
+        break;
+      }
+      case "flash":
+        ctx.fillStyle = "#fffdf6";
+        ctx.fillRect(0, 0, BOOTH_W, BOOTH_H);
+        if (t >= BOOTH_FLASH_TIME) {
+          if (st.shots && st.shots.length < BOOTH_STRIP_SHOTS) {
+            st.state = "interlude";
+          } else {
+            st.state = "develop";
+          }
+          st.t = 0;
+        }
+        break;
+      case "interlude":
+        // The shot just taken lingers while the next pose is telegraphed.
+        ctx.drawImage(st.snap, 0, 0);
+        boothChrome(ctx, BOOTH_W, BOOTH_H, t, `NEXT: ${st.shots.length + 1} OF ${BOOTH_STRIP_SHOTS} — NEW POSE!`);
+        if (t >= BOOTH_INTERLUDE_TIME) {
+          st.state = "countdown";
+          st.t = 0;
+          st.countLen = BOOTH_STRIP_COUNT;
+        }
+        break;
+      case "develop": {
+        ctx.drawImage(st.snap, 0, 0);
+        const k = Math.min(1, t / BOOTH_DEVELOP_TIME);
+        ctx.fillStyle = `rgba(255,252,244,${(1 - k) ** 2})`;
+        ctx.fillRect(0, 0, BOOTH_W, BOOTH_H);
+        if (k >= 1) {
+          st.state = "photo";
+          // Print's done developing — the machine EJECTS it from the slot
+          // under the screen. No auto-popup: clicking the hanging print is
+          // what opens the share overlay (pendingShare sticks around so it
+          // can be opened as many times as they like).
+          if (st.pendingShare) {
+            const printCanvas = st.pendingShare.format === "strip"
+              ? st.printCanvas
+              : composeMiniPolaroid(st.snap);
+            if (printCanvas) {
+              const tex = new THREE.CanvasTexture(printCanvas);
+              tex.colorSpace = THREE.SRGBColorSpace;
+              tex.minFilter = THREE.LinearFilter;
+              const w = frame?.printW
+                ? frame.printW * (BOOTH_PRINT_SLIT_FACTOR[st.pendingShare.format] ?? 0.7)
+                : (BOOTH_PRINT_WIDTH[st.pendingShare.format] ?? 0.3);
+              setEjected({ tex, w, h: w * (printCanvas.height / printCanvas.width), format: st.pendingShare.format });
+              ejectStartRef.current = state.clock.elapsedTime;
+            }
+            st.printCanvas = null;
+          }
+        }
+        break;
+      }
+      case "photo":
+        // static — draw once, then stop touching the texture
+        if (st.photoDrawn) return;
+        ctx.drawImage(st.snap, 0, 0);
+        st.photoDrawn = true;
+        break;
+      default:
+        break;
+    }
+    st.texture.needsUpdate = true;
+  });
+
+  return (
+    <group
+      onClick={handleClick}
+      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+      onPointerOut={() => { document.body.style.cursor = "auto"; }}
+    >
+      {frame && (
+        <mesh position={frame.center}>
+          <boxGeometry args={frame.size} />
+          {/* transparent, not visible={false} — invisible objects are skipped
+              by the raycaster and would take no clicks at all */}
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
+      {frame && (
+        <pointLight
+          ref={flashRef}
+          position={frame.cabin}
+          intensity={0}
+          distance={BOOTH_FLASH_DIST}
+          decay={2}
+          color="#fff6e8"
+          castShadow={false}
+        />
+      )}
+      {frame && (
+        <pointLight
+          ref={cabinRef}
+          position={frame.cabin}
+          intensity={0}
+          distance={BOOTH_CABIN_LIGHT_DIST}
+          decay={2}
+          color="#ffd9a0"
+          castShadow={false}
+        />
+      )}
+      {frame && ejected && (
+        <group position={frame.slotPos} quaternion={frame.slotQuat}>
+          <mesh
+            ref={printRef}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (e.delta > STRIP_CLICK_DRAG_PX) return;
+              const sh = rig.current?.pendingShare;
+              if (sh) onBoothPhoto?.(sh.url, sh.format);
+            }}
+            onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+            onPointerOut={() => { document.body.style.cursor = "auto"; }}
+          >
+            {/* height 1 is nominal — every row is repositioned along the
+                feed/curl curve per frame; 24 segments keep the bend smooth */}
+            <planeGeometry args={[ejected.w, 1, 1, 24]} />
+            <meshBasicMaterial map={ejected.tex} toneMapped={false} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      )}
+    </group>
+  );
+}
+
+// The booth lives IN the strip GLB (CommercialStrip2 onward), so the rig just
+// binds to the strip's own copy. If a re-export ever drops the booth, this
+// renders nothing and the booth is visibly absent — fix at source, in Blender.
+function PhotoBooth({ stripScene, ...props }) {
+  // A viewfinder is what makes the booth functional: the cabin screen, or the
+  // legacy framed screen until the strip re-export lands.
+  const present = useMemo(
+    () => !!(findMaterialMesh(stripScene, BOOTH_SCREEN_CABIN) || findMaterialMesh(stripScene, BOOTH_SCREEN_OUTER)),
+    [stripScene]
+  );
+  if (!present) return null;
+  return <PhotoBoothRig boothScene={stripScene} {...props} />;
+}
+
 const _spotAt = /* @__PURE__ */ new THREE.Vector3();
 const _bulbAt = /* @__PURE__ */ new THREE.Vector3();
 
@@ -1426,6 +2866,8 @@ function WagonLights({ stripScene, envPreset }) {
 // lights the bulbs and nothing else — no re-export, no added draw calls, no
 // geometry.
 const STRING_RE = /^SM_Prop_Light_04\d*$/;
+// sanitizeName deletes dots, so "Face1.001" arrives as "Face1001".
+const STRIP_FACE_JUNK_RE = /^Face\d*$/;
 // The bulb island, padded a hair past the measured box (u 0.0211-0.0225,
 // v 0.9741-0.9858) so no rim vert sitting exactly on the boundary drops out.
 // The wire (v~0.929) and sockets (u~0.076) are nowhere near, so padding is free.
@@ -1615,11 +3057,16 @@ function VendorSpotlight({ focus, stripScene, envPreset }) {
   );
 }
 
-export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut }) {
+export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
   const { scene: stripScene } = useGLTF(STRIP_MODEL);
   // Which vendor is zoomed, and what the beam should point at. Lifted here so
   // one shared SpotLight can serve every vendor.
   const [focus, setFocus] = useState(null);
+  // While the player is INSIDE the photo booth, every surface they can click
+  // IS booth interior — and those meshes live in the strip GLB, under the
+  // deck's own click handler. The booth registers its click handler here so
+  // handleStripClick can hand those clicks over instead of flying the camera.
+  const boothClickRef = useRef(null);
 
   const deckW = worldW + DECK_MARGIN * 2 * cellSize;
   const deckD = DECK_DEPTH * cellSize;
@@ -1691,6 +3138,34 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     };
   }, [stripScene, deckW, deckZ, deckLocal, worldD, cellSize]);
 
+  // Export junk. CommercialStrip2 shipped with two of the rug goblin's face
+  // meshes baked into it — Face1.001 and Face3.001. They came across UNSKINNED
+  // (the strip has zero skins), so with no head bone to follow they render at
+  // their raw mesh coordinates, which the auto-fit throws ~22 world units off
+  // the side of the mesa and 1.6 up: a face floating in the sky.
+  //
+  // The rule can be this narrow and still be safe. The strip has no skins and no
+  // legitimate face geometry of its own — faces belong to the character GLBs —
+  // so an unskinned mesh named Face<n> inside the STRIP scene is always junk.
+  // Same idiom as the Icosphere rule on the character exports.
+  //
+  // raycast is stubbed too, not just visibility: the strip GLB sits inside the
+  // click-to-fly wrapper, so an invisible-but-pickable face would still catch a
+  // click and fly the camera 22 units into empty air.
+  //
+  // Fix at source by deleting them from the Blender scene and re-exporting.
+  // This costs nothing once they are gone.
+  useEffect(() => {
+    const junk = [];
+    stripScene.traverse((o) => {
+      if (o.isMesh && !o.isSkinnedMesh && STRIP_FACE_JUNK_RE.test(sanitizeName(o.name))) junk.push(o);
+    });
+    if (!junk.length) return;
+    const rays = junk.map((o) => o.raycast);
+    junk.forEach((o) => { o.visible = false; o.raycast = () => {}; });
+    return () => { junk.forEach((o, i) => { o.visible = true; o.raycast = rays[i]; }); };
+  }, [stripScene]);
+
   // Where the deck actually ended up, in world units. The braces need its real
   // outer edge and underside — both move with the fit, so neither can be
   // written as a constant offset from the nominal deck line.
@@ -1739,6 +3214,12 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
     // Without this the same ray keeps going and also lands on the grid/ground
     // handlers behind the strip, which would fly there instead / as well.
     e.stopPropagation();
+    // In-booth clicks (snap / exit) land on the cabin's interior walls, which
+    // are strip geometry — delegate them to the booth's state machine.
+    if (focus?.id === "photobooth" && boothClickRef.current) {
+      boothClickRef.current(e);
+      return;
+    }
     if (!onFocusObject || !e.point) return;
     // Approach from the field side. +Z is the same direction the vendors use
     // (approachDirWorld resolves their default to exactly (0,0,1)), so a strip
@@ -1835,6 +3316,19 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
             onFocusChange={setFocus}
           />
         ))}
+        {/* The photo booth rides the same shared transform: its GLB is
+            exported in the strip's coordinate space like the characters. */}
+        <PhotoBooth
+          stripScene={stripScene}
+          stripScale={fit.scale}
+          focus={focus}
+          onVendorClick={onVendorClick}
+          onFocusObject={onFocusObject}
+          onZoomOut={onZoomOut}
+          onFocusChange={setFocus}
+          onBoothPhoto={onBoothPhoto}
+          boothClickRef={boothClickRef}
+        />
       </group>
     </>
   );

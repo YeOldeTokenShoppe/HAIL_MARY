@@ -14,6 +14,8 @@ const PolaroidSnapshot = ({
   watermark = true, // false skips the "Hail Mary / Prospecting Co." corner signature (e.g. /fountain)
   shareCaption = undefined, // override the share text; '' = share with no caption (e.g. /fountain)
   shareLink = undefined,    // override the share URL; '' = share with no link (e.g. /fountain)
+  imageSource = null, // data URL of a ready-made photo (e.g. the PHOTOMATIC booth print) — used instead of capturing captureElementId
+  format = 'square', // 'square' = classic polaroid crop; 'strip' = tall booth strip shown at its own aspect, uncropped
 }) => {
   const instanceId = React.useRef(Math.random().toString(36).substring(7));
   React.useEffect(() => {
@@ -29,6 +31,7 @@ const PolaroidSnapshot = ({
   }, [backgroundImage]);
   const [isVisible, setIsVisible] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
+  const [imageAspect, setImageAspect] = useState(1); // h/w — sizes the strip frame
   const [compositedImageUrl, setCompositedImageUrl] = useState(null); // Store the composited version separately
   const [isBlurred, setIsBlurred] = useState(true);
   const [polaroidImageUrl, setPolaroidImageUrl] = useState(null); // Cached polaroid capture
@@ -92,8 +95,14 @@ const PolaroidSnapshot = ({
     if (trigger) {
       setCaption(label);
       setShowReferral(true);
-      playShutter();
-      captureSnapshot();
+      if (imageSource) {
+        // Ready-made print (the photo booth): its flash + shutter already
+        // happened in-scene, so no second shutter here — just develop it.
+        captureFromImage(imageSource);
+      } else {
+        playShutter();
+        captureSnapshot();
+      }
     }
   }, [trigger]);
 
@@ -166,6 +175,52 @@ const PolaroidSnapshot = ({
     ctx.font = `bold ${small}px 'Orbitron', -apple-system, sans-serif`;
     ctx.fillText('Prospecting Co.', leftX, topY + big + gap);
     ctx.restore();
+  };
+
+  // A print handed in ready-made (imageSource) instead of captured off the
+  // WebGL canvas. Square center-crop + watermark, exactly like the no-background
+  // canvas path — the 1:1 photo frame would crop it anyway, and baking the crop
+  // keeps the downloaded polaroid identical to the on-screen one.
+  const captureFromImage = (src) => {
+    const img = new Image();
+    img.onload = () => {
+      // A booth STRIP arrives fully composed (borders, footer, branding) —
+      // use it verbatim at its own tall aspect; cropping or watermarking a
+      // strip would destroy it.
+      if (format === 'strip') {
+        const iw = img.naturalWidth || img.width || 1;
+        const ih = img.naturalHeight || img.height || 1;
+        setImageAspect(ih / iw);
+        setImageUrl(src);
+        setCompositedImageUrl(src);
+        setIsVisible(true);
+        setTimeout(() => { setIsBlurred(false); }, 300);
+        return;
+      }
+      const s = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height);
+      const sq = document.createElement('canvas');
+      sq.width = s;
+      sq.height = s;
+      const sqCtx = sq.getContext('2d', { alpha: true });
+      sqCtx.drawImage(
+        img,
+        ((img.naturalWidth || img.width) - s) / 2,
+        ((img.naturalHeight || img.height) - s) / 2,
+        s, s, 0, 0, s, s
+      );
+      (async () => {
+        if (watermark) await drawWatermark(sqCtx);
+        const dataUrl = sq.toDataURL('image/jpeg', 0.85);
+        if (dataUrl) {
+          setImageUrl(dataUrl);
+          setCompositedImageUrl(dataUrl);
+          setIsVisible(true);
+          setTimeout(() => { setIsBlurred(false); }, 300);
+        }
+      })();
+    };
+    img.onerror = () => console.error('[PolaroidSnapshot] imageSource failed to load');
+    img.src = src;
   };
 
   const captureSnapshot = () => {
@@ -825,9 +880,20 @@ const PolaroidSnapshot = ({
       className={`${styles.overlay} ${isVisible ? styles.visible : ''}`}
       onClick={handleClick}
     >
-      <div 
+      <div
         ref={polaroidRef}
         className={`${styles.polaroid} ${isVisible ? styles.dropped : ''}`}
+        style={format === 'strip' ? {
+          // A strip is its own artifact — no polaroid dressing. The composed
+          // image already carries its paper, margins and HMPC footer, so the
+          // card reduces to a transparent holder sized off the image's aspect
+          // to fit the viewport height.
+          width: `min(230px, calc(74vh / ${Math.max(imageAspect, 1)}))`,
+          maxHeight: 'none',
+          padding: 0,
+          background: 'transparent',
+          border: 'none',
+        } : undefined}
       >
         {/* Close button */}
         <button
@@ -868,13 +934,18 @@ const PolaroidSnapshot = ({
         </button>
         
         <div className={styles.polaroidInner}>
-          <div className={styles.photoFrame}>
-            <img 
-              src={imageUrl} 
+          <div
+            className={styles.photoFrame}
+            style={format === 'strip' ? { paddingBottom: 0, height: 'auto', background: 'transparent', boxShadow: '0 14px 36px rgba(0,0,0,0.5)' } : undefined}
+          >
+            <img
+              src={imageUrl}
               alt="Snapshot"
               className={`${styles.photo} ${isBlurred ? styles.blurred : ''}`}
+              style={format === 'strip' ? { position: 'static', width: '100%', height: 'auto', objectFit: 'contain', display: 'block' } : undefined}
             />
           </div>
+          {format !== 'strip' && (
           <div className={styles.polaroidBottom} onClick={(e) => e.stopPropagation()}>
             <p
               ref={captionRef}
@@ -952,7 +1023,8 @@ const PolaroidSnapshot = ({
               </div>
             )}
           </div>
-          
+          )}
+
           {/* Action Buttons */}
           <div className={styles.actionButtons}>
             <button 

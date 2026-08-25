@@ -6558,6 +6558,9 @@ export default function OilVoxelGrid({
   // vendor id ("fortunes" | "souvenirs" | "hotdogs" | "tattoos" | "promos" |
   // "tonics").
   onVendorClick,
+  // PHOTOMATIC booth print finished developing; called with the photo's data
+  // URL so the page can pop the shared PolaroidSnapshot.
+  onBoothPhoto,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -6976,6 +6979,7 @@ export default function OilVoxelGrid({
           onVendorClick={onVendorClick}
           onFocusObject={onFocusObject}
           onZoomOut={onZoomOut}
+          onBoothPhoto={onBoothPhoto}
         />
       )}
 
