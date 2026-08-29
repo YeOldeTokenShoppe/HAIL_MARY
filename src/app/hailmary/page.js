@@ -90,7 +90,11 @@ const ENV_PRESETS = {
   // blue, leaving solstice its golden festival identity.
   day:   { sky: "#54aee8", skyBottom: "#c9e7f7", ambient: 0.72, dirA: 4.8, dirB: 2.6, point: "#4488ff", cloudOpacity: 0.24, fog: null, hemi: { sky: "#8ecbf0", ground: "#d8c9a8", intensity: 0.55 } },
   solstice: { sky: "#36aee2", skyBottom: "#aee6c0", ambient: 0.82, dirA: 5.2, dirB: 2.4, dirAColor: "#fff2b8", dirBColor: "#7fd8ff", point: "#ffd45a", cloudOpacity: 0.34, fog: "#d8c86a", hemi: { sky: "#80ddff", ground: "#e6b758", intensity: 0.72 } },
-  dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
+  // Dusk horizon carries a soft pink cast over the old tan (2026-08-29; a full
+  // dusty-rose #e0a6b4 read far too strong once the bottom gradient filled the
+  // sky at zoomed-out camera angles). skyBottom, fog, and the hemi ground-
+  // bounce move together so the haze and lighting agree with the sky.
+  dusk:  { sky: "#8b7faa", skyBottom: "#dab0ac", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c8a49e", hemi: { sky: "#9088aa", ground: "#d2aca6", intensity: 0.5 } },
   // Night IS the Lyquid80 look (consolidated 2026-08-29 — there is exactly one
   // night theme). These are the former parabolumEnv values: an arcane violet
   // twilight, brighter ambient than the old navy night (which left the ground
