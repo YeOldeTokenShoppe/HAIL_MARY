@@ -23,6 +23,13 @@ const ALLOWED_FIELDS = new Set([
   "gameStartDate",
   "seasonLengthDays",
   "testingEnabled",
+  // v2 EXTRACT-OR-PASS loop flag (docs/oil-game.md → "v2 LOOP"). Per-season:
+  // flip BEFORE the season starts — mid-season the two loops' drill docs
+  // disagree about what tankOil means.
+  "loopV2",
+  // v2 extraction budget (charges per rig). 20 = whole-column reach; set
+  // pre-season like the other tuning knobs.
+  "passiveCharges",
 ]);
 
 const sha256Hex = (s) => createHash("sha256").update(String(s)).digest("hex");

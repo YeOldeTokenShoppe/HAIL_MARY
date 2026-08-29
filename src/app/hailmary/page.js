@@ -23,6 +23,8 @@ import OilWelcomeModal from "@/components/OilWelcomeModal";
 import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
 import OilOverlayModal from "@/components/OilOverlayModal";
+import OilCoreSampleV2 from "@/components/OilCoreSampleV2";
+import { chargesCapFor } from "@/lib/oilLoopV2";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
@@ -82,16 +84,135 @@ function presetForHour(h) {
 }
 
 const ENV_PRESETS = {
-  day:   { sky: "#7da4c9", skyBottom: null, ambient: 0.6, dirA: 4.0, dirB: 3.0, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
+  // Brightened 2026-08-29: the old day (#7da4c9 flat sky, ambient 0.6, no hemi)
+  // read DARKER than solstice at 9am. Now a luminous clear-blue gradient with a
+  // sky/sand hemisphere fill — comparable brightness to solstice but neutral
+  // blue, leaving solstice its golden festival identity.
+  day:   { sky: "#54aee8", skyBottom: "#c9e7f7", ambient: 0.72, dirA: 4.8, dirB: 2.6, point: "#4488ff", cloudOpacity: 0.24, fog: null, hemi: { sky: "#8ecbf0", ground: "#d8c9a8", intensity: 0.55 } },
   solstice: { sky: "#36aee2", skyBottom: "#aee6c0", ambient: 0.82, dirA: 5.2, dirB: 2.4, dirAColor: "#fff2b8", dirBColor: "#7fd8ff", point: "#ffd45a", cloudOpacity: 0.34, fog: "#d8c86a", hemi: { sky: "#80ddff", ground: "#e6b758", intensity: 0.72 } },
   dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
-  night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.38, dirA: 1.1, dirB: 0.6, dirAColor: "#aac4ff", dirBColor: "#6a80c0", point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: { sky: "#2e3650", ground: "#161824", intensity: 0.4 } },
+  // Night IS the Lyquid80 look (consolidated 2026-08-29 — there is exactly one
+  // night theme). These are the former parabolumEnv values: an arcane violet
+  // twilight, brighter ambient than the old navy night (which left the ground
+  // near-black) so the field reads, with violet key/fill/point lights matching
+  // the Parabolum console. Everything gated on envPreset === "night" (stars,
+  // constellation, string lights, warehouse env-map, ParabolumMoon, violet
+  // fluid, parabolumDark UI) now rides this preset.
+  night: { sky: "#1a0f2e", skyBottom: "#3a1f5c", ambient: 0.55, dirA: 2.4, dirB: 1.2, dirAColor: "#e8d0ff", dirBColor: "#9a7ad6", point: "#a45cff", cloudOpacity: 0.2, fog: "#1f1438", hemi: { sky: "#4a2d7a", ground: "#2a1f3a", intensity: 0.55 } },
   hell:  { sky: "#1a0808", skyBottom: "#6b1a05", ambient: 0.2, dirA: 0.8, dirB: 0.4, point: "#ff2200", cloudOpacity: 0.4, fog: "#1a0505", hemi: { sky: "#3a0800", ground: "#150000", intensity: 0.35 } },
-  // Self-contained scene for Parabolum — an arcane violet twilight. Brighter
-  // ambient than night (which left the ground near-black) so the field reads,
-  // with violet key/fill/point lights to match the Parabolum console.
-  parabolumEnv: { sky: "#1a0f2e", skyBottom: "#3a1f5c", ambient: 0.55, dirA: 2.4, dirB: 1.2, dirAColor: "#e8d0ff", dirBColor: "#9a7ad6", point: "#a45cff", cloudOpacity: 0.2, fog: "#1f1438", hemi: { sky: "#4a2d7a", ground: "#2a1f3a", intensity: 0.55 } },
 };
+
+// ── Continuous time-of-day (auto mode) ───────────────────────────────────────
+// While autoTheme is on, the scene no longer snaps between presets at the
+// presetForHour boundaries — it lerps through them. Each frame below anchors an
+// EXISTING tuned preset to an hour, so at the anchor hours the scene looks
+// exactly like the preset it was tuned as; the hours between are interpolation.
+// presetForHour still runs alongside to flip the discrete consumers (stars,
+// constellation, env-map choice, UI theme) at its old boundaries.
+//
+// Frames are canonicalized so every field is lerpable:
+//  - skyBottom null (uniform sky) → the sky color itself. This also pins the
+//    SkyDome to its gradient-shader branch for the whole cycle, so the dome
+//    material never swaps mid-animation (and the shader branch ignores fog,
+//    unlike the basic-material branch).
+//  - day's fog null → sky-colored fog pushed out to 60..500, so the field reads
+//    exactly like the fogless preset while dusk/night lerp back to 20..200 and
+//    the <fog> element never has to unmount mid-cycle.
+//  - day's hemi null → dusk's hemi colors at intensity 0, so the light count
+//    stays constant across the cycle (no shader recompiles) and colors lerp
+//    from something sane.
+//  - night's cool key (#aac4ff, dirA 1.1) becomes the MOON light on its own
+//    arc; the sun's intensity fades to 0 instead. They crossfade through dusk
+//    and dawn so the key direction never visibly snaps between arcs.
+function todFrame(p, over = {}) {
+  return {
+    sky: p.sky, skyBottom: p.skyBottom ?? p.sky, ambient: p.ambient,
+    sun: p.dirA, sunColor: p.dirAColor ?? "#ffffff", moon: 0,
+    fill: p.dirB, fillColor: p.dirBColor ?? "#ffffff",
+    point: p.point, cloudOpacity: p.cloudOpacity,
+    fog: p.fog ?? p.sky, fogNear: 20, fogFar: 200,
+    hemiSky: p.hemi?.sky ?? ENV_PRESETS.dusk.hemi.sky,
+    hemiGround: p.hemi?.ground ?? ENV_PRESETS.dusk.hemi.ground,
+    hemiI: p.hemi?.intensity ?? 0,
+    ...over,
+  };
+}
+const TOD_FRAME_DAY = todFrame(ENV_PRESETS.day, { fogNear: 60, fogFar: 500 });
+const TOD_FRAME_DUSK = todFrame(ENV_PRESETS.dusk);
+const TOD_FRAME_NIGHT = todFrame(ENV_PRESETS.night, { sun: 0, moon: ENV_PRESETS.night.dirA });
+const TOD_MOON_COLOR = ENV_PRESETS.night.dirAColor;
+
+// Anchor hours. Dawn borrows dusk (there is no dawn preset — same rationale as
+// presetForHour), day holds through the middle, and both ends are night so the
+// midnight wrap is seamless.
+const TOD_FRAMES = [
+  { h: 0, f: TOD_FRAME_NIGHT },
+  { h: 5, f: TOD_FRAME_NIGHT },
+  { h: 7, f: TOD_FRAME_DUSK },
+  { h: 9, f: TOD_FRAME_DAY },
+  { h: 17, f: TOD_FRAME_DAY },
+  { h: 19, f: TOD_FRAME_DUSK },
+  { h: 21, f: TOD_FRAME_NIGHT },
+  { h: 24, f: TOD_FRAME_NIGHT },
+];
+
+function lerpHex(a, b, t) {
+  if (a === b) return a;
+  const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+  const ch = (sh) => Math.round(((A >> sh) & 255) + (((B >> sh) & 255) - ((A >> sh) & 255)) * t);
+  return "#" + ((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, "0");
+}
+
+// Sample the cycle at a fractional hour → an env object with the same fields
+// the static presets carry (so SkyDome and EnvLights read it identically) plus
+// sunPos/moonPos/moon/fogNear/fogFar, which only sampled envs have.
+function sampleEnvAt(hour) {
+  const h = ((hour % 24) + 24) % 24;
+  let lo = TOD_FRAMES[0], hi = TOD_FRAMES[1];
+  for (let i = 0; i < TOD_FRAMES.length - 1; i++) {
+    if (h >= TOD_FRAMES[i].h && h <= TOD_FRAMES[i + 1].h) { lo = TOD_FRAMES[i]; hi = TOD_FRAMES[i + 1]; break; }
+  }
+  const t = hi.h === lo.h ? 0 : (h - lo.h) / (hi.h - lo.h);
+  const a = lo.f, b = hi.f;
+  const num = (k) => a[k] + (b[k] - a[k]) * t;
+  const col = (k) => lerpHex(a[k], b[k], t);
+
+  // Key-light arcs — sun travels east→zenith→west over 6h..18h, the moon the
+  // same over 18h..6h. Only direction matters for a directional light, so the
+  // radius is arbitrary; y is floored so a set sun grazes instead of uplighting.
+  const arcPos = (angle) => [-40 * Math.cos(angle), Math.max(4, 40 * Math.sin(angle)), 12];
+  const sunAngle = Math.max(0, Math.min(Math.PI, ((h - 6) / 12) * Math.PI));
+  const moonAngle = Math.max(0, Math.min(Math.PI, (((h - 18 + 24) % 24) / 12) * Math.PI));
+
+  return {
+    sky: col("sky"), skyBottom: col("skyBottom"),
+    ambient: num("ambient"),
+    dirA: num("sun"), dirAColor: col("sunColor"), sunPos: arcPos(sunAngle),
+    moon: num("moon"), moonColor: TOD_MOON_COLOR, moonPos: arcPos(moonAngle),
+    dirB: num("fill"), dirBColor: col("fillColor"),
+    point: col("point"), cloudOpacity: num("cloudOpacity"),
+    fog: col("fog"), fogNear: num("fogNear"), fogFar: num("fogFar"),
+    hemi: { sky: col("hemiSky"), ground: col("hemiGround"), intensity: num("hemiI") },
+  };
+}
+
+// Fog + light rig shared by both canvases. A static preset env renders exactly
+// the lights it always did; a sampled auto-mode env additionally puts the key
+// light on the sun arc, adds the moon key on its arc, and widens/narrows the
+// fog range through the cycle.
+function EnvLights({ env, moodScale }) {
+  return (
+    <>
+      {env.fog && <fog attach="fog" args={[env.fog, env.fogNear ?? 20, env.fogFar ?? 200]} />}
+      <ambientLight intensity={env.ambient * moodScale} />
+      {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity * moodScale]} />}
+      <directionalLight position={env.sunPos ?? [10, 15, 10]} intensity={env.dirA * moodScale} color={env.dirAColor || "#ffffff"} />
+      {env.moon != null && <directionalLight position={env.moonPos} intensity={env.moon * moodScale} color={env.moonColor} />}
+      <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
+      <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
+    </>
+  );
+}
 
 // ── Theme color maps (UI only — 3D canvas unaffected) ────────────────────────
 const THEMES = {
@@ -109,6 +230,63 @@ const THEMES = {
     inspectorKey: "#5e5040", depthUndrilled: "#7e7560",
     btnText: "#504030", btnBg: "rgba(180,160,130,0.1)",
     cornerBorder: "rgba(139,105,20,0.3)",
+  },
+  // Dusk (golden hour) — the light console warmed to terracotta and rose.
+  // BENCHED 2026-08-29 while the restored Geode theme (below) trials as the
+  // dusk console; kept intact so switching back is a one-line themeKey change.
+  duskLight: {
+    bg: "#f4e6d6", text: "#503c38", textStrong: "#2e1e1a", accent: "#a34a2e",
+    muted: "#7a6258", border: "#dcc0a8", borderLight: "#d0b8a4",
+    panelBg: "rgba(244,230,214,0.95)", headerBg: "rgba(244,230,214,0.97)",
+    inputBg: "#eeded0", barBg: "#e6d4c2", tintBg: "rgba(196,150,110,0.1)",
+    green: "#3f7a2a", greenBg: "rgba(90,138,58,0.07)",
+    warn: "#96421e", red: "#b03a28",
+    gold: "#d49a4a", goldBorder: "#b8823a",
+    scanline: "rgba(60,20,0,0.025)",
+    statusText: "#5a6a30", seedLabel: "#6a544a", seedValue: "#6a544a",
+    rankClaim: "#5a4438", rankOil: "#503c38", rankBarBg: "#e4d2be",
+    inspectorKey: "#6a544a", depthUndrilled: "#8a7060",
+    btnText: "#5a4438", btnBg: "rgba(196,150,110,0.12)",
+    cornerBorder: "rgba(163,74,46,0.32)",
+    panelWash: "linear-gradient(135deg, rgba(255,246,234,0.72) 0%, rgba(250,224,198,0.85) 48%, rgba(238,202,190,0.62) 100%)",
+    panelLine: "linear-gradient(90deg, rgba(163,74,46,0.02), rgba(163,74,46,0.16), rgba(212,154,74,0.18), rgba(163,74,46,0.02))",
+    statWash: "linear-gradient(135deg, rgba(255,246,230,0.7), rgba(248,214,170,0.22) 55%, rgba(202,142,150,0.12))",
+    softShadow: "inset 0 1px 0 rgba(255,252,244,0.7), 0 10px 28px rgba(150,90,40,0.09)",
+    // Survey-map paper takes the sunset tint (same mechanism as solsticeLight).
+    mapBg: "#f0dcc4", mapEmpty: "#f8ecda",
+  },
+  // Geode — restored 2026-08-29 from commit 6d4da7ba^ (cut with the old
+  // GeodeMode toggle) and now serving as the DUSK console. Mirrors the
+  // SpaceScene prospecting-Geode palette: gold/cyan/orange accents floating on
+  // a translucent indigo-black panel. Cyan rides on the `green` token (status +
+  // positive readouts); orange rides on `warn`.
+  Geode: {
+    bg: "#0f141c", text: "#aebccb", textStrong: "#e8d9b8", accent: "#d4a854",
+    muted: "#7e94a6", border: "rgba(107,199,209,0.24)", borderLight: "rgba(107,199,209,0.14)",
+    panelBg: "rgba(15,22,30,0.08)", headerBg: "rgba(13,19,27,0.66)",
+    inputBg: "rgba(22,32,42,0.5)", barBg: "rgba(107,199,209,0.12)", tintBg: "rgba(107,199,209,0.06)",
+    green: "#6bc7d1", greenBg: "rgba(107,199,209,0.12)",
+    warn: "#e87a2b", red: "#e0563c",
+    gold: "#d4a854", goldBorder: "#b8922e",
+    scanline: "rgba(107,199,209,0.04)",
+    statusText: "#6bc7d1", seedLabel: "#7e94a6", seedValue: "#9fc4cf",
+    rankClaim: "#8aa0b0", rankOil: "#cbd9e2", rankBarBg: "rgba(107,199,209,0.14)",
+    inspectorKey: "#7e94a6", depthUndrilled: "#3a4754",
+    btnText: "#bfe0e6", btnBg: "rgba(107,199,209,0.1)",
+    cornerBorder: "rgba(107,199,209,0.32)",
+    // Cool frosted-glass panel — a cyan-led wash with a gold counterpoint, a
+    // cyan/gold accent line, and a cream top-highlight. The low panel opacity
+    // lets the sunset bleed through as colored glass, not an opaque brown slab.
+    titleCool: "#6bc7d1", titleCoolBorder: "rgba(107,199,209,0.7)",
+    panelWash: "linear-gradient(160deg, rgba(107,199,209,0.10) 0%, rgba(170,210,220,0.03) 50%, rgba(212,168,84,0.06) 100%)",
+    panelLine: "linear-gradient(90deg, rgba(107,199,209,0.05), rgba(107,199,209,0.40), rgba(212,168,84,0.34), rgba(107,199,209,0.05))",
+    statWash: "linear-gradient(150deg, rgba(107,199,209,0.08), rgba(15,22,30,0.16) 55%, rgba(212,168,84,0.05))",
+    softShadow: "inset 0 1px 0 rgba(190,224,230,0.10), 0 10px 30px rgba(0,0,0,0.4)",
+    // Selection highlight FILL — arcane violet (the cyan border stays via t.green).
+    // Used by the surface map + cross-section selected column.
+    selectFill: "rgba(176,123,255,0.5)",
+    selectOverlay: "rgba(176,123,255,0.22)",
+    selectHatch: "rgba(176,123,255,0.45)",
   },
   dark: {
     bg: "#12161c", text: "#b0bcc8", textStrong: "#d4dce4", accent: "#d4a854",
@@ -495,6 +673,55 @@ function ParabolumMoon() {
         />
       </mesh>
     </group>
+  );
+}
+
+// Sun disc for the continuous time-of-day cycle — the same radiant
+// canvas-gradient sprite technique as the Solstice sun, riding the same
+// 6h..18h angle as EnvLights' sun key. The angle is deliberately UNclamped:
+// past the horizon the altitude goes negative, which both fades the sprite out
+// and drops it below the ground plane (sprites depth-test, so the field
+// occludes a setting sun naturally). No moon sprite here: night is the Lyquid80
+// look, and the textured ParabolumMoon (mounted whenever envPreset is "night")
+// is the one night moon. Mounted for auto mode (live hour) AND for pinned
+// day/dusk (fixed representative hour via skySunHour) — solstice keeps its own.
+function TODSkyBodies({ todHour }) {
+  const sunTexture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const s = 256;
+    const c = document.createElement("canvas");
+    c.width = c.height = s;
+    const ctx = c.getContext("2d");
+    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    g.addColorStop(0.0, "rgba(255,252,238,1)");
+    g.addColorStop(0.18, "rgba(255,244,200,1)");
+    g.addColorStop(0.32, "rgba(255,212,120,0.72)");
+    g.addColorStop(0.55, "rgba(255,184,92,0.26)");
+    g.addColorStop(1.0, "rgba(255,170,80,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    return new THREE.CanvasTexture(c);
+  }, []);
+
+  const h = ((todHour % 24) + 24) % 24;
+  const sunAngle = ((h - 6) / 12) * Math.PI;
+  // Display arc, calibrated to the Solstice sun's placement ([-18, 28, -45] —
+  // a close billboard ~20° above the default camera, on the −z sky it faces):
+  // rises screen-left at the horizon, peaks at noon right where the Solstice
+  // sun hangs, sets screen-right, and slides below the ground plane past the
+  // horizon (sprites depth-test, so the field occludes it). Deliberately NOT
+  // the key light's arc: EnvLights keeps its near-overhead sweep for lighting
+  // continuity, and Solstice already proves disc and light azimuth can differ.
+  const place = (a) => [-60 * Math.cos(a), 6 + 18 * Math.sin(a), -45 - 10 * Math.sin(a)];
+  // Full strength once ~16° up, gone shortly after slipping under the horizon.
+  const fade = (a) => Math.max(0, Math.min(1, 0.15 + Math.sin(a) * 3));
+  const sunO = fade(sunAngle);
+
+  if (!sunTexture || sunO <= 0.01) return null;
+  return (
+    <sprite position={place(sunAngle)} scale={[34, 34, 1]}>
+      <spriteMaterial map={sunTexture} transparent opacity={sunO} depthWrite={false} fog={false} />
+    </sprite>
   );
 }
 
@@ -1108,8 +1335,8 @@ const TIME_OF_DAY = [["day", ICON_DAY], ["dusk", ICON_DUSK], ["night", ICON_NIGH
 // collapses it again. Themes are a set-once preference, so they don't earn
 // permanent screen space over the hero shot of the field.
 function SceneThemeToolbar({
-  envPreset, setEnvPreset, darkMode, setDarkMode,
-  parabolum, setParabolum,
+  envPreset, setEnvPreset,
+  parabolum,
   autoTheme, enableAutoTheme,
   setFireworksOn, size = 28,
 }) {
@@ -1128,17 +1355,14 @@ function SceneThemeToolbar({
   }, [open]);
 
   // Glyph + tint shown on the collapsed trigger, reflecting the active theme.
+  // Reads envPreset ONLY, deliberately (parabolum is derived from it): a glyph
+  // that could disagree with the scene it controls cost real debugging time
+  // once — spotlight beams and string lights gate on envPreset, and the tray
+  // used to insist it was night while they were correctly off. Night shows the
+  // violet ◈ because night IS the Lyquid80 theme.
   let triggerGlyph, triggerVariant = "gold";
   if (parabolum) { triggerGlyph = "◈"; triggerVariant = "violet"; }
   else if (envPreset === "solstice") triggerGlyph = "✺";
-  // Reads envPreset ONLY, deliberately. This used to be `darkMode || envPreset
-  // === "night"`, which let the tray show the night glyph while the 3D scene was
-  // still in day — the two are separate states and the time-of-day buttons only
-  // move envPreset. That cost real debugging time (spotlight beams and string
-  // lights are gated on envPreset, so they were correctly off while every UI
-  // affordance insisted it was night). The glyph now cannot disagree with the
-  // scene it is controlling.
-  else if (envPreset === "night") triggerGlyph = ICON_NIGHT;
   else if (envPreset === "dusk") triggerGlyph = ICON_DUSK;
   else triggerGlyph = ICON_DAY;
 
@@ -1154,30 +1378,23 @@ function SceneThemeToolbar({
             onClick={() => { enableAutoTheme?.(); setFireworksOn(false); }}
             style={toolbarBtn(autoTheme, size)}
           >⏱</button>
+          {/* Night doubles as the Lyquid80 theme — one night, and it's violet.
+              The old standalone ◈ toggle and the ◐ dark-UI toggle are gone:
+              both collapsed into this pick (consolidated 2026-08-29). */}
           {TIME_OF_DAY.map(([key, icon]) => (
             <button
               key={key}
-              title={key[0].toUpperCase() + key.slice(1)}
+              title={key === "night" ? "Night — Lyquid80" : key[0].toUpperCase() + key.slice(1)}
               onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
-              style={toolbarBtn(!autoTheme && envPreset === key, size)}
+              style={toolbarBtn(!autoTheme && envPreset === key, size, key === "night" ? "violet" : key === "dusk" ? "cyan" : undefined)}
             >{icon}</button>
           ))}
           <div style={TOOLBAR_DIVIDER} />
           <button
             title="Solstice theme"
-            onClick={() => { setEnvPreset("solstice"); setParabolum(false); setDarkMode(false); setFireworksOn(false); }}
-            style={toolbarBtn(!autoTheme && envPreset === "solstice" && !parabolum, size)}
+            onClick={() => { setEnvPreset("solstice"); setFireworksOn(false); }}
+            style={toolbarBtn(!autoTheme && envPreset === "solstice", size)}
           >✺</button>
-          <button
-            title={darkMode ? "Dark theme (active)" : "Dark theme"}
-            onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
-            style={toolbarBtn(darkMode, size)}
-          >{darkMode ? "●" : "◐"}</button>
-          <button
-            title="Lyquid80 theme"
-            onClick={() => setParabolum((p) => !p)}
-            style={toolbarBtn(parabolum, size, "violet")}
-          >◈</button>
           <div style={TOOLBAR_DIVIDER} />
         </>
       )}
@@ -1186,6 +1403,52 @@ function SceneThemeToolbar({
         onClick={() => setOpen((o) => !o)}
         style={toolbarBtn(!open, size, triggerVariant)}
       >{open ? "✕" : triggerGlyph}</button>
+    </div>
+  );
+}
+
+// Dev-only time-of-day scrubber: drag to sweep the whole lighting cycle
+// without waiting on the wall clock. Drives the same todOverride the ?tod=
+// URL param uses (and forces auto mode for the session, exactly like ?tod=),
+// so the discrete preset, console theme, stars, and sun all flip live while
+// dragging. LIVE snaps back to the real clock. Temporary tooling — mounted
+// only in development builds; delete its two mount lines to retire it.
+function TODScrubber({ todHour, todOverride, onScrub, onLive }) {
+  const shown = todOverride ?? todHour;
+  const hh = String(Math.floor(shown)).padStart(2, "0");
+  const mm = String(Math.floor((shown % 1) * 60)).padStart(2, "0");
+  return (
+    <div style={{
+      position: "absolute", left: "50%", bottom: 10, transform: "translateX(-50%)",
+      zIndex: 10, display: "flex", flexDirection: "column", gap: 3,
+      background: "rgba(10,12,18,0.78)", border: "1px solid rgba(255,210,120,0.35)",
+      borderRadius: 6, padding: "6px 10px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: 11, color: "#ffe08a", minWidth: 40 }}>{hh}:{mm}</span>
+        <input
+          type="range" min={0} max={24} step={0.1}
+          value={shown}
+          onChange={(e) => onScrub(parseFloat(e.target.value))}
+          style={{ width: 240, accentColor: "#ffd278" }}
+        />
+        <button
+          onClick={onLive}
+          disabled={todOverride == null}
+          style={{
+            fontFamily: "'Share Tech Mono', monospace", fontSize: 10, letterSpacing: 1,
+            color: todOverride == null ? "#6a7888" : "#0f141c",
+            background: todOverride == null ? "transparent" : "#ffd278",
+            border: "1px solid rgba(255,210,120,0.5)", borderRadius: 3,
+            padding: "2px 6px", cursor: todOverride == null ? "default" : "pointer",
+          }}
+        >LIVE</button>
+      </div>
+      {/* Day-cycle map under the track: violet night → dawn → day → dusk → night */}
+      <div style={{
+        height: 3, borderRadius: 2, margin: "0 52px 0 48px",
+        background: "linear-gradient(90deg, #120a24 0%, #120a24 21%, #d4784a 29%, #54aee8 37%, #54aee8 71%, #e88a40 79%, #120a24 88%, #120a24 100%)",
+      }} />
     </div>
   );
 }
@@ -1261,21 +1524,25 @@ export default function OilPage() {
   // oil_darkMode is still WRITTEN (below), so an in-session choice persists; it
   // just no longer gets to contradict the scene at startup.
   const [darkMode, setDarkMode] = useState(() => envPreset === "night");
-  // Parabolum material theme — independent of the day/dusk/night env presets.
-  // When on, the UI shifts to the arcane violet console AND the extracted fluid
-  // glows violet in the 3D scene (threaded into OilVoxelGrid below).
-  const [parabolum, setParabolum] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("oil_parabolum") === "true";
-    }
-    return false;
-  });
+  // Parabolum/Lyquid80 is no longer an independent toggle — night IS the
+  // Lyquid80 theme (consolidated 2026-08-29). Derived, not state: everything
+  // that used to key on the toggle (violet console UI, violet fluid threaded
+  // into OilVoxelGrid, ParabolumMoon, warehouse env-map) now simply follows
+  // the night preset, whether night was pinned in the tray, reached by the
+  // auto clock, or forced by fireworks. The old oil_parabolum localStorage key
+  // is intentionally no longer read.
+  const parabolum = envPreset === "night";
   // Handed to the tray IN PLACE OF setEnvPreset, so a click there counts as a
   // deliberate pick and ends auto mode. The page keeps using the raw setter for
   // its own programmatic changes (fireworks, hell), which must NOT.
+  // darkMode is synced here too: with the standalone dark-UI toggle gone from
+  // the tray (night's violet console covers it), a stale dark flag from an
+  // auto-night session would otherwise stick to a freshly pinned day scene
+  // with no affordance left to clear it.
   const chooseEnvPreset = useCallback((next) => {
     setAutoTheme(false);
     setEnvPreset(next);
+    setDarkMode(next === "night");
   }, []);
   // Back to following the clock: drop the stored pick and re-derive now, so the
   // scene changes immediately rather than at the next reload. darkMode is synced
@@ -1288,20 +1555,60 @@ export default function OilPage() {
     setDarkMode(next === "night");
   }, []);
 
-  // Active scene lighting: Parabolum forces its own violet-lit scene (a
-  // self-contained themed look, independent of the day/dusk/night presets);
-  // otherwise the user's selected time-of-day.
-  const env = ENV_PRESETS[parabolum ? "parabolumEnv" : envPreset];
+  // ── Continuous clock (auto mode) ───────────────────────────────────────────
+  // Fractional hour driving sampleEnvAt. Advanced once a minute by the tick
+  // effect (which lives further down, after the fireworks state it must
+  // respect). ?tod=H.H pins it, for previewing any hour of the cycle.
+  const [todHour, setTodHour] = useState(() => {
+    if (typeof window === "undefined") return 12;
+    const now = new Date();
+    return now.getHours() + now.getMinutes() / 60;
+  });
+  const [todOverride, setTodOverride] = useState(null);
+  useEffect(() => {
+    const t = parseFloat(new URLSearchParams(window.location.search).get("tod"));
+    if (Number.isFinite(t)) {
+      setTodOverride(((t % 24) + 24) % 24);
+      // Previewing an hour implies following the (pinned) clock. Session-only:
+      // setting autoTheme state alone never touches the stored preset pick.
+      setAutoTheme(true);
+    }
+  }, []);
+  // Dev-scrubber handlers (TODScrubber) — scrubbing behaves exactly like ?tod=:
+  // a session-only override that forces auto mode and never touches storage.
+  const scrubTOD = useCallback((v) => { setTodOverride(v); setAutoTheme(true); }, []);
+  const scrubLive = useCallback(() => setTodOverride(null), []);
+
+  // Active scene lighting: the user's selected time-of-day, except in auto mode
+  // where the env is sampled from the clock instead of read off a preset — but
+  // only while envPreset agrees with the clock: a programmatic override
+  // (fireworks forcing night, the hell event) moves envPreset off the clock
+  // preset without ending auto mode, and must win for as long as it holds. The
+  // auto cycle's night phase lerps into the violet Lyquid80 night like any
+  // other preset.
+  const liveTOD = autoTheme && envPreset === presetForHour(todHour);
+  const env = useMemo(
+    () => (liveTOD ? sampleEnvAt(todHour) : ENV_PRESETS[envPreset]),
+    [liveTOD, todHour, envPreset]
+  );
+  // Hour driving the visible sun disc (TODSkyBodies). Auto mode rides the live
+  // clock; a PINNED day or dusk gets a fixed representative hour — high sun for
+  // day, low setting sun for dusk — so the disc doesn't exist only in auto mode
+  // (pinning used to unmount it, leaving Solstice the only preset with a sun).
+  // null = no disc: night has the ParabolumMoon, solstice its own sun, and
+  // hell/fireworks force presets that fall through to null here.
+  const skySunHour = liveTOD ? todHour
+    : envPreset === "day" ? 13
+    : envPreset === "dusk" ? 17.4
+    : null;
   // Reflections-only env map for the rigs' metal (NOT the sky). Warm "sunset"
   // reflections flatter the warm brass/copper on the bright day/dusk scenes;
-  // "warehouse" (cooler, contrasty) suits the night/dark scenes and the Lyquid80
-  // substance theme (Parabolum). Drei caches each HDR, so toggling is
-  // instant after first load.
+  // "warehouse" (cooler, contrasty) suits the Lyquid80 night and hell.
+  // Drei caches each HDR, so toggling is instant after first load.
   const envMapPreset = useMemo(() => {
-    if (parabolum) return "warehouse";                           // Lyquid80 theme
     if (envPreset === "night" || envPreset === "hell") return "warehouse";
     return "sunset";                                             // day, solstice, dusk
-  }, [parabolum, envPreset]);
+  }, [envPreset]);
   // Don't persist the transient "hell" preset — otherwise a reload during a
   // demon event restores hell forever. Keep the last real preset saved instead.
   //
@@ -1316,20 +1623,24 @@ export default function OilPage() {
     if (envPreset !== "hell") localStorage.setItem("oil_envPreset", envPreset);
   }, [envPreset, autoTheme]);
   useEffect(() => { localStorage.setItem("oil_darkMode", String(darkMode)); }, [darkMode]);
-  useEffect(() => { localStorage.setItem("oil_parabolum", String(parabolum)); }, [parabolum]);
-  // Parabolum overrides light/dark for the UI chrome when active, but still
-  // Parabolum is a self-contained dark violet look (its own violet scene), so it
-  // always uses the dark console — there's no Parabolum "day" variant.
+  // Each scene has its own console now: day = cream light, dusk = the restored
+  // Geode frosted-glass console (cyan/gold on translucent indigo — trialing
+  // over the mauve dusk scene; duskLight is benched), night (= Lyquid80) =
+  // violet parabolumDark, solstice = teal-gold. The darkMode fallback below
+  // only matters for transient in-session states (e.g. mid-hell with a
+  // restored preset pending).
   const themeKey = parabolum
     ? "parabolumDark"
       : envPreset === "solstice"
         ? "solsticeLight"
-        : (darkMode ? "dark" : "light");
+        : envPreset === "dusk"
+          ? "Geode"
+          : (darkMode ? "dark" : "light");
   const theme = THEMES[themeKey];
   // Effective dark flag for the child overlay panels (CoreSamplePanel, How-To,
-  // inspector, etc.). Parabolum and dark mode are both dark aesthetics, so their
-  // panels render dark even when the day/night toggle is on "day".
-  const uiDark = darkMode || parabolum;
+  // inspector, etc.). Parabolum, dark mode, and the Geode dusk console are all
+  // dark aesthetics, so their panels render dark even in a light scene.
+  const uiDark = darkMode || parabolum || envPreset === "dusk";
   const styles = useMemo(() => getStyles(theme), [theme]);
   const m = useMemo(() => getMobileStyles(theme), [theme]);
   const drillBtnStyles = useMemo(() => getDrillStyles(theme), [theme]);
@@ -1393,6 +1704,7 @@ export default function OilPage() {
   const [gamePhase, setGamePhase] = useState("ticket_sale");
   const [gameEnded, setGameEnded] = useState(false);
   const [testingEnabled, setTestingEnabled] = useState(false);
+  const [loopV2, setLoopV2] = useState(false); // v2 extract-or-pass loop flag (admin-set, per season)
   // gameDay is derived from the season clock (see the useMemo below), not stored
   // or admin-set — it's a truthful "DAY N" display, can't desync.
   const [gameStartDate, setGameStartDate] = useState(null);
@@ -1456,6 +1768,7 @@ export default function OilPage() {
   const [mounted, setMounted] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
   const [numberOfDeposits, setNumberOfDeposits] = useState(5);
+  const [passiveCharges, setPassiveCharges] = useState(8); // v2 extraction budget (20 = can reach the bottom of your own column)
   const [numberOfHellPockets, setNumberOfHellPockets] = useState(null); // null ⇒ auto (~3% of grid)
   const [totalOilBudget, setTotalOilBudget] = useState(500);
   const [gridSize, setGridSize] = useState(10);
@@ -1494,6 +1807,7 @@ export default function OilPage() {
         // seed can never be computed client-side by a non-admin.
         else if (d.blockHash && adminAuthed) setBlockHash(d.blockHash);
         if (d.numberOfDeposits) setNumberOfDeposits(d.numberOfDeposits);
+        if (typeof d.passiveCharges === "number") setPassiveCharges(d.passiveCharges);
         if (typeof d.numberOfHellPockets === "number") setNumberOfHellPockets(d.numberOfHellPockets);
         if (d.totalOilBudget) setTotalOilBudget(d.totalOilBudget);
         if (typeof d.gameEnded === "boolean") setGameEnded(d.gameEnded);
@@ -1502,6 +1816,7 @@ export default function OilPage() {
         if (d.gameStartDate) setGameStartDate(d.gameStartDate);
         if (typeof d.seasonLengthDays === "number" && d.seasonLengthDays > 0) setSeasonLengthDays(d.seasonLengthDays);
         if (typeof d.testingEnabled === "boolean") setTestingEnabled(d.testingEnabled);
+        if (typeof d.loopV2 === "boolean") setLoopV2(d.loopV2);
         // Anchor-as-event: the public commit/anchor fields drive the "map does
         // not exist yet" countdown (OilAnchorEvent). Both are public by design.
         setAnchorBlock(typeof d.anchorBlock === "number" ? d.anchorBlock : null);
@@ -1895,6 +2210,29 @@ export default function OilPage() {
   }, [toggleFireworks]);
   useEffect(() => () => clearTimeout(jackpotFireworksTimer.current), []);
 
+  // Advance the auto-mode clock once a minute, and keep the DISCRETE preset in
+  // step with it so everything keyed on envPreset (stars, constellation,
+  // env-map choice, UI theme, tray glyph) flips at the presetForHour boundaries
+  // exactly as it always did. The preset sync stands down while a programmatic
+  // override holds the preset — fireworks forcing night, the hell event — whose
+  // own restore paths put it back; the next tick then trues it up to the clock.
+  // (This effect sits below the fireworks state on purpose: it needs it.)
+  useEffect(() => {
+    if (!autoTheme) return undefined;
+    const tick = () => {
+      const now = new Date();
+      const h = todOverride ?? now.getHours() + now.getMinutes() / 60;
+      setTodHour(h);
+      if (fireworksOn) return;
+      const derived = presetForHour(h);
+      setEnvPreset((prev) => (prev === "hell" ? prev : derived));
+      setDarkMode(derived === "night");
+    };
+    tick();
+    const id = setInterval(tick, 60000);
+    return () => clearInterval(id);
+  }, [autoTheme, todOverride, fireworksOn]);
+
   // Reset snapshot trigger after timeout (fallback if user dismisses without onComplete)
   useEffect(() => {
     if (snapshotTrigger) {
@@ -1930,7 +2268,7 @@ export default function OilPage() {
       setDrillLoaded(true);
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0 });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0, tankOil: d.tankOil, lastStrikeAt: d.lastStrikeAt || null, lastStrikeOil: d.lastStrikeOil ?? null, lastStrikeDepth: d.lastStrikeDepth ?? null, lastStrikeHell: d.lastStrikeHell || false, armed: d.armed, rigDepleted: d.rigDepleted || false, bonusFromShares: d.bonusFromShares || 0, bonusFromHolding: d.bonusFromHolding || 0, artifacts: d.artifacts || {}, artifactFinds: d.artifactFinds || 0, lastStrikeArtifact: d.lastStrikeArtifact || null, supplies: d.supplies || {}, coupon: d.coupon || null, bonusClaimJumps: d.bonusClaimJumps || 0, bonusFromTickets: d.bonusFromTickets || 0, ticketStreak: d.ticketStreak || 0, pending: d.pending || null, chargesSpent: d.chargesSpent || 0, threshold: d.threshold ?? null });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -3763,6 +4101,86 @@ export default function OilPage() {
     }
   }, [user?.id, userDrill, oilInTank, playerExtracted, username, myGusherActive, oilApiFetch]);
 
+  // v2 Core Sample verbs (loopV2 only). Optimistic local update — the
+  // oilDrills snapshot listener confirms the server's version moments later.
+  // NOTE: must live HERE, above the pre-game phase gates (~line 5460) — hooks
+  // declared after those early returns are conditional and break hook order
+  // the moment settings finish loading.
+  const handleLayerDecide = useCallback(async (action) => {
+    const res = await oilApiFetch("/api/oil-layer-decide", { method: "POST", body: JSON.stringify({ action }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "decide failed");
+    setUserDrill((prev) => prev ? {
+      ...prev, pending: null,
+      chargesSpent: (prev.chargesSpent || 0) + (action === "extract" ? 1 : 0),
+    } : prev);
+    return data;
+  }, [oilApiFetch]);
+  const handleSetThreshold = useCallback(async (btr) => {
+    const res = await oilApiFetch("/api/oil-threshold", { method: "POST", body: JSON.stringify({ btr }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "threshold failed");
+    setUserDrill((prev) => prev ? { ...prev, threshold: btr } : prev);
+    return data;
+  }, [oilApiFetch]);
+  const handleLateral = useCallback(async ({ col, row, layer }) => {
+    const res = await oilApiFetch("/api/oil-lateral", { method: "POST", body: JSON.stringify({ col, row, layer }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "lateral failed");
+    setUserDrill((prev) => prev ? { ...prev, chargesSpent: (prev.chargesSpent || 0) + 1 } : prev);
+    return data;
+  }, [oilApiFetch]);
+  // Open pockets in the 4 orthogonal neighbour columns — the salvage board.
+  // Untaken passed layers only; richest (and flagged) first.
+  const salvagePockets = useMemo(() => {
+    if (!loopV2 || !userDrill || userDrill.col == null) return [];
+    const out = [];
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const key = `${userDrill.col + dc}_${userDrill.row + dr}`;
+      const p = allPlotsMap[key];
+      if (!p?.passed) continue;
+      for (const [ls, oil] of Object.entries(p.passed)) {
+        const layer = Number(ls);
+        const hasInclusion = !!p.passedInclusions?.[layer];
+        if (p.lateralTaken?.[layer] !== undefined) continue;
+        if ((oil || 0) <= 0 && !hasInclusion) continue;
+        out.push({ col: userDrill.col + dc, row: userDrill.row + dr, layer, oil: oil || 0, hasInclusion });
+      }
+    }
+    return out.sort((a, b) => (b.oil + (b.hasInclusion ? 1 : 0)) - (a.oil + (a.hasInclusion ? 1 : 0)));
+  }, [loopV2, userDrill, allPlotsMap]);
+  const handleWildcat = useCallback(async ({ col, row, layer }) => {
+    const res = await oilApiFetch("/api/oil-wildcat", { method: "POST", body: JSON.stringify({ col, row, layer }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "wildcat failed");
+    setUserDrill((prev) => prev ? { ...prev, chargesSpent: (prev.chargesSpent || 0) + 1 } : prev);
+    return data;
+  }, [oilApiFetch]);
+  // The frontier: unclaimed 8-neighbour columns, each offering its DEEPEST
+  // virgin layer within your bore's reach (depth = reach; deeper strata skew
+  // richer, so the auto-pick is the rational blind dig).
+  const frontierTargets = useMemo(() => {
+    if (!loopV2 || !userDrill || userDrill.col == null) return [];
+    const ownDepth = allPlotsMap[`${userDrill.col}_${userDrill.row}`]?.drillDay || 0;
+    if (ownDepth <= 0) return [];
+    const out = [];
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        if (dc === 0 && dr === 0) continue;
+        const c = userDrill.col + dc, r = userDrill.row + dr;
+        if (c < 0 || c >= gridSize || r < 0 || r >= gridSize) continue;
+        const p = allPlotsMap[`${c}_${r}`];
+        if (p?.currentOwnerId != null) continue; // claimed — that's lateral territory
+        let layer = -1;
+        for (let z = ownDepth - 1; z >= 0; z--) {
+          if (p?.revealed?.[z] === undefined && p?.wildcatTaken?.[z] === undefined) { layer = z; break; }
+        }
+        if (layer >= 0) out.push({ col: c, row: r, layer });
+      }
+    }
+    return out;
+  }, [loopV2, userDrill, allPlotsMap, gridSize]);
+
   // Bounty claimed toast
   const [bountyToast, setBountyToast] = useState(null);
   const bountyToastTimer = useRef(null);
@@ -3928,13 +4346,38 @@ export default function OilPage() {
       <div style={styles.paramRow}>
         <span style={styles.paramLabel}>DEPOSITS</span>
         <div style={styles.paramButtons}>
-          {[1, 2, 3, 4, 5, 8, 12, 16].map((n) => (
+          {/* 20-40 added for the v2 loop: the extract-or-pass decision only
+              binds when wet layers/column exceed charges — the sim gate
+              (scripts/sim-v2-ring-capture.mjs) puts that at ~30 deposits.
+              Total payout is unchanged (fixed field budget, fixed rate);
+              more deposits only spreads it into smaller pockets. */}
+          {[1, 2, 3, 4, 5, 8, 12, 16, 20, 25, 30, 40].map((n) => (
             <button
               key={n}
               onClick={() => { setNumberOfDeposits(n); handleReset(); saveGameSettings({ numberOfDeposits: n }); }}
               style={{
                 ...styles.paramBtn,
                 ...(numberOfDeposits === n ? styles.paramBtnActive : {}),
+              }}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={styles.paramRow}>
+        <span style={styles.paramLabel}>CHARGES</span>
+        <div style={styles.paramButtons}>
+          {/* v2 extraction budget. 20 = a player can take their whole column
+              (autopilot is opt-in, so the frontier still competes for these).
+              Decided 2026-08-27 alongside frontier wildcats. */}
+          {[8, 10, 12, 14, 16, 20].map((n) => (
+            <button
+              key={n}
+              onClick={() => { setPassiveCharges(n); saveGameSettings({ passiveCharges: n }); }}
+              style={{
+                ...styles.paramBtn,
+                ...(passiveCharges === n ? styles.paramBtnActive : {}),
               }}
             >
               {n}
@@ -4245,6 +4688,16 @@ export default function OilPage() {
           await saveGameSettings({ testingEnabled: next });
           return next ? "✓ TESTING ON — tester code active" : "✓ TESTING OFF — code locked for live play";
         })}>{testingEnabled ? "TESTING: ON" : "TESTING: OFF"}</button>
+        <button disabled={toolBusy} style={{ ...styles.btn, ...(loopV2 ? { borderColor: theme.gold, color: theme.gold } : {}) }} onClick={() => runTool("Toggling loop v2", async () => {
+          // v2 EXTRACT-OR-PASS loop (docs/oil-game.md → "v2 LOOP"): strikes
+          // reveal a PENDING layer that resolves by the player's standing
+          // order before the next reveal; charges gate keeping, not depth.
+          // Flip BEFORE a season starts — mid-season the two loops disagree
+          // about what tankOil means.
+          const next = !loopV2;
+          await saveGameSettings({ loopV2: next });
+          return next ? "✓ LOOP V2 ON — extract-or-pass (flip before the season starts)" : "✓ LOOP V2 OFF — classic tank/bank loop";
+        })}>{loopV2 ? "LOOP V2: ON" : "LOOP V2: OFF"}</button>
       </div>
       {toolStatus && (
         <div style={{ marginTop: 8, fontSize: 10, fontFamily: "'Share Tech Mono', monospace", color: theme.accent, wordBreak: "break-word", lineHeight: 1.4 }}>
@@ -6899,6 +7352,21 @@ export default function OilPage() {
         )}
       </PanelTitle>
       {drillButton}
+      {loopV2 && userDrill && userDrill.col != null && (
+        <OilCoreSampleV2
+          theme={theme}
+          pending={userDrill.pending}
+          chargesRemaining={Math.max(0, chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z) - (userDrill.chargesSpent || 0))}
+          chargesCap={chargesCapFor(userDrill, { passiveCharges }, DEPTH_Z)}
+          threshold={userDrill.threshold}
+          onDecide={handleLayerDecide}
+          onSetThreshold={handleSetThreshold}
+          salvage={salvagePockets}
+          onLateral={handleLateral}
+          frontier={frontierTargets}
+          onWildcat={handleWildcat}
+        />
+      )}
       {gaugesPanel}
       {rigDetails}
     </PanelSection>
@@ -7044,17 +7512,14 @@ export default function OilPage() {
                 {envPreset === "hell" && <HellSkyEffects />}
                 {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
                 {parabolum && <ParabolumMoon />}
+                {skySunHour != null && <TODSkyBodies todHour={skySunHour} />}
                 {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
                 {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} finale sound={fireworksSound} />}
-                {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
-                <ambientLight intensity={env.ambient * moodScale} />
-                {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity * moodScale]} />}
-                <directionalLight position={[10, 15, 10]} intensity={env.dirA * moodScale} color={env.dirAColor || "#ffffff"} />
-                <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
-                <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
+                <EnvLights env={env} moodScale={moodScale} />
                 <group position={[0, 1, 0]}>
                   <OilVoxelGrid
+                    strataLivePlots={loopV2 ? allPlotsMap : null}
                     blockHash={blockHash}
                     numberOfDeposits={numberOfDeposits}
                     numberOfHellPockets={numberOfHellPockets}
@@ -7219,13 +7684,15 @@ export default function OilPage() {
                   </svg>
                 </button>
               </div>
+              {process.env.NODE_ENV === "development" && (
+                <TODScrubber todHour={todHour} todOverride={todOverride} onScrub={scrubTOD} onLive={scrubLive} />
+              )}
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10 }}>
                 <SceneThemeToolbar
                   size={32}
                   envPreset={envPreset} setEnvPreset={chooseEnvPreset}
                   autoTheme={autoTheme} enableAutoTheme={enableAutoTheme}
-                  darkMode={darkMode} setDarkMode={setDarkMode}
-                  parabolum={parabolum} setParabolum={setParabolum}
+                  parabolum={parabolum}
                   setFireworksOn={setFireworksOn}
                 />
               </div>
@@ -7620,17 +8087,14 @@ export default function OilPage() {
             {envPreset === "hell" && <HellSkyEffects />}
             {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
             {parabolum && <ParabolumMoon />}
+            {skySunHour != null && <TODSkyBodies todHour={skySunHour} />}
             {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
             {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
             {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} />}
-            {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
-            <ambientLight intensity={env.ambient * moodScale} />
-            {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity * moodScale]} />}
-            <directionalLight position={[10, 15, 10]} intensity={env.dirA * moodScale} color={env.dirAColor || "#ffffff"} />
-            <directionalLight position={[-5, 10, -5]} intensity={env.dirB * moodScale} color={env.dirBColor || "#ffffff"} />
-            <pointLight position={[-8, 5, -8]} intensity={1.5 * moodScale} color={env.point} />
+            <EnvLights env={env} moodScale={moodScale} />
             <group position={[0, 5, 0]}>
               <OilVoxelGrid
+                strataLivePlots={loopV2 ? allPlotsMap : null}
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
                 numberOfHellPockets={numberOfHellPockets}
@@ -7781,13 +8245,15 @@ export default function OilPage() {
               </svg>
             </button>
           </div>
+          {process.env.NODE_ENV === "development" && (
+            <TODScrubber todHour={todHour} todOverride={todOverride} onScrub={scrubTOD} onLive={scrubLive} />
+          )}
           <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, zoom: uiScale, display: "flex", alignItems: "center", gap: 8 }}>
             <SceneThemeToolbar
               size={28}
               envPreset={envPreset} setEnvPreset={chooseEnvPreset}
               autoTheme={autoTheme} enableAutoTheme={enableAutoTheme}
-              darkMode={darkMode} setDarkMode={setDarkMode}
-              parabolum={parabolum} setParabolum={setParabolum}
+              parabolum={parabolum}
               setFireworksOn={setFireworksOn}
             />
             <button
@@ -8769,6 +9235,7 @@ function getStyles(t) { return {
   paramButtons: {
     display: "flex",
     gap: 2,
+    flexWrap: "wrap", // 12 deposit options since the v2 range (20-40) — wrap, don't clip
   },
 
   paramBtn: {

@@ -30,13 +30,108 @@ Banking stops being a chore: extracted oil is banked on extraction.
   - **EXTRACT** — spend a charge; the tank pumps down the pipeline to the main tank; BANKED ticks up. Final.
   - **PASS** — the layer is gone from this column; the tank vents it back into the ground at that layer, where it is **open to lateral drills** from neighbours. **Pass is final** (decided; no re-open, not for any price).
 - **Offline default — the player's own line.** Every rig has a threshold ("auto-extract any layer ≥ 800 BTR"). If a layer is still undecided when the next strike lands, the rig resolves it by the threshold. Nobody is punished for being asleep; the threshold *is* the strategy dial and the strike alert becomes actionable: "Layer 12: 1,400 BTR — above your line, extracting" / "below it — passing in 9 h unless you say otherwise."
-- **Endgame rule:** when charges remaining ≥ layers remaining, the rig extracts everything automatically (there is nothing left to decide). Unspent charges at the buzzer are wasted, so hoarding has a cost.
+- **Endgame rule (amended 2026-08-27): autopilot is OPT-IN.** The original forced rule ("charges ≥ layers remaining → extract everything") became dominated play once laterals/wildcats compete for the same charges — at 20 charges it would fire from layer 1 and starve the frontier. A player who opts in (`oilDrills.autopilot: true`) gets the original behaviour; default is threshold-only resolution. Unspent charges at the buzzer are still wasted, so hoarding has a cost either way.
 
 ### Lateral drills — the full-grid game
 
 - A **passed layer in a neighbouring column** (the 4 orthogonal neighbours; 8 if the field wants it) can be taken by a **lateral drill**: spend a charge, take that layer's oil. Contested between neighbours: first lateral wins; the layer then closes.
 - Nothing anyone chose to keep can ever be touched — this is the "contested capture" principle already in this doc, finally with a concrete object. Banked oil stays sacrosanct.
 - Claim jumps stay for when plots release. The dino, if it remains, hunts **passed layers only**.
+- **Wording is load-bearing:** a lateral takes what its owner irrevocably discarded — the owner loses nothing (pass is final, they were never getting it back). UI language is **taken / salvaged**, never poached or stolen; the race is between the *other* neighbours, not against the owner. Adversarial is fine as long as it's fair, and it reads fair only if the words say what actually happened.
+- Laterals never originate from, or salvage from, company land — the ring plays by **wildcat** rules (next section).
+
+### Wildcats generalized — the frontier (decided 2026-08-27 · BUILT)
+
+> **Supersedes the ring-only wildcat scope below for now.** Origin: Michelle's "3×3 territories" proposal (each claim = own center + 8 surrounding columns, contested first-come). Full territories are a v3-scale structural change (claim ≠ column breaks the data model; bore routing unsolved), so the decided bridge keeps 1-column claims and generalizes the wildcat verb: **any of the 8 adjacent columns that is UNCLAIMED is frontier** — spend a charge to drill it blind at a layer your own bore has reached (depth = reach), first wildcat per cell wins, oil banks like an extraction, inclusions ride along, a dormant hell pocket wakes the demon on the wildcatter (tonic caps it). On a sparse field this IS the territory game: everyone is surrounded by frontier, contested exactly where claims sit within 2 cells of each other — and the land rush prices placement. Note the asymmetric reach, deliberately: **wildcats reach 8 neighbours** (territories touch diagonally), **salvage laterals stay 4-orthogonal** (the doc's decided reach into *played* columns). Implemented: `oil-wildcat` route + the FRONTIER board on the Core Sample card + wildcat scars on the live strata wall. The **company ring** below is DEFERRED — if generalized wildcats play as well as the sim suggests, the ring's equal-neighbour rationale may be retired entirely; season data decides. Whether full 3×3 spaced-claim territories become v3 stays open, with this bridge as the experiment.
+>
+> **Lattice sim (2026-08-27, 15 pads on 10×10 · 30 dep · capture on · 30 seeds):** the economy INVERTS — own-column banking falls to 6–10% of field oil while wildcats + pool drains harvest 54–65%; the rig becomes a base camp, the frontier becomes the mine. Consequences if v3 happens: (1) charges must scale hard (8ch strands 34% of the field; 14ch → 17%; likely ~20 needed); (2) phase-5 capture (pool drains) is near-mandatory — without it blind digs can't harvest enough; (3) pads must be INSET a cell from every board edge (Michelle's sketch already does this — its salmon frame) or edge pads run ~0.78 EV from clipped frontier; (4) relic recovery collapses (7–14% vs 49%) — inclusion distribution would need re-aiming at reachable frontier depths. Extract-or-pass becomes a side dish (bind 0–24%) — v3 is a different game, and these numbers are the eyes-open cost sheet for choosing it.
+
+### The company ring — wildcats & equal neighbours (decided 2026-08-26 · DEFERRED — see "Wildcats generalized" above)
+
+> **Status: DESIGN, decided with Michelle 2026-08-26.** Prototyped live in the `?strata=1` mock-season demo (`src/components/StrataVoxels.jsx`). Motivation: under plain laterals, edge plots have 3 salvage sources and corners 2 against the interior's 4 — a strict dominance gradient (perimeter rots). The ring converts the gradient into a priced tradeoff and gives "poaching unclaimed ground" — an instinct from earlier design rounds — a rules-legal home.
+
+**The rule.**
+
+- The **outer ring of columns is company land**: unclaimable, no rig, no reveals, no passes. The claimable field is the interior (10×10 → **8×8 = 64 claims**, 36 ring columns).
+- Every claim therefore touches **exactly 4 columns**. What varies is their *composition*, and that variance is the strategy:
+
+| claim position | player neighbours | private ring columns |
+|---|---|---|
+| deep interior | 4 | 0 |
+| border edge | 3 | 1 |
+| border corner | 2 | 2 |
+
+- Each non-corner ring cell is adjacent to exactly **one** claim — ring access is **exclusive**, a private reserve, not a commons. Two play styles, priced at claim time with the geometry in plain sight: the **salvage trader** (interior — maximum contested discards, wall-watching, races) vs the **wildcatter** (border — quieter, a frontier nobody else can touch). Visible-geometry inequality is strategy, not unfairness.
+- The 4 ring **corner** cells touch no claim at all: **the company keeps the corners** (they fall into the operator `sweep()` with the rest of the unclaimed remainder).
+- Diegesis is free: the commercial strip and water tower already stand on the perimeter — company installations on company land. The cube's outer faces (the public view of the underground) are all ring columns, so the walls show the season's wildcat bites.
+
+**Wildcat drills.**
+
+- A border claim may **wildcat**: spend a charge to drill sideways into its adjacent **ring** column — **blind**. Ring columns are never revealed, so a wildcat is a gamble priced only by the **public survey** (which thereby gets a second life mid-season instead of being spent information after the land rush).
+- **Depth prerequisite:** a wildcat can only target a ring layer the claim's **own bore has already reached**. Depth = reach; border play gains a progression arc, and the tunnel the client draws is physically honest.
+- **One take per ring cell**, permanent — mirror of "first lateral wins" (moot for non-corner cells, which have a single eligible driller; binding if reach ever goes to 8).
+- Outcomes resolve against the sealed map: oil → banked as an extraction; dry → the charge is burned (the visible cost of drilling blind); a dormant **hell pocket → wakes the demon on the wildcatter**, tonic applies exactly as on a reveal. Company land carries company hazards.
+
+**Interactions with existing rules.**
+
+- **Grid sizing (cross-ref 2026-06-08):** the ring is proportionally brutal on small grids — 6×6 leaves 16 claims inside a 20-column ring. Size the *interior* to 2–4× expected signups, or accept a deliberately frontier-heavy small season.
+- **Field tuning:** deposits under the ring are reachable only by border wildcats, so the ring's share of the oil budget flows to border claims or the sweep. **Re-run the §Field-tuning sim with the ring modelled** before setting `numberOfDeposits` — same before-the-anchor rule as always.
+- **Endgame rule tension (flagged 2026-08-26):** "charges ≥ layers remaining → extract everything automatically" becomes *dominated play* once laterals and wildcats exist — auto-extracting your own dregs can be worth less than salvaging a neighbour's discard. Lean: make auto-extract an **opt-in autopilot** rather than a forced rule (open question below).
+
+**Build deltas (on top of the v2 list).**
+
+- **Data:** ring membership is derivable from coords (no flag needed; `oilPlots.ring: true` optional for legibility). Ring `oilPlots/{col_row}` gains `wildcatTaken: { [layer]: userId }`. No `oilDrills` doc ever exists for a ring column; claim/claim-jump routes reject ring coords.
+- **Server:** `oil-wildcat { col, row, layer }` — border-adjacency check, depth-prerequisite check against the claimant's bore, one-take check, charge, blind resolve against the sealed map. Results feed FIELD ACTIVITY ("X2·Y5 wildcat L7 — dry hole").
+- **Client:** ring columns tinted company land in the world and on the survey map; excluded from the claim flow; a WILDCAT control on border claims' rig card / Core Sample, showing the survey's forecast for the target column (the only information there is).
+
+### Rule of capture — ownerless oil only (decided 2026-08-26 · NOT BUILT)
+
+> **Status: DESIGN, decided with Michelle 2026-08-26.** Named for the real doctrine (you own what your wellhead pumps, even if it migrated from under the neighbour's fence — the dynamic behind Spindletop's derrick forests and the milkshake speech). In real fields there is no dividing wall underground; here, deposits already span columns in the sealed map (blob radius), so hydraulic connection is **derivable from existing data**. The design question was where capture may run without breaking the covenants. Answer: **one universal principle — capture applies only to ownerless oil — instantiated on two terrains.** Raw drainage of a claim's unrevealed layers was considered and **rejected**: it punishes players for a reveal schedule they don't control (the server's, not theirs) and touches oil its owner never got to decide about.
+
+**The principle.** Oil is capturable iff no one owns it: **unclaimed** (ring deposits) or **disclaimed** (passed layers). Revealed-and-kept oil and unrevealed claimed oil are untouchable, always. Both claim archetypes get a capture game; they differ in flavour, not in access — which keeps the trader/wildcatter tradeoff symmetric in principle and prevents capture from reintroducing positional inequality.
+
+**Interior terrain — the siphon (capture of disclaimed oil).**
+
+- An **operating bore passively siphons adjacent open pockets of the same deposit**: a passed layer orthogonally adjacent to a claim's bore, connected through the blob, drains slowly toward that bore — the siphoned oil **banks to the siphoner**. No charge spent.
+- Interplay with laterals is the point: a **lateral is buy-it-now** (a charge, the whole pocket, instantly); the **siphon is free, slow, and interruptible** — a rival's lateral can still snap up whatever the siphon hasn't drunk. Speed vs thrift.
+- Salvage now **decays**: an open pocket next to an operating bore shrinks tick by tick, so camping on the salvage market has a price and the wall shows it (the green cell visibly deflating toward the bore — fill-level rendering earns its keep here).
+- Offline-safe by construction: the siphon only ever drinks what someone **consciously discarded**, and slowly, with a field alert ("X4·Y5's bore is drinking the L7 pocket") in time for rivals to answer with a charge.
+
+**Ring terrain — pool races (capture of unclaimed oil).**
+
+- A **wildcat strike starts draining its connected ring deposit**: cells of the same blob in company land deplete over time toward the wildcatter's take — including cells only a *rival border claim* can reach.
+- Where a deposit spans several claims' ring reach, that's the milkshake race proper: wildcat **early** (shallow, with the depth prerequisite biting) or wait for depth and risk the husk. The survey shows shared ring pools **at claim time** — a border plot on an isolated pocket is a true private reserve; one on a shared pool is buying into a race, knowingly.
+- The company royalty (open question above) applies to drained oil same as struck oil.
+
+**Balance (required before the anchor).**
+
+- Capture adds upside to both archetypes but not automatically *equal* upside. **Extend the §Field-tuning sim** with both archetypes and capture on (siphon rate, ring drain rate, royalty as knobs) and tune until neither archetype dominates the land-rush EV across seeds. If the numbers won't balance, the rates are per-zone — the milkshake is tunable.
+- Supply-side dependency: siphons and laterals both live on **passes**, so this whole section inherits the field-tuning requirement — if charges don't bind (today's 5-deposit field), nobody passes wet layers and the capture economy starves.
+
+**Build sketch.** Deposit membership per cell from the sealed map (blob id at generation); siphon/drain amounts advance on the existing server cron tick, integer-quantized, written to the same `oilPlots.passed` map (a pocket is its remaining value); FIELD ACTIVITY lines for siphon start and pool-drain progress.
+
+### Multi-element core & relic distribution (decided 2026-08-26 · NOT BUILT)
+
+> **Status: DESIGN, decided with Michelle 2026-08-26.** Motivation: bind is a budget dial (deposits/charges) — but the two-thirds of claims whose charges never bind still deserve decisions. The fix is the information axis, WITHOUT breaking "UI numbers are real": **the assay is exact about oil and incomplete about everything else.**
+
+- **A cell holds `{ oil, inclusion? }`.** The core sample reads the oil exactly and flags — but does not identify — anything else: **"82 BTR · anomalous inclusion detected."** The number never lies; ambiguity lives only in the secondary channel. Extract to recover the inclusion; the **appraiser** (commercial strip) identifies it. Builds directly on `artifactDistribution.js` + `docs/artifact-expansion.md` (same seed, already rendered behind the reveal gate).
+- **Flag at reveal, hide identity until extracted** — the anti-lottery guard. Unflagged relics would make every dry layer a lottery ticket and resurrect extract-everything (the §Field-tuning failure mode). The ping makes relic-chasing an *informed* purchase.
+- **Anti-correlate with oil.** Bias inclusions toward dry layers, deeper strata, and the ring. Rich columns must not also be the relic motherlode — the archaeology lives in the barren rock, so a dry claim can still have a great season as a dig site, and ring inclusions give wildcats a second prize ("struck something weird in company land").
+- **Depth-tiered rarity, hell-cursed at the bottom.** Bottle caps shallow → fossils mid → meteor iron deep → cursed pieces in hell strata. Seeded **before the anchor**, same rule as everything.
+- **The crew never gambles.** The standing order reads BTR only — auto-resolve ignores inclusions. A below-line layer with a ping is always a *manual* purchase. (A wet above-line layer with a ping extracts normally and the relic rides along.)
+- **Taxonomy (Michelle, 2026-08-26): relics/artifacts are BURIED items — they only ever come out of the ground** (drilling, laterals, wildcats). They are a distinct class from **boardwalk goods** — things acquired at the commercial strip (tonics, cards, souvenirs, tattoos, tickets). The two meet only at the vendors: the appraiser *identifies* buried finds and may pay for them in boardwalk credit, but the strip never mints or sells relics. One direction of flow: ground → player → boardwalk, never boardwalk → relic.
+- **Knobs (sim-gated):** inclusions per column (~1–2 avg), dry-cell share (~70%), ring share, relic value tiers. Extend `sim-v2-ring-capture.mjs` with inclusion prospecting and measure **demand** (desirable purchases vs charges) for slack-budget claims before fixing counts.
+
+### Build order (concept approved 2026-08-26)
+
+> Michelle approved the combined concept off the `?strata=1` playable mock: extract-or-pass + laterals + company ring + rule of capture + the strata-voxel world rendering. The demo panel is **not** the player UI (that gets a proper design pass, Michelle-led) — but the mock's surfaces are the requirements list: decision card with explicit cost copy, the claim's column always visible (core rack), a running ledger, and an end-of-season reckoning (banked vs column total vs what rivals captured).
+
+1. **Sim gate — first, zero production risk.** `scripts/sim-v2-ring-capture.mjs` extends §Field tuning with the ring, both archetypes, and capture. Outputs the deposits / charges / royalty / capture-rate recommendation. Anchor knobs move only on its numbers.
+2. **v2 core loop, server + test mode** (no ring/capture yet): charges, pending + threshold resolve on the tick, `oil-layer-decide` / `oil-threshold`, `oilPlots.passed` / `lateralTaken`, alerts under the copy rule. Cell contents are `{ oil, inclusion? }` from day one (§Multi-element core) so relics don't need a second data migration. Lands at a **season boundary** — never hot-swapped mid-season (the anchor rule).
+3. **Laterals + the wall:** `oil-lateral`; extraction mirrored onto `oilPlots`; StrataVoxels promoted from mock timeline to Firestore listeners (same instancing — only the event source changes).
+4. **Company ring + wildcats:** claim flow excludes ring coords, `oil-wildcat`, ring rendering (tint, no rigs).
+5. **Rule of capture:** siphon + pool drain on the server tick; capture lines in FIELD ACTIVITY.
+6. **Player UI pass** (Michelle-led) on the Core Sample surface, informed by every confusion the mock surfaced.
 
 ### The tonic (daily-ticket prize)
 
@@ -73,13 +168,25 @@ Reading it: with the field as tuned today the mechanic is fake — a column rare
 
 **Client:** the Core Sample column is the decision surface (EXTRACT / PASS on the pending layer, passed layers marked open, neighbours' open layers marked for laterals); the rig card shows CHARGES n/20, the threshold (editable), the pending layer with its countdown, and the cadence line ("a reveal every 9.6 h · next before …"); the BANK block is replaced by the pending-layer block; the tank animates fill / pipeline / vent.
 
+**Copy rule (playtested 2026-08-26):** every decision surface and alert must state the cost model explicitly — "EXTRACT banks the full N BTR for 1 charge · PASS is free but final." Never present the threshold bare ("your line: 764") — a playtester read it as a *price* ("do I spend 764 to get 1,285?"). The threshold is always phrased as the crew's standing order: "if you're away, the crew follows 'extract ≥ 764' → would EXTRACT." BTR only ever flows toward the player; charges only ever flow away.
+
 **Test mode:** the existing LAYER stepper reveals; add EXTRACT / PASS / LATERAL controls and a threshold field.
 
 ### Open questions
 
-- Lateral reach: 4 neighbours or 8? (Start with 4.)
+- Lateral reach: 4 neighbours or 8? (Start with 4. Note 8 would break the ring's exclusive-access geometry — diagonal reach makes ring cells contested and gives corner claims 4 private columns.)
 - Should a lateral cost more than a charge (a charge + a bonus drill) to keep columns primary? (Start at one charge; watch the sim.)
 - Whether the dino survives at all once passed layers exist for it to hunt.
+- **Wildcat royalty (2026-08-26):** does the pot take a cut of wildcat strikes? It is company land, and a small royalty both reinforces that and prices the blind upside. (Lean: yes, small.)
+- ~~**Endgame auto-extract (2026-08-26)**~~ — **DECIDED 2026-08-27: opt-in autopilot** (see the amended Endgame rule above). Implemented in `oilLoopV2.resolvePendingDecision`.
+- **Charges scale with frontier share (2026-08-27, measured):** the admin CHARGES knob (8–20) exists and the sim says the two worlds want opposite settings — dense claims-anywhere wants **8** (20 charges there → bind 0%, salvage collapses to 3%, corner EV 2.03 — the decision game dies), sparse/lattice wants **20** (stranded oil falls 34% → **3%**). One knob, set per season with the field shape.
+- **Anti-stranding stack (Michelle's concern, 2026-08-27):** charge budget is the main lever (above); phase-5 pool drains do the rest of the harvesting; her further ideas logged for the full-grid case — adjacency-recovery under conditions ("first dibs", already the rule for wildcats/laterals) and an **acquired reach tool** (e.g. a boardwalk/Pimp-My-Pump SKU extending wildcat reach to distance 2 — ties the strip economy in; the stall coupon would apply). Un-won oil is never burned — it stays with the operator — so this is a generosity/game-feel dial, not a solvency one.
+- **Relic distribution re-aim for lattice (2026-08-27):** her framing is the mechanic — most relics should surface via the own-column assay ("mostly dry, one unknown object"), i.e. bias inclusions toward CLAIMED pad columns and shallow reachable frontier. Lattice sim recovers only 7–23% of relic value with today's depth-biased spread; re-aim before any lattice season.
+- **Depth prerequisite for salvage laterals (2026-08-26):** wildcats require the bore to have reached the target layer — decided. Does the same apply to interior salvage laterals? Yes makes depth strategic everywhere and the tunnels honest; no keeps salvage purely reactive. (Undecided.)
+- **Ring on small grids:** run the ring from season one (frontier-heavy 6×6, 16 claims) or only at ≥ 8×8? Interior should size to 2–4× signups either way.
+- **Siphon depth prerequisite (2026-08-26):** wildcats require the bore at target depth — does the siphon too (only drink pockets at/above your bore head)? Consistency says yes; simplicity says any adjacent open pocket. (Lean: yes — one depth rule everywhere.)
+- **Siphon rate & alerting:** how many BTR per tick, and who gets the "pocket is being drunk" alert — all eligible lateral rivals, or the whole field feed? (Lean: field feed; the wall shows it anyway.)
+- **Casing (parked door):** a purchasable per-column seal only matters if capture of *claimed* oil is ever introduced — which was rejected 2026-08-26. Parked: revisit only if a future season wants true interior drainage, in which case casing is the defense economy that makes it fair (drain or defend, both priced).
 
 ### Design through-line
 

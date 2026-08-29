@@ -27,12 +27,19 @@ async function handle(req) {
   const plotsSnap = await db.collection("oilPlots").get();
   for (const d of plotsSnap.docs) {
     const p = d.data();
-    if (p.currentOwnerId != null || p.drillDay || p.revealed || p.hellLayers) {
+    if (p.currentOwnerId != null || p.drillDay || p.revealed || p.hellLayers ||
+        p.passed || p.inclusionFlags || p.passedInclusions || p.hellCapped) {
       batch.set(d.ref, {
         currentOwnerId: null,
         drillDay: 0,
         revealed: FieldValue.delete(),
         hellLayers: FieldValue.delete(),
+        // v2 loop state (open pockets, inclusion flags, capped hell)
+        passed: FieldValue.delete(),
+        passedInclusions: FieldValue.delete(),
+        inclusionFlags: FieldValue.delete(),
+        hellCapped: FieldValue.delete(),
+        revealedArtifacts: FieldValue.delete(),
       }, { merge: true });
       plotsCleared++; n++; await flush(false);
     }
@@ -44,13 +51,22 @@ async function handle(req) {
   const drillsSnap = await db.collection("oilDrills").get();
   for (const d of drillsSnap.docs) {
     const dd = d.data();
-    if (dd.col != null || dd.tankOil || dd.drillDay) {
+    if (dd.col != null || dd.tankOil || dd.drillDay ||
+        dd.pending || dd.chargesSpent || dd.layersExtracted || dd.layersPassed) {
       batch.set(d.ref, {
         col: null, row: null,
         drillDay: 0, tankOil: 0,
         lastStrikeOil: null, lastStrikeDepth: null, lastStrikeDate: null,
         lastDrillDate: null, // else a same-day reset keeps rigs in the TODAY count
         rigDepleted: false, armed: FieldValue.delete(),
+        // v2 loop state — stale chargesSpent from a previous season silently
+        // exhausts the new season's budget (smoke test 2026-08-26: 12 ghost
+        // charges → every wet layer auto-passed as "no charges").
+        pending: FieldValue.delete(),
+        chargesSpent: FieldValue.delete(),
+        threshold: FieldValue.delete(),
+        layersExtracted: FieldValue.delete(),
+        layersPassed: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
       rigsCleared++; n++; await flush(false);

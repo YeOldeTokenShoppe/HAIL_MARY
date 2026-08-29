@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Text, useGLTF, useAnimations, useEnvironment } from "@react-three/drei";
+import { Text, useGLTF, useAnimations } from "@react-three/drei";
+import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import {
   VENDOR_SITEPAL_CONFIG,
   getVendorSitePalSource,
@@ -22,7 +23,7 @@ import {
 // group and no per-stall placement exists any more. Re-exporting any of them
 // from Blender just works: the group auto-fits from the strip's bounding box.
 
-const STRIP_MODEL = "/models/CommercialStrip2.glb";
+const STRIP_MODEL = "/models/CommercialStrip3_opt2k.glb";
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's
@@ -215,10 +216,18 @@ export const VENDOR_CATALOG = [
     model: "/models/Vendor_Rugs.glb", idleClip: "idle_goblin", talkClip: "sit_talk",
     offset: [0, 0, 0],
     prop: "SM_Prop_Market_Stall_05",
-    // Seated, so the camera stays much closer to level than the standing
-    // vendors' -0.35 — a big camDrop here puts the lens under his stall. His
-    // face sits at local y ~1.25 against a standing vendor's ~1.6.
-    faceDist: 0.2, faceLift: -0.02, camDrop: -0.15,
+    // The ONLY vendor with a positive camDrop, i.e. the camera above him looking
+    // down. He is the only one seated behind a loaded counter, and the counter is
+    // the problem: his eyes sit at strip-local y ~1.30 and the boxes stacked on
+    // the table top out at 1.29 — the same height. Anything close to a level
+    // sightline goes straight through the merchandise.
+    //
+    // Remember camDrop is not the final angle: CameraFlyTo adds FOCUS_TILT (0.15)
+    // before normalising, so the old -0.15 cancelled it exactly and produced a
+    // dead-level shot. +0.2 gives dir.y 0.35, which at this faceDist puts the
+    // lens ~0.92 local units above his face — clear over the stack, looking down
+    // at him across the counter the way a customer would.
+    faceDist: 0.28, faceLift: 0, camDrop: 0.2,
     sitepal: "rugs" },
   { id: "carny",     label: "",    awning: "#6b3f1f", accent: "#ffc46b",
     // The balloon barker, alone at the far -Z end with the hot air balloon as
@@ -548,10 +557,11 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, restClip]);
 
-  // The retry. VendorModel suspends TWICE on the way in — once on useGLTF and
-  // again on useEnvironment further down — so the order in which the group ref
-  // attaches relative to this effect is not something to rely on, and a
-  // re-suspend after commit (any newly added vendor GLB perturbs it) tears
+  // The retry. VendorModel suspends on useGLTF on the way in (the env map used
+  // to be a second suspension before it moved to the non-suspending
+  // useEnvMapSafe) — so the order in which the group ref attaches relative to
+  // this effect is not something to rely on, and a re-suspend after commit
+  // (any newly added vendor GLB perturbs it) tears
   // effects down and back up. If the pose could not be started, keep trying:
   // one cheap ref check per frame until it takes, then never again.
   useFrame(() => {
@@ -568,7 +578,7 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   // field-facing sides read near-silhouette on ambient alone. The rigs stay
   // legible via IBL from the same preset — give the vendor materials the
   // identical treatment (no extra dynamic lights, mobile-safe).
-  const envMap = useEnvironment({ preset: "warehouse" });
+  const envMap = useEnvMapSafe("warehouse");
   useEffect(() => {
     if (!envMap) return;
     scene.traverse((o) => {
@@ -881,6 +891,21 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
 const DECK_DEPTH = 1.2;   // boardwalk depth (cellSize units), off the mesa edge
 const DECK_MARGIN = 0.2;  // deck overhang past the mesa's side walls
 const DECK_OVERLAP = 0.02;  // how far the deck's inner edge bites into the mesa wall
+// Lift the walking surface a hair PROUD of the field instead of exactly level
+// with it. The deck top used to be anchored to world y = 0, and OilVoxelGrid's
+// ground box (position [0, -worldH/2, 0], height worldH) puts its top face at
+// world y = 0 as well — so across the DECK_OVERLAP band where the deck is
+// deliberately buried into the mesa, two surfaces sat at identical depth along
+// the entire edge. That is a z-fight by construction, and the overlap is
+// precisely what makes it visible.
+//
+// World units, and tiny on purpose: 0.004 against a 10-unit-wide mesa is well
+// under a pixel at any sane camera distance, so the seam does not read as a
+// step — but it is far more than the depth buffer needs to pick a winner. A
+// boardwalk sitting slightly proud of the dirt is also just what a boardwalk
+// does. Do NOT solve this by shrinking DECK_OVERLAP: the overlap is what stops
+// a hairline gap opening along the wall at grazing angles.
+const DECK_LIFT = 0.004;
 // Clicking the boardwalk itself flies the camera to whatever stretch you
 // clicked. This exists because OrbitControls' dolly is TARGET-relative: it
 // slides the camera along the line to controls.target and nothing more, so with
@@ -3112,7 +3137,7 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
         scale,
         position: [
           -((deckLocal.min.z + deckLocal.max.z) / 2) * scale, // deck centred on the mesa edge
-          -deckLocal.max.y * scale,  // walking surface flush with the field (y = 0)
+          -deckLocal.max.y * scale + DECK_LIFT,  // walking surface a hair proud of the field
           // Butt the deck's inner edge into the mesa wall rather than centring
           // it on the nominal deck line. Scale is driven by the strip's LONG
           // axis, so its depth lands wherever the model's aspect puts it
@@ -3171,12 +3196,16 @@ export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPrese
   // written as a constant offset from the nominal deck line.
   const deckSpan = useMemo(() => {
     if (!deckLocal) {
-      return { zOuter: deckZ - deckD / 2, underY: 0 };
+      return { zOuter: deckZ - deckD / 2, underY: DECK_LIFT };
     }
     const s = fit.scale;
     return {
       zOuter: fit.position[2] - deckLocal.max.x * s, // furthest from the mesa
-      underY: (deckLocal.min.y - deckLocal.max.y) * s,
+      // Relative to the deck's TOP surface, which DECK_LIFT moved off zero. The
+      // braces are built in world units outside the fitted group, so without
+      // carrying the lift through they would stay behind and leave a gap
+      // between each brace head and the underside it is supposed to meet.
+      underY: DECK_LIFT + (deckLocal.min.y - deckLocal.max.y) * s,
     };
   }, [deckLocal, fit, deckZ, deckD]);
 

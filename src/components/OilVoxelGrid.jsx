@@ -3,12 +3,14 @@
 import { useRef, useMemo, useEffect, useCallback, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Text, Html, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
+import { Text, Html, useGLTF, useTexture } from "@react-three/drei";
+import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { generateArtifactDistribution3D } from "@/lib/artifactDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
 import CommercialStrip from "@/components/CommercialStrip";
+import StrataVoxels from "@/components/StrataVoxels";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
@@ -85,6 +87,11 @@ const SPUTTER_PARTICLES = 28;
 // opt in with ?fog=1 to revisit/A-B. Linear so the foreground stays crisp.
 const FIELD_FOG = typeof window !== "undefined"
   && new URLSearchParams(window.location.search).get("fog") === "1";
+// Phase-0 spike: ?strata=1 swaps the painted earth block for live game-state
+// voxels (see StrataVoxels.jsx) fed by a MOCK season simulated from the real
+// seeded field. A/B by toggling the flag. Keys: ,/. day · [/] slice · x x-ray.
+const STRATA_SPIKE = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("strata") === "1";
 const FOG_NEAR = 6;   // within this distance: no haze (keeps the selected plot clear)
 const FOG_FAR = 24;   // full haze by here (back of the grid recedes)
 // Horizon-haze color per environment — distant rigs fade toward this, so it should
@@ -370,7 +377,12 @@ function buildFragShader({ deposits, gridX, gridY, depthZ, cellSize, depthCellSi
 
   // Bake deposit positions in OBJECT SPACE (mesh-local, box centered at origin)
   // Surface is at y=+halfH, deepest at y=-halfH
-  const depositLines = deposits.slice(0, 16).map((d, i) => {
+  // Cap raised 16 → 40 with the admin deposit options (v2 wants ~30 smaller
+  // deposits): a truncated survey volume would silently HIDE real deposits,
+  // which breaks "the survey is honest". Cost is linear in the raymarch loop
+  // (NUM_DEPOSITS sphere tests × 80 steps) — if mobile chokes at 40, lower the
+  // step count before lowering this cap.
+  const depositLines = deposits.slice(0, 40).map((d, i) => {
     const ox = ((d.cx / (gridX - 1)) - 0.5) * worldW;
     const oy = halfH - (d.cz / (depthZ - 1)) * worldH;  // surface=+halfH, bottom=-halfH
     const oz = (0.5 - d.cy / (gridY - 1)) * worldD;
@@ -379,7 +391,7 @@ function buildFragShader({ deposits, gridX, gridY, depthZ, cellSize, depthCellSi
   richness[${i}] = ${d.richness.toFixed(6)};`;
   }).join("\n");
 
-  const numDeposits = Math.min(deposits.length, 16);
+  const numDeposits = Math.min(deposits.length, 40);
 
   return /* glsl */ `
   precision highp float;
@@ -5578,9 +5590,11 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
   // page: warm "sunset" for the bright day/dusk scenes, "warehouse" (cooler,
   // contrasty) for night/dark + the Lyquid80 substance themes. Both read as shaped
   // metal without raising envMapIntensity (which would blow out the white plastic
-  // against the dark ground). Drei caches each HDR, so switching themes is instant
-  // after first load.
-  const envMap = useEnvironment({ preset: envMapPreset });
+  // against the dark ground). Loaded from locally-bundled HDRs via a
+  // never-throwing hook (drei's CDN-fetching preset path crashed the page on
+  // flaky connections); the hook caches, so switching themes is instant after
+  // first load.
+  const envMap = useEnvMapSafe(envMapPreset);
 
   // OilTower position — centered on the 4 middle cells
   const towerPos = useMemo(() => {
@@ -5595,6 +5609,9 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
     const list = [];
     for (let row = 0; row < gridY; row++) {
       for (let col = 0; col < gridX; col++) {
+        // Strata spike: the outer ring is unclaimable company land — no rigs
+        // on it (see StrataVoxels.jsx). Flag-gated; normal builds unaffected.
+        if (STRATA_SPIKE && (col === 0 || row === 0 || col === gridX - 1 || row === gridY - 1)) continue;
         const x = -worldW / 2 + col * cellSize + cellSize / 2;
         const z = worldD / 2 - row * cellSize - cellSize / 2;
         list.push({ key: `pj-${row}-${col}`, position: [x, 0, z], col, row });
@@ -6561,6 +6578,10 @@ export default function OilVoxelGrid({
   // PHOTOMATIC booth print finished developing; called with the photo's data
   // URL so the page can pop the shared PolaroidSnapshot.
   onBoothPhoto,
+  // Live oilPlots map (page's allPlotsMap) — with ?strata=1 this switches the
+  // strata wall from the mock season to the real field (loopV2 seasons only;
+  // the page passes null otherwise).
+  strataLivePlots = null,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -6634,7 +6655,7 @@ export default function OilVoxelGrid({
   const worldH = depthZ * depthCellSize;
   const worldD = gridY * cellSize;
 
-  const { deposits, hellPockets: generatedHellPockets, artifactCells, peakDepthMap } = useMemo(() => {
+  const { deposits, hellPockets: generatedHellPockets, artifactCells, peakDepthMap, oilGrid } = useMemo(() => {
     const result = generateOilDistribution3D({
       blockHash, gridX, gridY, depthZ, totalOilBudget: OIL_FIELD_UNITS, numberOfDeposits,
       numberOfHellPockets, // match the server/admin count — else the 3D derives a different one
@@ -6661,7 +6682,7 @@ export default function OilVoxelGrid({
         if (bestZ >= 0) peak[`${x}_${y}`] = bestZ;
       }
     }
-    return { deposits: result.deposits, hellPockets: result.hellPockets, artifactCells: artifacts.cells, peakDepthMap: peak };
+    return { deposits: result.deposits, hellPockets: result.hellPockets, artifactCells: artifacts.cells, peakDepthMap: peak, oilGrid: result.grid };
   }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, numberOfHellPockets, totalOilBudget]);
 
   // Build fragment shader with deposit data baked in as constants
@@ -6786,11 +6807,25 @@ export default function OilVoxelGrid({
         );
       })}
 
-      {/* Opaque ground block — hidden once reveal starts */}
-      {!animateReveal && revealProgress === 0 && (
+      {/* Opaque ground block — hidden once reveal starts (and in the strata
+          spike, which draws the earth as game-state voxels instead) */}
+      {!STRATA_SPIKE && !animateReveal && revealProgress === 0 && (
         <mesh position={[0, -worldH / 2, 0]} material={groundMaterials} onClick={handleGroundClick}>
           <boxGeometry args={[worldW, worldH, worldD]} />
         </mesh>
+      )}
+      {STRATA_SPIKE && (
+        <StrataVoxels
+          oilGrid={oilGrid}
+          hellPockets={generatedHellPockets}
+          gridX={gridX} gridY={gridY} depthZ={depthZ}
+          cellSize={cellSize} depthCellSize={depthCellSize}
+          worldW={worldW} worldD={worldD}
+          palette={groundPalette}
+          blockHash={blockHash}
+          onGroundClick={handleGroundClick}
+          livePlots={strataLivePlots}
+        />
       )}
 
       {/* Wireframe grid */}

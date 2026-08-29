@@ -118,6 +118,15 @@ export async function POST(req) {
         t.set(drillRef, {
           col, row, armed: true, rigDepleted: false,
           ...(typeof username === "string" && username.trim() ? { username: username.trim().slice(0, 60) } : {}),
+          // v2 layer history is PER-PLOT but keyed by layer number only, so a
+          // claim move must clear it or the new plot's layers collide with the
+          // old plot's (smoke test 2026-08-26: extracted L4 on plot A + dry L4
+          // passed on plot B landed in the same maps). Banked score, charges
+          // spent, and supplies persist — they're per-player, per-season.
+          pending: null,
+          tankOil: 0,
+          layersExtracted: FieldValue.delete(),
+          layersPassed: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       }

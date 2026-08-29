@@ -8,6 +8,8 @@ import { sendPlayerAlert } from "@/lib/oilAlerts";
 import {
   PASSIVE_DRILLS, MAX_DEPTH, depthCapFor, seasonClock, strikeTargetMs,
 } from "@/lib/oilStrikeClock";
+import { chargesCapFor, resolvePendingDecision, assayAlertBody } from "@/lib/oilLoopV2";
+import { applyV2Resolution } from "@/lib/oilLoopV2Server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,7 +88,7 @@ function publicArtifact(a) {
 // End-of-season buzzer: flip the phase once (txn-guarded so concurrent ticks
 // don't double-run), auto-bank every rig's un-banked tank so nobody loses oil to
 // timing, then publish the fairness reveal (mirrors oil-settings' gameEnded path).
-async function endSeason(db) {
+async function endSeason(db, settings = {}) {
   const settingsRef = db.collection("oilGame").doc("settings");
   const won = await db.runTransaction(async (t) => {
     const s = (await t.get(settingsRef)).data() || {};
@@ -103,17 +105,63 @@ async function endSeason(db) {
 
   // Sweep tankOil → totalCollected (only un-banked oil; idempotent — a re-run sees 0).
   let swept = 0, sweptOil = 0;
-  const drillsSnap = await db.collection("oilDrills").get();
-  for (const d of drillsSnap.docs) {
-    const tank = d.data().tankOil || 0;
-    if (tank > 0) {
-      await d.ref.set({
-        totalCollected: FieldValue.increment(tank),
-        tankOil: 0,
-        armed: false,
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-      swept++; sweptOil += tank;
+  if (settings.loopV2 === true) {
+    // v2 buzzer: the tank is a DECISION BUFFER, not a balance — never blind-
+    // sweep it. Resolve every rig's final pending by its standing order
+    // (charges permitting); unspent charges are simply wasted (hoarding has a
+    // cost). Regenerate the artifact map once for inclusion grants.
+    const secretSnap = await db.collection("oilSecret").doc("seed").get();
+    const seed = (secretSnap.exists && secretSnap.data().seed) || settings.blockHash || null;
+    const gridSize = settings.gridSize || 10;
+    const depthZ = settings.depthZ || DEFAULT_DEPTH_Z;
+    let artifactsByKey = {};
+    if (seed) {
+      const dist = generateOilDistribution3D({
+        blockHash: seed, gridX: gridSize, gridY: gridSize, depthZ,
+        totalOilBudget: OIL_FIELD_UNITS,
+        numberOfDeposits: settings.numberOfDeposits || 5,
+        numberOfHellPockets: settings.numberOfHellPockets ?? null,
+      });
+      artifactsByKey = generateArtifacts(settings, seed, gridSize, depthZ, dist.grid, dist.hellPockets).byKey;
+    }
+    const communityRef = db.collection("oilGame").doc("communityStorage");
+    const drillsSnapV2 = await db.collection("oilDrills").get();
+    for (const d of drillsSnapV2.docs) {
+      const data = d.data();
+      if (!data.pending || typeof data.pending.layer !== "number" || data.col == null) continue;
+      const plotRef = db.collection("oilPlots").doc(`${data.col}_${data.row}`);
+      await db.runTransaction(async (t) => {
+        const drillNow = (await t.get(d.ref)).data() || {};
+        const p = drillNow.pending;
+        if (!p || typeof p.layer !== "number") return; // already resolved
+        const chargesRemaining = Math.max(0, chargesCapFor(drillNow, settings, depthZ) - (drillNow.chargesSpent || 0));
+        const decision = resolvePendingDecision({
+          pending: p, threshold: Number(drillNow.threshold) || 0, chargesRemaining, depthZ,
+          autopilot: drillNow.autopilot === true,
+        });
+        const inclArt = p.hasInclusion
+          ? (artifactsByKey[artifactKey(data.col, data.row, p.layer)] || null) : null;
+        applyV2Resolution(t, {
+          FieldValue, drillRef: d.ref, plotRef, communityRef,
+          drillNow, col: data.col, row: data.row, pending: p, decision, inclusionArtifact: inclArt,
+        });
+        t.set(d.ref, { armed: false }, { merge: true });
+      });
+      swept++;
+    }
+  } else {
+    const drillsSnap = await db.collection("oilDrills").get();
+    for (const d of drillsSnap.docs) {
+      const tank = d.data().tankOil || 0;
+      if (tank > 0) {
+        await d.ref.set({
+          totalCollected: FieldValue.increment(tank),
+          tankOil: 0,
+          armed: false,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        swept++; sweptOil += tank;
+      }
     }
   }
 
@@ -180,7 +228,7 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
   // phase, auto-banks every tank, and reveals the seed. Runs before any drilling.
   const season = seasonClock(settings);
   if (season && Date.now() >= season.endMs) {
-    return await endSeason(db);
+    return await endSeason(db, settings);
   }
 
   // Seed lives in the server-only secret doc; fall back to the legacy public
@@ -196,6 +244,12 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
   if (blockadeSnap.exists && blockadeSnap.data().active) {
     return { ok: true, skipped: "demon_blockade" };
   }
+
+  // v2 EXTRACT-OR-PASS (docs/oil-game.md → "v2 LOOP" + "Build order" phase 2).
+  // Flag-gated per dev season from the admin panel: settings.loopV2 === true.
+  // In v2 the bore reveals EVERY layer over the season (depth is no longer
+  // gated by bonuses); charges decide what you keep. v1 path untouched.
+  const loopV2 = settings.loopV2 === true;
 
   const gridSize = settings.gridSize || 10;
   const depthZ = settings.depthZ || DEFAULT_DEPTH_Z;
@@ -261,8 +315,9 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
     // Per-rig depth ceiling (base + earned bonus). Read the cell's current depth
     // up front — it drives both the depletion check and the interval pacing.
     // Admin force/deep drilling bypasses the cap (drill the full field for testing).
-    const depthCap = depthCapFor(drill, depthZ);
-    const effectiveCap = ignoreDayGuard ? depthZ : depthCap;
+    // v2: the bore is never gated — it reveals the whole field; charges gate keeping.
+    const depthCap = loopV2 ? depthZ : depthCapFor(drill, depthZ);
+    const effectiveCap = (loopV2 || ignoreDayGuard) ? depthZ : depthCap;
     const gateDepth = ((await plotRef.get()).data()?.drillDay) || 0;
     if (gateDepth >= effectiveCap) {
       // Capped for THIS player (cells persist across owners; earning bonus later
@@ -310,6 +365,79 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
             // raises depthCap and the rig revives on the next tick.
             t.set(drillRef, { rigDepleted: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             return { status: "depleted" };
+          }
+
+          if (loopV2) {
+            // ── v2 EXTRACT-OR-PASS: resolve the prior pending layer by the
+            // standing order, then reveal the next layer as the NEW pending.
+            // Extraction = banking (applyV2Resolution writes totalCollected +
+            // the community total in this txn). Hell resolves immediately —
+            // a tonic caps the breach (v2 tonic semantics), else the demon.
+            const communityRef = db.collection("oilGame").doc("communityStorage");
+            const threshold = Number(drillNow.threshold) || 0;
+            const chargesCap = chargesCapFor(drillNow, settings, depthZ);
+            let chargesRemaining = Math.max(0, chargesCap - (drillNow.chargesSpent || 0));
+            let resolved = null;
+            const pending = drillNow.pending;
+            if (pending && typeof pending.layer === "number") {
+              const decision = resolvePendingDecision({ pending, threshold, chargesRemaining, depthZ, autopilot: drillNow.autopilot === true });
+              const inclArt = pending.hasInclusion
+                ? (artifactsByKey[artifactKey(col, row, pending.layer)] || null) : null;
+              resolved = applyV2Resolution(t, {
+                FieldValue, drillRef, plotRef, communityRef,
+                drillNow, col, row, pending, decision, inclusionArtifact: inclArt,
+              });
+              if (decision === "extract") chargesRemaining -= 1;
+            }
+
+            const li = currentDepth;
+            const isHellL = hellSet.has(`${col}_${row}_${li}`);
+            const v2oil = grid?.[col]?.[row]?.[li] ?? 0;
+            const v2art = artifactsByKey[artifactKey(col, row, li)] || null;
+            const plotUpdate = { col, row, drillDay: li + 1, lastStrikeAt: FieldValue.serverTimestamp() };
+            const drillUpdate = {
+              userId,
+              lastStrikeDate: today,
+              lastStrikeAt: FieldValue.serverTimestamp(),
+              lastStrikeDepth: li + 1,
+              rigDepleted: false,
+              updatedAt: FieldValue.serverTimestamp(),
+            };
+            let tonicCapped = false;
+            if (isHellL) {
+              plotUpdate.hellLayers = { [li]: true };
+              plotUpdate.revealed = { [li]: 0 };
+              drillUpdate.pending = null;
+              drillUpdate.tankOil = 0;
+              drillUpdate.lastStrikeOil = 0;
+              drillUpdate.lastStrikeHell = true;
+              if ((drillNow.supplies?.tonic || 0) > 0) {
+                tonicCapped = true;
+                plotUpdate.hellCapped = { [li]: true };
+                drillUpdate.supplies = { tonic: FieldValue.increment(-1) };
+                drillUpdate.tonicsUsed = FieldValue.increment(1);
+                drillUpdate.lastTonicAt = FieldValue.serverTimestamp();
+              }
+            } else {
+              plotUpdate.revealed = { [li]: v2oil };
+              // §Multi-element core: flag the inclusion, keep its identity
+              // hidden until extraction (the anti-lottery guard).
+              if (v2art) plotUpdate.inclusionFlags = { [li]: true };
+              drillUpdate.pending = { layer: li, oil: v2oil, hasInclusion: !!v2art, revealedAt: Date.now() };
+              drillUpdate.tankOil = v2oil; // decision buffer: full = a decision is waiting
+              drillUpdate.lastStrikeOil = v2oil;
+              drillUpdate.lastStrikeHell = false;
+            }
+            t.set(plotRef, plotUpdate, { merge: true });
+            t.set(drillRef, drillUpdate, { merge: true });
+            return {
+              status: "struck", v2: true, oil: v2oil, depth: li + 1,
+              isHell: isHellL && !tonicCapped, tonicCapped,
+              resolved, hasInclusion: !!v2art,
+              threshold, chargesRemaining,
+              username: drillNow.username || null,
+              newTank: v2oil,
+            };
           }
 
           // The layers this strike drills: one, or two when the rig has a
@@ -465,7 +593,40 @@ async function runTick({ force = false, deep = 1, targetCol = null, targetRow = 
           }
 
           // Best-effort retention hook — skipped during deep admin drills to avoid spam.
-          if (deep === 1) {
+          if (deep === 1 && outcome.v2) {
+            // v2 alerts under the Copy rule: cost model explicit, threshold
+            // phrased as the crew's standing order — never a bare number.
+            const resolvedLine = outcome.resolved
+              ? (outcome.resolved.decision === "extract"
+                ? `\n✔ L${outcome.resolved.layer + 1} EXTRACTED — ${Math.round(outcome.resolved.oil).toLocaleString()} BTR banked${outcome.resolved.inclusion ? " · inclusion recovered" : ""}.`
+                : `\n↷ L${outcome.resolved.layer + 1} passed${outcome.resolved.oil > 0 ? " — open to neighbours" : " (dry)"}.`)
+              : "";
+            if (outcome.tonicCapped) {
+              await logTimeline(db, { type: "tonic", username: outcome.username, userId, detail: "capped a hell pocket" });
+              await sendPlayerAlert(db, userId, {
+                title: "🧪 TONIC CAPPED A HELL POCKET",
+                body: `Plot (${col + 1}, ${row + 1}) L${outcome.depth}: the breach hit hell — your tonic sealed it. No demon, no halt.${resolvedLine}`,
+                tag: "hmpc-strike",
+                telegramHtml: `🧪 <b>TONIC CAPPED A HELL POCKET</b>\nPlot (${col + 1}, ${row + 1}) L${outcome.depth}: the breach hit hell — your tonic sealed it. No demon, no halt.${resolvedLine}`,
+              });
+            } else if (!outcome.isHell) {
+              const body = assayAlertBody({
+                col, row, layer: outcome.depth - 1, oil: outcome.oil,
+                threshold: outcome.threshold, chargesRemaining: outcome.chargesRemaining,
+                hasInclusion: outcome.hasInclusion,
+              }) + resolvedLine;
+              await sendPlayerAlert(db, userId, {
+                title: "⛏ CORE ASSAY — LAYER " + outcome.depth,
+                body,
+                tag: "hmpc-strike",
+                // Dry, no-inclusion assays go Telegram-only, same signal-value
+                // rule as v1 dry layers.
+                ...(outcome.oil <= 0 && !outcome.hasInclusion ? { channels: { telegram: true, push: false } } : {}),
+                telegramHtml: `⛏ <b>CORE ASSAY — LAYER ${outcome.depth}</b>\n${body}`,
+              });
+            }
+            // Uncapped hell is alerted by the demon path above, as in v1.
+          } else if (deep === 1) {
             // One artifact line, appended to a strike push or standing alone.
             const artLine = !art ? ""
               : art.type === "amber" ? `🦴 Amber shard unearthed — ${art.specimenId.toUpperCase()} fragment ${art.fragmentIndex + 1}/6.`
