@@ -27,6 +27,7 @@ export default function OilCoreSampleV2({
   onLateral,          // async ({ col, row, layer }) => void — spend a charge, take it
   frontier = [],      // unclaimed 8-neighbours: [{ col, row, layer }] — deepest virgin layer in reach
   onWildcat,          // async ({ col, row, layer }) => result — blind dig, spend a charge
+  onWalk,             // () => void — enter v1 ground mode (third-person walker)
 }) {
   const [busy, setBusy] = useState(false);
   const [thrDraft, setThrDraft] = useState(null); // null = mirror server value
@@ -223,6 +224,14 @@ export default function OilCoreSampleV2({
         </button>
       </div>
       {note && <div style={{ ...muted, marginTop: 4, color: theme.gold }}>{note}</div>}
+      {onWalk && (
+        <div style={{ marginTop: 8 }}>
+          <button style={btn(theme.gold, busy)} disabled={busy} onClick={onWalk}>
+            🥾 WALK THE FIELD (beta)
+          </button>
+          <span style={{ ...muted, marginLeft: 6 }}>WASD · E digs frontier · ESC returns</span>
+        </div>
+      )}
     </div>
   );
 }

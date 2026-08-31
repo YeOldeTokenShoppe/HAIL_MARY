@@ -1,0 +1,913 @@
+/* The 20/80 Principle — permanent liquidity program. Sits below the Holy
+   Trin80, where the "Liquid80" pillar has just admitted the pool is small.
+   This section is the answer to that admission, so it deliberately borrows
+   the Trin80's plaque chrome and gold/cyan palette to read as its sibling.
+
+   Palette roles (kept consistent throughout):
+     cyan   #2ad6ee — permanent liquidity
+     gold   #d4af37 — the commitment / treasury
+     magenta #d92db0 — revenue & products
+   IoskeleyMono is the body face, matching .holy-trin-pillar-desc. */
+
+.p2080 {
+  position: relative;
+  isolation: isolate;
+  width: min(100% - 48px, 1060px);
+  margin: 22px auto;
+  padding: clamp(36px, 5vw, 60px) clamp(20px, 4vw, 54px)
+    clamp(34px, 5vw, 54px);
+  background: linear-gradient(
+    180deg,
+    rgba(8, 13, 26, 0.78) 0%,
+    rgba(4, 6, 16, 0.86) 100%
+  );
+  backdrop-filter: blur(2px);
+  border-radius: 14px;
+  border-top: 1px solid rgba(42, 214, 238, 0.28);
+  color: #e9d4a0;
+  box-shadow:
+    0 18px 54px rgba(0, 0, 0, 0.42),
+    0 0 42px rgba(42, 214, 238, 0.1),
+    inset 0 1px 0 rgba(214, 250, 255, 0.08);
+  pointer-events: auto;
+  touch-action: pan-y;
+  overflow-anchor: none;
+}
+
+.p2080::before {
+  content: "";
+  position: absolute;
+  inset: 10% -12vw auto;
+  height: 320px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(42, 214, 238, 0.1), transparent 64%),
+    radial-gradient(ellipse at 50% 78%, rgba(212, 175, 55, 0.08), transparent 60%);
+  filter: blur(4px);
+}
+
+/* ───── HEAD ───── */
+
+.p2080-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.p2080-kicker {
+  font-family: "Cinzel", serif;
+  font-size: clamp(0.68rem, 0.9vw, 0.8rem);
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(42, 214, 238, 0.8);
+  text-shadow: 0 0 12px rgba(42, 214, 238, 0.35);
+  margin-bottom: clamp(14px, 2vw, 20px);
+}
+
+/* Static heading. DropInTitle (GSAP letter drop-in) is what the sibling
+   sections use, but its letters are currently stuck at opacity 0 on this
+   route — .holy-trin's title is invisible for the same reason — so this
+   section paints its own heading rather than depending on that. Styling
+   mirrors .holy-trin-heading so the two still read as siblings. */
+.p2080-heading {
+  display: inline-block;
+  /* The rotate+skew swings the descenders down and left, so the badge below
+     needs more clearance than the visual gap suggests. */
+  margin: 0 auto clamp(16px, 2vw, 22px);
+  font-family: "UnifrakturCook", serif;
+  /* "The 20/80 Principle" is a longer string than the old title — the lower
+     bound drops so it wraps to two lines rather than overflowing at 398px. */
+  font-size: clamp(1.9rem, 4vw, 3.4rem);
+  max-width: 100%;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  color: #d4af37;
+  transform: rotate(-3deg) skew(-8deg);
+  transform-origin: center;
+  text-shadow:
+    0 0 12px rgba(42, 214, 238, 0.55),
+    0 0 28px rgba(42, 214, 238, 0.35),
+    0 0 52px rgba(217, 45, 176, 0.4),
+    2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.p2080-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 5px 14px;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.08);
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f1d77a;
+}
+
+.p2080-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d4af37;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.9);
+}
+
+.p2080-lead {
+  max-width: 46rem;
+  margin: clamp(18px, 2.4vw, 26px) auto 0;
+  font-family: "IoskeleyMono", "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(0.92rem, 1.05vw, 1.08rem);
+  line-height: 1.6;
+  color: #e9d4a0;
+  text-align: center;
+  opacity: 0.95;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
+/* ───── THESIS PANEL ─────
+   The whole program in one block, directly under the title: the formula, the
+   commitment, the first milestone, and the closing line. Everything below it
+   is elaboration, so this has to stand on its own if nobody scrolls. */
+
+.p2080-thesis {
+  width: 100%;
+  max-width: 44rem;
+  margin: clamp(22px, 2.8vw, 32px) auto 0;
+  padding: clamp(22px, 2.8vw, 34px) clamp(18px, 2.6vw, 34px);
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  border-radius: 10px;
+  background: linear-gradient(
+    150deg,
+    rgba(212, 175, 55, 0.07),
+    rgba(42, 214, 238, 0.05)
+  );
+  box-shadow: inset 0 0 46px rgba(212, 175, 55, 0.05);
+}
+
+/* 20% → 80 ETH — the number pair the whole section exists to communicate. */
+.p2080-formula {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(10px, 1.6vw, 20px);
+  font-family: "Fjalla One", sans-serif;
+  font-size: clamp(1.9rem, 3.6vw, 3rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.p2080-formula-share {
+  color: #d4af37;
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.45);
+}
+
+.p2080-formula-arrow {
+  color: rgba(233, 212, 160, 0.35);
+  font-size: 0.7em;
+}
+
+.p2080-formula-goal {
+  color: #2ad6ee;
+  text-shadow: 0 0 20px rgba(42, 214, 238, 0.45);
+}
+
+.p2080-thesis-body {
+  margin: clamp(18px, 2.2vw, 24px) 0 0;
+  font-family: "IoskeleyMono", "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(0.9rem, 1.05vw, 1.04rem);
+  line-height: 1.65;
+  text-align: center;
+  color: #e9d4a0;
+}
+
+.p2080-thesis-body strong {
+  color: #f1d77a;
+  font-weight: 700;
+}
+
+.p2080-milestone {
+  margin: clamp(18px, 2.2vw, 24px) 0 0;
+  padding-top: clamp(16px, 2vw, 20px);
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.p2080-milestone-label {
+  font-family: "Cinzel", serif;
+  font-size: clamp(0.74rem, 0.95vw, 0.88rem);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #2ad6ee;
+  text-shadow: 0 0 14px rgba(42, 214, 238, 0.4);
+  margin-bottom: 10px;
+}
+
+.p2080-thesis-closer {
+  margin: clamp(18px, 2.2vw, 24px) 0 0;
+  padding-top: clamp(16px, 2vw, 20px);
+  border-top: 1px solid rgba(212, 175, 55, 0.2);
+  font-family: "Cinzel", serif;
+  font-size: clamp(0.88rem, 1.2vw, 1.1rem);
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #f1d77a;
+  text-shadow: 0 0 18px rgba(212, 175, 55, 0.3);
+}
+
+/* ───── LABELLED RULE (internal divider) ───── */
+
+.p2080-rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: clamp(34px, 4.5vw, 54px) 0 clamp(20px, 2.4vw, 28px);
+}
+
+.p2080-rule::before,
+.p2080-rule::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent, #d4af37) 55%, transparent)
+  );
+}
+
+.p2080-rule::after {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent, #d4af37) 55%, transparent),
+    transparent
+  );
+}
+
+.p2080-rule span {
+  font-family: "Cinzel", serif;
+  font-size: clamp(0.72rem, 0.95vw, 0.86rem);
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent, #d4af37);
+  text-shadow: 0 0 12px
+    color-mix(in srgb, var(--accent, #d4af37) 45%, transparent);
+  white-space: nowrap;
+}
+
+/* ───── BODY COPY ───── */
+
+.p2080-body {
+  margin: 0 0 clamp(16px, 2vw, 22px);
+  font-family: "IoskeleyMono", "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(0.88rem, 1vw, 1.02rem);
+  line-height: 1.65;
+  /* globals.css centres every <p> app-wide — override explicitly. */
+  text-align: left;
+  color: #e9d4a0;
+  opacity: 0.92;
+}
+
+.p2080-body strong {
+  color: var(--accent, #d4af37);
+  font-weight: 700;
+  text-shadow: 0 0 10px
+    color-mix(in srgb, var(--accent, #d4af37) 40%, transparent);
+}
+
+/* ───── PLAQUES (shared card chrome) ───── */
+
+.p2080-plaque {
+  position: relative;
+  padding: clamp(16px, 1.8vw, 22px);
+  border-radius: 10px;
+  border: 1px solid
+    color-mix(in srgb, var(--accent, #d4af37) 26%, transparent);
+  border-left: 2px solid
+    color-mix(in srgb, var(--accent, #d4af37) 70%, transparent);
+  background: radial-gradient(
+    120% 100% at 50% 0%,
+    rgba(6, 11, 19, 0.9) 0%,
+    rgba(3, 6, 12, 0.86) 55%,
+    rgba(0, 0, 0, 0.74) 100%
+  );
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.45),
+    0 0 18px color-mix(in srgb, var(--accent, #d4af37) 8%, transparent);
+  text-align: left;
+}
+
+.p2080-plaque-label {
+  font-family: "Cinzel", serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(233, 212, 160, 0.55);
+  margin-bottom: 10px;
+}
+
+.p2080-plaque-value {
+  font-family: "Fjalla One", sans-serif;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--accent, #d4af37);
+  text-shadow: 0 0 16px
+    color-mix(in srgb, var(--accent, #d4af37) 45%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.p2080-plaque-sub {
+  margin: 9px 0 0;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: left;
+  color: rgba(233, 212, 160, 0.6);
+}
+
+/* ───── LEDGER (transparency readouts) ───── */
+
+.p2080-ledger {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(12px, 1.4vw, 16px);
+}
+
+.p2080-ledger-note {
+  margin: clamp(14px, 1.6vw, 18px) 0 0;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: rgba(233, 212, 160, 0.5);
+}
+
+/* Segmented meter — reads as a votive gauge filling toward a milestone */
+.p2080-meter {
+  margin-top: 14px;
+}
+
+.p2080-meter-track {
+  position: relative;
+  height: 14px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid color-mix(in srgb, var(--accent, #d4af37) 22%, transparent);
+}
+
+/* Width is set statically from --fill, NOT animated. A `transition: width`
+   here stalls dead on this page: the landing route re-renders constantly
+   behind the 3D scene, which restarts the transition every frame — it sits
+   at currentTime ~16ms (one frame) forever and the bar renders at a few
+   percent of its true value. A meter that under-reports its own number is
+   worse than a meter that doesn't animate, so the fill just paints. */
+.p2080-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 0%);
+  /* A real but tiny value (1 ETH of 80) still deserves a visible sliver —
+     the exact figure is printed under the bar either way. */
+  min-width: 3px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent, #d4af37) 45%, transparent),
+    var(--accent, #d4af37)
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent, #d4af37) 65%, transparent);
+}
+
+/* Tick overlay so the bar reads as discrete units, not a smooth bar */
+.p2080-meter-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(var(--tick, 4%) - 1px),
+    rgba(0, 0, 0, 0.85) calc(var(--tick, 4%) - 1px),
+    rgba(0, 0, 0, 0.85) var(--tick, 4%)
+  );
+}
+
+.p2080-meter-pct {
+  margin-top: 6px;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-align: right;
+  color: color-mix(in srgb, var(--accent, #d4af37) 80%, transparent);
+}
+
+/* ───── CURRENT POSITION STRIP ───── */
+
+.p2080-state {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1.2vw, 14px);
+}
+
+.p2080-state .p2080-plaque {
+  padding: clamp(13px, 1.4vw, 17px);
+}
+
+.p2080-state .p2080-plaque-value {
+  font-size: clamp(1.05rem, 1.5vw, 1.3rem);
+}
+
+.p2080-state-unit {
+  margin-top: 6px;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: rgba(233, 212, 160, 0.5);
+}
+
+/* ───── REVENUE CHIPS ───── */
+
+.p2080-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: clamp(18px, 2vw, 24px) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.p2080-chip {
+  padding: 6px 13px;
+  border: 1px solid rgba(217, 45, 176, 0.42);
+  border-radius: 999px;
+  background: rgba(217, 45, 176, 0.09);
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f0b9e2;
+  white-space: nowrap;
+}
+
+/* ───── REVENUE SPLIT BAR ───── */
+
+.p2080-split {
+  --accent: #d4af37;
+}
+
+.p2080-split-bar {
+  display: flex;
+  height: 38px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.p2080-split-share {
+  width: var(--fill, 20%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.6), #d4af37);
+  box-shadow: 0 0 22px rgba(212, 175, 55, 0.5);
+  font-family: "Fjalla One", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  color: #120a04;
+  overflow: hidden;
+}
+
+.p2080-split-rest {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.045);
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-align: center;
+  color: rgba(233, 212, 160, 0.6);
+}
+
+.p2080-purpose {
+  margin: clamp(14px, 1.6vw, 18px) 0 0;
+  font-family: "Cinzel", serif;
+  font-size: clamp(0.78rem, 1vw, 0.92rem);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #d4af37;
+  text-shadow: 0 0 14px rgba(212, 175, 55, 0.4);
+}
+
+/* ───── EXECUTION STEPS ───── */
+
+.p2080-steps {
+  display: grid;
+  gap: 10px;
+  margin: clamp(20px, 2.2vw, 26px) 0 clamp(22px, 2.6vw, 30px);
+  padding: 0;
+  list-style: none;
+}
+
+.p2080-step {
+  --accent: #2ad6ee;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(12px, 1.4vw, 18px);
+}
+
+.p2080-step-n {
+  flex: 0 0 auto;
+  min-width: 2.2ch;
+  font-family: "Fjalla One", sans-serif;
+  font-size: clamp(1.1rem, 1.5vw, 1.4rem);
+  line-height: 1.1;
+  color: rgba(42, 214, 238, 0.55);
+}
+
+.p2080-step-title {
+  display: block;
+  font-family: "Fjalla One", sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #2ad6ee;
+  text-shadow: 0 0 12px rgba(42, 214, 238, 0.4);
+  margin-bottom: 5px;
+}
+
+.p2080-step-body {
+  display: block;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  text-align: left;
+  color: rgba(233, 212, 160, 0.82);
+}
+
+/* ───── BEFORE / AFTER POOLS ───── */
+
+.p2080-pools {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(12px, 1.4vw, 18px);
+}
+
+.p2080-pool {
+  flex: 1;
+  text-align: center;
+  padding: clamp(20px, 2.2vw, 28px) clamp(14px, 1.6vw, 20px);
+}
+
+.p2080-pool--after {
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      rgba(0, 0, 0, 0.6)
+    );
+}
+
+.p2080-pool-tag {
+  font-family: "Cinzel", serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.8;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.p2080-pool-amount {
+  font-family: "Fjalla One", sans-serif;
+  font-size: clamp(1.5rem, 2.3vw, 2rem);
+  line-height: 1.15;
+  color: #f6ecd2;
+}
+
+.p2080-pool-amount--eth {
+  color: var(--accent);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.p2080-pool-unit {
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  color: rgba(233, 212, 160, 0.42);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.p2080-pools-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.2rem, 1.8vw, 1.6rem);
+  color: #2ad6ee;
+  text-shadow: 0 0 14px rgba(42, 214, 238, 0.6);
+}
+
+/* ───── EFFECTS ───── */
+
+.p2080-effects {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1.2vw, 14px);
+  margin-top: clamp(12px, 1.4vw, 16px);
+  padding: 0;
+  list-style: none;
+}
+
+.p2080-effects .p2080-plaque {
+  --accent: #2ad6ee;
+  text-align: center;
+  border-left-width: 1px;
+}
+
+.p2080-effect-value {
+  display: block;
+  font-family: "Fjalla One", sans-serif;
+  font-size: clamp(1.2rem, 1.8vw, 1.55rem);
+  line-height: 1;
+  color: #2ad6ee;
+  text-shadow: 0 0 14px rgba(42, 214, 238, 0.4);
+  margin-bottom: 9px;
+}
+
+.p2080-effect-label {
+  display: block;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: center;
+  color: rgba(233, 212, 160, 0.6);
+}
+
+/* ───── DISCLAIMER ───── */
+
+.p2080-caveat {
+  margin: clamp(16px, 1.8vw, 22px) 0 0;
+  padding: clamp(13px, 1.5vw, 17px) clamp(15px, 1.8vw, 20px);
+  border-left: 3px solid #d4af37;
+  border-radius: 3px;
+  background: rgba(212, 175, 55, 0.07);
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  text-align: left;
+  color: rgba(241, 215, 122, 0.88);
+}
+
+/* ───── MILESTONE LADDER ───── */
+
+.p2080-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: clamp(20px, 2.4vw, 28px) 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.p2080-rung {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+}
+
+.p2080-rung-mark {
+  padding: 7px 11px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.8rem;
+  color: rgba(233, 212, 160, 0.5);
+  transition: opacity 400ms ease;
+}
+
+.p2080-rung--done .p2080-rung-mark {
+  border-color: #2ad6ee;
+  background: rgba(42, 214, 238, 0.14);
+  color: #2ad6ee;
+  font-weight: 700;
+}
+
+.p2080-rung--next .p2080-rung-mark {
+  border-color: #d4af37;
+  background: rgba(212, 175, 55, 0.14);
+  color: #f1d77a;
+  font-weight: 700;
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.35);
+}
+
+.p2080-rung-arrow {
+  color: rgba(233, 212, 160, 0.25);
+  font-size: 0.72rem;
+}
+
+.p2080-ladder-key {
+  margin: 0;
+  font-family: "IoskeleyMono", ui-monospace, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgba(233, 212, 160, 0.45);
+}
+
+.p2080-ladder-key i {
+  font-style: normal;
+}
+
+.p2080-ladder-key .k-now {
+  color: #2ad6ee;
+}
+
+.p2080-ladder-key .k-next {
+  color: #d4af37;
+}
+
+/* ───── FLYWHEEL ───── */
+
+.p2080-flywheel {
+  display: grid;
+  gap: 6px;
+  max-width: 34rem;
+  margin: 0 auto clamp(20px, 2.4vw, 28px);
+  padding: 0;
+  list-style: none;
+}
+
+.p2080-flywheel li {
+  padding: clamp(11px, 1.3vw, 14px) clamp(14px, 1.6vw, 20px);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 10%, transparent),
+    rgba(0, 0, 0, 0.35)
+  );
+  font-family: "Cinzel", serif;
+  font-size: clamp(0.74rem, 0.95vw, 0.88rem);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #f6ecd2;
+}
+
+.p2080-flywheel-arrow {
+  border: 0 !important;
+  background: none !important;
+  padding: 0 !important;
+  font-size: 0.8rem !important;
+  color: rgba(233, 212, 160, 0.3) !important;
+  letter-spacing: 0 !important;
+}
+
+/* ───── DISCLOSURE ─────
+   The mechanism (steps, before/after, ladder, flywheel) lives behind this
+   button. Content is conditionally rendered rather than height-animated, and
+   the button itself uses instant state changes with no transitions — this
+   route has a documented problem with CSS transitions never advancing (see
+   the note on .p2080-meter-fill), so nothing here depends on one running. */
+
+.p2080-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 26rem;
+  margin: clamp(26px, 3.2vw, 38px) auto 0;
+  padding: clamp(13px, 1.6vw, 17px) clamp(18px, 2.2vw, 26px);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.07);
+  font-family: "Cinzel", serif;
+  font-size: clamp(0.74rem, 0.95vw, 0.86rem);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f1d77a;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.p2080-more:hover {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: rgba(212, 175, 55, 0.75);
+  color: #ffe9a8;
+}
+
+.p2080-more:focus-visible {
+  outline: 1px dashed rgba(241, 215, 122, 0.8);
+  outline-offset: 4px;
+}
+
+.p2080-more-caret {
+  font-size: 0.8em;
+  line-height: 1;
+}
+
+.p2080-more[aria-expanded="true"] .p2080-more-caret {
+  transform: rotate(180deg);
+}
+
+/* ───── THE PROMISE ───── */
+
+.p2080-promise {
+  margin: clamp(30px, 3.6vw, 42px) 0 0;
+  padding: clamp(24px, 3vw, 36px) clamp(20px, 3vw, 40px);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 10px;
+  background: linear-gradient(
+    135deg,
+    rgba(212, 175, 55, 0.08),
+    rgba(42, 214, 238, 0.05)
+  );
+  box-shadow: inset 0 0 46px rgba(212, 175, 55, 0.06);
+  text-align: center;
+}
+
+.p2080-promise-label {
+  font-family: "Cinzel", serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(212, 175, 55, 0.65);
+  margin-bottom: 16px;
+}
+
+.p2080-promise blockquote {
+  margin: 0;
+  font-family: "Cinzel", serif;
+  font-size: clamp(1rem, 1.5vw, 1.32rem);
+  font-weight: 700;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
+  text-align: center;
+  color: #f1d77a;
+  text-shadow: 0 0 22px rgba(212, 175, 55, 0.3);
+}
+
+/* ───── MOBILE ───── */
+
+@media (max-width: 900px) {
+  .p2080 {
+    width: min(100% - 32px, 620px);
+  }
+
+  .p2080-ledger,
+  .p2080-state,
+  .p2080-effects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .p2080-pools {
+    flex-direction: column;
+  }
+
+  .p2080-split-rest {
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+  }
+}
+
+@media (max-width: 520px) {
+  .p2080-ledger {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .p2080-split-bar {
+    height: 32px;
+  }
+}
+

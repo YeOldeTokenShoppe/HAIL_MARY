@@ -24,6 +24,7 @@ import VendorSitePalHost from "@/components/VendorSitePalHost";
 import { setVendorGreetingContext } from "@/lib/vendorSitePal";
 import OilOverlayModal from "@/components/OilOverlayModal";
 import OilCoreSampleV2 from "@/components/OilCoreSampleV2";
+import PlayerWalker from "@/components/PlayerWalker";
 import { chargesCapFor } from "@/lib/oilLoopV2";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
@@ -1773,6 +1774,12 @@ export default function OilPage() {
   const [introComplete, setIntroComplete] = useState(false);
   const [numberOfDeposits, setNumberOfDeposits] = useState(5);
   const [passiveCharges, setPassiveCharges] = useState(8); // v2 extraction budget (20 = can reach the bottom of your own column)
+  const [walkMode, setWalkMode] = useState(false); // v1 ground mode: third-person cowboy on the field
+  // Walk-mode camera: C cycles follow → orbit → cowboy. Orbit is mounted only
+  // in "orbit" (the walker steers its target); in the other two the walker
+  // writes the camera directly, and damping fights external writes even when
+  // disabled, so orbit unmounts.
+  const [walkerCam, setWalkerCam] = useState("follow");
   const [numberOfHellPockets, setNumberOfHellPockets] = useState(null); // null ⇒ auto (~3% of grid)
   const [totalOilBudget, setTotalOilBudget] = useState(500);
   const [gridSize, setGridSize] = useState(10);
@@ -7369,6 +7376,9 @@ export default function OilPage() {
           onLateral={handleLateral}
           frontier={frontierTargets}
           onWildcat={handleWildcat}
+          // No WALK during the intro fly-in — CameraFlyIn drives the camera
+          // until introComplete, and two camera drivers = the shake.
+          onWalk={introComplete ? () => setWalkMode(true) : undefined}
         />
       )}
       {gaugesPanel}
@@ -7573,16 +7583,28 @@ export default function OilPage() {
                     onFocusObject={handleFocusObject}
                     onBoothPhoto={handleBoothPhoto}
                   />
+                  {walkMode && userDrill?.col != null && (
+                    <PlayerWalker
+                      worldW={gridSize} worldD={gridSize}
+                      spawnCol={userDrill.col} spawnRow={userDrill.row}
+                      frontier={frontierTargets}
+                      onWildcat={handleWildcat}
+                      controlsRef={controlsRefMobile}
+                      onCam={setWalkerCam}
+                      onExit={() => { setWalkerCam("follow"); setWalkMode(false); }}
+                    />
+                  )}
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
                 {introComplete ? (
                   <>
-                    <OrbitControls
+                    {/* Orbit mounts only in the walker's ORBIT cam mode. */}
+                    {(!walkMode || walkerCam === "orbit") && <OrbitControls
                       ref={controlsRefMobile}
                       enableDamping
                       dampingFactor={0.1}
                       enablePan
-                      minDistance={1.5}
+                      minDistance={walkMode ? 0.25 : 1.5}
                       maxDistance={45}
                       maxPolarAngle={Math.PI}
                       minPolarAngle={0}
@@ -7591,8 +7613,8 @@ export default function OilPage() {
                       autoRotateSpeed={0.6}
                       onStart={() => { if (hellOrbit) setHellOrbit(false); }}
                       target={introExitTarget || [1.5, 1.5, 1.5]}
-                    />
-                    <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
+                    />}
+                    {!walkMode && <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />}
                   </>
                 ) : (
                   <CameraFlyIn onComplete={handleIntroComplete} mobile grid={gridSize} />
@@ -7688,7 +7710,7 @@ export default function OilPage() {
                   </svg>
                 </button>
               </div>
-              {process.env.NODE_ENV === "development" && (
+              {process.env.NODE_ENV === "development" && !walkMode && (
                 <TODScrubber todHour={todHour} todOverride={todOverride} onScrub={scrubTOD} onLive={scrubLive} />
               )}
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10 }}>
@@ -8148,24 +8170,36 @@ export default function OilPage() {
                 onFocusObject={handleFocusObject}
                 onBoothPhoto={handleBoothPhoto}
               />
+              {walkMode && userDrill?.col != null && (
+                <PlayerWalker
+                  worldW={gridSize} worldD={gridSize}
+                  spawnCol={userDrill.col} spawnRow={userDrill.row}
+                  frontier={frontierTargets}
+                  onWildcat={handleWildcat}
+                  controlsRef={controlsRef}
+                  onCam={setWalkerCam}
+                  onExit={() => { setWalkerCam("follow"); setWalkMode(false); }}
+                />
+              )}
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
             {introComplete ? (
               <>
-                <OrbitControls
+                {/* Orbit mounts only in the walker's ORBIT cam mode. */}
+                {(!walkMode || walkerCam === "orbit") && <OrbitControls
                   ref={controlsRef}
                   enableDamping
                   dampingFactor={0.08}
                   enablePan
                   panSpeed={2}
-                  minDistance={1.5}
+                  minDistance={walkMode ? 0.25 : 1.5}
                   maxDistance={45}
                   maxPolarAngle={Math.PI}
                   minPolarAngle={0}
                   target={introExitTarget || [3, 5, 3]}
                   zoomToCursor
-                />
-                <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />
+                />}
+                {!walkMode && <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />}
               </>
             ) : (
               <CameraFlyIn onComplete={handleIntroComplete} grid={gridSize} />
@@ -8249,7 +8283,7 @@ export default function OilPage() {
               </svg>
             </button>
           </div>
-          {process.env.NODE_ENV === "development" && (
+          {process.env.NODE_ENV === "development" && !walkMode && (
             <TODScrubber todHour={todHour} todOverride={todOverride} onScrub={scrubTOD} onLive={scrubLive} />
           )}
           <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, zoom: uiScale, display: "flex", alignItems: "center", gap: 8 }}>

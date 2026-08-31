@@ -1020,6 +1020,44 @@ body:has(.shrine-page.neon) {
   opacity: 0.75;
 }
 
+/* Terse variant — the three rites as a single inscription line rather than a
+   stacked list. Drops the bullet markers, which never sat right against the
+   centred copy anyway (the dot is absolutely positioned at the left edge while
+   the text centres away from it). Cream, not gold: .hero-intro__pop is the only
+   gold accent in this block and two competing highlights flatten both. */
+.shrine-page.neon .hero-intro__rites--terse {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.16em 0.62em;
+  margin: 1.3em 0 0;
+}
+
+.shrine-page.neon .hero-intro__rites--terse li {
+  padding-left: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: #f4e3b6;
+  white-space: nowrap;
+}
+
+.shrine-page.neon .hero-intro__rites--terse li::before {
+  content: none;
+}
+
+/* The single line needs ~397px. Below the section's 901px split it breaks 2/1,
+   which reads as an accident rather than a choice — so stack it instead. One
+   rite per line is a litany, which is the register this block is going for
+   anyway. Breakpoint matches the section's own layout switch. */
+@media (max-width: 900px) {
+  .shrine-page.neon .hero-intro__rites--terse {
+    flex-direction: column;
+    gap: 0.34em;
+  }
+}
+
 .shrine-page.neon .hero-intro__rites strong {
   color: #f4e3b6;
   font-weight: 700;

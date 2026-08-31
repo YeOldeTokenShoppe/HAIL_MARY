@@ -23,7 +23,7 @@ import {
 // group and no per-stall placement exists any more. Re-exporting any of them
 // from Blender just works: the group auto-fits from the strip's bounding box.
 
-const STRIP_MODEL = "/models/CommercialStrip3_opt2k.glb";
+const STRIP_MODEL = "/models/CommercialStrip3.glb";
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's

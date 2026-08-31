@@ -21,6 +21,7 @@ import ReliquaryRail from "@/components/ReliquaryRail";
 import HolyTrinSection from "@/components/HolyTrinSection";
 import MaterExMachinaSection from "@/components/MaterExMachinaSection";
 import BusinessSection from "@/components/BusinessSection";
+import Principle2080Section from "@/components/Principle2080Section";
 import DropInTitle from "../components/DropInTitle";
 import CoinLoader from "@/components/CoinLoader";
 import { useCandles } from "@/hooks/useCandles";
@@ -2803,27 +2804,24 @@ export default function HomePage() {
               </blockquote>
               <div className="hero-intro">
                 <p className="hero-intro__cry" style={{ textAlign: "center" }}>
-                  Where empires mint their coins and shadows move beneath the
-                  exchange, Our Lady of Perpetual Profit keeps the old signal
-                  alive. <em>Mater ex machina</em>, patron saint of portfolios,
-                  she reads the markets from blue chips to blockchains,
-                  revealing what the powerful bury and what the patient learn to
-                  see.
+                  Where empires mint their coins and shadows move beneath the exchanges, Our Lady of Perpetual Profit keeps watch over those with small stakes and long odds. Rejoice! <em>Mater ex machina</em>, patron saint of portfolios, is on our side.
                 </p>
-                <ul className="hero-intro__rites">
-                  <li>
-                    <strong>Prospect</strong> &mdash; stake a claim with The
-                    Hail Mary Prospecting Co. and vie for escrowed USDC.
-                  </li>
-                  <li>
-                    <strong>Study</strong> &mdash; sharpen your eye in the
-                    Liminal Terminal, where scams get named and signals get
-                    separated from the noise.
-                  </li>
-                  <li>
-                    <strong>Sacrifice</strong> &mdash; burn a votive candle to Our Lady, and perhaps a few tokens - scarcity creates value for all holders.
-                  </li>
+                {/* <p className="hero-intro__dek">
+                  Everyone here is looking for the same thing. Some of us are
+                  honest about it.
+                </p> */}
+                {/* Still a list semantically — three rites — but set as one
+                    inscription line. The tails were cut on purpose: the pages
+                    themselves explain what they are. */}
+                <ul className="hero-intro__rites hero-intro__rites--terse">
+                  <li>Prospect.</li>
+                  <li>Study.</li>
+                  <li>Keep vigil.</li>
                 </ul>
+                <p className="hero-intro__key">
+                  A <span className="hero-intro__pop">small economy</span> runs
+                  beneath the shrine, and awaits your presence.
+                </p>
                 {/* <p className="hero-intro__key">
                   Every rite opens with the same key:{" "}
                   <span className="hero-intro__pop">RL80</span>, the
@@ -2865,13 +2863,24 @@ export default function HomePage() {
 
         {/* <MaterExMachinaSection /> */}
 
-        <div className="section-divider" role="separator" aria-hidden="true">
+        {/* <div className="section-divider" role="separator" aria-hidden="true">
           <span className="section-divider-line section-divider-line--left" />
           <span className="section-divider-icon">&#x2020;</span>
           <span className="section-divider-line section-divider-line--right" />
+        </div> */}
+
+        {/* <HolyTrinSection /> */}
+
+        {/* The 20/80 Principle — permanent liquidity program. Deliberately
+            sits right after the Trin80, because "Liquid80 — small pool, but
+            unruggable" names the weakness this section answers. */}
+        <div className="section-divider" role="separator" aria-hidden="true">
+          <span className="section-divider-line section-divider-line--left" />
+          <span className="section-divider-icon">&#x271D;</span>
+          <span className="section-divider-line section-divider-line--right" />
         </div>
 
-        <HolyTrinSection />
+        <Principle2080Section />
 
 
 

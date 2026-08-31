@@ -770,7 +770,19 @@ export default function StrataVoxels({
 
   return (
     <group>
-      <instancedMesh ref={dirtRef} args={[undefined, undefined, CELLS]} frustumCulled={false} onClick={onGroundClick}>
+      <instancedMesh
+        ref={dirtRef}
+        args={[undefined, undefined, CELLS]}
+        frustumCulled={false}
+        onClick={(e) => {
+          // Only the TOP surface navigates. The wall faces are content, not a
+          // destination — clicking them dollied the camera into the cube's
+          // side. (Instances only translate/scale, so the local face normal
+          // is world-aligned: top faces have normal.y ≈ 1.)
+          if (e.face?.normal?.y > 0.5) onGroundClick?.(e);
+          else e.stopPropagation();
+        }}
+      >
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color="#ffffff" roughness={0.92} metalness={0.03} />
       </instancedMesh>
