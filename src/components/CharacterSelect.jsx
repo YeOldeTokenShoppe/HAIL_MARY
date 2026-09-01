@@ -72,7 +72,7 @@ function NeonFrame({ hue = FRAME_DEFAULT_HUE, onLoaded }) {
     dracoLoader.setDecoderPath(dracoPath);
     gltfLoader.setDRACOLoader(dracoLoader);
 
-    gltfLoader.load("/models/neonFrame.glb", (gltf) => {
+    gltfLoader.load("/models/neonFrame2.glb", (gltf) => {
       const model = gltf.scene;
       model.traverse((child) => {
         if (child.isMesh && child.material) {

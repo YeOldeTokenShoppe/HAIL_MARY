@@ -1718,7 +1718,7 @@ export default function MainPage() {
       // The shared neon frame loads lazily inside CharacterSelect's canvas —
       // without this warm-up it arrives visibly AFTER the loader clears and
       // pops in against the already-revealed page.
-      preloadGLBParsed("/models/neonFrame.glb"),
+      preloadGLBParsed("/models/neonFrame2.glb"),
       preloadImage("/images/mary.png"),
       preloadImage("/shoulder_angel.webp"),
       preloadImage("/shoulder_demon.webp"),

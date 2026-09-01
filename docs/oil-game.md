@@ -1141,6 +1141,48 @@ Phase durations (`DEMON_*_DUR`), `DEMON_PAUSE_DUR` (size of the catchable window
 `DEMON_WANDER_RADIUS`, and two visual offsets: `DEMON_GROUND_Y` (raise if the model sits sunk) and
 `DEMON_YAW_OFFSET` (if it faces the wrong way).
 
+### On-Foot Encounter (walk mode, 2026-09-01)
+
+The walker can fight the demon in person: E fires a neon-rimmed laser pistol (Synty revolver +
+inverted-hull shell, runtime-attached to the forearm bone — the rig has no hand bone; drawn only
+while a demon is loose). **All resolution stays inside `HellDemon` under the exact click rules** —
+same vulnerable window, same counter + 3.5s lockout on a mistime, same `handleClaimBounty` PATCH —
+so walk mode can never cheese the bounty. On-foot differences, all deliberate:
+
+- **Range is the shooter's boots**, not the camera: `DEMON_WALKER_HIT_RANGE` (2.0 cells) — zoom
+  can't game it. Easy phase keeps click parity (a timed shot banishes at any range).
+- **The pause is a stare-down**: within `DEMON_STARE_RANGE` it stops and faces the cowboy — the
+  stare IS the shot-window tell (plus a struck-match sting). The pause is sacred: the menace never
+  fires during it.
+- **Backstab**: a shot from its rear ~110° arc (`DEMON_BACKSTAB_DOT`) within hit range lands as a
+  clean hit — it can't dodge what it can't see. Close-range only; stare keeps duels frontal.
+- **Menace**: loitering inside `DEMON_MENACE_RANGE` for `DEMON_MENACE_DWELL` provokes an unprovoked
+  strike (camera shake + walker flinch, NO lockout/economy, `DEMON_MENACE_COOLDOWN` between).
+- **Laser sight** = the rules readout: the demon publishes `walkerShotLands` per frame (same gates
+  as the shot resolver — single source of truth), and the walker's aiming beam burns hot exactly
+  when E lands. Dim = it'll dodge; near-off = lockout.
+- **Interior streets only**: wander/home nodes clamp to [1, grid−1] (`interiorNode`) — perimeter
+  grid lines sit on the walker's `EDGE_MARGIN` boundary clamp and were unreachable on foot.
+- **Demon-aware camera**: follow/cowboy cams blend their gaze toward a loose demon (airborne
+  registers to ~7 cells; grounded only engage-close) — safe because tank controls never derive
+  input from the camera.
+
+**Bus contract** (the walker↔demon channel, `hm-*` window-event convention): walker dispatches
+`hm-shoot {x,y,z}` (world); demon publishes `window.__hmDemonState {x,y,z,vulnerable,roaming,
+cooldown,hits,required,done,walkerShotLands}` per frame and answers `hm-shot-result
+{result: banish|hit|far|dodge, backstab}` + `hm-demon-attack {x,y,z}`.
+
+**Sound** (`DEMON_SFX`, shared `uiSfx` context; missing files fail silently): hellErupts at mount →
+roar on surfacing/landing/menace (banish replays it at rate 0.72 as the death bellow under the
+churchBell toll) → a continuous furnace bed while airborne (`startSfxLoop`: distance falloff +
+radial-speed doppler; synthesized furnaceLoop.mp3, replaceable in place) → match-strike sting on the
+stare → laser pew → cackle-short on a dodge.
+
+**Testing**: `?mode=test` has a WALK button in the stepper (walker mounts off `activeUserDrill`);
+dev builds expose `window.__hmHellMap` ("col_row_layer" keys) — select the pocket plot, step LAYER
+past it. Known quirk: the 25s test hard→easy flip is shorter than the fly intro, so the 3-hit hard
+fight is barely reachable on foot in test mode.
+
 ## Post-Game Payout
 
 After the game ends (`gamePhase = "ended"`), players are paid out in USDC on Base.

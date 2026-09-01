@@ -818,7 +818,15 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     if (!head) return;
     const t = trackRef.current;
     head.getWorldPosition(_headPos);
-    _toCam.copy(state.camera.position).sub(_headPos);
+    // Gaze target: a nearby walking cowboy outranks the camera — he's a
+    // counter-high customer, so the vendor looks DOWN at him while talking
+    // instead of over his hat at the lens.
+    const _wp = window.__hmWalkerPos;
+    if (_wp && (_wp.x - _headPos.x) ** 2 + (_wp.z - _headPos.z) ** 2 < 1.0) {
+      _toCam.set(_wp.x - _headPos.x, _wp.y + 0.12 - _headPos.y, _wp.z - _headPos.z);
+    } else {
+      _toCam.copy(state.camera.position).sub(_headPos);
+    }
     let targetYaw = 0, targetPitch = 0, targetRoll = 0;
     if (engaged) {
       faceDirWorld(vendor, _face, stripRotY);
@@ -968,16 +976,10 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
   // Same click-to-zoom idiom as OilTower: first click dollies in — to the
   // character's face when the model has a head bone, else head-on to the
   // stall — second click pulls back to the overview.
-  const handleClick = (e) => {
-    e.stopPropagation();
-    if (zoomedRef.current) {
-      zoomedRef.current = false;
-      if (vendor.sitepal) deactivateVendorSitePal();
-      if (vendor.moodDim) window.dispatchEvent(new CustomEvent("vendor-mood", { detail: { active: false } }));
-      onFocusChange?.(null);
-      onZoomOut?.();
-      return;
-    }
+  // The full face-zoom flow, shared between a sky click and the walker's
+  // on-foot entry (the "hm-vendor-enter" window event).
+  const enterVendor = () => {
+    if (zoomedRef.current) return;
     onVendorClick?.(vendor.id);
     // Voiced vendors greet on approach: swap the host to their SitePal scene
     // and speak an ElevenLabs line (engine 14) with real lipsync. The click
@@ -1028,6 +1030,62 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
     // rigged, else the paired prop so tent-only vendors still get lit.
     onFocusChange?.({ id: vendor.id, object: headRef.current || propObj || rootRef.current });
   };
+  // flyOut=false is the walker's exit: he resumes his own camera where he
+  // stands, so no overview fly-back.
+  const exitVendor = (flyOut = true) => {
+    if (!zoomedRef.current) return;
+    zoomedRef.current = false;
+    if (vendor.sitepal) deactivateVendorSitePal();
+    if (vendor.moodDim) window.dispatchEvent(new CustomEvent("vendor-mood", { detail: { active: false } }));
+    onFocusChange?.(null);
+    if (flyOut) onZoomOut?.();
+    // Tell the walker (if he's mid-visit) that the scene ended, whichever
+    // door it ended through.
+    window.dispatchEvent(new CustomEvent("hm-vendor-left"));
+  };
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (zoomedRef.current) { exitVendor(); return; }
+    enterVendor();
+  };
+  // Register this stall for the walker — world position + label — and answer
+  // its enter/exit events.
+  const enterRef = useRef(); enterRef.current = enterVendor;
+  const exitRef = useRef(); exitRef.current = exitVendor;
+  useEffect(() => {
+    const reg = (window.__hmVendorSpots = window.__hmVendorSpots || {});
+    // Anchor on the vendor's HEAD once the character loads — the group root
+    // can sit at the far end of a trailer (the taco stand's soda machine),
+    // which pointed the walker's hat-cam at the appliances. eyeY carries the
+    // real eye height per vendor (seated, standing, counter — all differ).
+    let tries = 0;
+    const t = setInterval(() => {
+      tries++;
+      const head = headRef.current;
+      const anchor = head || (tries > 12 ? rootRef.current : null);
+      if (anchor) {
+        const v = new THREE.Vector3();
+        anchor.getWorldPosition(v);
+        reg[vendor.id] = {
+          id: vendor.id, label: vendor.label || vendor.id,
+          x: v.x, z: v.z, eyeY: head ? v.y : null,
+        };
+        clearInterval(t);
+      } else if (tries > 40) {
+        clearInterval(t);
+      }
+    }, 250);
+    const onEnter = (e) => { if (e.detail?.id === vendor.id) enterRef.current?.(); };
+    const onExit = () => exitRef.current?.(false);
+    window.addEventListener("hm-vendor-enter", onEnter);
+    window.addEventListener("hm-vendor-exit", onExit);
+    return () => {
+      clearInterval(t);
+      delete reg[vendor.id];
+      window.removeEventListener("hm-vendor-enter", onEnter);
+      window.removeEventListener("hm-vendor-exit", onExit);
+    };
+  }, [vendor.id, vendor.label]);
   // Identity transform: this group is a child of the shared strip group, and
   // both the strip GLB and the character GLBs are authored in that same frame.
   // The click volume over the paired prop is what makes the tent itself
@@ -2416,13 +2474,14 @@ function PhotoBoothRig({ boothScene, stripScale, focus, onVendorClick, onFocusOb
     st.pendingShare = { url: st.snapUrl, format: "square" };
   };
 
-  const handleClick = (e) => {
-    e.stopPropagation();
-    // Same drag guard as the deck: the booth is a wide target, and R3F only
-    // suppresses post-drag clicks on the pointer-MISSED path.
-    if (e.delta > STRIP_CLICK_DRAG_PX) return;
+  // The full booth-entry flow (fly inside, boot the cam, dress the screens) —
+  // shared by the click below and the walker's curtain trigger (the
+  // "hm-booth-enter" window event, dispatched when the cowboy steps through
+  // Photo_booth_Curtain on foot).
+  const enterBooth = () => {
     const st = ensureRig();
-    if (!zoomedRef.current) {
+    if (zoomedRef.current) return;
+    {
       zoomedRef.current = true;
       onVendorClick?.("photobooth");
       // Fly INSIDE: through the curtain to face the cabin viewfinder. Its
@@ -2457,8 +2516,23 @@ function PhotoBoothRig({ boothScene, stripScale, focus, onVendorClick, onFocusOb
       st.ctx.fillRect(0, 0, BOOTH_W, BOOTH_H);
       st.texture.needsUpdate = true;
       startCam();
-      return;
     }
+  };
+  const enterBoothRef = useRef();
+  enterBoothRef.current = enterBooth;
+  useEffect(() => {
+    const onEnter = () => enterBoothRef.current?.();
+    window.addEventListener("hm-booth-enter", onEnter);
+    return () => window.removeEventListener("hm-booth-enter", onEnter);
+  }, []);
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    // Same drag guard as the deck: the booth is a wide target, and R3F only
+    // suppresses post-drag clicks on the pointer-MISSED path.
+    if (e.delta > STRIP_CLICK_DRAG_PX) return;
+    if (!zoomedRef.current) { enterBooth(); return; }
+    const st = ensureRig();
     if (st.state === "countdown" || st.state === "flash" || st.state === "develop" || st.state === "interlude") return;
     // The camera sequence belongs to the SCREEN: only a click that lands on
     // the viewfinder assembly (the screen quad or its frame) starts the

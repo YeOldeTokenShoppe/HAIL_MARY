@@ -374,7 +374,7 @@ export default function RibbonCarousel({ turns = 1, height = '100vh' }) {
     >
       <div style={{ flex: '0 0 auto', paddingTop: '2.5rem' }}>
         <DropInTitle
-          lines={['Souvenirs', 'From the', 'Singular80']}
+          lines={['Snapshots', 'From the', 'Singular80']}
           colors={['#00ff00', '#f4e4c1', '#ffd700']}
           fontSize={{ mobile: '3rem', desktop: '3.4rem' }}
           isMobile={false}

@@ -42,6 +42,7 @@ import RogueAdminPanel from "@/components/RogueAdminPanel";
 import useCctvRecorder from "@/hooks/useCctvRecorder";
 import PumpPurchaseModal from "@/components/PumpPurchaseModal";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
+import CoinLoader from "@/components/CoinLoader";
 
 // ── Milestone caption pools ──────────────────────────────────────────────────
 // Randomized per capture so the feed doesn't read the same with only 2 event
@@ -762,6 +763,63 @@ const FREE_CLAIM_JUMPS = 2;
 // backstop for a bugged/abandoned bounty (must match BOUNTY_TTL_MS in the API).
 const DEMON_BOUNTY_TTL_MS = 24 * 60 * 60 * 1000; // 24h orphan backstop
 
+// Painted on the page root while the loader is up. CoinLoader draws its own
+// black backdrop from styled-jsx, which isn't applied on the very first client
+// frame — long enough for the day theme's #f5efe6 to flash through before the
+// coin appears. An inline style is there from frame one, so the wait starts
+// black and the coin fades in over it.
+const LOADING_ROOT = { background: "#000" };
+
+// Reports a single "the field has finished streaming" edge to the page so the
+// CoinLoader can lift. drei's useProgress store is module-level (it listens on
+// THREE.DefaultLoadingManager), so this works outside the Canvas — and keeping
+// it in its own node means the progress ticks re-render these few lines rather
+// than the whole page while a hundred rigs' GLBs come in.
+//
+// The settle signal is `active` going quiet, the same one CameraFlyIn holds the
+// intro clock on, so the loader lifts exactly as the fly-in starts moving.
+// `stateRef` (the fired/started flags) is owned by the page, not by this
+// component: useIsMobile settles after mount and swaps the whole layout, which
+// remounts the gate — local refs would forget that loading had already begun
+// and let a backstop lift the loader early.
+function SceneLoadGate({ stateRef, onReady, holdMs = 600, graceMs = 2500, maxWaitMs = 20000 }) {
+  const { active } = useProgress();
+
+  const finish = useCallback(() => {
+    if (stateRef.current.fired) return;
+    stateRef.current.fired = true;
+    onReady();
+  }, [stateRef, onReady]);
+
+  // A cold mount reports active=false for a beat before the first loader
+  // registers — remember that loading actually began so that opening beat is
+  // never mistaken for "done".
+  useEffect(() => {
+    if (active) stateRef.current.started = true;
+  }, [active, stateRef]);
+
+  useEffect(() => {
+    if (stateRef.current.fired || !stateRef.current.started || active) return;
+    // Hold a beat past the last asset so the reveal lands on a composited
+    // frame instead of the canvas's first black one. A new batch starting
+    // inside the hold cancels it (cleanup) and the wait resumes.
+    const t = setTimeout(finish, holdMs);
+    return () => clearTimeout(t);
+  }, [active, finish, holdMs, stateRef]);
+
+  // Two backstops, because sitting on an opaque black screen is the worst
+  // possible failure: nothing ever registered with the loading manager (fully
+  // cached, or the canvas never mounted) lifts at the grace window, and a load
+  // that stalls or errors out lifts at the hard cap.
+  useEffect(() => {
+    const grace = setTimeout(() => { if (!stateRef.current.started) finish(); }, graceMs);
+    const cap = setTimeout(finish, maxWaitMs);
+    return () => { clearTimeout(grace); clearTimeout(cap); };
+  }, [finish, graceMs, maxWaitMs, stateRef]);
+
+  return null;
+}
+
 // Continuous orbit exactly like the Three.js horse example. Stops when user interacts.
 function CameraFlyIn({ onComplete, mobile = false, grid = 10 }) {
   const { camera, gl } = useThree();
@@ -1469,6 +1527,14 @@ export default function OilPage() {
     return () => document.documentElement.style.removeProperty("--hm-ui-scale");
   }, [uiScale, isMobile]);
 
+  // Opaque loader over the whole page until the field's assets have streamed
+  // in — without it the 3D view reveals as a black canvas and the camera
+  // fly-in (which holds at t=0 on the same signal) appears to start late.
+  // SceneLoadGate owns the lift, backstops included.
+  const [isLoading, setIsLoading] = useState(true);
+  const loadGateRef = useRef({ fired: false, started: false });
+  const finishLoading = useCallback(() => setIsLoading(false), []);
+
   // Read mode from URL search params (avoids useSearchParams / Suspense issues)
   const [mode, setMode] = useState("active");
   const [previewMode, setPreviewMode] = useState(false);
@@ -1780,6 +1846,9 @@ export default function OilPage() {
   // writes the camera directly, and damping fights external writes even when
   // disabled, so orbit unmounts.
   const [walkerCam, setWalkerCam] = useState("follow");
+  // Walker is face-to-face with a vendor: the sky grammar borrows the camera
+  // (CameraFlyTo does the face zoom, orbit rests on it), the walker waits.
+  const [walkerVendor, setWalkerVendor] = useState(false);
   const [numberOfHellPockets, setNumberOfHellPockets] = useState(null); // null ⇒ auto (~3% of grid)
   const [totalOilBudget, setTotalOilBudget] = useState(500);
   const [gridSize, setGridSize] = useState(10);
@@ -2905,6 +2974,11 @@ export default function OilPage() {
   // players see only what the server has revealed into oilPlots.
   const displayGrid3D = seedVisible ? stats.grid3D : revealedGrid3D;
   const displayHellMap = seedVisible ? stats.hellMap : revealedHellMap;
+  // Dev-only debug export: lists the hell pockets ("col_row_layer" keys) so a
+  // demon-encounter test can jump straight to a pocket instead of hunting.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") window.__hmHellMap = displayHellMap;
+  }, [displayHellMap]);
 
   const communityGrid3D = displayGrid3D;
 
@@ -3822,6 +3896,12 @@ export default function OilPage() {
   }, [isMobile, gridSize]);
 
   const handleZoomOut = useCallback(() => {
+    // A walker vendor visit can end through ANY zoom-out path (panel close,
+    // overview button, click-away). Chain the vendor cleanup events so the
+    // stall un-focuses and the walker resumes instead of freezing under a
+    // sky camera. No-ops when nothing is focused / no walker is visiting.
+    window.dispatchEvent(new CustomEvent("hm-vendor-exit"));
+    window.dispatchEvent(new CustomEvent("hm-vendor-left"));
     flyIdRef.current++;
     setFlyTarget({ x: 0, y: isMobile ? 3.5 : 8, z: isMobile ? 4 : 8, id: flyIdRef.current, mobile: isMobile, overview: true });
     setSelectedX(null);
@@ -5909,7 +5989,16 @@ export default function OilPage() {
     // Also hold during ticket_sale until the drill doc resolves, so a
     // plot-holder doesn't flash the registration lobby before landing on the
     // field in pre-season mode.
-    return <div style={{ width: "100vw", height: "100vh", background: theme.bg }} />;
+    //
+    // This is the FIRST thing painted on a cold visit, and it used to be a bare
+    // theme.bg rectangle — a full second of cream (or violet, in night) before
+    // the field branch mounted its black loader. Same wait, one screen: hand the
+    // coin over to the branch below without ever changing colour underneath it.
+    return (
+      <div style={{ width: "100vw", height: "100vh", ...LOADING_ROOT }}>
+        <CoinLoader loading />
+      </div>
+    );
   }
   const userHasPlot = userDrill?.col != null;
   // Pre-season split: lobbyView=true pins the registration lobby open;
@@ -6939,6 +7028,17 @@ export default function OilPage() {
           Click a plot on the map to start testing
         </div>
       )}
+      {/* Test-mode walk entry — the real button lives on the V2 core-sample
+          card (signed-in only); the sandbox needs its own door so the ground
+          game (and the demon encounter) can be exercised without a claim. */}
+      {selectedX !== null && introComplete && (
+        <button
+          onClick={() => setWalkMode(true)}
+          style={{ ...drillBtnStyles.active, padding: "4px 10px", fontSize: 11, marginTop: 8, width: "100%" }}
+        >
+          🥾 WALK THE FIELD (beta)
+        </button>
+      )}
     </div>
   );
 
@@ -7435,7 +7535,9 @@ export default function OilPage() {
   // ═══════════════════════════════════════════════════════════
   if (isMobile) {
     return (
-      <div style={m.root}>
+      <div style={{ ...m.root, ...(isLoading ? LOADING_ROOT : null) }}>
+        <SceneLoadGate stateRef={loadGateRef} onReady={finishLoading} />
+        <CoinLoader loading={isLoading} />
         {previewBanner}
         <div style={styles.scanlines} />
         <div style={styles.grain} />
@@ -7583,23 +7685,28 @@ export default function OilPage() {
                     onFocusObject={handleFocusObject}
                     onBoothPhoto={handleBoothPhoto}
                   />
-                  {walkMode && userDrill?.col != null && (
+                  {/* activeUserDrill, not userDrill: test mode synthesizes a
+                      drill from the selected cell (same as the panels), so
+                      the walker — and the demon encounter — are testable. */}
+                  {walkMode && activeUserDrill?.col != null && (
                     <PlayerWalker
                       worldW={gridSize} worldD={gridSize}
-                      spawnCol={userDrill.col} spawnRow={userDrill.row}
+                      spawnCol={activeUserDrill.col} spawnRow={activeUserDrill.row}
                       frontier={frontierTargets}
                       onWildcat={handleWildcat}
                       controlsRef={controlsRefMobile}
                       onCam={setWalkerCam}
-                      onExit={() => { setWalkerCam("follow"); setWalkMode(false); }}
+                      onVendorMode={setWalkerVendor}
+                      onExit={() => { setWalkerCam("follow"); setWalkerVendor(false); setWalkMode(false); }}
                     />
                   )}
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
                 {introComplete ? (
                   <>
-                    {/* Orbit mounts only in the walker's ORBIT cam mode. */}
-                    {(!walkMode || walkerCam === "orbit") && <OrbitControls
+                    {/* Orbit mounts in the walker's ORBIT cam mode and during
+                        vendor face-to-faces (sky grammar borrows the camera). */}
+                    {(!walkMode || walkerCam === "orbit" || walkerVendor) && <OrbitControls
                       ref={controlsRefMobile}
                       enableDamping
                       dampingFactor={0.1}
@@ -7614,7 +7721,7 @@ export default function OilPage() {
                       onStart={() => { if (hellOrbit) setHellOrbit(false); }}
                       target={introExitTarget || [1.5, 1.5, 1.5]}
                     />}
-                    {!walkMode && <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />}
+                    {(!walkMode || walkerVendor) && <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />}
                   </>
                 ) : (
                   <CameraFlyIn onComplete={handleIntroComplete} mobile grid={gridSize} />
@@ -8008,7 +8115,9 @@ export default function OilPage() {
   // DESKTOP LAYOUT — 3-column CSS grid
   // ═══════════════════════════════════════════════════════════
   return (
-    <div style={styles.root}>
+    <div style={{ ...styles.root, ...(isLoading ? LOADING_ROOT : null) }}>
+      <SceneLoadGate stateRef={loadGateRef} onReady={finishLoading} />
+      <CoinLoader loading={isLoading} />
       {previewBanner}
       <div style={styles.scanlines} />
       <div style={styles.grain} />
@@ -8170,23 +8279,26 @@ export default function OilPage() {
                 onFocusObject={handleFocusObject}
                 onBoothPhoto={handleBoothPhoto}
               />
-              {walkMode && userDrill?.col != null && (
+              {/* activeUserDrill, not userDrill — see the mobile mount. */}
+              {walkMode && activeUserDrill?.col != null && (
                 <PlayerWalker
                   worldW={gridSize} worldD={gridSize}
-                  spawnCol={userDrill.col} spawnRow={userDrill.row}
+                  spawnCol={activeUserDrill.col} spawnRow={activeUserDrill.row}
                   frontier={frontierTargets}
                   onWildcat={handleWildcat}
                   controlsRef={controlsRef}
                   onCam={setWalkerCam}
-                  onExit={() => { setWalkerCam("follow"); setWalkMode(false); }}
+                  onVendorMode={setWalkerVendor}
+                  onExit={() => { setWalkerCam("follow"); setWalkerVendor(false); setWalkMode(false); }}
                 />
               )}
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
             {introComplete ? (
               <>
-                {/* Orbit mounts only in the walker's ORBIT cam mode. */}
-                {(!walkMode || walkerCam === "orbit") && <OrbitControls
+                {/* Orbit mounts in the walker's ORBIT cam mode and during
+                    vendor face-to-faces (sky grammar borrows the camera). */}
+                {(!walkMode || walkerCam === "orbit" || walkerVendor) && <OrbitControls
                   ref={controlsRef}
                   enableDamping
                   dampingFactor={0.08}
@@ -8199,7 +8311,7 @@ export default function OilPage() {
                   target={introExitTarget || [3, 5, 3]}
                   zoomToCursor
                 />}
-                {!walkMode && <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />}
+                {(!walkMode || walkerVendor) && <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />}
               </>
             ) : (
               <CameraFlyIn onComplete={handleIntroComplete} grid={gridSize} />

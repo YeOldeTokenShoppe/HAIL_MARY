@@ -61,6 +61,8 @@ import {
 } from "@/lib/candlePrefs";
 import { fireCandleIgnitionPulse } from "@/utils/candleIgnitionPulse";
 import CommunityCandles from "@/components/CommunityCandles";
+import VigilRail from "@/components/VigilRail";
+import VigilRailDom from "@/components/VigilRailDom";
 import "./chart-shrine/chart-shrine.css";
 
 // Preload the votive — the only candle variant the page renders since
@@ -2152,6 +2154,24 @@ export default function HomePage() {
   // bounded; past that the count just reads "99".
   const [litCandles, setLitCandles] = useState([]);
   useEffect(() => subscribeLitCandles(setLitCandles, 99), []);
+
+  // VigilRail dev switch (same query-flag convention as ?tod= on /hailmary):
+  // ?mockrail=1 renders the guest-votive rail with its mock pool,
+  // ?mockrail=live joins the real subscribeLitCandles feed instead.
+  // Absent → the rail stays out of the page entirely. Default renderer is
+  // the 2D DOM votives (VigilRailDom — Michelle prefers the mock's graphic
+  // candles); add &rail=3d for the in-scene GLB-clone rail for comparison.
+  const [railMode, setRailMode] = useState(null);
+  const [rail3d, setRail3d] = useState(false);
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get("mockrail");
+      if (q === "1") setRailMode("mock");
+      else if (q === "live") setRailMode("live");
+      setRail3d(params.get("rail") === "3d");
+    } catch {}
+  }, []);
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const userId = isConnected && address ? address.toLowerCase() : null;
@@ -2702,6 +2722,17 @@ export default function HomePage() {
             onHoverChange={setCandleObjectHovered}
             onTap={toggleCandle}
           />
+          {/* VigilRail (3D variant) — GLB-clone guests in-scene, kept for
+              comparison behind &rail=3d. The default guest renderer is the
+              2D VigilRailDom overlay mounted outside this canvas. */}
+          {railMode && rail3d && (
+            <VigilRail
+              mock={railMode === "mock"}
+              candles={litCandles}
+              excludeUserId={userId}
+              isMobile={isMobileDevice}
+            />
+          )}
           {/* Our Lady's chamber at the bottom of the crane descent —
               scroll-gated inside the component, so it costs nothing
               until the visitor heads down. */}
@@ -2727,6 +2758,20 @@ export default function HomePage() {
       </div>
 
       {/* <CommunityCandles /> */}
+
+      {/* VigilRailDom — other keepers' votives as stylized 2D candles along
+          the bottom edge (the approved mock's look), dev-gated behind
+          ?mockrail=1 (mock pool) / ?mockrail=live (real feed). The class is
+          excluded from the catch-all direct-child rule in chart-shrine.css
+          so its fixed positioning survives. */}
+      {railMode && !rail3d && (
+        <VigilRailDom
+          mock={railMode === "mock"}
+          candles={litCandles}
+          excludeUserId={userId}
+          isMobile={isMobileDevice}
+        />
+      )}
 
       <div className="hero-header">
         <div
@@ -2804,7 +2849,7 @@ export default function HomePage() {
               </blockquote>
               <div className="hero-intro">
                 <p className="hero-intro__cry" style={{ textAlign: "center" }}>
-                  Where empires mint their coins and shadows move beneath the exchanges, Our Lady of Perpetual Profit keeps watch over those with small stakes and long odds. Rejoice! <em>Mater ex machina</em>, patron saint of portfolios, is on our side.
+                  Where empires mint their coins and shadows move beneath the exchanges, Our Lady of Perpetual Profit keeps watch over those with small stakes and big dreams. Rejoice! <em>Mater ex machina</em>, patron saint of portfolios, is on our side.
                 </p>
                 {/* <p className="hero-intro__dek">
                   Everyone here is looking for the same thing. Some of us are
@@ -2814,12 +2859,12 @@ export default function HomePage() {
                     inscription line. The tails were cut on purpose: the pages
                     themselves explain what they are. */}
                 <ul className="hero-intro__rites hero-intro__rites--terse">
-                  <li>Prospect.</li>
-                  <li>Study.</li>
-                  <li>Keep vigil.</li>
+                  <li></li>
+                  {/* <li>Learn.</li>
+                  <li>Burn.</li> */}
                 </ul>
                 <p className="hero-intro__key">
-                  A <span className="hero-intro__pop">small economy</span> runs
+                  A <span className="hero-intro__pop">micro economy</span> runs
                   beneath the shrine, and awaits your presence.
                 </p>
                 {/* <p className="hero-intro__key">
@@ -2871,7 +2916,7 @@ export default function HomePage() {
 
         {/* <HolyTrinSection /> */}
 
-        {/* The 20/80 Principle — permanent liquidity program. Deliberately
+        {/* The 20/80 Covenant — permanent liquidity program. Deliberately
             sits right after the Trin80, because "Liquid80 — small pool, but
             unruggable" names the weakness this section answers. */}
         <div className="section-divider" role="separator" aria-hidden="true">

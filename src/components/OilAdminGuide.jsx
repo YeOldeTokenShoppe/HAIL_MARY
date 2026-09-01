@@ -13,7 +13,7 @@ const RUNBOOK = [
   ["PHASE → REGISTRATION", "sidebar PHASE buttons (they keep gameEnded in sync) or lobby PHASE OVERRIDE."],
   ["SET GRID SIZE", "size for expected demand NOW — frozen once the first plot is claimed; never resize after anchor."],
   ["START DATE + SEASON LENGTH", "drives “SEASON STARTS IN” and the season clock / GAME DAY."],
-  ["COMMIT", "fairness console, lead ≈ seconds-until-start ÷ 2 (1d ≈ 43,200 · 3d ≈ 129,600 · 7d ≈ 302,400 blocks; empty = 30 ≈ 1 min). Starts the public countdown; claims stay open while there's no anchor hash."],
+  ["COMMIT", "fairness console, lead ≈ seconds-until-start ÷ 2 (1d ≈ 43,200 · 3d ≈ 129,600 · 7d ≈ 302,400 blocks; empty = 30 ≈ 1 min). Starts the public countdown; claims stay open while there's no anchor hash. Also unlocks the DAILY TICKET — mint 503s until the seed is committed (tickets need COMMIT only, not ANCHOR)."],
   ["DURING REGISTRATION", "RUN QUALIFICATION SNAPSHOT (lobby) re-checks holders vs their token floor; watch the waitlist count."],
   ["SEASON START", "once the anchor block mines: ANCHOR, then PHASE → ACTIVE — promptly and together. Anchor closes first-plot claims and enables strikes; the map is computable from that moment."],
   ["SEASON END", "strike-tick auto-flips to ended at the buzzer (auto-banks tanks, auto-reveals). Manual fallback: END GAME button (sets ended + triggers reveal); REVEAL in the console if it didn't auto-publish."],
@@ -22,8 +22,12 @@ const RUNBOOK = [
 const TEST_CYCLE =
   "Quick test cycle: RESET BOARD → COMMIT (empty lead ≈ 1 min) → ANCHOR → TESTING: ON → SEED + REVEAL FIELD or CLAIM SELECTED + FORCE STRIKE → REMOVE TEST BOTS / RESET BOARD when done → TESTING: OFF.";
 
+// COMMIT from a terminal — identical to the console button (GET or POST).
+const SEED_CURL = 'curl "https://<host>/api/oil-fairness?action=commit&password=$ADMIN_PASSWORD"';
+
 const GOTCHAS = [
   "ticket_sale is the stored value behind the REGISTRATION label.",
+  "DAILY TICKET mint 503s “seed is not committed” until COMMIT — the legacy blockHash path in oil-settings never writes serverSecret, so it can't unlock tickets.",
   "Claims 403 during registration? Check for a leftover anchorBlockHash — RESET BOARD clears it.",
   "Lobby PHASE OVERRIDE sets only gamePhase; the sidebar buttons also sync gameEnded. Leaving ENDED? Use the sidebar (or RESET BOARD).",
   "FORCE STRIKE / SEED + REVEAL error no_seed until COMMIT + ANCHOR.",
@@ -56,6 +60,12 @@ export default function OilAdminGuide() {
               </li>
             ))}
           </ol>
+
+          <div style={s.curlBox}>
+            <div style={s.sectionTitle}>COMMIT FROM A TERMINAL (SAME AS THE CONSOLE BUTTON)</div>
+            <code style={s.curlCmd}>{SEED_CURL}</code>
+            <div style={s.curlNote}>append &amp;lead=43200 for a 1-day lead; action=anchor / action=reveal drive the other steps.</div>
+          </div>
 
           <div style={s.testCycle}>{TEST_CYCLE}</div>
 
@@ -98,5 +108,8 @@ const s = {
     marginTop: 8, padding: 8, fontSize: 8.5, lineHeight: 1.5, color: "#d0c2a8",
     background: "rgba(180,160,130,0.1)", border: "1px solid #d4c8b4",
   },
+  curlBox: { marginTop: 8, padding: 8, background: "rgba(180,160,130,0.1)", border: "1px solid #d4c8b4" },
+  curlCmd: { display: "block", fontSize: 8.5, lineHeight: 1.5, color: "#e6bd63", wordBreak: "break-all", userSelect: "all" },
+  curlNote: { fontSize: 8, color: "#b3a48c", fontStyle: "italic", marginTop: 4, lineHeight: 1.4 },
   note: { fontSize: 8, color: "#b3a48c", fontStyle: "italic", marginTop: 8, lineHeight: 1.4 },
 };

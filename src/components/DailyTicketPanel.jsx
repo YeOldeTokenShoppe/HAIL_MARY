@@ -2,16 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PanelSection, PanelTitle, PANEL_ICONS } from "./HailMaryPanel";
-import ScratchReveal from "./ScratchReveal";
+import SpinReveal from "./SpinReveal";
 import {
   TICKET_CELLS as CELLS, TICKET_MATCH as MATCH, TICKET_STREAK_GUARANTEE as STREAK_GUARANTEE,
   TICKET_PRIZES as PRIZES, hashStr, mintTicketCells, evaluateCells, ticketDayKey, msToNextTicketDay,
 } from "@/lib/oilTicket";
 
 // DAILY TICKET — a HAIL MARY PROSPECTING CO. scratch ticket. Nine silver
-// circles in a 3×3; match three of one symbol and win the prize on the legend
-// — a win settles the moment the third one shows, a loss only once every disc
-// is scratched. No pick, no external event: a pure instant-win, free entry,
+// circles in a 3×3; tap a disc and its 💰 cover whirls away (SpinReveal, after
+// the CodePen emoji scratch card) to show the symbol. Match three of one
+// symbol and win the prize on the legend — a win settles the moment the third
+// one shows, a loss only once every disc is open. No pick, no external event:
+// a pure instant-win, free entry,
 // prizes paid in game terms (never dollars), so it's a sweepstakes, not a
 // wager. The rules (cells, prizes, odds, mint, evaluate) live in
 // src/lib/oilTicket.js, shared with the server.
@@ -66,14 +68,20 @@ function ticketPalette(t, dark) {
   };
 }
 
-// ── Symbols (24-grid line icons, game vocabulary; ids match oilTicket.js) ──
+// ── Symbols (emoji, after the CodePen source; ids match oilTicket.js) ──
+// The ids are the wire format — the server's cells speak pickaxe/derrick/coin —
+// so only the faces change: derrick shows as a DIAMOND and coin as a GREENBACK
+// because no derrick emoji exists and 💵 isn't a coin. 🕳️ stands in for the
+// treasure chest (🪎 is Unicode 17 — tofu on anything but the newest OSes) and
+// happens to BE a dry hole. All six render everywhere back to ~2021 fonts
+// (❤️‍🔥, the newest, is Emoji 13.1).
 const SYMBOLS = {
-  pickaxe: { name: "PICKAXE", icon: <><path d="M14.531 12.469 6.619 20.38a1 1 0 1 1-3-3l7.912-7.912" /><path d="M15.686 4.314A12.5 12.5 0 0 0 5.461 2.958 1 1 0 0 0 5.58 4.71a22 22 0 0 1 6.318 3.393" /><path d="M17.7 3.7a1 1 0 0 0-1.4 0l-4.6 4.6a1 1 0 0 0 0 1.4l2.6 2.6a1 1 0 0 0 1.4 0l4.6-4.6a1 1 0 0 0 0-1.4z" /><path d="M19.686 8.314a12.501 12.501 0 0 1 1.356 10.225 1 1 0 0 1-1.751.119 22 22 0 0 0-3.393-6.319" /></> },
-  derrick: { name: "DERRICK", icon: <><path d="M8 22 11 3h2l3 19" /><path d="M5 22h14" /><path d="M9.4 10h5.2" /><path d="M8.6 16h6.8" /><path d="M12 3V1" /></> },
-  coin:    { name: "RL80 COIN", icon: <><circle cx="12" cy="12" r="9" /><path d="M9 8h4a2 2 0 0 1 0 4H9" /><path d="M9 8v8" /><path d="m13 12 3 4" /></> },
-  gusher:  { name: "GUSHER", icon: <><path d="M12 22a6 6 0 0 0 6-6c0-2-1-3.5-2-5l-4-6-4 6c-1 1.5-2 3-2 5a6 6 0 0 0 6 6z" /><path d="m4 5 2 2" /><path d="m20 5-2 2" /><path d="M12 2v1" /></> },
-  barrel:  { name: "BARREL", icon: <><rect x="6" y="3" width="12" height="18" rx="3" /><path d="M6 9h12" /><path d="M6 15h12" /></> },
-  dry:     { name: "DRY HOLE", icon: <><path d="M5 20h14" /><path d="M8 20V9" /><path d="M16 20V9" /><path d="M7 9h10" /><path d="M12 9v4" /></> },
+  pickaxe: { name: "PICKAXE", emoji: "⛏️" },
+  derrick: { name: "DIAMOND", emoji: "💎" },
+  coin:    { name: "GREENBACK", emoji: "💵" },
+  gusher:  { name: "GUSHER", emoji: "❤️‍🔥" },
+  barrel:  { name: "BARREL", emoji: "🛢️" },
+  dry:     { name: "DRY HOLE", emoji: "🕳️" },
 };
 const FRESH = Object.freeze(new Array(CELLS).fill(false));
 
@@ -126,12 +134,10 @@ function mintLocal(seedStr, guaranteeWin, forced = null) {
 
 const fmtCountdown = (ms) => { const m = Math.max(0, Math.ceil(ms / 60000)); const h = Math.floor(m / 60); return h > 0 ? `${h}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`; };
 
-function Icon({ path, size = 32, color }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-      {path}
-    </svg>
-  );
+// An emoji sized like the line icons it replaced: `size` is the box, the glyph
+// fills ~90% of it. Emoji carry their own color, so no color prop.
+function Em({ e, size = 32 }) {
+  return <span aria-hidden="true" style={{ fontSize: Math.round(size * 0.9), lineHeight: 1, flexShrink: 0 }}>{e}</span>;
 }
 
 export default function DailyTicketPanel({
@@ -174,8 +180,8 @@ export default function DailyTicketPanel({
   }, [live, remote, ticketId, serial, forcedOutcome]);
   const ticketNo = `${day.slice(4)}-${String(live ? 1 : serial).padStart(2, "0")}`;
 
-  // Scratch state is keyed to the ticket, so a fresh ticket is unscratched in
-  // the same render it appears.
+  // Reveal state is keyed to the ticket, so a fresh ticket arrives fully
+  // covered in the same render it appears.
   const [scratch, setScratch] = useState({ id: ticketId, cells: FRESH });
   const revealed = scratch.id === ticketId ? scratch.cells : FRESH;
   const markRevealed = (i) => setScratch((s) => { const cells = s.id === ticketId ? s.cells : FRESH; return cells[i] ? s : { id: ticketId, cells: cells.map((v, k) => (k === i ? true : v)) }; });
@@ -186,8 +192,8 @@ export default function DailyTicketPanel({
   // Live: mint (or fetch) today's ticket on mount — and again whenever the
   // season commitment changes (a fresh COMMIT in the admin panel turns "not
   // committed yet" into a ticket without a reload) or the player taps the
-  // error bar to retry. A ticket already settled today comes back scratched,
-  // with no fanfare — it's a replay.
+  // error bar to retry. A ticket already settled today comes back fully
+  // revealed, with no fanfare — it's a replay.
   const [mintAttempt, setMintAttempt] = useState(0);
   const retryMint = () => { setRemoteError(null); setMintAttempt((n) => n + 1); };
   const liveSettled = live && remote?.status === "settled";
@@ -216,7 +222,7 @@ export default function DailyTicketPanel({
   const complete = count === CELLS;
   const winSym = ticket?.win?.sym || null;
   // A win settles the moment the third matching symbol shows; a losing ticket
-  // is only known once every disc is scratched.
+  // is only known once every disc is tapped open.
   const won = !!ticket && !!winSym && ticket.cells.filter((s, i) => revealed[i] && s === winSym).length >= MATCH;
   const lost = !!ticket && complete && !won;
   const settled = !!ticket && (won || complete);
@@ -295,7 +301,7 @@ export default function DailyTicketPanel({
           boxShadow: `0 0 10px ${gold}55, inset 0 1px 0 rgba(255,255,255,0.35)`,
           animation: reduceMotion ? "none" : "hmTicketGlimmer 2.6s ease-in-out infinite",
         }}>
-          <span>✦</span><span>Scratch today&apos;s ticket</span><span>▸</span>
+          <span>✦</span><span>Reveal today&apos;s ticket</span><span>▸</span>
         </button>
       )
       : (
@@ -350,7 +356,7 @@ export default function DailyTicketPanel({
 
           {band(won
             ? `Match ${MATCH} — ${ticket.win.prize}`
-            : complete ? "No match — scratch again tomorrow" : `Scratch all ${CELLS} · match ${MATCH} & win`, won ? "win" : undefined)}
+            : complete ? "No match — new ticket tomorrow" : `Tap the 💰 · match ${MATCH} & win`, won ? "win" : undefined)}
 
           {/* the 3×3 (60px discs) — with the headline and the NO MATCH stamp layered over it */}
           <div style={{ position: "relative", maxWidth: 196, margin: "0 auto" }}>
@@ -358,18 +364,11 @@ export default function DailyTicketPanel({
               {ticket.cells.map((sym, i) => {
                 const hit = won && winSym === sym && revealed[i];
                 return (
-                  <ScratchReveal
+                  <SpinReveal
                     key={`${ticketId}-${i}`}
-                    theme={t}
-                    variant="silver"
-                    shape="circle"
-                    threshold={0.4}
-                    brush={12}
-                    coinSize={26}
-                    label=""
-                    minHeight={0}
                     revealed={revealed[i]}
-                    onRevealed={() => markRevealed(i)}
+                    onReveal={() => markRevealed(i)}
+                    label={`disc ${i + 1} of ${CELLS} — tap to reveal`}
                     style={{
                       aspectRatio: "1 / 1", borderRadius: "50%", border: `1px solid ${hit ? K.win : K.rule}`, background: K.field,
                       boxShadow: hit ? `0 0 0 2px ${K.win}55, 0 0 12px ${K.win}66` : "none",
@@ -378,10 +377,10 @@ export default function DailyTicketPanel({
                       opacity: lost ? 0.55 : 1,
                     }}
                   >
-                    <div title={SYMBOLS[sym].name} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: hit ? K.win : K.ink }}>
-                      <Icon path={SYMBOLS[sym].icon} size={30} />
+                    <div title={SYMBOLS[sym].name} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Em e={SYMBOLS[sym].emoji} size={32} />
                     </div>
-                  </ScratchReveal>
+                  </SpinReveal>
                 );
               })}
             </div>
@@ -408,8 +407,8 @@ export default function DailyTicketPanel({
           {/* result line */}
           <div style={{ marginTop: 8, minHeight: 14, fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", color: resultColor, textAlign: "center", textTransform: "uppercase", fontWeight: settled ? 700 : 400 }}>
             {won
-              ? `Three ${SYMBOLS[winSym].name}s — ${ticket.win.prize}${complete ? "" : ` · ${CELLS - count} left to scratch`}`
-              : complete ? `Nothing matched · streak ${streak}` : `${count} / ${CELLS} scratched`}
+              ? `Three ${SYMBOLS[winSym].name}s — ${ticket.win.prize}${complete ? "" : ` · ${CELLS - count} left to tap`}`
+              : complete ? `Nothing matched · streak ${streak}` : `${count} / ${CELLS} revealed`}
           </div>
 
           {/* legend (one row) + the ledger: the last seven tickets as stubs, and the guarantee countdown */}
@@ -421,7 +420,7 @@ export default function DailyTicketPanel({
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
                   {PRIZES.map((pz) => (
                     <span key={pz.sym} title={`Three ${SYMBOLS[pz.sym].name}s — ${pz.prize}`} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontFamily: MONO, fontSize: 7, letterSpacing: "0.06em", color: K.label, textTransform: "uppercase", whiteSpace: "nowrap", minWidth: 0 }}>
-                      <Icon path={SYMBOLS[pz.sym].icon} size={12} color={K.ink} />
+                      <Em e={SYMBOLS[pz.sym].emoji} size={12} />
                       <span style={{ color: K.ink }}>×3</span>
                       <span>{pz.short}</span>
                     </span>
@@ -434,7 +433,7 @@ export default function DailyTicketPanel({
                       border: `1px solid ${h ? (h.sym ? K.win : K.rule) : K.rule}`, borderStyle: h ? "solid" : "dashed",
                       background: h ? (h.sym ? `${K.win}22` : K.field) : "transparent", color: h?.sym ? K.win : K.label,
                     }}>
-                      {h ? (h.sym ? <Icon path={SYMBOLS[h.sym].icon} size={12} /> : <span style={{ fontFamily: MONO, fontSize: 9 }}>—</span>) : <span style={{ fontFamily: MONO, fontSize: 9, opacity: 0.6 }}>·</span>}
+                      {h ? (h.sym ? <Em e={SYMBOLS[h.sym].emoji} size={12} /> : <span style={{ fontFamily: MONO, fontSize: 9 }}>—</span>) : <span style={{ fontFamily: MONO, fontSize: 9, opacity: 0.6 }}>·</span>}
                     </div>
                   ))}
                   <span style={{ marginLeft: "auto", alignSelf: "center", fontFamily: MONO, fontSize: 7, letterSpacing: "0.1em", color: until === 0 ? K.win : K.label, textTransform: "uppercase", fontWeight: until === 0 ? 700 : 400, textAlign: "right", lineHeight: 1.2 }}>

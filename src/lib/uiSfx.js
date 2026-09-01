@@ -70,8 +70,9 @@ function playViaElement(url, volume) {
 
 // Fire a one-shot SFX. Prefers a decoded buffer (mixes, never steals the audio
 // session); only falls back to an HTMLAudioElement when Web Audio is
-// unavailable or the asset can't be decoded.
-export function playSfx(url, { volume = 1 } = {}) {
+// unavailable or the asset can't be decoded. `rate` repitches (0.72 turns a
+// roar into a death bellow); the element fallback plays at normal rate.
+export function playSfx(url, { volume = 1, rate = 1 } = {}) {
   if (typeof window === "undefined" || !url) return;
   const ctx = getCtx();
   if (!ctx) {
@@ -85,6 +86,7 @@ export function playSfx(url, { volume = 1 } = {}) {
     try {
       const src = ctx.createBufferSource();
       src.buffer = buf;
+      src.playbackRate.value = rate;
       const gain = ctx.createGain();
       gain.gain.value = volume;
       src.connect(gain).connect(ctx.destination);
@@ -98,4 +100,60 @@ export function playSfx(url, { volume = 1 } = {}) {
   // this first click with the element so it still sounds.
   decode(url, ctx);
   playViaElement(url, volume);
+}
+
+// A continuous looping SFX with live volume/pitch control — furnace beds,
+// engine hums, anything that plays *while* something happens rather than
+// *when* it happens. Returns a handle immediately; audio starts once the
+// buffer decodes (setVolume/setRate/stop are all safe to call before then).
+// `loopTrim` shaves the mp3 encoder's padding off both loop points so the
+// seam doesn't click. No element fallback: a loop that can't mix through the
+// shared context (the iOS rule) is better silent than session-stealing.
+export function startSfxLoop(url, { volume = 1, rate = 1, loopTrim = 0.06 } = {}) {
+  const handle = {
+    _vol: volume, _rate: rate, _src: null, _gain: null, _stopped: false,
+    setVolume(v) { this._vol = v; if (this._gain) this._gain.gain.value = v; },
+    setRate(r) { this._rate = r; if (this._src) this._src.playbackRate.value = r; },
+    stop(fade = 0.3) {
+      this._stopped = true;
+      const ctx = getCtx();
+      if (this._gain && this._src && ctx) {
+        try {
+          this._gain.gain.setTargetAtTime(0, ctx.currentTime, Math.max(0.01, fade / 3));
+          this._src.stop(ctx.currentTime + fade);
+        } catch {}
+      }
+    },
+  };
+  const ctx = getCtx();
+  if (!ctx || !url) return handle;
+  if (ctx.state !== "running") ctx.resume().catch(() => {});
+  const begin = (buf) => {
+    if (handle._stopped) return;
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.loopStart = Math.min(loopTrim, buf.duration / 4);
+      src.loopEnd = Math.max(buf.duration - loopTrim, buf.duration * 0.75);
+      src.playbackRate.value = handle._rate;
+      const gain = ctx.createGain();
+      gain.gain.value = handle._vol;
+      src.connect(gain).connect(ctx.destination);
+      src.start(0, src.loopStart);
+      handle._src = src;
+      handle._gain = gain;
+    } catch {}
+  };
+  const buf = _buffers.get(url);
+  if (buf) begin(buf);
+  else {
+    decode(url, ctx);
+    const poll = setInterval(() => {
+      if (handle._stopped || _failed.has(url)) { clearInterval(poll); return; }
+      const b = _buffers.get(url);
+      if (b) { clearInterval(poll); begin(b); }
+    }, 120);
+  }
+  return handle;
 }

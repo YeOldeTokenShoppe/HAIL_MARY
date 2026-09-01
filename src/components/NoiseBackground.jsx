@@ -29,6 +29,13 @@ export default function NoiseBackground({
   speed = 0.000025,
   mix = 0.18, // how strongly noise blends over bg (0..1)
   pattern = 1,
+  local = false,
+  dprCap = 1.5,
+  pauseWhenHidden = false,
+  className,
+  style,
+  onReady,
+  onUnavailable,
 }) {
   const canvasRef = useRef(null);
 
@@ -38,6 +45,7 @@ export default function NoiseBackground({
     const gl = canvas.getContext("webgl2", { antialias: false, alpha: true });
     if (!gl) {
       console.warn("NoiseBackground: WebGL2 not available — skipping");
+      onUnavailable?.(false);
       return;
     }
     console.log("NoiseBackground GL:",
@@ -165,7 +173,10 @@ void main() {
 
     const vs = compile(vertexSource, gl.VERTEX_SHADER);
     const fs = compile(fragmentSource, gl.FRAGMENT_SHADER);
-    if (!vs || !fs) return;
+    if (!vs || !fs) {
+      onUnavailable?.(false);
+      return;
+    }
 
     const program = gl.createProgram();
     gl.attachShader(program, vs);
@@ -173,6 +184,7 @@ void main() {
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       console.error("NoiseBackground link:", gl.getProgramInfoLog(program));
+      onUnavailable?.(false);
       return;
     }
     gl.useProgram(program);
@@ -224,10 +236,18 @@ void main() {
       }
     }
 
-    let dpr = Math.min(window.devicePixelRatio || 1, 1.5); // cap DPR for perf
+    const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
+    let lastWidth = 0;
+    let lastHeight = 0;
     const resize = () => {
-      const w = Math.floor(window.innerWidth * dpr);
-      const h = Math.floor(window.innerHeight * dpr);
+      const rect = local ? canvas.getBoundingClientRect() : null;
+      const cssWidth = local ? rect.width : window.innerWidth;
+      const cssHeight = local ? rect.height : window.innerHeight;
+      const w = Math.max(1, Math.floor(cssWidth * dpr));
+      const h = Math.max(1, Math.floor(cssHeight * dpr));
+      if (lastWidth === w && lastHeight === h) return;
+      lastWidth = w;
+      lastHeight = h;
       canvas.width = w;
       canvas.height = h;
       gl.viewport(0, 0, w, h);
@@ -235,25 +255,68 @@ void main() {
       gl.uniform1f(uHeight, h);
     };
     resize();
-    window.addEventListener("resize", resize);
+
+    let resizeObserver = null;
+    if (local && typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(canvas);
+    } else {
+      window.addEventListener("resize", resize);
+    }
 
     let raf = 0;
     let runTime = 0;
     let prevT = performance.now();
-    const draw = () => {
+    let running = false;
+
+    const paint = () => {
       const now = performance.now();
       const dt = Math.min(now - prevT, 100);
       prevT = now;
       runTime += dt * speed;
       gl.uniform1f(uTime, runTime);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
+
+    const draw = () => {
+      if (!running) return;
+      paint();
       raf = requestAnimationFrame(draw);
     };
-    raf = requestAnimationFrame(draw);
+
+    const start = () => {
+      if (running) return;
+      running = true;
+      prevT = performance.now();
+      raf = requestAnimationFrame(draw);
+    };
+
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+
+    // Paint immediately so the local treatment never flashes empty while its
+    // visibility observer delivers the first entry.
+    paint();
+    onReady?.(true);
+
+    let visibilityObserver = null;
+    if (pauseWhenHidden && typeof IntersectionObserver !== "undefined") {
+      visibilityObserver = new IntersectionObserver(([entry]) => {
+        if (entry?.isIntersecting) start();
+        else stop();
+      });
+      visibilityObserver.observe(canvas);
+    } else {
+      start();
+    }
 
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
+      stop();
+      resizeObserver?.disconnect();
+      visibilityObserver?.disconnect();
+      if (!local || !resizeObserver) window.removeEventListener("resize", resize);
       // NOTE: do not call loseContext() here. React strict mode reuses the
       // canvas DOM node between the dev double-mount, and losing the context
       // breaks the second mount (getContext returns null forever after).
@@ -265,19 +328,34 @@ void main() {
         gl.deleteShader(fs);
       } catch {}
     };
-  }, [color, bgColor, palette, scale, speed, mix, pattern]);
+  }, [
+    color,
+    bgColor,
+    palette,
+    scale,
+    speed,
+    mix,
+    pattern,
+    local,
+    dprCap,
+    pauseWhenHidden,
+    onReady,
+    onUnavailable,
+  ]);
 
   return (
     <canvas
       ref={canvasRef}
+      className={className}
       style={{
-        position: "fixed",
+        position: local ? "absolute" : "fixed",
         inset: 0,
-        width: "100vw",
-        height: "100vh",
-        zIndex: 1,
+        width: local ? "100%" : "100vw",
+        height: local ? "100%" : "100vh",
+        zIndex: local ? 0 : 1,
         pointerEvents: "none",
         display: "block",
+        ...style,
       }}
       aria-hidden="true"
     />

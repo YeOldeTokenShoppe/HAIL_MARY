@@ -9,6 +9,7 @@ import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistributio
 import { generateArtifactDistribution3D } from "@/lib/artifactDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
+import { playSfx, preloadSfx, startSfxLoop } from "@/lib/uiSfx";
 import CommercialStrip from "@/components/CommercialStrip";
 import StrataVoxels from "@/components/StrataVoxels";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
@@ -5754,6 +5755,58 @@ const DEMON_HIT_COOLDOWN = 3.5;
 // the demon for a click to land as a hit, and land this many hits to banish it.
 const DEMON_HIT_RANGE = 4.0;
 const DEMON_HARD_HITS = 3;
+// On-foot shots (PlayerWalker's revolver via the "hm-shoot" event) measure
+// range from the COWBOY, not the camera — an embodied fight is played at
+// street scale (cells are 1.0), so the reach is much shorter than the click
+// path's camera range and can't be gamed by zooming.
+const DEMON_WALKER_HIT_RANGE = 2.0;
+// On-foot presence (2026-09-01 playtest: "it doesn't seem to see me"):
+// within STARE range the demon turns and stares the cowboy down during its
+// vulnerable pause — the stare IS the shoot-window tell — and loitering
+// inside MENACE range provokes its attack without a shot (no lockout, no
+// economy: pure threat). Local-client flourish only: the seeded wander path
+// is untouched, so cross-client drift stays inside the existing tolerance
+// (the bounty status remains the only authoritative sync point).
+const DEMON_STARE_RANGE = 2.4;   // matches the walker's engage range
+const DEMON_MENACE_RANGE = 0.9;
+const DEMON_MENACE_DWELL = 1.1;  // seconds standing that close before it strikes
+const DEMON_MENACE_COOLDOWN = 6;
+// Backstab: a shot from inside the demon's rear arc lands even outside the
+// pause window — it can't dodge what it can't see. Shooter must be within
+// DEMON_WALKER_HIT_RANGE (an embodied maneuver, no cross-map back-shots),
+// and the pause-stare makes duels frontal by construction, so backstabs only
+// exist while it walks or is distracted mid-mischief. Threshold is the dot
+// of its facing with the demon→shooter direction: -0.34 ≈ a ~110° rear arc.
+const DEMON_BACKSTAB_DOT = -0.34;
+// Encounter sound cues, mixed through the shared uiSfx context (never steals
+// the music session). Missing files fail SILENTLY in playSfx, so the demon/
+// slots below are safe to ship empty — drop a file at the path and the cue
+// goes live, no code change. Current placeholders → intended upgrades:
+//   strike: firework crackle → a claw whoosh (/audio/demon/claw.mp3)
+//   hit:    firework pop     → an imp pain grunt (/audio/demon/grunt.mp3)
+const DEMON_SFX = {
+  sting: "/audio/match.mp3",         // stare-window opens near the walker — a struck match
+  dodge: "/audio/demon/cackle-short.mp3", // taunt on a mistimed shot/click (2s trim of her
+                                          // 11s cackle.mp3 — the full take stacked into a choir)
+  strike: "/audio/fireworks/crackle-sm-1.mp3", // counter + menace attack beat
+  hit: "/audio/fireworks/burst-sm-1.mp3",      // a clean hit lands
+  banish: "/audio/churchBell.mp3",   // the toll — banished by the bell
+  banishBurst: "/audio/fireworks/burst1.mp3",
+  roar: "/audio/demon/roar.mp3",     // the demon surfaces (2s after the break)
+  erupt: "/audio/demon/hellErupts.mp3", // the ground breaks — gusher + hell effects begin
+  // Continuous flight bed (replaced the per-wingbeat flap one-shots — the
+  // repeating sample read as mechanical). Currently a synthesized brown-noise
+  // furnace roar; drop a real furnace blast at this path to upgrade it (3-5s,
+  // sustained, no big transient — it loops seamlessly via loopTrim).
+  furnace: "/audio/demon/furnaceLoop.mp3",
+};
+// Furnace bed shaping: volume falls off with camera distance, and pitch bends
+// with radial speed — the poor man's doppler, so it audibly recedes as it
+// flies away. RATE_K is exaggerated well past physical (fly speed is only
+// 0.5 u/s) because at diorama scale real doppler would be inaudible.
+const DEMON_FURNACE_VOL = 0.55;   // at zero distance
+const DEMON_FURNACE_FALLOFF = 0.3; // vol = VOL / (1 + dist * FALLOFF)
+const DEMON_FURNACE_RATE_K = 0.25; // pitch bend per unit/s of radial speed
 const DEMON_BANISH_DUR = 1.0;
 const DEMON_WANDER_RADIUS = 2; // cells around the victim plot
 const DEMON_YAW_OFFSET = 0;    // tweak if the model faces the wrong way
@@ -5834,6 +5887,9 @@ function HellDemon({
   requiredHitsRef.current = requiredHits;
   const hitRangeRef = useRef(hitRange);
   hitRangeRef.current = hitRange;
+  // Scratch for world-space reads (the demon group lives inside the field's
+  // offset group, so bridge positions are always exchanged in WORLD space).
+  const demonWorldRef = useMemo(() => new THREE.Vector3(), []);
 
   // Hold the demon hidden underground for a beat after the hell effects begin
   // (this component mounts exactly when they do), then run the spawn. `appeared`
@@ -5845,7 +5901,20 @@ function HellDemon({
       appearedRef.current = true;
       setAppeared(true);
     }, DEMON_APPEAR_DELAY * 1000);
-    return () => clearTimeout(id);
+    // Warm every encounter cue while the hell effects play, so the first
+    // sound already mixes instead of hitching on a decode.
+    Object.values(DEMON_SFX).forEach(preloadSfx);
+    // The break itself: this component mounts the moment the hell effects
+    // begin, so the eruption (3.6s) runs under the gusher and the 2s of
+    // rumbling ground before the demon surfaces into its roar.
+    playSfx(DEMON_SFX.erupt, { volume: 0.55 });
+    return () => {
+      clearTimeout(id);
+      // Never strand an infinite furnace: a mid-flight unmount (timeout,
+      // bounty claimed elsewhere) must take the loop down with it.
+      furnaceRef.current?.stop(0.2);
+      furnaceRef.current = null;
+    };
   }, []);
 
   // Cell-center → world position (cell centers are where the rigs sit)
@@ -5932,6 +6001,11 @@ function HellDemon({
   const vulnerableRef = useRef(false);
   const roamingRef = useRef(false); // false during the spawn→victim intro trek
   const counterStepRef = useRef(0); // 0 = flinch (Take Damage), 1 = retaliate (attack)
+  const menaceDwellRef = useRef(0); // seconds the cowboy has loitered in its face
+  const menaceCdRef = useRef(0);    // cooldown between unprovoked strikes
+  const furnaceRef = useRef(null);  // looping flight-bed handle while airborne
+  const furnaceDistRef = useRef(null); // last camera distance, for the doppler bend
+  const furnaceRateRef = useRef(1);    // smoothed playback rate
 
   const setPhase = (p) => {
     phaseRef.current = p;
@@ -5946,6 +6020,9 @@ function HellDemon({
   // Pick a street node within DEMON_WANDER_RADIUS of the victim plot that shares
   // ONE axis with where we are now — so the walk segment runs straight along a
   // grid line (a street between pads) and never diagonals across a rig.
+  // INTERIOR nodes only [1, grid-1]: the perimeter grid lines sit right on the
+  // walker's boundary clamp, so a rim-hugging demon was unreachable on foot
+  // (2026-09-01 playtest) — keep the fight inside the field.
   const pickWanderNode = () => {
     const home = homeNodeRef.current;
     const cur = wanderNodeRef.current;
@@ -5953,14 +6030,20 @@ function HellDemon({
       let i = cur.i;
       let j = cur.j;
       if (rng() < 0.5) {
-        i = demonClamp(home.i + Math.round((rng() * 2 - 1) * DEMON_WANDER_RADIUS), 0, gridX);
+        i = demonClamp(home.i + Math.round((rng() * 2 - 1) * DEMON_WANDER_RADIUS), 1, gridX - 1);
       } else {
-        j = demonClamp(home.j + Math.round((rng() * 2 - 1) * DEMON_WANDER_RADIUS), 0, gridY);
+        j = demonClamp(home.j + Math.round((rng() * 2 - 1) * DEMON_WANDER_RADIUS), 1, gridY - 1);
       }
       if (i !== cur.i || j !== cur.j) return { i, j };
     }
     return { i: cur.i, j: cur.j };
   };
+  // A victim plot on the border would put the home street node on the rim —
+  // pull it one street in (same walker-reachability rule as the wander).
+  const interiorNode = (i, j) => ({
+    i: demonClamp(i, 1, Math.max(1, gridX - 1)),
+    j: demonClamp(j, 1, Math.max(1, gridY - 1)),
+  });
 
   // Walk the demon through a queue of street nodes, one straight segment at a
   // time (turn to face → walk). Calls onDone when the queue empties.
@@ -6008,7 +6091,7 @@ function HellDemon({
   // L along the streets (horizontal run, then vertical) so it stays off rigs.
   const startTransit = (g) => {
     const s = { i: summonerCol, j: summonerRow };
-    const h = { i: targetCol, j: targetRow };
+    const h = interiorNode(targetCol, targetRow);
     homeNodeRef.current = h;
     // First step off the well/pad onto the street (the demon spawns at the cell
     // center), then L-route along the streets to the victim plot.
@@ -6027,7 +6110,7 @@ function HellDemon({
   // plot → land, then hand off to the normal ground wander loop. Not catchable
   // until it lands (roamingRef stays false through the intro).
   const startFlyIntro = (g) => {
-    homeNodeRef.current = { i: targetCol, j: targetRow };
+    homeNodeRef.current = interiorNode(targetCol, targetRow);
     roamingRef.current = false;
     headingRef.current = g.rotation.y - DEMON_YAW_OFFSET; // keep heading continuous
     flyRiseFromRef.current = g.position.y; // settle the hover down from the spawn apex
@@ -6089,6 +6172,11 @@ function HellDemon({
     setVuln(false);
     setPhase("banish");
     playAnim(/slash/, false);
+    // Banished by the bell — the death bellow (the roar pitched down into a
+    // groan) under the toll and the going-out burst.
+    playSfx(DEMON_SFX.roar, { volume: 0.6, rate: 0.72 });
+    playSfx(DEMON_SFX.banish, { volume: 0.5 });
+    playSfx(DEMON_SFX.banishBurst, { volume: 0.45 });
   };
 
   // Mistimed click (outside the catchable window) → the demon flinches with a
@@ -6104,6 +6192,7 @@ function HellDemon({
     setOnCooldown(true);
     setPhase("counter");
     playAnim(/^take damage/, false);
+    playSfx(DEMON_SFX.dodge, { volume: 0.5 });
   };
 
   // A clean, in-range hit during the catchable window: the demon flinches (Take
@@ -6115,11 +6204,36 @@ function HellDemon({
     playAnim(/^take damage/, false);
   };
 
+  // The cowboy loitered inside MENACE range: turn on him and strike unprovoked.
+  // Threat only — no player lockout, no onMiss, no economy; the walker decides
+  // whether the blow reaches (its DEMON_ATTACK_NEAR flinch check).
+  const beginMenace = (g) => {
+    menaceDwellRef.current = 0;
+    menaceCdRef.current = DEMON_MENACE_COOLDOWN;
+    const w = window.__hmWalkerPos;
+    if (w) {
+      const yaw = Math.atan2(w.x - g.position.x, w.z - g.position.z);
+      headingRef.current = yaw;
+      g.rotation.y = yaw + DEMON_YAW_OFFSET;
+    }
+    setVuln(false);
+    setPhase("menace");
+    playAnim(rng() < 0.5 ? /^slash attack/ : /^projectile attack/, false);
+    playSfx(DEMON_SFX.strike, { volume: 0.5 });
+    playSfx(DEMON_SFX.roar, { volume: 0.45, rate: 1.06 }); // roars in your face
+    onAttack?.(0); // camera shake only — the walker handles the flinch
+    g.getWorldPosition(demonWorldRef);
+    window.dispatchEvent(new CustomEvent("hm-demon-attack", {
+      detail: { x: demonWorldRef.x, y: demonWorldRef.y, z: demonWorldRef.z },
+    }));
+  };
+
   // Register one clean hit; banish on the final one.
   const landHit = () => {
     const required = requiredHitsRef.current;
     hitsRef.current += 1;
     setHits(hitsRef.current);
+    playSfx(DEMON_SFX.hit, { volume: 0.5 });
     onHit?.(hitsRef.current, required);
     if (hitsRef.current >= required) beginBanish();
     else beginHit();
@@ -6130,7 +6244,7 @@ function HellDemon({
     if (e?.stopPropagation) e.stopPropagation();
     if (!clickable || done) return;
     const ph = phaseRef.current;
-    if (ph === "banish" || ph === "counter" || ph === "hitstun") return;
+    if (ph === "banish" || ph === "counter" || ph === "hitstun" || ph === "menace") return;
     if (cooldownRef.current > 0) return; // locked out after a mistimed hit
     if (!roamingRef.current) return; // can't be caught during the intro trek
 
@@ -6156,6 +6270,80 @@ function HellDemon({
     }
   };
 
+  // ── On-foot encounter bridge (PlayerWalker) ────────────────────────────────
+  // The walker and the demon are siblings with no shared React state; the hm-*
+  // window-event bus (the vendor/booth convention) carries the fight:
+  //   reads  ← "hm-shoot" {x,y,z}: a revolver shot fired from that WORLD
+  //            position. Resolved with the SAME window/counter rules as a
+  //            click — the only difference is that hard-phase range is the
+  //            SHOOTER's distance (the cowboy's boots), not the camera's.
+  //   writes → "hm-shot-result" {result: banish|hit|far|dodge, hits, required}
+  //            — drives the walker's HUD line.
+  //   writes → "hm-demon-attack" {x,y,z}: the counter's retaliation landed —
+  //            the walker flinches if it's standing close.
+  //   writes → window.__hmDemonState (each frame, the __hmWalkerPos
+  //            convention) for the walker's proximity prompt + armed revolver.
+  const emitShotResult = (result, backstab = false) =>
+    window.dispatchEvent(new CustomEvent("hm-shot-result", {
+      detail: {
+        result,
+        backstab,
+        hits: hitsRef.current,
+        required: requiredHitsRef.current,
+      },
+    }));
+  const shootRef = useRef(null);
+  shootRef.current = (from) => {
+    const g = groupRef.current;
+    if (!g || !clickable || done) return;
+    if (from?.x == null) return;
+    const ph = phaseRef.current;
+    if (ph === "banish" || ph === "counter" || ph === "hitstun" || ph === "menace") return;
+    if (cooldownRef.current > 0) return; // locked out after a mistimed shot/click
+    if (!roamingRef.current) return;     // can't be shot during the intro
+
+    const inWindow = vulnerableRef.current && ph === "wander_pause";
+    g.getWorldPosition(demonWorldRef);
+    const dx = from.x - demonWorldRef.x, dz = from.z - demonWorldRef.z;
+    const dist = Math.hypot(dx, dz);
+    const near = dist <= DEMON_WALKER_HIT_RANGE;
+    // Is the shooter in its rear arc? Read the CURRENT visual facing
+    // (rotation.y), not headingRef — mid-turn the two disagree.
+    const facing = g.rotation.y - DEMON_YAW_OFFSET;
+    const behind = dist > 1e-4 &&
+      (Math.sin(facing) * dx + Math.cos(facing) * dz) / dist < DEMON_BACKSTAB_DOT;
+
+    if (inWindow) {
+      // Easy phase mirrors the click path: a timed shot banishes at any range
+      // (the easy phase exists as the blockade's guaranteed clean exit).
+      if (requiredHitsRef.current <= 1) { beginBanish(); emitShotResult("banish"); }
+      else if (near) {
+        landHit();
+        emitShotResult(hitsRef.current >= requiredHitsRef.current ? "banish" : "hit");
+      } else emitShotResult("far"); // no-op, never punished — same as the click rule
+    } else if (behind && near && WANDER_PHASES.includes(ph)) {
+      // Got the drop on it: a close-range back-shot is a clean hit — it
+      // whirls (the hitstun faces the shooter) but never dodges or counters.
+      if (requiredHitsRef.current <= 1) { beginBanish(); emitShotResult("banish", true); }
+      else {
+        landHit();
+        emitShotResult(hitsRef.current >= requiredHitsRef.current ? "banish" : "hit", true);
+      }
+    } else if (WANDER_PHASES.includes(ph)) {
+      beginCounter();
+      onMiss?.(DEMON_HIT_COOLDOWN);
+      emitShotResult("dodge");
+    }
+  };
+  useEffect(() => {
+    const onShoot = (e) => shootRef.current?.(e.detail || {});
+    window.addEventListener("hm-shoot", onShoot);
+    return () => {
+      window.removeEventListener("hm-shoot", onShoot);
+      delete window.__hmDemonState;
+    };
+  }, []);
+
   useFrame((state, delta) => {
     if (mixerRef.current) mixerRef.current.update(delta);
     if (cooldownRef.current > 0) {
@@ -6171,6 +6359,41 @@ function HellDemon({
       if (near !== inRangeRef.current) {
         inRangeRef.current = near;
         setInRange(near);
+      }
+    }
+    // Publish for the on-foot walker (proximity prompt, armed revolver, HUD).
+    // WORLD coords — the walker compares against its own getWorldPosition.
+    {
+      g.getWorldPosition(demonWorldRef);
+      const S = (window.__hmDemonState = window.__hmDemonState || {});
+      S.x = demonWorldRef.x; S.y = demonWorldRef.y; S.z = demonWorldRef.z;
+      S.vulnerable = vulnerableRef.current && phaseRef.current === "wander_pause";
+      S.roaming = roamingRef.current;
+      S.cooldown = cooldownRef.current;
+      S.hits = hitsRef.current;
+      S.required = requiredHitsRef.current;
+      S.done = false;
+      // Single source of truth for the laser sight: would a shot fired from
+      // the walker's current position land RIGHT NOW? Mirrors the shootRef
+      // gates exactly (window, or rear arc + range, phase, lockout) so the
+      // beam's hot color can never lie about the rules.
+      {
+        const w = window.__hmWalkerPos;
+        let lands = false;
+        const ph9 = phaseRef.current;
+        if (w && roamingRef.current && cooldownRef.current === 0 &&
+            ph9 !== "banish" && ph9 !== "counter" && ph9 !== "hitstun" && ph9 !== "menace") {
+          const dx9 = w.x - g.position.x, dz9 = w.z - g.position.z;
+          const dist9 = Math.hypot(dx9, dz9);
+          const near9 = dist9 <= DEMON_WALKER_HIT_RANGE;
+          if (S.vulnerable) {
+            lands = requiredHitsRef.current <= 1 || near9;
+          } else if (near9 && dist9 > 1e-4 && WANDER_PHASES.includes(ph9)) {
+            const facing9 = g.rotation.y - DEMON_YAW_OFFSET;
+            lands = (Math.sin(facing9) * dx9 + Math.cos(facing9) * dz9) / dist9 < DEMON_BACKSTAB_DOT;
+          }
+        }
+        S.walkerShotLands = lands;
       }
     }
     if (!appearedRef.current) {
@@ -6198,6 +6421,70 @@ function HellDemon({
       headingRef.current = yaw;
       g.rotation.y = yaw + DEMON_YAW_OFFSET;
     };
+    // Stare the cowboy down when he's inside STARE range (x/z are shared
+    // between world and field-local space — the field group only lifts y).
+    // Returns false when there's no walker close enough, so callers can fall
+    // back to the camera or keep their heading.
+    const trackWalker = () => {
+      const w = window.__hmWalkerPos;
+      if (!w) return false;
+      const dx = w.x - g.position.x, dz = w.z - g.position.z;
+      if (Math.hypot(dx, dz) > DEMON_STARE_RANGE) return false;
+      const yaw = Math.atan2(dx, dz);
+      headingRef.current = yaw;
+      g.rotation.y = yaw + DEMON_YAW_OFFSET;
+      return true;
+    };
+
+    // Furnace bed while airborne: a continuous blast from hover to landing
+    // that fades with camera distance and pitch-bends with radial speed, so
+    // it dopplers down as it flies away and back up as it comes at you.
+    {
+      const phF = phaseRef.current;
+      const airborne = phF === "fly_idle_2" || phF === "fly_turn" ||
+        phF === "fly_move" || phF === "fly_idle_3" || phF === "fly_land";
+      if (airborne && !furnaceRef.current) {
+        furnaceRef.current = startSfxLoop(DEMON_SFX.furnace, { volume: 0 });
+        furnaceDistRef.current = null;
+        furnaceRateRef.current = 1;
+      } else if (!airborne && furnaceRef.current) {
+        furnaceRef.current.stop(0.5);
+        furnaceRef.current = null;
+      }
+      if (furnaceRef.current) {
+        const dist = state.camera.position.distanceTo(g.position);
+        furnaceRef.current.setVolume(DEMON_FURNACE_VOL / (1 + dist * DEMON_FURNACE_FALLOFF));
+        if (furnaceDistRef.current != null && delta > 0) {
+          const radial = (dist - furnaceDistRef.current) / delta; // + = receding
+          const target = demonClamp(1 - radial * DEMON_FURNACE_RATE_K, 0.82, 1.15);
+          furnaceRateRef.current += (target - furnaceRateRef.current) * Math.min(1, delta * 5);
+          furnaceRef.current.setRate(furnaceRateRef.current);
+        }
+        furnaceDistRef.current = dist;
+      }
+    }
+
+    // Unprovoked strike: a cowboy loitering in its face gets attacked even
+    // without shooting — the demon SEES him. Dwell accumulates inside MENACE
+    // range and decays (twice as fast) outside it.
+    if (menaceCdRef.current > 0) menaceCdRef.current = Math.max(0, menaceCdRef.current - delta);
+    if (roamingRef.current) {
+      const ph0 = phaseRef.current;
+      const w0 = window.__hmWalkerPos;
+      // The vulnerable pause is deliberately EXCLUDED: it's the player's shot
+      // window, and a menace strike there turned the stare-down tell into a
+      // trap (2026-09-01 playtest: "it fires at me as soon as it looks at
+      // me"). Stand as close as you dare while it stares — that's the game.
+      const canMenace = w0 && menaceCdRef.current === 0 &&
+        (ph0 === "walk_turn" || ph0 === "walk_move" || ph0 === "wander_mischief");
+      if (canMenace &&
+          Math.hypot(w0.x - g.position.x, w0.z - g.position.z) <= DEMON_MENACE_RANGE) {
+        menaceDwellRef.current += delta;
+        if (menaceDwellRef.current >= DEMON_MENACE_DWELL) beginMenace(g);
+      } else {
+        menaceDwellRef.current = Math.max(0, menaceDwellRef.current - delta * 2);
+      }
+    }
 
     // Spawn point = the summoner's drill well (cell CENTER, under the rig), so
     // the demon erupts from the borehole rather than off at a plot corner.
@@ -6220,6 +6507,7 @@ function HellDemon({
           // Blend the emergence and the spell together so the demon bursts out
           // of the ground already casting — both play once and clamp.
           playAnim([/spawn to fly idle/, /fly cast spell/], false);
+          playSfx(DEMON_SFX.roar, { volume: 0.6 });
         }
         const f = demonClamp(t / DEMON_SPAWN_DUR, 0, 1);
         const ease = 1 - Math.pow(1 - f, 3);
@@ -6277,6 +6565,7 @@ function HellDemon({
           g.position.y = DEMON_GROUND_Y;
           wanderNodeRef.current = homeNodeRef.current;
           roamingRef.current = true; // now catchable — resume grid wandering
+          playSfx(DEMON_SFX.roar, { volume: 0.5 }); // touched down — the hunt is on
           setPhase("wander_pause");
         }
         break;
@@ -6304,7 +6593,17 @@ function HellDemon({
         if (init) {
           playAnim(/idle/);
           setVuln(true);
+          // The showdown sting — a struck match — but only for a cowboy close
+          // enough to duel; click players keep their silent ring as before.
+          const ws = window.__hmWalkerPos;
+          if (ws && Math.hypot(ws.x - g.position.x, ws.z - g.position.z) <= DEMON_STARE_RANGE) {
+            playSfx(DEMON_SFX.sting, { volume: 0.35 });
+          }
         }
+        // The vulnerable pause is a STARE-DOWN when the cowboy is close: it
+        // stops, turns, and holds his gaze — the on-foot draw signal. Far
+        // away (or no walker), it keeps its wander heading as before.
+        trackWalker();
         if (t >= DEMON_PAUSE_DUR) {
           setVuln(false);
           if (rng() < 0.45) startMischief(g);
@@ -6342,9 +6641,10 @@ function HellDemon({
         break;
       }
       case "hitstun": {
-        // Clean hit: flinch facing the player, then resume wandering (the click
+        // Clean hit: flinch facing the player — the cowboy when he's the
+        // shooter, the camera otherwise — then resume wandering (the click
         // handler already banished if this was the final hit).
-        faceCamera();
+        if (!trackWalker()) faceCamera();
         g.position.y = DEMON_GROUND_Y;
         if (t >= DEMON_TAKE_DAMAGE_DUR) startWalk(g);
         break;
@@ -6352,14 +6652,21 @@ function HellDemon({
       case "counter": {
         // Stand ground, facing the player, through the two-beat reaction:
         // flinch (Take Damage) → retaliate (Slash/Projectile) → resume wander.
-        faceCamera();
+        if (!trackWalker()) faceCamera();
         g.position.y = DEMON_GROUND_Y;
         if (counterStepRef.current === 0) {
           if (t >= DEMON_TAKE_DAMAGE_DUR) {
             counterStepRef.current = 1;
             tRef.current = 0; // restart the per-phase clock for the attack beat
             playAnim(rng() < 0.5 ? /^slash attack/ : /^projectile attack/, false);
+            playSfx(DEMON_SFX.strike, { volume: 0.5 });
             onAttack?.(DEMON_HIT_COOLDOWN); // damage hook — the retaliation lands here
+            // Tell the on-foot walker where the retaliation landed — it
+            // flinches if it's standing inside the demon's reach.
+            g.getWorldPosition(demonWorldRef);
+            window.dispatchEvent(new CustomEvent("hm-demon-attack", {
+              detail: { x: demonWorldRef.x, y: demonWorldRef.y, z: demonWorldRef.z },
+            }));
           }
         } else {
           // Attack-flash spark for impact, reusing the mischief spark mesh.
@@ -6379,6 +6686,26 @@ function HellDemon({
         }
         break;
       }
+      case "menace": {
+        // Unprovoked strike at a loitering cowboy — one attack beat (no
+        // flinch first: nothing hit it), then back to the wander.
+        trackWalker();
+        g.position.y = DEMON_GROUND_Y;
+        if (sparkRef.current) {
+          const sf = Math.sin(demonClamp(t / DEMON_COUNTER_ATTACK_DUR, 0, 1) * Math.PI);
+          sparkRef.current.visible = true;
+          sparkRef.current.material.opacity = sf * 0.9;
+          sparkRef.current.scale.setScalar(0.6 + sf * 0.9);
+        }
+        if (t >= DEMON_COUNTER_ATTACK_DUR) {
+          if (sparkRef.current) {
+            sparkRef.current.visible = false;
+            sparkRef.current.material.opacity = 0;
+          }
+          startWalk(g);
+        }
+        break;
+      }
       case "banish": {
         const f = demonClamp(t / DEMON_BANISH_DUR, 0, 1);
         g.scale.setScalar(1 - f);
@@ -6392,6 +6719,9 @@ function HellDemon({
         }
         if (f >= 1) {
           setDone(true);
+          // The walker reads done and holsters — useFrame stops publishing
+          // once done, so flag it here (unmount deletes the whole object).
+          if (window.__hmDemonState) window.__hmDemonState.done = true;
           onBanish?.();
         }
         break;

@@ -11,7 +11,13 @@ Personal how-to. Get in: **`/hailmary?mode=admin`** → password prompt (remembe
 3. **Phase → REGISTRATION** — PHASE buttons in the field sidebar (these keep `gameEnded` in sync) or PHASE OVERRIDE in the lobby.
 4. **GRID SIZE** (PARAMETERS) — size it for expected demand **now**: frozen once the first plot is claimed, never resize after anchor.
 5. **START DATE + SEASON LENGTH** (PARAMETERS, or lobby GAME START DATE / START NOW) — drives "SEASON STARTS IN" and the season clock / GAME DAY.
-6. **COMMIT** (PROVABLE FAIRNESS console) — set lead ≈ seconds-until-start ÷ 2 (1d ≈ 43,200 · 3d ≈ 129,600 · 7d ≈ 302,400 blocks; empty = 30 ≈ 1 min, fine for testing). Starts the public anchor countdown. Claims are open while there's no anchor hash.
+6. **COMMIT** (PROVABLE FAIRNESS console) — set lead ≈ seconds-until-start ÷ 2 (1d ≈ 43,200 · 3d ≈ 129,600 · 7d ≈ 302,400 blocks; empty = 30 ≈ 1 min, fine for testing). Starts the public anchor countdown. Claims are open while there's no anchor hash. Commit is also what unlocks the **DAILY TICKET** — mint 503s "The season's seed is not committed yet" until it runs (tickets need COMMIT only, not ANCHOR). Terminal fallback, same effect as the button (GET or POST):
+
+   ```
+   curl "https://<host>/api/oil-fairness?action=commit&password=$ADMIN_PASSWORD"
+   ```
+
+   Append `&lead=43200` for a 1-day lead; `action=anchor` / `action=reveal` drive the other steps.
 7. **During registration** — RUN QUALIFICATION SNAPSHOT (lobby) re-checks holders against their token floor; watch the waitlist count in the status banner.
 8. **Season start** — once the anchor block mines: **ANCHOR** then **phase → ACTIVE**, promptly and together (anchor closes first-plot claims and enables strikes; the map is computable from the moment it's anchored).
 9. **Season end** — strike-tick auto-flips to ended at the buzzer (auto-banks tanks, auto-reveals the seed). Manual fallback: the red **END GAME** button (sets `gameEnded` + phase ended together, triggers the reveal), then **REVEAL** in the console if it didn't auto-publish.
@@ -44,6 +50,7 @@ Fairness console · RUN QUALIFICATION SNAPSHOT · GAME START DATE / START NOW ·
 ## Gotchas
 
 - `ticket_sale` is the stored value behind the **REGISTRATION** label.
+- DAILY TICKET mint 503s until COMMIT — it needs `oilSecret/seed.serverSecret`, which only the fairness commit writes. The legacy `blockHash` path in oil-settings publishes a commitment but never writes `serverSecret`, so it can't unlock tickets.
 - A leftover `anchorBlockHash` silently blocks all first-plot claims — RESET BOARD now clears it, but if claims ever 403 during registration, check this first.
 - The **lobby** PHASE OVERRIDE sets only `gamePhase`; the **field sidebar** buttons also sync `gameEnded`. Leaving ENDED? Use the sidebar (or RESET BOARD, which clears `gameEnded` too).
 - Order matters at start: ANCHOR + phase flip together — a long gap means the operator (you) knowably holds the map while claims are still open-looking.
