@@ -10,7 +10,7 @@
 // it resolves account track names only, never URLs (proven by
 // /trade/spike-sayaudio).
 //
-// NOTE: SitePal caches rendered TTS by text — after changing a voice, reword
+// NOTE: SitePal caches rendered TTS by text — after changing a voice, re-word
 // the greeting lines or the old voice replays from cache.
 
 export const VENDOR_SITEPAL_CONTAINER_ID = "vendor-sitepal-host";
