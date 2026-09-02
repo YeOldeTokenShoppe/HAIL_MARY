@@ -19,6 +19,10 @@ import {
   TACOS_SITEPAL_FILTER,
   CARNY_SITEPAL_CROP,
   CARNY_SITEPAL_FILTER,
+  TATTOOS_IDLE_SITEPAL_CROP,
+  TATTOOS_IDLE_SITEPAL_FILTER,
+  TATTOOS_SEATED_SITEPAL_CROP,
+  TATTOOS_SEATED_SITEPAL_FILTER,
   VENDOR_SITEPAL_CONFIG,
   speakPendingVendorLine,
   getVendorSitePalSource,
@@ -27,6 +31,9 @@ import {
 
 // Vendor tabs for the crop tuner. constName is used by the "Log values"
 // output so the pasted block lands on the right export in vendorSitePal.js.
+// `sitepalId` is the VENDOR_SITEPAL_CONFIG key — normally the same as the tab
+// key, but the tattoo artist gets one tab per POSE while remaining a single
+// sitepal vendor, so those two tabs both point at "tattoos".
 const TUNER_VENDORS = {
   fortunes: { label: "FORTUNE", crop: FORTUNES_SITEPAL_CROP, filter: FORTUNES_SITEPAL_FILTER, constName: "FORTUNES" },
   tonics: { label: "SALESMAN", crop: TONICS_SITEPAL_CROP, filter: TONICS_SITEPAL_FILTER, constName: "TONICS" },
@@ -35,6 +42,11 @@ const TUNER_VENDORS = {
   rugs: { label: "RUGS", crop: RUGS_SITEPAL_CROP, filter: RUGS_SITEPAL_FILTER, constName: "RUGS" },
   tacos: { label: "TACOS", crop: TACOS_SITEPAL_CROP, filter: TACOS_SITEPAL_FILTER, constName: "TACOS" },
   carny: { label: "CARNY", crop: CARNY_SITEPAL_CROP, filter: CARNY_SITEPAL_FILTER, constName: "CARNY" },
+  // Two poses, two crop sets. Only the pose this page load DREW is on screen —
+  // pin it with ?pose=idle / ?pose=tattooing or you are tuning a set nothing is
+  // currently using.
+  tattoos_idle: { label: "TAT STAND", crop: TATTOOS_IDLE_SITEPAL_CROP, filter: TATTOOS_IDLE_SITEPAL_FILTER, constName: "TATTOOS_IDLE", sitepalId: "tattoos" },
+  tattoos_seated: { label: "TAT SIT", crop: TATTOOS_SEATED_SITEPAL_CROP, filter: TATTOOS_SEATED_SITEPAL_FILTER, constName: "TATTOOS_SEATED", sitepalId: "tattoos" },
 };
 
 // ── Single SitePal host embed for the /hailmary vendor strip ───────────────
@@ -123,7 +135,8 @@ function VendorCropTuner() {
   // The compositor is per-vendor but only the FOCUSED stall ever projects, so
   // one global is unambiguous. Named for the two meshes rather than for the
   // vendor, because the mesh names are what you read in Blender.
-  const sitepalCfg = VENDOR_SITEPAL_CONFIG[vendorKey];
+  const sitepalId = active.sitepalId || vendorKey;
+  const sitepalCfg = VENDOR_SITEPAL_CONFIG[sitepalId];
   const face1Name = sitepalCfg?.regularFaces?.[0] || "Face1";
   const face2Name = sitepalCfg?.projFace || "Face2";
 
@@ -132,11 +145,11 @@ function VendorCropTuner() {
     // rather than on whichever one happens to be focused — and so it still
     // works before you have flown in to anything.
     window.__vendorSitePalFaceOverride =
-      faceMode === "auto" ? null : { mode: faceMode, vendorId: vendorKey };
+      faceMode === "auto" ? null : { mode: faceMode, vendorId: sitepalId };
     // Clearing on unmount matters: the pin survives a tuner close otherwise,
     // and a pinned face1 looks exactly like SitePal being broken.
     return () => { window.__vendorSitePalFaceOverride = null; };
-  }, [faceMode, vendorKey]);
+  }, [faceMode, sitepalId]);
 
   // Blink comparator. Starting from "auto" it enters on face1 — the painted
   // mesh — so the first swap you see is the one you are tuning INTO.

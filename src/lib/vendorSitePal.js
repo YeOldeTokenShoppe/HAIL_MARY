@@ -156,7 +156,7 @@ export const TACOS_SITEPAL_CROP = {
 // block is the one that was never actually measured.
 export const CARNY_SITEPAL_CROP = {
   cropX: 208,
-  cropY: 106,
+  cropY: 100,
   cropW: 191,
   cropH: 239,
   rotateZ: 0,
@@ -168,6 +168,55 @@ export const CARNY_SITEPAL_FILTER = {
   brightness: 124,
   hueRotate: 0,
   sepia: 28,
+};
+
+// Tattoo artist — TWO sets, one per pose GLB, because her head sits at a very
+// different angle standing out front versus bent over the chair. rotateX is the
+// knob that earns its keep here: it squashes the crop vertically by cos(angle),
+// which is what reconciles a face the camera is looking at from above. The lamp
+// under her tent also falls on her differently seated, so the filters are free
+// to diverge too.
+//
+// Which set is used is decided by `sitepalCrop`/`sitepalFilter` in her
+// poseOverrides (CommercialStrip.jsx), keyed by whichever pose file this page
+// load drew. The registry entry below points at the IDLE pair as the default,
+// so a pose that names neither still renders.
+//
+// Tune via /hailmary?tune=vendor, and note the pose is drawn at random per
+// load: ?pose=idle / ?pose=tattooing pins the one you want. Getting that wrong
+// is the easy mistake here — the tuner tab names the const, but nothing checks
+// that the tab matches the pose actually on screen.
+export const TATTOOS_IDLE_SITEPAL_CROP = {
+  cropX: 158,
+  cropY: 144,
+  cropW: 229,
+  cropH: 235,
+  rotateZ: 9,
+  rotateX: 0,
+};
+export const TATTOOS_IDLE_SITEPAL_FILTER = {
+  saturate: 137,
+  contrast: 105,
+  brightness: 121,
+  hueRotate: 0,
+  sepia: 30,
+};
+
+// Seated at the stool, head bowed over the work.
+export const TATTOOS_SEATED_SITEPAL_CROP = {
+  cropX: 142,
+  cropY: 150,
+  cropW: 224,
+  cropH: 226,
+  rotateZ: -5,
+  rotateX: 0,
+};
+export const TATTOOS_SEATED_SITEPAL_FILTER = {
+  saturate: 92,
+  contrast: 103,
+  brightness: 133,
+  hueRotate: 0,
+  sepia: 27,
 };
 
 // Per-vendor registry, keyed by VENDOR_CATALOG id. `projFace` receives the
@@ -252,6 +301,42 @@ export const VENDOR_SITEPAL_CONFIG = {
       frequent: [
         "The usual? Of course the usual. I had it rolling the moment I saw you cross the field.",
         "You know, you are the only one out here who chews before swallowing. I respect that.",
+      ],
+    },
+  },
+  // Tattoo artist at the tent. Unlike the other vendors she has TWO pose GLBs
+  // (idle / tattooing), one drawn per page load — both carry Face1/Face2/Face3
+  // under the same names, so one config covers either file.
+  //
+  // She is the only sitepal vendor with no talkClip: each pose GLB ships a
+  // single clip, so she speaks without a gesture swap (a supported case — the
+  // fortune teller does the same). Give her a talk clip in Blender if the
+  // stillness reads wrong while she is mid-line.
+  tattoos: {
+    sceneId: 2775451,
+    voice: { voice: "adPLpvbQrUYGySEBoFJu", lang: 1, engine: 14 },
+    projFace: "Face2",
+    regularFaces: ["Face1", "Face3"],
+    // Default / fallback pair. Each pose overrides these in poseOverrides.
+    crop: TATTOOS_IDLE_SITEPAL_CROP,
+    filter: TATTOOS_IDLE_SITEPAL_FILTER,
+    greetings: {
+      first: [
+        "New skin. I can always tell — you are standing like the chair might bite.",
+        "First time in my chair? Then we start small. Something you can hide from your own reflection.",
+      ],
+      returning: [
+        "Sit. Everyone out here is trying to pull something permanent out of the ground. At least mine goes on the outside.",
+        "I do not do names. Names come off worse than the ink does. Pick something else.",
+        "Derricks, dice, and one little bottle of tonic — I have put all three on somebody this week. The tonic was his idea.",
+        "Hold still and it is a line. Flinch and it is a story. Either way you are paying for it.",
+        "You want the lucky number. Everybody wants the lucky number. It stops being lucky around the fourth guy.",
+        "Day {day}, and I have inked more dry holes than gushers. People commemorate the strangest things.",
+        "I can cover a bad one. I cannot cover a bad decision, but I can make it look deliberate.",
+      ],
+      frequent: [
+        "You again. At this rate I run out of arm before you run out of ideas.",
+        "Back already? Good. You are the only one out here who lets me finish a piece properly.",
       ],
     },
   },

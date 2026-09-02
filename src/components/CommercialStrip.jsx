@@ -7,6 +7,10 @@ import { Text, useGLTF, useAnimations } from "@react-three/drei";
 import { extendKTX2 } from "@/lib/ktx2";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import {
+  TATTOOS_IDLE_SITEPAL_CROP,
+  TATTOOS_IDLE_SITEPAL_FILTER,
+  TATTOOS_SEATED_SITEPAL_CROP,
+  TATTOOS_SEATED_SITEPAL_FILTER,
   VENDOR_SITEPAL_CONFIG,
   getVendorSitePalSource,
   activateVendorSitePal,
@@ -41,7 +45,10 @@ const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 
 // Per-vendor fields: `model`, `prop`, `idleClip`, `talkClip`, `sitepal`,
 // `faceYaw`/`faceDist`/`faceLift`/`camDrop` (close-up framing), `gazeLift`/
-// `gazeTurn` (head-tracking bias), `glowMesh`/`glowColor`.
+// `gazeTurn` (head-tracking bias), `glowMesh`/`glowColor`,
+// `sitepalCrop`/`sitepalFilter` (override the registry's crop/filter for this
+// vendor — set per POSE in poseOverrides when a head angle differs enough that
+// one crop cannot serve both).
 //
 // Two ways to give a vendor more than one resting pose. Pick ONE:
 //
@@ -128,6 +135,9 @@ export const VENDOR_CATALOG = [
     // is the click volume. In the tattooing pose she sits on
     // SM_Prop_Stool_01.004 (x 1.90, z 28.58) — her own root matches it exactly.
     prop: "SM_Prop_Tent_01",
+    // Both pose GLBs carry Face1/Face2/Face3 under the same names, so the one
+    // sitepal config works whichever file this load drew.
+    sitepal: "tattoos",
     // Standing out front vs seated at the stool want different approaches:
     // standing takes the low hero angle the other standing vendors use, seated
     // needs a near-level one or the camera ends up under the bench.
@@ -137,7 +147,8 @@ export const VENDOR_CATALOG = [
     // getters at a moment when they may all still be undefined). Naming the
     // clip routes her through actions[restClip] like every other vendor.
     poseOverrides: {
-      "/models/Vendor_TattooArtist_idle.glb":      { idleClip: "idle", faceDist: 0.18, faceLift: -0.03, camDrop: -0.35 },
+      "/models/Vendor_TattooArtist_idle.glb":      { idleClip: "idle", faceDist: 0.18, faceLift: -0.03, camDrop: -0.35,
+        sitepalCrop: TATTOOS_IDLE_SITEPAL_CROP, sitepalFilter: TATTOOS_IDLE_SITEPAL_FILTER },
       // Seated at the stool (local z 28.58) working on the barber chair (z
       // 29.69), so she faces strip-local +Z — which the group's +90° maps to
       // world +X. faceYaw 0 encodes that. This matters for more than the
@@ -171,7 +182,11 @@ export const VENDOR_CATALOG = [
         // short enough not to feel unresponsive
         pauseOnFocus: true, focusGazeDelay: 1.8, focusGazeLift: 0.5, headPitchUp: 1.0,
         // ~20° head cock, eased in with the look-up. Negative flips the tilt.
-        focusHeadRoll: -0.55 },
+        focusHeadRoll: -0.55,
+        // Her own crop/filter: bowed over the chair, the camera meets her face
+        // from further above than it does standing, so the standing box does
+        // not land. Tune this pair with ?pose=tattooing.
+        sitepalCrop: TATTOOS_SEATED_SITEPAL_CROP, sitepalFilter: TATTOOS_SEATED_SITEPAL_FILTER },
     } },
   { id: "promos",    label: "",    awning: "#17505e", accent: "#5fe9ff",
     // RL80 promos + merch, working the prize wheel at the balloon end of the
@@ -281,10 +296,20 @@ export const VENDOR_CATALOG = [
 // The choice is made HERE, at module scope, so it happens once per page load
 // and the preloader and the component agree — which means only the chosen file
 // is ever fetched. Two files on disk, one file downloaded.
+// ?pose=<substring> pins the draw instead of leaving it to chance — needed to
+// tune a pose's crop at all, since otherwise reaching the one you want is a
+// coin flip per reload. Matches the model URL case-insensitively, so
+// ?pose=tattooing and ?pose=idle each name one of her two files.
 const CHOSEN_POSE_MODEL = {};
+const POSE_PIN =
+  typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("pose")?.toLowerCase()
+    : null;
 VENDOR_CATALOG.forEach((v) => {
   const pool = v.poseModels?.length ? v.poseModels : (v.model ? [v.model] : []);
-  if (pool.length) CHOSEN_POSE_MODEL[v.id] = pool[Math.floor(Math.random() * pool.length)];
+  if (!pool.length) return;
+  const pinned = POSE_PIN && pool.find((url) => url.toLowerCase().includes(POSE_PIN));
+  CHOSEN_POSE_MODEL[v.id] = pinned || pool[Math.floor(Math.random() * pool.length)];
 });
 
 // Preload the strip and vendor GLBs (same idiom as ADDON_CATALOG in OilVoxelGrid)
@@ -824,8 +849,9 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
         ensureVendorProjectionMaterial(st);
         const ctx = st.cropCtx;
         const canvas = st.cropCanvas;
-        const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = sp.crop;
-        const f = sp.filter;
+        // A pose may carry its own pair (poseOverrides), else the registry's.
+        const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = vendor.sitepalCrop || sp.crop;
+        const f = vendor.sitepalFilter || sp.filter;
         ctx.fillStyle = "#9F7854"; // skin-tone backfill for letterboxing
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         try {
