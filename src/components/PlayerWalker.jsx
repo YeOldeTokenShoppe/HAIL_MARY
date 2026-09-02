@@ -357,6 +357,7 @@ export default function PlayerWalker({
       if (!(t > 0)) return;
       const hx = raycaster.ray.origin.x + raycaster.ray.direction.x * t;
       const hz = raycaster.ray.origin.z + raycaster.ray.direction.z * t;
+      if (!Number.isFinite(hx) || !Number.isFinite(hz)) return; // NaN passes bounds tests
       const m = EDGE_MARGIN, ext = 1.0; // same walkable bounds as on foot
       if (hx < -worldW / 2 + m || hx > worldW / 2 - m) return;
       if (hz < -worldD / 2 - ext || hz > worldD / 2 - m) return;
@@ -1366,9 +1367,12 @@ export default function PlayerWalker({
       g.position.x += tmpV.x * step;
       g.position.z += tmpV.z * step;
       const m = EDGE_MARGIN;
-      // The boardwalk deck hangs off the −Z edge (CommercialStrip DECK_DEPTH
-      // = 1.2 cells, top flush with the field) — walkable, minus a rail margin.
-      const STRIP_EXTEND = 1.0;
+      // The boardwalk deck hangs off the −Z edge, top flush with the field —
+      // walkable, minus a rail margin. Widened 2026-09-01: the deck's outer
+      // edge was pushed +3 local units (~1.05 → ~1.45 world-cell depth) for
+      // more room to work; STRIP_EXTEND tracks the new outer edge (world depth
+      // ≈ 1.45, minus a hair so he can't step off the last plank).
+      const STRIP_EXTEND = 1.4;
       g.position.x = THREE.MathUtils.clamp(g.position.x, -worldW / 2 + m, worldW / 2 - m);
       g.position.z = THREE.MathUtils.clamp(g.position.z, -worldD / 2 - STRIP_EXTEND, worldD / 2 - m);
     }
@@ -1476,12 +1480,17 @@ export default function PlayerWalker({
     {
       const D = window.__hmDemonState;
       const loose = !!(D && !D.done);
-      if (gunRef.current && gunRef.current.visible !== loose) {
-        gunRef.current.visible = loose;
+      // `capturable` is false for a stunned summoner — they can't fight their
+      // own demon. Treat the whole encounter as inert for them: gun holstered,
+      // no prompt, no beam, E falls through to bull/vendor/dig. (Older demon
+      // states without the field default to capturable so nothing regresses.)
+      const engageable = loose && D.roaming && (D.capturable !== false);
+      if (gunRef.current && gunRef.current.visible !== engageable) {
+        gunRef.current.visible = engageable;
       }
-      demonLooseRef.current = !!(loose && D.roaming);
+      demonLooseRef.current = engageable;
       let nd = false;
-      if (loose && D.roaming) {
+      if (engageable) {
         g.getWorldPosition(worldPos);
         nd = Math.hypot(D.x - worldPos.x, D.z - worldPos.z) < DEMON_ENGAGE;
       }

@@ -3,6 +3,7 @@
 import { Canvas } from '@react-three/fiber';
 import { useEffect, useRef, forwardRef } from 'react';
 import * as THREE from 'three';
+import { ensureKTX2Support } from '@/lib/ktx2';
 
 /**
  * Enhanced Canvas component with automatic cleanup on unmount
@@ -18,7 +19,13 @@ const CleanCanvas = forwardRef(function CleanCanvas({ children, onCreated, ...pr
   const handleCreated = (state) => {
     sceneRef.current = state.scene;
     rendererRef.current = state.gl;
-    
+
+    // KTX2 support must be detected on the renderer BEFORE any GLB with
+    // KHR_texture_basisu parses its textures — and this fires outside the
+    // children's Suspense boundary (unlike a component, which deadlocks: the
+    // strip suspends → the detector never commits → the strip can't transcode).
+    ensureKTX2Support(state.gl);
+
     // Call user's onCreated if provided
     if (onCreated) {
       onCreated(state);

@@ -5887,6 +5887,11 @@ function HellDemon({
   requiredHitsRef.current = requiredHits;
   const hitRangeRef = useRef(hitRange);
   hitRangeRef.current = hitRange;
+  // Mirror `clickable` (= demonCapturable) so the per-frame publisher reads the
+  // SAME gate the shoot/click resolvers enforce — otherwise the laser sight can
+  // burn hot for a stunned summoner whose shots are silently dropped.
+  const clickableRef = useRef(clickable);
+  clickableRef.current = clickable;
   // Scratch for world-space reads (the demon group lives inside the field's
   // offset group, so bridge positions are always exchanged in WORLD space).
   const demonWorldRef = useMemo(() => new THREE.Vector3(), []);
@@ -6243,6 +6248,12 @@ function HellDemon({
   const handleClick = (e) => {
     if (e?.stopPropagation) e.stopPropagation();
     if (!clickable || done) return;
+    // On foot the fight is E-only: while a walker is placed, a canvas click is
+    // the walker's move/place gesture, not an attack. Letting the demon's
+    // pointer handler ALSO fire would run the camera-range click rules in
+    // parallel (mistimed → counter + lockout) AND then teleport the cowboy —
+    // two actions from one click. The revolver (hm-shoot) is the only verb.
+    if (window.__hmWalkerPos) return;
     const ph = phaseRef.current;
     if (ph === "banish" || ph === "counter" || ph === "hitstun" || ph === "menace") return;
     if (cooldownRef.current > 0) return; // locked out after a mistimed hit
@@ -6373,15 +6384,19 @@ function HellDemon({
       S.hits = hitsRef.current;
       S.required = requiredHitsRef.current;
       S.done = false;
+      // Whether THIS client may catch the demon at all (stunned summoners can't
+      // — clickable = demonCapturable). The walker suppresses the SHOOT prompt
+      // and lets E fall through to bull/vendor/dig when this is false.
+      S.capturable = clickableRef.current;
       // Single source of truth for the laser sight: would a shot fired from
       // the walker's current position land RIGHT NOW? Mirrors the shootRef
-      // gates exactly (window, or rear arc + range, phase, lockout) so the
-      // beam's hot color can never lie about the rules.
+      // gates exactly (clickable, window, or rear arc + range, phase, lockout)
+      // so the beam's hot color can never lie about the rules.
       {
         const w = window.__hmWalkerPos;
         let lands = false;
         const ph9 = phaseRef.current;
-        if (w && roamingRef.current && cooldownRef.current === 0 &&
+        if (w && clickableRef.current && roamingRef.current && cooldownRef.current === 0 &&
             ph9 !== "banish" && ph9 !== "counter" && ph9 !== "hitstun" && ph9 !== "menace") {
           const dx9 = w.x - g.position.x, dz9 = w.z - g.position.z;
           const dist9 = Math.hypot(dx9, dz9);

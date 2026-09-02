@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, useGLTF, useAnimations } from "@react-three/drei";
+import { extendKTX2 } from "@/lib/ktx2";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import {
   VENDOR_SITEPAL_CONFIG,
@@ -23,7 +24,15 @@ import {
 // group and no per-stall placement exists any more. Re-exporting any of them
 // from Blender just works: the group auto-fits from the strip's bounding box.
 
-const STRIP_MODEL = "/models/CommercialStrip3.glb";
+// The gltf-transform-optimized build (2K WebP, node structure preserved via
+// --instance false so the spotlight/collision names survive). The ?v tag
+// busts the CDN/browser cache on re-export (the strip URL had none, which
+// served stale files before); BUMP it whenever this GLB is rebuilt.
+// NOTE: a 2K-KTX2/Basis variant (for ~4× less GPU memory on iOS) is built and
+// staged — the encoder pipeline + loader wiring exist — but the drei/Suspense
+// detectSupport ordering still needs a debugging pass in a stable browser
+// before the KTX2 GLB can ship. See src/lib/ktx2.js.
+const STRIP_MODEL = "/models/CommercialStrip3_opt2k.glb?v=webp4";
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's
@@ -279,13 +288,16 @@ VENDOR_CATALOG.forEach((v) => {
 });
 
 // Preload the strip and vendor GLBs (same idiom as ADDON_CATALOG in OilVoxelGrid)
-useGLTF.preload(STRIP_MODEL);
-Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(url));
+// NOT module-scope preloaded: a KTX2 GLB must not parse before the renderer
+// exists (KTX2Loader.detectSupport needs it), or its textures fail and cache
+// as broken. It loads inside the Canvas via useGLTF below, after <KTX2Init/>
+// has run detectSupport.
+Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(url, true, true, extendKTX2));
 // ...and the companion belonging to whichever pose was drawn, so it arrives
 // with the character rather than popping in a beat later.
 VENDOR_CATALOG.forEach((v) => {
   const companion = v.poseOverrides?.[CHOSEN_POSE_MODEL[v.id]]?.companionModel;
-  if (companion) useGLTF.preload(companion);
+  if (companion) useGLTF.preload(companion, true, true, extendKTX2);
 });
 
 // three.js GLTFLoader pushes EVERY node name through
@@ -470,7 +482,7 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   const group = useRef();
   // Stable for the whole session: chosen at module load, so the hook's URL
   // never changes under it and Suspense fetches exactly one file.
-  const { scene, animations } = useGLTF(CHOSEN_POSE_MODEL[vendor.id] || vendor.model);
+  const { scene, animations } = useGLTF(CHOSEN_POSE_MODEL[vendor.id] || vendor.model, true, true, extendKTX2);
   const { actions, mixer } = useAnimations(animations, group);
 
   // Cap per-frame animation advance: on a main-thread hitch the mixer would
@@ -571,6 +583,25 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     // "clips exist but the rig wasn't ready yet" case is worth retrying.
     if (!animations?.length) { needsStartRef.current = false; return; }
     if (startRest()) needsStartRef.current = false;
+  });
+
+  // Low-graphics idle gate (mobile tier, via window.__hmLowGfx). Freeze the
+  // resting idle when the vendor is neither focused (sky zoom) nor being
+  // approached on foot, so its skinned mixer stops advancing — the character
+  // holds a static pose until you engage it. Full quality never pauses. A
+  // paused action still writes its frozen pose, so nothing pops to bind pose;
+  // a talk/gesture crossfade only ever runs while focused (→ unpaused here).
+  useFrame(() => {
+    const rest = restActionRef.current;
+    if (!rest) return;
+    if (!window.__hmLowGfx) { if (rest.paused) rest.paused = false; return; }
+    let active = !!focusedRef?.current;
+    if (!active) {
+      const spot = window.__hmVendorSpots?.[vendor.id];
+      const w = window.__hmWalkerPos;
+      if (spot && w) active = Math.hypot(spot.x - w.x, spot.z - w.z) < 2.2;
+    }
+    rest.paused = !active;
   });
 
   // Environment-map fill: the strip sits on the −Z edge where one scene
@@ -3157,7 +3188,7 @@ function VendorSpotlight({ focus, stripScene, envPreset }) {
 }
 
 export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
-  const { scene: stripScene } = useGLTF(STRIP_MODEL);
+  const { scene: stripScene } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
   // Which vendor is zoomed, and what the beam should point at. Lifted here so
   // one shared SpotLight can serve every vendor.
   const [focus, setFocus] = useState(null);

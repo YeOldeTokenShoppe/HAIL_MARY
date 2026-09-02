@@ -10,6 +10,7 @@ import * as THREE from "three";
 import CleanCanvas from "@/components/canvas/CleanCanvas";
 import { Perf } from "r3f-webgpu-perf";
 import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
+import { KTX2Init } from "@/lib/ktx2";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { REFERRAL_BONUS } from "@/lib/oilBonusMath";
 import { couponValid, couponDaysLeft } from "@/lib/oilTicket";
@@ -375,7 +376,31 @@ const skyGradientShader = {
   `,
 };
 
-const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false }) {
+// Cloud layouts as data so the low-poly (mobile) tier can drop count and cap
+// segments without duplicating the JSX. Order matters: the low tier keeps the
+// first N (the nearest/most-read canopy clouds), skipping the upper towers.
+const DAY_CLOUDS = [
+  { position: [-8, 10, -12], speed: 0.02,  opMul: 1.25, width: 1.2, depth: 0.15, segments: 4 },
+  { position: [14, 12, -6],  speed: 0.03,  opMul: 1.0,  width: 1.5, depth: 0.12, segments: 4 },
+  { position: [3, 11, 16],   speed: 0.015, opMul: 1.1,  width: 1.0, depth: 0.1,  segments: 3 },
+  { position: [-12, 13, 8],  speed: 0.025, opMul: 0.9,  width: 1.8, depth: 0.15, segments: 4 },
+  { position: [18, 9, 14],   speed: 0.02,  opMul: 1.0,  width: 0.8, depth: 0.1,  segments: 3 },
+  { position: [-4, 14, -18], speed: 0.01,  opMul: 0.75, width: 1.3, depth: 0.12, segments: 3 },
+  { position: [10, 12, -16], speed: 0.02,  opMul: 0.9,  width: 1.0, depth: 0.1,  segments: 3 },
+];
+const HELL_CLOUDS = [
+  { position: [-5, 8, -6],   speed: 0.45, opacity: 0.7,  color: "#bbbbbb", width: 12, depth: 2.5, segments: 12 },
+  { position: [8, 7, -3],    speed: 0.48, opacity: 0.65, color: "#aaaaaa", width: 14, depth: 3,   segments: 14 },
+  { position: [0, 9, 8],     speed: 0.42, opacity: 0.7,  color: "#cccccc", width: 10, depth: 2,   segments: 10 },
+  { position: [-10, 7, 5],   speed: 0.2,  opacity: 0.6,  color: "#b0b0b0", width: 13, depth: 3,   segments: 12 },
+  { position: [12, 8, 7],    speed: 0.45, opacity: 0.65, color: "#bbbbbb", width: 11, depth: 2.5, segments: 10 },
+  { position: [-3, 14, -12], speed: 0.41, opacity: 0.55, color: "#999999", width: 16, depth: 4,   segments: 14 },
+  { position: [6, 12, -10],  speed: 0.46, opacity: 0.6,  color: "#cccccc", width: 13, depth: 3,   segments: 12 },
+  { position: [-8, 13, 10],  speed: 0.44, opacity: 0.55, color: "#b0b0b0", width: 14, depth: 3.5, segments: 12 },
+  { position: [10, 15, 4],   speed: 0.4,  opacity: 0.5,  color: "#999999", width: 15, depth: 3,   segments: 14 },
+];
+
+const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false, lowPoly = false }) {
   const topCol = useMemo(() => new THREE.Color(skyColor), [skyColor]);
   const bottomCol = useMemo(() => skyBottom ? new THREE.Color(skyBottom) : null, [skyBottom]);
   const uniforms = useMemo(() => ({
@@ -416,28 +441,24 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
         <pointLight position={[12, 8, 7]}   color="#ff2200" intensity={3} distance={18} decay={1.5} />
       </>}
       {hell ? (
+        // Low tier: the 5 canopy clouds only (drop the 4 upper towers) and cap
+        // segments at 6 — the hell clouds are the scene's most expensive geo.
         <Clouds material={THREE.MeshLambertMaterial} texture="/cloud.png">
-          {/* Low canopy layer */}
-          <Cloud position={[-5, 8, -6]}   speed={0.45} opacity={0.7}  color="#bbbbbb" width={12} depth={2.5} segments={12} />
-          <Cloud position={[8, 7, -3]}     speed={0.48} opacity={0.65} color="#aaaaaa" width={14} depth={3}   segments={14} />
-          <Cloud position={[0, 9, 8]}      speed={0.42} opacity={0.7}  color="#cccccc" width={10} depth={2}   segments={10} />
-          <Cloud position={[-10, 7, 5]}    speed={0.2}  opacity={0.6}  color="#b0b0b0" width={13} depth={3}   segments={12} />
-          <Cloud position={[12, 8, 7]}     speed={0.45} opacity={0.65} color="#bbbbbb" width={11} depth={2.5} segments={10} />
-          {/* Upper towers */}
-          <Cloud position={[-3, 14, -12]}  speed={0.41}  opacity={0.55} color="#999999" width={16} depth={4}   segments={14} />
-          <Cloud position={[6, 12, -10]}   speed={0.46} opacity={0.6}  color="#cccccc" width={13} depth={3}   segments={12} />
-          <Cloud position={[-8, 13, 10]}   speed={0.44} opacity={0.55} color="#b0b0b0" width={14} depth={3.5} segments={12} />
-          <Cloud position={[10, 15, 4]}    speed={0.4}  opacity={0.5}  color="#999999" width={15} depth={3}   segments={14} />
+          {(lowPoly ? HELL_CLOUDS.slice(0, 5) : HELL_CLOUDS).map((c, i) => (
+            <Cloud key={i} position={c.position} speed={c.speed} opacity={c.opacity}
+              color={c.color} width={c.width} depth={c.depth}
+              segments={lowPoly ? Math.min(c.segments, 6) : c.segments} />
+          ))}
         </Clouds>
       ) : (
+        // Low tier: 4 of the 7 day clouds, segments capped at 2 (they're small
+        // and distant — the cut is barely legible but halves the cloud draw).
         <Clouds material={THREE.MeshBasicMaterial} texture="/cloud.png">
-          <Cloud position={[-8, 10, -12]} speed={0.02} opacity={cloudOpacity * 1.25} width={1.2} depth={0.15} segments={4} />
-          <Cloud position={[14, 12, -6]} speed={0.03} opacity={cloudOpacity} width={1.5} depth={0.12} segments={4} />
-          <Cloud position={[3, 11, 16]} speed={0.015} opacity={cloudOpacity * 1.1} width={1} depth={0.1} segments={3} />
-          <Cloud position={[-12, 13, 8]} speed={0.025} opacity={cloudOpacity * 0.9} width={1.8} depth={0.15} segments={4} />
-          <Cloud position={[18, 9, 14]} speed={0.02} opacity={cloudOpacity} width={0.8} depth={0.1} segments={3} />
-          <Cloud position={[-4, 14, -18]} speed={0.01} opacity={cloudOpacity * 0.75} width={1.3} depth={0.12} segments={3} />
-          <Cloud position={[10, 12, -16]} speed={0.02} opacity={cloudOpacity * 0.9} width={1} depth={0.1} segments={3} />
+          {(lowPoly ? DAY_CLOUDS.slice(0, 4) : DAY_CLOUDS).map((c, i) => (
+            <Cloud key={i} position={c.position} speed={c.speed}
+              opacity={cloudOpacity * c.opMul} width={c.width} depth={c.depth}
+              segments={lowPoly ? Math.min(c.segments, 2) : c.segments} />
+          ))}
         </Clouds>
       )}
     </group>
@@ -1519,6 +1540,39 @@ function TODScrubber({ todHour, todOverride, onScrub, onLive }) {
 export default function OilPage() {
   const isMobile = useIsMobile();
   const uiScale = useUiScale();
+
+  // ── Quality tier ────────────────────────────────────────────────────────
+  // One source of truth for device-scaled graphics knobs. `?perf` shows the
+  // r3f HUD on ANY device (measure on a real phone); `?q=high|low` force-
+  // overrides the auto tier for A/B testing. dpr stays crisp by default
+  // (Michelle's call — the scene's detail is the point); it's a knob here so
+  // it can be dialed per-device without hunting through the Canvas props.
+  const [qForce, setQForce] = useState(null);   // "high" | "low" | null (auto)
+  const [showPerf, setShowPerf] = useState(false);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    setShowPerf(p.has("perf"));
+    const q = p.get("q");
+    if (q === "high" || q === "low") setQForce(q);
+  }, []);
+  const lowGfx = qForce ? qForce === "low" : isMobile;
+  // Publish for deep children that read the tier without prop-drilling — same
+  // convention as __hmWalkerPos / __hmVendorSpots (the vendor idle gate reads
+  // this). Off-tree so OilVoxelGrid → CommercialStrip → VendorModel stays clean.
+  useEffect(() => {
+    window.__hmLowGfx = lowGfx;
+    return () => { delete window.__hmLowGfx; };
+  }, [lowGfx]);
+  const quality = useMemo(() => ({
+    lowGfx,
+    // Keep full crispness even on mobile — lowering this is the last resort,
+    // exposed here so it's one number to change if the HUD says we need it.
+    dpr: lowGfx ? [1, 1.5] : [1, 1.5],
+    clouds: lowGfx ? "low" : "full",     // SkyDome renders fewer/flatter clouds
+    lazyVendorAnim: lowGfx,              // vendors hold a static pose until focused
+    fireworks: lowGfx ? 1 : 2,
+  }), [lowGfx]);
+
   // Published as a CSS variable on <html> so overlays — including the ones that
   // portal to document.body (polaroid, purchase modal, certificate lightbox) —
   // can zoom their cards to match the panels. Mobile stays at 1.
@@ -2506,6 +2560,17 @@ export default function OilPage() {
   const activeUserDrill = isTest && selectedX !== null
     ? { col: selectedX, row: sliceY, drillDay: testDay, lastDrillDate: null, lastDrainExtracted: 0, totalCollected: 0, tankDrains: 0, tankOil: null }
     : userDrill;
+
+  // Guard: in test mode the walker mounts off activeUserDrill (synthesized from
+  // the selected plot). Deselecting mid-walk (double-click a rig, zoom out)
+  // would unmount the walker with walkMode still true — its camera + ESC
+  // handler die together, freezing the view with no exit. Fall back to the sky
+  // the moment the spawn drill vanishes so the normal camera rig remounts.
+  useEffect(() => {
+    if (walkMode && activeUserDrill?.col == null) {
+      setWalkMode(false); setWalkerCam("follow"); setWalkerVendor(false);
+    }
+  }, [walkMode, activeUserDrill?.col]);
 
   // Cell depth from oilPlots (persists across owners) — or computed playerDepth for active players
   const cellDepth = userPlotState?.drillDay ?? userDrill?.drillDay ?? 0;
@@ -4376,7 +4441,10 @@ export default function OilPage() {
   // (late joiners who load past the cutoff get the easy phase immediately). Admin/
   // test uses a short hard phase so both phases are quick to exercise.
   const DEMON_HARD_HITS = 3;
-  const demonHardPhaseMs = (isAdmin || isTest) ? 25_000 : 5 * 60 * 1000;
+  // Test/admin hard window: was 25s, but the flying intro alone runs ~20-25s
+  // (the demon isn't catchable until it lands), so the 3-hit hard fight was
+  // unreachable on foot in test mode. 90s leaves ~60s of real hard phase.
+  const demonHardPhaseMs = (isAdmin || isTest) ? 90_000 : 5 * 60 * 1000;
   const [demonEasyPhase, setDemonEasyPhase] = useState(false);
   const demonStartMsRef = useRef(null);
   useEffect(() => {
@@ -6727,7 +6795,7 @@ export default function OilPage() {
       )}
       {drillStatus === "sign-in" && (
         <div style={drillBtnStyles.wrap}>
-          <button onClick={() => clerk.openSignIn()} style={drillBtnStyles.active}>SIGN IN TO PLAY</button>
+          <button onClick={() => router.push("/sign-in?redirect_url=/hailmary")} style={drillBtnStyles.active}>SIGN IN TO PLAY</button>
         </div>
       )}
       {drillStatus === "stunned" && (
@@ -7510,7 +7578,7 @@ export default function OilPage() {
     setTimeout(() => document.getElementById("your-rig")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   };
   const mobilePrimary = (() => {
-    if (!user) return { label: "PLAY", sub: "SIGN IN", title: "Sign in to play", onClick: () => clerk.openSignIn() };
+    if (!user) return { label: "PLAY", sub: "SIGN IN", title: "Sign in to play", onClick: () => router.push("/sign-in?redirect_url=/hailmary") };
     if (userDrill?.col == null) {
       const claimsOpen = gamePhase === "ticket_sale" || (gamePhase === "active" && testingEnabled);
       return {
@@ -7615,16 +7683,24 @@ export default function OilPage() {
 
         {/* Scrollable: active view + panels below */}
         <div id="oil-scroll" style={m.scroll}>
-          {/* 3D Voxel */}
-          {mobileTab === "3d" && (
-            <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}) }}>
+          {/* 3D Voxel — the Canvas stays MOUNTED across tab switches. Gating it
+              on `mobileTab === "3d"` tore down the whole WebGL scene (dispose +
+              forceContextLoss) when you opened a 2D tab, and rebuilding it on
+              return re-decoded ~10MB of GLBs/textures on the main thread — which
+              crashed iOS Safari on memory. Now it's hidden (display:none) and
+              its render loop paused (frameloop="never") off the 3D tab, so the
+              context, geometry, and textures survive and returning is instant. */}
+          {(
+            <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}), ...(mobileTab === "3d" ? null : { display: "none" }) }}>
               <CleanCanvas
                 camera={{ position: [0, 3.5, 4], fov: 50 }}
-                dpr={[1, 1.5]}
+                dpr={quality.dpr}
+                frameloop={mobileTab === "3d" ? "always" : "never"}
                 style={{ width: "100%", height: "100%" }}
                 gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
-                <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
+                <KTX2Init />
+                <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} lowPoly={quality.clouds === "low"} />
                 {envPreset === "hell" && <HellSkyEffects />}
                 {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
                 {parabolum && <ParabolumMoon />}
@@ -7727,17 +7803,15 @@ export default function OilPage() {
                   <CameraFlyIn onComplete={handleIntroComplete} mobile grid={gridSize} />
                 )}
                 <CameraShake shakeRef={shakeRef} />
-                {/* Dev-only perf HUD (plain canvas here — no CRT
-                    wrapper, so no bleed compensation needed). */}
-                {/* {process.env.NODE_ENV === "development" && (
-                  <Perf position="top-left" zIndex={10001} />
-                )} */}
+                {/* Perf HUD — add ?perf to the URL to show it on ANY device
+                    (measure FPS/draw calls/triangles on a real phone). */}
+                {showPerf && <Perf position="top-left" zIndex={10001} />}
               </CleanCanvas>
               {/* The game's fixed overlays sit at z-index 10000; the
                   perf panel bakes 9999 into its own stylesheet and
                   ignores inline style on the fixed container, so
                   out-rank it with !important (the package applies neither className nor style props to that container). */}
-              {process.env.NODE_ENV === "development" && (
+              {showPerf && (
                 <style>{`
                 .perf-panel { z-index: 10001 !important; }
                 /* The mobile app-shell owns the top ~90px (48px header
@@ -7817,9 +7891,12 @@ export default function OilPage() {
                   </svg>
                 </button>
               </div>
+              {/* Time-of-day scrubber retired from the page (2026-09-01). The
+                  component and its scrubTOD/scrubLive handlers are kept above —
+                  uncomment this mount to bring the slider back in dev.
               {process.env.NODE_ENV === "development" && !walkMode && (
                 <TODScrubber todHour={todHour} todOverride={todOverride} onScrub={scrubTOD} onLive={scrubLive} />
-              )}
+              )} */}
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10 }}>
                 <SceneThemeToolbar
                   size={32}
@@ -8214,11 +8291,12 @@ export default function OilPage() {
         }}>
           <CleanCanvas
             camera={{ position: [0, 8, 8], fov: 50 }}
-            dpr={[1, 1.5]}
+            dpr={quality.dpr}
             style={{ width: "100%", height: "100%" }}
             gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
-            <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} />
+            <KTX2Init />
+            <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} lowPoly={quality.clouds === "low"} />
             {envPreset === "hell" && <HellSkyEffects />}
             {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
             {parabolum && <ParabolumMoon />}
@@ -8317,14 +8395,11 @@ export default function OilPage() {
               <CameraFlyIn onComplete={handleIntroComplete} grid={gridSize} />
             )}
             <CameraShake shakeRef={shakeRef} />
-            {/* Dev-only perf HUD (plain canvas here — no CRT wrapper,
-                so no bleed compensation needed). */}
-            {/* {process.env.NODE_ENV === "development" && (
-              <Perf position="top-left" style={{zIndex: 10001}}/>
-            )} */}
+            {/* Perf HUD — add ?perf to the URL to show it on any device. */}
+            {showPerf && <Perf position="top-left" style={{ zIndex: 10001 }} />}
           </CleanCanvas>
           {/* Same z-index hook as the mobile canvas above. */}
-          {process.env.NODE_ENV === "development" && (
+          {showPerf && (
             <style>{`
                 .perf-panel { z-index: 10001 !important; }
                 /* The mobile app-shell owns the top ~90px (48px header
@@ -8395,9 +8470,12 @@ export default function OilPage() {
               </svg>
             </button>
           </div>
+          {/* Time-of-day scrubber retired from the page (2026-09-01). The
+              component and its scrubTOD/scrubLive handlers are kept above —
+              uncomment this mount to bring the slider back in dev.
           {process.env.NODE_ENV === "development" && !walkMode && (
             <TODScrubber todHour={todHour} todOverride={todOverride} onScrub={scrubTOD} onLive={scrubLive} />
-          )}
+          )} */}
           <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, zoom: uiScale, display: "flex", alignItems: "center", gap: 8 }}>
             <SceneThemeToolbar
               size={28}

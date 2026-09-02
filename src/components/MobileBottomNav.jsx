@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUser, useClerk } from "@clerk/nextjs";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { UnifiedAccountModal } from './UnifiedAccountModal';
 import { useLanguage } from './LanguageProvider';
@@ -107,6 +107,7 @@ export default function MobileBottomNav({
   // Once the user taps the book slot they've found it — stop nagging.
   const [bookPulseDone, setBookPulseDone] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { user: clerkUser } = useUser();
   const clerk = useClerk();
   const { t } = useLanguage();
@@ -277,7 +278,10 @@ export default function MobileBottomNav({
         if (isHydrated && clerkUser) {
           setShowUnifiedModal(true);
         } else {
-          clerk.openSignIn();
+          // Route to the lightweight /sign-in page instead of the in-page
+          // modal — the OAuth redirect must not fire over a heavy page (iOS
+          // crash). Comes back to wherever the user was.
+          router.push(`/sign-in?redirect_url=${encodeURIComponent(pathname || "/hailmary")}`);
         }
       }}
     >
