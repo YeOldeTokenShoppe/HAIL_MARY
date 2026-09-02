@@ -19,6 +19,7 @@ import {
   TACOS_SITEPAL_FILTER,
   CARNY_SITEPAL_CROP,
   CARNY_SITEPAL_FILTER,
+  VENDOR_SITEPAL_CONFIG,
   speakPendingVendorLine,
   getVendorSitePalSource,
   notifyVendorTalk,
@@ -101,11 +102,68 @@ const TUNER_FILTER_FIELDS = [
   ["hueRotate", -180, 180], ["sepia", 0, 100],
 ];
 
+// Face A/B compare. The SitePal crop is projected onto its OWN mesh (projFace)
+// while the painted one (regularFaces[0]) hides, so a crop that is off by a few
+// pixels reads as the face JUMPING the instant the projection takes over —
+// which is invisible if you only ever see one of the two. These modes pin one
+// face down so the camera holds still while you swap between them; blink mode
+// does the swapping for you, which is how a small shift becomes obvious.
+// CommercialStrip's per-frame compositor reads the global.
+const BLINK_MS = 650;
+
 function VendorCropTuner() {
   const previewRef = useRef(null);
   const [vendorKey, setVendorKey] = useState("fortunes");
   const [, force] = useState(0);
   const active = TUNER_VENDORS[vendorKey];
+  // "auto" = normal play (projection while focused). "face1" pins the painted
+  // mesh, "face2" pins the projection.
+  const [faceMode, setFaceMode] = useState("auto");
+  const [blink, setBlink] = useState(false);
+  // The compositor is per-vendor but only the FOCUSED stall ever projects, so
+  // one global is unambiguous. Named for the two meshes rather than for the
+  // vendor, because the mesh names are what you read in Blender.
+  const sitepalCfg = VENDOR_SITEPAL_CONFIG[vendorKey];
+  const face1Name = sitepalCfg?.regularFaces?.[0] || "Face1";
+  const face2Name = sitepalCfg?.projFace || "Face2";
+
+  useEffect(() => {
+    // Carries the vendor so the pin lands on the stall whose sliders are live,
+    // rather than on whichever one happens to be focused — and so it still
+    // works before you have flown in to anything.
+    window.__vendorSitePalFaceOverride =
+      faceMode === "auto" ? null : { mode: faceMode, vendorId: vendorKey };
+    // Clearing on unmount matters: the pin survives a tuner close otherwise,
+    // and a pinned face1 looks exactly like SitePal being broken.
+    return () => { window.__vendorSitePalFaceOverride = null; };
+  }, [faceMode, vendorKey]);
+
+  // Blink comparator. Starting from "auto" it enters on face1 — the painted
+  // mesh — so the first swap you see is the one you are tuning INTO.
+  useEffect(() => {
+    if (!blink) return;
+    setFaceMode((m) => (m === "auto" ? "face1" : m));
+    const timer = setInterval(
+      () => setFaceMode((m) => (m === "face2" ? "face1" : "face2")),
+      BLINK_MS
+    );
+    return () => clearInterval(timer);
+  }, [blink]);
+
+  // "f" flips by hand — the same comparison at your own pace, and the one you
+  // want while a slider is mid-drag. Ignored while typing in a field.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "f" && e.key !== "F") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      setBlink(false);
+      setFaceMode((m) => (m === "face1" ? "face2" : "face1"));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -177,6 +235,39 @@ function VendorCropTuner() {
             {v.label}
           </button>
         ))}
+      </div>
+      {/* Face A/B: which of the two face meshes the FOCUSED stall shows. */}
+      <div style={{ display: "flex", gap: 4, alignItems: "stretch" }}>
+        {[
+          ["auto", "AUTO"],
+          ["face1", `${face1Name} · mesh`],
+          ["face2", `${face2Name} · SitePal`],
+        ].map(([mode, label]) => (
+          <button
+            key={mode}
+            onClick={() => { setBlink(false); setFaceMode(mode); }}
+            style={{
+              flex: "1 1 0", padding: "4px 6px", fontSize: 11, cursor: "pointer",
+              background: mode === faceMode ? "#6a4a2a" : "#1a2230",
+              color: "#cde", border: "1px solid #6a4a2a", borderRadius: 4,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          onClick={() => setBlink((b) => !b)}
+          style={{
+            flex: "0 0 62px", padding: "4px 6px", fontSize: 11, cursor: "pointer",
+            background: blink ? "#6a4a2a" : "#1a2230",
+            color: "#cde", border: "1px solid #6a4a2a", borderRadius: 4,
+          }}
+        >
+          BLINK
+        </button>
+      </div>
+      <div style={{ fontSize: 10, opacity: 0.6 }}>
+        press f to flip · pins {active.label} — exactly one face mesh is drawn
       </div>
       <canvas ref={previewRef} width={400} height={300} style={{ width: "100%", borderRadius: 4, background: "#222" }} />
       {TUNER_CROP_FIELDS.map(([k, min, max]) => slider(active.crop, k, min, max))}

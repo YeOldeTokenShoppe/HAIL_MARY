@@ -30,7 +30,7 @@ export const FORTUNES_SITEPAL_CROP = {
   cropX: 194,
   cropY: 106,
   cropW: 187,
-  cropH: 222,
+  cropH: 216,
   rotateZ: 0,
   rotateX: 0,
 };
@@ -38,49 +38,50 @@ export const FORTUNES_SITEPAL_CROP = {
 // Color correction (CSS filter values; 100 = identity) — SitePal frames come
 // back washed out. Also mutable/live like the crop.
 export const FORTUNES_SITEPAL_FILTER = {
-  saturate: 112,
-  contrast: 102,
-  brightness: 124,
-  hueRotate: 0,
-  sepia: 34,
+  saturate: 122,
+  contrast: 110,
+  brightness: 138,
+  hueRotate: -71,
+  sepia: 21,
 };
+
 
 // Salesman crop/filter — tuned via /hailmary?tune=vendor (SALESMAN tab);
 // re-tune there and paste the logged values back here if his scene's avatar
 // ever changes.
 export const TONICS_SITEPAL_CROP = {
-  cropX: 195,
-  cropY: 143,
-  cropW: 160,
-  cropH: 222,
-  rotateZ: 0,
+  cropX: 206,
+  cropY: 138,
+  cropW: 154,
+  cropH: 232,
+  rotateZ: 2,
   rotateX: 0,
 };
 export const TONICS_SITEPAL_FILTER = {
-  saturate: 199,
+  saturate: 117,
   contrast: 103,
-  brightness: 124,
-  hueRotate: 0,
-  sepia: 34,
+  brightness: 147,
+  hueRotate: 7,
+  sepia: 22,
 };
 
 // Hot dog vendor crop/filter — tuned via /hailmary?tune=vendor (HOT DOG
 // tab); re-tune there and paste the logged values back here if his scene's
 // avatar ever changes.
 export const HOTDOGS_SITEPAL_CROP = {
-  cropX: 184,
+  cropX: 190,
   cropY: 140,
-  cropW: 187,
+  cropW: 161,
   cropH: 222,
   rotateZ: 0,
   rotateX: 0,
 };
 export const HOTDOGS_SITEPAL_FILTER = {
-  saturate: 199,
+  saturate: 174,
   contrast: 103,
-  brightness: 124,
+  brightness: 114,
   hueRotate: 0,
-  sepia: 34,
+  sepia: 36,
 };
 
 // Promos hologram crop/filter — tuned via /hailmary?tune=vendor (PROMOS tab);
@@ -89,18 +90,19 @@ export const HOTDOGS_SITEPAL_FILTER = {
 // their 222. No sepia either, unlike the dusty prospectors — she is a
 // projection, and the warm cast reads as grime on a screen that should look
 // backlit.
+
 export const PROMOS_SITEPAL_CROP = {
   cropX: 202,
   cropY: 124,
-  cropW: 150,
-  cropH: 155,
-  rotateZ: 0,
+  cropW: 151,
+  cropH: 154,
+  rotateZ: 4,
   rotateX: 0,
 };
 export const PROMOS_SITEPAL_FILTER = {
-  saturate: 150,
+  saturate: 110,
   contrast: 103,
-  brightness: 124,
+  brightness: 115,
   hueRotate: 0,
   sepia: 0,
 };
@@ -140,10 +142,10 @@ export const TACOS_SITEPAL_CROP = {
   rotateZ: 0,
   rotateX: 0,
 };
-export const TACOS_SITEPAL_FILTER = {
-  saturate: 104,
-  contrast: 96,
-  brightness: 94,
+  export const TACOS_SITEPAL_FILTER = {
+  saturate: 139,
+  contrast: 130,
+  brightness: 70,
   hueRotate: 0,
   sepia: 0,
 };

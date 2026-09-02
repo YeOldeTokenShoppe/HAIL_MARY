@@ -32,7 +32,7 @@ import {
 // staged — the encoder pipeline + loader wiring exist — but the drei/Suspense
 // detectSupport ordering still needs a debugging pass in a stable browser
 // before the KTX2 GLB can ship. See src/lib/ktx2.js.
-const STRIP_MODEL = "/models/CommercialStrip3_opt2k.glb?v=webp4";
+const STRIP_MODEL = "/models/CommercialStrip3_opt2k.glb?v=webp7";
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's
@@ -798,8 +798,29 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
         typeof window !== "undefined" &&
         window.__vendorSitePalSceneLoaded === true &&
         window.__vendorSitePalCurrentSceneId === sp.sceneId;
-      const show = !!(focusedNow && source && onScene && st.proj);
-      if (show) {
+      // Face A/B pin from the ?tune=vendor panel — { mode, vendorId }, scoped
+      // to the vendor whose tab is open so it lines up with the crop sliders.
+      // The projection lands on a DIFFERENT mesh from the painted face
+      // (projFace vs regularFaces), so a mis-registered crop reads as the face
+      // jumping the moment SitePal takes over. Pinning one holds the camera
+      // still while you flip between them.
+      //
+      // A pin is ABSOLUTE: exactly one of the two meshes is ever visible, so
+      // the swap is a clean A/B with nothing overlapping and nothing left
+      // behind. In particular "face2" does not wait on a live SitePal frame —
+      // it is the mesh you are comparing, and the whole point is to see where
+      // its geometry sits against the painted one.
+      const ab = typeof window !== "undefined" ? window.__vendorSitePalFaceOverride : null;
+      const pinned = ab && ab.vendorId === vendor.sitepal ? ab.mode : null;
+      let show = !!(focusedNow && source && onScene && st.proj);
+      if (pinned === "face1") show = false;
+      else if (pinned === "face2") show = !!st.proj;
+      // Painting is gated separately from visibility. Without a live frame of
+      // the RIGHT scene there is nothing honest to draw: a pinned face2 that
+      // has never projected keeps its authored material (which is what you
+      // want to see), and one that has keeps its last good frame instead of
+      // flashing to the flat backfill.
+      if (show && source && onScene) {
         ensureVendorProjectionMaterial(st);
         const ctx = st.cropCtx;
         const canvas = st.cropCanvas;

@@ -7061,7 +7061,7 @@ const _stand = gltf.animations.find(a => a.name === 'monk_standPray');
               // Prefer an Idle animation; fall back to Typing. Match the
               // keyword at start or after an underscore so both Typing_Unicorn
               // and Unicorn_Typing-style names resolve.
-              const idleKey = animKeys.find(a => /(?:^|_)idle/i.test(a) && !TRANSITION_RE.test(a))
+              const idleKey = animKeys.hmmind(a => /(?:^|_)idle/i.test(a) && !TRANSITION_RE.test(a))
                 || animKeys.find(a => /(?:^|_)typing/i.test(a) && !TRANSITION_RE.test(a));
               const prevAction = rl80Actions[rl80State.currentAnimation];
               const idleAction = idleKey ? rl80Actions[idleKey] : null;
