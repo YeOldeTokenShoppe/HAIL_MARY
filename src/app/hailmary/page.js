@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef, memo, Suspense } fro
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { OrbitControls, Cloud, Clouds, useProgress } from "@react-three/drei";
+import { OrbitControls, Cloud, Clouds, useProgress, useGLTF } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import CleanCanvas from "@/components/canvas/CleanCanvas";
@@ -401,7 +401,50 @@ const HELL_CLOUDS = [
   { position: [10, 15, 4],   speed: 0.4,  opacity: 0.5,  color: "#999999", width: 15, depth: 3,   segments: 14 },
 ];
 
-const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false, lowPoly = false }) {
+// Experiment (2026-09-02, Michelle): a Synty low-poly cloud ring GLB in place
+// of drei's volumetric day clouds on the phone tier. The file is 45 placements
+// of 3 meshes (≈1k triangles, one lit atlas material, 0.18 MB) authored on a
+// ~400-unit ring at 23–133 high in centimetre scale; scaled 0.04 and lifted 8
+// it sits in the same band as DAY_CLOUDS (≈15 units out, 9–13 high). Lit, so
+// it takes the time-of-day light and fog like everything else; the atlas'
+// emissive channel is dropped so the ring cannot glow at night. Drifts as one
+// slow ring. Switch: SkyDome `cloudMode` ("drei" | "glb"); ?clouds=glb|drei
+// forces it on any tier for A/B.
+const LOW_POLY_CLOUDS_GLB = "/models/clouds_lowPoly.glb";
+const LOW_POLY_CLOUDS_SCALE = 0.04;
+// Height of the ring's base. The field camera looks up and around, so 8 puts
+// the ring where DAY_CLOUDS are; the phone's rig scene looks nearly level at
+// a rig 1 unit up, so the same ring sits above its top edge — the phone
+// passes a lower lift so the clouds decorate its sky band instead.
+const LOW_POLY_CLOUDS_LIFT = 8;
+const LOW_POLY_CLOUDS_LIFT_PHONE = 3;
+const LOW_POLY_CLOUDS_DRIFT = 0.004; // rad/s, the whole ring
+function LowPolyClouds({ hell = false, lift = LOW_POLY_CLOUDS_LIFT }) {
+  const { scene } = useGLTF(LOW_POLY_CLOUDS_GLB);
+  const group = useRef();
+  const ring = useMemo(() => {
+    const s = scene.clone(true);
+    s.traverse((o) => {
+      if (!o.isMesh) return;
+      const m = o.material.clone();
+      m.emissiveMap = null;
+      m.emissive.set(0x000000);
+      if (hell) m.color.set("#7a5a50");
+      o.material = m;
+      o.castShadow = false; o.receiveShadow = false;
+      o.frustumCulled = true;
+    });
+    return s;
+  }, [scene, hell]);
+  useFrame((_, dt) => { if (group.current) group.current.rotation.y += LOW_POLY_CLOUDS_DRIFT * dt; });
+  return (
+    <group ref={group} position={[0, lift, 0]} scale={LOW_POLY_CLOUDS_SCALE}>
+      <primitive object={ring} />
+    </group>
+  );
+}
+
+const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2, hell = false, lowPoly = false, cloudMode = "drei", cloudLift = LOW_POLY_CLOUDS_LIFT }) {
   const topCol = useMemo(() => new THREE.Color(skyColor), [skyColor]);
   const bottomCol = useMemo(() => skyBottom ? new THREE.Color(skyBottom) : null, [skyBottom]);
   const uniforms = useMemo(() => ({
@@ -451,6 +494,8 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
               segments={lowPoly ? Math.min(c.segments, 6) : c.segments} />
           ))}
         </Clouds>
+      ) : cloudMode === "glb" ? (
+        <Suspense fallback={null}><LowPolyClouds lift={cloudLift} /></Suspense>
       ) : (
         // Low tier: 4 of the 7 day clouds, segments capped at 2 (they're small
         // and distant — the cut is barely legible but halves the cloud draw).
@@ -1592,6 +1637,13 @@ export default function OilPage() {
     setTouchTier(isTouchDevice());
   }, []);
   const lowGfx = qForce ? qForce === "low" : (isMobile || touchTier);
+  // Cloud experiment (2026-09-02): the low tier gets the low-poly GLB ring;
+  // ?clouds=glb|drei forces either on any tier for the comparison.
+  const [cloudForce, setCloudForce] = useState(null);
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("clouds");
+    if (c === "glb" || c === "drei") setCloudForce(c);
+  }, []);
   // Publish for deep children that read the tier without prop-drilling — same
   // convention as __hmWalkerPos / __hmVendorSpots (the vendor idle gate reads
   // this). Off-tree so OilVoxelGrid → CommercialStrip → VendorModel stays clean.
@@ -1605,9 +1657,10 @@ export default function OilPage() {
     // gives up what a measurement justified — see LOW_TIER_DPR.
     dpr: lowGfx ? LOW_TIER_DPR : [1, 1.5],
     clouds: lowGfx ? "low" : "full",     // SkyDome renders fewer/flatter clouds
+    cloudMode: cloudForce || (lowGfx ? "glb" : "drei"),
     lazyVendorAnim: lowGfx,              // vendors hold a static pose until focused
     fireworks: lowGfx ? 1 : 2,
-  }), [lowGfx]);
+  }), [lowGfx, cloudForce]);
 
   // Published as a CSS variable on <html> so overlays — including the ones that
   // portal to document.body (polaroid, purchase modal, certificate lightbox) —
@@ -7775,7 +7828,7 @@ export default function OilPage() {
                 gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
                 <KTX2Init />
-                <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} lowPoly={quality.clouds === "low"} />
+                <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} lowPoly={quality.clouds === "low"} cloudMode={quality.cloudMode} cloudLift={LOW_POLY_CLOUDS_LIFT_PHONE} />
                 {envPreset === "hell" && <HellSkyEffects />}
                 {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
                 {parabolum && <ParabolumMoon />}
@@ -8293,7 +8346,7 @@ export default function OilPage() {
             gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
             <KTX2Init />
-            <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} lowPoly={quality.clouds === "low"} />
+            <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} hell={envPreset === "hell"} lowPoly={quality.clouds === "low"} cloudMode={quality.cloudMode} />
             {envPreset === "hell" && <HellSkyEffects />}
             {!parabolum && envPreset === "solstice" && <SolsticeSkyEffects />}
             {parabolum && <ParabolumMoon />}
