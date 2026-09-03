@@ -39,8 +39,16 @@ import {
 // load. Verified rendering in Chrome, Safari and iPad Safari; the loader
 // wiring is KTX2Init/CleanCanvas (see src/lib/ktx2.js). ?strip=webp falls
 // back to the webp build for an A/B. Rebuild recipe: docs/strip-export.md.
-const STRIP_MODEL_WEBP = "/models/CommercialStrip3_opt2k.glb?v=webp8";
-const STRIP_MODEL_KTX2 = "/models/CommercialStrip3_opt2k_ktx2.glb?v=ktx1";
+// ONE tag for BOTH builds. They are two encodings of the same Blender export, so
+// a rebuild invalidates both — and the KTX2 URL is the one actually fetched by
+// default, so bumping only the webp tag changes nothing. That is exactly how a
+// stale strip reached rl80.com on 2026-09-02 while local dev looked correct: the
+// dev server revalidates on every request regardless of the query string, so the
+// fresh file always won locally, while the CDN kept serving whatever it had
+// cached under the unchanged `?v=ktx2` key. BUMP THIS on every rebuild.
+const STRIP_MODEL_V = "9";
+const STRIP_MODEL_WEBP = `/models/CommercialStrip3_opt2k.glb?v=${STRIP_MODEL_V}`;
+const STRIP_MODEL_KTX2 = `/models/CommercialStrip3_opt2k_ktx2.glb?v=${STRIP_MODEL_V}`;
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
     ? STRIP_MODEL_WEBP

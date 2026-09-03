@@ -4304,6 +4304,23 @@ function PlotBorderHighlight({ position, cellSize }) {
 // from that plot's pumpConfig zone colors. ~1 draw call per idle rig.
 const _MERGE_GRAY = new THREE.Color(0x8a8a8a);
 
+// MachinePanel parity between the merged field and the close-up rig.
+// The full rig (Pumpjack) re-dresses three panel parts at RUNTIME: both screens
+// are darkened to LED black (darkenScreen + the PressurePanel2 block), the baked
+// LOW/MED/HIGH letter meshes are hidden behind live drei text, and GaugeNeedle
+// gets a red emissive. None of that reaches the merge, which bakes the GLB as
+// authored — the screens ship cyan (PolygonGangWarfare_Base_Mat.001/.002, base
+// AND emissive 0.19/0.78/1.0), so an idle rig showed lit cyan screens with baked
+// digits while the selected one showed black screens with live readouts.
+// Bake the TREATED look instead. Keep these in sync with the Pumpjack blocks.
+const MERGE_SCREEN_DARK = new THREE.Color("#06080c");
+const MERGE_NEEDLE_RED = new THREE.Color("#ff2a1a");
+const MERGE_SCREEN_MESHES = new Set(["PressurePanel", "PressurePanel2"]);
+// Hidden on the full rig. The merged field has no live text to put in their
+// place, so a dark, unlit screen is the honest match — and at field distance a
+// baked digit was never readable anyway.
+const MERGE_HIDDEN_MESHES = new Set(["Text_HIGH", "Text_MED", "Text_LOW"]);
+
 // Cache a texture's full pixel data once (the model uses Synty-style color-swatch
 // ATLASES, so we must sample at each part's UV, not average the whole atlas).
 const _texDataCache = new WeakMap();
@@ -4379,6 +4396,7 @@ function buildBaseRig(scene) {
     if (!child.isMesh || !child.geometry) return;
     if (/^(CrankPin|BeamPin|CrankAxle)(_Left|_Right)?$/.test(child.name)) return; // hide only mesh markers, not "_Mesh" geometry
     if (child.name === "Envelope") return; // removed from scene
+    if (MERGE_HIDDEN_MESHES.has(child.name)) return; // full rig hides these
     if (child.name === "Straw") {
       const wp = new THREE.Vector3();
       child.getWorldPosition(wp);
@@ -4499,7 +4517,13 @@ function buildBaseRig(scene) {
     // Per-vertex base color: sample the atlas swatch at each vertex's UV; for
     // untextured (flat-material) parts use the material color. This reproduces
     // the textured look (copper pipes etc.) on the merged rig in one draw call.
-    const hasMap = !!child.material?.map;
+    // Parts the full rig re-dresses at runtime take the treated colour, not the
+    // authored one — the atlas/flat sample is what made the idle panel diverge.
+    const isScreen = MERGE_SCREEN_MESHES.has(child.name);
+    const forcedColor = isScreen ? MERGE_SCREEN_DARK
+      : child.name === "GaugeNeedle" ? MERGE_NEEDLE_RED
+      : null;
+    const hasMap = !forcedColor && !!child.material?.map;
     const td = hasMap ? getTexData(child.material.map) : null;
     const cols = new Float32Array(n * 3);
     if (td && uv) {
@@ -4508,14 +4532,16 @@ function buildBaseRig(scene) {
         cols[i * 3] = tmp.r; cols[i * 3 + 1] = tmp.g; cols[i * 3 + 2] = tmp.b;
       }
     } else {
-      const c = child.material?.color || _MERGE_GRAY;
+      const c = forcedColor || child.material?.color || _MERGE_GRAY;
       for (let i = 0; i < n; i++) { cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b; }
     }
 
     // Per-vertex finish: textured "detail/metal" parts read reflective; flat
     // painted parts stay more matte. Drives the material via onBeforeCompile.
-    const metalVal = hasMap ? 0.8 : 0.3;
-    const roughVal = hasMap ? 0.4 : 0.5;
+    // Screens match darkenScreen's matte glass (roughness 1, metalness 0), or the
+    // env map lights them to a hotspot the close-up rig does not have.
+    const metalVal = isScreen ? 0.0 : hasMap ? 0.8 : 0.3;
+    const roughVal = isScreen ? 1.0 : hasMap ? 0.4 : 0.5;
     const mArr = new Float32Array(n); mArr.fill(metalVal);
     const rArr = new Float32Array(n); rArr.fill(roughVal);
 
