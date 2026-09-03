@@ -18,7 +18,8 @@ import { couponValid, couponDaysLeft } from "@/lib/oilTicket";
 import OilAnchorEvent from "@/components/OilAnchorEvent";
 import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
-import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
+import PimpMyPumpPanel, { getDefaultPumpConfig, THEME_PRESETS } from "@/components/PimpMyPumpPanel";
+import RigScene, { RIG_CAMERA } from "@/components/RigScene";
 import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
 import DailyTicketPanel from "@/components/DailyTicketPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
@@ -32,7 +33,6 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
 import NavControlsHome from "@/components/NavControlsHome";
-import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import CyberNav from "@/components/CyberNav";
 import PolaroidSnapshot from "@/components/PolaroidSnapshot";
@@ -1334,10 +1334,21 @@ const SeasonCountdown = memo(function SeasonCountdown({ gameStartDate, style }) 
 // can read. Scale them with the viewport instead. CSS zoom (not transform)
 // reflows fonts, widths and SVGs together, so the grid columns are multiplied
 // by the same factor below to keep the panels' own layout width unchanged.
+// Finger-driven devices never get a UI scale below this. The clamp above
+// bottoms out at 1 for anything under 1440px, which handed a 13" iPad the
+// desktop 10–11px panel type and 26px targets. Landscape only for now: in
+// portrait the grid already squeezes the 3D column to ~411px and a larger
+// scale would squeeze it further — portrait gets its own layout later.
+const TOUCH_UI_SCALE_MIN = 1.15;
+
 function useUiScale(base = 1440, max = 2.5) {
   const [scale, setScale] = useState(1);
   useEffect(() => {
-    const update = () => setScale(Math.min(max, Math.max(1, window.innerWidth / base)));
+    const update = () => {
+      let next = Math.min(max, Math.max(1, window.innerWidth / base));
+      if (isTouchDevice() && window.innerWidth >= 1200) next = Math.max(next, TOUCH_UI_SCALE_MIN);
+      setScale(next);
+    };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
@@ -1350,6 +1361,15 @@ function useUiScale(base = 1440, max = 2.5) {
 // fingers; zoom the non-canvas content (same mechanism as the desktop UI
 // scale). 1.2 keeps the 252px gauge row inside the 312px layout width.
 const MOBILE_PANEL_ZOOM = 1.2;
+// Header (48) + tab bar (39) above the scroll area.
+const MOBILE_CHROME_H = 87;
+// Non-canvas strip kept visible under the scene at the initial scroll position:
+// the scroll handle plus the YOUR RIG title row, both under the 1.2× panel
+// zoom (≈53 + ≈43, measured 92px). The canvas height is derived so exactly
+// that peek shows on mid-height phones; taller phones show more of the stack.
+// (The phone has no bottom nav on this page since 2026-09-02 — it duplicated
+// the stack's own buttons and its FAB sat over the first card's.)
+const MOBILE_PEEK_H = 100;
 // Height of the pinned scene while the rig editor is open on mobile: 45% of
 // the viewport (≈365px on a 812px phone), so the rig is a proper viewer and the
 // editor still has ~300px below it. Clamped for very short / very tall phones.
@@ -2312,6 +2332,12 @@ export default function OilPage() {
   const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "surface" | "xsec"
   // Rig editor (Pimp My Pump) open on the phone — pins the scene as a compact live view.
   const [pimpOpenMobile, setPimpOpenMobile] = useState(false);
+  // Phone showcase rig (no claim yet): pages through the editor's theme
+  // presets as an enticement — the same list Pimp My Pump sells. Opens on
+  // GOLD RUSH.
+  const showcaseKeys = useMemo(() => Object.keys(THEME_PRESETS), []);
+  const [showcaseIdx, setShowcaseIdx] = useState(() => Math.max(0, Object.keys(THEME_PRESETS).indexOf("goldRush")));
+  const showcaseConfig = useMemo(() => THEME_PRESETS[showcaseKeys[showcaseIdx]].build(), [showcaseKeys, showcaseIdx]);
 
   // 2D interaction state lifted up
   const [selectedX, setSelectedX] = useState(null);
@@ -4061,6 +4087,33 @@ export default function OilPage() {
     setDrillDepth(0);
     handleFlyTo(x, y);
   }, [handleFlyTo, gridSize]);
+
+  // "Pick a plot" without a plot selected: take the player to the survey map.
+  // On the phone that is the SURFACE tab (the field lives there now); on
+  // desktop the map is already on screen, so just bring it into view.
+  const goToSurveyMap = useCallback(() => {
+    if (isMobile) {
+      setMobileTab("surface");
+      document.getElementById("oil-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      document.getElementById("survey-map")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isMobile]);
+
+  // Phone: the 3D is your rig (RigScene), so the panels should be about your
+  // plot from the first frame — select it once when the claim arrives. Once,
+  // so a later deselect by the player is respected. And there is no field to
+  // fly over, so the intro is over before it starts.
+  const phoneAutoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (!isMobile) return;
+    setIntroComplete(true);
+    if (phoneAutoSelectedRef.current || selectedX !== null || userDrill?.col == null) return;
+    phoneAutoSelectedRef.current = true;
+    setSelectedX(userDrill.col);
+    setSliceY(userDrill.row);
+    setDrillDepth(0);
+  }, [isMobile, userDrill?.col, userDrill?.row, selectedX]);
 
   // ── Click-to-drill handler — one layer per click, capped by playerDepth (time + bonus) ──
   const handleDailyDrill = useCallback(async () => {
@@ -6788,10 +6841,14 @@ export default function OilPage() {
                     ⛏ STAKE YOUR CLAIM ({selectedX + 1}, {sliceY + 1})
                   </button>
                 ) : (
-                  <button disabled style={drillBtnStyles.disabled}>SELECT AN OPEN PLOT</button>
+                  <button onClick={goToSurveyMap} style={drillBtnStyles.active}>
+                    {isMobile ? "PICK A PLOT ON THE SURVEY MAP" : "SELECT AN OPEN PLOT"}
+                  </button>
                 )}
                 <div style={drillBtnStyles.hint}>
-                  Click any open plot on the field or the survey map — that ground is yours for the season.
+                  {isMobile
+                    ? "Tap any open plot on the survey map — that ground is yours for the season."
+                    : "Click any open plot on the field or the survey map — that ground is yours for the season."}
                 </div>
                 <SeasonCountdown
                   gameStartDate={gameStartDate}
@@ -6856,7 +6913,9 @@ export default function OilPage() {
                 CLAIM THIS PLOT ({selectedX + 1}, {sliceY + 1})
               </button>
             ) : (
-              <button disabled style={drillBtnStyles.disabled}>SELECT AN OPEN PLOT</button>
+              <button onClick={goToSurveyMap} style={drillBtnStyles.active}>
+                {isMobile ? "PICK A PLOT ON THE SURVEY MAP" : "SELECT AN OPEN PLOT"}
+              </button>
             )
           ) : (
             /* Claims closed (mid-season / ended) — next-season waitlist is the
@@ -7115,7 +7174,7 @@ export default function OilPage() {
       {/* Test-mode walk entry — the real button lives on the V2 core-sample
           card (signed-in only); the sandbox needs its own door so the ground
           game (and the demon encounter) can be exercised without a claim. */}
-      {selectedX !== null && introComplete && (
+      {selectedX !== null && introComplete && !isMobile && (
         <button
           onClick={() => setWalkMode(true)}
           style={{ ...drillBtnStyles.active, padding: "4px 10px", fontSize: 11, marginTop: 8, width: "100%" }}
@@ -7593,26 +7652,6 @@ export default function OilPage() {
   const scrollToRig = () => {
     setTimeout(() => document.getElementById("your-rig")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   };
-  const mobilePrimary = (() => {
-    if (!user) return { label: "PLAY", sub: "SIGN IN", title: "Sign in to play", onClick: () => router.push("/sign-in?redirect_url=/hailmary") };
-    if (userDrill?.col == null) {
-      const claimsOpen = gamePhase === "ticket_sale" || (gamePhase === "active" && testingEnabled);
-      return {
-        label: "CLAIM", sub: claimsOpen ? "PICK A PLOT" : "WAITLIST", title: claimsOpen ? "Pick a plot to claim" : "Join the waitlist",
-        onClick: () => {
-          if (claimsOpen) { setMobileTab("surface"); document.getElementById("oil-scroll")?.scrollTo({ top: 0, behavior: "smooth" }); }
-          else scrollToRig();
-        },
-      };
-    }
-    if (showPayout && oilInTank > 0 && !tankDrained) {
-      return { label: "BANK", sub: fmtUsd(tankShownOil), title: "Bank your Betroleum", onClick: handleTankDrain };
-    }
-    return {
-      label: "MY RIG", sub: showPayout ? fmtUsd(bankedOil) : "PRE-SEASON", title: "Go to your rig",
-      onClick: () => { setMobileTab("3d"); handleSelectClaim({ x: userDrill.col, y: userDrill.row }); scrollToRig(); },
-    };
-  })();
 
   // ═══════════════════════════════════════════════════════════
   // MOBILE LAYOUT — tabbed views + scrollable panel below
@@ -7625,7 +7664,6 @@ export default function OilPage() {
         {previewBanner}
         <div style={styles.scanlines} />
         <div style={styles.grain} />
-        <style>{`.nav-mobile-home { background: transparent !important; border: none !important; box-shadow: none !important; }`}</style>
 
         {/* Header */}
         <header style={m.header}>
@@ -7674,13 +7712,34 @@ export default function OilPage() {
             >
               ?
             </button>
+            {/* Account: the phone has no bottom nav any more (it duplicated the
+                stack's own buttons and its FAB sat over them), so identity
+                lives here — sign-in when signed out, the account modal when in. */}
+            <button
+              onClick={() => (user ? setShowAccountModal(true) : router.push("/sign-in?redirect_url=/hailmary"))}
+              title={user ? "Account" : "Sign in"}
+              aria-label={user ? "Account" : "Sign in"}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 40, height: 40, borderRadius: 10,
+                background: "rgba(212, 175, 55, 0.05)",
+                border: "1.5px solid rgba(212, 175, 55, 0.2)",
+                color: theme.accent, cursor: "pointer", padding: 0,
+                flexShrink: 0, fontFamily: "inherit",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
           </div>
         </header>
 
         {/* Tab bar */}
         <div style={m.tabBar}>
           {[
-            { key: "3d", label: "3D" },
+            { key: "3d", label: "RIG" },
             { key: "surface", label: "SURFACE" },
             { key: "xsec", label: "X-SECTION" },
           ].map((tab) => (
@@ -7709,7 +7768,7 @@ export default function OilPage() {
           {(
             <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}), ...(mobileTab === "3d" ? null : { display: "none" }) }}>
               <CleanCanvas
-                camera={{ position: [0, 3.5, 4], fov: 50 }}
+                camera={{ position: RIG_CAMERA.position, fov: 50 }}
                 dpr={quality.dpr}
                 frameloop={mobileTab === "3d" ? "always" : "never"}
                 style={{ width: "100%", height: "100%" }}
@@ -7725,104 +7784,86 @@ export default function OilPage() {
                 {envPreset === "night" && <Suspense fallback={null}><ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} /></Suspense>}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} finale sound={fireworksSound} />}
                 <EnvLights env={env} moodScale={moodScale} />
-                <group position={[0, 1, 0]}>
-                  <OilVoxelGrid
-                    strataLivePlots={loopV2 ? allPlotsMap : null}
-                    blockHash={blockHash}
-                    numberOfDeposits={numberOfDeposits}
-                    numberOfHellPockets={numberOfHellPockets}
-                    totalOilBudget={totalOilBudget}
-                    gridX={gridSize}
-                    gridY={gridSize}
-                    revealProgress={revealProgress}
-                    animateReveal={animateReveal}
-                    revealDuration={2}
-                    drillDay={effectiveDrillDay}
-                    selectedCol={selectedX}
-                    selectedRow={selectedX !== null ? sliceY : null}
-                    onSelectCell={(col, row) => { setSelectedX(col); setSliceY(row); setDrillDepth(0); }}
-                    onEnvelopeClick={(col, row) => setChatModalPlotKey(`${col}_${row}`)}
-                    onFlyTo={handleFlyTo}
-                    onZoomOut={handleZoomOut}
-                    pumpConfig={pumpConfig}
-                    allPumpConfigs={allPumpConfigs}
-                    oilStrike={combinedStrike}
-                    forceStrikeGusher={isAdmin || isReport || isTest}
-                    gusherTrigger={gusherTest}
-                    drillEvent={drillEvent}
-                    drillProximity={drillProximity}
-                    tankFill={tankFill}
-                    onTankDrain={handleTankDrain}
-                    communityOil={communityOil}
-                    rogueEvents={rogueEvents}
-                    gusherEvents={gusherEvents}
-                    onRogueArrive={handleRogueArrive}
-                    onRogueConsequence={handleRogueConsequence}
-                    envPreset={envPreset}
-                    envMapPreset={envMapPreset}
-                    parabolum={parabolum}
-                    plotsWithMessages={plotsWithMessages}
-                    hellActive={hellActive}
-                    hellCol={hellCol}
-                    hellRow={hellRow}
-                    demonBounty={demonBounty}
-                    demonTargetCol={localDemonTarget?.col}
-                    demonTargetRow={localDemonTarget?.row}
-                    demonCapturable={demonCapturable}
-                    demonRequiredHits={demonRequiredHits}
-                    onClaimBounty={handleClaimBounty}
-                    onDemonMiss={handleDemonMiss}
-                    onDemonAttack={handleDemonAttack}
-                    cameraViewable={cameraViewable}
-                    onFocusObject={handleFocusObject}
-                    onBoothPhoto={handleBoothPhoto}
-                  />
-                  {/* activeUserDrill, not userDrill: test mode synthesizes a
-                      drill from the selected cell (same as the panels), so
-                      the walker — and the demon encounter — are testable. */}
-                  {walkMode && activeUserDrill?.col != null && (
-                    <PlayerWalker
-                      worldW={gridSize} worldD={gridSize}
-                      spawnCol={activeUserDrill.col} spawnRow={activeUserDrill.row}
-                      frontier={frontierTargets}
-                      onWildcat={handleWildcat}
-                      controlsRef={controlsRefMobile}
-                      onCam={setWalkerCam}
-                      onVendorMode={setWalkerVendor}
-                      onExit={() => { setWalkerCam("follow"); setWalkerVendor(false); setWalkMode(false); }}
+                {/* Phone 3D = your rig, not the field (2026-09-02, see RigScene).
+                    The rig card's live values feed it exactly as the field fed
+                    the selected plot. The showcase rig stands in until a plot is
+                    claimed. The demon stopgap: a bounty targeting THIS plot
+                    rises on the tile, so it can still be tapped and claimed
+                    here until the arena ships. */}
+                {(() => {
+                  const own = activeUserDrill?.col != null ? { col: activeUserDrill.col, row: activeUserDrill.row } : null;
+                  const ownKey = own ? `${own.col}_${own.row}` : null;
+                  const ownSelected = own && selectedX === own.col && sliceY === own.row;
+                  const ownConfig = own
+                    ? (ownSelected ? pumpConfig : { ...getDefaultPumpConfig(), ...(allPumpConfigs[ownKey]?.config || {}) })
+                    : showcaseConfig;
+                  const demonTargetsOwn = own && (
+                    (demonBounty && (localDemonTarget?.col ?? demonBounty.targetCol ?? demonBounty.summonerCol) === own.col && (localDemonTarget?.row ?? demonBounty.targetRow ?? demonBounty.summonerRow) === own.row) ||
+                    (hellActive && hellCol === own.col && hellRow === own.row)
+                  );
+                  return (
+                    <RigScene
+                      config={ownConfig}
+                      plot={own}
+                      gridSize={gridSize}
+                      blockHash={blockHash}
+                      numberOfDeposits={numberOfDeposits}
+                      numberOfHellPockets={numberOfHellPockets}
+                      drillDay={own ? effectiveDrillDay : 3}
+                      oilStrike={own ? combinedStrike : null}
+                      drillEvent={own ? drillEvent : 0}
+                      drillProximity={own ? drillProximity : 0}
+                      tankFill={own ? tankFill : 0}
+                      onTankDrain={own ? handleTankDrain : undefined}
+                      envPreset={envPreset}
+                      envMapPreset={envMapPreset}
+                      parabolum={parabolum}
+                      forceStrikeGusher={isAdmin || isReport || isTest}
+                      gusherTrigger={own ? gusherTest : 0}
+                      gusherEvents={gusherEvents}
+                      hasMessages={!!(ownKey && plotsWithMessages[ownKey])}
+                      onEnvelopeClick={own ? () => setChatModalPlotKey(ownKey) : undefined}
+                      hellActive={!!(own && hellActive && hellCol === own.col && hellRow === own.row)}
+                      demon={demonTargetsOwn ? {
+                        active: true,
+                        seed: demonBounty?.id || `local_${own.col}_${own.row}`,
+                        capturable: demonCapturable,
+                        requiredHits: demonRequiredHits,
+                        onBanish: handleClaimBounty,
+                        onMiss: handleDemonMiss,
+                        onAttack: handleDemonAttack,
+                      } : null}
+                      cameraViewable={cameraViewable}
                     />
-                  )}
-                </group>
+                  );
+                })()}
                 <CctvRenderer canvasRef={cctvCanvasRef} />
-                {introComplete ? (
-                  <>
-                    {/* Orbit mounts in the walker's ORBIT cam mode and during
-                        vendor face-to-faces (sky grammar borrows the camera). */}
-                    {(!walkMode || walkerCam === "orbit" || walkerVendor) && <OrbitControls
-                      ref={controlsRefMobile}
-                      enableDamping
-                      dampingFactor={0.1}
-                      enablePan
-                      minDistance={walkMode ? 0.25 : 1.5}
-                      maxDistance={45}
-                      maxPolarAngle={Math.PI}
-                      minPolarAngle={0}
-                      zoomToCursor
-                      autoRotate={hellOrbit}
-                      autoRotateSpeed={0.6}
-                      onStart={() => { if (hellOrbit) setHellOrbit(false); }}
-                      target={introExitTarget || [1.5, 1.5, 1.5]}
-                    />}
-                    {(!walkMode || walkerVendor) && <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />}
-                  </>
-                ) : (
-                  <CameraFlyIn onComplete={handleIntroComplete} mobile grid={gridSize} />
-                )}
                 <CameraShake shakeRef={shakeRef} />
                 {/* Perf HUD — add ?perf to the URL to show it on ANY device
                     (measure FPS/draw calls/triangles on a real phone). */}
                 {showPerf && <Perf position="top-left" zIndex={10001} />}
               </CleanCanvas>
+              {/* Showcase pager — no claim yet: page through the rig styles the
+                  editor sells. Sits bottom-centre, clear of the tray at right. */}
+              {activeUserDrill?.col == null && mobileTab === "3d" && !editorOpen && (
+                <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 10, ...TOOLBAR_PILL, gap: 4, padding: "2px 4px", cursor: "default" }}>
+                  <button
+                    type="button"
+                    aria-label="Previous rig style"
+                    onClick={() => setShowcaseIdx((i) => (i - 1 + showcaseKeys.length) % showcaseKeys.length)}
+                    style={{ width: 36, height: 36, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}
+                  >◀</button>
+                  <span style={{ minWidth: 132, textAlign: "center", fontSize: 10, letterSpacing: "0.14em" }}>
+                    {THEME_PRESETS[showcaseKeys[showcaseIdx]].label}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Next rig style"
+                    onClick={() => setShowcaseIdx((i) => (i + 1) % showcaseKeys.length)}
+                    style={{ width: 36, height: 36, background: "none", border: "none", color: "inherit", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}
+                  >▶</button>
+                </div>
+              )}
               {/* The game's fixed overlays sit at z-index 10000; the
                   perf panel bakes 9999 into its own stylesheet and
                   ignores inline style on the fixed container, so
@@ -7846,9 +7887,8 @@ export default function OilPage() {
               <div style={{ ...styles.cornerBracket, top: 6, right: 6, transform: "scaleX(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, left: 6, transform: "scaleY(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, right: 6, transform: "scale(-1)" }} />
-              <div style={styles.gridLabel}>
-                {gridSize}&times;{gridSize}&times;{DEPTH_Z} 
-              </div>
+              {/* No field dimensions badge on the phone: the scene is one rig,
+                  and the survey map carries the field. */}
               {selectedX !== null && (() => {
                 const mineCol = userDrill?.col ?? myPlot?.col;
                 const mineRow = userDrill?.row ?? myPlot?.row;
@@ -7866,36 +7906,8 @@ export default function OilPage() {
               })()}
               {!editorOpen && (<>
               <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, ...TOOLBAR_TRAY }}>
-                <button
-                  onClick={toggleFireworks}
-                  title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
-                  style={toolbarBtn(fireworksOn, 32)}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2 L14 8 L12 6 L10 8 Z" />
-                    <path d="M12 6 L12 12" />
-                    <path d="M8 14 L5 11" /><path d="M16 14 L19 11" />
-                    <path d="M6 18 L3 17" /><path d="M18 18 L21 17" />
-                    <path d="M9 20 L7 22" /><path d="M15 20 L17 22" />
-                    <circle cx="12" cy="16" r="3" fill={fireworksOn ? "currentColor" : "none"} opacity={fireworksOn ? 0.3 : 1} />
-                  </svg>
-                </button>
-                {fireworksOn && (
-                  <button
-                    onClick={() => setFireworksSound((s) => !s)}
-                    title={fireworksSound ? "Mute fireworks sound" : "Unmute fireworks sound"}
-                    style={toolbarBtn(fireworksSound, 32)}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 5 6 9H2v6h4l5 4z" />
-                      {fireworksSound ? (
-                        <><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></>
-                      ) : (
-                        <><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></>
-                      )}
-                    </svg>
-                  </button>
-                )}
+                {/* No fireworks toggle on the phone: the rig scene is a small
+                    frame and the launcher sat on top of the style pager. */}
                 <button
                   title="Snapshot"
                   onClick={handleManualSnapshot}
@@ -7934,7 +7946,7 @@ export default function OilPage() {
             <button
               type="button"
               style={m.scrollHandle}
-              aria-label="Scroll down to your rig"
+              aria-label="Scroll down to your report"
               onClick={() => {
                 document.getElementById("oil-scroll")?.scrollBy({
                   top: Math.round(window.innerHeight * 0.5),
@@ -7943,7 +7955,7 @@ export default function OilPage() {
               }}
             >
               <span style={m.scrollHandleGrip} />
-              <span>Scroll for your rig ↓</span>
+              <span>Scroll for your report ↓</span>
             </button>
           )}
 
@@ -8077,37 +8089,6 @@ export default function OilPage() {
           </div>
         </div>
 
-        {/* Bottom Mobile Nav */}
-        <MobileBottomNav
-          isPlaying={contextIsPlaying}
-          onPlayMusic={() => play()}
-          onStopMusic={() => pause()}
-          onSkipTrack={() => nextTrack()}
-          hideMenu
-          hideMusicOnMobile
-          hideWallet
-          onUserClick={() => {}}
-          isUserSignedIn={!!user}
-          userImage={user?.imageUrl}
-          onBuyClick={mobilePrimary.onClick}
-          centerLabel={mobilePrimary.label}
-          centerSubLabel={mobilePrimary.sub}
-          centerTitle={mobilePrimary.title}
-          centerSize={72}
-          isMobile
-          show80sButton={false}
-          darkMode={uiDark}
-          accountModalInitialTab="referrals"
-          accountModalTheme="industrial"
-          accountModalUnlockedItems={unlockedItems}
-          extraLeft={[{
-            key: "home",
-            label: "Home",
-            title: "Return to home",
-            onClick: () => router.push("/"),
-            icon: <img src="/brand-mark-cyan.svg" alt="" width="24" height="24" style={{ display: "block" }} />,
-          }]}
-        />
 
         {/* Buy Modal */}
         <BuyModal
@@ -8513,7 +8494,7 @@ export default function OilPage() {
         {/* Middle column */}
         {!panelsCollapsed && (
           <div style={{ ...styles.midColumn, zoom: uiScale }}>
-            <div style={styles.midPanel}>
+            <div id="survey-map" style={styles.midPanel}>
               <OilSurfaceMap
                 claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
                 maxClaimTotal={communityMaxClaimTotal}
@@ -9534,7 +9515,9 @@ function getMobileStyles(t) { return {
     overflowY: "auto",
     overflowX: "hidden",
     WebkitOverflowScrolling: "touch",
-    paddingBottom: "calc(110px + env(safe-area-inset-bottom, 0px))",
+    // No bottom nav on this page: the stack runs to the viewport edge, with
+    // room for the home indicator.
+    paddingBottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
     background: t.panelWash || "transparent",
   },
 
@@ -9553,9 +9536,11 @@ function getMobileStyles(t) { return {
     // visible below the scene on small phones. The 3D canvas captures all touch
     // (OrbitControls), so without a touchable band below it the page can't be
     // scrolled on an iPhone 13. See scrollHandle below.
-    height: "56vh",
+    // Derived from the viewport so the peek below the scene lands at the
+    // bottom edge: 100dvh − header/tabs − peek. Was a flat 56vh.
+    height: `calc(100dvh - ${MOBILE_CHROME_H + MOBILE_PEEK_H}px - env(safe-area-inset-bottom, 0px))`,
     minHeight: 240,
-    maxHeight: 420,
+    maxHeight: 480,
     borderBottom: `1px solid ${t.border}`,
     transition: "height 0.3s ease, min-height 0.3s ease, max-height 0.3s ease",
   },

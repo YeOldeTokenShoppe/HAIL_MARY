@@ -6970,54 +6970,9 @@ export default function OilVoxelGrid({
   const revealRef = useRef(revealProgress);
   const animatingRef = useRef(animateReveal);
 
-  // Load side texture for ground block
-  const sideTex = useTexture("/LandGradient2.webp");
-  sideTex.wrapS = sideTex.wrapT = THREE.ClampToEdgeWrapping;
-
-  // Load topography texture for top surface
-  const topoTex = useTexture("/topography1.webp");
-  topoTex.wrapS = topoTex.wrapT = THREE.RepeatWrapping;
-
-  const groundPalette = useMemo(() => {
-    if (parabolum) {
-      return {
-        top: "#5a4a78",
-        bottom: "#2a1d44",
-        side: "#4a3a66",
-        wire: 0xa45cff,
-      };
-    }
-    if (envPreset === "solstice") {
-      return {
-        top: "#b99557",
-        bottom: "#6b4a26",
-        side: "#a8793a",
-        wire: 0xd6b351,
-      };
-    }
-    if (envPreset === "night") {
-      return {
-        top: "#6a7090",
-        bottom: "#2c2a40",
-        side: "#5e6478",
-        wire: 0x8290c0,
-      };
-    }
-    if (envPreset === "hell") {
-      return {
-        top: "#553018",
-        bottom: "#1c0c08",
-        side: "#4b2413",
-        wire: 0xaa3c20,
-      };
-    }
-    return {
-      top: "#8b7355",
-      bottom: "#5a4030",
-      side: "#ffffff",
-      wire: 0x8b7355,
-    };
-  }, [envPreset, parabolum]);
+  // Ground textures + per-environment palette — shared with the phone's
+  // RigScene so its tile matches the field exactly.
+  const { sideTex, topoTex, palette: groundPalette } = useGroundLook(envPreset, parabolum);
 
   // 6 materials for box faces: +x, -x, +y (top), -y (bottom), +z, -z
   const groundMaterials = useMemo(() => {
@@ -7052,18 +7007,7 @@ export default function OilVoxelGrid({
     // Per-column deposit depth: the layer (z) holding the most oil in that column.
     // The gusher feeder emanates from here so the beam rises out of the deposit the
     // cell actually holds, not from the current (often shallow) drill head.
-    const peak = {};
-    const g = result.grid;
-    for (let x = 0; x < gridX; x++) {
-      for (let y = 0; y < gridY; y++) {
-        let bestZ = -1, bestV = 0;
-        for (let z = 0; z < depthZ; z++) {
-          const v = g[x][y][z];
-          if (v > bestV) { bestV = v; bestZ = z; }
-        }
-        if (bestZ >= 0) peak[`${x}_${y}`] = bestZ;
-      }
-    }
+    const peak = buildPeakDepthMap(result.grid, gridX, gridY, depthZ);
     return { deposits: result.deposits, hellPockets: result.hellPockets, artifactCells: artifacts.cells, peakDepthMap: peak, oilGrid: result.grid };
   }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, numberOfHellPockets, totalOilBudget]);
 
@@ -7420,3 +7364,43 @@ export default function OilVoxelGrid({
     </group>
   );
 }
+
+// ── Shared with RigScene (the phone's rig-only 3D, 2026-09-02) ─────────────
+// The phone renders one plot instead of the field; these are the pieces a
+// plot is made of, kept here so the two scenes cannot drift apart.
+
+// Ground textures + per-environment palette (top / side / bottom / wire).
+export function useGroundLook(envPreset, parabolum) {
+  const sideTex = useTexture("/LandGradient2.webp");
+  sideTex.wrapS = sideTex.wrapT = THREE.ClampToEdgeWrapping;
+  const topoTex = useTexture("/topography1.webp");
+  topoTex.wrapS = topoTex.wrapT = THREE.RepeatWrapping;
+  const palette = useMemo(() => {
+    if (parabolum) return { top: "#5a4a78", bottom: "#2a1d44", side: "#4a3a66", wire: 0xa45cff };
+    if (envPreset === "solstice") return { top: "#b99557", bottom: "#6b4a26", side: "#a8793a", wire: 0xd6b351 };
+    if (envPreset === "night") return { top: "#6a7090", bottom: "#2c2a40", side: "#5e6478", wire: 0x8290c0 };
+    if (envPreset === "hell") return { top: "#553018", bottom: "#1c0c08", side: "#4b2413", wire: 0xaa3c20 };
+    return { top: "#8b7355", bottom: "#5a4030", side: "#ffffff", wire: 0x8b7355 };
+  }, [envPreset, parabolum]);
+  return { sideTex, topoTex, palette };
+}
+
+// Per-column deposit depth: the layer (z) holding the most oil in that column.
+// The gusher feeder emanates from here so the beam rises out of the deposit the
+// cell actually holds, not from the current (often shallow) drill head.
+export function buildPeakDepthMap(grid, gridX, gridY, depthZ) {
+  const peak = {};
+  for (let x = 0; x < gridX; x++) {
+    for (let y = 0; y < gridY; y++) {
+      let bestZ = -1, bestV = 0;
+      for (let z = 0; z < depthZ; z++) {
+        const v = grid[x][y][z];
+        if (v > bestV) { bestV = v; bestZ = z; }
+      }
+      if (bestZ >= 0) peak[`${x}_${y}`] = bestZ;
+    }
+  }
+  return peak;
+}
+
+export { Pumpjack, PlotSign, HellDemon, PUMPJACK_SCALE };

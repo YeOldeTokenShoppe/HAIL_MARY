@@ -166,7 +166,8 @@ export function getDefaultPumpConfig() {
 }
 
 // ── Fun preset themes (full rig presets) ─────────────────────────────────────
-const THEME_PRESETS = {
+// Exported for the phone's showcase rig (RigScene pager) — same list the editor offers.
+export const THEME_PRESETS = {
   stock: { label: "FACTORY DEFAULT", build: () => getDefaultPumpConfig() },
   goldRush: {
     label: "GOLD RUSH",

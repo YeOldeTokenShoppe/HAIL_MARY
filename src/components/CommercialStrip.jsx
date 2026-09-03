@@ -371,13 +371,20 @@ VENDOR_CATALOG.forEach((v) => {
 // exists (KTX2Loader.detectSupport needs it), or its textures fail and cache
 // as broken. It loads inside the Canvas via useGLTF below, after <KTX2Init/>
 // has run detectSupport.
-Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(url, true, true, extendKTX2));
-// ...and the companion belonging to whichever pose was drawn, so it arrives
-// with the character rather than popping in a beat later.
-VENDOR_CATALOG.forEach((v) => {
-  const companion = v.poseOverrides?.[CHOSEN_POSE_MODEL[v.id]]?.companionModel;
-  if (companion) useGLTF.preload(companion, true, true, extendKTX2);
-});
+// Vendor characters are preloaded when the STRIP mounts, not at module load:
+// the phone's rig-only scene imports this module (via OilVoxelGrid) without
+// ever rendering the strip, and module-scope preloads were downloading and
+// decoding nine characters it never shows (2026-09-02). drei's preload is
+// idempotent, so the desktop field still gets them on its first render.
+function preloadVendorModels() {
+  Object.values(CHOSEN_POSE_MODEL).forEach((url) => useGLTF.preload(url, true, true, extendKTX2));
+  // ...and the companion belonging to whichever pose was drawn, so it arrives
+  // with the character rather than popping in a beat later.
+  VENDOR_CATALOG.forEach((v) => {
+    const companion = v.poseOverrides?.[CHOSEN_POSE_MODEL[v.id]]?.companionModel;
+    if (companion) useGLTF.preload(companion, true, true, extendKTX2);
+  });
+}
 
 // three.js GLTFLoader pushes EVERY node name through
 // PropertyBinding.sanitizeNodeName, whose reserved set is [ ] . : / — dots are
@@ -3584,6 +3591,7 @@ function VendorSpotlight({ focus, stripScene, envPreset }) {
 }
 
 export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
+  useEffect(() => { preloadVendorModels(); }, []);
   const { scene: stripScene } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
   // The strip is the only KTX2 asset: once it is in, the transcoder worker and
   // its wasm heap are dead weight in the page process (see getKTX2Loader).

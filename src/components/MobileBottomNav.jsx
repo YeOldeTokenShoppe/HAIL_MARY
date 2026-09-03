@@ -270,7 +270,9 @@ export default function MobileBottomNav({
 
   /* Account slot — extracted so callers can place it on the LEFT of the
      center FAB via `accountOnLeft`. When signed in the emoji is swapped
-     for the user's avatar and the label becomes ACCT. */
+     for the user's avatar and the label becomes ACCT; signed out it says
+     SIGN IN (the page vocabulary — the /hailmary rig card and FAB route to
+     the same /sign-in page, and this slot is the one that names identity). */
   const accountSlot = !hideUserOnMobile && !onBookClick && (
     <button
       className="btm-nav-item"
@@ -297,7 +299,7 @@ export default function MobileBottomNav({
         )}
       </div>
       <span className="btm-nav-label">
-        {isHydrated && clerkUser ? 'ACCT' : 'LOGIN'}
+        {isHydrated && clerkUser ? 'ACCT' : 'SIGN IN'}
       </span>
     </button>
   );
