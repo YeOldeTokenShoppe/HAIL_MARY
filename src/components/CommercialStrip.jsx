@@ -39,7 +39,7 @@ import {
 // load. Verified rendering in Chrome, Safari and iPad Safari; the loader
 // wiring is KTX2Init/CleanCanvas (see src/lib/ktx2.js). ?strip=webp falls
 // back to the webp build for an A/B. Rebuild recipe: docs/strip-export.md.
-const STRIP_MODEL_WEBP = "/models/CommercialStrip3_opt2k.glb?v=webp7";
+const STRIP_MODEL_WEBP = "/models/CommercialStrip3_opt2k.glb?v=webp8";
 const STRIP_MODEL_KTX2 = "/models/CommercialStrip3_opt2k_ktx2.glb?v=ktx1";
 const STRIP_MODEL =
   typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
