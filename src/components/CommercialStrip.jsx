@@ -37,19 +37,42 @@ import {
 // staged — the encoder pipeline + loader wiring exist — but the drei/Suspense
 // detectSupport ordering still needs a debugging pass in a stable browser
 // before the KTX2 GLB can ship. See src/lib/ktx2.js.
-const STRIP_MODEL = "/models/CommercialStrip3_opt2k.glb?v=webp7";
+const STRIP_MODEL_WEBP = "/models/CommercialStrip3_opt2k.glb?v=webp7";
+const STRIP_MODEL_KTX2 = "/models/CommercialStrip3_opt2k_ktx2.glb?v=ktx1";
+// ?strip=ktx2 loads the staged KTX2/Basis build instead — for measuring the
+// memory difference in a real browser (the iPad Safari tab-kill diagnosis,
+// 2026-09-02). Default stays webp until that build is signed off.
+const STRIP_MODEL =
+  typeof window !== "undefined" && /[?&]strip=ktx2\b/.test(window.location.search)
+    ? STRIP_MODEL_KTX2
+    : STRIP_MODEL_WEBP;
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's
 // own Y-rotation is added on top in faceDirWorld to get world space.
 const VENDOR_LOCAL_FACE_YAW = -Math.PI / 2;
 
+// Interior dim: a prop you can be INSIDE (the fortune teller's wagon) is lit by
+// the scene's ambient with no occlusion, so in daylight its inside reads as
+// flat and blown out — there is nothing to cast into it and her purple wagon
+// PointLight is gated off outside night/dusk. Rather than darken the wagon on
+// the boardwalk, where it looks correct, the dim is gated on FOCUS: it applies
+// only while the close-up has the camera inside. Eased rather than switched, so
+// it lands as eyes adjusting instead of a lighting pop.
+//
+// Multiplies the material's base colour, which is the only per-material lever on
+// ambient response — MeshStandardMaterial has no "receive less ambient" knob.
+const INTERIOR_DIM_EASE = 2.5;     // 1/s — ~0.4s to settle, matched to the fly-in
+//
 // Per-vendor fields: `model`, `prop`, `idleClip`, `talkClip`, `sitepal`,
 // `faceYaw`/`faceDist`/`faceLift`/`camDrop` (close-up framing), `gazeLift`/
 // `gazeTurn` (head-tracking bias), `glowMesh`/`glowColor`,
 // `sitepalCrop`/`sitepalFilter` (override the registry's crop/filter for this
 // vendor — set per POSE in poseOverrides when a head angle differs enough that
-// one crop cannot serve both).
+// one crop cannot serve both), `interiorDim` (0-1 multiplier on the PROP's base
+// colour while focused; omit for props you never get inside) and
+// `interiorContents` ({ level, props[], character } — the same dim at a second,
+// gentler level for the furniture inside that prop and for the character).
 //
 // Two ways to give a vendor more than one resting pose. Pick ONE:
 //
@@ -96,6 +119,29 @@ export const VENDOR_CATALOG = [
     model: "/models/Vendor_FortuneTeller_Character.glb", idleClip: "sit_idle",
     offset: [0, 0, 0],
     prop: "FortuneTeller_Wagon_Empty",
+    // Her wagon is the one prop the camera goes INSIDE; the boardwalk view is
+    // untouched. See INTERIOR_DIM_EASE above.
+    //
+    // TWO levels on purpose. The shell is the enclosing box and goes almost
+    // black, but her furniture and the character herself only step DOWN toward
+    // it — at the shell's 0.05 they would vanish, at 1.0 they read as lit by a
+    // different sun than the room they are sitting in.
+    interiorDim: 0.15,
+    interiorContents: {
+      level: 0.35,
+      // Booth furniture: everything within ~2.5 units of the wagon EXCEPT the
+      // crystal ball. That one is the light source, and the glow rig already
+      // owns its materials — dimming it here would mean two effects assigning
+      // .material on the same mesh, and whichever ran last would win.
+      props: [
+        "SM_Prop_Table_02", "SM_Prop_Table_02_Cloth_01", "SM_Prop_Rug_01",
+        "SM_Prop_Stool_01", "SM_Prop_Stool_01.001",
+        "SM_Prop_Stool_01.002", "SM_Prop_Stool_01.003",
+      ],
+      // Her own GLB, kept a touch brighter than the furniture so she still
+      // reads as the subject of the shot.
+      character: 0.5,
+    },
     // She sits square to the boardwalk rather than facing off it, so her
     // strip-local face yaw is 0 (90° off the VENDOR_LOCAL_FACE_YAW default).
     // faceYaw swings the fly-in (and the head-tracking rest direction) to meet
@@ -628,7 +674,7 @@ function applyVendorSkinGain(st, sp, vendorId) {
 }
 const HEAD_EASE = 8;           // 1/s — smoothing rate toward the target angles
 
-function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 }) {
+function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0, dimRef }) {
   const group = useRef();
   // Stable for the whole session: chosen at module load, so the hook's URL
   // never changes under it and Suspense fetches exactly one file.
@@ -772,6 +818,43 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
       });
     });
   }, [scene, envMap]);
+
+  // Character half of the interior dim (VendorStall owns the eased factor).
+  // Clones for the same reason the stall does: a Synty character shares one
+  // material across several meshes, and the projection face gets its material
+  // REPLACED later by ensureVendorProjectionMaterial — which simply means the
+  // projected face stops being dimmed, not that the two rigs fight.
+  const charDimRef = useRef({ clones: [] });
+  useEffect(() => {
+    const level = vendor.interiorContents?.character;
+    if (!level) return;
+    const st = charDimRef.current;
+    const byMaterial = new Map();
+    const swappedFor = [];
+    scene.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const swapped = mats.map((m) => {
+        if (!m || !m.color) return m;
+        let clone = byMaterial.get(m.uuid);
+        if (!clone) {
+          clone = m.clone();
+          clone.userData = {};                       // see the scrub note above
+          clone.userData.hmBaseColor = m.color.clone();
+          byMaterial.set(m.uuid, clone);
+          st.clones.push(clone);
+        }
+        return clone;
+      });
+      swappedFor.push({ mesh: o, original: o.material });
+      o.material = Array.isArray(o.material) ? swapped : swapped[0];
+    });
+    return () => {
+      swappedFor.forEach(({ mesh, original }) => { mesh.material = original; });
+      st.clones.forEach((m) => { try { m.dispose(); } catch (e) {} });
+      st.clones = [];
+    };
+  }, [scene, vendor.interiorContents]);
 
   // Talk-clip swap: crossfade idle → vendor.talkClip while the greeting audio
   // actually plays (SitePal's talk callbacks via the vendorSitePal bridge),
@@ -942,6 +1025,17 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
   const trackRef = useRef({ yaw: 0, pitch: 0, roll: 0 });
   const dwellRef = useRef(0);   // seconds focused, for focusGazeDelay
   useFrame((state, delta) => {
+    // Interior dim, driven by the stall's shared eased factor so she tracks the
+    // room she is sitting in exactly rather than on a clock of her own.
+    const charLevel = vendor.interiorContents?.character;
+    const dimClones = charDimRef.current.clones;
+    if (charLevel && dimClones.length && dimRef?.current) {
+      const t = dimRef.current.t;
+      dimClones.forEach((m) => {
+        const base = m.userData.hmBaseColor;
+        if (base) m.color.copy(base).multiplyScalar(1 + (charLevel - 1) * t);
+      });
+    }
     // Crystal-ball life: advance the swirl shader, and drive the light +
     // stand emissive with a quasi-periodic flicker (two incommensurate
     // sines — organic drift, never a metronome).
@@ -1224,6 +1318,80 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
   const rootRef = useRef();
   const zoomedRef = useRef(false);
   const headRef = useRef(null);
+
+  // ── Focus-gated interior dim (see INTERIOR_DIM_EASE) ─────────────────────
+  // Materials are CLONED before anything is written: BOARDWALK_Atlas_MAT is
+  // shared by 77 meshes across the boardwalk, so tinting it in place would
+  // darken most of the strip. One clone per unique material, not per mesh.
+  // The clone stays assigned whether focused or not — at dim 1.0 it renders
+  // identically, and swapping materials on the fly would cost a recompile
+  // mid-flight.
+  //
+  // `t` is a single eased 0→1 focus factor SHARED by every consumer — the
+  // shell here, and the character over in VendorModel, which reads this same
+  // ref. Each maps it to its own level via lerp(1, level, t), so the whole
+  // booth moves as one; two independent eases would let them drift apart
+  // mid-fade and the room would come apart while you fly in.
+  const dimRef = useRef({ t: 0, targets: [], clones: [] });
+  useEffect(() => {
+    const shell = vendor.interiorDim;
+    if (!shell) return;
+    const st = dimRef.current;
+    // Clone key is (material, level), NOT material alone: the shell and the
+    // furniture both use BOARDWALK_Atlas_MAT, and one shared clone could only
+    // carry one of the two levels.
+    const byMaterial = new Map();
+    const claim = (root, level) => {
+      if (!root) return;
+      root.traverse((o) => {
+        if (!o.isMesh || !o.material) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        const swapped = mats.map((m) => {
+          if (!m || !m.color) return m;
+          const key = `${m.uuid}@${level}`;
+          let clone = byMaterial.get(key);
+          if (!clone) {
+            clone = m.clone();
+            // clone() JSON-round-trips userData, so a Texture stashed there
+            // comes back as a plain object and throws on upload. Same scrub as
+            // the string-light clone below.
+            clone.userData = {};
+            clone.userData.hmBaseColor = m.color.clone();
+            clone.userData.hmDimLevel = level;
+            byMaterial.set(key, clone);
+            st.clones.push(clone);
+          }
+          return clone;
+        });
+        st.targets.push({ mesh: o, original: o.material });
+        o.material = Array.isArray(o.material) ? swapped : swapped[0];
+      });
+    };
+    claim(propObj, shell);
+    const contents = vendor.interiorContents;
+    if (contents?.props?.length) {
+      contents.props.forEach((name) => claim(findByBaseName(stripScene, name), contents.level));
+    }
+    return () => {
+      // Captured locals, not refs: a ref read in a cleanup can already be null,
+      // and then the restore silently never runs and the clones leak.
+      st.targets.forEach(({ mesh, original }) => { mesh.material = original; });
+      st.clones.forEach((m) => { try { m.dispose(); } catch (e) {} });
+      st.targets = []; st.clones = []; st.t = 0;
+    };
+  }, [propObj, stripScene, vendor.interiorDim, vendor.interiorContents]);
+
+  useFrame((_, delta) => {
+    const st = dimRef.current;
+    const target = zoomedRef.current ? 1 : 0;
+    if (Math.abs(st.t - target) < 1e-3) return;       // settled: stop writing
+    st.t += (target - st.t) * (1 - Math.exp(-INTERIOR_DIM_EASE * delta));
+    st.clones.forEach((m) => {
+      const base = m.userData.hmBaseColor;
+      if (base) m.color.copy(base).multiplyScalar(1 + (m.userData.hmDimLevel - 1) * st.t);
+    });
+  });
+
   // Same click-to-zoom idiom as OilTower: first click dollies in — to the
   // character's face when the model has a head bone, else head-on to the
   // stall — second click pulls back to the overview.
@@ -1360,6 +1528,7 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
           <VendorModel
             vendor={vendor}
             focusedRef={zoomedRef}
+            dimRef={dimRef}
             headRef={headRef}
             stripScene={stripScene}
             stripRotY={stripRotY}

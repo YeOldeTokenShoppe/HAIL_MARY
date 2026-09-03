@@ -11,20 +11,25 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const log = (m) => { document.getElementById("log").innerHTML += "<br>" + m; window.__ktxlog = (window.__ktxlog||[]); window.__ktxlog.push(m); };
 try {
   const renderer = new THREE.WebGLRenderer();               // headless-ish, just for caps
   const ktx2 = new KTX2Loader().setTranscoderPath("/basis/").detectSupport(renderer);
   log("KTX2Loader created + detectSupport OK");
-  const gltf = new GLTFLoader().setKTX2Loader(ktx2);
+  // The staged GLB is meshopt-compressed (EXT_meshopt_compression is in
+  // extensionsRequired), so the decoder is mandatory — without it the load
+  // fails before any KTX2 texture is ever touched.
+  const gltf = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
   gltf.load("/models/CommercialStrip3_opt2k_ktx2.glb", (g) => {
     let textured = 0, total = 0;
     g.scene.traverse((o) => {
       if (o.isMesh) { const mats = [].concat(o.material); mats.forEach((m) => { total++; if (m && m.map && m.map.image) textured++; }); }
     });
     log("LOADED OK — materials with a real texture image: " + textured + "/" + total);
+    document.title = "KTX2 OK " + textured + "/" + total;
     window.__ktxResult = { ok: true, textured, total };
-  }, undefined, (err) => { log("LOAD ERROR: " + (err.message||err)); window.__ktxResult = { ok:false, err: String(err.message||err) }; });
+  }, undefined, (err) => { document.title = "KTX2 FAIL"; log("LOAD ERROR: " + (err.message||err)); window.__ktxResult = { ok:false, err: String(err.message||err) }; });
 } catch (e) { log("SETUP ERROR: " + (e.message||e)); window.__ktxResult = { ok:false, err:String(e.message||e) }; }
 </script>
 </body></html>

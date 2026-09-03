@@ -38,11 +38,11 @@ export const FORTUNES_SITEPAL_CROP = {
 // Color correction (CSS filter values; 100 = identity) — SitePal frames come
 // back washed out. Also mutable/live like the crop.
 export const FORTUNES_SITEPAL_FILTER = {
-  saturate: 122,
-  contrast: 110,
-  brightness: 138,
-  hueRotate: -71,
-  sepia: 21,
+  saturate: 265,
+  contrast: 181,
+  brightness: 30,
+  hueRotate: -9,
+  sepia: 51,
 };
 
 

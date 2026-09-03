@@ -21,7 +21,7 @@ import {
   increment,
   arrayUnion
 } from "firebase/firestore";
-import { getAuth, signInWithCustomToken } from "firebase/auth";
+import { getAuth, initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, signInWithCustomToken } from "firebase/auth";
 import { getStorage, ref, getDownloadURL, uploadBytes } from "firebase/storage";
 import { getDatabase, ref as dbRef, set, onValue, push, onDisconnect, serverTimestamp as rtdbServerTimestamp } from "firebase/database";
 
@@ -87,7 +87,32 @@ try {
   // Connect to Firebase services
   db = getFirestore(app);
   setLogLevel("error"); // Suppress BloomFilter warnings
-  auth = getAuth(app);
+  // NOT getAuth(app). getAuth defaults to IndexedDB persistence, and on iPadOS
+  // Safari that hung forever when a second tab of the site sat suspended in
+  // the background holding the same IndexedDB store: onAuthStateChanged never
+  // fired, and because Firestore waits for Auth's first token check before
+  // its first request, the oilGame/settings listener never started and
+  // /hailmary sat on the coin loader indefinitely (measured on Michelle's iPad
+  // Pro, 2026-09-02: IndexedDB persistence never reported in 50 s; in-memory
+  // reported in 48 ms; localStorage in 0.7 s with Firestore following at 1.2 s).
+  // localStorage persistence is synchronous, has no cross-tab lock, and still
+  // keeps a custom-token session across reloads. The resolver is what getAuth
+  // would have registered, so popup/redirect sign-in is unchanged.
+  //
+  // initializeAuth may only run once per app. Under Fast Refresh this module
+  // re-evaluates against the app that getApps() already holds, whose Auth is
+  // already initialized, and initializeAuth throws auth/already-initialized —
+  // which the catch below would turn into db = null and a dead page. Reuse
+  // the existing instance in that case; a cold load never takes this branch.
+  try {
+    auth = initializeAuth(app, {
+      persistence: browserLocalPersistence,
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch (e) {
+    if (e && e.code === "auth/already-initialized") auth = getAuth(app);
+    else throw e;
+  }
   storage = getStorage(app);
   rtdb = getDatabase(app);
   
