@@ -24,6 +24,7 @@ import {
   TATTOOS_SEATED_SITEPAL_CROP,
   TATTOOS_SEATED_SITEPAL_FILTER,
   VENDOR_SITEPAL_CONFIG,
+  SKIN_SAMPLE_DEFAULT,
   speakPendingVendorLine,
   getVendorSitePalSource,
   notifyVendorTalk,
@@ -113,6 +114,8 @@ const TUNER_FILTER_FIELDS = [
   ["saturate", 0, 300], ["contrast", 20, 200], ["brightness", 20, 200],
   ["hueRotate", -180, 180], ["sepia", 0, 100],
 ];
+// Skin-match measurement box, fractions of the crop canvas.
+const TUNER_SKIN_FIELDS = [["x", 0, 0.9], ["y", 0, 0.9], ["w", 0.05, 1], ["h", 0.05, 1]];
 
 // Face A/B compare. The SitePal crop is projected onto its OWN mesh (projFace)
 // while the painted one (regularFaces[0]) hides, so a crop that is off by a few
@@ -139,6 +142,22 @@ function VendorCropTuner() {
   const sitepalCfg = VENDOR_SITEPAL_CONFIG[sitepalId];
   const face1Name = sitepalCfg?.regularFaces?.[0] || "Face1";
   const face2Name = sitepalCfg?.projFace || "Face2";
+  // Skin match readout: what the compositor measured on the crop, where it
+  // is aiming, and the gain between them (published per frame while the
+  // stall projects). Only meaningful for the vendor whose tab is open.
+  const [skin, setSkin] = useState(null);
+  const skinJsonRef = useRef("");
+  // skinTarget is typed freely and applied only once it is a full hex (or
+  // cleared, which means "the authored colour").
+  const [targetText, setTargetText] = useState(sitepalCfg?.skinTarget || "");
+  useEffect(() => { setTargetText(sitepalCfg?.skinTarget || ""); }, [sitepalId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const skinBox = sitepalCfg?.skinSample || SKIN_SAMPLE_DEFAULT;
+  const editSkinBox = (key, value) => {
+    if (!sitepalCfg) return;
+    if (!sitepalCfg.skinSample) sitepalCfg.skinSample = { ...SKIN_SAMPLE_DEFAULT };
+    sitepalCfg.skinSample[key] = value;
+    force((n) => n + 1);
+  };
 
   useEffect(() => {
     // Carries the vendor so the pin lands on the stall whose sliders are live,
@@ -198,15 +217,34 @@ function VendorCropTuner() {
       ctx.strokeStyle = "#ff3355";
       ctx.lineWidth = 2;
       ctx.strokeRect(c.cropX * scale, c.cropY * scale, c.cropW * scale, c.cropH * scale);
+      // Skin-match box, in blue: the same crop fractions the compositor
+      // samples, drawn un-rotated inside the crop rectangle (approximate
+      // once rotateZ/rotateX are non-zero, exact otherwise).
+      const id = TUNER_VENDORS[vendorKey].sitepalId || vendorKey;
+      const box = VENDOR_SITEPAL_CONFIG[id]?.skinSample || SKIN_SAMPLE_DEFAULT;
+      ctx.strokeStyle = "#44bbdd";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(
+        (c.cropX + box.x * c.cropW) * scale, (c.cropY + box.y * c.cropH) * scale,
+        box.w * c.cropW * scale, box.h * c.cropH * scale
+      );
+      const sm = window.__vendorSitePalSkinMatch;
+      const next = sm && sm.vendorId === id ? sm : null;
+      const json = JSON.stringify(next);
+      if (json !== skinJsonRef.current) { skinJsonRef.current = json; setSkin(next); }
     }, 120);
     return () => clearInterval(timer);
   }, [vendorKey]);
 
   const logValues = () => {
     const { crop: c, filter: f, constName } = active;
+    const b = skinBox;
     console.log(
       `export const ${constName}_SITEPAL_CROP = {\n  cropX: ${c.cropX},\n  cropY: ${c.cropY},\n  cropW: ${c.cropW},\n  cropH: ${c.cropH},\n  rotateZ: ${c.rotateZ},\n  rotateX: ${c.rotateX},\n};\n` +
-      `export const ${constName}_SITEPAL_FILTER = {\n  saturate: ${f.saturate},\n  contrast: ${f.contrast},\n  brightness: ${f.brightness},\n  hueRotate: ${f.hueRotate},\n  sepia: ${f.sepia},\n};`
+      `export const ${constName}_SITEPAL_FILTER = {\n  saturate: ${f.saturate},\n  contrast: ${f.contrast},\n  brightness: ${f.brightness},\n  hueRotate: ${f.hueRotate},\n  sepia: ${f.sepia},\n};\n` +
+      `// VENDOR_SITEPAL_CONFIG.${sitepalId} — skin match:\n` +
+      `  skinTarget: ${sitepalCfg?.skinTarget ? JSON.stringify(sitepalCfg.skinTarget) : "undefined, // authored Face colour"}\n` +
+      `  skinSample: { x: ${b.x}, y: ${b.y}, w: ${b.w}, h: ${b.h} },`
     );
   };
 
@@ -284,8 +322,52 @@ function VendorCropTuner() {
       </div>
       <canvas ref={previewRef} width={400} height={300} style={{ width: "100%", borderRadius: 4, background: "#222" }} />
       {TUNER_CROP_FIELDS.map(([k, min, max]) => slider(active.crop, k, min, max))}
-      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>filter</div>
+      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+        filter <span style={{ opacity: 0.6 }}>· brightness is cancelled by the skin match</span>
+      </div>
       {TUNER_FILTER_FIELDS.map(([k, min, max]) => slider(active.filter, k, min, max))}
+      {/* Skin match: measured swatch, target swatch, gain. The blue box on the
+          preview is the measured region; ?skinmatch=0 shows the lit crop with
+          no correction for comparison. */}
+      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>skin match</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+        <span style={{ width: 84 }}>measured</span>
+        <span title={skin?.measured || ""} style={{ width: 26, height: 16, borderRadius: 3, background: skin?.measured || "transparent", border: "1px solid #3a4a6a" }} />
+        <span style={{ width: 84, textAlign: "right" }}>target</span>
+        <span title={skin?.target || ""} style={{ width: 26, height: 16, borderRadius: 3, background: skin?.target || "transparent", border: "1px solid #3a4a6a" }} />
+        <span style={{ flex: 1, opacity: 0.75, paddingLeft: 6 }}>
+          {!skin ? "not projecting"
+            : skin.active ? `gain ${skin.gain.map((g) => g.toFixed(2)).join(" · ")}`
+            : skin.target ? (skin.measured ? "off" : "measuring…")
+            : "no target — set skinTarget"}
+        </span>
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+        <span style={{ width: 84 }}>skinTarget</span>
+        <input
+          type="text" value={targetText} placeholder="authored colour"
+          onChange={(e) => {
+            const v = e.target.value.trim();
+            setTargetText(v);
+            if (!sitepalCfg) return;
+            if (v === "") sitepalCfg.skinTarget = undefined;
+            else if (/^#[0-9a-fA-F]{6}$/.test(v)) sitepalCfg.skinTarget = v;
+          }}
+          style={{ flex: 1, fontFamily: "monospace", fontSize: 12, background: "#1a2230", color: "#cde", border: "1px solid #3a4a6a", borderRadius: 4, padding: "2px 6px" }}
+        />
+        <span style={{ width: 42, height: 16, borderRadius: 3, background: skin?.target || "transparent", border: "1px solid #3a4a6a" }} />
+      </label>
+      {TUNER_SKIN_FIELDS.map(([k, min, max]) => (
+        <label key={`skin-${k}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+          <span style={{ width: 84 }}>sample {k}</span>
+          <input
+            type="range" min={min} max={max} step={0.01} value={skinBox[k]}
+            onChange={(e) => editSkinBox(k, Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <span style={{ width: 42, textAlign: "right" }}>{skinBox[k].toFixed(2)}</span>
+        </label>
+      ))}
       <button onClick={logValues} style={{ marginTop: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>
         Log values to console
       </button>

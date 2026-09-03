@@ -219,6 +219,23 @@ export const TATTOOS_SEATED_SITEPAL_FILTER = {
   sepia: 27,
 };
 
+// Skin match (CommercialStrip's projection compositor). The projected crop
+// is measured — per-channel median of a box on the crop canvas — and its
+// material colour set to target ÷ measured, so the skin lands on the face's
+// authored colour whatever SitePal's own lighting did; the scene lights then
+// treat both faces alike through the day-night cycle. Optional per-vendor
+// fields in the registry below:
+//   skinTarget: "#rrggbb"  — aim here instead of the projFace's authored
+//                            flat colour (the Blender eyedropper value).
+//   skinSample: {x,y,w,h}  — measurement box as fractions of the crop canvas
+//                            (default: the central 40%, cheeks and nose).
+//                            Move it off a beard or a mask; ?tune=vendor
+//                            draws it in blue on the frame preview.
+//   skinMatch: false       — lit projection, no correction.
+// The filter's `brightness` is cancelled by the match; saturate, contrast,
+// sepia and hue-rotate still shape the crop before it is measured.
+export const SKIN_SAMPLE_DEFAULT = Object.freeze({ x: 0.3, y: 0.3, w: 0.4, h: 0.4 });
+
 // Per-vendor registry, keyed by VENDOR_CATALOG id. `projFace` receives the
 // SitePal projection; `regularFaces` are the painted face layers hidden
 // while the projection is active (the two models label them differently —

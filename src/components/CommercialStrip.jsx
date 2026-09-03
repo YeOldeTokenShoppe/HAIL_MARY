@@ -12,6 +12,7 @@ import {
   TATTOOS_SEATED_SITEPAL_CROP,
   TATTOOS_SEATED_SITEPAL_FILTER,
   VENDOR_SITEPAL_CONFIG,
+  SKIN_SAMPLE_DEFAULT,
   getVendorSitePalSource,
   activateVendorSitePal,
   deactivateVendorSitePal,
@@ -468,9 +469,29 @@ function makeSwirlMaterial(glassMesh, colorHex) {
   });
 }
 
-// Lazily builds the 512² crop canvas + CanvasTexture + unlit material and
-// assigns it to the projection face mesh. flipY=false matches glTF UVs;
-// toneMapped=false so the tuned filter values are what actually shows.
+// ── SitePal projection: lit material, skin match, crossfade ────────────────
+// The crop used to land on an unlit MeshBasicMaterial with tone mapping off,
+// so it ignored every scene light while the painted face beside it took the
+// sun/moon arcs, the hemisphere fill, the env map and ACES. Each vendor's
+// filter then matched the final pixel at ONE time of day and drifted through
+// the rest of the cycle. The projection now wears a clone of the painted
+// face's own material with the crop as its map, so both faces see identical
+// light and the filter only has to match albedo — which does not change with
+// the hour. The skin match below does even that part automatically.
+const PROJ_FADE_S = 0.28;       // painted ↔ projected crossfade, seconds
+const SKIN_SAMPLE_MS = 900;     // how often the crop is re-measured
+const SKIN_EMA = 0.35;          // smoothing on the measured skin colour
+const SKIN_GAIN_MIN = 0.2;
+const SKIN_GAIN_MAX = 5;
+// ?skinmatch=0 leaves the projection lit but un-corrected — the A/B for
+// judging what the gain is doing.
+const SKIN_MATCH_ENABLED =
+  typeof window === "undefined" || !/[?&]skinmatch=0\b/.test(window.location.search);
+const _skinSample = new THREE.Color();
+
+// Lazily builds the 512² crop canvas + CanvasTexture and dresses the
+// projection face in a LIT material derived from the painted face's own.
+// flipY=false matches glTF UVs.
 function ensureVendorProjectionMaterial(st) {
   if (!st.cropCanvas) {
     const c = document.createElement("canvas");
@@ -489,16 +510,120 @@ function ensureVendorProjectionMaterial(st) {
     tex.wrapT = THREE.ClampToEdgeWrapping;
     st.texture = tex;
   }
-  if (!st.material) {
-    st.material = new THREE.MeshBasicMaterial({
-      map: st.texture,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-    });
+  if (!st.material && st.proj) {
+    const authored = Array.isArray(st.proj.material) ? st.proj.material[0] : st.proj.material;
+    const painted = st.regulars[0]?.material;
+    // Base on the painted face's material — lights, env map, emissive, fog
+    // and tone mapping identical by construction — else the projection
+    // face's own authored one, else a plain standard material.
+    const base = painted?.isMeshStandardMaterial ? painted
+      : authored?.isMeshStandardMaterial ? authored : null;
+    const m = base ? base.clone() : new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 });
+    m.map = st.texture;
+    // The painted face's emissive map is the same atlas as its colour map, so
+    // the crop plays that role here too: emissive × crop matches emissive ×
+    // atlas (HoloGirl's glow) instead of a flat wash.
+    m.emissiveMap = m.emissiveMap ? st.texture : null;
+    // Every other map is authored in atlas UV space, which the projection
+    // face's UVs do not share — sampled here they would read garbage.
+    m.normalMap = null; m.bumpMap = null; m.roughnessMap = null; m.metalnessMap = null;
+    m.aoMap = null; m.alphaMap = null; m.lightMap = null; m.displacementMap = null;
+    // COLOR_0 is white on every vendor face, and a face without the
+    // attribute would render black with vertexColors on.
+    m.vertexColors = false;
+    m.color.set(0xffffff);      // the skin-match gain lands here
+    m.side = THREE.DoubleSide;
+    m.toneMapped = true;
+    m.transparent = false;
+    m.opacity = 1;
+    m.depthWrite = true;
+    // Bias the projection toward the camera in depth so it composites over
+    // the painted face during the crossfade even where the two are coplanar.
+    m.polygonOffset = true;
+    m.polygonOffsetFactor = -2;
+    m.polygonOffsetUnits = -2;
+    m.userData.hmProjectionClone = true;
+    m.needsUpdate = true;
+    st.material = m;
   }
-  if (!st.materialApplied && st.proj) {
+  if (!st.materialApplied && st.proj && st.material) {
     st.proj.material = st.material;
     st.materialApplied = true;
+  }
+}
+
+// What the projected skin should land on. `skinTarget` (hex) in the vendor's
+// config wins; otherwise the projection face's authored flat colour — the
+// one eyedropped in Blender to match the painted skin — which the mesh keeps
+// in userData because its live material is our clone. A textured authored
+// face has no single colour to aim at: no correction.
+function refreshVendorSkinTarget(st, sp) {
+  const skin = st.skin;
+  const key = sp.skinTarget || "";
+  if (skin.targetKey === key) return;
+  skin.targetKey = key;
+  if (key) { skin.target = new THREE.Color(key); return; }
+  const authored = st.proj?.userData?.hmAuthoredColor;
+  skin.target = authored ? authored.clone() : null;
+}
+
+// Per-channel median of the crop's skin box (sRGB → working space), eased
+// into st.skin.measured. Skin dominates a face crop, so hair, eyes and the
+// moving mouth do not pull a median the way they pull a mean. Cheap and
+// rare: ~2.5k samples every SKIN_SAMPLE_MS, nothing per frame.
+function sampleVendorSkin(st, sp, nowMs) {
+  const skin = st.skin;
+  if (nowMs - skin.lastSampleAt < SKIN_SAMPLE_MS) return;
+  skin.lastSampleAt = nowMs;
+  const c = st.cropCanvas;
+  const box = sp.skinSample || SKIN_SAMPLE_DEFAULT;
+  const x = Math.round(box.x * c.width), y = Math.round(box.y * c.height);
+  const w = Math.max(4, Math.round(box.w * c.width)), h = Math.max(4, Math.round(box.h * c.height));
+  let data;
+  try { data = st.cropCtx.getImageData(x, y, w, h).data; } catch (e) { return; }
+  const rs = [], gs = [], bs = [];
+  for (let j = 0; j < h; j += 4) {
+    for (let i = 0; i < w; i += 4) {
+      const k = (j * w + i) * 4;
+      rs.push(data[k]); gs.push(data[k + 1]); bs.push(data[k + 2]);
+    }
+  }
+  if (rs.length < 16) return;
+  const med = (a) => { a.sort((p, q) => p - q); return a[a.length >> 1]; };
+  const mr = med(rs), mg = med(gs), mb = med(bs);
+  // A blank frame (embed not drawing yet) or a white one must not become a gain.
+  const sum = mr + mg + mb;
+  if (sum < 24 || sum > 740) return;
+  _skinSample.setRGB(mr / 255, mg / 255, mb / 255, THREE.SRGBColorSpace);
+  if (!skin.measured) skin.measured = _skinSample.clone();
+  else skin.measured.lerp(_skinSample, SKIN_EMA);
+}
+
+// target ÷ measured as the material colour: exposure and white balance in one
+// per-channel gain the shader applies for free. Publishes the numbers for the
+// ?tune=vendor panel.
+function applyVendorSkinGain(st, sp, vendorId) {
+  const m = st.material;
+  if (!m) return;
+  const skin = st.skin;
+  const active = SKIN_MATCH_ENABLED && sp.skinMatch !== false && !!skin.target && !!skin.measured;
+  let gain = null;
+  if (active) {
+    const t = skin.target, s = skin.measured;
+    const g = (a, b) => Math.min(SKIN_GAIN_MAX, Math.max(SKIN_GAIN_MIN, a / Math.max(b, 1e-3)));
+    gain = [g(t.r, s.r), g(t.g, s.g), g(t.b, s.b)];
+    m.color.setRGB(gain[0], gain[1], gain[2]);
+  } else {
+    m.color.set(0xffffff);
+  }
+  if (typeof window !== "undefined") {
+    window.__vendorSitePalSkinMatch = {
+      vendorId,
+      active,
+      measured: skin.measured ? "#" + skin.measured.getHexString() : null,
+      target: skin.target ? "#" + skin.target.getHexString() : null,
+      gain,
+    };
   }
 }
 const HEAD_EASE = 8;           // 1/s — smoothing rate toward the target angles
@@ -770,6 +895,9 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     proj: null, regulars: [],
     cropCanvas: null, cropCtx: null,
     texture: null, material: null, materialApplied: false,
+    authoredMaterial: null,
+    fade: 0,   // 0 = painted face, 1 = projection; crossfaded per frame
+    skin: { measured: null, target: null, targetKey: undefined, lastSampleAt: 0, sceneVersion: -1 },
   });
   useEffect(() => {
     const sp = vendor.sitepal ? VENDOR_SITEPAL_CONFIG[vendor.sitepal] : null;
@@ -779,13 +907,29 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
     st.regulars = (sp.regularFaces || [])
       .map((name) => findByBaseName(scene, name))
       .filter(Boolean);
-    if (st.proj) st.proj.visible = false; // hidden until the projection is live
+    if (st.proj) {
+      st.proj.visible = false; // hidden until the projection is live
+      // Remember the face's authored material and flat colour. useGLTF hands
+      // the same scene object to every mount, so an unclean remount could
+      // find our clone already in place — never take THAT for authored.
+      const cur = Array.isArray(st.proj.material) ? st.proj.material[0] : st.proj.material;
+      if (cur && !cur.userData?.hmProjectionClone) {
+        st.authoredMaterial = cur;
+        if (!st.proj.userData.hmAuthoredColor && cur.color && !cur.map) {
+          st.proj.userData.hmAuthoredColor = cur.color.clone();
+        }
+      }
+    }
+    st.fade = 0;
+    st.skin = { measured: null, target: null, targetKey: undefined, lastSampleAt: 0, sceneVersion: -1 };
     return () => {
+      if (st.proj && st.authoredMaterial) st.proj.material = st.authoredMaterial;
       if (st.texture) { try { st.texture.dispose(); } catch (e) {} }
       if (st.material) { try { st.material.dispose(); } catch (e) {} }
       st.texture = null; st.material = null;
       st.cropCanvas = null; st.cropCtx = null;
       st.materialApplied = false;
+      st.fade = 0;
       st.regulars.forEach((m) => { m.visible = true; });
       if (st.proj) st.proj.visible = false;
     };
@@ -847,12 +991,22 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
       // flashing to the flat backfill.
       if (show && source && onScene) {
         ensureVendorProjectionMaterial(st);
+        const skin = st.skin;
+        // A scene swap in the host is a different avatar: drop the old skin
+        // measurement rather than easing out of it.
+        const ver = window.__vendorSitePalSceneVersion || 0;
+        if (ver !== skin.sceneVersion) { skin.sceneVersion = ver; skin.measured = null; skin.lastSampleAt = 0; }
+        refreshVendorSkinTarget(st, sp);
         const ctx = st.cropCtx;
         const canvas = st.cropCanvas;
         // A pose may carry its own pair (poseOverrides), else the registry's.
         const { cropX, cropY, cropW, cropH, rotateZ, rotateX } = vendor.sitepalCrop || sp.crop;
         const f = vendor.sitepalFilter || sp.filter;
-        ctx.fillStyle = "#9F7854"; // skin-tone backfill for letterboxing
+        // Letterbox backfill in the MEASURED skin colour, so after the gain it
+        // lands on the target exactly like the skin beside it. Before the
+        // first measurement, the target itself.
+        ctx.fillStyle = skin.measured ? skin.measured.getStyle()
+          : skin.target ? skin.target.getStyle() : "#9F7854";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         try {
           ctx.save();
@@ -868,9 +1022,28 @@ function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0 })
           // Source canvas not yet renderable (preserveDrawingBuffer race).
         }
         if (st.texture) st.texture.needsUpdate = true;
+        sampleVendorSkin(st, sp, performance.now());
+        applyVendorSkinGain(st, sp, vendor.sitepal);
       }
-      if (st.proj) st.proj.visible = show;
-      st.regulars.forEach((m) => { m.visible = !show; });
+      // Crossfade rather than cut: the projection eases in over the painted
+      // face (transparent, no depth write) and only once it is fully opaque
+      // does the painted face hide; reversed on the way out. A/B pins stay a
+      // hard cut — the whole point of a pin is to see the swap.
+      const fadeTarget = show ? 1 : 0;
+      if (pinned || !st.material) st.fade = fadeTarget;
+      else if (st.fade !== fadeTarget) {
+        const stepF = delta / PROJ_FADE_S;
+        st.fade = fadeTarget > st.fade ? Math.min(1, st.fade + stepF) : Math.max(0, st.fade - stepF);
+      }
+      const fade = st.fade;
+      if (st.proj) st.proj.visible = fade > 0;
+      if (st.material) {
+        const mid = fade > 0 && fade < 1;
+        st.material.opacity = fade;
+        st.material.transparent = mid;
+        st.material.depthWrite = !mid;
+      }
+      st.regulars.forEach((m) => { m.visible = fade < 1; });
     }
     // A working pose (head down over the tattoo) can't be corrected by additive
     // tracking: the delta is driven by CAMERA ELEVATION, so a level camera asks
