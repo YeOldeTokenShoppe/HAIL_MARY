@@ -2,10 +2,9 @@ import React, { useRef, useEffect } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 
-// Preload the models
-useGLTF.preload("/models/marketFight.glb");
-useGLTF.preload("/models/whale.glb");
-useGLTF.preload("/models/arrow.glb");
+// Not preloaded: the constellation only exists at night, and the three GLBs
+// were being fetched and decoded on every daytime visit too. They stream in
+// when the component mounts, behind the <Suspense> the page wraps it in.
 // useGLTF.preload("/InfinityStars.glb");
 
 function ConstellationModel({

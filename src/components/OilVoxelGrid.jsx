@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useEffect, useCallback, useState } from "react";
+import { useRef, useMemo, useEffect, useCallback, useState, Suspense } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, Html, useGLTF, useTexture } from "@react-three/drei";
@@ -1727,29 +1727,28 @@ function PlotAddons({ addons }) {
         const rot = typeof value === "string" ? 0 : (value?.rot || 0);
         const item = ADDON_CATALOG.find((c) => c.id === itemId);
         if (!slot || !item) return null;
-        if (item.animated === "tubeMan") {
-          return <AddonTubeMan key={slotKey} item={item} slotPos={slot} rotation={rot} />;
+        if (!item.model) {
+          return <AddonPlaceholder key={slotKey} item={item} slotPos={slot} rotation={rot} />;
         }
-        if (item.animated && item.model) {
-          return <AddonAnimatedGLB key={slotKey} item={item} slotPos={slot} rotation={rot} />;
-        }
-        if (item.model) {
-          return <AddonGLB key={slotKey} item={item} slotPos={slot} rotation={rot} />;
-        }
-        return <AddonPlaceholder key={slotKey} item={item} slotPos={slot} rotation={rot} />;
+        // Own boundary per prop: the GLB streams in on first use (no preload).
+        const Comp = item.animated === "tubeMan" ? AddonTubeMan : item.animated ? AddonAnimatedGLB : AddonGLB;
+        return (
+          <Suspense key={slotKey} fallback={null}>
+            <Comp item={item} slotPos={slot} rotation={rot} />
+          </Suspense>
+        );
       })}
     </group>
   );
 }
 
-// Preload addon GLBs
-ADDON_CATALOG.forEach((item) => { if (item.model) useGLTF.preload(item.model); });
-
-// Preload fence GLBs
-FENCE_CATALOG.forEach((f) => { useGLTF.preload(f.model); });
-
-// Preload poop GLB
-useGLTF.preload("/models/poop.glb");
+// Add-on, fence, sign and poop GLBs are NOT preloaded. They used to be — every
+// catalog entry, ~30 files, fetched and decoded for every visitor at page load —
+// and on an iPad Pro that was ≈230 MB of the page process plus ≈250 MB in the
+// GPU process for props most rigs never wear (measured 2026-09-02 in the Safari
+// engine by blocking the requests). Each now streams in the first time a rig on
+// the field actually equips it, inside its own <Suspense> so only that prop
+// pops in late instead of the whole Canvas re-suspending.
 
 function PlotFence({ fenceType }) {
   const catalog = FENCE_CATALOG.find((f) => f.id === fenceType);
@@ -3937,10 +3936,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       )}
       {/* Fence — separate GLB model */}
       {pumpConfig?.fenceType && (
-        <PlotFence fenceType={pumpConfig.fenceType} />
+        <Suspense fallback={null}>
+          <PlotFence fenceType={pumpConfig.fenceType} />
+        </Suspense>
       )}
       {/* Poop — left by Crudingo rogue */}
-      {pumpConfig?.poop && <PlotPoop />}
+      {pumpConfig?.poop && (
+        <Suspense fallback={null}>
+          <PlotPoop />
+        </Suspense>
+      )}
     </group>
   );
 }
@@ -5192,9 +5197,15 @@ function PlotSign({ position, signImageUrl, signStyle, signFit = "fill", showCam
   if (!entry) return null;
   return (
     <group position={position} scale={PUMPJACK_SCALE}>
-      <SignModel model={entry.model} signImageUrl={signImageUrl} signFit={signFit} />
+      <Suspense fallback={null}>
+        <SignModel model={entry.model} signImageUrl={signImageUrl} signFit={signFit} />
+      </Suspense>
       {/* Camera model still renders for everyone; the live feed (active) only for the owner. */}
-      {showCamera && entry.cameraModel && <SignCameraModel model={entry.cameraModel} active={!!isSelected && cameraViewable} />}
+      {showCamera && entry.cameraModel && (
+        <Suspense fallback={null}>
+          <SignCameraModel model={entry.cameraModel} active={!!isSelected && cameraViewable} />
+        </Suspense>
+      )}
     </group>
   );
 }
@@ -5218,7 +5229,7 @@ function PlotSignField({ items, allPumpConfigs, pumpConfig, selectedCol, selecte
     <PlotSign key={s.key} position={s.position} signImageUrl={s.signImageUrl} signStyle={s.signStyle} signFit={s.signFit} showCamera={s.showCamera} isSelected={s.isSelected} cameraViewable={cameraViewable} />
   ));
 }
-SIGN_CATALOG.forEach((s) => { useGLTF.preload(s.model); if (s.cameraModel) useGLTF.preload(s.cameraModel); });
+// Sign GLBs load on first use (see the add-on note above) — no catalog preload.
 
 // Gather all idle-plot static decorations and render them as instanced batches.
 function StaticDecoField({ items, allPumpConfigs, selectedCol, selectedRow, fullRigCells, base, frameMat }) {

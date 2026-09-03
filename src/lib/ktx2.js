@@ -17,8 +17,24 @@ let _loader = null;
 let _supported = false;
 
 export function getKTX2Loader() {
-  if (!_loader) _loader = new KTX2Loader().setTranscoderPath("/basis/");
+  // One transcoder worker, not the default four. Each worker carries its own
+  // wasm heap, and measured in the Safari engine at iPad size the default pool
+  // put the KTX2 strip ≈174 MB ABOVE the webp build in the page process while
+  // saving ≈99 MB in the GPU process — the wrong direction for iPadOS, which
+  // judges the page process. With one worker, released after the strip loads
+  // (releaseKTX2Workers), the same measurement came out at parity in the page
+  // process (1256 vs 1258 MB) and ≈95 MB lighter in the GPU process. The strip
+  // is the only KTX2 asset, and one worker transcodes its 14 textures in well
+  // under a second.
+  if (!_loader) _loader = new KTX2Loader().setTranscoderPath("/basis/").setWorkerLimit(1);
   return _loader;
+}
+
+// Terminate the transcoder worker (and drop its wasm heap) once the only KTX2
+// asset is in. A later KTX2 load re-creates the worker on demand.
+export function releaseKTX2Workers() {
+  if (!_loader) return;
+  try { _loader.dispose(); } catch {}
 }
 
 // detectSupport reads the renderer's compressed-texture caps. Idempotent and

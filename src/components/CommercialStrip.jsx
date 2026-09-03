@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, useGLTF, useAnimations } from "@react-three/drei";
-import { extendKTX2 } from "@/lib/ktx2";
+import { extendKTX2, releaseKTX2Workers } from "@/lib/ktx2";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
 import {
   TATTOOS_IDLE_SITEPAL_CROP,
@@ -33,19 +33,18 @@ import {
 // --instance false so the spotlight/collision names survive). The ?v tag
 // busts the CDN/browser cache on re-export (the strip URL had none, which
 // served stale files before); BUMP it whenever this GLB is rebuilt.
-// NOTE: a 2K-KTX2/Basis variant (for ~4× less GPU memory on iOS) is built and
-// staged — the encoder pipeline + loader wiring exist — but the drei/Suspense
-// detectSupport ordering still needs a debugging pass in a stable browser
-// before the KTX2 GLB can ship. See src/lib/ktx2.js.
+// The KTX2/Basis build is the default (2026-09-02): the same 2K atlases, but
+// they stay GPU-compressed instead of decoding to RGBA — ≈52 MB of texture
+// memory for the strip against ≈198 MB for the webp build, and no decode on
+// load. Verified rendering in Chrome, Safari and iPad Safari; the loader
+// wiring is KTX2Init/CleanCanvas (see src/lib/ktx2.js). ?strip=webp falls
+// back to the webp build for an A/B. Rebuild recipe: docs/strip-export.md.
 const STRIP_MODEL_WEBP = "/models/CommercialStrip3_opt2k.glb?v=webp7";
 const STRIP_MODEL_KTX2 = "/models/CommercialStrip3_opt2k_ktx2.glb?v=ktx1";
-// ?strip=ktx2 loads the staged KTX2/Basis build instead — for measuring the
-// memory difference in a real browser (the iPad Safari tab-kill diagnosis,
-// 2026-09-02). Default stays webp until that build is signed off.
 const STRIP_MODEL =
-  typeof window !== "undefined" && /[?&]strip=ktx2\b/.test(window.location.search)
-    ? STRIP_MODEL_KTX2
-    : STRIP_MODEL_WEBP;
+  typeof window !== "undefined" && /[?&]strip=webp\b/.test(window.location.search)
+    ? STRIP_MODEL_WEBP
+    : STRIP_MODEL_KTX2;
 
 // Strip-local yaw that means "facing the customer side of the boardwalk".
 // Props sit on local +X, so the field-facing direction is local −X; the group's
@@ -3578,6 +3577,9 @@ function VendorSpotlight({ focus, stripScene, envPreset }) {
 
 export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
   const { scene: stripScene } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
+  // The strip is the only KTX2 asset: once it is in, the transcoder worker and
+  // its wasm heap are dead weight in the page process (see getKTX2Loader).
+  useEffect(() => { if (stripScene) releaseKTX2Workers(); }, [stripScene]);
   // Which vendor is zoomed, and what the beam should point at. Lifted here so
   // one shared SpotLight can serve every vendor.
   const [focus, setFocus] = useState(null);

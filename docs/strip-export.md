@@ -100,11 +100,13 @@ Then hard-reload the page (the version bump also handles this for other users).
   back in Blender for walking room is the better fix; `STRIP_EXTEND = 1.4` in
   `PlayerWalker.jsx` can stay (it just allows a bit more outer walking range,
   harmless) or drop back to `1.0` if the deck is narrower again.
-- **KTX2 (future, for iOS memory):** a KTX2/Basis variant of the strip is
-  staged (`CommercialStrip3_opt2k_ktx2.glb`) with the loader wired but not yet
-  verified. When ready, the optimize command becomes
+- **KTX2 ships (since 2026-09-02):** `CommercialStrip3_opt2k_ktx2.glb` is the
+  default `STRIP_MODEL`; the webp build stays on disk as the `?strip=webp`
+  fallback. Measured ≈52 MB of GPU texture memory for the strip against ≈198 MB
+  for webp. To rebuild it the optimize command becomes
   `--texture-compress ktx2 --texture-size 2048` **run on a PNG-textured base**
   (the `ktx` encoder can't read webp). The `ktx` CLI is staged at
   `~/.local/ktx/bin` — prefix the command with
   `PATH="$HOME/.local/ktx/bin:$PATH" DYLD_LIBRARY_PATH="$HOME/.local/ktx/lib"`.
-  See `src/lib/ktx2.js`. Ship webp for now.
+  Bump `?v=ktx…` on every re-export, same rule as webp. Loader wiring:
+  `src/lib/ktx2.js`; `/ktx2-test.html` checks a build in any browser.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef, memo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, memo, Suspense } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import CleanCanvas from "@/components/canvas/CleanCanvas";
 import { Perf } from "r3f-webgpu-perf";
 import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { KTX2Init } from "@/lib/ktx2";
+import { isTouchDevice } from "@/lib/deviceTier";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { REFERRAL_BONUS } from "@/lib/oilBonusMath";
 import { couponValid, couponDaysLeft } from "@/lib/oilTicket";
@@ -791,6 +792,14 @@ const DEMON_BOUNTY_TTL_MS = 24 * 60 * 60 * 1000; // 24h orphan backstop
 // black and the coin fades in over it.
 const LOADING_ROOT = { background: "#000" };
 
+// Canvas pixel-ratio clamp for the low (touch) tier. Deliberately the same as
+// desktop: measured 2026-09-02 in the Safari engine at iPad Pro size, rendering
+// the canvas at 1× instead of 1.5× changed the GPU process by nothing (675 vs
+// 685 MB) — the framebuffers are a rounding error next to the models — so the
+// scene keeps its crispness. Lower only if a HUD measurement on a real device
+// says a specific one needs it.
+const LOW_TIER_DPR = [1, 1.5];
+
 // Reports a single "the field has finished streaming" edge to the page so the
 // CoinLoader can lift. drei's useProgress store is module-level (it listens on
 // THREE.DefaultLoadingManager), so this works outside the Canvas — and keeping
@@ -1549,13 +1558,20 @@ export default function OilPage() {
   // it can be dialed per-device without hunting through the Canvas props.
   const [qForce, setQForce] = useState(null);   // "high" | "low" | null (auto)
   const [showPerf, setShowPerf] = useState(false);
+  // Finger-driven device (pointer: coarse + touch points), settled after mount
+  // like qForce so SSR and the first client frame agree. This is what puts a
+  // 13" iPad Pro on the low tier: it is wider than the mobile breakpoint and
+  // sends a desktop user agent, so isMobile alone took it for a desktop and
+  // handed it the full-fat scene (2026-09-02).
+  const [touchTier, setTouchTier] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     setShowPerf(p.has("perf"));
     const q = p.get("q");
     if (q === "high" || q === "low") setQForce(q);
+    setTouchTier(isTouchDevice());
   }, []);
-  const lowGfx = qForce ? qForce === "low" : isMobile;
+  const lowGfx = qForce ? qForce === "low" : (isMobile || touchTier);
   // Publish for deep children that read the tier without prop-drilling — same
   // convention as __hmWalkerPos / __hmVendorSpots (the vendor idle gate reads
   // this). Off-tree so OilVoxelGrid → CommercialStrip → VendorModel stays clean.
@@ -1565,9 +1581,9 @@ export default function OilPage() {
   }, [lowGfx]);
   const quality = useMemo(() => ({
     lowGfx,
-    // Keep full crispness even on mobile — lowering this is the last resort,
-    // exposed here so it's one number to change if the HUD says we need it.
-    dpr: lowGfx ? [1, 1.5] : [1, 1.5],
+    // Render scale. Crispness is the point of the scene, so the low tier only
+    // gives up what a measurement justified — see LOW_TIER_DPR.
+    dpr: lowGfx ? LOW_TIER_DPR : [1, 1.5],
     clouds: lowGfx ? "low" : "full",     // SkyDome renders fewer/flatter clouds
     lazyVendorAnim: lowGfx,              // vendors hold a static pose until focused
     fireworks: lowGfx ? 1 : 2,
@@ -7706,7 +7722,7 @@ export default function OilPage() {
                 {parabolum && <ParabolumMoon />}
                 {skySunHour != null && <TODSkyBodies todHour={skySunHour} />}
                 {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
-                {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
+                {envPreset === "night" && <Suspense fallback={null}><ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} /></Suspense>}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} finale sound={fireworksSound} />}
                 <EnvLights env={env} moodScale={moodScale} />
                 <group position={[0, 1, 0]}>
@@ -8302,7 +8318,7 @@ export default function OilPage() {
             {parabolum && <ParabolumMoon />}
             {skySunHour != null && <TODSkyBodies todHour={skySunHour} />}
             {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
-            {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
+            {envPreset === "night" && <Suspense fallback={null}><ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} /></Suspense>}
             {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} />}
             <EnvLights env={env} moodScale={moodScale} />
             <group position={[0, 5, 0]}>

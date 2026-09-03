@@ -670,7 +670,19 @@ export function speakPendingVendorLine() {
   const win = w();
   if (!win || !state.pending) return;
   if (state.desiredVolume <= 0) return;
-  if (win.__vendorSitePalCurrentSceneId !== state.pending.sceneId) return;
+  if (win.__vendorSitePalCurrentSceneId !== state.pending.sceneId) {
+    // The scene that just finished is not the staged vendor's. That is the
+    // lazy-embed case: the stall was entered while the player was still
+    // booting its first scene, so activateVendorSitePal could not ask for the
+    // swap itself. Ask now; the next vh_sceneLoaded lands here again with a
+    // matching scene and the line goes out. Guarded so a swap already in
+    // flight is not requested twice.
+    if (win.__vendorSitePalSceneLoaded === true && typeof win.loadSceneByID === "function") {
+      win.__vendorSitePalSceneLoaded = false;
+      try { win.loadSceneByID(state.pending.sceneId); } catch (e) {}
+    }
+    return;
+  }
   const wait = state.speakNotBefore - Date.now();
   if (wait > 0) {
     if (state.speakTimer) clearTimeout(state.speakTimer);
@@ -689,12 +701,28 @@ export function speakPendingVendorLine() {
   if (text) speakNow(text, voice);
 }
 
+// Ask the page-level host to boot the SitePal player. On touch devices the
+// host no longer embeds at page load (the player is ≈290 MB of page-process
+// memory on an iPad Pro, paid by every visitor whether or not they ever reach
+// the strip — measured 2026-09-02); it embeds the first time something wants
+// it: the walker coming within reach of a stall, or a stall being entered.
+// Idempotent, and a no-op wherever the host embedded eagerly.
+export function requestVendorSitePalEmbed(reason) {
+  const win = w();
+  if (!win || win.__vendorSitePalEmbedded) return;
+  win.__vendorSitePalWanted = true;
+  try { win.dispatchEvent(new CustomEvent("vendor-sitepal-wanted", { detail: { reason } })); } catch (e) {}
+}
+
 // Focus a vendor: raise volume, stage a greeting, swap scenes if needed.
 // Speaks immediately when the right scene is already loaded.
 export function activateVendorSitePal(vendorId) {
   const win = w();
   const config = VENDOR_SITEPAL_CONFIG[vendorId];
   if (!win || !config) return;
+  // A lazily-embedded host boots now; vh_sceneLoaded then speaks the staged
+  // line once the vendor's scene is up (the pending mechanism below).
+  requestVendorSitePalEmbed("activate:" + vendorId);
   try {
     state.desiredVolume = 7;
     state.activeVendorId = vendorId;

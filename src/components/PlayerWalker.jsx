@@ -18,6 +18,7 @@
 // surface = local y 0); the follow camera works in world space.
 
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { requestVendorSitePalEmbed } from "@/lib/vendorSitePal";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useAnimations, Html } from "@react-three/drei";
@@ -141,6 +142,9 @@ const KICK_REWARD = 0.05;   // grip refunded for a clean brace
 const TAP_WHIFF = 0.03;     // mash discouragement — whiffed taps sting, never throw
 const BULL_NEAR = 0.55;     // world units to mount
 const VENDOR_NEAR = 0.6;    // world units to strike up a vendor conversation.
+// Boot the (lazily embedded) SitePal player this far from any stall, so it is
+// up by the time he is close enough to press E. No-op where it embedded eagerly.
+const SITEPAL_PREWARM = 2.5;
                             // Anchors sit at the vendor CHARACTER (behind the
                             // counter, inside the trailer), so the radius has
                             // to reach across counter-service stalls — nearest
@@ -272,6 +276,7 @@ export default function PlayerWalker({
   const camLookWRef = useRef(0); // smoothed demon-framing gaze weight (0..~0.65)
   const [nearBull, setNearBull] = useState(false);
   const nearVendorRef = useRef(null);
+  const sitepalPrewarmedRef = useRef(false);
   const [nearVendor, setNearVendor] = useState(null);
   const [talkingTo, setTalkingTo] = useState(null); // vendor mode — HUD + mode machine
   // Demon encounter state — mirrors of window.__hmDemonState, promoted to
@@ -1546,6 +1551,10 @@ export default function PlayerWalker({
         const s = reg[id];
         const d = Math.hypot(s.x - g.position.x, s.z - g.position.z);
         if (d < bd) { bd = d; nv = s; }
+        if (!sitepalPrewarmedRef.current && d < SITEPAL_PREWARM) {
+          sitepalPrewarmedRef.current = true;
+          requestVendorSitePalEmbed("walker-approach");
+        }
       }
     }
     if ((nv?.id || null) !== (nearVendorRef.current?.id || null)) {

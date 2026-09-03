@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { isTouchDevice } from "@/lib/deviceTier";
 import {
   VENDOR_SITEPAL_CONTAINER_ID,
   VENDOR_SITEPAL_ACCOUNT,
@@ -461,7 +462,8 @@ export default function VendorSitePalHost() {
     // embed script browser-cached, Strict Mode's first mount used to win the
     // race against its own cleanup and the second mount double-embedded —
     // which kills the player.
-    if (!window.__vendorSitePalEmbedded) {
+    const embedNow = () => {
+      if (window.__vendorSitePalEmbedded) return;
       window.__vendorSitePalEmbedded = true;
       loadVendorSitePalScriptOnce(VENDOR_SITEPAL_ACCOUNT).then((ok) => {
         // The embed functions come from vhss-d.oddcast.com. When that host is
@@ -492,6 +494,25 @@ export default function VendorSitePalHost() {
           `catch (e) { AC_Vhost_Embed(${VENDOR_SITEPAL_EMBED_PARAMS}); }`;
         host.appendChild(script);
       });
+    };
+    // When to boot. Desktop keeps embedding at page load, so the first stall
+    // greets instantly. A finger-driven device waits for a
+    // requestVendorSitePalEmbed() — the walker nearing a stall, or a stall
+    // being entered — because the player costs ≈290 MB of page-process memory
+    // on an iPad Pro whether or not the visitor ever reaches the strip
+    // (measured 2026-09-02). ?sitepal=eager or ?tune=vendor force the old way;
+    // ?sitepal=lazy forces the new way on desktop for testing.
+    const search = window.location.search;
+    const forceEager = /[?&](sitepal=eager|tune=vendor)\b/.test(search);
+    const forceLazy = /[?&]sitepal=lazy\b/.test(search);
+    const lazy = forceLazy || (!forceEager && isTouchDevice());
+    if (!lazy || window.__vendorSitePalWanted) {
+      embedNow();
+    } else if (!window.__vendorSitePalWantedListener) {
+      // Page-lifetime listener (see the no-cleanup note below); embedNow is
+      // idempotent, so a remount cannot double-embed.
+      window.__vendorSitePalWantedListener = true;
+      window.addEventListener("vendor-sitepal-wanted", embedNow);
     }
 
     // No cleanup: the host div, the player inside it, vh_sceneLoaded, and
