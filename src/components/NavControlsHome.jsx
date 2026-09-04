@@ -22,6 +22,10 @@ export default function NavControlsHome({
   onBuyClick,
   isMobile = false,
   onHelpClick = null,
+  // Draws a one-time attention pulse on the "?" until the caller clears it.
+  // Defaults OFF — this nav is shared across pages and none of the others ask
+  // for it.
+  helpNudge = false,
   showHelpActive = false,
   hideMusicOnMobile = false,
   hideUserOnMobile = false,
@@ -752,6 +756,25 @@ export default function NavControlsHome({
           transform: scale(0.95);
         }
 
+        /* First-visit nudge: an expanding ring, no layout shift and nothing to
+           dismiss. box-shadow rather than a pseudo-element so it cannot disturb
+           the flex row the nav buttons sit in. */
+        .help-btn-nav.nudge {
+          animation: helpNudgePulse 2.4s ease-out infinite;
+        }
+        @keyframes helpNudgePulse {
+          0%   { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.5); }
+          70%  { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+        }
+        /* Motion-sensitive users still get the cue, just a static ring. */
+        @media (prefers-reduced-motion: reduce) {
+          .help-btn-nav.nudge {
+            animation: none;
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.35);
+          }
+        }
+
         .mode-80s .help-btn-nav {
           background: ${showHelpActive
             ? 'rgba(255, 0, 255, 0.1)'
@@ -773,7 +796,7 @@ export default function NavControlsHome({
         {/* Help Button */}
         {onHelpClick && (
           <button
-            className="help-btn-nav"
+            className={`help-btn-nav${helpNudge ? " nudge" : ""}`}
             onClick={onHelpClick}
             title="Show help annotations"
             style={accentColor ? { color: accentColor } : undefined}

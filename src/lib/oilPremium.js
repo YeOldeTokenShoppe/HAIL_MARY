@@ -28,7 +28,7 @@ export const FREE_THEME_KEYS = new Set([
   "solarFlare",     // Solar Flare
   "crimsonCharge",  // Red Bull
   "atomicSurge",    // Monster Energy
-  "vaporwave",      // Vaporwave
+  "myLittlePony",      // My Little Pony
   "whiteGold",      // White Gold
   // Premium: chrome, dragonforge, celestial, midnightSovereign, metalAF
 ]);

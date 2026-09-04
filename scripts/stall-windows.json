@@ -1,0 +1,38 @@
+{
+  "windows": {
+    "carny": [
+      -40.7,
+      -29.9
+    ],
+    "promos": [
+      -30.2,
+      -23.4
+    ],
+    "fortunes": [
+      -15.6,
+      -5
+    ],
+    "tacos": [
+      0.6,
+      8
+    ],
+    "hotdogs": [
+      7.6,
+      12.6
+    ],
+    "rugs": [
+      12.9,
+      18.6
+    ],
+    "tonics": [
+      18.9,
+      26.2
+    ],
+    "tattoos": [
+      25.6,
+      33
+    ]
+  },
+  "maxX": 4.7,
+  "exclude": "^(Boardwalk$|SM_Prop_Bunting_Pole|SM_Prop_Light_0|Spotlight|SC_CincoDeMayo|Photo_booth|Booth_|Text|Point|Wire|StringLight|SM_Prop_Mechanical_Bull|Bull_Tent|Claw_Machine|Vending_Machine|ATM$)"
+}

@@ -477,8 +477,8 @@ texas: {
     return c;
   },
 },
-vaporwave: {
-  label: "VAPORWAVE",
+myLittlePony: {
+  label: "MY LITTLE PONY",
   build: () => {
     const c = getDefaultPumpConfig();
 

@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, Html, useGLTF, useTexture } from "@react-three/drei";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
+import useSkyEnvMap from "@/hooks/useSkyEnvMap";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { generateArtifactDistribution3D } from "@/lib/artifactDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG, SIGN_CATALOG } from "@/components/PimpMyPumpPanel";
@@ -5562,7 +5563,7 @@ function MergedRigField({ scene, items, allPumpConfigs, pumpConfig, envMap, cell
   );
 }
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, peakDepthMap = {}, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, envMapPreset = "warehouse", skyEnv = null, parabolum = false, forceStrikeGusher = false, gusherTrigger = 0, gusherEvents = [], plotsWithMessages = {}, onEnvelopeClick, hellActive = false, hellCol = null, hellRow = null, cameraViewable = true, onFocusObject }) {
   // Cells with a live gusher event. Each renders a full animated rig (instead of
   // merged static geometry) so the pump pauses + the rig pitches back as it erupts
   // — visible to every player, not just the gusher's owner.
@@ -5632,7 +5633,9 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
   // never-throwing hook (drei's CDN-fetching preset path crashed the page on
   // flaky connections); the hook caches, so switching themes is instant after
   // first load.
-  const envMap = useEnvMapSafe(envMapPreset);
+  const skyMap = useSkyEnvMap(skyEnv);
+  const hdrMap = useEnvMapSafe(skyEnv ? null : envMapPreset);
+  const envMap = skyMap || hdrMap;
 
   // OilTower position — centered on the 4 middle cells
   const towerPos = useMemo(() => {
@@ -5875,6 +5878,7 @@ function HellDemon({
   onMiss,
   onAttack,
   onHit,
+  onSelect,           // set → a click OPENS THE ARENA instead of capturing here
   requiredHits = 1,   // 1 = easy one-click banish; >1 = hard combat phase
   hitRange = DEMON_HIT_RANGE,
 }) {
@@ -6284,6 +6288,10 @@ function HellDemon({
   const WANDER_PHASES = ["walk_turn", "walk_move", "wander_mischief", "wander_pause"];
   const handleClick = (e) => {
     if (e?.stopPropagation) e.stopPropagation();
+    // The fight lives in the arena now (2026-09-03): the field demon is the
+    // lure, and clicking it opens the arena. Capture-by-click only remains
+    // for callers that do not pass onSelect.
+    if (onSelect && !done) { onSelect(); return; }
     if (!clickable || done) return;
     // On foot the fight is E-only: while a walker is placed, a canvas click is
     // the walker's move/place gesture, not an attack. Letting the demon's
@@ -6930,6 +6938,7 @@ export default function OilVoxelGrid({
   onRogueConsequence,
   envPreset,
   envMapPreset = "warehouse",
+  skyEnv = null,
   parabolum = false,
   forceStrikeGusher = false,
   gusherTrigger = 0,
@@ -6947,6 +6956,7 @@ export default function OilVoxelGrid({
   onClaimBounty,
   onDemonMiss,
   onDemonAttack,
+  onDemonSelect,
   // Gate the live CCTV feed: only the plot owner (or admin/test/report) sees it.
   // Visitors clicking a camera-enabled plot get the rig + camera model, no feed.
   cameraViewable = true,
@@ -7188,6 +7198,7 @@ export default function OilVoxelGrid({
             totalOilBudget={totalOilBudget}
             envPreset={envPreset}
             envMapPreset={envMapPreset}
+            skyEnv={skyEnv}
             parabolum={parabolum}
             forceStrikeGusher={forceStrikeGusher}
             gusherTrigger={gusherTrigger}
@@ -7230,6 +7241,7 @@ export default function OilVoxelGrid({
               onBanish={onClaimBounty}
               onMiss={onDemonMiss}
               onAttack={onDemonAttack}
+              onSelect={onDemonSelect}
             />
           )}
           {demonBounty && ["active", "flying", "waiting"].includes(demonBounty.status) && (
@@ -7249,6 +7261,7 @@ export default function OilVoxelGrid({
               onBanish={onClaimBounty}
               onMiss={onDemonMiss}
               onAttack={onDemonAttack}
+              onSelect={onDemonSelect}
             />
           )}
           {/* Gusher events render as full animated rigs inside PumpjackInstances

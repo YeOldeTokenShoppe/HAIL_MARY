@@ -714,6 +714,20 @@ export function requestVendorSitePalEmbed(reason) {
   try { win.dispatchEvent(new CustomEvent("vendor-sitepal-wanted", { detail: { reason } })); } catch (e) {}
 }
 
+// Pre-warm from a tap that is NOT yet a stall entry — the phone's BOARDWALK
+// tab and its postcard row. On touch the host embeds lazily, so without this
+// the first STEP UP would be the boot: the player would not exist inside that
+// gesture, saySilent(0) could not prime iOS audio, and the first greeting
+// would be blocked. (The desktop/iPad get the same warm-up from the walker
+// nearing a stall.) Idempotent and cheap once the player is up.
+export function warmVendorSitePal(reason) {
+  const win = w();
+  if (!win) return;
+  requestVendorSitePalEmbed(reason);
+  unlockAudio(win);
+  if (typeof win.saySilent === "function") { try { win.saySilent(0); } catch (e) {} }
+}
+
 // Focus a vendor: raise volume, stage a greeting, swap scenes if needed.
 // Speaks immediately when the right scene is already loaded.
 export function activateVendorSitePal(vendorId) {

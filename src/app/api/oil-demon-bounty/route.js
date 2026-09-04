@@ -58,7 +58,11 @@ export async function PATCH(req) {
     if (!hunterId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    const { bountyId, hunterUsername } = await req.json().catch(() => ({}));
+    // `arena: true` marks a banish won in the arena. The summoner may fight
+    // their own demon there and, on winning, end the stun early: the bounty
+    // still returns to the pool (a dismiss, not a claim) but the blockade
+    // lifts now instead of at the end of the two minutes (2026-09-03).
+    const { bountyId, hunterUsername, arena } = await req.json().catch(() => ({}));
     if (!bountyId) {
       return NextResponse.json({ error: "Missing bountyId" }, { status: 400 });
     }
@@ -79,7 +83,7 @@ export async function PATCH(req) {
 
       // Check stun: if hunter is the summoner, stun must have expired
       const isSummoner = hunterId === bounty.summonerId;
-      if (isSummoner && bounty.stunEndsAt) {
+      if (isSummoner && bounty.stunEndsAt && !arena) {
         const stunEnd = bounty.stunEndsAt.toMillis();
         if (Date.now() < stunEnd) {
           throw new Error("You are still incapacitated");

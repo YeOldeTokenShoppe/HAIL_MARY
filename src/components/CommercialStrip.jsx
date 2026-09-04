@@ -688,7 +688,7 @@ function applyVendorSkinGain(st, sp, vendorId) {
 }
 const HEAD_EASE = 8;           // 1/s — smoothing rate toward the target angles
 
-function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0, dimRef }) {
+export function VendorModel({ vendor, focusedRef, headRef, stripScene, stripRotY = 0, dimRef }) {
   const group = useRef();
   // Stable for the whole session: chosen at module load, so the hook's URL
   // never changes under it and Suspense fetches exactly one file.
@@ -1499,9 +1499,15 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
       if (anchor) {
         const v = new THREE.Vector3();
         anchor.getWorldPosition(v);
+        const ap = approachDirWorld(vendor, new THREE.Vector3(), stripRotY);
         reg[vendor.id] = {
           id: vendor.id, label: vendor.label || vendor.id,
           x: v.x, z: v.z, eyeY: head ? v.y : null,
+          rootY: (() => { const r = new THREE.Vector3(); rootRef.current?.getWorldPosition(r); return r.y; })(),
+          // Framing hints for the boardwalk postcard render (scripts/render-postcards.mjs).
+          approach: { x: ap.x, z: ap.z }, camDrop: vendor.camDrop ?? 0, faceDist: vendor.faceDist ?? 0.65, faceLift: vendor.faceLift ?? 0, framingUnit,
+          // Backplate renders hide the character too (it is not a strip node).
+          hide: (h) => { if (rootRef.current) rootRef.current.visible = !h; },
         };
         clearInterval(t);
       } else if (tries > 40) {
@@ -1518,6 +1524,7 @@ function VendorStall({ vendor: baseVendor, stripScene, stripRotY, framingUnit, p
       window.removeEventListener("hm-vendor-enter", onEnter);
       window.removeEventListener("hm-vendor-exit", onExit);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor.id, vendor.label]);
   // Identity transform: this group is a child of the shared strip group, and
   // both the strip GLB and the character GLBs are authored in that same frame.
@@ -3593,6 +3600,31 @@ function VendorSpotlight({ focus, stripScene, envPreset }) {
 export default function CommercialStrip({ worldW, worldD, cellSize = 1, envPreset, vendors = VENDOR_CATALOG, onVendorClick, onFocusObject, onZoomOut, onBoothPhoto }) {
   useEffect(() => { preloadVendorModels(); }, []);
   const { scene: stripScene } = useGLTF(STRIP_MODEL, true, true, extendKTX2);
+  // Tooling hook for scripts/render-postcards.mjs --plates: hide every top-level
+  // strip prop whose strip-local centre falls in a Z window (the stall's own
+  // dressing, same windows scripts/extract-stalls.mjs uses), so the phone's
+  // portal backplate shows the neighbours and sky behind a 3D stall, not a
+  // second copy of it. __hmStripShowAll() restores everything.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hidden = [];
+    window.__hmStripHide = ({ z: [z0, z1], maxX = 4.7, exclude = "" } = { z: [0, 0] }) => {
+      const re = exclude ? new RegExp(exclude) : null;
+      const box = new THREE.Box3(); const c = new THREE.Vector3();
+      stripScene.updateMatrixWorld(true);
+      let n = 0;
+      stripScene.children.forEach((child) => {
+        if (re && re.test(child.name) && child.name !== "Boardwalk") return;
+        if (child.name === "Boardwalk") return;
+        box.setFromObject(child); if (box.isEmpty()) return;
+        box.getCenter(c); stripScene.worldToLocal(c);
+        if (c.z >= z0 && c.z <= z1 && c.x <= maxX && child.visible) { child.visible = false; hidden.push(child); n++; }
+      });
+      return n;
+    };
+    window.__hmStripShowAll = () => { hidden.splice(0).forEach((o) => { o.visible = true; }); };
+    return () => { window.__hmStripShowAll?.(); delete window.__hmStripHide; delete window.__hmStripShowAll; };
+  }, [stripScene]);
   // The strip is the only KTX2 asset: once it is in, the transcoder worker and
   // its wasm heap are dead weight in the page process (see getKTX2Loader).
   useEffect(() => { if (stripScene) releaseKTX2Workers(); }, [stripScene]);

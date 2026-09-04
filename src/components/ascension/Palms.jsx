@@ -1,5 +1,5 @@
 "use client";
-// Vaporwave set-dressing: rows of palms flanking the runway, reusing the
+// My Little Pony set-dressing: rows of palms flanking the runway, reusing the
 // project's own palm2 model (no sourced track asset). Instanced via drei <Clone>
 // so one load serves every palm. SCALE/yOffset are first-guess values — tune
 // against a screenshot (GLB node transforms make exact size hard to predict).

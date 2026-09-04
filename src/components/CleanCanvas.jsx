@@ -9,12 +9,16 @@ import { ensureKTX2Support } from '@/lib/ktx2';
  * Enhanced Canvas component with automatic cleanup on unmount
  * Prevents memory leaks when navigating between pages
  */
-const CleanCanvas = forwardRef(function CleanCanvas({ children, onCreated, ...props }, ref) {
+const CleanCanvas = forwardRef(function CleanCanvas({ children, onCreated, onContextLost, onContextRestored, ...props }, ref) {
   const internalRef = useRef();
   const canvasRef = ref || internalRef;
   const sceneRef = useRef();
   const rendererRef = useRef();
   const cleanupTimeoutRef = useRef();
+  // Set once this instance is going away: the cleanup below forces a context
+  // loss on purpose, and that event must not be mistaken for the real thing.
+  const disposingRef = useRef(false);
+  const contextHandlersRef = useRef(null);
 
   const handleCreated = (state) => {
     sceneRef.current = state.scene;
@@ -25,6 +29,24 @@ const CleanCanvas = forwardRef(function CleanCanvas({ children, onCreated, ...pr
     // children's Suspense boundary (unlike a component, which deadlocks: the
     // strip suspends → the detector never commits → the strip can't transcode).
     ensureKTX2Support(state.gl);
+
+    // WebGL context loss. iOS Safari reclaims a backgrounded page's GPU
+    // resources after a while; on return the page is alive and React keeps
+    // updating, but the canvas can no longer draw — every control on the
+    // scene looks dead until a reload (Michelle, 2026-09-03: the rig's style
+    // pager "stops working after a few hours of inactivity"). preventDefault
+    // lets the browser restore the context if it will; the page decides what
+    // to do if it does not (it remounts the canvas — see page.js).
+    const el = state.gl.domElement;
+    const onLost = (e) => {
+      e.preventDefault();
+      if (disposingRef.current) return;
+      onContextLost?.();
+    };
+    const onRestored = () => { if (!disposingRef.current) onContextRestored?.(); };
+    el.addEventListener("webglcontextlost", onLost, false);
+    el.addEventListener("webglcontextrestored", onRestored, false);
+    contextHandlersRef.current = { el, onLost, onRestored };
 
     // Call user's onCreated if provided
     if (onCreated) {
@@ -40,12 +62,26 @@ const CleanCanvas = forwardRef(function CleanCanvas({ children, onCreated, ...pr
         clearTimeout(cleanupTimeoutRef.current);
       }
 
+      disposingRef.current = true;
+      if (contextHandlersRef.current) {
+        const { el, onLost, onRestored } = contextHandlersRef.current;
+        el.removeEventListener("webglcontextlost", onLost, false);
+        el.removeEventListener("webglcontextrestored", onRestored, false);
+        contextHandlersRef.current = null;
+      }
+
       // Defer cleanup to ensure React has finished unmounting
       cleanupTimeoutRef.current = setTimeout(() => {
         // Dispose of scene objects
         try {
           if (sceneRef.current && sceneRef.current.traverse && typeof sceneRef.current.traverse === 'function') {
-            sceneRef.current.traverse((child) => {
+            // Collect first, then dispose: removing a child from its parent
+            // inside traverse() shifts the siblings under the walk and threw
+            // "undefined is not an object (evaluating 'children[i].traverse')",
+            // which aborted the rest of the teardown.
+            const toDispose = [];
+            sceneRef.current.traverse((child) => { toDispose.push(child); });
+            toDispose.forEach((child) => {
             // Dispose geometry
             if (child.geometry) {
               child.geometry.dispose();

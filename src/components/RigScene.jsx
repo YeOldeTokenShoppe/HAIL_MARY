@@ -12,8 +12,10 @@
 
 import { useMemo, useEffect } from "react";
 import * as THREE from "three";
+import { useThree } from "@react-three/fiber";
 import { useGLTF, OrbitControls } from "@react-three/drei";
 import useEnvMapSafe from "@/hooks/useEnvMapSafe";
+import useSkyEnvMap from "@/hooks/useSkyEnvMap";
 import { generateOilDistribution3D, OIL_FIELD_UNITS } from "@/lib/oilDistribution";
 import { Pumpjack, PlotSign, HellDemon, useGroundLook, buildPeakDepthMap } from "@/components/OilVoxelGrid";
 
@@ -37,7 +39,7 @@ export const RIG_CAMERA = {
 
 // Ground tile with the field's textures and palette. Full field depth so it
 // reads as a cut-out of the mesa (the X-SECTION metaphor), one box either way.
-function MesaTile({ cellSize, depthZ, envPreset, parabolum }) {
+export function MesaTile({ cellSize, depthZ, envPreset, parabolum }) {
   const { sideTex, topoTex, palette } = useGroundLook(envPreset, parabolum);
   const size = TILE_CELLS * cellSize;
   const height = depthZ * cellSize * 0.5;
@@ -62,6 +64,19 @@ function MesaTile({ cellSize, depthZ, envPreset, parabolum }) {
  * ships: when a bounty targets THIS plot the demon rises here, on the tile,
  * so a phone player can still tap it and claim the bounty.
  */
+// Puts the camera back on the rig whenever the scene mounts — the arena
+// (which swaps in for this scene) parks the camera somewhere else entirely.
+function RigCamera() {
+  const { camera } = useThree();
+  useEffect(() => {
+    camera.position.set(...RIG_CAMERA.position);
+    camera.lookAt(...RIG_CAMERA.target);
+    camera.updateProjectionMatrix();
+    if (typeof window !== "undefined") window.__hmRigCam = () => ({ pos: camera.position.toArray().map((v) => +v.toFixed(3)), rot: camera.rotation.toArray().slice(0, 3).map((v) => +v.toFixed(3)) });
+  }, [camera]);
+  return null;
+}
+
 export default function RigScene({
   config,
   plot = null,
@@ -79,6 +94,7 @@ export default function RigScene({
   onTankDrain,
   envPreset,
   envMapPreset = "warehouse",
+  skyEnv = null,                 // { sky, skyBottom, ground, sunHour, preset } → reflections = the scene's own sky
   parabolum = false,
   forceStrikeGusher = false,
   gusherTrigger = 0,
@@ -90,7 +106,9 @@ export default function RigScene({
   cameraViewable = true,
 }) {
   const { scene, animations } = useGLTF(RIG_GLB);
-  const envMap = useEnvMapSafe(envMapPreset);
+  const skyMap = useSkyEnvMap(skyEnv);
+  const hdrMap = useEnvMapSafe(skyEnv ? null : envMapPreset);
+  const envMap = skyMap || hdrMap;
 
   // The deposit under the player's real column — same seeded distribution the
   // field uses, so the gusher rises from the right layer. Showcase: none.
@@ -115,6 +133,7 @@ export default function RigScene({
 
   return (
     <>
+      <RigCamera />
       {/* Same +1 lift as the field's group, so the camera numbers match. */}
       <group position={[0, 1, 0]}>
         <MesaTile cellSize={cellSize} depthZ={depthZ} envPreset={envPreset} parabolum={parabolum} />
@@ -176,6 +195,7 @@ export default function RigScene({
             onBanish={demon.onBanish}
             onMiss={demon.onMiss}
             onAttack={demon.onAttack}
+            onSelect={demon.onSelect}
           />
         )}
       </group>

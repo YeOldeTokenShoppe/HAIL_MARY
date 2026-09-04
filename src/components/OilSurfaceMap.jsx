@@ -23,6 +23,10 @@ export default function OilSurfaceMap({
   selectedClaimIndex,
   onSelectClaim,
   theme,
+  // { col, row } of the summoner's plot while a demon is loose: every other
+  // plot dims (the field-wide blockade, made visible where the phone sees the
+  // field) and the summoner's burns.
+  blockade = null,
   gridX = 10,
   gridY = 10,
   allPlotsMap = {},
@@ -87,6 +91,16 @@ export default function OilSurfaceMap({
             );
           })}
         </div>
+        {blockade && (
+          <div style={{
+            padding: "5px 8px", marginBottom: 4, textAlign: "center",
+            fontSize: 10, letterSpacing: "0.18em", fontWeight: 700, color: "#ff4422",
+            background: "rgba(140,10,0,0.18)", border: "1px solid rgba(255,34,0,0.45)", borderRadius: 4,
+            animation: "demonBannerPulse 2s ease-in-out infinite",
+          }}>
+            ALL RIGS HALTED — DEMON LOOSE
+          </div>
+        )}
         <div style={{
           display: "grid", gridTemplateColumns: `repeat(${gridX}, 1fr)`,
           gap: 2, padding: 8,
@@ -94,6 +108,8 @@ export default function OilSurfaceMap({
         }}>
           {claimTotals.map((claim, i) => {
             const plotKey = `${claim.x}_${claim.y}`;
+            const isSummonerPlot = !!blockade && blockade.col === claim.x && blockade.row === claim.y;
+            const halted = !!blockade && !isSummonerPlot;
             const plotData = allPlotsMap[plotKey];
             const isOwned = plotData?.currentOwnerId != null;
             const isMine = !!currentUserId && plotData?.currentOwnerId === currentUserId;
@@ -133,8 +149,12 @@ export default function OilSurfaceMap({
                 }}
                 style={{
                   aspectRatio: "1",
-                  background: bg,
-                  border: claim.index === selectedClaimIndex
+                  background: isSummonerPlot ? "rgba(255,50,20,0.55)" : bg,
+                  // Blockade: every rig but the summoner's is halted — dim them.
+                  filter: halted ? "grayscale(0.75) brightness(0.55)" : undefined,
+                  border: isSummonerPlot
+                    ? "2px solid #ff4422"
+                    : claim.index === selectedClaimIndex
                     ? `2px solid ${t.green}`
                     : isMine
                     ? `2px solid ${t.green}88`
@@ -155,6 +175,7 @@ export default function OilSurfaceMap({
                   animation: isJumpTarget ? "claimJumpPulse 1.5s ease-in-out infinite" : "none",
                 }}
               >
+                {isSummonerPlot && <span aria-label="demon summoned here" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, pointerEvents: "none" }}>🔥</span>}
                 {isMine ? (
                   <div style={{ fontSize: 8, fontWeight: 700, color: t.green }}>YOU</div>
                 ) : isOwned ? (

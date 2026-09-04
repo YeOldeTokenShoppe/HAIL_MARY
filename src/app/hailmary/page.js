@@ -20,6 +20,9 @@ import OilAwayRecap from "@/components/OilAwayRecap";
 import usePushAlerts from "@/hooks/usePushAlerts";
 import PimpMyPumpPanel, { getDefaultPumpConfig, THEME_PRESETS } from "@/components/PimpMyPumpPanel";
 import RigScene, { RIG_CAMERA } from "@/components/RigScene";
+import DemonArena, { WEAPONS } from "@/components/DemonArena";
+import VendorStage, { BoardwalkStrip, VendorCart, stepUpVendor, stepBackVendor, warmBoardwalk } from "@/components/VendorStage";
+import { playSfx } from "@/lib/uiSfx";
 import { panelChrome, PanelSection, PanelTitle, PANEL_ICONS } from "@/components/HailMaryPanel";
 import DailyTicketPanel from "@/components/DailyTicketPanel";
 import OilWelcomeModal from "@/components/OilWelcomeModal";
@@ -845,6 +848,120 @@ const LOADING_ROOT = { background: "#000" };
 // says a specific one needs it.
 const LOW_TIER_DPR = [1, 1.5];
 
+// ── Arena HUD ────────────────────────────────────────────────────────────────
+// The DOM over the arena canvas: the bounty and phase on top, the race strip
+// (every hunter in the arena, hits so far), the last shot's verdict, EXIT, and
+// the reticle. The whole surface is the aim layer — drag moves the reticle
+// (no shot), a tap fires where the reticle is — and it talks to the scene over
+// the window bus ("hm-arena-fire" {nx, ny} in NDC), the hm-* convention.
+function ArenaHud({ bountyAmount, phaseLabel, hits, required, lockout, hunters, note, vulnerable, backstabOpen, frozen, onExit, meId, rehearsal, weapon = "revolver", onWeapon, cooldowns, vials = 0, onVial }) {
+  const layerRef = useRef(null);
+  const [ret, setRet] = useState(null); // reticle px within the layer
+  const downRef = useRef(null);
+  useEffect(() => {
+    const el = layerRef.current; if (!el) return;
+    const r = el.getBoundingClientRect(); setRet({ x: r.width / 2, y: r.height * 0.42 });
+  }, []);
+  const toLocal = (e) => { const r = layerRef.current.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height }; };
+  const fireAt = (x, y, w, h) => {
+    window.dispatchEvent(new CustomEvent("hm-arena-fire", { detail: { nx: (x / w) * 2 - 1, ny: -((y / h) * 2 - 1), weapon } }));
+  };
+  // Screen flash on a lightning strike (the scene dispatches hm-arena-flash).
+  const [flash, setFlash] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const onFlash = (e) => { setFlash(Math.min(1, e.detail?.strength ?? 0.3)); cancelAnimationFrame(raf); raf = requestAnimationFrame(() => requestAnimationFrame(() => setFlash(0))); };
+    window.addEventListener("hm-arena-flash", onFlash);
+    return () => { window.removeEventListener("hm-arena-flash", onFlash); cancelAnimationFrame(raf); };
+  }, []);
+  // Desktop: 1–4 pick a weapon.
+  useEffect(() => {
+    const keys = Object.keys(WEAPONS);
+    const onKey = (e) => { const i = Number(e.key) - 1; if (i >= 0 && i < keys.length && !e.metaKey && !e.ctrlKey) onWeapon?.(keys[i]); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onWeapon]);
+  const onDown = (e) => { const l = toLocal(e); downRef.current = { x: l.x, y: l.y, t: Date.now(), moved: false }; setRet({ x: l.x, y: l.y }); e.currentTarget.setPointerCapture?.(e.pointerId); };
+  const onMove = (e) => {
+    const l = toLocal(e);
+    if (downRef.current) { if (Math.hypot(l.x - downRef.current.x, l.y - downRef.current.y) > 12) downRef.current.moved = true; setRet({ x: l.x, y: l.y }); }
+    else if (e.pointerType === "mouse") setRet({ x: l.x, y: l.y });
+  };
+  const onUp = (e) => {
+    const d = downRef.current; downRef.current = null; if (!d) return;
+    const l = toLocal(e);
+    if (!d.moved && Date.now() - d.t < 450) fireAt(l.x, l.y, l.w, l.h);
+  };
+  const pips = (n, of) => "◆".repeat(Math.min(n, of)) + "◇".repeat(Math.max(0, of - n));
+  const list = Object.entries(hunters || {}).filter(([, h]) => h && h.active !== false).sort((a, b) => (b[1].hits || 0) - (a[1].hits || 0)).slice(0, 5);
+  const mono = { fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.12em" };
+  const panel = { background: "rgba(20,4,2,0.78)", border: "1px solid rgba(255,60,30,0.45)", borderRadius: 8, color: "#ffd9c9", backdropFilter: "blur(6px)" };
+  return (
+    <div ref={layerRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { downRef.current = null; }}
+      style={{ position: "absolute", inset: 0, zIndex: 20, touchAction: "none", cursor: "crosshair", userSelect: "none", WebkitUserSelect: "none" }}>
+      {/* top strip */}
+      {/* Left-anchored and capped so it clears the desktop canvas toolbar at top right. */}
+      <div style={{ position: "absolute", top: 8, left: 8, right: 8, maxWidth: 440, display: "flex", gap: 6, alignItems: "stretch", pointerEvents: "none" }}>
+        <div style={{ ...panel, ...mono, flex: 1, padding: "6px 10px", fontSize: 10 }}>
+          <div style={{ color: "#ff5a3a", fontWeight: 700, letterSpacing: "0.2em" }}>{rehearsal ? "ARENA REHEARSAL" : "DEMON LOOSE"}</div>
+          <div style={{ marginTop: 2 }}>BOUNTY {bountyAmount || 0} BTR + 3 DRILLS · {phaseLabel}</div>
+        </div>
+        <div style={{ ...panel, ...mono, padding: "6px 10px", fontSize: 12, display: "flex", alignItems: "center", color: vulnerable ? (backstabOpen ? "#ffd27a" : "#7dff9a") : "#ffd9c9" }}>
+          {pips(hits, required)}
+        </div>
+      </div>
+      {/* race strip */}
+      {list.length > 0 && (
+        <div style={{ position: "absolute", top: 58, left: 8, right: 8, ...panel, ...mono, padding: "5px 10px", fontSize: 10, display: "flex", gap: 12, flexWrap: "wrap", pointerEvents: "none" }}>
+          {list.map(([id, h]) => (
+            <span key={id} style={{ color: id === meId ? "#7dff9a" : "#ffd9c9" }}>{(h.username || "HUNTER").toUpperCase().slice(0, 12)} {pips(h.hits || 0, required)}</span>
+          ))}
+        </div>
+      )}
+      {/* verdict + lockout */}
+      <div style={{ position: "absolute", left: 8, right: 8, bottom: 56, textAlign: "center", ...mono, fontSize: 11, color: lockout > 0 ? "#ff8a6a" : vulnerable ? (backstabOpen ? "#ffd27a" : "#7dff9a") : "#ffd9c9", textShadow: "0 1px 6px rgba(0,0,0,0.8)", pointerEvents: "none" }}>
+        {lockout > 0 ? `✗ SHAKEN — ${lockout}s` : frozen ? "❄ FROZEN — SHATTER IT" : vulnerable ? (backstabOpen ? "◆ ITS BACK IS TURNED — SHOOT" : "◆ IT'S OPEN — SHOOT") : (note || "WAIT FOR IT TO STOP")}
+      </div>
+      {/* reticle */}
+      {ret && (
+        <div style={{ position: "absolute", left: ret.x - 16, top: ret.y - 16, width: 32, height: 32, pointerEvents: "none", opacity: lockout > 0 ? 0.35 : 0.95 }}>
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke={vulnerable ? "#7dff9a" : "#ffd9c9"} strokeWidth="1.5">
+            <circle cx="16" cy="16" r="10" /><path d="M16 2v7M16 23v7M2 16h7M23 16h7" />
+          </svg>
+        </div>
+      )}
+      <div aria-hidden style={{ position: "absolute", inset: 0, background: "#dfe9ff", opacity: flash, transition: flash ? "none" : "opacity 280ms ease-out", pointerEvents: "none", zIndex: 5 }} />
+      {/* arsenal — tap to select; the fill drains while the weapon reloads */}
+      <div style={{ position: "absolute", left: 8, bottom: 10, display: "flex", gap: 6 }}>
+        {Object.entries(WEAPONS).map(([key, w], i) => {
+          const cd = cooldowns?.[key] || 0; const frac = cd > 0 ? Math.min(1, cd / w.cooldown) : 0; const on = key === weapon;
+          return (
+            <button key={key} type="button" title={`${w.label} (${i + 1})`} aria-label={w.label} aria-pressed={on}
+              onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); onWeapon?.(key); }} onClick={(e) => { e.stopPropagation(); onWeapon?.(key); }}
+              style={{ ...panel, ...mono, position: "relative", overflow: "hidden", width: 46, height: 46, padding: 0, cursor: "pointer", pointerEvents: "auto", border: on ? "1px solid #ffd27a" : panel.border, boxShadow: on ? "0 0 10px rgba(255,210,122,0.45)" : "none", color: on ? "#ffd27a" : "#ffd9c9" }}>
+              <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${frac * 100}%`, background: "rgba(255,90,40,0.35)", pointerEvents: "none" }} />
+              <span style={{ position: "relative", display: "block", fontSize: 16, lineHeight: "20px", marginTop: 4 }}>{w.glyph}</span>
+              <span style={{ position: "relative", display: "block", fontSize: 7, letterSpacing: "0.08em", opacity: 0.85 }}>{w.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {/* holy water — a consumable, not a weapon: tap to throw; the count is the badge */}
+      <button type="button" title="Holy water: forces the demon's pause, back turned, and steadies your hand" aria-label="HOLY WATER" disabled={vials <= 0}
+        onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); if (vials > 0) onVial?.(); }} onClick={(e) => { e.stopPropagation(); if (vials > 0) onVial?.(); }}
+        style={{ ...panel, ...mono, position: "absolute", left: 8 + 4 * 52 + 10, bottom: 10, width: 46, height: 46, padding: 0, cursor: vials > 0 ? "pointer" : "default", pointerEvents: "auto",
+          border: vials > 0 ? "1px solid #9fd8ff" : panel.border, color: vials > 0 ? "#dff2ff" : "rgba(255,217,201,0.4)", boxShadow: vials > 0 ? "0 0 10px rgba(159,216,255,0.35)" : "none" }}>
+        <span style={{ display: "block", fontSize: 16, lineHeight: "20px", marginTop: 4, opacity: vials > 0 ? 1 : 0.5 }}>💧</span>
+        <span style={{ display: "block", fontSize: 7, letterSpacing: "0.08em", opacity: 0.85 }}>HOLY ×{vials}</span>
+      </button>
+      <button type="button" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={onExit}
+        style={{ position: "absolute", right: 8, bottom: 10, ...panel, ...mono, padding: "8px 12px", fontSize: 10, cursor: "pointer", pointerEvents: "auto" }}>
+        EXIT ARENA
+      </button>
+    </div>
+  );
+}
+
 // Reports a single "the field has finished streaming" edge to the page so the
 // CoinLoader can lift. drei's useProgress store is module-level (it listens on
 // THREE.DefaultLoadingManager), so this works outside the Canvas — and keeping
@@ -1635,6 +1752,8 @@ export default function OilPage() {
     const q = p.get("q");
     if (q === "high" || q === "low") setQForce(q);
     setTouchTier(isTouchDevice());
+    if (p.get("arena") === "1") { setArenaRehearsal(true); setArenaOpen(true); }
+    if (p.get("arena") === "break") { setArenaRehearsal(true); setBreakRehearsal(Date.now()); }
   }, []);
   const lowGfx = qForce ? qForce === "low" : (isMobile || touchTier);
   // Cloud experiment (2026-09-02): the low tier gets the low-poly GLB ring;
@@ -1815,6 +1934,9 @@ export default function OilPage() {
     : envPreset === "day" ? 13
     : envPreset === "dusk" ? 17.4
     : null;
+  // Reflections = the scene's own sky (useSkyEnvMap): the live palette and the
+  // sun's hour, so chrome mirrors the mesa's sky instead of a stock HDR.
+  const skyEnv = useMemo(() => ({ sky: env.sky, skyBottom: env.skyBottom, ground: env.hemi?.ground, sunHour: skySunHour, preset: envPreset }), [env.sky, env.skyBottom, env.hemi?.ground, skySunHour, envPreset]);
   // Reflections-only env map for the rigs' metal (NOT the sky). Warm "sunset"
   // reflections flatter the warm brass/copper on the bright day/dusk scenes;
   // "warehouse" (cooler, contrasty) suits the Lyquid80 night and hell.
@@ -1888,17 +2010,38 @@ export default function OilPage() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardSectionOpen, setLeaderboardSectionOpen] = useState(true);
 
-  // First-visit onboarding: auto-open the welcome/rules modal once per device.
+  // Onboarding is opt-IN (2026-09-03). The welcome/rules modal carries the
+  // intro video, which is a pleasure once and an obstacle every time after, so
+  // it no longer auto-opens on first visit. Reached from the "?" button:
+  // NavControlsHome's onHelpClick on desktop, the "How to play" button on
+  // mobile — both already existed, this only removed the automatic path.
+  //
+  // The old guard was a localStorage "oilWelcomeSeen" flag, which suppressed it
+  // per DEVICE — so a second browser, a cleared cache or a private window
+  // replayed the video at someone who had already sat through it. That flag is
+  // now unread; stale values in existing users' localStorage are inert.
+
+  // …but opt-in onboarding still has to be FINDABLE, so the "?" pulses until it
+  // has been opened once. Read in an EFFECT, not a useState initializer:
+  // localStorage does not exist during SSR, and seeding state from it directly
+  // hydrates mismatched.
+  const [helpNudge, setHelpNudge] = useState(false);
   useEffect(() => {
-    try {
-      if (!localStorage.getItem("oilWelcomeSeen")) setShowWelcome(true);
-    } catch {}
+    try { if (!localStorage.getItem("oilHelpSeen")) setHelpNudge(true); } catch {}
+  }, []);
+
+  // Every path that opens the modal goes through here, so the nudge is retired
+  // by USING the button — not by sitting through the video. Opening it from the
+  // fairness link counts too: they found the help, which is the whole point.
+  const openWelcome = useCallback(() => {
+    setShowWelcome(true);
+    setHelpNudge(false);
+    try { localStorage.setItem("oilHelpSeen", "1"); } catch {}
   }, []);
 
   const closeWelcome = useCallback(() => {
     setShowWelcome(false);
     setHelpFairness(false);
-    try { localStorage.setItem("oilWelcomeSeen", "1"); } catch {}
   }, []);
 
   // Premium purchases
@@ -2382,15 +2525,110 @@ export default function OilPage() {
   }, [isAdmin, adminAuthed, adminPassword]);
 
   // Mobile tab view
-  const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "surface" | "xsec"
+  const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "boardwalk" | "surface" | "xsec"
+  // Phone boardwalk (2026-09-03): which postcard is up, and whether the portal is stepped into.
+  const [boardwalkVendor, setBoardwalkVendor] = useState("tonics");
+  const [boardwalkOpen, setBoardwalkOpen] = useState(false);
+  useEffect(() => { if (mobileTab !== "boardwalk" && boardwalkOpen) { stepBackVendor(); setBoardwalkOpen(false); } }, [mobileTab, boardwalkOpen]);
+  // STEP UP / STEP BACK. Opening starts the vendor's SitePal greeting HERE, inside
+  // the tap — the audio unlock and the on-demand embed need the gesture; closing
+  // mutes the same way the desktop's exit does.
+  const toggleBoardwalk = useCallback(() => {
+    if (!boardwalkOpen) stepUpVendor(boardwalkVendor); else stepBackVendor();
+    setBoardwalkOpen(!boardwalkOpen);
+  }, [boardwalkOpen, boardwalkVendor]);
+  // Desktop walk-up: which stall the camera is parked at (the strip reports the
+  // enter via onVendorClick and the exit via the hm-vendor-left window event).
+  const [focusedVendor, setFocusedVendor] = useState(null);
+  const handleVendorClick = useCallback((id) => setFocusedVendor(id || null), []);
+  useEffect(() => {
+    const onLeft = () => setFocusedVendor(null);
+    window.addEventListener("hm-vendor-left", onLeft);
+    return () => window.removeEventListener("hm-vendor-left", onLeft);
+  }, []);
+  // Buy from a boardwalk cart: the server charges the tank and grants the supply
+  // (src/lib/oilVendor.js is the one price table). Returns { ok, count } | { error }.
+  const handleVendorBuy = useCallback(async (item) => {
+    if (!user) return { error: "unauthorized" };
+    try {
+      const res = await oilApiFetch("/api/oil-vendor-buy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item, username: user?.username || user?.firstName || null }) });
+      const data = res && typeof res.json === "function" ? await res.json().catch(() => ({})) : (res || {});
+      if (res && typeof res.ok === "boolean" && !res.ok && !data.error) data.error = res.status === 401 ? "unauthorized" : "failed";
+      return data;
+    } catch (e) { return { error: e?.message || "failed" }; }
+  }, [user, oilApiFetch]);
+  const sceneTab = mobileTab === "3d" || mobileTab === "boardwalk";
   // Rig editor (Pimp My Pump) open on the phone — pins the scene as a compact live view.
   const [pimpOpenMobile, setPimpOpenMobile] = useState(false);
   // Phone showcase rig (no claim yet): pages through the editor's theme
   // presets as an enticement — the same list Pimp My Pump sells. Opens on
   // GOLD RUSH.
+  // WebGL context loss → remount the canvas (see CleanCanvas). A lost context
+  // that the browser does not restore leaves a live page with a dead scene;
+  // a remount rebuilds it from the cached assets (cheap on the phone — one
+  // rig — which is one reason the phone stopped rendering the field). Wait a
+  // beat for a restore first, and never remount while the page is hidden:
+  // do it on the way back to the foreground instead.
+  const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const glLostRef = useRef(false);
+  const glRemountTimerRef = useRef(null);
+  const remountCanvas = useCallback(() => {
+    if (glRemountTimerRef.current) { clearTimeout(glRemountTimerRef.current); glRemountTimerRef.current = null; }
+    glLostRef.current = false;
+    setCanvasEpoch((n) => n + 1);
+  }, []);
+  const handleContextLost = useCallback(() => {
+    glLostRef.current = true;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    if (glRemountTimerRef.current) clearTimeout(glRemountTimerRef.current);
+    glRemountTimerRef.current = setTimeout(() => { if (glLostRef.current) remountCanvas(); }, 1500);
+  }, [remountCanvas]);
+  const handleContextRestored = useCallback(() => {
+    glLostRef.current = false;
+    if (glRemountTimerRef.current) { clearTimeout(glRemountTimerRef.current); glRemountTimerRef.current = null; }
+  }, []);
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "visible" && glLostRef.current) remountCanvas(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [remountCanvas]);
+
   const showcaseKeys = useMemo(() => Object.keys(THEME_PRESETS), []);
   const [showcaseIdx, setShowcaseIdx] = useState(() => Math.max(0, Object.keys(THEME_PRESETS).indexOf("goldRush")));
   const showcaseConfig = useMemo(() => THEME_PRESETS[showcaseKeys[showcaseIdx]].build(), [showcaseKeys, showcaseIdx]);
+
+  // ── Demon arena (2026-09-03) — the hell-hit fight, canonical everywhere ──
+  // The canvas swaps its scene for DemonArena while open (one canvas at a
+  // time); the HUD is DOM. ?arena=1 rehearses it with a local demon and no
+  // server: three hits, no bounty, no race strip.
+  const [arenaOpen, setArenaOpen] = useState(false);
+  const [arenaRehearsal, setArenaRehearsal] = useState(false);
+  const [arenaState, setArenaState] = useState({ phase: "spawn", vulnerable: false, backstabOpen: false, hits: 0, required: 3 });
+  const [arenaNote, setArenaNote] = useState("");
+  const [arenaWeapon, setArenaWeapon] = useState("revolver");
+  const [arenaCooldowns, setArenaCooldowns] = useState(null);
+  // Holy water on hand: the live drill doc in a real fight, two free vials in rehearsal.
+  const [rehearsalVials, setRehearsalVials] = useState(2);
+  const throwVial = useCallback(() => { window.dispatchEvent(new CustomEvent("hm-arena-vial")); }, []);
+  // An untouched thaw has no shot result to speak through — swap the frozen advice out here.
+  const prevFrozenRef = useRef(false);
+  useEffect(() => {
+    const f = !!arenaState?.frozen;
+    if (prevFrozenRef.current && !f) setArenaNote((n) => (typeof n === "string" && n.startsWith("❄ FROZEN")) ? "❄ IT SHAKES OFF THE ICE" : n);
+    prevFrozenRef.current = f;
+  }, [arenaState?.frozen]);
+  const arenaEnteredRef = useRef(null); // bountyId we registered on
+  // The BREAK (2026-09-03): the sequence that joins a hell hit to the arena for
+  // the SUMMONER — crack (sky flips, shake, roar), rise (the imp climbs out of
+  // your own rig on the tile — the field's demon at your plot on desktop), cut
+  // (red fade, arena opens with the demon rising at range). Keyed off the
+  // bounty document arriving with your id, never the local drill animation, so
+  // it cannot race the server. Hunters get the banner, not the ride. The same
+  // fade wraps the return trip.
+  const [hellFade, setHellFade] = useState(0);
+  const breakKeyRef = useRef(null);
+  const breakTimersRef = useRef([]);
+  const [breakRehearsal, setBreakRehearsal] = useState(0); // ?arena=break
 
   // 2D interaction state lifted up
   const [selectedX, setSelectedX] = useState(null);
@@ -2484,6 +2722,8 @@ export default function OilPage() {
 
   // ── Daily Drill (player mode) ──
   const [userDrill, setUserDrill] = useState(null); // { col, row, drillDay, lastDrillDate }
+  // Holy water on hand (declared here: userDrill is only initialised above this line).
+  const arenaVials = arenaRehearsal ? rehearsalVials : (userDrill?.supplies?.holyWater ?? 0);
   // True once the player's drill doc (or signed-out status) has actually
   // resolved — gates decisions that must not run on the loading-race null.
   const [drillLoaded, setDrillLoaded] = useState(false);
@@ -4038,7 +4278,20 @@ export default function OilPage() {
     setIntroComplete(true);
   }, []);
 
+  // Navigating away ends a vendor visit, whichever door it goes out through.
+  // Both zoom-out AND fly-to need this: a stall clears its own zoom state only
+  // on these events or on a second click, so without it the stall stays "zoomed"
+  // after you fly to a plot from inside it. The SitePal host keeps that vendor's
+  // scene live, the head keeps tracking an absent camera, and — the visible one —
+  // the fortune teller's interiorDim holds her wagon at 0.05 from across the
+  // field in broad daylight until some later zoom-out happens to release it.
+  const endVendorVisit = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("hm-vendor-exit"));
+    window.dispatchEvent(new CustomEvent("hm-vendor-left"));
+  }, []);
+
   const handleFlyTo = useCallback((col, row) => {
+    endVendorVisit();
     const worldW = gridSize * CELL_SIZE;
     const worldD = gridSize * CELL_SIZE;
     const x = -worldW / 2 + col * CELL_SIZE + CELL_SIZE / 2;
@@ -4053,20 +4306,18 @@ export default function OilPage() {
     setSelectedX(col);
     setSliceY(row);
     setDrillDepth(0);
-  }, [isMobile, gridSize]);
+  }, [isMobile, gridSize, endVendorVisit]);
 
   const handleZoomOut = useCallback(() => {
     // A walker vendor visit can end through ANY zoom-out path (panel close,
-    // overview button, click-away). Chain the vendor cleanup events so the
-    // stall un-focuses and the walker resumes instead of freezing under a
-    // sky camera. No-ops when nothing is focused / no walker is visiting.
-    window.dispatchEvent(new CustomEvent("hm-vendor-exit"));
-    window.dispatchEvent(new CustomEvent("hm-vendor-left"));
+    // overview button, click-away). No-ops when nothing is focused / no walker
+    // is visiting.
+    endVendorVisit();
     flyIdRef.current++;
     setFlyTarget({ x: 0, y: isMobile ? 3.5 : 8, z: isMobile ? 4 : 8, id: flyIdRef.current, mobile: isMobile, overview: true });
     setSelectedX(null);
     setDrillDepth(0);
-  }, [isMobile]);
+  }, [isMobile, endVendorVisit]);
 
   // Click-to-zoom on a scene object (e.g. MachinePanel). worldPoint is the THREE
   // intersection point; CameraFlyTo's `focus` branch dollies the camera in toward it.
@@ -4087,6 +4338,13 @@ export default function OilPage() {
       id: flyIdRef.current, mobile: isMobile, focus: true,
     });
   }, [isMobile]);
+  // Tooling hook: the boardwalk postcard render (scripts/render-postcards.mjs)
+  // frames each stall through the same fly-to the walker uses.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.__hmFocusObject = handleFocusObject;
+    return () => { if (window.__hmFocusObject === handleFocusObject) delete window.__hmFocusObject; };
+  }, [handleFocusObject]);
 
   // The player's own rig cell, if they hold a claimed plot. When set, the page
   // SKIPS the aerial intro orbit and opens focused on that rig instead (both
@@ -4493,7 +4751,7 @@ export default function OilPage() {
   }, [user?.id]);
 
   // Claim the demon bounty — player clicks the demon in 3D
-  const handleClaimBounty = useCallback(async () => {
+  const handleClaimBounty = useCallback(async (fromArena = false) => {
     // Always turn off the local hell visuals immediately on banish — regardless
     // of mode, signed-in state, or whether the server PATCH below succeeds. The
     // PATCH (for a real bounty) still awards it and clears the blockade for the
@@ -4518,6 +4776,7 @@ export default function OilPage() {
         body: JSON.stringify({
           bountyId: demonBounty.id,
           hunterUsername: username?.trim() || user?.firstName || "Anonymous",
+          arena: fromArena === true,
         }),
       });
       const data = await res.json();
@@ -4585,6 +4844,10 @@ export default function OilPage() {
   // player out for a few seconds. demonStunRemaining drives the HUD countdown.
   const [demonStunRemaining, setDemonStunRemaining] = useState(0);
   const demonStunTimer = useRef(null);
+  const handleDemonSteady = useCallback(() => {
+    if (demonStunTimer.current) { clearInterval(demonStunTimer.current); demonStunTimer.current = null; }
+    setDemonStunRemaining(0);
+  }, []);
   const handleDemonMiss = useCallback((cooldownSecs = 3.5) => {
     if (demonStunTimer.current) clearInterval(demonStunTimer.current);
     const endAt = Date.now() + cooldownSecs * 1000;
@@ -4603,6 +4866,92 @@ export default function OilPage() {
   const handleDemonAttack = useCallback(() => {
     shakeRef.current = 1;
   }, []);
+
+  // Arena presence → the bounty doc's race strip (server-written; no-op in
+  // rehearsal or for a local test demon).
+  const postArena = useCallback((action, hits = 0) => {
+    const id = demonBounty?.id; if (!id || arenaRehearsal || !user?.id) return;
+    oilApiFetch("/api/oil-demon-arena", { method: "POST", body: JSON.stringify({ bountyId: id, action, hits, username: username?.trim() || user?.firstName || null }) }).catch(() => {});
+  }, [demonBounty?.id, arenaRehearsal, user?.id, user?.firstName, username, oilApiFetch]);
+  const openArena = useCallback(() => {
+    if (isMobile) setMobileTab("3d");
+    setArenaNote(""); setArenaState((s) => ({ ...s, hits: 0 }));
+    setArenaOpen(true);
+    if (demonBounty?.id && arenaEnteredRef.current !== demonBounty.id) { arenaEnteredRef.current = demonBounty.id; postArena("enter"); }
+  }, [isMobile, demonBounty?.id, postArena]);
+  const closeArena = useCallback(() => {
+    setArenaOpen(false);
+    if (arenaEnteredRef.current) { postArena("leave"); arenaEnteredRef.current = null; }
+    // Desktop: the arena parked the camera at its own vantage; go back to the field overview.
+    if (!isMobile) setTimeout(() => handleZoomOut?.(), 60);
+  }, [postArena, isMobile]);
+  const onArenaResult = useCallback((r) => {
+    if (!r) return;
+    const pip = (n, of) => "◆".repeat(Math.min(n, of)) + "◇".repeat(Math.max(0, of - n));
+    if (r.result === "banish") setArenaNote(r.backstab ? "🔥 SHOT IN THE BACK — BANISHED" : "🔥 BANISHED");
+    else if (r.result === "hit") { setArenaNote(`${r.shattered ? "❄ SHATTERED" : r.weapon === "lightning" ? "⚡ DOUBLE HIT" : r.backstab ? "◆ GOT THE DROP ON IT" : "◆ CLEAN HIT"} ${pip(r.hits, r.required)}`); postArena("hit", r.hits); }
+    else if (r.result === "dodge") setArenaNote("☠ IT DODGES — brace for its counter");
+    else if (r.result === "miss") setArenaNote(r.weapon === "ice" ? "❄ THE BOLT SAILS PAST" : "✗ MISSED");
+    else if (r.result === "frozen") setArenaNote("❄ FROZEN — one clean shot before it thaws");
+    else if (r.result === "vial_thrown") setArenaNote("💧 THE VIAL FLIES…");
+    else if (r.result === "vial") { setArenaNote("💧 IT REELS — ITS BACK IS TURNED"); if (arenaRehearsal) setRehearsalVials((v) => Math.max(0, v - 1)); else postArena("vial"); }
+    else if (r.result === "vial_frozen") setArenaNote("💧 it's already frozen — save the vial");
+    else if (r.result === "vial_gone") setArenaNote("💧 nothing to soak");
+    else if (r.result === "vial_inflight") setArenaNote("💧 one at a time");
+    else if (r.result === "cooldown") setArenaNote(`… ${(WEAPONS[r.weapon]?.label || "").toLowerCase()} reloading`);
+    else if (r.result === "locked") setArenaNote("✗ still shaken");
+  }, [postArena, arenaRehearsal]);
+  const onArenaBanish = useCallback(() => {
+    setTimeout(() => setHellFade(1), 600);
+    if (arenaRehearsal) {
+      setBountyToast({ dismissed: true, bountyAmount: 0, isYou: false });
+      if (bountyToastTimer.current) clearTimeout(bountyToastTimer.current);
+      bountyToastTimer.current = setTimeout(() => setBountyToast(null), 6000);
+      setTimeout(() => { setArenaOpen(false); setArenaRehearsal(false); setTimeout(() => setHellFade(0), 500); }, 1000);
+      return;
+    }
+    handleClaimBounty(true);
+    setTimeout(() => { closeArena(); setTimeout(() => setHellFade(0), 500); }, 1000);
+  }, [arenaRehearsal, handleClaimBounty, closeArena]);
+  // The demon was banished or claimed elsewhere while we were in: leave. The
+  // bounty toast says who.
+  useEffect(() => {
+    if (arenaOpen && !arenaRehearsal && !hellActive) { setHellFade(1); setTimeout(() => { closeArena(); setTimeout(() => setHellFade(0), 500); }, 350); }
+  }, [arenaOpen, arenaRehearsal, hellActive, closeArena]);
+
+  const runBreak = useCallback(() => {
+    breakTimersRef.current.forEach(clearTimeout); breakTimersRef.current = [];
+    const at = (ms, fn) => breakTimersRef.current.push(setTimeout(fn, ms));
+    // crack
+    shakeRef.current = 1.2;
+    playSfx("/audio/demon/roar.mp3", { volume: 0.5 });
+    // rise: the tile / field demon is climbing out over these beats
+    at(2400, () => setHellFade(1));
+    // cut
+    at(3200, () => openArena());
+    at(3600, () => setHellFade(0));
+  }, [openArena]);
+  useEffect(() => () => { breakTimersRef.current.forEach(clearTimeout); }, []);
+
+  // Summoner watcher: a NEW hell whose summoner is this player. Covers the real
+  // bounty and the local TEST HELL on your own (or test-selected) plot.
+  useEffect(() => {
+    const own = activeUserDrill?.col != null ? { col: activeUserDrill.col, row: activeUserDrill.row } : null;
+    const realSummoner = !!(demonBounty && ["active", "flying", "waiting"].includes(demonBounty.status) && user?.id && demonBounty.summonerId === user.id);
+    const localSummoner = !!(!demonBounty && hellActive && own && hellCol === own.col && hellRow === own.row);
+    if (!realSummoner && !localSummoner) { if (!hellActive) breakKeyRef.current = null; return; }
+    const key = demonBounty?.id || `local_${hellCol}_${hellRow}`;
+    if (breakKeyRef.current === key || arenaOpen) return;
+    breakKeyRef.current = key;
+    runBreak();
+  }, [demonBounty, hellActive, hellCol, hellRow, user?.id, activeUserDrill?.col, activeUserDrill?.row, arenaOpen, runBreak]);
+
+  // ?arena=break — rehearse the whole ride without a strike.
+  useEffect(() => {
+    if (!breakRehearsal) return;
+    const t = setTimeout(() => runBreak(), 2500);
+    return () => clearTimeout(t);
+  }, [breakRehearsal, runBreak]);
 
   // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
@@ -5170,7 +5519,7 @@ export default function OilPage() {
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               maxWidth: "65%", textAlign: "right", cursor: "pointer",
             }}
-            onClick={() => { setHelpFairness(true); setShowWelcome(true); }}
+            onClick={() => { setHelpFairness(true); openWelcome(); }}
           >
             {seedReadout.slice(0, 10)}...{seedReadout.slice(-8)}
           </span>
@@ -5960,6 +6309,21 @@ export default function OilPage() {
         0% { background-position: 0% center; }
         100% { background-position: 200% center; }
       }
+      /* First-visit nudge on the "?" — an expanding ring, so it draws the eye
+         without shifting layout or adding anything to dismiss. */
+      .help-nudge { animation: helpNudgePulse 2.4s ease-out infinite; }
+      @keyframes helpNudgePulse {
+        0%   { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.5); }
+        70%  { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+      }
+      /* Motion-sensitive users still get the cue, just a static ring. */
+      @media (prefers-reduced-motion: reduce) {
+        .help-nudge {
+          animation: none;
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.35);
+        }
+      }
     `}</style>
   );
 
@@ -6444,24 +6808,26 @@ export default function OilPage() {
             : "RECOVERING..."}
         </div>
       )}
-      {!isSummonerStunned && activeDemonBlockade?.summonerId === user?.id && (
-        <div style={{
-          fontSize: 10,
-          letterSpacing: "0.12em",
-          color: "#ffaa88",
-          marginTop: 4,
-        }}>
-          CATCH THE DEMON WHEN IT STOPS TO DISMISS IT — BOUNTY RETURNS TO COMMUNITY POOL
-        </div>
-      )}
-      {!isSummonerStunned && activeDemonBlockade?.summonerId !== user?.id && (
-        <div style={{
-          fontSize: 10,
-          letterSpacing: "0.12em",
-          color: "#ffaa88",
-          marginTop: 4,
-        }}>
-          ALL DRILLING HALTED — CATCH THE DEMON WHEN IT STOPS TO CLAIM THE BOUNTY
+      {/* The fight is the arena (2026-09-03). Hunters race for the bounty; the
+          summoner fights for an early release — win, and the blockade lifts
+          now instead of at the end of the stun, bounty back to the pool. */}
+      {!arenaOpen && (
+        <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={openArena}
+            style={{
+              padding: "7px 14px", fontSize: 11, letterSpacing: "0.18em", fontWeight: 700,
+              background: "linear-gradient(180deg, #ff5a2a, #c42a0a)", color: "#fff",
+              border: "1px solid #ffb090", borderRadius: 6, cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 0 14px rgba(255,80,40,0.6)",
+            }}
+          >
+            {activeDemonBlockade?.summonerId === user?.id ? "ENTER THE ARENA — FIGHT FOR RELEASE" : "ENTER THE ARENA — CLAIM THE BOUNTY"}
+          </button>
+          <span style={{ fontSize: 10, letterSpacing: "0.12em", color: "#ffaa88" }}>
+            {(() => { const n = Object.values(demonBounty?.hunters || {}).filter((h) => h && h.active !== false).length; return n > 0 ? `${n} HUNTER${n === 1 ? "" : "S"} IN THE ARENA` : "ALL DRILLING HALTED UNTIL IT IS BANISHED"; })()}
+          </span>
         </div>
       )}
     </div>
@@ -7444,12 +7810,14 @@ export default function OilPage() {
       )}
       {/* SUPPLIES — DAILY TICKET prizes that are held, not spent yet: tonics
           (the next strike drills two layers) and the stall coupon. */}
-      {((userDrill?.supplies?.tonic ?? 0) > 0 || couponValid(userDrill?.coupon)) && (
+      {((userDrill?.supplies?.tonic ?? 0) > 0 || (userDrill?.supplies?.holyWater ?? 0) > 0 || couponValid(userDrill?.coupon)) && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6, fontSize: 10, letterSpacing: "0.1em", flexWrap: "wrap" }}>
           <span style={{ color: theme.muted }}>SUPPLIES</span>
           <span style={{ color: theme.green, textAlign: "right" }}>
             {(userDrill?.supplies?.tonic ?? 0) > 0 && <span title="Your next strike drills two layers">🧪 TONIC ×{userDrill.supplies.tonic}</span>}
-            {(userDrill?.supplies?.tonic ?? 0) > 0 && couponValid(userDrill?.coupon) && "  ·  "}
+            {(userDrill?.supplies?.tonic ?? 0) > 0 && (userDrill?.supplies?.holyWater ?? 0) > 0 && "  ·  "}
+            {(userDrill?.supplies?.holyWater ?? 0) > 0 && <span title="Thrown in the arena: forces the demon's pause, back turned">💧 HOLY WATER ×{userDrill.supplies.holyWater}</span>}
+            {((userDrill?.supplies?.tonic ?? 0) > 0 || (userDrill?.supplies?.holyWater ?? 0) > 0) && couponValid(userDrill?.coupon) && "  ·  "}
             {couponValid(userDrill?.coupon) && <span title="Applied automatically at the Pimp My Pump checkout">🎟 COUPON {userDrill.coupon.pct}% OFF · {couponDaysLeft(userDrill.coupon)}d left</span>}
           </span>
         </div>
@@ -7752,7 +8120,8 @@ export default function OilPage() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
             </button>
             <button
-              onClick={() => setShowWelcome(true)}
+              onClick={openWelcome}
+              className={helpNudge ? "help-nudge" : undefined}
               title="How to play"
               style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -7761,6 +8130,10 @@ export default function OilPage() {
                 border: "1.5px solid rgba(212, 175, 55, 0.2)",
                 color: theme.accent, cursor: "pointer", padding: 0,
                 flexShrink: 0, fontSize: 18, fontWeight: "bold", fontFamily: "inherit",
+                // The pulse itself is the .help-nudge CLASS, not an inline
+                // animation: inline styles cannot carry the reduced-motion
+                // media query, and a stylesheet cannot override them without
+                // !important.
               }}
             >
               ?
@@ -7793,12 +8166,13 @@ export default function OilPage() {
         <div style={m.tabBar}>
           {[
             { key: "3d", label: "RIG" },
+            { key: "boardwalk", label: "BOARDWALK" },
             { key: "surface", label: "SURFACE" },
             { key: "xsec", label: "X-SECTION" },
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setMobileTab(tab.key)}
+              onClick={() => { if (tab.key === "boardwalk") warmBoardwalk("boardwalk-tab"); setMobileTab(tab.key); }}
               style={{
                 ...m.tab,
                 ...(mobileTab === tab.key ? m.tabActive : {}),
@@ -7818,12 +8192,18 @@ export default function OilPage() {
               crashed iOS Safari on memory. Now it's hidden (display:none) and
               its render loop paused (frameloop="never") off the 3D tab, so the
               context, geometry, and textures survive and returning is instant. */}
+          {/* Stepped into a stall: the same canvas, lifted to a fixed full-viewport
+              layer over the header, tabs and report — the visit is the whole screen
+              until STEP BACK. No remount, so the vendor keeps talking. */}
           {(
-            <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}), ...(mobileTab === "3d" ? null : { display: "none" }) }}>
+            <div id="oil-canvas" style={{ ...m.canvasWrap, ...(editorOpen ? { ...m.canvasCompact, height: editorSceneH, minHeight: editorSceneH, maxHeight: editorSceneH } : {}), ...(sceneTab ? null : { display: "none" }), ...(mobileTab === "boardwalk" && boardwalkOpen && !arenaOpen ? { position: "fixed", inset: 0, zIndex: 10003, height: "100dvh", minHeight: 0, maxHeight: "none", background: "#0b0709" } : {}) }}>
               <CleanCanvas
+                key={canvasEpoch}
+                onContextLost={handleContextLost}
+                onContextRestored={handleContextRestored}
                 camera={{ position: RIG_CAMERA.position, fov: 50 }}
                 dpr={quality.dpr}
-                frameloop={mobileTab === "3d" ? "always" : "never"}
+                frameloop={sceneTab ? "always" : "never"}
                 style={{ width: "100%", height: "100%" }}
                 gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
@@ -7843,7 +8223,25 @@ export default function OilPage() {
                     claimed. The demon stopgap: a bounty targeting THIS plot
                     rises on the tile, so it can still be tapped and claimed
                     here until the arena ships. */}
-                {(() => {
+                {arenaOpen ? (
+                  <DemonArena
+                    seed={arenaRehearsal ? "rehearsal" : (demonBounty?.id || `local_${hellCol}_${hellRow}`)}
+                    required={arenaRehearsal ? 3 : demonRequiredHits}
+                    locked={demonStunRemaining > 0}
+                    envPreset="hell"
+                    parabolum={parabolum}
+                    onState={setArenaState}
+                    onResult={onArenaResult}
+                    onBanish={onArenaBanish}
+                    onAttack={handleDemonAttack}
+                    onLockout={handleDemonMiss}
+                    weapon={arenaWeapon}
+                    onCooldown={setArenaCooldowns}
+                    onSteady={handleDemonSteady}
+                  />
+                ) : mobileTab === "boardwalk" ? (
+                  <VendorStage vendorId={boardwalkVendor} open={boardwalkOpen} onToggle={() => setBoardwalkOpen((o) => !o)} lowTier={!!quality.lowGfx} />
+                ) : (() => {
                   const own = activeUserDrill?.col != null ? { col: activeUserDrill.col, row: activeUserDrill.row } : null;
                   const ownKey = own ? `${own.col}_${own.row}` : null;
                   const ownSelected = own && selectedX === own.col && sliceY === own.row;
@@ -7870,6 +8268,7 @@ export default function OilPage() {
                       onTankDrain={own ? handleTankDrain : undefined}
                       envPreset={envPreset}
                       envMapPreset={envMapPreset}
+                      skyEnv={skyEnv}
                       parabolum={parabolum}
                       forceStrikeGusher={isAdmin || isReport || isTest}
                       gusherTrigger={own ? gusherTest : 0}
@@ -7885,6 +8284,7 @@ export default function OilPage() {
                         onBanish: handleClaimBounty,
                         onMiss: handleDemonMiss,
                         onAttack: handleDemonAttack,
+                        onSelect: openArena,
                       } : null}
                       cameraViewable={cameraViewable}
                     />
@@ -7896,9 +8296,36 @@ export default function OilPage() {
                     (measure FPS/draw calls/triangles on a real phone). */}
                 {showPerf && <Perf position="top-left" zIndex={10001} />}
               </CleanCanvas>
+              {arenaOpen && (
+                <ArenaHud
+                  bountyAmount={activeDemonBlockade?.bountyAmount || 0}
+                  phaseLabel={arenaRehearsal ? "REHEARSAL · 3 HITS" : (demonRequiredHits > 1 ? `HARD PHASE · ${demonRequiredHits} HITS` : "EASY PHASE · 1 HIT")}
+                  hits={arenaState.hits}
+                  required={arenaRehearsal ? 3 : demonRequiredHits}
+                  lockout={demonStunRemaining}
+                  hunters={arenaRehearsal ? null : demonBounty?.hunters}
+                  note={arenaNote}
+                  vulnerable={arenaState.vulnerable}
+                  backstabOpen={arenaState.backstabOpen}
+                  onExit={() => { if (arenaRehearsal) setArenaRehearsal(false); closeArena(); }}
+                  meId={user?.id}
+                  rehearsal={arenaRehearsal}
+                  frozen={!!arenaState.frozen}
+                  weapon={arenaWeapon}
+                  onWeapon={setArenaWeapon}
+                  cooldowns={arenaCooldowns}
+                  vials={arenaVials}
+                  onVial={throwVial}
+                />
+              )}
               {/* Showcase pager — no claim yet: page through the rig styles the
                   editor sells. Sits bottom-centre, clear of the tray at right. */}
-              {activeUserDrill?.col == null && mobileTab === "3d" && !editorOpen && (
+              {mobileTab === "boardwalk" && !arenaOpen && (
+                <BoardwalkStrip vendorId={boardwalkVendor} onSelect={(id) => { if (boardwalkOpen) stepBackVendor(); setBoardwalkVendor(id); setBoardwalkOpen(false); }} open={boardwalkOpen} onToggleOpen={toggleBoardwalk}>
+                  <VendorCart vendorId={boardwalkVendor} tank={userDrill?.tankOil ?? 0} owned={userDrill?.supplies} signedIn={!!user} onBuy={handleVendorBuy} compact />
+                </BoardwalkStrip>
+              )}
+              {activeUserDrill?.col == null && mobileTab === "3d" && !editorOpen && !arenaOpen && (
                 <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 10, ...TOOLBAR_PILL, gap: 4, padding: "2px 4px", cursor: "default" }}>
                   <button
                     type="button"
@@ -7957,7 +8384,8 @@ export default function OilPage() {
                   </div>
                 );
               })()}
-              {!editorOpen && (<>
+              {/* The rig tab's corner tray (camera, lights…) — not over the boardwalk stage. */}
+              {!editorOpen && mobileTab === "3d" && (<>
               <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, ...TOOLBAR_TRAY }}>
                 {/* No fireworks toggle on the phone: the rig scene is a small
                     frame and the launcher sat on top of the style pager. */}
@@ -8023,6 +8451,7 @@ export default function OilPage() {
           {mobileTab === "surface" && (
             <div style={m.section}>
               <OilSurfaceMap
+                blockade={hellActive && hellCol != null ? { col: hellCol, row: hellRow } : null}
                 claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
                 maxClaimTotal={communityMaxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
@@ -8206,6 +8635,9 @@ export default function OilPage() {
 
         {cssAnimations}
         {demonBanner}
+      {hellFade > 0 && (
+        <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 10002, pointerEvents: "none", background: "radial-gradient(ellipse at center, rgba(120,8,0,0.92) 0%, rgba(20,0,0,0.98) 100%)", opacity: hellFade, transition: "opacity 420ms ease" }} />
+      )}
         {bountyClaimedBanner}
         {claimToastBanner}
         {boothCamBanner}
@@ -8301,7 +8733,8 @@ export default function OilPage() {
             onPlayMusic={() => play()}
             onStopMusic={() => pause()}
             onSkipTrack={() => nextTrack()}
-            onHelpClick={() => setShowWelcome(true)}
+            onHelpClick={openWelcome}
+            helpNudge={helpNudge}
             accentColor={theme.accent}
             framedAvatar
             hideMenu
@@ -8340,6 +8773,9 @@ export default function OilPage() {
           borderRight: panelsCollapsed ? "none" : `1px solid ${theme.border}`,
         }}>
           <CleanCanvas
+            key={canvasEpoch}
+            onContextLost={handleContextLost}
+            onContextRestored={handleContextRestored}
             camera={{ position: [0, 8, 8], fov: 50 }}
             dpr={quality.dpr}
             style={{ width: "100%", height: "100%" }}
@@ -8355,6 +8791,23 @@ export default function OilPage() {
             {envPreset === "night" && <Suspense fallback={null}><ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} /></Suspense>}
             {fireworksOn && <Fireworks quality={2} shellSize={2} finale sound={fireworksSound} />}
             <EnvLights env={env} moodScale={moodScale} />
+            {arenaOpen ? (
+              <DemonArena
+                seed={arenaRehearsal ? "rehearsal" : (demonBounty?.id || `local_${hellCol}_${hellRow}`)}
+                required={arenaRehearsal ? 3 : demonRequiredHits}
+                locked={demonStunRemaining > 0}
+                envPreset="hell"
+                parabolum={parabolum}
+                onState={setArenaState}
+                onResult={onArenaResult}
+                onBanish={onArenaBanish}
+                onAttack={handleDemonAttack}
+                onLockout={handleDemonMiss}
+                weapon={arenaWeapon}
+                onCooldown={setArenaCooldowns}
+                onSteady={handleDemonSteady}
+              />
+            ) : (<>
             <group position={[0, 5, 0]}>
               <OilVoxelGrid
                 strataLivePlots={loopV2 ? allPlotsMap : null}
@@ -8390,6 +8843,7 @@ export default function OilPage() {
                 onRogueConsequence={handleRogueConsequence}
                 envPreset={envPreset}
                 envMapPreset={envMapPreset}
+                skyEnv={skyEnv}
                 parabolum={parabolum}
                 plotsWithMessages={plotsWithMessages}
                 hellActive={hellActive}
@@ -8403,6 +8857,8 @@ export default function OilPage() {
                 onClaimBounty={handleClaimBounty}
                 onDemonMiss={handleDemonMiss}
                 onDemonAttack={handleDemonAttack}
+                onDemonSelect={openArena}
+                onVendorClick={handleVendorClick}
                 cameraViewable={cameraViewable}
                 onFocusObject={handleFocusObject}
                 onBoothPhoto={handleBoothPhoto}
@@ -8444,10 +8900,38 @@ export default function OilPage() {
             ) : (
               <CameraFlyIn onComplete={handleIntroComplete} grid={gridSize} />
             )}
+            </>)}
             <CameraShake shakeRef={shakeRef} />
             {/* Perf HUD — add ?perf to the URL to show it on any device. */}
             {showPerf && <Perf position="top-left" style={{ zIndex: 10001 }} />}
           </CleanCanvas>
+          {focusedVendor === "tonics" && !arenaOpen && (
+            <div style={{ position: "fixed", left: 16, bottom: 16, zIndex: 1001 }}>
+              <VendorCart vendorId="tonics" tank={userDrill?.tankOil ?? 0} owned={userDrill?.supplies} signedIn={!!user} onBuy={handleVendorBuy} />
+            </div>
+          )}
+          {arenaOpen && (
+            <ArenaHud
+              bountyAmount={activeDemonBlockade?.bountyAmount || 0}
+              phaseLabel={arenaRehearsal ? "REHEARSAL · 3 HITS" : (demonRequiredHits > 1 ? `HARD PHASE · ${demonRequiredHits} HITS` : "EASY PHASE · 1 HIT")}
+              hits={arenaState.hits}
+              required={arenaRehearsal ? 3 : demonRequiredHits}
+              lockout={demonStunRemaining}
+              hunters={arenaRehearsal ? null : demonBounty?.hunters}
+              note={arenaNote}
+              vulnerable={arenaState.vulnerable}
+              backstabOpen={arenaState.backstabOpen}
+              onExit={() => { if (arenaRehearsal) setArenaRehearsal(false); closeArena(); }}
+              meId={user?.id}
+              rehearsal={arenaRehearsal}
+              frozen={!!arenaState.frozen}
+              weapon={arenaWeapon}
+              onWeapon={setArenaWeapon}
+              cooldowns={arenaCooldowns}
+              vials={arenaVials}
+              onVial={throwVial}
+            />
+          )}
           {/* Same z-index hook as the mobile canvas above. */}
           {showPerf && (
             <style>{`
@@ -8549,6 +9033,7 @@ export default function OilPage() {
           <div style={{ ...styles.midColumn, zoom: uiScale }}>
             <div id="survey-map" style={styles.midPanel}>
               <OilSurfaceMap
+                blockade={hellActive && hellCol != null ? { col: hellCol, row: hellRow } : null}
                 claimTotals={showOilData ? stats.claimTotals : communityClaimTotals}
                 maxClaimTotal={communityMaxClaimTotal}
                 selectedClaimIndex={selectedClaimIndex}
@@ -8679,6 +9164,9 @@ export default function OilPage() {
 
       {cssAnimations}
       {demonBanner}
+      {hellFade > 0 && (
+        <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 10002, pointerEvents: "none", background: "radial-gradient(ellipse at center, rgba(120,8,0,0.92) 0%, rgba(20,0,0,0.98) 100%)", opacity: hellFade, transition: "opacity 420ms ease" }} />
+      )}
       {bountyClaimedBanner}
       {claimToastBanner}
       {boothCamBanner}

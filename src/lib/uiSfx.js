@@ -35,7 +35,7 @@ function decode(url, ctx) {
   if (_buffers.has(url) || _pending.has(url) || _failed.has(url)) return;
   _pending.add(url);
   fetch(url)
-    .then((r) => r.arrayBuffer())
+    .then((r) => { if (!r.ok) throw new Error(`sfx ${r.status}`); return r.arrayBuffer(); })
     .then((ab) => ctx.decodeAudioData(ab))
     .then((buf) => {
       _buffers.set(url, buf);
@@ -68,12 +68,24 @@ function playViaElement(url, volume) {
   el.play().catch(() => {});
 }
 
+// True once a fetch/decode of `url` has failed (404, CORS, bad file). Lets a
+// caller with a stand-in sound (`fallback`) stay audible while the real file
+// is still to be authored — preload the slot on mount so the answer is known
+// before the first play.
+export function sfxMissing(url) {
+  return _failed.has(url);
+}
+
 // Fire a one-shot SFX. Prefers a decoded buffer (mixes, never steals the audio
 // session); only falls back to an HTMLAudioElement when Web Audio is
 // unavailable or the asset can't be decoded. `rate` repitches (0.72 turns a
 // roar into a death bellow); the element fallback plays at normal rate.
-export function playSfx(url, { volume = 1, rate = 1 } = {}) {
+// `fallback`: another url to play instead when `url` is known to be missing.
+export function playSfx(url, { volume = 1, rate = 1, fallback = null } = {}) {
   if (typeof window === "undefined" || !url) return;
+  if (fallback && fallback !== url && _failed.has(url)) { playSfx(fallback, { volume, rate }); return; }
+  // test/debug hook: what actually played (last 16 calls)
+  window.__hmSfxLast = url; (window.__hmSfxLog ||= []).push({ t: Math.round(performance.now()), url, volume: +volume.toFixed(2), rate: +rate.toFixed(3) }); if (window.__hmSfxLog.length > 16) window.__hmSfxLog.shift();
   const ctx = getCtx();
   if (!ctx) {
     playViaElement(url, volume);
@@ -127,6 +139,7 @@ export function startSfxLoop(url, { volume = 1, rate = 1, loopTrim = 0.06 } = {}
   };
   const ctx = getCtx();
   if (!ctx || !url) return handle;
+  if (typeof window !== "undefined") { (window.__hmSfxLog ||= []).push({ t: Math.round(performance.now()), url, volume: +volume.toFixed(2), rate: +rate.toFixed(3), loop: true }); if (window.__hmSfxLog.length > 16) window.__hmSfxLog.shift(); }
   if (ctx.state !== "running") ctx.resume().catch(() => {});
   const begin = (buf) => {
     if (handle._stopped) return;
